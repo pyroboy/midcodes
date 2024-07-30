@@ -68,12 +68,13 @@
     }
     
     function handleFileUpload(event: Event, variableName: string) {
-        const input = event.target as HTMLInputElement;
-        if (input.files && input.files.length > 0) {
-            fileUploads[variableName] = input.files[0];
-            renderIdCard();
-        }
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+        fileUploads[variableName] = input.files[0];
+        formData[variableName] = input.files[0].name; // Update formData with file name
+        renderIdCard();
     }
+}
     
     let isRendering = false;
 
@@ -311,41 +312,41 @@ async function renderIdCard(fullResolution = false) {
         <div class="form-container">
             <h1>Use Template</h1>
             {#if template}
-                <form on:submit|preventDefault={saveIdCard}>
-                    {#each template.template_elements as element (element.variableName)}
-                        <div class="form-group">
-                            <label for={element.variableName}>{element.variableName}</label>
-                            {#if element.type === 'text'}
-                                <input 
-                                    type="text"
-                                    id={element.variableName}
-                                    bind:value={formData[element.variableName]}
-                                    on:input={handleInputChange}
-                                >
-                            {:else if element.type === 'photo' || element.type === 'signature'}
-                                <input 
-                                    type="file"
-                                    id={element.variableName}
-                                    accept={element.type === 'photo' ? 'image/*' : 'image/png'}
-                                    on:change={(e) => handleFileUpload(e, element.variableName)}
-                                >
-                                {#if fileUploads[element.variableName]}
-                                    <div 
-                                        class="resize-handle" 
-                                        role="button"
-                                        tabindex="0"
-                                        
-                                        on:mousedown={(e) => startResize(e, element.variableName)}
-                                    >
-                                        Resize
-                                    </div>
-                           
-                                {/if}
-                            {/if}
-                        </div>
-                    {/each}
-                    <button type="submit">Generate and Save ID Card</button>
-                </form>
+            <form on:submit|preventDefault={saveIdCard}>
+                {#each template.template_elements as element (element.variableName)}
+                    <div class="form-group">
+                        <label for={element.variableName}>{element.variableName}</label>
+                        {#if element.type === 'text'}
+                        <input 
+                            type="text"
+                            id={element.variableName}
+                            bind:value={formData[element.variableName]}
+                            on:input={handleInputChange}
+                        >
+                    {:else if element.type === 'photo' || element.type === 'signature'}
+                        <input 
+                            type="file"
+                            id={element.variableName}
+                            accept={element.type === 'photo' ? 'image/*' : 'image/png'}
+                            on:change={(e) => handleFileUpload(e, element.variableName)}
+                        >
+                        {#if fileUploads[element.variableName]}
+                            <div 
+                                class="resize-handle" 
+                                role="button"
+                                tabindex="0"
+                                on:mousedown={(e) => startResize(e, element.variableName)}
+                            >
+                                Resize
+                            </div>
+                        {/if}
+                    {/if}
+                    
+                    
+                    </div>
+                {/each}
+                <button type="submit">Generate and Save ID Card</button>
+            </form>
             {/if}
             {#if errorMessage}
                 <p class="error">{errorMessage}</p>

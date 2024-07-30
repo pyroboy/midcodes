@@ -1,15 +1,21 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import { supabase } from '$lib/supabaseClient';
+    import JSZip from 'jszip';
     
     interface IdCard {
-        id: string;
-        template_id: string;
-        front_image: string;
-        back_image: string;
-        data: string;
-        created_at: string;
-    }
+     id: string;
+     template_id: string;
+     front_image: string;
+     back_image: string;
+     data: {
+       name?: string;
+       licenseNo?: string;
+       [key: string]: any;
+     };
+     created_at: string;
+   }
+
     
     let idCards: IdCard[] = [];
     let selectedCards: Set<string> = new Set();
@@ -36,26 +42,23 @@
     } else {
         console.log('Fetched data:', data);
         if (data && data.length > 0) {
-            idCards = await Promise.all(data.map(async (card: IdCard) => {
-                const parsedData = JSON.parse(card.data);
-                // Process the parsed data here
-                // For example, you can extract specific properties or perform calculations
-                const processedData = parsedData;
-                return {
-                    ...card,
-                    front_image: await getPublicUrl(card.front_image),
-                    back_image: await getPublicUrl(card.back_image),
-                    data: processedData
-                };
-            }));
-            console.log('Processed idCards:', idCards);
-        } else {
+       idCards = await Promise.all(data.map(async (card: any) => {
+         const parsedData = typeof card.data === 'string' ? JSON.parse(card.data) : card.data;
+         return {
+           ...card,
+           front_image: await getPublicUrl(card.front_image),
+           back_image: await getPublicUrl(card.back_image),
+           data: parsedData
+         };
+       }));
+     }else {
             console.log('No ID cards found');
             errorMessage = 'No ID cards found';
         }
     }
     isLoading = false;
 }
+
     async function getPublicUrl(path: string): Promise<string> {
         if (!path) return '';
         const { data } = await supabase.storage.from('rendered-id-cards').getPublicUrl(path);
