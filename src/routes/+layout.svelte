@@ -3,7 +3,8 @@
     import { supabase } from '$lib/supabaseClient';
     import { goto } from '$app/navigation';
     import type { User } from '@supabase/supabase-js';
-    
+    import { darkMode } from '../stores/darkMode';
+    import "../app.css";
     let user: User | null = null;
     let menuOpen = false;
     
@@ -47,11 +48,24 @@
         </ul>
     </nav>
     
-    <main>
+
+
+    
+    <main class:dark={$darkMode}>
         <slot></slot>
     </main>
     
     <style>
+
+:global(html) {
+        background-color: theme('colors.background');
+        color: theme('colors.foreground');
+    }
+    :global(.dark) {
+        color-scheme: dark;
+    }
+
+
     nav {
         background-color: #f0f0f0;
         padding: 10px;
