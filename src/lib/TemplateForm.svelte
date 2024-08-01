@@ -166,6 +166,7 @@ function updateStore() {
             if (context) {
                 context.font = `${element.size}px ${element.font}`;
                 const metrics = context.measureText(element.content || '');
+                console.log(metrics)
                 limitDragBounds(currentElementIndex, newX, newY, element.width, element.height, metrics);
             }
         }

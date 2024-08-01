@@ -13,7 +13,6 @@
    import { Switch } from "$lib/components/ui/switch";
    import { onDestroy } from 'svelte';
    import ThumbnailInput from '$lib/ThumbnailInput.svelte';
-import ErrorBoundary from '$lib/ErrorBoundary.svelte';
 import { browser } from '$app/environment';
    let frontCanvasComponent: IdCanvas;
    let backCanvasComponent: IdCanvas;
@@ -92,6 +91,15 @@ function createAndCacheFileUrl(file: File, variableName: string) {
    let MOUSE_MOVING = false;
    let fullResolution = false;
    
+   //on mouse drag
+   function handleMouseDown() {
+    MOUSE_MOVING = true;
+  }
+
+  function handleMouseUp() {
+    MOUSE_MOVING = false;
+  }
+
 //    onMount(async () => {
 //        const templateId = $page.params.id;
 //        await fetchTemplate(templateId);
@@ -270,7 +278,6 @@ function addDebugMessage(message: string) {
             <div class="p-4">
                 <h2 class="text-2xl font-bold mb-4">ID Card Preview</h2>
                 <div class="canvas-wrapper" class:landscape={template?.orientation === 'landscape'} class:portrait={template?.orientation === 'portrait'}>
-                    <ErrorBoundary>
                         <div class="front-canvas">
                             <h3 class="text-lg font-semibold mb-2">Front</h3>
                             {#if template}
@@ -282,15 +289,14 @@ function addDebugMessage(message: string) {
                                     {fileUploads}
                                     {imagePositions}
                                     {fullResolution}
+                                    isDragging={MOUSE_MOVING}
                                     on:rendered={() => console.log('Front canvas rendered')}
                                 />
                             {/if}
                         </div>
-                    </ErrorBoundary>
-                    <ErrorBoundary>
                         <div class="back-canvas">
                             <h3 class="text-lg font-semibold mb-2">Back</h3>
-                            {#if template && !MOUSE_MOVING}
+                            {#if template }
                                 <IdCanvas
                                     bind:this={backCanvasComponent}
                                     elements={template.template_elements.filter(el => el.side === 'back')}
@@ -299,11 +305,11 @@ function addDebugMessage(message: string) {
                                     {fileUploads}
                                     {imagePositions}
                                     {fullResolution}
+                                    isDragging={MOUSE_MOVING}
                                     on:rendered={() => console.log('Back canvas rendered')}
                                 />
                             {/if}
                         </div>
-                    </ErrorBoundary>
                 </div>
             </div>
         </Card>
@@ -326,7 +332,8 @@ function addDebugMessage(message: string) {
                {#if template}
                <form on:submit|preventDefault={saveIdCard} class="space-y-4">
                    {#each template.template_elements as element (element.variableName)}
-                       <div class="grid grid-cols-[auto,1fr] gap-4 items-center">
+                       <div class="grid grid-cols-[auto,1fr] gap-4 items-center"   on:mousedown={handleMouseDown} 
+                       on:mouseup={handleMouseUp}>
                            <Label for={element.variableName} class="text-base whitespace-nowrap">
                                {element.variableName}:
                            </Label>
@@ -348,6 +355,7 @@ function addDebugMessage(message: string) {
                            isSignature={element.type === 'signature'}
                            on:selectFile={() => handleSelectFile(element.variableName)}
                            on:update={(e) => handleImageUpdate(e, element.variableName)}
+                         
                        />
                            {/if}
                        </div>

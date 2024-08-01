@@ -10,23 +10,29 @@
     export let fileUploads: { [key: string]: File | null };
     export let imagePositions: { [key: string]: { x: number, y: number, width: number, height: number, scale: number } };
     export let fullResolution = false;
+    export let isDragging = false;
     
     const dispatch = createEventDispatcher();
     
-    let canvas: HTMLCanvasElement;
+    let displayCanvas: HTMLCanvasElement;
+    let bufferCanvas: HTMLCanvasElement;
     let offscreenCanvas: OffscreenCanvas;
+    let displayCtx: CanvasRenderingContext2D;
+    let bufferCtx: CanvasRenderingContext2D;
     let canvasInitialized = false;
     let isRendering = false;
     let renderRequested = false;
     
-    const DEBOUNCE_DELAY = 16; // Approximately 60 fps
+    const DEBOUNCE_DELAY = 20; // Approximately 60 fps
     const PREVIEW_SCALE = 0.5;
+    const ELEMENT_SCALE = 2;
     const FULL_WIDTH = 1013;
     const FULL_HEIGHT = 638;
-    const elementScale = 2;
+    const LOW_RES_SCALE = 0.4; // Scale for low-resolution images during drag
     
     // Cache for loaded images
     const imageCache = new Map<string, HTMLImageElement>();
+    const lowResImageCache = new Map<string, HTMLImageElement>();
     
     onMount(() => {
         if (browser) {
@@ -44,23 +50,32 @@
     
     function initializeCanvases() {
         console.log('Initializing canvases');
-        if (canvas) {
+        if (displayCanvas) {
+            displayCtx = displayCanvas.getContext('2d')!;
+            bufferCanvas = document.createElement('canvas');
+            bufferCtx = bufferCanvas.getContext('2d')!;
             offscreenCanvas = new OffscreenCanvas(FULL_WIDTH, FULL_HEIGHT);
             canvasInitialized = true;
             console.log('Canvases initialized');
             renderIdCard();
-            dispatch('mounted', { canvas, offscreenCanvas });
+            dispatch('mounted', { displayCanvas, bufferCanvas, offscreenCanvas });
         } else {
-            console.log('Canvas not yet available');
+            console.log('Display canvas not yet available');
         }
     }
     
-    async function loadAndCacheImage(url: string): Promise<HTMLImageElement> {
-        if (imageCache.has(url)) {
-            return imageCache.get(url)!;
+    async function loadAndCacheImage(url: string, lowRes: boolean = false): Promise<HTMLImageElement> {
+        const cache = lowRes ? lowResImageCache : imageCache;
+        if (cache.has(url)) {
+            return cache.get(url)!;
         }
         const img = await loadImage(url);
-        imageCache.set(url, img);
+        if (lowRes) {
+            const lowResImg = await createLowResImage(img);
+            cache.set(url, lowResImg);
+            return lowResImg;
+        }
+        cache.set(url, img);
         return img;
     }
     
@@ -74,6 +89,41 @@
         });
     }
     
+    async function createLowResImage(img: HTMLImageElement): Promise<HTMLImageElement> {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d')!;
+
+    // Calculate new dimensions
+    let newWidth = img.width * LOW_RES_SCALE;
+    let newHeight = img.height * LOW_RES_SCALE;
+let pxLimit = 400
+
+    // Adjust dimensions if they exceed 300 pixels
+    if (newWidth > pxLimit || newHeight > pxLimit) {
+        const aspectRatio = img.width / img.height;
+        if (newWidth > newHeight) {
+            newWidth = pxLimit;
+            newHeight = newWidth / aspectRatio;
+        } else {
+            newHeight = pxLimit;
+            newWidth = newHeight * aspectRatio;
+        }
+    }
+
+    canvas.width = newWidth;
+    canvas.height = newHeight;
+
+    // Apply blur effect
+    ctx.drawImage(img, 0, 0, newWidth, newHeight);
+
+    return new Promise((resolve) => {
+        canvas.toBlob((blob) => {
+            const lowResImg = new Image();
+            lowResImg.onload = () => resolve(lowResImg);
+            lowResImg.src = URL.createObjectURL(blob!);
+        }, 'image/jpeg', 0.5); // Adjust quality as needed
+    });
+}
     const debouncedRender = debounce(() => {
         if (!renderRequested) {
             renderRequested = true;
@@ -82,8 +132,8 @@
     }, DEBOUNCE_DELAY);
     
     async function renderIdCard() {
-        console.log("Rendering ID card");
-        if (!canvas || isRendering) {
+        console.log("Rendering ID card, isDragging:", isDragging);
+        if (!displayCanvas || !bufferCanvas || isRendering) {
             return;
         }
     
@@ -94,38 +144,18 @@
         const width = FULL_WIDTH * scale;
         const height = FULL_HEIGHT * scale;
     
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-            console.error('Could not get 2D context from canvas');
-            isRendering = false;
-            return;
-        }
+        bufferCanvas.width = width;
+        bufferCanvas.height = height;
     
-        canvas.width = width;
-        canvas.height = height;
+        await renderCanvas(bufferCtx, scale, false);
     
-        // Render background
-        const backgroundImage = await loadAndCacheImage(backgroundUrl);
-        ctx.drawImage(backgroundImage, 0, 0, width, height);
-    
-        ctx.save();
-        ctx.scale(scale * elementScale, scale * elementScale);
-    
-        // Render static elements first
-        elements.filter(el => el.type === 'text').forEach(element => {
-            renderTextElement(ctx, element, scale * elementScale);
-        });
-    
-        // Render dynamic elements (photos and signatures)
-        for (const element of elements.filter(el => el.type === 'photo' || el.type === 'signature')) {
-            await renderImageElement(ctx, element, scale * elementScale);
-        }
-    
-        ctx.restore();
+        // Swap buffer with display canvas
+        displayCanvas.width = width;
+        displayCanvas.height = height;
+        displayCtx.drawImage(bufferCanvas, 0, 0);
     
         isRendering = false;
     
-        // Request next frame if needed
         if (renderRequested) {
             requestAnimationFrame(renderIdCard);
         }
@@ -133,135 +163,166 @@
         dispatch('rendered');
     }
     
-    function renderTextElement(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, element: TemplateElement, scale: number) {
-
-
-    ctx.font = `${(element.size || 12) * scale}px ${element.font || 'Arial'}`;
-    ctx.fillStyle = element.color || 'black';
-    ctx.textAlign = element.alignment as CanvasTextAlign;
-
-    const text = formData[element.variableName] || '';
-
-    if (element.type !== 'text') return;
-    console.log(`Rendering text for ${element.variableName}: "${text}"`);
-
+    async function renderCanvas(ctx: CanvasRenderingContext2D, scale: number, isOffScreen: boolean) {
+        // Render background
+        const backgroundImage = await loadAndCacheImage(backgroundUrl);
+        ctx.drawImage(backgroundImage, 0, 0, ctx.canvas.width, ctx.canvas.height);
     
-    const x = element.alignment === 'center' ? ((element.width || 0) / 2) :
-              element.alignment === 'right' ? (element.x || 0) + (element.width || 0) :
-              (element.x || 0);
-    const y = (element.y || 0) + (ctx.measureText(text).actualBoundingBoxAscent || 0);
-
-    ctx.fillText(text, x * scale, y * scale);
-}
-
+        // Render elements
+        for (const element of elements) {
+            if (element.type === 'text') {
+                renderTextElement(ctx, element, scale);
+            } else if (element.type === 'photo' || element.type === 'signature') {
+                await renderImageElement(ctx, element, scale, isOffScreen);
+            }
+        }
+    }
     
-async function renderImageElement(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, element: TemplateElement, scale: number) {
- 
- if (element.type !== 'photo' && element.type !== 'signature') return;
+    function measureTextHeight(ctx: CanvasRenderingContext2D, fontFamily?: string, fontSize?: number): number {
+        const previousFont = ctx.font;
+        ctx.font = `${fontSize}px ${fontFamily}`;
+        const metrics = ctx.measureText('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ');
+        ctx.font = previousFont;
+        return metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
+    }
+    
+    function renderTextElement(ctx: CanvasRenderingContext2D, element: TemplateElement, scale: number) {
+        if (element.type !== 'text') return;
+     
+        const nScale = scale * ELEMENT_SCALE;
+        const fontSize = (element.size || 12) * nScale;
+        ctx.font = `${fontSize}px ${element.font || 'Arial'}`;
+        ctx.fillStyle = element.color || 'black';
+        ctx.textAlign = element.alignment as CanvasTextAlign;
+        ctx.textBaseline = 'top';
+    
+        const text = formData[element.variableName] || '';
+        const elementWidth = (element.width || 0) * nScale;
+        const elementHeight = (element.height || 0) * nScale;
+        const elementX = (element.x || 0) * nScale;
+        const elementY = (element.y || 0) * nScale;
+    
+        let x: number;
+        if (element.alignment === 'center') {
+            x = elementX + elementWidth / 2;
+        } else if (element.alignment === 'right') {
+            x = elementX + elementWidth;
+        } else {
+            x = elementX;
+        }
+    
+        const textHeight = element.font ? measureTextHeight(ctx, element.font, element.size) : 0;
+        const y = elementY + (textHeight/2.3) * nScale;
+    
+        ctx.fillText(text, x, y);
+    }
+    
+    async function renderImageElement(ctx: CanvasRenderingContext2D, element: TemplateElement, scale: number, isOffScreen: boolean) {
+        if (element.type !== 'photo' && element.type !== 'signature') return;
+    
+        const nScale = scale * ELEMENT_SCALE;
+        const file = fileUploads[element.variableName];
+        const pos = imagePositions[element.variableName];
+    
+        const elementX = (element.x || 0) * nScale;
+        const elementY = (element.y || 0) * nScale;
+        const elementWidth = (element.width || 100) * nScale;
+        const elementHeight = (element.height || 100) * nScale;
+    
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(elementX, elementY, elementWidth, elementHeight);
+        ctx.clip();
+    
+        if (file) {
+            try {
+                const image = await loadAndCacheImage(URL.createObjectURL(file), isDragging && !isOffScreen && !(element.type === 'signature'));
+                const imgAspectRatio = image.width / image.height;
+                const elementAspectRatio = elementWidth / elementHeight;
+                
+                let drawWidth = elementWidth * (pos.scale || 1);
+                let drawHeight = elementHeight * (pos.scale || 1);
+    
+                if (imgAspectRatio > elementAspectRatio) {
+                    drawHeight = drawWidth / imgAspectRatio;
+                } else {
+                    drawWidth = drawHeight * imgAspectRatio;
+                }
+    
+                const x = elementX + (elementWidth - drawWidth) / 2 + (pos.x || 0) * nScale;
+                const y = elementY + (elementHeight - drawHeight) / 2 + (pos.y || 0) * nScale;
+    
+                if (element.type === 'signature') {
+                    ctx.globalCompositeOperation = 'multiply';
+                }
+    
+                ctx.drawImage(image, x, y, drawWidth, drawHeight);
+                ctx.globalCompositeOperation = 'source-over';
 
- const file = fileUploads[element.variableName];
- const pos = imagePositions[element.variableName];
-
- ctx.save();
- ctx.beginPath();
- ctx.rect((element.x || 0) * scale, (element.y || 0) * scale, (element.width || 100) * scale, (element.height || 100) * scale);
- ctx.clip();
-
- if (file) {
-     try {
-         const image = await loadAndCacheImage(URL.createObjectURL(file));
-         const imgAspectRatio = image.width / image.height;
-         const elementAspectRatio = (element.width || 100) / (element.height || 100);
-         
-         let drawWidth = (element.width || 100) * pos.scale * scale;
-         let drawHeight = (element.height || 100) * pos.scale * scale;
-
-         if (imgAspectRatio > elementAspectRatio) {
-             drawHeight = drawWidth / imgAspectRatio;
-         } else {
-             drawWidth = drawHeight * imgAspectRatio;
-         }
-
-         const x = ((element.x || 0) + ((element.width || 100) - drawWidth) / 2 + pos.x) * scale;
-         const y = ((element.y || 0) + ((element.height || 100) - drawHeight) / 2 + pos.y) * scale;
-
-         // Apply multiply blending mode for signatures
-         if (element.type === 'signature') {
-             ctx.globalCompositeOperation = 'multiply';
-         }
-
-         ctx.drawImage(image, x, y, drawWidth, drawHeight);
-
-         // Reset the blending mode
-         ctx.globalCompositeOperation = 'source-over';
-     } catch (error) {
-         console.error(`Error loading image for ${element.variableName}:`, error);
-     }
- } else {
-     // Render placeholder
-     ctx.fillStyle = '#f0f0f0';
-     ctx.fillRect((element.x || 0) * scale, (element.y || 0) * scale, (element.width || 100) * scale, (element.height || 100) * scale);
-     ctx.strokeStyle = '#999';
-     ctx.strokeRect((element.x || 0) * scale, (element.y || 0) * scale, (element.width || 100) * scale, (element.height || 100) * scale);
-     ctx.fillStyle = '#999';
-     ctx.font = `${12 * scale}px Arial`;
-     ctx.textAlign = 'center';
-     ctx.textBaseline = 'middle';
-     ctx.fillText(
-         element.type,
-         ((element.x || 0) + (element.width || 100) / 2) * scale,
-         ((element.y || 0) + (element.height || 100) / 2) * scale
-     );
- }
-
- ctx.restore();
-}
+       
+            } catch (error) {
+                console.error(`Error loading image for ${element.variableName}:`, error);
+                if (!isOffScreen) {
+                    renderPlaceholder(ctx, elementX, elementY, elementWidth, elementHeight, "Error Photo", nScale);
+                }
+            }
+        } else if (!isOffScreen) {
+            renderPlaceholder(ctx, elementX, elementY, elementWidth, elementHeight, element.type, nScale);
+        }
+    
+        ctx.restore();
+    }
+    
+    function renderPlaceholder(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, type: string, scale: number) {
+        ctx.fillStyle = '#f0f0f0';
+        ctx.fillRect(x, y, width, height);
+        ctx.strokeStyle = '#999';
+        ctx.strokeRect(x, y, width, height);
+        ctx.fillStyle = '#999';
+        ctx.font = `${12 * scale}px Arial`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(type, x + width / 2, y + height / 2);
+    }
     
     export async function renderFullResolution(): Promise<Blob | null> {
-    console.log('renderFullResolution called');
-    if (!offscreenCanvas) {
-        console.error('Offscreen canvas not initialized in renderFullResolution');
-        return null;
-    }
-
-    const ctx = offscreenCanvas.getContext('2d');
-    if (!ctx) {
-        console.error('Could not get 2D context from offscreen canvas');
-        return null;
-    }
-
-    // Clear the canvas
-    ctx.clearRect(0, 0, FULL_WIDTH, FULL_HEIGHT);
-
-    // Render background
-    const backgroundImage = await loadImage(backgroundUrl);
-    ctx.drawImage(backgroundImage, 0, 0, FULL_WIDTH, FULL_HEIGHT);
-
-    // Render elements
-    for (const element of elements) {
-        if (element.type === 'text') {
-            renderTextElement(ctx, element, 1 * elementScale);  // Use scale 1 for full resolution
-        } else if (element.type === 'photo' || element.type === 'signature') {
-            await renderImageElement(ctx, element, 1 * elementScale);;  // Use scale 1 for full resolution
+        console.log('renderFullResolution called');
+        if (!offscreenCanvas) {
+            console.error('Offscreen canvas not initialized in renderFullResolution');
+            return null;
         }
+    
+        const offscreenCtx = offscreenCanvas.getContext('2d');
+        if (!offscreenCtx) {
+            console.error('Could not get 2D context from offscreen canvas');
+            return null;
+        }
+    
+        offscreenCanvas.width = FULL_WIDTH;
+        offscreenCanvas.height = FULL_HEIGHT;
+    
+        // Clear the canvas
+        offscreenCtx.clearRect(0, 0, FULL_WIDTH, FULL_HEIGHT);
+    
+        // Render at full resolution
+        await renderCanvas(offscreenCtx as unknown as CanvasRenderingContext2D, 1, true);
+    
+        console.log('Full resolution rendering complete');
+        
+        // Convert OffscreenCanvas to Blob
+        return await offscreenCanvas.convertToBlob({ type: 'image/png' });
     }
-
-    console.log('Full resolution rendering complete');
     
-    // Convert OffscreenCanvas to Blob
-    return await offscreenCanvas.convertToBlob({ type: 'image/png' });
-}
-
-    
-    $: if (elements || formData || fileUploads || imagePositions || fullResolution) {
+    $: if (elements || formData || fileUploads || imagePositions || fullResolution || isDragging) {
+        console.log("State changed, isDragging:", isDragging);
         debouncedRender();
     }
-    </script>
-    
-    <canvas bind:this={canvas}></canvas>
-    
-    <style>
-        canvas {
-            border: 1px solid #ccc;
-        }
-    </style>
+</script>
+
+<canvas bind:this={displayCanvas}></canvas>
+
+<style>
+    canvas {
+        border: 1px solid #ccc;
+    }
+</style>
