@@ -1,6 +1,6 @@
 <script lang="ts">
     import { Loader } from 'lucide-svelte';
-   import { onMount } from 'svelte';
+   import { onMount ,createEventDispatcher} from 'svelte';
    import { page } from '$app/stores';
    import { supabase } from '$lib/supabaseClient';
    import type { TemplateData, TemplateElement } from '../../../stores/templateStore';
@@ -13,20 +13,41 @@
    import { Switch } from "$lib/components/ui/switch";
    import { onDestroy } from 'svelte';
    import ThumbnailInput from '$lib/ThumbnailInput.svelte';
-
+import ErrorBoundary from '$lib/ErrorBoundary.svelte';
+import { browser } from '$app/environment';
    let frontCanvasComponent: IdCanvas;
    let backCanvasComponent: IdCanvas;
    let isSaving = false;
    let debugMessages: string[] = [];
 
+   const dispatch = createEventDispatcher();
 
-   function handleResize(event: CustomEvent, variableName: string) {
-       const { scale } = event.detail;
-       imagePositions[variableName] = {
-           ...imagePositions[variableName],
-           scale
-       };
-   }
+   onMount(async () => {
+    if (browser) {
+        const templateId = $page.params.id;
+        await fetchTemplate(templateId);
+        
+        // Wait for both canvases to be mounted
+        await Promise.all([
+            new Promise(resolve => frontCanvasComponent.$on('mounted', resolve)),
+            new Promise(resolve => backCanvasComponent.$on('mounted', resolve))
+        ]);
+
+        console.log('Front canvas:', frontCanvasComponent?.canvas);
+        console.log('Front hidden canvas:', frontCanvasComponent?.hiddenCanvas);
+        console.log('Back canvas:', backCanvasComponent?.canvas);
+        console.log('Back hidden canvas:', backCanvasComponent?.hiddenCanvas);
+
+        // Only call saveIdCard if canvases are properly initialized
+        if (frontCanvasComponent?.canvas && frontCanvasComponent?.hiddenCanvas &&
+            backCanvasComponent?.canvas && backCanvasComponent?.hiddenCanvas) {
+            saveIdCard();
+        } else {
+            console.error('Canvas components not properly initialized');
+        }
+    }
+});
+
 
 function handleImageUpdate(event: CustomEvent, variableName: string) {
        const { scale, x, y } = event.detail;
@@ -127,7 +148,6 @@ onMount(async () => {
            });
        }
    }
-
    
    function handleFileUpload(event: Event, variableName: string) {
    const input = event.target as HTMLInputElement;
@@ -139,132 +159,155 @@ onMount(async () => {
    }
 }
    
+async function saveIdCard() {
+    if (!template) {
+        console.error("Template not loaded");
+        addDebugMessage("Error: Template not loaded");
+        errorMessage = "Template not loaded";
+        return;
+    }
 
-    async function saveIdCard() {
-       if (!template) {
-           errorMessage = "Template not loaded";
-           console.error("Template not loaded");
-           return;
-       }
+    isSaving = true;
+    debugMessages = [];
+    addDebugMessage("Starting saveIdCard function");
 
-       isSaving = true;
-       debugMessages = [];
-       addDebugMessage("Starting saveIdCard function");
+    try {
+        // Check if canvas components are initialized
+        if (!frontCanvasComponent || !backCanvasComponent) {
+            throw new Error('Canvas components are not initialized');
+        }
 
-       try {
-           addDebugMessage("Rendering full resolution canvases");
-           frontCanvasComponent.renderFullResolution();
-           backCanvasComponent.renderFullResolution();
+        addDebugMessage("Rendering full resolution canvases");
+        console.log('Front component:', frontCanvasComponent);
+        console.log('Back component:', backCanvasComponent);
 
-           await Promise.all([
-               new Promise(resolve => frontCanvasComponent.$on('fullResolutionRendered', resolve)),
-               new Promise(resolve => backCanvasComponent.$on('fullResolutionRendered', resolve))
-           ]);
+        // Render full resolution canvases and get blobs
+        const [frontBlob, backBlob] = await Promise.all([
+            frontCanvasComponent.renderFullResolution(),
+            backCanvasComponent.renderFullResolution()
+        ]);
 
-           addDebugMessage("Full resolution canvases rendered");
+        addDebugMessage("Full resolution canvases rendered");
 
-           if (!frontCanvasComponent.hiddenCanvas || !backCanvasComponent.hiddenCanvas) {
-            addDebugMessage('Canvas components not initialized')}
+        if (!frontBlob || !backBlob) {
+            throw new Error('Failed to create blobs from canvases');
+        }
 
+        addDebugMessage("Blobs created successfully");
 
-           const frontCanvas = frontCanvasComponent.hiddenCanvas;
-           const backCanvas = backCanvasComponent.hiddenCanvas;
+        // Generate unique filenames
+        const timestamp = Date.now();
+        const frontFilename =  `front_${template.id}_${timestamp}.png`;
+        const backFilename = `back_${template.id}_${timestamp}.png`;
 
-           addDebugMessage("Creating blobs from canvases");
-           const frontBlob = await new Promise<Blob | null>(resolve => frontCanvas.toBlob(resolve, 'image/png'));
-           const backBlob = await new Promise<Blob | null>(resolve => backCanvas.toBlob(resolve, 'image/png'));
+        // Upload images to storage
+        addDebugMessage("Uploading images to storage");
+        const frontUpload = await uploadToStorage('rendered-id-cards', frontFilename, frontBlob);
+        const backUpload = await uploadToStorage('rendered-id-cards', backFilename, backBlob);
 
-           if (!frontBlob || !backBlob) throw new Error('Failed to create blobs from canvases');
+        addDebugMessage("Images uploaded successfully");
 
-           addDebugMessage("Blobs created successfully");
+        // Prepare data for saving
+        const savedData = {
+           ... formData,
+            imagePositions,
+            fileUploads: Object.fromEntries(
+                Object.entries(fileUploads).map(([key, file]) => [key, file ? file.name : null])
+            )
+        };
 
-           const timestamp = Date.now();
-           addDebugMessage("Uploading images to storage");
-           const frontUpload = await uploadToStorage('rendered-id-cards', `${template.id}/front_${timestamp}.png`, frontBlob);
-           const backUpload = await uploadToStorage('rendered-id-cards', `${template.id}/back_${timestamp}.png`, backBlob);
+        console.log("Data to be saved:", JSON.stringify(savedData, null, 2));
+        addDebugMessage(`Form Data: ${JSON.stringify(formData)}`);
+        addDebugMessage(`Image Positions: ${JSON.stringify(imagePositions)}`);
+        addDebugMessage(`File Uploads: ${JSON.stringify(savedData.fileUploads)}`);
 
-           addDebugMessage("Images uploaded to storage");
+        // Save record to database
+        const { data, error } = await supabase
+            .from('idcards')
+            .insert({
+                template_id: template.id,
+                front_image: frontUpload,
+                back_image: backUpload,
+                data: JSON.stringify(savedData),
+    
+            });
 
-           const { data, error } = await supabase
-               .from('idcards')
-               .insert({
-                   template_id: template.id,
-                   front_image: frontUpload,
-                   back_image: backUpload,
-                   data: JSON.stringify({ ...formData, ...fileUploads, imagePositions })
-               });
+        if (error) throw error;
 
-           if (error) throw error;
+        console.log("Database insert response:", data);
+        addDebugMessage('ID card saved successfully');
+        alert('ID card saved successfully!');
+    } catch (error) {
+        console.error('Error saving ID card:', error);
+        errorMessage = `Failed to save ID card: ${error instanceof Error ? error.message : JSON.stringify(error)}`;
+        addDebugMessage(errorMessage);
+    } finally {
+        isSaving = false;
+    }
+}
+function addDebugMessage(message: string) {
+    console.log(message); // Also log to console for easier debugging
+    debugMessages = [...debugMessages, message];
+}
 
-           addDebugMessage('ID card saved successfully');
-           alert('ID card saved successfully!');
-       } catch (error) {
-           console.error('Error saving ID card:', error);
-           errorMessage = `Failed to save ID card: ${error instanceof Error ? error.message : JSON.stringify(error)}`;
-           addDebugMessage(errorMessage);
-           // alert(errorMessage);
-       } finally {
-           isSaving = false;
-       }
-   }
+   async function uploadToStorage(bucket: string, filename: string, file: Blob): Promise<string> {
+    const { data, error } = await supabase.storage
+        .from(bucket)
+        .upload(filename, file, {
+            cacheControl: '3600',
+            upsert: true
+        });
 
-   function addDebugMessage(message: string) {
-       debugMessages = [...debugMessages, message];
-   }
+    if (error) throw error;
+    return data.path;
+}
 
-   async function uploadToStorage(bucket: string, path: string, file: Blob): Promise<string> {
-       const { data, error } = await supabase.storage
-           .from(bucket)
-           .upload(path, file, {
-               cacheControl: '3600',
-               upsert: true
-           });
-   
-       if (error) throw error;
-       return data.path;
-   }
 </script>
 
 <div class="container mx-auto p-4 flex flex-col md:flex-row gap-4">
-   <div class="w-full md:w-1/2">
-       <Card class="h-full">
-           <div class="p-4">
-               <h2 class="text-2xl font-bold mb-4">ID Card Preview</h2>
-               <div class="canvas-wrapper" class:landscape={template?.orientation === 'landscape'} class:portrait={template?.orientation === 'portrait'}>
-                   <div class="front-canvas">
-                       <h3 class="text-lg font-semibold mb-2">Front</h3>
-                       {#if template}
-                           <IdCanvas
-                               bind:this={frontCanvasComponent}
-                               elements={template.template_elements.filter(el => el.side === 'front')}
-                               backgroundUrl={template.front_background}
-                               {formData}
-                               {fileUploads}
-                               {imagePositions}
-                               {fullResolution}
-                               on:rendered={() => console.log('Front canvas rendered')}
-                           />
-                       {/if}
-                   </div>
-                   <div class="back-canvas">
-                       <h3 class="text-lg font-semibold mb-2">Back</h3>
-                       {#if template && !MOUSE_MOVING}
-                           <IdCanvas
-                               bind:this={backCanvasComponent}
-                               elements={template.template_elements.filter(el => el.side === 'back')}
-                               backgroundUrl={template.back_background}
-                               {formData}
-                               {fileUploads}
-                               {imagePositions}
-                               {fullResolution}
-                               on:rendered={() => console.log('Back canvas rendered')}
-                           />
-                       {/if}
-                   </div>
-               </div>
-           </div>
-       </Card>
-   </div>
+    <div class="w-full md:w-1/2">
+        <Card class="h-full">
+            <div class="p-4">
+                <h2 class="text-2xl font-bold mb-4">ID Card Preview</h2>
+                <div class="canvas-wrapper" class:landscape={template?.orientation === 'landscape'} class:portrait={template?.orientation === 'portrait'}>
+                    <ErrorBoundary>
+                        <div class="front-canvas">
+                            <h3 class="text-lg font-semibold mb-2">Front</h3>
+                            {#if template}
+                                <IdCanvas
+                                    bind:this={frontCanvasComponent}
+                                    elements={template.template_elements.filter(el => el.side === 'front')}
+                                    backgroundUrl={template.front_background}
+                                    {formData}
+                                    {fileUploads}
+                                    {imagePositions}
+                                    {fullResolution}
+                                    on:rendered={() => console.log('Front canvas rendered')}
+                                />
+                            {/if}
+                        </div>
+                    </ErrorBoundary>
+                    <ErrorBoundary>
+                        <div class="back-canvas">
+                            <h3 class="text-lg font-semibold mb-2">Back</h3>
+                            {#if template && !MOUSE_MOVING}
+                                <IdCanvas
+                                    bind:this={backCanvasComponent}
+                                    elements={template.template_elements.filter(el => el.side === 'back')}
+                                    backgroundUrl={template.back_background}
+                                    {formData}
+                                    {fileUploads}
+                                    {imagePositions}
+                                    {fullResolution}
+                                    on:rendered={() => console.log('Back canvas rendered')}
+                                />
+                            {/if}
+                        </div>
+                    </ErrorBoundary>
+                </div>
+            </div>
+        </Card>
+    </div>
    <div class="w-full md:w-1/2">
        <Card class="h-full">
            <div class="p-6">
