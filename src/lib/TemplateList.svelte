@@ -58,6 +58,41 @@
         }
     }
 
+    async function duplicateTemplate(template: Template) {
+    const { data, error } = await supabase
+        .from('templates')
+        .select('*')
+        .eq('id', template.id)
+        .single();
+
+    if (error) {
+        console.error('Error fetching template details:', error);
+        showNotification('Error duplicating template READ');
+        return;
+    }
+    const { id, ...templateData } = data;
+    const newTemplate = {
+        ...templateData,
+
+        name: `Copy of ${data.name}`,
+        created_at: new Date().toISOString()
+    };
+
+    const { data: insertedTemplate, error: insertError } = await supabase
+        .from('templates')
+        .insert([newTemplate])
+        .select()
+        .single();
+
+    if (insertError) {
+        console.error('Error inserting duplicated template:', insertError);
+        showNotification('Error duplicating template COPY');
+    } else {
+        templates = [insertedTemplate, ...templates];
+        showNotification('Template duplicated successfully');
+    }
+}
+
     function useTemplate(id: string) {
         window.location.href = `/use-template/${id}`;
     }
@@ -82,6 +117,7 @@
             </div>
             <div class="template-actions">
                 <button on:click={() => useTemplate(template.id)}>Use</button>
+                <button on:click={() => duplicateTemplate(template)}>Duplicate</button>
                 <button on:click={() => deleteTemplate(template.id)}>Delete</button>
             </div>
         </div>

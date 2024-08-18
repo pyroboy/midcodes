@@ -24,6 +24,14 @@ export interface TemplateElement {
   size?: number;
   color?: string;
   alignment?: string;
+  fontWeight?: string;
+  fontStyle?: 'normal' | 'italic' | 'oblique';
+  textDecoration?: 'none' | 'underline' | 'overline' | 'line-through';
+  letterSpacing?: number;
+  lineHeight?: number | string;
+  textTransform?: 'none' | 'capitalize' | 'uppercase' | 'lowercase';
+  opacity?: number; // Stored as a decimal (0-1)
+  visible?: boolean;
 }
 
 // Initialize the template data store with a default value

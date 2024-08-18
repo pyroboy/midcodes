@@ -15,7 +15,7 @@
     let backPreview: string | null = null;
     let orientation: 'landscape' | 'portrait' = 'landscape';
     let errorMessage = '';
-    
+
     let frontElements: TemplateElement[] = [];
     let backElements: TemplateElement[] = [];
 
@@ -27,25 +27,77 @@
         }
     });
 
+    async function validateBackgrounds(): Promise<boolean> {
+        if ((!frontBackground && !frontPreview) || (!backBackground && !backPreview)) {
+            errorMessage = 'Both front and back backgrounds are required. Please ensure both are present.';
+            return false;
+        }
+
+        if (frontBackground) {
+            const frontValid = await validateImage(frontBackground, 'front');
+            if (!frontValid) return false;
+        }
+
+        if (backBackground) {
+            const backValid = await validateImage(backBackground, 'back');
+            if (!backValid) return false;
+        }
+
+        return true;
+    }
+
+    async function validateImage(file: File, side: string): Promise<boolean> {
+        try {
+            const url = URL.createObjectURL(file);
+            const img = new Image();
+            await new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = reject;
+                img.src = url;
+            });
+
+            if (img.width !== 1013 || img.height !== 638) {
+                errorMessage = `${side.charAt(0).toUpperCase() + side.slice(1)} background must be exactly 1013x638 pixels.`;
+                return false;
+            }
+
+            return true;
+        } catch {
+            errorMessage = `Error validating ${side} background image. Please try again.`;
+            return false;
+        }
+    }
+
     async function saveTemplate() {
         console.log('front elements count:', frontElements.length);
         console.log('back elements count:', backElements.length);
 
-        if (!user || !frontBackground || !backBackground) {
-            errorMessage = 'Please upload both front and back backgrounds.';
+        if (!user) {
+            errorMessage = 'User is not authenticated.';
+            return;
+        }
+
+        if (!(await validateBackgrounds())) {
             return;
         }
 
         try {
-            const frontUrl = await uploadImage(frontBackground, 'front', user.id);
-            const backUrl = await uploadImage(backBackground, 'back', user.id);
+            let frontUrl = frontPreview;
+            let backUrl = backPreview;
+
+            if (frontBackground) {
+                frontUrl = await uploadImage(frontBackground, 'front', user.id);
+            }
+            if (backBackground) {
+                backUrl = await uploadImage(backBackground, 'back', user.id);
+            }
 
             const templateDataToSave: TemplateData = {
-                id: crypto.randomUUID(),
+                id: $templateData.id || crypto.randomUUID(),
                 user_id: user.id,
-                name: 'My Template',
-                front_background: frontUrl,
-                back_background: backUrl,
+                name: $templateData.name || 'My Template',
+                front_background: frontUrl!,
+                back_background: backUrl!,
                 orientation: orientation,
                 template_elements: [...frontElements, ...backElements],
             };
@@ -56,11 +108,11 @@
 
             const { data, error } = await supabase
                 .from('templates')
-                .insert([templateDataToSave])
+                .upsert([templateDataToSave])
                 .select('*');
 
             if (error) throw error;
-            if (!data || data.length === 0) throw new Error('No template data returned after insert');
+            if (!data || data.length === 0) throw new Error('No template data returned after upsert');
 
             alert('Template saved successfully!');
             window.location.reload();
@@ -74,36 +126,27 @@
         const { event: fileEvent, side } = event.detail;
         const input = fileEvent.target as HTMLInputElement;
         if (!input.files || input.files.length === 0) return;
-    
+
         const file = input.files[0];
         if (!file.type.startsWith('image/')) {
             errorMessage = 'Please upload an image file.';
             return;
         }
-    
-        const img = new Image();
-        img.onload = async () => {
-            if (img.width !== 1013 || img.height !== 638) {
-                errorMessage = `${side.charAt(0).toUpperCase() + side.slice(1)} background must be exactly 1013x638 pixels.`;
-                return;
-            }
-    
-            if (side === 'front') {
-                frontBackground = file;
-                frontPreview = URL.createObjectURL(file);
-            } else {
-                backBackground = file;
-                backPreview = URL.createObjectURL(file);
-            }
-    
-            errorMessage = '';
-        };
-        img.onerror = () => {
-            errorMessage = 'Error loading image. Please try again.';
-        };
-        img.src = URL.createObjectURL(file);
+
+        const isValid = await validateImage(file, side);
+        if (!isValid) return;
+
+        if (side === 'front') {
+            frontBackground = file;
+            frontPreview = URL.createObjectURL(file);
+        } else {
+            backBackground = file;
+            backPreview = URL.createObjectURL(file);
+        }
+
+        errorMessage = '';
     }
-    
+
     function removeImage(event: CustomEvent) {
         const { side } = event.detail;
         if (side === 'front') {
@@ -117,7 +160,7 @@
         }
     }
 
-    function updateElements(event: CustomEvent<{elements: TemplateElement[], side: 'front' | 'back'}>) {
+    function updateElements(event: CustomEvent<{ elements: TemplateElement[], side: 'front' | 'back' }>) {
         const { elements, side } = event.detail;
         if (side === 'front') {
             frontElements = elements;
@@ -161,7 +204,7 @@
             back_background: data.back_background,
             orientation: data.orientation,
             template_elements: data.template_elements.map((el: any): TemplateElement => ({
-                variableName: el.variable_name,
+                variableName: el.variableName, // Handle both cases
                 type: el.type as 'text' | 'photo',
                 side: el.side as 'front' | 'back',
                 content: el.content,
@@ -178,7 +221,6 @@
 
         return templateData;
     }
-
     async function handleTemplateSelect(event: CustomEvent) {
         const selectedTemplate = event.detail;
         try {
@@ -190,6 +232,9 @@
                 frontElements = data.template_elements.filter((el) => el.side === 'front');
                 backElements = data.template_elements.filter((el) => el.side === 'back');
                 templateData.set(data);
+                frontBackground = null;
+                backBackground = null;
+                errorMessage = '';
             }
         } catch (error) {
             console.error('Error fetching template details:', error);
@@ -230,7 +275,7 @@
         <TemplateList on:select={handleTemplateSelect} />
         <div class="template-form-container">
             <h1>Edit Template</h1>
-    
+
             <TemplateForm
                 side="front"
                 preview={frontPreview}
@@ -239,7 +284,7 @@
                 on:removeImage={removeImage}
                 on:update={updateElements}
             />
-        
+
             <TemplateForm
                 side="back"
                 preview={backPreview}
@@ -277,26 +322,12 @@
     }
 
     .template-form-container {
-        flex-grow: 1;
+        flex: 1;
         padding: 20px;
         overflow-y: auto;
     }
 
     .error {
         color: red;
-    }
-
-    button {
-        background-color: #4CAF50;
-        color: white;
-        padding: 14px 20px;
-        margin: 8px 0;
-        border: none;
-        cursor: pointer;
-        width: 100%;
-    }
-
-    button:hover {
-        opacity: 0.8;
     }
 </style>

@@ -2,6 +2,8 @@
     import { onMount, createEventDispatcher } from 'svelte';
     import { templateData } from '../stores/templateStore';
     import type { TemplateData, TemplateElement } from '../stores/templateStore';
+    import ElementList from './ElementList.svelte';
+    import PositionGroup from './PositionGroup.svelte';
 
     export let side: 'front' | 'back';
     export let preview: string | null;
@@ -21,23 +23,17 @@
             elements = side === 'front' ? [...defaultFrontElements] : [...defaultBackElements];
             updateStore();
         }
+        fontOptions = detectFonts();
     });
 
-
-function updateStore() {
-    templateData.update((data: TemplateData) => {
-        const updatedElements = data.template_elements.filter((el: TemplateElement) => el.side !== side);
-        return {
-            ...data,
-            template_elements: [...updatedElements, ...elements.map(el => ({ ...el, side }))]
-        };
-    });
-}
-
-    function removeElement(index: number) {
-        elements = elements.filter((_, i) => i !== index);
-        updateStore();
-        dispatch('update', { elements, side });
+    function updateStore() {
+        templateData.update((data: TemplateData) => {
+            const updatedElements = data.template_elements.filter((el: TemplateElement) => el.side !== side);
+            return {
+                ...data,
+                template_elements: [...updatedElements, ...elements.map(el => ({ ...el, side }))]
+            };
+        });
     }
 
     function limitDragBounds(index: number, x: number, y: number, width?: number, height?: number, metrics?: TextMetrics) {
@@ -74,27 +70,6 @@ function updateStore() {
 
     function removeImage() {
         dispatch('removeImage', { side });
-    }
-
-    function addElement(type: 'text' | 'photo' | 'signature') {
-        const newElement: TemplateElement = {
-            variableName: `new_${type}_${Date.now()}`,
-            type,
-            side,
-            x: 10,
-            y: 10,
-            width: 100,
-            height: 100,
-            ...(type === 'text' ? { content: 'New Text', font: 'Arial', size: 16, color: '#000000', alignment: 'left' } : {})
-        };
-        elements = [...elements, newElement];
-        updateStore();
-        dispatch('update', { elements, side });
-    }
-
-    function updateElement() {
-        updateStore();
-        dispatch('update', { elements, side });
     }
 
     function onMouseDown(event: MouseEvent, index: number, handle: string | null = null) {
@@ -166,14 +141,13 @@ function updateStore() {
             if (context) {
                 context.font = `${element.size}px ${element.font}`;
                 const metrics = context.measureText(element.content || '');
-                console.log(metrics)
                 limitDragBounds(currentElementIndex, newX, newY, element.width, element.height, metrics);
             }
         }
 
         startX = event.clientX;
         startY = event.clientY;
-        updateElement();
+        updateStore();
     }
 
     function onMouseUp() {
@@ -183,13 +157,42 @@ function updateStore() {
         resizeHandle = null;
     }
 
-    const fontOptions = [
+    function handleElementsUpdate(event: CustomEvent) {
+        elements = event.detail.elements;
+        updateStore();
+        dispatch('update', { elements, side });
+    }
+
+    let fontOptions: string[] = [];
+
+function detectFonts() {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    const testFonts = [
         'Arial', 'Helvetica', 'Times New Roman', 'Courier New', 'Verdana', 'Georgia', 
         'Palatino', 'Garamond', 'Bookman', 'Comic Sans MS', 'Trebuchet MS', 'Arial Black', 
-        'Impact', 'Brush Script MT', 'Lucida Sans', 'Tahoma', 'Lucida Console', 'Optima'
+        'Impact', 'Calibri', 'Cambria', 'Candara', 'Consolas', 'Constantia', 'Corbel', 
+        'Franklin Gothic', 'Futura', 'Geneva', 'Gill Sans', 'Lucida Grande', 'Lucida Sans', 
+        'Optima', 'Segoe UI', 'Tahoma', 'Monaco', 'San Francisco', 'Helvetica Neue', 
+        'Avenir', 'Avenir Next', 'Ubuntu', 'DejaVu Sans', 'Liberation Sans', 'Nimbus Sans L'
     ];
+    const availableFonts: string[] = [];
 
+    if (context) {
+        for (let font of testFonts) {
+            const testString = 'abcdefghijklmnopqrstuvwxyz0123456789';
+            context.font = '12px serif';
+            const serifWidth = context.measureText(testString).width;
+            context.font = `12px ${font}, serif`;
+            const testWidth = context.measureText(testString).width;
+            if (testWidth !== serifWidth) {
+                availableFonts.push(font);
+            }
+        }
+    }
 
+    return availableFonts;
+}
 
     const defaultFrontElements: TemplateElement[] = [
         { variableName: 'licenseNo', type: 'text', side: 'front', content: '75-005-24', x: 293, y: 159, font: 'Arial', size: 16, color: '#000000', alignment: 'left' },
@@ -226,110 +229,59 @@ function updateStore() {
             {/if}
             {#if preview}
                 {#each elements as element, i}
-                    <div
-                        id="element-{side}-{i}"
-                        class="template-element {element.type}"
-                        style="left: {element.x}px; top: {element.y}px; width: {element.width}px; height: {element.height}px;"
-                        on:mousedown={(e) => onMouseDown(e, i)}
-                        role="button" tabindex="0" aria-label="{element.type} element"
-                    >
+                <div
+                class="template-element {element.type}"
+                style="left: {element.x}px; top: {element.y}px; width: {element.width}px; height: {element.height}px;"
+                on:mousedown={(e) => onMouseDown(e, i)}
+                role="button"
+                tabindex="0"
+                aria-label="{element.type} element"
+            >
                         {#if element.type === 'text'}
-                            <span style:font-family={element.font} style:font-size="{element.size}px" style:color={element.color} style:text-align={element.alignment}>{element.content}</span>
+                            <span style:font-family={element.font} 
+                             style:font-weight={element.fontWeight}
+                              style:font-size="{element.size}px"
+                               style:color={element.color} 
+                               style:text-align={element.alignment}
+                               style:text-transform={element.textTransform}
+                               style:text-decoration={element.textDecoration}
+                               style:opacity={element.opacity}
+                               >
+                               {element.content}
+                            </span>
+                            <!-- <span 
+                            style:font-family={element.font}
+                            style:font-size="{element.size}px"
+                            style:font-weight={element.fontWeight}
+                            style:font-style={element.fontStyle}
+                            style:text-decoration={element.textDecoration}
+                            style:text-transform={element.textTransform}
+                            style:color={element.color}
+                            style:opacity={element.opacity}
+                            style:text-align={element.alignment}
+                            style:display={element.visible ? 'block' : 'none'}
+                        >
+                            {element.content}
+                        </span> -->
                         {:else if element.type === 'photo'}
                             <div class="placeholder photo-placeholder">Photo</div>
                         {:else if element.type === 'signature'}
                             <div class="placeholder signature-placeholder">Signature</div>
                         {/if}
-                        <div role="button" tabindex="0" aria-label="Resize top-left" class="resize-handle top-left" on:mousedown|stopPropagation={(e) => onMouseDown(e, i, 'top-left')}></div>
-                        <div role="button" tabindex="0" aria-label="Resize top-right" class="resize-handle top-right" on:mousedown|stopPropagation={(e) => onMouseDown(e, i, 'top-right')}></div>
-                        <div role="button" tabindex="0" aria-label="Resize bottom-left" class="resize-handle bottom-left" on:mousedown|stopPropagation={(e) => onMouseDown(e, i, 'bottom-left')}></div>
-                        <div role="button" tabindex="0" aria-label="Resize bottom-right" class="resize-handle bottom-right" on:mousedown|stopPropagation={(e) => onMouseDown(e, i, 'bottom-right')}></div>
-                    </div>
+                        <div class="resize-handle top-left" on:mousedown|stopPropagation={(e) => onMouseDown(e, i, 'top-left')} role="button" tabindex="0" aria-label="Resize top left"></div>
+                        <div class="resize-handle top-right" on:mousedown|stopPropagation={(e) => onMouseDown(e, i, 'top-right')} role="button" tabindex="0" aria-label="Resize top right"></div>
+                        <div class="resize-handle bottom-left" on:mousedown|stopPropagation={(e) => onMouseDown(e, i, 'bottom-left')} role="button" tabindex="0" aria-label="Resize bottom left"></div>
+                        <div class="resize-handle bottom-right" on:mousedown|stopPropagation={(e) => onMouseDown(e, i, 'bottom-right')} role="button" tabindex="0" aria-label="Resize bottom right"></div>
+                        </div>
                 {/each}
             {/if}
         </div>
         {#if preview}
-            <div class="element-list">
-                <h3>Elements</h3>
-                {#each elements as element, i}
-                    <div class="element-item">
-                        <div class="element-inputs">
-                            <label title="Unique identifier for the element">
-                                Variable Name:
-                                <input bind:value={element.variableName} on:input={updateElement}>
-                            </label>
-                            {#if element.type === 'text'}
-                                <label title="Content of the text element">
-                                    Text:
-                                    <input bind:value={element.content} on:input={updateElement}>
-                                </label>
-                                <label title="Horizontal position">
-                                    X:
-                                    <input type="number" bind:value={element.x} on:input={updateElement}>
-                                </label>
-                                <label title="Vertical position">
-                                    Y:
-                                    <input type="number" bind:value={element.y} on:input={updateElement}>
-                                </label>
-                       <label title="Font family">
-    Font:
-    <select bind:value={element.font} on:change={updateElement}>
-        {#each fontOptions as font}
-            <option value={font}>{font}</option>
-        {/each}
-    </select>
-</label>
-
-                                <label title="Font size in pixels">
-                                    Size:
-                                    <input type="number" bind:value={element.size} on:input={updateElement}>
-                                </label>
-                                <label title="Text color" class="color-label">
-                                    Color:
-                                    <input type="color" bind:value={element.color} class="color-input" on:input={updateElement}>
-                                </label>
-                                <label title="Text alignment">
-                                    Alignment:
-                                    <select bind:value={element.alignment} on:change={updateElement}>
-                                        <option value="left">Left</option>
-                                        <option value="center">Center</option>
-                                        <option value="right">Right</option>
-                                    </select>
-                                </label>
-                                <label title="Width of the element">
-                                    Width:
-                                    <input type="number" bind:value={element.width} on:input={updateElement}>
-                                </label>
-                                <label title="Height of the element">
-                                    Height:
-                                    <input type="number" bind:value={element.height} on:input={updateElement}>
-                                </label>
-                            {:else if element.type === 'photo' || element.type === 'signature'}
-                                <label title="Horizontal position">
-                                    X:
-                                    <input type="number" bind:value={element.x} on:input={updateElement}>
-                                </label>
-                                <label title="Vertical position">
-                                    Y:
-                                    <input type="number" bind:value={element.y} on:input={updateElement}>
-                                </label>
-                                <label title="Width of the element">
-                                    Width:
-                                    <input type="number" bind:value={element.width} on:input={updateElement}>
-                                </label>
-                                <label title="Height of the element">
-                                    Height:
-                                    <input type="number" bind:value={element.height} on:input={updateElement}>
-                                </label>
-                            {/if}
-                            <button class="remove-element" on:click={() => removeElement(i)}>X</button>
-                        </div>
-                    </div>
-                {/each}
-                <button on:click={() => addElement('text')}>Add Text</button>
-                <button on:click={() => addElement('photo')}>Add Photo</button>
-                <button on:click={() => addElement('signature')}>Add Signature</button>
-            </div>
+            <ElementList 
+                {elements} 
+                {fontOptions} 
+                on:update={handleElementsUpdate}
+            />
         {/if}
     </div>
 </div>
@@ -350,27 +302,6 @@ function updateStore() {
         background-size: cover;
         background-position: center;
         overflow: hidden;
-    }
-    .element-list {
-        width: 100%;
-        max-width: 600px;
-    }
-    .element-item {
-        margin-bottom: 20px;
-    }
-    .element-inputs {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-    .element-inputs label {
-        display: flex;
-        flex-direction: column;
-        flex: 1;
-        min-width: 80px;
-    }
-    .element-inputs input, .element-inputs select {
-        width: 100%;
     }
     .template-element {
         position: absolute;
@@ -431,39 +362,6 @@ function updateStore() {
         height: 30px;
         font-size: 16px;
         cursor: pointer;
-    }
-    .color-label {
-        display: flex;
-        align-items: center;
-    }
-    .color-input {
-        width: 30px;
-        height: 30px;
-        padding: 0;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-    }
-    .remove-element {
-        background: red;
-        color: white;
-        border: none;
-        border-radius: 50%;
-        width: 20px;
-        height: 20px;
-        font-size: 12px;
-        cursor: pointer;
-        padding: 0;
-        line-height: 20px;
-        text-align: center;
-    }
-    .resize-handle {
-        position: absolute;
-        width: 8px;
-        height: 8px;
-        background-color: white;
-        border: 1px solid #000;
-        border-radius: 50%;
     }
     .resize-handle.top-left { top: -4px; left: -4px; cursor: nwse-resize; }
     .resize-handle.top-right { top: -4px; right: -4px; cursor: nesw-resize; }

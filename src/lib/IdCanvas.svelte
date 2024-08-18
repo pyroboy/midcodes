@@ -132,7 +132,6 @@ let pxLimit = 400
     }, DEBOUNCE_DELAY);
     
     async function renderIdCard() {
-        console.log("Rendering ID card, isDragging:", isDragging);
         if (!displayCanvas || !bufferCanvas || isRendering) {
             return;
         }
@@ -286,35 +285,23 @@ let pxLimit = 400
     }
     
     export async function renderFullResolution(): Promise<Blob | null> {
-        console.log('renderFullResolution called');
         if (!offscreenCanvas) {
             console.error('Offscreen canvas not initialized in renderFullResolution');
             return null;
         }
-    
         const offscreenCtx = offscreenCanvas.getContext('2d');
         if (!offscreenCtx) {
             console.error('Could not get 2D context from offscreen canvas');
             return null;
         }
-    
         offscreenCanvas.width = FULL_WIDTH;
         offscreenCanvas.height = FULL_HEIGHT;
-    
-        // Clear the canvas
         offscreenCtx.clearRect(0, 0, FULL_WIDTH, FULL_HEIGHT);
-    
-        // Render at full resolution
         await renderCanvas(offscreenCtx as unknown as CanvasRenderingContext2D, 1, true);
-    
-        console.log('Full resolution rendering complete');
-        
-        // Convert OffscreenCanvas to Blob
         return await offscreenCanvas.convertToBlob({ type: 'image/png' });
     }
     
     $: if (elements || formData || fileUploads || imagePositions || fullResolution || isDragging) {
-        console.log("State changed, isDragging:", isDragging);
         debouncedRender();
     }
 </script>
