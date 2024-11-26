@@ -1,134 +1,197 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
-    import { supabase } from '$lib/supabaseClient';
+    import { page } from '$app/stores';
     import { goto } from '$app/navigation';
-    import type { User } from '@supabase/supabase-js';
-    import { darkMode } from '../stores/darkMode';
+    import { invalidate } from '$app/navigation';
+    import { navigating } from '$app/stores';
+    import { Progress } from '$lib/components/ui/progress';
+    import { Button } from '$lib/components/ui/button';
+    import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "$lib/components/ui/dropdown-menu";
+    import { User, Sun, Moon } from 'lucide-svelte';
+    import { onMount, onDestroy } from 'svelte';
+    import { session, user } from '$lib/stores/auth';
+    import { settings } from '$lib/stores/settings';
+    import { Badge } from "$lib/components/ui/badge";
+    import { loadGoogleFonts } from '$lib/config/fonts';
+    import { supabase } from '$lib/supabaseClient';
     import "../app.css";
-    let user: User | null = null;
-    let menuOpen = false;
     
+    interface Profile {
+        role: string;
+    }
+
+    $: profile = $page.data.profile as Profile | null;
+    $: path = $page.url.pathname;
+    $: showHeader = $session && path !== '/auth';
+    $: userEmail = $user?.email;
+    $: selectedTemplate = $settings.selectedTemplate;
+    $: createIdUrl = selectedTemplate ? `/use-template/${selectedTemplate.id}` : '/use-template';
+    $: isDark = $settings.theme === 'dark';
+
+    let progressValue = 0;
+    let progressInterval: ReturnType<typeof setTimeout> | undefined;
+    let showProgress = false;
+
     onMount(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            user = session?.user ?? null;
-        });
-    
-        supabase.auth.onAuthStateChange((_, session) => {
-            user = session?.user ?? null;
-        });
+        loadGoogleFonts();
     });
-    
+
+    onDestroy(() => {
+        if (progressInterval) clearInterval(progressInterval);
+    });
+
+    $: {
+        if ($navigating) {
+            showProgress = true;
+            progressValue = 20;
+            progressInterval = setInterval(() => {
+                if (progressValue < 90) progressValue += 10;
+            }, 100);
+        } else {
+            if (progressInterval) {
+                clearInterval(progressInterval);
+                progressInterval = undefined;
+            }
+            if (showProgress) {
+                progressValue = 100;
+                setTimeout(() => {
+                    progressValue = 0;
+                    showProgress = false;
+                }, 200);
+            }
+        }
+    }
+
+    async function handleSignOut() {
+        const { error } = await supabase.auth.signOut();
+        if (!error) {
+            await goto('/');
+        }
+    }
+
+    function handleThemeChange() {
+        document.body.classList.add('theme-transition');
+        setTimeout(() => {
+            settings.toggleTheme();
+            requestAnimationFrame(() => {
+                document.body.classList.remove('theme-transition');
+            });
+        }, 1);
+    }
+
     async function signOut() {
         const { error } = await supabase.auth.signOut();
-        if (error) console.error('Error signing out:', error);
-        else goto('/signin');
+        if (error) {
+            console.error('Error signing out:', error);
+            return;
+        }
+        await invalidate('supabase:auth');
+        goto('/auth');
     }
-    
-    function toggleMenu() {
-        menuOpen = !menuOpen;
-    }
-    </script>
-    <nav>
-        <div class="nav-container">
-            <a href="/" class="logo">ID Generator</a>
-            <button class="menu-toggle" on:click={toggleMenu}>
-                ☰
-            </button>
+</script>
+
+<svelte:head>
+    <title>ID Card Generator</title>
+    <link rel="icon" href="/favicon.ico" />
+</svelte:head>
+
+{#if showProgress}
+    <Progress value={progressValue} class="fixed top-0 left-0 right-0 z-50 h-1 w-full" />
+{/if}
+
+{#if showHeader}
+    <header class="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div class="container flex h-14 items-center">
+            <div class="mr-4 flex">
+                <a href="/" class="mr-6 flex items-center space-x-2">
+                    <span class="font-bold">ID Generator</span>
+                </a>
+                <nav class="flex items-center space-x-6 text-sm font-medium">
+                    <a
+                        href="/templates"
+                        class="transition-colors hover:text-foreground/80 {path === '/templates' ? 'text-foreground' : 'text-foreground/60'}"
+                    >
+                        Templates
+                    </a>
+                    <div class="flex flex-col items-start gap-1">
+                        {#if selectedTemplate}
+                            <a
+                                href={createIdUrl}
+                                class="transition-colors hover:text-foreground/80 {path.startsWith('/use-template') ? 'text-foreground' : 'text-foreground/60'}"
+                            >
+                                Create ID
+                            </a>
+                            <span class="text-xs text-muted-foreground">Using: {selectedTemplate.name}</span>
+                        {:else}
+                            <span 
+                                class="text-muted-foreground cursor-not-allowed"
+                                title="Select a template first"
+                            >
+                                Create ID
+                            </span>
+                            <span class="text-xs text-muted-foreground">No template selected</span>
+                        {/if}
+                    </div>
+                    <a
+                        href="/all-ids"
+                        class="transition-colors hover:text-foreground/80 {path === '/all-ids' ? 'text-foreground' : 'text-foreground/60'}"
+                    >
+                        My IDs
+                    </a>
+                </nav>
+            </div>
+            <div class="flex flex-1 items-center justify-end space-x-4">
+                {#if selectedTemplate}
+                    <Badge variant="outline" class="hidden sm:inline-flex">
+                        Using: {selectedTemplate.name}
+                    </Badge>
+                {/if}
+                <Button 
+                    variant="ghost" 
+                    size="icon"
+                    on:click={handleThemeChange}
+                >
+                    {#if isDark}
+                        <Sun class="h-5 w-5" />
+                    {:else}
+                        <Moon class="h-5 w-5" />
+                    {/if}
+                </Button>
+                <div class="flex items-center gap-4">
+                    <span class="text-sm text-gray-600">{userEmail}</span>
+                    <Button variant="outline" size="sm" on:click={signOut}>Sign Out</Button>
+                </div>
+            </div>
         </div>
-        <ul class:open={menuOpen}>
-            <li><a href="/" on:click={toggleMenu}>Home</a></li>
-            {#if user}
-                <li><a href="/all-ids" on:click={toggleMenu}>All IDs</a></li>
-                <li><a href="/edit-template" on:click={toggleMenu}>Edit Template</a></li>
-                <li><button on:click={() => { signOut(); toggleMenu(); }}>Sign Out</button></li>
-            {:else}
-                <li><a href="/signin" on:click={toggleMenu}>Sign In</a></li>
-                <li><a href="/signup" on:click={toggleMenu}>Sign Up</a></li>
-            {/if}
-        </ul>
-    </nav>
-    
+    </header>
+{/if}
 
+<main>
+    <slot />
+</main>
 
-    
-    <main class:dark={$darkMode}>
-        <slot></slot>
-    </main>
-    
-    <style>
+<style>
+    :global(:root) {
+        --nav-height: 4rem;
+    }
 
-:global(html) {
+    :global(html) {
         background-color: theme('colors.background');
         color: theme('colors.foreground');
     }
-    :global(.dark) {
+
+    :global(html.dark) {
         color-scheme: dark;
     }
 
+    :global(body) {
+        transition: opacity 0.5s ease;
+    }
 
-    nav {
-        background-color: #f0f0f0;
-        padding: 10px;
+    :global(.theme-transition) {
+        opacity: 0;
     }
-    .nav-container {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+
+    main {
+        padding-top: var(--nav-height);
     }
-    .logo {
-        font-size: 1.2em;
-        font-weight: bold;
-        text-decoration: none;
-        color: #333;
-    }
-    .menu-toggle {
-        display: none;
-        background: none;
-        border: none;
-        font-size: 1.5em;
-        cursor: pointer;
-    }
-    ul {
-        list-style-type: none;
-        padding: 0;
-        display: flex;
-        justify-content: space-around;
-    }
-    li {
-        margin: 0 10px;
-    }
-    a {
-        text-decoration: none;
-        color: #333;
-    }
-    button {
-        background: none;
-        border: none;
-        cursor: pointer;
-        color: #333;
-        font-size: 1em;
-    }
- 
-    
-    @media (max-width: 768px) {
-        .menu-toggle {
-            display: block;
-        }
-        ul {
-            display: none;
-            flex-direction: column;
-            position: absolute;
-            top: 50px;
-            left: 0;
-            right: 0;
-            background-color: #f0f0f0;
-            padding: 10px;
-        }
-        ul.open {
-            display: flex;
-        }
-        li {
-            margin: 10px 0;
-        }
-    }
-    </style>
+</style>

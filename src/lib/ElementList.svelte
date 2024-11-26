@@ -1,16 +1,22 @@
 <script lang="ts">
     import type { TemplateElement } from '../stores/templateStore';
     import PositionGroup from './PositionGroup.svelte';
-    
     import FontSettings from './FontSettings.svelte';
+    import * as Select from "$lib/components/ui/select";
+    import { Input } from "$lib/components/ui/input"
+    import { ChevronDown, ChevronUp } from 'lucide-svelte';
+    import { slide } from 'svelte/transition';
     
-
-
     export let elements: TemplateElement[];
     export let fontOptions: string[];
     
     import { createEventDispatcher } from 'svelte';
     const dispatch = createEventDispatcher();
+
+    // Type predicate for selection option safety
+    function isValidOption(value: unknown): value is string {
+        return typeof value === 'string';
+    }
 
     function updateElement(index: number, updates: Partial<TemplateElement>) {
         elements[index] = { ...elements[index], ...updates };
@@ -22,126 +28,297 @@
         dispatch('update', { elements });
     }
 
-    function addElement(type: 'text' | 'photo' | 'signature') {
+    function addElement(type: 'text' | 'photo' | 'signature' | 'selection') {
         const newElement: TemplateElement = {
             variableName: `new_${type}_${Date.now()}`,
             type,
-            side: 'front', // Assuming 'front' as default, adjust as needed
+            side: 'front',
             x: 10,
             y: 10,
             width: 100,
             height: 100,
-            ...(type === 'text' ? { content: 'New Text', font: 'Arial', size: 16, color: '#ffffff', alignment: 'left' } : {})
+            ...(type === 'text' ? {
+                content: 'New Text',
+                font: 'Arial',
+                size: 16,
+                color: '#ffffff',
+                alignment: 'left'
+            } : type === 'selection' ? {
+                options: ['Option 1', 'Option 2', 'Option 3'],
+                font: 'Arial',
+                size: 16,
+                color: '#ffffff',
+                alignment: 'left'
+            } : {})
         };
         elements = [...elements, newElement];
         dispatch('update', { elements });
     }
+
+    function getSelectedState(element: TemplateElement) {
+        return element.content 
+            ? { value: element.content, label: element.content }
+            : { value: '', label: 'Select option' };
+    };
+
+    function getOptionsString(options: string[] | undefined): string {
+        return options?.join('\n') || '';
+    }
+
+    function handleOptionsInput(event: Event, index: number) {
+        const target = event.target as HTMLTextAreaElement;
+        const options = target.value
+            .split('\n')
+            .map(opt => opt.trim())
+            .filter(opt => opt.length > 0);
+        updateElement(index, { options });
+    }
+
+    let expandedElementIndex: number | null = null;
+
+    function toggleElement(index: number) {
+        expandedElementIndex = expandedElementIndex === index ? null : index;
+    }
 </script>
 
 <div class="element-list">
-    <h3>Elements</h3>
     {#each elements as element, i}
         <div class="element-item">
-            <div class="element-header">
-                <span>{element.type.charAt(0).toUpperCase() + element.type.slice(1)} Element</span>
-                <button class="remove-element" on:click={() => removeElement(i)}>×</button>
-            </div>
-            <div class="element-inputs">
-                <div class="input-group">
-                    <label>
-                        Variable Name
-                        <input bind:value={element.variableName} on:input={() => updateElement(i, { variableName: element.variableName })}>
-                    </label>
+            <div class="element-header" 
+                role="button"
+                tabindex="0"
+                on:click={() => toggleElement(i)}
+                on:keydown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleElement(i);
+                    }
+                }}
+            >
+                <div class="header-content">
+                    <span class="chevron">
+                        {#if expandedElementIndex === i}
+                            <ChevronUp size={16} />
+                        {:else}
+                            <ChevronDown size={16} />
+                        {/if}
+                    </span>
+                    <span class="element-type">{element.type.charAt(0).toUpperCase() + element.type.slice(1)}</span>
+                    <span class="element-name">{element.variableName}</span>
                 </div>
-              {#if element.type === 'text'}
-    <div class="input-group">
-        <label>
-            Text
-            <input bind:value={element.content} on:input={() => updateElement(i, { content: element.content })}>
-        </label>
-    </div>
-    <FontSettings 
-        {element} 
-        {fontOptions} 
-        on:update={(event) => updateElement(i, event.detail)}
-    />
-{/if}
-
-                <PositionGroup 
-                    x={element.x} 
-                    y={element.y} 
-                    width={element.width} 
-                    height={element.height} 
-                    on:update={({ detail }) => updateElement(i, detail)} 
-                />
+                <button class="remove-element" on:click|stopPropagation={() => removeElement(i)}>×</button>
             </div>
+            {#if expandedElementIndex === i}
+                <div class="element-inputs" transition:slide={{ duration: 200 }}>
+                    <div class="input-group">
+                        <label for="variable-name-{i}">Variable Name</label>
+                        <Input 
+                            id="variable-name-{i}"
+                            bind:value={element.variableName} 
+                            on:input={() => updateElement(i, { variableName: element.variableName })}
+                        />
+                    </div>
+
+                    {#if element.type === 'text'}
+                        <div class="input-group">
+                            <label for="text-content-{i}">Text</label>
+                            <Input 
+                                id="text-content-{i}"
+                                bind:value={element.content} 
+                                on:input={() => updateElement(i, { content: element.content })}
+                            />
+                        </div>
+                        <FontSettings 
+                            {element} 
+                            {fontOptions} 
+                            on:update={(event) => updateElement(i, event.detail)}
+                        />
+                    {:else if element.type === 'selection'}
+                        <div class="input-group">
+                            <label for="select-{i}">Options</label>
+                            <Select.Root
+                                selected={getSelectedState(element)}
+                                onSelectedChange={(selection) => {
+                                    if (selection && isValidOption(selection.value)) {
+                                        updateElement(i, { content: selection.value });
+                                    }
+                                }}
+                            >
+                                <Select.Trigger id="select-{i}">
+                                    <Select.Value placeholder="Select option" />
+                                </Select.Trigger>
+                                <Select.Content>
+                                    {#each element.options || [] as option}
+                                        <Select.Item 
+                                            value={option}
+                                            label={option}
+                                        >
+                                            {option}
+                                        </Select.Item>
+                                    {/each}
+                                </Select.Content>
+                            </Select.Root>
+                        </div>
+                        <div class="input-group">
+                            <label for="options-{i}">Edit Options (one per line)</label>
+                            <textarea
+                                id="options-{i}"
+                                class="options-textarea"
+                                value={getOptionsString(element.options)}
+                                on:input={(event) => handleOptionsInput(event, i)}
+                                rows="4"
+                            ></textarea>
+                        </div>
+                        <FontSettings 
+                            {element} 
+                            {fontOptions} 
+                            on:update={(event) => updateElement(i, event.detail)}
+                        />
+                    {/if}
+
+                    <PositionGroup 
+                        x={element.x} 
+                        y={element.y} 
+                        width={element.width} 
+                        height={element.height} 
+                        on:update={({ detail }) => updateElement(i, detail)} 
+                    />
+                </div>
+            {/if}
         </div>
     {/each}
     <div class="add-elements">
         <button on:click={() => addElement('text')}>Add Text</button>
         <button on:click={() => addElement('photo')}>Add Photo</button>
         <button on:click={() => addElement('signature')}>Add Signature</button>
+        <button on:click={() => addElement('selection')}>Add Selection</button>
     </div>
 </div>
 
 <style>
     .element-list {
-        width: 300px;
+        width: 400px;
         background-color: #1e1e1e;
         color: #ffffff;
-        padding: 10px;
-        border-radius: 5px;
+        padding: 0.75rem;
+        border-radius: 0.5rem;
+        max-height: calc(100vh - 2rem);
+        overflow-y: auto;
     }
+
     .element-item {
-        margin-bottom: 10px;
         background-color: #2d2d2d;
-        border-radius: 5px;
+        border-radius: 0.375rem;
+        margin-bottom: 0.25rem;
         overflow: hidden;
     }
+
     .element-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        background-color: #3d3d3d;
-        padding: 5px 10px;
+        padding: 0.4rem 0.75rem;
+        background-color: #363636;
+        cursor: pointer;
+        user-select: none;
+        min-height: 2rem;
     }
+
+    .element-header:hover {
+        background-color: #404040;
+    }
+
+    .header-content {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+    }
+
+    .chevron {
+        display: flex;
+        align-items: center;
+        color: #a0a0a0;
+    }
+
+    .element-type {
+        font-weight: 500;
+        color: #e0e0e0;
+        font-size: 0.875rem;
+    }
+
+    .element-name {
+        color: #a0a0a0;
+        font-size: 0.75rem;
+    }
+
     .element-inputs {
-        padding: 10px;
+        padding: 0.75rem;
+        border-top: 1px solid #404040;
+    }
+
+    .input-group {
+        margin-bottom: 1rem;
     }
 
     .input-group label {
-        display: flex;
-        flex-direction: column;
-        font-size: 12px;
+        display: block;
+        margin-bottom: 0.375rem;
+        color: #e0e0e0;
+        font-size: 0.875rem;
     }
-    .input-group input {
-        width: 100%;
-        background-color: #3d3d3d;
-        border: 1px solid #4d4d4d;
-        color: #ffffff;
-        padding: 2px 5px;
-        border-radius: 3px;
-    }
+
     .remove-element {
         background: none;
         border: none;
-        color: #ff6b6b;
+        color: #a0a0a0;
+        font-size: 1.25rem;
         cursor: pointer;
-        font-size: 16px;
+        padding: 0.25rem;
+        line-height: 1;
+        border-radius: 0.25rem;
     }
+
+    .remove-element:hover {
+        color: #ff4444;
+        background-color: rgba(255, 68, 68, 0.1);
+    }
+
+    .options-textarea {
+        width: 100%;
+        min-height: 80px;
+        background-color: #2d2d2d;
+        color: #ffffff;
+        border: 1px solid #404040;
+        border-radius: 0.375rem;
+        padding: 0.5rem;
+        font-family: inherit;
+        resize: vertical;
+    }
+
+    .options-textarea:focus {
+        outline: none;
+        border-color: #606060;
+    }
+
     .add-elements {
-        display: flex;
-        gap: 5px;
-        margin-top: 10px;
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+        margin-top: 16px;
     }
+
     .add-elements button {
-        flex: 1;
         background-color: #4d4d4d;
         border: none;
         color: #ffffff;
-        padding: 5px;
+        padding: 8px;
         cursor: pointer;
         border-radius: 3px;
+        font-size: 12px;
+        transition: background-color 0.2s;
     }
-   
+
+    .add-elements button:hover {
+        background-color: #5d5d5d;
+    }
 </style>

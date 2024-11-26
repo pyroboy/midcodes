@@ -1,99 +1,32 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
-    import { supabase } from '$lib/supabaseClient';
-    import type { User } from '@supabase/supabase-js';
-
-    let user: User | null = null;
-    let idCards: any[] = [];
-    let isLoading = true;
-    let error: string | null = null;
-
-    onMount(async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        user = session?.user ?? null;
-
-        if (user) {
-            await fetchIdCards();
-        }
-    });
-
-    async function fetchIdCards() {
-        isLoading = true;
-        error = null;
-
-        const { data, error: fetchError } = await supabase
-            .from('id_cards')
-            .select('*')
-            .order('created_at', { ascending: false });
-
-        if (fetchError) {
-            console.error('Error fetching ID cards:', fetchError);
-            error = fetchError.message;
-        } else {
-            idCards = data || [];
-        }
-
-        isLoading = false;
-    }
-
-    function formatDate(dateString: string): string {
-        return new Date(dateString).toLocaleDateString();
-    }
+    import { session } from '$lib/stores/auth';
+    import { Button } from "$lib/components/ui/button";
+    import { goto } from '$app/navigation';
 </script>
 
-{#if user}
-    <div class="dashboard">
-        <h2>ID Card Dashboard</h2>
-        {#if isLoading}
-            <p>Loading ID cards...</p>
-        {:else if error}
-            <p class="error">Error: {error}</p>
-        {:else if idCards.length === 0}
-            <p>No ID cards found.</p>
-        {:else}
-            <table>
-                <thead>
-                    <tr>
-                        <th>Full Name</th>
-                        <th>ID Number</th>
-                        <th>Date of Birth</th>
-                        <th>Created At</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {#each idCards as card}
-                        <tr>
-                            <td>{card.full_name}</td>
-                            <td>{card.id_number}</td>
-                            <td>{formatDate(card.date_of_birth)}</td>
-                            <td>{formatDate(card.created_at)}</td>
-                        </tr>
-                    {/each}
-                </tbody>
-            </table>
-        {/if}
+{#if $session}
+    <div class="container flex flex-col items-center justify-center min-h-screen p-4">
+        <div class="flex flex-col items-center space-y-2 text-center">
+            <h1 class="text-3xl font-bold">Welcome to ID Card Generator</h1>
+            <p class="text-gray-600">Start creating your ID cards or view your existing ones.</p>
+        </div>
+        <div class="flex gap-4">
+            <Button on:click={() => goto('/use-template')}>Create New ID</Button>
+            <Button variant="outline" on:click={() => goto('/all-ids')}>View My IDs</Button>
+        </div>
     </div>
 {:else}
-    <p>Please sign in to view the dashboard.</p>
+    <div class="container flex flex-col items-center justify-center min-h-screen p-4">
+        <div class="flex max-w-3xl flex-col items-center gap-2 text-center">
+            <h1 class="text-3xl font-bold leading-tight tracking-tighter md:text-4xl lg:leading-[1.1]">
+                Create Professional ID Cards in Minutes
+            </h1>
+            <p class="max-w-md text-lg text-gray-600 sm:text-xl">
+                Design, generate, and manage ID cards for your organization. Easy to use, professional results.
+            </p>
+        </div>
+        <div class="flex gap-4">
+            <Button size="lg" on:click={() => goto('/auth')}>Get Started</Button>
+        </div>
+    </div>
 {/if}
-
-<style>
-    .dashboard {
-        padding: 20px;
-    }
-    table {
-        width: 100%;
-        border-collapse: collapse;
-    }
-    th, td {
-        border: 1px solid #ddd;
-        padding: 8px;
-        text-align: left;
-    }
-    th {
-        background-color: #f2f2f2;
-    }
-    .error {
-        color: red;
-    }
-</style>

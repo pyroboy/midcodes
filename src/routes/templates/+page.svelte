@@ -327,7 +327,27 @@
         overflow-y: auto;
     }
 
-    .error {
-        color: red;
+    /* .template-form-container h1 {
+        @apply text-foreground mb-6;
     }
+
+    .template-form-container label {
+        @apply text-foreground;
+    }
+
+    .template-form-container select {
+        @apply bg-background text-foreground border-input mt-1 p-2 rounded-md;
+    }
+
+    .template-form-container button {
+        @apply bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md mt-4 mr-2;
+    }
+
+    .template-form-container button:last-child {
+        @apply bg-secondary text-secondary-foreground hover:bg-secondary/90;
+    }
+
+    .error {
+        @apply text-destructive font-medium mt-2;
+    } */
 </style>

@@ -1,44 +1,69 @@
 <script lang="ts">
-    import { Loader } from 'lucide-svelte';
-    import { onMount, createEventDispatcher, onDestroy } from 'svelte';
-    import { page } from '$app/stores';
+    import { onMount, onDestroy } from 'svelte';
+    import { browser } from '$app/environment';
     import { supabase } from '$lib/supabaseClient';
-    import type { TemplateData, TemplateElement } from '../../../stores/templateStore';
     import IdCanvas from '$lib/IdCanvas.svelte';
     import { Button } from "$lib/components/ui/button";
     import { Card } from "$lib/components/ui/card";
     import { Input } from "$lib/components/ui/input";
     import { Label } from "$lib/components/ui/label";
+    import * as Select from "$lib/components/ui/select";
     import { darkMode } from '../../../stores/darkMode';
     import { Switch } from "$lib/components/ui/switch";
     import ThumbnailInput from '$lib/ThumbnailInput.svelte';
-    import { browser } from '$app/environment';
+    import { Loader } from 'lucide-svelte';
+    import type { Session } from '@supabase/supabase-js';
+    
+    import type { 
+        Template,
+        SelectItem,
+        FormData,
+        FileUploads,
+        ImagePositions,
+        CachedFileUrls
+    } from './types';
+
+    interface PageData {
+        template: Template;
+        session: Session;
+    }
+
+    export let data: PageData;
 
     let frontCanvasComponent: IdCanvas;
     let backCanvasComponent: IdCanvas;
-    let isSaving = false;
+    let template: Template = data.template;
+    let selectedOptions: Record<string, SelectItem> = {};
+    let formData: FormData = {};
+    let fileUploads: FileUploads = {};
+    let imagePositions: ImagePositions = {};
+    let cachedFileUrls: CachedFileUrls = {};
     let debugMessages: string[] = [];
-    let template: TemplateData | null = null;
-    let formData: {[key: string]: string} = {};
-    let fileUploads: {[key: string]: File | null} = {};
-    let imagePositions: {[key: string]: {x: number, y: number, width: number, height: number, scale: number}} = {};
-    let errorMessage = '';
+    let errorMessage: string | null = null;
+    let isSaving = false;
     let MOUSE_MOVING = false;
     let fullResolution = false;
-    let cachedFileUrls: {[key: string]: string} = {};
 
     onMount(async () => {
         if (browser) {
-            const templateId = $page.params.id;
-            await fetchTemplate(templateId);
+            initializeFormData();
             
-            // Wait for both canvases to be mounted
+            if (template?.template_elements) {
+                template.template_elements.forEach((element) => {
+                    if (element.type === 'selection' && element.variableName) {
+                        selectedOptions[element.variableName] = {
+                            value: formData[element.variableName] || '',
+                            label: formData[element.variableName] || 'Select an option'
+                        };
+                    }
+                });
+            }
+
             await Promise.all([
                 new Promise(resolve => frontCanvasComponent?.$on('mounted', resolve)),
                 new Promise(resolve => backCanvasComponent?.$on('mounted', resolve))
             ]);
 
-            // Only call saveIdCard if canvases are properly initialized
             if (frontCanvasComponent?.canvas && frontCanvasComponent?.hiddenCanvas &&
                 backCanvasComponent?.canvas && backCanvasComponent?.hiddenCanvas) {
                 saveIdCard();
@@ -48,10 +73,40 @@
             }
         }
     });
+    function handleSelectChange(selection: SelectItem | undefined, variableName: string) {
+        if (selection) {
+            formData[variableName] = selection.value;
+            selectedOptions[variableName] = {
+                value: selection.value,
+                label: selection.value
+            };
+        }
+    }
 
     onDestroy(() => {
         Object.values(cachedFileUrls).forEach(URL.revokeObjectURL);
     });
+
+    function initializeFormData() {
+        if (template?.template_elements) {
+            template.template_elements.forEach((el) => {
+                if (!el.variableName) return;
+                
+                if (el.type === 'text' || el.type === 'selection') {
+                    formData[el.variableName] = el.content || '';
+                } else if (el.type === 'photo' || el.type === 'signature') {
+                    fileUploads[el.variableName] = null;
+                    imagePositions[el.variableName] = {
+                        x: 0,
+                        y: 0,
+                        width: el.width || 100,
+                        height: el.height || 100,
+                        scale: 1
+                    };
+                }
+            });
+        }
+    }
 
     function handleImageUpdate(event: CustomEvent, variableName: string) {
         const { scale, x, y } = event.detail;
@@ -71,8 +126,14 @@
         input.click();
     }
 
-    function handleToggle(checked: boolean) {
-        darkMode.set(checked);
+    function handleFileUpload(event: Event, variableName: string) {
+        const input = event.target as HTMLInputElement;
+        if (input.files && input.files[0]) {
+            const file = input.files[0];
+            fileUploads[variableName] = file;
+            formData[variableName] = file.name;
+            createAndCacheFileUrl(file, variableName);
+        }
     }
 
     function createAndCacheFileUrl(file: File, variableName: string) {
@@ -84,6 +145,10 @@
         return url;
     }
 
+    function handleToggle(checked: boolean) {
+        darkMode.set(checked);
+    }
+
     function handleMouseDown() {
         MOUSE_MOVING = true;
     }
@@ -92,62 +157,9 @@
         MOUSE_MOVING = false;
     }
 
-    async function fetchTemplate(id: string) {
-        try {
-            const { data, error } = await supabase
-                .from('templates')
-                .select('*')
-                .eq('id', id)
-                .single();
-
-            if (error) throw error;
-
-            template = data as TemplateData;
-            initializeFormData();
-            console.log('Template fetched:', template);
-            addDebugMessage('Template fetched successfully');
-        } catch (error) {
-            console.error('Error fetching template:', error);
-            errorMessage = 'Failed to load template';
-            addDebugMessage(`Error fetching template: ${error instanceof Error ? error.message : JSON.stringify(error)}`);
-        }
-    }
-
-    let elementErrors: string[] = [];
-
-    function initializeFormData() {
-        if (template) {
-            elementErrors = [];
-            template.template_elements.forEach((el, index) => {
-                if (!el.variableName) {
-                    elementErrors.push(`Element at index ${index} is missing variableName`);
-                    el.variableName = `undefined-${index}`; // Assign a unique identifier for undefined variableNames
-                }
-                if (el.type === 'text') {
-                    formData[el.variableName] = el.content || '';
-                } else {
-                    fileUploads[el.variableName] = null;
-                    imagePositions[el.variableName] = {
-                        x: 0,
-                        y: 0,
-                        width: el.width || 100,
-                        height: el.height || 100,
-                        scale: 1
-                    };
-                }
-            });
-        }
-    }
-
-
-    function handleFileUpload(event: Event, variableName: string) {
-        const input = event.target as HTMLInputElement;
-        if (input.files && input.files.length > 0) {
-            const file = input.files[0];
-            fileUploads[variableName] = file;
-            formData[variableName] = file.name;
-            createAndCacheFileUrl(file, variableName);
-        }
+    function addDebugMessage(message: string) {
+        console.log(message);
+        debugMessages = [...debugMessages, message];
     }
 
     async function saveIdCard() {
@@ -163,40 +175,21 @@
         addDebugMessage("Starting saveIdCard function");
 
         try {
-            // Check if canvas components are initialized
             if (!frontCanvasComponent || !backCanvasComponent) {
-                throw new Error('Canvas components are not initialized');
+                throw new Error('Canvas components not initialized');
             }
 
             addDebugMessage("Rendering full resolution canvases");
 
-            // Render full resolution canvases and get blobs
             const [frontBlob, backBlob] = await Promise.all([
                 frontCanvasComponent.renderFullResolution(),
                 backCanvasComponent.renderFullResolution()
             ]);
 
-            addDebugMessage("Full resolution canvases rendered");
-
             if (!frontBlob || !backBlob) {
                 throw new Error('Failed to create blobs from canvases');
             }
 
-            addDebugMessage("Blobs created successfully");
-
-            // Generate unique filenames
-            const timestamp = Date.now();
-            const frontFilename = `front_${template.id}_${timestamp}.png`;
-            const backFilename = `back_${template.id}_${timestamp}.png`;
-
-            // Upload images to storage
-            addDebugMessage("Uploading images to storage");
-            const frontUpload = await uploadToStorage('rendered-id-cards', frontFilename, frontBlob);
-            const backUpload = await uploadToStorage('rendered-id-cards', backFilename, backBlob);
-
-            addDebugMessage("Images uploaded successfully");
-
-            // Prepare data for saving
             const savedData = {
                 ...formData,
                 imagePositions,
@@ -205,21 +198,23 @@
                 )
             };
 
-            addDebugMessage(`Form Data: ${JSON.stringify(formData)}`);
-            addDebugMessage(`Image Positions: ${JSON.stringify(imagePositions)}`);
-            addDebugMessage(`File Uploads: ${JSON.stringify(savedData.fileUploads)}`);
+            const formDataToSend = new FormData();
+            formDataToSend.append('frontBlob', frontBlob);
+            formDataToSend.append('backBlob', backBlob);
+            formDataToSend.append('templateId', template.id);
+            formDataToSend.append('data', JSON.stringify(savedData));
 
-            // Save record to database
-            const { data, error } = await supabase
-                .from('idcards')
-                .insert({
-                    template_id: template.id,
-                    front_image: frontUpload,
-                    back_image: backUpload,
-                    data: JSON.stringify(savedData),
-                });
+            const response = await fetch('?/saveIdCard', {
+                method: 'POST',
+                body: formDataToSend
+            });
 
-            if (error) throw error;
+            const result = await response.json();
+
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to save ID card');
+            }
+
             addDebugMessage('ID card saved successfully');
             alert('ID card saved successfully!');
         } catch (error) {
@@ -228,23 +223,6 @@
         } finally {
             isSaving = false;
         }
-    }
-
-    function addDebugMessage(message: string) {
-        console.log(message); // Also log to console for easier debugging
-        debugMessages = [...debugMessages, message];
-    }
-
-    async function uploadToStorage(bucket: string, filename: string, file: Blob): Promise<string> {
-        const { data, error } = await supabase.storage
-            .from(bucket)
-            .upload(filename, file, {
-                cacheControl: '3600',
-                upsert: true
-            });
-
-        if (error) throw error;
-        return data.path;
     }
 </script>
 
@@ -272,7 +250,7 @@
                     </div>
                     <div class="back-canvas">
                         <h3 class="text-lg font-semibold mb-2">Back</h3>
-                        {#if template }
+                        {#if template}
                             <IdCanvas
                                 bind:this={backCanvasComponent}
                                 elements={template.template_elements.filter(el => el.side === 'back')}
@@ -307,39 +285,69 @@
                 {#if template && template.template_elements}
                     <form on:submit|preventDefault={saveIdCard} class="space-y-4">
                         {#each template.template_elements as element (element.variableName)}
-                        {@const variableName = element.variableName }
-                        {#if variableName}
-                            <div role="button" tabindex="-1" class="grid grid-cols-[auto,1fr] gap-4 items-center" 
-                                on:mousedown={handleMouseDown} 
-                                on:mouseup={handleMouseUp}>
-                                <Label for={variableName} class="text-base whitespace-nowrap">
-                                    {variableName}:
-                                </Label>
-                                {#if element.type === 'text'}
-                                    <Input 
-                                        type="text"
-                                        id={variableName}
-                                        bind:value={formData[variableName]}
-                                        class="bg-muted"
-                                    />
-                                {:else if element.type === 'photo' || element.type === 'signature'}
-                                    <ThumbnailInput
-                                        width={element.width || 100}
-                                        height={element.height || 100}
-                                        fileUrl={cachedFileUrls[variableName]}
-                                        initialScale={imagePositions[variableName]?.scale ?? 1}
-                                        initialX={imagePositions[variableName]?.x ?? 0}
-                                        initialY={imagePositions[variableName]?.y ?? 0}
-                                        isSignature={element.type === 'signature'}
-                                        on:selectFile={() => handleSelectFile(variableName)}
-                                        on:update={(e) => handleImageUpdate(e, variableName)}
-                                    />
-                                {/if}
-                            </div>
-                        {:else}
-                            <p class="text-red-500">Error: Invalid template element (missing variable name)</p>
-                        {/if}
-                    {/each}
+                            {#if element.variableName}
+                                <div role="button" tabindex="-1" class="grid grid-cols-[auto,1fr] gap-4 items-center" 
+                                    on:mousedown={handleMouseDown} 
+                                    on:mouseup={handleMouseUp}>
+                                    <Label for={element.variableName} class="text-base whitespace-nowrap">
+                                        {element.variableName}:
+                                    </Label>
+                                    {#if element.type === 'text'}
+                                        <Input 
+                                            type="text"
+                                            id={element.variableName}
+                                            bind:value={formData[element.variableName]}
+                                            class="bg-muted"
+                                        />
+                                    {:else if element.type === 'selection' && element.options}
+                                        <div class="relative w-full">
+                                            <Select.Root
+                                                selected={selectedOptions[element.variableName]}
+                                                onSelectedChange={(selection) => {
+                                                    if (selection && typeof selection.value === 'string') {
+                                                        formData[element.variableName] = selection.value;
+                                                        selectedOptions[element.variableName] = {
+                                                            value: selection.value,
+                                                            label: selection.value
+                                                        };
+                                                    }
+                                                }}
+                                            >
+                                                <Select.Trigger class="w-full">
+                                                    <Select.Value placeholder="Select an option">
+                                                        {selectedOptions[element.variableName]?.label || 'Select an option'}
+                                                    </Select.Value>
+                                                </Select.Trigger>
+                                                <Select.Content>
+                                                    {#each element.options as option}
+                                                        <Select.Item 
+                                                            value={option}
+                                                            label={option}
+                                                        >
+                                                            {option}
+                                                        </Select.Item>
+                                                    {/each}
+                                                </Select.Content>
+                                            </Select.Root>
+                                        </div>
+                                    {:else if element.type === 'photo' || element.type === 'signature'}
+                                        <ThumbnailInput
+                                            width={element.width || 100}
+                                            height={element.height || 100}
+                                            fileUrl={cachedFileUrls[element.variableName]}
+                                            initialScale={imagePositions[element.variableName]?.scale ?? 1}
+                                            initialX={imagePositions[element.variableName]?.x ?? 0}
+                                            initialY={imagePositions[element.variableName]?.y ?? 0}
+                                            isSignature={element.type === 'signature'}
+                                            on:selectFile={() => handleSelectFile(element.variableName)}
+                                            on:update={(e) => handleImageUpdate(e, element.variableName)}
+                                        />
+                                    {/if}
+                                </div>
+                            {:else}
+                                <p class="text-red-500">Error: Invalid template element (missing variable name)</p>
+                            {/if}
+                        {/each}
                         <Button type="submit" class="w-full mt-6" on:click={saveIdCard} disabled={isSaving}>
                             {#if isSaving}
                                 <Loader class="mr-2 h-4 w-4 animate-spin" />

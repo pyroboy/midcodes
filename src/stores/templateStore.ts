@@ -13,9 +13,10 @@ export interface TemplateData {
 
 export interface TemplateElement {
   variableName: string;
-  type: 'text' | 'photo'|'signature';
+  type: 'text' | 'photo' | 'signature' | 'selection';
   side: 'front' | 'back';
   content?: string;
+  options?: string[];
   x: number;
   y: number;
   width?: number;
