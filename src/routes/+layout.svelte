@@ -21,11 +21,20 @@
 
     $: profile = $page.data.profile as Profile | null;
     $: path = $page.url.pathname;
-    $: showHeader = $session && path !== '/auth';
-    $: userEmail = $user?.email;
+    $: showHeader = $session !== null && path !== '/auth';
+    $: userEmail = $user?.email ?? $page.data.user?.email;
     $: selectedTemplate = $settings.selectedTemplate;
     $: createIdUrl = selectedTemplate ? `/use-template/${selectedTemplate.id}` : '/use-template';
     $: isDark = $settings.theme === 'dark';
+
+    // Log state changes
+    $: console.log('Layout: Current path:', path);
+    $: console.log('Layout: Session exists:', !!$session);
+    $: console.log('Layout: User exists:', !!$user);
+    $: console.log('Layout: Page data user exists:', !!$page.data.user);
+    $: console.log('Layout: User email:', userEmail);
+    $: console.log('Layout: Show header:', showHeader);
+    $: console.log('Layout: Profile:', profile);
 
     let progressValue = 0;
     let progressInterval: ReturnType<typeof setTimeout> | undefined;
@@ -33,6 +42,10 @@
 
     onMount(() => {
         loadGoogleFonts();
+        console.log('Layout: Mounted');
+        console.log('Layout: Initial page data:', $page.data);
+        console.log('Layout: Initial session:', $session);
+        console.log('Layout: Initial user:', $user);
     });
 
     onDestroy(() => {
@@ -157,7 +170,12 @@
                     {/if}
                 </Button>
                 <div class="flex items-center gap-4">
-                    <span class="text-sm text-gray-600">{userEmail}</span>
+                    <div class="flex flex-col">
+                        <span class="text-sm text-gray-600">{userEmail}</span>
+                        {#if profile?.role}
+                            <span class="text-xs text-muted-foreground">{profile.role}</span>
+                        {/if}
+                    </div>
                     <Button variant="outline" size="sm" on:click={signOut}>Sign Out</Button>
                 </div>
             </div>

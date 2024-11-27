@@ -35,29 +35,23 @@ const createSettingsStore = () => {
     if (browser) {
         subscribe(($settings) => {
             const root = document.documentElement;
-            if ($settings.theme === 'dark') {
-                root.classList.add('dark');
-            } else {
-                root.classList.remove('dark');
-            }
+            root.classList.remove('light', 'dark');
+            root.classList.add($settings.theme);
             localStorage.setItem('theme', $settings.theme);
         });
     }
 
     return {
         subscribe,
-        toggleTheme: () => update(settings => ({
-            ...settings,
-            theme: settings.theme === 'light' ? 'dark' : 'light'
-        })),
-        setTemplate: (template: Template | null) => update(settings => ({
-            ...settings,
-            selectedTemplate: template
-        })),
-        clearTemplate: () => update(settings => ({
-            ...settings,
-            selectedTemplate: null
-        }))
+        setTheme: (theme: 'light' | 'dark') => 
+            update(settings => ({ ...settings, theme })),
+        toggleTheme: () => 
+            update(settings => ({
+                ...settings,
+                theme: settings.theme === 'light' ? 'dark' : 'light'
+            })),
+        setSelectedTemplate: (template: Template | null) =>
+            update(settings => ({ ...settings, selectedTemplate: template }))
     };
 };
 

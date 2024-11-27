@@ -17,7 +17,7 @@
 	"devDependencies": {
 		"@playwright/test": "^1.28.1",
 		"@sveltejs/adapter-auto": "^3.0.0",
-		"@sveltejs/kit": "^2.0.0",
+		"@sveltejs/kit": "^2.8.5",
 		"@sveltejs/vite-plugin-svelte": "^3.0.0",
 		"@tailwindcss/typography": "^0.5.14",
 		"@types/eslint": "^8.56.0",
@@ -44,10 +44,9 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"@supabase/auth-helpers-sveltekit": "^0.13.0",
 		"@supabase/ssr": "^0.5.2",
 		"@supabase/supabase-js": "^2.46.1",
-		"@sveltejs/adapter-vercel": "^4.0.0",
+		"@sveltejs/adapter-vercel": "^5.4.8",
 		"clsx": "^2.1.1",
 		"cmdk-sv": "^0.0.18",
 		"jszip": "^3.10.1",
