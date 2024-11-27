@@ -619,5 +619,8 @@
         @apply border border-slate-200 rounded-md shadow-sm;
         image-rendering: -webkit-optimize-contrast;
         image-rendering: crisp-edges;
+        width: 100%; /* Make it stretch to its container's width */
+  height: auto; /* Maintain aspect ratio */
+  display: block; /* Avoid inline gap */
     }
 </style>
