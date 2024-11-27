@@ -175,7 +175,6 @@
     </div>
 </header>
 
-
 {/if}
 
 <main>
