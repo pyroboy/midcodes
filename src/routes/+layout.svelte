@@ -18,7 +18,11 @@
     interface Profile {
         role: string;
     }
+    let isMenuOpen = false;
 
+    function toggleMenu() {
+        isMenuOpen = !isMenuOpen;
+    }
     $: profile = $page.data.profile as Profile | null;
     $: path = $page.url.pathname;
     $: showHeader = $session !== null && path !== '/auth';
@@ -112,75 +116,66 @@
 {/if}
 
 {#if showHeader}
-    <header class="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div class="container flex h-14 items-center">
-            <div class="mr-4 flex">
-                <a href="/" class="mr-6 flex items-center space-x-2">
-                    <span class="font-bold">ID Generator</span>
-                </a>
-                <nav class="flex items-center space-x-6 text-sm font-medium">
-                    <a
-                        href="/templates"
-                        class="transition-colors hover:text-foreground/80 {path === '/templates' ? 'text-foreground' : 'text-foreground/60'}"
-                    >
-                        Templates
-                    </a>
-                    <div class="flex flex-col items-start gap-1">
-                        {#if selectedTemplate}
-                            <a
-                                href={createIdUrl}
-                                class="transition-colors hover:text-foreground/80 {path.startsWith('/use-template') ? 'text-foreground' : 'text-foreground/60'}"
-                            >
-                                Create ID
-                            </a>
-                            <span class="text-xs text-muted-foreground">Using: {selectedTemplate.name}</span>
-                        {:else}
-                            <span 
-                                class="text-muted-foreground cursor-not-allowed"
-                                title="Select a template first"
-                            >
-                                Create ID
-                            </span>
-                            <span class="text-xs text-muted-foreground">No template selected</span>
-                        {/if}
-                    </div>
-                    <a
-                        href="/all-ids"
-                        class="transition-colors hover:text-foreground/80 {path === '/all-ids' ? 'text-foreground' : 'text-foreground/60'}"
-                    >
-                        My IDs
-                    </a>
-                </nav>
-            </div>
-            <div class="flex flex-1 items-center justify-end space-x-4">
+<header class="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <div class="container">
+        <!-- Branding -->
+        <div class="mr-4 flex">
+            <a href="/" class="mr-6 flex items-center space-x-2">
+                <span class="font-bold">ID Generator</span>
+            </a>
+        </div>
+
+        <!-- Toggle for small screens -->
+        <button class="menu-toggle" on:click={toggleMenu}>
+            {isMenuOpen ? 'Close' : 'Menu'}
+        </button>
+
+        <!-- Navigation -->
+        <nav class={`flex items-center space-x-6 text-sm font-medium ${isMenuOpen ? 'show' : ''}`}>
+            <a href="/templates" class="transition-colors hover:text-foreground/80">
+                Templates
+            </a>
+            <div class="flex flex-col items-start gap-1">
                 {#if selectedTemplate}
-                    <Badge variant="outline" class="hidden sm:inline-flex">
-                        Using: {selectedTemplate.name}
-                    </Badge>
+                    <a href={createIdUrl} class="transition-colors hover:text-foreground/80">
+                        Create ID
+                    </a>
+                    <span class="text-xs text-muted-foreground">Using: {selectedTemplate.name}</span>
+                {:else}
+                    <span class="text-muted-foreground cursor-not-allowed" title="Select a template first">
+                        Create ID
+                    </span>
+                    <span class="text-xs text-muted-foreground">No template selected</span>
                 {/if}
-                <Button 
-                    variant="ghost" 
-                    size="icon"
-                    on:click={handleThemeChange}
-                >
-                    {#if isDark}
-                        <Sun class="h-5 w-5" />
-                    {:else}
-                        <Moon class="h-5 w-5" />
+            </div>
+            <a href="/all-ids" class="transition-colors hover:text-foreground/80">
+                My IDs
+            </a>
+        </nav>
+
+        <!-- User Profile and Theme Toggle -->
+        <div class="flex items-center space-x-4">
+            <Button variant="ghost" size="icon" on:click={handleThemeChange}>
+                {#if isDark}
+                    <Sun class="h-5 w-5" />
+                {:else}
+                    <Moon class="h-5 w-5" />
+                {/if}
+            </Button>
+            <div class="flex items-center gap-4">
+                <div class="flex flex-col">
+                    <span class="text-sm text-gray-600">{userEmail}</span>
+                    {#if profile?.role}
+                        <span class="text-xs text-muted-foreground">{profile.role}</span>
                     {/if}
-                </Button>
-                <div class="flex items-center gap-4">
-                    <div class="flex flex-col">
-                        <span class="text-sm text-gray-600">{userEmail}</span>
-                        {#if profile?.role}
-                            <span class="text-xs text-muted-foreground">{profile.role}</span>
-                        {/if}
-                    </div>
-                    <Button variant="outline" size="sm" on:click={signOut}>Sign Out</Button>
                 </div>
+                <Button variant="outline" size="sm" on:click={signOut}>Sign Out</Button>
             </div>
         </div>
-    </header>
+    </div>
+</header>
+
+
 {/if}
 
 <main>
@@ -212,4 +207,55 @@
     main {
         padding-top: var(--nav-height);
     }
+    header {
+  display: flex; /* Default for desktop */
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem;
+  flex-wrap: nowrap; /* No wrapping on desktop */
+}
+
+header nav {
+  display: flex; /* Show all nav links on desktop */
+  gap: 1rem; /* Space between items */
+}
+
+header .menu-toggle {
+  display: none; /* Hide toggle button by default (desktop) */
+}
+
+header .container {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+/* Media query for smaller screens */
+@media (max-width: 768px) {
+  header {
+    flex-direction: column; /* Stack items vertically */
+    padding: 1rem;
+  }
+
+  header nav {
+    flex-direction: column; /* Stack nav links */
+    gap: 0.5rem;
+    display: none; /* Initially hidden */
+  }
+
+  header nav.show {
+    display: flex; /* Show when toggled */
+  }
+
+  header .menu-toggle {
+    display: block; /* Show toggle button */
+    cursor: pointer;
+    font-size: 1rem;
+    background: none;
+    border: none;
+  }
+}
+
 </style>
