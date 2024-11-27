@@ -6,7 +6,7 @@
     import { Progress } from '$lib/components/ui/progress';
     import { Button } from '$lib/components/ui/button';
     import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "$lib/components/ui/dropdown-menu";
-    import { User, Sun, Moon } from 'lucide-svelte';
+    import { User, Sun, Moon, Menu, X } from 'lucide-svelte';
     import { onMount, onDestroy } from 'svelte';
     import { session, user } from '$lib/stores/auth';
     import { settings } from '$lib/stores/settings';
@@ -18,11 +18,18 @@
     interface Profile {
         role: string;
     }
+    
     let isMenuOpen = false;
+    let isUserMenuOpen = false;
 
     function toggleMenu() {
         isMenuOpen = !isMenuOpen;
     }
+
+    function toggleUserMenu() {
+        isUserMenuOpen = !isUserMenuOpen;
+    }
+
     $: profile = $page.data.profile as Profile | null;
     $: path = $page.url.pathname;
     $: showHeader = $session !== null && path !== '/auth';
@@ -31,25 +38,12 @@
     $: createIdUrl = selectedTemplate ? `/use-template/${selectedTemplate.id}` : '/use-template';
     $: isDark = $settings.theme === 'dark';
 
-    // Log state changes
-    $: console.log('Layout: Current path:', path);
-    $: console.log('Layout: Session exists:', !!$session);
-    $: console.log('Layout: User exists:', !!$user);
-    $: console.log('Layout: Page data user exists:', !!$page.data.user);
-    $: console.log('Layout: User email:', userEmail);
-    $: console.log('Layout: Show header:', showHeader);
-    $: console.log('Layout: Profile:', profile);
-
     let progressValue = 0;
     let progressInterval: ReturnType<typeof setTimeout> | undefined;
     let showProgress = false;
 
     onMount(() => {
         loadGoogleFonts();
-        console.log('Layout: Mounted');
-        console.log('Layout: Initial page data:', $page.data);
-        console.log('Layout: Initial session:', $session);
-        console.log('Layout: Initial user:', $user);
     });
 
     onDestroy(() => {
@@ -75,13 +69,6 @@
                     showProgress = false;
                 }, 200);
             }
-        }
-    }
-
-    async function handleSignOut() {
-        const { error } = await supabase.auth.signOut();
-        if (!error) {
-            await goto('/');
         }
     }
 
@@ -117,66 +104,136 @@
 
 {#if showHeader}
 <header class="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-    <div class="container">
-        <!-- Branding -->
-        <div class="mr-4 flex">
-            <a href="/" class="mr-6 flex items-center space-x-2">
-                <span class="font-bold">ID Generator</span>
-            </a>
-        </div>
-
-        <!-- Toggle for small screens -->
-        <button class="menu-toggle" on:click={toggleMenu}>
-            {isMenuOpen ? 'Close' : 'Menu'}
-        </button>
-
-        <!-- Navigation -->
-        <nav class={`flex items-center space-x-6 text-sm font-medium ${isMenuOpen ? 'show' : ''}`}>
-            <a href="/templates" class="transition-colors hover:text-foreground/80">
-                Templates
-            </a>
-            <div class="flex flex-col items-start gap-1">
-                {#if selectedTemplate}
-                    <a href={createIdUrl} class="transition-colors hover:text-foreground/80">
-                        Create ID
-                    </a>
-                    <span class="text-xs text-muted-foreground">Using: {selectedTemplate.name}</span>
-                {:else}
-                    <span class="text-muted-foreground cursor-not-allowed" title="Select a template first">
-                        Create ID
-                    </span>
-                    <span class="text-xs text-muted-foreground">No template selected</span>
-                {/if}
+    <div class="container mx-auto px-4">
+        <div class="flex h-16 items-center justify-between">
+            <!-- Brand/Logo - Left -->
+            <div class="flex items-center">
+                <a href="/" class="flex items-center space-x-2">
+                    <span class="text-xl font-bold">ID Generator</span>
+                </a>
             </div>
-            <a href="/all-ids" class="transition-colors hover:text-foreground/80">
-                My IDs
-            </a>
-        </nav>
 
-        <!-- User Profile and Theme Toggle -->
-        <div class="flex items-center space-x-4">
-            <Button variant="ghost" size="icon" on:click={handleThemeChange}>
-                {#if isDark}
-                    <Sun class="h-5 w-5" />
-                {:else}
-                    <Moon class="h-5 w-5" />
-                {/if}
-            </Button>
-            <div class="flex items-center gap-4">
-                <div class="flex flex-col">
-                    <span class="text-sm text-gray-600">{userEmail}</span>
-                    {#if profile?.role}
-                        <span class="text-xs text-muted-foreground">{profile.role}</span>
-                    {/if}
+            <!-- Desktop Navigation - Middle -->
+            <nav class="hidden space-x-8 md:flex">
+                <a 
+                    href="/templates" 
+                    class="text-sm font-medium transition-colors hover:text-foreground/80"
+                    class:text-primary={path === '/templates'}
+                >
+                    Templates
+                </a>
+                <a 
+                    href="/all-ids" 
+                    class="text-sm font-medium transition-colors hover:text-foreground/80"
+                    class:text-primary={path === '/all-ids'}
+                >
+                    My IDs
+                </a>
+            </nav>
+
+            <!-- User Section - Right -->
+            <div class="flex items-center space-x-4">
+                <!-- Desktop User Menu -->
+                <div class="hidden md:flex md:items-center">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger>
+                            <div class="flex items-center space-x-2">
+                                <div class="flex flex-col items-end">
+                                    <span class="max-w-[200px] truncate text-sm">{userEmail}</span>
+                                    {#if profile?.role}
+                                        <span class="text-xs text-muted-foreground capitalize">{profile.role}</span>
+                                    {/if}
+                                </div>
+                                <User class="h-5 w-5" />
+                            </div>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem on:click={handleThemeChange}>
+                                {#if isDark}
+                                    <Sun class="mr-2 h-4 w-4" />
+                                {:else}
+                                    <Moon class="mr-2 h-4 w-4" />
+                                {/if}
+                                Toggle Theme
+                            </DropdownMenuItem>
+                            <DropdownMenuItem on:click={signOut}>
+                                Sign Out
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
-                <Button variant="outline" size="sm" on:click={signOut}>Sign Out</Button>
+
+                <!-- Mobile Menu Button -->
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    class="md:hidden"
+                    on:click={toggleMenu}
+                >
+                    {#if isMenuOpen}
+                        <X class="h-6 w-6" />
+                    {:else}
+                        <Menu class="h-6 w-6" />
+                    {/if}
+                </Button>
             </div>
         </div>
+
+        <!-- Mobile Navigation Menu -->
+        {#if isMenuOpen}
+        <div class="border-t md:hidden">
+            <div class="space-y-4 px-2 py-4">
+                <a 
+                    href="/templates" 
+                    class="block px-3 py-2 text-base font-medium transition-colors hover:bg-muted"
+                    class:text-primary={path === '/templates'}
+                >
+                    Templates
+                </a>
+                <a 
+                    href="/all-ids" 
+                    class="block px-3 py-2 text-base font-medium transition-colors hover:bg-muted"
+                    class:text-primary={path === '/all-ids'}
+                >
+                    My IDs
+                </a>
+                <div class="border-t pt-4">
+                    <div class="px-3 py-2">
+                        <div class="mb-2 text-sm font-medium">{userEmail}</div>
+                        {#if profile?.role}
+                            <div class="text-xs text-muted-foreground capitalize">{profile.role}</div>
+                        {/if}
+                    </div>
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        class="w-full justify-start px-3" 
+                        on:click={handleThemeChange}
+                    >
+                        {#if isDark}
+                            <Sun class="mr-2 h-4 w-4" />
+                        {:else}
+                            <Moon class="mr-2 h-4 w-4" />
+                        {/if}
+                        Toggle Theme
+                    </Button>
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        class="w-full justify-start px-3" 
+                        on:click={signOut}
+                    >
+                        Sign Out
+                    </Button>
+                </div>
+            </div>
+        </div>
+        {/if}
     </div>
 </header>
-
 {/if}
-<main>
+
+<main class="min-h-screen">
     <slot />
 </main>
 
@@ -201,59 +258,4 @@
     :global(.theme-transition) {
         opacity: 0;
     }
-
-    main {
-        padding-top: var(--nav-height);
-    }
-    header {
-  display: flex; /* Default for desktop */
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 1rem;
-  flex-wrap: nowrap; /* No wrapping on desktop */
-}
-
-header nav {
-  display: flex; /* Show all nav links on desktop */
-  gap: 1rem; /* Space between items */
-}
-
-header .menu-toggle {
-  display: none; /* Hide toggle button by default (desktop) */
-}
-
-header .container {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-}
-
-/* Media query for smaller screens */
-@media (max-width: 768px) {
-  header {
-    flex-direction: column; /* Stack items vertically */
-    padding: 1rem;
-  }
-
-  header nav {
-    flex-direction: column; /* Stack nav links */
-    gap: 0.5rem;
-    display: none; /* Initially hidden */
-  }
-
-  header nav.show {
-    display: flex; /* Show when toggled */
-  }
-
-  header .menu-toggle {
-    display: block; /* Show toggle button */
-    cursor: pointer;
-    font-size: 1rem;
-    background: none;
-    border: none;
-  }
-}
-
 </style>

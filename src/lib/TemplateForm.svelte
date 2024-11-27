@@ -13,6 +13,8 @@
     export let elements: TemplateElement[];
 
     const dispatch = createEventDispatcher();
+    const BASE_WIDTH = 506.5;
+    const BASE_HEIGHT = 319;
 
     let isDragging = false;
     let isResizing = false;
@@ -22,51 +24,83 @@
     let templateContainer: HTMLElement;
     let fontOptions: string[] = [];
     let fontsLoaded = false;
-    onMount(async () => {
+    let previewDimensions = {
+        width: BASE_WIDTH,
+        height: BASE_HEIGHT,
+        scale: 1
+    };
+
+    function updatePreviewDimensions() {
+        if (!templateContainer?.parentElement) return;
+
+        const parentWidth = templateContainer.parentElement.offsetWidth;
+        const containerWidth = Math.min(parentWidth, BASE_WIDTH);
+        const containerHeight = (containerWidth / BASE_WIDTH) * BASE_HEIGHT;
+        const scale = containerWidth / BASE_WIDTH;
+
+        previewDimensions = {
+            width: containerWidth,
+            height: containerHeight,
+            scale
+        };
+
+        return previewDimensions;
+    }
+
+    onMount(() => {
         if (elements.length === 0) {
             elements = side === 'front' ? [...defaultFrontElements] : [...defaultBackElements];
             updateStore();
         }
         
-        try {
-            await loadGoogleFonts();
+        loadGoogleFonts().then(() => {
             fontOptions = getAllFontFamilies();
             fontsLoaded = true;
-            console.log('Loaded fonts:', fontOptions);
-        } catch (error) {
+        }).catch(error => {
             console.error('Error loading some Google Fonts:', error);
-            // Still use all available fonts even if some failed to load
             fontOptions = getAllFontFamilies();
             fontsLoaded = true;
-            console.log('Using available fonts:', fontOptions);
+        });
+
+        const resizeObserver = new ResizeObserver(() => {
+            updatePreviewDimensions();
+        });
+
+        if (templateContainer?.parentElement) {
+            resizeObserver.observe(templateContainer.parentElement);
+            updatePreviewDimensions();
         }
+
+        return () => resizeObserver.disconnect();
     });
 
-    $: textStyle = (element: TemplateElement) => {
-    const fontFamily = element.font || 'Arial';
-    return {
-        'font-family': `"${fontFamily}", ${getFontFallback(fontFamily)}`,
+    $: elementStyle = (element: TemplateElement) => ({
+        left: `${(element.x || 0) * previewDimensions.scale}px`,
+        top: `${(element.y || 0) * previewDimensions.scale}px`,
+        width: `${((element.width || 0) * previewDimensions.scale)}px`,
+        height: `${((element.height || 0) * previewDimensions.scale)}px`
+    });
+
+    $: textStyle = (element: TemplateElement) => ({
+        'font-family': `"${element.font || 'Arial'}", ${getFontFallback(element.font || 'Arial')}`,
         'font-weight': element.fontWeight || '400',
         'font-style': element.fontStyle || 'normal',
-        'font-size': `${element.size}px`,
+        'font-size': `${((element.size || 16) * previewDimensions.scale)}px`,
         'color': element.color || '#000000',
         'text-align': element.alignment || 'left',
         'text-transform': element.textTransform || 'none',
         'text-decoration': element.textDecoration || 'none',
-        'letter-spacing': element.letterSpacing ? `${element.letterSpacing}px` : 'normal',
+        'letter-spacing': element.letterSpacing ? `${element.letterSpacing * previewDimensions.scale}px` : 'normal',
         'line-height': element.lineHeight || 'normal',
         'opacity': element.opacity || 1,
-        'display': 'block', // This ensures text-align works properly
-        'width': '100%'    // This ensures text-align affects the full width
-    };
-};
+        'display': 'block',
+        'width': '100%'
+    });
 
-function getFontFallback(font: string): string {
-    const fontConfig = fonts.find(f => f.family === font);
-    return fontConfig?.category || 'sans-serif';
-}
-
-
+    function getFontFallback(font: string): string {
+        const fontConfig = fonts.find(f => f.family === font);
+        return fontConfig?.category || 'sans-serif';
+    }
 
     function updateStore() {
         templateData.update((data: TemplateData) => {
@@ -84,19 +118,17 @@ function getFontFallback(font: string): string {
             if (i === index) {
                 let newEl = { ...el, side };
                 if (templateContainer) {
-                    const containerRect = templateContainer.getBoundingClientRect();
-                    const maxX = containerRect.width - (newEl.width || 0);
-                    const maxY = containerRect.height - (newEl.height || 0);
+                    const maxX = BASE_WIDTH - (newEl.width || 0);
+                    const maxY = BASE_HEIGHT - (newEl.height || 0);
 
                     newEl.x = Math.min(Math.max(x, 0), maxX);
                     newEl.y = Math.min(Math.max(y, 0), maxY);
 
                     if ((el.type === 'photo' || el.type === 'signature') && width && height) {
-                        newEl.width = Math.max(1, Math.round(width));
-                        newEl.height = Math.max(1, Math.round(height));
-                    } else if (el.type === 'text') {
-                        const elWidth = width || (metrics?.width || 0);
-                        newEl.width = Math.max(1, Math.round(elWidth));
+                        newEl.width = Math.max(20, Math.round(width));
+                        newEl.height = Math.max(20, Math.round(height));
+                    } else if (el.type === 'text' && metrics) {
+                        newEl.width = Math.max(20, Math.round(metrics.width / previewDimensions.scale));
                     }
                 }
                 return newEl;
@@ -134,55 +166,57 @@ function getFontFallback(font: string): string {
         const dx = event.clientX - startX;
         const dy = event.clientY - startY;
 
-        const element = elements[currentElementIndex];
+        // Apply inverse scaling to mouse movement
+        const scaledDx = dx / previewDimensions.scale;
+        const scaledDy = dy / previewDimensions.scale;
 
-        if (isResizing) {
-            let newWidth = element.width || 0;
-            let newHeight = element.height || 0;
-            let newX = element.x;
-            let newY = element.y;
+        const element = elements[currentElementIndex];
+        if (!element) return;
+
+        if (isResizing && element.width !== undefined && element.height !== undefined) {
+            let newWidth = element.width;
+            let newHeight = element.height;
+            let newX = element.x || 0;
+            let newY = element.y || 0;
 
             switch (resizeHandle) {
                 case 'top-left':
-                    newWidth -= dx;
-                    newHeight -= dy;
-                    newX += dx;
-                    newY += dy;
+                    newWidth -= scaledDx;
+                    newHeight -= scaledDy;
+                    newX += scaledDx;
+                    newY += scaledDy;
                     break;
                 case 'top-right':
-                    newWidth += dx;
-                    newHeight -= dy;
-                    newY += dy;
+                    newWidth += scaledDx;
+                    newHeight -= scaledDy;
+                    newY += scaledDy;
                     break;
                 case 'bottom-left':
-                    newWidth -= dx;
-                    newHeight += dy;
-                    newX += dx;
+                    newWidth -= scaledDx;
+                    newHeight += scaledDy;
+                    newX += scaledDx;
                     break;
                 case 'bottom-right':
-                    newWidth += dx;
-                    newHeight += dy;
+                    newWidth += scaledDx;
+                    newHeight += scaledDy;
                     break;
             }
 
-            const containerRect = templateContainer.getBoundingClientRect();
-            const maxX = containerRect.width;
-            const maxY = containerRect.height;
-
-            newX = Math.max(0, Math.min(newX, maxX - newWidth));
-            newY = Math.max(0, Math.min(newY, maxY - newHeight));
+            newX = Math.max(0, Math.min(newX, BASE_WIDTH - newWidth));
+            newY = Math.max(0, Math.min(newY, BASE_HEIGHT - newHeight));
 
             element.x = newX;
             element.y = newY;
             element.width = Math.max(20, newWidth);
             element.height = Math.max(20, newHeight);
         } else {
-            const newX = element.x + dx;
-            const newY = element.y + dy;
+            const newX = (element.x || 0) + scaledDx;
+            const newY = (element.y || 0) + scaledDy;
+            
             const canvas = document.createElement('canvas');
             const context = canvas.getContext('2d');
             if (context) {
-                context.font = `${element.size}px ${element.font}`;
+                context.font = `${element.size || 16}px ${element.font || 'Arial'}`;
                 const metrics = context.measureText(element.content || '');
                 limitDragBounds(currentElementIndex, newX, newY, element.width, element.height, metrics);
             }
@@ -206,6 +240,7 @@ function getFontFallback(font: string): string {
         dispatch('update', { elements, side });
     }
 
+    // Your existing default elements...
     const defaultFrontElements: TemplateElement[] = [
         { variableName: 'licenseNo', type: 'text', side: 'front', content: '75-005-24', x: 293, y: 159, font: 'Arial', size: 16, color: '#000000', alignment: 'left' },
         { variableName: 'valid', type: 'text', side: 'front', content: '01/01/2026', x: 295, y: 179, font: 'Arial', size: 16, color: '#000000', alignment: 'left' },
@@ -230,41 +265,45 @@ function getFontFallback(font: string): string {
 <div class="template-section">
     <h2 class="text-2xl font-semibold mb-4 text-foreground">{side.charAt(0).toUpperCase() + side.slice(1)} Template</h2>
     <div class="template-layout">
-        <div class="template-container {side} group" 
-             class:has-preview={preview}
-             bind:this={templateContainer} 
-             style:background-image={preview ? `url('${preview}')` : 'none'}>
-            
-            {#if !preview}
-                <div class="placeholder-design">
-                    <div class="placeholder-content">
-                        <div class="icon-container">
-                            <Image class="w-8 h-8 mb-2 text-muted-foreground/40" />
-                            <Plus class="w-4 h-4 text-primary absolute -right-1 -bottom-1" />
+        <div class="preview-container">
+            <div 
+                class="template-container {side} group" 
+                class:has-preview={preview}
+                bind:this={templateContainer}
+                style="background-image: {preview ? `url('${preview}')` : 'none'};"
+            >
+                {#if !preview}
+                    <div class="placeholder-design">
+                        <div class="placeholder-content">
+                            <div class="icon-container">
+                                <Image class="w-8 h-8 mb-2 text-muted-foreground/40" />
+                                <Plus class="w-4 h-4 text-primary absolute -right-1 -bottom-1" />
+                            </div>
+                            <h3 class="text-lg font-medium text-foreground/80 mb-1">Add Template Background</h3>
+                            <p class="text-sm text-muted-foreground mb-4">Recommended size: 1013x638 pixels</p>
+                            <label class="upload-button">
+                                <input type="file" accept="image/*" on:change={handleImageUpload} />
+                                <span class="upload-text">
+                                    <Upload class="w-4 h-4 mr-2" />
+                                    Choose File
+                                </span>
+                            </label>
                         </div>
-                        <h3 class="text-lg font-medium text-foreground/80 mb-1">Add Template Background</h3>
-                        <p class="text-sm text-muted-foreground mb-4">Recommended size: 1013x638 pixels</p>
-                        <label class="upload-button">
-                            <input type="file" accept="image/*" on:change={handleImageUpload} />
-                            <span class="upload-text">
-                                <Upload class="w-4 h-4 mr-2" />
-                                Choose File
-                            </span>
-                        </label>
+                        <div class="placeholder-grid" />
                     </div>
-                    <div class="placeholder-grid" />
-                </div>
-            {:else}
-                {#each elements as element, i}
-                    <div
-                        class="template-element {element.type}"
-                        style="left: {element.x}px; top: {element.y}px; width: {element.width}px; height: {element.height}px;"
-                        on:mousedown={(e) => onMouseDown(e, i)}
-                        role="button"
-                        tabindex="0"
-                        aria-label="{element.type} element"
-                    >
-                        {#if element.type === 'text' || element.type === 'selection'}
+                {:else}
+                    {#each elements as element, i}
+                        <div
+                            class="template-element {element.type}"
+                            style={Object.entries(elementStyle(element))
+                                .map(([key, value]) => `${key}: ${value}`)
+                                .join(';')}
+                            on:mousedown={(e) => onMouseDown(e, i)}
+                            role="button"
+                            tabindex="0"
+                            aria-label="{element.type} element"
+                        >
+                            {#if element.type === 'text' || element.type === 'selection'}
                             <span style={Object.entries(textStyle(element))
                                 .map(([key, value]) => `${key}: ${value}`)
                                 .join(';')}>
@@ -292,143 +331,173 @@ function getFontFallback(font: string): string {
                 </Button>
             {/if}
         </div>
-        {#if preview}
-            <ElementList 
-                {elements} 
-                {fontOptions} 
-                on:update={handleElementsUpdate}
-            />
-        {/if}
     </div>
+    {#if preview}
+        <ElementList 
+            {elements} 
+            {fontOptions} 
+            on:update={handleElementsUpdate}
+        />
+    {/if}
+</div>
 </div>
 
 <style>
-    .template-section {
-        margin-bottom: 40px;
-    }
+.template-section {
+    margin-bottom: 2.5rem;
+    width: 100%;
+    padding: 1rem;
+}
 
+.template-layout {
+    display: flex;
+    gap: 1.25rem;
+    width: 100%;
+    flex-direction: column;
+}
+
+@media (min-width: 1024px) {
     .template-layout {
-        display: flex;
-        gap: 20px;
+        flex-direction: row;
+        align-items: flex-start;
     }
 
-    .template-container {
-        width: 506.5px;
-        height: 319px;
-        border: 1px solid #000;
-        position: relative;
-        background-size: cover;
-        background-position: center;
-        overflow: hidden;
+    .preview-container {
+        flex: 0 0 506.5px;
+        max-width: 506.5px;
     }
+}
 
-    .placeholder-design {
-        position: absolute;
-        inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: var(--background);
-    }
+.preview-container {
+    width: 100%;
+    max-width: 506.5px;
+    aspect-ratio: 506.5/319;
+    position: relative;
+    background: var(--background);
+}
 
-    .placeholder-content {
-        position: relative;
-        z-index: 10;
-        text-align: center;
-        padding: 1.5rem;
-    }
+.template-container {
+    width: 100%;
+    height: 100%;
+    border: 1px solid #000;
+    position: relative;
+    background-size: cover;
+    background-position: center;
+    overflow: hidden;
+}
 
-    .icon-container {
-        position: relative;
-        display: inline-flex;
-        margin-bottom: 1rem;
-    }
+.placeholder-design {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--background);
+}
 
-    .placeholder-grid {
-        position: absolute;
-        inset: 0;
-        opacity: 0.03;
-        pointer-events: none;
-        background-image: linear-gradient(to right, var(--primary) 1px, transparent 1px),
-                         linear-gradient(to bottom, var(--primary) 1px, transparent 1px);
-        background-size: 20px 20px;
-    }
+.placeholder-content {
+    position: relative;
+    z-index: 10;
+    text-align: center;
+    padding: 1.5rem;
+}
 
-    /* Restored Original Styles */
-    .template-element {
-        position: absolute;
-        cursor: move;
-        border: 1px solid cyan;
-        box-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
-        box-sizing: border-box;
-        opacity: 0.5;
-    }
+.icon-container {
+    position: relative;
+    display: inline-flex;
+    margin-bottom: 1rem;
+}
 
-    .template-element:hover {
-        opacity: 1;
-    }
+.placeholder-grid {
+    position: absolute;
+    inset: 0;
+    opacity: 0.03;
+    pointer-events: none;
+    background-image: linear-gradient(to right, var(--primary) 1px, transparent 1px),
+                     linear-gradient(to bottom, var(--primary) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
 
-    .resize-handle {
-        position: absolute;
-        width: 8px;
-        height: 8px;
-        background-color: white;
-        border: 1px solid #000;
-        border-radius: 50%;
-        display: none;
-    }
+.template-element {
+    position: absolute;
+    cursor: move;
+    border: 1px solid cyan;
+    box-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
+    box-sizing: border-box;
+    opacity: 0.5;
+}
 
-    .template-element:hover .resize-handle {
-        display: block;
-    }
+.template-element:hover {
+    opacity: 1;
+}
 
-    .template-element.text span {
-        display: block;
-        width: 100%;
-        cursor: move;
-    }
+.resize-handle {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background-color: white;
+    border: 1px solid #000;
+    border-radius: 50%;
+    display: none;
+}
 
-    .placeholder {
-        background-color: rgba(200, 200, 200, 0.5);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 14px;
-        width: 100%;
-        height: 100%;
-    }
+.template-element:hover .resize-handle {
+    display: block;
+}
 
-    .file-input-label {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        cursor: pointer;
-    }
+.template-element.text span {
+    display: block;
+    width: 100%;
+    cursor: move;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 
-    .file-input-label input[type="file"] {
-        display: none;
-    }
+.placeholder {
+    background-color: rgba(200, 200, 200, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    width: 100%;
+    height: 100%;
+}
 
-    .remove-image {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        background: red;
-        color: white;
-        border: none;
-        border-radius: 50%;
-        width: 30px;
-        height: 30px;
-        font-size: 16px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
+.upload-button {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    background-color: var(--primary);
+    color: white;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
 
-    .resize-handle.top-left { top: -4px; left: -4px; cursor: nwse-resize; }
-    .resize-handle.top-right { top: -4px; right: -4px; cursor: nesw-resize; }
-    .resize-handle.bottom-left { bottom: -4px; left: -4px; cursor: nesw-resize; }
-    .resize-handle.bottom-right { bottom: -4px; right: -4px; cursor: nwse-resize; }
+.upload-button:hover {
+    background-color: var(--primary-hover);
+}
+
+.upload-button input[type="file"] {
+    display: none;
+}
+
+.upload-text {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.875rem;
+}
+
+.remove-image {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 10;
+}
+
+.resize-handle.top-left { top: -4px; left: -4px; cursor: nwse-resize; }
+.resize-handle.top-right { top: -4px; right: -4px; cursor: nesw-resize; }
+.resize-handle.bottom-left { bottom: -4px; left: -4px; cursor: nesw-resize; }
+.resize-handle.bottom-right { bottom: -4px; right: -4px; cursor: nwse-resize; }
 </style>

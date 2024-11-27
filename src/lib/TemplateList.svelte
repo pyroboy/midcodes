@@ -1,7 +1,9 @@
 <script lang="ts">
     import { onMount, createEventDispatcher } from 'svelte';
-    import { fade } from 'svelte/transition';
+    import { fade, slide } from 'svelte/transition';
     import { supabase } from '$lib/supabaseClient';
+    import { Button } from "$lib/components/ui/button";
+    import { Copy, Trash2, ExternalLink } from 'lucide-svelte';
     
     interface Template {
         id: string;
@@ -14,6 +16,7 @@
     let templates: Template[] = [];
     let selectedTemplate: Template | null = null;
     let notification: string | null = null;
+    let hoveredAction: 'use' | 'duplicate' | 'delete' | null = null;
     const dispatch = createEventDispatcher();
     
     onMount(async () => {
@@ -59,39 +62,37 @@
     }
 
     async function duplicateTemplate(template: Template) {
-    const { data, error } = await supabase
-        .from('templates')
-        .select('*')
-        .eq('id', template.id)
-        .single();
+        const { data, error } = await supabase
+            .from('templates')
+            .select('*')
+            .eq('id', template.id)
+            .single();
 
-    if (error) {
-        console.error('Error fetching template details:', error);
-        showNotification('Error duplicating template READ');
-        return;
+        if (error) {
+            showNotification('Error duplicating template');
+            return;
+        }
+
+        const { id, ...templateData } = data;
+        const newTemplate = {
+            ...templateData,
+            name: `Copy of ${data.name}`,
+            created_at: new Date().toISOString()
+        };
+
+        const { data: insertedTemplate, error: insertError } = await supabase
+            .from('templates')
+            .insert([newTemplate])
+            .select()
+            .single();
+
+        if (insertError) {
+            showNotification('Error duplicating template');
+        } else {
+            templates = [insertedTemplate, ...templates];
+            showNotification('Template duplicated successfully');
+        }
     }
-    const { id, ...templateData } = data;
-    const newTemplate = {
-        ...templateData,
-
-        name: `Copy of ${data.name}`,
-        created_at: new Date().toISOString()
-    };
-
-    const { data: insertedTemplate, error: insertError } = await supabase
-        .from('templates')
-        .insert([newTemplate])
-        .select()
-        .single();
-
-    if (insertError) {
-        console.error('Error inserting duplicated template:', insertError);
-        showNotification('Error duplicating template COPY');
-    } else {
-        templates = [insertedTemplate, ...templates];
-        showNotification('Template duplicated successfully');
-    }
-}
 
     function useTemplate(id: string) {
         window.location.href = `/use-template/${id}`;
@@ -103,94 +104,145 @@
             notification = null;
         }, 3000);
     }
+
+    function handleActionClick(e: Event, template: Template, action: 'use' | 'duplicate' | 'delete') {
+        e.stopPropagation();
+        selectTemplate(template);
+        
+        switch (action) {
+            case 'use':
+                useTemplate(template.id);
+                break;
+            case 'duplicate':
+                duplicateTemplate(template);
+                break;
+            case 'delete':
+                deleteTemplate(template.id);
+                break;
+        }
+    }
+
+    function setHoveredAction(action: 'use' | 'duplicate' | 'delete' | null) {
+        hoveredAction = action;
+    }
+
+    function getRowClasses(template: Template): string {
+        const baseClasses = "group relative transition-all duration-200";
+        
+        if (selectedTemplate?.id === template.id) {
+            return `${baseClasses} bg-muted`;
+        }
+        
+        switch (hoveredAction) {
+            case 'use':
+                return `${baseClasses} bg-primary/5`;
+            case 'duplicate':
+                return `${baseClasses} bg-warning/5`;
+            case 'delete':
+                return `${baseClasses} bg-destructive/5`;
+            default:
+                return `${baseClasses} hover:bg-muted/50`;
+        }
+    }
 </script>
 
-<div class="template-list">
-    <h2>Templates</h2>
-    {#each templates as template (template.id)}
-        <div class="template-item" class:selected={selectedTemplate?.id === template.id}>
-            <div class="template-info" role="button" tabindex="0" on:click={() => selectTemplate(template)} on:keydown={(e) => e.key === 'Enter' && selectTemplate(template)}>
-                <span class="template-name">{template.name}</span>
-                <img src={template.front_background} alt={`Front of ${template.name}`} class="template-image" />
-                <span>{template.orientation}</span>
-                <span>{new Date(template.created_at).toLocaleDateString()}</span>
-            </div>
-            <div class="template-actions">
-                <button on:click={() => useTemplate(template.id)}>Use</button>
-                <button on:click={() => duplicateTemplate(template)}>Duplicate</button>
-                <button on:click={() => deleteTemplate(template.id)}>Delete</button>
-            </div>
+<div class="h-full w-[40%] overflow-hidden bg-background">
+    <div class="flex flex-col space-y-4 p-4">
+        <h2 class="text-2xl font-bold tracking-tight">Templates</h2>
+        
+        <div class="relative overflow-x-auto rounded-lg border bg-card">
+            <table class="w-full text-sm">
+                <thead class="border-b bg-muted/50 text-muted-foreground">
+                    <tr>
+                        <th class="px-4 py-3 text-left font-medium">Template</th>
+                        <th class="hidden px-4 py-3 text-left font-medium sm:table-cell">Created</th>
+                        <th class="hidden px-4 py-3 text-left font-medium sm:table-cell">Orientation</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y">
+                    {#each templates as template (template.id)}
+                        <tr 
+                            class={getRowClasses(template)}
+                            class:selected={selectedTemplate?.id === template.id}
+                            on:click={() => selectTemplate(template)}
+                            tabindex="0"
+                            role="button"
+                            on:keydown={(e) => e.key === 'Enter' && selectTemplate(template)}
+                        >
+                            <td class="px-4 py-3">
+                                <div class="flex items-center gap-3">
+                                    <img 
+                                        src={template.front_background} 
+                                        alt={template.name}
+                                        class="h-12 w-12 rounded-md border object-cover"
+                                    />
+                                    <span class="font-medium">{template.name}</span>
+                                </div>
+                            </td>
+                            <td class="hidden px-4 py-3 text-muted-foreground sm:table-cell">
+                                {new Date(template.created_at).toLocaleDateString()}
+                            </td>
+                            <td class="hidden px-4 py-3 capitalize text-muted-foreground sm:table-cell">
+                                {template.orientation}
+                            </td>
+                            
+                            <div class="invisible absolute inset-0 flex items-center justify-end opacity-0 transition-all duration-200 group-hover:visible group-hover:opacity-100">
+                                <div 
+                                    class="flex items-center gap-2 px-4"
+                                    transition:slide={{ axis: 'y', duration: 200 }}
+                                >
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon"
+                                        on:click={(e) => handleActionClick(e, template, 'use')}
+                                        on:mouseenter={() => setHoveredAction('use')}
+                                        on:mouseleave={() => setHoveredAction(null)}
+                                        class="hover:bg-primary hover:text-primary-foreground"
+                                    >
+                                        <ExternalLink class="h-4 w-4" />
+                                    </Button>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon"
+                                        on:click={(e) => handleActionClick(e, template, 'duplicate')}
+                                        on:mouseenter={() => setHoveredAction('duplicate')}
+                                        on:mouseleave={() => setHoveredAction(null)}
+                                        class="hover:bg-warning hover:text-warning-foreground"
+                                    >
+                                        <Copy class="h-4 w-4" />
+                                    </Button>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon"
+                                        on:click={(e) => handleActionClick(e, template, 'delete')}
+                                        on:mouseenter={() => setHoveredAction('delete')}
+                                        on:mouseleave={() => setHoveredAction(null)}
+                                        class="hover:bg-destructive hover:text-destructive-foreground"
+                                    >
+                                        <Trash2 class="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
+                        </tr>
+                    {/each}
+                </tbody>
+            </table>
         </div>
-    {/each}
+    </div>
 </div>
 
 {#if notification}
-    <div class="notification" transition:fade>
+    <div 
+        class="fixed bottom-4 right-4 z-50 rounded-lg bg-primary px-4 py-2 text-primary-foreground shadow-lg"
+        transition:fade={{ duration: 200 }}
+        role="alert"
+    >
         {notification}
     </div>
 {/if}
 
 <style>
-    .template-list {
-        width: 300px;
-        border-right: 1px solid #ccc;
-        padding: 10px;
-        height: 100vh;
-        overflow-y: auto;
-    }
-    
-    .template-item {
-        padding: 10px;
-        border-bottom: 1px solid #eee;
-        cursor: pointer;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    
-    .template-item:hover {
-        background-color: #f0f0f0;
-    }
-    
     .selected {
-        background-color: #e0e0e0;
-    }
-    
-    .template-info {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        flex: 1;
-    }
-
-    .template-name {
-        font-weight: bold;
-        margin-bottom: 5px;
-    }
-
-    .template-image {
-        width: 70%;
-        max-width: 175px;
-        height: auto;
-        margin: 10px 0;
-        object-fit: cover;
-    }
-
-    .template-actions {
-        display: flex;
-        flex-direction: column;
-        gap: 5px;
-        margin-left: 10px;
-    }
-
-    .notification {
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        background-color: #4CAF50;
-        color: white;
-        padding: 15px;
-        border-radius: 5px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        @apply bg-muted;
     }
 </style>

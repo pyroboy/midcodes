@@ -173,74 +173,102 @@
         }));
     }
 
+
     async function fetchTemplateDetails(templateId: string): Promise<TemplateData> {
-        const { data, error } = await supabase
-            .from('templates')
-            .select(`
-                id,
-                user_id,
-                name,
-                front_background,
-                back_background,
-                orientation,
-                template_elements
-            `)
-            .eq('id', templateId)
-            .single();
+    console.log('🔄 EditTemplate: Fetching template details for ID:', templateId);
+    const { data, error } = await supabase
+        .from('templates')
+        .select(`
+            id,
+            user_id,
+            name,
+            front_background,
+            back_background,
+            orientation,
+            template_elements
+        `)
+        .eq('id', templateId)
+        .single();
 
-        if (error) {
-            throw error;
-        }
-
-        if (!data) {
-            throw new Error('Template not found');
-        }
-
-        const templateData: TemplateData = {
-            id: data.id,
-            user_id: data.user_id,
-            name: data.name,
-            front_background: data.front_background,
-            back_background: data.back_background,
-            orientation: data.orientation,
-            template_elements: data.template_elements.map((el: any): TemplateElement => ({
-                variableName: el.variableName, // Handle both cases
-                type: el.type as 'text' | 'photo',
-                side: el.side as 'front' | 'back',
-                content: el.content,
-                x: el.x,
-                y: el.y,
-                width: el.width,
-                height: el.height,
-                font: el.font,
-                size: el.size,
-                color: el.color,
-                alignment: el.alignment as 'left' | 'center' | 'right',
-            })),
-        };
-
-        return templateData;
+    if (error) {
+        console.error('❌ EditTemplate: Error fetching template details:', error);
+        throw error;
     }
-    async function handleTemplateSelect(event: CustomEvent) {
-        const selectedTemplate = event.detail;
-        try {
-            const data = await fetchTemplateDetails(selectedTemplate.id);
-            if (data) {
-                orientation = data.orientation;
-                frontPreview = data.front_background;
-                backPreview = data.back_background;
-                frontElements = data.template_elements.filter((el) => el.side === 'front');
-                backElements = data.template_elements.filter((el) => el.side === 'back');
-                templateData.set(data);
-                frontBackground = null;
-                backBackground = null;
-                errorMessage = '';
-            }
-        } catch (error) {
-            console.error('Error fetching template details:', error);
-            errorMessage = 'Error fetching template details. Please try again.';
-        }
+
+    if (!data) {
+        console.error('❌ EditTemplate: Template not found');
+        throw new Error('Template not found');
     }
+
+    console.log('✅ EditTemplate: Template details fetched successfully:', data);
+
+    const templateData: TemplateData = {
+        id: data.id,
+        user_id: data.user_id,
+        name: data.name,
+        front_background: data.front_background,
+        back_background: data.back_background,
+        orientation: data.orientation,
+        template_elements: data.template_elements.map((el: any): TemplateElement => ({
+            variableName: el.variableName,
+            type: el.type as 'text' | 'photo',
+            side: el.side as 'front' | 'back',
+            content: el.content,
+            x: el.x,
+            y: el.y,
+            width: el.width,
+            height: el.height,
+            font: el.font,
+            size: el.size,
+            color: el.color,
+            alignment: el.alignment as 'left' | 'center' | 'right',
+        })),
+    };
+
+    console.log('✅ EditTemplate: Template data transformed:', templateData);
+    return templateData;
+}
+
+async function handleTemplateSelect(event: CustomEvent) {
+    console.log('🔄 EditTemplate: Template select event received:', event.detail);
+    try {
+        const data = await fetchTemplateDetails(event.detail.id);
+        if (data) {
+            console.log('🔄 EditTemplate: Updating component state with template data');
+            orientation = data.orientation;
+            frontPreview = data.front_background;
+            backPreview = data.back_background;
+            frontElements = data.template_elements.filter((el) => el.side === 'front');
+            backElements = data.template_elements.filter((el) => el.side === 'back');
+            
+            console.log('🔄 EditTemplate: Front elements count:', frontElements.length);
+            console.log('🔄 EditTemplate: Back elements count:', backElements.length);
+            
+            templateData.set(data);
+            console.log('✅ EditTemplate: Template store updated');
+            
+            frontBackground = null;
+            backBackground = null;
+            errorMessage = '';
+            console.log('✅ EditTemplate: Template selection complete');
+        }
+    } catch (error) {
+        console.error('❌ EditTemplate: Error in template selection:', error);
+        errorMessage = 'Error fetching template details. Please try again.';
+    }
+}
+$: {
+    if ($templateData) {
+        console.log('🔄 EditTemplate: Template store updated:', {
+            id: $templateData.id,
+            name: $templateData.name,
+            elementsCount: $templateData.template_elements.length
+        });
+        frontElements = $templateData.template_elements.filter((el) => el.side === 'front');
+        backElements = $templateData.template_elements.filter((el) => el.side === 'back');
+        console.log('✅ EditTemplate: Elements filtered - Front:', frontElements.length, 'Back:', backElements.length);
+    }
+}
 
     function clearForm() {
         frontBackground = null;
