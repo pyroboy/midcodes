@@ -176,7 +176,6 @@
 </header>
 
 {/if}
-
 <main>
     <slot />
 </main>
