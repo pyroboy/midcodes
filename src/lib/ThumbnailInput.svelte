@@ -3,16 +3,14 @@
     import { Move, Scaling } from "lucide-svelte";
     import { debounce } from 'lodash-es';
 
-    // export let variableName: string;
     export let width: number;
     export let height: number;
     export let fileUrl: string | null = null;
     export let initialScale = 1;
     export let initialX = 0;
     export let initialY = 0;
-    export let isSignature = false;  // New prop to indicate if it's a signature
+    export let isSignature = false;
 
-    
     const dispatch = createEventDispatcher();
     let canvas: HTMLCanvasElement;
     let ctx: CanvasRenderingContext2D;
@@ -67,12 +65,10 @@
         ctx.rect(0, 0, thumbnailWidth, thumbnailHeight);
         ctx.clip();
 
-            // Add white background for signatures
-            if (isSignature) {
+        if (isSignature) {
             ctx.fillStyle = 'white';
             ctx.fillRect(0, 0, thumbnailWidth, thumbnailHeight);
         }
-
 
         ctx.drawImage(
             img,
@@ -92,79 +88,68 @@
         dispatch('update', { scale, x, y });
     }, 16);
 
-    function startResize(event: MouseEvent) {
-        event.preventDefault();
-        isDragging = true;
-        const startX = event.clientX;
-        const startY = event.clientY;
-        const startScale = imageScale;
-
-        function onMouseMove(e: MouseEvent) {
-            if (!isDragging) return;
-            const dx = e.clientX - startX;
-            const dy = e.clientY - startY;
-            const newScale = Math.max(0.1, startScale + Math.max(dx, dy) / (100 * scale));
-            imageScale = newScale;
-            
-            requestAnimationFrame(() => {
-                if (fileUrl) {
-                    const img = new Image();
-                    img.onload = () => drawImage(img);
-                    img.src = fileUrl;
-                }
-            });
-            
-            debouncedDispatch(newScale, imageX, imageY);
+    function updateImage() {
+        if (fileUrl) {
+            const img = new Image();
+            img.onload = () => drawImage(img);
+            img.src = fileUrl;
         }
-
-        function onMouseUp() {
-            isDragging = false;
-            window.removeEventListener('mousemove', onMouseMove);
-            window.removeEventListener('mouseup', onMouseUp);
-        }
-
-        window.addEventListener('mousemove', onMouseMove);
-        window.addEventListener('mouseup', onMouseUp);
     }
 
-    function startMove(event: MouseEvent) {
+    function handleStart(event: MouseEvent | TouchEvent, mode: 'move' | 'resize') {
         event.preventDefault();
         isDragging = true;
-        const startX = event.clientX;
-        const startY = event.clientY;
-        const startImageX = imageX;
-        const startImageY = imageY;
+        
+        const startPoint = 'touches' in event ? 
+            { x: event.touches[0].clientX, y: event.touches[0].clientY } :
+            { x: (event as MouseEvent).clientX, y: (event as MouseEvent).clientY };
 
-        function onMouseMove(e: MouseEvent) {
+        const startValues = {
+            scale: imageScale,
+            x: imageX,
+            y: imageY
+        };
+
+        function handleMove(e: MouseEvent | TouchEvent) {
             if (!isDragging) return;
-            const dx = (e.clientX - startX) / scale;
-            const dy = (e.clientY - startY) / scale;
-            imageX = startImageX + dx;
-            imageY = startImageY + dy;
-            
-            requestAnimationFrame(() => {
-                if (fileUrl) {
-                    const img = new Image();
-                    img.onload = () => drawImage(img);
-                    img.src = fileUrl;
-                }
-            });
-            
+
+            const currentPoint = 'touches' in e ?
+                { x: e.touches[0].clientX, y: e.touches[0].clientY } :
+                { x: (e as MouseEvent).clientX, y: (e as MouseEvent).clientY };
+
+            const dx = currentPoint.x - startPoint.x;
+            const dy = currentPoint.y - startPoint.y;
+
+            if (mode === 'resize') {
+                const delta = Math.max(dx, dy);
+                imageScale = Math.max(0.1, startValues.scale + delta / (100 * scale));
+            } else {
+                imageX = startValues.x + dx / scale;
+                imageY = startValues.y + dy / scale;
+            }
+
+            requestAnimationFrame(updateImage);
             debouncedDispatch(imageScale, imageX, imageY);
         }
 
-        function onMouseUp() {
+        function handleEnd() {
             isDragging = false;
-            window.removeEventListener('mousemove', onMouseMove);
-            window.removeEventListener('mouseup', onMouseUp);
+            window.removeEventListener('mousemove', handleMove);
+            window.removeEventListener('mouseup', handleEnd);
+            window.removeEventListener('touchmove', handleMove);
+            window.removeEventListener('touchend', handleEnd);
+            window.removeEventListener('touchcancel', handleEnd);
         }
 
-        window.addEventListener('mousemove', onMouseMove);
-        window.addEventListener('mouseup', onMouseUp);
+        window.addEventListener('mousemove', handleMove);
+        window.addEventListener('mouseup', handleEnd);
+        window.addEventListener('touchmove', handleMove);
+        window.addEventListener('touchend', handleEnd);
+        window.addEventListener('touchcancel', handleEnd);
     }
 </script>
 
-<div class="flex items-center">
+<div class="flex items-center touch-none">
     <div class="relative" style="width: {thumbnailWidth}px; height: {thumbnailHeight}px;">
         <canvas
             bind:this={canvas}
@@ -176,8 +161,9 @@
     </div>
     <div class="ml-2 flex flex-col gap-2">
         <div 
-            class="w-6 h-6 bg-gray-200 flex items-center justify-center cursor-move"
-            on:mousedown={startMove}
+            class="w-6 h-6 bg-gray-200 flex items-center justify-center cursor-move active:bg-gray-300"
+            on:mousedown={(e) => handleStart(e, 'move')}
+            on:touchstart={(e) => handleStart(e, 'move')}
             role="button"
             tabindex="0"
             aria-label="Move image"
@@ -185,8 +171,9 @@
             <Move size={16} />
         </div>
         <div 
-            class="w-6 h-6 bg-gray-200 flex items-center justify-center cursor-se-resize"
-            on:mousedown={startResize}
+            class="w-6 h-6 bg-gray-200 flex items-center justify-center cursor-se-resize active:bg-gray-300"
+            on:mousedown={(e) => handleStart(e, 'resize')}
+            on:touchstart={(e) => handleStart(e, 'resize')}
             role="button"
             tabindex="0"
             aria-label="Resize image"
