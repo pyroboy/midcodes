@@ -5,6 +5,13 @@ export const load = async ({ locals: { supabase, safeGetSession }, url }: Layout
     // Get authenticated session data using the safe method
     const { session, user } = await safeGetSession();
 
+    // Add security headers
+    const response = new Response();
+    response.headers.set('X-Frame-Options', 'DENY');
+    response.headers.set('X-Content-Type-Options', 'nosniff');
+    response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+    response.headers.set('Permissions-Policy', 'geolocation=(), microphone=()');
+
     if (!session || !user) {
         console.log('No session or user found');
         return {
