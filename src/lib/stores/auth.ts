@@ -26,24 +26,34 @@ interface UserProfile {
 interface RoleState {
     baseRole: UserRole | null
     currentRole: UserRole | null
+    emulatedRole: UserRole | null
     isEmulating: boolean
     emulationExpiry: string | null
     sessionId: string | null
     orgId: string | null
 }
 
-export const user = writable<User | null>(null)
-export const session = writable<Session | null>(null)
-export const profile = writable<UserProfile | null>(null)
-export const roleState = writable<RoleState>({
+// Private internal stores
+const _user = writable<User | null>(null)
+const _session = writable<Session | null>(null)
+const _profile = writable<UserProfile | null>(null)
+const _roleState = writable<RoleState>({
     baseRole: null,
     currentRole: null,
+    emulatedRole: null,
     isEmulating: false,
     emulationExpiry: null,
     sessionId: null,
     orgId: null
 })
-export const isLoggingOut = writable<boolean>(false)
+const _isLoggingOut = writable<boolean>(false)
+
+// Public read-only stores
+export const user = { subscribe: _user.subscribe }
+export const session = { subscribe: _session.subscribe }
+export const profile = { subscribe: _profile.subscribe }
+export const roleState = { subscribe: _roleState.subscribe }
+export const isLoggingOut = { subscribe: _isLoggingOut.subscribe }
 
 const extractRoleFromJWT = (accessToken: string): Partial<RoleState> => {
     try {
@@ -87,18 +97,19 @@ const refreshSession = async () => {
         if (error) throw error
         if (!newSession) throw new Error('No session after refresh')
         
-        session.set(newSession)
-        user.set(newSession.user)
+        _session.set(newSession)
+        _user.set(newSession.user)
         
         const userProfile = await loadUserProfile(newSession.user.id)
         if (!userProfile) throw new Error('Failed to load user profile after refresh')
         
-        profile.set(userProfile)
+        _profile.set(userProfile)
         
         const roleEmulation = extractRoleFromJWT(newSession.access_token)
-        roleState.set({
+        _roleState.set({
             baseRole: userProfile.role,
             currentRole: roleEmulation.currentRole || userProfile.role,
+            emulatedRole: roleEmulation.emulatedRole || userProfile.role,
             isEmulating: roleEmulation.isEmulating || false,
             emulationExpiry: roleEmulation.emulationExpiry || null,
             sessionId: roleEmulation.sessionId || null,
@@ -129,16 +140,17 @@ if (browser) {
 
     supabase.auth.onAuthStateChange(async (event, currentSession) => {
         if (currentSession) {
-            session.set(currentSession)
-            user.set(currentSession.user)
+            _session.set(currentSession)
+            _user.set(currentSession.user)
 
             const userProfile = await loadUserProfile(currentSession.user.id)
             if (userProfile) {
-                profile.set(userProfile)
+                _profile.set(userProfile)
                 const roleEmulation = extractRoleFromJWT(currentSession.access_token)
-                roleState.set({
+                _roleState.set({
                     baseRole: userProfile.role,
                     currentRole: roleEmulation.currentRole || userProfile.role,
+                    emulatedRole: roleEmulation.emulatedRole || userProfile.role,
                     isEmulating: roleEmulation.isEmulating || false,
                     emulationExpiry: roleEmulation.emulationExpiry || null,
                     sessionId: roleEmulation.sessionId || null,
@@ -179,22 +191,48 @@ export const auth = {
 
     signOut: async () => {
         try {
-            isLoggingOut.set(true)
+            _isLoggingOut.set(true)
+            
+            // Clear all stores first
             auth.clearSession()
-            const { error } = await supabase.auth.signOut()
-            if (error) throw error
+            _user.set(null)
+            _session.set(null)
+            _profile.set(null)
+            _roleState.set({
+                baseRole: null,
+                currentRole: null,
+                emulatedRole: null,
+                isEmulating: false,
+                emulationExpiry: null,
+                sessionId: null,
+                orgId: null
+            })
+
+            // Call the server-side signout endpoint
+            const response = await fetch('/auth/signout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+
+            if (!response.ok) {
+                throw new Error('Failed to sign out')
+            }
+
+            // Redirect to auth page
             await goto('/auth')
         } catch (error) {
             console.error('Error during sign out:', error)
             throw error
         } finally {
-            isLoggingOut.set(false)
+            _isLoggingOut.set(false)
         }
     },
 
     startRoleEmulation: async (targetRole: UserRole, durationHours = 4) => {
         try {
-            const response = await fetch('/api/role-emulation', {
+            const response = await fetch('https://wnkqlrfmtiibrqnncgqu.supabase.co/functions/v1/role-emulation', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ targetRole, durationHours })
@@ -218,7 +256,7 @@ export const auth = {
 
     stopRoleEmulation: async () => {
         try {
-            const response = await fetch('/api/role-emulation', {
+            const response = await fetch('https://wnkqlrfmtiibrqnncgqu.supabase.co/functions/v1/role-emulation', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ reset: true })
@@ -241,12 +279,13 @@ export const auth = {
     },
 
     clearSession: () => {
-        session.set(null)
-        user.set(null)
-        profile.set(null)
-        roleState.set({
+        _session.set(null)
+        _user.set(null)
+        _profile.set(null)
+        _roleState.set({
             baseRole: null,
             currentRole: null,
+            emulatedRole: null,
             isEmulating: false,
             emulationExpiry: null,
             sessionId: null,

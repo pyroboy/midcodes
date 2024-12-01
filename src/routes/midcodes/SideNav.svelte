@@ -1,10 +1,13 @@
 <script lang="ts">
   import { page } from '$app/stores';
   import SelectRole from './SelectRole.svelte';
+  import { roleState } from '$lib/stores/auth';
   export let currentView: 'dashboard' | 'event-manager' = 'dashboard';
 
   // Get user role from page data
   $: isSuperAdmin = $page.data.profile?.role === 'super_admin';
+  $: currentRole = $roleState.currentRole;
+  $: emulatedRole = $roleState.emulatedRole;
 </script>
 
 <nav class="flex flex-col gap-2 p-4 min-w-[200px]">
@@ -13,6 +16,20 @@
       <SelectRole />
     </div>
   {/if}
+  
+  <!-- Role Display -->
+  <div class="mb-4 pb-4 border-b text-sm">
+    <div class="flex flex-col gap-1">
+      <div class="text-gray-600">
+        Current Role: <span class="font-medium text-gray-900">{currentRole || 'None'}</span>
+      </div>
+      {#if emulatedRole}
+        <div class="text-gray-600">
+          Emulated Role: <span class="font-medium text-blue-600">{emulatedRole}</span>
+        </div>
+      {/if}
+    </div>
+  </div>
   
   <button 
     on:click={() => currentView = 'dashboard'}
