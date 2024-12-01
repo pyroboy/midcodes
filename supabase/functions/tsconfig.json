@@ -1,0 +1,13 @@
+{
+    "compilerOptions": {
+      "target": "esnext",
+      "module": "esnext",
+      "moduleResolution": "bundler",
+      "noEmit": true,
+      "strict": true,
+      "allowJs": true,
+      "skipLibCheck": true,
+      "types": ["./types.d.ts"]
+    },
+    "include": ["**/*.ts"]
+  }

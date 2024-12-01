@@ -4,6 +4,8 @@
 	"private": true,
 	"scripts": {
 		"dev": "vite dev",
+		"serve:edge": "supabase functions serve role-emulation --env-file .env.local",
+		"deploy:edge": "supabase functions deploy role-emulation",
 		"build": "vite build",
 		"preview": "vite preview",
 		"test": "npm run test:integration && npm run test:unit",
@@ -51,6 +53,7 @@
 		"cmdk-sv": "^0.0.18",
 		"html5-qrcode": "^2.3.8",
 		"jszip": "^3.10.1",
+		"jwt-decode": "^4.0.0",
 		"lodash-es": "^4.17.21",
 		"qr-code-styling": "^1.8.4",
 		"svelte-french-toast": "^1.2.0",

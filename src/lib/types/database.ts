@@ -9,11 +9,19 @@ export type UserRole = 'super_admin' | 'org_admin' | 'event_admin' | 'user' | 'e
 
 export interface Profile {
     id: string;  // UUID, matches auth.users.id
+    email: string;
     role: UserRole;
     org_id: string | null;  // UUID reference to organizations.id
     created_at: string;
     updated_at: string;
-    full_name?: string;
+    full_name?: string | null;
+}
+
+// Extended profile type for role emulation
+export interface EmulatedProfile extends Profile {
+    isEmulated: boolean;
+    originalRole: UserRole | null;
+    emulationToken: string | null;
 }
 
 export interface EventOtherInfo {

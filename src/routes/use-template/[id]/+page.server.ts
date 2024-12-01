@@ -41,6 +41,13 @@ interface Template {
     };
 }
 
+interface ProfileData {
+    id: string;
+    role: UserRole;
+    org_id: string | null;
+    originalRole?: UserRole;
+}
+
 export const load: PageServerLoad = async ({ params, locals, parent }) => {
     const { session, supabase } = locals;
     
@@ -48,8 +55,13 @@ export const load: PageServerLoad = async ({ params, locals, parent }) => {
         throw error(401, 'Unauthorized');
     }
 
-    const parentData = await parent() as ParentData;
-    const isSuperAdmin = parentData?.profile?.role === 'super_admin';
+    const parentData = await parent();
+    const profile = parentData?.profile as ProfileData | null;
+    const isSuperAdmin = profile?.role === 'super_admin' || profile?.originalRole === 'super_admin';
+
+    if (!isSuperAdmin) {
+        throw error(403, 'Unauthorized: Super admin access required');
+    }
 
     const { data: simpleTemplate, error: simpleError } = await supabase
         .from('templates')
