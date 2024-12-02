@@ -11,40 +11,137 @@ interface RoleConfigType {
     isAdmin: boolean
 }
 
+// Define public paths that don't require authentication
+export const PublicPaths = {
+    auth: '/auth',
+    register: '/register',
+    eventPattern: /\/EVNT-\d{4}-[A-Z0-9]{5}$/
+}
+
+// Helper to check if a path is public
+export function isPublicPath(path: string): boolean {
+    if (path.startsWith(PublicPaths.auth)) return true
+    
+    const eventUrlMatch = path.match(/^\/([^/]+)/)
+    const eventUrl = eventUrlMatch ? eventUrlMatch[1] : null
+    
+    return !!(eventUrl && (
+        path.endsWith(PublicPaths.register) || 
+        PublicPaths.eventPattern.test(path)
+    ))
+}
+
+// Helper to check path access
+export function hasPathAccess(role: UserRole, path: string, originalRole?: UserRole): boolean {
+    const roleConfig = RoleConfig[role]
+    if (!roleConfig) return false
+
+    // Special case for /midcodes - allow access if:
+    // 1. User is super_admin (original role)
+    // 2. There's an active emulation session (originalRole exists)
+    if (path === '/midcodes' && (originalRole === 'super_admin' || originalRole)) {
+        return true
+    }
+
+    // Special case for super_admin role emulation
+    if (path.startsWith('/admin') && originalRole === 'super_admin') {
+        return true
+    }
+    
+    // Full access patterns
+    if (roleConfig.allowedPaths.some(ap => ap.path === '*' || ap.path === '/**')) {
+        return true
+    }
+    
+    // Clean up path for matching
+    const cleanPath = path.replace(/\/$/, '')
+    
+    // Check each allowed path pattern
+    for (const allowedPath of roleConfig.allowedPaths) {
+        const pattern = allowedPath.path.replace(/\/$/, '')
+        
+        // Exact match
+        if (cleanPath === pattern) return true
+        
+        // Direct child match (for single *)
+        if (pattern.endsWith('/*')) {
+            const prefix = pattern.slice(0, -1)
+            if (cleanPath === prefix || cleanPath.startsWith(prefix + '/')) {
+                return true
+            }
+        }
+        
+        // Deep match (for **)
+        if (pattern.includes('**')) {
+            const regex = new RegExp(
+                '^' + pattern
+                    .replace(/\*\*/g, '.*')
+                    .replace(/\*/g, '[^/]*')
+                    + '(/.*)?$'
+            )
+            if (regex.test(cleanPath)) return true
+        }
+    }
+    
+    return false
+}
+
+// Helper to get redirect path
+export function getRedirectPath(role: UserRole, path: string, originalRole?: UserRole): string | null {
+    const roleConfig = RoleConfig[role]
+    if (!roleConfig) return PublicPaths.auth
+    
+    // Don't redirect if user has access to the path
+    if (hasPathAccess(role, path, originalRole)) return null
+
+    // Make sure the default redirect is accessible
+    const defaultRedirect = roleConfig.defaultRedirect
+    if (!hasPathAccess(role, defaultRedirect, originalRole)) {
+        return PublicPaths.auth
+    }
+    
+    // Don't redirect to the same path (avoid loops)
+    if (path === defaultRedirect) {
+        return PublicPaths.auth
+    }
+
+    return defaultRedirect
+}
+
 export const RoleConfig: Record<UserRole, RoleConfigType> = {
     super_admin: {
         allowedPaths: [{ path: '/**' }],
-        defaultRedirect: '/admin',
+        defaultRedirect: '/midcodes',
         isAdmin: true
     },
     org_admin: {
-        allowedPaths: [{ path: '/**' }],  // Full access
+        allowedPaths: [{ path: '/**' }],
         defaultRedirect: '/rat',
         isAdmin: true
     },
     event_admin: {
         allowedPaths: [
-            { path: '/rat' }, 
-            { path: '/midcodes' },          // Base RAT path
-            { path: '/rat/**' },       // All RAT subpaths
-            { path: '/events' },       // Base events path
-            { path: '/events/**' },    // All event subpaths
-            { path: '/api/**' }        // API access
+            { path: '/rat' },
+            { path: '/midcodes' },
+            { path: '/rat/**' },
+            { path: '/events' },
+            { path: '/events/**' },
+            { path: '/api/**' }
         ],
         defaultRedirect: '/rat',
         isAdmin: true
     },
     event_qr_checker: {
         allowedPaths: [
-            { path: '/check/**' }
+            { path: '/**/qr-checker' }
         ],
-        defaultRedirect: '/check',
+        defaultRedirect: '/**/qr-checker',
         isAdmin: false
     },
     user: {
         allowedPaths: [
-            { path: '/profile/**' },
-            { path: '/events/**', methods: ['GET'] }
+            { path: '/auth' },
+            { path: '/profile' }
         ],
         defaultRedirect: '/profile',
         isAdmin: false

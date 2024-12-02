@@ -3,7 +3,7 @@
     import { Progress } from '$lib/components/ui/progress';
     import { Button } from '$lib/components/ui/button';
     import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "$lib/components/ui/dropdown-menu";
-    import { User, Sun, Moon, Menu, X } from 'lucide-svelte';
+    import { User, Sun, Moon, Menu, X, Crown } from 'lucide-svelte';
     import { onMount, onDestroy } from 'svelte';
     import { session, user, auth, roleState, profile } from '$lib/stores/auth';
     import { settings } from '$lib/stores/settings';
@@ -214,6 +214,8 @@
     </div>
 </header>
 {/if}
+
+
 
 <main class="min-h-screen">
     <slot />

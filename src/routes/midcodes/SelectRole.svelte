@@ -10,8 +10,9 @@
         SelectValue,
     } from "$lib/components/ui/select";
     import toast from "svelte-french-toast";
+    import { RoleConfig } from "$lib/auth/roleConfig";
     
-    type UserRole = 'super_admin' | 'org_admin' | 'event_admin' | 'user';
+    type UserRole = 'super_admin' | 'org_admin' | 'event_admin' | 'event_qr_checker' | 'user';
 
     interface RoleOption {
         label: string;
@@ -19,14 +20,15 @@
         disabled?: boolean;
     }
 
-    export let currentRole: UserRole;
     
     let selectedRole: RoleOption | undefined = undefined;
     let loading = false;
     
     const roles: RoleOption[] = [
+        { label: "Super Admin", value: "super_admin" },
         { label: "Organization Admin", value: "org_admin" },
         { label: "Event Admin", value: "event_admin" },
+        { label: "Event QR Checker", value: "event_qr_checker" },
         { label: "Regular User", value: "user" }
     ];
     
@@ -63,7 +65,10 @@
             }
             
             toast.success("Role emulation started successfully");
-            window.location.reload();
+            
+            // Get default redirect URL for the selected role
+            const defaultRedirect = RoleConfig[selectedRole.value].defaultRedirect;
+            window.location.href = defaultRedirect;
         } catch (err) {
             const message = err instanceof Error ? err.message : "An error occurred";
             toast.error(message);
@@ -108,12 +113,7 @@
         <h2 class="text-lg font-semibold">Role Emulator</h2>
     </div>
 
-    <div class="space-y-2">
-        <Label>Current Role</Label>
-        <div class="text-sm font-medium bg-white p-2 rounded border">
-            {roles.find(r => r.value === currentRole)?.label || currentRole}
-        </div>
-    </div>
+
 
     <div class="space-y-2">
         <Label>Emulate Role</Label>
@@ -127,7 +127,6 @@
                 {#each roles as role}
                     <SelectItem 
                         value={role.value}
-                        disabled={role.value === currentRole}
                     >
                         {role.label}
                     </SelectItem>
@@ -139,7 +138,7 @@
     <div class="flex gap-2">
         <Button
             on:click={handleEmulateRole}
-            disabled={!selectedRole || loading || selectedRole.value === currentRole}
+            disabled={!selectedRole || loading }
             class="w-full"
         >
             {loading ? "Loading..." : "Start Emulation"}

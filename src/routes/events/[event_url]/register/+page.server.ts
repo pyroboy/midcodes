@@ -1,9 +1,9 @@
 // +page.server.ts
 import { error, fail } from '@sveltejs/kit';
-import type { PageServerLoad } from '../$types';
+import type { PageServerLoad } from './$types';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
-import { registrationSchema } from '../schema';
+import { registrationSchema } from './schema';
 import { PUBLIC_RECAPTCHA_SITE_KEY } from '$env/static/public';
 import { RECAPTCHA_SECRET_KEY } from '$env/static/private';
 import { message } from 'sveltekit-superforms/server';

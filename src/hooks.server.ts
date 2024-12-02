@@ -5,7 +5,7 @@ import { redirect, error } from '@sveltejs/kit'
 import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public'
 import type { Handle } from '@sveltejs/kit'
 import type { RoleEmulationData, RoleEmulationClaim, EmulatedProfile, ProfileData, LocalsSession } from '$lib/types/roleEmulation'
-import { RoleConfig } from '$lib/auth/roleConfig'
+import { RoleConfig, isPublicPath, hasPathAccess, getRedirectPath } from '$lib/auth/roleConfig'
 import type { UserRole } from '$lib/types/database'
 
 const ADMIN_URL = '/admin'
@@ -167,111 +167,6 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
   }
 
   return resolve(event)
-}
-
-const isPublicPath = (path: string): boolean => {
-  if (path.startsWith('/auth')) return true
-  
-  const eventUrlMatch = path.match(/^\/([^/]+)/)
-  const eventUrl = eventUrlMatch ? eventUrlMatch[1] : null
-  
-  return !!(eventUrl && (
-    path.endsWith('/register') || 
-    path.match(/\/EVNT-\d{4}-[A-Z0-9]{5}$/)
-  ))
-}
-
-function hasPathAccess(role: UserRole, path: string, originalRole?: UserRole): boolean {
-  console.log(`[hasPathAccess] Checking if ${role} can access ${path}${originalRole ? ` (original role: ${originalRole})` : ''}`)
-
-  // Special case for super_admin role emulation
-  if (path.startsWith(ADMIN_URL) && originalRole === 'super_admin') {
-    console.log(`[hasPathAccess] Allowing ${path} due to super_admin original role`)
-    return true
-  }
-
-  const roleConfig = RoleConfig[role]
-  if (!roleConfig) {
-    console.log(`[hasPathAccess] No config found for role ${role}`)
-    return false
-  }
-  
-  // Full access patterns
-  if (roleConfig.allowedPaths.some(ap => ap.path === '*' || ap.path === '/**')) {
-    console.log(`[hasPathAccess] Full access granted to ${role}`)
-    return true
-  }
-  
-  // Clean up path for matching
-  const cleanPath = path.replace(/\/$/, '')  // Remove trailing slash
-  
-  // Check each allowed path pattern
-  for (const allowedPath of roleConfig.allowedPaths) {
-    const pattern = allowedPath.path
-      .replace(/\/$/, '')  // Remove trailing slash
-    
-    // Exact match
-    if (cleanPath === pattern) {
-      console.log(`[hasPathAccess] Exact match: ${cleanPath} = ${pattern}`)
-      return true
-    }
-    
-    // Direct child match (for single *)
-    if (pattern.endsWith('/*')) {
-      const prefix = pattern.slice(0, -1)  // Remove /*
-      if (cleanPath === prefix || cleanPath.startsWith(prefix + '/')) {
-        console.log(`[hasPathAccess] Direct child match: ${cleanPath} matches ${pattern}`)
-        return true
-      }
-    }
-    
-    // Deep match (for **)
-    if (pattern.includes('**')) {
-      const regex = new RegExp(
-        '^' + pattern
-          .replace(/\*\*/g, '.*')
-          .replace(/\*/g, '[^/]*')
-          + '(/.*)?$'
-      )
-      if (regex.test(cleanPath)) {
-        console.log(`[hasPathAccess] Deep match: ${cleanPath} matches ${pattern}`)
-        return true
-      }
-    }
-  }
-
-  console.log(`[hasPathAccess] No matching pattern found for ${cleanPath}`)
-  return false
-}
-
-const getRedirectPath = (role: UserRole, path: string, originalRole?: UserRole): string | null => {
-  const roleConfig = RoleConfig[role]
-  if (!roleConfig) {
-    console.log(`[getRedirectPath] No config for role ${role}, redirecting to /auth`)
-    return '/auth'
-  }
-  
-  // Don't redirect if user has access to the path
-  if (hasPathAccess(role, path, originalRole)) {
-    console.log(`[getRedirectPath] User ${role} has access to ${path}, no redirect needed`)
-    return null
-  }
-
-  // Make sure the default redirect is accessible
-  const defaultRedirect = roleConfig.defaultRedirect
-  if (!hasPathAccess(role, defaultRedirect, originalRole)) {
-    console.error(`[getRedirectPath] Default redirect ${defaultRedirect} for role ${role} is not accessible! Redirecting to /auth`)
-    return '/auth'
-  }
-  
-  // Don't redirect to the same path (avoid loops)
-  if (path === defaultRedirect) {
-    console.error(`[getRedirectPath] Cannot redirect to ${defaultRedirect} because user ${role} doesn't have access to it! Redirecting to /auth`)
-    return '/auth'
-  }
-
-  console.log(`[getRedirectPath] User ${role} does not have access to ${path}, redirecting to ${defaultRedirect}`)
-  return defaultRedirect
 }
 
 const authGuard: Handle = async ({ event, resolve }) => {
