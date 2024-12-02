@@ -42,15 +42,18 @@ async function getUserProfile(userId: string, supabase: SupabaseClient): Promise
 
 async function getActiveRoleEmulation(userId: string, supabase: SupabaseClient) {
   const { data: emulation } = await supabase
-    .from('auth.role_emulation_sessions')
+    .from('role_emulation_sessions')
     .select('*')
     .eq('user_id', userId)
     .eq('status', 'active')
     .gt('expires_at', new Date().toISOString())
-    .order('created_at', { ascending: false })
-    .limit(1)
     .single()
 
+  if (emulation) {
+    console.log('[Session] Emulated Role:', 
+     emulation.emulated_role
+    )
+  }
   return emulation
 }
 
@@ -124,6 +127,7 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
     }
 
     const user = session.user
+
     const [profile, activeEmulation] = await Promise.all([
       getUserProfile(user.id, event.locals.supabase),
       getActiveRoleEmulation(user.id, event.locals.supabase)
@@ -337,8 +341,8 @@ const authGuard: Handle = async ({ event, resolve }) => {
   }
 
   // Check path access and redirect if necessary
-  const originalRole = (profile as EmulatedProfile).originalRole
-  const redirectPath = getRedirectPath(profile.role, path, originalRole)
+  const originalRole = (profile as EmulatedProfile)?.originalRole
+  const redirectPath = originalRole ? getRedirectPath(profile.role, path, originalRole) : getRedirectPath(profile.role, path)
   if (redirectPath) {
     throw redirect(303, redirectPath)
   }
@@ -362,7 +366,7 @@ const roleEmulationGuard: Handle = async ({ event, resolve }) => {
     if (now > expiresAt) {
       // Mark session as expired in database
       await event.locals.supabase
-        .from('auth.role_emulation_sessions')
+        .from('role_emulation_sessions')
         .update({ status: 'expired' })
         .eq('id', roleEmulation.session_id)
 

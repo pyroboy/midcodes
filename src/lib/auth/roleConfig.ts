@@ -24,6 +24,7 @@ export const RoleConfig: Record<UserRole, RoleConfigType> = {
     },
     event_admin: {
         allowedPaths: [
+            { path: '/rat' }, 
             { path: '/midcodes' },          // Base RAT path
             { path: '/rat/**' },       // All RAT subpaths
             { path: '/events' },       // Base events path

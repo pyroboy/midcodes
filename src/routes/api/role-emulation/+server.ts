@@ -30,15 +30,17 @@ export const POST: RequestHandler = async ({ request, locals: { supabase, safeGe
         // Use SUPABASE_URL from environment
         const functionUrl = `${PUBLIC_SUPABASE_URL}/functions/v1/role-emulation`;
         
+        //get payload. 
+
         // Simple test payload
         const testBody = {
-            emulatedRole: 'event_admin',
-            test: 'data'
+            emulatedRole: 'event_admin' 
         };
+ const payload = await request.json();
 
         console.log('=== DEBUG CLIENT SIDE ===');
         console.log('Function URL:', functionUrl);
-        console.log('Sending body:', testBody);
+        console.log('Sending body:', payload);
         
         // Create a proper request with the body
         const response = await fetch(functionUrl, {
@@ -47,7 +49,7 @@ export const POST: RequestHandler = async ({ request, locals: { supabase, safeGe
                 'Authorization': `Bearer ${session.session.access_token}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(testBody)
+            body: JSON.stringify(payload)
         });
 
         if (!response.ok) {

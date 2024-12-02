@@ -5,17 +5,14 @@
   export let currentView: 'dashboard' | 'event-manager' = 'dashboard';
 
   // Get user role from page data
-  $: isSuperAdmin = $page.data.profile?.role === 'super_admin';
   $: currentRole = $roleState.currentRole;
   $: emulatedRole = $roleState.emulatedRole;
 </script>
 
 <nav class="flex flex-col gap-2 p-4 min-w-[200px]">
-  {#if isSuperAdmin}
     <div class="mb-4 pb-4 border-b">
       <SelectRole />
     </div>
-  {/if}
   
   <!-- Role Display -->
   <div class="mb-4 pb-4 border-b text-sm">
