@@ -12,7 +12,7 @@ export interface AuthActionData {
 }
 
 export const actions: Actions = {
-    signin: async ({ request, locals: { supabase } }) => {
+    signin: async ({ request, locals: { supabase }, cookies }) => {
         const formData = await request.formData();
         const email = formData.get('email') as string;
         const password = formData.get('password') as string;
@@ -50,63 +50,55 @@ export const actions: Actions = {
 
         console.log(`[Auth] Successfully authenticated user: ${data.user.id}`);
 
-        const { data: profile, error: profileError } = await supabase
+        // Set session cookies
+        const { access_token, refresh_token } = data.session;
+        
+        cookies.set('sb-access-token', access_token, {
+            path: '/',
+            httpOnly: true,
+            secure: true,
+            sameSite: 'lax',
+            maxAge: 3600 // 1 hour
+        });
+        
+        cookies.set('sb-refresh-token', refresh_token, {
+            path: '/',
+            httpOnly: true,
+            secure: true,
+            sameSite: 'lax',
+            maxAge: 604800 // 1 week
+        });
+
+        // Get user profile
+        const { data: profile } = await supabase
             .from('profiles')
-            .select('*')
+            .select('role')
             .eq('id', data.user.id)
             .single();
 
-        if (profileError) {
-            console.error('[Auth] Error loading profile:', profileError);
-            return fail(500, { 
-                error: 'Failed to load profile',
-                success: false 
-            });
-        }
-
         if (!profile) {
             console.error('[Auth] No profile found for user:', data.user.id);
-            return fail(404, {
-                error: 'User profile not found',
+            return fail(400, {
+                error: 'No profile found',
                 success: false
             });
         }
 
-        console.log(`[Auth] Loaded profile for user ${data.user.id}, role: ${profile.role}`);
+        console.log(`[Auth] User role: ${profile.role}`);
 
-        if (profile.role === 'super_admin') {
-            console.log(`[Auth] Redirecting super admin to /${ADMIN_URL}`);
-            throw redirect(303, `/${ADMIN_URL}`);
+        // Redirect based on role
+        switch (profile.role) {
+            case 'super_admin':
+                throw redirect(303, ADMIN_URL);
+            case 'org_admin':
+                throw redirect(303, '/org');
+            case 'event_admin':
+                throw redirect(303, '/events');
+            case 'event_qr_checker':
+                throw redirect(303, '/check');
+            default:
+                throw redirect(303, '/');
         }
-
-        if (profile.role === 'event_qr_checker') {
-            const { data: eventData, error: eventError } = await supabase
-                .from('events')
-                .select('event_url')
-                .single();
-            
-            if (eventError) {
-                console.error('[Auth] Error loading event:', eventError);
-                return fail(500, {
-                    error: 'Failed to load event data',
-                    success: false
-                });
-            }
-
-            if (!eventData?.event_url) {
-                console.error('[Auth] No event URL found for QR checker');
-                return fail(404, {
-                    error: 'Event URL not found',
-                    success: false
-                });
-            }
-
-            console.log(`[Auth] Redirecting QR checker to event: ${eventData.event_url}`);
-            throw redirect(303, `/${eventData.event_url}/qr-checker`);
-        }
-
-        console.log('[Auth] Redirecting to templates page');
-        throw redirect(303, '/templates');
     },
 
     signup: async ({ request, url, locals: { supabase } }) => {
@@ -115,10 +107,7 @@ export const actions: Actions = {
         const password = formData.get('password') as string;
         const confirmPassword = formData.get('confirmPassword') as string;
 
-        console.log(`[Auth] Sign up attempt for email: ${email}`);
-
         if (password !== confirmPassword) {
-            console.error('[Auth] Password mismatch during signup');
             return fail(400, {
                 error: 'Passwords do not match',
                 success: false,
@@ -135,49 +124,23 @@ export const actions: Actions = {
         });
 
         if (err) {
-            console.error('[Auth] Sign up error:', err);
+            if (err instanceof AuthApiError && err.status === 400) {
+                return fail(400, {
+                    error: 'Invalid email or password',
+                    success: false,
+                    email
+                });
+            }
+
             return fail(500, {
-                error: err.message,
+                error: 'Server error. Please try again later.',
                 success: false
             });
         }
 
-        if (data?.user?.identities?.length === 0) {
-            console.error('[Auth] Email already registered:', email);
-            return fail(400, {
-                error: 'Email already registered',
-                success: false,
-                email
-            });
-        }
-
-        // Create a profile for the new user
-        if (data.user) {
-            const { error: profileError } = await supabase
-                .from('profiles')
-                .insert({
-                    id: data.user.id,
-                    email: email,
-                    role: 'user',
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                });
-
-            if (profileError) {
-                console.error('[Auth] Error creating profile:', profileError);
-                // Delete the auth user since profile creation failed
-                await supabase.auth.admin.deleteUser(data.user.id);
-                return fail(500, {
-                    error: 'Failed to create user profile',
-                    success: false
-                });
-            }
-        }
-
-        console.log(`[Auth] Successfully created account and profile for: ${email}`);
         return {
             success: true,
             message: 'Please check your email for a confirmation link.'
-        } as const;
+        };
     }
 };

@@ -33,6 +33,20 @@ interface RoleState {
     orgId: string | null
 }
 
+export interface EmulationSession {
+    id: string;
+    user_id: string;
+    original_role: UserRole;
+    emulated_role: UserRole;
+    status: 'active' | 'ended';
+    expires_at: string;
+    created_at: string;
+    metadata: {
+        created_by: string;
+        created_at: string;
+    };
+}
+
 // Private internal stores
 const _user = writable<User | null>(null)
 const _session = writable<Session | null>(null)
@@ -275,6 +289,31 @@ export const auth = {
                 success: false,
                 error: error instanceof Error ? error.message : 'An unknown error occurred'
             }
+        }
+    },
+
+    checkActiveEmulation: async (): Promise<EmulationSession | null> => {
+        const { data: session } = await supabase.auth.getSession();
+        if (!session?.session) return null;
+
+        const { data: activeSession } = await supabase
+            .from('role_emulation_sessions')
+            .select('*')
+            .eq('user_id', session.session.user.id)
+            .eq('status', 'active')
+            .single();
+
+        return activeSession;
+    },
+
+    endEmulation: async (): Promise<void> => {
+        const { error } = await supabase.functions.invoke('role-emulation', {
+            method: 'DELETE'
+        });
+
+        if (error) {
+            console.error('Failed to end role emulation:', error);
+            throw error;
         }
     },
 

@@ -2,15 +2,32 @@ import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
-    const { supabase, user, profile } = locals;
+    const { supabase, safeGetSession } = locals;
+    const { user, session } = await safeGetSession();
 
-    if (!user || !profile) {
+    if (!user) {
         throw error(401, { message: 'Unauthorized' });
     }
 
-    // Verify super admin role
-    if (profile.role !== 'super_admin') {
-        throw error(403, { message: 'You are not Arjo Magno' });
+    // Verify session
+    if (!session?.access_token) {
+        throw error(401, { message: 'No valid session' });
+    }
+
+    // Verify super admin role directly from database
+    const { data: userProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+    if (profileError || !userProfile) {
+        throw error(500, { message: 'Error fetching user profile' });
+    }
+
+    console.log('User profile:', userProfile);
+    if (userProfile.role !== 'super_admin') {
+        throw error(403, { message: 'Access denied: Super Admin only' });
     }
 
     // Fetch data from all relevant tables
@@ -68,6 +85,7 @@ export const load: PageServerLoad = async ({ locals }) => {
         templates: templatesResult.data,
         idcards: idcardsResult.data,
         organizations: organizationsResult.data,
-        profiles: profilesResult.data
+        profiles: profilesResult.data,
+        session
     };
 };

@@ -1,197 +1,156 @@
 <script lang="ts">
-    import { page } from '$app/stores';
-    import { roleState } from '$lib/stores/auth';
-    import { supabase } from '$lib/supabaseClient';
-    import type { UserRole } from '$lib/types/database';
-    import toast from 'svelte-french-toast';
+    import { Crown } from "lucide-svelte";
+    import { Button } from "$lib/components/ui/button";
+    import { Label } from "$lib/components/ui/label";
+    import {
+        Select,
+        SelectContent,
+        SelectItem,
+        SelectTrigger,
+        SelectValue,
+    } from "$lib/components/ui/select";
+    import toast from "svelte-french-toast";
+    
+    type UserRole = 'super_admin' | 'org_admin' | 'event_admin' | 'user';
 
-    interface RoleEmulationResponse {
-        success: boolean;
-        session?: {
-            id: string;
-            role: UserRole;
-            expires_at: string;
-        };
-        error?: string;
+    interface RoleOption {
+        label: string;
+        value: UserRole;
+        disabled?: boolean;
     }
 
-    const ROLES = ['org_admin', 'event_admin', 'user'] as const;
-    type AvailableRole = (typeof ROLES)[number];
-
-    function isAvailableRole(value: string): value is AvailableRole {
-        console.log('Checking if role is available:', value);
-        return ROLES.includes(value as AvailableRole);
-    }
-
-    let selectedRole: UserRole | null = null;
-
-    $: userId = $page.data.user?.id;
-    $: currentRole = $page.data.profile?.role || $roleState.currentRole;
-    $: {
-        console.log('Current user state:', {
-            userId,
-            currentRole,
-            selectedRole
-        });
-    }
-
-    async function handleRoleSelect() {
-        console.log('Attempting to change role to:', selectedRole);
-        
-        if (!selectedRole || !userId) {
-            console.log('Role selection failed - Missing data:', { selectedRole, userId });
+    export let currentRole: UserRole;
+    
+    let selectedRole: RoleOption | undefined = undefined;
+    let loading = false;
+    
+    const roles: RoleOption[] = [
+        { label: "Organization Admin", value: "org_admin" },
+        { label: "Event Admin", value: "event_admin" },
+        { label: "Regular User", value: "user" }
+    ];
+    
+    function handleSelect(event: { value: UserRole } | undefined) {
+        if (!event) {
+            selectedRole = undefined;
             return;
         }
-
+        selectedRole = roles.find(r => r.value === event.value);
+    }
+    
+    async function handleEmulateRole() {
+        if (!selectedRole) return;
+        
+        loading = true;
         try {
-            const {
-                data: { session },
-            } = await supabase.auth.getSession();
-
-            if (!session?.access_token) {
-                throw new Error('No active session');
-            }
-
-            console.log('Invoking role-emulation function with:', {
-                role: selectedRole,
-                userId,
-                currentRole
-            });
-
-            const { data, error } = await supabase.functions.invoke<RoleEmulationResponse>('role-emulation', {
-                body: { 
-                    role: selectedRole
+            const payload = { emulatedRole: selectedRole.value };
+            console.log('Sending payload:', payload);
+            
+            const response = await fetch("/api/role-emulation", {
+                method: "POST",
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
                 },
-                headers: {
-                    Authorization: `Bearer ${session.access_token}`,
-                    'Content-Type': 'application/json'
+                body: JSON.stringify(payload)
+            });
+            
+            const data = await response.json();
+            console.log('Response:', data);
+            
+            if (!response.ok) {
+                throw new Error(data.message || "Failed to emulate role");
+            }
+            
+            toast.success("Role emulation started successfully");
+            window.location.reload();
+        } catch (err) {
+            const message = err instanceof Error ? err.message : "An error occurred";
+            toast.error(message);
+            console.error('Role emulation error:', err);
+        } finally {
+            loading = false;
+        }
+    }
+    
+    async function handleStopEmulation() {
+        loading = true;
+        try {
+            const response = await fetch("/api/role-emulation", {
+                method: "DELETE",
+                headers: { 
+                    "Accept": "application/json"
                 }
             });
-
-            console.log('Role emulation response:', { data, error });
-
-            if (error || !data?.success) {
-                throw new Error(error?.message || data?.error || 'Role emulation failed');
+            
+            const data = await response.json();
+            console.log('Stop emulation response:', data);
+            
+            if (!response.ok) {
+                throw new Error(data.message || "Failed to stop emulation");
             }
-
-            toast.success(`Role changed to ${selectedRole}`, {
-                duration: 3000,
-                position: 'top-right'
-            });
             
-            console.log('Role change successful, reloading page...');
-            setTimeout(() => window.location.reload(), 1000);
-        } catch (error) {
-            console.error('Role change error:', error);
-            const errorMessage = error instanceof Error ? error.message : 'Failed to change role';
-            
-            toast.error(`${errorMessage}. Please try again.`, {
-                duration: 3000,
-                position: 'top-right'
-            });
-        }
-    }
-
-    async function handleRoleReset() {
-        console.log('Attempting to reset role for user:', userId);
-        
-        if (!userId) {
-            console.log('Role reset failed - Missing userId');
-            return;
-        }
-
-        try {
-            console.log('Invoking role-emulation reset');
-            const { data, error } = await supabase.functions.invoke<RoleEmulationResponse>('role-emulation', {
-                body: { reset: true }
-            });
-
-            console.log('Role reset response:', { data, error });
-
-            if (error || !data?.success) {
-                throw new Error(error?.message || data?.error || 'Role reset failed');
-            }
-
-            toast.success('Role reset successful', {
-                duration: 3000,
-                position: 'top-right'
-            });
-            
-            console.log('Role reset successful, reloading page...');
-            setTimeout(() => window.location.reload(), 1000);
-        } catch (error) {
-            console.error('Role reset error:', error);
-            const errorMessage = error instanceof Error ? error.message : 'Failed to reset role';
-            
-            toast.error(`${errorMessage}. Please try again.`, {
-                duration: 3000,
-                position: 'top-right'
-            });
-        }
-    }
-
-    function handleSelectChange(event: Event) {
-        const select = event.target as HTMLSelectElement;
-        console.log('Select value changed:', select.value);
-        
-        if (select.value && isAvailableRole(select.value)) {
-            console.log('Setting selected role to:', select.value);
-            selectedRole = select.value;
-        } else {
-            console.log('Clearing selected role');
-            selectedRole = null;
+            toast.success("Role emulation stopped successfully");
+            window.location.reload();
+        } catch (err) {
+            const message = err instanceof Error ? err.message : "An error occurred";
+            toast.error(message);
+            console.error('Stop emulation error:', err);
+        } finally {
+            loading = false;
         }
     }
 </script>
 
-<div class="relative">
-    <select 
-        class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        on:change={handleSelectChange}
-        value={selectedRole || ''}
-    >
-        <option value="">Select a role to emulate</option>
-        {#each ROLES as role}
-            <option value={role}>
-                {role}
-            </option>
-        {/each}
-    </select>
-
-    <div class="mt-4 space-x-2">
-        <button
-            on:click={handleRoleSelect}
-            disabled={!selectedRole}
-            class="px-4 py-2 text-sm text-white bg-blue-500 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-            Emulate Role
-        </button>
-
-        {#if currentRole}
-            <button
-                on:click={handleRoleReset}
-                class="px-4 py-2 text-sm text-white bg-red-500 rounded-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
-            >
-                Reset Role
-            </button>
-        {/if}
+<div class="space-y-4 p-4 border rounded-lg bg-gray-50">
+    <div class="flex items-center gap-2">
+        <Crown class="h-5 w-5 text-yellow-500" />
+        <h2 class="text-lg font-semibold">Role Emulator</h2>
     </div>
 
-    {#if currentRole !== $roleState.currentRole}
-        <div class="mt-2 text-sm">
-            <span class="text-yellow-600">
-                Currently emulating: {currentRole}
-            </span>
+    <div class="space-y-2">
+        <Label>Current Role</Label>
+        <div class="text-sm font-medium bg-white p-2 rounded border">
+            {roles.find(r => r.value === currentRole)?.label || currentRole}
         </div>
-    {/if}
-</div>
+    </div>
 
-<style>
-    select {
-        text-transform: capitalize;
-    }
-    
-    option {
-        text-transform: capitalize;
-    }
-</style>
+    <div class="space-y-2">
+        <Label>Emulate Role</Label>
+        <Select onSelectedChange={handleSelect}>
+            <SelectTrigger class="w-full">
+                <SelectValue placeholder="Select role to emulate">
+                    {selectedRole?.label ?? "Select role to emulate"}
+                </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+                {#each roles as role}
+                    <SelectItem 
+                        value={role.value}
+                        disabled={role.value === currentRole}
+                    >
+                        {role.label}
+                    </SelectItem>
+                {/each}
+            </SelectContent>
+        </Select>
+    </div>
+
+    <div class="flex gap-2">
+        <Button
+            on:click={handleEmulateRole}
+            disabled={!selectedRole || loading || selectedRole.value === currentRole}
+            class="w-full"
+        >
+            {loading ? "Loading..." : "Start Emulation"}
+        </Button>
+        <Button
+            on:click={handleStopEmulation}
+            variant="outline"
+            disabled={loading}
+            class="w-full"
+        >
+            Stop Emulation
+        </Button>
+    </div>
+</div>

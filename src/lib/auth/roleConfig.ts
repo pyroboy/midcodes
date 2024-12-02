@@ -18,20 +18,19 @@ export const RoleConfig: Record<UserRole, RoleConfigType> = {
         isAdmin: true
     },
     org_admin: {
-        allowedPaths: [
-            { path: '/dashboard/**' },
-            { path: '/events/**' },
-            { path: '/settings/**' }
-        ],
-        defaultRedirect: '/dashboard',
+        allowedPaths: [{ path: '/**' }],  // Full access
+        defaultRedirect: '/rat',
         isAdmin: true
     },
     event_admin: {
         allowedPaths: [
-            { path: '/events/**' },
-            { path: '/dashboard/**' }
+            { path: '/midcodes' },          // Base RAT path
+            { path: '/rat/**' },       // All RAT subpaths
+            { path: '/events' },       // Base events path
+            { path: '/events/**' },    // All event subpaths
+            { path: '/api/**' }        // API access
         ],
-        defaultRedirect: '/dashboard',
+        defaultRedirect: '/rat',
         isAdmin: true
     },
     event_qr_checker: {

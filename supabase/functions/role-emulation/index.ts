@@ -1,222 +1,321 @@
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
+import { serve } from 'std/http/server.ts'
+import { createClient } from '@supabase/supabase-js'
+import { corsHeaders } from '../_shared/cors.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': [
-    'authorization',
-    'x-client-info',
-    'apikey',
-    'content-type',
-    'Authorization',
-    'X-Client-Info',
-    'Apikey'
-  ].join(', '),
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Max-Age': '86400',
-  'Access-Control-Allow-Credentials': 'true'
+const supabaseUrl = Deno.env.get('SUPABASE_URL')
+const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
+const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+if (!supabaseUrl || !supabaseServiceRoleKey) {
+  throw new Error('Missing Supabase environment variables')
 }
 
-type UserRole = 'super_admin' | 'org_admin' | 'event_admin' | 'user' | 'event_qr_checker'
+type UserRole = 'super_admin' | 'org_admin' | 'event_admin' | 'event_qr_checker' | 'user'
+type EmulationStatus = 'active' | 'ended'
 
-interface ErrorResponseBody {
-  error: string
-  details?: unknown
+interface RequestBody {
+  emulatedRole: UserRole
 }
 
-interface RoleEmulationRequest {
-  role?: UserRole
-  metadata?: Record<string, unknown>
-  reset?: boolean
+interface ResponseBody {
+  status: 'success' | 'error'
+  message: string
+  data?: unknown
+  error?: unknown
 }
 
-serve(async (req: Request) => {
-  console.log('=== Starting role emulation request ===')
-  console.log('Request method:', req.method)
-  console.log('Request headers:', Object.fromEntries(req.headers.entries()))
-  
-  if (req.method === 'OPTIONS') {
-    console.log('Handling CORS preflight request')
-    return new Response(null, {
-      status: 204,
-      headers: corsHeaders
-    })
+interface EmulationSession {
+  id: string
+  user_id: string
+  original_role: UserRole
+  emulated_role: UserRole
+  status: EmulationStatus
+  expires_at: string
+  created_at: string
+  metadata: Record<string, unknown>
+}
+
+class RoleEmulationError extends Error {
+  constructor(
+    message: string,
+    public status: number = 500,
+    public details?: unknown
+  ) {
+    super(message)
+    this.name = 'RoleEmulationError'
   }
+}
+
+function createResponse(status: number, body: ResponseBody): Response {
+  return new Response(
+    JSON.stringify(body),
+    { 
+      status, 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    }
+  )
+}
+
+function isUserRole(role: string): role is UserRole {
+  return ['super_admin', 'org_admin', 'event_admin', 'event_qr_checker', 'user'].includes(role)
+}
+
+async function validateRequest(req: Request): Promise<RequestBody> {
+  try {
+    console.log('=== DEBUG REQUEST INFO ===')
+    console.log('Method:', req.method)
+    console.log('Headers:', Object.fromEntries(req.headers.entries()))
+    
+    const rawBody = await req.text()
+    console.log('Raw body text:', rawBody)
+    
+    let parsedBody = null
+    try {
+      if (rawBody) {
+        parsedBody = JSON.parse(rawBody)
+        console.log('Parsed JSON body:', parsedBody)
+      } else {
+        console.log('No request body provided')
+      }
+    } catch (e) {
+      console.log('Failed to parse JSON:', e)
+    }
+
+    if (!parsedBody || typeof parsedBody !== 'object') {
+      console.error('[Role Emulation] Body is not an object:', parsedBody)
+      throw new RoleEmulationError('Request body must be a JSON object', 400)
+    }
+
+    if (!('emulatedRole' in parsedBody)) {
+      console.error('[Role Emulation] Missing emulatedRole:', parsedBody)
+      throw new RoleEmulationError('emulatedRole is required in request body', 400)
+    }
+
+    const { emulatedRole } = parsedBody as { emulatedRole: unknown }
+    console.log('[Role Emulation] Extracted emulatedRole:', emulatedRole)
+    
+    if (!emulatedRole || typeof emulatedRole !== 'string' || !isUserRole(emulatedRole)) {
+      console.error('[Role Emulation] Invalid emulatedRole:', emulatedRole)
+      throw new RoleEmulationError(
+        `Invalid role: ${emulatedRole}. Must be one of: super_admin, org_admin, event_admin, event_qr_checker, user`,
+        400
+      )
+    }
+
+    return { emulatedRole }
+  } catch (error) {
+    if (error instanceof RoleEmulationError) {
+      throw error
+    }
+    console.error('[Role Emulation] Validation error:', error)
+    throw new RoleEmulationError(
+      'Request validation failed: ' + (error instanceof Error ? error.message : 'Unknown error'),
+      400
+    )
+  }
+}
+
+async function getSupabaseClient(): Promise<ReturnType<typeof createClient>> {
+  return createClient(supabaseUrl, supabaseServiceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  })
+}
+
+async function handleRoleEmulation(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  originalRole: UserRole,
+  emulatedRole: UserRole
+): Promise<EmulationSession> {
+  const expiresAt = new Date()
+  expiresAt.setHours(expiresAt.getHours() + 4)
 
   try {
-    // Log the raw request body for debugging
+    const { error: endActiveError } = await supabase
+      .from('role_emulation_sessions')
+      .update({ status: 'ended' })
+      .eq('user_id', userId)
+      .eq('status', 'active')
+
+    if (endActiveError) {
+      console.error('[Role Emulation] Failed to end active sessions:', endActiveError)
+      throw new RoleEmulationError('Failed to end active sessions', 500)
+    }
+
+    const metadata = {
+      timestamp: new Date().toISOString(),
+      action: 'start_emulation',
+      previous_role: originalRole
+    }
+
+    const { data: emulationSession, error: emulationError } = await supabase
+      .from('role_emulation_sessions')
+      .insert({
+        user_id: userId,
+        original_role: originalRole,
+        emulated_role: emulatedRole,
+        expires_at: expiresAt.toISOString(),
+        status: 'active',
+        metadata: metadata
+      })
+      .select()
+      .single()
+
+    if (emulationError || !emulationSession) {
+      console.error('[Role Emulation] Failed to create emulation session:', emulationError)
+      throw new RoleEmulationError('Failed to create emulation session', 500, emulationError)
+    }
+
+    return emulationSession
+  } catch (error) {
+    if (error instanceof RoleEmulationError) {
+      throw error
+    }
+    console.error('[Role Emulation] Database operation error:', error)
+    throw new RoleEmulationError(
+      'Database operation failed',
+      500,
+      error instanceof Error ? error.message : 'Unknown error'
+    )
+  }
+}
+
+async function handleOptions(request: Request) {
+  if (request.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+}
+
+serve(async (req) => {
+  try {
+    const preflightResponse = await handleOptions(req)
+    if (preflightResponse) return preflightResponse
+
+    console.log('=== DEBUG REQUEST INFO ===')
+    console.log('Method:', req.method)
+    console.log('Headers:', Object.fromEntries(req.headers.entries()))
+    
+    const contentType = req.headers.get('content-type')
+    if (!contentType?.includes('application/json')) {
+      throw new Error(`Invalid content type: ${contentType}. Expected application/json`)
+    }
+    
     const rawBody = await req.text()
     console.log('Raw request body:', rawBody)
     
-    let requestBody: RoleEmulationRequest
+    if (!rawBody) {
+      throw new Error('Request body is empty')
+    }
+    
+    let body: unknown
     try {
-      requestBody = JSON.parse(rawBody)
-      console.log('Parsed request body:', requestBody)
-    } catch (error) {
-      console.error('Failed to parse request body:', error)
-      const errorBody: ErrorResponseBody = { error: 'Invalid request body', details: error }
-      return new Response(
-        JSON.stringify(errorBody),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
+      body = JSON.parse(rawBody)
+      console.log('Parsed body:', body)
+    } catch (e) {
+      console.error('Failed to parse JSON:', e)
+      throw new Error('Invalid JSON in request body')
     }
-
-    console.log('Creating Supabase client')
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    console.log('Environment variables:', {
-      hasSupabaseUrl: !!supabaseUrl,
-      hasSupabaseKey: !!supabaseKey
-    })
     
-    const supabaseClient = createClient(
-      supabaseUrl ?? '',
-      supabaseKey ?? ''
-    )
-
-    console.log('Getting auth header')
+    if (!body || typeof body !== 'object') {
+      throw new Error('Request body must be a JSON object')
+    }
+    
+    const typedBody = body as Record<string, unknown>
+    if (!('emulatedRole' in typedBody)) {
+      throw new Error('emulatedRole is required')
+    }
+    
+    if (typeof typedBody.emulatedRole !== 'string') {
+      throw new Error('emulatedRole must be a string')
+    }
+    
     const authHeader = req.headers.get('Authorization')?.split(' ')[1]
-    console.log('Auth header status:', {
-      present: !!authHeader,
-      length: authHeader?.length
-    })
-    
     if (!authHeader) {
-      console.log('Missing authorization header')
-      const errorBody: ErrorResponseBody = { error: 'Missing authorization header' }
-      return new Response(
-        JSON.stringify(errorBody),
-        {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
+      console.error('[Role Emulation] No authorization header')
+      return createResponse(401, {
+        status: 'error',
+        message: 'No authorization header'
+      })
     }
 
-    console.log('Getting user data')
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(authHeader)
-    console.log('User lookup result:', {
-      userFound: !!user,
-      userId: user?.id,
-      errorPresent: !!userError
+    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
     })
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser(authHeader)
     
     if (userError || !user) {
-      console.error('User lookup failed:', userError)
-      const errorBody: ErrorResponseBody = { error: 'Invalid token', details: userError }
-      return new Response(
-        JSON.stringify(errorBody),
-        {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
+      console.error('[Role Emulation] Invalid JWT:', userError)
+      return createResponse(401, {
+        status: 'error',
+        message: 'Invalid authorization token'
+      })
+    }
+    console.log('[Role Emulation] JWT verified for user:', user.id)
+
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (profileError || !profile) {
+      console.error('[Role Emulation] Failed to get user profile:', profileError)
+      return createResponse(500, {
+        status: 'error',
+        message: 'Failed to get user profile'
+      })
     }
 
-    // Validate request body
-    if (!requestBody.role && !requestBody.reset) {
-      console.log('Invalid request body: Either role or reset must be specified')
-      const errorBody: ErrorResponseBody = { error: 'Either role or reset must be specified' }
-      return new Response(
-        JSON.stringify(errorBody),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
+    if (profile.role !== 'super_admin') {
+      console.error('[Role Emulation] User does not have super_admin role:', profile.role)
+      return createResponse(403, {
+        status: 'error',
+        message: 'Only super admins can emulate roles'
+      })
     }
 
-    // Handle role change
-    try {
-      console.log('Attempting role update')
-      if (requestBody.reset) {
-        // Reset role
-        const { error: updateError } = await supabaseClient
-          .from('profiles')
-          .update({ role: null })
-          .eq('id', user.id)
-          .select()
+    console.log('[Role Emulation] Starting role emulation')
+    const emulationSession = await handleRoleEmulation(
+      supabase,
+      user.id,
+      profile.role,
+      typedBody.emulatedRole
+    )
+    console.log('[Role Emulation] Role emulation successful')
 
-        console.log('Update result:', {
-          success: !updateError,
-          error: updateError
-        })
-
-        if (updateError) {
-          throw updateError
-        }
-
-        console.log('Role reset successful')
-        return new Response(
-          JSON.stringify({ 
-            success: true,
-            message: 'Role reset successfully'
-          }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        )
-      } else if (requestBody.role) {
-        // Change role
-        const { error: updateError } = await supabaseClient
-          .from('profiles')
-          .update({ role: requestBody.role })
-          .eq('id', user.id)
-          .select()
-
-        console.log('Update result:', {
-          success: !updateError,
-          error: updateError
-        })
-
-        if (updateError) {
-          throw updateError
-        }
-
-        console.log('Role update successful')
-        return new Response(
-          JSON.stringify({ 
-            success: true,
-            message: 'Role updated successfully',
-            role: requestBody.role
-          }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        )
-      }
-    } catch (error) {
-      console.error('Role update failed:', error)
-      const errorBody: ErrorResponseBody = { 
-        error: 'Failed to update role', 
-        details: error 
-      }
-      return new Response(
-        JSON.stringify(errorBody),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
-    }
+    return createResponse(200, {
+      status: 'success',
+      message: `Role emulation active: ${typedBody.emulatedRole}`,
+      data: emulationSession
+    })
 
   } catch (error) {
-    console.error('Unexpected error:', error)
-    const errorBody: ErrorResponseBody = { 
-      error: 'Internal server error', 
-      details: error 
+    console.error('[Role Emulation] Error:', error)
+    console.error('[Role Emulation] Error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    })
+    
+    if (error instanceof RoleEmulationError) {
+      return createResponse(error.status, {
+        status: 'error',
+        message: error.message,
+        error: error.details
+      })
     }
-    return new Response(
-      JSON.stringify(errorBody),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    )
+
+    return createResponse(500, {
+      status: 'error',
+      message: 'Internal server error',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    })
   }
 })
