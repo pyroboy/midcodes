@@ -5,13 +5,13 @@
     import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "$lib/components/ui/dropdown-menu";
     import { User, Sun, Moon, Menu, X, Crown } from 'lucide-svelte';
     import { onMount, onDestroy } from 'svelte';
-    import { session, user, auth, roleState, profile } from '$lib/stores/auth';
+    import { session, user, auth, profile } from '$lib/stores/auth';
     import { settings } from '$lib/stores/settings';
     import { loadGoogleFonts } from '$lib/config/fonts';
-    import { supabase } from '$lib/supabaseClient';
     import { navigating } from '$app/stores';
     import { browser } from '$app/environment';
     import { loadConfig } from '$lib/stores/config';
+    import type { RoleEmulationClaim } from '$lib/types/roleEmulation';
     import "../app.css";
     
     let isMenuOpen = false;
@@ -20,14 +20,34 @@
     let progressValue = 0;
     let progressInterval: ReturnType<typeof setTimeout> | undefined;
     
-
+console.log('[Role Debug] Emulationnnnnn:', $page.data.session?.roleEmulation);
     $: path = $page.url.pathname;
     $: navigation = $page.data.navigation;
     $: showHeader = navigation?.showHeader ?? false;
     $: isDark = $settings.theme === 'dark';
     $: userEmail = $page.data.user?.email ?? '';
-    $: role = $roleState;
+    $: emulation = $page.data.session?.roleEmulation as RoleEmulationClaim | null;
     $: userProfile = $page.data.profile;
+
+    $: console.log('[Role Debug] Emulation:', emulation);
+    $: console.log('[Role Debug] Current Role:', emulation?.emulated_role ?? userProfile?.role);
+    $: console.log('[Role Debug] Is Emulating:', emulation?.active);
+    $: console.log('[Role Debug] Emulated Org:', emulation?.emulated_org_id);
+
+    // Update session when server data changes
+    $: if (userProfile && $session) {
+        if (userProfile.isEmulated !== emulation?.active) {
+            auth.refreshSession();
+        }
+    }
+
+    // Debug logging
+    $: {
+        console.log('[Role Debug] Emulation:', emulation);
+        console.log('[Role Debug] Current Role:', emulation?.emulated_role ?? userProfile?.role);
+        console.log('[Role Debug] Is Emulating:', emulation?.active);
+        console.log('[Role Debug] Emulated Org:', emulation?.emulated_org_id);
+    }
 
     // Navigation progress bar
     $: {
@@ -132,9 +152,9 @@
                                     <span class="max-w-[200px] truncate text-sm font-medium">{userEmail}</span>
                                     {#if userProfile}
                                         <span class="text-xs text-muted-foreground">
-                                            {#if role.isEmulating}
-                                                <span class="text-yellow-500">Emulating: {role.currentRole}</span>
-                                                <span class="text-muted-foreground">(Base: {role.baseRole})</span>
+                                            {#if emulation?.active}
+                                                <span class="text-yellow-500">Emulating: {emulation?.emulated_role}</span>
+                                                <span class="text-muted-foreground">({emulation?.organizationName ?? 'Unknown Organization'})</span>
                                             {:else}
                                                 Role: {userProfile.role}
                                             {/if}
@@ -153,6 +173,23 @@
                                 {/if}
                                 Toggle Theme
                             </DropdownMenuItem>
+                            {#if navigation.showRoleEmulation}
+                                <DropdownMenuItem class="cursor-pointer">
+                                    {#if emulation?.active}
+                                        <form action="/api/role-emulation?/stop" method="POST">
+                                            <button class="flex items-center">
+                                                <Crown class="mr-2 h-4 w-4 text-yellow-500" />
+                                                <span>Stop Role Emulation</span>
+                                            </button>
+                                        </form>
+                                    {:else}
+                                        <a href="/role-emulation" class="flex items-center">
+                                            <Crown class="mr-2 h-4 w-4" />
+                                            <span>Start Role Emulation</span>
+                                        </a>
+                                    {/if}
+                                </DropdownMenuItem>
+                            {/if}
                             <DropdownMenuItem on:click={signOut}>
                                 Sign Out
                             </DropdownMenuItem>

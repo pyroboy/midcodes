@@ -8,7 +8,7 @@ import type { RoleEmulationData, RoleEmulationClaim, EmulatedProfile, ProfileDat
 import { RoleConfig, isPublicPath, hasPathAccess, getRedirectPath } from '$lib/auth/roleConfig'
 import type { UserRole } from '$lib/types/database'
 
-const ADMIN_URL = '/admin'
+
 
 interface SessionInfo {
   session: LocalsSession | null
@@ -137,12 +137,23 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
     let roleEmulation: RoleEmulationClaim | null = null
 
     if (activeEmulation && profile) {
+      // Fetch organization name
+      const { data: org } = await event.locals.supabase
+        .from('organizations')
+        .select('name')
+        .eq('id', activeEmulation.emulated_org_id)
+        .single();
+
       roleEmulation = {
         active: true,
         original_role: activeEmulation.original_role,
         emulated_role: activeEmulation.emulated_role,
+        original_org_id: profile.organization_id || null,
+        emulated_org_id: activeEmulation.emulated_org_id,
         expires_at: activeEmulation.expires_at,
-        session_id: activeEmulation.id
+        session_id: activeEmulation.id,
+        metadata: activeEmulation.metadata,
+        organizationName: org?.name ?? null
       }
 
       emulatedProfile = {
@@ -152,10 +163,7 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
         isEmulated: true
       } as EmulatedProfile
 
-      ;(session as LocalsSession).role_emulation = {
-        targetRole: activeEmulation.emulated_role,
-        durationHours: 4
-      } as RoleEmulationData
+      ;(session as LocalsSession).roleEmulation = roleEmulation
     }
 
     return {
@@ -268,7 +276,7 @@ const roleEmulationGuard: Handle = async ({ event, resolve }) => {
       // Clear role emulation cookie and session data
       event.cookies.delete('role_emulation', { path: '/' })
       if (session) {
-        delete (session as LocalsSession).role_emulation
+        delete (session as LocalsSession).roleEmulation
       }
 
       // Redirect to refresh the page state

@@ -229,6 +229,29 @@ async function handleRoleEmulation(
       throw new RoleEmulationError('Failed to create emulation session', 500);
     }
 
+    // Update the JWT claims with the role emulation data
+    const { error: updateError } = await supabase.auth.admin.updateUserById(
+      userId,
+      {
+        app_metadata: {
+          role_emulation: {
+            active: true,
+            original_role: profile.role,
+            emulated_role: emulatedRole,
+            original_org_id: profile.org_id,
+            emulated_org_id: emulatedOrgId,
+            expires_at: expiresAt.toISOString(),
+            session_id: sessionId
+          }
+        }
+      }
+    );
+
+    if (updateError) {
+      console.error('Failed to update JWT claims:', updateError);
+      throw new RoleEmulationError('Failed to update JWT claims', 500);
+    }
+
     return session;
   } catch (err) {
     if (err instanceof RoleEmulationError) throw err;
@@ -241,36 +264,54 @@ async function stopRoleEmulation(
   supabase: ReturnType<typeof createClient>,
   userId: string
 ): Promise<void> {
-  // First check if there's an active session
-  const { data: activeSession, error: queryError } = await supabase
-    .from('role_emulation_sessions')
-    .select()
-    .eq('user_id', userId)
-    .eq('status', 'active')
-    .single();
+  try {
+    // First check if there's an active session
+    const { data: activeSession, error: queryError } = await supabase
+      .from('role_emulation_sessions')
+      .select()
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .single();
 
-  if (queryError?.code === 'PGRST116') {
-    // PGRST116 is the error code for no rows returned
-    throw new RoleEmulationError('No active role emulation session found', 404);
-  }
+    if (queryError?.code === 'PGRST116' || !activeSession) {
+      // No active session found
+      throw new RoleEmulationError('No active role emulation session found', 404);
+    }
 
-  if (queryError) {
-    console.error('Failed to query role emulation session:', queryError);
-    throw new RoleEmulationError('Failed to query role emulation session', 500);
-  }
+    if (queryError) {
+      console.error('Failed to query role emulation session:', queryError);
+      throw new RoleEmulationError('Failed to query role emulation session', 500);
+    }
 
-  if (!activeSession) {
-    throw new RoleEmulationError('No active role emulation session found', 404);
-  }
+    // End the active emulation session
+    const { error: updateError } = await supabase
+      .from('role_emulation_sessions')
+      .update({ status: 'ended' })
+      .eq('id', activeSession.id);
 
-  const { error } = await supabase
-    .from('role_emulation_sessions')
-    .update({ status: 'ended' })
-    .eq('id', activeSession.id);
+    if (updateError) {
+      console.error('Failed to end emulation sessions:', updateError);
+      throw new RoleEmulationError('Failed to end emulation sessions', 500);
+    }
 
-  if (error) {
-    console.error('Failed to stop role emulation:', error);
-    throw new RoleEmulationError('Failed to stop role emulation', 500);
+    // Clear the role emulation metadata from JWT claims
+    const { error: jwtError } = await supabase.auth.admin.updateUserById(
+      userId,
+      {
+        app_metadata: {
+          role_emulation: null
+        }
+      }
+    );
+
+    if (jwtError) {
+      console.error('Failed to clear JWT claims:', jwtError);
+      throw new RoleEmulationError('Failed to clear JWT claims', 500);
+    }
+  } catch (err) {
+    if (err instanceof RoleEmulationError) throw err;
+    console.error('Internal server error:', err);
+    throw new RoleEmulationError('Internal server error', 500, err);
   }
 }
 

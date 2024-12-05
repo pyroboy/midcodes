@@ -1,5 +1,5 @@
 import type { Session, User, SupabaseClient } from '@supabase/supabase-js';
-import type { EmulatedProfile } from '$lib/types/database';
+import type { Profile } from '$lib/types/database';
 import type { RoleEmulationData, RoleEmulationClaim, ProfileData, LocalsSession } from '$lib/types/roleEmulation';
 
 export type UserRole = 'super_admin' | 'org_admin' | 'event_admin' | 'user' | 'event_qr_checker';
@@ -7,7 +7,7 @@ export type UserRole = 'super_admin' | 'org_admin' | 'event_admin' | 'user' | 'e
 export interface SessionInfo {
     session: Session | null;
     user: User | null;
-    profile: ProfileData | EmulatedProfile | null;
+    profile: ProfileData | Profile | null;
     roleEmulation: RoleEmulationClaim | null;
 }
 
@@ -17,5 +17,5 @@ export interface Locals {
     safeGetSession: () => Promise<SessionInfo>;
     session?: Session | null;
     user?: User | null;
-    profile?: ProfileData | EmulatedProfile | null;
+    profile?: ProfileData | Profile | null;
 }

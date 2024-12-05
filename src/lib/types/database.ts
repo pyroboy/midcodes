@@ -14,6 +14,10 @@ export interface Profile {
     org_id: string | null;  // UUID reference to organizations.id
     created_at: string;
     updated_at: string;
+    // Emulation-related fields
+    isEmulated?: boolean;
+    originalRole?: UserRole;
+    originalOrgId?: string | null;
 }
 
 export interface RoleEmulationSession {

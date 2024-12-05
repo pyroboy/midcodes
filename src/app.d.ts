@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // See https://kit.svelte.dev/docs/types#app
 // for information about these interfaces
-import type { Session, SupabaseClient, User } from '@supabase/supabase-js';
+import type { Session as SupabaseSession, SupabaseClient, User } from '@supabase/supabase-js';
 import type { ProfileData, EmulatedProfile, RoleEmulationClaim } from '$lib/types/roleEmulation';
 
 interface ImportMetaEnv {
@@ -39,4 +39,9 @@ declare global {
 	}
 }
 
-export {}
+// Extend the Supabase Session type to include roleEmulation
+interface Session extends SupabaseSession {
+	roleEmulation?: RoleEmulationClaim;
+}
+
+export { Session };

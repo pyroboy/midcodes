@@ -19,14 +19,30 @@ export interface RoleEmulationClaim {
     active: boolean
     original_role: UserRole
     emulated_role: UserRole
+    original_org_id: string | null
+    emulated_org_id: string | null
     expires_at: string
     session_id: string
+    metadata?: Record<string, unknown>
+    organizationName?: string | null
 }
 
 export interface RoleEmulationData {
     targetRole: UserRole
     durationHours: number
     status?: string
+}
+
+export interface EmulationData {
+    isEmulated: boolean
+    originalRole: UserRole
+    emulatedRole: UserRole
+    originalOrgId: string | null
+    emulatedOrgId: string | null
+    expiresAt: string
+    sessionId: string
+    createdAt: string
+    metadata: Record<string, unknown>
 }
 
 export interface EmulatedProfile {
@@ -49,7 +65,7 @@ export interface ProfileData {
 }
 
 export interface LocalsSession extends Session {
-    role_emulation?: RoleEmulationData
+    roleEmulation?: RoleEmulationClaim
 }
 
 export interface SessionInfo {
