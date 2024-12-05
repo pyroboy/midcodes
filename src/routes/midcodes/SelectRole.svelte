@@ -11,6 +11,7 @@
     } from "$lib/components/ui/select";
     import toast from "svelte-french-toast";
     import { RoleConfig } from "$lib/auth/roleConfig";
+    import { onMount } from "svelte";
     
     type UserRole = 'super_admin' | 'org_admin' | 'event_admin' | 'event_qr_checker' | 'user';
 
@@ -20,9 +21,15 @@
         disabled?: boolean;
     }
 
+    interface Organization {
+        id: string;
+        name: string;
+    }
     
     let selectedRole: RoleOption | undefined = undefined;
+    let selectedOrgId: string | undefined = undefined;
     let loading = false;
+    let organizations: Organization[] = [];
     
     const roles: RoleOption[] = [
         { label: "Super Admin", value: "super_admin" },
@@ -31,6 +38,17 @@
         { label: "Event QR Checker", value: "event_qr_checker" },
         { label: "Regular User", value: "user" }
     ];
+
+    onMount(async () => {
+        try {
+            const { data: orgs, error } = await fetch('/api/organizations').then(r => r.json());
+            if (error) throw error;
+            organizations = orgs;
+        } catch (err) {
+            console.error('Failed to load organizations:', err);
+            toast.error('Failed to load organizations');
+        }
+    });
     
     function handleSelect(event: { value: UserRole } | undefined) {
         if (!event) {
@@ -39,13 +57,20 @@
         }
         selectedRole = roles.find(r => r.value === event.value);
     }
+
+    function handleOrgSelect(event: { value: string } | undefined) {
+        selectedOrgId = event?.value;
+    }
     
     async function handleEmulateRole() {
         if (!selectedRole) return;
         
         loading = true;
         try {
-            const payload = { emulatedRole: selectedRole.value };
+            const payload = { 
+                emulatedRole: selectedRole.value,
+                emulatedOrgId: selectedOrgId 
+            };
             console.log('Sending payload:', payload);
             
             const response = await fetch("/api/role-emulation", {
@@ -113,32 +138,46 @@
         <h2 class="text-lg font-semibold">Role Emulator</h2>
     </div>
 
+    <div class="space-y-4">
+        <div class="space-y-2">
+            <Label>Emulate Role</Label>
+            <Select onSelectedChange={handleSelect}>
+                <SelectTrigger class="w-full">
+                    <SelectValue placeholder="Select role to emulate">
+                        {selectedRole?.label ?? "Select role to emulate"}
+                    </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                    {#each roles as role}
+                        <SelectItem 
+                            value={role.value}
+                        >
+                            {role.label}
+                        </SelectItem>
+                    {/each}
+                </SelectContent>
+            </Select>
+        </div>
 
-
-    <div class="space-y-2">
-        <Label>Emulate Role</Label>
-        <Select onSelectedChange={handleSelect}>
-            <SelectTrigger class="w-full">
-                <SelectValue placeholder="Select role to emulate">
-                    {selectedRole?.label ?? "Select role to emulate"}
-                </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-                {#each roles as role}
-                    <SelectItem 
-                        value={role.value}
-                    >
-                        {role.label}
-                    </SelectItem>
-                {/each}
-            </SelectContent>
-        </Select>
+        <div class="space-y-2" data-testid="org-select">
+            <Label for="organization">Organization</Label>
+            <Select onSelectedChange={handleOrgSelect}>
+                <SelectTrigger class="w-full">
+                    <SelectValue placeholder="Select organization" />
+                </SelectTrigger>
+                <SelectContent>
+                    {#each organizations as org}
+                        <SelectItem value={org.id}>{org.name}</SelectItem>
+                    {/each}
+                </SelectContent>
+            </Select>
+        </div>
     </div>
 
     <div class="flex gap-2">
         <Button
             on:click={handleEmulateRole}
-            disabled={!selectedRole || loading }
+            disabled={!selectedRole || !selectedOrgId || loading }
             class="w-full"
         >
             {loading ? "Loading..." : "Start Emulation"}

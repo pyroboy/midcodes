@@ -15,6 +15,7 @@ type EmulationStatus = 'active' | 'ended'
 
 interface RequestBody {
   emulatedRole: UserRole
+  emulatedOrgId?: string
 }
 
 interface ResponseBody {
@@ -29,6 +30,8 @@ interface EmulationSession {
   user_id: string
   original_role: UserRole
   emulated_role: UserRole
+  original_org_id: string | null
+  emulated_org_id: string | null
   status: EmulationStatus
   expires_at: string
   created_at: string
@@ -62,6 +65,10 @@ function isUserRole(role: string): role is UserRole {
 
 async function validateRequest(req: Request): Promise<RequestBody> {
   try {
+    if (req.method === 'DELETE') {
+      return {} as RequestBody;
+    }
+
     const contentType = req.headers.get('content-type')
     if (!contentType?.includes('application/json')) {
       throw new RoleEmulationError(`Invalid content type: ${contentType}. Expected application/json`, 400)
@@ -92,7 +99,7 @@ async function validateRequest(req: Request): Promise<RequestBody> {
       throw new RoleEmulationError('emulatedRole is required', 400)
     }
 
-    const { emulatedRole } = typedBody
+    const { emulatedRole, emulatedOrgId } = typedBody
     if (typeof emulatedRole !== 'string' || !isUserRole(emulatedRole)) {
       throw new RoleEmulationError(
         `Invalid role: ${emulatedRole}. Must be one of: super_admin, org_admin, event_admin, event_qr_checker, user`,
@@ -100,7 +107,10 @@ async function validateRequest(req: Request): Promise<RequestBody> {
       )
     }
 
-    return { emulatedRole }
+    // Ensure emulatedOrgId is a string if present
+    const validatedOrgId = typeof emulatedOrgId === 'string' ? emulatedOrgId : undefined;
+
+    return { emulatedRole, emulatedOrgId: validatedOrgId }
   } catch (error) {
     if (error instanceof RoleEmulationError) {
       throw error
@@ -130,67 +140,106 @@ function getSupabaseClient(): ReturnType<typeof createClient> {
 async function handleRoleEmulation(
   supabase: ReturnType<typeof createClient>,
   userId: string,
-  originalRole: UserRole,
-  emulatedRole: UserRole
+  _originalRole: UserRole, // Prefix with underscore since it's unused
+  emulatedRole: UserRole,
+  emulatedOrgId?: string
 ): Promise<EmulationSession> {
-  const expiresAt = new Date()
-  expiresAt.setHours(expiresAt.getHours() + 4)
-
   try {
-    // Check for existing active sessions
-    const sessionsQuery = supabase
+    // Validate org_admin and super_admin require organization ID
+    if ((emulatedRole === 'org_admin' || emulatedRole === 'super_admin') && !emulatedOrgId) {
+      throw new RoleEmulationError('Organization ID is required for org_admin and super_admin roles', 400);
+    }
+
+    // Get user's original profile
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role, org_id')
+      .eq('id', userId)
+      .single();
+
+    if (profileError || !profile) {
+      console.error('Failed to fetch profile:', profileError);
+      throw new RoleEmulationError('Failed to fetch user profile', 404);
+    }
+
+    // Expire any active sessions
+    const { error: expireError } = await supabase
       .from('role_emulation_sessions')
-      .select('*')
+      .update({ status: 'ended' })
       .eq('user_id', userId)
-      .eq('status', 'active' as EmulationStatus);
+      .eq('status', 'active');
 
-    const { data: sessions, error: sessionsError } = await sessionsQuery;
-
-    if (sessionsError) {
-      throw new RoleEmulationError('Failed to check existing sessions', 500, sessionsError)
+    if (expireError) {
+      console.error('Failed to expire active sessions:', expireError);
+      throw new RoleEmulationError('Failed to expire active sessions', 500);
     }
 
-    // End any existing active sessions
-    if (sessions && sessions.length > 0) {
-      const updateQuery = supabase
-        .from('role_emulation_sessions')
-        .update({ status: 'ended' as EmulationStatus })
-        .eq('user_id', userId)
-        .eq('status', 'active' as EmulationStatus);
+    // Generate a secure session ID
+    const sessionId = crypto.randomUUID();
 
-      const { error: endActiveError } = await updateQuery;
-
-      if (endActiveError) {
-        throw new RoleEmulationError('Failed to end active sessions', 500, endActiveError)
-      }
-    }
+    // Set expiration to 4 hours from now
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 4);
 
     // Create new emulation session
-    const insertQuery = supabase
+    console.log('Creating new session with:', {
+      sessionId,
+      userId,
+      originalRole: profile.role,
+      emulatedRole,
+      originalOrgId: profile.org_id,
+      emulatedOrgId
+    });
+
+    const { data: session, error: sessionError } = await supabase
       .from('role_emulation_sessions')
-      .insert({
+      .insert([{
+        id: sessionId,
         user_id: userId,
-        original_role: originalRole,
+        original_role: profile.role,
         emulated_role: emulatedRole,
-        status: 'active' as EmulationStatus,
+        original_org_id: profile.org_id,
+        emulated_org_id: emulatedOrgId || null,
+        status: 'active',
         expires_at: expiresAt.toISOString(),
         metadata: {
-          created_at: new Date().toISOString()
+          source: 'web_interface',
+          timestamp: new Date().toISOString()
         }
-      })
+      }])
       .select()
       .single();
 
-    const { data: session, error: createError } = await insertQuery;
-
-    if (createError || !session) {
-      throw new RoleEmulationError('Failed to create emulation session', 500, createError)
+    if (sessionError) {
+      console.error('Failed to create session:', sessionError);
+      throw new RoleEmulationError('Failed to create emulation session', 500);
     }
 
-    return session as EmulationSession;
-  } catch (error) {
-    console.error('[Role Emulation] Error in handleRoleEmulation:', error)
-    throw error
+    if (!session) {
+      console.error('No session returned after creation');
+      throw new RoleEmulationError('Failed to create emulation session', 500);
+    }
+
+    return session;
+  } catch (err) {
+    if (err instanceof RoleEmulationError) throw err;
+    console.error('Internal server error:', err);
+    throw new RoleEmulationError('Internal server error', 500, err);
+  }
+}
+
+async function stopRoleEmulation(
+  supabase: ReturnType<typeof createClient>,
+  userId: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('role_emulation_sessions')
+    .update({ status: 'ended' })
+    .eq('user_id', userId)
+    .eq('status', 'active');
+
+  if (error) {
+    throw new RoleEmulationError('Failed to stop role emulation', 500, error);
   }
 }
 
@@ -254,13 +303,22 @@ serve(async (req: Request) => {
       })
     }
 
+    if (req.method === 'DELETE') {
+      await stopRoleEmulation(supabase, user.id)
+      return createResponse(200, {
+        status: 'success',
+        message: 'Role emulation stopped'
+      })
+    }
+
     console.log('[Role Emulation] Starting role emulation')
     const requestBody = await validateRequest(req)
     const emulationSession = await handleRoleEmulation(
       supabase,
       user.id,
       profile.role,
-      requestBody.emulatedRole
+      requestBody.emulatedRole,
+      requestBody.emulatedOrgId
     )
 
     console.log('[Role Emulation] Role emulation successful:', emulationSession)
