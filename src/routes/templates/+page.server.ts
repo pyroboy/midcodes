@@ -9,6 +9,14 @@ export const load: PageServerLoad = async ({ locals }) => {
         throw redirect(303, '/auth');
     }
 
+    // Check if user is super_admin
+    const userRole = session.user.user_metadata?.role;
+    if (userRole !== 'super_admin') {
+        return {
+            templates: []
+        };
+    }
+
     const { data: templates, error: templatesError } = await supabase
         .from('templates')
         .select('*');

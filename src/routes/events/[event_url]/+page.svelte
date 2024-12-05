@@ -35,11 +35,18 @@ const routes = [
         color: 'bg-purple-500 hover:bg-purple-600'
     },
     {
-        name: 'QR Checker',
-        href: `/${data.event.event_url}/qr-checker`,
-        description: 'Scan and verify QR codes',
+        name: 'QR Scanner',
+        href: `/${data.event.event_url}/scanner`,
+        description: 'Scan QR codes for check-in',
         icon: QrCode,
-        color: 'bg-orange-500 hover:bg-orange-600'
+        color: 'bg-yellow-500 hover:bg-yellow-600'
+    },
+    {
+        name: 'Settings',
+        href: `/${data.event.event_url}/settings`,
+        description: 'Configure event settings',
+        icon: Settings,
+        color: 'bg-gray-500 hover:bg-gray-600'
     }
 ];
 

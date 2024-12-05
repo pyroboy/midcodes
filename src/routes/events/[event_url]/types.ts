@@ -26,6 +26,8 @@ export interface PageData {
     session: any;
     user: any;
     profile: { role: any; org_id: any; } | null;
+    role: any;
+    org_id: any;
     organizations: any[];
     currentOrg: any | null;
     event: Event;
