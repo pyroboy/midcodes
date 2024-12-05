@@ -1,54 +1,55 @@
 <script lang="ts">
-    import type { PageData } from './types';
-    import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '$lib/components/ui/card';
-    import { Button } from '$lib/components/ui/button';
-    import { CalendarDays, Users, CreditCard, QrCode, Tag, Settings } from 'lucide-svelte';
+import type { PageData } from './types';
+import { Root as Card, Content as CardContent, Description as CardDescription, Header as CardHeader, Title as CardTitle } from '$lib/components/ui/card';
+import { Button } from '$lib/components/ui/button';
+import { CalendarDays, Users, CreditCard, QrCode, Tag, Settings } from 'lucide-svelte';
 
-    export let data: PageData;
-    
-    function formatPercentage(value: number, total: number): string {
-        if (!total) return '0%';
-        return `${Math.round((value / total) * 100)}%`;
+export let data: PageData;
+
+function formatPercentage(value: number, total: number): string {
+    if (!total) return '0%';
+    const percentage = (value / total) * 100;
+    return `${percentage < 0 ? 0 : Math.round(percentage)}%`;
+}
+
+const routes = [
+    {
+        name: 'Registration',
+        href: `/${data.event.event_url}/register`,
+        description: 'Register new attendees',
+        icon: Users,
+        color: 'bg-blue-500 hover:bg-blue-600'
+    },
+    {
+        name: 'Payments',
+        href: `/${data.event.event_url}/payments`,
+        description: 'Manage payments and transactions',
+        icon: CreditCard,
+        color: 'bg-green-500 hover:bg-green-600'
+    },
+    {
+        name: 'Name Tags',
+        href: `/${data.event.event_url}/name-tags`,
+        description: 'Generate and print name tags',
+        icon: Tag,
+        color: 'bg-purple-500 hover:bg-purple-600'
+    },
+    {
+        name: 'QR Checker',
+        href: `/${data.event.event_url}/qr-checker`,
+        description: 'Scan and verify QR codes',
+        icon: QrCode,
+        color: 'bg-orange-500 hover:bg-orange-600'
     }
-    
-    const routes = [
-        {
-            name: 'Registration',
-            href: `/${data.event.event_url}/register`,
-            description: 'Register new attendees',
-            icon: Users,
-            color: 'bg-blue-500 hover:bg-blue-600'
-        },
-        {
-            name: 'Payments',
-            href: `/${data.event.event_url}/payments`,
-            description: 'Manage payments and transactions',
-            icon: CreditCard,
-            color: 'bg-green-500 hover:bg-green-600'
-        },
-        {
-            name: 'Name Tags',
-            href: `/${data.event.event_url}/name-tags`,
-            description: 'Generate and print name tags',
-            icon: Tag,
-            color: 'bg-purple-500 hover:bg-purple-600'
-        },
-        {
-            name: 'QR Checker',
-            href: `/${data.event.event_url}/qr-checker`,
-            description: 'Scan and verify QR codes',
-            icon: QrCode,
-            color: 'bg-orange-500 hover:bg-orange-600'
-        }
-    ];
+];
 
-    // Format currency
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('en-PH', {
-            style: 'currency',
-            currency: 'PHP'
-        }).format(amount);
-    };
+// Format currency
+const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-PH', {
+        style: 'currency',
+        currency: 'PHP'
+    }).format(amount);
+};
 </script>
 
 <svelte:head>

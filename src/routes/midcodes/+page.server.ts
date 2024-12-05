@@ -27,7 +27,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 
     console.log('User profile:', userProfile);
     if (userProfile.role !== 'super_admin') {
-        throw error(403, { message: 'Access denied: Super Admin only' });
+        throw error(404, { message: 'Not found' });
     }
 
     // Fetch data from all relevant tables

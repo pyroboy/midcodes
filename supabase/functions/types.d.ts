@@ -1,17 +1,38 @@
-declare module "https://deno.land/std@0.177.0/http/server.ts" {
-    export function serve(handler: (request: Request) => Promise<Response> | Response): void;
+declare module "std/http/server.ts" {
+  export function serve(handler: (request: Request) => Promise<Response> | Response): void;
+}
+
+declare module "@supabase/supabase-js" {
+  export interface SupabaseClientOptions {
+    auth: {
+      autoRefreshToken: boolean;
+      persistSession: boolean;
+      detectSessionInUrl: boolean;
+    };
   }
-  
-  declare module "https://esm.sh/@supabase/supabase-js@2.38.4" {
-    export * from "@supabase/supabase-js";
+
+  export interface QueryBuilder<T> {
+    eq(column: string, value: string): QueryBuilder<T>;
+    select(columns?: string): QueryBuilder<T>;
+    single(): Promise<{ data: T | null; error: Error | null }>;
+    maybeSingle(): Promise<{ data: T | null; error: Error | null }>;
+    execute(): Promise<{ data: T[]; error: Error | null }>;
   }
-  
-  // Declare Deno namespace
-  declare namespace Deno {
-    export interface Env {
-      get(key: string): string | undefined;
-      set(key: string, value: string): void;
-      toObject(): { [key: string]: string };
-    }
-    export const env: Env;
+
+  export interface SupabaseClient {
+    auth: {
+      getUser(jwt: string): Promise<{ data: { user: { id: string } }, error: Error | null }>;
+    };
+    from<T>(table: string): {
+      select(columns?: string): QueryBuilder<T>;
+      insert(data: Partial<T>): Promise<{ data: T; error: Error | null }>;
+      update(data: Partial<T>): Promise<{ data: T; error: Error | null }>;
+    };
   }
+
+  export function createClient(
+    url: string, 
+    key: string, 
+    options: SupabaseClientOptions
+  ): SupabaseClient;
+}
