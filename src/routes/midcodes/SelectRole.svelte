@@ -69,9 +69,9 @@
         try {
             const payload = { 
                 emulatedRole: selectedRole.value,
-                emulatedOrgId: selectedOrgId 
+                ...(selectedOrgId && { emulatedOrgId: selectedOrgId })
             };
-            console.log('Sending payload:', payload);
+            console.log('[Role Emulation] Sending payload:', payload);
             
             const response = await fetch("/api/role-emulation", {
                 method: "POST",
@@ -82,12 +82,15 @@
                 body: JSON.stringify(payload)
             });
             
-            const data = await response.json();
-            console.log('Response:', data);
+            const result = await response.json();
+            console.log('[Role Emulation] Response:', result);
             
             if (!response.ok) {
-                throw new Error(data.message || "Failed to emulate role");
+                throw new Error(result.message || "Failed to emulate role");
             }
+            
+            // Wait for role state to update
+            await new Promise(resolve => setTimeout(resolve, 1000));
             
             toast.success("Role emulation started successfully");
             
@@ -97,7 +100,7 @@
         } catch (err) {
             const message = err instanceof Error ? err.message : "An error occurred";
             toast.error(message);
-            console.error('Role emulation error:', err);
+            console.error('[Role Emulation] Error:', err);
         } finally {
             loading = false;
         }

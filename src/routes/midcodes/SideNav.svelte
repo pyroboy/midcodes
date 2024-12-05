@@ -7,6 +7,8 @@
   // Get user role from page data
   $: currentRole = $roleState.currentRole;
   $: emulatedRole = $roleState.emulatedRole;
+  $: originalOrgId = $roleState.originalOrgId;
+  $: emulatedOrgId = $roleState.emulatedOrgId;
 </script>
 
 <nav class="flex flex-col gap-2 p-4 min-w-[200px]">
@@ -23,6 +25,14 @@
       {#if emulatedRole}
         <div class="text-gray-600">
           Emulated Role: <span class="font-medium text-blue-600">{emulatedRole}</span>
+        </div>
+      {/if}
+      <div class="text-gray-600">
+        Original Org: <span class="font-medium text-gray-900">{originalOrgId || 'None'}</span>
+      </div>
+      {#if emulatedOrgId}
+        <div class="text-gray-600">
+          Emulated Org: <span class="font-medium text-blue-600">{emulatedOrgId}</span>
         </div>
       {/if}
     </div>

@@ -95,31 +95,27 @@ async function validateRequest(req: Request): Promise<RequestBody> {
     }
 
     const typedBody = body as Record<string, unknown>
+    
+    // Validate emulatedRole
     if (!('emulatedRole' in typedBody)) {
       throw new RoleEmulationError('emulatedRole is required', 400)
     }
 
-    const { emulatedRole, emulatedOrgId } = typedBody
-    if (typeof emulatedRole !== 'string' || !isUserRole(emulatedRole)) {
-      throw new RoleEmulationError(
-        `Invalid role: ${emulatedRole}. Must be one of: super_admin, org_admin, event_admin, event_qr_checker, user`,
-        400
-      )
+    const emulatedRole = typedBody.emulatedRole as string
+    if (!isUserRole(emulatedRole)) {
+      throw new RoleEmulationError('Invalid emulatedRole', 400)
     }
 
-    // Ensure emulatedOrgId is a string if present
-    const validatedOrgId = typeof emulatedOrgId === 'string' ? emulatedOrgId : undefined;
-
-    return { emulatedRole, emulatedOrgId: validatedOrgId }
-  } catch (error) {
-    if (error instanceof RoleEmulationError) {
-      throw error
+    // Construct and return a valid RequestBody
+    const requestBody: RequestBody = {
+      emulatedRole,
+      ...(typeof typedBody.emulatedOrgId === 'string' ? { emulatedOrgId: typedBody.emulatedOrgId } : {})
     }
-    console.error('[Role Emulation] Validation error:', error)
-    throw new RoleEmulationError(
-      'Request validation failed: ' + (error instanceof Error ? error.message : 'Unknown error'),
-      400
-    )
+
+    return requestBody
+  } catch (err) {
+    if (err instanceof RoleEmulationError) throw err
+    throw new RoleEmulationError('Failed to validate request', 400, err)
   }
 }
 
@@ -133,6 +129,11 @@ function getSupabaseClient(): ReturnType<typeof createClient> {
       autoRefreshToken: false,
       persistSession: false,
       detectSessionInUrl: false
+    },
+    global: {
+      headers: {
+        'Authorization': `Bearer ${supabaseServiceRoleKey}`
+      }
     }
   })
 }
@@ -140,7 +141,7 @@ function getSupabaseClient(): ReturnType<typeof createClient> {
 async function handleRoleEmulation(
   supabase: ReturnType<typeof createClient>,
   userId: string,
-  _originalRole: UserRole, // Prefix with underscore since it's unused
+  _originalRole: UserRole,
   emulatedRole: UserRole,
   emulatedOrgId?: string
 ): Promise<EmulationSession> {
@@ -181,6 +182,20 @@ async function handleRoleEmulation(
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 4);
 
+    // Validate emulatedOrgId exists in organizations table if provided
+    if (emulatedOrgId) {
+      const { data: org, error: orgError } = await supabase
+        .from('organizations')
+        .select('id')
+        .eq('id', emulatedOrgId)
+        .single();
+
+      if (orgError || !org) {
+        console.error('Invalid organization ID:', orgError);
+        throw new RoleEmulationError('Invalid organization ID', 400);
+      }
+    }
+
     // Create new emulation session
     console.log('Creating new session with:', {
       sessionId,
@@ -199,24 +214,18 @@ async function handleRoleEmulation(
         original_role: profile.role,
         emulated_role: emulatedRole,
         original_org_id: profile.org_id,
-        emulated_org_id: emulatedOrgId || null,
-        status: 'active',
+        emulated_org_id: emulatedOrgId,
+        status: 'active' as const,
         expires_at: expiresAt.toISOString(),
         metadata: {
-          source: 'web_interface',
-          timestamp: new Date().toISOString()
+          created_at: new Date().toISOString()
         }
       }])
       .select()
       .single();
 
-    if (sessionError) {
+    if (sessionError || !session) {
       console.error('Failed to create session:', sessionError);
-      throw new RoleEmulationError('Failed to create emulation session', 500);
-    }
-
-    if (!session) {
-      console.error('No session returned after creation');
       throw new RoleEmulationError('Failed to create emulation session', 500);
     }
 
@@ -239,7 +248,8 @@ async function stopRoleEmulation(
     .eq('status', 'active');
 
   if (error) {
-    throw new RoleEmulationError('Failed to stop role emulation', 500, error);
+    console.error('Failed to stop role emulation:', error);
+    throw new RoleEmulationError('Failed to stop role emulation', 500);
   }
 }
 
@@ -247,7 +257,6 @@ function handleOptions(req: Request): Response | undefined {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
-  return undefined
 }
 
 serve(async (req: Request) => {
@@ -255,32 +264,28 @@ serve(async (req: Request) => {
     const preflightResponse = await handleOptions(req)
     if (preflightResponse) return preflightResponse
 
-    console.log('=== DEBUG REQUEST INFO ===')
-    console.log('Method:', req.method)
-    console.log('Headers:', Object.fromEntries(req.headers.entries()))
-
-    const authHeader = req.headers.get('Authorization')?.split(' ')[1]
+    // Get JWT token from request
+    const authHeader = req.headers.get('authorization')
     if (!authHeader) {
-      console.error('[Role Emulation] No authorization header')
-      return createResponse(401, {
-        status: 'error',
-        message: 'No authorization header'
-      })
+      throw new RoleEmulationError('Missing authorization header', 401)
     }
 
+    const token = authHeader.replace('Bearer ', '')
+    if (!token) {
+      throw new RoleEmulationError('Invalid authorization header', 401)
+    }
+
+    // Initialize Supabase client
     const supabase = getSupabaseClient()
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser(authHeader)
-    
+    // Get user ID from JWT
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token)
     if (userError || !user) {
-      console.error('[Role Emulation] Invalid JWT:', userError)
-      return createResponse(401, {
-        status: 'error',
-        message: 'Invalid authorization token'
-      })
+      console.error('Failed to get user:', userError)
+      throw new RoleEmulationError('Invalid JWT token', 401)
     }
-    console.log('[Role Emulation] JWT verified for user:', user.id)
 
+    // Get user's current role
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('role')
@@ -288,19 +293,8 @@ serve(async (req: Request) => {
       .single()
 
     if (profileError || !profile) {
-      console.error('[Role Emulation] Failed to get user profile:', profileError)
-      return createResponse(500, {
-        status: 'error',
-        message: 'Failed to get user profile'
-      })
-    }
-
-    if (profile.role !== 'super_admin') {
-      console.error('[Role Emulation] User does not have super_admin role:', profile.role)
-      return createResponse(403, {
-        status: 'error',
-        message: 'Only super admins can emulate roles'
-      })
+      console.error('Failed to get profile:', profileError)
+      throw new RoleEmulationError('Failed to get user profile', 404)
     }
 
     if (req.method === 'DELETE') {
@@ -311,35 +305,27 @@ serve(async (req: Request) => {
       })
     }
 
-    console.log('[Role Emulation] Starting role emulation')
-    const requestBody = await validateRequest(req)
-    const emulationSession = await handleRoleEmulation(
-      supabase,
-      user.id,
-      profile.role,
-      requestBody.emulatedRole,
-      requestBody.emulatedOrgId
-    )
+    const body = await validateRequest(req)
+    const session = await handleRoleEmulation(supabase, user.id, profile.role, body.emulatedRole, body.emulatedOrgId)
 
-    console.log('[Role Emulation] Role emulation successful:', emulationSession)
     return createResponse(200, {
       status: 'success',
-      message: 'Role emulation started',
-      data: emulationSession
+      message: 'Role emulation started successfully',
+      data: session
     })
-
-  } catch (error) {
-    console.error('[Role Emulation] Error:', error)
-    if (error instanceof RoleEmulationError) {
-      return createResponse(error.status, {
+  } catch (err) {
+    console.error('Error in role emulation:', err)
+    if (err instanceof RoleEmulationError) {
+      return createResponse(err.status, {
         status: 'error',
-        message: error.message,
-        error: error.details
+        message: err.message,
+        error: err.details
       })
     }
     return createResponse(500, {
       status: 'error',
-      message: error instanceof Error ? error.message : 'Unknown error'
+      message: 'Internal server error',
+      error: err
     })
   }
 })
