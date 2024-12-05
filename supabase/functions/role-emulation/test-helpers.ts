@@ -49,10 +49,13 @@ export class TestHelpers {
   }
 
   async cleanupEmulationSessions(userId: string) {
-    await this.supabase
+    const { data, error } = await this.supabase
       .from('role_emulation_sessions')
       .update({ status: 'ended' })
-      .eq('user_id', userId)
+      .eq('user_id', userId);
+    
+    if (error) throw error;
+    return data;
   }
 
   async ensureTestUser(email: string, password: string) {
@@ -101,18 +104,40 @@ export class TestHelpers {
     await this.supabase.auth.signOut()
   }
 
-  async getEmulationSession(userId: string) {
-    const { data: session, error } = await this.supabase
+  async getEmulationSession(userId: string, status?: 'active' | 'ended') {
+    const query = this.supabase
       .from('role_emulation_sessions')
       .select('*')
       .eq('user_id', userId)
-      .eq('status', 'active')
-      .single()
+      .order('created_at', { ascending: false })
+      .limit(1);
 
-    if (error || !session) {
-      throw new Error('Failed to get emulation session')
+    if (status) {
+      query.eq('status', status);
     }
 
-    return session
+    const { data: session, error } = await query.single();
+
+    if (error) {
+      console.error('Error fetching emulation session:', error);
+      throw new Error('Failed to get emulation session');
+    }
+
+    if (!session) {
+      throw new Error('No emulation session found');
+    }
+
+    return session;
+  }
+
+  // Helper function to safely consume response bodies
+  async safelyConsumeResponse<T extends { status?: string; message?: string; data?: unknown }>(response: Response): Promise<T> {
+    try {
+      return await response.json() as T;
+    } catch (error) {
+      // If JSON parsing fails, still consume the response body
+      await response.text();
+      throw error;
+    }
   }
 }

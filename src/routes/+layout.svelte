@@ -11,6 +11,7 @@
     import { supabase } from '$lib/supabaseClient';
     import { navigating } from '$app/stores';
     import { browser } from '$app/environment';
+    import { loadConfig } from '$lib/stores/config';
     import "../app.css";
     
     let isMenuOpen = false;
@@ -54,6 +55,7 @@
         if (browser) {
             await loadGoogleFonts();
         }
+        loadConfig();
     });
 
     onDestroy(() => {

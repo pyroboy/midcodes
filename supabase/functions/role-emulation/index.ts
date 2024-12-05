@@ -241,11 +241,32 @@ async function stopRoleEmulation(
   supabase: ReturnType<typeof createClient>,
   userId: string
 ): Promise<void> {
+  // First check if there's an active session
+  const { data: activeSession, error: queryError } = await supabase
+    .from('role_emulation_sessions')
+    .select()
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .single();
+
+  if (queryError?.code === 'PGRST116') {
+    // PGRST116 is the error code for no rows returned
+    throw new RoleEmulationError('No active role emulation session found', 404);
+  }
+
+  if (queryError) {
+    console.error('Failed to query role emulation session:', queryError);
+    throw new RoleEmulationError('Failed to query role emulation session', 500);
+  }
+
+  if (!activeSession) {
+    throw new RoleEmulationError('No active role emulation session found', 404);
+  }
+
   const { error } = await supabase
     .from('role_emulation_sessions')
     .update({ status: 'ended' })
-    .eq('user_id', userId)
-    .eq('status', 'active');
+    .eq('id', activeSession.id);
 
   if (error) {
     console.error('Failed to stop role emulation:', error);

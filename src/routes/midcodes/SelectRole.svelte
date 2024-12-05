@@ -63,7 +63,10 @@
     }
     
     async function handleEmulateRole() {
-        if (!selectedRole) return;
+        if (!selectedRole) {
+            toast.error("Please select a role first");
+            return;
+        }
         
         loading = true;
         try {
@@ -86,7 +89,9 @@
             console.log('[Role Emulation] Response:', result);
             
             if (!response.ok) {
-                throw new Error(result.message || "Failed to emulate role");
+                const errorMessage = result.error || result.message || "Failed to emulate role";
+                console.error('[Role Emulation] Error:', errorMessage);
+                throw new Error(errorMessage);
             }
             
             // Wait for role state to update
@@ -98,9 +103,9 @@
             const defaultRedirect = RoleConfig[selectedRole.value].defaultRedirect;
             window.location.href = defaultRedirect;
         } catch (err) {
+            console.error('[Role Emulation] Full error:', err);
             const message = err instanceof Error ? err.message : "An error occurred";
             toast.error(message);
-            console.error('[Role Emulation] Error:', err);
         } finally {
             loading = false;
         }

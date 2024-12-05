@@ -1,15 +1,6 @@
 import type { UserRole } from '$lib/types/database'
-
-export interface AllowedPath {
-    path: string
-    methods?: string[]
-}
-
-interface RoleConfigType {
-    allowedPaths: AllowedPath[]
-    defaultRedirect: string
-    isAdmin: boolean
-}
+import { config } from '$lib/stores/config'
+import { get } from 'svelte/store'
 
 // Define public paths that don't require authentication
 export const PublicPaths = {
@@ -36,10 +27,9 @@ export function hasPathAccess(role: UserRole, path: string, originalRole?: UserR
     const roleConfig = RoleConfig[role]
     if (!roleConfig) return false
 
-    // Special case for /midcodes - allow access if:
     // 1. User is super_admin (original role)
     // 2. There's an active emulation session (originalRole exists)
-    if (path === '/midcodes' && (originalRole === 'super_admin' || originalRole)) {
+    if (path === `/${get(config).adminUrl}` && (originalRole === 'super_admin' || originalRole)) {
         return true
     }
 
@@ -111,7 +101,7 @@ export function getRedirectPath(role: UserRole, path: string, originalRole?: Use
 export const RoleConfig: Record<UserRole, RoleConfigType> = {
     super_admin: {
         allowedPaths: [{ path: '/**' }],
-        defaultRedirect: '/midcodes',
+        defaultRedirect: `/${get(config).adminUrl}`,
         isAdmin: true
     },
     org_admin: {
@@ -121,8 +111,7 @@ export const RoleConfig: Record<UserRole, RoleConfigType> = {
     },
     event_admin: {
         allowedPaths: [
-            { path: '/rat' },
-            { path: '/midcodes' },
+            { path: `/${get(config).adminUrl}` },
             { path: '/rat/**' },
             { path: '/events' },
             { path: '/events/**' },
@@ -146,4 +135,15 @@ export const RoleConfig: Record<UserRole, RoleConfigType> = {
         defaultRedirect: '/profile',
         isAdmin: false
     }
+}
+
+interface RoleConfigType {
+    allowedPaths: AllowedPath[]
+    defaultRedirect: string
+    isAdmin: boolean
+}
+
+interface AllowedPath {
+    path: string
+    methods?: string[]
 }

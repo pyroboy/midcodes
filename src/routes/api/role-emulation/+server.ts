@@ -30,13 +30,14 @@ export const POST: RequestHandler = async ({ request, locals: { supabase, safeGe
         // Use SUPABASE_URL from environment
         const functionUrl = `${PUBLIC_SUPABASE_URL}/functions/v1/role-emulation`;
         
-        //get payload. 
+        const payload = await request.json();
 
-        // Simple test payload
-        const testBody = {
-            emulatedRole: 'event_admin' 
-        };
- const payload = await request.json();
+        // Validate payload
+        if (!payload.emulatedRole || !isValidRole(payload.emulatedRole)) {
+            return json({ 
+                error: 'Invalid role specified' 
+            }, { status: 400 });
+        }
 
         console.log('=== DEBUG CLIENT SIDE ===');
         console.log('Function URL:', functionUrl);
@@ -86,15 +87,15 @@ export const DELETE: RequestHandler = async ({ locals: { supabase, safeGetSessio
         const { session, user, profile } = sessionResult;
         
         if (!session?.access_token) {
-            createError(401, 'No valid session');
+            throw error(401, 'No valid session');
         }
 
         if (!user) {
-            createError(401, 'No user found');
+            throw error(401, 'No user found');
         }
 
         if (!profile) {
-            createError(401, 'No profile found');
+            throw error(401, 'No profile found');
         }
 
         console.log(`[Role Emulation] Stopping emulation for user ${user.id}`);
@@ -102,21 +103,15 @@ export const DELETE: RequestHandler = async ({ locals: { supabase, safeGetSessio
         // Invoke Edge Function with reset flag
         console.log('[Role Emulation] Invoking Edge Function...');
         const functionResult = await supabase.functions.invoke('role-emulation', {
-            body: { 
-                reset: true,
-                metadata: {
-                    timestamp: new Date().toISOString()
-                }
-            },
+            method: 'DELETE',
             headers: {
-                Authorization: `Bearer ${session.access_token}`,
-                'Content-Type': 'application/json'
+                Authorization: `Bearer ${session.access_token}`
             }
         });
         console.log('[Role Emulation] Edge Function result:', functionResult);
 
         if (functionResult.error) {
-            createError(500, 'Failed to stop role emulation', functionResult.error.message);
+            throw error(500, 'Failed to stop role emulation: ' + functionResult.error.message);
         }
 
         console.log(`[Role Emulation] Successfully stopped emulation for user ${user.id}`);
@@ -131,6 +126,6 @@ export const DELETE: RequestHandler = async ({ locals: { supabase, safeGetSessio
             throw err;
         }
         // Otherwise create a new error
-        createError(500, 'An unexpected error occurred', err instanceof Error ? err.message : 'Unknown error');
+        throw error(500, 'An unexpected error occurred');
     }
 };
