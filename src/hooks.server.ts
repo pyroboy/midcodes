@@ -35,27 +35,7 @@ async function getUserProfile(userId: string, supabase: SupabaseClient): Promise
     .select('*, organizations(id, name)')
     .eq('id', userId)
     .single()
-
-  if (profile) {
-    // If user has an organization, add event_url to context
-    if (profile.org_id) {
-      const { data: events } = await supabase
-        .from('events')
-        .select('event_url')      
-        .eq('org_id', profile.org_id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
-
-      if (events?.event_url) {
-        profile.context = {
-          ...profile.context,
-          event_url: events.event_url
-        }
-      }
-    }
-  }
-
+    
   return profile
 }
 

@@ -138,7 +138,8 @@ export const RoleConfig: Record<UserRole, RoleConfigType> = {
             { path: '/api/**' }
         ],
         defaultPath: (context?: any) => {
-            return `/events/${context.event_url}`;
+            console.log('defaultPath context:', context);
+            return `/events/${context?.event_url}`;
         },
         isAdmin: true,
         label: 'Event Admin'
@@ -150,7 +151,8 @@ export const RoleConfig: Record<UserRole, RoleConfigType> = {
             { path: '/events/*/qr-checker' }
         ],
         defaultPath: (context?: any) => {
-            return `/events/${context.event_url}/qr-checker`;
+            console.log('defaultPath context:', context);
+            return `/events/${context?.event_url}/qr-checker`;
         },
         isAdmin: false,
         label: 'Event QR Checker'

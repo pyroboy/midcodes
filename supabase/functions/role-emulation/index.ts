@@ -258,8 +258,8 @@ async function handleRoleEmulation(
         status: 'active' as const,
         expires_at: expiresAt.toISOString(),
         metadata: {
-          created_at: new Date().toISOString(),
-          context
+          ...context,
+          created_at: new Date().toISOString()
         },
         is_role_existing: false
       }])
@@ -283,7 +283,7 @@ async function handleRoleEmulation(
             emulated_org_id: emulatedOrgId,
             expires_at: expiresAt.toISOString(),
             session_id: sessionId,
-            context
+            ...context
           }
         }
       }
@@ -316,8 +316,8 @@ async function stopRoleEmulation(
       .single();
 
     if (queryError?.code === 'PGRST116' || !activeSession) {
-      // No active session found
-      throw new RoleEmulationError('No active role emulation session found', 404);
+      // No active session found - this is an acceptable state when signing out
+      return;
     }
 
     if (queryError) {

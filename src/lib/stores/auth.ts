@@ -1,5 +1,5 @@
 import { writable, get } from 'svelte/store'
-import type { User, Session } from '@supabase/supabase-js'
+import type { User, Session, AuthError } from '@supabase/supabase-js'
 import { supabase } from '$lib/supabaseClient'
 import { browser } from '$app/environment'
 import { goto } from '$app/navigation'
@@ -41,6 +41,11 @@ export interface EmulationSessionDatabaseRow {
         context: Record<string, unknown> | null;
     };
 }
+
+/** Creates a promise that rejects after the specified timeout */
+const timeoutPromise = (ms: number) => new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('Operation timed out')), ms);
+});
 
 // Private internal stores
 const _user = writable<User | null>(null)
@@ -254,34 +259,77 @@ export const auth = {
     },
 
     signOut: async () => {
+        console.log('[Auth] Starting sign out process');
         try {
             _isLoggingOut.set(true)
+            console.log('[Auth] Set isLoggingOut to true');
             
-            // Clear all stores first
-            auth.clearSession()
+            // Try to end any active emulation first
+            try {
+                console.log('[Auth] Attempting to end any active emulation');
+                const emulationResponse = await Promise.race([
+                    fetch('/api/role-emulation', {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    }),
+                    timeoutPromise(5000)
+                ]) as Response;
+                
+                if (!emulationResponse.ok) {
+                    console.error('[Auth] Failed to end emulation:', await emulationResponse.text());
+                } else {
+                    console.log('[Auth] Emulation end request completed');
+                }
+            } catch (error) {
+                console.error('[Auth] Error ending emulation:', error);
+                // Continue with signout even if emulation end fails
+            }
+
+            // Call server-side signout endpoint which handles Supabase signout
+            try {
+                console.log('[Auth] Calling server-side signout endpoint');
+                const serverResponse = await Promise.race([
+                    fetch('/auth/signout', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    }),
+                    timeoutPromise(5000)
+                ]) as Response;
+                
+                if (!serverResponse.ok) {
+                    console.error('[Auth] Server signout failed:', await serverResponse.text())
+                } else {
+                    console.log('[Auth] Server signout successful');
+                }
+            } catch (error) {
+                console.error('[Auth] Server signout error:', error)
+            }
+
+            // Always clear stores
+            console.log('[Auth] Clearing all stores');
             _user.set(null)
             _session.set(null)
             _profile.set(null)
 
-            // Call the server-side signout endpoint
-            const response = await fetch('/auth/signout', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            })
-
-            if (!response.ok) {
-                throw new Error('Failed to sign out')
-            }
-
-            // Redirect to auth page
+            // Always try to redirect
+            console.log('[Auth] Redirecting to auth page');
             await goto('/auth')
+            console.log('[Auth] Sign out process complete');
         } catch (error) {
-            console.error('Error during sign out:', error)
-            throw error
+            console.error('[Auth] Error during sign out:', error)
+            // Even if there's an error, try to redirect to auth
+            try {
+                await goto('/auth')
+            } catch (e) {
+                console.error('[Auth] Failed to redirect after error:', e)
+            }
         } finally {
             _isLoggingOut.set(false)
+            console.log('[Auth] Set isLoggingOut back to false');
         }
     },
 
@@ -358,12 +406,23 @@ export const auth = {
     },
 
     endEmulation: async (): Promise<void> => {
-        const { error } = await supabase.functions.invoke('role-emulation', {
-            method: 'DELETE'
-        });
+        try {
+            const response = await fetch('/api/role-emulation', {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
 
-        if (error) {
-            console.error('Failed to end role emulation:', error);
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('[Auth] Failed to end emulation:', errorText);
+                throw new Error(errorText);
+            }
+
+            console.log('[Auth] Successfully ended emulation');
+        } catch (error) {
+            console.error('[Auth] Error ending emulation:', error);
             throw error;
         }
     },

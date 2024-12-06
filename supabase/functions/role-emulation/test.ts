@@ -333,15 +333,45 @@ Deno.test('Role Emulation Function Tests', async (t) => {
   await t.step('Should allow role emulation with context metadata', async () => {
     await testHelpers.cleanupEmulationSessions(userId)
     console.log('\n🔄 Testing role emulation with context metadata...')
+    
     const context = {
-      reason: 'Testing context',
       approved_by: 'test@example.com',
+      reason: 'Testing context',
       timestamp: new Date().toISOString(),
       metadata: {
         nested: 'value',
         nullValue: null
       }
     }
+
+    const response = await fetch('http://localhost:54321/functions/v1/role-emulation', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        emulatedRole: 'org_admin',
+        emulatedOrgId: testOrgId,
+        context
+      })
+    })
+
+    assertEquals(response.status, 200)
+    const data = await response.json()
+    assertExists(data.data)
+    assertEquals(data.data.emulated_role, 'org_admin')
+    assertEquals(data.data.emulated_org_id, testOrgId)
+    assertExists(data.data.metadata)
+    assertEquals(data.data.metadata.approved_by, context.approved_by)
+    assertEquals(data.data.metadata.reason, context.reason)
+    assertEquals(data.data.metadata.metadata.nested, context.metadata.nested)
+    assertEquals(data.data.metadata.metadata.nullValue, context.metadata.nullValue)
+  })
+
+  await t.step('Should allow role emulation with null context', async () => {
+    await testHelpers.cleanupEmulationSessions(userId)
+    console.log('\n🔄 Testing role emulation with null context...')
     
     const response = await fetch('http://localhost:54321/functions/v1/role-emulation', {
       method: 'POST',
@@ -350,26 +380,26 @@ Deno.test('Role Emulation Function Tests', async (t) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        emulatedRole: 'event_admin',
-        context
+        emulatedRole: 'org_admin',
+        emulatedOrgId: testOrgId,
+        context: null
       })
     })
 
-    try {
-      const _responseData = await testHelpers.safelyConsumeResponse(response)
-      assertEquals(response.ok, true)
-      const session = await testHelpers.getEmulationSession(userId)
-      assertExists(session, 'Emulation session should exist')
-      assertEquals(session.emulated_role, 'event_admin')
-      assertEquals(session.metadata.context, context)
-    } finally {
-      await testHelpers.cleanupEmulationSessions(userId)
-    }
+    assertEquals(response.status, 200)
+    const data = await response.json()
+    assertExists(data.data)
+    assertEquals(data.data.emulated_role, 'org_admin')
+    assertEquals(data.data.emulated_org_id, testOrgId)
+    assertExists(data.data.metadata)
+    assertExists(data.data.metadata.created_at)
   })
 
-  await t.step('Should allow role emulation with null context', async () => {
+  await t.step('Should handle event_admin role emulation with context', async () => {
     await testHelpers.cleanupEmulationSessions(userId)
-    console.log('\n🔄 Testing role emulation with null context...')
+    console.log('\n🔄 Testing event_admin role emulation with context...')
+    
+    const eventUrl = 'EVNT-2023-ABC12'
     const response = await fetch('http://localhost:54321/functions/v1/role-emulation', {
       method: 'POST',
       headers: {
@@ -378,20 +408,49 @@ Deno.test('Role Emulation Function Tests', async (t) => {
       },
       body: JSON.stringify({
         emulatedRole: 'event_admin',
-        context: null
+        emulatedOrgId: testOrgId,
+        context: {
+          event_url: eventUrl
+        }
       })
     })
 
-    try {
-      const _responseData = await testHelpers.safelyConsumeResponse(response)
-      assertEquals(response.ok, true)
-      const session = await testHelpers.getEmulationSession(userId)
-      assertExists(session, 'Emulation session should exist')
-      assertEquals(session.emulated_role, 'event_admin')
-      assertEquals(session.metadata.context, null)
-    } finally {
-      await testHelpers.cleanupEmulationSessions(userId)
-    }
+    assertEquals(response.status, 200)
+    const data = await response.json()
+    assertExists(data.data)
+    assertEquals(data.data.emulated_role, 'event_admin')
+    assertEquals(data.data.emulated_org_id, testOrgId)
+    assertExists(data.data.metadata)
+    assertEquals(data.data.metadata.event_url, eventUrl)
+  })
+
+  await t.step('Should handle event_qr_checker role emulation with context', async () => {
+    await testHelpers.cleanupEmulationSessions(userId)
+    console.log('\n🔄 Testing event_qr_checker role emulation with context...')
+    
+    const eventUrl = 'EVNT-2023-ABC12'
+    const response = await fetch('http://localhost:54321/functions/v1/role-emulation', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        emulatedRole: 'event_qr_checker',
+        emulatedOrgId: testOrgId,
+        context: {
+          event_url: eventUrl
+        }
+      })
+    })
+
+    assertEquals(response.status, 200)
+    const data = await response.json()
+    assertExists(data.data)
+    assertEquals(data.data.emulated_role, 'event_qr_checker')
+    assertEquals(data.data.emulated_org_id, testOrgId)
+    assertExists(data.data.metadata)
+    assertEquals(data.data.metadata.event_url, eventUrl)
   })
 
   await t.step('Should reject invalid context values', async () => {

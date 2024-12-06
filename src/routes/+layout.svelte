@@ -99,6 +99,7 @@ console.log('[Role Debug] Emulationnnnnn:', $page.data.session?.roleEmulation);
     }
     
     async function signOut() {
+        console.log('[Layout] Sign out clicked, calling auth.signOut()');
         await auth.signOut();
     }
 </script>
