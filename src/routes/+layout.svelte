@@ -173,23 +173,7 @@ console.log('[Role Debug] Emulationnnnnn:', $page.data.session?.roleEmulation);
                                 {/if}
                                 Toggle Theme
                             </DropdownMenuItem>
-                            {#if navigation.showRoleEmulation}
-                                <DropdownMenuItem class="cursor-pointer">
-                                    {#if emulation?.active}
-                                        <form action="/api/role-emulation?/stop" method="POST">
-                                            <button class="flex items-center">
-                                                <Crown class="mr-2 h-4 w-4 text-yellow-500" />
-                                                <span>Stop Role Emulation</span>
-                                            </button>
-                                        </form>
-                                    {:else}
-                                        <a href="/role-emulation" class="flex items-center">
-                                            <Crown class="mr-2 h-4 w-4" />
-                                            <span>Start Role Emulation</span>
-                                        </a>
-                                    {/if}
-                                </DropdownMenuItem>
-                            {/if}
+                          
                             <DropdownMenuItem on:click={signOut}>
                                 Sign Out
                             </DropdownMenuItem>

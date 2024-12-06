@@ -1,7 +1,5 @@
 <script lang="ts">
-    import { Crown } from "lucide-svelte";
     import { Button } from "$lib/components/ui/button";
-    import { Label } from "$lib/components/ui/label";
     import {
         Select,
         SelectContent,
@@ -9,9 +7,10 @@
         SelectTrigger,
         SelectValue,
     } from "$lib/components/ui/select";
-    import toast from "svelte-french-toast";
     import { RoleConfig } from "$lib/auth/roleConfig";
     import { onMount } from "svelte";
+    import { page } from '$app/stores';
+    import type { RoleEmulationClaim } from '$lib/types/roleEmulation';
     
     type UserRole = 'super_admin' | 'org_admin' | 'event_admin' | 'event_qr_checker' | 'user';
 
@@ -30,7 +29,10 @@
     let selectedOrgId: string | undefined = undefined;
     let loading = false;
     let organizations: Organization[] = [];
-    
+    $: emulation = $page.data.session?.roleEmulation as RoleEmulationClaim | null;
+    $: isEmulating = emulation?.active ?? false;
+    $: currentRole = emulation?.emulated_role;
+    $: organizationName = emulation?.organizationName ?? 'Unknown Organization';
     const roles: RoleOption[] = [
         { label: "Super Admin", value: "super_admin" },
         { label: "Organization Admin", value: "org_admin" },
@@ -46,7 +48,6 @@
             organizations = orgs;
         } catch (err) {
             console.error('Failed to load organizations:', err);
-            toast.error('Failed to load organizations');
         }
     });
     
@@ -64,7 +65,7 @@
     
     async function handleEmulateRole() {
         if (!selectedRole) {
-            toast.error("Please select a role first");
+            console.error("Please select a role first");
             return;
         }
         
@@ -97,15 +98,13 @@
             // Wait for role state to update
             await new Promise(resolve => setTimeout(resolve, 1000));
             
-            toast.success("Role emulation started successfully");
-            
             // Get default redirect URL for the selected role
             const defaultRedirect = RoleConfig[selectedRole.value].defaultRedirect;
             window.location.href = defaultRedirect;
         } catch (err) {
             console.error('[Role Emulation] Full error:', err);
             const message = err instanceof Error ? err.message : "An error occurred";
-            toast.error(message);
+            console.error(message);
         } finally {
             loading = false;
         }
@@ -128,11 +127,9 @@
                 throw new Error(data.message || "Failed to stop emulation");
             }
             
-            toast.success("Role emulation stopped successfully");
             window.location.reload();
         } catch (err) {
             const message = err instanceof Error ? err.message : "An error occurred";
-            toast.error(message);
             console.error('Stop emulation error:', err);
         } finally {
             loading = false;
@@ -140,63 +137,75 @@
     }
 </script>
 
-<div class="space-y-4 p-4 border rounded-lg bg-gray-50">
+<div class="space-y-4 p-4 border rounded-lg bg-card text-card-foreground dark:bg-gray-900 dark:border-gray-800">
     <div class="flex items-center gap-2">
-        <Crown class="h-5 w-5 text-yellow-500" />
-        <h2 class="text-lg font-semibold">Role Emulator</h2>
+        <h2 class="text-lg font-semibold text-foreground dark:text-white">Role Emulator</h2>
     </div>
 
-    <div class="space-y-4">
-        <div class="space-y-2">
-            <Label>Emulate Role</Label>
-            <Select onSelectedChange={handleSelect}>
-                <SelectTrigger class="w-full">
-                    <SelectValue placeholder="Select role to emulate">
-                        {selectedRole?.label ?? "Select role to emulate"}
-                    </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                    {#each roles as role}
-                        <SelectItem 
-                            value={role.value}
-                        >
-                            {role.label}
-                        </SelectItem>
-                    {/each}
-                </SelectContent>
-            </Select>
+    {#if isEmulating}
+        <div class="p-3 bg-yellow-50 border border-yellow-200 rounded-md dark:bg-yellow-900/20 dark:border-yellow-900/30">
+            <p class="text-sm text-yellow-800 dark:text-yellow-200">
+                Currently emulating: <span class="font-medium">{currentRole}</span>
+                <br>
+                Organization: <span class="font-medium">{organizationName}</span>
+            </p>
         </div>
-
-        <div class="space-y-2" data-testid="org-select">
-            <Label for="organization">Organization</Label>
-            <Select onSelectedChange={handleOrgSelect}>
-                <SelectTrigger class="w-full">
-                    <SelectValue placeholder="Select organization" />
-                </SelectTrigger>
-                <SelectContent>
-                    {#each organizations as org}
-                        <SelectItem value={org.id}>{org.name}</SelectItem>
-                    {/each}
-                </SelectContent>
-            </Select>
-        </div>
-    </div>
-
-    <div class="flex gap-2">
-        <Button
-            on:click={handleEmulateRole}
-            disabled={!selectedRole || !selectedOrgId || loading }
-            class="w-full"
-        >
-            {loading ? "Loading..." : "Start Emulation"}
-        </Button>
+        
         <Button
             on:click={handleStopEmulation}
             variant="outline"
             disabled={loading}
-            class="w-full"
+            class="w-full bg-background hover:bg-accent dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700 dark:border-gray-700"
         >
-            Stop Emulation
+            {loading ? "Loading..." : "Stop Emulation"}
         </Button>
-    </div>
+    {:else}
+        <div class="space-y-3">
+            <div class="space-y-2">
+                <Select onSelectedChange={handleSelect}>
+                    <SelectTrigger class="w-full dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:hover:bg-gray-700">
+                        <SelectValue placeholder="Select role to emulate">
+                            {selectedRole?.label ?? "Select role to emulate"}
+                        </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent class="dark:bg-gray-800 dark:border-gray-700">
+                        {#each roles as role}
+                            <SelectItem 
+                                value={role.value}
+                                class="dark:text-white dark:focus:bg-gray-700 dark:hover:bg-gray-700"
+                            >
+                                {role.label}
+                            </SelectItem>
+                        {/each}
+                    </SelectContent>
+                </Select>
+            </div>
+
+            <div class="space-y-2" data-testid="org-select">
+                <Select onSelectedChange={handleOrgSelect}>
+                    <SelectTrigger class="w-full dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:hover:bg-gray-700">
+                        <SelectValue placeholder="Select organization" />
+                    </SelectTrigger>
+                    <SelectContent class="dark:bg-gray-800 dark:border-gray-700">
+                        {#each organizations as org}
+                            <SelectItem 
+                                value={org.id}
+                                class="dark:text-white dark:focus:bg-gray-700 dark:hover:bg-gray-700"
+                            >
+                                {org.name}
+                            </SelectItem>
+                        {/each}
+                    </SelectContent>
+                </Select>
+            </div>
+
+            <Button
+                on:click={handleEmulateRole}
+                disabled={!selectedRole || !selectedOrgId || loading }
+                class="w-full bg-primary text-primary-foreground hover:bg-primary/90 dark:bg-blue-600 dark:hover:bg-blue-700"
+            >
+                {loading ? "Loading..." : "Start Emulation"}
+            </Button>
+        </div>
+    {/if}
 </div>
