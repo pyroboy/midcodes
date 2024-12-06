@@ -16,6 +16,7 @@ type EmulationStatus = 'active' | 'ended'
 interface RequestBody {
   emulatedRole: UserRole
   emulatedOrgId?: string
+  context?: Record<string, unknown> | null
 }
 
 interface ResponseBody {
@@ -106,10 +107,31 @@ async function validateRequest(req: Request): Promise<RequestBody> {
       throw new RoleEmulationError('Invalid emulatedRole', 400)
     }
 
+    // Validate context if provided
+    if ('context' in typedBody) {
+      if (typedBody.context !== null && (typeof typedBody.context !== 'object' || Array.isArray(typedBody.context))) {
+        throw new RoleEmulationError('context must be a plain object or null', 400)
+      }
+      
+      // Validate each value in the context object if it's not null
+      if (typedBody.context !== null) {
+        const context = typedBody.context as Record<string, unknown>
+        for (const [key, value] of Object.entries(context)) {
+          if (value === undefined || value === null) {
+            throw new RoleEmulationError(`context property '${key}' cannot be null`, 400)
+          }
+          if (typeof value === 'function') {
+            throw new RoleEmulationError(`context property '${key}' cannot be a function`, 400)
+          }
+        }
+      }
+    }
+
     // Construct and return a valid RequestBody
     const requestBody: RequestBody = {
       emulatedRole,
-      ...(typeof typedBody.emulatedOrgId === 'string' ? { emulatedOrgId: typedBody.emulatedOrgId } : {})
+      ...(typeof typedBody.emulatedOrgId === 'string' ? { emulatedOrgId: typedBody.emulatedOrgId } : {}),
+      ...(typedBody.context !== undefined ? { context: typedBody.context as (Record<string, unknown> | null) } : {})
     }
 
     return requestBody
@@ -143,7 +165,8 @@ async function handleRoleEmulation(
   userId: string,
   _originalRole: UserRole,
   emulatedRole: UserRole,
-  emulatedOrgId?: string
+  emulatedOrgId?: string,
+  context?: Record<string, unknown> | null
 ): Promise<EmulationSession> {
   try {
     // Validate org_admin and super_admin require organization ID
@@ -218,7 +241,8 @@ async function handleRoleEmulation(
         status: 'active' as const,
         expires_at: expiresAt.toISOString(),
         metadata: {
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
+          context
         }
       }])
       .select()
@@ -241,7 +265,8 @@ async function handleRoleEmulation(
             original_org_id: profile.org_id,
             emulated_org_id: emulatedOrgId,
             expires_at: expiresAt.toISOString(),
-            session_id: sessionId
+            session_id: sessionId,
+            context
           }
         }
       }
@@ -368,7 +393,7 @@ serve(async (req: Request) => {
     }
 
     const body = await validateRequest(req)
-    const session = await handleRoleEmulation(supabase, user.id, profile.role, body.emulatedRole, body.emulatedOrgId)
+    const session = await handleRoleEmulation(supabase, user.id, profile.role, body.emulatedRole, body.emulatedOrgId, body.context)
 
     return createResponse(200, {
       status: 'success',

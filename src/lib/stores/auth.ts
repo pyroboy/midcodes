@@ -14,7 +14,7 @@ interface RoleEmulationClaim {
     emulated_org_id: string | null
     expires_at: string
     session_id: string
-    metadata: Record<string, unknown>
+    context: Record<string, unknown>
 }
 
 interface UserProfile {
@@ -24,35 +24,21 @@ interface UserProfile {
     org_id: string | null
     created_at: string
     updated_at: string
+    context: Record<string, unknown> | null
 }
 
-type EmulationStatus = 'active' | 'ended'
-
-export interface RoleState {
-    baseRole: UserRole | null
-    currentRole: UserRole | null
-    emulatedRole: UserRole | null
-    isEmulating: boolean
-    status: EmulationStatus | null
-    emulationExpiry: string | null
-    sessionId: string | null
-    originalOrgId: string | null
-    emulatedOrgId: string | null
-    metadata: Record<string, unknown> | null
-    createdAt: string | null
-}
-
-export interface EmulationSession {
+export interface EmulationSessionDatabaseRow {
     id: string;
     user_id: string;
     original_role: UserRole;
     emulated_role: UserRole;
+    original_org_id: string | null;
+    emulated_org_id: string | null;
     status: 'active' | 'ended';
     expires_at: string;
-    created_at: string;
     metadata: {
-        created_by: string;
         created_at: string;
+        context: Record<string, unknown> | null;
     };
 }
 
@@ -60,29 +46,16 @@ export interface EmulationSession {
 const _user = writable<User | null>(null)
 const _session = writable<Session | null>(null)
 const _profile = writable<UserProfile | null>(null)
-const _roleState = writable<RoleState>({
-    baseRole: null,
-    currentRole: null,
-    emulatedRole: null,
-    isEmulating: false,
-    status: null,
-    emulationExpiry: null,
-    sessionId: null,
-    originalOrgId: null,
-    emulatedOrgId: null,
-    metadata: null,
-    createdAt: null
-})
+
 const _isLoggingOut = writable<boolean>(false)
 
 // Public read-only stores
 export const user = { subscribe: _user.subscribe }
 export const session = { subscribe: _session.subscribe }
 export const profile = { subscribe: _profile.subscribe }
-export const roleState = { subscribe: _roleState.subscribe }
 export const isLoggingOut = { subscribe: _isLoggingOut.subscribe }
 
-const extractRoleFromJWT = (accessToken: string): Partial<RoleState> => {
+const extractRoleFromJWT = (accessToken: string) => {
     try {
         const decoded: any = jwtDecode(accessToken)
         console.log('[JWT Debug] Full decoded token:', decoded)
@@ -100,37 +73,26 @@ const extractRoleFromJWT = (accessToken: string): Partial<RoleState> => {
             original_org_id: roleEmulation?.original_org_id,
             emulated_org_id: roleEmulation?.emulated_org_id,
             expires_at: roleEmulation?.expires_at,
-            session_id: roleEmulation?.session_id
+            session_id: roleEmulation?.session_id,
+            context: roleEmulation?.context
         })
-        
+
         return {
-            baseRole: roleEmulation?.original_role || decoded.role || null,
-            currentRole: roleEmulation?.active ? roleEmulation.emulated_role : decoded.role || null,
+            baseRole: roleEmulation?.original_role || decoded.app_metadata?.role,
+            currentRole: roleEmulation?.active ? roleEmulation.emulated_role : decoded.app_metadata?.role,
             emulatedRole: roleEmulation?.active ? roleEmulation.emulated_role : null,
             isEmulating: roleEmulation?.active || false,
             status: roleEmulation?.active ? 'active' : null,
             emulationExpiry: roleEmulation?.expires_at || null,
             sessionId: roleEmulation?.session_id || null,
-            originalOrgId: roleEmulation?.original_org_id || decoded.org_id || null,
-            emulatedOrgId: roleEmulation?.active ? roleEmulation.emulated_org_id : null,
-            metadata: roleEmulation?.metadata || null,
+            originalOrgId: roleEmulation?.original_org_id || decoded.app_metadata?.org_id,
+            emulatedOrgId: roleEmulation?.emulated_org_id || null,
+            context: roleEmulation?.active ? roleEmulation.context : null,
             createdAt: null
         }
     } catch (error) {
-        console.error('[JWT Debug] Error extracting role from JWT:', error)
-        return {
-            baseRole: null,
-            currentRole: null,
-            emulatedRole: null,
-            isEmulating: false,
-            status: null,
-            emulationExpiry: null,
-            sessionId: null,
-            originalOrgId: null,
-            emulatedOrgId: null,
-            metadata: null,
-            createdAt: null
-        }
+        console.error('[JWT Debug] Error decoding token:', error)
+        return {}
     }
 }
 
@@ -178,19 +140,7 @@ const refreshSession = async () => {
         const roleEmulation = extractRoleFromJWT(newSession.access_token)
         console.log('[Role Emulation Debug] JWT Role Data:', roleEmulation)
 
-        _roleState.set({
-            baseRole: userProfile.role,
-            currentRole: activeSession?.emulated_role || userProfile.role,
-            emulatedRole: activeSession?.emulated_role || null,
-            isEmulating: !!activeSession,
-            status: activeSession?.status || null,
-            emulationExpiry: activeSession?.expires_at || null,
-            sessionId: activeSession?.id || null,
-            originalOrgId: activeSession?.original_org_id || userProfile.org_id || null,
-            emulatedOrgId: activeSession?.emulated_org_id || null,
-            metadata: activeSession?.metadata || null,
-            createdAt: activeSession?.created_at || null
-        })
+
         
         return { success: true, session: newSession }
     } catch (error) {
@@ -242,23 +192,6 @@ if (browser) {
                 console.log('[Auth Debug] Active emulation session:', activeSession)
                 const roleEmulation = extractRoleFromJWT(session.access_token)
                 console.log('[Auth Debug] Role emulation from JWT:', roleEmulation)
-                
-                const newRoleState: RoleState = {
-                    baseRole: userProfile.role,
-                    currentRole: activeSession?.emulated_role || userProfile.role,
-                    emulatedRole: activeSession?.emulated_role || null,
-                    isEmulating: !!activeSession,
-                    status: activeSession ? ('active' as EmulationStatus) : null,
-                    emulationExpiry: activeSession?.expires_at || null,
-                    sessionId: activeSession?.id || null,
-                    originalOrgId: activeSession?.original_org_id || userProfile.org_id || null,
-                    emulatedOrgId: activeSession?.emulated_org_id || null,
-                    metadata: activeSession?.metadata || null,
-                    createdAt: activeSession?.created_at || null
-                }
-                
-                console.log('[Auth Debug] Setting new role state:', newRoleState)
-                _roleState.set(newRoleState)
             } else {
                 console.log('[Auth Debug] No user profile found')
             }
@@ -287,19 +220,6 @@ if (browser) {
             if (userProfile) {
                 _profile.set(userProfile)
                 const roleEmulation = extractRoleFromJWT(currentSession.access_token)
-                _roleState.set({
-                    baseRole: userProfile.role,
-                    currentRole: roleEmulation.currentRole || userProfile.role,
-                    emulatedRole: roleEmulation.emulatedRole || userProfile.role,
-                    isEmulating: roleEmulation.isEmulating || false,
-                    status: roleEmulation.status || null,
-                    emulationExpiry: roleEmulation.emulationExpiry || null,
-                    sessionId: roleEmulation.sessionId || null,
-                    originalOrgId: roleEmulation.originalOrgId || userProfile.org_id || null,
-                    emulatedOrgId: roleEmulation.emulatedOrgId || null,
-                    metadata: roleEmulation.metadata || null,
-                    createdAt: null
-                })
             }
         } else {
             auth.clearSession()
@@ -342,19 +262,6 @@ export const auth = {
             _user.set(null)
             _session.set(null)
             _profile.set(null)
-            _roleState.set({
-                baseRole: null,
-                currentRole: null,
-                emulatedRole: null,
-                isEmulating: false,
-                status: null,
-                emulationExpiry: null,
-                sessionId: null,
-                originalOrgId: null,
-                emulatedOrgId: null,
-                metadata: null,
-                createdAt: null
-            })
 
             // Call the server-side signout endpoint
             const response = await fetch('/auth/signout', {
@@ -402,24 +309,6 @@ export const auth = {
             // Refresh session to get updated JWT with new role claims
             await refreshSession();
 
-            // Update role state with emulation data
-            const currentProfile = get(_profile);
-            if (currentProfile) {
-                _roleState.set({
-                    baseRole: currentProfile.role,
-                    currentRole: targetRole,
-                    emulatedRole: targetRole,
-                    isEmulating: true,
-                    status: 'active',
-                    emulationExpiry: result.data?.expires_at || null,
-                    sessionId: result.data?.id || null,
-                    originalOrgId: currentProfile.org_id,
-                    emulatedOrgId: null,
-                    metadata: result.data?.metadata || null,
-                    createdAt: result.data?.created_at || null
-                });
-            }
-
             return { success: true, data: result.data };
         } catch (error) {
             console.error('[Role Emulation] Start error:', error);
@@ -429,8 +318,11 @@ export const auth = {
 
     stopRoleEmulation: async () => {
         try {
-            const response = await fetch('/api/role-emulation', {
-                method: 'DELETE'
+            const response = await fetch('/api/role-emulation/stop', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
             });
 
             if (!response.ok) {
@@ -438,35 +330,20 @@ export const auth = {
                 throw new Error(error.message || 'Failed to stop role emulation');
             }
 
-            // Refresh session to update role state
+            const result = await response.json();
+            console.log('[Role Emulation] Stop result:', result);
+
+            // Refresh session to get updated JWT with new role claims
             await refreshSession();
 
-            // Reset role state
-            const currentProfile = get(_profile);
-            if (currentProfile) {
-                _roleState.set({
-                    baseRole: currentProfile.role,
-                    currentRole: currentProfile.role,
-                    emulatedRole: null,
-                    isEmulating: false,
-                    status: null,
-                    emulationExpiry: null,
-                    sessionId: null,
-                    originalOrgId: currentProfile.org_id,
-                    emulatedOrgId: null,
-                    metadata: null,
-                    createdAt: null
-                });
-            }
-
-            return { success: true };
+            return { success: true, data: result.data };
         } catch (error) {
             console.error('[Role Emulation] Stop error:', error);
             throw error;
         }
     },
 
-    checkActiveEmulation: async (): Promise<EmulationSession | null> => {
+    checkActiveEmulation: async (): Promise<EmulationSessionDatabaseRow | null> => {
         const { data: session } = await supabase.auth.getSession();
         if (!session?.session) return null;
 
@@ -492,22 +369,10 @@ export const auth = {
     },
 
     clearSession: () => {
-        _session.set(null)
         _user.set(null)
+        _session.set(null)
         _profile.set(null)
-        _roleState.set({
-            baseRole: null,
-            currentRole: null,
-            emulatedRole: null,
-            isEmulating: false,
-            status: null,
-            emulationExpiry: null,
-            sessionId: null,
-            originalOrgId: null,
-            emulatedOrgId: null,
-            metadata: null,
-            createdAt: null
-        })
+        _isLoggingOut.set(false)
     },
 
     resetPassword: async (email: string) => {

@@ -302,7 +302,7 @@ Deno.test('Role Emulation Function Tests', async (t) => {
     }
 
     // Verify session started
-    let session = await testHelpers.getEmulationSession(userId, 'active');
+    let session = await testHelpers.getEmulationSession(userId)
     assertEquals(session.status, 'active');
 
     // Now stop the session
@@ -324,6 +324,110 @@ Deno.test('Role Emulation Function Tests', async (t) => {
     // Verify session is ended
     session = await testHelpers.getEmulationSession(userId);
     assertEquals(session.status, 'ended');
+  })
+
+  await t.step('Should allow role emulation with context metadata', async () => {
+    await testHelpers.cleanupEmulationSessions(userId)
+    console.log('\n🔄 Testing role emulation with context metadata...')
+    const context = {
+      reason: 'Testing context',
+      approved_by: 'test@example.com',
+      timestamp: new Date().toISOString(),
+      metadata: {
+        nested: 'value',
+        nullValue: null
+      }
+    }
+    
+    const response = await fetch('http://localhost:54321/functions/v1/role-emulation', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        emulatedRole: 'event_admin',
+        context
+      })
+    })
+
+    try {
+      const _responseData = await testHelpers.safelyConsumeResponse(response)
+      assertEquals(response.ok, true)
+      const session = await testHelpers.getEmulationSession(userId)
+      assertEquals(session.emulated_role, 'event_admin')
+      assertEquals(session.metadata.context, context)
+    } finally {
+      await testHelpers.cleanupEmulationSessions(userId)
+    }
+  })
+
+  await t.step('Should allow role emulation with null context', async () => {
+    await testHelpers.cleanupEmulationSessions(userId)
+    console.log('\n🔄 Testing role emulation with null context...')
+    const response = await fetch('http://localhost:54321/functions/v1/role-emulation', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        emulatedRole: 'event_admin',
+        context: null
+      })
+    })
+
+    try {
+      const _responseData = await testHelpers.safelyConsumeResponse(response)
+      assertEquals(response.ok, true)
+      const session = await testHelpers.getEmulationSession(userId)
+      assertEquals(session.emulated_role, 'event_admin')
+      assertEquals(session.metadata.context, null)
+    } finally {
+      await testHelpers.cleanupEmulationSessions(userId)
+    }
+  })
+
+  await t.step('Should reject invalid context values', async () => {
+    await testHelpers.cleanupEmulationSessions(userId)
+    console.log('\n🔄 Testing role emulation with invalid context...')
+    
+    // Test with array context
+    const arrayResponse = await fetch('http://localhost:54321/functions/v1/role-emulation', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        emulatedRole: 'event_admin',
+        context: []
+      })
+    })
+
+    assertFalse(arrayResponse.ok)
+    const arrayData = await testHelpers.safelyConsumeResponse(arrayResponse)
+    assertEquals(arrayData.message, 'context must be a plain object or null')
+
+    // Test with undefined value in context
+    const undefinedResponse = await fetch('http://localhost:54321/functions/v1/role-emulation', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        emulatedRole: 'event_admin',
+        context: {
+          valid: 'value',
+          invalid: null  // JSON.stringify converts undefined to null
+        }
+      })
+    })
+
+    assertFalse(undefinedResponse.ok)
+    const undefinedData = await testHelpers.safelyConsumeResponse(undefinedResponse)
+    assertEquals(undefinedData.message, "context property 'invalid' cannot be null")
   })
 
   // Cleanup: Sign out and consume any remaining response bodies

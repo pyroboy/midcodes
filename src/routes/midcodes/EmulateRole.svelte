@@ -33,6 +33,16 @@
     $: isEmulating = emulation?.active ?? false;
     $: currentRole = emulation?.emulated_role;
     $: organizationName = emulation?.organizationName ?? 'Unknown Organization';
+    $: contextData = emulation?.metadata?.context ?? null;
+    
+    // Debug log to check emulation data
+    $: {
+        if (emulation) {
+            console.log('Emulation data:', emulation);
+            console.log('Context data:', contextData);
+        }
+    }
+
     const roles: RoleOption[] = [
         { label: "Super Admin", value: "super_admin" },
         { label: "Organization Admin", value: "org_admin" },
@@ -73,7 +83,17 @@
         try {
             const payload = { 
                 emulatedRole: selectedRole.value,
-                ...(selectedOrgId && { emulatedOrgId: selectedOrgId })
+                ...(selectedOrgId && { emulatedOrgId: selectedOrgId }),
+                context: {
+                    permissions: [],
+                    settings: {
+                        theme: 'light',
+                        notifications: true
+                    },
+                    preferences: {
+                        defaultView: 'dashboard'
+                    }
+                }
             };
             console.log('[Role Emulation] Sending payload:', payload);
             
@@ -142,14 +162,23 @@
         <h2 class="text-lg font-semibold text-foreground dark:text-white">Role Emulator</h2>
     </div>
 
-    {#if isEmulating}
-        <div class="p-3 bg-yellow-50 border border-yellow-200 rounded-md dark:bg-yellow-900/20 dark:border-yellow-900/30">
-            <p class="text-sm text-yellow-800 dark:text-yellow-200">
-                Currently emulating: <span class="font-medium">{currentRole}</span>
-                <br>
-                Organization: <span class="font-medium">{organizationName}</span>
-            </p>
+    <!-- Debug Display -->
+    <div class="mt-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-md">
+        <h3 class="text-sm font-medium mb-2">Emulation Status:</h3>
+        <pre class="text-xs overflow-auto max-h-48 p-2 bg-white dark:bg-gray-900 rounded border dark:border-gray-700">Active: {isEmulating}
+Current Role: {currentRole}
+Organization: {organizationName}
+Has Context: {!!contextData}</pre>
+    </div>
+    <!-- Context Data Display -->
+    {#if emulation?.metadata}
+        <div class="mt-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-md">
+            <pre class="text-xs overflow-auto max-h-48 p-2 bg-white dark:bg-gray-900 rounded border dark:border-gray-700">{JSON.stringify(emulation.metadata, null, 2).trim()}</pre>
         </div>
+    {/if}
+
+    {#if isEmulating}
+
         
         <Button
             on:click={handleStopEmulation}

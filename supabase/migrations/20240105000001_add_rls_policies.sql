@@ -4,7 +4,6 @@ ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.attendees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.templates ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.idcards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.role_emulation_sessions ENABLE ROW LEVEL SECURITY;
 
 -- Helper function to get current role considering emulation
@@ -87,8 +86,8 @@ WITH CHECK (
       profiles.role = 'super_admin'::user_role OR
       -- Org admins can emulate roles within their org
       (profiles.role = 'org_admin'::user_role AND
-       NEW.emulated_role IN ('event_admin'::user_role, 'event_qr_checker'::user_role) AND
-       NEW.emulated_org_id = profiles.org_id)
+       emulated_role IN ('event_admin'::user_role, 'event_qr_checker'::user_role) AND
+       emulated_org_id = profiles.org_id)
     )
   )
 );
@@ -351,73 +350,6 @@ USING (
     WHEN public.get_current_role() = 'super_admin'::user_role THEN true
     WHEN public.get_current_role() IN ('org_admin'::user_role) THEN
       org_id = public.get_current_org_id()
-    ELSE false
-  END
-);
-
--- Create policies for idcards
-CREATE POLICY "ID cards are viewable by org members"
-ON public.idcards
-FOR SELECT
-TO authenticated
-USING (
-  CASE
-    WHEN public.get_current_role() = 'super_admin'::user_role THEN true
-    ELSE EXISTS (
-      SELECT 1 FROM events
-      WHERE events.id = idcards.event_id
-      AND events.org_id = public.get_current_org_id()
-    )
-  END
-);
-
-CREATE POLICY "ID cards are insertable by event admins"
-ON public.idcards
-FOR INSERT
-TO authenticated
-WITH CHECK (
-  CASE
-    WHEN public.get_current_role() = 'super_admin'::user_role THEN true
-    WHEN public.get_current_role() IN ('org_admin'::user_role, 'event_admin'::user_role) THEN
-      EXISTS (
-        SELECT 1 FROM events
-        WHERE events.id = event_id
-        AND events.org_id = public.get_current_org_id()
-      )
-    ELSE false
-  END
-);
-
-CREATE POLICY "ID cards are updatable by event admins"
-ON public.idcards
-FOR UPDATE
-TO authenticated
-USING (
-  CASE
-    WHEN public.get_current_role() = 'super_admin'::user_role THEN true
-    WHEN public.get_current_role() IN ('org_admin'::user_role, 'event_admin'::user_role) THEN
-      EXISTS (
-        SELECT 1 FROM events
-        WHERE events.id = idcards.event_id
-        AND events.org_id = public.get_current_org_id()
-      )
-    ELSE false
-  END
-);
-
-CREATE POLICY "ID cards are deletable by event admins"
-ON public.idcards
-FOR DELETE
-TO authenticated
-USING (
-  CASE
-    WHEN public.get_current_role() = 'super_admin'::user_role THEN true
-    WHEN public.get_current_role() IN ('org_admin'::user_role, 'event_admin'::user_role) THEN
-      EXISTS (
-        SELECT 1 FROM events
-        WHERE events.id = idcards.event_id
-        AND events.org_id = public.get_current_org_id()
-      )
     ELSE false
   END
 );
