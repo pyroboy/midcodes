@@ -219,6 +219,25 @@ async function handleRoleEmulation(
       }
     }
 
+    // Validate event_id if provided in context
+    if (context?.event_id && (emulatedRole === 'event_admin' || emulatedRole === 'event_qr_checker')) {
+      const { data: event, error: eventError } = await supabase
+        .from('events')
+        .select('id, org_id')
+        .eq('id', context.event_id)
+        .single();
+
+      if (eventError || !event) {
+        console.error('Invalid event ID:', eventError);
+        throw new RoleEmulationError('Invalid event ID', 400);
+      }
+
+      // Ensure event belongs to the emulated organization
+      if (emulatedOrgId && event.org_id !== emulatedOrgId) {
+        throw new RoleEmulationError('Event does not belong to the selected organization', 400);
+      }
+    }
+
     // Create new emulation session
     console.log('Creating new session with:', {
       sessionId,

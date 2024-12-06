@@ -24,16 +24,29 @@
         id: string;
         name: string;
     }
+
+    interface Event {
+        id: string;
+        event_url: string;
+        event_name: string;
+        org_id: string;
+    }
     
     let selectedRole: RoleOption | undefined = undefined;
     let selectedOrgId: string | undefined = undefined;
+    let selectedEventId: string | undefined = undefined;
     let loading = false;
     let organizations: Organization[] = [];
+    let events: Event[] = [];
+    
     $: emulation = $page.data.session?.roleEmulation as RoleEmulationClaim | null;
     $: isEmulating = emulation?.active ?? false;
     $: currentRole = emulation?.emulated_role;
     $: organizationName = emulation?.organizationName ?? 'Unknown Organization';
     $: contextData = emulation?.metadata?.context ?? null;
+    $: filteredEvents = selectedOrgId 
+        ? events.filter(e => e.org_id === selectedOrgId)
+        : events;
     
     // Debug log to check emulation data
     $: {
@@ -53,11 +66,30 @@
 
     onMount(async () => {
         try {
-            const { data: orgs, error } = await fetch('/api/organizations').then(r => r.json());
-            if (error) throw error;
+            // Load organizations
+            const { data: orgs, error: orgsError } = await fetch('/api/organizations', {
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include'
+            }).then(r => r.json());
+            if (orgsError) throw orgsError;
             organizations = orgs;
+
+            // Load events
+            const { data: eventsData, error: eventsError } = await fetch('/api/events', {
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include'
+            }).then(r => r.json());
+            if (eventsError) throw eventsError;
+            events = eventsData || [];
+            console.log('Loaded events:', events);
         } catch (err) {
-            console.error('Failed to load organizations:', err);
+            console.error('Failed to load data:', err);
         }
     });
     
@@ -71,6 +103,12 @@
 
     function handleOrgSelect(event: { value: string } | undefined) {
         selectedOrgId = event?.value;
+        // Reset event selection when org changes
+        selectedEventId = undefined;
+    }
+
+    function handleEventSelect(event: { value: string } | undefined) {
+        selectedEventId = event?.value;
     }
     
     async function handleEmulateRole() {
@@ -84,16 +122,11 @@
             const payload = { 
                 emulatedRole: selectedRole.value,
                 ...(selectedOrgId && { emulatedOrgId: selectedOrgId }),
-                context: {
-                    permissions: [],
-                    settings: {
-                        theme: 'light',
-                        notifications: true
-                    },
-                    preferences: {
-                        defaultView: 'dashboard'
+                ...(selectedEventId && { 
+                    context: {
+                        event_id: selectedEventId
                     }
-                }
+                })
             };
             console.log('[Role Emulation] Sending payload:', payload);
             
@@ -157,6 +190,15 @@
     }
 </script>
 
+<style>
+    :global(.json-key) { color: #f8f8f2; }
+    :global(.json-string-value) { color: #a6e22e; }
+    :global(.json-number) { color: #ae81ff; }
+    :global(.json-boolean) { color: #66d9ef; }
+    :global(.json-null) { color: #f92672; }
+    :global(.json-punctuation) { color: #75715e; }
+</style>
+
 <div class="space-y-4 p-4 border rounded-lg bg-card text-card-foreground dark:bg-gray-900 dark:border-gray-800">
     <div class="flex items-center gap-2">
         <h2 class="text-lg font-semibold text-foreground dark:text-white">Role Emulator</h2>
@@ -170,38 +212,40 @@ Current Role: {currentRole}
 Organization: {organizationName}
 Has Context: {!!contextData}</pre>
     </div>
+
     <!-- Context Data Display -->
     {#if emulation?.metadata}
         <div class="mt-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-md">
-            <pre class="text-xs overflow-auto max-h-48 p-2 bg-white dark:bg-gray-900 rounded border dark:border-gray-700">{JSON.stringify(emulation.metadata, null, 2).trim()}</pre>
+            <h3 class="text-sm font-medium mb-2">Metadata:</h3>
+            <pre class="text-xs overflow-auto max-h-48 p-2 bg-white dark:bg-gray-900 rounded border dark:border-gray-700">{JSON.stringify(emulation.metadata, null, 2)}</pre>
         </div>
     {/if}
 
     {#if isEmulating}
-
-        
         <Button
             on:click={handleStopEmulation}
             variant="outline"
+            class="w-full"
             disabled={loading}
-            class="w-full bg-background hover:bg-accent dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700 dark:border-gray-700"
         >
-            {loading ? "Loading..." : "Stop Emulation"}
+            Stop Emulation
         </Button>
     {:else}
-        <div class="space-y-3">
+        <div class="space-y-4">
             <div class="space-y-2">
-                <Select onSelectedChange={handleSelect}>
-                    <SelectTrigger class="w-full dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:hover:bg-gray-700">
-                        <SelectValue placeholder="Select role to emulate">
-                            {selectedRole?.label ?? "Select role to emulate"}
-                        </SelectValue>
+                <label for="role" class="text-sm font-medium">Role</label>
+                <Select
+                    onSelectedChange={handleSelect}
+                    disabled={loading}
+                >
+                    <SelectTrigger>
+                        <SelectValue placeholder="Select role" />
                     </SelectTrigger>
-                    <SelectContent class="dark:bg-gray-800 dark:border-gray-700">
+                    <SelectContent>
                         {#each roles as role}
-                            <SelectItem 
+                            <SelectItem
                                 value={role.value}
-                                class="dark:text-white dark:focus:bg-gray-700 dark:hover:bg-gray-700"
+                                disabled={role.disabled}
                             >
                                 {role.label}
                             </SelectItem>
@@ -210,30 +254,58 @@ Has Context: {!!contextData}</pre>
                 </Select>
             </div>
 
-            <div class="space-y-2" data-testid="org-select">
-                <Select onSelectedChange={handleOrgSelect}>
-                    <SelectTrigger class="w-full dark:bg-gray-800 dark:border-gray-700 dark:text-white dark:hover:bg-gray-700">
-                        <SelectValue placeholder="Select organization" />
-                    </SelectTrigger>
-                    <SelectContent class="dark:bg-gray-800 dark:border-gray-700">
-                        {#each organizations as org}
-                            <SelectItem 
-                                value={org.id}
-                                class="dark:text-white dark:focus:bg-gray-700 dark:hover:bg-gray-700"
-                            >
-                                {org.name}
-                            </SelectItem>
-                        {/each}
-                    </SelectContent>
-                </Select>
-            </div>
+            {#if selectedRole?.value === 'org_admin' || selectedRole?.value === 'super_admin'}
+                <div class="space-y-2">
+                    <label for="organization" class="text-sm font-medium">Organization</label>
+                    <Select
+                        onSelectedChange={handleOrgSelect}
+                        disabled={loading}
+                    >
+                        <SelectTrigger>
+                            <SelectValue placeholder="Select organization" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {#each organizations as org}
+                                <SelectItem value={org.id}>
+                                    {org.name}
+                                </SelectItem>
+                            {/each}
+                        </SelectContent>
+                    </Select>
+                </div>
+            {/if}
+
+            {#if selectedRole && (selectedRole.value === 'event_admin' || selectedRole.value === 'event_qr_checker')}
+                <div class="space-y-2">
+                    <label for="event" class="text-sm font-medium">Event</label>
+                    <Select
+                        onSelectedChange={handleEventSelect}
+                        disabled={loading}
+                    >
+                        <SelectTrigger>
+                            <SelectValue placeholder="Select event" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {#each filteredEvents as event}
+                                <SelectItem value={event.id}>
+                                    {event.event_url || event.event_name}
+                                </SelectItem>
+                            {/each}
+                        </SelectContent>
+                    </Select>
+                </div>
+            {/if}
 
             <Button
                 on:click={handleEmulateRole}
-                disabled={!selectedRole || !selectedOrgId || loading }
-                class="w-full bg-primary text-primary-foreground hover:bg-primary/90 dark:bg-blue-600 dark:hover:bg-blue-700"
+                class="w-full"
+                disabled={loading || !selectedRole || (
+                    (selectedRole.value === 'org_admin' || selectedRole.value === 'super_admin') && !selectedOrgId
+                ) || (
+                    (selectedRole.value === 'event_admin' || selectedRole.value === 'event_qr_checker') && !selectedEventId
+                )}
             >
-                {loading ? "Loading..." : "Start Emulation"}
+                Start Emulation
             </Button>
         </div>
     {/if}
