@@ -114,6 +114,7 @@ Deno.test('Role Emulation Function Tests', async (t) => {
       console.log('Response data:', _responseData)
       assertEquals(response.ok, true, `Response was not ok: ${JSON.stringify(_responseData)}`)
       const session = await testHelpers.getEmulationSession(userId)
+      assertExists(session, 'Emulation session should exist')
       assertEquals(session.emulated_role, 'org_admin')
       assertEquals(session.emulated_org_id, testOrgId)
     } finally {
@@ -186,6 +187,7 @@ Deno.test('Role Emulation Function Tests', async (t) => {
       const _responseData = await testHelpers.safelyConsumeResponse(response)
       assertEquals(response.ok, true)
       const session = await testHelpers.getEmulationSession(userId)
+      assertExists(session, 'Emulation session should exist')
       assertEquals(session.emulated_role, 'super_admin')
       assertEquals(session.emulated_org_id, testOrgId)
     } finally {
@@ -211,6 +213,7 @@ Deno.test('Role Emulation Function Tests', async (t) => {
       const _responseData = await testHelpers.safelyConsumeResponse(response)
       assertEquals(response.ok, true)
       const session = await testHelpers.getEmulationSession(userId)
+      assertExists(session, 'Emulation session should exist')
       assertEquals(session.emulated_role, 'event_admin')
       assertEquals(session.emulated_org_id, null)
     } finally {
@@ -302,6 +305,7 @@ Deno.test('Role Emulation Function Tests', async (t) => {
 
     // Verify session started
     let session = await testHelpers.getEmulationSession(userId)
+    assertExists(session, 'Emulation session should exist')
     assertEquals(session.status, 'active');
 
     // Now stop the session
@@ -322,6 +326,7 @@ Deno.test('Role Emulation Function Tests', async (t) => {
 
     // Verify session is ended
     session = await testHelpers.getEmulationSession(userId);
+    assertExists(session, 'Emulation session should exist after stopping')
     assertEquals(session.status, 'ended');
   })
 
@@ -354,6 +359,7 @@ Deno.test('Role Emulation Function Tests', async (t) => {
       const _responseData = await testHelpers.safelyConsumeResponse(response)
       assertEquals(response.ok, true)
       const session = await testHelpers.getEmulationSession(userId)
+      assertExists(session, 'Emulation session should exist')
       assertEquals(session.emulated_role, 'event_admin')
       assertEquals(session.metadata.context, context)
     } finally {
@@ -380,6 +386,7 @@ Deno.test('Role Emulation Function Tests', async (t) => {
       const _responseData = await testHelpers.safelyConsumeResponse(response)
       assertEquals(response.ok, true)
       const session = await testHelpers.getEmulationSession(userId)
+      assertExists(session, 'Emulation session should exist')
       assertEquals(session.emulated_role, 'event_admin')
       assertEquals(session.metadata.context, null)
     } finally {
@@ -451,11 +458,13 @@ Deno.test('Role Emulation - Organization Tests', async (t) => {
   // Create test organization and get authenticated session
   await testHelpers.createOrganization(testOrgId, 'Test Organization')
   const session = await testHelpers.signIn(email, password)
+  assertExists(session, 'Session should exist')
+  assertExists(session.user, 'User should exist')
   const userId = session.user.id
 
   await testHelpers.updateUserRole(userId, 'super_admin', testOrgId)
-  const profile = await testHelpers.getProfile(userId)
-  assertEquals(profile.org_id, testOrgId)
+  const _profile = await testHelpers.getProfile(userId)
+  assertEquals(_profile.org_id, testOrgId)
 
   await t.step('emulate org_admin role with organization', async () => {
     await testHelpers.cleanupEmulationSessions(userId)
@@ -481,6 +490,7 @@ Deno.test('Role Emulation - Organization Tests', async (t) => {
     }
     
     const emulationSession = await testHelpers.getEmulationSession(userId)
+    assertExists(emulationSession, 'Emulation session should exist')
     assertEquals(emulationSession.emulated_role, 'org_admin')
     assertEquals(emulationSession.emulated_org_id, testOrgId)
 
@@ -545,7 +555,7 @@ Deno.test('Role Emulation - Organization Tests', async (t) => {
 
   await t.step('emulate event_admin with organization', async () => {
     await testHelpers.cleanupEmulationSessions(userId)
-    const profile = await testHelpers.getProfile(userId)
+    const _profile = await testHelpers.getProfile(userId)
     
     const response = await fetch(`${supabaseUrl}/functions/v1/role-emulation`, {
       method: 'POST',
@@ -568,6 +578,7 @@ Deno.test('Role Emulation - Organization Tests', async (t) => {
     }
     
     const emulationSession = await testHelpers.getEmulationSession(userId)
+    assertExists(emulationSession, 'Emulation session should exist')
     assertEquals(emulationSession.emulated_role, 'event_admin')
     assertEquals(emulationSession.emulated_org_id, testOrgId)
 
@@ -591,6 +602,8 @@ Deno.test('Role Emulation - Organization Tests', async (t) => {
 
 Deno.test('should start role emulation with organization', async () => {
   const session = await testHelpers.signIn(email, password)
+  assertExists(session, 'Session should exist')
+  assertExists(session.user, 'User should exist')
   await testHelpers.cleanupEmulationSessions(session.user.id)
   
   const response = await fetch(`${supabaseUrl}/functions/v1/role-emulation`, {
@@ -629,6 +642,8 @@ Deno.test('should start role emulation with organization', async () => {
 
 Deno.test('should allow super_admin role with organization', async () => {
   const session = await testHelpers.signIn(email, password)
+  assertExists(session, 'Session should exist')
+  assertExists(session.user, 'User should exist')
   await testHelpers.cleanupEmulationSessions(session.user.id)
   
   const response = await fetch(`${supabaseUrl}/functions/v1/role-emulation`, {
@@ -666,6 +681,8 @@ Deno.test('should allow super_admin role with organization', async () => {
 
 Deno.test('should stop role emulation', async () => {
   const session = await testHelpers.signIn(email, password)
+  assertExists(session, 'Session should exist')
+  assertExists(session.user, 'User should exist')
   await testHelpers.cleanupEmulationSessions(session.user.id)
 
   // Start an emulation session first

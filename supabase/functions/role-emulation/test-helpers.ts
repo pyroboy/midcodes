@@ -1,5 +1,16 @@
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 
+interface EmulationSession {
+  id: string
+  user_id: string
+  emulated_role: string
+  emulated_org_id: string | null
+  status: 'active' | 'ended'
+  created_at: string
+  ended_at: string | null
+  metadata: Record<string, unknown>
+}
+
 export class TestHelpers {
   private serviceRoleClient: SupabaseClient;
   
@@ -166,17 +177,6 @@ export class TestHelpers {
     await this.serviceRoleClient.auth.signOut()
   }
 
-  interface EmulationSession {
-    id: string
-    user_id: string
-    emulated_role: string
-    emulated_org_id: string | null
-    status: 'active' | 'ended'
-    created_at: string
-    ended_at: string | null
-    metadata: Record<string, unknown>
-  }
-
   async getEmulationSession(userId: string, status?: 'active' | 'ended', retries = 3): Promise<EmulationSession | null> {
     for (let i = 0; i < retries; i++) {
       let query = this.serviceRoleClient
@@ -203,7 +203,6 @@ export class TestHelpers {
     throw new Error('No emulation session found');
   }
 
-  // Helper function to safely consume response bodies
   async safelyConsumeResponse<T extends { status?: string; message?: string; data?: unknown }>(response: Response): Promise<T> {
     try {
       return await response.json() as T;
