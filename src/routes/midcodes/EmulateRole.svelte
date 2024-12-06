@@ -119,12 +119,16 @@
         
         loading = true;
         try {
+            // Find the selected event to get its URL
+            const selectedEvent = events.find(e => e.id === selectedEventId);
+            
             const payload = { 
                 emulatedRole: selectedRole.value,
                 ...(selectedOrgId && { emulatedOrgId: selectedOrgId }),
                 ...(selectedEventId && { 
                     context: {
-                        event_id: selectedEventId
+                        event_id: selectedEventId,
+                        event_url: selectedEvent?.event_url || null
                     }
                 })
             };
@@ -151,9 +155,9 @@
             // Wait for role state to update
             await new Promise(resolve => setTimeout(resolve, 1000));
             
-            // Get default redirect URL for the selected role
-            const defaultRedirect = RoleConfig[selectedRole.value].defaultRedirect;
-            window.location.href = defaultRedirect;
+            // Get default redirect URL for the selected role, passing the context
+            const redirectUrl = RoleConfig[selectedRole.value].defaultPath(payload.context);
+            window.location.href = redirectUrl;
         } catch (err) {
             console.error('[Role Emulation] Full error:', err);
             const message = err instanceof Error ? err.message : "An error occurred";
