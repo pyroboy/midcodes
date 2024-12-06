@@ -1,4 +1,4 @@
-export type UserRole = 'super_admin' | 'org_admin' | 'user' | 'event_admin' | 'event_qr_checker';
+import type { UserRole } from '$lib/auth/roleConfig';
 
 export interface Organization {
     id: string;  // UUID

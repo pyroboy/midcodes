@@ -1,13 +1,11 @@
-import type { UserRole } from '$lib/types/database'
 import { config } from '$lib/stores/config'
 import { get } from 'svelte/store'
 
-// i want @roleConfig.ts if i login as event_admin default redirect me to my events url
-// we already have context in the session's user context or the emulation's context, and there is the data there event_id, i dont know what other files to touch for it to work with the context
 
-// like this "events/youth-revival-2024", because the url is tied up to it
+// Define all available user roles
+export type UserRole = 'super_admin' | 'org_admin' | 'id_gen_admin' | 'event_admin' | 'event_qr_checker' | 'user';
 
-// Define public paths that don't require authentication
+
 export const PublicPaths = {
     auth: '/auth',
     error: '/error',
@@ -109,37 +107,53 @@ export const RoleConfig: Record<UserRole, RoleConfigType> = {
     super_admin: {
         allowedPaths: [{ path: '/**' }],
         defaultPath: () => `/${get(config).adminUrl}`,
-        isAdmin: true
+        isAdmin: true,
+        label: 'Super Admin'
     },
     org_admin: {
         allowedPaths: [{ path: '/**' }],
-        defaultPath: () => '/rat',
-        isAdmin: true
+        defaultPath: () => `/${get(config).adminUrl}`,
+        isAdmin: true,
+        label: 'Organization Admin'
+    },
+    id_gen_admin: {
+        allowedPaths: [
+            { path: `/${get(config).adminUrl}` },
+            { path: '/templates' },
+            { path: '/templates/**' },
+            { path: '/use-template' },
+            { path: '/use-template/**' },
+            { path: '/all-ids' },
+            { path: '/api/**' }
+        ],
+        defaultPath: () => '/templates',
+        isAdmin: true,
+        label: 'ID Generator Admin'
     },
     event_admin: {
         allowedPaths: [
             { path: `/${get(config).adminUrl}` },
-            { path: '/rat/**' },
             { path: '/events' },
             { path: '/events/**' },
             { path: '/api/**' }
         ],
         defaultPath: (context?: any) => {
-            // If we have an event_url in the context, redirect to that event's page
-            if (context?.event_url) {
-                return `/events/${context.event_url}`;
-            }
-            // Fallback to events list if no specific event
-            return '/events';
+            return `/events/${context.event_url}`;
         },
-        isAdmin: true
+        isAdmin: true,
+        label: 'Event Admin'
     },
     event_qr_checker: {
         allowedPaths: [
-            { path: '/**/qr-checker' }
+            { path: '/events' },
+            { path: '/events/**' },
+            { path: '/events/*/qr-checker' }
         ],
-        defaultPath: () => '/**/qr-checker',
-        isAdmin: false
+        defaultPath: (context?: any) => {
+            return `/events/${context.event_url}/qr-checker`;
+        },
+        isAdmin: false,
+        label: 'Event QR Checker'
     },
     user: {
         allowedPaths: [
@@ -147,7 +161,8 @@ export const RoleConfig: Record<UserRole, RoleConfigType> = {
             { path: '/profile' }
         ],
         defaultPath: () => '/profile',
-        isAdmin: false
+        isAdmin: false,
+        label: 'Regular User'
     }
 }
 
@@ -155,6 +170,7 @@ interface RoleConfigType {
     allowedPaths: AllowedPath[]
     defaultPath: (context?: any) => string
     isAdmin: boolean
+    label: string
 }
 
 interface AllowedPath {

@@ -7,18 +7,10 @@
         SelectTrigger,
         SelectValue,
     } from "$lib/components/ui/select";
-    import { RoleConfig } from "$lib/auth/roleConfig";
+    import { RoleConfig, type UserRole } from "$lib/auth/roleConfig";
     import { onMount } from "svelte";
     import { page } from '$app/stores';
     import type { RoleEmulationClaim } from '$lib/types/roleEmulation';
-    
-    type UserRole = 'super_admin' | 'org_admin' | 'event_admin' | 'event_qr_checker' | 'user';
-
-    interface RoleOption {
-        label: string;
-        value: UserRole;
-        disabled?: boolean;
-    }
 
     interface Organization {
         id: string;
@@ -32,7 +24,7 @@
         org_id: string;
     }
     
-    let selectedRole: RoleOption | undefined = undefined;
+    let selectedRole: UserRole | undefined = undefined;
     let selectedOrgId: string | undefined = undefined;
     let selectedEventId: string | undefined = undefined;
     let loading = false;
@@ -56,13 +48,8 @@
         }
     }
 
-    const roles: RoleOption[] = [
-        { label: "Super Admin", value: "super_admin" },
-        { label: "Organization Admin", value: "org_admin" },
-        { label: "Event Admin", value: "event_admin" },
-        { label: "Event QR Checker", value: "event_qr_checker" },
-        { label: "Regular User", value: "user" }
-    ];
+    // Get available roles from RoleConfig
+    const roles = Object.keys(RoleConfig) as UserRole[];
 
     onMount(async () => {
         try {
@@ -98,7 +85,7 @@
             selectedRole = undefined;
             return;
         }
-        selectedRole = roles.find(r => r.value === event.value);
+        selectedRole = event.value;
     }
 
     function handleOrgSelect(event: { value: string } | undefined) {
@@ -123,7 +110,7 @@
             const selectedEvent = events.find(e => e.id === selectedEventId);
             
             const payload = { 
-                emulatedRole: selectedRole.value,
+                emulatedRole: selectedRole,
                 ...(selectedOrgId && { emulatedOrgId: selectedOrgId }),
                 ...(selectedEventId && { 
                     context: {
@@ -156,7 +143,7 @@
             await new Promise(resolve => setTimeout(resolve, 1000));
             
             // Get default redirect URL for the selected role, passing the context
-            const redirectUrl = RoleConfig[selectedRole.value].defaultPath(payload.context);
+            const redirectUrl = RoleConfig[selectedRole].defaultPath(payload.context);
             window.location.href = redirectUrl;
         } catch (err) {
             console.error('[Role Emulation] Full error:', err);
@@ -248,17 +235,16 @@ Has Context: {!!contextData}</pre>
                     <SelectContent>
                         {#each roles as role}
                             <SelectItem
-                                value={role.value}
-                                disabled={role.disabled}
+                                value={role}
                             >
-                                {role.label}
+                                {RoleConfig[role].label}
                             </SelectItem>
                         {/each}
                     </SelectContent>
                 </Select>
             </div>
 
-            {#if selectedRole?.value === 'org_admin' || selectedRole?.value === 'super_admin'}
+            {#if selectedRole === 'org_admin' || selectedRole === 'super_admin'}
                 <div class="space-y-2">
                     <label for="organization" class="text-sm font-medium">Organization</label>
                     <Select
@@ -279,7 +265,7 @@ Has Context: {!!contextData}</pre>
                 </div>
             {/if}
 
-            {#if selectedRole && (selectedRole.value === 'event_admin' || selectedRole.value === 'event_qr_checker')}
+            {#if selectedRole && (selectedRole === 'event_admin' || selectedRole === 'event_qr_checker')}
                 <div class="space-y-2">
                     <label for="event" class="text-sm font-medium">Event</label>
                     <Select
@@ -304,9 +290,9 @@ Has Context: {!!contextData}</pre>
                 on:click={handleEmulateRole}
                 class="w-full"
                 disabled={loading || !selectedRole || (
-                    (selectedRole.value === 'org_admin' || selectedRole.value === 'super_admin') && !selectedOrgId
+                    (selectedRole === 'org_admin' || selectedRole === 'super_admin') && !selectedOrgId
                 ) || (
-                    (selectedRole.value === 'event_admin' || selectedRole.value === 'event_qr_checker') && !selectedEventId
+                    (selectedRole === 'event_admin' || selectedRole === 'event_qr_checker') && !selectedEventId
                 )}
             >
                 Start Emulation

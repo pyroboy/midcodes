@@ -1,4 +1,4 @@
-import type { UserRole } from './database'
+import type { UserRole } from '$lib/auth/roleConfig'
 import type { Session } from '@supabase/supabase-js'
 
 // types/roleEmulation.ts
@@ -50,6 +50,7 @@ export interface EmulatedProfile {
     email: string
     role: UserRole
     org_id: string | null
+    context: Record<string, unknown>
     created_at: string
     updated_at: string
     originalRole: UserRole
@@ -60,6 +61,8 @@ export interface ProfileData {
     id: string
     role: UserRole
     email: string
+    context?: Record<string, unknown>
+    org_id?: string | null
     full_name?: string
     organization_id?: string
 }

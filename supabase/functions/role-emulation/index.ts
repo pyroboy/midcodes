@@ -31,12 +31,12 @@ interface EmulationSession {
   user_id: string
   original_role: UserRole
   emulated_role: UserRole
-  original_org_id: string | null
   emulated_org_id: string | null
   status: EmulationStatus
   expires_at: string
   created_at: string
   metadata: Record<string, unknown>
+  is_role_existing: boolean
 }
 
 class RoleEmulationError extends Error {
@@ -244,7 +244,6 @@ async function handleRoleEmulation(
       userId,
       originalRole: profile.role,
       emulatedRole,
-      originalOrgId: profile.org_id,
       emulatedOrgId
     });
 
@@ -255,14 +254,14 @@ async function handleRoleEmulation(
         user_id: userId,
         original_role: profile.role,
         emulated_role: emulatedRole,
-        original_org_id: profile.org_id,
         emulated_org_id: emulatedOrgId,
         status: 'active' as const,
         expires_at: expiresAt.toISOString(),
         metadata: {
           created_at: new Date().toISOString(),
           context
-        }
+        },
+        is_role_existing: false
       }])
       .select()
       .single();
@@ -281,7 +280,6 @@ async function handleRoleEmulation(
             active: true,
             original_role: profile.role,
             emulated_role: emulatedRole,
-            original_org_id: profile.org_id,
             emulated_org_id: emulatedOrgId,
             expires_at: expiresAt.toISOString(),
             session_id: sessionId,

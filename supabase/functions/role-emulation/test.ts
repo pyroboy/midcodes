@@ -3,8 +3,7 @@ import { assertFalse, assertEquals, assertExists } from "https://deno.land/std@0
 import { TestHelpers } from './test-helpers.ts';
 
 const supabaseUrl = 'http://localhost:54321'
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
-const supabaseServiceRoleKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU'
+const supabaseServiceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU'
 
 // Test configuration
 const email = 'admin@example.com'
@@ -12,7 +11,7 @@ const password = 'test123456'
 const testOrgId = '123e4567-e89b-12d3-a456-426614174000' // Valid UUID for testing
 const invalidOrgId = '123e4567-e89b-12d3-a456-426614174999' // Non-existent org ID
 
-const testHelpers = new TestHelpers(supabaseUrl, supabaseAnonKey, supabaseServiceRoleKey);
+const testHelpers = new TestHelpers(supabaseUrl, supabaseServiceKey);
 
 Deno.test('Role Emulation Function Tests', async (t) => {
   let authToken: string;
@@ -454,9 +453,12 @@ Deno.test('Role Emulation - Organization Tests', async (t) => {
   const session = await testHelpers.signIn(email, password)
   const userId = session.user.id
 
+  await testHelpers.updateUserRole(userId, 'super_admin', testOrgId)
+  const profile = await testHelpers.getProfile(userId)
+  assertEquals(profile.org_id, testOrgId)
+
   await t.step('emulate org_admin role with organization', async () => {
     await testHelpers.cleanupEmulationSessions(userId)
-    const profile = await testHelpers.getProfile(userId)
     
     const response = await fetch(`${supabaseUrl}/functions/v1/role-emulation`, {
       method: 'POST',
@@ -481,7 +483,6 @@ Deno.test('Role Emulation - Organization Tests', async (t) => {
     const emulationSession = await testHelpers.getEmulationSession(userId)
     assertEquals(emulationSession.emulated_role, 'org_admin')
     assertEquals(emulationSession.emulated_org_id, testOrgId)
-    assertEquals(emulationSession.original_org_id, profile.org_id)
 
     // Cleanup after test
     await testHelpers.cleanupEmulationSessions(userId)
@@ -569,7 +570,6 @@ Deno.test('Role Emulation - Organization Tests', async (t) => {
     const emulationSession = await testHelpers.getEmulationSession(userId)
     assertEquals(emulationSession.emulated_role, 'event_admin')
     assertEquals(emulationSession.emulated_org_id, testOrgId)
-    assertEquals(emulationSession.original_org_id, profile.org_id)
 
     // Cleanup after test
     await testHelpers.cleanupEmulationSessions(userId)

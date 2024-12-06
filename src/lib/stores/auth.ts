@@ -3,7 +3,7 @@ import type { User, Session } from '@supabase/supabase-js'
 import { supabase } from '$lib/supabaseClient'
 import { browser } from '$app/environment'
 import { goto } from '$app/navigation'
-import type { UserRole } from '$lib/types/database'
+import type { UserRole } from '$lib/auth/roleConfig'
 import { jwtDecode } from "jwt-decode"
 
 interface RoleEmulationClaim {

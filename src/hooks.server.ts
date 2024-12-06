@@ -6,9 +6,7 @@ import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/publi
 import type { Handle } from '@sveltejs/kit'
 import type { RoleEmulationData, RoleEmulationClaim, EmulatedProfile, ProfileData, LocalsSession } from '$lib/types/roleEmulation'
 import { RoleConfig, isPublicPath, hasPathAccess, getRedirectPath } from '$lib/auth/roleConfig'
-import type { UserRole } from '$lib/types/database'
-
-
+import type { UserRole } from '$lib/auth/roleConfig'
 
 interface SessionInfo {
   session: LocalsSession | null
@@ -34,9 +32,30 @@ function isValidUserRole(role: string): role is UserRole {
 async function getUserProfile(userId: string, supabase: SupabaseClient): Promise<ProfileData | null> {
   const { data: profile } = await supabase
     .from('profiles')
-    .select('*')
+    .select('*, organizations(id, name)')
     .eq('id', userId)
     .single()
+
+  if (profile) {
+    // If user has an organization, add event_url to context
+    if (profile.org_id) {
+      const { data: events } = await supabase
+        .from('events')
+        .select('event_url')      
+        .eq('org_id', profile.org_id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (events?.event_url) {
+        profile.context = {
+          ...profile.context,
+          event_url: events.event_url
+        }
+      }
+    }
+  }
+
   return profile
 }
 
@@ -201,14 +220,15 @@ const authGuard: Handle = async ({ event, resolve }) => {
 
   // Get session info
   const sessionInfo = await event.locals.safeGetSession()
-  const { user, profile, session } = sessionInfo
+  const { user, profile, session, roleEmulation } = sessionInfo
 
   // Update locals with session info
   event.locals = {
     ...event.locals,
     session,
     user,
-    profile
+    profile,
+    
   }
 
   // Handle authentication
@@ -224,7 +244,7 @@ const authGuard: Handle = async ({ event, resolve }) => {
   if (isAuthPath && profile?.role && isValidUserRole(profile.role)) {
     const config = RoleConfig[profile.role]
     if (config) {
-      throw redirect(303, config.defaultRedirect)
+      throw redirect(303, config.defaultPath(profile.context))
     }
   }
 
@@ -245,7 +265,11 @@ const authGuard: Handle = async ({ event, resolve }) => {
 
   // Check path access and redirect if necessary
   const originalRole = (profile as EmulatedProfile)?.originalRole
-  const redirectPath = originalRole ? getRedirectPath(profile.role, path, originalRole) : getRedirectPath(profile.role, path)
+  const context = roleEmulation?.metadata?.context || profile?.context || {}
+  const redirectPath = originalRole 
+    ? getRedirectPath(profile.role, path, originalRole, context) 
+    : getRedirectPath(profile.role, path, undefined, context)
+  
   if (redirectPath) {
     throw redirect(303, redirectPath)
   }
