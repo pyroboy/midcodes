@@ -40,7 +40,8 @@
     $: role = $page.data.profile?.role as UserRole | undefined;
     $: navLinks = getNavLinks(role);
     $: navigation = $page.data.navigation;
-    $: showHeader = navigation?.showHeader ?? false;
+    $: pageSession = $page.data.session;
+    $: showHeader = !!pageSession && !!navigation?.showHeader;
     $: isDark = $settings.theme === 'dark';
     $: userEmail = $page.data.user?.email ?? '';
     $: emulation = $page.data.session?.roleEmulation as RoleEmulationClaim | null;
@@ -50,6 +51,13 @@
     $: console.log('[Role Debug] Current Role:', emulation?.emulated_role ?? userProfile?.role);
     $: console.log('[Role Debug] Is Emulating:', emulation?.active);
     $: console.log('[Role Debug] Emulated Org:', emulation?.emulated_org_id);
+
+    $: console.log('[Layout Debug] Auth State:', {
+        showHeader,
+        hasSession: !!pageSession,
+        navigation,
+        path
+    });
 
     // Update session when server data changes
     $: if (userProfile && $session) {

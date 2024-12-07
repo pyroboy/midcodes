@@ -57,15 +57,22 @@ export const load = async ({ locals: { safeGetSession, profile, supabase }, url 
 
   // Navigation state
   const navigation: NavigationState = {
-    homeUrl: currentProfile?.role === 'super_admin' ? '/(admin)/midcodes' : '/',
-    showHeader: true,
+    homeUrl: currentProfile?.role === 'super_admin' ? '/midcodes' : '/',
+    showHeader: false, // Default to false
     allowedPaths: [],
     showRoleEmulation: currentProfile?.role === 'super_admin'
   };
 
-  console.log('[Layout Server] Navigation config:', navigation);
+  console.log('[Layout Server] Navigation and Session:', {
+    hasSession: !!session,
+    session,
+    navigation,
+    url: url.pathname
+  });
 
   if (session && currentProfile) {
+    navigation.showHeader = true; // Only show header if authenticated
+
     // Check for active role emulation session for super_admin users
     if (currentProfile.role === 'super_admin') {
       const { data: activeEmulation } = await supabase
@@ -123,7 +130,6 @@ export const load = async ({ locals: { safeGetSession, profile, supabase }, url 
     }
 
     // Show nav for all authenticated users
-    navigation.showHeader = !url.pathname.startsWith('/auth');
     // navigation.allowedPaths = ['/templates', '/all-ids'];
   }
 
