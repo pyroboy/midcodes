@@ -155,7 +155,7 @@
 </script>
 
 <svelte:head>
-    <title>ID Card Generator</title>
+    <title>March of Faith Incorporated</title>
     <link rel="icon" href="/favicon.ico" />
 </svelte:head>
 
