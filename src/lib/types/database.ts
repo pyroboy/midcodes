@@ -1,5 +1,7 @@
 import type { UserRole } from '$lib/auth/roleConfig';
 
+export type { UserRole } from '$lib/auth/roleConfig';
+
 export interface Organization {
     id: string;  // UUID
     name: string;
@@ -54,13 +56,34 @@ export interface IdCard {
     org_id: string;  // UUID
 }
 
+export interface EventOtherInfo {
+    description?: string;
+    location?: string;
+    startDate?: string;
+    endDate?: string;
+    contactPerson?: string;
+    contactEmail?: string;
+    contactPhone?: string;
+    [key: string]: any;
+}
+
+export interface EventTicketType {
+    name: string;
+    price: number;
+    description?: string;
+    maxQuantity?: number;
+    availableQuantity?: number;
+    [key: string]: any;
+}
+
 export interface Event {
     id: string;  // UUID
     event_name: string;
     event_long_name: string | null;
     event_url: string | null;
-    other_info: Record<string, any>;
-    ticketing_data: Record<string, any>[];
+    other_info: EventOtherInfo;
+    ticketing_data: EventTicketType[];
+    payment_timeout_minutes: number;
     is_public: boolean;
     created_at: string;
     updated_at: string;
@@ -70,19 +93,47 @@ export interface Event {
 
 export interface Attendee {
     id: string;  // UUID
-    basic_info: Record<string, any>;
+    basic_info: {
+        firstName: string;
+        lastName: string;
+        email: string;
+        phone: string;
+    };
     event_id: string;  // UUID
-    ticket_info: Record<string, any>;
+    ticket_info: {
+        type: string;
+        price: number;
+        includes: string[];
+    };
     is_paid: boolean;
-    is_printed: boolean;
-    received_by: string | null;  // UUID
     qr_link: string | null;
     reference_code_url: string | null;
-    attendance_status: string;
-    qr_scan_info: Record<string, any>[];
     created_at: string;
     updated_at: string;
-    org_id: string;  // UUID
+    org_id: string;
+    attendance_status: 'registered' | 'paymentPending' | 'expired';
+}
+
+export interface AttendeeWithStatus extends Attendee {
+    status: 'registered' | 'paymentPending' | 'expired';
+    time_remaining_minutes: number | null;
+}
+
+export interface PaymentDetails {
+    attendeeId: string;  // UUID
+    basicInfo: Record<string, any>;
+    eventId: string;  // UUID
+    isPaid: boolean;
+    receivedBy: string | null;  // UUID
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface PaymentSummary {
+    grandTotal: number;
+    totalPaid: number;
+    totalUnpaid: number;
+    totalByReceiver: Record<string, number>;
 }
 
 export interface Database {
@@ -123,6 +174,11 @@ export interface Database {
                 Insert: Omit<Attendee, 'id' | 'created_at' | 'updated_at'>;
                 Update: Partial<Omit<Attendee, 'id'>>;
             };
+            payment_details: {
+                Row: PaymentDetails;
+                Insert: Omit<PaymentDetails, 'createdAt' | 'updatedAt'>;
+                Update: Partial<Omit<PaymentDetails, 'attendeeId'>>;
+            };
         };
         Views: {
             public_events: {
@@ -131,12 +187,15 @@ export interface Database {
                     event_name: string;
                     event_long_name: string | null;
                     event_url: string | null;
-                    other_info: Record<string, any>;
-                    ticketing_data: Record<string, any>[];
+                    other_info: EventOtherInfo;
+                    ticketing_data: EventTicketType[];
                     is_public: boolean;
                     org_id: string;
                     organization_name: string;
                 };
+            };
+            payment_summaries: {
+                Row: PaymentSummary;
             };
         };
         Functions: {

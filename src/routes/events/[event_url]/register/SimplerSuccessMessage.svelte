@@ -2,12 +2,15 @@
     import { Check } from 'lucide-svelte';
     import { onMount } from 'svelte';
     import { fade } from 'svelte/transition';
+    import type { RegistrationResponse } from './schema';
+    
+    export let data: RegistrationResponse;
     
     let visible = false;
     let showCheck = false;
     let showText = false;
     let typedText = '';
-    const fullText = 'Redirecting to your ticketing information...';
+    const fullText = `Please complete payment within ${data.paymentTimeoutMinutes} minutes`;
     
     onMount(() => {
         visible = true;
@@ -53,6 +56,9 @@
             {#if showText}
                 <p class="text-gray-600 h-6 font-medium">
                     {typedText}
+                </p>
+                <p class="text-gray-600 mt-2">
+                    Reference Code: <span class="font-mono font-bold">{data.referenceCode}</span>
                 </p>
             {/if}
         </div>

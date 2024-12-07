@@ -21,16 +21,29 @@
     import toast from 'svelte-french-toast';
     import { z } from 'zod';
     import { invalidateAll } from '$app/navigation';
+    import { onMount, onDestroy } from 'svelte';
+    import { AlertTriangle, Check, Clock, Trash2 } from 'lucide-svelte';
 
     export let data: PageData;
 
     const { form, enhance } = superForm<z.infer<PaymentUpdateSchema>>(data.form, {
+        onSubmit: ({ formData }) => {
+            // Log the raw form data
+            const formValues = Object.fromEntries(formData);
+            console.log('[Client] Form data being submitted:', formValues);
+            return true;
+        },
         onResult: async ({ result }) => {
+            console.log('[Client] Form submission result:', result);
             if (result.type === 'success') {
                 await invalidateAll();
                 toast.success('Payment status updated');
             } else if (result.type === 'error') {
-                toast.error('Failed to update payment status');
+                if (result.error === 'PAYMENT_EXPIRED') {
+                    toast.error('Payment window has expired. Registration must be done again.');
+                } else {
+                    toast.error('Failed to update payment status');
+                }
             }
         },
         resetForm: false,
@@ -91,6 +104,113 @@
             receivedBy: userId
         }));
     };
+
+    // Timer state
+    let timers: { [key: string]: { timeLeft: string; interval: ReturnType<typeof setInterval>; isExpired: boolean } } = {};
+
+    function calculateTimeLeft(createdAt: string) {
+        const created = new Date(createdAt).getTime();
+        const now = new Date().getTime();
+        const timeLimit = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+        const timeLeft = created + timeLimit - now;
+
+        if (timeLeft <= 0) return '00:00:00';
+
+        const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+        const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    function startTimer(attendeeId: string, createdAt: string) {
+        if (timers[attendeeId]) return;
+
+        const interval = setInterval(() => {
+            const timeLeft = calculateTimeLeft(createdAt);
+            timers[attendeeId] = { ...timers[attendeeId], timeLeft };
+            
+            if (timeLeft === '00:00:00') {
+                clearInterval(timers[attendeeId].interval);
+                timers[attendeeId].isExpired = true;
+                timers = { ...timers }; // Trigger reactivity
+            }
+        }, 1000);
+
+        timers[attendeeId] = {
+            timeLeft: calculateTimeLeft(createdAt),
+            interval,
+            isExpired: false
+        };
+    }
+
+    onMount(() => {
+        // Start timers for all unpaid registrations
+        filteredAttendees.forEach(attendee => {
+            if (!attendee.is_paid && attendee.attendance_status !== 'expired') {
+                startTimer(attendee.id, attendee.created_at);
+            }
+        });
+    });
+
+    onDestroy(() => {
+        // Clean up all intervals
+        Object.values(timers).forEach(timer => {
+            clearInterval(timer.interval);
+        });
+    });
+
+    function getStatusDisplay(attendee: any) {
+        if (attendee.attendance_status === 'expired') {
+            return {
+                text: 'Expired',
+                classes: 'bg-red-100 text-red-800',
+                icon: AlertTriangle
+            };
+        }
+        return attendee.is_paid 
+            ? { text: 'Paid', classes: 'bg-green-100 text-green-800', icon: Check }
+            : { text: 'Pending', classes: 'bg-yellow-100 text-yellow-800', icon: Clock };
+    }
+
+
+
+    $: expiredIds = filteredAttendees
+        .filter(attendee => {
+            const timer = timers[attendee.id];
+            return (timer?.timeLeft && Number(timer.timeLeft) <= 0) || timer?.isExpired || attendee.attendance_status === 'expired';
+        })
+        .map(attendee => attendee.id);
+
+    async function handleClearExpired() {
+        if (!expiredIds.length) return;
+
+        console.log('[Client] Clearing expired entries:', { expiredIds });
+
+        try {
+            const formData = new FormData();
+            formData.append('attendeeIds', JSON.stringify(expiredIds));
+
+            const result = await fetch(`?/clearExpired`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const response = await result.json();
+            
+            if (result.ok) {
+                console.log('[Client] Successfully cleared expired entries');
+                toast.success('Successfully cleared expired entries');
+                window.location.reload();
+            } else {
+                console.error('[Client] Failed to clear expired entries:', response);
+                toast.error(response.message || 'Failed to clear expired entries');
+            }
+        } catch (error) {
+            console.error('[Client] Error clearing expired entries:', error);
+            toast.error('Failed to clear expired entries');
+        }
+    }
 </script>
 
 <svelte:head>
@@ -143,15 +263,27 @@
     {/if}
 
     <!-- Filters -->
-    <div class="flex flex-col md:flex-row gap-4 mb-6">
-        <div class="flex-1">
+    <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-4">
             <Input
                 type="search"
                 placeholder="Search attendees..."
                 bind:value={searchQuery}
+                class="w-[300px]"
             />
+            {#if expiredIds.length > 0}
+                <Button
+                    variant="destructive"
+                    size="sm"
+                    on:click={handleClearExpired}
+                    class="flex items-center gap-2"
+                >
+                    <Trash2 class="w-4 h-4" />
+                    Clear {expiredIds.length} Expired {expiredIds.length === 1 ? 'Entry' : 'Entries'}
+                </Button>
+            {/if}
         </div>
-        <div class="flex items-center gap-6">
+        <div class="flex items-center gap-2">
             <div class="flex items-center gap-2">
                 <Switch bind:checked={showPaidOnly} />
                 <Label>Paid Only</Label>
@@ -170,13 +302,11 @@
                 <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
-                    <TableHead>Phone</TableHead>
                     <TableHead>Ticket Type</TableHead>
                     <TableHead>Amount</TableHead>
+                    <TableHead>Registered</TableHead>
                     <TableHead>Payment Status</TableHead>
-                    <TableHead>Received By</TableHead>
-                    <TableHead>Last Updated</TableHead>
-                    <TableHead>Reference Link</TableHead>
+                    <TableHead class="text-right">Actions</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -186,66 +316,65 @@
                             {attendee.basic_info.firstName} {attendee.basic_info.lastName}
                         </TableCell>
                         <TableCell>{attendee.basic_info.email}</TableCell>
-                        <TableCell>{attendee.basic_info.phone}</TableCell>
                         <TableCell>{attendee.ticket_info.type}</TableCell>
                         <TableCell>{formatCurrency(attendee.ticket_info.price || 0)}</TableCell>
                         <TableCell>
-                            <div class="flex items-center gap-2">
-                                <form
-                                    method="POST"
-                                    action="?/updatePayment"
-                                    use:enhance
-                                    class="flex items-center"
-                                >
-                                    <input type="hidden" name="attendeeId" value={attendee.id} />
-                                    <input type="hidden" name="isPaid" value={!attendee.is_paid} />
-                                    <input type="hidden" name="receivedBy" value={data.session?.user?.id ?? ''} />
-                                    <button type="submit" class="w-full">
-                                        <Switch
-                                            checked={attendee.is_paid}
-                                            onCheckedChange={() => {
-                                                if (!data.session?.user?.id) {
-                                                    toast.error('Please log in to update payment status');
-                                                    return;
-                                                }
-                                            }}
-                                        />
-                                    </button>
-                                </form>
-                                <span class={cn(
-                                    "text-sm font-medium",
-                                    attendee.is_paid ? "text-green-600" : "text-red-600"
-                                )}>
-                                    {attendee.is_paid ? 'Paid' : 'Unpaid'}
-                                </span>
-                            </div>
+                            {formatDate(attendee.created_at)}
                         </TableCell>
                         <TableCell>
-                            <span class="text-sm text-gray-600">
-                                {attendee.received_by || '-'}
-                            </span>
-                        </TableCell>
-                        <TableCell>
-                            <span class="text-sm text-gray-600">
-                                {formatDate(attendee.updated_at)}
-                            </span>
-                        </TableCell>
-                        <TableCell>
-                            {#if attendee.reference_code_url}
-                                <a 
-                                    href="/{data.event.event_url}/{attendee.reference_code_url}" 
-                                    class="text-primary hover:text-primary/80 underline"
-                                >
-                                    View Details
-                                </a>
+                            {#if attendee.attendance_status === 'expired' || (timers[attendee.id]?.isExpired)}
+                                <div class="flex items-center gap-2">
+                                    <AlertTriangle class="w-4 h-4 text-red-500" />
+                                    <span class="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
+                                        Expired
+                                    </span>
+                                </div>
                             {:else}
-                                <span class="text-gray-400">No Reference</span>
+                                <div class="flex items-center gap-2">
+                                    <svelte:component 
+                                        this={attendee.is_paid ? Check : Clock} 
+                                        class="w-4 h-4 {attendee.is_paid ? 'text-green-500' : 'text-yellow-500'}" 
+                                    />
+                                    <span class="px-2 py-1 rounded-full text-xs font-semibold {attendee.is_paid ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
+                                        {attendee.is_paid ? 'Paid' : 'Pending'}
+                                    </span>
+                                    {#if !attendee.is_paid && timers[attendee.id] && !timers[attendee.id].isExpired}
+                                        <span class="text-sm {timers[attendee.id].timeLeft === '00:00:00' ? 'text-red-600 font-semibold' : 'text-gray-600'}">
+                                            ({timers[attendee.id].timeLeft})
+                                        </span>
+                                    {/if}
+                                </div>
+                            {/if}
+                        </TableCell>
+                        <TableCell class="text-right">
+                            {#if !attendee.is_paid && attendee.attendance_status !== 'expired'}
+                            <form
+    method="POST"
+    action="?/updatePayment"
+    use:enhance
+    class="flex items-center justify-end"
+>
+    <input type="hidden" name="attendeeId" value={attendee.id} />
+    <input type="hidden" name="receivedBy" value={data.session?.user?.id} />
+    <Button 
+        type="submit" 
+        variant="outline" 
+        size="sm"
+        disabled={!data.session?.user?.id}
+        class="relative"
+    >
+        <div class="flex items-center">
+            <Check class="w-4 h-4 mr-2" />
+            Confirm Payment
+        </div>
+    </Button>
+</form>
                             {/if}
                         </TableCell>
                     </TableRow>
                 {:else}
                     <TableRow>
-                        <TableCell colspan={9} class="text-center py-8 text-gray-500">
+                        <TableCell colspan={8} class="text-center py-8 text-gray-500">
                             No attendees found
                         </TableCell>
                     </TableRow>

@@ -213,24 +213,30 @@ const authGuard: Handle = async ({ event, resolve }) => {
 
   // Handle authentication
   if (!user) {
+    // Check if path is public first
+    if (isPublicPath(path)) {
+      return resolve(event);
+    }
+    
     // Unauthenticated users can only access /auth
     if (!isAuthPath) {
-      throw redirect(303, '/auth')
+      const returnTo = event.url.pathname;
+      throw redirect(303, `/auth?returnTo=${encodeURIComponent(returnTo)}`);
     }
-    return resolve(event)
+    return resolve(event);
   }
 
   // Authenticated users shouldn't stay on /auth
   if (isAuthPath && profile?.role && isValidUserRole(profile.role)) {
-    const config = RoleConfig[profile.role]
+    const config = RoleConfig[profile.role];
     if (config) {
-      throw redirect(303, config.defaultPath(profile.context))
+      throw redirect(303, config.defaultPath(profile.context));
     }
   }
 
-  // Public paths are accessible to all authenticated users
+  // Public paths are accessible to all users
   if (isPublicPath(path)) {
-    return resolve(event)
+    return resolve(event);
   }
 
   // Check if user has a valid role
@@ -240,7 +246,7 @@ const authGuard: Handle = async ({ event, resolve }) => {
 
   // Log access (except favicon)
   if (!path.endsWith('/favicon.ico')) {
-    console.log(`[AuthGuard] ${path} | User: ${user.id} | Role: ${profile.role}${(profile as EmulatedProfile)?.isEmulated ? ' (Emulated)' : ''}`)
+    // console.log(`[AuthGuard] ${path} | User: ${user.id} | Role: ${profile.role}${(profile as EmulatedProfile)?.isEmulated ? ' (Emulated)' : ''}`)
   }
 
   // Check path access and redirect if necessary

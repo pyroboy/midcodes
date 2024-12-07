@@ -15,35 +15,35 @@ function formatPercentage(value: number, total: number): string {
 const routes = [
     {
         name: 'Registration',
-        href: `/${data.event.event_url}/register`,
+        href: `/events/${data.event.event_url}/register`,
         description: 'Register new attendees',
         icon: Users,
         color: 'bg-blue-500 hover:bg-blue-600'
     },
     {
         name: 'Payments',
-        href: `/${data.event.event_url}/payments`,
+        href: `/events/${data.event.event_url}/payments`,
         description: 'Manage payments and transactions',
         icon: CreditCard,
         color: 'bg-green-500 hover:bg-green-600'
     },
     {
         name: 'Name Tags',
-        href: `/${data.event.event_url}/name-tags`,
+        href: `/events/${data.event.event_url}/name-tags`,
         description: 'Generate and print name tags',
         icon: Tag,
         color: 'bg-purple-500 hover:bg-purple-600'
     },
     {
         name: 'QR Scanner',
-        href: `/${data.event.event_url}/scanner`,
+        href: `/events/${data.event.event_url}/qr-checker`,
         description: 'Scan QR codes for check-in',
         icon: QrCode,
         color: 'bg-yellow-500 hover:bg-yellow-600'
     },
     {
         name: 'Settings',
-        href: `/${data.event.event_url}/settings`,
+        href: `/events/${data.event.event_url}/settings`,
         description: 'Configure event settings',
         icon: Settings,
         color: 'bg-gray-500 hover:bg-gray-600'

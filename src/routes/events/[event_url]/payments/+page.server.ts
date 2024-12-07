@@ -3,45 +3,41 @@ import type { PageServerLoad, Actions } from './$types';
 import { z } from 'zod';
 import { zod } from 'sveltekit-superforms/adapters';
 import { superValidate } from 'sveltekit-superforms/server';
-import type { PaymentSummary } from '$lib/types/database';
 
-// Schema for payment status update
 const paymentUpdateSchema = z.object({
     attendeeId: z.string().uuid(),
-    isPaid: z.boolean(),
+
     receivedBy: z.string().uuid()
 });
 
-export type PaymentUpdateSchema = typeof paymentUpdateSchema;
+const clearExpiredSchema = z.object({
+    attendeeIds: z.array(z.string().uuid())
+});
 
-// Type for the Supabase response
-interface AttendeeWithProfile {
-    id: string;
-    basic_info: Record<string, any>;
-    event_id: string;
-    ticket_info: { price: number } & Record<string, any>;
-    is_paid: boolean;
-    received_by: string | null;
-    reference_code_url: string | null;
-    created_at: string;
-    updated_at: string;
-    profiles: Array<{
-        id: string;
-        full_name: string;
-    }>;
+export type PaymentUpdateSchema = typeof paymentUpdateSchema;
+export type ClearExpiredSchema = typeof clearExpiredSchema;
+
+interface PaymentSummary {
+    grandTotal: number;
+    totalPaid: number;
+    totalUnpaid: number;
+    totalByReceiver: Record<string, number>;
 }
 
-export const load = (async ({ locals: { supabase }, params }) => {
-    const { data: { session } } = await supabase.auth.getSession();
+export const load = (async ({ locals: { safeGetSession, supabase }, params }) => {
+    const sessionInfo = await safeGetSession();
+    // console.log('Session info:', { 
+    //     hasSession: !!sessionInfo.session, 
+    //     userId: sessionInfo.session?.user?.id 
+    // });
     
-    if (!session) {
+    if (!sessionInfo.session || !sessionInfo.profile) {
         throw error(401, 'Unauthorized');
     }
 
-    // Fetch event data first to verify access
     const { data: event, error: eventError } = await supabase
         .from('events')
-        .select('*, organizations(id)')
+        .select('*, organizations(id, name)')
         .eq('event_url', params.event_url)
         .single();
 
@@ -49,19 +45,19 @@ export const load = (async ({ locals: { supabase }, params }) => {
         throw error(404, 'Event not found');
     }
 
-    // Get attendees with payment info
     const { data: attendees, error: attendeesError } = await supabase
         .from('attendees')
         .select(`
             id,
             basic_info,
-            event_id,
             ticket_info,
             is_paid,
             received_by,
             reference_code_url,
+            attendance_status,
             created_at,
-            updated_at
+            updated_at,
+            org_id
         `)
         .eq('event_id', event.id)
         .order('created_at', { ascending: false });
@@ -70,15 +66,7 @@ export const load = (async ({ locals: { supabase }, params }) => {
         throw error(500, 'Failed to fetch attendees');
     }
 
-    // Calculate payment summary
-    const initialSummary: PaymentSummary = {
-        grandTotal: 0,
-        totalByReceiver: {},
-        totalPaid: 0,
-        totalUnpaid: 0
-    };
-
-    const paymentSummary = (attendees as AttendeeWithProfile[]).reduce((summary, attendee) => {
+    const paymentSummary = (attendees || []).reduce((summary: PaymentSummary, attendee) => {
         const ticketPrice = attendee.ticket_info?.price || 0;
         summary.grandTotal += ticketPrice;
 
@@ -93,93 +81,111 @@ export const load = (async ({ locals: { supabase }, params }) => {
         }
 
         return summary;
-    }, initialSummary);
+    }, {
+        grandTotal: 0,
+        totalByReceiver: {},
+        totalPaid: 0,
+        totalUnpaid: 0
+    });
 
-    // Initialize the form with the schema
     const form = await superValidate(zod(paymentUpdateSchema));
+    const clearForm = await superValidate(zod(clearExpiredSchema));
 
     return {
-        form,
         event,
-        attendees,
-        paymentSummary
+        attendees: attendees || [],
+        paymentSummary,
+        form,
+        clearForm,
+        session: {
+            user: sessionInfo.session.user
+        }
     };
 }) satisfies PageServerLoad;
 
 export const actions = {
-    updatePayment: async ({ request, locals: { supabase }, params }) => {
-        const formData = await request.formData();
-        const attendeeId = formData.get('attendeeId') as string;
-        const isPaid = formData.get('isPaid') === 'true';
-        const receivedBy = formData.get('receivedBy') as string;
-
-        const { error: updateError } = await supabase
-            .from('attendees')
-            .update({
-                is_paid: isPaid,
-                received_by: isPaid ? receivedBy : null
-            })
-            .eq('id', attendeeId);
-
-        if (updateError) {
-            return fail(500, { message: 'Failed to update payment status' });
+    updatePayment: async ({ request, locals: { safeGetSession, supabase }}) => {
+        const sessionInfo = await safeGetSession();
+        if (!sessionInfo.session || !sessionInfo.profile) {
+            return fail(401, { message: 'Unauthorized' });
         }
 
-        // Fetch updated data
-        const { data: event } = await supabase
-            .from('events')
-            .select('*, organizations(id)')
-            .eq('event_url', params.event_url)
-            .single();
+        // Get form data
+        const formData = await request.formData();
+        console.log('Raw form data received:', Object.fromEntries(formData));
 
-        const { data: attendees } = await supabase
-            .from('attendees')
-            .select(`
-                id,
-                basic_info,
-                event_id,
-                ticket_info,
-                is_paid,
-                received_by,
-                reference_code_url,
-                created_at,
-                updated_at
-            `)
-            .eq('event_id', event.id)
-            .order('created_at', { ascending: false });
+        // Handle superForm submission
+        const form = await superValidate(formData, zod(paymentUpdateSchema));
+        
+        console.log('Form validation result:', {
+            isValid: form.valid,
+            data: form.data,
+            errors: form.errors
+        });
 
-        // Calculate new payment summary
-        const initialSummary: PaymentSummary = {
-            grandTotal: 0,
-            totalByReceiver: {},
-            totalPaid: 0,
-            totalUnpaid: 0
+        if (!form.valid) {
+            console.error('Form validation failed:', form.errors);
+            return fail(400, { 
+                form,
+                message: 'Invalid form data',
+                debug: { errors: form.errors }
+            });
+        }
+
+        // Call RPC with validated data
+        console.log('Calling RPC with:', { p_attendee_id: form.data.attendeeId });
+        const { data: result, error: paymentError } = await supabase.rpc('confirm_attendee_payment', {
+            p_attendee_id: form.data.attendeeId
+        });
+
+        console.log('RPC result:', { result, error: paymentError });
+
+        if (paymentError) {
+            console.error('Payment error:', paymentError);
+            return fail(500, {
+                form,
+                message: paymentError.message || 'Failed to update payment status'
+            });
+        }
+
+        if (!result?.success) {
+            console.error('Payment not successful:', result);
+            const message = result?.message || 'Failed to confirm payment';
+            const status = result?.status || 'failed';
+            
+            return fail(400, {
+                form,
+                error: status === 'expired' ? 'PAYMENT_EXPIRED' : 'PAYMENT_FAILED',
+                message
+            });
+        }
+
+        console.log('Payment confirmed successfully');
+        return { 
+            form,
+            success: true,
+            message: 'Payment confirmed successfully'
         };
+    },
 
-        const paymentSummary = (attendees as AttendeeWithProfile[]).reduce((summary, attendee) => {
-            const ticketPrice = attendee.ticket_info?.price || 0;
-            summary.grandTotal += ticketPrice;
+    clearExpired: async ({ request, locals: { safeGetSession, supabase }}) => {
+        const sessionInfo = await safeGetSession();
+        if (!sessionInfo.session || !sessionInfo.profile) {
+            return fail(401, { message: 'Unauthorized' });
+        }
 
-            if (attendee.is_paid) {
-                summary.totalPaid += ticketPrice;
-                if (attendee.received_by) {
-                    summary.totalByReceiver[attendee.received_by] = 
-                        (summary.totalByReceiver[attendee.received_by] || 0) + ticketPrice;
-                }
-            } else {
-                summary.totalUnpaid += ticketPrice;
-            }
+        const { data: result, error: cleanupError } = await supabase
+            .rpc('cleanup_expired_registrations');
 
-            return summary;
-        }, initialSummary);
+        if (cleanupError) {
+            return fail(500, {
+                message: cleanupError.message || 'Failed to archive expired entries'
+            });
+        }
 
         return {
-            type: 'success',
-            status: 200,
-            data: {
-                attendees,
-                paymentSummary
-            }
+            success: true,
+            message: result.message
         };
     }
 } satisfies Actions;

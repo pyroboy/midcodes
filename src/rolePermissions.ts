@@ -14,6 +14,11 @@ export const RoleConfig = {
     defaultRedirect: '/rat',
     isAdmin: true
   },
+  id_gen_admin: {
+    allowedPaths: ['/templates', '/all-ids'] as AllowedPath[],
+    defaultRedirect: '/templates',
+    isAdmin: true
+  },
   event_admin: {
     allowedPaths: ['*'] as AllowedPath[],
     defaultRedirect: '/dashboard',

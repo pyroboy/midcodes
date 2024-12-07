@@ -5,10 +5,8 @@ import { nanoid, customAlphabet } from 'nanoid';
  * @returns Promise<string> The QR code URL
  */
 export async function generateQRCode(): Promise<string> {
-    // Generate a unique identifier
-    const uniqueId = generateReferenceCode();
-    // For now, return a placeholder URL. You can implement actual QR code generation later
-    return `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${uniqueId}`;
+    const randomString = Math.random().toString(36).substring(7);
+    return `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(randomString)}`;
 }
 
 /**

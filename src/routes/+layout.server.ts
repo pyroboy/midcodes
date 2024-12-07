@@ -70,7 +70,7 @@ export const load = async ({ locals: { safeGetSession, profile, supabase }, url 
         .gt('expires_at', new Date().toISOString())
         .single();
 
-      console.log('[Layout Server Debug] Active emulation:', activeEmulation);
+      // console.log('[Layout Server Debug] Active emulation:', activeEmulation);
 
       if (activeEmulation) {
         isEmulated = true;
@@ -92,7 +92,7 @@ export const load = async ({ locals: { safeGetSession, profile, supabase }, url 
           organizationName
         };
         
-        console.log('[Layout Server Debug] Emulation data:', emulationData);
+        // console.log('[Layout Server Debug] Emulation data:', emulationData);
         
         // Update profile with emulated data
         currentProfile = {
@@ -104,7 +104,7 @@ export const load = async ({ locals: { safeGetSession, profile, supabase }, url 
           isEmulated: true
         } as ServerProfile;
 
-        console.log('[Layout Server Debug] Updated profile:', currentProfile);
+        // console.log('[Layout Server Debug] Updated profile:', currentProfile);
       }
       navigation.showRoleEmulation = true;
     }
@@ -118,16 +118,16 @@ export const load = async ({ locals: { safeGetSession, profile, supabase }, url 
 
     // Show nav for all authenticated users
     navigation.showHeader = !url.pathname.startsWith('/auth');
-    navigation.allowedPaths = ['/templates', '/all-ids'];
+    // navigation.allowedPaths = ['/templates', '/all-ids'];
   }
 
-  console.log('[Layout Server Debug] Final result:', {
-    user,
-    profile: currentProfile,
-    navigation,
-    session,
-    emulation: emulationData
-  });
+  // console.log('[Layout Server Debug] Final result:', {
+  //   user,
+  //   profile: currentProfile,
+  //   navigation,
+  //   session,
+  //   emulation: emulationData
+  // });
 
   return {
     user,

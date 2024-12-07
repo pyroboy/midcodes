@@ -1,22 +1,24 @@
 import { config } from '$lib/stores/config'
 import { get } from 'svelte/store'
 
-
 // Define all available user roles
 export type UserRole = 'super_admin' | 'org_admin' | 'id_gen_admin' | 'event_admin' | 'event_qr_checker' | 'user';
-
 
 export const PublicPaths = {
     auth: '/auth',
     error: '/error',
     home: '/',
     register: '/register',
-    eventPattern: /\/EVNT-\d{4}-[A-Z0-9]{5}$/
+    eventPattern: /\/EVNT-\d{4}-[A-Z0-9]{5}$/,
+    eventRegisterPattern: /^\/events\/[a-zA-Z0-9-]+\/register$/
 }
 
 // Helper to check if a path is public
 export function isPublicPath(path: string): boolean {
     if (path.startsWith(PublicPaths.auth)) return true
+    
+    // Check for event registration path
+    if (PublicPaths.eventRegisterPattern.test(path)) return true
     
     const eventUrlMatch = path.match(/^\/([^/]+)/)
     const eventUrl = eventUrlMatch ? eventUrlMatch[1] : null
@@ -29,6 +31,9 @@ export function isPublicPath(path: string): boolean {
 
 // Helper to check path access
 export function hasPathAccess(role: UserRole, path: string, originalRole?: UserRole): boolean {
+    // Check if path is public first
+    if (isPublicPath(path)) return true
+
     const roleConfig = RoleConfig[role]
     if (!roleConfig) return false
 
@@ -58,24 +63,13 @@ export function hasPathAccess(role: UserRole, path: string, originalRole?: UserR
         // Exact match
         if (cleanPath === pattern) return true
         
-        // Direct child match (for single *)
-        if (pattern.endsWith('/*')) {
-            const prefix = pattern.slice(0, -1)
-            if (cleanPath === prefix || cleanPath.startsWith(prefix + '/')) {
-                return true
-            }
-        }
+        // Convert path pattern to regex
+        const regexPattern = pattern
+            .replace(/\*/g, '[^/]+')  // Single * matches anything except /
+            .replace(/\[\^\/\]\+\[\^\/\]\+/g, '.*')  // ** matches anything including /
         
-        // Deep match (for **)
-        if (pattern.includes('**')) {
-            const regex = new RegExp(
-                '^' + pattern
-                    .replace(/\*\*/g, '.*')
-                    .replace(/\*/g, '[^/]*')
-                    + '(/.*)?$'
-            )
-            if (regex.test(cleanPath)) return true
-        }
+        const regex = new RegExp('^' + regexPattern + '$')
+        if (regex.test(cleanPath)) return true
     }
     
     return false
@@ -135,6 +129,12 @@ export const RoleConfig: Record<UserRole, RoleConfigType> = {
             { path: `/${get(config).adminUrl}` },
             { path: '/events' },
             { path: '/events/**' },
+            { path: '/events/*/payments' },
+            { path: '/events/*/qr-checker' },
+            { path: '/events/*/ratpayment' },
+            { path: '/events/*/name-tags' },
+            { path: '/events/*/name-tag' },
+            { path: '/events/*/test' },
             { path: '/api/**' }
         ],
         defaultPath: (context?: any) => {
@@ -146,8 +146,6 @@ export const RoleConfig: Record<UserRole, RoleConfigType> = {
     },
     event_qr_checker: {
         allowedPaths: [
-            { path: '/events' },
-            { path: '/events/**' },
             { path: '/events/*/qr-checker' }
         ],
         defaultPath: (context?: any) => {
@@ -168,14 +166,14 @@ export const RoleConfig: Record<UserRole, RoleConfigType> = {
     }
 }
 
-interface RoleConfigType {
+export interface RoleConfigType {
     allowedPaths: AllowedPath[]
     defaultPath: (context?: any) => string
     isAdmin: boolean
     label: string
 }
 
-interface AllowedPath {
+export interface AllowedPath {
     path: string
     methods?: string[]
 }

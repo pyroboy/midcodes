@@ -6,10 +6,10 @@
     import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '$lib/components/ui/card';
     import { Input } from '$lib/components/ui/input';
     import { Label } from '$lib/components/ui/label';
-    import { onMount } from 'svelte';
+    import { onMount, onDestroy } from 'svelte';
     import { page } from '$app/stores';
     import PaymentInstructions from '../register/PaymentInstructions.svelte';
-    import { Check, Clock } from 'lucide-svelte';
+    import { Check, Clock, AlertTriangle } from 'lucide-svelte';
 
     export let data: PageData;
 
@@ -34,6 +34,58 @@
             currency: 'PHP'
         }).format(amount);
     };
+
+    // Payment timeout countdown
+    function getTimeLeft(createdAt: string, timeoutMinutes: number) {
+        const createdTime = new Date(createdAt).getTime();
+        const timeoutTime = createdTime + (timeoutMinutes * 60 * 1000);
+        const now = new Date().getTime();
+        return Math.max(0, timeoutTime - now);
+    }
+
+    function formatTimeLeft(ms: number) {
+        if (ms <= 0) return 'Expired';
+        
+        const days = Math.floor(ms / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((ms % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((ms % (1000 * 60)) / 1000);
+
+        // Only show timer if less than 60 minutes remaining
+        if (days === 0 && hours === 0 && minutes >= 60) return '';
+
+        let timeString = '';
+        if (days > 0) timeString += `${days}d `;
+        if (hours > 0 || days > 0) timeString += `${hours}h `;
+        if (minutes > 0 || hours > 0 || days > 0) timeString += `${minutes}m `;
+        timeString += `${seconds}s`;
+
+        return timeString.trim();
+    }
+
+    let timeLeft = '';
+    let countdownInterval: number;
+
+    onMount(() => {
+        if (!data.attendee.is_paid) {
+            countdownInterval = window.setInterval(() => {
+                const newTimeLeft = formatTimeLeft(
+                    getTimeLeft(
+                        data.attendee.created_at,
+                        data.event.payment_timeout_minutes || 60
+                    )
+                );
+                // Only update if we have a value to show (less than 60 mins) or if expired
+                if (newTimeLeft === 'Expired' || newTimeLeft !== '') {
+                    timeLeft = newTimeLeft;
+                }
+            }, 1000);
+        }
+    });
+
+    onDestroy(() => {
+        if (countdownInterval) clearInterval(countdownInterval);
+    });
 
     $: amount = data.attendee.ticket_info.price?.toString() || '0';
 </script>
@@ -93,6 +145,29 @@
                             <div class="text-center py-4 bg-blue-50 rounded-lg">
                                 <p class="text-sm text-blue-600 font-medium mb-1">Reference Number</p>
                                 <p class="font-mono text-3xl lg:text-4xl font-bold text-blue-700 tracking-wider break-all px-4">{data.attendee.reference_code_url}</p>
+                                
+                                <!-- Payment Countdown -->
+                                {#if timeLeft !== ''}
+                                    <div class="mt-4 flex flex-col items-center gap-2">
+                                        <div class="flex items-center gap-2">
+                                            {#if timeLeft === 'Expired'}
+                                                <AlertTriangle class="w-5 h-5 text-red-500" />
+                                                <span class="text-red-600 font-medium">Registration Expired</span>
+                                            {:else}
+                                                <Clock class="w-5 h-5 text-yellow-500" />
+                                                <span class="text-yellow-600 font-medium">Time remaining to pay:</span>
+                                            {/if}
+                                        </div>
+                                        <div class={`text-2xl font-mono font-bold ${timeLeft === 'Expired' ? 'text-red-600' : 'text-yellow-600'}`}>
+                                            {timeLeft || '...'}
+                                        </div>
+                                        {#if timeLeft === 'Expired'}
+                                            <p class="text-sm text-red-600 mt-2">
+                                                Your registration has expired. Please register again to get a new slot.
+                                            </p>
+                                        {/if}
+                                    </div>
+                                {/if}
                             </div>
                         {/if}
 
@@ -125,9 +200,9 @@
                         <div>
                             <h3 class="text-lg font-semibold mb-2">Payment Status</h3>
                             <div class="flex items-center gap-2">
-                                <div class={`w-3 h-3 rounded-full ${data.attendee.is_paid ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                                <span class={`font-medium ${data.attendee.is_paid ? 'text-green-600' : 'text-red-600'}`}>
-                                    {data.attendee.is_paid ? 'Paid' : 'Unpaid'}
+                                <div class={`w-3 h-3 rounded-full ${data.attendee.is_paid ? 'bg-green-500' : timeLeft === 'Expired' ? 'bg-red-500' : 'bg-yellow-500'}`}></div>
+                                <span class={`font-medium ${data.attendee.is_paid ? 'text-green-600' : timeLeft === 'Expired' ? 'text-red-600' : 'text-yellow-600'}`}>
+                                    {data.attendee.is_paid ? 'Paid' : timeLeft === 'Expired' ? 'Expired' : 'Payment Pending'}
                                 </span>
                             </div>
                             {#if data.attendee.is_paid}

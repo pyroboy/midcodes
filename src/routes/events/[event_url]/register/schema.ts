@@ -23,15 +23,16 @@ export const registrationSchema = z.object({
 
 export type RegistrationSchema = z.infer<typeof registrationSchema>;
 
-export interface RegistrationResponse {
+export type RegistrationResponse = {
     name: string;
     email: string;
     phone: string;
     ticketType: string;
     referenceCode: string;
+    paymentTimeoutMinutes: number;
     event: {
         name: string;
-        longName?: string;
-        otherInfo?: Record<string, unknown>;
+        longName: string | null;
+        otherInfo: Record<string, any>;
     };
 };

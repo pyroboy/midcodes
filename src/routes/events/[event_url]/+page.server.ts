@@ -43,8 +43,8 @@ export const load: PageServerLoad = async ({ params, locals: { supabase } }) => 
 
     // Check event status and dates
     const now = new Date();
-    const regStartDate = new Date(otherInfo.startDate);
-    const regEndDate = new Date(otherInfo.endDate);
+    const regStartDate = otherInfo.startDate ? new Date(otherInfo.startDate) : new Date(0);
+    const regEndDate = otherInfo.endDate ? new Date(otherInfo.endDate) : new Date(8640000000000000);
     
     const eventStatus: EventStatus = {
         isActive: true, // You might want to add a status field to your event table

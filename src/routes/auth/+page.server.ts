@@ -1,7 +1,34 @@
 import { fail, redirect } from '@sveltejs/kit';
-import type { Actions } from './$types';
+import type { Actions, PageServerLoad } from './$types';
 import { AuthApiError } from '@supabase/supabase-js';
 import { ADMIN_URL } from '$env/static/private';
+
+export const load: PageServerLoad = async ({ locals: { safeGetSession }, url }) => {
+    const { session, profile } = await safeGetSession();
+    
+    // If user is already logged in, redirect them based on their role
+    if (session && profile) {
+        const returnTo = url.searchParams.get('returnTo');
+        if (returnTo) {
+            throw redirect(303, returnTo);
+        }
+
+        switch (profile.role) {
+            case 'super_admin':
+                throw redirect(303, ADMIN_URL);
+            case 'org_admin':
+                throw redirect(303, '/org');
+            case 'event_admin':
+                throw redirect(303, '/events');
+            case 'event_qr_checker':
+                throw redirect(303, '/check');
+            default:
+                throw redirect(303, '/');
+        }
+    }
+
+    return {};
+};
 
 export interface AuthActionData {
     success: boolean;

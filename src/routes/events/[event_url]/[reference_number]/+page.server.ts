@@ -2,7 +2,7 @@ import { error } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { superValidate } from 'sveltekit-superforms/server';
 import { z } from 'zod';
-import type { Event, PublicEvent } from '$lib/types/database';
+import type { Event } from '$lib/types/database';
 import { zod } from 'sveltekit-superforms/adapters';
 
 // Schema for email receipt
@@ -15,7 +15,7 @@ export type EmailReceiptSchema = z.infer<typeof emailReceiptSchema>;
 export const load = (async ({ locals: { supabase, session }, params }) => {
     const { event_url, reference_number } = params;
 
-    let event: Event | PublicEvent;
+    let event: Event ;
     
     // Fetch event data first
     if (session) {
