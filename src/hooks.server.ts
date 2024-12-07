@@ -233,7 +233,7 @@ const authGuard: Handle = async ({ event, resolve }) => {
     // Unauthenticated users can only access /auth
     if (!isAuthPath) {
       const returnTo = event.url.pathname;
-      throw redirect(303, `/auth?returnTo=${encodeURIComponent(returnTo)}`);
+      throw redirect(303, `/auth`);
     }
     return resolve(event);
   }

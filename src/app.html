@@ -5,7 +5,10 @@
 		<link rel="icon" href="%sveltekit.assets%/favicon.ico" type="image/x-icon" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<script>
-			let theme = localStorage.getItem('theme') || 'light';
+			// Always default to light theme for first-time users
+			let theme = 'light';
+			const stored = localStorage.getItem('theme');
+			if (stored === 'dark') theme = 'dark';
 			document.documentElement.classList.toggle('dark', theme === 'dark');
 		</script>
 		%sveltekit.head%
