@@ -177,6 +177,13 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
 }
 
 const authGuard: Handle = async ({ event, resolve }) => {
+  console.log('\n[Auth Guard] ----------------');
+  console.log('1. Request:', {
+    url: event.url.pathname,
+    method: event.request.method,
+    headers: Object.fromEntries(event.request.headers)
+  });
+
   // For API routes, only check basic authentication
   if (event.url.pathname.startsWith('/api')) {
     const sessionInfo = await event.locals.safeGetSession()
@@ -202,13 +209,18 @@ const authGuard: Handle = async ({ event, resolve }) => {
   const sessionInfo = await event.locals.safeGetSession()
   const { user, profile, session, roleEmulation } = sessionInfo
 
+  console.log('2. Session:', {
+    userId: user?.id,
+    role: profile?.role,
+    emulation: roleEmulation
+  });
+
   // Update locals with session info
   event.locals = {
     ...event.locals,
     session,
     user,
     profile,
-    
   }
 
   // Handle authentication
@@ -256,9 +268,20 @@ const authGuard: Handle = async ({ event, resolve }) => {
     ? getRedirectPath(profile.role, path, originalRole, context) 
     : getRedirectPath(profile.role, path, undefined, context)
   
+  console.log('3. Access Check:', {
+    path,
+    hasAccess: !redirectPath,
+    redirectPath: redirectPath || 'none',
+    role: profile?.role,
+    originalRole
+  });
+
   if (redirectPath) {
+    console.log('4. Redirecting to:', redirectPath);
     throw redirect(303, redirectPath)
   }
+
+  console.log('[Auth Guard End] ----------------\n');
 
   return resolve(event)
 }

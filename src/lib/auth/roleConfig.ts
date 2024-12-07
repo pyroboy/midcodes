@@ -30,6 +30,14 @@ export function hasPathAccess(role: UserRole, path: string, originalRole?: UserR
     const roleConfig = RoleConfig[role]
     if (!roleConfig) return false
 
+    // Debug logging
+    console.log('[Path Debug] Checking access:', {
+        role,
+        path,
+        originalRole,
+        allowedPaths: roleConfig.allowedPaths
+    })
+
     // 1. User is super_admin (original role)
     // 2. There's an active emulation session (originalRole exists)
     if (path === `/${get(config).adminUrl}` && (originalRole === 'super_admin' || originalRole)) {
@@ -53,15 +61,21 @@ export function hasPathAccess(role: UserRole, path: string, originalRole?: UserR
     for (const allowedPath of roleConfig.allowedPaths) {
         const pattern = allowedPath.path.replace(/\/$/, '')
         
-        // Exact match
-        if (cleanPath === pattern) return true
-        
         // Convert path pattern to regex
-        const regexPattern = pattern
+        let regexPattern = pattern
+            .replace(/\*\*/g, '.*')  // ** matches anything including /
             .replace(/\*/g, '[^/]+')  // Single * matches anything except /
-            .replace(/\[\^\/\]\+\[\^\/\]\+/g, '.*')  // ** matches anything including /
         
         const regex = new RegExp('^' + regexPattern + '$')
+        
+        // Debug logging
+        console.log('[Path Debug] Pattern match:', {
+            cleanPath,
+            pattern,
+            regexPattern,
+            matches: regex.test(cleanPath)
+        })
+
         if (regex.test(cleanPath)) return true
     }
     
@@ -70,36 +84,59 @@ export function hasPathAccess(role: UserRole, path: string, originalRole?: UserR
 
 // Helper to get redirect path
 export function getRedirectPath(role: UserRole, path: string, originalRole?: UserRole, context?: any): string | null {
+    console.log('\n[Redirect Check] ----------------');
+    console.log('1. Checking redirect for:', {
+        role,
+        path,
+        originalRole,
+        context
+    });
+
     const roleConfig = RoleConfig[role]
-    if (!roleConfig) return PublicPaths.auth
+    if (!roleConfig) {
+        console.log('2. No role config found - redirecting to auth');
+        return PublicPaths.auth
+    }
     
     // Don't redirect if user has access to the path
-    if (hasPathAccess(role, path, originalRole)) return null
+    const hasAccess = hasPathAccess(role, path, originalRole)
+    console.log('3. Path access check:', {
+        hasAccess,
+        path
+    });
+    
+    if (hasAccess) return null
 
     // Make sure the default redirect is accessible
     const defaultRedirect = roleConfig.defaultPath(context)
+    console.log('4. Default redirect path:', defaultRedirect);
+    
     if (!hasPathAccess(role, defaultRedirect, originalRole)) {
+        console.log('5. No access to default redirect - sending to auth');
         return PublicPaths.auth
     }
     
     // Don't redirect to the same path (avoid loops)
     if (path === defaultRedirect) {
+        console.log('6. Same path as default - avoiding loop');
         return PublicPaths.auth
     }
-
+    
+    console.log('7. Redirecting to default path');
+    console.log('[Redirect Check End] ----------------\n');
     return defaultRedirect
 }
 
 export const RoleConfig: Record<UserRole, RoleConfigType> = {
     super_admin: {
         allowedPaths: [{ path: '/**' }],
-        defaultPath: () => `/${get(config).adminUrl}`,
+        defaultPath: () => `/midcodes`,
         isAdmin: true,
         label: 'Super Admin'
     },
     org_admin: {
         allowedPaths: [{ path: '/**' }],
-        defaultPath: () => `/${get(config).adminUrl}`,
+        defaultPath: () => `/midcodes`,
         isAdmin: true,
         label: 'Organization Admin'
     },
@@ -124,9 +161,7 @@ export const RoleConfig: Record<UserRole, RoleConfigType> = {
             { path: '/events/**' },
             { path: '/events/*/payments' },
             { path: '/events/*/qr-checker' },
-            { path: '/events/*/ratpayment' },
             { path: '/events/*/name-tags' },
-            { path: '/events/*/name-tag' },
             { path: '/events/*/test' },
             { path: '/api/**' }
         ],

@@ -351,6 +351,7 @@
                     <TableHead>Email</TableHead>
                     <TableHead>Ticket Type</TableHead>
                     <TableHead>Amount</TableHead>
+                    <TableHead>Reference</TableHead>
                     <TableHead>Registered</TableHead>
                     <TableHead>Payment Status</TableHead>
                     <TableHead class="text-right">Actions</TableHead>
@@ -365,6 +366,19 @@
                         <TableCell>{attendee.basic_info.email}</TableCell>
                         <TableCell>{attendee.ticket_info.type}</TableCell>
                         <TableCell>{formatCurrency(attendee.ticket_info.price || 0)}</TableCell>
+                        <TableCell>
+                            {#if attendee.reference_code_url}
+                            <a 
+                            href="/events/{data.event.event_url}/{attendee.reference_code_url}" 
+                            class="text-blue-600 hover:text-blue-800 hover:underline"
+                        >
+                            {attendee.reference_code_url}
+                        </a>
+                            {:else}
+                                -
+                            {/if}
+                        </TableCell>
+
                         <TableCell>
                             {formatDate(attendee.created_at)}
                         </TableCell>
@@ -428,7 +442,7 @@
                     </TableRow>
                 {:else}
                     <TableRow>
-                        <TableCell colspan={8} class="text-center py-8 text-gray-500">
+                        <TableCell colspan={10} class="text-center py-8 text-gray-500">
                             No attendees found
                         </TableCell>
                     </TableRow>

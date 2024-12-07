@@ -2,15 +2,18 @@ import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
+    console.log('[Midcodes Page] Starting load');
     const { supabase, safeGetSession } = locals;
     const { user, session } = await safeGetSession();
 
     if (!user) {
+        console.log('[Midcodes Page] No user found');
         throw error(401, { message: 'Unauthorized' });
     }
 
     // Verify session
     if (!session?.access_token) {
+        console.log('[Midcodes Page] No valid session');
         throw error(401, { message: 'No valid session' });
     }
 
@@ -22,14 +25,17 @@ export const load: PageServerLoad = async ({ locals }) => {
         .single();
 
     if (profileError || !userProfile) {
+        console.log('[Midcodes Page] Profile error:', profileError);
         throw error(500, { message: 'Error fetching user profile' });
     }
 
-    console.log('User profile:', userProfile);
+    console.log('[Midcodes Page] User profile:', userProfile);
     if (userProfile.role !== 'super_admin') {
+        console.log('[Midcodes Page] Not super admin');
         throw error(404, { message: 'Not found' });
     }
 
+    console.log('[Midcodes Page] Starting data fetch');
     // Fetch data from all relevant tables
     const [
         templatesResult,
@@ -44,18 +50,22 @@ export const load: PageServerLoad = async ({ locals }) => {
     ]);
 
     if (templatesResult.error) {
+        console.log('[Midcodes Page] Templates error:', templatesResult.error);
         throw error(500, { message: 'Error fetching templates' });
     }
 
     if (idcardsResult.error) {
+        console.log('[Midcodes Page] ID cards error:', idcardsResult.error);
         throw error(500, { message: 'Error fetching ID cards' });
     }
 
     if (organizationsResult.error) {
+        console.log('[Midcodes Page] Organizations error:', organizationsResult.error);
         throw error(500, { message: 'Error fetching organizations' });
     }
 
     if (profilesResult.error) {
+        console.log('[Midcodes Page] Profiles error:', profilesResult.error);
         throw error(500, { message: 'Error fetching profiles' });
     }
 
@@ -80,6 +90,7 @@ export const load: PageServerLoad = async ({ locals }) => {
         }
     };
 
+    console.log('[Midcodes Page] Finished data fetch and calculation');
     return {
         stats,
         templates: templatesResult.data,

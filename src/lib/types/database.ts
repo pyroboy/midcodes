@@ -108,6 +108,10 @@ export interface Attendee {
     is_paid: boolean;
     qr_link: string | null;
     reference_code_url: string | null;
+    payment_info?: {
+        reference_number: string;
+        url: string;
+    };
     created_at: string;
     updated_at: string;
     org_id: string;

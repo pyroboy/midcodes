@@ -66,6 +66,11 @@
         console.log('[Role Debug] Emulated Org:', emulation?.emulated_org_id);
     }
 
+    // URL logging
+    $: {
+        console.log('[Page URL]', $page.url.pathname);
+    }
+
     // Navigation progress bar
     $: {
         if ($navigating) {
@@ -85,6 +90,26 @@
                     progressInterval = undefined;
                 }
             }, 300);
+        }
+    }
+
+    $: {
+        console.log('[Navigation Debug] Current state:', {
+            path,
+            homeUrl: navigation?.homeUrl,
+            role,
+            navLinks,
+            showHeader: navigation?.showHeader
+        });
+    }
+
+    $: {
+        if (browser) {
+            console.log('[Page Load Debug]', {
+                url: $page.url.pathname,
+                data: $page.data,
+                params: $page.params
+            });
         }
     }
 
@@ -135,9 +160,9 @@
     <div class="container mx-auto px-4">
         <div class="flex h-16 items-center justify-between">
             <div class="flex items-center">
-                <a href={navigation.homeUrl} class="flex items-center space-x-2">
+                <a href={path === navigation.homeUrl ? path : navigation.homeUrl} class="flex items-center space-x-2">
                     <span class="hidden font-bold sm:inline-block">
-                        {navigation.homeUrl === '/' ? 'ID Card Generator' : 
+                        {path === '/' ? 'ID Card Generator' : 
                          navigation.homeUrl.replace('/', '').charAt(0).toUpperCase() + 
                          navigation.homeUrl.replace('/', '').slice(1)}
                     </span>

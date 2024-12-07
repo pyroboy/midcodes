@@ -37,8 +37,11 @@ type EmulationData = {
 }
 
 export const load = async ({ locals: { safeGetSession, profile, supabase }, url }: LayoutServerLoadEvent) => {
+  console.log('[Layout Server] Starting load for:', url.pathname);
   const session = await safeGetSession();
   const user = session?.user ?? null;
+
+  console.log('[Layout Server] User profile:', profile);
 
   // Set security headers
   const response = new Response();
@@ -52,12 +55,15 @@ export const load = async ({ locals: { safeGetSession, profile, supabase }, url 
   let emulationData: EmulationData | null = null;
   let organizationName: string | null = null;
 
+  // Navigation state
   const navigation: NavigationState = {
-    homeUrl: '/',
-    showHeader: false,
+    homeUrl: currentProfile?.role === 'super_admin' ? '/(admin)/midcodes' : '/',
+    showHeader: true,
     allowedPaths: [],
-    showRoleEmulation: false
+    showRoleEmulation: currentProfile?.role === 'super_admin'
   };
+
+  console.log('[Layout Server] Navigation config:', navigation);
 
   if (session && currentProfile) {
     // Check for active role emulation session for super_admin users
