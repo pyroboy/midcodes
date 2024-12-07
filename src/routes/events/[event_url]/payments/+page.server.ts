@@ -17,7 +17,7 @@ const clearExpiredSchema = z.object({
 export type PaymentUpdateSchema = typeof paymentUpdateSchema;
 export type ClearExpiredSchema = typeof clearExpiredSchema;
 
-interface PaymentSummary {
+export interface PaymentSummary {
     grandTotal: number;
     totalPaid: number;
     totalUnpaid: number;
@@ -45,6 +45,7 @@ export const load = (async ({ locals: { safeGetSession, supabase }, params }) =>
         throw error(404, 'Event not found');
     }
 
+    // Get attendees
     const { data: attendees, error: attendeesError } = await supabase
         .from('attendees')
         .select(`
@@ -66,16 +67,28 @@ export const load = (async ({ locals: { safeGetSession, supabase }, params }) =>
         throw error(500, 'Failed to fetch attendees');
     }
 
+    // Get payment summary from view
+    const { data: receiverSummary, error: summaryError } = await supabase
+        .from('payment_summary_by_receiver')
+        .select('*')
+        .order('total_amount', { ascending: false });
+
+    if (summaryError) {
+        throw error(500, 'Failed to fetch payment summary');
+    }
+
+    // Calculate overall totals
     const paymentSummary = (attendees || []).reduce((summary: PaymentSummary, attendee) => {
+        // Skip archived entries entirely unless they're paid
+        if (attendee.attendance_status === 'archived' && !attendee.is_paid) {
+            return summary;
+        }
+
         const ticketPrice = attendee.ticket_info?.price || 0;
         summary.grandTotal += ticketPrice;
 
         if (attendee.is_paid) {
             summary.totalPaid += ticketPrice;
-            if (attendee.received_by) {
-                summary.totalByReceiver[attendee.received_by] = 
-                    (summary.totalByReceiver[attendee.received_by] || 0) + ticketPrice;
-            }
         } else {
             summary.totalUnpaid += ticketPrice;
         }
@@ -83,9 +96,12 @@ export const load = (async ({ locals: { safeGetSession, supabase }, params }) =>
         return summary;
     }, {
         grandTotal: 0,
-        totalByReceiver: {},
         totalPaid: 0,
-        totalUnpaid: 0
+        totalUnpaid: 0,
+        totalByReceiver: (receiverSummary || []).reduce((acc, { receiver_email, total_amount }) => {
+            acc[receiver_email] = total_amount;
+            return acc;
+        }, {} as Record<string, number>)
     });
 
     const form = await superValidate(zod(paymentUpdateSchema));
@@ -103,7 +119,7 @@ export const load = (async ({ locals: { safeGetSession, supabase }, params }) =>
     };
 }) satisfies PageServerLoad;
 
-export const actions = {
+export const actions: Actions = {
     updatePayment: async ({ request, locals: { safeGetSession, supabase }}) => {
         const sessionInfo = await safeGetSession();
         if (!sessionInfo.session || !sessionInfo.profile) {
@@ -133,9 +149,9 @@ export const actions = {
         }
 
         // Call RPC with validated data
-        console.log('Calling RPC with:', { p_attendee_id: form.data.attendeeId });
+        console.log('Calling RPC with:', { p_attendee_id: form.data.attendeeId , p_received_by: form.data.receivedBy });
         const { data: result, error: paymentError } = await supabase.rpc('confirm_attendee_payment', {
-            p_attendee_id: form.data.attendeeId
+            p_attendee_id: form.data.attendeeId,p_received_by: form.data.receivedBy
         });
 
         console.log('RPC result:', { result, error: paymentError });
@@ -168,24 +184,76 @@ export const actions = {
         };
     },
 
-    clearExpired: async ({ request, locals: { safeGetSession, supabase }}) => {
+    clearExpired: async ({ request, locals: { safeGetSession,supabase } }) => {
+        console.log('[Server] Starting cleanup operation');
+        
         const sessionInfo = await safeGetSession();
         if (!sessionInfo.session || !sessionInfo.profile) {
+            console.log('[Server] Cleanup failed: Unauthorized');
             return fail(401, { message: 'Unauthorized' });
         }
 
+        const formData = await request.formData();
+        const attendeeIdsStr = formData.get('attendeeIds');
+        
+        if (!attendeeIdsStr) {
+            console.log('[Server] No attendee IDs provided');
+            return fail(400, { message: 'No attendee IDs provided' });
+        }
+
+        let attendeeIds;
+        try {
+            attendeeIds = JSON.parse(attendeeIdsStr.toString());
+            console.log('[Server] Parsed attendee IDs:', { count: attendeeIds.length });
+        } catch (error) {
+            console.error('[Server] Error parsing attendeeIds:', error);
+            return fail(400, { message: 'Invalid attendee IDs format' });
+        }
+
+        console.log('[Server] Calling archive_expired_attendees RPC');
         const { data: result, error: cleanupError } = await supabase
-            .rpc('cleanup_expired_registrations');
+            .rpc('archive_expired_attendees', {
+                p_attendee_ids: attendeeIds
+            });
 
         if (cleanupError) {
+            console.error('[Server] Cleanup error:', cleanupError);
             return fail(500, {
                 message: cleanupError.message || 'Failed to archive expired entries'
             });
         }
 
+        console.log('[Server] Cleanup result:', {
+            success: result?.success,
+            message: result?.message,
+            data: result
+        });
+
         return {
             success: true,
-            message: result.message
+            message: result?.message || 'Cleanup completed'
         };
+    },
+
+    deleteAllArchived: async ({ request, locals: { supabase } }) => {
+        const formData = await request.formData();
+        const eventUrl = formData.get('eventUrl')?.toString();
+
+        if (!eventUrl) {
+            return fail(400, { message: 'Event URL is required' });
+        }
+
+        const { error } = await supabase
+            .from('attendees')
+            .delete()
+            .eq('event_url', eventUrl)
+            .eq('attendance_status', 'archived');
+
+        if (error) {
+            console.error('Error deleting archived entries:', error);
+            return fail(500, { message: 'Failed to delete archived entries' });
+        }
+
+        return { success: true };
     }
-} satisfies Actions;
+};

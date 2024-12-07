@@ -9,16 +9,12 @@ export const PublicPaths = {
     error: '/error',
     home: '/',
     register: '/register',
-    eventPattern: /\/EVNT-\d{4}-[A-Z0-9]{5}$/,
-    eventRegisterPattern: /^\/events\/[a-zA-Z0-9-]+\/register$/
+    eventPattern: /\/EVNT-\d{4}-[A-Z0-9]{5}$/
 }
 
 // Helper to check if a path is public
 export function isPublicPath(path: string): boolean {
     if (path.startsWith(PublicPaths.auth)) return true
-    
-    // Check for event registration path
-    if (PublicPaths.eventRegisterPattern.test(path)) return true
     
     const eventUrlMatch = path.match(/^\/([^/]+)/)
     const eventUrl = eventUrlMatch ? eventUrlMatch[1] : null
@@ -31,9 +27,6 @@ export function isPublicPath(path: string): boolean {
 
 // Helper to check path access
 export function hasPathAccess(role: UserRole, path: string, originalRole?: UserRole): boolean {
-    // Check if path is public first
-    if (isPublicPath(path)) return true
-
     const roleConfig = RoleConfig[role]
     if (!roleConfig) return false
 
@@ -113,11 +106,11 @@ export const RoleConfig: Record<UserRole, RoleConfigType> = {
     id_gen_admin: {
         allowedPaths: [
             { path: `/${get(config).adminUrl}` },
-            { path: '/templates' },
+            { path: '/templates', showInNav: true, label: 'Templates' },
             { path: '/templates/**' },
             { path: '/use-template' },
             { path: '/use-template/**' },
-            { path: '/all-ids' },
+            { path: '/all-ids', showInNav: true, label: 'My IDs' },
             { path: '/api/**' }
         ],
         defaultPath: () => '/templates',
@@ -127,7 +120,7 @@ export const RoleConfig: Record<UserRole, RoleConfigType> = {
     event_admin: {
         allowedPaths: [
             { path: `/${get(config).adminUrl}` },
-            { path: '/events' },
+            // { path: '/events', showInNav: true, label: 'Events' },
             { path: '/events/**' },
             { path: '/events/*/payments' },
             { path: '/events/*/qr-checker' },
@@ -174,6 +167,8 @@ export interface RoleConfigType {
 }
 
 export interface AllowedPath {
-    path: string
-    methods?: string[]
+    path: string;
+    methods?: string[];
+    showInNav?: boolean;
+    label?: string;
 }

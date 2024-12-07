@@ -1,9 +1,10 @@
 <script lang="ts">
     import type { PageData } from './$types';
     import { superForm } from 'sveltekit-superforms/client';
-    import type { PaymentUpdateSchema } from './+page.server';
+    import type { PaymentUpdateSchema, PaymentSummary } from './+page.server';
     import type { Attendee } from '$lib/types/database';
     import type { SuperValidated } from 'sveltekit-superforms';
+    
     import { Button } from '$lib/components/ui/button';
     import { Card } from '$lib/components/ui/card';
     import { Switch } from '$lib/components/ui/switch';
@@ -20,7 +21,7 @@
     import { cn } from '$lib/utils';
     import toast from 'svelte-french-toast';
     import { z } from 'zod';
-    import { invalidateAll } from '$app/navigation';
+    import { invalidate } from '$app/navigation';
     import { onMount, onDestroy } from 'svelte';
     import { AlertTriangle, Check, Clock, Trash2 } from 'lucide-svelte';
 
@@ -28,7 +29,7 @@
 
     const { form, enhance } = superForm<z.infer<PaymentUpdateSchema>>(data.form, {
         onSubmit: ({ formData }) => {
-            // Log the raw form data
+            isUpdating = true;
             const formValues = Object.fromEntries(formData);
             console.log('[Client] Form data being submitted:', formValues);
             return true;
@@ -36,7 +37,11 @@
         onResult: async ({ result }) => {
             console.log('[Client] Form submission result:', result);
             if (result.type === 'success') {
-                await invalidateAll();
+                // Invalidate both the attendees and payment summary data
+                await Promise.all([
+                    invalidate('app:attendees'),
+                    invalidate('app:payment-summary')
+                ]);
                 toast.success('Payment status updated');
             } else if (result.type === 'error') {
                 if (result.error === 'PAYMENT_EXPIRED') {
@@ -45,6 +50,9 @@
                     toast.error('Failed to update payment status');
                 }
             }
+            setTimeout(() => {
+                isUpdating = false;
+            }, 2000); // Small delay to ensure the UI updates are smooth
         },
         resetForm: false,
         applyAction: true,
@@ -73,21 +81,28 @@
     let searchQuery = '';
     let showPaidOnly = false;
     let showUnpaidOnly = false;
+    let showArchived = false;
+    let isUpdating = false;
 
     // Filter attendees based on search and payment status
-    $: filteredAttendees = (data.attendees as any[]).filter(attendee => {
-        const matchesSearch = searchQuery === '' || 
-            Object.values(attendee.basic_info).some(value => 
-                value?.toString().toLowerCase().includes(searchQuery.toLowerCase())
-            );
-        
-        const matchesPaymentStatus = 
-            (!showPaidOnly && !showUnpaidOnly) ||
-            (showPaidOnly && attendee.is_paid) ||
-            (showUnpaidOnly && !attendee.is_paid);
-        
-        return matchesSearch && matchesPaymentStatus;
-    });
+    $: filteredAttendees = data.attendees
+        .filter(attendee => 
+            // Handle archived entries based on toggle
+            (showArchived || attendee.attendance_status !== 'archived') &&
+            // Apply search filter
+            (!searchQuery || 
+                attendee.basic_info.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                attendee.basic_info.lastName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                attendee.basic_info.email?.toLowerCase().includes(searchQuery.toLowerCase())
+            ) &&
+            // Apply paid filter
+            (!showPaidOnly || attendee.is_paid) &&
+            (!showUnpaidOnly || !attendee.is_paid)
+        )
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    // Get count of archived entries
+    $: archivedCount = data.attendees.filter(a => a.attendance_status === 'archived').length;
 
     // Handle payment toggle
     const handlePaymentToggle = async (attendeeId: string, isPaid: boolean) => {
@@ -147,7 +162,7 @@
     onMount(() => {
         // Start timers for all unpaid registrations
         filteredAttendees.forEach(attendee => {
-            if (!attendee.is_paid && attendee.attendance_status !== 'expired') {
+            if (!attendee.is_paid && attendee.attendance_status !== 'expired' && attendee.attendance_status !== 'archived') {
                 startTimer(attendee.id, attendee.created_at);
             }
         });
@@ -173,7 +188,7 @@
             : { text: 'Pending', classes: 'bg-yellow-100 text-yellow-800', icon: Clock };
     }
 
-
+    const paymentsByReceiver: Record<string, number> = data.paymentSummary.totalByReceiver;
 
     $: expiredIds = filteredAttendees
         .filter(attendee => {
@@ -224,7 +239,13 @@
     </div>
 
     <!-- Payment Summary Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <Card class="p-6">
+            <h3 class="font-semibold text-lg mb-2">Total Attendees</h3>
+            <p class="text-2xl font-bold text-primary">
+                {data.attendees.length}
+            </p>
+        </Card>
         <Card class="p-6">
             <h3 class="font-semibold text-lg mb-2">Grand Total</h3>
             <p class="text-2xl font-bold text-primary">
@@ -247,20 +268,29 @@
         </Card>
     </div>
 
-    <!-- Receiver Summary -->
-    {#if Object.keys(data.paymentSummary.totalByReceiver).length > 0}
-        <Card class="p-6 mb-8">
+<!-- Payment Summary Section -->
+{#if Object.keys(paymentsByReceiver).length > 0}
+    <div class="container mx-auto px-4 pb-8">
+        <Card class="p-6">
             <h3 class="font-semibold text-lg mb-4">Payments by Receiver</h3>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {#each Object.entries(data.paymentSummary.totalByReceiver) as [receiver, amount]}
-                    <div class="bg-gray-50 p-4 rounded-lg">
-                        <p class="font-medium">{receiver}</p>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {#each Object.entries(paymentsByReceiver) as [receiver, amount]}
+                    <div class="bg-gray-50 p-4 rounded-lg relative {isUpdating ? 'opacity-50' : ''}">
+                        {#if isUpdating}
+                            <div class="absolute inset-0 flex items-center justify-center bg-gray-50/50">
+                                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                            </div>
+                        {/if}
+                        <p class="text-sm text-gray-600 mb-1">Receiver</p>
+                        <p class="font-medium mb-2">{receiver}</p>
+                        <p class="text-sm text-gray-600 mb-1">Total Amount</p>
                         <p class="text-lg font-bold text-primary">{formatCurrency(amount)}</p>
                     </div>
                 {/each}
             </div>
         </Card>
-    {/if}
+    </div>
+{/if}
 
     <!-- Filters -->
     <div class="flex items-center justify-between mb-4">
@@ -291,6 +321,23 @@
             <div class="flex items-center gap-2">
                 <Switch bind:checked={showUnpaidOnly} />
                 <Label>Unpaid Only</Label>
+            </div>
+            <div class="flex items-center gap-2">
+                <Switch bind:checked={showArchived} />
+                <Label>Show Archived ({archivedCount})</Label>
+                {#if showArchived && archivedCount > 0}
+                    <form action="?/deleteAllArchived" method="POST" use:enhance>
+                        <input type="hidden" name="eventUrl" value={data.event.url} />
+                        <Button
+                            variant="destructive"
+                            size="sm"
+                            class="flex items-center gap-2"
+                        >
+                            <Trash2 class="w-3 h-3" />
+                            Delete All Archives
+                        </Button>
+                    </form>
+                {/if}
             </div>
         </div>
     </div>
@@ -329,6 +376,13 @@
                                         Expired
                                     </span>
                                 </div>
+                            {:else if attendee.attendance_status === 'archived'}
+                                <div class="flex items-center gap-2">
+                                    <AlertTriangle class="w-4 h-4 text-gray-500" />
+                                    <span class="px-2 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-800">
+                                        Archived
+                                    </span>
+                                </div>
                             {:else}
                                 <div class="flex items-center gap-2">
                                     <svelte:component 
@@ -347,28 +401,28 @@
                             {/if}
                         </TableCell>
                         <TableCell class="text-right">
-                            {#if !attendee.is_paid && attendee.attendance_status !== 'expired'}
-                            <form
-    method="POST"
-    action="?/updatePayment"
-    use:enhance
-    class="flex items-center justify-end"
->
-    <input type="hidden" name="attendeeId" value={attendee.id} />
-    <input type="hidden" name="receivedBy" value={data.session?.user?.id} />
-    <Button 
-        type="submit" 
-        variant="outline" 
-        size="sm"
-        disabled={!data.session?.user?.id}
-        class="relative"
-    >
-        <div class="flex items-center">
-            <Check class="w-4 h-4 mr-2" />
-            Confirm Payment
-        </div>
-    </Button>
-</form>
+                            {#if !attendee.is_paid && attendee.attendance_status !== 'expired' && attendee.attendance_status !== 'archived'}
+                                <form
+                                    method="POST"
+                                    action="?/updatePayment"
+                                    use:enhance
+                                    class="flex items-center justify-end"
+                                >
+                                    <input type="hidden" name="attendeeId" value={attendee.id} />
+                                    <input type="hidden" name="receivedBy" value={data.session?.user?.id} />
+                                    <Button 
+                                        type="submit" 
+                                        variant="outline" 
+                                        size="sm"
+                                        disabled={!data.session?.user?.id}
+                                        class="relative"
+                                    >
+                                        <div class="flex items-center">
+                                            <Check class="w-4 h-4 mr-2" />
+                                            Confirm Payment
+                                        </div>
+                                    </Button>
+                                </form>
                             {/if}
                         </TableCell>
                     </TableRow>

@@ -1,5 +1,11 @@
 <script lang="ts">
+    import '../app.css';
     import { page } from '$app/stores';
+    import { RoleConfig, type UserRole } from '$lib/auth/roleConfig';
+    import type { LayoutData } from './$types';
+    import { browser } from '$app/environment';
+    import { loadConfig } from '$lib/stores/config';
+    import type { RoleEmulationClaim } from '$lib/types/roleEmulation';
     import { Progress } from '$lib/components/ui/progress';
     import { Button } from '$lib/components/ui/button';
     import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "$lib/components/ui/dropdown-menu";
@@ -9,19 +15,30 @@
     import { settings } from '$lib/stores/settings';
     import { loadGoogleFonts } from '$lib/config/fonts';
     import { navigating } from '$app/stores';
-    import { browser } from '$app/environment';
-    import { loadConfig } from '$lib/stores/config';
-    import type { RoleEmulationClaim } from '$lib/types/roleEmulation';
-    import "../app.css";
     
+    // Get navigation links based on role
+    function getNavLinks(role?: UserRole): { path: string; label: string }[] {
+        if (!role) return [];
+        const roleConfig = RoleConfig[role];
+        if (!roleConfig) return [];
+        
+        return roleConfig.allowedPaths
+            .filter(path => path.showInNav)
+            .map(path => ({
+                path: path.path.replace(/\[.*?\]/g, ''), // Remove dynamic parts
+                label: path.label || path.path
+            }));
+    }
+
     let isMenuOpen = false;
     let isUserMenuOpen = false;
     let showProgress = false;
     let progressValue = 0;
     let progressInterval: ReturnType<typeof setTimeout> | undefined;
-    
-console.log('[Role Debug] Emulationnnnnn:', $page.data.session?.roleEmulation);
+
     $: path = $page.url.pathname;
+    $: role = $page.data.profile?.role as UserRole | undefined;
+    $: navLinks = getNavLinks(role);
     $: navigation = $page.data.navigation;
     $: showHeader = navigation?.showHeader ?? false;
     $: isDark = $settings.theme === 'dark';
@@ -128,20 +145,15 @@ console.log('[Role Debug] Emulationnnnnn:', $page.data.session?.roleEmulation);
             </div>
 
             <nav class="hidden space-x-8 md:flex">
-                <a 
-                    href="/templates" 
-                    class="text-sm font-medium transition-colors hover:text-foreground/80"
-                    class:text-primary={path === '/templates'}
-                >
-                    Templates
-                </a>
-                <a 
-                    href="/all-ids" 
-                    class="text-sm font-medium transition-colors hover:text-foreground/80"
-                    class:text-primary={path === '/all-ids'}
-                >
-                    My IDs
-                </a>
+                {#each navLinks as link}
+                    <a 
+                        href={link.path}
+                        class="text-sm font-medium transition-colors hover:text-foreground/80"
+                        class:text-primary={path === link.path}
+                    >
+                        {link.label}
+                    </a>
+                {/each}
             </nav>
 
             <div class="flex items-center space-x-4">
@@ -200,20 +212,15 @@ console.log('[Role Debug] Emulationnnnnn:', $page.data.session?.roleEmulation);
         {#if isMenuOpen}
         <div class="border-t md:hidden">
             <div class="space-y-4 px-2 py-4">
-                <a 
-                    href="/templates" 
-                    class="block px-3 py-2 text-base font-medium transition-colors hover:bg-muted"
-                    class:text-primary={path === '/templates'}
-                >
-                    Templates
-                </a>
-                <a 
-                    href="/all-ids" 
-                    class="block px-3 py-2 text-base font-medium transition-colors hover:bg-muted"
-                    class:text-primary={path === '/all-ids'}
-                >
-                    My IDs
-                </a>
+                {#each navLinks as link}
+                    <a 
+                        href={link.path}
+                        class="block px-3 py-2 text-base font-medium transition-colors hover:bg-muted"
+                        class:text-primary={path === link.path}
+                    >
+                        {link.label}
+                    </a>
+                {/each}
                 <div class="px-3 py-2">
                     <div class="flex items-center justify-between">
                         <span class="text-sm">Theme</span>
