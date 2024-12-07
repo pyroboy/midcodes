@@ -67,9 +67,9 @@ const formatCurrency = (amount: number) => {
     <!-- Event Header -->
     <div class="mb-8">
         <h1 class="text-4xl font-bold mb-2">{data.event.event_name}</h1>
-        {#if data.event.event_long_name}
+        <!-- {#if data.event.event_long_name}
             <p class="text-xl text-muted-foreground">{data.event.event_long_name}</p>
-        {/if}
+        {/if} -->
         
         <!-- Event Status -->
         <div class="flex items-center gap-2 mt-4">
@@ -78,9 +78,9 @@ const formatCurrency = (amount: number) => {
                 {new Date(data.eventStatus.registrationStartDate).toLocaleDateString()} - 
                 {new Date(data.eventStatus.registrationEndDate).toLocaleDateString()}
             </span>
-            <span class={`ml-2 px-2 py-1 text-xs rounded-full ${data.eventStatus.isRegistrationOpen ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+            <!-- <span class={`ml-2 px-2 py-1 text-xs rounded-full ${data.eventStatus.isRegistrationOpen ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
                 {data.eventStatus.isRegistrationOpen ? 'Registration Open' : 'Registration Closed'}
-            </span>
+            </span> -->
         </div>
     </div>
 
