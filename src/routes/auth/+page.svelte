@@ -23,22 +23,29 @@
             isLoading = false;
         };
     };
+
+    // add flag here to disable sign up tab
+    let disableSignUp = true;
 </script>
 
 <div class="min-h-screen w-full bg-background px-4 py-8 sm:px-6 lg:px-8">
     <div class="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[500px] lg:w-[600px]">
         <Card class="w-full p-6 shadow-lg">
             <CardHeader class="space-y-4 text-center">
-                <CardTitle class="text-3xl font-bold tracking-tight">Welcome to ID Generator</CardTitle>
-                <CardDescription class="text-lg text-muted-foreground">Sign in or create an account to continue</CardDescription>
+                <img src="/android-chrome-192x192.png" alt="March of Faith Logo" class="mx-auto h-60 w-60" />
+                <CardTitle class="text-3xl font-bold tracking-tight">Welcome to March of Faith, Inc.</CardTitle>
+                <!-- <CardDescription class="text-lg text-muted-foreground">Sign in or create an account to continue</CardDescription> -->
             </CardHeader>
             <CardContent class="pt-6">
                 <Tabs value="signin" class="w-full">
-                    <TabsList class="grid w-full grid-cols-2 gap-4 rounded-lg p-1">
+                    {#if !disableSignUp}
+                    <TabsList class="grid w-full {disableSignUp ? 'grid-cols-1' : 'grid-cols-2'} gap-4 rounded-lg p-1">
                         <TabsTrigger value="signin" class="text-base py-2">Sign In</TabsTrigger>
-                        <TabsTrigger value="signup" class="text-base py-2">Sign Up</TabsTrigger>
+                       
+                            <TabsTrigger value="signup" class="text-base py-2">Sign Up</TabsTrigger>
+                       
                     </TabsList>
-
+                    {/if}
                     <TabsContent value="signin">
                         <form
                             method="POST"
@@ -83,64 +90,66 @@
                         </form>
                     </TabsContent>
 
-                    <TabsContent value="signup">
-                        <form
-                            method="POST"
-                            action="?/signup"
-                            use:enhance={handleSubmit}
-                            class="space-y-6"
-                        >
-                            <div class="space-y-4">
-                                <div class="space-y-2">
-                                    <Input
-                                        id="signup-email"
-                                        name="email"
-                                        type="email"
-                                        placeholder="name@example.com"
-                                        value={form?.email ?? ''}
-                                        required
-                                    />
+                    {#if !disableSignUp}
+                        <TabsContent value="signup">
+                            <form
+                                method="POST"
+                                action="?/signup"
+                                use:enhance={handleSubmit}
+                                class="space-y-6"
+                            >
+                                <div class="space-y-4">
+                                    <div class="space-y-2">
+                                        <Input
+                                            id="signup-email"
+                                            name="email"
+                                            type="email"
+                                            placeholder="name@example.com"
+                                            value={form?.email ?? ''}
+                                            required
+                                        />
+                                    </div>
+                                    <div class="space-y-2">
+                                        <Input
+                                            id="signup-password"
+                                            name="password"
+                                            type="password"
+                                            placeholder="••••••••"
+                                            required
+                                        />
+                                    </div>
+                                    <div class="space-y-2">
+                                        <Input
+                                            id="signup-confirm-password"
+                                            name="confirmPassword"
+                                            type="password"
+                                            placeholder="••••••••"
+                                            required
+                                        />
+                                    </div>
                                 </div>
-                                <div class="space-y-2">
-                                    <Input
-                                        id="signup-password"
-                                        name="password"
-                                        type="password"
-                                        placeholder="••••••••"
-                                        required
-                                    />
-                                </div>
-                                <div class="space-y-2">
-                                    <Input
-                                        id="signup-confirm-password"
-                                        name="confirmPassword"
-                                        type="password"
-                                        placeholder="••••••••"
-                                        required
-                                    />
-                                </div>
-                            </div>
 
-                            {#if form?.error}
-                                <div class="text-sm text-red-500" role="alert">
-                                    {form.error}
-                                </div>
-                            {/if}
-
-                            {#if form?.success}
-                                <div class="text-sm text-green-500" role="alert">
-                                    {form.message}
-                                </div>
-                            {/if}
-
-                            <Button type="submit" class="w-full" disabled={isLoading}>
-                                {#if isLoading}
-                                    <Loader class="mr-2 h-4 w-4 animate-spin" />
+                                {#if form?.error}
+                                    <div class="text-sm text-red-500" role="alert">
+                                        {form.error}
+                                    </div>
                                 {/if}
-                                {isLoading ? 'Creating account...' : 'Sign Up'}
-                            </Button>
-                        </form>
-                    </TabsContent>
+
+                                {#if form?.success}
+                                    <div class="text-sm text-green-500" role="alert">
+                                        {form.message}
+                                    </div>
+                                {/if}
+
+                                <Button type="submit" class="w-full" disabled={isLoading}>
+                                    {#if isLoading}
+                                        <Loader class="mr-2 h-4 w-4 animate-spin" />
+                                    {/if}
+                                    {isLoading ? 'Creating account...' : 'Sign Up'}
+                                </Button>
+                            </form>
+                        </TabsContent>
+                    {/if}
                 </Tabs>
             </CardContent>
         </Card>
