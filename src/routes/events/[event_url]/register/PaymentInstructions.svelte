@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { CreditCard, Camera, Smartphone, Building2, AlertCircle } from 'lucide-svelte';
+    import { CreditCard, Camera, Smartphone, MapPin, AlertCircle } from 'lucide-svelte';
     import { onMount } from 'svelte';
     
     export let amount: string;
@@ -7,14 +7,13 @@
 
     let visible = false;
     let gcashVisible = false;
-    let bankVisible = false;
+    let onsiteVisible = false;
     let importantVisible = false;
 
     onMount(() => {
-        // Start the cascade of animations
         setTimeout(() => visible = true, 500);
         setTimeout(() => gcashVisible = true, 1000);
-        setTimeout(() => bankVisible = true, 2000);
+        setTimeout(() => onsiteVisible = true, 2000);
         setTimeout(() => importantVisible = true, 3000);
     });
 </script>
@@ -52,24 +51,23 @@
                 </div>
                 {/if}
 
-                <!-- Bank Transfer Instructions -->
-                {#if bankVisible}
+                <!-- Onsite Payment Instructions -->
+                {#if onsiteVisible}
                 <div class="bg-white rounded-lg p-3 shadow-sm animate-in fade-in slide-in-from-right duration-500">
                     <div class="flex items-center gap-2 mb-2">
-                        <Building2 size={18} class="text-blue-500" />
-                        <h4 class="font-medium text-blue-900">Bank Transfer (BDO)</h4>
+                        <MapPin size={18} class="text-blue-500" />
+                        <h4 class="font-medium text-blue-900">Onsite Registration</h4>
                     </div>
                     <ol class="list-decimal list-inside space-y-2 text-gray-700 [&>li]:animate-in [&>li]:fade-in [&>li]:slide-in-from-right [&>li]:duration-300">
-                        <li style="animation-delay: 100ms">Log in to your online banking app</li>
-                        <li style="animation-delay: 200ms">Select "Transfer to Other Banks"</li>
-                        <li style="animation-delay: 300ms">Enter account: <span class="font-mono font-medium">1234-5678-90</span></li>
-                        <li style="animation-delay: 400ms">Enter amount: <span class="font-medium">₱{amount}</span></li>
-                        <li style="animation-delay: 500ms">Add reference: <span class="font-mono font-medium">{referenceCode}</span></li>
-                        <li style="animation-delay: 600ms">Take a screenshot of the transfer confirmation</li>
+                        <li style="animation-delay: 100ms">Visit our registration booth at the venue</li>
+                        <li style="animation-delay: 200ms">Present your reference code: <span class="font-mono font-medium">{referenceCode}</span></li>
+                        <li style="animation-delay: 300ms">Pay the amount: <span class="font-medium">₱{amount}</span></li>
+                        <li style="animation-delay: 400ms">Collect your official receipt</li>
+                        <li style="animation-delay: 500ms">Get your event materials and ID</li>
                     </ol>
                     <div class="mt-2 flex items-center gap-1 text-xs text-blue-600">
-                        <Camera size={14} />
-                        <p>Remember to screenshot your payment!</p>
+                        <MapPin size={14} />
+                        <p>Registration booth opens 1 hour before the event</p>
                     </div>
                 </div>
                 {/if}
@@ -83,9 +81,9 @@
             <div class="space-y-1">
                 <p class="font-medium text-yellow-800">Important:</p>
                 <ul class="list-disc list-inside text-yellow-700 space-y-1 [&>li]:animate-in [&>li]:fade-in [&>li]:slide-in-from-right [&>li]:duration-300">
-                    <li style="animation-delay: 100ms">Always include your reference number in the payment</li>
-                    <li style="animation-delay: 200ms">Keep your payment screenshot until the event</li>
-                    <li style="animation-delay: 300ms">Payment confirmation may take up to 24 hours</li>
+                    <li style="animation-delay: 100ms">Keep your reference number for registration</li>
+                    <li style="animation-delay: 200ms">For GCash payments, keep your payment screenshot</li>
+                    <li style="animation-delay: 300ms">Arrive early to avoid registration queues</li>
                 </ul>
             </div>
         </div>

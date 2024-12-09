@@ -51,13 +51,10 @@
         const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
         const seconds = Math.floor((ms % (1000 * 60)) / 1000);
 
-        // Only show timer if less than 60 minutes remaining
-        if (days === 0 && hours === 0 && minutes >= 60) return '';
-
         let timeString = '';
         if (days > 0) timeString += `${days}d `;
-        if (hours > 0 || days > 0) timeString += `${hours}h `;
-        if (minutes > 0 || hours > 0 || days > 0) timeString += `${minutes}m `;
+        if (hours > 0) timeString += `${hours}h `;
+        if (minutes > 0) timeString += `${minutes}m `;
         timeString += `${seconds}s`;
 
         return timeString.trim();
@@ -69,16 +66,12 @@
     onMount(() => {
         if (!data.attendee.is_paid) {
             countdownInterval = window.setInterval(() => {
-                const newTimeLeft = formatTimeLeft(
+                timeLeft = formatTimeLeft(
                     getTimeLeft(
                         data.attendee.created_at,
                         data.event.payment_timeout_minutes || 60
                     )
                 );
-                // Only update if we have a value to show (less than 60 mins) or if expired
-                if (newTimeLeft === 'Expired' || newTimeLeft !== '') {
-                    timeLeft = newTimeLeft;
-                }
             }, 1000);
         }
     });
@@ -103,14 +96,13 @@
                 <Card>
                     <CardHeader>
                         <div class="flex items-center gap-3 mb-2">
-                     
-                            <CardTitle class="text-2xl">{data.event.event_name}</CardTitle>
+                            <CardTitle class="text-xl sm:text-2xl">{data.event.event_name}</CardTitle>
                         </div>
                     </CardHeader>
-                    <CardContent class="space-y-6">
+                    <CardContent class="space-y-4">
                         <!-- QR Code -->
                         {#if data.attendee.is_paid}
-                            <div class="flex flex-col items-center space-y-6">
+                            <div class="flex flex-col items-center space-y-4">
                                 <div class="flex justify-center">
                                     <img 
                                         src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={data.attendee.reference_code_url}"
@@ -121,12 +113,12 @@
                                 <!-- Debug info - will remove after fixing -->
                          
                                 <!-- Reference Number -->
-                                <div class="text-center py-4 bg-blue-50 rounded-lg w-full">
-                                    <p class="text-sm text-blue-600 font-medium mb-1">Reference Number</p>
-                                    <p class="font-mono text-3xl lg:text-4xl font-bold text-blue-700 tracking-wider break-all px-4">{data.attendee.reference_code_url}</p>
+                                <div class="text-center py-3 bg-blue-50 rounded-lg w-full">
+                                    <p class="text-xs sm:text-sm text-blue-600 font-medium mb-1">Reference Number</p>
+                                    <p class="font-mono text-2xl sm:text-3xl font-bold text-blue-700 tracking-wider break-all px-4">{data.attendee.reference_code_url}</p>
                                 </div>
 
-                                <p class="text-sm text-gray-600 text-center">
+                                <p class="text-xs sm:text-sm text-gray-600 text-center">
                                     Use this QR code for event check-in
                                 </p>
 
@@ -134,7 +126,7 @@
                                 <div class="text-center">
                                     <a
                                         href="/{$page.params.event_url}/{data.attendee.reference_code_url}"
-                                        class="inline-flex items-center justify-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                        class="inline-flex items-center justify-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
                                     >
                                         View your ticket
                                     </a>
@@ -142,29 +134,39 @@
                             </div>
                         {:else}
                             <!-- Reference Number for unpaid tickets -->
-                            <div class="text-center py-4 bg-blue-50 rounded-lg">
-                                <p class="text-sm text-blue-600 font-medium mb-1">Reference Number</p>
-                                <p class="font-mono text-3xl lg:text-4xl font-bold text-blue-700 tracking-wider break-all px-4">{data.attendee.reference_code_url}</p>
+                            <div class="text-center py-3 bg-blue-50 rounded-lg">
+                                <p class="text-xs sm:text-sm text-blue-600 font-medium mb-1">Reference Number</p>
+                                <p class="font-mono text-2xl sm:text-3xl font-bold text-blue-700 tracking-wider break-all px-4">{data.attendee.reference_code_url}</p>
                                 
                                 <!-- Payment Countdown -->
                                 {#if timeLeft !== ''}
-                                    <div class="mt-4 flex flex-col items-center gap-2">
+                                    <div class="mt-3 flex flex-col items-center gap-2">
                                         <div class="flex items-center gap-2">
                                             {#if timeLeft === 'Expired'}
-                                                <AlertTriangle class="w-5 h-5 text-red-500" />
-                                                <span class="text-red-600 font-medium">Registration Expired</span>
+                                                <AlertTriangle class="w-4 h-4 text-red-500" />
+                                                <span class="text-sm text-red-600 font-medium">Registration Expired</span>
                                             {:else}
-                                                <Clock class="w-5 h-5 text-yellow-500" />
-                                                <span class="text-yellow-600 font-medium">Time remaining to pay:</span>
+                                                <Clock class="w-4 h-4 text-yellow-500" />
+                                                <span class="text-sm text-yellow-600 font-medium">Time remaining to pay:</span>
                                             {/if}
                                         </div>
-                                        <div class={`text-2xl font-mono font-bold ${timeLeft === 'Expired' ? 'text-red-600' : 'text-yellow-600'}`}>
+                                        <div class={`text-xl sm:text-2xl font-mono font-bold ${timeLeft === 'Expired' ? 'text-red-600' : 'text-yellow-600'}`}>
                                             {timeLeft || '...'}
                                         </div>
                                         {#if timeLeft === 'Expired'}
-                                            <p class="text-sm text-red-600 mt-2">
+                                            <p class="text-xs sm:text-sm text-red-600 mt-2">
                                                 Your registration has expired. Please register again to get a new slot.
                                             </p>
+                                        {:else}
+                                            <a 
+                                                href="#payment-instructions" 
+                                                class="text-xs sm:text-sm text-blue-600 hover:text-blue-700 mt-2 inline-flex items-center gap-1"
+                                            >
+                                                View payment instructions
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                                </svg>
+                                            </a>
                                         {/if}
                                     </div>
                                 {/if}
@@ -173,43 +175,43 @@
 
                         <!-- Attendee Info -->
                         <div>
-                            <h3 class="text-lg font-semibold mb-2">Attendee Information</h3>
+                            <h3 class="text-base sm:text-lg font-semibold mb-2">Attendee Information</h3>
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
-                                    <Label>Name</Label>
-                                    <p class="text-lg font-medium">
+                                    <Label class="text-xs sm:text-sm text-gray-600">Name</Label>
+                                    <p class="text-sm sm:text-base font-medium">
                                         {data.attendee.basic_info.firstName} {data.attendee.basic_info.lastName}
                                     </p>
                                 </div>
                                 <div>
-                                    <Label>Email</Label>
-                                    <p class="text-lg break-all">{data.attendee.basic_info.email}</p>
+                                    <Label class="text-xs sm:text-sm text-gray-600">Email</Label>
+                                    <p class="text-sm sm:text-base break-all">{data.attendee.basic_info.email}</p>
                                 </div>
                                 <div>
-                                    <Label>Phone</Label>
-                                    <p class="text-lg">{data.attendee.basic_info.phone}</p>
+                                    <Label class="text-xs sm:text-sm text-gray-600">Phone</Label>
+                                    <p class="text-sm sm:text-base">{data.attendee.basic_info.phone}</p>
                                 </div>
                                 <div>
-                                    <Label>Ticket Type</Label>
-                                    <p class="text-lg">{data.attendee.ticket_info.type}</p>
+                                    <Label class="text-xs sm:text-sm text-gray-600">Ticket Type</Label>
+                                    <p class="text-sm sm:text-base">{data.attendee.ticket_info.type}</p>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Payment Status -->
                         <div>
-                            <h3 class="text-lg font-semibold mb-2">Payment Status</h3>
+                            <h3 class="text-base sm:text-lg font-semibold mb-2">Payment Status</h3>
                             <div class="flex items-center gap-2">
-                                <div class={`w-3 h-3 rounded-full ${data.attendee.is_paid ? 'bg-green-500' : timeLeft === 'Expired' ? 'bg-red-500' : 'bg-yellow-500'}`}></div>
-                                <span class={`font-medium ${data.attendee.is_paid ? 'text-green-600' : timeLeft === 'Expired' ? 'text-red-600' : 'text-yellow-600'}`}>
+                                <div class={`w-2.5 h-2.5 rounded-full ${data.attendee.is_paid ? 'bg-green-500' : timeLeft === 'Expired' ? 'bg-red-500' : 'bg-yellow-500'}`}></div>
+                                <span class={`text-sm sm:text-base font-medium ${data.attendee.is_paid ? 'text-green-600' : timeLeft === 'Expired' ? 'text-red-600' : 'text-yellow-600'}`}>
                                     {data.attendee.is_paid ? 'Paid' : timeLeft === 'Expired' ? 'Expired' : 'Payment Pending'}
                                 </span>
                             </div>
                             {#if data.attendee.is_paid}
-                                <p class="text-sm text-gray-600 mt-1">
+                                <p class="text-xs sm:text-sm text-gray-600 mt-1">
                                     Amount Paid: {formatCurrency(data.attendee.ticket_info.price || 0)}
                                 </p>
-                                <p class="text-sm text-gray-600">
+                                <p class="text-xs sm:text-sm text-gray-600">
                                     Date: {formatDate(data.attendee.updated_at)}
                                 </p>
                             {/if}
@@ -218,21 +220,22 @@
                         <!-- Email Receipt Form -->
                         {#if data.attendee.is_paid}
                             <div>
-                                <h3 class="text-lg font-semibold mb-2">Email Receipt</h3>
+                                <h3 class="text-base sm:text-lg font-semibold mb-2">Email Receipt</h3>
                                 <form method="POST" action="?/sendReceipt" use:enhance>
-                                    <div class="flex gap-4">
+                                    <div class="flex gap-2">
                                         <div class="flex-1">
                                             <Input
                                                 type="email"
                                                 name="email"
                                                 placeholder="Enter email address"
                                                 bind:value={$form.email}
+                                                class="text-sm"
                                             />
                                         </div>
-                                        <Button type="submit">Send Receipt</Button>
+                                        <Button type="submit" class="text-sm whitespace-nowrap">Send Receipt</Button>
                                     </div>
                                     {#if $message}
-                                        <p class="text-sm mt-2" class:text-green-600={$message.success} class:text-red-600={!$message.success}>
+                                        <p class="text-xs sm:text-sm mt-1" class:text-green-600={$message.success} class:text-red-600={!$message.success}>
                                             {$message.text}
                                         </p>
                                     {/if}
@@ -245,7 +248,7 @@
 
             <!-- Right Column - Payment Instructions -->
             {#if !data.attendee.is_paid}
-                <div class="h-full">
+                <div id="payment-instructions" class="h-full scroll-mt-4">
                     <PaymentInstructions amount={amount} referenceCode={data.attendee.reference_code_url} />
                 </div>
             {/if}
