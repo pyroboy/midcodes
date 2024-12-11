@@ -39,7 +39,7 @@
                     <ol class="list-decimal list-inside space-y-2 text-gray-700 [&>li]:animate-in [&>li]:fade-in [&>li]:slide-in-from-right [&>li]:duration-300">
                         <li style="animation-delay: 100ms">Open your GCash app</li>
                         <li style="animation-delay: 200ms">Tap "Send Money"</li>
-                        <li style="animation-delay: 300ms">Enter number: <span class="font-mono font-medium">0919-XXX-XXXX</span></li>
+                        <li style="animation-delay: 300ms">Enter number: <span class="font-mono font-medium">0935 -079-4880</span></li>
                         <li style="animation-delay: 400ms">Enter amount: <span class="font-medium">₱{amount}</span></li>
                         <li style="animation-delay: 500ms">In the message field, type: <span class="font-mono font-medium">{referenceCode}</span></li>
                         <li style="animation-delay: 600ms">Take a screenshot of the payment confirmation</li>
