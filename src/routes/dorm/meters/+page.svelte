@@ -4,7 +4,6 @@
   import Button from '$lib/components/ui/button/button.svelte';
   import type { PageData } from './$types';
   import MeterForm from './MeterForm.svelte';
-  import { SvelteToast } from '@zerodevx/svelte-toast';
 
   export let data: PageData;
   let formData: any;
@@ -56,8 +55,6 @@
     }
   }
 </script>
-
-<SvelteToast />
 
 <div class="container mx-auto p-4 flex">
   <div class="w-2/3 pr-4">

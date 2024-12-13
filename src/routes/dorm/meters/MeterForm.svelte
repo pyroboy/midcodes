@@ -7,7 +7,6 @@
   import Label from '$lib/components/ui/label/label.svelte';
   import * as Select from "$lib/components/ui/select";
   import { createEventDispatcher } from 'svelte';
-  import { toast } from '@zerodevx/svelte-toast';
   
   export { form };
   export let data: any;
@@ -38,12 +37,6 @@
     },
     onResult: ({ result }) => {
       if (result.type === 'success') {
-        toast.push(editMode ? 'Meter updated successfully' : 'Meter added successfully', {
-          theme: {
-            '--toastBackground': '#48BB78',
-            '--toastColor': 'white',
-          }
-        });
         dispatch('meterAdded');
         reset();
       }

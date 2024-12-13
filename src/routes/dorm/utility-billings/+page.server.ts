@@ -2,13 +2,11 @@
 import { superValidate } from 'sveltekit-superforms/server';
 import { fail } from '@sveltejs/kit';
 import { z } from 'zod';
-import { createInsertSchema } from 'drizzle-zod';
 import { db } from '$lib/db/db';
 import { meters, readings, utilityBillings, leases, tenants, accounts, utilityBillingTypeEnum } from '$lib/db/schema';
-import { eq, and, sql } from 'drizzle-orm';
 import { zod } from 'sveltekit-superforms/adapters';
 
-const utilityBillingSchema = createInsertSchema(utilityBillings).extend({
+const utilityBillingSchema = z.object({
   startDate: z.coerce.date(),
   endDate: z.coerce.date(),
   type: z.enum(utilityBillingTypeEnum.enumValues),
@@ -51,15 +49,15 @@ export const load = async () => {
   const tenantCounts = await db
     .select({
       locationId: leases.locationId,
-      tenantCount: sql<number>`COUNT(DISTINCT ${tenants.id})`,
+      tenantCount: db.sql<number>`COUNT(DISTINCT ${tenants.id})`,
     })
     .from(leases)
-    .leftJoin(tenants, eq(tenants.locationId, leases.locationId))
+    .leftJoin(tenants, db.eq(tenants.locationId, leases.locationId))
     .where(
-      and(
-        eq(leases.leaseStatus, 'ACTIVE'),
-        sql`${leases.leaseStartDate} <= CURRENT_DATE`,
-        sql`${leases.leaseEndDate} >= CURRENT_DATE`
+      db.and(
+        db.eq(leases.leaseStatus, 'ACTIVE'),
+        db.sql`${leases.leaseStartDate} <= CURRENT_DATE`,
+        db.sql`${leases.leaseEndDate} >= CURRENT_DATE`
       )
     )
     .groupBy(leases.locationId);
@@ -119,13 +117,13 @@ export const actions = {
           locationId: leases.locationId,
         })
         .from(leases)
-        .innerJoin(meters, eq(meters.locationId, leases.locationId))
+        .innerJoin(meters, db.eq(meters.locationId, leases.locationId))
         .where(
-          and(
-            eq(meters.id, meterBilling.meterId),
-            eq(leases.leaseStatus, 'ACTIVE'),
-            sql`${leases.leaseStartDate} <= ${endDate}`,
-            sql`${leases.leaseEndDate} >= ${startDate}`
+          db.and(
+            db.eq(meters.id, meterBilling.meterId),
+            db.eq(leases.leaseStatus, 'ACTIVE'),
+            db.sql`${leases.leaseStartDate} <= ${endDate}`,
+            db.sql`${leases.leaseEndDate} >= ${startDate}`
           )
         );
         console.log(`Found ${activeLeases.length} active leases for meter ${meterBilling.meterId}`);

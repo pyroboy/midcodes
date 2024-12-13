@@ -4,16 +4,12 @@ import { superValidate } from 'sveltekit-superforms/server';
 import type { Actions, PageServerLoad } from './$types';
 import type { RequestEvent } from '@sveltejs/kit';
 import { fail } from '@sveltejs/kit';
-import { createInsertSchema } from 'drizzle-zod';
 import { db } from '$lib/db/db';
 import { meters, readings, locations } from '$lib/db/schema';
-import { eq, desc, sql } from 'drizzle-orm';
 import { zod } from 'sveltekit-superforms/adapters';
 import { z } from 'zod';
 
-const meterSchema = createInsertSchema(meters);
 const schema = z.object({
-  ...meterSchema.shape,
   locationId: z.number().int().optional(),
   meterType: z.enum(['ELECTRICITY', 'WATER', 'GAS']),
 //   meterNumber: z.string().min(1, 'Meter number is required'),
@@ -36,13 +32,13 @@ export const load: PageServerLoad = async () => {
         // meterNumber: meters.meterNumber,
         createdAt: meters.createdAt,
         updatedAt: meters.updatedAt,
-        readingsCount: sql<number>`count(${readings.id})`.as('readingsCount'),
-        latestReading: sql<number>`max(${readings.readingValue})`.as('latestReading'),
+        readingsCount: db.fn.count(readings.id).as('readingsCount'),
+        latestReading: db.fn.max(readings.readingValue).as('latestReading'),
       })
       .from(meters)
-      .leftJoin(readings, eq(meters.id, readings.meterId))
+      .leftJoin(readings, db.raw(`${meters.id} = ${readings.meterId}`))
       .groupBy(meters.id)
-      .orderBy(desc(meters.createdAt));
+      .orderBy(db.raw('createdAt DESC'));
   
     return { form, locations: allLocations, meters: metersWithReadings };
   };
@@ -90,7 +86,7 @@ export const actions: Actions = {
         meterType: form.data.meterType,
         meterActive: form.data.meterActive,
         })
-        .where(eq(meters.id, form.data.id));
+        .where(db.raw(`${meters.id} = ${form.data.id}`));
 
       return { form };
     } catch (err) {
@@ -108,7 +104,7 @@ export const actions: Actions = {
     }
 
     try {
-      await db.delete(meters).where(eq(meters.id, form.data.id));
+      await db.delete(meters).where(db.raw(`${meters.id} = ${form.data.id}`));
       return { form };
     } catch (err) {
       console.error(err);

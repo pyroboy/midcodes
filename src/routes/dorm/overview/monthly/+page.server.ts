@@ -2,7 +2,6 @@
 
 import { db } from '$lib/db/db';
 import { locations, leases, tenants, accounts } from '$lib/db/schema';
-import { eq, and, asc, sql } from 'drizzle-orm';
 
 
 

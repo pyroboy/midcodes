@@ -140,6 +140,20 @@ export interface PaymentSummary {
     totalByReceiver: Record<string, number>;
 }
 
+export interface Account {
+  id: number;
+  lease_id: number;
+  type: 'CREDIT' | 'DEBIT';
+  category: 'RENT' | 'UTILITY' | 'PENALTY' | 'PAYMENT' | 'DEPOSIT' | 'OTHER';
+  amount: number;
+  paid_amount?: number;
+  notes?: string;
+  date_issued: string;
+  due_on?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
 export interface Database {
     public: {
         Tables: {
@@ -182,6 +196,11 @@ export interface Database {
                 Row: PaymentDetails;
                 Insert: Omit<PaymentDetails, 'createdAt' | 'updatedAt'>;
                 Update: Partial<Omit<PaymentDetails, 'attendeeId'>>;
+            };
+            accounts: {
+                Row: Account;
+                Insert: Omit<Account, 'id' | 'created_at' | 'updated_at'>;
+                Update: Partial<Omit<Account, 'id' | 'created_at' | 'updated_at'>>;
             };
         };
         Views: {

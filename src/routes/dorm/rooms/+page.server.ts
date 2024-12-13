@@ -5,7 +5,6 @@ import { locationSchema } from '$lib/db/zodschema';
 import { fail } from '@sveltejs/kit';
 import { db } from '$lib/db/db';
 import { locations, type Locations ,tenants} from '$lib/db/schema';
-import { eq ,sql } from 'drizzle-orm';
 
 export const load: PageServerLoad = async () => {
     const locationForm = await superValidate(zod(locationSchema));

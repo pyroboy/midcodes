@@ -2,7 +2,6 @@
 <script lang="ts">
   import { superForm } from 'sveltekit-superforms/client';
   import { zodClient } from 'sveltekit-superforms/adapters';
-  import { createInsertSchema } from 'drizzle-zod';
   import { locations } from '$lib/db/schema';
   import Button from '$lib/components/ui/button/button.svelte';
   import Input from '$lib/components/ui/input/input.svelte';
@@ -19,11 +18,9 @@
 
   const dispatch = createEventDispatcher();
 
-  const locationSchema = createInsertSchema(locations);
-
   const { form, errors, enhance, submitting,reset,submit } = superForm(data, {
     id: 'locationForm',
-    validators: zodClient(locationSchema),
+    validators: zodClient(),
     applyAction: true,
     resetForm: true,
     taintedMessage: null,

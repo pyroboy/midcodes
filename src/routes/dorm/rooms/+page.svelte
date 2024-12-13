@@ -4,15 +4,13 @@
   import { Button } from "$lib/components/ui/button";
   import type { PageData } from './$types';
   import { locations } from '$lib/db/schema';
-  import type { InferSelectModel } from 'drizzle-orm';
   import LocationForm from './LocationForm.svelte';
-  import { SvelteToast, toast } from '@zerodevx/svelte-toast';
 
   export let data: PageData;
 
   let editMode = false;
   let showForm = true;
-  let currentLocation: InferSelectModel<typeof locations> | undefined;
+  let currentLocation: any | undefined;
 
   function toggleForm() {
     showForm = !showForm;
@@ -22,7 +20,7 @@
     }
   }
 
-  function editLocation(location: InferSelectModel<typeof locations>) {
+  function editLocation(location: any) {
     editMode = true;
     currentLocation = location;
     showForm = true;
@@ -56,8 +54,6 @@
     }
   }
 </script>
-
-<SvelteToast />
 
 <div class="container mx-auto p-4 flex">
   <div class="w-2/3 pr-4">

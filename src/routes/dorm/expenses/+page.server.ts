@@ -4,7 +4,6 @@ import { expenses } from '$lib/db/schema';
 import { fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { z } from 'zod';
-import { desc } from 'drizzle-orm';
 import { zod } from 'sveltekit-superforms/adapters';
 
 // Define a Zod schema for the form
@@ -18,7 +17,7 @@ const formSchema = z.object({
 });
 
 export const load = async () => {
-  const expenseList = await db.select().from(expenses).orderBy(desc(expenses.dateIssued));
+  const expenseList = await db.select().from(expenses).orderBy('dateIssued', { descending: true });
   const form = await superValidate(zod(formSchema));
 
   return {

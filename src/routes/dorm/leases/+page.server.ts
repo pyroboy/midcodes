@@ -4,21 +4,21 @@ import { superValidate } from 'sveltekit-superforms/server';
 import type { Actions, PageServerLoad } from './$types';
 import type { RequestEvent } from '@sveltejs/kit';
 import { fail } from '@sveltejs/kit';
-import { createInsertSchema } from 'drizzle-zod';
 import { db } from '$lib/db/db';
 import { leases, leaseTenants, tenants, locations } from '$lib/db/schema';
-import { eq } from 'drizzle-orm';
 import { zod } from 'sveltekit-superforms/adapters';
 import { z } from 'zod';
 import _ from 'lodash';
 import { leaseHooks } from '$lib/server/leaseHooks';
 
 
-const leaseSchema = createInsertSchema(leases);
 const schema = z.object({
-    ...leaseSchema.shape,
-    tenantIds: z.array(z.number()).min(1, 'At least one tenant must be selected'),
+    leaseType: z.string(),
+    leaseStatus: z.string(),
+    leaseStartDate: z.date(),
+    leaseEndDate: z.date(),
     locationId: z.number(),
+    tenantIds: z.array(z.number()).min(1, 'At least one tenant must be selected'),
   });
 
 let allLocations: any[] = [];

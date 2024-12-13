@@ -4,12 +4,10 @@ import { db } from '$lib/db/db';
 import { transactions, accounts, leases, transactionAccounts } from '$lib/db/schema';
 import { fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
-import { createInsertSchema } from 'drizzle-zod';
 import { z } from 'zod';
 import { zod } from "sveltekit-superforms/adapters";
-import { eq, sql,desc } from 'drizzle-orm';
 
-const transactionInsertSchema = createInsertSchema(transactions, {
+const transactionInsertSchema = {
   id: z.number().optional(),
   totalAccountCharges: z.number(),
   amount: z.number(),
@@ -21,7 +19,7 @@ const transactionInsertSchema = createInsertSchema(transactions, {
   updatedBy: z.number().optional(),
   transactionType: z.enum(['CASH', 'BANK', 'GCASH', 'OTHER']),
   financialPeriodId: z.number().optional(),
-});
+};
 
 const accountSchema = z.object({
   id: z.number(),
@@ -33,7 +31,8 @@ const accountSchema = z.object({
   dueOn: z.string().nullable(),
 });
 
-const formSchema = transactionInsertSchema.extend({
+const formSchema = z.object({
+  ...transactionInsertSchema,
   selectedAccounts: z.array(accountSchema),
 });
 
