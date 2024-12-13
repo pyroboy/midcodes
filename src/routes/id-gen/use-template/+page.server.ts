@@ -1,8 +1,8 @@
-import type { PageServerLoad } from './$types';
+import type { PageServerLoad, RequestEvent } from './$types';
 import { error } from '@sveltejs/kit';
-import type { Profile } from '../../lib/types/database';
+import type { Profile } from '../../../lib/types/database';
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals }: RequestEvent) => {
     const { supabase, user, profile } = locals;
 
     if (!user || !profile) {

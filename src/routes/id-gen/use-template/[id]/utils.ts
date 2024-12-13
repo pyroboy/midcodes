@@ -1,5 +1,5 @@
 import type { ImagePosition, CachedFileUrls, DebugMessage } from './types';
-import type { TemplateData } from '../../../stores/templateStore';
+import type { TemplateData } from '../../../../stores/templateStore';
 
 export function isValidOption(value: string, options: string[]): value is string {
     return options.includes(value);
