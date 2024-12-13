@@ -60,7 +60,7 @@
     }
   </script>
   
-  <Popover.Root bind:open on:openChange={({ detail }) => handleOpenChange(detail)}>
+  <Popover.Root bind:open on:openChange={({ detail }: { detail: boolean }) => handleOpenChange(detail)}>
     <Popover.Trigger asChild let:builder>
       <Button
         builders={[builder]}
