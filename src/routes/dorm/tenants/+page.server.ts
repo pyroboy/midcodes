@@ -1,155 +1,149 @@
 // src/routes/tenants/+page.server.ts
 
 import { superValidate } from 'sveltekit-superforms/server';
-import type { Actions, PageServerLoad } from './$types';
-import type { RequestEvent } from '@sveltejs/kit';
-import { fail } from '@sveltejs/kit';
-// import { createInsertSchema } from 'drizzle-zod';
-import { db } from '$lib/db/db';
-import { tenants, locations, leaseTenants } from '$lib/db/schema';
-import { eq, and } from 'drizzle-orm';
 import { zod } from 'sveltekit-superforms/adapters';
-import { z } from 'zod';
-import { tenantHooks } from '$lib/server/tenantHooks';
+import type { Actions, PageServerLoad } from './$types';
+import { error, fail } from '@sveltejs/kit';
+import { tenantSchema } from './schema';
 
-// const tenantSchema = createInsertSchema(tenants);
+export const load: PageServerLoad = async ({ locals }) => {
+    const { supabase } = locals;
+    const form = await superValidate(zod(tenantSchema));
 
-const schema = z.object({
-  // ...tenantSchema.shape,
-  mainleaseId: z.number().int().positive().optional(),
-  id: z.number().optional(),
-  tenantName: z.string().min(1, 'Name is required'),
-  tenantContactNumber: z.string().optional(),
-  locationId: z.number().int().positive().optional(),
-});
+    // Get tenants with their lease information
+    const { data: tenants, error: tenantsError } = await supabase
+        .from('tenants')
+        .select(`
+            *,
+            lease_tenants (
+                *,
+                lease:leases (
+                    *,
+                    room:rooms (*)
+                )
+            )
+        `);
 
-export const load: PageServerLoad = async () => {
-  const form = await superValidate(zod(schema));
-  const allTenants = await db.query.tenants.findMany({
-    with: {
-      location: true,
-      leaseTenants: {
-        with: {
-          lease: true
-        }
-      }
-    },
-    limit: 100 // Add a limit to prevent performance issues with large datasets
-  });
+    if (tenantsError) {
+        throw error(500, 'Error fetching tenants');
+    }
 
-  const allLocations = await db.query.locations.findMany();
+    // Get all rooms for the form
+    const { data: rooms, error: roomsError } = await supabase
+        .from('rooms')
+        .select('*');
 
-  const allLeases = await db.query.leases.findMany({
-    with: {
-      leaseTenants: {
-        with: {
-          tenant: true
-        }
-      }
-    },
-    orderBy: (leases, { desc }) => [desc(leases.leaseStartDate)]
-  });
+    if (roomsError) {
+        throw error(500, 'Error fetching rooms');
+    }
 
-  return { form, tenants: allTenants, locations: allLocations, leases: allLeases };
+    // Get all leases for the form
+    const { data: leases, error: leasesError } = await supabase
+        .from('leases')
+        .select(`
+            *,
+            room:rooms (*),
+            lease_tenants (
+                tenant:tenants (*)
+            )
+        `)
+        .order('start_date', { ascending: false });
+
+    if (leasesError) {
+        throw error(500, 'Error fetching leases');
+    }
+
+    return { form, tenants, rooms, leases };
 };
 
 export const actions: Actions = {
-  create: async (event) => {
-    const form = await superValidate(event, zod(schema));
-    if (!form.valid) return fail(400, { form });
+    create: async ({ request, locals }) => {
+        const form = await superValidate(request, zod(tenantSchema));
+        if (!form.valid) return fail(400, { form });
 
-    try {
-      const result = await db.transaction(async (tx) => {
-        if (form.data.locationId) {
-          const location = await tx.query.locations.findFirst({
-            where: eq(locations.id, form.data.locationId)
-          });
-          if (!location) {
-            throw new Error('Invalid location ID');
-          }
+        const { supabase } = locals;
+
+        try {
+            const { data: tenant, error: insertError } = await supabase
+                .from('tenants')
+                .insert({
+                    name: form.data.name,
+                    contact_number: form.data.contact_number,
+                    email: form.data.email
+                })
+                .select()
+                .single();
+
+            if (insertError) throw insertError;
+
+            return { form };
+        } catch (err) {
+            console.error(err);
+            return fail(500, { 
+                form, 
+                error: err instanceof Error ? err.message : 'Failed to add tenant' 
+            });
         }
+    },
 
-        const [savedTenant] = await tx.insert(tenants).values({
-         ...form.data,
-          createdBy: 1, // Replace with actual user ID
-        }).returning();
+    update: async ({ request, locals }) => {
+        const form = await superValidate(request, zod(tenantSchema));
+        if (!form.valid) return fail(400, { form });
 
-        await tenantHooks.afterSave(savedTenant, tx);
+        const { supabase } = locals;
 
-        return savedTenant;
-      });
+        try {
+            const { error: updateError } = await supabase
+                .from('tenants')
+                .update({
+                    name: form.data.name,
+                    contact_number: form.data.contact_number,
+                    email: form.data.email
+                })
+                .eq('id', form.data.id);
 
-      // form.data = {};
-      return { form, success: true };
-    } catch (err) {
-      console.error(err);
-      return fail(500, { form, error: err instanceof Error ? err.message : 'Failed to add tenant' });
-    }
-  },
+            if (updateError) throw updateError;
 
-
-  update: async (event: RequestEvent) => {
-    const form = await superValidate(event.request, zod(schema));
-    if (!form.valid) return fail(400, { form });
-
-    try {
-      await db.transaction(async (tx) => {
-        const existingTenant = await tx.query.tenants.findFirst({
-          where: eq(tenants.id, form.data.id!)
-        });
-        if (!existingTenant) {
-          throw new Error('Tenant not found');
+            return { form };
+        } catch (err) {
+            console.error(err);
+            return fail(500, { 
+                form, 
+                error: err instanceof Error ? err.message : 'Failed to update tenant' 
+            });
         }
+    },
 
-        // Check if location exists
-        if (form.data.locationId) {
-          const location = await tx.query.locations.findFirst({
-            where: eq(locations.id, form.data.locationId)
-          });
-          if (!location) {
-            throw new Error('Invalid location ID');
-          }
+    delete: async ({ request, locals }) => {
+        const form = await superValidate(request, zod(tenantSchema));
+        if (!form.valid) return fail(400, { form });
+
+        const { supabase } = locals;
+
+        try {
+            // First delete all lease_tenant relationships
+            const { error: deleteLeaseTenantsError } = await supabase
+                .from('lease_tenants')
+                .delete()
+                .eq('tenant_id', form.data.id);
+
+            if (deleteLeaseTenantsError) throw deleteLeaseTenantsError;
+
+            // Then delete the tenant
+            const { error: deleteTenantError } = await supabase
+                .from('tenants')
+                .delete()
+                .eq('id', form.data.id);
+
+            if (deleteTenantError) throw deleteTenantError;
+
+            return { form };
+        } catch (err) {
+            console.error(err);
+            return fail(500, { 
+                form, 
+                error: err instanceof Error ? err.message : 'Failed to delete tenant' 
+            });
         }
-
-        const [updatedTenant] = await tx.update(tenants)
-          .set({
-            tenantName: form.data.tenantName ?? existingTenant.tenantName,
-            tenantContactNumber: form.data.tenantContactNumber ?? existingTenant.tenantContactNumber,
-            locationId: form.data.locationId ?? existingTenant.locationId,
-            updatedAt: new Date(),
-            updatedBy: 1, // Replace with actual user ID
-          })
-          .where(eq(tenants.id, form.data.id!))
-          .returning();
-      });
-
-      return { form };
-    } catch (err) {
-      console.error(err);
-      return fail(500, { form, error: err instanceof Error ? err.message : 'An unknown error occurred' });
     }
-  },
-
-  delete: async ({ request }) => {
-    const data = await request.formData();
-    const tenantId = Number(data.get('id'));
-
-    if (!tenantId) {
-      return fail(400, { error: 'Invalid tenant ID' });
-    }
-
-    try {
-      await db.transaction(async (tx) => {
-        // Delete associated lease-tenant relationships
-        await tx.delete(leaseTenants).where(eq(leaseTenants.tenantId, tenantId));
-        
-        // Delete the tenant
-        await tx.delete(tenants).where(eq(tenants.id, tenantId));
-      });
-      return { success: true };
-    } catch (err) {
-      console.error(err);
-      return fail(500, { error: err instanceof Error ? err.message : 'Failed to delete tenant' });
-    }
-  }
-}
+};
