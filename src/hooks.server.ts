@@ -5,8 +5,7 @@ import { redirect, error } from '@sveltejs/kit'
 import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public'
 import type { Handle } from '@sveltejs/kit'
 import type { RoleEmulationData, RoleEmulationClaim, EmulatedProfile, ProfileData, LocalsSession } from '$lib/types/roleEmulation'
-import { RoleConfig, isPublicPath, hasPathAccess, getRedirectPath } from '$lib/auth/roleConfig'
-import type { UserRole } from '$lib/auth/roleConfig'
+import { RoleConfig, type UserRole, isPublicPath, hasPathAccess, getRedirectPath } from '$lib/auth/roleConfig'
 
 interface SessionInfo {
   session: LocalsSession | null
@@ -25,8 +24,7 @@ interface Locals {
 }
 
 function isValidUserRole(role: string): role is UserRole {
-  const validRoles: UserRole[] = ['super_admin', 'org_admin', 'event_admin', 'user', 'event_qr_checker']
-  return validRoles.includes(role as UserRole)
+  return Object.keys(RoleConfig).includes(role as UserRole)
 }
 
 async function getUserProfile(userId: string, supabase: SupabaseClient): Promise<ProfileData | null> {
@@ -177,12 +175,12 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
 }
 
 const authGuard: Handle = async ({ event, resolve }) => {
-  console.log('\n[Auth Guard] ----------------');
-  console.log('1. Request:', {
-    url: event.url.pathname,
-    method: event.request.method,
-    headers: Object.fromEntries(event.request.headers)
-  });
+  // console.log('\n[Auth Guard] ----------------');
+  // console.log('1. Request:', {
+  //   url: event.url.pathname,
+  //   method: event.request.method,
+  //   headers: Object.fromEntries(event.request.headers)
+  // });
 
   // For API routes, only check basic authentication
   if (event.url.pathname.startsWith('/api')) {

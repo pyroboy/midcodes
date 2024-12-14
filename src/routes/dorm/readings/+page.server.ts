@@ -2,7 +2,6 @@ import { superValidate, withFiles } from 'sveltekit-superforms/server';
 import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 import { db } from '$lib/db/db';
-import { readings, meters } from '$lib/db/schema';
 import { zod } from 'sveltekit-superforms/adapters';
 import { z } from 'zod';
 import { createSchema, type Schema } from './schema';

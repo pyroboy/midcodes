@@ -2,7 +2,6 @@
 import { superValidate } from 'sveltekit-superforms/server';
 import { fail } from '@sveltejs/kit';
 import { z } from 'zod';
-import { db } from '$lib/db/db';
 import { meters, readings, utilityBillings, leases, tenants, accounts, utilityBillingTypeEnum } from '$lib/db/schema';
 import { zod } from 'sveltekit-superforms/adapters';
 

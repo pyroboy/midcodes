@@ -1,10 +1,10 @@
 import { error, json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import type { UserRole } from '$lib/types/database';
+import { RoleConfig, type UserRole } from '$lib/auth/roleConfig';
 import { PUBLIC_SUPABASE_URL } from '$env/static/public';
 
 function isValidRole(role: string): role is UserRole {
-    return ['super_admin', 'org_admin', 'event_admin', 'event_qr_checker', 'user'].includes(role);
+    return Object.keys(RoleConfig).includes(role as UserRole);
 }
 
 // Custom error type for structured error responses

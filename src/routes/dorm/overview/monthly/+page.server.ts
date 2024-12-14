@@ -1,7 +1,6 @@
 // src/routes/overview/monthly/+page.server.ts
 
 import { db } from '$lib/db/db';
-import { locations, leases, tenants, accounts } from '$lib/db/schema';
 
 
 

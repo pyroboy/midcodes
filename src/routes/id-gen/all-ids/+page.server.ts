@@ -1,4 +1,4 @@
-import { error, redirect } from '@sveltejs/kit';
+import { redirect, error } from '@sveltejs/kit';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import type { ProfileData, EmulatedProfile } from '$lib/types/roleEmulation';
 import type { Session } from '../../../app';
@@ -15,7 +15,7 @@ interface PageServerLoad {
             user: User | null;
             profile: ProfileData | EmulatedProfile | null;
         };
-    }): Promise<{ templates: any[] }>;
+    }): Promise<{ idCards: any[] }>;
 }
 
 export const load = (async ({ locals: { supabase, safeGetSession, user, profile } }) => {
@@ -28,34 +28,36 @@ export const load = (async ({ locals: { supabase, safeGetSession, user, profile 
         throw error(400, 'Profile not found');
     }
 
-    const userRole = profile.role;
-    const orgId = profile.org_id;
+    // Get the effective organization ID (either emulated or actual)
+    const effectiveOrgId = session?.roleEmulation?.active ? 
+        session.roleEmulation.emulated_org_id : 
+        profile.org_id;
     
-    // Check role-specific access - all roles that can use templates
+    if (!effectiveOrgId) {
+        throw error(500, 'Organization ID not found');
+    }
+
+    const userRole = profile.role;
+    
+    // Check role-specific access
     const allowedRoles = ['super_admin', 'org_admin', 'id_gen_admin', 'id_gen_user'];
     if (!allowedRoles.includes(userRole)) {
-        throw error(403, 'Insufficient permissions');
+        throw redirect(303, '/unauthorized');
     }
 
-    // Fetch templates based on role and organization
-    let query = supabase
-        .from('templates')
+    // Fetch ID cards based on role and organization
+    const { data: idCards, error: fetchError } = await supabase
+        .from('idcards')
         .select('*')
+        .eq('org_id', effectiveOrgId)
         .order('created_at', { ascending: false });
 
-    // Filter by organization for non-super-admin roles
-    if (userRole !== 'super_admin') {
-        query = query.eq('org_id', orgId);
-    }
-
-    const { data: templates, error: err } = await query;
-
-    if (err) {
-        console.error('Error fetching templates:', err);
-        throw error(500, 'Error fetching templates');
+    if (fetchError) {
+        console.error('Error fetching ID cards:', fetchError);
+        throw error(500, 'Error fetching ID cards');
     }
 
     return {
-        templates
+        idCards
     };
 }) satisfies PageServerLoad;

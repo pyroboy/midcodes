@@ -9,7 +9,7 @@
     import { Input } from "$lib/components/ui/input";
     import { Label } from "$lib/components/ui/label";
     import * as Select from "$lib/components/ui/select";
-    import { darkMode } from '../../../stores/darkMode';
+    import { darkMode } from '../../../../stores/darkMode';
     import { Switch } from "$lib/components/ui/switch";
     import ThumbnailInput from '$lib/ThumbnailInput.svelte';
     import { Loader } from 'lucide-svelte';

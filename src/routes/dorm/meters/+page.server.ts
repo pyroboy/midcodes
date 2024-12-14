@@ -5,7 +5,6 @@ import type { Actions, PageServerLoad } from './$types';
 import type { RequestEvent } from '@sveltejs/kit';
 import { fail } from '@sveltejs/kit';
 import { db } from '$lib/db/db';
-import { meters, readings, locations } from '$lib/db/schema';
 import { zod } from 'sveltekit-superforms/adapters';
 import { z } from 'zod';
 

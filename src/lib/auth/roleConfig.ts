@@ -2,7 +2,22 @@ import { config } from '$lib/stores/config'
 import { get } from 'svelte/store'
 
 // Define all available user roles
-export type UserRole = 'super_admin' | 'org_admin' | 'id_gen_admin' | 'event_admin' | 'event_qr_checker' | 'user';
+export type UserRole =
+  | 'super_admin'
+  | 'org_admin'
+  | 'user'
+  | 'event_admin'
+  | 'event_qr_checker'
+  | 'property_admin'
+  | 'property_manager'
+  | 'property_accountant'
+  | 'property_maintenance'
+  | 'property_utility'
+  | 'property_frontdesk'
+  | 'property_tenant'
+  | 'property_guest'
+  | 'id_gen_admin'
+  | 'id_gen_user';
 
 export const PublicPaths = {
     auth: '/auth',
@@ -127,32 +142,44 @@ export function getRedirectPath(role: UserRole, path: string, originalRole?: Use
     return defaultRedirect
 }
 
-export const RoleConfig: Record<UserRole, RoleConfigType> = {
+export interface RoleConfiguration {
+    allowedPaths: AllowedPath[];
+    defaultPath: (context?: any) => string;
+    isAdmin: boolean;
+    label: string;
+    requiresOrgId?: boolean;
+}
+
+export const RoleConfig: Record<UserRole, RoleConfiguration> = {
     super_admin: {
         allowedPaths: [{ path: '/**' }],
-        defaultPath: () => `/midcodes`,
+        defaultPath() {
+            return '/admin';
+        },
         isAdmin: true,
-        label: 'Super Admin'
+        label: 'Super Admin',
+        requiresOrgId: false
     },
     org_admin: {
         allowedPaths: [{ path: '/**' }],
-        defaultPath: () => `/midcodes`,
+        defaultPath() {
+            return '/';
+        },
         isAdmin: true,
-        label: 'Organization Admin'
+        label: 'Organization Admin',
+        requiresOrgId: true
     },
-    id_gen_admin: {
+    user: {
         allowedPaths: [
-            { path: `/${get(config).adminUrl}` },
-            { path: '/templates', showInNav: true, label: 'Templates' },
-            { path: '/templates/**' },
-            { path: '/use-template' },
-            { path: '/use-template/**' },
-            { path: '/all-ids', showInNav: true, label: 'My IDs' },
-            { path: '/api/**' }
+            { path: '/auth' },
+            { path: '/profile' }
         ],
-        defaultPath: () => '/templates',
-        isAdmin: true,
-        label: 'ID Generator Admin'
+        defaultPath() {
+            return '/profile';
+        },
+        isAdmin: false,
+        label: 'Regular User',
+        requiresOrgId: false
     },
     event_admin: {
         allowedPaths: [
@@ -170,7 +197,8 @@ export const RoleConfig: Record<UserRole, RoleConfigType> = {
             return `/events/${context?.event_url}`;
         },
         isAdmin: true,
-        label: 'Event Admin'
+        label: 'Event Admin',
+        requiresOrgId: true
     },
     event_qr_checker: {
         allowedPaths: [
@@ -181,25 +209,125 @@ export const RoleConfig: Record<UserRole, RoleConfigType> = {
             return `/events/${context?.event_url}/qr-checker`;
         },
         isAdmin: false,
-        label: 'Event QR Checker'
+        label: 'Event QR Checker',
+        requiresOrgId: true
     },
-    user: {
+    property_admin: {
         allowedPaths: [
-            { path: '/auth' },
-            { path: '/profile' }
+            { path: '/property', showInNav: true, label: 'Properties' },
+            { path: '/property/**' }
         ],
-        defaultPath: () => '/profile',
+        defaultPath() {
+            return '/property';
+        },
+        isAdmin: true,
+        label: 'Property Admin',
+        requiresOrgId: true
+    },
+    property_manager: {
+        allowedPaths: [
+            { path: '/property/*/manage', showInNav: true, label: 'Property Management' }
+        ],
+        defaultPath() {
+            return '/property';
+        },
         isAdmin: false,
-        label: 'Regular User'
+        label: 'Property Manager',
+        requiresOrgId: true
+    },
+    property_accountant: {
+        allowedPaths: [
+            { path: '/property/*/accounting', showInNav: true, label: 'Property Accounting' }
+        ],
+        defaultPath() {
+            return '/property';
+        },
+        isAdmin: false,
+        label: 'Property Accountant',
+        requiresOrgId: true
+    },
+    property_maintenance: {
+        allowedPaths: [
+            { path: '/property/*/maintenance', showInNav: true, label: 'Maintenance' }
+        ],
+        defaultPath() {
+            return '/property';
+        },
+        isAdmin: false,
+        label: 'Property Maintenance',
+        requiresOrgId: true
+    },
+    property_utility: {
+        allowedPaths: [
+            { path: '/property/*/utility', showInNav: true, label: 'Utilities' }
+        ],
+        defaultPath() {
+            return '/property';
+        },
+        isAdmin: false,
+        label: 'Property Utility',
+        requiresOrgId: true
+    },
+    property_frontdesk: {
+        allowedPaths: [
+            { path: '/property/*/frontdesk', showInNav: true, label: 'Front Desk' }
+        ],
+        defaultPath() {
+            return '/property';
+        },
+        isAdmin: false,
+        label: 'Property Front Desk',
+        requiresOrgId: true
+    },
+    property_tenant: {
+        allowedPaths: [
+            { path: '/property/*/tenant', showInNav: true, label: 'Tenant Portal' }
+        ],
+        defaultPath() {
+            return '/property';
+        },
+        isAdmin: false,
+        label: 'Property Tenant',
+        requiresOrgId: true
+    },
+    property_guest: {
+        allowedPaths: [
+            { path: '/property/*/guest', showInNav: true, label: 'Guest Portal' }
+        ],
+        defaultPath() {
+            return '/property';
+        },
+        isAdmin: false,
+        label: 'Property Guest',
+        requiresOrgId: true
+    },
+    id_gen_admin: {
+        allowedPaths: [
+            { path: '/id-gen', showInNav: true, label: 'ID Generator' },
+            { path: '/id-gen/**' },
+            { path: '/id-gen/use-template', showInNav: true, label: 'Generate IDs' },
+            { path: '/id-gen/use-template/**' }
+        ],
+        defaultPath() {
+            return '/id-gen';
+        },
+        isAdmin: true,
+        label: 'ID Generator Admin',
+        requiresOrgId: true
+    },
+    id_gen_user: {
+        allowedPaths: [
+            { path: '/id-gen/use-template', showInNav: true, label: 'Generate IDs' },
+            { path: '/id-gen/use-template/**' }
+        ],
+        defaultPath() {
+            return '/id-gen/use-template';
+        },
+        isAdmin: false,
+        label: 'ID Generator User',
+        requiresOrgId: true
     }
-}
-
-export interface RoleConfigType {
-    allowedPaths: AllowedPath[]
-    defaultPath: (context?: any) => string
-    isAdmin: boolean
-    label: string
-}
+};
 
 export interface AllowedPath {
     path: string;

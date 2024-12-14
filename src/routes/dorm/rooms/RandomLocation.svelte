@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { locationStatusEnum } from '$lib/db/schema';
     import Button from '$lib/components/ui/button/button.svelte';
     import { createEventDispatcher } from 'svelte';
 

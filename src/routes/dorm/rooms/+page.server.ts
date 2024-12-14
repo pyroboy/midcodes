@@ -1,10 +1,8 @@
 import type { Actions, PageServerLoad } from './$types';
 import { superValidate, message } from 'sveltekit-superforms';
 import { zod } from 'sveltekit-superforms/adapters';
-import { locationSchema } from '$lib/db/zodschema';
 import { fail } from '@sveltejs/kit';
 import { db } from '$lib/db/db';
-import { locations, type Locations ,tenants} from '$lib/db/schema';
 
 export const load: PageServerLoad = async () => {
     const locationForm = await superValidate(zod(locationSchema));

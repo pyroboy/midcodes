@@ -3,7 +3,7 @@ import { supabase } from '$lib/supabaseClient';
 import { fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from "sveltekit-superforms/adapters";
-import { accountSchema } from './formSchema';
+import { billingSchema } from './formSchema';
 import type { Database } from '$lib/types/database';
 
 export const load = async () => {
@@ -11,9 +11,9 @@ export const load = async () => {
   // - Admin/Accountant: Full access
   // - Manager: View and update
   // - Frontdesk: View and create
-  // - Tenant: View own accounts
-  const { data: accounts, error: accountsError } = await supabase
-    .from('accounts')
+  // - Tenant: View own billings
+  const { data: billings, error: billingsError } = await supabase
+    .from('billings')
     .select(`
       *,
       lease:leases (
@@ -22,12 +22,13 @@ export const load = async () => {
         lease_tenants (
           tenant:tenants (*)
         )
-      )
+      ),
+      payments (*)
     `);
 
-  if (accountsError) {
-    console.error('Error fetching accounts:', accountsError);
-    throw new Error('Failed to load accounts');
+  if (billingsError) {
+    console.error('Error fetching billings:', billingsError);
+    throw new Error('Failed to load billings');
   }
 
   // Only admin, accountant, manager, and frontdesk can see all leases
@@ -46,66 +47,78 @@ export const load = async () => {
     throw new Error('Failed to load leases');
   }
 
-  const form = await superValidate(zod(accountSchema));
+  const form = await superValidate(zod(billingSchema));
 
   return {
-    accounts,
-    leases,
-    form
+    form,
+    billings,
+    leases
   };
 };
 
 export const actions = {
   create: async ({ request }) => {
-    const form = await superValidate(request, zod(accountSchema));
+    const form = await superValidate(request, zod(billingSchema));
 
     if (!form.valid) {
       return fail(400, { form });
     }
 
-    try {
-      // RLS will enforce that only admin, accountant, and frontdesk can create
-      const { error } = await supabase
-        .from('accounts')
-        .insert({
-          ...form.data,
-          created_at: new Date().toISOString()
-        });
+    const { data, error } = await supabase
+      .from('billings')
+      .insert({
+        leaseId: form.data.leaseId,
+        type: form.data.type,
+        utilityType: form.data.utilityType,
+        amount: form.data.amount,
+        paidAmount: form.data.paidAmount,
+        balance: form.data.amount - form.data.paidAmount,
+        status: form.data.status,
+        dueDate: form.data.dueDate,
+        billingDate: form.data.billingDate,
+        penaltyAmount: form.data.penaltyAmount,
+        notes: form.data.notes,
+      })
+      .select()
+      .single();
 
-      if (error) throw error;
-      return { form };
-    } catch (error) {
-      console.error('Error creating account:', error);
-      return fail(500, { form, error: 'Failed to create account' });
+    if (error) {
+      console.error('Error creating billing:', error);
+      return fail(500, { form });
     }
+
+    return { form };
   },
 
   update: async ({ request }) => {
-    const form = await superValidate(request, zod(accountSchema));
+    const form = await superValidate(request, zod(billingSchema));
 
     if (!form.valid) {
       return fail(400, { form });
     }
 
-    if (!form.data.id) {
-      return fail(400, { form, error: 'Account ID is required for update' });
+    const { error } = await supabase
+      .from('billings')
+      .update({
+        leaseId: form.data.leaseId,
+        type: form.data.type,
+        utilityType: form.data.utilityType,
+        amount: form.data.amount,
+        paidAmount: form.data.paidAmount,
+        balance: form.data.amount - form.data.paidAmount,
+        status: form.data.status,
+        dueDate: form.data.dueDate,
+        billingDate: form.data.billingDate,
+        penaltyAmount: form.data.penaltyAmount,
+        notes: form.data.notes,
+      })
+      .eq('id', form.data.id);
+
+    if (error) {
+      console.error('Error updating billing:', error);
+      return fail(500, { form });
     }
 
-    try {
-      // RLS will enforce that only admin, accountant, and manager can update
-      const { error } = await supabase
-        .from('accounts')
-        .update({
-          ...form.data,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', form.data.id);
-
-      if (error) throw error;
-      return { form };
-    } catch (error) {
-      console.error('Error updating account:', error);
-      return fail(500, { form, error: 'Failed to update account' });
-    }
+    return { form };
   }
 };

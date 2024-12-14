@@ -10,7 +10,7 @@ if (!supabaseUrl || !supabaseServiceRoleKey) {
   throw new Error('Missing required environment variables: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
 }
 
-type UserRole = 'super_admin' | 'org_admin' | 'event_admin' | 'event_qr_checker' | 'user'
+type UserRole = 'super_admin' | 'org_admin' | 'event_admin' | 'event_qr_checker' | 'user' | 'property_admin' | 'property_manager' | 'property_accountant' | 'property_maintenance' | 'property_utility' | 'property_frontdesk' | 'property_tenant' | 'property_guest' | 'id_gen_admin' | 'id_gen_user'
 type EmulationStatus = 'active' | 'ended'
 
 interface RequestBody {
@@ -61,7 +61,24 @@ function createResponse(status: number, body: ResponseBody): Response {
 }
 
 function isUserRole(role: string): role is UserRole {
-  return ['super_admin', 'org_admin', 'event_admin', 'event_qr_checker', 'user'].includes(role)
+  const allowedRoles = [
+    'super_admin',
+    'org_admin',
+    'user',
+    'event_admin',
+    'event_qr_checker',
+    'property_admin',
+    'property_manager',
+    'property_accountant',
+    'property_maintenance',
+    'property_utility',
+    'property_frontdesk',
+    'property_tenant',
+    'property_guest',
+    'id_gen_admin',
+    'id_gen_user'
+  ];
+  return allowedRoles.includes(role)
 }
 
 async function validateRequest(req: Request): Promise<RequestBody> {

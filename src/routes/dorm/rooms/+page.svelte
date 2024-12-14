@@ -3,7 +3,6 @@
   import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
   import { Button } from "$lib/components/ui/button";
   import type { PageData } from './$types';
-  import { locations } from '$lib/db/schema';
   import LocationForm from './LocationForm.svelte';
 
   export let data: PageData;

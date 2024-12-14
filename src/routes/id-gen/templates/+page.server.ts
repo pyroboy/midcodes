@@ -1,10 +1,19 @@
 import type { PageServerLoad } from './$types';
-import { supabase } from '../../lib/supabaseClient';
 import { error, redirect } from '@sveltejs/kit';
 
-export const load: PageServerLoad = async ({ locals }) => {
-    const { session } = await locals.safeGetSession();
+
+
+
+export const load = (async ({ locals: { supabase, session } }) => {
+
+    let event: Event ;
     
+    // Fetch event data first
+    // if (session) {
+    //     const { data, error: eventError } = await supabase
+
+
+
     if (!session) {
         throw redirect(303, '/auth');
     }
@@ -28,4 +37,4 @@ export const load: PageServerLoad = async ({ locals }) => {
     return {
         templates: templates || []
     };
-};
+})

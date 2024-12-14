@@ -2,7 +2,6 @@
 <script lang="ts">
     import { superForm } from 'sveltekit-superforms/client';
     import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
-    import { expenseTypeEnum } from '$lib/db/schema';
     import * as Select from "$lib/components/ui/select";
     import { Button } from '$lib/components/ui/button';
     import { Input } from '$lib/components/ui/input';

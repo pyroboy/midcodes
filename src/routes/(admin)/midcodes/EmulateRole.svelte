@@ -16,7 +16,7 @@
         id: string;
         name: string;
     }
-
+    
     interface Event {
         id: string;
         event_url: string;
@@ -30,15 +30,25 @@
     let loading = false;
     let organizations: Organization[] = [];
     let events: Event[] = [];
+    let orgIdInput = '';
+    let selectedOrg: Organization | null = null;
+    let selectedEvent: Event | null = null;
     
     $: emulation = $page.data.session?.roleEmulation as RoleEmulationClaim | null;
     $: isEmulating = emulation?.active ?? false;
-    $: currentRole = emulation?.emulated_role;
-    $: organizationName = emulation?.organizationName ?? 'Unknown Organization';
-    $: contextData = emulation?.metadata?.context ?? null;
+    $: if (selectedOrg) selectedOrgId = selectedOrg.id;
+    $: if (selectedEvent) selectedEventId = selectedEvent.id;
     $: filteredEvents = selectedOrgId 
         ? events.filter(e => e.org_id === selectedOrgId)
         : events;
+    $: roleConfig = selectedRole ? RoleConfig[selectedRole as UserRole] : null;
+    $: requiresOrgId = roleConfig?.requiresOrgId ?? false;
+    $: requiresEventId = selectedRole === 'event_admin' || selectedRole === 'event_qr_checker';
+    $: isValidForm = selectedRole && 
+        (!requiresOrgId || selectedOrgId) &&
+        (!requiresEventId || selectedEventId);
+    $: currentRole = emulation?.emulated_role;
+    $: contextData = emulation?.metadata?.context ?? null;
     
     // Debug log to check emulation data
     $: {
@@ -50,6 +60,10 @@
 
     // Get available roles from RoleConfig
     const roles = Object.keys(RoleConfig) as UserRole[];
+
+    function getRoleLabel(role: string): string {
+        return RoleConfig[role as UserRole].label;
+    }
 
     onMount(async () => {
         try {
@@ -88,19 +102,24 @@
         selectedRole = event.value;
     }
 
-    function handleOrgSelect(event: { value: string } | undefined) {
-        selectedOrgId = event?.value;
+    function handleOrgSelect(event: { value: Organization } | undefined) {
+        selectedOrg = event?.value ?? null;
         // Reset event selection when org changes
-        selectedEventId = undefined;
+        selectedEvent = null;
     }
 
-    function handleEventSelect(event: { value: string } | undefined) {
-        selectedEventId = event?.value;
+    function handleEventSelect(event: { value: Event } | undefined) {
+        selectedEvent = event?.value ?? null;
     }
     
     async function handleEmulateRole() {
         if (!selectedRole) {
             console.error("Please select a role first");
+            return;
+        }
+        
+        if (requiresOrgId && !selectedOrgId) {
+            console.error("Please select an organization");
             return;
         }
         
@@ -143,7 +162,7 @@
             await new Promise(resolve => setTimeout(resolve, 1000));
             
             // Get default redirect URL for the selected role, passing the context
-            const redirectUrl = RoleConfig[selectedRole].defaultPath(payload.context);
+            const redirectUrl = RoleConfig[selectedRole as UserRole].defaultPath(payload.context);
             window.location.href = redirectUrl;
         } catch (err) {
             console.error('[Role Emulation] Full error:', err);
@@ -200,7 +219,6 @@
         <h3 class="text-sm font-medium mb-2">Emulation Status:</h3>
         <pre class="text-xs overflow-auto max-h-48 p-2 bg-white dark:bg-gray-900 rounded border dark:border-gray-700">Active: {isEmulating}
 Current Role: {currentRole}
-Organization: {organizationName}
 Has Context: {!!contextData}</pre>
     </div>
 
@@ -237,32 +255,34 @@ Has Context: {!!contextData}</pre>
                             <SelectItem
                                 value={role}
                             >
-                                {RoleConfig[role].label}
+                                {getRoleLabel(role)}
                             </SelectItem>
                         {/each}
                     </SelectContent>
                 </Select>
             </div>
 
-            {#if selectedRole === 'org_admin' || selectedRole === 'super_admin'}
-                <div class="space-y-2">
-                    <label for="organization" class="text-sm font-medium">Organization</label>
-                    <Select
-                        onSelectedChange={handleOrgSelect}
-                        disabled={loading}
-                    >
-                        <SelectTrigger>
-                            <SelectValue placeholder="Select organization" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {#each organizations as org}
-                                <SelectItem value={org.id}>
-                                    {org.name}
-                                </SelectItem>
-                            {/each}
-                        </SelectContent>
-                    </Select>
-                </div>
+   
+
+            {#if requiresOrgId}
+            <div class="space-y-2">
+                <label for="organization" class="text-sm font-medium">Organization</label>
+                <Select
+                    onSelectedChange={handleOrgSelect}
+                    disabled={loading}
+                >
+                    <SelectTrigger>
+                        <SelectValue placeholder="Select organization" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {#each organizations as org}
+                            <SelectItem value={org}>
+                                {org.name}
+                            </SelectItem>
+                        {/each}
+                    </SelectContent>
+                </Select>
+            </div>
             {/if}
 
             {#if selectedRole && (selectedRole === 'event_admin' || selectedRole === 'event_qr_checker')}
@@ -277,7 +297,7 @@ Has Context: {!!contextData}</pre>
                         </SelectTrigger>
                         <SelectContent>
                             {#each filteredEvents as event}
-                                <SelectItem value={event.id}>
+                                <SelectItem value={event}>
                                     {event.event_url || event.event_name}
                                 </SelectItem>
                             {/each}
@@ -289,14 +309,18 @@ Has Context: {!!contextData}</pre>
             <Button
                 on:click={handleEmulateRole}
                 class="w-full"
-                disabled={loading || !selectedRole || (
-                    (selectedRole === 'org_admin' || selectedRole === 'super_admin') && !selectedOrgId
-                ) || (
-                    (selectedRole === 'event_admin' || selectedRole === 'event_qr_checker') && !selectedEventId
-                )}
+                disabled={loading || !isValidForm}
             >
                 Start Emulation
             </Button>
+        </div>
+    {/if}
+
+    {#if emulation?.emulated_org_id}
+        <div class="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded">
+            <h3 class="text-lg font-medium text-yellow-800">Currently Emulating:</h3>
+            <p class="mt-1 text-yellow-700">Role: {getRoleLabel(emulation.emulated_role)}</p>
+            <p class="mt-1 text-yellow-700">Organization ID: {emulation.emulated_org_id}</p>
         </div>
     {/if}
 </div>

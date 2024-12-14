@@ -1,25 +1,32 @@
-// src/routes/accounts/formSchema.ts
+// src/routes/dorm/accounts/formSchema.ts
 
 import { z } from "zod";
 
-export const accountTypeEnum = {
-    enumValues: ['CREDIT', 'DEBIT'] as const
+export const billingTypeEnum = {
+    enumValues: ['RENT', 'UTILITY', 'PENALTY', 'MAINTENANCE', 'SERVICE'] as const
 } as const;
 
-export const accountCategoryEnum = {
-    enumValues: ['RENT', 'UTILITY', 'PENALTY', 'PAYMENT', 'DEPOSIT', 'OTHER'] as const
+export const utilityTypeEnum = {
+    enumValues: ['ELECTRICITY', 'WATER', 'INTERNET'] as const
 } as const;
 
-export const accountSchema = z.object({
+export const paymentStatusEnum = {
+    enumValues: ['PENDING', 'PARTIAL', 'PAID', 'OVERDUE'] as const
+} as const;
+
+export const billingSchema = z.object({
   id: z.number().optional(),
   leaseId: z.number(),
-  type: z.enum(accountTypeEnum.enumValues),
-  category: z.enum(accountCategoryEnum.enumValues),
+  type: z.enum(billingTypeEnum.enumValues),
+  utilityType: z.enum(utilityTypeEnum.enumValues).optional(),
   amount: z.number().min(0),
-  paidAmount: z.number().min(0).optional(),
+  paidAmount: z.number().min(0).default(0),
+  balance: z.number().min(0),
+  status: z.enum(paymentStatusEnum.enumValues).default('PENDING'),
+  dueDate: z.date(),
+  billingDate: z.date(),
+  penaltyAmount: z.number().min(0).default(0),
   notes: z.string().optional(),
-  dateIssued: z.string(),
-  dueOn: z.string().optional(),
 });
 
-export type AccountSchema = typeof accountSchema;
+export type BillingSchema = typeof billingSchema;

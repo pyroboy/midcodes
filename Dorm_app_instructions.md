@@ -281,6 +281,57 @@ This document provides instructions for integrating the new database schema migr
    - Include proper typing for status enums
    - Add created_at and updated_at fields
 
+### `/dorm/accounts`
+
+1. Update `formSchema.ts`:
+   ```typescript
+   // Update schema to use new billing structure
+   const billingSchema = z.object({
+     leaseId: z.string(),
+     type: z.enum(['RENT', 'UTILITY', 'PENALTY']),
+     utilityType: z.enum(['WATER', 'ELECTRICITY']).optional(),
+     amount: z.number(),
+     paidAmount: z.number(),
+     status: z.enum(['UNPAID', 'PARTIAL', 'PAID']),
+     dueDate: z.date(),
+     billingDate: z.date(),
+     penaltyAmount: z.number(),
+     notes: z.string().optional()
+   })
+   ```
+
+2. Update `+page.server.ts`:
+   ```typescript
+   // Update queries to use billings table instead of accounts
+   const { data: billings } = await supabase
+     .from('billings')
+     .select('*, lease:leases(*, room:rooms(*), tenant:tenants(*))')
+   ```
+
+3. Update `+page.svelte`:
+   - Update form to use new billing schema
+   - Add support for utility types when billing type is UTILITY
+   - Add proper date handling for billing and due dates
+   - Add dynamic balance calculation
+   - Display associated payments
+   - Add role-based UI controls
+
+4. Implement RLS policies:
+   - Admin and Accountant: Full access
+   - Manager: View and update
+   - Frontdesk: Create and view
+   - Tenants: View own billings
+
+5. Key Changes:
+   - Switched from `accounts` to `billings` table
+   - Added support for different billing types (RENT, UTILITY, PENALTY)
+   - Added utility type selection for UTILITY billings
+   - Improved payment status tracking
+   - Added penalty amount support
+   - Enhanced date handling for billing and due dates
+   - Dynamic balance calculation based on amount and paidAmount
+   - Better integration with leases, rooms, and tenants
+
 ### Testing Instructions
 
 1. Test Property Management:

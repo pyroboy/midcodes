@@ -10,17 +10,16 @@
     import { Field, Control, Label, FieldErrors } from "formsnap";
     import type { PageData } from './$types';
     import { browser } from "$app/environment";
-    import { accountSchema } from './formSchema';
+    import { billingSchema, billingTypeEnum, utilityTypeEnum, paymentStatusEnum } from './formSchema';
     import type { Infer } from "sveltekit-superforms";
-    import { accountTypeEnum, accountCategoryEnum } from '$lib/db/schema';
     import { zodClient } from 'sveltekit-superforms/adapters';
 
-    export let data: PageData & { form: Infer<typeof accountSchema> };
+    export let data: PageData & { form: Infer<typeof billingSchema> };
     let editMode = false;
     let showForm = true;
 
     const form = superForm(data.form, {
-      validators: zodClient(accountSchema),
+      validators: zodClient(billingSchema),
       taintedMessage: null,
       resetForm: true,
       onSubmit: ({ formData, cancel }) => {
@@ -46,15 +45,22 @@
       }
     }
 
-    function editAccount(account: any) {
+    function editBilling(billing: any) {
       editMode = true;
-      $formData = { ...account };
+      $formData = { 
+        ...billing,
+        dueDate: new Date(billing.dueDate),
+        billingDate: new Date(billing.billingDate)
+      };
       showForm = true;
     }
   
-    $: accountTypeSelected = $formData.type ? { value: $formData.type, label: $formData.type } : undefined;
-    $: accountCategorySelected = $formData.category ? { value: $formData.category, label: $formData.category } : undefined;
+    $: billingTypeSelected = $formData.type ? { value: $formData.type, label: $formData.type } : undefined;
+    $: utilityTypeSelected = $formData.utilityType ? { value: $formData.utilityType, label: $formData.utilityType } : undefined;
+    $: statusSelected = $formData.status ? { value: $formData.status, label: $formData.status } : undefined;
     $: leaseSelected = $formData.leaseId ? { value: $formData.leaseId, label: data.leases.find(l => l.id === $formData.leaseId)?.leaseName ?? 'Select a lease' } : undefined;
+    $: balance = ($formData.amount || 0) - ($formData.paidAmount || 0);
+    $: showUtilityType = $formData.type === 'UTILITY';
 </script>
   
 <div class="container mx-auto p-4 flex">
@@ -62,7 +68,7 @@
     <div class="w-2/3 pr-4">
       <h2 class="text-xl font-bold mb-2">Accounts List</h2>
       <ul class="space-y-2">
-        {#each data.accounts as account}
+        {#each data.billings as account}
           <li class="bg-gray-100 p-4 rounded shadow">
             <div class="flex justify-between items-start mb-2">
               <div>
@@ -73,7 +79,7 @@
                 <span class="text-green-600">{account.category}</span>
               </div>
               <div>
-                <Button on:click={() => editAccount(account)} class="mr-2">Edit</Button>
+                <Button on:click={() => editBilling(account)} class="mr-2">Edit</Button>
                 <form method="POST" action="?/delete" use:enhance class="inline">
                   <input type="hidden" name="id" value={account.id} />
                   <Button type="submit" variant="destructive">Delete</Button>
@@ -81,9 +87,9 @@
               </div>
             </div>
             <div class="grid grid-cols-2 gap-2 text-sm">
-              <div><strong>Amount:</strong> ${account.amount.toFixed(2)}</div>
-              <div><strong>Paid:</strong> ${account.paidAmount?account.paidAmount?.toFixed(2):0}</div>
-              <div><strong>Balance:</strong> ${account.balance?.toFixed(2)}</div>
+              <div><strong>Amount:</strong> {account.amount}</div>
+              <div><strong>Paid:</strong> {account.paidAmount || 0}</div>
+              <div><strong>Balance:</strong> {account.amount - (account.paidAmount || 0)}</div>
               <div><strong>Date Issued:</strong> {new Date(account.dateIssued).toLocaleDateString()}</div>
               <div><strong>Due Date:</strong> {account.dueOn ? new Date(account.dueOn).toLocaleDateString() : 'N/A'}</div>
             </div>
@@ -132,7 +138,7 @@
             <Control let:attrs>
               <Label>Account Type</Label>
               <Select.Root
-                selected={accountTypeSelected}
+                selected={billingTypeSelected}
                 onSelectedChange={(s) => {
                   if (s) $formData.type = s.value;
                 }}
@@ -141,7 +147,7 @@
                   <Select.Value placeholder="Select an account type" />
                 </Select.Trigger>
                 <Select.Content>
-                  {#each accountTypeEnum.enumValues as type}
+                  {#each billingTypeEnum.enumValues as type}
                     <Select.Item value={type} label={type} />
                   {/each}
                 </Select.Content>
@@ -150,27 +156,29 @@
             <FieldErrors class="text-red-500 text-sm mt-1" />
           </Field>
   
-          <Field {form} name="category">
-            <Control let:attrs>
-              <Label>Account Category</Label>
-              <Select.Root
-                selected={accountCategorySelected}
-                onSelectedChange={(s) => {
-                  if (s) $formData.category = s.value;
-                }}
-              >
-                <Select.Trigger {...attrs}>
-                  <Select.Value placeholder="Select an account category" />
-                </Select.Trigger>
-                <Select.Content>
-                  {#each accountCategoryEnum.enumValues as category}
-                    <Select.Item value={category} label={category} />
-                  {/each}
-                </Select.Content>
-              </Select.Root>
-            </Control>
-            <FieldErrors class="text-red-500 text-sm mt-1" />
-          </Field>
+          {#if showUtilityType}
+            <Field {form} name="utilityType">
+              <Control let:attrs>
+                <Label>Utility Type</Label>
+                <Select.Root
+                  selected={utilityTypeSelected}
+                  onSelectedChange={(s) => {
+                    if (s) $formData.utilityType = s.value;
+                  }}
+                >
+                  <Select.Trigger {...attrs}>
+                    <Select.Value placeholder="Select a utility type" />
+                  </Select.Trigger>
+                  <Select.Content>
+                    {#each utilityTypeEnum.enumValues as type}
+                      <Select.Item value={type} label={type} />
+                    {/each}
+                  </Select.Content>
+                </Select.Root>
+              </Control>
+              <FieldErrors class="text-red-500 text-sm mt-1" />
+            </Field>
+          {/if}
   
           <Field {form} name="amount">
             <Control let:attrs>
@@ -180,10 +188,58 @@
             <FieldErrors class="text-red-500 text-sm mt-1" />
           </Field>
   
-          <Field {form} name="balance">
+          <Field {form} name="paidAmount">
             <Control let:attrs>
-              <Label>Balance</Label>
-              <Input type="number" {...attrs} bind:value={$formData.balance} min="0" step="0.01" />
+              <Label>Paid Amount</Label>
+              <Input type="number" {...attrs} bind:value={$formData.paidAmount} min="0" step="0.01" />
+            </Control>
+            <FieldErrors class="text-red-500 text-sm mt-1" />
+          </Field>
+
+          <div class="space-y-2">
+            <Label>Balance</Label>
+            <Input 
+              type="number" 
+              value={($formData.amount || 0) - ($formData.paidAmount || 0)} 
+              disabled 
+              class="bg-gray-100"
+            />
+          </div>
+  
+          <Field {form} name="status">
+            <Control let:attrs>
+              <Label>Status</Label>
+              <Select.Root
+                selected={statusSelected}
+                onSelectedChange={(s) => {
+                  if (s) $formData.status = s.value;
+                }}
+              >
+                <Select.Trigger {...attrs}>
+                  <Select.Value placeholder="Select a status" />
+                </Select.Trigger>
+                <Select.Content>
+                  {#each paymentStatusEnum.enumValues as status}
+                    <Select.Item value={status} label={status} />
+                  {/each}
+                </Select.Content>
+              </Select.Root>
+            </Control>
+            <FieldErrors class="text-red-500 text-sm mt-1" />
+          </Field>
+  
+          <Field {form} name="billingDate">
+            <Control let:attrs>
+              <Label>Billing Date</Label>
+              <Input type="date" {...attrs} bind:value={$formData.billingDate} />
+            </Control>
+            <FieldErrors class="text-red-500 text-sm mt-1" />
+          </Field>
+  
+          <Field {form} name="dueDate">
+            <Control let:attrs>
+              <Label>Due Date</Label>
+              <Input type="date" {...attrs} bind:value={$formData.dueDate} />
             </Control>
             <FieldErrors class="text-red-500 text-sm mt-1" />
           </Field>
@@ -192,22 +248,6 @@
             <Control let:attrs>
               <Label>Notes</Label>
               <Textarea {...attrs} bind:value={$formData.notes} />
-            </Control>
-            <FieldErrors class="text-red-500 text-sm mt-1" />
-          </Field>
-  
-          <Field {form} name="dateIssued">
-            <Control let:attrs>
-              <Label>Date Issued</Label>
-              <Input type="date" {...attrs} bind:value={$formData.dateIssued} />
-            </Control>
-            <FieldErrors class="text-red-500 text-sm mt-1" />
-          </Field>
-  
-          <Field {form} name="dueOn">
-            <Control let:attrs>
-              <Label>Due Date</Label>
-              <Input type="date" {...attrs} bind:value={$formData.dueOn} />
             </Control>
             <FieldErrors class="text-red-500 text-sm mt-1" />
           </Field>

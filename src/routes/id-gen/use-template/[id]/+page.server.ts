@@ -1,20 +1,16 @@
-import { error, fail } from '@sveltejs/kit';
-import type { Actions, PageServerLoad } from './$types';
+import { error, fail, redirect } from '@sveltejs/kit';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
+import type { ProfileData, EmulatedProfile } from '$lib/types/roleEmulation';
+import type { Session } from '../../../../app';
+import { handleImageUploads, saveIdCardData, deleteFromStorage } from '$lib/utils/idCardHelpers';
 
 interface ParentData {
-    session: User | null;
-    user: User | null;
-    profile: {
-        id: string;
-        role: UserRole;
-        org_id: string | null;
-    } | null;
+    session: any;
+    user: any;
+    profile: any;
     organizations: any[];
     currentOrg: any | null;
 }
-
-type UserRole = 'super_admin' | 'org_admin' | 'user';
 
 interface Template {
     id: string;
@@ -41,272 +37,158 @@ interface Template {
     };
 }
 
-interface ProfileData {
-    id: string;
-    role: UserRole;
-    org_id: string | null;
-    originalRole?: UserRole;
+type UserRole = 'super_admin' | 'org_admin' | 'id_gen_admin' | 'id_gen_user';
+
+interface PageServerLoad {
+    ({ locals, params }: {
+        locals: {
+            supabase: SupabaseClient;
+            safeGetSession: () => Promise<{
+                session: Session | null;
+                user: User | null;
+                profile: ProfileData | EmulatedProfile | null;
+            }>;
+            user: User | null;
+            profile: ProfileData | EmulatedProfile | null;
+        };
+        params: { id: string };
+    }): Promise<{ template: any }>;
 }
 
-export const load: PageServerLoad = async ({ params, locals, parent }) => {
-    const { session, supabase } = locals;
-    
+interface Actions {
+    saveIdCard: (event: {
+        request: Request;
+        locals: {
+            supabase: SupabaseClient;
+            safeGetSession: () => Promise<{
+                session: Session | null;
+                user: User | null;
+                profile: ProfileData | EmulatedProfile | null;
+            }>;
+            user: User | null;
+            profile: ProfileData | EmulatedProfile | null;
+        };
+    }) => Promise<any>;
+}
+
+export const load = (async ({ params, locals: { supabase, safeGetSession, user, profile } }) => {
+    const { session } = await safeGetSession();
     if (!session) {
         throw error(401, 'Unauthorized');
     }
 
-    const parentData = await parent();
-    const profile = parentData?.profile as ProfileData | null;
-    const isSuperAdmin = profile?.role === 'super_admin' || profile?.originalRole === 'super_admin';
-
-    if (!isSuperAdmin) {
-        throw error(403, 'Unauthorized: Super admin access required');
+    if (!profile) {
+        throw error(400, 'Profile not found');
     }
 
-    const { data: simpleTemplate, error: simpleError } = await supabase
+    const userRole = profile.role;
+    const orgId = profile.org_id;
+    
+    // Check role-specific access - all roles that can use templates
+    const allowedRoles = ['super_admin', 'org_admin', 'id_gen_admin', 'id_gen_user'];
+    if (!allowedRoles.includes(userRole)) {
+        throw error(403, 'Insufficient permissions');
+    }
+
+    const templateId = params.id;
+    
+    // Fetch the template
+    const { data: template, error: templateError } = await supabase
         .from('templates')
         .select('*')
-        .eq('id', params.id)
+        .eq('id', templateId)
         .single();
 
-    if (simpleTemplate) {
-        const { data: template, error: templateError } = await supabase
-            .from('templates')
-            .select(`
-                *,
-                organizations (
-                    id,
-                    name
-                )
-            `)
-            .eq('id', params.id)
-            .single();
-
-        if (template) {
-            return {
-                template,
-                session: session.user,
-                profile: parentData?.profile
-            };
-        }
+    if (templateError || !template) {
+        throw error(404, 'Template not found');
     }
 
-    throw error(404, 'Template not found');
-};
+    // Check organization access for non-super-admin roles
+    if (userRole !== 'super_admin' && template.org_id !== orgId) {
+        throw error(403, 'You do not have access to this template');
+    }
+
+    return {
+        template
+    };
+}) satisfies PageServerLoad;
 
 export const actions: Actions = {
-    saveIdCard: async ({ request, locals: { supabase, session } }) => {
+    saveIdCard: async ({ request, locals: { supabase, safeGetSession, user, profile } }) => {
+        const { session } = await safeGetSession();
         if (!session) {
             return fail(401, { error: 'Unauthorized' });
         }
 
-        const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('id, role, org_id')
-            .eq('id', session.user.id)
-            .single();
+        if (!profile) {
+            return fail(400, { error: 'Profile not found' });
+        }
 
-        if (profileError || !profileData) {
-            return fail(400, {
-                type: 'failure',
-                data: { message: 'Failed to fetch user profile' }
-            });
+        const userRole = profile.role;
+        const orgId = profile.org_id;
+
+        // All roles with template access can save ID cards
+        const allowedRoles = ['super_admin', 'org_admin', 'id_gen_admin', 'id_gen_user'];
+        if (!allowedRoles.includes(userRole)) {
+            return fail(403, { error: 'Insufficient permissions' });
         }
 
         try {
             const formData = await request.formData();
-            const templateId = formData.get('templateId')?.toString();
+            const templateId = formData.get('templateId') as string;
 
-            if (!templateId) {
-                return fail(400, {
-                    type: 'failure',
-                    data: { message: 'Template ID is required' }
-                });
-            }
-
+            // Verify template access
             const { data: template, error: templateError } = await supabase
                 .from('templates')
-                .select('*, organizations(*)')
+                .select('org_id')
                 .eq('id', templateId)
                 .single();
 
             if (templateError || !template) {
-                return fail(400, {
-                    type: 'failure',
-                    data: { message: 'Failed to fetch template' }
-                });
+                return fail(404, { error: 'Template not found' });
             }
 
-            const effectiveOrgId = template.org_id;
-            if (!effectiveOrgId) {
-                return fail(400, {
-                    type: 'failure',
-                    data: { message: 'Template has no organization' }
-                });
+            // Check organization access for non-super-admin roles
+            if (userRole !== 'super_admin' && template.org_id !== orgId) {
+                return fail(403, { error: 'You do not have access to this template' });
             }
 
-            if (profileData.role === 'org_admin' && profileData.org_id !== effectiveOrgId) {
-                return fail(403, {
-                    type: 'failure',
-                    data: { message: 'You do not have permission to use this template' }
-                });
-            }
-
-            const { frontPath, backPath } = await handleImageUploads(
+            // Handle image uploads
+            const uploadResult = await handleImageUploads(
                 supabase,
                 formData,
-                effectiveOrgId,
+                orgId || '',
                 templateId
             );
 
-            const formFields = extractFormFields(formData);
-            await saveIdCardData(supabase, {
+            if ('error' in uploadResult) {
+                return fail(500, { error: uploadResult.error });
+            }
+
+            // Save ID card data
+            const { data: idCard, error: saveError } = await saveIdCardData(supabase, {
                 templateId,
-                orgId: effectiveOrgId,
-                frontPath,
-                backPath,
-                formFields
+                orgId: orgId || '',
+                frontPath: uploadResult.frontPath,
+                backPath: uploadResult.backPath,
+                formFields: {}
             });
 
-            return {
-                type: 'success',
-                data: {
-                    message: 'ID Card generated successfully',
-                    frontPath,
-                    backPath,
-                    organizationId: effectiveOrgId
-                }
-            };
+            if (saveError) {
+                // Clean up uploaded images if data save fails
+                await Promise.all([
+                    deleteFromStorage(supabase, 'rendered-id-cards', uploadResult.frontPath),
+                    deleteFromStorage(supabase, 'rendered-id-cards', uploadResult.backPath)
+                ]);
+                return fail(500, { error: 'Failed to save ID card data' });
+            }
 
+            return { success: true, data: idCard };
         } catch (err) {
+            console.error('Error in saveIdCard:', err);
             return fail(500, {
-                type: 'failure',
-                data: {
-                    message: err instanceof Error ? err.message : 'Failed to save ID card'
-                }
+                error: err instanceof Error ? err.message : 'An unexpected error occurred'
             });
         }
     }
 };
-
-async function handleImageUploads(
-    supabase: SupabaseClient,
-    formData: FormData,
-    orgId: string,
-    templateId: string
-) {
-    const frontImage = formData.get('frontImage') as Blob;
-    const backImage = formData.get('backImage') as Blob;
-
-    if (!frontImage || !backImage) {
-        throw new Error('Missing image files');
-    }
-
-    const timestamp = Date.now();
-    const frontPath = `${orgId}/${templateId}/${timestamp}_front.png`;
-    const backPath = `${orgId}/${templateId}/${timestamp}_back.png`;
-
-    const frontUpload = await uploadToStorage(supabase, {
-        bucket: 'rendered-id-cards',
-        file: frontImage,
-        path: frontPath
-    });
-
-    if (frontUpload.error) {
-        throw new Error('Front image upload failed');
-    }
-
-    const backUpload = await uploadToStorage(supabase, {
-        bucket: 'rendered-id-cards',
-        file: backImage,
-        path: backPath
-    });
-
-    if (backUpload.error) {
-        await deleteFromStorage(supabase, 'rendered-id-cards', frontPath);
-        throw new Error('Back image upload failed');
-    }
-
-    return { frontPath, backPath };
-}
-
-function extractFormFields(formData: FormData): Record<string, string> {
-    const fields: Record<string, string> = {};
-    for (const [key, value] of formData.entries()) {
-        if (key.startsWith('form_')) {
-            fields[key.replace('form_', '')] = value.toString();
-        }
-    }
-    return fields;
-}
-
-async function uploadToStorage(
-    supabase: SupabaseClient,
-    {
-        bucket,
-        file,
-        path,
-        options = {}
-    }: {
-        bucket: string;
-        file: Blob;
-        path: string;
-        options?: {
-            cacheControl?: string;
-            contentType?: string;
-            upsert?: boolean;
-        };
-    }
-) {
-    return await supabase.storage
-        .from(bucket)
-        .upload(path, file, {
-            cacheControl: '3600',
-            contentType: 'image/png',
-            upsert: true,
-            ...options
-        });
-}
-
-async function saveIdCardData(
-    supabase: SupabaseClient,
-    {
-        templateId,
-        orgId,
-        frontPath,
-        backPath,
-        formFields
-    }: {
-        templateId: string;
-        orgId: string;
-        frontPath: string;
-        backPath: string;
-        formFields: Record<string, string>;
-    }
-) {
-    const { error: dbError } = await supabase
-        .from('idcards')
-        .insert({
-            template_id: templateId,
-            org_id: orgId,
-            front_image: frontPath,
-            back_image: backPath,
-            data: formFields
-        });
-
-    if (dbError) {
-        await Promise.all([
-            deleteFromStorage(supabase, 'rendered-id-cards', frontPath),
-            deleteFromStorage(supabase, 'rendered-id-cards', backPath)
-        ]);
-        throw new Error('Failed to save ID card data');
-    }
-}
-
-async function deleteFromStorage(
-    supabase: SupabaseClient,
-    bucket: string,
-    path: string
-): Promise<void> {
-    await supabase.storage.from(bucket).remove([path]);
-}
