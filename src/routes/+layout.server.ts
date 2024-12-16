@@ -1,7 +1,5 @@
 import type { LayoutServerLoadEvent } from './$types';
-import { ADMIN_URL } from '$env/static/private';
-import { RoleConfig } from '../rolePermissions';
-import type { UserRole, Profile } from '$lib/types/database';
+import { RoleConfig, type UserRole } from '$lib/auth/roleConfig';
 import type { Database } from '$lib/database.types';
 
 type NavigationState = {
@@ -15,13 +13,8 @@ type ServerProfile = Database['public']['Tables']['profiles']['Row'] & {
   isEmulated?: boolean;
   originalRole?: UserRole;
   originalOrgId?: string | null;
+  context?: Record<string, any>;
 };
-
-type EmulatedProfile = ServerProfile & {
-  isEmulated: boolean;
-  originalRole: UserRole;
-  originalOrgId: string | null;
-}
 
 type EmulationData = {
   isEmulated: boolean;
@@ -36,12 +29,12 @@ type EmulationData = {
   organizationName: string | null;
 }
 
-export const load = async ({ locals: { safeGetSession, profile, supabase }, url }: LayoutServerLoadEvent) => {
+export const load = async ({ locals: { safeGetSession, profile, supabase,special_url }, url }: LayoutServerLoadEvent) => {
   console.log('[Layout Server] Starting load for:', url.pathname);
   const session = await safeGetSession();
   const user = session?.user ?? null;
 
-  console.log('[Layout Server] User profile:', profile);
+  // console.log('[Layout Server] User profile:', profile);
 
   // Set security headers
   const response = new Response();
@@ -55,20 +48,33 @@ export const load = async ({ locals: { safeGetSession, profile, supabase }, url 
   let emulationData: EmulationData | null = null;
   let organizationName: string | null = null;
 
+
+  // console.log the context
+  console.log('[Layout Server] Context:', currentProfile?.context);
+  // console.log('[Layout Server] Full Profile:', JSON.stringify(currentProfile, null, 2));
+  
   // Navigation state
   const navigation: NavigationState = {
-    homeUrl: currentProfile?.role === 'super_admin' ? '/midcodes' : '/',
+    homeUrl: (() => {
+      const context = currentProfile?.context || {};  // Ensure we always pass an object
+      console.log('[Layout Server] Role:', currentProfile?.role);
+      // console.log('[Layout Server] Context being passed:', context);
+      if (!currentProfile?.role) return '/';
+      const path = RoleConfig[currentProfile.role].defaultPath(context);
+      // console.log('[Layout Server] Generated path:', path);
+      return path;
+    })(),
     showHeader: false, // Default to false
     allowedPaths: [],
     showRoleEmulation: currentProfile?.role === 'super_admin'
   };
-
-  console.log('[Layout Server] Navigation and Session:', {
-    hasSession: !!session,
-    session,
-    navigation,
-    url: url.pathname
-  });
+// 
+  // console.log('[Layout Server] Navigation and Session:', {
+  //   hasSession: !!session,
+  //   session,
+  //   navigation,
+  //   url: url.pathname
+  // });
 
   if (session && currentProfile) {
     navigation.showHeader = true; // Only show header if authenticated
@@ -122,13 +128,6 @@ export const load = async ({ locals: { safeGetSession, profile, supabase }, url 
       navigation.showRoleEmulation = true;
     }
 
-    // Set home URL based on role and emulation status
-    if (isEmulated) {
-      navigation.homeUrl = RoleConfig[currentProfile.role as UserRole]?.defaultRedirect ?? '/';
-    } else {
-      navigation.homeUrl = RoleConfig[currentProfile.role as UserRole]?.defaultRedirect ?? '/';
-    }
-
     // Show nav for all authenticated users
     // navigation.allowedPaths = ['/templates', '/all-ids'];
   }
@@ -149,6 +148,7 @@ export const load = async ({ locals: { safeGetSession, profile, supabase }, url 
     emulation: {
       ...emulationData,
       organizationName
-    }
+    },
+    special_url
   };
 };

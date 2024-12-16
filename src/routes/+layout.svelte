@@ -2,20 +2,21 @@
     import '../app.css';
     import { page } from '$app/stores';
     import { RoleConfig, type UserRole } from '$lib/auth/roleConfig';
-    import type { LayoutData } from './$types';
     import { browser } from '$app/environment';
-    import { loadConfig } from '$lib/stores/config';
     import type { RoleEmulationClaim } from '$lib/types/roleEmulation';
     import { Progress } from '$lib/components/ui/progress';
     import { Button } from '$lib/components/ui/button';
     import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "$lib/components/ui/dropdown-menu";
-    import { User, Sun, Moon, Menu, X, Crown } from 'lucide-svelte';
+    import { User, Sun, Moon, Menu, X } from 'lucide-svelte';
     import { onMount, onDestroy } from 'svelte';
     import { session, user, auth, profile } from '$lib/stores/auth';
     import { settings } from '$lib/stores/settings';
     import { loadGoogleFonts } from '$lib/config/fonts';
     import { navigating } from '$app/stores';
     
+    // Initialize config immediately with page data
+
+
     // Get navigation links based on role
     function getNavLinks(role?: UserRole): { path: string; label: string }[] {
         if (!role) return [];
@@ -46,8 +47,10 @@
     $: userEmail = $page.data.user?.email ?? '';
     $: emulation = $page.data.session?.roleEmulation as RoleEmulationClaim | null;
     $: userProfile = $page.data.profile;
+    $: special_url = $page.data.special_url;
 
-    $: console.log('[Role Debug] Emulation:', emulation);
+    
+    $: console.log('[Role Debug] Special URL:', special_url, 'Emulation:', emulation);
     $: console.log('[Role Debug] Current Role:', emulation?.emulated_role ?? userProfile?.role);
     $: console.log('[Role Debug] Is Emulating:', emulation?.active);
     $: console.log('[Role Debug] Emulated Org:', emulation?.emulated_org_id);
@@ -121,11 +124,14 @@
         }
     }
 
+
+
+    $: console.log('[Role Debug] Emulation:', emulation);
+
     onMount(async () => {
         if (browser) {
             await loadGoogleFonts();
         }
-        loadConfig();
     });
 
     onDestroy(() => {
@@ -167,14 +173,23 @@
 <header class="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
     <div class="container mx-auto px-4">
         <div class="flex h-16 items-center justify-between">
-            <div class="flex items-center">
-                <a href={path === navigation.homeUrl ? path : navigation.homeUrl} class="flex items-center space-x-2">
-                    <span class="hidden font-bold sm:inline-block">
-                        {path === '/' ? 'ID Card Generator' : 
-                         navigation.homeUrl.replace('/', '').charAt(0).toUpperCase() + 
-                         navigation.homeUrl.replace('/', '').slice(1)}
-                    </span>
-                </a>
+            <div class="flex items-center space-x-4">
+                {#if special_url !== '/'}
+                    <a href={special_url} class="flex items-center">
+                        <span class="hidden font-bold sm:inline-block">
+                            {(special_url.split('/').pop() || 'Admin').charAt(0).toUpperCase() + 
+                             (special_url.split('/').pop() || 'Admin').slice(1)}
+                        </span>
+                    </a>
+                {/if}
+                {#if navigation.homeUrl !== '/'}
+                    <a href={navigation.homeUrl} class="flex items-center">
+                        <span class="hidden font-bold sm:inline-block">
+                            {navigation.homeUrl.replace('/', '').charAt(0).toUpperCase() + 
+                             navigation.homeUrl.replace('/', '').slice(1)}
+                        </span>
+                    </a>
+                {/if}
             </div>
 
             <nav class="hidden space-x-8 md:flex">

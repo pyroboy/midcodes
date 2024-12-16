@@ -5,8 +5,8 @@
     import TemplateForm from '$lib/TemplateForm.svelte';
     import TemplateList from '$lib/TemplateList.svelte';
     import { uploadImage } from '$lib/database';
-    import { templateData } from '../../stores/templateStore';
-    import type { TemplateData, TemplateElement } from '../../stores/templateStore';
+    import { templateData } from '$lib/stores/templateStore';
+    import type { TemplateData, TemplateElement } from '$lib/stores/templateStore';
 
     let user: User | null = null;
     let frontBackground: File | null = null;

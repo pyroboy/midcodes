@@ -176,7 +176,7 @@ if (browser) {
             _user.set(session.user)
 
             const userProfile = await loadUserProfile(session.user.id)
-            console.log('[Auth Debug] Loaded user profile:', userProfile)
+            // console.log('[Auth Debug] Loaded user profile:', userProfile)
             
             if (userProfile) {
                 _profile.set(userProfile)

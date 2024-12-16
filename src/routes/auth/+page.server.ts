@@ -16,12 +16,6 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession }, url }) 
         switch (profile.role) {
             case 'super_admin':
                 throw redirect(303, ADMIN_URL);
-            case 'org_admin':
-                throw redirect(303, '/org');
-            case 'event_admin':
-                throw redirect(303, '/events');
-            case 'event_qr_checker':
-                throw redirect(303, '/check');
             default:
                 throw redirect(303, '/');
         }
@@ -53,79 +47,61 @@ export const actions: Actions = {
 
         if (error) {
             if (error instanceof AuthApiError && error.status === 400) {
-                console.error('[Auth] Invalid credentials:', error.message);
+                console.log('[Auth] Invalid credentials:', error.message);
                 return fail(400, {
                     error: 'Invalid credentials',
                     success: false,
                     email
                 });
             }
-            console.error('[Auth] Server error during sign in:', error);
+            console.log('[Auth] Server error during sign in:', error);
             return fail(500, {
                 error: 'Server error. Please try again later.',
                 success: false
             });
         }
 
-        if (!data.user) {
-            console.error('[Auth] No user data returned after successful authentication');
+        if (!data.session) {
+            console.log('[Auth] No session after sign in');
             return fail(400, {
-                error: 'No user returned after sign in',
+                error: 'No session after sign in',
                 success: false
             });
         }
 
-        console.log(`[Auth] Successfully authenticated user: ${data.user.id}`);
-
-        // Set session cookies
+        // Set auth cookie
         const { access_token, refresh_token } = data.session;
-        
         cookies.set('sb-access-token', access_token, {
             path: '/',
-            httpOnly: true,
             secure: true,
+            httpOnly: true,
             sameSite: 'lax',
-            maxAge: 3600 // 1 hour
+            maxAge: 60 * 60 // 1 hour
         });
-        
         cookies.set('sb-refresh-token', refresh_token, {
             path: '/',
-            httpOnly: true,
             secure: true,
+            httpOnly: true,
             sameSite: 'lax',
-            maxAge: 604800 // 1 week
+            maxAge: 60 * 60 * 24 * 7 // 1 week
         });
 
-        // Get user profile
+        // Get user profile to check role
         const { data: profile } = await supabase
             .from('profiles')
             .select('role')
-            .eq('id', data.user.id)
+            .eq('id', data.session.user.id)
             .single();
 
-        if (!profile) {
-            console.error('[Auth] No profile found for user:', data.user.id);
-            return fail(400, {
-                error: 'No profile found',
-                success: false
-            });
-        }
-
-        console.log(`[Auth] User role: ${profile.role}`);
+        console.log('[Auth] Got profile after sign in:', profile);
 
         // Redirect based on role
-        switch (profile.role) {
-            case 'super_admin':
-                throw redirect(303, ADMIN_URL);
-            case 'org_admin':
-                throw redirect(303, '/org');
-            case 'event_admin':
-                throw redirect(303, '/events');
-            case 'event_qr_checker':
-                throw redirect(303, '/check');
-            default:
-                throw redirect(303, '/');
+        if (profile?.role === 'super_admin') {
+            console.log('[Auth] Redirecting super_admin to:', ADMIN_URL);
+            throw redirect(303, ADMIN_URL);
         }
+
+        throw redirect(303, '/');
     },
 
     signup: async ({ request, url, locals: { supabase } }) => {

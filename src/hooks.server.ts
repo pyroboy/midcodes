@@ -3,9 +3,10 @@ import type { SupabaseClient, User, Session } from '@supabase/supabase-js'
 import { sequence } from '@sveltejs/kit/hooks'
 import { redirect, error } from '@sveltejs/kit'
 import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public'
+import { ADMIN_URL } from '$env/static/private'
 import type { Handle } from '@sveltejs/kit'
 import type { RoleEmulationData, RoleEmulationClaim, EmulatedProfile, ProfileData, LocalsSession } from '$lib/types/roleEmulation'
-import { RoleConfig, type UserRole, isPublicPath, hasPathAccess, getRedirectPath } from '$lib/auth/roleConfig'
+import { RoleConfig, type UserRole, isPublicPath, getRedirectPath, PublicPaths } from '$lib/auth/roleConfig'
 
 interface SessionInfo {
   session: LocalsSession | null
@@ -14,13 +15,20 @@ interface SessionInfo {
   roleEmulation: RoleEmulationClaim | null
 }
 
-interface Locals {
+interface AppLocals {
   supabase: SupabaseClient
   getSession: () => Promise<LocalsSession | null>
   safeGetSession: () => Promise<SessionInfo>
   session?: LocalsSession | null
   user?: User | null
   profile?: ProfileData | EmulatedProfile | null
+  special_url?: string
+}
+
+declare global {
+  namespace App {
+    interface Locals extends AppLocals {}
+  }
 }
 
 function isValidUserRole(role: string): role is UserRole {
@@ -28,12 +36,17 @@ function isValidUserRole(role: string): role is UserRole {
 }
 
 async function getUserProfile(userId: string, supabase: SupabaseClient): Promise<ProfileData | null> {
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*, organizations(id, name)')
-    .eq('id', userId)
-    .single()
-    
+  const { data: profile, error } = await supabase
+  .from('profiles')
+  .select('*, organizations(id, name), context')
+  .eq('id', userId)
+  .single();
+
+  if (error) {
+    console.error('Error fetching profile:', error);
+    return null;
+  }
+  // console.log('[Hooks] Fetched profile:', JSON.stringify(profile, null, 2));
   return profile
 }
 
@@ -133,6 +146,13 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
     let emulatedProfile = profile
     let roleEmulation: RoleEmulationClaim | null = null
 
+    // Set special_url based on profile role
+    if (profile?.role === 'super_admin') {
+      event.locals.special_url = '/' + ADMIN_URL;
+    } else {
+      event.locals.special_url = '/';
+    }
+
     if (activeEmulation && profile) {
       // Fetch organization name
       const { data: org } = await event.locals.supabase
@@ -207,11 +227,11 @@ const authGuard: Handle = async ({ event, resolve }) => {
   const sessionInfo = await event.locals.safeGetSession()
   const { user, profile, session, roleEmulation } = sessionInfo
 
-  console.log('2. Session:', {
-    userId: user?.id,
-    role: profile?.role,
-    emulation: roleEmulation
-  });
+  // console.log('2. Session:', {
+  //   userId: user?.id,
+  //   role: profile?.role,
+  //   emulation: roleEmulation
+  // });
 
   // Update locals with session info
   event.locals = {
@@ -238,6 +258,9 @@ const authGuard: Handle = async ({ event, resolve }) => {
 
   // Authenticated users shouldn't stay on /auth
   if (isAuthPath && profile?.role && isValidUserRole(profile.role)) {
+    if (profile.role === 'super_admin') {
+      throw redirect(303, `/${ADMIN_URL}`);
+    }
     const config = RoleConfig[profile.role];
     if (config) {
       throw redirect(303, config.defaultPath(profile.context));
@@ -262,10 +285,33 @@ const authGuard: Handle = async ({ event, resolve }) => {
   // Check path access and redirect if necessary
   const originalRole = (profile as EmulatedProfile)?.originalRole
   const context = roleEmulation?.metadata?.context || profile?.context || {}
-  const redirectPath = originalRole 
-    ? getRedirectPath(profile.role, path, originalRole, context) 
-    : getRedirectPath(profile.role, path, undefined, context)
-  
+
+  console.log('[Auth Debug] Checking access:', {
+    path,
+    originalRole,
+    currentRole: profile.role,
+    adminUrl: `/${ADMIN_URL}`
+  });
+
+  // Allow admin URL access for both regular and emulated super_admin
+  if (path === `/${ADMIN_URL}` && 
+      ((!originalRole && profile.role === 'super_admin') || originalRole === 'super_admin')) {
+    console.log('[Auth Debug] Allowing admin URL access');
+    return resolve(event);
+  }
+
+  const redirectPath = getRedirectPath(
+    profile.role,
+    path,
+    originalRole,
+    context
+  );
+
+  // If path is not found, redirect to 404 instead of auth
+  if (redirectPath === PublicPaths.auth) {
+    throw error(404, { message: 'Not found' });
+  }
+
   console.log('3. Access Check:', {
     path,
     hasAccess: !redirectPath,

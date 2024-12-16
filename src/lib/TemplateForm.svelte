@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount, createEventDispatcher } from 'svelte';
-    import { templateData } from '../stores/templateStore';
-    import type { TemplateData, TemplateElement } from '../stores/templateStore';
+    import { templateData } from '$lib/stores/templateStore';
+    import type { TemplateData, TemplateElement } from '$lib/stores/templateStore';
     import ElementList from './ElementList.svelte';
     import PositionGroup from './PositionGroup.svelte';
     import { Button } from '$lib/components/ui/button';

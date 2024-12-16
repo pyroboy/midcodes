@@ -235,14 +235,13 @@
     <div 
         class="fixed bottom-4 right-4 z-50 rounded-lg bg-primary px-4 py-2 text-primary-foreground shadow-lg"
         transition:fade={{ duration: 200 }}
-        role="alert"
     >
         {notification}
     </div>
 {/if}
 
 <style>
-    .selected {
-        @apply bg-muted;
+    :global(tr.selected) {
+        background-color: hsl(var(--muted));
     }
 </style>

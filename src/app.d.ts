@@ -7,6 +7,7 @@ import type { ProfileData, EmulatedProfile, RoleEmulationClaim } from '$lib/type
 interface ImportMetaEnv {
 	VITE_PUBLIC_SUPABASE_URL: string
 	VITE_PUBLIC_SUPABASE_ANON_KEY: string
+	ADMIN_URL: string
 }
 
 interface ImportMeta {

@@ -9,6 +9,7 @@ export type Database = {
           org_id: string | null
           created_at: string
           updated_at: string
+          context: Record<string, any> | null
         }
         Insert: {
           id: string
@@ -17,6 +18,7 @@ export type Database = {
           org_id?: string | null
           created_at?: string
           updated_at?: string
+          context?: Record<string, any> | null
         }
         Update: {
           id?: string
@@ -25,6 +27,7 @@ export type Database = {
           org_id?: string | null
           created_at?: string
           updated_at?: string
+          context?: Record<string, any> | null
         }
       }
     }

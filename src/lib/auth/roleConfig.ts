@@ -1,4 +1,3 @@
-import { config } from '$lib/stores/config'
 import { get } from 'svelte/store'
 
 // Define all available user roles
@@ -30,10 +29,8 @@ export const PublicPaths = {
 // Helper to check if a path is public
 export function isPublicPath(path: string): boolean {
     if (path.startsWith(PublicPaths.auth)) return true
-    
     const eventUrlMatch = path.match(/^\/([^/]+)/)
     const eventUrl = eventUrlMatch ? eventUrlMatch[1] : null
-    
     return !!(eventUrl && (
         path.endsWith(PublicPaths.register) || 
         PublicPaths.eventPattern.test(path)
@@ -55,14 +52,8 @@ export function hasPathAccess(role: UserRole, path: string, originalRole?: UserR
 
     // 1. User is super_admin (original role)
     // 2. There's an active emulation session (originalRole exists)
-    if (path === `/${get(config).adminUrl}` && (originalRole === 'super_admin' || originalRole)) {
-        return true
-    }
 
-    // Special case for super_admin role emulation
-    if (path.startsWith('/admin') && originalRole === 'super_admin') {
-        return true
-    }
+
     
     // Full access patterns
     if (roleConfig.allowedPaths.some(ap => ap.path === '*' || ap.path === '/**')) {
@@ -142,23 +133,78 @@ export function getRedirectPath(role: UserRole, path: string, originalRole?: Use
     return defaultRedirect
 }
 
+// Function to check if a path is allowed for a role
+export function isPathAllowedForRole(path: string, role: UserRole | null, originalRole?: UserRole): boolean {
+    console.log('[RoleConfig] Checking path:', path, 'for role:', role, 'original role:', originalRole);
+    
+    // If no role, deny access
+    if (!role) return false;
+    
+   
+    const adminPath = `/midcodes`;
+
+    // 1. User is super_admin (original role)
+    // 2. There's an active emulation session (originalRole exists)
+    if (path === adminPath && (originalRole === 'super_admin' || originalRole)) {
+        console.log('[RoleConfig] Allowing admin path access');
+        return true;
+    }
+
+    const roleConfig = RoleConfig[role];
+    if (!roleConfig) return false;
+
+    // Full access patterns
+    if (roleConfig.allowedPaths.some((ap: AllowedPath) => ap.path === '*' || ap.path === '/**')) {
+        return true;
+    }
+    
+    // Clean up path for matching
+    const cleanPath = path.replace(/\/$/, '')
+    
+    // Check each allowed path pattern
+    for (const allowedPath of roleConfig.allowedPaths) {
+        const pattern = allowedPath.path.replace(/\/$/, '')
+        
+        // Convert path pattern to regex
+        let regexPattern = pattern
+            .replace(/\*\*/g, '.*')  // ** matches anything including /
+            .replace(/\*/g, '[^/]+')  // Single * matches anything except /
+        
+        const regex = new RegExp('^' + regexPattern + '$')
+        
+        // Debug logging
+        console.log('[Path Debug] Pattern match:', {
+            cleanPath,
+            pattern,
+            regexPattern,
+            matches: regex.test(cleanPath)
+        })
+
+        if (regex.test(cleanPath)) return true
+    }
+    
+    return false
+}
+
 export interface RoleConfiguration {
     allowedPaths: AllowedPath[];
     defaultPath: (context?: any) => string;
     isAdmin: boolean;
     label: string;
     requiresOrgId?: boolean;
+    showInNav?: boolean;
+    icon?: string;
 }
 
 export const RoleConfig: Record<UserRole, RoleConfiguration> = {
     super_admin: {
         allowedPaths: [{ path: '/**' }],
         defaultPath() {
-            return '/admin';
+            return '/';
         },
         isAdmin: true,
         label: 'Super Admin',
-        requiresOrgId: false
+        requiresOrgId: true
     },
     org_admin: {
         allowedPaths: [{ path: '/**' }],
@@ -183,7 +229,6 @@ export const RoleConfig: Record<UserRole, RoleConfiguration> = {
     },
     event_admin: {
         allowedPaths: [
-            { path: `/${get(config).adminUrl}` },
             // { path: '/events', showInNav: true, label: 'Events' },
             { path: '/events/**' },
             { path: '/events/*/payments' },
@@ -193,7 +238,9 @@ export const RoleConfig: Record<UserRole, RoleConfiguration> = {
             { path: '/api/**' }
         ],
         defaultPath: (context?: any) => {
-            console.log('defaultPath context:', context);
+            console.log('[RoleConfig] event_admin defaultPath called');
+            console.log('[RoleConfig] context received:', context);
+            console.log('[RoleConfig] event_url from context:', context?.event_url);
             return `/events/${context?.event_url}`;
         },
         isAdmin: true,
@@ -303,9 +350,9 @@ export const RoleConfig: Record<UserRole, RoleConfiguration> = {
     },
     id_gen_admin: {
         allowedPaths: [
-            { path: '/id-gen', showInNav: true, label: 'ID Generator' },
+            { path: '/id-gen/all-ids', showInNav: true, label: 'All IDs' },
             { path: '/id-gen/**' },
-            { path: '/id-gen/use-template', showInNav: true, label: 'Generate IDs' },
+            { path: '/id-gen/templates', showInNav: true, label: 'templates' },
             { path: '/id-gen/use-template/**' }
         ],
         defaultPath() {
