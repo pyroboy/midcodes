@@ -29,6 +29,26 @@ class AppError extends Error {
     }
 }
 
+// Function to determine orientation from image dimensions
+async function getImageOrientation(imageUrl: string): Promise<'landscape' | 'portrait'> {
+    try {
+        const response = await fetch(imageUrl);
+        const buffer = await response.arrayBuffer();
+        const blob = new Blob([buffer]);
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        img.src = url;
+        await new Promise(resolve => img.onload = resolve);
+        const width = img.width;
+        const height = img.height;
+        URL.revokeObjectURL(url);
+        return width >= height ? 'landscape' : 'portrait';
+    } catch (err) {
+        console.error('Error determining image orientation:', err);
+        return 'landscape'; // default fallback
+    }
+}
+
 export const load: PageServerLoad = async ({ locals: { supabase, session, profile } }) => {
     console.log(' [Templates Page] ====== START LOAD ======');
     console.log(' [Templates Page] Current state:', {
@@ -131,5 +151,125 @@ export const load: PageServerLoad = async ({ locals: { supabase, session, profil
             stack: e instanceof Error ? e.stack : undefined
         });
         throw error(500, 'An unexpected error occurred while loading templates');
+    }
+};
+
+export const actions = {
+    create: async ({ request, locals: { supabase, session, profile } }) => {
+        if (!session) {
+            throw error(401, 'Unauthorized');
+        }
+
+        try {
+            const formData = await request.formData();
+            const templateData = JSON.parse(formData.get('templateData') as string);
+
+            console.log('📝 Server: Processing template save:', {
+                templateId: templateData.id,
+                name: templateData.name,
+                elementsCount: templateData.template_elements?.length,
+                action: templateData.id ? 'update' : 'create'
+            });
+
+            // Prepare template data
+            const templateToSave = {
+                ...templateData,
+                user_id: session.user.id,
+                org_id: profile?.org_id,
+                updated_at: new Date().toISOString()
+            };
+
+            // Use upsert for both create and update
+            const { data, error: upsertError } = await supabase
+                .from('templates')
+                .upsert([templateToSave])
+                .select()
+                .single();
+
+            if (upsertError) {
+                console.error('❌ Server: Database error:', {
+                    error: upsertError,
+                    details: upsertError.details,
+                    hint: upsertError.hint
+                });
+                throw error(500, 'Error saving template');
+            }
+
+            if (!data) {
+                console.error('❌ Server: No data returned after save');
+                throw error(500, 'No data returned after save');
+            }
+
+            console.log('✅ Server: Template saved successfully:', {
+                id: data.id,
+                name: data.name,
+                elementsCount: data.template_elements?.length,
+                action: templateData.id ? 'updated' : 'created'
+            });
+
+            return {
+                success: true,
+                data,
+                message: `Template ${templateData.id ? 'updated' : 'created'} successfully`
+            };
+        } catch (err) {
+            console.error('❌ Server: Error in create action:', err);
+            throw error(
+                err instanceof Error && err.message.includes('400') ? 400 : 500,
+                err instanceof Error ? err.message : 'Error processing template save'
+            );
+        }
+    },
+    
+    delete: async ({ request, locals: { supabase, session } }) => {
+        if (!session) {
+            throw error(401, 'Unauthorized');
+        }
+
+        try {
+            const formData = await request.formData();
+            const templateId = formData.get('templateId') as string;
+
+            if (!templateId) {
+                throw error(400, 'Template ID is required');
+            }
+
+            console.log('🗑️ Server: Processing template delete:', { templateId });
+
+            // First, set template_id to NULL in idcards
+            const { error: updateError } = await supabase
+                .from('idcards')
+                .update({ template_id: null })
+                .eq('template_id', templateId);
+
+            if (updateError) {
+                console.error('❌ Server: Error updating ID cards:', updateError);
+                throw error(500, 'Error updating ID cards');
+            }
+
+            // Then delete the template
+            const { error: deleteError } = await supabase
+                .from('templates')
+                .delete()
+                .match({ id: templateId, user_id: session.user.id });
+
+            if (deleteError) {
+                console.error('❌ Server: Database error:', deleteError);
+                throw error(500, 'Error deleting template');
+            }
+
+            console.log('✅ Server: Template deleted successfully:', { templateId });
+
+            return {
+                success: true,
+                message: 'Template deleted successfully'
+            };
+        } catch (err) {
+            console.error('❌ Server: Error in delete action:', err);
+            throw error(
+                err instanceof Error && err.message.includes('400') ? 400 : 500,
+                err instanceof Error ? err.message : 'Error deleting template'
+            );
+        }
     }
 };

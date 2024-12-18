@@ -16,16 +16,31 @@
 
     // Animation state
     let rotationY = 0;
-    let animationFrameId: number;
-    let isAnimating = false;
+    let animationFrameId: number | null = null;
+    let autoRotateId: number | null = null;
+    let isFlipping = false;
+    let shouldAutoRotate = true;
 
-    // Scene state tracking
-    let sceneState = {
-        frontTextureLoaded: false,
-        backTextureLoaded: false,
-        meshInitialized: false,
-        lastError: null as string | null
-    };
+    function easeInOutCubic(x: number): number {
+        return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+    }
+
+    function startAutoRotate() {
+        if (!autoRotateId && !isFlipping && shouldAutoRotate) {
+            function animate() {
+                rotationY += 0.005; // Slow rotation speed
+                autoRotateId = requestAnimationFrame(animate);
+            }
+            autoRotateId = requestAnimationFrame(animate);
+        }
+    }
+
+    function stopAutoRotate() {
+        if (autoRotateId) {
+            cancelAnimationFrame(autoRotateId);
+            autoRotateId = null;
+        }
+    }
 
     function createRoundedRectCard(width = 2, height = 1.25, depth = 0.007, radius = 0.08) {
         // Create a flat rounded rectangle shape
@@ -161,27 +176,37 @@
     }
 
     onMount(() => {
+        startAutoRotate();
         return () => {
             if (animationFrameId) {
                 cancelAnimationFrame(animationFrameId);
             }
+            stopAutoRotate();
         };
     });
 
     function handleFlip() {
-        isAnimating = true;
-        const targetRotation = rotationY + Math.PI;
+        stopAutoRotate();
+        shouldAutoRotate = false;  // Permanently disable auto-rotation
+        isFlipping = true;
+        const startRotation = rotationY;
+        const targetRotation = startRotation + Math.PI;
+        let startTime: number | null = null;
+        const duration = 1000; // 1 second flip duration
         
-        function animate() {
-            const step = 0.15;
-            const difference = targetRotation - rotationY;
+        function animate(currentTime: number) {
+            if (!startTime) startTime = currentTime;
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / duration, 1);
             
-            if (Math.abs(difference) > step) {
-                rotationY += step * Math.sign(difference);
+            rotationY = startRotation + (targetRotation - startRotation) * easeInOutCubic(progress);
+            
+            if (progress < 1) {
                 animationFrameId = requestAnimationFrame(animate);
             } else {
                 rotationY = targetRotation;
-                isAnimating = false;
+                animationFrameId = null;
+                isFlipping = false;
             }
         }
         
@@ -197,6 +222,14 @@
             sceneState.backTextureLoaded = true;
         }
     }
+
+    // Scene state tracking
+    let sceneState = {
+        frontTextureLoaded: false,
+        backTextureLoaded: false,
+        meshInitialized: false,
+        lastError: null as string | null
+    };
 </script>
 
 <svelte:window on:keydown={handleKeydown} />
@@ -222,7 +255,7 @@
                 on:created={handleCanvasCreated}
             >
                 <T.Scene>
-                    <T.Color attach="background" args={[0x1a1a1a]} />
+                    <T.Color attach="background" args={[0, 0, 0, 0]} transparent={true} />
                 </T.Scene>
                 
                 <T.PerspectiveCamera 
@@ -240,7 +273,7 @@
                     />
                 </T.PerspectiveCamera>
 
-                <T.AmbientLight intensity={1} />
+                <T.AmbientLight intensity={1.9} />
                 <T.DirectionalLight position={[5, 5, 5]} intensity={0.7} castShadow />
                 <T.DirectionalLight position={[-5, 5, -5]} intensity={0.3} />
                 <T.DirectionalLight position={[0, -5, 0]} intensity={0.2} />
@@ -295,12 +328,11 @@
                                     frontImageUrl,
                                     (texture) => {
                                         texture.flipY = false;
-                                        texture.encoding = THREE.sRGBEncoding;
+                                        texture.colorSpace = THREE.SRGBColorSpace;
                                         texture.repeat.set(1, 1);
                                         texture.center.set(0.5, 0.5);
                                         texture.magFilter = THREE.LinearFilter;
                                         texture.minFilter = THREE.LinearFilter;
-                                        texture.anisotropy = 16;
                                         texture.needsUpdate = true;
                                         handleImageLoad(true);
                                     },
@@ -330,12 +362,11 @@
                                     backImageUrl,
                                     (texture) => {
                                         texture.flipY = false;
-                                        texture.encoding = THREE.sRGBEncoding;
+                                        texture.colorSpace = THREE.SRGBColorSpace;
                                         texture.repeat.set(1, 1);
                                         texture.center.set(0.5, 0.5);
                                         texture.magFilter = THREE.LinearFilter;
                                         texture.minFilter = THREE.LinearFilter;
-                                        texture.anisotropy = 16;
                                         texture.needsUpdate = true;
                                         handleImageLoad(false);
                                     },
@@ -382,8 +413,7 @@
             <button 
                 type="button"
                 class="control-button"
-                on:click={handleFlip}
-                disabled={isAnimating}>
+                on:click={handleFlip}>
                 Flip Card
             </button>
             {#if debugMode}
@@ -404,19 +434,20 @@ Last Error: {sceneState.lastError || 'None'}
 
 <style lang="postcss">
     .modal-wrapper {
-        @apply fixed inset-0 z-50 bg-background/80 backdrop-blur-sm;
+        @apply fixed inset-0 z-50 bg-background/60 backdrop-blur-[2px];
         display: grid;
         place-items: center;
     }
 
     .modal-content {
-        @apply bg-card rounded-lg shadow-lg max-w-2xl w-full mx-4 relative;
+        @apply rounded-lg max-w-2xl w-full mx-4 relative;
         height: 80vh;
+        background: transparent;
     }
 
     .canvas-container {
         @apply relative w-full h-full;
-        background-color: #1a1a1a;
+        background-color: transparent;
         border-radius: 0.5rem;
         overflow: hidden;
     }
@@ -451,7 +482,7 @@ Last Error: {sceneState.lastError || 'None'}
     }
 
     .control-button {
-        @apply px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50;
+        @apply px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90;
     }
 
     .error-message {

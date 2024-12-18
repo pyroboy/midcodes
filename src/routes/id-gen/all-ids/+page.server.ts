@@ -46,18 +46,31 @@ export const load = (async ({ locals: { supabase, safeGetSession, user, profile 
     }
 
     // Fetch ID cards based on role and organization
-    const { data: idCards, error: fetchError } = await supabase
+    const query = supabase
         .from('idcards')
-        .select('*')
-        .eq('org_id', effectiveOrgId)
+        .select(`
+            *,
+            templates (
+                id,
+                name,
+                org_id
+            )
+        `)
         .order('created_at', { ascending: false });
+
+    // Filter by organization for non-super-admin roles
+    if (userRole !== 'super_admin') {
+        query.eq('org_id', effectiveOrgId);
+    }
+
+    const { data: idCards, error: fetchError } = await query;
 
     if (fetchError) {
         console.error('Error fetching ID cards:', fetchError);
-        throw error(500, 'Error fetching ID cards');
+        throw error(500, 'Failed to load ID cards');
     }
 
     return {
-        idCards
+        idCards: idCards || []
     };
 }) satisfies PageServerLoad;

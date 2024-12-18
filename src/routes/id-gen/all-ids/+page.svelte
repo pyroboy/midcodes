@@ -3,105 +3,109 @@
     import { supabase } from '$lib/supabaseClient';
     import JSZip from 'jszip';
     import ImagePreviewModal from '$lib/components/ImagePreviewModal.svelte';
+    import { invalidate } from '$app/navigation';
     
     interface IdCard {
-     id: string;
-     template_id: string;
-     front_image: string;
-     back_image: string;
-     data: {
-       name?: string;
-       licenseNo?: string;
-       [key: string]: any;
-     };
-     created_at: string;
-   }
+        id: string;
+        template_id: string;
+        front_image: string;
+        back_image: string;
+        data: {
+            name?: string;
+            licenseNo?: string;
+            [key: string]: any;
+        };
+        created_at: string;
+    }
 
-    
+    export let data: { idCards: any[] };
     let idCards: IdCard[] = [];
     let selectedCards: Set<string> = new Set();
     let selectAll = false;
-    let isLoading = true;
+    let isLoading = false;
     let errorMessage = '';
     let selectedFrontImage: string | null = null;
     let selectedBackImage: string | null = null;
-    
+    let loadingProgress = 0;
+    let totalCards = 0;
+    let downloadingCards = new Set<string>();
+
     onMount(async () => {
-        await fetchIdCards();
+        if (data.idCards?.length > 0) {
+            idCards = data.idCards.map(card => ({
+                ...card,
+                data: typeof card.data === 'string' ? JSON.parse(card.data) : card.data
+            }));
+        }
     });
-    
-    async function fetchIdCards() {
+
+    async function openPreview(card: IdCard) {
         isLoading = true;
-        errorMessage = '';
-        console.log('Starting fetchIdCards()...');
-        
         try {
-            console.log('Querying Supabase...');
-            const { data, error } = await supabase
-                .from('idcards')
-                .select('*')
-                .order('created_at', { ascending: false });
-
-            if (error) {
-                console.error('Error fetching ID cards:', error);
-                errorMessage = `Error fetching ID cards: ${error.message}`;
-                return;
-            }
-
-            console.log('Raw data from Supabase:', data);
-            
-            if (data && data.length > 0) {
-                console.log(`Processing ${data.length} ID cards...`);
-                idCards = await Promise.all(data.map(async (card: any, index: number) => {
-                    console.log(`Processing card ${index + 1}/${data.length}`);
-                    const parsedData = typeof card.data === 'string' ? JSON.parse(card.data) : card.data;
-                    console.log(`Getting public URL for card ${index + 1} images...`);
-                    const frontUrl = await getPublicUrl(card.front_image);
-                    const backUrl = await getPublicUrl(card.back_image);
-                    console.log(`Finished processing card ${index + 1}`);
-                    return {
-                        ...card,
-                        front_image: frontUrl,
-                        back_image: backUrl,
-                        data: parsedData
-                    };
-                }));
-                console.log('Finished processing all cards');
-            } else {
-                console.log('No ID cards found in the response');
-                errorMessage = 'No ID cards found';
-            }
-        } catch (e: any) {
-            console.error('Unexpected error in fetchIdCards:', e);
-            errorMessage = `Unexpected error: ${e.message}`;
+            const [frontUrl, backUrl] = await Promise.all([
+                getPublicUrl(card.front_image),
+                getPublicUrl(card.back_image)
+            ]);
+            selectedFrontImage = frontUrl;
+            selectedBackImage = backUrl;
+        } catch (e) {
+            console.error('Error loading preview images:', e);
+            errorMessage = 'Failed to load preview images';
         } finally {
-            console.log('Setting isLoading to false');
             isLoading = false;
         }
     }
 
     async function getPublicUrl(path: string): Promise<string> {
-        if (!path) {
-            console.log('[Debug] Empty path provided to getPublicUrl');
+        if (!path) return '';
+        try {
+            const { data } = await supabase.storage.from('rendered-id-cards').getPublicUrl(path);
+            return data.publicUrl;
+        } catch (e) {
+            console.error('Error getting public URL:', e);
             return '';
         }
-        console.log('[Debug] Getting public URL for path:', path);
-        const { data } = await supabase.storage.from('rendered-id-cards').getPublicUrl(path);
-        console.log('[Debug] Got public URL:', data.publicUrl);
-        return data.publicUrl;
     }
-    
+
+    async function fetchIdCards() {
+        if (isLoading) return; // Prevent multiple fetches
+        
+        try {
+            const { data: newData, error } = await supabase
+                .from('idcards')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            
+            if (newData?.length > 0) {
+                idCards = newData.map(card => ({
+                    ...card,
+                    data: typeof card.data === 'string' ? JSON.parse(card.data) : card.data
+                }));
+                await invalidate('app:idCards');
+            } else {
+                errorMessage = 'No ID cards found';
+                idCards = [];
+            }
+        } catch (e: any) {
+            console.error('Error fetching ID cards:', e);
+            errorMessage = `Error: ${e.message}`;
+        }
+    }
+
     function formatDate(dateString: string): string {
         return new Date(dateString).toLocaleDateString();
     }
 
     function toggleSelectAll() {
-        if (selectAll) {
+        if (!selectAll) {
             selectedCards = new Set(idCards.map(card => card.id));
         } else {
             selectedCards.clear();
         }
-        selectedCards = selectedCards;
+        selectAll = !selectAll;
+        console.log('Selected cards after toggle all:', Array.from(selectedCards));
     }
 
     function toggleCardSelection(cardId: string) {
@@ -110,32 +114,53 @@
         } else {
             selectedCards.add(cardId);
         }
-        selectedCards = selectedCards;
+        selectedCards = selectedCards; // Trigger reactivity
         selectAll = selectedCards.size === idCards.length;
+        console.log('Selected cards after toggle:', Array.from(selectedCards));
     }
 
     async function downloadCard(card: IdCard) {
+        if (downloadingCards.has(card.id)) return;
+        downloadingCards.add(card.id);
+        
         try {
-            const frontResponse = await fetch(card.front_image);
-            const backResponse = await fetch(card.back_image);
-            const frontBlob = await frontResponse.blob();
-            const backBlob = await backResponse.blob();
-
             const zip = new JSZip();
-            zip.file(`${card.data.name || 'unknown'}_front.png`, frontBlob);
-            zip.file(`${card.data.name || 'unknown'}_back.png`, backBlob);
-
-            const content = await zip.generateAsync({type: "blob"});
-            const url = URL.createObjectURL(content);
+            const frontUrl = card.front_image;
+            const backUrl = card.back_image;
+            const cardName = card.data?.name?.replace(/[^a-zA-Z0-9-_]/g, '_') || 'id-card';
+            
+            const [frontResponse, backResponse] = await Promise.all([
+                fetch(supabase.storage.from('rendered-id-cards').getPublicUrl(frontUrl).data.publicUrl),
+                fetch(supabase.storage.from('rendered-id-cards').getPublicUrl(backUrl).data.publicUrl)
+            ]);
+            
+            if (!frontResponse.ok || !backResponse.ok) {
+                throw new Error('Failed to fetch images');
+            }
+            
+            const [frontBlob, backBlob] = await Promise.all([
+                frontResponse.blob(),
+                backResponse.blob()
+            ]);
+            
+            zip.file(`${cardName}_front.png`, frontBlob);
+            zip.file(`${cardName}_back.png`, backBlob);
+            
+            const content = await zip.generateAsync({ type: 'blob' });
+            const downloadUrl = URL.createObjectURL(content);
+            
             const link = document.createElement('a');
-            link.href = url;
-            link.download = `${card.data.name || 'id_card'}.zip`;
+            link.href = downloadUrl;
+            link.download = `${cardName}.zip`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+            URL.revokeObjectURL(downloadUrl);
         } catch (error) {
             console.error('Error downloading card:', error);
-            alert('Failed to download card');
+            errorMessage = 'Failed to download ID card';
+        } finally {
+            downloadingCards.delete(card.id);
         }
     }
 
@@ -155,32 +180,79 @@
     }
 
     async function bulkDownload() {
+        const selectedCardsList = idCards.filter(card => selectedCards.has(card.id));
+        console.log('Starting bulk download with cards:', selectedCardsList.map(card => ({
+            id: card.id,
+            name: card.data?.name,
+            front_image: card.front_image,
+            back_image: card.back_image
+        })));
+        if (selectedCardsList.length === 0) {
+            errorMessage = 'No cards selected for download';
+            return;
+        }
+
         try {
             const zip = new JSZip();
-            for (const cardId of selectedCards) {
-                const card = idCards.find(c => c.id === cardId);
-                if (card) {
-                    const frontResponse = await fetch(card.front_image);
-                    const backResponse = await fetch(card.back_image);
-                    const frontBlob = await frontResponse.blob();
-                    const backBlob = await backResponse.blob();
+            let successCount = 0;
 
-                    zip.file(`${card.data.name || 'unknown'}_${card.id}_front.png`, frontBlob);
-                    zip.file(`${card.data.name || 'unknown'}_${card.id}_back.png`, backBlob);
+            for (const card of selectedCardsList) {
+                try {
+                    const cardName = card.data?.name?.replace(/[^a-zA-Z0-9-_]/g, '_') || 'id-card';
+                    const folderName = cardName + '/';
+
+                    const [frontResponse, backResponse] = await Promise.all([
+                        fetch(supabase.storage.from('rendered-id-cards').getPublicUrl(card.front_image).data.publicUrl),
+                        fetch(supabase.storage.from('rendered-id-cards').getPublicUrl(card.back_image).data.publicUrl)
+                    ]);
+
+                    if (!frontResponse.ok || !backResponse.ok) {
+                        console.error(`Failed to fetch images for ${cardName}`);
+                        continue;
+                    }
+
+                    const [frontBlob, backBlob] = await Promise.all([
+                        frontResponse.blob(),
+                        backResponse.blob()
+                    ]);
+
+                    // Create folder and add files
+                    zip.folder(folderName); // Explicitly create the folder
+                    zip.file(folderName + 'front.png', frontBlob);
+                    zip.file(folderName + 'back.png', backBlob);
+                    successCount++;
+                } catch (error) {
+                    console.error('Error processing card:', error);
                 }
             }
 
-            const content = await zip.generateAsync({type: "blob"});
-            const url = URL.createObjectURL(content);
+            if (successCount === 0) {
+                throw new Error('Failed to process any cards');
+            }
+
+            const content = await zip.generateAsync({
+                type: 'blob',
+                compression: 'DEFLATE',
+                compressionOptions: {
+                    level: 9
+                }
+            });
+
+            const downloadUrl = URL.createObjectURL(content);
             const link = document.createElement('a');
-            link.href = url;
+            link.href = downloadUrl;
             link.download = 'id_cards.zip';
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+            URL.revokeObjectURL(downloadUrl);
+
+            // Clear selection only on successful download
+            selectedCards.clear();
+            selectAll = false;
         } catch (error) {
-            console.error('Error bulk downloading cards:', error);
-            alert('Failed to download selected cards');
+            console.error('Error in bulk download:', error);
+            errorMessage = 'Failed to download selected cards';
         }
     }
 
@@ -199,20 +271,6 @@
             selectAll = false;
         }
     }
-
-    function openImageModal(frontImage: string, backImage: string) {
-        console.log('[Debug] Opening modal with images:', { frontImage, backImage });
-        selectedFrontImage = frontImage;
-        selectedBackImage = backImage;
-    }
-
-    function closeImageModal() {
-        console.log('[Debug] Closing modal');
-        selectedFrontImage = null;
-        selectedBackImage = null;
-    }
-console.log(idCards)
-    
 </script>
 
 <svelte:head>
@@ -224,176 +282,228 @@ console.log(idCards)
         @apply p-4;
     }
 
-    h2 {
-        @apply text-2xl font-bold mb-4 text-foreground;
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
     }
 
-    .bulk-actions {
-        @apply mb-4 flex gap-2;
+    .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid #3498db;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
     }
 
-    .bulk-actions button {
-        @apply px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed;
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .error-message {
+        @apply text-destructive bg-destructive/10 p-4 rounded mb-4;
+    }
+
+    .table-container {
+        @apply relative overflow-x-auto rounded-lg border border-border bg-card;
     }
 
     table {
-        @apply w-full border-collapse bg-card text-card-foreground;
+        @apply w-full text-sm;
     }
 
     thead {
-        @apply bg-muted;
+        @apply bg-muted/50 text-muted-foreground;
     }
 
     th {
-        @apply px-4 py-2 text-left font-medium text-muted-foreground border-b border-border;
+        @apply px-6 py-4 text-left font-medium whitespace-nowrap sticky top-0 bg-muted/50;
+    }
+
+    tbody tr {
+        @apply border-t border-border hover:bg-muted/50 cursor-pointer;
     }
 
     td {
-        @apply px-4 py-2 border-b border-border;
-    }
-
-    .actions {
-        @apply flex gap-2;
-    }
-
-    .actions button {
-        @apply px-3 py-1 rounded text-sm;
-    }
-
-    .actions button.download {
-        @apply bg-primary text-primary-foreground hover:bg-primary/90;
-    }
-
-    .actions button.delete {
-        @apply bg-destructive text-destructive-foreground hover:bg-destructive/90;
-    }
-
-    .error {
-        @apply text-destructive;
+        @apply px-6 py-4 align-middle;
     }
 
     .checkbox-cell {
-        @apply w-8 text-center;
-    }
-
-    input[type="checkbox"] {
-        @apply w-4 h-4 rounded border-primary text-primary focus:ring-primary;
+        @apply w-10 text-center;
     }
 
     .image-cell {
-        @apply relative;
-    }
-
-    .image-button {
-        @apply p-0 border-0 bg-transparent hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary rounded;
+        @apply w-24;
     }
 
     .id-thumbnail {
-        @apply h-12 w-auto object-contain;
+        @apply h-16 w-auto object-contain rounded shadow-sm;
+    }
+
+    .image-placeholder {
+        @apply h-16 w-24 bg-muted/30 rounded flex items-center justify-center text-muted-foreground text-xs;
+    }
+
+    .actions-cell {
+        @apply w-48 whitespace-nowrap;
+    }
+
+    .name-cell {
+        @apply font-medium;
+    }
+
+    .license-cell {
+        @apply font-mono text-muted-foreground;
+    }
+
+    .date-cell {
+        @apply text-muted-foreground whitespace-nowrap;
+    }
+
+    .bulk-actions {
+        @apply mb-4 flex items-center gap-4;
+    }
+
+    .btn-download {
+        @apply inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors;
+        min-width: 100px;
+        justify-content: center;
+    }
+
+    .loading-spinner {
+        @apply inline-block w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin;
     }
 </style>
 
 <div class="id-cards-container">
-    <h2>Generated ID Cards</h2>
-    
-    {#if isLoading}
-        <p>Loading ID cards...</p>
-    {:else if errorMessage}
-        <p class="error">{errorMessage}</p>
-    {:else if idCards.length === 0}
-        <p>No ID cards found.</p>
-    {:else}
-        <div class="bulk-actions">
-            <button on:click={bulkDownload} disabled={selectedCards.size === 0}>Download Selected</button>
-            <button on:click={bulkDelete} disabled={selectedCards.size === 0}>Delete Selected</button>
-        </div>
+    <h2 class="text-2xl font-bold mb-4">Generated ID Cards</h2>
 
-        <div class="rounded-md border">
-            <table>
-                <thead>
-                    <tr>
-                        <th class="checkbox-cell">
-                            <input
-                                type="checkbox"
-                                bind:checked={selectAll}
-                                on:change={toggleSelectAll}
-                            />
-                        </th>
-                        <th>Name</th>
-                        <th>ID Number</th>
-                        <th>Created At</th>
-                        <th>Front Image</th>
-                        <th>Back Image</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {#each idCards as card}
-                        <tr class="hover:bg-muted/50">
-                            <td class="checkbox-cell">
-                                <input
-                                    type="checkbox"
-                                    checked={selectedCards.has(card.id)}
-                                    on:change={() => toggleCardSelection(card.id)}
-                                />
-                            </td>
-                            <td>{card.data?.name || 'N/A'}</td>
-                            <td>{card.data?.licenseNo || 'N/A'}</td>
-                            <td>{formatDate(card.created_at)}</td>
-                            <td class="image-cell">
-                                {#if card.front_image}
-                                    <button 
-                                        type="button"
-                                        class="image-button"
-                                        on:click={() => openImageModal(card.front_image, card.back_image)}
-                                        aria-label="View ID card images">
-                                        <img 
-                                            src={card.front_image} 
-                                            alt="Front ID" 
-                                            class="id-thumbnail"
-                                            on:error={() => console.error(`Failed to load front image for card ${card.id}`)} 
-                                        />
-                                    </button>
-                                {:else}
-                                    <span>No front image</span>
-                                {/if}
-                            </td>
-                            <td class="image-cell">
-                                {#if card.back_image}
-                                    <button 
-                                        type="button"
-                                        class="image-button"
-                                        on:click={() => openImageModal(card.front_image, card.back_image)}
-                                        aria-label="View ID card images">
-                                        <img 
-                                            src={card.back_image} 
-                                            alt="Back ID" 
-                                            class="id-thumbnail"
-                                            on:error={() => console.error(`Failed to load back image for card ${card.id}`)} 
-                                        />
-                                    </button>
-                                {:else}
-                                    <span>No back image</span>
-                                {/if}
-                            </td>
-                            <td class="actions">
-                                <button class="download" on:click={() => downloadCard(card)}>
-                                    Download
-                                </button>
-                                <button class="delete" on:click={() => deleteCard(card.id)}>
-                                    Delete
-                                </button>
-                            </td>
-                        </tr>
-                    {/each}
-                </tbody>
-            </table>
+    {#if isLoading}
+        <div class="loading-overlay">
+            <div class="loading-spinner" />
+            <div class="mt-4 text-white">Loading...</div>
         </div>
     {/if}
+
+    {#if errorMessage}
+        <div class="error-message">
+            {errorMessage}
+            <button class="btn btn-primary ml-4" on:click={() => errorMessage = ''}>Dismiss</button>
+        </div>
+    {/if}
+
+    <div class="bulk-actions">
+        <label class="flex items-center gap-2">
+            <input
+                type="checkbox"
+                bind:checked={selectAll}
+                on:change={toggleSelectAll}
+            />
+            Select All
+        </label>
+
+        {#if selectedCards.size > 0}
+            <button class="btn btn-primary" on:click={bulkDownload}>
+                Download Selected ({selectedCards.size})
+            </button>
+            <button class="btn btn-destructive" on:click={bulkDelete}>
+                Delete Selected ({selectedCards.size})
+            </button>
+        {/if}
+    </div>
+
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th class="checkbox-cell">
+                        <input
+                            type="checkbox"
+                            bind:checked={selectAll}
+                            on:change={toggleSelectAll}
+                        />
+                    </th>
+                    <th class="image-cell">Preview</th>
+                    <th>Name</th>
+                    <th>License No.</th>
+                    <th>Created</th>
+                    <th class="actions-cell">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {#each idCards as card}
+                    <tr on:click={() => openPreview(card)}>
+                        <td class="checkbox-cell">
+                            <input
+                                type="checkbox"
+                                checked={selectedCards.has(card.id)}
+                                on:change={() => toggleCardSelection(card.id)}
+                                on:click|stopPropagation
+                            />
+                        </td>
+                        <td class="image-cell">
+                            {#if card.front_image}
+                                <img
+                                    src={supabase.storage.from('rendered-id-cards').getPublicUrl(card.front_image).data.publicUrl}
+                                    alt="ID Card Preview"
+                                    class="id-thumbnail"
+                                    loading="lazy"
+                                />
+                            {:else}
+                                <div class="image-placeholder">
+                                    No Image
+                                </div>
+                            {/if}
+                        </td>
+                        <td class="name-cell">{card.data?.name || 'N/A'}</td>
+                        <td class="license-cell">{card.data?.licenseNo || 'N/A'}</td>
+                        <td class="date-cell">{formatDate(card.created_at)}</td>
+                        <td class="actions-cell">
+                            <button 
+                                class="btn-download mr-2" 
+                                on:click|stopPropagation={async () => {
+                                    await downloadCard(card);
+                                }}
+                                disabled={downloadingCards.has(card.id)}
+                            >
+                                {#if downloadingCards.has(card.id)}
+                                    <div class="loading-spinner" />
+                                    <span>Loading</span>
+                                {:else}
+                                    <span>Download</span>
+                                {/if}
+                            </button>
+                            <button 
+                                class="btn btn-destructive" 
+                                on:click|stopPropagation={() => deleteCard(card.id)}
+                            >
+                                Delete
+                            </button>
+                        </td>
+                    </tr>
+                {/each}
+            </tbody>
+        </table>
+    </div>
 </div>
 
-<ImagePreviewModal 
-    frontImageUrl={selectedFrontImage}
-    backImageUrl={selectedBackImage}
-    onClose={closeImageModal}
-/>
+{#if selectedFrontImage || selectedBackImage}
+    <ImagePreviewModal
+        frontImageUrl={selectedFrontImage}
+        backImageUrl={selectedBackImage}
+        onClose={() => {
+            selectedFrontImage = null;
+            selectedBackImage = null;
+        }}
+    />
+{/if}

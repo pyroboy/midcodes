@@ -16,56 +16,70 @@
     
     // Get user profile from page store
 
-    async function deleteTemplate(id: string) {
-        if (confirm('Are you sure you want to delete this template?')) {
-            const { error } = await supabase
-                .from('templates')
-                .delete()
-                .match({ id });
-        
-            if (error) {
-                console.error('Error deleting template:', error);
-                showNotification('Error deleting template');
-            } else {
-                templates = templates.filter(t => t.id !== id);
-                if (selectedTemplate?.id === id) {
-                    selectedTemplate = null;
-                }
-                showNotification('Template deleted successfully');
+    async function deleteTemplate(template: TemplateData) {
+        try {
+            if (!confirm(`Are you sure you want to delete "${template.name}"?`)) {
+                return;
             }
+
+            // Create FormData
+            const formData = new FormData();
+            formData.append('templateId', template.id);
+
+            // Call server action
+            const response = await fetch('/id-gen/templates?/delete', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to delete template');
+            }
+
+            // Remove template from list
+            templates = templates.filter(t => t.id !== template.id);
+            showNotification('Template deleted successfully');
+        } catch (err) {
+            console.error('Error deleting template:', err);
+            showNotification('Error deleting template');
         }
     }
 
     async function duplicateTemplate(template: TemplateData) {
-        const { data, error } = await supabase
-            .from('templates')
-            .select('*')
-            .eq('id', template.id)
-            .single();
+        try {
+            // Create new template data with a new ID
+            const newTemplate: TemplateData = {
+                ...template,
+                id: crypto.randomUUID(),
+                name: `Copy of ${template.name}`,
+                created_at: new Date().toISOString()
+            };
 
-        if (error) {
-            showNotification('Error duplicating template');
-            return;
-        }
+            // Create FormData
+            const formData = new FormData();
+            formData.append('templateData', JSON.stringify(newTemplate));
 
-        const { id, ...templateData } = data;
-        const newTemplate = {
-            ...templateData,
-            name: `Copy of ${data.name}`,
-            created_at: new Date().toISOString()
-        };
+            // Call server action
+            const response = await fetch('/id-gen/templates?/create', {
+                method: 'POST',
+                body: formData
+            });
 
-        const { data: insertedTemplate, error: insertError } = await supabase
-            .from('templates')
-            .insert([newTemplate])
-            .select()
-            .single();
+            if (!response.ok) {
+                throw new Error('Failed to duplicate template');
+            }
 
-        if (insertError) {
-            showNotification('Error duplicating template');
-        } else {
-            templates = [insertedTemplate, ...templates];
+            const result = await response.json();
+            
+            // Add new template to list and show success message
+            templates = [result.data, ...templates];
             showNotification('Template duplicated successfully');
+            
+            // Reload the page to refresh the template list
+            window.location.reload();
+        } catch (err) {
+            console.error('Error duplicating template:', err);
+            showNotification('Error duplicating template');
         }
     }
 
@@ -86,10 +100,12 @@
         dispatch('select', { id: template.id });
     }
 
-    function handleActionClick(e: Event, template: TemplateData, action: 'use' | 'duplicate' | 'delete') {
-        e.stopPropagation();
-        
+    function handleActionClick(e: Event, template: TemplateData, action: 'edit' | 'use' | 'duplicate' | 'delete') {
+        e.stopPropagation(); // Prevent the template click event from firing
         switch (action) {
+            case 'edit':
+                selectTemplate(template);
+                break;
             case 'use':
                 useTemplate(template.id);
                 break;
@@ -97,7 +113,7 @@
                 duplicateTemplate(template);
                 break;
             case 'delete':
-                deleteTemplate(template.id);
+                deleteTemplate(template);
                 break;
         }
     }
@@ -110,26 +126,27 @@
     
     <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
         {#each templates as template (template.id)}
-            <article 
-                class="template-card group relative rounded-lg border bg-card transition-all duration-300 ease-in-out hover:shadow-lg"
-                aria-label={`Template: ${template.name}`}
+            <div 
+                class="bg-white rounded-lg shadow-md overflow-hidden"
+                role="article"
+                aria-label={`Template card for ${template.name}`}
                 on:mouseenter={() => hoveredTemplate = template.id}
                 on:mouseleave={() => hoveredTemplate = null}
             >
                 <button 
-                    class="aspect-[1.6/1] w-full overflow-hidden rounded-t-lg bg-muted text-left"
-                    on:click={() => selectTemplate(template)}
-                    on:keydown={(e) => e.key === 'Enter' && selectTemplate(template)}
-                    aria-label={`Edit template: ${template.name}`}
+                    class="w-full text-left"
+                    on:click={() => useTemplate(template.id)}
+                    on:keydown={(e) => e.key === 'Enter' && useTemplate(template.id)}
+                    aria-label={`Use template: ${template.name}`}
                 >
                     {#if template.front_background}
                         <img 
                             src={template.front_background} 
-                            alt={`Preview of template: ${template.name}`}
-                            class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            alt={template.name}
+                            class="aspect-[1.6/1] w-full object-cover"
                         />
                     {:else}
-                        <div class="flex h-full items-center justify-center bg-muted">
+                        <div class="aspect-[1.6/1] w-full flex items-center justify-center bg-muted">
                             <span class="text-muted-foreground">No preview</span>
                         </div>
                     {/if}
@@ -139,29 +156,15 @@
                     <h3 class="text-sm font-medium">{template.name}</h3>
                 </div>
 
-                <div 
-                    class="absolute bottom-0 left-0 right-0 flex justify-center gap-2 p-3 opacity-0 transition-opacity duration-300 bg-gradient-to-t from-background/90 to-transparent"
-                    class:opacity-100={hoveredTemplate === template.id}
-                    role="toolbar"
-                    aria-label="Template actions"
-                >
+                <div class="absolute right-2 top-2 flex gap-1">
                     <Button 
                         variant="ghost" 
                         size="sm"
                         class="h-8 w-8 p-0"
-                        on:click={() => selectTemplate(template)}
+                        on:click={(e) => handleActionClick(e, template, 'edit')}
                         aria-label={`Edit ${template.name}`}
                     >
                         <Edit class="h-4 w-4" />
-                    </Button>
-                    <Button 
-                        variant="ghost" 
-                        size="sm"
-                        class="h-8 w-8 p-0"
-                        on:click={(e) => handleActionClick(e, template, 'use')}
-                        aria-label={`Use ${template.name}`}
-                    >
-                        <ExternalLink class="h-4 w-4" />
                     </Button>
                     <Button 
                         variant="ghost" 
@@ -182,7 +185,7 @@
                         <Trash2 class="h-4 w-4" />
                     </Button>
                 </div>
-            </article>
+            </div>
         {/each}
     </div>
 </div>
@@ -197,17 +200,4 @@
 {/if}
 
 <style>
-    .template-card {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-        min-height: 200px;
-    }
-
-    /* Ensure buttons are clickable on touch devices */
-    @media (hover: none) {
-        .template-card .opacity-0 {
-            opacity: 1 !important;
-        }
-    }
 </style>

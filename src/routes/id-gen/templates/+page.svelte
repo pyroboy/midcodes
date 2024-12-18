@@ -7,6 +7,7 @@
     import { uploadImage } from '$lib/database';
     import { templateData } from '$lib/stores/templateStore';
     import type { TemplateData, TemplateElement } from '$lib/stores/templateStore';
+    import { auth, session, user } from '$lib/stores/auth';
 
     // Add data prop from server
     export let data: {
@@ -18,12 +19,10 @@
         }
     };
 
-    let user: User | null = null;
     let frontBackground: File | null = null;
     let backBackground: File | null = null;
     let frontPreview: string | null = null;
     let backPreview: string | null = null;
-    let orientation: 'landscape' | 'portrait' = 'landscape';
     let errorMessage = '';
 
     let frontElements: TemplateElement[] = [];
@@ -34,9 +33,7 @@
     let isEditMode = false;
 
     onMount(async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        user = session?.user ?? null;
-        if (!user) {
+        if (!$session) {
             window.location.href = '/login';
         }
     });
@@ -83,15 +80,24 @@
     }
 
     async function saveTemplate() {
-        console.log('front elements count:', frontElements.length);
-        console.log('back elements count:', backElements.length);
+        console.log('📝 Starting template save...', {
+            frontElementsCount: frontElements.length,
+            backElementsCount: backElements.length,
+            authStatus: {
+                hasSession: !!$session,
+                hasUser: !!$user,
+                userId: $user?.id
+            }
+        });
 
-        if (!user) {
+        if (!$session || !$user) {
+            console.error('❌ Auth check failed:', { session: !!$session, user: !!$user });
             errorMessage = 'User is not authenticated.';
             return;
         }
 
         if (!(await validateBackgrounds())) {
+            console.error('❌ Background validation failed');
             return;
         }
 
@@ -99,40 +105,74 @@
             let frontUrl = frontPreview;
             let backUrl = backPreview;
 
+            console.log('🖼️ Processing backgrounds:', {
+                hasFrontBackground: !!frontBackground,
+                hasBackBackground: !!backBackground,
+                currentFrontUrl: frontUrl,
+                currentBackUrl: backUrl
+            });
+
             if (frontBackground) {
-                frontUrl = await uploadImage(frontBackground, 'front', user.id);
+                frontUrl = await uploadImage(frontBackground, 'front', $user.id);
+                console.log('✅ Front background uploaded:', frontUrl);
             }
             if (backBackground) {
-                backUrl = await uploadImage(backBackground, 'back', user.id);
+                backUrl = await uploadImage(backBackground, 'back', $user.id);
+                console.log('✅ Back background uploaded:', backUrl);
             }
 
             const templateDataToSave: TemplateData = {
                 id: $templateData.id || crypto.randomUUID(),
-                user_id: user.id,
+                user_id: $user.id,
                 name: $templateData.name || 'My Template',
                 front_background: frontUrl!,
                 back_background: backUrl!,
-                orientation: orientation,
+                orientation: 'landscape' as const,
                 template_elements: [...frontElements, ...backElements],
                 created_at: $templateData.created_at || new Date().toISOString()
             };
 
+            console.log('📋 Template data to save:', {
+                id: templateDataToSave.id,
+                name: templateDataToSave.name,
+                userId: templateDataToSave.user_id,
+                elementsCount: templateDataToSave.template_elements.length,
+                frontElements: frontElements.map(el => ({ type: el.type, name: el.variableName })),
+                backElements: backElements.map(el => ({ type: el.type, name: el.variableName }))
+            });
+
             if (templateDataToSave.template_elements.length === 0) {
+                console.error('❌ No template elements found');
                 throw new Error('No template elements provided');
             }
 
-            const { data, error } = await supabase
-                .from('templates')
-                .upsert([templateDataToSave])
-                .select('*');
+            console.log('💾 Saving to database...');
+            
+            // Create form data
+            const formData = new FormData();
+            formData.append('templateData', JSON.stringify(templateDataToSave));
 
-            if (error) throw error;
-            if (!data || data.length === 0) throw new Error('No template data returned after upsert');
+            // Use fetch to call the server action
+            const response = await fetch('?/create', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                console.error('❌ Server action failed:', result);
+                throw new Error(result.message || 'Failed to save template');
+            }
+
+            console.log('✅ Template saved successfully:', {
+                savedData: result.data
+            });
 
             alert('Template saved successfully!');
             window.location.reload();
         } catch (error) {
-            console.error('Error saving template:', error);
+            console.error('❌ Error saving template:', error);
             errorMessage = `Error saving template: ${error instanceof Error ? error.message : JSON.stringify(error)}`;
         }
     }
@@ -215,7 +255,6 @@
             console.log('📥 EditTemplate: Template data fetched:', {
                 id: data.id,
                 name: data.name,
-                orientation: data.orientation,
                 elements: data.template_elements?.length || 0,
                 frontBackground: data.front_background?.substring(0, 50) + '...',
                 backBackground: data.back_background?.substring(0, 50) + '...'
@@ -247,17 +286,16 @@
         backBackground = null;
         frontPreview = null;
         backPreview = null;
-        orientation = 'landscape';
         frontElements = [];
         backElements = [];
         errorMessage = '';
         templateData.set({
             id: '',
-            user_id: user?.id || '',
+            user_id: $user?.id ?? '',
             name: '',
             front_background: '',
             back_background: '',
-            orientation: 'landscape',
+            orientation: 'landscape' as const,
             template_elements: [],
             created_at: new Date().toISOString()
         });
@@ -271,7 +309,6 @@
             backElements = $templateData.template_elements.filter(el => el.side === 'back');
             frontPreview = $templateData.front_background;
             backPreview = $templateData.back_background;
-            orientation = $templateData.orientation;
             
             console.log('📋 EditTemplate: Elements filtered:', {
                 front: {
@@ -346,12 +383,6 @@
                                     <div class="h-4 bg-gray-200 rounded w-1/4"></div>
                                 </div>
                             </div>
-
-                            <!-- Skeleton for orientation selector -->
-                            <div class="space-y-2">
-                                <div class="h-4 bg-gray-200 rounded w-1/6"></div>
-                                <div class="h-8 bg-gray-200 rounded w-1/3"></div>
-                            </div>
                         </div>
                     {:else}
                         <div class="template-form">
@@ -373,19 +404,6 @@
                             />
                         </div>
 
-                        <div class="mt-4">
-                            <label class="block text-sm font-medium text-gray-700">
-                                Orientation:
-                                <select 
-                                    bind:value={orientation}
-                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                                >
-                                    <option value="landscape">Landscape</option>
-                                    <option value="portrait">Portrait</option>
-                                </select>
-                            </label>
-                        </div>
-
                         {#if errorMessage}
                             <p class="mt-4 text-sm text-red-600">{errorMessage}</p>
                         {/if}
@@ -393,7 +411,7 @@
                         <div class="mt-6 flex gap-4">
                             <button 
                                 on:click={saveTemplate}
-                                class="inline-flex justify-center rounded-md border border-transparent bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                                class="inline-flex justify-center rounded-md border-0 bg-blue-600 dark:bg-blue-500 px-4 py-2 text-sm font-medium text-white shadow-md hover:bg-blue-700 dark:hover:bg-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 dark:focus:ring-blue-400 transition-colors duration-200 dark:shadow-blue-900/30"
                             >
                                 Save Template
                             </button>
