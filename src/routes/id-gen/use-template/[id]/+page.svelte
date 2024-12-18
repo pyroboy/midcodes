@@ -193,13 +193,15 @@
             });
 
             const result = await response.json();
+            console.log('Save response:', result);
 
-            if (result.error) {
-                error = result.error;
-                console.error('Save error:', result);
-            } else {
-                // Redirect to ID cards list on success
+            // Check if the response indicates success (either through type or data.success)
+            if (response.ok && (result.type === 'success' || (result.data && result.data[0]?.success))) {
+                // Save was successful, redirect to ID cards list
                 goto('/id-gen/all-ids');
+            } else {
+                error = (result.data && result.data[0]?.error) || 'Failed to save ID card';
+                console.error('Save error:', error);
             }
         } catch (err) {
             console.error('Submit error:', err);

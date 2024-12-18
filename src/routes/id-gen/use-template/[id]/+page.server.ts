@@ -72,30 +72,29 @@ interface Actions {
 }
 
 export const load = (async ({ params, locals: { supabase, safeGetSession, user, profile } }) => {
+    console.log('[Use Template Load] Starting with params:', params);
     const { session } = await safeGetSession();
+    console.log('[Use Template Load] Session:', {
+        hasSession: !!session,
+        userId: session?.user?.id,
+        hasRoleEmulation: !!session?.roleEmulation
+    });
+
     if (!session) {
         throw error(401, 'Unauthorized');
     }
 
     if (!profile) {
+        console.log('[Use Template Load] No profile found');
         throw error(400, 'Profile not found');
     }
 
-    // Get organization ID from emulated profile or regular profile
-    const orgId = (profile as EmulatedProfile).isEmulated 
-        ? session.roleEmulation?.emulated_org_id || profile.org_id
-        : profile.org_id;
-
-    if (!orgId) {
-        console.log(' [Use Template] No organization ID found:', {
-            isEmulated: (profile as EmulatedProfile).isEmulated,
-            profileOrgId: profile.org_id,
-            emulatedOrgId: session.roleEmulation?.emulated_org_id
-        });
-        throw error(400, 'Organization ID is required');
-    }
-
     const userRole = profile.role;
+    console.log('[Use Template Load] User profile:', {
+        role: userRole,
+        orgId: profile.org_id,
+        emulation: session.roleEmulation
+    });
     
     // Check if user has appropriate role (super_admin or id_gen_*)
     if (userRole !== 'super_admin' && !userRole.startsWith('id_gen')) {
@@ -133,17 +132,39 @@ export const load = (async ({ params, locals: { supabase, safeGetSession, user, 
 
     // Check organization access for non-super-admin roles
     if (userRole !== 'super_admin') {
-        console.log(' [Use Template] Checking organization access:', {
+        // Get the effective organization ID (either emulated or actual)
+        const effectiveOrgId = session?.roleEmulation?.active ? 
+            session.roleEmulation.emulated_org_id : 
+            profile.org_id;
+
+        // id_gen_admin must have an org_id
+        if (userRole === 'id_gen_admin' && !effectiveOrgId) {
+            console.log('[Use Template] Organization check:', {
+                userRole,
+                hasOrgId: false,
+                emulated: !!session?.roleEmulation?.active,
+                reason: 'id_gen_admin requires organization'
+            });
+            throw error(403, 'Access denied - Organization required for id_gen_admin role');
+        }
+
+        console.log('[Use Template] Checking organization access:', {
             userRole,
             templateOrgId: template.org_id,
-            userOrgId: orgId
+            userOrgId: effectiveOrgId,
+            emulated: !!session?.roleEmulation?.active
         });
 
-        if (template.org_id !== orgId) {
-            throw error(403, 'You do not have access to this template');
+        if (template.org_id !== effectiveOrgId) {
+            throw error(403, '1 You do not have access to this template');
         }
     } else {
-        console.log(' [Use Template] Skipping organization check for super_admin');
+        console.log('[Use Template] Skipping organization check:', {
+            userRole,
+            hasOrgId: !!profile.org_id,
+            emulated: !!session?.roleEmulation?.active,
+            reason: 'super_admin'
+        });
     }
 
     return {
@@ -153,65 +174,51 @@ export const load = (async ({ params, locals: { supabase, safeGetSession, user, 
 
 export const actions: Actions = {
     saveIdCard: async ({ request, locals: { supabase, safeGetSession, user, profile } }) => {
-        console.log(' [Save ID Card] Starting save process...');
+        console.log('[Save ID Card] Starting save process...');
         
         try {
             const { session } = await safeGetSession();
+            console.log('[Save ID Card] Session:', {
+                hasSession: !!session,
+                userId: session?.user?.id,
+                hasRoleEmulation: !!session?.roleEmulation,
+                emulationDetails: session?.roleEmulation
+            });
+
             if (!session) {
-                console.log(' [Save ID Card] No session found');
+                console.log('[Save ID Card] No session found');
                 return fail(401, { error: 'Unauthorized' });
             }
 
             if (!profile) {
-                console.log(' [Save ID Card] No profile found');
+                console.log('[Save ID Card] No profile found');
                 return fail(400, { error: 'Profile not found' });
             }
 
-            // Get organization ID from emulated profile or regular profile
-            const orgId = (profile as EmulatedProfile).isEmulated 
-                ? session.roleEmulation?.emulated_org_id || profile.org_id
-                : profile.org_id;
-
-            if (!orgId) {
-                console.log(' [Save ID Card] No organization ID found:', {
-                    isEmulated: (profile as EmulatedProfile).isEmulated,
-                    profileOrgId: profile.org_id,
-                    emulatedOrgId: session.roleEmulation?.emulated_org_id
-                });
-                return fail(400, { error: 'Organization ID is required' });
+            const userRole = profile.role;
+            console.log('[Save ID Card] User profile:', {
+                role: userRole,
+                orgId: profile.org_id,
+                emulation: session.roleEmulation
+            });
+            
+            // Check if user has appropriate role (super_admin or id_gen_*)
+            if (userRole !== 'super_admin' && !userRole.startsWith('id_gen')) {
+                console.log('[Save ID Card] Insufficient permissions:', { userRole });
+                return fail(403, { error: 'Insufficient permissions' });
             }
 
             const formData = await request.formData();
-            console.log(' [Save ID Card] Form data received:', {
+            console.log('[Save ID Card] Form data received:', {
                 fields: Array.from(formData.keys()),
-                hasFiles: Array.from(formData.keys()).some(key => formData.get(key) instanceof File)
-            });
-
-            // Extract form fields
-            const formFields: Record<string, string> = {};
-            for (const [key, value] of formData.entries()) {
-                if (key.startsWith('form_') && typeof value === 'string') {
-                    formFields[key.replace('form_', '')] = value;
-                }
-            }
-
-            console.log(' [Save ID Card] Extracted form fields:', {
-                count: Object.keys(formFields).length,
-                fields: Object.keys(formFields)
+                hasFiles: Array.from(formData.keys()).some(key => formData.get(key) instanceof File),
+                templateId: formData.get('templateId')?.toString()
             });
 
             const templateId = formData.get('templateId')?.toString();
             if (!templateId) {
-                console.log(' [Save ID Card] No template ID provided');
+                console.log('[Save ID Card] No template ID provided');
                 return fail(400, { error: 'Template ID is required' });
-            }
-
-            const userRole = profile.role;
-            
-            // Check if user has appropriate role (super_admin or id_gen_*)
-            if (userRole !== 'super_admin' && !userRole.startsWith('id_gen')) {
-                console.log(' [Save ID Card] Insufficient permissions:', { userRole });
-                return fail(403, { error: 'Insufficient permissions' });
             }
 
             // Verify template access
@@ -221,8 +228,14 @@ export const actions: Actions = {
                 .eq('id', templateId)
                 .single();
 
+            console.log('[Save ID Card] Template lookup:', {
+                found: !!template,
+                error: templateError?.message,
+                templateOrgId: template?.org_id
+            });
+
             if (templateError || !template) {
-                console.log(' [Save ID Card] Template not found:', {
+                console.log('[Save ID Card] Template not found:', {
                     error: templateError,
                     templateId
                 });
@@ -231,66 +244,132 @@ export const actions: Actions = {
 
             // Check organization access for non-super-admin roles
             if (userRole !== 'super_admin') {
-                console.log(' [Save ID Card] Checking organization access:', {
+                // Get the effective organization ID (either emulated or actual)
+                const effectiveOrgId = session?.roleEmulation?.active ? 
+                    session.roleEmulation.emulated_org_id : 
+                    profile.org_id || '';
+
+                // id_gen_admin must have an org_id
+                if (userRole === 'id_gen_admin' && !effectiveOrgId) {
+                    console.log('[Save ID Card] Organization check:', {
+                        userRole,
+                        hasOrgId: false,
+                        emulated: !!session?.roleEmulation?.active,
+                        reason: 'id_gen_admin requires organization'
+                    });
+                    return fail(403, { error: 'Access denied - Organization required for id_gen_admin role' });
+                }
+
+                const templateOrgId = template.org_id || '';
+                
+                console.log('[Save ID Card] Checking organization access:', {
                     userRole,
-                    templateOrgId: template.org_id,
-                    userOrgId: orgId
+                    templateOrgId,
+                    effectiveOrgId,
+                    emulated: !!session?.roleEmulation?.active
                 });
 
-                if (template.org_id !== orgId) {
-                    return fail(403, { error: 'You do not have access to this template' });
+                // Allow access if either both are empty or they match
+                const hasAccess = 
+                    (templateOrgId === '' && effectiveOrgId === '') || 
+                    (templateOrgId === effectiveOrgId);
+                    
+                if (!hasAccess) {
+                    return fail(403, { error: '2 You do not have access to this template' });
                 }
+            } else {
+                console.log('[Save ID Card] Skipping organization check:', {
+                    userRole,
+                    hasOrgId: !!profile.org_id,
+                    emulated: !!session?.roleEmulation?.active,
+                    reason: 'super_admin'
+                });
             }
 
             // Handle image uploads
-            console.log(' [Save ID Card] Processing image uploads...');
+            console.log('[Save ID Card] Processing image uploads...');
+            const effectiveOrgId = (session?.roleEmulation?.active ? 
+                session.roleEmulation.emulated_org_id : 
+                profile.org_id) ?? '';
+
+            console.log('[Save ID Card] Organization resolution:', {
+                effectiveOrgId,
+                fromEmulation: session?.roleEmulation?.active,
+                emulatedOrgId: session?.roleEmulation?.emulated_org_id,
+                profileOrgId: profile.org_id
+            });
+
+            if (!effectiveOrgId) {
+                console.log('[Save ID Card] No organization ID found');
+                return fail(400, { error: 'Organization ID is required' });
+            }
+
             const uploadResult = await handleImageUploads(
                 supabase,
                 formData,
-                orgId,
+                effectiveOrgId,
                 templateId
             );
 
-            if (uploadResult.error) {
-                console.error(' [Save ID Card] Upload error:', uploadResult.error);
-                return fail(500, { error: uploadResult.error });
+            console.log('[Save ID Card] Upload result:', {
+                success: !('error' in uploadResult),
+                error: 'error' in uploadResult ? uploadResult.error : null,
+                paths: !('error' in uploadResult) ? {
+                    front: uploadResult.frontPath,
+                    back: uploadResult.backPath
+                } : null
+            });
+
+            if ('error' in uploadResult) {
+                console.error('[Save ID Card] Upload error:', uploadResult.error);
+                return fail(500, { error: 'Failed to upload images' });
             }
 
             // Save ID card data
-            console.log(' [Save ID Card] Saving ID card data:', {
-                templateId,
-                orgId,
-                formFields
-            });
-
+            console.log('[Save ID Card] Saving ID card data...');
             const { data: idCard, error: saveError } = await saveIdCardData(supabase, {
                 templateId,
-                orgId,
+                orgId: effectiveOrgId,
                 frontPath: uploadResult.frontPath,
                 backPath: uploadResult.backPath,
-                formFields
+                formFields: {}
+            });
+
+            console.log('[Save ID Card] Save result:', {
+                success: !!idCard,
+                error: saveError,
+                idCardId: idCard?.id
             });
 
             if (saveError) {
-                console.error(' [Save ID Card] Save error:', saveError);
-                // Clean up uploaded images if data save fails
-                await Promise.all([
-                    deleteFromStorage(supabase, 'rendered-id-cards', uploadResult.frontPath),
-                    deleteFromStorage(supabase, 'rendered-id-cards', uploadResult.backPath)
-                ]);
+                console.error('[Save ID Card] Save error:', saveError);
                 return fail(500, { error: 'Failed to save ID card' });
             }
 
-            console.log(' [Save ID Card] Successfully saved ID card:', {
+            console.log('[Save ID Card] Successfully saved ID card:', {
                 idCardId: idCard?.id,
                 frontPath: uploadResult.frontPath,
                 backPath: uploadResult.backPath
             });
 
-            return { success: true };
+            // Return success response
+            return {
+                type: 'success',
+                data: [{
+                    success: true,
+                    idCardId: idCard?.id
+                }]
+            };
             
         } catch (error) {
-            console.error(' [Save ID Card] Unexpected error:', error);
+            console.error('[Save ID Card] Unexpected error:', error);
+            if (error instanceof Error) {
+                console.error('[Save ID Card] Error details:', {
+                    name: error.name,
+                    message: error.message,
+                    stack: error.stack
+                });
+            }
             return fail(500, { error: 'An unexpected error occurred' });
         }
     }

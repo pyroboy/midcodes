@@ -15,8 +15,7 @@
     const dispatch = createEventDispatcher();
     
     // Get user profile from page store
-    $: profile = $page.data.profile;
-    
+
     async function deleteTemplate(id: string) {
         if (confirm('Are you sure you want to delete this template?')) {
             const { error } = await supabase
@@ -70,7 +69,7 @@
         }
     }
 
-    async function useTemplate(id: string) {
+    function useTemplate(id: string) {
         goto(`/id-gen/use-template/${id}`);
     }
 

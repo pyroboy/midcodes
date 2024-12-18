@@ -2,6 +2,7 @@
     import { onMount } from 'svelte';
     import { supabase } from '$lib/supabaseClient';
     import JSZip from 'jszip';
+    import ImagePreviewModal from '$lib/components/ImagePreviewModal.svelte';
     
     interface IdCard {
      id: string;
@@ -22,46 +23,71 @@
     let selectAll = false;
     let isLoading = true;
     let errorMessage = '';
+    let selectedFrontImage: string | null = null;
+    let selectedBackImage: string | null = null;
     
     onMount(async () => {
         await fetchIdCards();
     });
     
     async function fetchIdCards() {
-    isLoading = true;
-    errorMessage = '';
-    console.log('Fetching ID cards...');
-    const { data, error } = await supabase
-        .from('idcards')
-        .select('*')
-        .order('created_at', { ascending: false });
+        isLoading = true;
+        errorMessage = '';
+        console.log('Starting fetchIdCards()...');
+        
+        try {
+            console.log('Querying Supabase...');
+            const { data, error } = await supabase
+                .from('idcards')
+                .select('*')
+                .order('created_at', { ascending: false });
 
-    if (error) {
-        console.error('Error fetching ID cards:', error);
-        errorMessage = `Error fetching ID cards: ${error.message}`;
-    } else {
-        console.log('Fetched data:', data);
-        if (data && data.length > 0) {
-       idCards = await Promise.all(data.map(async (card: any) => {
-         const parsedData = typeof card.data === 'string' ? JSON.parse(card.data) : card.data;
-         return {
-           ...card,
-           front_image: await getPublicUrl(card.front_image),
-           back_image: await getPublicUrl(card.back_image),
-           data: parsedData
-         };
-       }));
-     }else {
-            console.log('No ID cards found');
-            errorMessage = 'No ID cards found';
+            if (error) {
+                console.error('Error fetching ID cards:', error);
+                errorMessage = `Error fetching ID cards: ${error.message}`;
+                return;
+            }
+
+            console.log('Raw data from Supabase:', data);
+            
+            if (data && data.length > 0) {
+                console.log(`Processing ${data.length} ID cards...`);
+                idCards = await Promise.all(data.map(async (card: any, index: number) => {
+                    console.log(`Processing card ${index + 1}/${data.length}`);
+                    const parsedData = typeof card.data === 'string' ? JSON.parse(card.data) : card.data;
+                    console.log(`Getting public URL for card ${index + 1} images...`);
+                    const frontUrl = await getPublicUrl(card.front_image);
+                    const backUrl = await getPublicUrl(card.back_image);
+                    console.log(`Finished processing card ${index + 1}`);
+                    return {
+                        ...card,
+                        front_image: frontUrl,
+                        back_image: backUrl,
+                        data: parsedData
+                    };
+                }));
+                console.log('Finished processing all cards');
+            } else {
+                console.log('No ID cards found in the response');
+                errorMessage = 'No ID cards found';
+            }
+        } catch (e: any) {
+            console.error('Unexpected error in fetchIdCards:', e);
+            errorMessage = `Unexpected error: ${e.message}`;
+        } finally {
+            console.log('Setting isLoading to false');
+            isLoading = false;
         }
     }
-    isLoading = false;
-}
 
     async function getPublicUrl(path: string): Promise<string> {
-        if (!path) return '';
+        if (!path) {
+            console.log('[Debug] Empty path provided to getPublicUrl');
+            return '';
+        }
+        console.log('[Debug] Getting public URL for path:', path);
         const { data } = await supabase.storage.from('rendered-id-cards').getPublicUrl(path);
+        console.log('[Debug] Got public URL:', data.publicUrl);
         return data.publicUrl;
     }
     
@@ -173,6 +199,18 @@
             selectAll = false;
         }
     }
+
+    function openImageModal(frontImage: string, backImage: string) {
+        console.log('[Debug] Opening modal with images:', { frontImage, backImage });
+        selectedFrontImage = frontImage;
+        selectedBackImage = backImage;
+    }
+
+    function closeImageModal() {
+        console.log('[Debug] Closing modal');
+        selectedFrontImage = null;
+        selectedBackImage = null;
+    }
 console.log(idCards)
     
 </script>
@@ -180,6 +218,80 @@ console.log(idCards)
 <svelte:head>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
 </svelte:head>
+
+<style lang="postcss">
+    .id-cards-container {
+        @apply p-4;
+    }
+
+    h2 {
+        @apply text-2xl font-bold mb-4 text-foreground;
+    }
+
+    .bulk-actions {
+        @apply mb-4 flex gap-2;
+    }
+
+    .bulk-actions button {
+        @apply px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed;
+    }
+
+    table {
+        @apply w-full border-collapse bg-card text-card-foreground;
+    }
+
+    thead {
+        @apply bg-muted;
+    }
+
+    th {
+        @apply px-4 py-2 text-left font-medium text-muted-foreground border-b border-border;
+    }
+
+    td {
+        @apply px-4 py-2 border-b border-border;
+    }
+
+    .actions {
+        @apply flex gap-2;
+    }
+
+    .actions button {
+        @apply px-3 py-1 rounded text-sm;
+    }
+
+    .actions button.download {
+        @apply bg-primary text-primary-foreground hover:bg-primary/90;
+    }
+
+    .actions button.delete {
+        @apply bg-destructive text-destructive-foreground hover:bg-destructive/90;
+    }
+
+    .error {
+        @apply text-destructive;
+    }
+
+    .checkbox-cell {
+        @apply w-8 text-center;
+    }
+
+    input[type="checkbox"] {
+        @apply w-4 h-4 rounded border-primary text-primary focus:ring-primary;
+    }
+
+    .image-cell {
+        @apply relative;
+    }
+
+    .image-button {
+        @apply p-0 border-0 bg-transparent hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary rounded;
+    }
+
+    .id-thumbnail {
+        @apply h-12 w-auto object-contain;
+    }
+</style>
 
 <div class="id-cards-container">
     <h2>Generated ID Cards</h2>
@@ -196,117 +308,92 @@ console.log(idCards)
             <button on:click={bulkDelete} disabled={selectedCards.size === 0}>Delete Selected</button>
         </div>
 
-        <table>
-            <thead>
-                <tr>
-                    <th>
-                        <input type="checkbox" bind:checked={selectAll} on:change={toggleSelectAll}>
-                    </th>
-                    <th>Name</th>
-                    <th>ID Number</th>
-                    <th>Created At</th>
-                    <th>Front Image</th>
-                    <th>Back Image</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {#each idCards as card}
+        <div class="rounded-md border">
+            <table>
+                <thead>
                     <tr>
-                         
-                        <td>
-                            <input 
-                                type="checkbox" 
-                                checked={selectedCards.has(card.id)} 
-                                on:change={() => toggleCardSelection(card.id)}
-                            >
-                        </td>
-
-             
-                        <td>{card.data?.name || 'N/A'}</td>
-                        <td>{card.data?.licenseNo || 'N/A'}</td>
-                        <td>{formatDate(card.created_at)}</td>
-                        <td class="image-cell">
-                            {#if card.front_image}
-                                <img src={card.front_image} alt="Front" class="id-thumbnail" on:error={() => console.error(`Failed to load front image for card ${card.id}`)} />
-                                <div class="image-hover">
-                                    <img src={card.front_image} alt="Front Large" class="large-preview" />
-                                </div>
-                            {:else}
-                                <span>No front image</span>
-                            {/if}
-                        </td>
-                        <td class="image-cell">
-                            {#if card.back_image}
-                                <img src={card.back_image} alt="Back" class="id-thumbnail" on:error={() => console.error(`Failed to load back image for card ${card.id}`)} />
-                                <div class="image-hover">
-                                    <img src={card.back_image} alt="Back Large" class="large-preview" />
-                                </div>
-                            {:else}
-                                <span>No back image</span>
-                            {/if}
-                        </td>
-                        <td>
-                            <button on:click={() => downloadCard(card)}>Download</button>
-                            <button on:click={() => deleteCard(card.id)}>Delete</button>
-                        </td>
+                        <th class="checkbox-cell">
+                            <input
+                                type="checkbox"
+                                bind:checked={selectAll}
+                                on:change={toggleSelectAll}
+                            />
+                        </th>
+                        <th>Name</th>
+                        <th>ID Number</th>
+                        <th>Created At</th>
+                        <th>Front Image</th>
+                        <th>Back Image</th>
+                        <th>Actions</th>
                     </tr>
-                {/each}
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    {#each idCards as card}
+                        <tr class="hover:bg-muted/50">
+                            <td class="checkbox-cell">
+                                <input
+                                    type="checkbox"
+                                    checked={selectedCards.has(card.id)}
+                                    on:change={() => toggleCardSelection(card.id)}
+                                />
+                            </td>
+                            <td>{card.data?.name || 'N/A'}</td>
+                            <td>{card.data?.licenseNo || 'N/A'}</td>
+                            <td>{formatDate(card.created_at)}</td>
+                            <td class="image-cell">
+                                {#if card.front_image}
+                                    <button 
+                                        type="button"
+                                        class="image-button"
+                                        on:click={() => openImageModal(card.front_image, card.back_image)}
+                                        aria-label="View ID card images">
+                                        <img 
+                                            src={card.front_image} 
+                                            alt="Front ID" 
+                                            class="id-thumbnail"
+                                            on:error={() => console.error(`Failed to load front image for card ${card.id}`)} 
+                                        />
+                                    </button>
+                                {:else}
+                                    <span>No front image</span>
+                                {/if}
+                            </td>
+                            <td class="image-cell">
+                                {#if card.back_image}
+                                    <button 
+                                        type="button"
+                                        class="image-button"
+                                        on:click={() => openImageModal(card.front_image, card.back_image)}
+                                        aria-label="View ID card images">
+                                        <img 
+                                            src={card.back_image} 
+                                            alt="Back ID" 
+                                            class="id-thumbnail"
+                                            on:error={() => console.error(`Failed to load back image for card ${card.id}`)} 
+                                        />
+                                    </button>
+                                {:else}
+                                    <span>No back image</span>
+                                {/if}
+                            </td>
+                            <td class="actions">
+                                <button class="download" on:click={() => downloadCard(card)}>
+                                    Download
+                                </button>
+                                <button class="delete" on:click={() => deleteCard(card.id)}>
+                                    Delete
+                                </button>
+                            </td>
+                        </tr>
+                    {/each}
+                </tbody>
+            </table>
+        </div>
     {/if}
 </div>
 
-<style>
-    .id-cards-container {
-        padding: 20px;
-    }
-    table {
-        width: 100%;
-        border-collapse: collapse;
-    }
-    th, td {
-        border: 1px solid #ddd;
-        padding: 8px;
-        text-align: left;
-    }
-    th {
-        background-color: #f2f2f2;
-    }
-    .id-thumbnail {
-        width: auto;
-        height: 50px;
-        object-fit: contain;
-    }
-    .bulk-actions {
-        margin-bottom: 10px;
-    }
-    button {
-        margin-right: 5px;
-    }
-    .error {
-        color: red;
-    }
-    .image-cell {
-        position: relative;
-    }
-    .image-hover {
-        display: none;
-        position: absolute;
-        top: 100%;
-        left: 0;
-        z-index: 1000;
-        background-color: white;
-        border: 1px solid #ddd;
-        padding: 5px;
-        box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    }
-    .image-cell:hover .image-hover {
-        display: block;
-    }
-    .large-preview {
-        width: 3in;
-        height: 2in;
-        object-fit: contain;
-    }
-</style>
+<ImagePreviewModal 
+    frontImageUrl={selectedFrontImage}
+    backImageUrl={selectedBackImage}
+    onClose={closeImageModal}
+/>
