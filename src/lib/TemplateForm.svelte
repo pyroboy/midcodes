@@ -9,8 +9,42 @@
     import { loadGoogleFonts, getAllFontFamilies, isFontLoaded, fonts } from './config/fonts';
 
     export let side: 'front' | 'back';
-    export let preview: string | null;
-    export let elements: TemplateElement[];
+    export let preview: string | null = null;
+    export let elements: TemplateElement[] = [];
+
+    $: {
+        if (elements) {
+            console.log(`📝 TemplateForm [${side}]:`, {
+                preview: preview ? 'present' : 'none',
+                elements: {
+                    count: elements.length,
+                    details: elements.map(e => ({
+                        name: e.variableName,
+                        type: e.type,
+                        content: e.content,
+                        position: { x: e.x, y: e.y },
+                        style: {
+                            font: e.font,
+                            size: e.size,
+                            color: e.color
+                        }
+                    }))
+                }
+            });
+        }
+    }
+
+    $: {
+        console.log(`🔄 TemplateForm (${side}):`, {
+            preview,
+            elements: elements?.map(e => ({
+                name: e.variableName,
+                content: e.content,
+                x: e.x,
+                y: e.y
+            }))
+        });
+    }
 
     const dispatch = createEventDispatcher();
     const BASE_WIDTH = 506.5;

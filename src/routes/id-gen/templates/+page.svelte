@@ -8,6 +8,16 @@
     import { templateData } from '$lib/stores/templateStore';
     import type { TemplateData, TemplateElement } from '$lib/stores/templateStore';
 
+    // Add data prop from server
+    export let data: {
+        templates: TemplateData[],
+        user: {
+            id: string;
+            role: string;
+            org_id: string | null;
+        }
+    };
+
     let user: User | null = null;
     let frontBackground: File | null = null;
     let backBackground: File | null = null;
@@ -18,6 +28,10 @@
 
     let frontElements: TemplateElement[] = [];
     let backElements: TemplateElement[] = [];
+
+    // Add view mode state
+    let isLoading = false;
+    let isEditMode = false;
 
     onMount(async () => {
         const { data: { session } } = await supabase.auth.getSession();
@@ -100,6 +114,7 @@
                 back_background: backUrl!,
                 orientation: orientation,
                 template_elements: [...frontElements, ...backElements],
+                created_at: $templateData.created_at || new Date().toISOString()
             };
 
             if (templateDataToSave.template_elements.length === 0) {
@@ -173,104 +188,61 @@
         }));
     }
 
-
-    async function fetchTemplateDetails(templateId: string): Promise<TemplateData> {
-    console.log('🔄 EditTemplate: Fetching template details for ID:', templateId);
-    const { data, error } = await supabase
-        .from('templates')
-        .select(`
-            id,
-            user_id,
-            name,
-            front_background,
-            back_background,
-            orientation,
-            template_elements
-        `)
-        .eq('id', templateId)
-        .single();
-
-    if (error) {
-        console.error('❌ EditTemplate: Error fetching template details:', error);
-        throw error;
-    }
-
-    if (!data) {
-        console.error('❌ EditTemplate: Template not found');
-        throw new Error('Template not found');
-    }
-
-    console.log('✅ EditTemplate: Template details fetched successfully:', data);
-
-    const templateData: TemplateData = {
-        id: data.id,
-        user_id: data.user_id,
-        name: data.name,
-        front_background: data.front_background,
-        back_background: data.back_background,
-        orientation: data.orientation,
-        template_elements: data.template_elements.map((el: any): TemplateElement => ({
-            variableName: el.variableName,
-            type: el.type as 'text' | 'photo',
-            side: el.side as 'front' | 'back',
-            content: el.content,
-            x: el.x,
-            y: el.y,
-            width: el.width,
-            height: el.height,
-            font: el.font,
-            size: el.size,
-            color: el.color,
-            alignment: el.alignment as 'left' | 'center' | 'right',
-        })),
-    };
-
-    console.log('✅ EditTemplate: Template data transformed:', templateData);
-    return templateData;
-}
-
-async function handleTemplateSelect(event: CustomEvent) {
-    console.log('🔄 EditTemplate: Template select event received:', event.detail);
-    try {
-        const data = await fetchTemplateDetails(event.detail.id);
-        if (data) {
-            console.log('🔄 EditTemplate: Updating component state with template data');
-            orientation = data.orientation;
-            frontPreview = data.front_background;
-            backPreview = data.back_background;
-            frontElements = data.template_elements.filter((el) => el.side === 'front');
-            backElements = data.template_elements.filter((el) => el.side === 'back');
+    async function handleTemplateSelect(event: CustomEvent<{ id: string }>) {
+        const templateId = event.detail.id;
+        console.log('🔄 EditTemplate: Template select event received:', event.detail);
+        
+        // Immediately show loading state
+        isEditMode = true;
+        isLoading = true;
+        
+        try {
+            const response = await fetch(`/api/templates/${templateId}`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                },
+                credentials: 'include'
+            });
             
-            console.log('🔄 EditTemplate: Front elements count:', frontElements.length);
-            console.log('🔄 EditTemplate: Back elements count:', backElements.length);
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('❌ EditTemplate: Server response:', errorText);
+                throw new Error('Failed to fetch template. Please try again.');
+            }
             
-            templateData.set(data);
-            console.log('✅ EditTemplate: Template store updated');
-            
+            const data = await response.json();
+            console.log('📥 EditTemplate: Template data fetched:', {
+                id: data.id,
+                name: data.name,
+                orientation: data.orientation,
+                elements: data.template_elements?.length || 0,
+                frontBackground: data.front_background?.substring(0, 50) + '...',
+                backBackground: data.back_background?.substring(0, 50) + '...'
+            });
+
+            // Update store which will trigger reactive updates
+            templateData.select(data);
             frontBackground = null;
             backBackground = null;
             errorMessage = '';
-            console.log('✅ EditTemplate: Template selection complete');
+        } catch (err: unknown) {
+            const error = err as Error;
+            console.error('❌ EditTemplate: Error:', error);
+            errorMessage = error.message || 'An unexpected error occurred. Please try again.';
+            isEditMode = false;
+        } finally {
+            isLoading = false;
         }
-    } catch (error) {
-        console.error('❌ EditTemplate: Error in template selection:', error);
-        errorMessage = 'Error fetching template details. Please try again.';
     }
-}
-$: {
-    if ($templateData) {
-        console.log('🔄 EditTemplate: Template store updated:', {
-            id: $templateData.id,
-            name: $templateData.name,
-            elementsCount: $templateData.template_elements.length
-        });
-        frontElements = $templateData.template_elements.filter((el) => el.side === 'front');
-        backElements = $templateData.template_elements.filter((el) => el.side === 'back');
-        console.log('✅ EditTemplate: Elements filtered - Front:', frontElements.length, 'Back:', backElements.length);
+
+    function handleBack() {
+        isEditMode = false;
+        clearForm();
     }
-}
 
     function clearForm() {
+        console.log('🔄 EditTemplate: Clearing form');
         frontBackground = null;
         backBackground = null;
         frontPreview = null;
@@ -286,96 +258,213 @@ $: {
             front_background: '',
             back_background: '',
             orientation: 'landscape',
-            template_elements: []
+            template_elements: [],
+            created_at: new Date().toISOString()
         });
+        console.log('✅ EditTemplate: Form cleared');
     }
 
+    // Reactive declarations for template elements
     $: {
-        if ($templateData) {
-            frontElements = $templateData.template_elements.filter((el) => el.side === 'front');
-            backElements = $templateData.template_elements.filter((el) => el.side === 'back');
+        if ($templateData && $templateData.template_elements) {
+            frontElements = $templateData.template_elements.filter(el => el.side === 'front');
+            backElements = $templateData.template_elements.filter(el => el.side === 'back');
+            frontPreview = $templateData.front_background;
+            backPreview = $templateData.back_background;
+            orientation = $templateData.orientation;
+            
+            console.log('📋 EditTemplate: Elements filtered:', {
+                front: {
+                    count: frontElements.length,
+                    elements: frontElements.map(e => ({
+                        name: e.variableName,
+                        type: e.type,
+                        position: { x: e.x, y: e.y }
+                    }))
+                },
+                back: {
+                    count: backElements.length,
+                    elements: backElements.map(e => ({
+                        name: e.variableName,
+                        type: e.type,
+                        position: { x: e.x, y: e.y }
+                    }))
+                }
+            });
         }
     }
 </script>
 
-<main>
-    <div class="edit-template-container">
-        <TemplateList on:select={handleTemplateSelect} />
-        <div class="template-form-container">
-            <h1>Edit Template</h1>
+<main class="h-full">
+    <div class="edit-template-container {isEditMode ? 'edit-mode' : ''}">
+        {#if !isEditMode}
+            <TemplateList templates={data.templates} on:select={handleTemplateSelect} />
+        {:else}
+            <div class="template-form-container active">
+                <div class="back-button-container">
+                    <button 
+                        on:click={handleBack}
+                        class="back-button inline-flex items-center text-lg dark:text-gray-300 text-gray-700 hover:text-primary dark:hover:text-primary-400"
+                    >
+                        <svg 
+                            xmlns="http://www.w3.org/2000/svg" 
+                            viewBox="0 0 24 24" 
+                            fill="none" 
+                            stroke="currentColor" 
+                            class="w-6 h-6 mr-2"
+                            stroke-width="2.5" 
+                            stroke-linecap="round" 
+                            stroke-linejoin="round"
+                        >
+                            <path d="M19 12H5M12 19l-7-7 7-7"/>
+                        </svg>
+                        Back
+                    </button>
+                </div>
 
-            <TemplateForm
-                side="front"
-                preview={frontPreview}
-                elements={frontElements}
-                on:imageUpload={handleImageUpload}
-                on:removeImage={removeImage}
-                on:update={updateElements}
-            />
+                <div class="template-content">
+                    <h1 class="text-2xl font-bold mb-6">Edit Template</h1>
 
-            <TemplateForm
-                side="back"
-                preview={backPreview}
-                elements={backElements}
-                on:imageUpload={handleImageUpload}
-                on:removeImage={removeImage}
-                on:update={updateElements}
-            />
+                    {#if isLoading}
+                        <div class="animate-pulse space-y-8">
+                            <!-- Skeleton for front template form -->
+                            <div class="space-y-4">
+                                <div class="h-8 bg-gray-200 rounded w-1/4"></div>
+                                <div class="h-64 bg-gray-200 rounded"></div>
+                                <div class="space-y-2">
+                                    <div class="h-4 bg-gray-200 rounded w-1/3"></div>
+                                    <div class="h-4 bg-gray-200 rounded w-1/4"></div>
+                                </div>
+                            </div>
 
-            <div>
-                <label>
-                    Orientation:
-                    <select bind:value={orientation}>
-                        <option value="landscape">Landscape</option>
-                        <option value="portrait">Portrait</option>
-                    </select>
-                </label>
+                            <!-- Skeleton for back template form -->
+                            <div class="space-y-4">
+                                <div class="h-8 bg-gray-200 rounded w-1/4"></div>
+                                <div class="h-64 bg-gray-200 rounded"></div>
+                                <div class="space-y-2">
+                                    <div class="h-4 bg-gray-200 rounded w-1/3"></div>
+                                    <div class="h-4 bg-gray-200 rounded w-1/4"></div>
+                                </div>
+                            </div>
+
+                            <!-- Skeleton for orientation selector -->
+                            <div class="space-y-2">
+                                <div class="h-4 bg-gray-200 rounded w-1/6"></div>
+                                <div class="h-8 bg-gray-200 rounded w-1/3"></div>
+                            </div>
+                        </div>
+                    {:else}
+                        <div class="template-form">
+                            <TemplateForm
+                                side="front"
+                                bind:elements={frontElements}
+                                bind:preview={frontPreview}
+                                on:imageUpload={handleImageUpload}
+                                on:removeImage={removeImage}
+                            />
+                        </div>
+                        <div class="template-form">
+                            <TemplateForm
+                                side="back"
+                                bind:elements={backElements}
+                                bind:preview={backPreview}
+                                on:imageUpload={handleImageUpload}
+                                on:removeImage={removeImage}
+                            />
+                        </div>
+
+                        <div class="mt-4">
+                            <label class="block text-sm font-medium text-gray-700">
+                                Orientation:
+                                <select 
+                                    bind:value={orientation}
+                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                                >
+                                    <option value="landscape">Landscape</option>
+                                    <option value="portrait">Portrait</option>
+                                </select>
+                            </label>
+                        </div>
+
+                        {#if errorMessage}
+                            <p class="mt-4 text-sm text-red-600">{errorMessage}</p>
+                        {/if}
+
+                        <div class="mt-6 flex gap-4">
+                            <button 
+                                on:click={saveTemplate}
+                                class="inline-flex justify-center rounded-md border border-transparent bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                            >
+                                Save Template
+                            </button>
+                            <button 
+                                on:click={clearForm}
+                                class="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                            >
+                                Clear Form
+                            </button>
+                        </div>
+                    {/if}
+                </div>
             </div>
-
-            {#if errorMessage}
-                <p class="error">{errorMessage}</p>
-            {/if}
-
-            <button on:click={saveTemplate}>Save Template</button>
-            <button on:click={clearForm}>Clear Form</button>
-        </div>
+        {/if}
     </div>
 </main>
 
 <style>
     .edit-template-container {
         display: flex;
-        width: 100vw;
-        height: 100vh;
+        width: 100%;
+        height: 100%;
+        transition: all 0.3s ease;
+    }
+
+    .edit-template-container.edit-mode {
+        justify-content: center;
     }
 
     .template-form-container {
         flex: 1;
-        padding: 20px;
+        padding: 2rem;
         overflow-y: auto;
+        max-width: 100%;
+        transition: all 0.3s ease;
+        position: relative;
     }
 
-    /* .template-form-container h1 {
-        @apply text-foreground mb-6;
+    .template-form-container.active {
+        max-width: 1200px;
+        margin: 0 auto;
     }
 
-    .template-form-container label {
-        @apply text-foreground;
+    .back-button-container {
+        position: sticky;
+        top: 0;
+        left: 0;
+        padding: 1rem 0;
+        z-index: 10;
     }
 
-    .template-form-container select {
-        @apply bg-background text-foreground border-input mt-1 p-2 rounded-md;
+    .back-button {
+        font-size: 1.125rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
     }
 
-    .template-form-container button {
-        @apply bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md mt-4 mr-2;
+    .template-content {
+        padding-top: 1rem;
     }
 
-    .template-form-container button:last-child {
-        @apply bg-secondary text-secondary-foreground hover:bg-secondary/90;
+    :global(.animate-pulse) {
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
     }
 
-    .error {
-        @apply text-destructive font-medium mt-2;
-    } */
+    @keyframes pulse {
+        0%, 100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: .5;
+        }
+    }
 </style>

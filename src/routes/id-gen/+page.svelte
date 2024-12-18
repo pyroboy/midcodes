@@ -35,9 +35,15 @@
     }
 </script>
 
+<style>
+    :global(.dark) {
+        color-scheme: dark;
+    }
+</style>
+
 <div class="container mx-auto px-4 py-8">
     <!-- Welcome Section -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+    <div class="card-content bg-white rounded-lg shadow-md p-6 mb-8">
         <h1 class="text-3xl font-bold mb-2">Welcome, {data.profile?.email || data.user?.email}</h1>
         <p class="text-gray-600">Role: {roleConfig.label}</p>
         {#if data.profile?.org_id}
@@ -47,21 +53,21 @@
 
     <!-- Quick Stats -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="card-content rounded-lg shadow-md p-6">
             <h3 class="text-lg font-semibold mb-2">Total ID Cards</h3>
-            <p class="text-3xl font-bold text-blue-600">{data.totalCards}</p>
+            <p class="text-3xl font-bold text-primary">{data.totalCards}</p>
         </div>
         <!-- Add more stat cards as needed -->
     </div>
 
     <!-- Navigation Links -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+    <div class="card-content rounded-lg shadow-md p-6 mb-8">
         <h2 class="text-2xl font-bold mb-4">Quick Actions</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {#each allowedPaths as { path, label }}
                 <a 
                     href={path.replace('/**', '')} 
-                    class="block p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+                    class="block p-4 bg-muted hover:bg-muted/80 rounded-lg transition-colors duration-200"
                 >
                     <h3 class="text-lg font-semibold mb-1">{label}</h3>
                 </a>
@@ -75,12 +81,12 @@
             <p>Error loading recent activity. Please try again later.</p>
         </div>
     {:else if data.recentCards?.length > 0}
-        <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="card-content bg-white rounded-lg shadow-md p-6">
             <h2 class="text-2xl font-bold mb-4">Recent ID Cards</h2>
             <div class="overflow-x-auto">
                 <table class="min-w-full table-auto">
                     <thead>
-                        <tr class="bg-gray-50">
+                        <tr class="bg-muted">
                             <th class="px-4 py-2 text-left">ID</th>
                             <th class="px-4 py-2 text-left">ID Number</th>
                             <th class="px-4 py-2 text-left">Name</th>

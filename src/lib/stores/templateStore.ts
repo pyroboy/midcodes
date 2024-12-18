@@ -12,6 +12,7 @@ export interface TemplateData {
   back_background_url?: string;
   orientation: 'landscape' | 'portrait';
   template_elements: TemplateElement[];
+  created_at: string;
 }
 
 export interface TemplateElement {
@@ -47,6 +48,7 @@ function createTemplateStore() {
     back_background: '',
     orientation: 'landscape',
     template_elements: [],
+    created_at: new Date().toISOString()
   });
 
   return {
@@ -65,6 +67,7 @@ function createTemplateStore() {
         back_background: '',
         orientation: 'landscape',
         template_elements: [],
+        created_at: new Date().toISOString()
       });
     }
   };

@@ -56,9 +56,11 @@
         [key: string]: File | null;
     }
 
+    export let data: { template: Template };
+    
     let templateId = $page.params.id;
-    let template: Template | null = null;
-    let loading = true;
+    let template: Template = data.template;
+    let loading = false;
     let error: string | null = null;
     let formElement: HTMLFormElement;
     let debugMessages: string[] = [];
@@ -78,26 +80,6 @@
     $: {
         console.log('Use Template Page: Session exists:', !!$session);
         console.log('Use Template Page: User exists:', !!$user);
-    }
-
-    async function loadTemplate() {
-        if (!templateId) return;
-        
-        const { data, error: templateError } = await supabase
-            .from('templates')
-            .select('*')
-            .eq('id', templateId)
-            .single();
-
-        if (templateError) {
-            console.error('Template fetch error:', templateError);
-            error = 'Failed to load template';
-            return;
-        }
-
-        template = data;
-        loading = false;
-        initializeFormData();
     }
 
     function initializeFormData() {
@@ -129,13 +111,18 @@
     }
 
     onMount(async () => {
-        console.log('Use Template Page: Mounted');
-        if (!$session) {
-            goto('/auth');
+        if (!templateId) {
+            error = 'No template ID provided';
             return;
         }
         
-        await loadTemplate();
+        console.log(' [Use Template] Initializing with template:', {
+            id: template.id,
+            name: template.name,
+            elementsCount: template.template_elements?.length || 0
+        });
+        
+        initializeFormData();
     });
 
     function handleCanvasReady(side: 'front' | 'back') {
@@ -165,64 +152,62 @@
         };
     }
 
-    async function handleSubmit(event: SubmitEvent) {
-    event.preventDefault();
-    if (!template || !frontCanvasComponent || !backCanvasComponent) return;
+    async function handleSubmit(event: Event) {
+        event.preventDefault(); // Prevent default form submission
+        
+        try {
+            loading = true;
+            error = null;
 
-    loading = true;
-    error = null;
-
-    try {
-        if (!validateForm()) {
-            loading = false;
-            return;
-        }
-
-        const formDataToSubmit = new FormData();
-        formDataToSubmit.append('templateId', template.id);
-
-        // Get rendered images from canvases using renderFullResolution
-        const [frontBlob, backBlob] = await Promise.all([
-            frontCanvasComponent.renderFullResolution(),
-            backCanvasComponent.renderFullResolution()
-        ]);
-
-        formDataToSubmit.append('frontImage', frontBlob);
-        formDataToSubmit.append('backImage', backBlob);
-
-        // Add form fields with proper prefix
-        for (const [key, value] of Object.entries(formData)) {
-            formDataToSubmit.append(`form_${key}`, value);
-        }
-
-        // Add file uploads
-        for (const [key, file] of Object.entries(fileUploads)) {
-            if (file) {
-                formDataToSubmit.append(`upload_${key}`, file);
+            if (!template || !frontCanvasComponent || !backCanvasComponent) {
+                error = 'Missing required components';
+                return;
             }
+
+            // Get rendered images from canvases
+            const [frontBlob, backBlob] = await Promise.all([
+                frontCanvasComponent.renderFullResolution(),
+                backCanvasComponent.renderFullResolution()
+            ]);
+
+            const form = event.target as HTMLFormElement;
+            const formData = new FormData(form);
+
+            // Add template ID and rendered images
+            formData.append('templateId', $page.params.id);
+            formData.append('frontImage', frontBlob, 'front.png');
+            formData.append('backImage', backBlob, 'back.png');
+
+            // Add form_ prefix to all form fields
+            for (const [key, value] of formData.entries()) {
+                if (key !== 'templateId' && key !== 'frontImage' && key !== 'backImage') {
+                    formData.append(`form_${key}`, value);
+                    formData.delete(key); // Remove the original field
+                }
+            }
+
+            // Submit form data
+            const response = await fetch('?/saveIdCard', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (result.error) {
+                error = result.error;
+                console.error('Save error:', result);
+            } else {
+                // Redirect to ID cards list on success
+                goto('/id-gen/all-ids');
+            }
+        } catch (err) {
+            console.error('Submit error:', err);
+            error = err instanceof Error ? err.message : 'An unexpected error occurred';
+        } finally {
+            loading = false;
         }
-
-        const response = await fetch('?/saveIdCard', {
-            method: 'POST',
-            body: formDataToSubmit
-        });
-
-        const result = await response.json();
-
-        if (result.type === 'success') {
-            goto('/all-ids');
-        } else {
-            error = result.data?.message || 'Failed to save ID card';
-            addDebugMessage(`Error: ${error}`);
-        }
-    } catch (err) {
-        console.error('Error submitting form:', err);
-        error = err instanceof Error ? err.message : 'Failed to submit form';
-        addDebugMessage(`Error: ${error}`);
-    } finally {
-        loading = false;
     }
-}
 
     function handleMouseDown() {
         mouseMoving = true;
@@ -447,6 +432,9 @@
                             {/if}
                             Generate and Save ID Card
                         </Button>
+                        {#if error}
+                            <p class="mt-2 text-sm text-red-500">{error}</p>
+                        {/if}
                     </form>
                 {/if}
 

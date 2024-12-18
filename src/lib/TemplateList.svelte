@@ -1,45 +1,21 @@
 <script lang="ts">
-    import { onMount, createEventDispatcher } from 'svelte';
+    import { createEventDispatcher } from 'svelte';
     import { fade, slide } from 'svelte/transition';
     import { supabase } from '$lib/supabaseClient';
     import { Button } from "$lib/components/ui/button";
-    import { Copy, Trash2, ExternalLink } from 'lucide-svelte';
+    import { Copy, Trash2, ExternalLink, Edit } from 'lucide-svelte';
+    import type { TemplateData } from './stores/templateStore';
+    import { goto } from '$app/navigation';
+    import { page } from '$app/stores';
     
-    interface Template {
-        id: string;
-        name: string;
-        orientation: 'landscape' | 'portrait';
-        created_at: string;
-        front_background: string;
-    }
-    
-    let templates: Template[] = [];
-    let selectedTemplate: Template | null = null;
+    export let templates: TemplateData[] = [];
+    let selectedTemplate: TemplateData | null = null;
     let notification: string | null = null;
-    let hoveredAction: 'use' | 'duplicate' | 'delete' | null = null;
+    let hoveredTemplate: string | null = null;
     const dispatch = createEventDispatcher();
     
-    onMount(async () => {
-        await fetchTemplates();
-    });
-    
-    async function fetchTemplates() {
-        const { data, error } = await supabase
-            .from('templates')
-            .select('id, name, orientation, created_at, front_background')
-            .order('created_at', { ascending: false });
-    
-        if (error) {
-            console.error('Error fetching templates:', error);
-        } else {
-            templates = data || [];
-        }
-    }
-    
-    function selectTemplate(template: Template) {
-        selectedTemplate = template;
-        dispatch('select', template);
-    }
+    // Get user profile from page store
+    $: profile = $page.data.profile;
     
     async function deleteTemplate(id: string) {
         if (confirm('Are you sure you want to delete this template?')) {
@@ -61,7 +37,7 @@
         }
     }
 
-    async function duplicateTemplate(template: Template) {
+    async function duplicateTemplate(template: TemplateData) {
         const { data, error } = await supabase
             .from('templates')
             .select('*')
@@ -94,8 +70,8 @@
         }
     }
 
-    function useTemplate(id: string) {
-        window.location.href = `/use-template/${id}`;
+    async function useTemplate(id: string) {
+        goto(`/id-gen/use-template/${id}`);
     }
 
     function showNotification(message: string) {
@@ -105,9 +81,14 @@
         }, 3000);
     }
 
-    function handleActionClick(e: Event, template: Template, action: 'use' | 'duplicate' | 'delete') {
+    function selectTemplate(template: TemplateData) {
+        selectedTemplate = template;
+        console.log(' TemplateList: Template selected:', template.id);
+        dispatch('select', { id: template.id });
+    }
+
+    function handleActionClick(e: Event, template: TemplateData, action: 'use' | 'duplicate' | 'delete') {
         e.stopPropagation();
-        selectTemplate(template);
         
         switch (action) {
             case 'use':
@@ -121,127 +102,113 @@
                 break;
         }
     }
-
-    function setHoveredAction(action: 'use' | 'duplicate' | 'delete' | null) {
-        hoveredAction = action;
-    }
-
-    function getRowClasses(template: Template): string {
-        const baseClasses = "group relative transition-all duration-200";
-        
-        if (selectedTemplate?.id === template.id) {
-            return `${baseClasses} bg-muted`;
-        }
-        
-        switch (hoveredAction) {
-            case 'use':
-                return `${baseClasses} bg-primary/5`;
-            case 'duplicate':
-                return `${baseClasses} bg-warning/5`;
-            case 'delete':
-                return `${baseClasses} bg-destructive/5`;
-            default:
-                return `${baseClasses} hover:bg-muted/50`;
-        }
-    }
 </script>
 
-<div class="h-full w-[40%] overflow-hidden bg-background">
-    <div class="flex flex-col space-y-4 p-4">
+<div class="h-full w-full overflow-y-auto bg-background p-6">
+    <div class="mb-8">
         <h2 class="text-2xl font-bold tracking-tight">Templates</h2>
-        
-        <div class="relative overflow-x-auto rounded-lg border bg-card">
-            <table class="w-full text-sm">
-                <thead class="border-b bg-muted/50 text-muted-foreground">
-                    <tr>
-                        <th class="px-4 py-3 text-left font-medium">Template</th>
-                        <th class="hidden px-4 py-3 text-left font-medium sm:table-cell">Created</th>
-                        <th class="hidden px-4 py-3 text-left font-medium sm:table-cell">Orientation</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y">
-                    {#each templates as template (template.id)}
-                        <tr 
-                            class={getRowClasses(template)}
-                            class:selected={selectedTemplate?.id === template.id}
-                            on:click={() => selectTemplate(template)}
-                            tabindex="0"
-                            role="button"
-                            on:keydown={(e) => e.key === 'Enter' && selectTemplate(template)}
-                        >
-                            <td class="px-4 py-3">
-                                <div class="flex items-center gap-3">
-                                    <img 
-                                        src={template.front_background} 
-                                        alt={template.name}
-                                        class="h-12 w-12 rounded-md border object-cover"
-                                    />
-                                    <span class="font-medium">{template.name}</span>
-                                </div>
-                            </td>
-                            <td class="hidden px-4 py-3 text-muted-foreground sm:table-cell">
-                                {new Date(template.created_at).toLocaleDateString()}
-                            </td>
-                            <td class="hidden px-4 py-3 capitalize text-muted-foreground sm:table-cell">
-                                {template.orientation}
-                            </td>
-                            
-                            <div class="invisible absolute inset-0 flex items-center justify-end opacity-0 transition-all duration-200 group-hover:visible group-hover:opacity-100">
-                                <div 
-                                    class="flex items-center gap-2 px-4"
-                                    transition:slide={{ axis: 'y', duration: 200 }}
-                                >
-                                    <Button 
-                                        variant="ghost" 
-                                        size="icon"
-                                        on:click={(e) => handleActionClick(e, template, 'use')}
-                                        on:mouseenter={() => setHoveredAction('use')}
-                                        on:mouseleave={() => setHoveredAction(null)}
-                                        class="hover:bg-primary hover:text-primary-foreground"
-                                    >
-                                        <ExternalLink class="h-4 w-4" />
-                                    </Button>
-                                    <Button 
-                                        variant="ghost" 
-                                        size="icon"
-                                        on:click={(e) => handleActionClick(e, template, 'duplicate')}
-                                        on:mouseenter={() => setHoveredAction('duplicate')}
-                                        on:mouseleave={() => setHoveredAction(null)}
-                                        class="hover:bg-warning hover:text-warning-foreground"
-                                    >
-                                        <Copy class="h-4 w-4" />
-                                    </Button>
-                                    <Button 
-                                        variant="ghost" 
-                                        size="icon"
-                                        on:click={(e) => handleActionClick(e, template, 'delete')}
-                                        on:mouseenter={() => setHoveredAction('delete')}
-                                        on:mouseleave={() => setHoveredAction(null)}
-                                        class="hover:bg-destructive hover:text-destructive-foreground"
-                                    >
-                                        <Trash2 class="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </div>
-                        </tr>
-                    {/each}
-                </tbody>
-            </table>
-        </div>
+    </div>
+    
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        {#each templates as template (template.id)}
+            <article 
+                class="template-card group relative rounded-lg border bg-card transition-all duration-300 ease-in-out hover:shadow-lg"
+                aria-label={`Template: ${template.name}`}
+                on:mouseenter={() => hoveredTemplate = template.id}
+                on:mouseleave={() => hoveredTemplate = null}
+            >
+                <button 
+                    class="aspect-[1.6/1] w-full overflow-hidden rounded-t-lg bg-muted text-left"
+                    on:click={() => selectTemplate(template)}
+                    on:keydown={(e) => e.key === 'Enter' && selectTemplate(template)}
+                    aria-label={`Edit template: ${template.name}`}
+                >
+                    {#if template.front_background}
+                        <img 
+                            src={template.front_background} 
+                            alt={`Preview of template: ${template.name}`}
+                            class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        />
+                    {:else}
+                        <div class="flex h-full items-center justify-center bg-muted">
+                            <span class="text-muted-foreground">No preview</span>
+                        </div>
+                    {/if}
+                </button>
+
+                <div class="p-3 text-center">
+                    <h3 class="text-sm font-medium">{template.name}</h3>
+                </div>
+
+                <div 
+                    class="absolute bottom-0 left-0 right-0 flex justify-center gap-2 p-3 opacity-0 transition-opacity duration-300 bg-gradient-to-t from-background/90 to-transparent"
+                    class:opacity-100={hoveredTemplate === template.id}
+                    role="toolbar"
+                    aria-label="Template actions"
+                >
+                    <Button 
+                        variant="ghost" 
+                        size="sm"
+                        class="h-8 w-8 p-0"
+                        on:click={() => selectTemplate(template)}
+                        aria-label={`Edit ${template.name}`}
+                    >
+                        <Edit class="h-4 w-4" />
+                    </Button>
+                    <Button 
+                        variant="ghost" 
+                        size="sm"
+                        class="h-8 w-8 p-0"
+                        on:click={(e) => handleActionClick(e, template, 'use')}
+                        aria-label={`Use ${template.name}`}
+                    >
+                        <ExternalLink class="h-4 w-4" />
+                    </Button>
+                    <Button 
+                        variant="ghost" 
+                        size="sm"
+                        class="h-8 w-8 p-0"
+                        on:click={(e) => handleActionClick(e, template, 'duplicate')}
+                        aria-label={`Duplicate ${template.name}`}
+                    >
+                        <Copy class="h-4 w-4" />
+                    </Button>
+                    <Button 
+                        variant="ghost" 
+                        size="sm"
+                        class="h-8 w-8 p-0"
+                        on:click={(e) => handleActionClick(e, template, 'delete')}
+                        aria-label={`Delete ${template.name}`}
+                    >
+                        <Trash2 class="h-4 w-4" />
+                    </Button>
+                </div>
+            </article>
+        {/each}
     </div>
 </div>
 
 {#if notification}
     <div 
         class="fixed bottom-4 right-4 z-50 rounded-lg bg-primary px-4 py-2 text-primary-foreground shadow-lg"
-        transition:fade={{ duration: 200 }}
+        transition:fade
     >
         {notification}
     </div>
 {/if}
 
 <style>
-    :global(tr.selected) {
-        background-color: hsl(var(--muted));
+    .template-card {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        min-height: 200px;
+    }
+
+    /* Ensure buttons are clickable on touch devices */
+    @media (hover: none) {
+        .template-card .opacity-0 {
+            opacity: 1 !important;
+        }
     }
 </style>

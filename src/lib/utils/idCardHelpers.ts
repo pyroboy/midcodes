@@ -5,12 +5,14 @@ export async function handleImageUploads(
     formData: FormData,
     orgId: string,
     templateId: string
-): Promise<{ frontPath: string; backPath: string; error?: string } | { error: string }> {
+): Promise<{ frontPath: string; backPath: string; error?: string }> {
     try {
+        console.log(' [Image Upload] Starting upload process...');
         const frontImage = formData.get('frontImage') as Blob;
         const backImage = formData.get('backImage') as Blob;
 
         if (!frontImage || !backImage) {
+            console.error(' [Image Upload] Missing image files');
             return { error: 'Missing image files', frontPath: '', backPath: '' };
         }
 
@@ -18,6 +20,7 @@ export async function handleImageUploads(
         const frontPath = `${orgId}/${templateId}/${timestamp}_front.png`;
         const backPath = `${orgId}/${templateId}/${timestamp}_back.png`;
 
+        console.log(' [Image Upload] Uploading front image...');
         const frontUpload = await uploadToStorage(supabase, {
             bucket: 'rendered-id-cards',
             file: frontImage,
@@ -25,9 +28,11 @@ export async function handleImageUploads(
         });
 
         if (frontUpload.error) {
+            console.error(' [Image Upload] Front image upload failed:', frontUpload.error);
             return { error: 'Front image upload failed', frontPath: '', backPath: '' };
         }
 
+        console.log(' [Image Upload] Uploading back image...');
         const backUpload = await uploadToStorage(supabase, {
             bucket: 'rendered-id-cards',
             file: backImage,
@@ -35,12 +40,15 @@ export async function handleImageUploads(
         });
 
         if (backUpload.error) {
+            console.error(' [Image Upload] Back image upload failed:', backUpload.error);
             await deleteFromStorage(supabase, 'rendered-id-cards', frontPath);
             return { error: 'Back image upload failed', frontPath: '', backPath: '' };
         }
 
+        console.log(' [Image Upload] Upload successful:', { frontPath, backPath });
         return { frontPath, backPath };
     } catch (err) {
+        console.error(' [Image Upload] Unexpected error:', err);
         return { 
             error: err instanceof Error ? err.message : 'Failed to handle image uploads',
             frontPath: '',
