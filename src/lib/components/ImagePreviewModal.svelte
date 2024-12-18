@@ -27,7 +27,7 @@
         lastError: null as string | null
     };
 
-    function createRoundedRectCard(width = 2, height = 1.25, depth = 0.005, radius = 0.08) {
+    function createRoundedRectCard(width = 2, height = 1.25, depth = 0.007, radius = 0.08) {
         // Create a flat rounded rectangle shape
         const roundedRectShape = new THREE.Shape();
         
@@ -68,16 +68,20 @@
         // Extrusion settings
         const extrudeSettings = {
             depth: depth,
-            bevelEnabled: false,
+            bevelEnabled: true,
+            bevelThickness: 0.002,
+            bevelSize: 0.002,
+            bevelSegments: 2,
             steps: 1,
             curveSegments: 32
         };
 
         const geometry = new THREE.ExtrudeGeometry(roundedRectShape, extrudeSettings);
         
-        // Create separate geometries for front and back faces
+        // Create separate geometries for front, back, and edges
         const frontGeometry = new THREE.BufferGeometry();
         const backGeometry = new THREE.BufferGeometry();
+        const edgeGeometry = new THREE.BufferGeometry();
         
         const position = geometry.getAttribute('position');
         const normal = geometry.getAttribute('normal');
@@ -88,29 +92,39 @@
         const backPositions = [];
         const backNormals = [];
         const backUvs = [];
+        const edgePositions = [];
+        const edgeNormals = [];
         
         // Separate vertices based on normal direction
         for (let i = 0; i < position.count; i++) {
             const normalZ = normal.getZ(i);
             const px = position.getX(i);
             const py = position.getY(i);
+            const pz = position.getZ(i);
+            const nx = normal.getX(i);
+            const ny = normal.getY(i);
+            const nz = normal.getZ(i);
             
             if (normalZ > 0.5) {
                 // Front face
-                frontPositions.push(px, py, position.getZ(i));
-                frontNormals.push(normal.getX(i), normal.getY(i), normal.getZ(i));
+                frontPositions.push(px, py, pz);
+                frontNormals.push(nx, ny, nz);
                 frontUvs.push(
                     (px - x) / w,  // U coordinate
                     1 - (py - y) / h  // V coordinate, flipped to match image coordinates
                 );
             } else if (normalZ < -0.5) {
                 // Back face
-                backPositions.push(px, py, position.getZ(i));
-                backNormals.push(normal.getX(i), normal.getY(i), normal.getZ(i));
+                backPositions.push(px, py, pz);
+                backNormals.push(nx, ny, nz);
                 backUvs.push(
                     1 - (px - x) / w,  // U coordinate, flipped for back face
                     1 - (py - y) / h   // V coordinate, flipped to match image coordinates
                 );
+            } else {
+                // Edge faces
+                edgePositions.push(px, py, pz);
+                edgeNormals.push(nx, ny, nz);
             }
         }
         
@@ -122,7 +136,10 @@
         backGeometry.setAttribute('normal', new THREE.Float32BufferAttribute(backNormals, 3));
         backGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(backUvs, 2));
         
-        return { frontGeometry, backGeometry };
+        edgeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(edgePositions, 3));
+        edgeGeometry.setAttribute('normal', new THREE.Float32BufferAttribute(edgeNormals, 3));
+        
+        return { frontGeometry, backGeometry, edgeGeometry };
     }
 
     function handleCanvasCreated() {
@@ -223,11 +240,37 @@
                     />
                 </T.PerspectiveCamera>
 
-                <T.AmbientLight intensity={0.7} />
-                <T.DirectionalLight position={[5, 5, 5]} intensity={0.8} castShadow />
+                <T.AmbientLight intensity={1} />
+                <T.DirectionalLight position={[5, 5, 5]} intensity={0.7} castShadow />
                 <T.DirectionalLight position={[-5, 5, -5]} intensity={0.3} />
-                <T.PointLight position={[0, 3, 0]} intensity={0.3} />
-
+                <T.DirectionalLight position={[0, -5, 0]} intensity={0.2} />
+                
+                <!-- Front lights -->
+                <T.SpotLight 
+                    position={[1, 1, 2]} 
+                    intensity={2}
+                    angle={Math.PI / 6}
+                    penumbra={0.9}
+                    decay={1.5}
+                    distance={10}
+                />
+                
+                <!-- Back lights -->
+                <T.SpotLight 
+                    position={[-1,0.7,-2]} 
+                    intensity={1.5}
+                    angle={Math.PI / 6}
+                    penumbra={0.9}
+                    decay={1.5}
+                    distance={10}
+                />
+                
+                <!-- Side rim lights -->
+                <T.PointLight position={[4, 0, 0]} intensity={0.5} distance={8} />
+                <T.PointLight position={[-4, 0, 0]} intensity={0.5} distance={8} />
+                <T.PointLight position={[0, 4, 0]} intensity={0.5} distance={8} />
+                <T.PointLight position={[0, -4, 0]} intensity={0.5} distance={8} />
+                
                 {#if debugMode}
                     <T.GridHelper args={[10, 10]} />
                     <T.AxesHelper args={[5]} />
@@ -255,6 +298,9 @@
                                         texture.encoding = THREE.sRGBEncoding;
                                         texture.repeat.set(1, 1);
                                         texture.center.set(0.5, 0.5);
+                                        texture.magFilter = THREE.LinearFilter;
+                                        texture.minFilter = THREE.LinearFilter;
+                                        texture.anisotropy = 16;
                                         texture.needsUpdate = true;
                                         handleImageLoad(true);
                                     },
@@ -263,8 +309,7 @@
                                 )}
                                 transparent={true}
                                 metalness={0}
-                                roughness={0}
-                                envMapIntensity={1}
+                                roughness={0.23}
                             />
                         </T.Mesh>
                     {/if}
@@ -288,6 +333,9 @@
                                         texture.encoding = THREE.sRGBEncoding;
                                         texture.repeat.set(1, 1);
                                         texture.center.set(0.5, 0.5);
+                                        texture.magFilter = THREE.LinearFilter;
+                                        texture.minFilter = THREE.LinearFilter;
+                                        texture.anisotropy = 16;
                                         texture.needsUpdate = true;
                                         handleImageLoad(false);
                                     },
@@ -296,18 +344,35 @@
                                 )}
                                 transparent={true}
                                 metalness={0}
-                                roughness={0}
-                                envMapIntensity={1}
+                                roughness={0.2}
                             />
                         {:else}
                             <T.MeshStandardMaterial
                                 color="#e24a4a"
                                 transparent={true}
                                 metalness={0}
-                                roughness={0.2}
-                                opacity={0.95}
+                                roughness={0.23}
+                                opacity={1}
                             />
                         {/if}
+                    </T.Mesh>
+
+                    <!-- White edges -->
+                    <T.Mesh 
+                        castShadow
+                        receiveShadow
+                    >
+                        <T.BufferGeometry
+                            on:create={({ ref }) => {
+                                const { edgeGeometry } = createRoundedRectCard();
+                                ref.copy(edgeGeometry);
+                            }}
+                        />
+                        <T.MeshStandardMaterial
+                            color="#ffffff"
+                            metalness={0}
+                            roughness={0.2}
+                        />
                     </T.Mesh>
                 </T.Group>
             </Canvas>
