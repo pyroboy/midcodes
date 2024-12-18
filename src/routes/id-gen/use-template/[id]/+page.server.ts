@@ -269,14 +269,15 @@ export const actions: Actions = {
             // Verify template access
             const { data: template, error: templateError } = await supabase
                 .from('templates')
-                .select('org_id, organizations(*)')
+                .select('org_id, organizations(*), template_elements')
                 .eq('id', templateId)
                 .single();
 
             console.log('[Save ID Card] Template lookup:', {
                 found: !!template,
                 error: templateError?.message,
-                templateOrgId: template?.org_id
+                templateOrgId: template?.org_id,
+                elementsCount: template?.template_elements?.length
             });
 
             if (templateError || !template) {
@@ -372,12 +373,28 @@ export const actions: Actions = {
 
             // Save ID card data
             console.log('[Save ID Card] Saving ID card data...');
+            
+            // Log all form data for debugging
+            console.log('[Save ID Card] All form data:', Array.from(formData.entries()));
+            
+            // Collect form fields as simple key-value pairs
+            const formFields: Record<string, string> = {};
+            for (const [key, value] of formData.entries()) {
+                // Only include form_ prefixed fields and convert them to strings
+                if (key.startsWith('form_')) {
+                    const fieldName = key.replace('form_', '');
+                    formFields[fieldName] = value.toString();
+                }
+            }
+
+            console.log('[Save ID Card] Form fields:', formFields);
+
             const { data: idCard, error: saveError } = await saveIdCardData(supabase, {
                 templateId,
                 orgId: effectiveOrgId,
                 frontPath: uploadResult.frontPath,
                 backPath: uploadResult.backPath,
-                formFields: {}
+                formFields
             });
 
             console.log('[Save ID Card] Save result:', {

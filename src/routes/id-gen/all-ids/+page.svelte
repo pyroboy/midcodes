@@ -37,6 +37,7 @@
                 data: typeof card.data === 'string' ? JSON.parse(card.data) : card.data
             }));
         }
+        await fetchIdCards(); // Fetch fresh data and ensure proper parsing
     });
 
     async function openPreview(card: IdCard) {
@@ -184,9 +185,11 @@
         console.log('Starting bulk download with cards:', selectedCardsList.map(card => ({
             id: card.id,
             name: card.data?.name,
+            data: card.data,
             front_image: card.front_image,
             back_image: card.back_image
         })));
+
         if (selectedCardsList.length === 0) {
             errorMessage = 'No cards selected for download';
             return;
@@ -198,8 +201,17 @@
 
             for (const card of selectedCardsList) {
                 try {
-                    const cardName = card.data?.name?.replace(/[^a-zA-Z0-9-_]/g, '_') || 'id-card';
+                    // Use the parsed data for folder name
+                    const cardName = card.data?.name?.replace(/[^a-zA-Z0-9-_]/g, '_') || 
+                                   `id_card_${card.id.slice(0, 8)}`;
                     const folderName = cardName + '/';
+                    
+                    console.log('Processing card:', {
+                        id: card.id,
+                        folderName,
+                        data: card.data,
+                        name: card.data?.name
+                    });
 
                     const [frontResponse, backResponse] = await Promise.all([
                         fetch(supabase.storage.from('rendered-id-cards').getPublicUrl(card.front_image).data.publicUrl),
@@ -216,10 +228,18 @@
                         backResponse.blob()
                     ]);
 
-                    // Create folder and add files
-                    zip.folder(folderName); // Explicitly create the folder
-                    zip.file(folderName + 'front.png', frontBlob);
-                    zip.file(folderName + 'back.png', backBlob);
+                    // Create a new folder for each card
+                    const folder = zip.folder(folderName);
+                    if (!folder) {
+                        console.error(`Failed to create folder: ${folderName}`);
+                        continue;
+                    }
+
+                    // Add files to the folder
+                    folder.file('front.png', frontBlob);
+                    folder.file('back.png', backBlob);
+                    
+                    console.log(`Successfully added files to folder: ${folderName}`);
                     successCount++;
                 } catch (error) {
                     console.error('Error processing card:', error);
@@ -230,6 +250,7 @@
                 throw new Error('Failed to process any cards');
             }
 
+            console.log(`Creating zip with ${successCount} folders...`);
             const content = await zip.generateAsync({
                 type: 'blob',
                 compression: 'DEFLATE',
@@ -238,6 +259,7 @@
                 }
             });
 
+            console.log('Zip file generated, initiating download...');
             const downloadUrl = URL.createObjectURL(content);
             const link = document.createElement('a');
             link.href = downloadUrl;
@@ -247,7 +269,7 @@
             document.body.removeChild(link);
             URL.revokeObjectURL(downloadUrl);
 
-            // Clear selection only on successful download
+            console.log('Download complete, clearing selection...');
             selectedCards.clear();
             selectAll = false;
         } catch (error) {

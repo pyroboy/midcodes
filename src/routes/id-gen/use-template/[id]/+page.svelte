@@ -156,6 +156,12 @@
         event.preventDefault(); // Prevent default form submission
         
         try {
+            // Validate form before proceeding
+            if (!validateForm()) {
+                error = 'Please fill in all required fields';
+                return;
+            }
+
             loading = true;
             error = null;
 
@@ -364,7 +370,7 @@
                                             <input 
                                                 type="text"
                                                 id={element.variableName}
-                                                name={element.variableName}
+                                                name={`form_${element.variableName}`}
                                                 bind:value={formData[element.variableName]}
                                                 class="w-full px-3 py-2 border rounded-md {formErrors[element.variableName] ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-300'}"
                                                 placeholder={`Enter ${element.variableName}`}
