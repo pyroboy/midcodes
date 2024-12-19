@@ -1,107 +1,103 @@
 <script lang="ts">
-  import { browser } from '$app/environment';
-  import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
-  import { Button } from "$lib/components/ui/button";
-  import type { PageData } from './$types';
-  import LocationForm from './LocationForm.svelte';
+  import RoomForm from './RoomForm.svelte';
+  import { page } from '$app/stores';
+  import * as Card from '$lib/components/ui/card';
+  import { Badge } from '$lib/components/ui/badge';
 
-  export let data: PageData;
+  export let data;
 
+  let selectedRoom: any = undefined;
   let editMode = false;
-  let showForm = true;
-  let currentLocation: any | undefined;
 
-  function toggleForm() {
-    showForm = !showForm;
-    if (!showForm) {
-      editMode = false;
-      currentLocation = undefined;
-    }
-  }
-
-  function editLocation(location: any) {
+  function handleRoomClick(room: any) {
+    selectedRoom = room;
     editMode = true;
-    currentLocation = location;
-    showForm = true;
-    data.locationForm.data = {
-      id: location.id,
-      locationName: location.locationName,
-      locationFloorLevel: location.locationFloorLevel,
-      locationCapacity: location.locationCapacity,
-      locationStatus: location.locationStatus,
-      locationRentRate: location.locationRentRate,
-      locationActiveLease: location.locationActiveLease,
-      createdBy: location.createdBy,
-      updatedBy: location.updatedBy,
-      createdAt: location.createdAt,
-      updatedAt: location.updatedAt
-    };
   }
 
-  function deleteLocation(id: number) {
-    if (confirm('Are you sure you want to delete this location?')) {
-      const form = document.createElement('form');
-      form.method = 'POST';
-      form.action = '?/delete';
-      const idInput = document.createElement('input');
-      idInput.type = 'hidden';
-      idInput.name = 'id';
-      idInput.value = id.toString();
-      form.appendChild(idInput);
-      document.body.appendChild(form);
-      form.submit();
+  function handleRoomAdded() {
+    selectedRoom = undefined;
+    editMode = false;
+  }
+
+  $: isAdminLevel = data.user?.role === 'super_admin' || data.user?.role === 'property_admin';
+  $: isStaffLevel = data.user?.role === 'staff' || data.user?.role === 'frontdesk';
+  $: canCreate = isAdminLevel || isStaffLevel;
+
+  function getStatusColor(status: string) {
+    switch (status) {
+      case 'VACANT':
+        return 'success';
+      case 'OCCUPIED':
+        return 'default';
+      case 'MAINTENANCE':
+        return 'warning';
+      case 'RESERVED':
+        return 'secondary';
+      default:
+        return 'default';
     }
   }
 </script>
 
-<div class="container mx-auto p-4 flex">
-  <div class="w-2/3 pr-4">
-    <h2 class="text-xl font-bold mb-2">Location List</h2>
-    <ul class="space-y-2">
-      {#each data.countLocations as location}
-        <li class="bg-gray-100 p-4 rounded shadow-md">
-          <div class="flex justify-between items-center mb-2">
-            <span class="font-bold">{location.locationName}</span>
-            <span class="text-sm text-gray-600">Rent Rate: {location.locationRentRate}</span>
-          </div>
-          <div class="grid grid-cols-2 gap-2 text-sm">
-            <span>Floor: {location.locationFloorLevel}</span>
-            <span>Capacity: {location.locationCapacity}</span>
-            <span>Status: {location.locationStatus}</span>
-            <span>Tenants: {location.tenantCount}</span>
-          </div>
+<div class="container mx-auto p-4 space-y-8">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+    <!-- Room List -->
+    <div class="space-y-4">
+      <h2 class="text-2xl font-bold">Rooms</h2>
+      <div class="grid gap-4">
+        {#each data.rooms as room}
+          <Card.Root 
+            class="cursor-pointer hover:shadow-md transition-shadow" 
+            on:click={() => handleRoomClick(room)}
+          >
+            <Card.Header>
+              <Card.Title>
+                Room {room.room_number}
+                <Badge variant={getStatusColor(room.room_status)}>
+                  {room.room_status}
+                </Badge>
+              </Card.Title>
+              <Card.Description>
+                {room.property.name} - Floor {room.floor.floor_number}
+                {#if room.floor.wing}
+                  - Wing {room.floor.wing}
+                {/if}
+              </Card.Description>
+            </Card.Header>
+            <Card.Content class="grid grid-cols-2 gap-2">
+              <div>
+                <span class="font-semibold">Capacity:</span> {room.capacity}
+              </div>
+              <div>
+                <span class="font-semibold">Rate:</span> ${room.rate}
+              </div>
+              {#if room.description}
+                <div class="col-span-2">
+                  <span class="font-semibold">Description:</span> {room.description}
+                </div>
+              {/if}
+            </Card.Content>
+          </Card.Root>
+        {/each}
+      </div>
+    </div>
 
-          <div class="mt-2 space-x-2">
-            <Button on:click={() => editLocation({
-              ...location,
-              locationActiveLease: null,
-              createdBy: 0,
-              updatedBy: null,
-              createdAt: new Date(),
-              updatedAt: null
-            })}>Edit</Button>
-            <Button on:click={() => deleteLocation(location.id)}>Delete</Button>
-          </div>
-        </li>
-      {/each}
-    </ul>
-  </div>
-
-  <div class="w-1/3 pl-4">
-    {#if showForm}
-      <LocationForm data={data.locationForm} {editMode} />
-    {:else}
-      <p class="text-center text-gray-500 mt-8">Click "Add Location" to create a new location</p>
+    <!-- Room Form -->
+    {#if canCreate || editMode}
+      <div class="space-y-4">
+        <h2 class="text-2xl font-bold">
+          {editMode ? 'Edit Room' : 'Add New Room'}
+        </h2>
+        <RoomForm
+          {data}
+          properties={data.properties}
+          floors={data.floors}
+          {editMode}
+          room={selectedRoom}
+          user={data.user}
+          on:roomAdded={handleRoomAdded}
+        />
+      </div>
     {/if}
   </div>
 </div>
-
-<div class="fixed bottom-4 right-4">
-  <Button on:click={toggleForm} class="rounded-full w-16 h-16 flex items-center justify-center text-2xl">
-    {showForm ? '×' : '+'}
-  </Button>
-</div>
-
-{#if browser}
-  <SuperDebug data={data.locationForm} />
-{/if}

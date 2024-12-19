@@ -1,26 +1,33 @@
-// src/routes/meters/+page.server.ts
+// src/routes/dorm/meters/+page.server.ts
 
-import { superValidate } from 'sveltekit-superforms/server';
-import type { Actions, PageServerLoad } from './$types';
-import type { RequestEvent } from '@sveltejs/kit';
 import { fail } from '@sveltejs/kit';
-import { db } from '$lib/db/db';
+import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
-import { z } from 'zod';
+import { meterSchema } from './formSchema';
+import { supabase } from '$lib/supabase';
+import { db } from '$lib/db/db';
 
 const schema = z.object({
   locationId: z.number().int().optional(),
   meterType: z.enum(['ELECTRICITY', 'WATER', 'GAS']),
-//   meterNumber: z.string().min(1, 'Meter number is required'),
   meterName: z.string().min(1, 'Meter name is required'),
   meterFloorLevel: z.number().int().min(0, 'Meter floor level must be 0 or greater'),
 });
 
-export const load: PageServerLoad = async () => {
-    const form = await superValidate(zod(schema));
-  
-    const allLocations = await db.select().from(locations);
-    const metersWithReadings = await db
+export const load = async ({ locals }) => {
+  const session = await locals.getSession();
+  if (!session) {
+    return fail(401, { message: 'Unauthorized' });
+  }
+
+  const [{ data: userRole }, { data: meters }, { data: locations }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .single(),
+
+    db
       .select({
         id: meters.id,
         locationId: meters.locationId,
@@ -28,7 +35,6 @@ export const load: PageServerLoad = async () => {
         meterName: meters.meterName,
         meterFloorLevel: meters.meterFloorLevel,
         meterActive: meters.meterActive,
-        // meterNumber: meters.meterNumber,
         createdAt: meters.createdAt,
         updatedAt: meters.updatedAt,
         readingsCount: db.fn.count(readings.id).as('readingsCount'),
@@ -37,14 +43,45 @@ export const load: PageServerLoad = async () => {
       .from(meters)
       .leftJoin(readings, db.raw(`${meters.id} = ${readings.meterId}`))
       .groupBy(meters.id)
-      .orderBy(db.raw('createdAt DESC'));
-  
-    return { form, locations: allLocations, meters: metersWithReadings };
-  };
+      .orderBy(db.raw('createdAt DESC')),
 
-export const actions: Actions = {
-  create: async (event: RequestEvent) => {
-    const form = await superValidate(event.request, zod(schema));
+    db.select().from(locations),
+  ]);
+
+  const form = await superValidate(zod(schema));
+  const isAdminLevel = ['super_admin', 'property_admin'].includes(userRole?.role || '');
+  const isUtility = userRole?.role === 'property_utility';
+  const isMaintenance = userRole?.role === 'property_maintenance';
+
+  return {
+    form,
+    meters,
+    locations,
+    userRole: userRole?.role || 'user',
+    isAdminLevel,
+    isUtility,
+    isMaintenance,
+  };
+};
+
+export const actions = {
+  create: async ({ request, locals }) => {
+    const session = await locals.getSession();
+    if (!session) {
+      return fail(401, { message: 'Unauthorized' });
+    }
+
+    const { data: userRole } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .single();
+
+    if (!['super_admin', 'property_admin', 'property_utility'].includes(userRole?.role || '')) {
+      return fail(403, { message: 'Insufficient permissions' });
+    }
+
+    const form = await superValidate(request, zod(schema));
 
     if (!form.valid) {
       return fail(400, { form });
@@ -57,7 +94,6 @@ export const actions: Actions = {
         meterFloorLevel: form.data.meterFloorLevel,
         meterType: form.data.meterType,
         meterActive: form.data.meterActive,
-        // meterNumber: form.data.meterNumber,
       }).returning();
 
       console.log("Meter saved successfully:", savedMeter);
@@ -68,9 +104,24 @@ export const actions: Actions = {
     }
   },
 
-  update: async (event: RequestEvent) => {
+  update: async ({ request, locals }) => {
+    const session = await locals.getSession();
+    if (!session) {
+      return fail(401, { message: 'Unauthorized' });
+    }
+
+    const { data: userRole } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .single();
+
+    if (!['super_admin', 'property_admin', 'property_utility'].includes(userRole?.role || '')) {
+      return fail(403, { message: 'Insufficient permissions' });
+    }
+
     const updateSchema = schema.extend({ id: z.number() });
-    const form = await superValidate(event.request, zod(updateSchema));
+    const form = await superValidate(request, zod(updateSchema));
 
     if (!form.valid) {
       return fail(400, { form });
@@ -79,11 +130,11 @@ export const actions: Actions = {
     try {
       await db.update(meters)
         .set({
-  locationId: form.data.locationId,
-        meterName: form.data.meterName,
-        meterFloorLevel: form.data.meterFloorLevel,
-        meterType: form.data.meterType,
-        meterActive: form.data.meterActive,
+          locationId: form.data.locationId,
+          meterName: form.data.meterName,
+          meterFloorLevel: form.data.meterFloorLevel,
+          meterType: form.data.meterType,
+          meterActive: form.data.meterActive,
         })
         .where(db.raw(`${meters.id} = ${form.data.id}`));
 
@@ -94,9 +145,24 @@ export const actions: Actions = {
     }
   },
 
-  delete: async (event: RequestEvent) => {
+  delete: async ({ request, locals }) => {
+    const session = await locals.getSession();
+    if (!session) {
+      return fail(401, { message: 'Unauthorized' });
+    }
+
+    const { data: userRole } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .single();
+
+    if (!['super_admin', 'property_admin'].includes(userRole?.role || '')) {
+      return fail(403, { message: 'Insufficient permissions' });
+    }
+
     const deleteSchema = z.object({ id: z.number() });
-    const form = await superValidate(event.request, zod(deleteSchema));
+    const form = await superValidate(request, zod(deleteSchema));
 
     if (!form.valid) {
       return fail(400, { form });
@@ -109,5 +175,5 @@ export const actions: Actions = {
       console.error(err);
       return fail(500, { form, error: 'Failed to delete meter' });
     }
-  }
+  },
 };

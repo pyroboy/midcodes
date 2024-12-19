@@ -1,77 +1,122 @@
-import type { Actions, PageServerLoad } from './$types';
-import { superValidate, message } from 'sveltekit-superforms';
-import { zod } from 'sveltekit-superforms/adapters';
 import { fail } from '@sveltejs/kit';
-import { db } from '$lib/db/db';
+import { superValidate } from 'sveltekit-superforms/server';
+import { zod } from 'sveltekit-superforms/adapters';
+import { roomSchema } from './formSchema';
+import { supabase } from '$lib/supabase';
 
-export const load: PageServerLoad = async () => {
-    const locationForm = await superValidate(zod(locationSchema));
+export const load = async ({ locals }) => {
+  const [{ data: rooms }, { data: properties }, { data: floors }] = await Promise.all([
+    supabase
+      .from('rooms')
+      .select(`
+        *,
+        property:properties(name),
+        floor:floors(floor_number, wing)
+      `)
+      .order('property_id, floor_id, room_number'),
     
-    const countLocations = await db.select({
-        id: locations.id,
-        locationName: locations.locationName,
-        locationFloorLevel: locations.locationFloorLevel,
-        locationCapacity: locations.locationCapacity,
-        locationStatus: locations.locationStatus,
-        locationRentRate: locations.locationRentRate,
-        tenantCount: sql<number>`count(${tenants.id})`.as('tenant_count'),
-    })
-    .from(locations)
-    .leftJoin(tenants, eq(locations.id, tenants.locationId))
-    .groupBy(locations.id)
-    .orderBy(locations.id);
+    supabase
+      .from('properties')
+      .select('id, name')
+      .eq('status', 'ACTIVE')
+      .order('name'),
 
-    return { locationForm, countLocations };
+    supabase
+      .from('floors')
+      .select('id, property_id, floor_number, wing')
+      .eq('status', 'ACTIVE')
+      .order('property_id, floor_number')
+  ]);
+
+  const form = await superValidate(zod(roomSchema));
+
+  return {
+    form,
+    rooms,
+    properties,
+    floors,
+    user: locals.user
+  };
 };
 
-export const actions: Actions = {
-    create: async ({ request }) => {
-        const locationForm = await superValidate(request, zod(locationSchema));
-        console.log('create', locationForm);
-        
-        if (!locationForm.valid) return fail(400, { locationForm });
-        
-        try {
-            await db.insert(locations).values({
-              ...locationForm.data,
+export const actions = {
+  create: async ({ request }) => {
+    const form = await superValidate(request, zod(roomSchema));
 
-                createdBy: 1, // Replace with actual user ID
-            });
-            return message(locationForm, { text: 'Location created successfully!' });
-        } catch (error) {
-            console.error(error);
-            return message(locationForm, { text: 'Failed to create location.', status: 500 });
-        }
-    },
-    update: async ({ request }) => {
-        const locationForm = await superValidate(request, zod(locationSchema));
-        console.log('update', locationForm);
-        
-        if (!locationForm.valid) return fail(400, { locationForm });
-        
-        try {
-            const { id, ...updateData } = locationForm.data as Locations;
-            await db.update(locations).set(updateData).where(eq(locations.id, id));
-            return message(locationForm, { text: 'Location updated successfully!' });
-        } catch (error) {
-            console.error(error);
-            return message(locationForm, { text: 'Failed to update location.', status: 500 });
-        }
-    },
-    delete: async ({ request }) => {
-        const data = await request.formData();
-        const id = Number(data.get('id'));
-
-        if (!id) {
-            return fail(400, { message: 'Invalid location ID' });
-        }
-
-        try {
-            await db.delete(locations).where(eq(locations.id, id));
-            return { success: true };
-        } catch (error) {
-            console.error(error);
-            return fail(500, { message: 'Failed to delete location' });
-        }
+    if (!form.valid) {
+      return fail(400, { form });
     }
+
+    try {
+      const { error } = await supabase
+        .from('rooms')
+        .insert({
+          property_id: form.data.property_id,
+          floor_id: form.data.floor_id,
+          room_number: form.data.room_number,
+          room_status: form.data.room_status,
+          capacity: form.data.capacity,
+          rate: form.data.rate,
+          description: form.data.description,
+          amenities: form.data.amenities
+        });
+
+      if (error) throw error;
+      return { form };
+    } catch (err) {
+      console.error(err);
+      return fail(500, { form });
+    }
+  },
+
+  update: async ({ request }) => {
+    const form = await superValidate(request, zod(roomSchema));
+
+    if (!form.valid) {
+      return fail(400, { form });
+    }
+
+    try {
+      const { error } = await supabase
+        .from('rooms')
+        .update({
+          property_id: form.data.property_id,
+          floor_id: form.data.floor_id,
+          room_number: form.data.room_number,
+          room_status: form.data.room_status,
+          capacity: form.data.capacity,
+          rate: form.data.rate,
+          description: form.data.description,
+          amenities: form.data.amenities
+        })
+        .eq('id', form.data.id);
+
+      if (error) throw error;
+      return { form };
+    } catch (err) {
+      console.error(err);
+      return fail(500, { form });
+    }
+  },
+
+  delete: async ({ request }) => {
+    const form = await superValidate(request, zod(roomSchema));
+
+    if (!form.valid) {
+      return fail(400, { form });
+    }
+
+    try {
+      const { error } = await supabase
+        .from('rooms')
+        .delete()
+        .eq('id', form.data.id);
+
+      if (error) throw error;
+      return { form };
+    } catch (err) {
+      console.error(err);
+      return fail(500, { form });
+    }
+  }
 };

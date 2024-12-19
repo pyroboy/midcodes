@@ -1,57 +1,65 @@
 import { fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
-import { z } from 'zod';
 import { zod } from 'sveltekit-superforms/adapters';
-import { db } from '$lib/db/db';
-import { floors, properties } from '$lib/db/schema';
+import { floorSchema } from './formSchema';
+import { supabase } from '$lib/supabase';
 
-const floorSchema = z.object({
-  id: z.number().optional(),
-  name: z.string().min(1, 'Floor name is required'),
-  propertyId: z.number().min(1, 'Property is required'),
-  floorNumber: z.number().min(0, 'Floor number must be 0 or greater'),
-  description: z.string().optional(),
-  status: z.enum(['ACTIVE', 'INACTIVE', 'MAINTENANCE']).default('ACTIVE'),
-  createdAt: z.date().optional(),
-  updatedAt: z.date().optional(),
-  createdBy: z.number().optional(),
-  updatedBy: z.number().optional()
-});
+export const load = async ({ locals }) => {
+  const session = await locals.getSession();
+  if (!session) {
+    return fail(401, { message: 'Unauthorized' });
+  }
 
-export const load = async () => {
-  const [floorList, propertyList] = await Promise.all([
-    db
-      .select({
-        id: floors.id,
-        name: floors.name,
-        propertyId: floors.propertyId,
-        floorNumber: floors.floorNumber,
-        description: floors.description,
-        status: floors.status,
-        propertyName: properties.name
-      })
-      .from(floors)
-      .leftJoin(properties, db.raw(`${floors.propertyId} = ${properties.id}`))
-      .orderBy('propertyName', 'floorNumber'),
+  const [{ data: floors }, { data: properties }, { data: userRole }] = await Promise.all([
+    supabase
+      .from('floors')
+      .select('*, property:properties(name)')
+      .order('property_id, floor_number'),
     
-    db
-      .select()
-      .from(properties)
-      .where(db.raw(`${properties.status} = 'ACTIVE'`))
-      .orderBy('name')
+    supabase
+      .from('properties')
+      .select('id, name')
+      .eq('status', 'ACTIVE')
+      .order('name'),
+
+    supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .single()
   ]);
 
   const form = await superValidate(zod(floorSchema));
+  const isAdminLevel = ['super_admin', 'property_admin'].includes(userRole?.role || '');
+  const isStaffLevel = ['property_manager', 'property_maintenance'].includes(userRole?.role || '');
 
   return {
     form,
-    floors: floorList,
-    properties: propertyList
+    floors,
+    properties,
+    userRole: userRole?.role || 'user',
+    isAdminLevel,
+    isStaffLevel
   };
 };
 
 export const actions = {
-  create: async ({ request }) => {
+  create: async ({ request, locals }) => {
+    const session = await locals.getSession();
+    if (!session) {
+      return fail(401, { message: 'Unauthorized' });
+    }
+
+    const { data: userRole } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .single();
+
+    if (!['super_admin', 'property_admin', 'property_manager'].includes(userRole?.role || '')) {
+      return fail(403, { message: 'Insufficient permissions' });
+    }
+
     const form = await superValidate(request, zod(floorSchema));
 
     if (!form.valid) {
@@ -59,14 +67,16 @@ export const actions = {
     }
 
     try {
-      await db.insert(floors).values({
-        name: form.data.name,
-        propertyId: form.data.propertyId,
-        floorNumber: form.data.floorNumber,
-        description: form.data.description,
-        status: form.data.status,
-      });
+      const { error } = await supabase
+        .from('floors')
+        .insert({
+          property_id: form.data.property_id,
+          floor_number: form.data.floor_number,
+          wing: form.data.wing,
+          status: form.data.status
+        });
 
+      if (error) throw error;
       return { form };
     } catch (err) {
       console.error(err);
@@ -74,7 +84,22 @@ export const actions = {
     }
   },
 
-  update: async ({ request }) => {
+  update: async ({ request, locals }) => {
+    const session = await locals.getSession();
+    if (!session) {
+      return fail(401, { message: 'Unauthorized' });
+    }
+
+    const { data: userRole } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .single();
+
+    if (!['super_admin', 'property_admin', 'property_manager'].includes(userRole?.role || '')) {
+      return fail(403, { message: 'Insufficient permissions' });
+    }
+
     const form = await superValidate(request, zod(floorSchema));
 
     if (!form.valid) {
@@ -82,17 +107,17 @@ export const actions = {
     }
 
     try {
-      await db
-        .update(floors)
-        .set({
-          name: form.data.name,
-          propertyId: form.data.propertyId,
-          floorNumber: form.data.floorNumber,
-          description: form.data.description,
-          status: form.data.status,
+      const { error } = await supabase
+        .from('floors')
+        .update({
+          property_id: form.data.property_id,
+          floor_number: form.data.floor_number,
+          wing: form.data.wing,
+          status: form.data.status
         })
-        .where(db.raw(`${floors.id} = ${form.data.id}`));
+        .eq('id', form.data.id);
 
+      if (error) throw error;
       return { form };
     } catch (err) {
       console.error(err);
@@ -100,7 +125,22 @@ export const actions = {
     }
   },
 
-  delete: async ({ request }) => {
+  delete: async ({ request, locals }) => {
+    const session = await locals.getSession();
+    if (!session) {
+      return fail(401, { message: 'Unauthorized' });
+    }
+
+    const { data: userRole } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .single();
+
+    if (!['super_admin', 'property_admin'].includes(userRole?.role || '')) {
+      return fail(403, { message: 'Insufficient permissions' });
+    }
+
     const form = await superValidate(request, zod(floorSchema));
 
     if (!form.valid) {
@@ -108,10 +148,12 @@ export const actions = {
     }
 
     try {
-      await db
-        .delete(floors)
-        .where(db.raw(`${floors.id} = ${form.data.id}`));
+      const { error } = await supabase
+        .from('floors')
+        .delete()
+        .eq('id', form.data.id);
 
+      if (error) throw error;
       return { form };
     } catch (err) {
       console.error(err);

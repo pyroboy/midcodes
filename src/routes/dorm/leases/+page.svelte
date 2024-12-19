@@ -2,7 +2,7 @@
 
 <script lang="ts">
 
-  import { leaseStatusEnum, leaseTypeEnum } from '$lib/db/schema';
+  import { leaseStatusEnum, leaseTypeEnum } from './formSchema.ts'
   import { zod } from 'sveltekit-superforms/adapters';
    import RandomLease from './RandomLease.svelte';
   import { Button } from '$lib/components/ui/button';

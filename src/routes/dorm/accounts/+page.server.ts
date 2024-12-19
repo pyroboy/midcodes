@@ -4,7 +4,6 @@ import { fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from "sveltekit-superforms/adapters";
 import { billingSchema } from './formSchema';
-import type { Database } from '$lib/types/database';
 
 export const load = async () => {
   // RLS will automatically filter based on user's role:

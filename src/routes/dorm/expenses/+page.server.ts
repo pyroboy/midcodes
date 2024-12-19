@@ -1,50 +1,114 @@
-// src/routes/expenses/+page.server.ts
-import { db } from '$lib/db/db';
-import { expenses } from '$lib/db/schema';
+// src/routes/dorm/expenses/+page.server.ts
+
 import { fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
-import { z } from 'zod';
 import { zod } from 'sveltekit-superforms/adapters';
+import { expenseSchema } from './formSchema';
+import { supabase } from '$lib/supabase';
 
-// Define a Zod schema for the form
-const formSchema = z.object({
-  amount: z.coerce.number().positive(),
-  type: z.enum(['MAINTENANCE', 'RENOVATION', 'MISC', 'SUPPLIES', 'UTILITIES', 'TRAVEL', 'OPERATING', 'REPAIRS', 'CASH_ADVANCE', 'MARKETING', 'SALARIES']),
-  issuedTo: z.string().optional(),
-  notes: z.string().optional(),
-  dateIssued: z.string(),
-  isRecurring: z.boolean().optional(),
-});
+export const load = async ({ locals }) => {
+  const [{ data: expenses }, { data: properties }] = await Promise.all([
+    supabase
+      .from('expenses')
+      .select(`
+        *,
+        property:properties(name),
+        created_by_user:profiles!created_by(full_name),
+        approved_by_user:profiles!approved_by(full_name)
+      `)
+      .order('expense_date', { ascending: false }),
+    
+    supabase
+      .from('properties')
+      .select('id, name')
+      .eq('status', 'ACTIVE')
+      .order('name')
+  ]);
 
-export const load = async () => {
-  const expenseList = await db.select().from(expenses).orderBy('dateIssued', { descending: true });
-  const form = await superValidate(zod(formSchema));
+  const form = await superValidate(zod(expenseSchema));
 
   return {
-    expenseList,
-    form
+    form,
+    expenses,
+    properties,
+    user: locals.user
   };
 };
 
 export const actions = {
-  default: async ({ request }) => {
-    const form = await superValidate(request, zod(formSchema));
+  create: async ({ request, locals }) => {
+    const form = await superValidate(request, zod(expenseSchema));
 
     if (!form.valid) {
       return fail(400, { form });
     }
 
     try {
-      await db.insert(expenses).values({
-        ...form.data,
-        createdBy: 1, // Replace with actual user ID when authentication is implemented
-        dateIssued: new Date(form.data.dateIssued),
-      } as any); // Using 'as any' to bypass type checking for this insert
+      const { error } = await supabase
+        .from('expenses')
+        .insert({
+          ...form.data,
+          created_by: locals.user.id,
+          expense_status: 'PENDING'
+        });
+
+      if (error) throw error;
+      return { form };
     } catch (err) {
       console.error(err);
-      return fail(500, { form, message: 'Failed to add expense' });
+      return fail(500, { form });
+    }
+  },
+
+  update: async ({ request, locals }) => {
+    const form = await superValidate(request, zod(expenseSchema));
+
+    if (!form.valid) {
+      return fail(400, { form });
     }
 
-    return { form };
+    try {
+      const { error } = await supabase
+        .from('expenses')
+        .update({
+          property_id: form.data.property_id,
+          expense_type: form.data.expense_type,
+          expense_status: form.data.expense_status,
+          amount: form.data.amount,
+          description: form.data.description,
+          expense_date: form.data.expense_date,
+          receipt_url: form.data.receipt_url,
+          notes: form.data.notes,
+          approved_by: form.data.expense_status === 'APPROVED' ? locals.user.id : null
+        })
+        .eq('id', form.data.id);
+
+      if (error) throw error;
+      return { form };
+    } catch (err) {
+      console.error(err);
+      return fail(500, { form });
+    }
+  },
+
+  delete: async ({ request }) => {
+    const form = await superValidate(request, zod(expenseSchema));
+
+    if (!form.valid) {
+      return fail(400, { form });
+    }
+
+    try {
+      const { error } = await supabase
+        .from('expenses')
+        .delete()
+        .eq('id', form.data.id);
+
+      if (error) throw error;
+      return { form };
+    } catch (err) {
+      console.error(err);
+      return fail(500, { form });
+    }
   }
 };

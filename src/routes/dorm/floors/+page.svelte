@@ -1,82 +1,102 @@
 <script lang="ts">
-  import { superForm } from 'sveltekit-superforms/client';
-  import Button from '$lib/components/ui/button/button.svelte';
-  import type { PageData } from './$types';
-  import FloorForm from './FloorForm.svelte';
+  import Form from './Form.svelte';
+  import { page } from '$app/stores';
+  import * as Card from '$lib/components/ui/card';
+  import { Badge } from '$lib/components/ui/badge';
+  import Alert from '$lib/components/ui/alert/alert.svelte';
 
-  export let data: PageData;
-  let formData: any;
+  export let data;
+
+  let selectedFloor: any = undefined;
   let editMode = false;
-  let showForm = true;
-  let currentFloor: any | undefined;
 
-  function toggleForm() {
-    showForm = !showForm;
-    if (!showForm) {
-      currentFloor = undefined;
-      editMode = false;
+  function handleFloorClick(floor: any) {
+    if (data.isAdminLevel || data.isStaffLevel) {
+      selectedFloor = floor;
+      editMode = true;
     }
   }
 
-  function editFloor(floor: any) {
-    editMode = true;
-    currentFloor = floor;
-    showForm = true;
-  }
-
   function handleFloorAdded() {
-    currentFloor = undefined;
+    selectedFloor = undefined;
     editMode = false;
   }
+
+  $: canAdd = data.isAdminLevel || data.isStaffLevel;
 </script>
 
-<div class="container mx-auto p-4 flex">
-  <div class="w-2/3 pr-4">
-    <h2 class="text-xl font-bold mb-2">Floor List</h2>
-    <div class="overflow-x-auto">
-      <table class="min-w-full bg-white">
-        <thead>
-          <tr>
-            <th class="px-4 py-2">Property</th>
-            <th class="px-4 py-2">Floor Name</th>
-            <th class="px-4 py-2">Floor Number</th>
-            <th class="px-4 py-2">Status</th>
-            <th class="px-4 py-2">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each data.floors as floor}
-            <tr>
-              <td class="border px-4 py-2">{floor.propertyName}</td>
-              <td class="border px-4 py-2">{floor.name}</td>
-              <td class="border px-4 py-2">{floor.floorNumber}</td>
-              <td class="border px-4 py-2">{floor.status}</td>
-              <td class="border px-4 py-2">
-                <Button variant="outline" size="sm" on:click={() => editFloor(floor)}>Edit</Button>
-              </td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </div>
-  </div>
+<div class="container mx-auto p-4 space-y-8">
+  {#if !data.isAdminLevel && !data.isStaffLevel}
+    <Alert variant="info">
+      You are viewing this page in read-only mode. Contact an administrator for edit access.
+    </Alert>
+  {/if}
 
-  <div class="w-1/3">
-    <div class="flex justify-between items-center mb-4">
-      <h2 class="text-xl font-bold">{editMode ? 'Edit Floor' : 'Add Floor'}</h2>
-      <Button variant="outline" size="sm" on:click={toggleForm}>
-        {showForm ? 'Hide Form' : 'Show Form'}
-      </Button>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+    <!-- Floor List -->
+    <div class="space-y-4">
+      <div class="flex justify-between items-center">
+        <h2 class="text-2xl font-bold">Floors</h2>
+        {#if canAdd && !editMode}
+          <button
+            class="px-4 py-2 bg-primary text-white rounded hover:bg-primary/90"
+            on:click={() => {
+              selectedFloor = undefined;
+              editMode = true;
+            }}
+          >
+            Add Floor
+          </button>
+        {/if}
+      </div>
+
+      <div class="grid gap-4">
+        {#each data.floors as floor}
+          <Card.Root 
+            class="cursor-pointer {(data.isAdminLevel || data.isStaffLevel) ? 'hover:bg-gray-50' : ''}" 
+            on:click={() => handleFloorClick(floor)}
+          >
+            <Card.Header>
+              <Card.Title>
+                Floor {floor.floor_number}
+                {#if floor.wing}
+                  - Wing {floor.wing}
+                {/if}
+              </Card.Title>
+              <Card.Description>
+                Property: {floor.property.name}
+              </Card.Description>
+            </Card.Header>
+            <Card.Content>
+              <Badge
+                variant={floor.status === 'ACTIVE'
+                  ? 'success'
+                  : floor.status === 'MAINTENANCE'
+                  ? 'warning'
+                  : 'destructive'}
+              >
+                {floor.status}
+              </Badge>
+            </Card.Content>
+          </Card.Root>
+        {/each}
+      </div>
     </div>
 
-    {#if showForm}
-      <FloorForm
-        data={data.form}
-        properties={data.properties}
-        {editMode}
-        floor={currentFloor}
-        on:floorAdded={handleFloorAdded}
-      />
+    <!-- Floor Form -->
+    {#if editMode || (!selectedFloor && canAdd)}
+      <div>
+        <h2 class="text-2xl font-bold mb-4">
+          {editMode ? 'Edit Floor' : 'Add New Floor'}
+        </h2>
+        <Form
+          {data}
+          properties={data.properties}
+          {editMode}
+          floor={selectedFloor}
+          on:floorAdded={handleFloorAdded}
+        />
+      </div>
     {/if}
   </div>
 </div>

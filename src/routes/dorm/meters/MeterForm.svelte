@@ -1,40 +1,34 @@
 <script lang="ts">
   import { superForm } from 'sveltekit-superforms/client';
   import { zodClient } from 'sveltekit-superforms/adapters';
-  import { z } from 'zod';
   import Button from '$lib/components/ui/button/button.svelte';
   import Input from '$lib/components/ui/input/input.svelte';
   import Label from '$lib/components/ui/label/label.svelte';
-  import * as Select from "$lib/components/ui/select";
+  import * as Select from '$lib/components/ui/select';
   import { createEventDispatcher } from 'svelte';
-  
-  export { form };
+  import type { MeterSchema } from './formSchema';
+  import Textarea from '$lib/components/ui/textarea/textarea.svelte';
+
   export let data: any;
+  export let rooms: any[] = [];
   export let editMode = false;
-  export let currentMeter: any = undefined;
+  export let meter: MeterSchema | undefined = undefined;
 
   const dispatch = createEventDispatcher();
 
-  const schema = z.object({
-    locationId: z.coerce.number().int().optional(),
-    meterType: z.enum(['ELECTRICITY', 'WATER', 'GAS']),
-    meterName: z.string().min(1, 'Meter name is required'),
-    meterFloorLevel: z.coerce.number().int().min(0, 'Meter floor level must be 0 or greater'),
-    meterActive: z.coerce.boolean(),
-  });
+  $: {
+    if (meter && editMode) {
+      form.data.set({
+        ...meter
+      });
+    }
+  }
 
-  const { form: formStore, errors, enhance, submit, reset } = superForm(data.form, {
+  const { form, errors, enhance, submitting, reset } = superForm(data, {
     id: 'meterForm',
-    validators: zodClient(schema),
-    applyAction: true,
+    validators: zodClient(),
     resetForm: true,
     taintedMessage: null,
-    onUpdated: ({ form }) => {
-      // You can add any logic here that should run when the form is updated
-    },
-    onSubmit: ({ formData, cancel }) => {
-      console.log('Form data before submit:', $formStore);
-    },
     onResult: ({ result }) => {
       if (result.type === 'success') {
         dispatch('meterAdded');
@@ -43,143 +37,161 @@
     },
   });
 
-  $: {
-    if (currentMeter && editMode) {
-      const formData = {
-        ...currentMeter,
-      };
-
-      formStore.set(formData);
-      meterTypeSelected = { value: currentMeter.meterType, label: currentMeter.meterType };
-      locationSelected = currentMeter.locationId 
-        ? { value: currentMeter.locationId.toString(), label: getLocationString(currentMeter.locationId) }
-        : { value: '', label: 'Select a location' };
-    }
-  }
-
-  $: meterTypeSelected = $formStore?.meterType 
-    ? { value: $formStore.meterType, label: $formStore.meterType }
-    : { value: '', label: 'Select a meter type' };
-
-  $: locationSelected = $formStore?.locationId
-    ? { value: $formStore.locationId.toString(), label: getLocationString($formStore.locationId) }
-    : { value: '', label: 'Select a location' };
-
-  const meterTypes = ['ELECTRICITY', 'WATER', 'GAS'];
-
-  function getLocationString(locationId: number): string {
-    const location = data.locations.find((loc: any) => loc.id === locationId);
-    return location ? `${location.locationName} - Floor ${location.locationFloorLevel}` : 'Unknown';
-  }
+  $: canEdit = data.isAdminLevel || data.isUtility;
+  $: canDelete = data.isAdminLevel;
 </script>
 
-<form 
-  method="POST" 
-  action={editMode ? "?/update" : "?/create"} 
+<form
+  method="POST"
+  action={editMode ? "?/update" : "?/create"}
   use:enhance
-  on:submit|preventDefault={submit}
-  class="space-y-4 mb-8"
+  class="space-y-4 p-4 bg-white rounded-lg shadow"
 >
-  {#if editMode && $formStore?.id}
-    <input type="hidden" name="id" bind:value={$formStore.id} />
-  {/if}
-  <div>
-    <Label for="meterName">Meter Name</Label>
-    <Input id="meterName" name="meterName" bind:value={$formStore.meterName} />
-    {#if $errors.meterName}<span class="text-red-500">{$errors.meterName}</span>{/if}
-  </div>
+  <input type="hidden" name="id" bind:value={$form.id} />
 
-  <div>
-    <Label for="meterFloorLevel">Meter Floor Level</Label>
-    <Input type="number" id="meterFloorLevel" name="meterFloorLevel" bind:value={$formStore.meterFloorLevel} />
-    {#if $errors.meterFloorLevel}<span class="text-red-500">{$errors.meterFloorLevel}</span>{/if}
-  </div>
-
-  <div>
-    <Label for="locationId">Location</Label>
-    <Select.Root
-      selected={locationSelected}
-      onSelectedChange={(s) => {
-        if (s) {
-          $formStore.locationId = parseInt(s.value);
-          locationSelected = { value: s.value, label: s.label || 'Select a location' };
-        } else {
-          $formStore.locationId = undefined;
-          locationSelected = { value: '', label: 'Select a location' };
-        }
-      }}
-    >
-      <Select.Trigger>
-        <Select.Value placeholder="Select a location" />
+  <div class="space-y-2">
+    <Label for="room_id">Room</Label>
+    <Select.Root bind:value={$form.room_id} disabled={!canEdit}>
+      <Select.Trigger class="w-full">
+        <Select.Value placeholder="Select a room" />
       </Select.Trigger>
       <Select.Content>
-        <Select.Item value="" label="No location" />
-        {#each data.locations as location}
-          <Select.Item 
-            value={location.id.toString()} 
-            label={`${location.locationName} - Floor ${location.locationFloorLevel}`} 
-          />
+        {#each rooms as room}
+          <Select.Item value={room.id}>
+            Room {room.room_number}
+            {#if room.floor}
+              - Floor {room.floor.floor_number}
+              {#if room.floor.wing}
+                Wing {room.floor.wing}
+              {/if}
+              ({room.floor.property?.name})
+            {/if}
+          </Select.Item>
         {/each}
       </Select.Content>
     </Select.Root>
-    <input type="hidden" name="locationId" bind:value={$formStore.locationId} />
-    {#if $errors.locationId}<span class="text-red-500">{$errors.locationId}</span>{/if}
+    {#if $errors.room_id}
+      <p class="text-red-500 text-sm">{$errors.room_id}</p>
+    {/if}
   </div>
 
-  <div>
-    <Label for="meterType">Meter Type</Label>
-    <Select.Root    
-      selected={meterTypeSelected}
-      onSelectedChange={(s) => {
-        if (s) {
-          $formStore.meterType = s.value;
-          meterTypeSelected = { value: s.value, label: s.value };
-        }
-      }}
-    >
-      <Select.Trigger>
-        <Select.Value placeholder="Select a meter type" />
+  <div class="space-y-2">
+    <Label for="type">Type</Label>
+    <Select.Root bind:value={$form.type} disabled={!canEdit}>
+      <Select.Trigger class="w-full">
+        <Select.Value placeholder="Select utility type" />
       </Select.Trigger>
       <Select.Content>
-        {#each meterTypes as type}
-          <Select.Item value={type} label={type} />
-        {/each}
+        <Select.Item value="WATER">Water</Select.Item>
+        <Select.Item value="ELECTRICITY">Electricity</Select.Item>
+        <Select.Item value="GAS">Gas</Select.Item>
       </Select.Content>
     </Select.Root>
-    <input type="hidden" name="meterType" bind:value={$formStore.meterType} />
-    {#if $errors.meterType}<span class="text-red-500">{$errors.meterType}</span>{/if}
+    {#if $errors.type}
+      <p class="text-red-500 text-sm">{$errors.type}</p>
+    {/if}
   </div>
 
-  <div>
-    <Label for="meterActive">Meter Active</Label>
-    <Input type="checkbox" id="meterActive" name="meterActive" bind:value={$formStore.meterActive} />
-    {#if $errors.meterActive}<span class="text-red-500">{$errors.meterActive}</span>{/if}
+  <div class="space-y-2">
+    <Label for="name">Meter Name</Label>
+    <Input
+      type="text"
+      id="name"
+      name="name"
+      bind:value={$form.name}
+      disabled={!canEdit}
+    />
+    {#if $errors.name}
+      <p class="text-red-500 text-sm">{$errors.name}</p>
+    {/if}
   </div>
 
-  <Button type="submit">{editMode ? 'Update' : 'Add'} Meter</Button>
-  {#if editMode}
-    <Button type="button" on:click={() => {
-      editMode = false;
-      reset();
-    }}>Cancel</Button>
-  {/if}
-
-  {#if Object.keys($errors).length > 0}
-    <div class="error-message">
-      Please correct the following errors:
-      <ul>
-        {#each Object.entries($errors) as [field, error]}
-          <li>{field}: {error}</li>
-        {/each}
-      </ul>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="space-y-2">
+      <Label for="initial_reading">Initial Reading</Label>
+      <Input
+        type="number"
+        id="initial_reading"
+        name="initial_reading"
+        bind:value={$form.initial_reading}
+        min="0"
+        step="0.01"
+        disabled={!canEdit}
+      />
+      {#if $errors.initial_reading}
+        <p class="text-red-500 text-sm">{$errors.initial_reading}</p>
+      {/if}
     </div>
-  {/if}
-</form>
 
-<style>
-  .error-message {
-    color: red;
-    font-weight: bold;
-    margin-top: 0.25rem;
-  }
-</style>
+    <div class="space-y-2">
+      <Label for="unit_rate">Unit Rate</Label>
+      <Input
+        type="number"
+        id="unit_rate"
+        name="unit_rate"
+        bind:value={$form.unit_rate}
+        min="0"
+        step="0.01"
+        disabled={!canEdit}
+      />
+      {#if $errors.unit_rate}
+        <p class="text-red-500 text-sm">{$errors.unit_rate}</p>
+      {/if}
+    </div>
+  </div>
+
+  <div class="space-y-2">
+    <Label for="status">Status</Label>
+    <Select.Root bind:value={$form.status} disabled={!canEdit}>
+      <Select.Trigger class="w-full">
+        <Select.Value placeholder="Select status" />
+      </Select.Trigger>
+      <Select.Content>
+        <Select.Item value="ACTIVE">Active</Select.Item>
+        <Select.Item value="INACTIVE">Inactive</Select.Item>
+        <Select.Item value="MAINTENANCE">Maintenance</Select.Item>
+      </Select.Content>
+    </Select.Root>
+    {#if $errors.status}
+      <p class="text-red-500 text-sm">{$errors.status}</p>
+    {/if}
+  </div>
+
+  <div class="space-y-2">
+    <Label for="notes">Notes</Label>
+    <Textarea
+      id="notes"
+      name="notes"
+      bind:value={$form.notes}
+      disabled={!canEdit}
+      rows="3"
+    />
+    {#if $errors.notes}
+      <p class="text-red-500 text-sm">{$errors.notes}</p>
+    {/if}
+  </div>
+
+  <div class="flex justify-end space-x-2">
+    {#if editMode}
+      {#if canDelete}
+        <Button
+          type="submit"
+          formaction="?/delete"
+          variant="destructive"
+          disabled={$submitting}
+        >
+          Delete
+        </Button>
+      {/if}
+      {#if canEdit}
+        <Button type="submit" disabled={$submitting}>
+          Update
+        </Button>
+      {/if}
+    {:else if canEdit}
+      <Button type="submit" disabled={$submitting}>
+        Create
+      </Button>
+    {/if}
+  </div>
+</form>
