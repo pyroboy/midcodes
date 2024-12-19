@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount, createEventDispatcher, afterUpdate } from 'svelte';
+    import { onMount, createEventDispatcher, afterUpdate, onDestroy } from 'svelte';
     import { browser } from '$app/environment';
     import { debounce } from 'lodash-es';
     import type { TemplateElement } from './stores/templateStore';
@@ -47,10 +47,111 @@
     const ELEMENT_SCALE = 2;
     const FULL_WIDTH = 1013;
     const FULL_HEIGHT = 638;
-    const LOW_RES_SCALE = 0.4;
+    const LOW_RES_SCALE = 0.2;
+    const MAX_CACHE_SIZE = 20;
+    const MEMORY_CHECK_INTERVAL = 10000;
     
-    const imageCache = new Map<string, HTMLImageElement>();
-    const lowResImageCache = new Map<string, HTMLImageElement>();
+    const imageCache = new Map<string, { image: HTMLImageElement; lastUsed: number }>();
+    const lowResImageCache = new Map<string, { image: HTMLImageElement; lastUsed: number }>();
+    let memoryCheckInterval: ReturnType<typeof setInterval>;
+
+    function cleanImageCache() {
+        const now = Date.now();
+        const maxAge = 5 * 60 * 1000;
+
+        for (const [url, entry] of imageCache) {
+            if (now - entry.lastUsed > maxAge) {
+                URL.revokeObjectURL(url);
+                imageCache.delete(url);
+            }
+        }
+
+        for (const [url, entry] of lowResImageCache) {
+            if (now - entry.lastUsed > maxAge) {
+                URL.revokeObjectURL(url);
+                lowResImageCache.delete(url);
+            }
+        }
+
+        while (imageCache.size > MAX_CACHE_SIZE) {
+            let oldestUrl: string | null = null;
+            let oldestTime = Infinity;
+            
+            for (const [url, entry] of imageCache) {
+                if (entry.lastUsed < oldestTime) {
+                    oldestTime = entry.lastUsed;
+                    oldestUrl = url;
+                }
+            }
+            
+            if (oldestUrl) {
+                URL.revokeObjectURL(oldestUrl);
+                imageCache.delete(oldestUrl);
+            }
+        }
+    }
+
+    function checkMemoryUsage() {
+        if ('memory' in performance) {
+            const memory = (performance as any).memory;
+            if (memory.usedJSHeapSize > memory.jsHeapSizeLimit * 0.8) {
+                console.warn('High memory usage detected, cleaning caches...');
+                cleanImageCache();
+            }
+        }
+    }
+
+    function disposeCanvas(canvas: HTMLCanvasElement | null) {
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+        canvas.width = 0;
+        canvas.height = 0;
+    }
+
+    async function loadAndCacheImage(url: string, lowRes: boolean = false): Promise<HTMLImageElement> {
+        if (!browser || !url) {
+            throw new CanvasOperationError(
+                'Cannot load image: browser not available or URL is empty',
+                'IMAGE_LOAD_ERROR'
+            );
+        }
+
+        const cache = lowRes ? lowResImageCache : imageCache;
+        const cacheEntry = cache.get(url);
+        
+        // Return cached image if available and update last used time
+        if (cacheEntry?.image) {
+            cacheEntry.lastUsed = Date.now();
+            return cacheEntry.image;
+        }
+
+        // Clean cache if it's getting too large
+        if (cache.size >= MAX_CACHE_SIZE) {
+            cleanImageCache();
+        }
+        
+        try {
+            const img = await loadImage(url);
+            
+            if (lowRes) {
+                const lowResImg = await createLowResImage(img);
+                cache.set(url, { image: lowResImg, lastUsed: Date.now() });
+                return lowResImg;
+            }
+
+            cache.set(url, { image: img, lastUsed: Date.now() });
+            return img;
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            throw new CanvasOperationError(
+                `Failed to load and cache image: ${message}`,
+                'IMAGE_CACHE_ERROR'
+            );
+        }
+    }
 
     export function isCanvasReady(): { ready: boolean; error?: CanvasError } {
         try {
@@ -121,7 +222,17 @@
         if (browser) {
             isMounted = true;
             await initializeCanvases();
+            memoryCheckInterval = setInterval(checkMemoryUsage, MEMORY_CHECK_INTERVAL);
         }
+    });
+    
+    onDestroy(() => {
+        if (memoryCheckInterval) {
+            clearInterval(memoryCheckInterval);
+        }
+        disposeCanvas(displayCanvas);
+        disposeCanvas(bufferCanvas);
+        cleanImageCache();
     });
     
     afterUpdate(async () => {
@@ -172,41 +283,6 @@
                 : { code: 'INITIALIZATION_ERROR', message: 'Failed to initialize canvas' };
             
             dispatch('error', errorDetails);
-        }
-    }
-    
-    async function loadAndCacheImage(url: string, lowRes: boolean = false): Promise<HTMLImageElement> {
-        if (!browser || !url) {
-            throw new CanvasOperationError(
-                'Cannot load image: browser not available or URL is empty',
-                'IMAGE_LOAD_ERROR'
-            );
-        }
-
-        const cache = lowRes ? lowResImageCache : imageCache;
-        if (cache.has(url)) return cache.get(url)!;
-        
-        try {
-            const img = await loadImage(url);
-            if (lowRes) {
-                const lowResImg = await createLowResImage(img);
-                cache.set(url, lowResImg);
-                return lowResImg;
-            }
-            cache.set(url, img);
-            return img;
-        } catch (error: unknown) {
-            if (error instanceof Error) {
-                throw new CanvasOperationError(
-                    `Failed to load and cache image: ${error.message}`,
-                    'IMAGE_CACHE_ERROR'
-                );
-            } else {
-                throw new CanvasOperationError(
-                    'Failed to load and cache image: Unknown error',
-                    'IMAGE_CACHE_ERROR'
-                );
-            }
         }
     }
     
@@ -272,26 +348,25 @@
                         return;
                     }
                     const lowResImg = new Image();
-                    lowResImg.onload = () => resolve(lowResImg);
+                    lowResImg.onload = () => {
+                        disposeCanvas(canvas);
+                        resolve(lowResImg);
+                    };
                     lowResImg.onerror = (error) => reject(new CanvasOperationError(
                         'Failed to load low-res image',
                         'LOWRES_LOAD_ERROR'
                     ));
-                    lowResImg.src = URL.createObjectURL(blob);
+                    const objectUrl = URL.createObjectURL(blob);
+                    lowResImg.src = objectUrl;
+                    lowResImg.onload = () => {
+                        URL.revokeObjectURL(objectUrl);
+                        resolve(lowResImg);
+                    };
                 }, 'image/jpeg', 0.5);
             });
-        } catch (error: any) {
-            if (error instanceof Error) {
-                throw new CanvasOperationError(
-                    `Failed to create low-res image: ${error.message}`,
-                    'LOWRES_CREATION_ERROR'
-                );
-            } else {
-                throw new CanvasOperationError(
-                    'Failed to create low-res image: Unknown error',
-                    'LOWRES_CREATION_ERROR'
-                );
-            }
+        } catch (error) {
+            console.error('Error creating low-res image:', error);
+            return img; // Fallback to original image
         }
     }
 
@@ -323,14 +398,11 @@
         const testString = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ';
         
         try {
-            // Set the new font with all properties
             ctx.font = getFontString(options);
             
-            // Get detailed metrics
             const metrics = ctx.measureText(testString);
             const height = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
             
-            // Additional metrics for better accuracy
             const fontBoundingBoxAscent = metrics.fontBoundingBoxAscent || 0;
             const fontBoundingBoxDescent = metrics.fontBoundingBoxDescent || 0;
             const totalHeight = Math.max(
@@ -343,7 +415,6 @@
             console.error('Error measuring text height:', error);
             return 0;
         } finally {
-            // Always restore the previous font
             ctx.font = previousFont;
         }
     }
@@ -372,15 +443,20 @@
             const width = FULL_WIDTH * scale;
             const height = FULL_HEIGHT * scale;
 
-            bufferCanvas.width = width;
-            bufferCanvas.height = height;
+            if (bufferCanvas.width !== width || bufferCanvas.height !== height) {
+                bufferCanvas.width = width;
+                bufferCanvas.height = height;
+            }
             await renderCanvas(bufferCtx!, scale, false);
 
-            displayCanvas.width = width;
-            displayCanvas.height = height;
+            if (displayCanvas.width !== width || displayCanvas.height !== height) {
+                displayCanvas.width = width;
+                displayCanvas.height = height;
+            }
             displayCtx!.drawImage(bufferCanvas, 0, 0);
 
             dispatch('rendered');
+            checkMemoryUsage();
         } catch (error) {
             const errorDetails = error instanceof CanvasOperationError 
                 ? { code: error.code, message: error.message }
@@ -431,13 +507,13 @@
      
         try {
             const nScale = scale * ELEMENT_SCALE;
+            const fontSize = (element.size || 12) * nScale;
             const fontOptions = {
                 family: element.font,
-                size: element.size,
+                size: fontSize,  // Use scaled font size
                 weight: element.fontWeight,
                 style: element.fontStyle
             };
-            const fontSize = (element.size || 12) * nScale;
             ctx.font = getFontString(fontOptions);
             ctx.fillStyle = element.color || 'black';
             ctx.textAlign = element.alignment as CanvasTextAlign;
