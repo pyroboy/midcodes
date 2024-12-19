@@ -1,531 +1,518 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
-    import { supabase } from '$lib/supabaseClient';
-    import JSZip from 'jszip';
+    import type { HeaderRow, DataRow } from '$lib/types';
     import ImagePreviewModal from '$lib/components/ImagePreviewModal.svelte';
-    import { invalidate } from '$app/navigation';
+    import { getSupabaseStorageUrl } from '$lib/utils/supabase';
+    import JSZip from 'jszip';
     
-    interface IdCard {
-        id: string;
-        template_id: string;
-        front_image: string;
-        back_image: string;
-        data: {
-            name?: string;
-            licenseNo?: string;
-            [key: string]: any;
-        };
-        created_at: string;
-    }
+    export let data: { idCards: (HeaderRow | DataRow)[] };
+    const [headerRow, ...allRows] = data.idCards;
+    const header = headerRow as HeaderRow;
+    
+    $: templateFields = header?.metadata?.templates || {};
 
-    export let data: { idCards: any[] };
-    let idCards: IdCard[] = [];
-    let selectedCards: Set<string> = new Set();
-    let selectAll = false;
-    let isLoading = false;
+    let searchQuery = '';
+    let dataRows: DataRow[] = [];
     let errorMessage = '';
     let selectedFrontImage: string | null = null;
     let selectedBackImage: string | null = null;
-    let loadingProgress = 0;
-    let totalCards = 0;
     let downloadingCards = new Set<string>();
+    let deletingCards = new Set<string>();
+    let selectedCards = new Set<string>();
+    let selectedCount = 0;
 
-    onMount(async () => {
-        if (data.idCards?.length > 0) {
-            idCards = data.idCards.map(card => ({
-                ...card,
-                data: typeof card.data === 'string' ? JSON.parse(card.data) : card.data
-            }));
-        }
-        await fetchIdCards(); // Fetch fresh data and ensure proper parsing
-    });
+    // Create a map to store each group's selection state
+    let groupSelectionStates = new Map<string, boolean>();
 
-    async function openPreview(card: IdCard) {
-        isLoading = true;
-        try {
-            const [frontUrl, backUrl] = await Promise.all([
-                getPublicUrl(card.front_image),
-                getPublicUrl(card.back_image)
-            ]);
-            selectedFrontImage = frontUrl;
-            selectedBackImage = backUrl;
-        } catch (e) {
-            console.error('Error loading preview images:', e);
-            errorMessage = 'Failed to load preview images';
-        } finally {
-            isLoading = false;
-        }
+    $: {
+        // Update group selection states whenever selectedCards changes
+        Object.entries(groupedCards).forEach(([templateName, cards]) => {
+            groupSelectionStates.set(
+                templateName, 
+                cards.every(card => selectedCards.has(getCardId(card)))
+            );
+        });
+        groupSelectionStates = groupSelectionStates;
+        selectedCount = selectedCards.size;
     }
 
-    async function getPublicUrl(path: string): Promise<string> {
-        if (!path) return '';
-        try {
-            const { data } = await supabase.storage.from('rendered-id-cards').getPublicUrl(path);
-            return data.publicUrl;
-        } catch (e) {
-            console.error('Error getting public URL:', e);
-            return '';
-        }
+    interface SelectionState {
+        isSelected: (cardId: string) => boolean;
+        isGroupSelected: (cards: DataRow[]) => boolean;
+        toggleSelection: (cardId: string) => void;
+        toggleGroupSelection: (cards: DataRow[]) => void;
+        getSelectedCount: () => number;
+        clearSelection: () => void;
     }
 
-    async function fetchIdCards() {
-        if (isLoading) return; // Prevent multiple fetches
-        
-        try {
-            const { data: newData, error } = await supabase
-                .from('idcards')
-                .select('*')
-                .order('created_at', { ascending: false });
+    let isSelected = (cardId: string) => selectedCards.has(cardId);
+    let isGroupSelected = (cards: DataRow[]) => {
+        return cards.every(card => {
+            const cardId = getCardId(card);
+            return cardId && selectedCards.has(cardId);
+        });
+    };
 
-            if (error) throw error;
+    const selectionManager: SelectionState = {
+        isSelected,
+        isGroupSelected,
+        toggleSelection: (cardId: string) => {
+            if (!cardId) return;
             
-            if (newData?.length > 0) {
-                idCards = newData.map(card => ({
-                    ...card,
-                    data: typeof card.data === 'string' ? JSON.parse(card.data) : card.data
-                }));
-                await invalidate('app:idCards');
+            const newSelectedCards = new Set(selectedCards);
+            if (newSelectedCards.has(cardId)) {
+                newSelectedCards.delete(cardId);
             } else {
-                errorMessage = 'No ID cards found';
-                idCards = [];
+                newSelectedCards.add(cardId);
             }
-        } catch (e: any) {
-            console.error('Error fetching ID cards:', e);
-            errorMessage = `Error: ${e.message}`;
+            selectedCards = newSelectedCards;
+        },
+        toggleGroupSelection: (cards: DataRow[]) => {
+            const validCards = cards.filter(card => {
+                const cardId = getCardId(card);
+                return !!cardId;
+            });
+            
+            const allSelected = validCards.every(card => selectedCards.has(getCardId(card)));
+            const newSelectedCards = new Set(selectedCards);
+            
+            validCards.forEach(card => {
+                const cardId = getCardId(card);
+                if (allSelected) {
+                    newSelectedCards.delete(cardId);
+                } else {
+                    newSelectedCards.add(cardId);
+                }
+            });
+            
+            selectedCards = newSelectedCards;
+        },
+        getSelectedCount: () => selectedCards.size,
+        clearSelection: () => {
+            selectedCards = new Set();
+            selectedCount = 0;
         }
+    };
+
+    $: groupedCards = (() => {
+        const groups: Record<string, DataRow[]> = {};
+        dataRows.forEach(card => {
+            if (!groups[card.template_name]) {
+                groups[card.template_name] = [];
+            }
+            groups[card.template_name].push(card);
+        });
+        return groups;
+    })();
+
+    $: {
+        const query = searchQuery.toLowerCase();
+        dataRows = allRows.filter((row): row is DataRow => {
+            if (row.is_header) return false;
+            
+            if (row.template_name.toLowerCase().includes(query)) return true;
+            
+            return Object.values(row.fields || {}).some(field => 
+                field.value.toLowerCase().includes(query)
+            );
+        });
     }
 
-    function formatDate(dateString: string): string {
-        return new Date(dateString).toLocaleDateString();
+    function getCardId(card: DataRow): string {
+        const id = card.idcard_id?.toString();
+        if (!id) return '';
+        return id;
     }
 
-    function toggleSelectAll() {
-        if (!selectAll) {
-            selectedCards = new Set(idCards.map(card => card.id));
-        } else {
-            selectedCards.clear();
+    function getAllSelectedCards(): DataRow[] {
+        return dataRows.filter(card => selectionManager.isSelected(getCardId(card)));
+    }
+
+    async function openPreview(event: MouseEvent, card: DataRow) {
+        // Don't open preview if clicking on a checkbox, button, or their containers
+        const target = event.target as HTMLElement;
+        if (
+            target.closest('input[type="checkbox"]') ||
+            target.closest('button') ||
+            target.closest('.flex.items-center') ||
+            target.closest('.flex.gap-2')
+        ) {
+            return;
         }
-        selectAll = !selectAll;
-        console.log('Selected cards after toggle all:', Array.from(selectedCards));
+
+        selectedFrontImage = card.front_image;
+        selectedBackImage = card.back_image;
     }
 
-    function toggleCardSelection(cardId: string) {
-        if (selectedCards.has(cardId)) {
-            selectedCards.delete(cardId);
-        } else {
-            selectedCards.add(cardId);
-        }
-        selectedCards = selectedCards; // Trigger reactivity
-        selectAll = selectedCards.size === idCards.length;
-        console.log('Selected cards after toggle:', Array.from(selectedCards));
+    function closePreview() {
+        selectedFrontImage = null;
+        selectedBackImage = null;
     }
 
-    async function downloadCard(card: IdCard) {
-        if (downloadingCards.has(card.id)) return;
-        downloadingCards.add(card.id);
-        
+    async function downloadCard(card: DataRow) {
+        const cardId = getCardId(card);
+        downloadingCards.add(cardId);
+        downloadingCards = downloadingCards;
+
         try {
             const zip = new JSZip();
-            const frontUrl = card.front_image;
-            const backUrl = card.back_image;
-            const cardName = card.data?.name?.replace(/[^a-zA-Z0-9-_]/g, '_') || 'id-card';
             
-            const [frontResponse, backResponse] = await Promise.all([
-                fetch(supabase.storage.from('rendered-id-cards').getPublicUrl(frontUrl).data.publicUrl),
-                fetch(supabase.storage.from('rendered-id-cards').getPublicUrl(backUrl).data.publicUrl)
-            ]);
+            const nameField = card.fields?.['Name']?.value || 
+                            card.fields?.['name']?.value || 
+                            card.fields?.['Full Name']?.value || 
+                            `id-${cardId}`;
             
-            if (!frontResponse.ok || !backResponse.ok) {
-                throw new Error('Failed to fetch images');
+            const folder = zip.folder(nameField);
+            if (!folder) throw new Error('Failed to create folder');
+            
+            if (card.front_image) {
+                const frontImageUrl = getSupabaseStorageUrl(card.front_image);
+                if (frontImageUrl) {
+                    const frontResponse = await fetch(frontImageUrl);
+                    if (!frontResponse.ok) throw new Error('Failed to download front image');
+                    const frontBlob = await frontResponse.blob();
+                    folder.file(`${nameField}_front.jpg`, frontBlob);
+                }
             }
-            
-            const [frontBlob, backBlob] = await Promise.all([
-                frontResponse.blob(),
-                backResponse.blob()
-            ]);
-            
-            zip.file(`${cardName}_front.png`, frontBlob);
-            zip.file(`${cardName}_back.png`, backBlob);
-            
-            const content = await zip.generateAsync({ type: 'blob' });
-            const downloadUrl = URL.createObjectURL(content);
-            
-            const link = document.createElement('a');
-            link.href = downloadUrl;
-            link.download = `${cardName}.zip`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(downloadUrl);
+
+            if (card.back_image) {
+                const backImageUrl = getSupabaseStorageUrl(card.back_image);
+                if (backImageUrl) {
+                    const backResponse = await fetch(backImageUrl);
+                    if (!backResponse.ok) throw new Error('Failed to download back image');
+                    const backBlob = await backResponse.blob();
+                    folder.file(`${nameField}_back.jpg`, backBlob);
+                }
+            }
+
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            const url = window.URL.createObjectURL(zipBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${nameField}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
         } catch (error) {
-            console.error('Error downloading card:', error);
+            console.error('Error downloading ID card:', error);
             errorMessage = 'Failed to download ID card';
         } finally {
-            downloadingCards.delete(card.id);
+            downloadingCards.delete(cardId);
+            downloadingCards = downloadingCards;
         }
     }
 
-    async function deleteCard(cardId: string) {
-        const { error } = await supabase
-            .from('idcards')
-            .delete()
-            .eq('id', cardId);
+    async function downloadSelectedCards() {
+        const selectedRows = getAllSelectedCards();
+        if (selectedRows.length === 0) return;
 
-        if (error) {
-            console.error('Error deleting ID card:', error);
-        } else {
-            idCards = idCards.filter(card => card.id !== cardId);
+        try {
+            const zip = new JSZip();
+            const nameCount = new Map<string, number>();
+
+            // First pass: count all names
+            selectedRows.forEach(card => {
+                let baseName = card.fields?.['Name']?.value || 
+                             card.fields?.['name']?.value || 
+                             card.fields?.['Full Name']?.value || 
+                             `id-${getCardId(card)}`;
+                baseName = baseName.replace(/[^a-zA-Z0-9-_() ]/g, '');
+                nameCount.set(baseName, (nameCount.get(baseName) || 0) + 1);
+            });
+
+            // Second pass: create folders with proper numbering
+            const usedNames = new Map<string, number>();
+
+            for (const card of selectedRows) {
+                const cardId = getCardId(card);
+                downloadingCards.add(cardId);
+                downloadingCards = downloadingCards;
+
+                try {
+                    let baseName = card.fields?.['Name']?.value || 
+                                 card.fields?.['name']?.value || 
+                                 card.fields?.['Full Name']?.value || 
+                                 `id-${cardId}`;
+
+                    // Clean the name field to avoid invalid characters
+                    baseName = baseName.replace(/[^a-zA-Z0-9-_() ]/g, '');
+
+                    // Get current count for this name
+                    const currentCount = usedNames.get(baseName) || 0;
+                    const totalCount = nameCount.get(baseName) || 1;
+
+                    // Generate unique name
+                    let nameField = baseName;
+                    if (totalCount > 1) {
+                        nameField = `${baseName} (${currentCount + 1})`;
+                    }
+                    usedNames.set(baseName, currentCount + 1);
+
+                    // Create folder for each card
+                    const folder = zip.folder(nameField);
+                    if (!folder) {
+                        console.error(`Failed to create folder for ${nameField}`);
+                        continue;
+                    }
+
+                    // Download front image
+                    if (card.front_image) {
+                        const frontImageUrl = getSupabaseStorageUrl(card.front_image);
+                        if (frontImageUrl) {
+                            const frontResponse = await fetch(frontImageUrl);
+                            if (!frontResponse.ok) {
+                                console.error(`Failed to download front image for ${nameField}`);
+                            } else {
+                                const frontBlob = await frontResponse.blob();
+                                folder.file(`${nameField}_front.jpg`, frontBlob);
+                            }
+                        }
+                    }
+
+                    // Download back image
+                    if (card.back_image) {
+                        const backImageUrl = getSupabaseStorageUrl(card.back_image);
+                        if (backImageUrl) {
+                            const backResponse = await fetch(backImageUrl);
+                            if (!backResponse.ok) {
+                                console.error(`Failed to download back image for ${nameField}`);
+                            } else {
+                                const backBlob = await backResponse.blob();
+                                folder.file(`${nameField}_back.jpg`, backBlob);
+                            }
+                        }
+                    }
+                } catch (cardError) {
+                    console.error(`Error processing card ${cardId}:`, cardError);
+                } finally {
+                    downloadingCards.delete(cardId);
+                    downloadingCards = downloadingCards;
+                }
+            }
+
+            // Generate and download the zip file
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            const url = window.URL.createObjectURL(zipBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `id-cards-${new Date().toISOString().split('T')[0]}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+
+            // Clear selection after successful download
+            selectedCards.clear();
+            selectedCards = new Set();
+            selectedCount = 0;
+        } catch (error) {
+            console.error('Error downloading ID cards:', error);
+            errorMessage = 'Failed to download ID cards';
+        }
+    }
+
+    async function handleDelete(card: DataRow) {
+        const cardId = getCardId(card);
+        deletingCards.add(cardId);
+        deletingCards = deletingCards;
+
+        try {
+            const response = await fetch(`/api/id-cards/${cardId}`, {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) throw new Error('Failed to delete ID card');
+
+            dataRows = dataRows.filter(row => getCardId(row) !== cardId);
             selectedCards.delete(cardId);
-            selectedCards = selectedCards;
+            selectedCards = new Set(selectedCards);
+        } catch (error) {
+            console.error('Error deleting ID card:', error);
+            errorMessage = 'Failed to delete ID card';
+        } finally {
+            deletingCards.delete(cardId);
+            deletingCards = deletingCards;
         }
     }
 
-    async function bulkDownload() {
-        const selectedCardsList = idCards.filter(card => selectedCards.has(card.id));
-        console.log('Starting bulk download with cards:', selectedCardsList.map(card => ({
-            id: card.id,
-            name: card.data?.name,
-            data: card.data,
-            front_image: card.front_image,
-            back_image: card.back_image
-        })));
+    async function deleteSelectedCards() {
+        const selectedRows = getAllSelectedCards();
+        if (selectedRows.length === 0) return;
 
-        if (selectedCardsList.length === 0) {
-            errorMessage = 'No cards selected for download';
+        if (!confirm(`Are you sure you want to delete ${selectedRows.length} ID card${selectedRows.length > 1 ? 's' : ''}?`)) {
             return;
         }
 
         try {
-            const zip = new JSZip();
-            let successCount = 0;
+            for (const card of selectedRows) {
+                const cardId = getCardId(card);
+                if (!cardId) continue;
 
-            for (const card of selectedCardsList) {
+                deletingCards.add(cardId);
+                deletingCards = deletingCards;
+
                 try {
-                    // Use the parsed data for folder name
-                    const cardName = card.data?.name?.replace(/[^a-zA-Z0-9-_]/g, '_') || 
-                                   `id_card_${card.id.slice(0, 8)}`;
-                    const folderName = cardName + '/';
-                    
-                    console.log('Processing card:', {
-                        id: card.id,
-                        folderName,
-                        data: card.data,
-                        name: card.data?.name
+                    const response = await fetch(`/api/id-cards/${cardId}`, {
+                        method: 'DELETE'
                     });
 
-                    const [frontResponse, backResponse] = await Promise.all([
-                        fetch(supabase.storage.from('rendered-id-cards').getPublicUrl(card.front_image).data.publicUrl),
-                        fetch(supabase.storage.from('rendered-id-cards').getPublicUrl(card.back_image).data.publicUrl)
-                    ]);
-
-                    if (!frontResponse.ok || !backResponse.ok) {
-                        console.error(`Failed to fetch images for ${cardName}`);
-                        continue;
+                    if (!response.ok) {
+                        throw new Error(`Failed to delete ID card: ${response.statusText}`);
                     }
-
-                    const [frontBlob, backBlob] = await Promise.all([
-                        frontResponse.blob(),
-                        backResponse.blob()
-                    ]);
-
-                    // Create a new folder for each card
-                    const folder = zip.folder(folderName);
-                    if (!folder) {
-                        console.error(`Failed to create folder: ${folderName}`);
-                        continue;
-                    }
-
-                    // Add files to the folder
-                    folder.file('front.png', frontBlob);
-                    folder.file('back.png', backBlob);
-                    
-                    console.log(`Successfully added files to folder: ${folderName}`);
-                    successCount++;
-                } catch (error) {
-                    console.error('Error processing card:', error);
+                } catch (cardError) {
+                    console.error(`Error deleting card ${cardId}:`, cardError);
+                    errorMessage = 'Failed to delete some ID cards';
+                } finally {
+                    deletingCards.delete(cardId);
+                    deletingCards = deletingCards;
                 }
             }
 
-            if (successCount === 0) {
-                throw new Error('Failed to process any cards');
-            }
+            // Refresh the data after deletion
+            window.location.reload();
 
-            console.log(`Creating zip with ${successCount} folders...`);
-            const content = await zip.generateAsync({
-                type: 'blob',
-                compression: 'DEFLATE',
-                compressionOptions: {
-                    level: 9
-                }
-            });
-
-            console.log('Zip file generated, initiating download...');
-            const downloadUrl = URL.createObjectURL(content);
-            const link = document.createElement('a');
-            link.href = downloadUrl;
-            link.download = 'id_cards.zip';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(downloadUrl);
-
-            console.log('Download complete, clearing selection...');
+            // Clear selection and update UI
             selectedCards.clear();
-            selectAll = false;
+            selectedCards = new Set();
+            selectedCount = 0;
         } catch (error) {
-            console.error('Error in bulk download:', error);
-            errorMessage = 'Failed to download selected cards';
+            console.error('Error deleting ID cards:', error);
+            errorMessage = 'Failed to delete ID cards';
         }
     }
 
-    async function bulkDelete() {
-        const { error } = await supabase
-            .from('idcards')
-            .delete()
-            .in('id', Array.from(selectedCards));
+    function handleCheckboxClick(event: Event, card: DataRow) {
+        event.stopPropagation();
+        const cardId = getCardId(card);
+        if (!cardId) return;
+        selectionManager.toggleSelection(cardId);
+    }
 
-        if (error) {
-            console.error('Error deleting ID cards:', error);
-        } else {
-            idCards = idCards.filter(card => !selectedCards.has(card.id));
-            selectedCards.clear();
-            selectedCards = selectedCards;
-            selectAll = false;
-        }
+    function handleGroupCheckboxClick(event: Event, cards: DataRow[]) {
+        event.stopPropagation();
+        selectionManager.toggleGroupSelection(cards);
     }
 </script>
 
-<svelte:head>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
-</svelte:head>
-
-<style lang="postcss">
-    .id-cards-container {
-        @apply p-4;
-    }
-
-    .loading-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.5);
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        z-index: 1000;
-    }
-
-    .loading-spinner {
-        width: 50px;
-        height: 50px;
-        border: 5px solid #f3f3f3;
-        border-top: 5px solid #3498db;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-    }
-
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-
-    .error-message {
-        @apply text-destructive bg-destructive/10 p-4 rounded mb-4;
-    }
-
-    .table-container {
-        @apply relative overflow-x-auto rounded-lg border border-border bg-card;
-    }
-
-    table {
-        @apply w-full text-sm;
-    }
-
-    thead {
-        @apply bg-muted/50 text-muted-foreground;
-    }
-
-    th {
-        @apply px-6 py-4 text-left font-medium whitespace-nowrap sticky top-0 bg-muted/50;
-    }
-
-    tbody tr {
-        @apply border-t border-border hover:bg-muted/50 cursor-pointer;
-    }
-
-    td {
-        @apply px-6 py-4 align-middle;
-    }
-
-    .checkbox-cell {
-        @apply w-10 text-center;
-    }
-
-    .image-cell {
-        @apply w-24;
-    }
-
-    .id-thumbnail {
-        @apply h-16 w-auto object-contain rounded shadow-sm;
-    }
-
-    .image-placeholder {
-        @apply h-16 w-24 bg-muted/30 rounded flex items-center justify-center text-muted-foreground text-xs;
-    }
-
-    .actions-cell {
-        @apply w-48 whitespace-nowrap;
-    }
-
-    .name-cell {
-        @apply font-medium;
-    }
-
-    .license-cell {
-        @apply font-mono text-muted-foreground;
-    }
-
-    .date-cell {
-        @apply text-muted-foreground whitespace-nowrap;
-    }
-
-    .bulk-actions {
-        @apply mb-4 flex items-center gap-4;
-    }
-
-    .btn-download {
-        @apply inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors;
-        min-width: 100px;
-        justify-content: center;
-    }
-
-    .loading-spinner {
-        @apply inline-block w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin;
-    }
-</style>
-
-<div class="id-cards-container">
-    <h2 class="text-2xl font-bold mb-4">Generated ID Cards</h2>
-
-    {#if isLoading}
-        <div class="loading-overlay">
-            <div class="loading-spinner" />
-            <div class="mt-4 text-white">Loading...</div>
+<div class="mb-4 flex justify-between items-center">
+    <input
+        type="text"
+        placeholder="Search..."
+        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
+        bind:value={searchQuery}
+    />
+    {#if selectedCount > 0}
+        <div class="ml-4 flex gap-2">
+            <button
+                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                on:click={downloadSelectedCards}
+            >
+                Download Selected ({selectedCount})
+            </button>
+            <button
+                class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                on:click={deleteSelectedCards}
+            >
+                Delete Selected ({selectedCount})
+            </button>
         </div>
     {/if}
-
-    {#if errorMessage}
-        <div class="error-message">
-            {errorMessage}
-            <button class="btn btn-primary ml-4" on:click={() => errorMessage = ''}>Dismiss</button>
-        </div>
-    {/if}
-
-    <div class="bulk-actions">
-        <label class="flex items-center gap-2">
-            <input
-                type="checkbox"
-                bind:checked={selectAll}
-                on:change={toggleSelectAll}
-            />
-            Select All
-        </label>
-
-        {#if selectedCards.size > 0}
-            <button class="btn btn-primary" on:click={bulkDownload}>
-                Download Selected ({selectedCards.size})
-            </button>
-            <button class="btn btn-destructive" on:click={bulkDelete}>
-                Delete Selected ({selectedCards.size})
-            </button>
-        {/if}
-    </div>
-
-    <div class="table-container">
-        <table>
-            <thead>
-                <tr>
-                    <th class="checkbox-cell">
-                        <input
-                            type="checkbox"
-                            bind:checked={selectAll}
-                            on:change={toggleSelectAll}
-                        />
-                    </th>
-                    <th class="image-cell">Preview</th>
-                    <th>Name</th>
-                    <th>License No.</th>
-                    <th>Created</th>
-                    <th class="actions-cell">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {#each idCards as card}
-                    <tr on:click={() => openPreview(card)}>
-                        <td class="checkbox-cell">
-                            <input
-                                type="checkbox"
-                                checked={selectedCards.has(card.id)}
-                                on:change={() => toggleCardSelection(card.id)}
-                                on:click|stopPropagation
-                            />
-                        </td>
-                        <td class="image-cell">
-                            {#if card.front_image}
-                                <img
-                                    src={supabase.storage.from('rendered-id-cards').getPublicUrl(card.front_image).data.publicUrl}
-                                    alt="ID Card Preview"
-                                    class="id-thumbnail"
-                                    loading="lazy"
-                                />
-                            {:else}
-                                <div class="image-placeholder">
-                                    No Image
-                                </div>
-                            {/if}
-                        </td>
-                        <td class="name-cell">{card.data?.name || 'N/A'}</td>
-                        <td class="license-cell">{card.data?.licenseNo || 'N/A'}</td>
-                        <td class="date-cell">{formatDate(card.created_at)}</td>
-                        <td class="actions-cell">
-                            <button 
-                                class="btn-download mr-2" 
-                                on:click|stopPropagation={async () => {
-                                    await downloadCard(card);
-                                }}
-                                disabled={downloadingCards.has(card.id)}
-                            >
-                                {#if downloadingCards.has(card.id)}
-                                    <div class="loading-spinner" />
-                                    <span>Loading</span>
-                                {:else}
-                                    <span>Download</span>
-                                {/if}
-                            </button>
-                            <button 
-                                class="btn btn-destructive" 
-                                on:click|stopPropagation={() => deleteCard(card.id)}
-                            >
-                                Delete
-                            </button>
-                        </td>
-                    </tr>
-                {/each}
-            </tbody>
-        </table>
-    </div>
 </div>
 
-{#if selectedFrontImage || selectedBackImage}
-    <ImagePreviewModal
-        frontImageUrl={selectedFrontImage}
-        backImageUrl={selectedBackImage}
-        onClose={() => {
-            selectedFrontImage = null;
-            selectedBackImage = null;
-        }}
-    />
+{#each Object.entries(groupedCards) as [templateName, cards]}
+    <div class="mb-8">
+        <h3 class="text-xl font-semibold mb-4">{templateName}</h3>
+        <div class="relative overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-800 sticky top-0 z-20">
+                    <tr>
+                        <th scope="col" class="sticky left-0 z-30 w-16 px-4 py-2 bg-gray-50 dark:bg-gray-800">
+                            <div class="flex items-center justify-center">
+                                <input
+                                    type="checkbox"
+                                    class="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                                    checked={groupSelectionStates.get(templateName)}
+                                    on:change={(e) => handleGroupCheckboxClick(e, cards)}
+                                />
+                            </div>
+                        </th>
+                        <th scope="col" class="sticky left-[57px] z-30 px-4 py-2 bg-gray-50 dark:bg-gray-800">
+                            <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Preview</span>
+                        </th>
+                        {#if templateFields[templateName]}
+                            {#each templateFields[templateName] || [] as field (field.variableName)}
+                                <th scope="col" class="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200 {field.side === 'front' ? 'bg-blue-50/50 dark:bg-blue-900/10' : 'bg-green-50/50 dark:bg-green-900/10'}">
+                                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{field.variableName}</span>
+                                </th>
+                            {/each}
+                        {/if}
+                        <th scope="col" class="sticky right-0 z-30 px-4 py-2 bg-gray-50 dark:bg-gray-800">
+                            <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</span>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200 dark:divide-gray-700 dark:bg-gray-900">
+                    {#each cards as card}
+                    <tr
+                    class="group hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+                    on:click={(e) => openPreview(e, card)}
+                >
+                    <td class="sticky left-0 z-20 w-16 px-4 py-2 bg-white dark:bg-gray-900 group-hover:bg-gray-100 dark:group-hover:bg-gray-700">
+                        <div class="flex items-center justify-center">
+                            <input
+                                type="checkbox"
+                                class="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                                checked={selectionManager.isSelected(getCardId(card))}
+                                on:change={(e) => handleCheckboxClick(e, card)}
+                            />
+                        </div>
+                    </td>
+                    <td class="sticky left-[57px] z-20 px-4 py-2 bg-white dark:bg-gray-900 group-hover:bg-gray-100 dark:group-hover:bg-gray-700">
+                        <div class="flex items-center space-x-2">
+                            {#if card.front_image}
+                                <img
+                                    src={getSupabaseStorageUrl(card.front_image)}
+                                    alt="Front Preview"
+                                    class="w-8 h-8 object-cover rounded"
+                                />
+                            {/if}
+                        </div>
+                    </td>
+                    {#if templateFields[templateName]}
+                        {#each templateFields[templateName] || [] as field (field.variableName)}
+                            <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200 {field.side === 'front' ? 'bg-blue-50/50 dark:bg-blue-900/10' : 'bg-green-50/50 dark:bg-green-900/10'}">
+                                {card.fields?.[field.variableName]?.value || ''}
+                            </td>
+                        {/each}
+                    {/if}
+                    <td class="sticky right-0 z-20 px-4 py-2 bg-white dark:bg-gray-900 group-hover:bg-gray-100 dark:group-hover:bg-gray-700 flex gap-2 items-center">
+                        <button
+                            class="px-3 py-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-150"
+                            on:click|stopPropagation={() => downloadCard(card)}
+                            disabled={downloadingCards.has(getCardId(card))}
+                        >
+                            {downloadingCards.has(getCardId(card)) ? 'Downloading...' : 'Download'}
+                        </button>
+                        <button
+                            class="px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors duration-150"
+                            on:click|stopPropagation={() => handleDelete(card)}
+                            disabled={deletingCards.has(getCardId(card))}
+                        >
+                            {deletingCards.has(getCardId(card)) ? 'Deleting...' : 'Delete'}
+                        </button>
+                    </td>
+                </tr>
+            {/each}
+        </tbody>
+    </table>
+</div>
+</div>
+{/each}
+
+{#if selectedFrontImage}
+<ImagePreviewModal
+frontImageUrl={selectedFrontImage ? getSupabaseStorageUrl(selectedFrontImage) : null}
+backImageUrl={selectedBackImage ? getSupabaseStorageUrl(selectedBackImage) : null}
+onClose={closePreview}
+/>
 {/if}

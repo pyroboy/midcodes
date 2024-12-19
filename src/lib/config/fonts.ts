@@ -1,3 +1,4 @@
+
 export interface FontConfig {
     family: string;
     weights: number[];
@@ -98,78 +99,57 @@ export const googleFonts: FontConfig[] = [
 export const fonts: FontConfig[] = [...googleFonts, ...systemFonts];
 
 export function getFontUrl(fonts: FontConfig[]): string {
-    if (!fonts.length) return '';
+    if (!fonts.length) {
+        console.log('No fonts provided to getFontUrl');
+        return '';
+    }
     
-    const fontFamilies = googleFonts.map(font => {
-        const encodedFamily = encodeURIComponent(font.family.replace(/\s+/g, '+'));
+    const fontFamilies = fonts.map(font => {
+        const encodedFamily = font.family.replace(/\s+/g, '+');
         const hasItalic = font.styles?.includes('italic');
+        const weights = font.weights.join(';');
 
-        switch (font.family) {
-            case 'JetBrains Mono':
-                return `family=JetBrains+Mono:ital,wght@0,100..800;1,100..800`;
-            case 'Inter':
-                return `family=Inter:wght@100..900`;
-            case 'Roboto':
-                return hasItalic 
-                    ? `family=Roboto:ital,wght@0,100..900;1,100..900`
-                    : `family=Roboto:wght@100..900`;
-            case 'Montserrat':
-                return hasItalic
-                    ? `family=Montserrat:ital,wght@0,100..900;1,100..900`
-                    : `family=Montserrat:wght@100..900`;
-            case 'Open Sans':
-                return hasItalic
-                    ? `family=Open+Sans:ital,wght@0,300..800;1,300..800`
-                    : `family=Open+Sans:wght@300..800`;
-            case 'Poppins':
-                return hasItalic
-                    ? `family=Poppins:ital,wght@0,100..900;1,100..900`
-                    : `family=Poppins:wght@100..900`;
-            case 'Noto Sans':
-                return hasItalic
-                    ? `family=Noto+Sans:ital,wght@0,100..900;1,100..900`
-                    : `family=Noto+Sans:wght@100..900`;
-            case 'IBM Plex Sans':
-                return hasItalic
-                    ? `family=IBM+Plex+Sans:ital,wght@0,100..700;1,100..700`
-                    : `family=IBM+Plex+Sans:wght@100..700`;
-            case 'Fira Code':
-                return `family=Fira+Code:wght@300..700`;
-            case 'Playfair Display':
-                return hasItalic
-                    ? `family=Playfair+Display:ital,wght@0,100..900;1,100..900`
-                    : `family=Playfair+Display:wght@100..900`;
-            case 'Lato':
-                return hasItalic
-                    ? `family=Lato:ital,wght@0,100,300,400,700,900;1,100,300,400,700,900`
-                    : `family=Lato:wght@100,300,400,700,900`;
-            case 'Source Sans Pro':
-                return hasItalic
-                    ? `family=Source+Sans+Pro:ital,wght@0,200,300,400,600,700,900;1,200,300,400,600,700,900`
-                    : `family=Source+Sans+Pro:wght@200,300,400,600,700,900`;
-            case 'Merriweather':
-                return hasItalic
-                    ? `family=Merriweather:ital,wght@0,300,400,700,900;1,300,400,700,900`
-                    : `family=Merriweather:wght@300,400,700,900`;
-            default:
-                const weights = font.weights.sort((a, b) => a - b).join(',');
-                if (hasItalic) {
-                    return `family=${encodedFamily}:ital,wght@0,${weights};1,${weights}`;
-                }
-                return `family=${encodedFamily}:wght@${weights}`;
+        console.log(`Processing font: ${font.family}`);
+        console.log(`Encoded family: ${encodedFamily}`);
+        console.log(`Has italic: ${hasItalic}`);
+        console.log(`Weights: ${weights}`);
+
+        let fontUrl = '';
+        if (hasItalic) {
+            const italicWeights = font.weights.map(w => `1,${w}`).join(';');
+            const normalWeights = font.weights.map(w => `0,${w}`).join(';');
+            fontUrl = `family=${encodedFamily}:ital,wght@${normalWeights};${italicWeights}`;
+        } else {
+            fontUrl = `family=${encodedFamily}:wght@${weights}`;
         }
+
+        console.log(`Generated URL part for ${font.family}:`, fontUrl);
+        return fontUrl;
     });
-    
-    return `https://fonts.googleapis.com/css2?${fontFamilies.join('&')}&display=swap`;
+
+    const finalUrl = `https://fonts.googleapis.com/css2?${fontFamilies.join('&')}&display=swap`;
+    console.log('Final generated URL:', finalUrl);
+    return finalUrl;
 }
 
 export function loadGoogleFonts(): Promise<void> {
+    console.log('Starting loadGoogleFonts');
+    
+    if (typeof window === 'undefined') {
+        console.log('Window is undefined, skipping font loading');
+        return Promise.resolve();
+    }
+
     return new Promise((resolve, reject) => {
-        if (!document) {
+        console.log('Checking for existing font stylesheet');
+        const existingLink = document.querySelector('link[href*="fonts.googleapis.com/css2"]');
+        if (existingLink) {
+            console.log('Font stylesheet already exists, resolving');
             resolve();
             return;
         }
 
+        console.log('Creating preconnect links');
         const preconnectGoogle = document.createElement('link');
         preconnectGoogle.rel = 'preconnect';
         preconnectGoogle.href = 'https://fonts.googleapis.com';
@@ -179,40 +159,44 @@ export function loadGoogleFonts(): Promise<void> {
         preconnectGstatic.href = 'https://fonts.gstatic.com';
         preconnectGstatic.crossOrigin = 'anonymous';
 
-        const existingLink = document.querySelector('link[href*="fonts.googleapis.com/css2"]');
-        if (existingLink) {
-            resolve();
-            return;
-        }
-
+        console.log('Creating font stylesheet link');
         const link = document.createElement('link');
-        link.href = getFontUrl(googleFonts);
+        const fontUrl = getFontUrl(googleFonts);
+        link.href = fontUrl;
         link.rel = 'stylesheet';
         
         const loadTimeout = setTimeout(() => {
+            console.error('Font loading timed out after 5 seconds');
             reject(new Error('Font loading timeout'));
         }, 5000);
 
         const loadFonts = async () => {
             try {
+                console.log('Waiting for document.fonts.ready');
                 await document.fonts.ready;
+                console.log('Fonts loaded successfully');
                 clearTimeout(loadTimeout);
-                console.log('All fonts loaded successfully');
                 resolve();
             } catch (err) {
+                console.error('Error in loadFonts:', err);
                 clearTimeout(loadTimeout);
-                console.error('Error loading fonts:', err);
                 reject(err);
             }
         };
 
-        link.onload = () => loadFonts();
-        link.onerror = () => {
+        link.onload = () => {
+            console.log('Font stylesheet loaded successfully');
+            loadFonts();
+        };
+
+        link.onerror = (e) => {
+            console.error('Error loading font stylesheet:', e);
+            console.error('Failed URL:', link.href);
             clearTimeout(loadTimeout);
-            console.error('Error loading font stylesheet');
             reject(new Error('Failed to load font stylesheet'));
         };
 
+        console.log('Appending links to document head');
         document.head.appendChild(preconnectGoogle);
         document.head.appendChild(preconnectGstatic);
         document.head.appendChild(link);
@@ -240,8 +224,20 @@ export function isValidFontFamily(family: string): boolean {
     return fonts.some(f => f.family === family);
 }
 
-export function isFontLoaded(family: string): Promise<boolean> {
-    return document.fonts.ready.then(() => {
-        return document.fonts.check(`1em "${family}"`);
-    });
+export async function isFontLoaded(family: string): Promise<boolean> {
+    if (typeof window === 'undefined') {
+        console.log('Window is undefined, cannot check font loading');
+        return false;
+    }
+    
+    try {
+        console.log(`Checking if font '${family}' is loaded`);
+        await document.fonts.ready;
+        const isLoaded = document.fonts.check(`1em "${family}"`);
+        console.log(`Font '${family}' loaded status:`, isLoaded);
+        return isLoaded;
+    } catch (error) {
+        console.error('Error checking font load status:', error);
+        return false;
+    }
 }

@@ -350,10 +350,11 @@ export const RoleConfig: Record<UserRole, RoleConfiguration> = {
     },
     id_gen_admin: {
         allowedPaths: [
-            { path: '/id-gen/all-ids', showInNav: true, label: 'All IDs' },
+            { path: '/id-gen/templates', showInNav: true, label: 'Templates' },
+            { path: '/id-gen/all-ids', showInNav: true, label: 'Generated IDs' },
             { path: '/id-gen' },
             { path: '/id-gen/**' },
-            { path: '/id-gen/templates', showInNav: true, label: 'templates' },
+        
             { path: '/id-gen/use-template/**' }
         ],
         defaultPath() {

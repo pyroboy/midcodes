@@ -5,6 +5,7 @@ import type { TemplateElement } from './types';
 interface TemplateData {
     id: string;
     user_id: string;
+    org_id: string | null;
     name: string;
     front_background: string;
     back_background: string;

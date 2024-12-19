@@ -145,13 +145,7 @@
     }
 
     function handleThemeChange() {
-        document.body.classList.add('theme-transition');
-        setTimeout(() => {
-            settings.toggleTheme();
-            requestAnimationFrame(() => {
-                document.body.classList.remove('theme-transition');
-            });
-        }, 1);
+        settings.toggleTheme();
     }
     
     async function signOut() {
@@ -301,15 +295,17 @@
 </main>
 
 <style>
-    :global(body) {
-        transition: background-color 0.3s ease;
+    :global(html) {
+        transition: background-color 0.3s ease, color 0.3s ease;
     }
 
-    :global(body.theme-transition) {
-        transition: none !important;
+    :global(html.dark) {
+        background-color: var(--background);
+        color: var(--foreground);
     }
 
-    :global(.theme-transition *) {
-        transition: none !important;
+    :global(html.light) {
+        background-color: var(--background);
+        color: var(--foreground);
     }
 </style>

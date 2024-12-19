@@ -2,23 +2,59 @@ import { redirect, error } from '@sveltejs/kit';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import type { ProfileData, EmulatedProfile } from '$lib/types/roleEmulation';
 import type { Session } from '../../../app';
+import type { PageServerLoad } from './$types';
 
-interface PageServerLoad {
-    ({ locals }: {
-        locals: {
-            supabase: SupabaseClient;
-            safeGetSession: () => Promise<{
-                session: Session | null;
-                user: User | null;
-                profile: ProfileData | EmulatedProfile | null;
-            }>;
-            user: User | null;
-            profile: ProfileData | EmulatedProfile | null;
-        };
-    }): Promise<{ idCards: any[] }>;
+interface IDCardField {
+    value: string;
+    side: 'front' | 'back';
 }
 
-export const load = (async ({ locals: { supabase, safeGetSession, user, profile } }) => {
+interface TemplateVariable {
+    variableName: string;
+    side: 'front' | 'back';
+}
+
+interface PaginationInfo {
+    total_records: number;
+    current_offset: number;
+    limit: number | null;
+}
+
+interface HeaderMetadata {
+    organization_name: string;
+    templates: {
+        [templateName: string]: TemplateVariable[];
+    };
+    pagination: PaginationInfo;
+}
+
+interface HeaderRow {
+    is_header: true;
+    metadata: HeaderMetadata;
+    id: null;
+    template_name: null;
+    front_image: null;
+    back_image: null;
+    created_at: null;
+    fields: null;
+}
+
+interface DataRow {
+    is_header: false;
+    metadata: null;
+    id: string;
+    template_name: string;
+    front_image: string | null;
+    back_image: string | null;
+    created_at: string;
+    fields: {
+        [fieldName: string]: IDCardField;
+    };
+}
+
+type IDCardResponse = [HeaderRow, ...DataRow[]];
+
+export const load = (async ({ locals: { supabase, safeGetSession, user, profile }, url }) => {
     const { session } = await safeGetSession();
     if (!session) {
         throw error(401, 'Unauthorized');
@@ -45,32 +81,28 @@ export const load = (async ({ locals: { supabase, safeGetSession, user, profile 
         throw redirect(303, '/unauthorized');
     }
 
-    // Fetch ID cards based on role and organization
-    const query = supabase
-        .from('idcards')
-        .select(`
-            *,
-            templates (
-                id,
-                name,
-                org_id
-            )
-        `)
-        .order('created_at', { ascending: false });
-
-    // Filter by organization for non-super-admin roles
-    if (userRole !== 'super_admin') {
-        query.eq('org_id', effectiveOrgId);
-    }
-
-    const { data: idCards, error: fetchError } = await query;
+    const { data, error: fetchError } = await supabase
+        .rpc('get_idcards_by_org', {
+            org_id: effectiveOrgId,
+            page_limit: null,  // Fetch all records
+            page_offset: 0
+        });
 
     if (fetchError) {
-        console.error('Error fetching ID cards:', fetchError);
-        throw error(500, 'Failed to load ID cards');
+        throw error(500, fetchError.message);
+    }
+
+    if (!data || !Array.isArray(data) || data.length === 0) {
+        throw error(404, 'No ID cards found');
+    }
+
+    // Validate that the response matches our expected type
+    const [header, ...rows] = data as IDCardResponse;
+    if (!header.is_header || !header.metadata) {
+        throw error(500, 'Invalid response format');
     }
 
     return {
-        idCards: idCards || []
+        idCards: data as IDCardResponse
     };
 }) satisfies PageServerLoad;

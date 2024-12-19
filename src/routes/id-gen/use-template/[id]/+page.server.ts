@@ -378,12 +378,11 @@ export const actions: Actions = {
             console.log('[Save ID Card] All form data:', Array.from(formData.entries()));
             
             // Collect form fields as simple key-value pairs
+            const excludedKeys = ['templateId', 'frontImage', 'backImage'];
             const formFields: Record<string, string> = {};
             for (const [key, value] of formData.entries()) {
-                // Only include form_ prefixed fields and convert them to strings
-                if (key.startsWith('form_')) {
-                    const fieldName = key.replace('form_', '');
-                    formFields[fieldName] = value.toString();
+                if (!excludedKeys.includes(key)) {
+                    formFields[key] = value.toString();
                 }
             }
 

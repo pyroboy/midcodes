@@ -2,7 +2,7 @@
     import { onMount, createEventDispatcher, afterUpdate } from 'svelte';
     import { browser } from '$app/environment';
     import { debounce } from 'lodash-es';
-    import type { TemplateElement } from '../stores/templateStore';
+    import type { TemplateElement } from './stores/templateStore';
 
     export let elements: TemplateElement[];
     export let backgroundUrl: string;
@@ -295,6 +295,59 @@
         }
     }
 
+    interface FontOptions {
+        family?: string;
+        size?: number;
+        weight?: string | number;
+        style?: 'normal' | 'italic' | 'oblique';
+    }
+
+    function getFontString(options: FontOptions): string {
+        const {
+            style = 'normal',
+            weight = 400,
+            size = 16,
+            family = 'Arial'
+        } = options;
+
+        return `${style} ${weight} ${size}px "${family}"`;
+    }
+
+    function measureTextHeight(
+        ctx: CanvasRenderingContext2D, 
+        options: FontOptions = {}
+    ): number {
+        if (!browser) return 0;
+        
+        const previousFont = ctx.font;
+        const testString = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ';
+        
+        try {
+            // Set the new font with all properties
+            ctx.font = getFontString(options);
+            
+            // Get detailed metrics
+            const metrics = ctx.measureText(testString);
+            const height = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
+            
+            // Additional metrics for better accuracy
+            const fontBoundingBoxAscent = metrics.fontBoundingBoxAscent || 0;
+            const fontBoundingBoxDescent = metrics.fontBoundingBoxDescent || 0;
+            const totalHeight = Math.max(
+                height,
+                fontBoundingBoxAscent + fontBoundingBoxDescent
+            );
+
+            return totalHeight;
+        } catch (error) {
+            console.error('Error measuring text height:', error);
+            return 0;
+        } finally {
+            // Always restore the previous font
+            ctx.font = previousFont;
+        }
+    }
+
     const debouncedRender = debounce(() => {
         if (!renderRequested && browser) {
             renderRequested = true;
@@ -373,26 +426,22 @@
         }
     }
     
-    function measureTextHeight(ctx: CanvasRenderingContext2D, fontFamily?: string, fontSize?: number): number {
-        if (!browser) return 0;
-        
-        const previousFont = ctx.font;
-        ctx.font = `${fontSize}px ${fontFamily}`;
-        const metrics = ctx.measureText('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ');
-        ctx.font = previousFont;
-        return metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
-    }
-    
     function renderTextElement(ctx: CanvasRenderingContext2D, element: TemplateElement, scale: number) {
         if (element.type !== 'text' && element.type !== 'selection') return;
      
         try {
             const nScale = scale * ELEMENT_SCALE;
+            const fontOptions = {
+                family: element.font,
+                size: element.size,
+                weight: element.fontWeight,
+                style: element.fontStyle
+            };
             const fontSize = (element.size || 12) * nScale;
-            ctx.font = `${element.fontWeight || ''} ${fontSize}px ${element.font || 'Arial'}`;
+            ctx.font = getFontString(fontOptions);
             ctx.fillStyle = element.color || 'black';
             ctx.textAlign = element.alignment as CanvasTextAlign;
-            ctx.textBaseline = 'top';
+            ctx.textBaseline = 'middle';  // Change to middle for better vertical centering
         
             let text = '';
             if (element.type === 'selection') {
@@ -423,15 +472,14 @@
                 x += elementWidth;
             }
         
-            const textHeight = element.font ? measureTextHeight(ctx, element.font, element.size) : 0;
-            const y = elementY + (textHeight/2.3) * nScale;
+            const textHeight = measureTextHeight(ctx, fontOptions);
+            const y = elementY + (elementHeight / 2); // Center vertically within element height
 
             if (element.textDecoration === 'underline' || element.textDecoration === 'line-through') {
                 const metrics = ctx.measureText(text);
                 const lineY = element.textDecoration === 'underline' 
-                    ? y + textHeight 
-                    : y + textHeight / 2;
-                
+                    ? y + textHeight/2  // Adjust underline position
+                    : y;  // Line-through stays at center
                 ctx.beginPath();
                 ctx.moveTo(x - (element.alignment === 'right' ? metrics.width : 0), lineY);
                 ctx.lineTo(x + (element.alignment === 'left' ? metrics.width : 0), lineY);

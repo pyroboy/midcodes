@@ -13,8 +13,8 @@
     let canvasError: string | null = null;
     let canvasInitialized = false;
     let debugMode = false;
+    let modalRef: HTMLDialogElement;
 
-    // Animation state
     let rotationY = 0;
     let animationFrameId: number | null = null;
     let autoRotateId: number | null = null;
@@ -28,7 +28,7 @@
     function startAutoRotate() {
         if (!autoRotateId && !isFlipping && shouldAutoRotate) {
             function animate() {
-                rotationY += 0.005; // Slow rotation speed
+                rotationY += 0.005;
                 autoRotateId = requestAnimationFrame(animate);
             }
             autoRotateId = requestAnimationFrame(animate);
@@ -43,7 +43,6 @@
     }
 
     function createRoundedRectCard(width = 2, height = 1.25, depth = 0.007, radius = 0.08) {
-        // Create a flat rounded rectangle shape
         const roundedRectShape = new THREE.Shape();
         
         const x = -width / 2;
@@ -52,7 +51,6 @@
         const h = height;
         const r = radius;
 
-        // Start at top left corner and draw clockwise
         roundedRectShape.moveTo(x + r, y);
         roundedRectShape.lineTo(x + w - r, y);
         roundedRectShape.bezierCurveTo(
@@ -80,7 +78,6 @@
         );
         roundedRectShape.closePath();
 
-        // Extrusion settings
         const extrudeSettings = {
             depth: depth,
             bevelEnabled: true,
@@ -93,7 +90,6 @@
 
         const geometry = new THREE.ExtrudeGeometry(roundedRectShape, extrudeSettings);
         
-        // Create separate geometries for front, back, and edges
         const frontGeometry = new THREE.BufferGeometry();
         const backGeometry = new THREE.BufferGeometry();
         const edgeGeometry = new THREE.BufferGeometry();
@@ -110,7 +106,6 @@
         const edgePositions = [];
         const edgeNormals = [];
         
-        // Separate vertices based on normal direction
         for (let i = 0; i < position.count; i++) {
             const normalZ = normal.getZ(i);
             const px = position.getX(i);
@@ -121,23 +116,20 @@
             const nz = normal.getZ(i);
             
             if (normalZ > 0.5) {
-                // Front face
                 frontPositions.push(px, py, pz);
                 frontNormals.push(nx, ny, nz);
                 frontUvs.push(
-                    (px - x) / w,  // U coordinate
-                    1 - (py - y) / h  // V coordinate, flipped to match image coordinates
+                    (px - x) / w,
+                    1 - (py - y) / h
                 );
             } else if (normalZ < -0.5) {
-                // Back face
                 backPositions.push(px, py, pz);
                 backNormals.push(nx, ny, nz);
                 backUvs.push(
-                    1 - (px - x) / w,  // U coordinate, flipped for back face
-                    1 - (py - y) / h   // V coordinate, flipped to match image coordinates
+                    1 - (px - x) / w,
+                    1 - (py - y) / h
                 );
             } else {
-                // Edge faces
                 edgePositions.push(px, py, pz);
                 edgeNormals.push(nx, ny, nz);
             }
@@ -177,6 +169,9 @@
 
     onMount(() => {
         startAutoRotate();
+        if (modalRef) {
+            modalRef.showModal();
+        }
         return () => {
             if (animationFrameId) {
                 cancelAnimationFrame(animationFrameId);
@@ -187,12 +182,12 @@
 
     function handleFlip() {
         stopAutoRotate();
-        shouldAutoRotate = false;  // Permanently disable auto-rotation
+        shouldAutoRotate = false;
         isFlipping = true;
         const startRotation = rotationY;
         const targetRotation = startRotation + Math.PI;
         let startTime: number | null = null;
-        const duration = 1000; // 1 second flip duration
+        const duration = 1000;
         
         function animate(currentTime: number) {
             if (!startTime) startTime = currentTime;
@@ -223,7 +218,13 @@
         }
     }
 
-    // Scene state tracking
+    function handleModalClose(event: MouseEvent) {
+        const target = event.target as HTMLElement;
+        if (target.classList.contains('modal-backdrop')) {
+            onClose();
+        }
+    }
+
     let sceneState = {
         frontTextureLoaded: false,
         backTextureLoaded: false,
@@ -235,258 +236,286 @@
 <svelte:window on:keydown={handleKeydown} />
 
 {#if frontImageUrl || backImageUrl}
-<div class="modal-wrapper">
-    <div class="modal-content">
-        <button 
-            type="button"
-            class="close-button"
-            on:click={onClose}
-            aria-label="Close preview">
-            ✕
-        </button>
+<dialog
+    bind:this={modalRef}
+    class="modal-dialog"
+    on:close={onClose}
+    aria-labelledby="modal-title"
+>
+    <div 
+        class="modal-backdrop"
+        role="presentation"
+        on:click={handleModalClose}
+        on:keydown={handleKeydown}
+    >
+        <div 
+            class="modal-content"
+            role="document"
+        >
+            <h2 id="modal-title" class="sr-only">Card Preview</h2>
+            
+            <button 
+                type="button"
+                class="close-button"
+                on:click={onClose}
+                aria-label="Close preview">
+                ✕
+            </button>
 
-        <div class="canvas-container">
-            {#if canvasError}
-                <p class="error-message">Error: {canvasError}</p>
-            {/if}
-
-            <Canvas 
-                shadows 
-                on:created={handleCanvasCreated}
-            >
-                <T.Scene>
-                    <T.Color attach="background" args={[0, 0, 0, 0]} transparent={true} />
-                </T.Scene>
-                
-                <T.PerspectiveCamera 
-                    position={[0, 0, 3]} 
-                    fov={50}
-                    makeDefault
-                >
-                    <OrbitControls 
-                        enableZoom={true}
-                        enablePan={true}
-                        enableRotate={true}
-                        target={[0, 0, 0]}
-                        maxDistance={5}
-                        minDistance={1}
-                    />
-                </T.PerspectiveCamera>
-
-                <T.AmbientLight intensity={1.9} />
-                <T.DirectionalLight position={[5, 5, 5]} intensity={0.7} castShadow />
-                <T.DirectionalLight position={[-5, 5, -5]} intensity={0.3} />
-                <T.DirectionalLight position={[0, -5, 0]} intensity={0.2} />
-                
-                <!-- Front lights -->
-                <T.SpotLight 
-                    position={[1, 1, 2]} 
-                    intensity={2}
-                    angle={Math.PI / 6}
-                    penumbra={0.9}
-                    decay={1.5}
-                    distance={10}
-                />
-                
-                <!-- Back lights -->
-                <T.SpotLight 
-                    position={[-1,0.7,-2]} 
-                    intensity={1.5}
-                    angle={Math.PI / 6}
-                    penumbra={0.9}
-                    decay={1.5}
-                    distance={10}
-                />
-                
-                <!-- Side rim lights -->
-                <T.PointLight position={[4, 0, 0]} intensity={0.5} distance={8} />
-                <T.PointLight position={[-4, 0, 0]} intensity={0.5} distance={8} />
-                <T.PointLight position={[0, 4, 0]} intensity={0.5} distance={8} />
-                <T.PointLight position={[0, -4, 0]} intensity={0.5} distance={8} />
-                
-                {#if debugMode}
-                    <T.GridHelper args={[10, 10]} />
-                    <T.AxesHelper args={[5]} />
+            <div class="canvas-container">
+                {#if canvasError}
+                    <p class="error-message" role="alert">Error: {canvasError}</p>
                 {/if}
 
-                <T.Group rotation.y={rotationY}>
-                    {#if frontImageUrl}
+                <Canvas 
+                    shadows 
+                    on:created={handleCanvasCreated}
+                >
+                    <T.Scene>
+                        <T.Color attach="background" args={[0, 0, 0, 0]} transparent={true} />
+                    </T.Scene>
+                    
+                    <T.PerspectiveCamera 
+                        position={[0, 0, 3]} 
+                        fov={50}
+                        makeDefault
+                    >
+                        <OrbitControls 
+                            enableZoom={true}
+                            enablePan={true}
+                            enableRotate={true}
+                            target={[0, 0, 0]}
+                            maxDistance={5}
+                            minDistance={1}
+                        />
+                    </T.PerspectiveCamera>
+
+                    <T.AmbientLight intensity={1.9} />
+                    <T.DirectionalLight position={[5, 5, 5]} intensity={0.7} castShadow />
+                    <T.DirectionalLight position={[-5, 5, -5]} intensity={0.3} />
+                    <T.DirectionalLight position={[0, -5, 0]} intensity={0.2} />
+                    
+                    <T.SpotLight 
+                        position={[1, 1, 2]} 
+                        intensity={2}
+                        angle={Math.PI / 6}
+                        penumbra={0.9}
+                        decay={1.5}
+                        distance={10}
+                    />
+                    
+                    <T.SpotLight 
+                        position={[-1,0.7,-2]} 
+                        intensity={1.5}
+                        angle={Math.PI / 6}
+                        penumbra={0.9}
+                        decay={1.5}
+                        distance={10}
+                    />
+                    
+                    <T.PointLight position={[4, 0, 0]} intensity={0.5} distance={8} />
+                    <T.PointLight position={[-4, 0, 0]} intensity={0.5} distance={8} />
+                    <T.PointLight position={[0, 4, 0]} intensity={0.5} distance={8} />
+                    <T.PointLight position={[0, -4, 0]} intensity={0.5} distance={8} />
+                    
+                    {#if debugMode}
+                        <T.GridHelper args={[10, 10]} />
+                        <T.AxesHelper args={[5]} />
+                    {/if}
+
+                    <T.Group rotation.y={rotationY}>
+                        {#if frontImageUrl}
+                            <T.Mesh 
+                                bind:ref={meshRef}
+                                castShadow
+                                receiveShadow
+                            >
+                                <T.BufferGeometry
+                                    on:create={({ ref }) => {
+                                        const { frontGeometry } = createRoundedRectCard();
+                                        ref.copy(frontGeometry);
+                                        sceneState.meshInitialized = true;
+                                    }}
+                                />
+                                <T.MeshStandardMaterial
+                                    map={new THREE.TextureLoader().load(
+                                        frontImageUrl,
+                                        (texture) => {
+                                            texture.flipY = false;
+                                            texture.colorSpace = THREE.SRGBColorSpace;
+                                            texture.repeat.set(1, 1);
+                                            texture.center.set(0.5, 0.5);
+                                            texture.magFilter = THREE.LinearFilter;
+                                            texture.minFilter = THREE.LinearFilter;
+                                            texture.needsUpdate = true;
+                                            handleImageLoad(true);
+                                        },
+                                        undefined,
+                                        (error) => handleImageError(true, error)
+                                    )}
+                                    transparent={true}
+                                    metalness={0}
+                                    roughness={0.23}
+                                />
+                            </T.Mesh>
+                        {/if}
+                        
                         <T.Mesh 
-                            bind:ref={meshRef}
                             castShadow
                             receiveShadow
                         >
                             <T.BufferGeometry
                                 on:create={({ ref }) => {
-                                    const { frontGeometry } = createRoundedRectCard();
-                                    ref.copy(frontGeometry);
-                                    sceneState.meshInitialized = true;
+                                    const { backGeometry } = createRoundedRectCard();
+                                    ref.copy(backGeometry);
+                                }}
+                            />
+                            {#if backImageUrl}
+                                <T.MeshStandardMaterial
+                                    map={new THREE.TextureLoader().load(
+                                        backImageUrl,
+                                        (texture) => {
+                                            texture.flipY = false;
+                                            texture.colorSpace = THREE.SRGBColorSpace;
+                                            texture.repeat.set(1, 1);
+                                            texture.center.set(0.5, 0.5);
+                                            texture.magFilter = THREE.LinearFilter;
+                                            texture.minFilter = THREE.LinearFilter;
+                                            texture.needsUpdate = true;
+                                            handleImageLoad(false);
+                                        },
+                                        undefined,
+                                        (error) => handleImageError(false, error)
+                                    )}
+                                    transparent={true}
+                                    metalness={0}
+                                    roughness={0.2}
+                                />
+                            {:else}
+                                <T.MeshStandardMaterial
+                                    color="#e24a4a"
+                                    transparent={true}
+                                    metalness={0}
+                                    roughness={0.23}
+                                    opacity={1}
+                                />
+                            {/if}
+                        </T.Mesh>
+
+                        <T.Mesh 
+                            castShadow
+                            receiveShadow
+                        >
+                            <T.BufferGeometry
+                                on:create={({ ref }) => {
+                                    const { edgeGeometry } = createRoundedRectCard();
+                                    ref.copy(edgeGeometry);
                                 }}
                             />
                             <T.MeshStandardMaterial
-                                map={new THREE.TextureLoader().load(
-                                    frontImageUrl,
-                                    (texture) => {
-                                        texture.flipY = false;
-                                        texture.colorSpace = THREE.SRGBColorSpace;
-                                        texture.repeat.set(1, 1);
-                                        texture.center.set(0.5, 0.5);
-                                        texture.magFilter = THREE.LinearFilter;
-                                        texture.minFilter = THREE.LinearFilter;
-                                        texture.needsUpdate = true;
-                                        handleImageLoad(true);
-                                    },
-                                    undefined,
-                                    (error) => handleImageError(true, error)
-                                )}
-                                transparent={true}
-                                metalness={0}
-                                roughness={0.23}
-                            />
-                        </T.Mesh>
-                    {/if}
-                    
-                    <T.Mesh 
-                        castShadow
-                        receiveShadow
-                    >
-                        <T.BufferGeometry
-                            on:create={({ ref }) => {
-                                const { backGeometry } = createRoundedRectCard();
-                                ref.copy(backGeometry);
-                            }}
-                        />
-                        {#if backImageUrl}
-                            <T.MeshStandardMaterial
-                                map={new THREE.TextureLoader().load(
-                                    backImageUrl,
-                                    (texture) => {
-                                        texture.flipY = false;
-                                        texture.colorSpace = THREE.SRGBColorSpace;
-                                        texture.repeat.set(1, 1);
-                                        texture.center.set(0.5, 0.5);
-                                        texture.magFilter = THREE.LinearFilter;
-                                        texture.minFilter = THREE.LinearFilter;
-                                        texture.needsUpdate = true;
-                                        handleImageLoad(false);
-                                    },
-                                    undefined,
-                                    (error) => handleImageError(false, error)
-                                )}
-                                transparent={true}
+                                color="#ffffff"
                                 metalness={0}
                                 roughness={0.2}
                             />
-                        {:else}
-                            <T.MeshStandardMaterial
-                                color="#e24a4a"
-                                transparent={true}
-                                metalness={0}
-                                roughness={0.23}
-                                opacity={1}
-                            />
-                        {/if}
-                    </T.Mesh>
+                        </T.Mesh>
+                    </T.Group>
+                </Canvas>
+            </div>
 
-                    <!-- White edges -->
-                    <T.Mesh 
-                        castShadow
-                        receiveShadow
+            <div class="controls">
+                <button 
+                    type="button"
+                    class="control-button"
+                    on:click={handleFlip}
+                    aria-label="Flip card to see {rotationY > Math.PI ? 'front' : 'back'} side">
+                    Flip Card
+                </button>
+                {#if debugMode}
+                    <div 
+                        class="debug-overlay" 
+                        role="status" 
+                        aria-label="Debug information"
                     >
-                        <T.BufferGeometry
-                            on:create={({ ref }) => {
-                                const { edgeGeometry } = createRoundedRectCard();
-                                ref.copy(edgeGeometry);
-                            }}
-                        />
-                        <T.MeshStandardMaterial
-                            color="#ffffff"
-                            metalness={0}
-                            roughness={0.2}
-                        />
-                    </T.Mesh>
-                </T.Group>
-            </Canvas>
-        </div>
-
-        <div class="controls">
-            <button 
-                type="button"
-                class="control-button"
-                on:click={handleFlip}>
-                Flip Card
-            </button>
-            {#if debugMode}
-                <div class="debug-overlay">
-                    <pre>
+                        <pre>
 Canvas: {canvasInitialized ? '✓' : '✗'}
 Mesh: {sceneState.meshInitialized ? '✓' : '✗'}
 Front Texture: {sceneState.frontTextureLoaded ? '✓' : '✗'}
 Back Texture: {sceneState.backTextureLoaded ? '✓' : '✗'}
 Last Error: {sceneState.lastError || 'None'}
-                    </pre>
-                </div>
-            {/if}
+                        </pre>
+                    </div>
+                {/if}
+            </div>
         </div>
     </div>
-</div>
+</dialog>
 {/if}
 
 <style lang="postcss">
-    .modal-wrapper {
-        @apply fixed inset-0 z-50 bg-background/60 backdrop-blur-[2px];
-        display: grid;
-        place-items: center;
+    .modal-dialog {
+        @apply fixed inset-0 p-0 m-0 w-full h-full bg-transparent;
+        border: none;
+        &::backdrop {
+            @apply bg-background/60 backdrop-blur-[2px];
+        }
+    }
+
+    .modal-backdrop {
+        @apply h-full w-full grid place-items-center p-4;
     }
 
     .modal-content {
-        @apply rounded-lg max-w-2xl w-full mx-4 relative;
+        @apply rounded-lg max-w-2xl w-full relative bg-transparent;
         height: 80vh;
-        background: transparent;
+        min-height: 300px;
     }
 
     .canvas-container {
-        @apply relative w-full h-full;
+        @apply relative w-full h-full rounded-lg overflow-hidden;
         background-color: transparent;
-        border-radius: 0.5rem;
-        overflow: hidden;
     }
 
     .debug-overlay {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        background: rgba(0, 0, 0, 0.8);
-        color: white;
-        padding: 10px;
-        border-radius: 4px;
-        z-index: 1000;
+        @apply absolute top-4 left-4 bg-black/80 text-white p-3 rounded-md z-10;
         font-family: monospace;
         pointer-events: none;
         font-size: 12px;
+        max-width: 300px;
     }
 
     pre {
-        margin: 0;
-        white-space: pre-wrap;
+        @apply m-0 whitespace-pre-wrap;
     }
 
     .close-button {
-        @apply absolute top-2 right-2 p-2 hover:bg-muted rounded-full z-10;
+        @apply absolute top-2 right-2 p-2 hover:bg-muted rounded-full z-10 transition-colors;
         background: rgba(0, 0, 0, 0.5);
         color: white;
     }
 
+    .close-button:focus-visible {
+        @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+    }
+
     .controls {
-        @apply absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2;
+        @apply absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10;
     }
 
     .control-button {
-        @apply px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90;
+        @apply px-4 py-2 bg-primary text-primary-foreground rounded-md 
+               hover:bg-primary/90 transition-colors
+               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring 
+               focus-visible:ring-offset-2 focus-visible:ring-offset-background;
     }
 
     .error-message {
-        @apply absolute top-4 left-4 bg-destructive text-destructive-foreground px-4 py-2 rounded;
-        z-index: 1000;
+        @apply absolute top-4 left-4 bg-destructive text-destructive-foreground 
+               px-4 py-2 rounded-md z-10;
+    }
+
+    .sr-only {
+        @apply absolute w-px h-px p-0 -m-px overflow-hidden whitespace-nowrap border-0;
+        clip: rect(0, 0, 0, 0);
+        clip-path: inset(50%);
     }
 </style>

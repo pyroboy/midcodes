@@ -1,7 +1,6 @@
 <script lang="ts">
     import { onMount, onDestroy } from 'svelte';
     import { page } from '$app/stores';
-    import { supabase } from '$lib/supabaseClient';
     import { auth, session, user } from '$lib/stores/auth';
     import IdCanvas from '$lib/IdCanvas.svelte';
     import { Button } from "$lib/components/ui/button";
@@ -10,7 +9,6 @@
     import { Label } from "$lib/components/ui/label";
     import * as Select from "$lib/components/ui/select";
     import { darkMode } from '../../../../stores/darkMode';
-    import { Switch } from "$lib/components/ui/switch";
     import ThumbnailInput from '$lib/ThumbnailInput.svelte';
     import { Loader } from 'lucide-svelte';
     import { goto } from '$app/navigation';
@@ -185,13 +183,7 @@
             formData.append('backImage', backBlob, 'back.png');
 
             // Add form_ prefix to all form fields
-            for (const [key, value] of formData.entries()) {
-                if (key !== 'templateId' && key !== 'frontImage' && key !== 'backImage') {
-                    formData.append(`form_${key}`, value);
-                    formData.delete(key); // Remove the original field
-                }
-            }
-
+    
             // Submit form data
             const response = await fetch('?/saveIdCard', {
                 method: 'POST',
@@ -370,7 +362,7 @@
                                             <input 
                                                 type="text"
                                                 id={element.variableName}
-                                                name={`form_${element.variableName}`}
+                                                name={element.variableName}
                                                 bind:value={formData[element.variableName]}
                                                 class="w-full px-3 py-2 border rounded-md {formErrors[element.variableName] ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-300'}"
                                                 placeholder={`Enter ${element.variableName}`}

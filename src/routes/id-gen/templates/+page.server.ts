@@ -162,47 +162,48 @@ export const actions = {
 
         try {
             const formData = await request.formData();
-            const templateData = JSON.parse(formData.get('templateData') as string);
+            const templateDataStr = formData.get('templateData') as string;
 
-            console.log('📝 Server: Processing template save:', {
-                templateId: templateData.id,
+            if (!templateDataStr) {
+                throw error(400, 'Template data is required');
+            }
+
+            const templateData = JSON.parse(templateDataStr);
+
+            // Ensure org_id is set from the original template or from user's profile
+            if (!templateData.org_id && profile?.org_id) {
+                templateData.org_id = profile.org_id;
+            }
+
+            console.log('🎨 Server: Processing template save:', {
+                id: templateData.id,
                 name: templateData.name,
-                elementsCount: templateData.template_elements?.length,
-                action: templateData.id ? 'update' : 'create'
+                org_id: templateData.org_id,
+                elementsCount: templateData.template_elements?.length
             });
 
-            // Prepare template data
-            const templateToSave = {
-                ...templateData,
-                user_id: session.user.id,
-                org_id: profile?.org_id,
-                updated_at: new Date().toISOString()
-            };
+            // Set the user_id from the session
+            templateData.user_id = session.user.id;
 
-            // Use upsert for both create and update
-            const { data, error: upsertError } = await supabase
+            const { data, error: dbError } = await supabase
                 .from('templates')
-                .upsert([templateToSave])
+                .upsert(templateData)
                 .select()
                 .single();
 
-            if (upsertError) {
-                console.error('❌ Server: Database error:', {
-                    error: upsertError,
-                    details: upsertError.details,
-                    hint: upsertError.hint
-                });
+            if (dbError) {
+                console.error('❌ Server: Database error:', dbError);
                 throw error(500, 'Error saving template');
             }
 
             if (!data) {
-                console.error('❌ Server: No data returned after save');
-                throw error(500, 'No data returned after save');
+                throw error(500, 'No data returned from database');
             }
 
             console.log('✅ Server: Template saved successfully:', {
                 id: data.id,
                 name: data.name,
+                org_id: data.org_id,
                 elementsCount: data.template_elements?.length,
                 action: templateData.id ? 'updated' : 'created'
             });
@@ -236,7 +237,7 @@ export const actions = {
 
             console.log('🗑️ Server: Processing template delete:', { templateId });
 
-            // First, set template_id to NULL in idcards
+            // First, update ID cards that use this template
             const { error: updateError } = await supabase
                 .from('idcards')
                 .update({ template_id: null })
@@ -247,11 +248,12 @@ export const actions = {
                 throw error(500, 'Error updating ID cards');
             }
 
-            // Then delete the template
+            // Then delete the template, ensuring it belongs to the user
             const { error: deleteError } = await supabase
                 .from('templates')
                 .delete()
-                .match({ id: templateId, user_id: session.user.id });
+                .match({ id: templateId })
+                .eq('user_id', session.user.id);
 
             if (deleteError) {
                 console.error('❌ Server: Database error:', deleteError);

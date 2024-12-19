@@ -6,6 +6,7 @@ export interface TemplateData {
   user_id: string;
   name: string;
   description?: string;
+  org_id?: string;
   front_background: string;
   back_background: string;
   front_background_url?: string;
