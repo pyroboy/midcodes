@@ -25,17 +25,24 @@
   const { form, errors, enhance } = superForm<ExpenseSchema>(data.form);
 
   let typeSelected = { value: '', label: 'Select expense type' };
+
+  function isValidExpenseType(value: string): value is typeof expenseTypeEnum._type {
+    return Object.values(expenseTypeEnum.enum).includes(value as any);
+  }
+
+  $: expenses = data.expenses ?? [];
+  $: properties = data.properties ?? [];
 </script>
 
 <div class="flex">
     <!-- Expense List -->
     <div class="w-1/2 pr-4">
       <h2 class="text-2xl font-bold mb-4">Expenses</h2>
-      {#if !data.expenses?.length}
+      {#if !expenses.length}
         <p>No expenses found.</p>
       {:else}
         <ul class="space-y-2">
-          {#each data.expenses as expense (expense.id)}
+          {#each expenses as expense (expense.id)}
             <li class="bg-white shadow rounded p-3">
               <div class="font-bold">{expense.expense_type}</div>
               <div>Amount: ${expense.amount.toFixed(2)}</div>
@@ -63,8 +70,8 @@
             <Select.Root
               selected={{value: $form.expense_type ?? '', label: $form.expense_type ?? 'Select expense type'}}
               onSelectedChange={(s) => {
-                if (s) {
-                  $form.expense_type = s.value as typeof expenseTypeEnum._type;
+                if (s?.value && isValidExpenseType(s.value)) {
+                  $form.expense_type = s.value;
                   typeSelected = { value: s.value, label: s.value };
                 }
               }}
@@ -84,7 +91,7 @@
           <div>
             <Label for="property_id">Property</Label>
             <Select.Root
-              selected={{value: ($form.property_id ?? '').toString(), label: data.properties.find(p => p.id === $form.property_id)?.name ?? 'Select property'}}
+              selected={{value: ($form.property_id ?? '').toString(), label: properties.find(p => p.id === $form.property_id)?.name ?? 'Select property'}}
               onSelectedChange={(s) => {
                 if (s) {
                   $form.property_id = parseInt(s.value);
@@ -95,7 +102,7 @@
                 <Select.Value placeholder="Select property" />
               </Select.Trigger>
               <Select.Content>
-                {#each data.properties as property}
+                {#each properties as property}
                   <Select.Item value={property.id.toString()}>{property.name}</Select.Item>
                 {/each}
               </Select.Content>

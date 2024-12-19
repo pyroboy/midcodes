@@ -1,74 +1,61 @@
 import { z } from 'zod';
 
-const readingSchema = z.object({
-  meterId: z.number().int().positive(),
-  readingValue: z.number().nonnegative(),
+export interface Reading {
+  id: number;
+  meter_id: number;
+  reading: number;
+  reading_date: string;
+  created_at: string;
+}
+
+export const readingSchema = z.object({
+  id: z.number().optional(),
+  meter_id: z.number(),
+  reading: z.number(),
+  reading_date: z.string(),
+  created_at: z.string()
 });
 
-export const createSchema = (previousReadings: Record<number, { readingValue: number, readingDate: string }>, latestOverallReadingDate: string) => z.object({
-  readingDate: z.string()
-    .refine(date => new Date(date) >= new Date(latestOverallReadingDate), {
-      message: `Reading date must be on or after the latest overall reading date (${latestOverallReadingDate})`
-    }),
-  meterType: z.string().min(1, "Meter type is required"),
-  readings: z.array(readingSchema)
-    .min(1, "At least one reading is required")
-    .superRefine((readings, ctx) => {
-      let allNonZeroEqual = true;
-      let nonZeroReadings: { meterId: number, readingValue: number }[] = [];
-      let zeroReadings: { meterId: number, readingValue: number }[] = [];
+export function readingFormSchema(
+  previousReadings: Record<number, Reading>,
+  latestOverallReadingDate: string
+) {
+  return z.object({
+    reading_date: z
+      .string()
+      .min(1, 'Reading date is required')
+      .refine((date: string): boolean => {
+        const inputDate = new Date(date);
+        const lastDate = new Date(latestOverallReadingDate);
+        return inputDate >= lastDate;
+      }, {
+        message: `Reading date must be on or after ${latestOverallReadingDate}`,
+      }),
+    meter_type: z.enum(['ELECTRICITY', 'WATER', 'INTERNET']),
+    readings: z.array(
+      z.object({
+        meter_id: z.number(),
+        reading_value: z
+          .number()
+          .min(0, 'Reading value must be greater than or equal to 0')
+          .transform((val: number): number => Math.round(val))
+          .superRefine((val: number, ctx: z.RefinementCtx): void => {
+            const path = ctx.path;
+            const meterId = path[1] as number;
+            const previousReading = previousReadings[meterId];
 
-      readings.forEach((reading, index) => {
-        const previousReading = previousReadings[reading.meterId];
-
-        if (reading.readingValue === 0) {
-          zeroReadings.push(reading);
-        } else {
-          nonZeroReadings.push(reading);
-          if (previousReading) {
-            if (reading.readingValue < previousReading.readingValue) {
+            if (previousReading && val < previousReading.reading) {
               ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                path: [index, 'readingValue'],
-                message: `New reading for meter ${reading.meterId} must be greater than the previous reading of ${previousReading.readingValue}`
+                message: `Reading value must be greater than or equal to the previous reading (${previousReading.reading})`,
+                path: ctx.path
               });
-            } else if (reading.readingValue !== previousReading.readingValue) {
-              allNonZeroEqual = false;
             }
-          }
-        }
-      });
+          })
+      })
+    ),
+  });
+}
 
-      // Validate zero readings
-      zeroReadings.forEach((reading, index) => {
-        const previousReading = previousReadings[reading.meterId];
-        if (previousReading && previousReading.readingValue !== 0) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: [index, 'readingValue'],
-            message: `Meter ${reading.meterId} has a previous non-zero reading of ${previousReading.readingValue}. New reading cannot be 0.`
-          });
-        }
-      });
-
-      // Check if all non-zero readings are equal to their previous readings
-      if (nonZeroReadings.length > 0 && allNonZeroEqual) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: [],
-          message: "At least one current reading must be different from its previous value"
-        });
-      }
-
-      // Ensure that there's at least one non-zero reading if all readings are not zero
-      if (nonZeroReadings.length === 0 && zeroReadings.length > 0) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: [],
-          message: "At least one reading must be non-zero"
-        });
-      }
-    }),
-});
-
-export type Schema = ReturnType<typeof createSchema>;
+export type ReadingSchema = z.infer<typeof readingSchema>;
+export type ReadingFormSchema = z.infer<ReturnType<typeof readingFormSchema>>;

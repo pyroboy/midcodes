@@ -1,12 +1,21 @@
-// src/routes/dorm/expenses/+page.server.ts
-
 import { fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { expenseSchema } from './formSchema';
 import { supabase } from '$lib/supabaseClient';
+import type { RequestEvent } from './$types';
 
-export const load = async ({ locals }) => {
+interface User {
+  id: string;
+  full_name: string;
+  [key: string]: any;
+}
+
+interface Locals {
+  user: User | null;
+}
+
+export const load = async ({ locals }: { locals: Locals }) => {
   const [{ data: expenses }, { data: properties }] = await Promise.all([
     supabase
       .from('expenses')
@@ -36,11 +45,18 @@ export const load = async ({ locals }) => {
 };
 
 export const actions = {
-  create: async ({ request, locals }) => {
+  create: async ({ request, locals }: RequestEvent) => {
     const form = await superValidate(request, zod(expenseSchema));
 
     if (!form.valid) {
       return fail(400, { form });
+    }
+
+    if (!locals.user) {
+      return fail(401, { 
+        form,
+        message: 'User must be authenticated to create expenses' 
+      });
     }
 
     try {
@@ -60,11 +76,18 @@ export const actions = {
     }
   },
 
-  update: async ({ request, locals }) => {
+  update: async ({ request, locals }: RequestEvent) => {
     const form = await superValidate(request, zod(expenseSchema));
 
     if (!form.valid) {
       return fail(400, { form });
+    }
+
+    if (!locals.user) {
+      return fail(401, { 
+        form,
+        message: 'User must be authenticated to update expenses' 
+      });
     }
 
     try {
@@ -91,7 +114,7 @@ export const actions = {
     }
   },
 
-  delete: async ({ request }) => {
+  delete: async ({ request }: RequestEvent) => {
     const form = await superValidate(request, zod(expenseSchema));
 
     if (!form.valid) {

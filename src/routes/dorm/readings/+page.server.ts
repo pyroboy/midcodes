@@ -1,131 +1,167 @@
-import { superValidate, withFiles } from 'sveltekit-superforms/server';
+import { superValidate } from 'sveltekit-superforms/server';
 import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
-import { db } from '$lib/db/db';
+import { supabase } from '$lib/supabaseClient';
 import { zod } from 'sveltekit-superforms/adapters';
-import { z } from 'zod';
-import { createSchema, type Schema } from './schema';
+import { readingFormSchema, type Reading } from './schema';
 import { format } from 'date-fns';
 
-export const load: PageServerLoad = async () => {
-  const allMeters = await db.query.meters.findMany({
-    where: eq(meters.meterActive, true),
-    orderBy: [desc(meters.meterFloorLevel), desc(meters.meterName)]
-  });
+export const load: PageServerLoad = async ({ locals }) => {
+  const session = await locals.getSession();
+  if (!session) {
+    return fail(401, { message: 'Unauthorized' });
+  }
 
-  const meterTypes = [...new Set(allMeters.map(meter => meter.meterType))];
+  const { data: userRoleData } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', session.user.id)
+    .single();
 
-  const overallPreviousReading = await db.query.readings.findFirst({
-    orderBy: [desc(readings.readingDate)],
-  });
+  const userRole = userRoleData?.role;
+  const isAdmin = userRole === 'super_admin' || userRole === 'property_admin';
+  const isStaff = userRole === 'staff' || userRole === 'utility' || userRole === 'maintenance';
+  const canEdit = isAdmin || isStaff;
 
-  const previousReadings = await Promise.all(
-    allMeters.map(async (meter) => {
-      const latestReading = await db.query.readings.findFirst({
-        where: eq(readings.meterId, meter.id),
-        orderBy: [desc(readings.createdAt)],
-      });
-      return {
-        meterId: meter.id,
-        latestReading
-      };
-    })
-  );
+  // Get active meters with room and property information
+  const { data: meters, error: metersError } = await supabase
+    .from('meters')
+    .select(`
+      id,
+      name,
+      type,
+      active,
+      room:rooms (
+        id,
+        number,
+        floor:floors (
+          id,
+          floor_number,
+          wing,
+          property:properties (
+            id,
+            name
+          )
+        )
+      )
+    `)
+    .eq('active', true)
+    .order('name');
 
-  const previousReadingsMap = previousReadings.reduce((acc, curr) => {
-    acc[curr.meterId] = curr.latestReading || {
-      id: 0,
-      meterId: curr.meterId,
-      readingDate: '',
-      readingValue: 0,
-      createdAt: new Date(0) // Unix epoch
-    };
+  if (metersError) {
+    console.error('Error fetching meters:', metersError);
+    return fail(500, { error: 'Failed to fetch meters' });
+  }
+
+  const meterTypes = [...new Set(meters.map(meter => meter.type))];
+
+  // Get latest overall reading date
+  const { data: overallPreviousReading } = await supabase
+    .from('readings')
+    .select('reading_date')
+    .order('reading_date', { ascending: false })
+    .limit(1)
+    .single();
+
+  // Get previous readings for each meter
+  const { data: previousReadings } = await supabase
+    .from('readings')
+    .select('*')
+    .in('meter_id', meters.map(meter => meter.id))
+    .order('created_at', { ascending: false });
+
+  // Create a map of meter_id to latest reading
+  const previousReadingsMap = previousReadings?.reduce((acc, reading) => {
+    if (!acc[reading.meter_id] || new Date(reading.created_at) > new Date(acc[reading.meter_id].created_at)) {
+      acc[reading.meter_id] = reading;
+    }
     return acc;
-  }, {} as Record<number, NonNullable<typeof readings.$inferSelect>>);
+  }, {} as Record<number, Reading>) ?? {};
 
-  const latestOverallReadingDate = overallPreviousReading?.readingDate || format(new Date(), 'yyyy-MM-dd');
-  const schema = createSchema(previousReadingsMap, latestOverallReadingDate);
-  const form = await superValidate(zod<Schema>(schema));
+  const latestOverallReadingDate = overallPreviousReading?.reading_date || format(new Date(), 'yyyy-MM-dd');
+  const schema = readingFormSchema(previousReadingsMap, latestOverallReadingDate);
+  const form = await superValidate(zod(schema));
 
-  return { 
-    form, 
-    meters: allMeters, 
+  return {
+    form,
+    meters,
     meterTypes,
     previousReadings: previousReadingsMap,
-    overallPreviousReadingDate: overallPreviousReading?.readingDate,
-    latestOverallReadingDate
+    overallPreviousReadingDate: overallPreviousReading?.reading_date,
+    latestOverallReadingDate,
+    canEdit
   };
 };
 
 export const actions: Actions = {
   create: async (event) => {
-    const previousReadings = await loadPreviousReadings();
-    const latestOverallReadingDate = await getLatestOverallReadingDate();
-    const schema = createSchema(previousReadings, latestOverallReadingDate);
-    const form = await superValidate(event, zod<Schema>(schema));
+    const session = await event.locals.getSession();
+    if (!session) {
+      return fail(401, { error: 'Unauthorized' });
+    }
+
+    const { data: userRoleData } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', session.user.id)
+      .single();
+
+    const userRole = userRoleData?.role;
+    if (!userRole || !(userRole === 'super_admin' || userRole === 'property_admin' || userRole === 'staff' || userRole === 'utility' || userRole === 'maintenance')) {
+      return fail(403, { error: 'Insufficient permissions' });
+    }
+
+    // Get previous readings for validation
+    const { data: previousReadings } = await supabase
+      .from('readings')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    const previousReadingsMap = previousReadings?.reduce((acc, reading) => {
+      if (!acc[reading.meter_id] || new Date(reading.created_at) > new Date(acc[reading.meter_id].created_at)) {
+        acc[reading.meter_id] = reading;
+      }
+      return acc;
+    }, {} as Record<number, Reading>) ?? {};
+
+    const { data: latestReading } = await supabase
+      .from('readings')
+      .select('reading_date')
+      .order('reading_date', { ascending: false })
+      .limit(1)
+      .single();
+
+    const latestOverallReadingDate = latestReading?.reading_date || format(new Date(), 'yyyy-MM-dd');
+    const schema = readingFormSchema(previousReadingsMap, latestOverallReadingDate);
+    const form = await superValidate(event, zod(schema));
 
     if (!form.valid) {
       return fail(400, { form });
     }
 
     try {
-      await db.transaction(async (tx) => {
-        for (const reading of form.data.readings) {
-          await tx.insert(readings).values({
-            meterId: reading.meterId,
-            readingDate: form.data.readingDate,
-            readingValue: reading.readingValue,
-          });
-        }
-      });
+      // Insert all readings in a single batch
+      const { error: insertError } = await supabase
+        .from('readings')
+        .insert(
+          form.data.readings.map((reading) => ({
+            meter_id: reading.meter_id,
+            reading_date: form.data.reading_date,
+            reading: reading.reading_value,
+            created_at: new Date().toISOString()
+          }))
+        );
 
-      // Return a new, empty form after successful submission
-      const newForm = await superValidate(zod<Schema>(schema));
+      if (insertError) {
+        console.error('Error inserting readings:', insertError);
+        return fail(500, { form, error: 'Failed to add readings' });
+      }
+
+      const newForm = await superValidate(zod(schema));
       return { form: newForm };
     } catch (err) {
       console.error('Error inserting readings:', err);
       return fail(500, { form, error: err instanceof Error ? err.message : 'Failed to add readings' });
     }
-  },
+  }
 };
-
-async function getLatestOverallReadingDate() {
-  const overallPreviousReading = await db.query.readings.findFirst({
-    orderBy: [desc(readings.readingDate)],
-  });
-  return overallPreviousReading?.readingDate || format(new Date(), 'yyyy-MM-dd');
-}
-
-async function loadPreviousReadings() {
-  const allMeters = await db.query.meters.findMany({
-    where: eq(meters.meterActive, true),
-    orderBy: [desc(meters.meterFloorLevel), desc(meters.meterName)]
-  });
-
-  const previousReadings = await Promise.all(
-    allMeters.map(async (meter) => {
-      const latestReading = await db.query.readings.findFirst({
-        where: eq(readings.meterId, meter.id),
-        orderBy: [desc(readings.createdAt)],
-      });
-      return {
-        meterId: meter.id,
-        latestReading: latestReading || {
-          id: 0,
-          meterId: meter.id,
-          readingDate: '',
-          readingValue: 0,
-          createdAt: new Date(0) // Unix epoch
-        }
-      };
-    })
-  );
-
-  return previousReadings.reduce((acc, curr) => {
-    acc[curr.meterId] = {
-      readingValue: curr.latestReading.readingValue,
-      readingDate: curr.latestReading.readingDate
-    };
-    return acc;
-  }, {} as Record<number, { readingValue: number; readingDate: string }>);
-}

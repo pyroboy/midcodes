@@ -18,15 +18,15 @@
 
   $: {
     if (payment && editMode) {
-      form.data.set({
+      form.set({
         ...payment
       });
     }
   }
 
-  const { form, errors, enhance, submitting, reset } = superForm(data, {
+  const { form, errors, enhance, submitting, reset } = superForm(data.form, {
     id: 'paymentForm',
-    validators: zodClient(),
+    validators: zodClient(PaymentSchema),
     resetForm: true,
     taintedMessage: null,
     onResult: ({ result }) => {
@@ -48,12 +48,12 @@
   use:enhance
   class="space-y-4 p-4 bg-white rounded-lg shadow"
 >
-  <input type="hidden" name="id" bind:value={$form.id} />
+  <input type="hidden" name="id" value={$form.id} />
 
   {#if !editMode}
     <div class="space-y-2">
       <Label for="billing_id">Billing</Label>
-      <Select.Root bind:value={$form.billing_id} disabled={!canEdit || editMode}>
+      <Select.Root selected={$form.billing_id} onSelectedChange={(val) => form.update($form => ({ ...$form, billing_id: val }))} disabled={!canEdit || editMode}>
         <Select.Trigger class="w-full">
           <Select.Value placeholder="Select a billing" />
         </Select.Trigger>
@@ -91,7 +91,8 @@
         type="number"
         id="amount"
         name="amount"
-        bind:value={$form.amount}
+        value={$form.amount}
+        on:input={(e) => form.update($form => ({ ...$form, amount: parseFloat(e.currentTarget.value) }))}
         min="0"
         max={selectedBilling?.balance || 0}
         step="0.01"
@@ -105,7 +106,7 @@
 
   <div class="space-y-2">
     <Label for="payment_method">Payment Method</Label>
-    <Select.Root bind:value={$form.payment_method} disabled={!canEdit}>
+    <Select.Root selected={$form.payment_method} onSelectedChange={(val) => form.update($form => ({ ...$form, payment_method: val }))} disabled={!canEdit}>
       <Select.Trigger class="w-full">
         <Select.Value placeholder="Select payment method" />
       </Select.Trigger>
@@ -130,7 +131,8 @@
         type="date"
         id="payment_date"
         name="payment_date"
-        bind:value={$form.payment_date}
+        value={$form.payment_date}
+        on:input={(e) => form.update($form => ({ ...$form, payment_date: e.currentTarget.value }))}
         disabled={!canEdit}
       />
       {#if $errors.payment_date}
@@ -145,7 +147,8 @@
       type="text"
       id="reference_number"
       name="reference_number"
-      bind:value={$form.reference_number}
+      value={$form.reference_number ?? ''}
+      on:input={(e) => form.update($form => ({ ...$form, reference_number: e.currentTarget.value }))}
       disabled={!canEdit}
     />
     {#if $errors.reference_number}
@@ -159,7 +162,8 @@
       type="url"
       id="receipt_url"
       name="receipt_url"
-      bind:value={$form.receipt_url}
+      value={$form.receipt_url ?? ''}
+      on:input={(e) => form.update($form => ({ ...$form, receipt_url: e.currentTarget.value }))}
       disabled={!canEdit}
     />
     {#if $errors.receipt_url}
@@ -172,7 +176,8 @@
     <Textarea
       id="notes"
       name="notes"
-      bind:value={$form.notes}
+      value={$form.notes ?? ''}
+      on:input={(e) => form.update($form => ({ ...$form, notes: e.currentTarget.value }))}
       disabled={!canEdit}
       rows="3"
     />
@@ -184,7 +189,7 @@
   {#if editMode && canUpdateStatus}
     <div class="space-y-2">
       <Label for="status">Status</Label>
-      <Select.Root bind:value={$form.status}>
+      <Select.Root selected={$form.status} onSelectedChange={(val) => form.update($form => ({ ...$form, status: val }))} disabled={!canUpdateStatus}>
         <Select.Trigger class="w-full">
           <Select.Value placeholder="Select status" />
         </Select.Trigger>

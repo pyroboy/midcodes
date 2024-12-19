@@ -2,39 +2,59 @@
   import { tick } from 'svelte';
   import { superForm } from 'sveltekit-superforms/client';
   import { browser } from '$app/environment';
-  import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
   import { zodClient } from 'sveltekit-superforms/adapters';
   import { page } from '$app/stores';
   import * as Select from "$lib/components/ui/select";
+  import type { Selected } from "$lib/components/ui/select";
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
   import type { PageData } from './$types';
   import { format, parse, isAfter } from 'date-fns';
   import toast, { Toaster } from 'svelte-french-toast';
-  import { createSchema, type Schema } from './formSchema';
+  import { readingFormSchema, type ReadingFormSchema } from './schema';
   import { goto } from '$app/navigation';
   import { tweened } from 'svelte/motion';
 
   export let data: PageData;
+
+  interface Meter {
+    id: number;
+    name: string;
+    type: string;
+    active: boolean;
+    room: {
+      id: number;
+      number: string;
+      floor: {
+        id: number;
+        floor_number: number;
+        wing: string | null;
+        property: {
+          id: number;
+          name: string;
+        };
+      };
+    };
+  }
+
   let selectedMeterType = '';
-  $: filteredMeters = selectedMeterType
-    ? data.meters.filter(meter => meter.meterType === selectedMeterType)
+  $: filteredMeters = selectedMeterType && data.meters
+    ? data.meters.filter((meter: Meter) => meter.type === selectedMeterType)
     : [];
 
-  let meterTypeSelected = { value: '', label: 'Select a meter type' };
+  let meterTypeSelected: Selected<string> = { value: '', label: 'Select a meter type' };
 
   const today = format(new Date(), 'yyyy-MM-dd');
   const latestOverallReadingDate = data.latestOverallReadingDate;
   const isPreviousDateInFuture = isAfter(new Date(latestOverallReadingDate), new Date());
-  const schema = createSchema(data.latestOverallReadingDate);
-const duration = 1500;
-
+  const schema = readingFormSchema(data.previousReadings, latestOverallReadingDate);
+  const duration = 1500;
 
   let showProgressBar = false;
   const progress = tweened(0, { duration: duration });
 
-  const { form, errors, enhance, message, reset } = superForm(data.form, {
+  const { form, errors, enhance, message, reset } = superForm<ReadingFormSchema>(data.form, {
     validators: zodClient(schema),
     dataType: 'json',
     applyAction: true,
@@ -42,7 +62,6 @@ const duration = 1500;
     resetForm: true,
     onResult: async ({ result }) => {
       if (result.type === 'success') {
-        console.log('Form submitted successfully');
         toast.success('Readings submitted successfully!');
         
         // Start progress bar
@@ -51,13 +70,13 @@ const duration = 1500;
 
         // Wait for the next tick and then add a delay
         await tick();
-        await new Promise(resolve => setTimeout(resolve, duration)); // 2000ms delay
+        await new Promise(resolve => setTimeout(resolve, duration));
 
         // Reset the form and navigate
         selectedMeterType = '';
         meterTypeSelected = { value: '', label: 'Select a meter type' };
         filteredMeters = [];
-        $form.readingDate = isPreviousDateInFuture ? latestOverallReadingDate : today;
+        $form.reading_date = isPreviousDateInFuture ? latestOverallReadingDate : today;
         showProgressBar = false;
         progress.set(0);
         goto($page.url.pathname, { replaceState: true });
@@ -75,16 +94,16 @@ const duration = 1500;
   // Update form.readings when filteredMeters changes
   $: {
     if (filteredMeters.length > 0) {
-      $form.readings = filteredMeters.map(meter => ({
-        meterId: meter.id,
-        readingValue: data.previousReadings[meter.id]?.readingValue ?? 0
+      $form.readings = filteredMeters.map((meter: Meter) => ({
+        meter_id: meter.id,
+        reading_value: data.previousReadings[meter.id]?.reading_value ?? 0
       }));
     }
   }
 
-  // Set default value for readingDate
-  $: if (!$form.readingDate) {
-    $form.readingDate = isPreviousDateInFuture ? latestOverallReadingDate : today;
+  // Set default value for reading_date
+  $: if (!$form.reading_date) {
+    $form.reading_date = isPreviousDateInFuture ? latestOverallReadingDate : today;
   }
 
   function formatDate(date: string) {
@@ -99,121 +118,130 @@ const duration = 1500;
 
 <Toaster />
 <div class="container mx-auto p-4">
-  <h1 class="text-3xl font-bold mb-6 text-center">Meter Readings</h1>
-
-  {#if showProgressBar}
-    <div class="w-full max-w-2xl mx-auto h-1 bg-gray-200 mb-4">
-      <div class="h-1 bg-red-500" style="width: {$progress}%;"></div>
-    </div>
-  {/if}
-
-  <form method="POST" use:enhance action="?/create" class="max-w-2xl mx-auto bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
-    <div class="mb-4">
-      <Label for="readingDate" class="block text-gray-700 text-sm font-bold mb-2">Reading Date</Label>
-      <Input type="date" id="readingDate" name="readingDate" bind:value={$form.readingDate} min={today} />
-      {#if $errors.readingDate}<span class="text-red-500 text-xs italic">{$errors.readingDate}</span>{/if}
+  <div class="space-y-4">
+    <div class="flex items-center justify-between">
+      <h1 class="text-2xl font-bold">Meter Readings</h1>
+      {#if !data.canEdit}
+        <p class="text-sm text-red-500">You don't have permission to add or edit readings</p>
+      {/if}
     </div>
 
-    <div class="mb-6">
-      <Label for="meterType" class="block text-gray-700 text-sm font-bold mb-2">Meter Type</Label>
-      <Select.Root    
-        selected={{value: $form.meterType, label: $form.meterType || 'Select a meter type'}}
-        onSelectedChange={(s) => {
-          if (s) {
-            $form.meterType = s.value;
-            meterTypeSelected = { value: s.value, label: s.value };
-            selectedMeterType = s.value;
-          }
-        }}
-      >
-        <Select.Trigger class="w-full">
-          <Select.Value placeholder="Select a meter type" />
-        </Select.Trigger>
-        <Select.Content>
-          {#each data.meterTypes as type}
-            <Select.Item value={type}>{type}</Select.Item>
-          {/each}
-        </Select.Content>
-      </Select.Root>
-      {#if $errors.meterType}<span class="text-red-500 text-xs italic">{$errors.meterType}</span>{/if}
-    </div>
-
-    <div class="mb-6">
-      <div class="mb-6">
-        <h2 class="text-xl font-semibold mb-4">Readings</h2>
-        {#if $errors.readings}
-          <div class="mb-3 pl-2 text-red-500 text-xs italic">
-            {#if Array.isArray($errors.readings)}
-              <ul>
-                {#each $errors.readings as error, index}
-                  <li>{`Meter ${index + 1}: ${error}`}</li>
-                {/each}
-              </ul>
-            {:else}
-              {$errors.readings? JSON.stringify($errors.readings): ''}
-            {/if}
-          </div>
-        {/if}
-
-        <div class="grid grid-cols-4 gap-4 mb-2 font-bold">
-          <div>Meter</div>
-          <div>
-            Previous
-            <div class="text-xs text-gray-500">{formatDate2(data.overallPreviousReadingDate)}</div>
-          </div>
-          <div>
-            Current
-            <div class="text-xs font-normal">{formatDate($form.readingDate)}</div>
-          </div>
-          <div>Difference</div>
+    <form method="POST" use:enhance class="space-y-4">
+      <div class="grid gap-4 md:grid-cols-2">
+        <div class="space-y-2">
+          <Label for="reading_date">Reading Date</Label>
+          <Input
+            type="date"
+            name="reading_date"
+            bind:value={$form.reading_date}
+            min={latestOverallReadingDate}
+            disabled={!data.canEdit}
+          />
+          {#if $errors.reading_date}
+            <p class="text-sm text-red-500">{$errors.reading_date}</p>
+          {/if}
         </div>
-        {#if filteredMeters.length > 0}
-          {#each filteredMeters as meter, index (meter.id)}
-            <div class="grid grid-cols-4 gap-4 mb-2 items-center">
-              <div>{meter.meterName} (Floor {meter.meterFloorLevel})</div>
-              
-              <div>
-                {#if data.previousReadings[meter.id]}
-                  <Input type="number" value={data.previousReadings[meter.id]?.readingValue} disabled />
-                {:else}
-                  <Input type="number" value={0} disabled />
-                  <div class="text-xs text-gray-500">No previous date</div>
-                {/if}
-              </div>
-              <div>
-                <Input 
-                  type="number" 
-                  name="readings[{index}].readingValue"
-                  bind:value={$form.readings[index].readingValue} 
-                  min="0"
-                  step="0.01"
-                />
-                <input type="hidden" name="readings[{index}].meterId" value={meter.id} />
-                {#if $errors.readings?.[index]?.readingValue}
-                  <span class="text-red-500 text-xs italic">{$errors.readings[index].readingValue}</span>
-                {/if}
-              </div>
-              <Input 
-                type="number" 
-                value={calculateDifference($form.readings[index].readingValue, data.previousReadings[meter.id]?.readingValue)} 
-                disabled 
-              />
-            </div>
-          {/each}
-        {:else}
-          <div class="text-center text-gray-500 italic">No meters available for the selected type</div>
-        {/if}
+
+        <div class="space-y-2">
+          <Label for="meter_type">Meter Type</Label>
+          <Select.Root
+            selected={meterTypeSelected}
+            onSelectedChange={(value: Selected<string>) => {
+              selectedMeterType = value.value;
+              meterTypeSelected = value;
+              $form.meter_type = value.value;
+            }}
+            disabled={!data.canEdit}
+          >
+            <Select.Trigger class="w-full">
+              <Select.Value placeholder="Select a meter type" />
+            </Select.Trigger>
+            <Select.Content>
+              {#each data.meterTypes ?? [] as type}
+                <Select.Item value={type}>{type}</Select.Item>
+              {/each}
+            </Select.Content>
+          </Select.Root>
+          {#if $errors.meter_type}
+            <p class="text-sm text-red-500">{$errors.meter_type}</p>
+          {/if}
+        </div>
       </div>
-    </div>
 
-    <div class="flex items-center justify-end">
-      <Button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
-        Submit Readings
-      </Button>
-    </div>
-  </form>
+      {#if selectedMeterType && filteredMeters.length > 0}
+        <div class="space-y-4">
+          <h2 class="text-xl font-semibold">Readings</h2>
+          <div class="grid gap-4 md:grid-cols-2">
+            {#each filteredMeters as meter, i}
+              {@const previousReading = data.previousReadings[meter.id]}
+              <div class="space-y-2 p-4 border rounded-lg">
+                <div class="flex justify-between items-start">
+                  <div>
+                    <h3 class="font-medium">
+                      {meter.name}
+                      {#if meter.room?.floor?.property}
+                        <span class="text-sm text-gray-500">
+                          ({meter.room.floor.property.name})
+                        </span>
+                      {/if}
+                    </h3>
+                    <p class="text-sm text-gray-500">
+                      {#if meter.room}
+                        Room {meter.room.number}
+                        {#if meter.room.floor}
+                          - Floor {meter.room.floor.floor_number}
+                          {#if meter.room.floor.wing}
+                            Wing {meter.room.floor.wing}
+                          {/if}
+                        {/if}
+                      {/if}
+                    </p>
+                  </div>
+                  {#if previousReading}
+                    <div class="text-right text-sm">
+                      <p class="text-gray-500">Previous: {previousReading.reading_value}</p>
+                      <p class="text-gray-400">{formatDate2(previousReading.reading_date)}</p>
+                    </div>
+                  {/if}
+                </div>
 
-  {#if browser}
-    <SuperDebug data={$form} />
-  {/if}
+                <Input
+                  type="number"
+                  name="readings[{i}].reading_value"
+                  bind:value={$form.readings[i].reading_value}
+                  min={previousReading?.reading_value ?? 0}
+                  step="1"
+                  disabled={!data.canEdit}
+                />
+                {#if $errors.readings?.[i]?.reading_value}
+                  <p class="text-sm text-red-500">{$errors.readings[i].reading_value}</p>
+                {/if}
+
+                {#if $form.readings[i].reading_value > (previousReading?.reading_value ?? 0)}
+                  <p class="text-sm text-gray-500">
+                    Difference: {calculateDifference($form.readings[i].reading_value, previousReading?.reading_value)}
+                  </p>
+                {/if}
+              </div>
+            {/each}
+          </div>
+        </div>
+      {/if}
+
+      {#if showProgressBar}
+        <div class="w-full bg-gray-200 rounded-full h-2.5">
+          <div
+            class="bg-blue-600 h-2.5 rounded-full transition-all duration-500"
+            style="width: {$progress}%"
+          />
+        </div>
+      {/if}
+
+      {#if selectedMeterType && filteredMeters.length > 0}
+        <div class="flex justify-end">
+          <Button type="submit" disabled={!data.canEdit}>Submit Readings</Button>
+        </div>
+      {/if}
+    </form>
+  </div>
 </div>

@@ -1,33 +1,30 @@
 import { z } from 'zod';
 
-export const expenseTypeEnum = z.enum([
-  'MAINTENANCE',
-  'REPAIR',
-  'UTILITY',
-  'SUPPLIES',
-  'SALARY',
-  'MISC'
-]);
-
-export const expenseStatusEnum = z.enum([
-  'PENDING',
-  'APPROVED',
-  'REJECTED',
-  'CANCELLED'
-]);
+export const expenseTypeEnum = z.enum(['MAINTENANCE', 'UTILITIES', 'SUPPLIES', 'SALARY', 'OTHERS']);
 
 export const expenseSchema = z.object({
   id: z.number().optional(),
-  property_id: z.number(),
+  property_id: z.number({
+    required_error: "Property is required"
+  }),
+  expense_date: z.string({
+    required_error: "Date is required"
+  }),
   expense_type: expenseTypeEnum,
-  expense_status: expenseStatusEnum,
-  amount: z.number().min(0, 'Amount must be 0 or greater'),
-  description: z.string().min(1, 'Description is required'),
-  expense_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
-  receipt_url: z.string().url().optional().nullable(),
-  notes: z.string().optional().nullable(),
-  created_by: z.number(),
-  approved_by: z.number().optional().nullable()
+  description: z.string({
+    required_error: "Description is required"
+  }).min(1, "Description is required"),
+  amount: z.number({
+    required_error: "Amount is required"
+  }).min(0, "Amount must be greater than or equal to 0"),
+  status: z.enum(['PENDING', 'APPROVED', 'REJECTED'], {
+    required_error: "Status is required"
+  }).default('PENDING'),
+  created_by: z.string().optional(),
+  approved_by: z.string().optional(),
+  notes: z.string().optional(),
+  created_at: z.string().optional(),
+  updated_at: z.string().optional()
 });
 
-export type ExpenseSchema = typeof expenseSchema;
+export type ExpenseSchema = z.infer<typeof expenseSchema>;
