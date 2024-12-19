@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 export const expenseTypeEnum = z.enum(['MAINTENANCE', 'UTILITIES', 'SUPPLIES', 'SALARY', 'OTHERS']);
+export const expenseStatusEnum = z.enum(['PENDING', 'APPROVED', 'REJECTED']);
 
 export const expenseSchema = z.object({
   id: z.number().optional(),
@@ -11,15 +12,14 @@ export const expenseSchema = z.object({
     required_error: "Date is required"
   }),
   expense_type: expenseTypeEnum,
+  expense_status: expenseStatusEnum.default('PENDING'),
   description: z.string({
     required_error: "Description is required"
   }).min(1, "Description is required"),
   amount: z.number({
     required_error: "Amount is required"
   }).min(0, "Amount must be greater than or equal to 0"),
-  status: z.enum(['PENDING', 'APPROVED', 'REJECTED'], {
-    required_error: "Status is required"
-  }).default('PENDING'),
+  receipt_url: z.string().optional(),
   created_by: z.string().optional(),
   approved_by: z.string().optional(),
   notes: z.string().optional(),

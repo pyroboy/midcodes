@@ -1,16 +1,16 @@
 <script lang="ts">
-  import Form from './Form.svelte';
+  import FloorForm from './FloorForm.svelte';
   import { page } from '$app/stores';
   import * as Card from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
-  import Alert from '$lib/components/ui/alert/alert.svelte';
+  import { Alert, AlertDescription } from '$lib/components/ui/alert';
   import type { PageData } from './$types';
   import type { Database } from '$lib/database.types';
 
   type Floor = Database['public']['Tables']['floors']['Row'] & {
     property: {
       name: string;
-    };
+    } | null;
   };
 
   export let data: PageData;
@@ -31,13 +31,15 @@
   }
 
   $: canAdd = data.isAdminLevel || data.isStaffLevel;
-  $: floors = data.floors as Floor[] || [];
+  $: floors = (data.floors ?? []) as Floor[];
 </script>
 
 <div class="container mx-auto p-4 space-y-8">
   {#if !data.isAdminLevel && !data.isStaffLevel}
     <Alert variant="info">
-      You are viewing this page in read-only mode. Contact an administrator for edit access.
+      <AlertDescription>
+        You are viewing this page in read-only mode. Contact an administrator for edit access.
+      </AlertDescription>
     </Alert>
   {/if}
 
@@ -59,53 +61,49 @@
         {/if}
       </div>
 
-      <div class="grid gap-4">
-        {#each floors as floor (floor.id)}
-          <Card.Root 
-            class="cursor-pointer {(data.isAdminLevel || data.isStaffLevel) ? 'hover:bg-gray-50' : ''}" 
-            on:click={() => handleFloorClick(floor)}
-          >
-            <Card.Header>
-              <Card.Title>
-                Floor {floor.floor_number}
-                {#if floor.wing}
-                  - Wing {floor.wing}
-                {/if}
-              </Card.Title>
-              <Card.Description>
-                Property: {floor.property.name}
-              </Card.Description>
-            </Card.Header>
-            <Card.Content>
-              <Badge
-                variant={floor.status === 'ACTIVE'
-                  ? 'default'
-                  : floor.status === 'MAINTENANCE'
-                  ? 'secondary'
-                  : 'destructive'}
-              >
-                {floor.status}
-              </Badge>
-            </Card.Content>
-          </Card.Root>
-        {/each}
-      </div>
+      {#if !floors.length}
+        <p class="text-gray-500">No floors found.</p>
+      {:else}
+        <div class="grid gap-4">
+          {#each floors as floor (floor.id)}
+            <Card.Root
+              class="cursor-pointer hover:shadow-lg transition-shadow"
+              on:click={() => handleFloorClick(floor)}
+            >
+              <Card.Header>
+                <Card.Title>Floor {floor.floor_number}</Card.Title>
+                <Card.Description>
+                  Property: {floor.property?.name ?? 'N/A'}
+                </Card.Description>
+              </Card.Header>
+              <Card.Content>
+                <div class="flex items-center gap-2">
+                  <Badge variant={floor.status === 'ACTIVE' ? 'default' : 'secondary'}>
+                    {floor.status}
+                  </Badge>
+                  {#if floor.wing}
+                    <Badge variant="outline">Wing {floor.wing}</Badge>
+                  {/if}
+                </div>
+              </Card.Content>
+            </Card.Root>
+          {/each}
+        </div>
+      {/if}
     </div>
 
     <!-- Floor Form -->
-    {#if editMode || (!selectedFloor && canAdd)}
-      <div>
-        <h2 class="text-2xl font-bold mb-4">
-          {editMode ? 'Edit Floor' : 'Add New Floor'}
-        </h2>
-        <Form
-          {data}
+    <div class="space-y-4">
+      <h2 class="text-2xl font-bold">{editMode ? (selectedFloor ? 'Edit' : 'Add') : ''} Floor</h2>
+      {#if editMode}
+        <FloorForm
+          data={data}
           properties={data.properties ?? []}
-          {editMode}
+          editMode={!!selectedFloor}
           floor={selectedFloor}
           on:floorAdded={handleFloorAdded}
         />
-      </div>
-    {/if}
+      {/if}
+    </div>
   </div>
 </div>

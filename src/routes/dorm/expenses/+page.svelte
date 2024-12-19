@@ -7,7 +7,7 @@
   import { Label } from '$lib/components/ui/label';
   import type { PageData } from './$types';
   import { browser } from '$app/environment';
-  import { expenseTypeEnum, type ExpenseSchema } from './formSchema';
+  import { expenseTypeEnum, expenseStatusEnum, type ExpenseSchema } from './formSchema';
   import type { Database } from '$lib/database.types';
   import type { SuperValidated } from 'sveltekit-superforms';
   import type { ZodValidation } from 'sveltekit-superforms/adapters';
@@ -25,9 +25,14 @@
   const { form, errors, enhance } = superForm<ExpenseSchema>(data.form);
 
   let typeSelected = { value: '', label: 'Select expense type' };
+  let statusSelected = { value: '', label: 'Select status' };
 
   function isValidExpenseType(value: string): value is typeof expenseTypeEnum._type {
     return Object.values(expenseTypeEnum.enum).includes(value as any);
+  }
+
+  function isValidExpenseStatus(value: string): value is typeof expenseStatusEnum._type {
+    return Object.values(expenseStatusEnum.enum).includes(value as any);
   }
 
   $: expenses = data.expenses ?? [];
@@ -47,7 +52,11 @@
               <div class="font-bold">{expense.expense_type}</div>
               <div>Amount: ${expense.amount.toFixed(2)}</div>
               <div>Date: {new Date(expense.expense_date).toLocaleDateString()}</div>
+              <div>Status: {expense.expense_status}</div>
               <div>Notes: {expense.notes || 'N/A'}</div>
+              {#if expense.receipt_url}
+                <div>Receipt: <a href={expense.receipt_url} target="_blank" class="text-blue-500 hover:underline">View</a></div>
+              {/if}
             </li>
           {/each}
         </ul>
@@ -89,6 +98,29 @@
           </div>
 
           <div>
+            <Label for="expense_status">Status</Label>
+            <Select.Root
+              selected={{value: $form.expense_status ?? '', label: $form.expense_status ?? 'Select status'}}
+              onSelectedChange={(s) => {
+                if (s?.value && isValidExpenseStatus(s.value)) {
+                  $form.expense_status = s.value;
+                  statusSelected = { value: s.value, label: s.value };
+                }
+              }}
+            >
+              <Select.Trigger class="w-full">
+                <Select.Value placeholder="Select status" />
+              </Select.Trigger>
+              <Select.Content>
+                {#each Object.values(expenseStatusEnum.enum) as status}
+                  <Select.Item value={status}>{status}</Select.Item>
+                {/each}
+              </Select.Content>
+            </Select.Root>
+            {#if $errors.expense_status}<span class="text-red-500">{$errors.expense_status}</span>{/if}
+          </div>
+
+          <div>
             <Label for="property_id">Property</Label>
             <Select.Root
               selected={{value: ($form.property_id ?? '').toString(), label: properties.find(p => p.id === $form.property_id)?.name ?? 'Select property'}}
@@ -120,6 +152,12 @@
             <Label for="expense_date">Date</Label>
             <Input type="date" id="expense_date" bind:value={$form.expense_date} required />
             {#if $errors.expense_date}<span class="text-red-500">{$errors.expense_date}</span>{/if}
+          </div>
+
+          <div>
+            <Label for="receipt_url">Receipt URL</Label>
+            <Input type="url" id="receipt_url" bind:value={$form.receipt_url} />
+            {#if $errors.receipt_url}<span class="text-red-500">{$errors.receipt_url}</span>{/if}
           </div>
 
           <div>
