@@ -12,13 +12,13 @@
   import type { SuperValidated } from 'sveltekit-superforms';
   import type { ZodValidation } from 'sveltekit-superforms/adapters';
 
-  type Expense = Database['public']['Tables']['expenses']['Row'] & {
-    property: { name: string } | null;
-    created_by_user: { full_name: string } | null;
-    approved_by_user: { full_name: string } | null;
-  };
+  // type Expense = Database['public']['Tables']['expenses']['Row'] & {
+  //   property: { name: string } | null;
+  //   created_by_user: { full_name: string } | null;
+  //   approved_by_user: { full_name: string } | null;
+  // };
 
-  type Property = Database['public']['Tables']['properties']['Row'];
+  // type Property = Database['public']['Tables']['properties']['Row'];
 
   export let data: PageData;
 

@@ -10,8 +10,8 @@
   import { expenseSchema, type ExpenseSchema } from './formSchema';
   import type { Database } from '$lib/database.types';
   import type { SuperValidated } from 'sveltekit-superforms';
-
-  type Property = Database['public']['Tables']['properties']['Row'];
+import type {Property} from './formSchema';
+  // type Property = Database['public']['Tables']['properties']['Row'];
   type UserRole = 'super_admin' | 'property_admin' | 'staff' | 'frontdesk' | 'user';
 
   interface User {
@@ -19,7 +19,8 @@
   }
 
   interface PageData {
-    form: SuperValidated<ExpenseSchema>;
+    form?: SuperValidated<ExpenseSchema>;
+    expenses: any[];
     properties: Property[];
     user: User;
   }
