@@ -1,109 +1,192 @@
 <script lang="ts">
-  import FloorForm from './FloorForm.svelte';
-  import { page } from '$app/stores';
-  import * as Card from '$lib/components/ui/card';
-  import { Badge } from '$lib/components/ui/badge';
-  import { Alert, AlertDescription } from '$lib/components/ui/alert';
+  import { superForm } from 'sveltekit-superforms/client';
+  import { zodClient } from 'sveltekit-superforms/adapters';
+  import Button from '$lib/components/ui/button/button.svelte';
+  import Input from '$lib/components/ui/input/input.svelte';
+  import Label from '$lib/components/ui/label/label.svelte';
+  import * as Select from '$lib/components/ui/select';
+  import { createEventDispatcher } from 'svelte';
+  import { z } from 'zod';
   import type { PageData } from './$types';
   import type { Database } from '$lib/database.types';
-
-  type Floor = Database['public']['Tables']['floors']['Row'] & {
+  import type { SuperValidated } from 'sveltekit-superforms';
+  
+  const floorStatusEnum = z.enum(['ACTIVE', 'INACTIVE', 'MAINTENANCE']);
+  
+  const floorSchema = z.object({
+    id: z.number().optional(),
+    property_id: z.number(),
+    floor_number: z.number().int(),
+    wing: z.string().optional().nullable(),
+    status: floorStatusEnum
+  });
+  
+  type Property = Database['public']['Tables']['properties']['Row'];
+  type BaseFloor = Database['public']['Tables']['floors']['Row'];
+  
+  interface Floor extends BaseFloor {
     property: {
       name: string;
     } | null;
+  }
+  
+  type FormData = z.infer<typeof floorSchema> & {
+    [key: string]: unknown;
   };
-
-  export let data: PageData;
-
-  let selectedFloor: Floor | undefined = undefined;
-  let editMode = false;
-
-  function handleFloorClick(floor: Floor) {
-    if (data.isAdminLevel || data.isStaffLevel) {
-      selectedFloor = floor;
-      editMode = true;
+  
+  // Using type intersection instead of interface extension
+  type ExtendedPageData = PageData & {
+    form: SuperValidated<FormData>;
+    isAdminLevel: boolean;
+    isStaffLevel: boolean;
+  };
+  
+  export let data: ExtendedPageData;
+  export let properties: Property[] = [];
+  export let editMode = false;
+  export let floor: Floor | undefined = undefined;
+  
+  const dispatch = createEventDispatcher();
+  
+  const { form, errors, enhance, submitting, reset } = superForm<FormData>(data.form, {
+    id: 'floorForm',
+    validators: zodClient(floorSchema),
+    resetForm: true,
+    taintedMessage: null,
+    onResult: ({ result }) => {
+      if (result.type === 'success') {
+        dispatch('floorAdded');
+        reset();
+      }
+    },
+  });
+  
+  $: {
+    if (floor && editMode) {
+      form.update($form => ({
+        ...$form,
+        id: floor.id,
+        property_id: floor.property_id,
+        floor_number: floor.floor_number,
+        wing: floor.wing || undefined,
+        status: floor.status
+      }));
     }
   }
-
-  function handleFloorAdded() {
-    selectedFloor = undefined;
-    editMode = false;
-  }
-
-  $: canAdd = data.isAdminLevel || data.isStaffLevel;
-  $: floors = (data.floors ?? []) as Floor[];
-</script>
-
-<div class="container mx-auto p-4 space-y-8">
-  {#if !data.isAdminLevel && !data.isStaffLevel}
-    <Alert variant="info">
-      <AlertDescription>
-        You are viewing this page in read-only mode. Contact an administrator for edit access.
-      </AlertDescription>
-    </Alert>
-  {/if}
-
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-    <!-- Floor List -->
-    <div class="space-y-4">
-      <div class="flex justify-between items-center">
-        <h2 class="text-2xl font-bold">Floors</h2>
-        {#if canAdd && !editMode}
-          <button
-            class="px-4 py-2 bg-primary text-white rounded hover:bg-primary/90"
-            on:click={() => {
-              selectedFloor = undefined;
-              editMode = true;
-            }}
-          >
-            Add Floor
-          </button>
-        {/if}
-      </div>
-
-      {#if !floors.length}
-        <p class="text-gray-500">No floors found.</p>
-      {:else}
-        <div class="grid gap-4">
-          {#each floors as floor (floor.id)}
-            <Card.Root
-              class="cursor-pointer hover:shadow-lg transition-shadow"
-              on:click={() => handleFloorClick(floor)}
+  
+  $: canEdit = data.isAdminLevel || data.isStaffLevel;
+  $: canDelete = data.isAdminLevel;
+  </script>
+  
+  <form
+    method="POST"
+    action={editMode ? "?/update" : "?/create"}
+    use:enhance
+    class="space-y-4 p-4 bg-white rounded-lg shadow"
+  >
+    <input type="hidden" name="id" bind:value={$form.id} />
+  
+    <div class="space-y-2">
+      <Label for="property_id">Property</Label>
+      <Select.Root>
+        <Select.Trigger class="w-full" disabled={!canEdit}>
+          <Select.Value>{properties.find(p => p.id === $form.property_id)?.name ?? 'Select property'}</Select.Value>
+        </Select.Trigger>
+        <Select.Content>
+          {#each properties as property}
+            <Select.Item 
+              value={property.id.toString()} 
+              on:click={() => form.update($form => ({ ...$form, property_id: property.id }))}
             >
-              <Card.Header>
-                <Card.Title>Floor {floor.floor_number}</Card.Title>
-                <Card.Description>
-                  Property: {floor.property?.name ?? 'N/A'}
-                </Card.Description>
-              </Card.Header>
-              <Card.Content>
-                <div class="flex items-center gap-2">
-                  <Badge variant={floor.status === 'ACTIVE' ? 'default' : 'secondary'}>
-                    {floor.status}
-                  </Badge>
-                  {#if floor.wing}
-                    <Badge variant="outline">Wing {floor.wing}</Badge>
-                  {/if}
-                </div>
-              </Card.Content>
-            </Card.Root>
+              {property.name}
+            </Select.Item>
           {/each}
-        </div>
+        </Select.Content>
+      </Select.Root>
+      {#if $errors.property_id}
+        <p class="text-red-500 text-sm">{$errors.property_id}</p>
       {/if}
     </div>
-
-    <!-- Floor Form -->
-    <div class="space-y-4">
-      <h2 class="text-2xl font-bold">{editMode ? (selectedFloor ? 'Edit' : 'Add') : ''} Floor</h2>
+  
+    <div class="space-y-2">
+      <Label for="floor_number">Floor Number</Label>
+      <Input
+        type="number"
+        id="floor_number"
+        name="floor_number"
+        bind:value={$form.floor_number}
+        disabled={!canEdit}
+      />
+      {#if $errors.floor_number}
+        <p class="text-red-500 text-sm">{$errors.floor_number}</p>
+      {/if}
+    </div>
+  
+    <div class="space-y-2">
+      <Label for="wing">Wing</Label>
+      <Input
+        type="text"
+        id="wing"
+        name="wing"
+        bind:value={$form.wing}
+        disabled={!canEdit}
+        placeholder="Optional"
+      />
+      {#if $errors.wing}
+        <p class="text-red-500 text-sm">{$errors.wing}</p>
+      {/if}
+    </div>
+  
+    <div class="space-y-2">
+      <Label for="status">Status</Label>
+      <Select.Root>
+        <Select.Trigger class="w-full" disabled={!canEdit}>
+          <Select.Value>{$form.status ?? 'Select status'}</Select.Value>
+        </Select.Trigger>
+        <Select.Content>
+          <Select.Item 
+            value="ACTIVE" 
+            on:click={() => form.update($form => ({ ...$form, status: 'ACTIVE' }))}
+          >
+            Active
+          </Select.Item>
+          <Select.Item 
+            value="INACTIVE" 
+            on:click={() => form.update($form => ({ ...$form, status: 'INACTIVE' }))}
+          >
+            Inactive
+          </Select.Item>
+          <Select.Item 
+            value="MAINTENANCE" 
+            on:click={() => form.update($form => ({ ...$form, status: 'MAINTENANCE' }))}
+          >
+            Maintenance
+          </Select.Item>
+        </Select.Content>
+      </Select.Root>
+      {#if $errors.status}
+        <p class="text-red-500 text-sm">{$errors.status}</p>
+      {/if}
+    </div>
+  
+    <div class="flex justify-end gap-2">
       {#if editMode}
-        <FloorForm
-          data={data}
-          properties={data.properties ?? []}
-          editMode={!!selectedFloor}
-          floor={selectedFloor}
-          on:floorAdded={handleFloorAdded}
-        />
+        {#if canDelete}
+          <Button
+            type="submit"
+            formaction="?/delete"
+            variant="destructive"
+            disabled={$submitting}
+          >
+            Delete
+          </Button>
+        {/if}
+        <Button variant="outline" on:click={() => dispatch('floorAdded')} disabled={$submitting}>
+          Cancel
+        </Button>
       {/if}
+      <Button type="submit" disabled={$submitting || !canEdit}>
+        {editMode ? 'Update' : 'Create'} Floor
+      </Button>
     </div>
-  </div>
-</div>
+  </form>

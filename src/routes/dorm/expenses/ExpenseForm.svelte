@@ -1,17 +1,14 @@
 <script lang="ts">
   import { superForm } from 'sveltekit-superforms/client';
   import { zodClient } from 'sveltekit-superforms/adapters';
-  import { z } from 'zod';
   import Button from '$lib/components/ui/button/button.svelte';
   import Input from '$lib/components/ui/input/input.svelte';
   import Label from '$lib/components/ui/label/label.svelte';
   import * as Select from '$lib/components/ui/select';
   import { createEventDispatcher } from 'svelte';
-  import { expenseSchema, type ExpenseSchema } from './formSchema';
-  import type { Database } from '$lib/database.types';
+  import { expenseSchema, type ExpenseSchema, type Property } from './formSchema';
   import type { SuperValidated } from 'sveltekit-superforms';
-import type {Property} from './formSchema';
-  // type Property = Database['public']['Tables']['properties']['Row'];
+
   type UserRole = 'super_admin' | 'property_admin' | 'staff' | 'frontdesk' | 'user';
 
   interface User {
@@ -19,8 +16,8 @@ import type {Property} from './formSchema';
   }
 
   interface PageData {
-    form?: SuperValidated<ExpenseSchema>;
-    expenses: any[];
+    form: SuperValidated<ExpenseSchema>;
+    expenses: ExpenseSchema[];
     properties: Property[];
     user: User;
   }
@@ -31,7 +28,7 @@ import type {Property} from './formSchema';
 
   const dispatch = createEventDispatcher();
 
-  const { form, errors, enhance, submitting, reset } = superForm(data.form, {
+  const { form, errors, enhance, submitting, reset } = superForm<ExpenseSchema>(data.form, {
     id: 'expenseForm',
     validators: zodClient(expenseSchema),
     resetForm: true,
