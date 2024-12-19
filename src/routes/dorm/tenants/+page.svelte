@@ -8,14 +8,36 @@
   import * as Select from "$lib/components/ui/select";
   import type { PageData } from './$types';
   import TenantList from './TenantList.svelte';
-  import { tenantSchema } from './schema';
+  import { tenantSchema, tenantStatusEnum } from './formSchema';
   import { browser } from '$app/environment';
 
   export let data: PageData;
 
+  const defaultEmergencyContact = {
+    name: '',
+    relationship: '',
+    phone: '',
+    email: '',
+    address: ''
+  };
+
   const { form, errors, enhance, reset, submit } = superForm(data.form, {
+    id: 'tenant-form',
     validators: zodClient(tenantSchema),
     resetForm: true,
+    defaultValues: {
+      property_id: 0,
+      room_id: 0,
+      user_id: '',
+      tenant_status: 'PENDING' as const,
+      contract_start_date: new Date().toISOString().split('T')[0],
+      contract_end_date: new Date().toISOString().split('T')[0],
+      monthly_rate: 0,
+      security_deposit: 0,
+      emergency_contact: null,
+      notes: null,
+      created_by: ''
+    },
     onResult: ({ result }) => {
       if (result.type === 'success') {
         reset();
@@ -26,6 +48,7 @@
 
   let editMode = false;
   let showForm = true;
+  let showEmergencyContact = false;
 
   function handleDeleteSuccess() {
     if (editMode) {
@@ -41,26 +64,75 @@
     }
   }
 
+  function updatePropertyId(selected: { value: string } | undefined) {
+    if (selected?.value) {
+      $form.property_id = parseInt(selected.value);
+      // Reset room when property changes
+      $form.room_id = 0;
+    }
+  }
+
+  function updateRoomId(selected: { value: string } | undefined) {
+    if (selected?.value) {
+      $form.room_id = parseInt(selected.value);
+    }
+  }
+
+  function updateUserId(selected: { value: string } | undefined) {
+    if (selected?.value) {
+      $form.user_id = selected.value;
+    }
+  }
+
+  function updateTenantStatus(selected: { value: string } | undefined) {
+    if (selected?.value) {
+      $form.tenant_status = selected.value as typeof tenantStatusEnum._type;
+    }
+  }
+
+  function toggleEmergencyContact() {
+    showEmergencyContact = !showEmergencyContact;
+    if (!showEmergencyContact) {
+      $form.emergency_contact = null;
+    } else if (!$form.emergency_contact) {
+      $form.emergency_contact = defaultEmergencyContact;
+    }
+  }
+
   function editTenant(tenant: any) {
     editMode = true;
     form.set({
       id: tenant.id,
-      name: tenant.name,
-      contact_number: tenant.contact_number,
-      email: tenant.email
+      property_id: tenant.property_id,
+      room_id: tenant.room_id,
+      user_id: tenant.user_id,
+      tenant_status: tenant.tenant_status,
+      contract_start_date: tenant.contract_start_date,
+      contract_end_date: tenant.contract_end_date,
+      monthly_rate: tenant.monthly_rate,
+      security_deposit: tenant.security_deposit,
+      emergency_contact: tenant.emergency_contact,
+      notes: tenant.notes,
+      created_by: tenant.created_by
     });
     showForm = true;
+    showEmergencyContact = !!tenant.emergency_contact;
   }
 
   function cancelEdit() {
     editMode = false;
     reset();
   }
+
+  $: tenants = data.tenants ?? [];
+  $: availableRooms = data.rooms?.filter(room => 
+    !$form.property_id || room.property_id === $form.property_id
+  ) ?? [];
 </script>
 
 <div class="container mx-auto p-4 flex">
   <TenantList 
-    tenants={data.tenants} 
+    tenants={tenants}
     on:edit={event => editTenant(event.detail)}
     on:deleteSuccess={handleDeleteSuccess}
   />
@@ -77,73 +149,235 @@
         {/if}
 
         <div class="space-y-2">
-          <Label for="name">Name</Label>
-          <div class:input-error={$errors.name}>
-            <Input
-              type="text"
-              id="name"
-              name="name"
-              bind:value={$form.name}
-            />
-          </div>
-          {#if $errors.name}
-            <span class="text-red-500 text-sm">{$errors.name}</span>
+          <Label for="property">Property</Label>
+          <Select.Root onSelectedChange={updatePropertyId}>
+            <Select.Trigger class="w-full">
+              <Select.Value placeholder="Select property" />
+            </Select.Trigger>
+            <Select.Content>
+              {#each data.properties ?? [] as property}
+                <Select.Item value={property.id.toString()}>
+                  {property.name}
+                </Select.Item>
+              {/each}
+            </Select.Content>
+          </Select.Root>
+          {#if $errors.property_id}
+            <span class="text-red-500 text-sm">{$errors.property_id}</span>
           {/if}
         </div>
 
         <div class="space-y-2">
-          <Label for="contact_number">Contact Number</Label>
+          <Label for="room">Room</Label>
+          <Select.Root onSelectedChange={updateRoomId}>
+            <Select.Trigger class="w-full" disabled={!$form.property_id}>
+              <Select.Value placeholder="Select room" />
+            </Select.Trigger>
+            <Select.Content>
+              {#each availableRooms as room}
+                <Select.Item value={room.id.toString()}>
+                  Room {room.room_number}
+                </Select.Item>
+              {/each}
+            </Select.Content>
+          </Select.Root>
+          {#if $errors.room_id}
+            <span class="text-red-500 text-sm">{$errors.room_id}</span>
+          {/if}
+        </div>
+
+        <div class="space-y-2">
+          <Label for="user">User</Label>
+          <Select.Root onSelectedChange={updateUserId}>
+            <Select.Trigger class="w-full">
+              <Select.Value placeholder="Select user" />
+            </Select.Trigger>
+            <Select.Content>
+              {#each data.users ?? [] as user}
+                <Select.Item value={user.id}>
+                  {user.full_name}
+                </Select.Item>
+              {/each}
+            </Select.Content>
+          </Select.Root>
+          {#if $errors.user_id}
+            <span class="text-red-500 text-sm">{$errors.user_id}</span>
+          {/if}
+        </div>
+
+        <div class="space-y-2">
+          <Label for="tenant_status">Status</Label>
+          <Select.Root onSelectedChange={updateTenantStatus}>
+            <Select.Trigger class="w-full">
+              <Select.Value placeholder="Select status" />
+            </Select.Trigger>
+            <Select.Content>
+              {#each Object.values(tenantStatusEnum.Values) as status}
+                <Select.Item value={status}>
+                  {status}
+                </Select.Item>
+              {/each}
+            </Select.Content>
+          </Select.Root>
+          {#if $errors.tenant_status}
+            <span class="text-red-500 text-sm">{$errors.tenant_status}</span>
+          {/if}
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div class="space-y-2">
+            <Label for="contract_start_date">Start Date</Label>
+            <Input
+              type="date"
+              id="contract_start_date"
+              name="contract_start_date"
+              bind:value={$form.contract_start_date}
+            />
+            {#if $errors.contract_start_date}
+              <span class="text-red-500 text-sm">{$errors.contract_start_date}</span>
+            {/if}
+          </div>
+
+          <div class="space-y-2">
+            <Label for="contract_end_date">End Date</Label>
+            <Input
+              type="date"
+              id="contract_end_date"
+              name="contract_end_date"
+              bind:value={$form.contract_end_date}
+            />
+            {#if $errors.contract_end_date}
+              <span class="text-red-500 text-sm">{$errors.contract_end_date}</span>
+            {/if}
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div class="space-y-2">
+            <Label for="monthly_rate">Monthly Rate</Label>
+            <Input
+              type="number"
+              id="monthly_rate"
+              name="monthly_rate"
+              bind:value={$form.monthly_rate}
+              min="0"
+              step="0.01"
+            />
+            {#if $errors.monthly_rate}
+              <span class="text-red-500 text-sm">{$errors.monthly_rate}</span>
+            {/if}
+          </div>
+
+          <div class="space-y-2">
+            <Label for="security_deposit">Security Deposit</Label>
+            <Input
+              type="number"
+              id="security_deposit"
+              name="security_deposit"
+              bind:value={$form.security_deposit}
+              min="0"
+              step="0.01"
+            />
+            {#if $errors.security_deposit}
+              <span class="text-red-500 text-sm">{$errors.security_deposit}</span>
+            {/if}
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <div class="flex justify-between items-center">
+            <Label>Emergency Contact</Label>
+            <Button type="button" variant="outline" on:click={toggleEmergencyContact}>
+              {showEmergencyContact ? 'Hide' : 'Show'}
+            </Button>
+          </div>
+
+          {#if showEmergencyContact && $form.emergency_contact}
+            <div class="space-y-4 border p-4 rounded">
+              <div class="space-y-2">
+                <Label for="emergency_contact_name">Name</Label>
+                <Input
+                  type="text"
+                  id="emergency_contact_name"
+                  bind:value={$form.emergency_contact.name}
+                />
+              </div>
+
+              <div class="space-y-2">
+                <Label for="emergency_contact_relationship">Relationship</Label>
+                <Input
+                  type="text"
+                  id="emergency_contact_relationship"
+                  bind:value={$form.emergency_contact.relationship}
+                />
+              </div>
+
+              <div class="space-y-2">
+                <Label for="emergency_contact_phone">Phone</Label>
+                <Input
+                  type="tel"
+                  id="emergency_contact_phone"
+                  bind:value={$form.emergency_contact.phone}
+                />
+              </div>
+
+              <div class="space-y-2">
+                <Label for="emergency_contact_email">Email</Label>
+                <Input
+                  type="email"
+                  id="emergency_contact_email"
+                  bind:value={$form.emergency_contact.email}
+                />
+              </div>
+
+              <div class="space-y-2">
+                <Label for="emergency_contact_address">Address</Label>
+                <Input
+                  type="text"
+                  id="emergency_contact_address"
+                  bind:value={$form.emergency_contact.address}
+                />
+              </div>
+            </div>
+          {/if}
+          {#if $errors.emergency_contact}
+            <span class="text-red-500 text-sm">{$errors.emergency_contact}</span>
+          {/if}
+        </div>
+
+        <div class="space-y-2">
+          <Label for="notes">Notes</Label>
           <Input
             type="text"
-            id="contact_number"
-            name="contact_number"
-            bind:value={$form.contact_number}
+            id="notes"
+            name="notes"
+            bind:value={$form.notes}
           />
-        </div>
-
-        <div class="space-y-2">
-          <Label for="email">Email</Label>
-          <div class:input-error={$errors.email}>
-            <Input
-              type="email"
-              id="email"
-              name="email"
-              bind:value={$form.email}
-            />
-          </div>
-          {#if $errors.email}
-            <span class="text-red-500 text-sm">{$errors.email}</span>
+          {#if $errors.notes}
+            <span class="text-red-500 text-sm">{$errors.notes}</span>
           {/if}
         </div>
 
-        <div class="flex gap-2">
-          <Button type="submit" variant="default">
-            {editMode ? 'Update' : 'Add'} Tenant
-          </Button>
+        <div class="flex justify-end gap-2">
           {#if editMode}
-            <Button type="button" variant="destructive" on:click={cancelEdit}>
+            <Button type="button" variant="outline" on:click={cancelEdit}>
               Cancel
             </Button>
+            <Button type="submit" formaction="?/delete" variant="destructive">
+              Delete
+            </Button>
           {/if}
+          <Button type="submit">
+            {editMode ? 'Update' : 'Create'} Tenant
+          </Button>
         </div>
       </form>
     {:else}
-      <button class="w-full" on:click={toggleForm}>
-        <Button variant="outline">
-          Show Form
-        </Button>
-      </button>
+      <Button on:click={toggleForm}>
+        Show Form
+      </Button>
     {/if}
   </div>
-</div>
-
-<!-- Sticky Add Button -->
-<div class="fixed bottom-4 right-4">
-  <button class="rounded-full w-16 h-16 flex items-center justify-center text-2xl" on:click={toggleForm}>
-    <Button>
-      {showForm ? '×' : '+'}
-    </Button>
-  </button>
 </div>
 
 {#if browser}
