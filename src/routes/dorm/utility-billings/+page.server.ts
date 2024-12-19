@@ -1,171 +1,153 @@
-// src/routes/utility-billings/+page.server.ts
+import { error, fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
-import { fail } from '@sveltejs/kit';
-import { z } from 'zod';
-import { meters, readings, utilityBillings, leases, tenants, accounts, utilityBillingTypeEnum } from '$lib/db/schema';
 import { zod } from 'sveltekit-superforms/adapters';
+import type { PageServerLoad } from './$types';
+import type { Actions } from './$types';
+import type { Database } from '$lib/database.types';
+import { utilityBillingCreationSchema } from '$lib/schemas/utility-billings';
 
-const utilityBillingSchema = z.object({
-  startDate: z.coerce.date(),
-  endDate: z.coerce.date(),
-  type: z.enum(utilityBillingTypeEnum.enumValues),
-  costPerUnit: z.coerce.number().positive(),
-});
+export const load: PageServerLoad = async ({ locals: { supabase, getSession } }) => {
+  const session = await getSession();
+  if (!session) {
+    throw error(401, 'Unauthorized');
+  }
 
-const meterBillingSchema = z.object({
-  meterId: z.number(),
-  meterName: z.string(),
-  startReading: z.number(),
-  endReading: z.number(),
-  consumption: z.number(),
-  totalCost: z.number(),
-  tenantCount: z.coerce.number(),
-  perTenantCost: z.number(),
-});
-
-const utilityBillingCreationSchema = utilityBillingSchema.extend({
-  meterBillings: z.array(meterBillingSchema),
-});
-
-export const load = async () => {
   const form = await superValidate(zod(utilityBillingCreationSchema));
 
-  const allMeters = await db.select().from(meters);
-  const allReadings = await db
-    .select({
-      meterId: readings.meterId,
-      readingDate: readings.readingDate,
-      readingValue: readings.readingValue,
-    })
-    .from(readings);
+  // Get user's organization
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('org_id, role')
+    .eq('id', session.user.id)
+    .single();
 
-  const availableReadingDates = await db
-    .select({ readingDate: readings.readingDate })
-    .from(readings)
-    .groupBy(readings.readingDate)
-    .orderBy(readings.readingDate);
+  if (!profile?.org_id) {
+    throw error(400, 'User not associated with an organization');
+  }
 
-  const tenantCounts = await db
-    .select({
-      locationId: leases.locationId,
-      tenantCount: db.sql<number>`COUNT(DISTINCT ${tenants.id})`,
-    })
-    .from(leases)
-    .leftJoin(tenants, db.eq(tenants.locationId, leases.locationId))
-    .where(
-      db.and(
-        db.eq(leases.leaseStatus, 'ACTIVE'),
-        db.sql`${leases.leaseStartDate} <= CURRENT_DATE`,
-        db.sql`${leases.leaseEndDate} >= CURRENT_DATE`
+  // Check user role
+  const canAccessBillings = ['super_admin', 'property_admin', 'accountant', 'manager', 'frontdesk'].includes(profile.role);
+  if (!canAccessBillings) {
+    throw error(403, 'Insufficient permissions');
+  }
+
+  // Get all meters for the organization
+  const { data: meters, error: metersError } = await supabase
+    .from('meters')
+    .select(`
+      id,
+      name,
+      type,
+      room:rooms (
+        id,
+        name,
+        number
       )
-    )
-    .groupBy(leases.locationId);
+    `)
+    .eq('org_id', profile.org_id);
 
-  const meterTypes = utilityBillingTypeEnum.enumValues;
+  if (metersError) throw error(500, 'Error fetching meters');
+
+  // Get all readings
+  const { data: readings, error: readingsError } = await supabase
+    .from('readings')
+    .select(`
+      meter_id,
+      reading_date,
+      reading_value
+    `)
+    .eq('org_id', profile.org_id);
+
+  if (readingsError) throw error(500, 'Error fetching readings');
+
+  // Get available reading dates
+  const { data: availableReadingDates, error: datesError } = await supabase
+    .from('readings')
+    .select('reading_date')
+    .eq('org_id', profile.org_id)
+    .order('reading_date');
+
+  if (datesError) throw error(500, 'Error fetching reading dates');
+
+  // Get tenant counts per room
+  const { data: tenantCounts, error: tenantsError } = await supabase
+    .from('leases')
+    .select(`
+      room_id,
+      tenants:lease_tenants (
+        tenant:profiles (
+          id
+        )
+      )
+    `)
+    .eq('org_id', profile.org_id)
+    .eq('status', 'ACTIVE');
+
+  if (tenantsError) throw error(500, 'Error fetching tenant counts');
+
+  // Process tenant counts
+  const roomTenantCounts = tenantCounts.reduce((acc, lease) => {
+    acc[lease.room_id] = (lease.tenants?.length || 0);
+    return acc;
+  }, {} as Record<number, number>);
 
   return {
     form,
-    allMeters,
-    allReadings,
-    tenantCounts,
-    meterTypes,
-    availableReadingDates: availableReadingDates.map(d => d.readingDate),
+    meters,
+    readings,
+    availableReadingDates: availableReadingDates?.map(d => d.reading_date) || [],
+    roomTenantCounts,
+    org_id: profile.org_id,
+    role: profile.role
   };
 };
 
-export const actions = {
-  default: async ({ request }) => {
-    const form = await superValidate(request, zod(utilityBillingCreationSchema));
-    console.log('Received form data:', JSON.stringify(form.data, null, 2));
+export const actions: Actions = {
+  default: async ({ request, locals: { supabase, getSession } }) => {
+    const session = await getSession();
+    if (!session) {
+      throw error(401, 'Unauthorized');
+    }
 
+    const form = await superValidate(request, zod(utilityBillingCreationSchema));
     if (!form.valid) {
-      console.log('Form validation failed');
       return fail(400, { form });
     }
 
-    const { startDate, endDate, type, costPerUnit, meterBillings } = form.data;
+    // Get user's organization and role
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('org_id, role')
+      .eq('id', session.user.id)
+      .single();
 
-    // Begin a transaction
-    return await db.transaction(async (tx) => {
-      console.log('Starting database transaction');
+    if (!profile?.org_id) {
+      throw error(400, 'User not associated with an organization');
+    }
 
-      // Additional validation
-      if (!meterBillings || meterBillings.length === 0) {
-        console.log('No meter billings provided');
-        return fail(400, { form, message: "No meter billings provided" });
-      }
+    // Check if user has permission to create billings
+    const canCreateBillings = ['super_admin', 'property_admin', 'accountant'].includes(profile.role);
+    if (!canCreateBillings) {
+      throw error(403, 'Insufficient permissions to create utility billings');
+    }
 
-      // 1. Create the main utility billing record
-      const [utilityBilling] = await tx.insert(utilityBillings).values({
-        type,
-        billingDate: new Date().toISOString(),
-        dueDate: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString(),
-        createdBy: 1, // Assuming a default user ID for now
-      }).returning();
-      console.log('Created utility billing record:', utilityBilling);
-
-      let totalAccountsCreated = 0;
-      let totalBilledAmount = 0;
-
-      // 2. Process each meter billing
-      for (const meterBilling of meterBillings) {
-        console.log(`Processing meter billing for meter ${meterBilling.meterId}`);
-        // 3. Get active leases for the location associated with this meter
-        const activeLeases = await tx.select({
-          id: leases.id,
-          locationId: leases.locationId,
-        })
-        .from(leases)
-        .innerJoin(meters, db.eq(meters.locationId, leases.locationId))
-        .where(
-          db.and(
-            db.eq(meters.id, meterBilling.meterId),
-            db.eq(leases.leaseStatus, 'ACTIVE'),
-            db.sql`${leases.leaseStartDate} <= ${endDate}`,
-            db.sql`${leases.leaseEndDate} >= ${startDate}`
-          )
-        );
-        console.log(`Found ${activeLeases.length} active leases for meter ${meterBilling.meterId}`);
-
-        if (activeLeases.length === 0) {
-          console.log(`No active leases found for meter ${meterBilling.meterName}. Skipping account creation for this meter.`);
-          continue; // Skip this meter and continue with the next one
-        }
-
-        // 4. Calculate billing amount per lease
-        const costPerLease = meterBilling.totalCost / activeLeases.length;
-        console.log(`Cost per lease for meter ${meterBilling.meterId}: ${costPerLease}`);
-
-        // 5. Create accounts for each active lease
-        for (const lease of activeLeases) {
-          const [account] = await tx.insert(accounts).values({
-            leaseId: lease.id,
-            type: 'UTILITIES',
-            category: 'RECEIVABLE',
-            amount: costPerLease,
-            dateIssued: new Date().toISOString(),
-            dueOn: utilityBilling.dueDate,
-            utilityBillingId: utilityBilling.id,
-            createdBy: 1, // Assuming a default user ID for now
-          }).returning();
-          totalAccountsCreated++;
-          totalBilledAmount += costPerLease;
-          console.log(`Created account for lease ${lease.id}:`, account);
-        }
-      }
-
-      console.log('Transaction completed successfully');
-      console.log(`Total accounts created: ${totalAccountsCreated}`);
-      console.log(`Total billed amount: ${totalBilledAmount}`);
-      
-      return { 
-        form,
-        // success,
-        summary: {
-          totalAccountsCreated,
-          totalBilledAmount
-        }
-      };
+    const { data, error: billingError } = await supabase.rpc('create_utility_billing', {
+      p_start_date: form.data.start_date,
+      p_end_date: form.data.end_date,
+      p_type: form.data.type,
+      p_cost_per_unit: form.data.cost_per_unit,
+      p_org_id: profile.org_id,
+      p_meter_billings: form.data.meter_billings
     });
+
+    if (billingError) {
+      console.error('Error creating utility billing:', billingError);
+      return fail(500, {
+        form,
+        error: 'Failed to create utility billing. Please try again.'
+      });
+    }
+
+    return { form };
   }
 };

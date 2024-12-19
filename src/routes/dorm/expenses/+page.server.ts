@@ -4,7 +4,7 @@ import { fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { expenseSchema } from './formSchema';
-import { supabase } from '$lib/supabase';
+import { supabase } from '$lib/supabaseClient';
 
 export const load = async ({ locals }) => {
   const [{ data: expenses }, { data: properties }] = await Promise.all([

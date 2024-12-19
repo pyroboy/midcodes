@@ -4,7 +4,7 @@ import { fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { leaseSchema } from './formSchema';
-import { supabase } from '$lib/supabase';
+import { supabase } from '$lib/supabaseClient';
 
 export const load = async ({ locals }) => {
   const session = await locals.getSession();
@@ -121,15 +121,17 @@ export const actions = {
       const { data: lease, error: leaseError } = await supabase
         .from('leases')
         .insert({
-          locationId: form.data.locationId,
-          leaseType: form.data.leaseType,
-          leaseStatus: form.data.leaseStatus,
-          leaseStartDate: form.data.leaseStartDate,
-          leaseEndDate: form.data.leaseEndDate,
-          rentAmount: form.data.rentAmount,
-          securityDeposit: form.data.securityDeposit,
-          balance: form.data.balance,
-          notes: form.data.notes
+          location_id: form.data.locationId,
+          lease_type: form.data.leaseType,
+          lease_status: form.data.leaseStatus,
+          lease_start_date: form.data.leaseStartDate,
+          lease_end_date: form.data.leaseEndDate,
+          lease_terminate_date: form.data.leaseTerminateDate,
+          lease_terms_month: form.data.leaseTermsMonth,
+          lease_security_deposit: form.data.leaseSecurityDeposit,
+          lease_rent_rate: form.data.leaseRentRate,
+          lease_notes: form.data.leaseNotes,
+          created_by: form.data.createdBy
         })
         .select()
         .single();
@@ -216,20 +218,24 @@ export const actions = {
         if (newLocationError) throw newLocationError;
       }
 
-      const { error: leaseError } = await supabase
+      const { data: lease, error: leaseError } = await supabase
         .from('leases')
         .update({
-          locationId: form.data.locationId,
-          leaseType: form.data.leaseType,
-          leaseStatus: form.data.leaseStatus,
-          leaseStartDate: form.data.leaseStartDate,
-          leaseEndDate: form.data.leaseEndDate,
-          rentAmount: form.data.rentAmount,
-          securityDeposit: form.data.securityDeposit,
-          balance: form.data.balance,
-          notes: form.data.notes
+          location_id: form.data.locationId,
+          lease_type: form.data.leaseType,
+          lease_status: form.data.leaseStatus,
+          lease_start_date: form.data.leaseStartDate,
+          lease_end_date: form.data.leaseEndDate,
+          lease_terminate_date: form.data.leaseTerminateDate,
+          lease_terms_month: form.data.leaseTermsMonth,
+          lease_security_deposit: form.data.leaseSecurityDeposit,
+          lease_rent_rate: form.data.leaseRentRate,
+          lease_notes: form.data.leaseNotes,
+          updated_by: session.user.id
         })
-        .eq('id', form.data.id);
+        .eq('id', form.data.id)
+        .select()
+        .single();
 
       if (leaseError) throw leaseError;
 

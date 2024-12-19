@@ -1,15 +1,43 @@
 <script lang="ts">
   import MeterForm from './MeterForm.svelte';
+  import type { PageData } from './$types';
+  import type { z } from 'zod';
+  import { meterSchema } from './formSchema';
   import * as Card from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
-  import Button from '$lib/components/ui/button/button.svelte';
+  import { Button } from '$lib/components/ui/button';
 
-  export let data;
+  type Meter = z.infer<typeof meterSchema> & {
+    room?: {
+      id: number;
+      room_number: string;
+      floor?: {
+        floor_number: string;
+        wing?: string;
+        property?: {
+          name: string;
+        };
+      };
+    };
+    created_by_user?: {
+      full_name: string;
+    };
+    updated_by_user?: {
+      full_name: string;
+    };
+    readings?: {
+      id: number;
+      reading_value: number;
+      reading_date: string;
+    }[];
+  };
+
+  export let data: PageData;
 
   let showForm = false;
-  let selectedMeter = undefined;
+  let selectedMeter: Meter | undefined = undefined;
 
-  function handleMeterClick(meter) {
+  function handleMeterClick(meter: Meter) {
     if (data.isAdminLevel || data.isUtility) {
       selectedMeter = meter;
       showForm = true;
@@ -21,44 +49,51 @@
     selectedMeter = undefined;
   }
 
-  function getStatusVariant(status: string) {
+  function getStatusVariant(status: string): 'default' | 'destructive' | 'outline' | 'secondary' {
     switch (status) {
       case 'ACTIVE':
-        return 'success';
+        return 'secondary';
       case 'INACTIVE':
-        return 'secondary';
+        return 'destructive';
       case 'MAINTENANCE':
-        return 'warning';
+        return 'outline';
       default:
-        return 'secondary';
+        return 'default';
     }
   }
 
-  function getTypeVariant(type: string) {
+  function getTypeVariant(type: string): 'default' | 'destructive' | 'outline' | 'secondary' {
     switch (type) {
       case 'WATER':
-        return 'info';
-      case 'ELECTRICITY':
-        return 'warning';
-      case 'GAS':
-        return 'destructive';
-      default:
         return 'secondary';
+      case 'ELECTRICITY':
+        return 'destructive';
+      case 'GAS':
+        return 'outline';
+      default:
+        return 'default';
     }
+  }
+
+  function formatReading(value: number): string {
+    return value.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
   }
 </script>
 
 <div class="space-y-4">
   {#if !showForm}
     <div class="flex justify-between items-center">
-      <h1 class="text-2xl font-bold">Utility Meters</h1>
+      <h1 class="text-2xl font-bold">Meters</h1>
       {#if data.isAdminLevel || data.isUtility}
         <Button on:click={() => showForm = true}>Add Meter</Button>
       {/if}
     </div>
 
     <div class="grid gap-4">
-      {#each data.meters as meter}
+      {#each data.meters || [] as meter}
         <Card.Root 
           class="cursor-pointer {(data.isAdminLevel || data.isUtility) ? 'hover:bg-gray-50' : ''}"
           on:click={() => handleMeterClick(meter)}
@@ -75,36 +110,55 @@
                 </Badge>
               </span>
               <span class="text-sm font-normal">
-                Room {meter.room?.room_number}
-                {#if meter.room?.floor}
-                  - Floor {meter.room.floor.floor_number}
-                  {#if meter.room.floor.wing}
-                    Wing {meter.room.floor.wing}
+                {#if meter.room}
+                  Room {meter.room.room_number}
+                  {#if meter.room.floor}
+                    - Floor {meter.room.floor.floor_number}
+                    {#if meter.room.floor.wing}
+                      Wing {meter.room.floor.wing}
+                    {/if}
+                    {#if meter.room.floor.property}
+                      ({meter.room.floor.property.name})
+                    {/if}
                   {/if}
+                {:else}
+                  Unknown Room
                 {/if}
               </span>
             </Card.Title>
             <Card.Description>
               <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                 <div>
-                  <strong>Property:</strong> {meter.room?.floor?.property?.name}
+                  <strong>Initial Reading:</strong> {formatReading(meter.initial_reading)}
                 </div>
                 <div>
-                  <strong>Initial Reading:</strong> {meter.initial_reading}
+                  <strong>Unit Rate:</strong> ₱{formatReading(meter.unit_rate)}/unit
                 </div>
+                {#if meter.readings && meter.readings.length > 0}
+                  <div>
+                    <strong>Latest Reading:</strong> {formatReading(meter.readings[0].reading_value)}
+                    ({new Date(meter.readings[0].reading_date).toLocaleDateString()})
+                  </div>
+                  <div>
+                    <strong>Total Readings:</strong> {meter.readings.length}
+                  </div>
+                {/if}
+                {#if meter.notes}
+                  <div class="col-span-2">
+                    <strong>Notes:</strong> {meter.notes}
+                  </div>
+                {/if}
                 <div>
-                  <strong>Unit Rate:</strong> ₱{meter.unit_rate.toFixed(2)}
+                  <strong>Created By:</strong> {meter.created_by_user?.full_name || 'Unknown'}
                 </div>
+                {#if meter.updated_by_user}
+                  <div>
+                    <strong>Last Updated By:</strong> {meter.updated_by_user.full_name}
+                  </div>
+                {/if}
               </div>
             </Card.Description>
           </Card.Header>
-          {#if meter.notes}
-            <Card.Content>
-              <div class="text-sm">
-                <strong>Notes:</strong> {meter.notes}
-              </div>
-            </Card.Content>
-          {/if}
         </Card.Root>
       {/each}
     </div>
@@ -121,8 +175,6 @@
 
     <MeterForm
       {data}
-      rooms={data.rooms}
-      editMode={!!selectedMeter}
       meter={selectedMeter}
       on:meterAdded={handleMeterAdded}
     />

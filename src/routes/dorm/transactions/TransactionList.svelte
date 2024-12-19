@@ -1,7 +1,6 @@
 <!-- src/routes/transactions/TransactionList.svelte -->
 <script lang="ts">
     import * as Table from "$lib/components/ui/table/index.js";
-    import type { Transactions } from '$lib/db/schema';
   
     export let transactions: Transactions[];
   </script>

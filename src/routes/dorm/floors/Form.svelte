@@ -6,26 +6,34 @@
   import Label from '$lib/components/ui/label/label.svelte';
   import * as Select from '$lib/components/ui/select';
   import { createEventDispatcher } from 'svelte';
-  import type { FloorSchema } from './formSchema';
+  import { floorSchema, type FloorSchema } from './formSchema';
+  import type { PageData } from './$types';
+  import type { Database } from '$lib/database.types';
+  import type { SuperValidated } from 'sveltekit-superforms';
 
-  export let data: any;
-  export let properties: any[] = [];
+  type Property = Database['public']['Tables']['properties']['Row'];
+  type Floor = Database['public']['Tables']['floors']['Row'] & {
+    property: Pick<Property, 'name'>;
+  };
+
+  interface FormData extends SuperValidated<typeof floorSchema> {
+    id?: number;
+    property_id: number;
+    floor_number: number;
+    wing?: string;
+    status: 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE';
+  }
+
+  export let data: PageData;
+  export let properties: Property[] = [];
   export let editMode = false;
-  export let floor: FloorSchema | undefined = undefined;
+  export let floor: Floor | undefined = undefined;
 
   const dispatch = createEventDispatcher();
 
-  $: {
-    if (floor && editMode) {
-      form.data.set({
-        ...floor
-      });
-    }
-  }
-
-  const { form, errors, enhance, submitting, reset } = superForm(data, {
+  const { form, errors, enhance, submitting, reset } = superForm<FormData>(data.form, {
     id: 'floorForm',
-    validators: zodClient(),
+    validators: zodClient(floorSchema),
     resetForm: true,
     taintedMessage: null,
     onResult: ({ result }) => {
@@ -35,6 +43,19 @@
       }
     },
   });
+
+  $: {
+    if (floor && editMode) {
+      form.update($form => ({
+        ...$form,
+        id: floor.id,
+        property_id: floor.property_id,
+        floor_number: floor.floor_number,
+        wing: floor.wing,
+        status: floor.status
+      }));
+    }
+  }
 
   $: canEdit = data.isAdminLevel || data.isStaffLevel;
   $: canDelete = data.isAdminLevel;
@@ -50,13 +71,13 @@
 
   <div class="space-y-2">
     <Label for="property_id">Property</Label>
-    <Select.Root bind:value={$form.property_id} disabled={!canEdit}>
+    <Select.Root defaultValue={String($form.property_id)} onValueChange={(value: string) => form.update($form => ({ ...$form, property_id: Number(value) }))} disabled={!canEdit}>
       <Select.Trigger class="w-full">
         <Select.Value placeholder="Select a property" />
       </Select.Trigger>
       <Select.Content>
         {#each properties as property}
-          <Select.Item value={property.id}>{property.name}</Select.Item>
+          <Select.Item value={String(property.id)}>{property.name}</Select.Item>
         {/each}
       </Select.Content>
     </Select.Root>
@@ -95,7 +116,7 @@
 
   <div class="space-y-2">
     <Label for="status">Status</Label>
-    <Select.Root bind:value={$form.status} disabled={!canEdit}>
+    <Select.Root defaultValue={$form.status} onValueChange={(value: 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE') => form.update($form => ({ ...$form, status: value }))} disabled={!canEdit}>
       <Select.Trigger class="w-full">
         <Select.Value placeholder="Select status" />
       </Select.Trigger>
@@ -122,15 +143,12 @@
           Delete
         </Button>
       {/if}
-      {#if canEdit}
-        <Button type="submit" disabled={$submitting}>
-          Update
-        </Button>
-      {/if}
-    {:else if canEdit}
-      <Button type="submit" disabled={$submitting}>
-        Create
+      <Button variant="outline" on:click={() => dispatch('floorAdded')} disabled={$submitting}>
+        Cancel
       </Button>
     {/if}
+    <Button type="submit" disabled={$submitting || !canEdit}>
+      {editMode ? 'Update' : 'Create'} Floor
+    </Button>
   </div>
 </form>

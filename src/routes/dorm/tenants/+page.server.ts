@@ -4,7 +4,7 @@ import { fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { tenantSchema } from './formSchema';
-import { supabase } from '$lib/supabase';
+import { supabase } from '$lib/supabaseClient';
 
 export const load = async ({ locals }) => {
   const session = await locals.getSession();

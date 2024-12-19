@@ -1,99 +1,189 @@
-// src/routes/transactions/+page.server.ts
-
-import { db } from '$lib/db/db';
-import { transactions, accounts, leases, transactionAccounts } from '$lib/db/schema';
-import { fail } from '@sveltejs/kit';
+import { error, fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
-import { z } from 'zod';
-import { zod } from "sveltekit-superforms/adapters";
+import { zod } from 'sveltekit-superforms/adapters';
+import type { PageServerLoad } from './$types';
+import type { Actions } from './$types';
+import type { Database } from '$lib/database.types';
+import { transactionSchema, accountSchema, formSchema } from '$lib/schemas/transactions';
+import { supabase } from '$lib/supabaseClient';
 
-const transactionInsertSchema = {
-  id: z.number().optional(),
-  totalAccountCharges: z.number(),
-  amount: z.number(),
-  change: z.number(),
-  transactionDate: z.string(),
-  paidBy: z.string().optional(),
-  receivedBy: z.string().optional(),
-  createdBy: z.number(),
-  updatedBy: z.number().optional(),
-  transactionType: z.enum(['CASH', 'BANK', 'GCASH', 'OTHER']),
-  financialPeriodId: z.number().optional(),
-};
-
-const accountSchema = z.object({
-  id: z.number(),
-  leaseId: z.number(),
-  type: z.enum(['RENT', 'UTILITIES', 'SECURITY_DEPOSIT', 'PENALTY_RENT', 'PENALTY_UTILITY', 'OVERDUE_RENT', 'OVERDUE_UTILITIES', 'MAINTENANCE', 'SERVICE_FEE']),
-  amount: z.number(),
-  balance: z.number().nullable(),
-  dateIssued: z.string(),
-  dueOn: z.string().nullable(),
-});
-
-const formSchema = z.object({
-  ...transactionInsertSchema,
-  selectedAccounts: z.array(accountSchema),
-});
-
-export const load = async () => {
-  const accountsData = await db.query.accounts.findMany({
-    with: {
-      lease: true
-    }
-  });
+export const load: PageServerLoad = async ({ locals }) => {
+  const session = await locals.getSession();
+  if (!session) {
+    throw error(401, 'Unauthorized');
+  }
 
   const form = await superValidate(zod(formSchema));
-  const recentTransactions = await db
-  .select()
-  .from(transactions)
-  .orderBy(desc(transactions.transactionDate))
-  .limit(10);
+
+  // Get user's organization and role
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('org_id, role')
+    .eq('id', session.user.id)
+    .single();
+
+  if (!profile?.org_id) {
+    throw error(400, 'User not associated with an organization');
+  }
+
+  // Check if user has permission to access transactions
+  const canAccessTransactions = ['super_admin', 'property_admin', 'accountant', 'manager', 'frontdesk'].includes(profile.role);
+  if (!canAccessTransactions) {
+    throw error(403, 'Insufficient permissions to access transactions');
+  }
+
+  // Get all accounts for the organization
+  const { data: accounts, error: accountsError } = await supabase
+    .from('accounts')
+    .select(`
+      id,
+      amount,
+      balance,
+      type,
+      date_issued,
+      due_date,
+      lease:leases (
+        id,
+        lease_name,
+        room:rooms (
+          id,
+          name,
+          number
+        ),
+        tenant:lease_tenants (
+          tenant:profiles (
+            id,
+            email
+          )
+        )
+      )
+    `)
+    .eq('org_id', profile.org_id)
+    .eq('status', 'PENDING');
+
+  if (accountsError) {
+    throw error(500, 'Error fetching accounts');
+  }
+
+  // Get transactions for the organization
+  const { data: transactions, error: transactionsError } = await supabase
+    .from('transactions')
+    .select(`
+      id,
+      transaction_date,
+      transaction_type,
+      total_charges,
+      amount_paid,
+      change_amount,
+      paid_by,
+      notes,
+      status,
+      accounts:transaction_accounts (
+        account:accounts (
+          id,
+          type,
+          amount,
+          balance
+        )
+      )
+    `)
+    .eq('org_id', profile.org_id)
+    .order('transaction_date', { ascending: false });
+
+  if (transactionsError) {
+    throw error(500, 'Error fetching transactions');
+  }
 
   return {
-    transactions: recentTransactions,
-    accounts: accountsData,
-    form
+    form,
+    accounts,
+    transactions,
+    org_id: profile.org_id,
+    role: profile.role
   };
 };
 
-export const actions = {
-  create: async ({ request }) => {
-    const form = await superValidate(request, zod(formSchema));
+export const actions: Actions = {
+  create: async ({ request, locals }) => {
+    const session = await locals.getSession();
+    if (!session) {
+      throw error(401, 'Unauthorized');
+    }
 
+    const form = await superValidate(request, zod(formSchema));
     if (!form.valid) {
       return fail(400, { form });
     }
 
-    try {
-      const { selectedAccounts, ...transactionData } = form.data;
-      
-      await db.transaction(async (trx) => {
-        const [insertedTransaction] = await trx.insert(transactions).values({
-          ...transactionData,
-          transactionDate: sql`${transactionData.transactionDate}::date`
-        }).returning();
+    // Get user's organization and role
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('org_id, role')
+      .eq('id', session.user.id)
+      .single();
 
-        await trx.insert(transactionAccounts).values(
-          selectedAccounts.map(account => ({
-            transactionId: insertedTransaction.id,
-            accountId: account.id
+    if (!profile?.org_id) {
+      throw error(400, 'User not associated with an organization');
+    }
+
+    // Check if user has permission to create transactions
+    const canCreateTransactions = ['super_admin', 'property_admin', 'accountant', 'frontdesk'].includes(profile.role);
+    if (!canCreateTransactions) {
+      throw error(403, 'Insufficient permissions to create transactions');
+    }
+
+    try {
+      const { selected_accounts, ...transactionData } = form.data;
+
+      // Start transaction
+      const { data: transaction, error: transactionError } = await supabase
+        .from('transactions')
+        .insert({
+          ...transactionData,
+          created_by: session.user.id,
+          received_by: session.user.id,
+          transaction_date: new Date(transactionData.transaction_date).toISOString()
+        })
+        .select()
+        .single();
+
+      if (transactionError) {
+        throw transactionError;
+      }
+
+      // Insert transaction accounts
+      const { error: accountsError } = await supabase
+        .from('transaction_accounts')
+        .insert(
+          selected_accounts.map(account => ({
+            transaction_id: transaction.id,
+            account_id: account.id,
+            amount: account.amount
           }))
         );
 
-        for (const account of selectedAccounts) {
-          if (account.balance !== null) {
-            await trx.update(accounts)
-              .set({ balance: account.balance - account.amount })
-              .where(eq(accounts.id, account.id));
+      if (accountsError) {
+        throw accountsError;
+      }
+
+      // Update account balances
+      for (const account of selected_accounts) {
+        if (account.balance !== null) {
+          const { error: updateError } = await supabase
+            .from('accounts')
+            .update({ balance: account.balance - account.amount })
+            .eq('id', account.id);
+
+          if (updateError) {
+            throw updateError;
           }
         }
-      });
+      }
+
+      return { form };
     } catch (error) {
       console.error('Error creating transaction:', error);
-      return fail(500, { form, error: 'Failed to create transaction' });
+      return fail(500, { form, message: 'Failed to create transaction' });
     }
-
-    return { form };
-  },
+  }
 };

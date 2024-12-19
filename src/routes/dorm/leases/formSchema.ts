@@ -14,7 +14,7 @@ export const leaseTypeEnum = z.enum([
   'ANNUAL'
 ]);
 
-export const schema = z.object({
+export const leaseSchema = z.object({
   id: z.number().optional(),
   tenantIds: z.array(z.number()).min(1, 'At least one tenant must be selected'),
   locationId: z.number().min(1, 'a Location must be selected'),
@@ -34,4 +34,4 @@ export const schema = z.object({
   createdBy: z.number().optional(),
 });
 
-export type FormSchema = typeof schema;
+export type FormSchema = typeof leaseSchema;

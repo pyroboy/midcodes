@@ -1,58 +1,84 @@
-// src/routes/overview/monthly/+page.server.ts
+import { error } from '@sveltejs/kit';
+import type { PageServerLoad } from './$types';
 
-import { db } from '$lib/db/db';
+export const load: PageServerLoad = async ({ locals: { supabase, getSession } }) => {
+  const session = await getSession();
+  if (!session) {
+    throw error(401, 'Unauthorized');
+  }
 
+  // Get user's profile and property assignment
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id, role, property:staff_property_id')
+    .eq('id', session.user.id)
+    .single();
 
+  if (!profile) {
+    throw error(400, 'Profile not found');
+  }
 
+  if (!profile.property && !['super_admin', 'property_admin'].includes(profile.role)) {
+    throw error(400, 'User not associated with a property');
+  }
 
-
-export async function load() {
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
-  const currentMonth = currentDate.getMonth() + 1; // JavaScript months are 0-indexed
+  const currentMonth = currentDate.getMonth() + 1;
 
-  const result = await db.query.locations.findMany({
-    // where: eq(locations.locationStatus, 'OCCUPIED'),
-    orderBy: [asc(locations.locationFloorLevel)],
-    with: {
-      leases: {
-        where: eq(leases.leaseStatus, 'ACTIVE'),
-        with: {
-          leaseTenants: {
-            with: {
-              tenant: true
-            }
-          }
-        }
-      }
-    }
-  });
+  // Get rooms with active leases and tenants
+  const { data: rooms, error: roomsError } = await supabase
+    .from('rooms')
+    .select(`
+      id,
+      name,
+      number,
+      floor_number,
+      room_status,
+      property_id,
+      leases!room_id(
+        id,
+        lease_status,
+        lease_start_date,
+        lease_end_date,
+        lease_rent_rate,
+        lease_tenants!lease_id(
+          tenant:tenants!tenant_id(
+            id,
+            email,
+            first_name,
+            last_name
+          )
+        )
+      )
+    `)
+    .eq('property_id', profile.property)
+    .eq('leases.lease_status', 'ACTIVE')
+    .order('floor_number');
 
-  // Generate an array of the last 12 months
+  if (roomsError) throw error(500, 'Error fetching rooms');
+
+  // Generate array of last 12 months
   const months = Array.from({ length: 12 }, (_, i) => {
     const d = new Date(currentYear, currentMonth - i - 1, 1);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   }).reverse();
 
-  // Fetch balances for each tenant for the last 12 months
-  const balances = await db.select({
-    tenantId: tenants.id,
-    month: sql<string>`DATE_TRUNC('month', ${accounts.dateIssued})::text`,
-    balance: sql<number>`SUM(${accounts.balance})`
-  })
-    .from(accounts)
-    .innerJoin(leases, eq(accounts.leaseId, leases.id))
-    .innerJoin(tenants, eq(leases.id, tenants.mainleaseId))
-    .where(and(
-      eq(leases.leaseStatus, 'ACTIVE'),
-      sql`${accounts.dateIssued} >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '11 months')`
-    ))
-    .groupBy(tenants.id, sql`DATE_TRUNC('month', ${accounts.dateIssued})`)
-    .orderBy(tenants.id, sql`DATE_TRUNC('month', ${accounts.dateIssued})`);
+  // Get balances for each tenant for last 12 months
+  const { data: balances, error: balancesError } = await supabase
+    .rpc('get_tenant_monthly_balances', {
+      p_property_id: profile.property,
+      p_months_back: 12
+    });
+
+  if (balancesError) throw error(500, 'Error fetching balances');
 
   return {
-    locations: result,
+    rooms,
     months,
-    balances
+    balances,
+    isAdminLevel: ['super_admin', 'property_admin'].includes(profile.role),
+    isStaffLevel: ['property_manager', 'property_maintenance'].includes(profile.role),
+    role: profile.role
   };
-}
+};

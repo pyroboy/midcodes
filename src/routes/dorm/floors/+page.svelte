@@ -4,13 +4,21 @@
   import * as Card from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
   import Alert from '$lib/components/ui/alert/alert.svelte';
+  import type { PageData } from './$types';
+  import type { Database } from '$lib/database.types';
 
-  export let data;
+  type Floor = Database['public']['Tables']['floors']['Row'] & {
+    property: {
+      name: string;
+    };
+  };
 
-  let selectedFloor: any = undefined;
+  export let data: PageData;
+
+  let selectedFloor: Floor | undefined = undefined;
   let editMode = false;
 
-  function handleFloorClick(floor: any) {
+  function handleFloorClick(floor: Floor) {
     if (data.isAdminLevel || data.isStaffLevel) {
       selectedFloor = floor;
       editMode = true;
@@ -23,6 +31,7 @@
   }
 
   $: canAdd = data.isAdminLevel || data.isStaffLevel;
+  $: floors = data.floors as Floor[] || [];
 </script>
 
 <div class="container mx-auto p-4 space-y-8">
@@ -51,7 +60,7 @@
       </div>
 
       <div class="grid gap-4">
-        {#each data.floors as floor}
+        {#each floors as floor (floor.id)}
           <Card.Root 
             class="cursor-pointer {(data.isAdminLevel || data.isStaffLevel) ? 'hover:bg-gray-50' : ''}" 
             on:click={() => handleFloorClick(floor)}
@@ -70,9 +79,9 @@
             <Card.Content>
               <Badge
                 variant={floor.status === 'ACTIVE'
-                  ? 'success'
+                  ? 'default'
                   : floor.status === 'MAINTENANCE'
-                  ? 'warning'
+                  ? 'secondary'
                   : 'destructive'}
               >
                 {floor.status}
@@ -91,7 +100,7 @@
         </h2>
         <Form
           {data}
-          properties={data.properties}
+          properties={data.properties ?? []}
           {editMode}
           floor={selectedFloor}
           on:floorAdded={handleFloorAdded}

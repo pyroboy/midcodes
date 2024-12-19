@@ -1,197 +1,170 @@
 <script lang="ts">
   import { superForm } from 'sveltekit-superforms/client';
-  import { zodClient } from 'sveltekit-superforms/adapters';
-  import Button from '$lib/components/ui/button/button.svelte';
-  import Input from '$lib/components/ui/input/input.svelte';
-  import Label from '$lib/components/ui/label/label.svelte';
+  import type { SuperValidated } from 'sveltekit-superforms';
+  import type { ZodValidation } from 'sveltekit-superforms/adapters';
+  import * as Alert from '$lib/components/ui/alert';
   import * as Select from '$lib/components/ui/select';
-  import { createEventDispatcher } from 'svelte';
-  import type { MeterSchema } from './formSchema';
-  import Textarea from '$lib/components/ui/textarea/textarea.svelte';
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
+  import { utilityTypeEnum, meterStatusEnum, type MeterSchema } from './formSchema';
+  import type { Database } from '$lib/database.types';
 
-  export let data: any;
-  export let rooms: any[] = [];
-  export let editMode = false;
-  export let meter: MeterSchema | undefined = undefined;
+  type Room = Database['public']['Tables']['rooms']['Row'] & {
+    floor: { floor_number: number; wing: string | null } | null;
+  };
 
-  const dispatch = createEventDispatcher();
+  export let form: SuperValidated<ZodValidation<MeterSchema>>;
+  export let rooms: Room[];
 
-  $: {
-    if (meter && editMode) {
-      form.data.set({
-        ...meter
-      });
-    }
-  }
-
-  const { form, errors, enhance, submitting, reset } = superForm(data, {
-    id: 'meterForm',
-    validators: zodClient(),
+  const { enhance, errors, delayed, message } = superForm(form, {
     resetForm: true,
-    taintedMessage: null,
-    onResult: ({ result }) => {
-      if (result.type === 'success') {
-        dispatch('meterAdded');
-        reset();
+    onUpdated: ({ form }) => {
+      if (form.data.id) {
+        dispatch('success');
       }
-    },
+    }
   });
 
-  $: canEdit = data.isAdminLevel || data.isUtility;
-  $: canDelete = data.isAdminLevel;
+  import { createEventDispatcher } from 'svelte';
+  const dispatch = createEventDispatcher<{
+    success: void;
+  }>();
+
+  function getRoomLabel(room: Room): string {
+    const floor = room.floor;
+    if (!floor) return `Room ${room.name}`;
+    return `Room ${room.name} (Floor ${floor.floor_number}${floor.wing ? ` Wing ${floor.wing}` : ''})`;
+  }
 </script>
 
-<form
-  method="POST"
-  action={editMode ? "?/update" : "?/create"}
-  use:enhance
-  class="space-y-4 p-4 bg-white rounded-lg shadow"
->
-  <input type="hidden" name="id" bind:value={$form.id} />
-
-  <div class="space-y-2">
-    <Label for="room_id">Room</Label>
-    <Select.Root bind:value={$form.room_id} disabled={!canEdit}>
-      <Select.Trigger class="w-full">
-        <Select.Value placeholder="Select a room" />
-      </Select.Trigger>
-      <Select.Content>
-        {#each rooms as room}
-          <Select.Item value={room.id}>
-            Room {room.room_number}
-            {#if room.floor}
-              - Floor {room.floor.floor_number}
-              {#if room.floor.wing}
-                Wing {room.floor.wing}
-              {/if}
-              ({room.floor.property?.name})
-            {/if}
-          </Select.Item>
-        {/each}
-      </Select.Content>
-    </Select.Root>
-    {#if $errors.room_id}
-      <p class="text-red-500 text-sm">{$errors.room_id}</p>
+<form method="POST" use:enhance>
+  <div class="space-y-4">
+    {#if $message}
+      <Alert.Root>
+        <Alert.Title>{$message}</Alert.Title>
+      </Alert.Root>
     {/if}
-  </div>
 
-  <div class="space-y-2">
-    <Label for="type">Type</Label>
-    <Select.Root bind:value={$form.type} disabled={!canEdit}>
-      <Select.Trigger class="w-full">
-        <Select.Value placeholder="Select utility type" />
-      </Select.Trigger>
-      <Select.Content>
-        <Select.Item value="WATER">Water</Select.Item>
-        <Select.Item value="ELECTRICITY">Electricity</Select.Item>
-        <Select.Item value="GAS">Gas</Select.Item>
-      </Select.Content>
-    </Select.Root>
-    {#if $errors.type}
-      <p class="text-red-500 text-sm">{$errors.type}</p>
-    {/if}
-  </div>
+    <div>
+      <Label for="room_id">Room</Label>
+      <Select.Root
+        selected={{ 
+          label: rooms.find(r => r.id === $form.room_id) ? getRoomLabel(rooms.find(r => r.id === $form.room_id)!) : 'Select room',
+          value: $form.room_id?.toString() ?? ''
+        }}
+        onSelectedChange={(s) => {
+          if (s) {
+            $form.room_id = parseInt(s.value);
+          }
+        }}
+      >
+        <Select.Trigger class="w-full">
+          <Select.Value placeholder="Select room" />
+        </Select.Trigger>
+        <Select.Content>
+          {#each rooms as room}
+            <Select.Item value={room.id.toString()}>{getRoomLabel(room)}</Select.Item>
+          {/each}
+        </Select.Content>
+      </Select.Root>
+      {#if $errors.room_id}<span class="text-red-500">{$errors.room_id}</span>{/if}
+    </div>
 
-  <div class="space-y-2">
-    <Label for="name">Meter Name</Label>
-    <Input
-      type="text"
-      id="name"
-      name="name"
-      bind:value={$form.name}
-      disabled={!canEdit}
-    />
-    {#if $errors.name}
-      <p class="text-red-500 text-sm">{$errors.name}</p>
-    {/if}
-  </div>
+    <div>
+      <Label for="type">Type</Label>
+      <Select.Root
+        selected={{ 
+          label: $form.type ?? 'Select type',
+          value: $form.type ?? ''
+        }}
+        onSelectedChange={(s) => {
+          if (s) {
+            $form.type = s.value as typeof utilityTypeEnum._type;
+          }
+        }}
+      >
+        <Select.Trigger class="w-full">
+          <Select.Value placeholder="Select type" />
+        </Select.Trigger>
+        <Select.Content>
+          {#each Object.values(utilityTypeEnum.enum) as type}
+            <Select.Item value={type}>{type}</Select.Item>
+          {/each}
+        </Select.Content>
+      </Select.Root>
+      {#if $errors.type}<span class="text-red-500">{$errors.type}</span>{/if}
+    </div>
 
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-    <div class="space-y-2">
+    <div>
+      <Label for="name">Name</Label>
+      <Input type="text" id="name" bind:value={$form.name} required />
+      {#if $errors.name}<span class="text-red-500">{$errors.name}</span>{/if}
+    </div>
+
+    <div>
       <Label for="initial_reading">Initial Reading</Label>
-      <Input
-        type="number"
-        id="initial_reading"
-        name="initial_reading"
-        bind:value={$form.initial_reading}
-        min="0"
-        step="0.01"
-        disabled={!canEdit}
+      <Input 
+        type="number" 
+        id="initial_reading" 
+        bind:value={$form.initial_reading} 
+        min="0" 
+        step="0.01" 
+        required 
       />
-      {#if $errors.initial_reading}
-        <p class="text-red-500 text-sm">{$errors.initial_reading}</p>
-      {/if}
+      {#if $errors.initial_reading}<span class="text-red-500">{$errors.initial_reading}</span>{/if}
     </div>
 
-    <div class="space-y-2">
+    <div>
       <Label for="unit_rate">Unit Rate</Label>
-      <Input
-        type="number"
-        id="unit_rate"
-        name="unit_rate"
-        bind:value={$form.unit_rate}
-        min="0"
-        step="0.01"
-        disabled={!canEdit}
+      <Input 
+        type="number" 
+        id="unit_rate" 
+        bind:value={$form.unit_rate} 
+        min="0" 
+        step="0.01" 
+        required 
       />
-      {#if $errors.unit_rate}
-        <p class="text-red-500 text-sm">{$errors.unit_rate}</p>
-      {/if}
+      {#if $errors.unit_rate}<span class="text-red-500">{$errors.unit_rate}</span>{/if}
     </div>
-  </div>
 
-  <div class="space-y-2">
-    <Label for="status">Status</Label>
-    <Select.Root bind:value={$form.status} disabled={!canEdit}>
-      <Select.Trigger class="w-full">
-        <Select.Value placeholder="Select status" />
-      </Select.Trigger>
-      <Select.Content>
-        <Select.Item value="ACTIVE">Active</Select.Item>
-        <Select.Item value="INACTIVE">Inactive</Select.Item>
-        <Select.Item value="MAINTENANCE">Maintenance</Select.Item>
-      </Select.Content>
-    </Select.Root>
-    {#if $errors.status}
-      <p class="text-red-500 text-sm">{$errors.status}</p>
-    {/if}
-  </div>
+    <div>
+      <Label for="status">Status</Label>
+      <Select.Root
+        selected={{ 
+          label: $form.status ?? 'Select status',
+          value: $form.status ?? ''
+        }}
+        onSelectedChange={(s) => {
+          if (s) {
+            $form.status = s.value as typeof meterStatusEnum._type;
+          }
+        }}
+      >
+        <Select.Trigger class="w-full">
+          <Select.Value placeholder="Select status" />
+        </Select.Trigger>
+        <Select.Content>
+          {#each Object.values(meterStatusEnum.enum) as status}
+            <Select.Item value={status}>{status}</Select.Item>
+          {/each}
+        </Select.Content>
+      </Select.Root>
+      {#if $errors.status}<span class="text-red-500">{$errors.status}</span>{/if}
+    </div>
 
-  <div class="space-y-2">
-    <Label for="notes">Notes</Label>
-    <Textarea
-      id="notes"
-      name="notes"
-      bind:value={$form.notes}
-      disabled={!canEdit}
-      rows="3"
-    />
-    {#if $errors.notes}
-      <p class="text-red-500 text-sm">{$errors.notes}</p>
-    {/if}
-  </div>
+    <div>
+      <Label for="notes">Notes</Label>
+      <Input type="text" id="notes" bind:value={$form.notes} />
+      {#if $errors.notes}<span class="text-red-500">{$errors.notes}</span>{/if}
+    </div>
 
-  <div class="flex justify-end space-x-2">
-    {#if editMode}
-      {#if canDelete}
-        <Button
-          type="submit"
-          formaction="?/delete"
-          variant="destructive"
-          disabled={$submitting}
-        >
-          Delete
-        </Button>
+    <Button type="submit" disabled={$delayed}>
+      {#if $delayed}
+        Saving...
+      {:else}
+        Save Meter
       {/if}
-      {#if canEdit}
-        <Button type="submit" disabled={$submitting}>
-          Update
-        </Button>
-      {/if}
-    {:else if canEdit}
-      <Button type="submit" disabled={$submitting}>
-        Create
-      </Button>
-    {/if}
+    </Button>
   </div>
 </form>
