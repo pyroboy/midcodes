@@ -1,10 +1,12 @@
 import { fail } from '@sveltejs/kit';
+import type { Actions, ServerLoad } from '@sveltejs/kit';
+import type { RequestEvent } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { roomSchema } from './formSchema';
 import { supabase } from '$lib/supabaseClient';
 
-export const load = async ({ locals }) => {
+export const load: ServerLoad = async ({ locals }: { locals: App.Locals }) => {
   const [{ data: rooms, error: roomsError }, { data: properties, error: propertiesError }, { data: floors, error: floorsError }] = await Promise.all([
     supabase
       .from('rooms')
@@ -44,8 +46,8 @@ export const load = async ({ locals }) => {
   };
 };
 
-export const actions = {
-  create: async ({ request }) => {
+export const actions: Actions = {
+  create: async ({ request }: RequestEvent) => {
     const form = await superValidate(request, zod(roomSchema));
     
     if (!form.valid) {
@@ -91,7 +93,7 @@ export const actions = {
     return { form };
   },
 
-  update: async ({ request }) => {
+  update: async ({ request }: RequestEvent) => {
     const form = await superValidate(request, zod(roomSchema));
     
     if (!form.valid || !form.data.id) {
@@ -139,7 +141,7 @@ export const actions = {
     return { form };
   },
 
-  delete: async ({ request }) => {
+  delete: async ({ request }: RequestEvent) => {
     const form = await superValidate(request, zod(roomSchema));
     
     if (!form.valid || !form.data.id) {
@@ -160,4 +162,4 @@ export const actions = {
 
     return { form };
   }
-};
+} satisfies Actions;

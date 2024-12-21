@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { PageData } from './$types';
   import type { SuperValidated } from 'sveltekit-superforms';
+  import type { Database } from '$lib/database.types';
   import { superForm } from 'sveltekit-superforms/client';
   import { tenantSchema } from './formSchema';
   import type { Room } from './types';
@@ -22,7 +23,6 @@
   import { createEventDispatcher } from 'svelte';
   import { leaseStatusEnum, tenantStatusEnum, leaseTypeEnum } from './formSchema';
   import Textarea from '$lib/components/ui/textarea/textarea.svelte';
-  import type { Database } from '$lib/database.types';
   import { defaultEmergencyContact } from './constants';
   import * as Card from '$lib/components/ui/card';
   import * as Dialog from '$lib/components/ui/dialog';
@@ -43,7 +43,8 @@
   });
 
   let selectedPropertyId: number | null = null;
-  let availableRooms: Room[] = data.rooms;
+  type Room = Database['public']['Tables']['rooms']['Row'];
+  let availableRooms: Room[] | null = data.rooms;
   let showStatusDialog = false;
   let statusChangeReason = '';
 
@@ -55,11 +56,11 @@
   }
 
   $: filteredRooms = selectedPropertyId 
-    ? availableRooms.filter(room => 
+    ? (availableRooms?.filter(room => 
         room.property_id === selectedPropertyId && 
         room.room_status === 'VACANT'
-      )
-    : availableRooms;
+      ) ?? [])
+    : [];
 
   function handlePropertyChange(event: CustomEvent<string>) {
     const propertyId = parseInt(event.detail);
@@ -327,7 +328,7 @@
               <SelectValue placeholder="Select room" />
             </SelectTrigger>
             <SelectContent>
-              {#each filteredRooms as room}
+              {#each filteredRooms as room (room.id)}
                 <SelectItem value={room.id.toString()}>
                   Room {room.number}
                   <Badge variant="outline" class="ml-2">
@@ -339,7 +340,7 @@
           </Select>
           {#if !selectedPropertyId}
             <p class="text-sm text-gray-500">Select a property first</p>
-          {:else if filteredRooms.length === 0}
+          {:else if filteredRooms?.length === 0}
             <p class="text-sm text-red-500">No available rooms in this property</p>
           {/if}
         </div>

@@ -19,15 +19,14 @@ declare global {
 		interface Locals {
 			supabase: SupabaseClient;
 			safeGetSession: () => Promise<{
-				session: Session | null;
-				user: User | null;
-				profile: ProfileData | EmulatedProfile | null;
-				roleEmulation: RoleEmulationClaim | null;
+				session: SupabaseSession | null;
+				error: Error | null;
 			}>;
-			getSession: () => Promise<Session | null>;
-			session?: Session | null;
-			user?: User | null;
-			profile?: ProfileData | EmulatedProfile | null;
+			session: SupabaseSession | null;
+			user: {
+				// role: string;
+				// roleConfig: any;
+			} | null;
 		}
 		interface PageData {
 			session: Session | null;

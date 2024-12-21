@@ -261,11 +261,25 @@ export const RoleConfig: Record<UserRole, RoleConfiguration> = {
     },
     property_admin: {
         allowedPaths: [
-            { path: '/property', showInNav: true, label: 'Properties' },
-            { path: '/property/**' }
+            { path: '/dorm', showInNav: true, label: 'Dormitory' },
+            { path: '/dorm/overview/monthly', showInNav: true, label: 'Overview' },
+            { path: '/dorm/properties', showInNav: true, label: 'Properties' },
+            { path: '/dorm/floors', showInNav: true, label: 'Floors' },
+            { path: '/dorm/rooms', showInNav: true, label: 'Rooms' },
+            { path: '/dorm/tenants', showInNav: true, label: 'Tenants' },
+            { path: '/dorm/leases', showInNav: true, label: 'Leases' },
+            { path: '/dorm/payments', showInNav: true, label: 'Payments' },
+            { path: '/dorm/transactions', showInNav: true, label: 'Transactions' },
+            { path: '/dorm/meters', showInNav: true, label: 'Meters' },
+            { path: '/dorm/readings', showInNav: true, label: 'Readings' },
+            { path: '/dorm/utility-billings', showInNav: true, label: 'Utility Billings' },
+            { path: '/dorm/expenses', showInNav: true, label: 'Expenses' },
+            { path: '/dorm/budgets', showInNav: true, label: 'Budgets' },
+            { path: '/dorm/accounts', showInNav: true, label: 'Accounts' },
+            { path: '/dorm/**' }
         ],
         defaultPath() {
-            return '/property';
+            return '/dorm';
         },
         isAdmin: true,
         label: 'Property Admin',

@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import type { SupabaseClient, User, Session } from '@supabase/supabase-js'
 import { sequence } from '@sveltejs/kit/hooks'
-import { redirect, error } from '@sveltejs/kit'
+import { redirect } from '@sveltejs/kit'
 import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public'
 import { ADMIN_URL } from '$env/static/private'
 import type { Handle } from '@sveltejs/kit'
@@ -15,10 +15,18 @@ interface SessionInfo {
   roleEmulation: RoleEmulationClaim | null
 }
 
+type GetSessionResult = {
+  session: Session | null;
+  error: Error | null;
+  user: User | null;
+  profile: ProfileData | EmulatedProfile | null;
+  roleEmulation: RoleEmulationClaim | null;
+}
+
 interface AppLocals {
   supabase: SupabaseClient
   getSession: () => Promise<LocalsSession | null>
-  safeGetSession: () => Promise<SessionInfo>
+  safeGetSession: () => Promise<GetSessionResult>
   session?: LocalsSession | null
   user?: User | null
   profile?: ProfileData | EmulatedProfile | null
@@ -46,7 +54,6 @@ async function getUserProfile(userId: string, supabase: SupabaseClient): Promise
     console.error('Error fetching profile:', error);
     return null;
   }
-  // console.log('[Hooks] Fetched profile:', JSON.stringify(profile, null, 2));
   return profile
 }
 
@@ -60,9 +67,7 @@ async function getActiveRoleEmulation(userId: string, supabase: SupabaseClient) 
     .single()
 
   if (emulation) {
-    console.log('[Session] Emulated Role:', 
-     emulation.emulated_role
-    )
+    console.log('[Session] Emulated Role:', emulation.emulated_role)
   }
   return emulation
 }
@@ -87,9 +92,9 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
     }
   )
 
-  event.locals.safeGetSession = async (): Promise<SessionInfo> => {
+  event.locals.safeGetSession = async () => {
     let session = event.locals.session
-    let sessionError = null
+    let sessionError: Error | null = null
 
     if (!session) {
       try {
@@ -99,7 +104,7 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
         sessionError = initialError
       } catch (err) {
         console.error('Error getting session:', err)
-        sessionError = err
+        sessionError = err instanceof Error ? err : new Error('Unknown error occurred')
       }
     }
 
@@ -130,6 +135,7 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
     if (sessionError || !session?.user) {
       return {
         session: null,
+        error: sessionError,
         user: null,
         profile: null,
         roleEmulation: null
@@ -146,7 +152,6 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
     let emulatedProfile = profile
     let roleEmulation: RoleEmulationClaim | null = null
 
-    // Set special_url based on profile role
     if (profile?.role === 'super_admin') {
       event.locals.special_url = '/' + ADMIN_URL;
     } else {
@@ -154,7 +159,6 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
     }
 
     if (activeEmulation && profile) {
-      // Fetch organization name
       const { data: org } = await event.locals.supabase
         .from('organizations')
         .select('name')
@@ -185,6 +189,7 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
 
     return {
       session,
+      error: null,
       user,
       profile: emulatedProfile,
       roleEmulation
@@ -194,27 +199,20 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
   return resolve(event)
 }
 
-const authGuard: Handle = async ({ event, resolve }) => {
-  // console.log('\n[Auth Guard] ----------------');
-  // console.log('1. Request:', {
-  //   url: event.url.pathname,
-  //   method: event.request.method,
-  //   headers: Object.fromEntries(event.request.headers)
-  // });
+const { error: throwError } = await import('@sveltejs/kit');
 
-  // For API routes, only check basic authentication
+const authGuard: Handle = async ({ event, resolve }) => {
   if (event.url.pathname.startsWith('/api')) {
-    const sessionInfo = await event.locals.safeGetSession()
-    const { user, session } = sessionInfo
+    const sessionInfo = await event.locals.safeGetSession() as GetSessionResult
     
-    if (!user) {
-      throw error(401, 'Unauthorized')
+    if (!sessionInfo.user) {
+      throw throwError(401, 'Unauthorized')
     }
     
     event.locals = {
       ...event.locals,
-      session,
-      user
+      session: sessionInfo.session,
+      user: sessionInfo.user
     }
     
     return resolve(event)
@@ -223,140 +221,92 @@ const authGuard: Handle = async ({ event, resolve }) => {
   const path = event.url.pathname
   const isAuthPath = path === '/auth'
 
-  // Get session info
-  const sessionInfo = await event.locals.safeGetSession()
-  const { user, profile, session, roleEmulation } = sessionInfo
+  const sessionInfo = await event.locals.safeGetSession() as GetSessionResult
 
-  // console.log('2. Session:', {
-  //   userId: user?.id,
-  //   role: profile?.role,
-  //   emulation: roleEmulation
-  // });
-
-  // Update locals with session info
   event.locals = {
     ...event.locals,
-    session,
-    user,
-    profile,
+    session: sessionInfo.session,
+    user: sessionInfo.user,
+    profile: sessionInfo.profile,
   }
 
-  // Handle authentication
-  if (!user) {
-    // Check if path is public first
+  if (!sessionInfo.user) {
     if (isPublicPath(path)) {
       return resolve(event);
     }
     
-    // Unauthenticated users can only access /auth
     if (!isAuthPath) {
-      const returnTo = event.url.pathname;
       throw redirect(303, `/auth`);
     }
     return resolve(event);
   }
 
-  // Authenticated users shouldn't stay on /auth
-  if (isAuthPath && profile?.role && isValidUserRole(profile.role)) {
-    if (profile.role === 'super_admin') {
+  if (isAuthPath && sessionInfo.profile?.role && isValidUserRole(sessionInfo.profile.role)) {
+    if (sessionInfo.profile.role === 'super_admin') {
       throw redirect(303, `/${ADMIN_URL}`);
     }
-    const config = RoleConfig[profile.role];
+    const config = RoleConfig[sessionInfo.profile.role as UserRole];
     if (config) {
-      throw redirect(303, config.defaultPath(profile.context));
+      throw redirect(303, config.defaultPath(sessionInfo.profile.context));
     }
   }
 
-  // Public paths are accessible to all users
   if (isPublicPath(path)) {
     return resolve(event);
   }
 
-  // Check if user has a valid role
-  if (!profile?.role || !isValidUserRole(profile.role)) {
-    throw error(400, 'Invalid user role')
+  if (!sessionInfo.profile?.role || !isValidUserRole(sessionInfo.profile.role)) {
+    throw throwError(400, 'Invalid user role')
   }
 
-  // Log access (except favicon)
-  if (!path.endsWith('/favicon.ico')) {
-    // console.log(`[AuthGuard] ${path} | User: ${user.id} | Role: ${profile.role}${(profile as EmulatedProfile)?.isEmulated ? ' (Emulated)' : ''}`)
-  }
+  const originalRole = (sessionInfo.profile as EmulatedProfile)?.originalRole
+  const context = sessionInfo.roleEmulation?.metadata?.context || sessionInfo.profile?.context || {}
 
-  // Check path access and redirect if necessary
-  const originalRole = (profile as EmulatedProfile)?.originalRole
-  const context = roleEmulation?.metadata?.context || profile?.context || {}
-
-  console.log('[Auth Debug] Checking access:', {
-    path,
-    originalRole,
-    currentRole: profile.role,
-    adminUrl: `/${ADMIN_URL}`
-  });
-
-  // Allow admin URL access for both regular and emulated super_admin
   if (path === `/${ADMIN_URL}` && 
-      ((!originalRole && profile.role === 'super_admin') || originalRole === 'super_admin')) {
-    console.log('[Auth Debug] Allowing admin URL access');
+      ((!originalRole && sessionInfo.profile.role === 'super_admin') || originalRole === 'super_admin')) {
     return resolve(event);
   }
 
   const redirectPath = getRedirectPath(
-    profile.role,
+    sessionInfo.profile.role,
     path,
     originalRole,
     context
   );
 
-  // If path is not found, redirect to 404 instead of auth
   if (redirectPath === PublicPaths.auth) {
-    throw error(404, { message: 'Not found' });
+    throw throwError(404, { message: 'Not found' });
   }
-
-  console.log('3. Access Check:', {
-    path,
-    hasAccess: !redirectPath,
-    redirectPath: redirectPath || 'none',
-    role: profile?.role,
-    originalRole
-  });
 
   if (redirectPath) {
-    console.log('4. Redirecting to:', redirectPath);
     throw redirect(303, redirectPath)
   }
-
-  console.log('[Auth Guard End] ----------------\n');
 
   return resolve(event)
 }
 
 const roleEmulationGuard: Handle = async ({ event, resolve }) => {
-  // Skip check for API routes
   if (event.url.pathname.startsWith('/api')) {
     return resolve(event)
   }
 
-  const sessionInfo = await event.locals.safeGetSession()
-  const { roleEmulation, session } = sessionInfo
+  const sessionInfo = await event.locals.safeGetSession() as GetSessionResult
 
-  if (roleEmulation?.active) {
+  if (sessionInfo.roleEmulation?.active) {
     const now = new Date()
-    const expiresAt = new Date(roleEmulation.expires_at)
+    const expiresAt = new Date(sessionInfo.roleEmulation.expires_at)
 
     if (now > expiresAt) {
-      // Mark session as expired in database
       await event.locals.supabase
         .from('role_emulation_sessions')
         .update({ status: 'expired' })
-        .eq('id', roleEmulation.session_id)
+        .eq('id', sessionInfo.roleEmulation.session_id)
 
-      // Clear role emulation cookie and session data
       event.cookies.delete('role_emulation', { path: '/' })
-      if (session) {
-        delete (session as LocalsSession).roleEmulation
+      if (sessionInfo.session) {
+        delete (sessionInfo.session as LocalsSession).roleEmulation
       }
 
-      // Redirect to refresh the page state
       throw redirect(303, event.url.pathname)
     }
   }

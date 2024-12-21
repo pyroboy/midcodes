@@ -1,6 +1,7 @@
-import type { LayoutServerLoadEvent } from './$types';
-import { RoleConfig, type UserRole } from '$lib/auth/roleConfig';
+import type { LayoutServerLoad } from './$types';
 import type { Database } from '$lib/database.types';
+import type { User } from '@supabase/supabase-js';
+import { RoleConfig, type UserRole } from '$lib/auth/roleConfig';
 
 type NavigationState = {
   homeUrl: string;
@@ -29,9 +30,22 @@ type EmulationData = {
   organizationName: string | null;
 }
 
-export const load = async ({ locals: { safeGetSession, profile, supabase,special_url }, url }: LayoutServerLoadEvent) => {
+type Profile = Database['public']['Tables']['profiles']['Row'];
+type SessionWithAuth = {
+  session: {
+    roleEmulation?: {
+      active: boolean;
+      emulated_org_id: string | null;
+    } | null;
+  } | null;
+  user: User | null;
+  profile: Profile | null;
+  error: Error | null;
+};
+
+export const load: LayoutServerLoad = async ({ locals: { safeGetSession, profile, supabase, special_url }, url }) => {
   console.log('[Layout Server] Starting load for:', url.pathname);
-  const session = await safeGetSession();
+  const session = await safeGetSession() as SessionWithAuth;
   const user = session?.user ?? null;
 
   // console.log('[Layout Server] User profile:', profile);
