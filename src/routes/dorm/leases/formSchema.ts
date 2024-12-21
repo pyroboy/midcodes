@@ -14,6 +14,9 @@ export const leaseTypeEnum = z.enum([
   'ANNUAL'
 ]);
 
+
+export type LeaseStatus = z.infer<typeof leaseStatusEnum>;
+export type LeaseType = z.infer<typeof leaseTypeEnum>;
 export const leaseSchema = z.object({
   id: z.number().optional(),
   tenantIds: z.array(z.number()).min(1, 'At least one tenant must be selected'),

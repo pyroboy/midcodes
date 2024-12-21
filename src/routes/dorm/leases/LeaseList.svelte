@@ -14,20 +14,20 @@
     }
   }
 
-  function getStatusVariant(status: string) {
-    switch (status) {
-      case 'ACTIVE':
-        return 'success';
-      case 'INACTIVE':
-        return 'secondary';
-      case 'TERMINATED':
-        return 'destructive';
-      case 'EXPIRED':
-        return 'warning';
-      default:
-        return 'secondary';
-    }
+  function getStatusVariant(status: string): "default" | "destructive" | "outline" | "secondary" {
+  switch (status) {
+    case 'ACTIVE':
+      return 'default';  // Changed from 'success'
+    case 'INACTIVE':
+      return 'secondary';
+    case 'TERMINATED':
+      return 'destructive';
+    case 'EXPIRED':
+      return 'outline';  // Changed from 'warning'
+    default:
+      return 'secondary';
   }
+}
 
   function formatDate(dateStr: string) {
     return new Date(dateStr).toLocaleDateString('en-US', {

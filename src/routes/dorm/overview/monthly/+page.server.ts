@@ -1,84 +1,145 @@
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
+import { getMonthlyBalances } from '$lib/server/rpc';
 
-export const load: PageServerLoad = async ({ locals: { supabase, getSession } }) => {
+export const load = (async ({ locals: { supabase, getSession } }) => {
   const session = await getSession();
+
   if (!session) {
-    throw error(401, 'Unauthorized');
+    throw error(401, { message: 'Unauthorized' });
   }
 
-  // Get user's profile and property assignment
+  // Get property ID from user profile
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, role, property:staff_property_id')
+    .select('*')
     .eq('id', session.user.id)
     .single();
 
-  if (!profile) {
-    throw error(400, 'Profile not found');
+  if (!profile?.property_id) {
+    throw error(400, { message: 'No property assigned to user' });
   }
 
-  if (!profile.property && !['super_admin', 'property_admin'].includes(profile.role)) {
-    throw error(400, 'User not associated with a property');
-  }
-
-  const currentDate = new Date();
-  const currentYear = currentDate.getFullYear();
-  const currentMonth = currentDate.getMonth() + 1;
-
-  // Get rooms with active leases and tenants
+  // Get rooms with their leases and tenants
   const { data: rooms, error: roomsError } = await supabase
     .from('rooms')
     .select(`
-      id,
-      name,
-      number,
-      floor_number,
-      room_status,
-      property_id,
-      leases!room_id(
+      *,
+      floors!inner (
+        floor_number,
+        wing,
+        status
+      ),
+      leases (
         id,
-        lease_status,
-        lease_start_date,
-        lease_end_date,
-        lease_rent_rate,
-        lease_tenants!lease_id(
-          tenant:tenants!tenant_id(
+        name,
+        status,
+        type,
+        start_date,
+        end_date,
+        rent_amount,
+        security_deposit,
+        balance,
+        notes,
+        lease_tenants (
+          tenant:profiles (
             id,
-            email,
             first_name,
-            last_name
+            last_name,
+            email,
+            contact_number
           )
+        ),
+        billings (
+          id,
+          type,
+          utility_type,
+          amount,
+          paid_amount,
+          balance,
+          status,
+          due_date,
+          billing_date,
+          penalty_amount,
+          notes
+        ),
+        payment_schedules (
+          id,
+          due_date,
+          expected_amount,
+          type,
+          frequency,
+          status,
+          notes
         )
+      ),
+      meters (
+        id,
+        name,
+        location_type,
+        type,
+        is_active,
+        status,
+        initial_reading,
+        unit_rate,
+        notes,
+        readings (
+          reading,
+          reading_date
+        )
+      ),
+      maintenance (
+        id,
+        title,
+        description,
+        status,
+        completed_at,
+        notes
       )
     `)
-    .eq('property_id', profile.property)
-    .eq('leases.lease_status', 'ACTIVE')
-    .order('floor_number');
+    .eq('property_id', profile.property_id);
 
-  if (roomsError) throw error(500, 'Error fetching rooms');
+  if (roomsError) {
+    throw error(500, { message: roomsError.message });
+  }
 
-  // Generate array of last 12 months
-  const months = Array.from({ length: 12 }, (_, i) => {
-    const d = new Date(currentYear, currentMonth - i - 1, 1);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-  }).reverse();
+  // Get expenses for the last month
+  const { data: lastMonthExpenses, error: expensesError } = await supabase
+    .from('expenses')
+    .select('id, property_id, amount, description, type, status, created_by, created_at')
+    .eq('property_id', profile.property_id)
+    .gte('created_at', new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString());
 
-  // Get balances for each tenant for last 12 months
-  const { data: balances, error: balancesError } = await supabase
-    .rpc('get_tenant_monthly_balances', {
-      p_property_id: profile.property,
-      p_months_back: 12
-    });
+  if (expensesError) {
+    throw error(500, { message: expensesError.message });
+  }
 
-  if (balancesError) throw error(500, 'Error fetching balances');
+  // Get monthly balances for all tenants
+  const { data: balances, error: balancesError } = await getMonthlyBalances(supabase, {
+    property_id: profile.property_id,
+    months: 6
+  });
+
+  if (balancesError) {
+    throw error(500, { message: balancesError.message });
+  }
+
+  // Get months for the last 6 months
+  const months = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - i);
+    return d.toLocaleString('default', { month: 'short', year: 'numeric' });
+  });
+
+  const isAdminLevel = ['super_admin', 'property_admin'].includes(profile.role);
+  const isStaffLevel = ['property_manager', 'property_maintenance', 'property_accountant'].includes(profile.role);
 
   return {
-    rooms,
+    rooms: rooms || [],
+    balances: balances || [],
     months,
-    balances,
-    isAdminLevel: ['super_admin', 'property_admin'].includes(profile.role),
-    isStaffLevel: ['property_manager', 'property_maintenance'].includes(profile.role),
-    role: profile.role
+    lastMonthExpenses: lastMonthExpenses || [],
+    isAdminLevel,
+    isStaffLevel
   };
-};
+}) satisfies PageServerLoad;
