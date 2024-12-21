@@ -8,7 +8,6 @@
   import Label from '$lib/components/ui/label/label.svelte';
   import * as Select from "$lib/components/ui/select";
   import { createEventDispatcher } from 'svelte';
-  import RandomLocation from './RandomLocation.svelte';
 	import { sub } from 'date-fns';
 
 
@@ -81,7 +80,6 @@ function handleRandomData(event: CustomEvent) {
 
   <div class="flex justify-between items-center mb-4">
     <h1 class="text-2xl font-bold">Location Form</h1>
-    <RandomLocation on:randomData={handleRandomData} />
   </div>
 
   <div>

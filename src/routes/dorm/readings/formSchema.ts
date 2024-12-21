@@ -1,13 +1,15 @@
 import { z } from 'zod';
+import type { meter_location_type, utility_type } from './schema';
 
 export const createSchema = (latestOverallReadingDate: string) => z.object({
-  readingDate: z.string()
+  reading_date: z.string()
+    .min(1, "Reading date is required")
     .refine(
       (date) => {
-        if (!date || date.trim() === "") {
-          return true;  // Allow empty date
-        }
-        return new Date(date) >= new Date(latestOverallReadingDate);
+        if (!date || date.trim() === "") return true;
+        const inputDate = new Date(date);
+        const lastDate = new Date(latestOverallReadingDate);
+        return inputDate >= lastDate;
       },
       {
         message: `Reading date must be on or after the previous date (${latestOverallReadingDate})`
@@ -15,19 +17,26 @@ export const createSchema = (latestOverallReadingDate: string) => z.object({
     )
     .refine(
       (date) => {
-        if (date && date.trim() !== "") {
-          return new Date(date) > new Date();
-        }
-        return true;  // Allow empty date
+        if (!date || date.trim() === "") return true;
+        return new Date(date) <= new Date();
       },
       {
-        message: "Reading date must be in the future."
+        message: "Reading date cannot be in the future"
       }
     ),
-  meterType: z.string().min(1, "Meter type is required"),
+  meter_type: z.custom<utility_type>()
+    .refine((val) => ['ELECTRICITY', 'WATER', 'INTERNET'].includes(val), {
+      message: "Invalid meter type"
+    }),
+  location_type: z.custom<meter_location_type>()
+    .refine((val) => ['PROPERTY', 'FLOOR', 'ROOM'].includes(val), {
+      message: "Invalid location type"
+    }),
   readings: z.array(z.object({
-    meterId: z.number().int().positive(),
-    readingValue: z.coerce.number().nonnegative(),
+    meter_id: z.number().int().positive(),
+    reading_value: z.number()
+      .nonnegative("Reading value must be greater than or equal to 0")
+      .multipleOf(0.01, "Reading value must have at most 2 decimal places")
   })).min(1, "At least one reading is required"),
 });
 

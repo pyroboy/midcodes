@@ -2,7 +2,7 @@ import { fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { roomSchema } from './formSchema';
-import { supabase } from '$lib/supabase';
+import { supabase } from '$lib/supabaseClient';
 
 export const load = async ({ locals }) => {
   const [{ data: rooms }, { data: properties }, { data: floors }] = await Promise.all([

@@ -2,9 +2,41 @@ import { superValidate } from 'sveltekit-superforms/server';
 import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 import { supabase } from '$lib/supabaseClient';
-import { zod } from 'sveltekit-superforms/adapters';
-import { readingFormSchema, type Reading } from './schema';
+import { readingFormSchema, type Reading, type Meter, type meter_location_type, type utility_type, type meter_status } from './schema';
 import { format } from 'date-fns';
+import { zod } from 'sveltekit-superforms/adapters';
+
+type PostgrestResponse = {
+  id: number;
+  name: string;
+  type: utility_type;
+  location_type: meter_location_type;
+  property_id: number | null;
+  floor_id: number | null;
+  rooms_id: number | null;
+  is_active: boolean;
+  status: meter_status;
+  initial_reading: number;
+  unit_rate: number;
+  notes: string | null;
+  created_at: string;
+  room: {
+    id: number;
+    number: string;
+    floor: {
+      id: number;
+      floor_number: number;
+      wing: string | null;
+      property: {
+        id: number;
+        name: string;
+      };
+    };
+  } | null;
+}[];
+
+const ADMIN_ROLES = ['super_admin', 'property_admin', 'property_manager'] as const;
+const STAFF_ROLES = ['property_maintenance', 'property_utility', 'property_frontdesk'] as const;
 
 export const load: PageServerLoad = async ({ locals }) => {
   const session = await locals.getSession();
@@ -19,18 +51,26 @@ export const load: PageServerLoad = async ({ locals }) => {
     .single();
 
   const userRole = userRoleData?.role;
-  const isAdmin = userRole === 'super_admin' || userRole === 'property_admin';
-  const isStaff = userRole === 'staff' || userRole === 'utility' || userRole === 'maintenance';
+  const isAdmin = ADMIN_ROLES.includes(userRole as typeof ADMIN_ROLES[number]);
+  const isStaff = STAFF_ROLES.includes(userRole as typeof STAFF_ROLES[number]);
   const canEdit = isAdmin || isStaff;
 
-  // Get active meters with room and property information
-  const { data: meters, error: metersError } = await supabase
+  const { data: dbMeters, error: metersError } = await supabase
     .from('meters')
     .select(`
       id,
       name,
       type,
-      active,
+      location_type,
+      property_id,
+      floor_id,
+      rooms_id,
+      is_active,
+      status,
+      initial_reading,
+      unit_rate,
+      notes,
+      created_at,
       room:rooms (
         id,
         number,
@@ -45,59 +85,75 @@ export const load: PageServerLoad = async ({ locals }) => {
         )
       )
     `)
-    .eq('active', true)
-    .order('name');
+    .eq('is_active', true)
+    .order('name') as { data: PostgrestResponse | null; error: any };
 
   if (metersError) {
     console.error('Error fetching meters:', metersError);
-    return fail(500, { error: 'Failed to fetch meters' });
+    return fail(500, { message: 'Failed to load meters' });
   }
 
-  const meterTypes = [...new Set(meters.map(meter => meter.type))];
+  const meters: Meter[] = (dbMeters || []).map((meter) => ({
+    id: meter.id,
+    name: meter.name,
+    type: meter.type,
+    location_type: meter.location_type,
+    property_id: meter.property_id,
+    floor_id: meter.floor_id,
+    rooms_id: meter.rooms_id,
+    is_active: meter.is_active,
+    status: meter.status,
+    initial_reading: meter.initial_reading,
+    unit_rate: meter.unit_rate,
+    notes: meter.notes,
+    created_at: meter.created_at,
+    room: meter.room || undefined
+  }));
 
-  // Get latest overall reading date
-  const { data: overallPreviousReading } = await supabase
+  const { data: latestReading } = await supabase
     .from('readings')
     .select('reading_date')
     .order('reading_date', { ascending: false })
     .limit(1)
     .single();
 
-  // Get previous readings for each meter
+  const latestOverallReadingDate = latestReading?.reading_date || format(new Date(), 'yyyy-MM-dd');
+
   const { data: previousReadings } = await supabase
     .from('readings')
     .select('*')
-    .in('meter_id', meters.map(meter => meter.id))
-    .order('created_at', { ascending: false });
+    .in(
+      'meter_id',
+      meters.map(m => m.id)
+    )
+    .order('reading_date', { ascending: false });
 
-  // Create a map of meter_id to latest reading
-  const previousReadingsMap = previousReadings?.reduce((acc, reading) => {
-    if (!acc[reading.meter_id] || new Date(reading.created_at) > new Date(acc[reading.meter_id].created_at)) {
-      acc[reading.meter_id] = reading;
+  const previousReadingsMap: Record<number, Reading> = {};
+  if (previousReadings) {
+    for (const reading of previousReadings) {
+      if (!previousReadingsMap[reading.meter_id]) {
+        previousReadingsMap[reading.meter_id] = reading;
+      }
     }
-    return acc;
-  }, {} as Record<number, Reading>) ?? {};
+  }
 
-  const latestOverallReadingDate = overallPreviousReading?.reading_date || format(new Date(), 'yyyy-MM-dd');
   const schema = readingFormSchema(previousReadingsMap, latestOverallReadingDate);
   const form = await superValidate(zod(schema));
 
   return {
-    form,
     meters,
-    meterTypes,
-    previousReadings: previousReadingsMap,
-    overallPreviousReadingDate: overallPreviousReading?.reading_date,
+    form,
+    canEdit,
     latestOverallReadingDate,
-    canEdit
+    previousReadings: previousReadingsMap
   };
 };
 
 export const actions: Actions = {
-  create: async (event) => {
-    const session = await event.locals.getSession();
+  create: async ({ request, locals }) => {
+    const session = await locals.getSession();
     if (!session) {
-      return fail(401, { error: 'Unauthorized' });
+      return fail(401, { message: 'Unauthorized' });
     }
 
     const { data: userRoleData } = await supabase
@@ -107,22 +163,27 @@ export const actions: Actions = {
       .single();
 
     const userRole = userRoleData?.role;
-    if (!userRole || !(userRole === 'super_admin' || userRole === 'property_admin' || userRole === 'staff' || userRole === 'utility' || userRole === 'maintenance')) {
-      return fail(403, { error: 'Insufficient permissions' });
+    const isAdmin = ADMIN_ROLES.includes(userRole as typeof ADMIN_ROLES[number]);
+    const isStaff = STAFF_ROLES.includes(userRole as typeof STAFF_ROLES[number]);
+    const canEdit = isAdmin || isStaff;
+
+    if (!canEdit) {
+      return fail(403, { message: 'You do not have permission to add readings' });
     }
 
-    // Get previous readings for validation
     const { data: previousReadings } = await supabase
       .from('readings')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('reading_date', { ascending: false });
 
-    const previousReadingsMap = previousReadings?.reduce((acc, reading) => {
-      if (!acc[reading.meter_id] || new Date(reading.created_at) > new Date(acc[reading.meter_id].created_at)) {
-        acc[reading.meter_id] = reading;
+    const previousReadingsMap: Record<number, Reading> = {};
+    if (previousReadings) {
+      for (const reading of previousReadings) {
+        if (!previousReadingsMap[reading.meter_id]) {
+          previousReadingsMap[reading.meter_id] = reading;
+        }
       }
-      return acc;
-    }, {} as Record<number, Reading>) ?? {};
+    }
 
     const { data: latestReading } = await supabase
       .from('readings')
@@ -132,36 +193,32 @@ export const actions: Actions = {
       .single();
 
     const latestOverallReadingDate = latestReading?.reading_date || format(new Date(), 'yyyy-MM-dd');
+
     const schema = readingFormSchema(previousReadingsMap, latestOverallReadingDate);
-    const form = await superValidate(event, zod(schema));
+    const form = await superValidate(request, zod(schema));
 
     if (!form.valid) {
       return fail(400, { form });
     }
 
-    try {
-      // Insert all readings in a single batch
-      const { error: insertError } = await supabase
-        .from('readings')
-        .insert(
-          form.data.readings.map((reading) => ({
-            meter_id: reading.meter_id,
-            reading_date: form.data.reading_date,
-            reading: reading.reading_value,
-            created_at: new Date().toISOString()
-          }))
-        );
+    const { reading_date, readings } = form.data;
 
-      if (insertError) {
-        console.error('Error inserting readings:', insertError);
-        return fail(500, { form, error: 'Failed to add readings' });
-      }
+    const { error: insertError } = await supabase.from('readings').insert(
+      readings.map((r) => ({
+        meter_id: r.meter_id,
+        reading: r.reading_value,
+        reading_date
+      }))
+    );
 
-      const newForm = await superValidate(zod(schema));
-      return { form: newForm };
-    } catch (err) {
-      console.error('Error inserting readings:', err);
-      return fail(500, { form, error: err instanceof Error ? err.message : 'Failed to add readings' });
+    if (insertError) {
+      console.error('Error inserting readings:', insertError);
+      return fail(500, {
+        form,
+        message: 'Failed to save readings'
+      });
     }
+
+    return { form };
   }
 };

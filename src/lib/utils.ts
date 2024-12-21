@@ -40,7 +40,7 @@ export const flyAndScale = (
 	): string => {
 		return Object.keys(style).reduce((str, key) => {
 			if (style[key] === undefined) return str;
-			return str + `${key}:${style[key]};`;
+			return str + key + ":" + style[key] + ";";
 		}, "");
 	};
 
@@ -53,10 +53,30 @@ export const flyAndScale = (
 			const scale = scaleConversion(t, [0, 1], [params.start ?? 0.95, 1]);
 
 			return styleToString({
-				transform: `${transform} translate3d(${x}px, ${y}px, 0) scale(${scale})`,
+				transform:
+					transform +
+					"translate3d(" +
+					x +
+					"px, " +
+					y +
+					"px, 0) scale(" +
+					scale +
+					")",
 				opacity: t
 			});
 		},
 		easing: cubicOut
 	};
 };
+
+export function formatDateTime(date: string | Date | null): string {
+  if (!date) return '';
+  const d = new Date(date);
+  return d.toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}

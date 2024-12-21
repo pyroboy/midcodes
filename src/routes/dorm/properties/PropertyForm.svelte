@@ -1,122 +1,116 @@
 <script lang="ts">
   import { superForm } from 'sveltekit-superforms/client';
-  import { zodClient } from 'sveltekit-superforms/adapters';
-  import Button from '$lib/components/ui/button/button.svelte';
-  import Input from '$lib/components/ui/input/input.svelte';
-  import Label from '$lib/components/ui/label/label.svelte';
   import * as Select from '$lib/components/ui/select';
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
   import { createEventDispatcher } from 'svelte';
+  import type { PageData } from './$types';
+  import { PropertyStatus, PropertyType } from './formSchema';
 
-  export let data: any;
+  export let data: PageData;
   export let editMode = false;
   export let property: any | undefined = undefined;
 
   const dispatch = createEventDispatcher();
 
-  $: {
-    if (property && editMode) {
-      form.data.set({
-        ...property
-      });
-    }
-  }
-
-  const { form, errors, enhance, submitting, reset } = superForm(data, {
-    id: 'propertyForm',
-    validators: zodClient(),
-    resetForm: true,
-    taintedMessage: null,
+  const { form, errors, enhance } = superForm(data.form, {
     onResult: ({ result }) => {
       if (result.type === 'success') {
         dispatch('propertyAdded');
-        reset();
       }
-    },
+    }
   });
+
+  $: action = editMode ? '?/update' : '?/create';
+
+  const propertyTypes = Object.entries(PropertyType).map(([value]) => ({
+    value,
+    label: value.replace('_', ' ')
+  }));
+
+  const statusOptions = Object.entries(PropertyStatus).map(([value]) => ({
+    value,
+    label: value
+  }));
 </script>
 
-<form
-  method="POST"
-  action="?/create"
-  use:enhance
-  class="space-y-4 p-4 bg-white rounded-lg shadow"
->
-  <input type="hidden" name="id" bind:value={$form.id} />
+<form method="POST" {action} use:enhance>
+  {#if editMode && property}
+    <input type="hidden" name="id" bind:value={property.id} />
+  {/if}
 
-  <div class="space-y-2">
-    <Label for="name">Property Name</Label>
-    <Input
-      id="name"
-      name="name"
-      bind:value={$form.name}
-      placeholder="Enter property name"
-      class="w-full"
-    />
-    {#if $errors.name}
-      <span class="text-red-500 text-sm">{$errors.name}</span>
-    {/if}
-  </div>
+  <div class="space-y-4">
+    <div class="space-y-2">
+      <Label for="name">Name</Label>
+      <Input
+        id="name"
+        name="name"
+        value={property?.name ?? ''}
+      />
+      {#if $errors.name}
+        <p class="text-sm text-red-500">{$errors.name[0]}</p>
+      {/if}
+    </div>
 
-  <div class="space-y-2">
-    <Label for="address">Address</Label>
-    <Input
-      id="address"
-      name="address"
-      bind:value={$form.address}
-      placeholder="Enter address"
-      class="w-full"
-    />
-    {#if $errors.address}
-      <span class="text-red-500 text-sm">{$errors.address}</span>
-    {/if}
-  </div>
+    <div class="space-y-2">
+      <Label for="address">Address</Label>
+      <Input
+        id="address"
+        name="address"
+        value={property?.address ?? ''}
+      />
+      {#if $errors.address}
+        <p class="text-sm text-red-500">{$errors.address[0]}</p>
+      {/if}
+    </div>
 
-  <div class="space-y-2">
-    <Label for="description">Description</Label>
-    <Input
-      id="description"
-      name="description"
-      bind:value={$form.description}
-      placeholder="Enter description"
-      class="w-full"
-    />
-  </div>
-
-  <div class="space-y-2">
-    <Label for="status">Status</Label>
-    <Select.Root bind:value={$form.status}>
-      <Select.Trigger class="w-full">
-        <Select.Value placeholder="Select status" />
-      </Select.Trigger>
-      <Select.Content>
-        <Select.Item value="ACTIVE">Active</Select.Item>
-        <Select.Item value="INACTIVE">Inactive</Select.Item>
-      </Select.Content>
-    </Select.Root>
-  </div>
-
-  <div class="flex justify-end space-x-2">
-    {#if editMode}
-      <Button
-        type="submit"
-        formaction="?/delete"
-        variant="destructive"
-        disabled={$submitting}
+    <div class="space-y-2">
+      <Label for="type">Type</Label>
+      <Select.Root
+        name="type"
+        items={propertyTypes}
+        selected={property?.type}
       >
-        Delete
-      </Button>
-      <Button
-        type="submit"
-        formaction="?/update"
-        variant="default"
-        disabled={$submitting}
+        <Select.Trigger class="w-full">
+          <Select.Value placeholder="Select property type" />
+        </Select.Trigger>
+        <Select.Content>
+          {#each propertyTypes as type}
+            <Select.Item value={type.value}>{type.label}</Select.Item>
+          {/each}
+        </Select.Content>
+      </Select.Root>
+      {#if $errors.type}
+        <p class="text-sm text-red-500">{$errors.type[0]}</p>
+      {/if}
+    </div>
+
+    <div class="space-y-2">
+      <Label for="status">Status</Label>
+      <Select.Root
+        name="status"
+        items={statusOptions}
+        selected={property?.status ?? 'ACTIVE'}
       >
-        Update
+        <Select.Trigger class="w-full">
+          <Select.Value placeholder="Select status" />
+        </Select.Trigger>
+        <Select.Content>
+          {#each statusOptions as status}
+            <Select.Item value={status.value}>{status.label}</Select.Item>
+          {/each}
+        </Select.Content>
+      </Select.Root>
+      {#if $errors.status}
+        <p class="text-sm text-red-500">{$errors.status[0]}</p>
+      {/if}
+    </div>
+
+    <div class="flex justify-end space-x-2">
+      <Button type="submit">
+        {editMode ? 'Update' : 'Create'} Property
       </Button>
-    {:else}
-      <Button type="submit" variant="default" disabled={$submitting}>
-        Create
-      </Button>
-    {/if}
+    </div>
   </div>
 </form>

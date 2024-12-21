@@ -1,33 +1,40 @@
 import { fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
-import { z } from 'zod';
 import { zod } from 'sveltekit-superforms/adapters';
-import { db } from '$lib/db/db';
-import { properties } from '$lib/db/schema';
-
-const propertySchema = z.object({
-  id: z.number().optional(),
-  name: z.string().min(1, 'Property name is required'),
-  address: z.string().min(1, 'Address is required'),
-  description: z.string().optional(),
-  status: z.enum(['ACTIVE', 'INACTIVE']).default('ACTIVE'),
-  createdAt: z.date().optional(),
-  updatedAt: z.date().optional(),
-  createdBy: z.number().optional(),
-  updatedBy: z.number().optional()
-});
+import { supabase } from '$lib/supabaseClient';
+import { propertySchema, type PropertyWithCounts, preparePropertyData } from './formSchema';
 
 export const load = async () => {
-  const propertyList = await db
-    .select()
-    .from(properties)
-    .orderBy('name');
+  // Get properties with floor and room counts
+  const { data: properties, error } = await supabase
+    .from('properties')
+    .select(`
+      *,
+      floors:floors(count),
+      rooms:rooms(count)
+    `)
+    .order('name');
+
+  if (error) {
+    console.error('Error loading properties:', error);
+    return {
+      form: await superValidate(zod(propertySchema)),
+      properties: []
+    };
+  }
+
+  // Transform the data to include counts
+  const propertiesWithCounts: PropertyWithCounts[] = properties.map(property => ({
+    ...property,
+    floor_count: property.floors?.[0]?.count ?? 0,
+    room_count: property.rooms?.[0]?.count ?? 0
+  }));
 
   const form = await superValidate(zod(propertySchema));
 
   return {
     form,
-    properties: propertyList
+    properties: propertiesWithCounts
   };
 };
 
@@ -39,19 +46,21 @@ export const actions = {
       return fail(400, { form });
     }
 
-    try {
-      await db.insert(properties).values({
-        name: form.data.name,
-        address: form.data.address,
-        description: form.data.description,
-        status: form.data.status,
-      });
+    const propertyData = preparePropertyData(form.data);
 
-      return { form };
-    } catch (err) {
-      console.error(err);
-      return fail(500, { form });
+    const { error } = await supabase
+      .from('properties')
+      .insert(propertyData);
+
+    if (error) {
+      console.error('Error creating property:', error);
+      return fail(500, { 
+        form, 
+        error: 'Failed to create property' 
+      });
     }
+
+    return { form };
   },
 
   update: async ({ request }) => {
@@ -61,22 +70,22 @@ export const actions = {
       return fail(400, { form });
     }
 
-    try {
-      await db
-        .update(properties)
-        .set({
-          name: form.data.name,
-          address: form.data.address,
-          description: form.data.description,
-          status: form.data.status,
-        })
-        .where(db.raw(`${properties.id} = ${form.data.id}`));
+    const propertyData = preparePropertyData(form.data);
 
-      return { form };
-    } catch (err) {
-      console.error(err);
-      return fail(500, { form });
+    const { error } = await supabase
+      .from('properties')
+      .update(propertyData)
+      .eq('id', form.data.id);
+
+    if (error) {
+      console.error('Error updating property:', error);
+      return fail(500, { 
+        form, 
+        error: 'Failed to update property' 
+      });
     }
+
+    return { form };
   },
 
   delete: async ({ request }) => {
@@ -86,15 +95,33 @@ export const actions = {
       return fail(400, { form });
     }
 
-    try {
-      await db
-        .delete(properties)
-        .where(db.raw(`${properties.id} = ${form.data.id}`));
+    // Check for existing floors/rooms
+    const { data: floors } = await supabase
+      .from('floors')
+      .select('id')
+      .eq('property_id', form.data.id)
+      .limit(1);
 
-      return { form };
-    } catch (err) {
-      console.error(err);
-      return fail(500, { form });
+    if (floors && floors.length > 0) {
+      return fail(400, {
+        form,
+        error: 'Cannot delete property with existing floors/rooms. Please delete them first.'
+      });
     }
+
+    const { error } = await supabase
+      .from('properties')
+      .delete()
+      .eq('id', form.data.id);
+
+    if (error) {
+      console.error('Error deleting property:', error);
+      return fail(500, { 
+        form, 
+        error: 'Failed to delete property' 
+      });
+    }
+
+    return { form };
   }
 };
