@@ -196,6 +196,104 @@ export type Database = {
           payment_timeout_minutes?: number | null
         }
       }
+      tenants: {
+        Row: {
+          id: number
+          name: string
+          contact_number: string | null
+          email: string | null
+          created_at: string
+          updated_at: string | null
+          auth_id: string | null
+        }
+        Insert: {
+          id?: number
+          name: string
+          contact_number?: string | null
+          email?: string | null
+          created_at?: string
+          updated_at?: string | null
+          auth_id?: string | null
+        }
+        Update: {
+          id?: number
+          name?: string
+          contact_number?: string | null
+          email?: string | null
+          created_at?: string
+          updated_at?: string | null
+          auth_id?: string | null
+        }
+      }
+      leases: {
+        Row: {
+          id: number
+          location_id: number
+          user_id: string
+          start_date: string
+          end_date: string
+          rent_amount: number
+          security_deposit: number
+          notes: string | null
+          status: Database['public']['Enums']['lease_status']
+          outstanding_balance: number
+          last_payment_date: string | null
+          next_payment_due: string | null
+          created_at: string
+          updated_at: string
+          created_by: string
+        }
+        Insert: {
+          id?: number
+          location_id: number
+          user_id: string
+          start_date: string
+          end_date: string
+          rent_amount: number
+          security_deposit: number
+          notes?: string | null
+          status?: Database['public']['Enums']['lease_status']
+          outstanding_balance?: number
+          last_payment_date?: string | null
+          next_payment_due?: string | null
+          created_by: string
+        }
+        Update: {
+          id?: number
+          location_id?: number
+          user_id?: string
+          start_date?: string
+          end_date?: string
+          rent_amount?: number
+          security_deposit?: number
+          notes?: string | null
+          status?: Database['public']['Enums']['lease_status']
+          outstanding_balance?: number
+          last_payment_date?: string | null
+          next_payment_due?: string | null
+          created_by?: string
+        }
+      }
+      lease_tenants: {
+        Row: {
+          id: number
+          lease_id: number
+          tenant_id: number
+          created_at: string
+        }
+        Insert: {
+          id?: number
+          lease_id: number
+          tenant_id: number
+          created_at?: string
+        }
+        Update: {
+          id?: number
+          lease_id?: number
+          tenant_id?: number
+          created_at?: string
+        }
+      }
     }
     Enums: {
       user_role: 
@@ -227,6 +325,7 @@ export type Database = {
       payment_frequency: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'CUSTOM'
       expense_type: 'UTILITY' | 'MAINTENANCE' | 'SUPPLIES' | 'OTHER'
       expense_status: 'PENDING' | 'APPROVED' | 'REJECTED'
+      tenant_status: 'ACTIVE' | 'INACTIVE' | 'PENDING' | 'BLACKLISTED'
     }
   }
 }

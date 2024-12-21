@@ -1,143 +1,169 @@
 <script lang="ts">
+  import type { PageData } from './$types';
+  import type { SuperValidated } from 'sveltekit-superforms';
   import { superForm } from 'sveltekit-superforms/client';
   import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
   import { zodClient } from 'sveltekit-superforms/adapters';
-  import Button from '$lib/components/ui/button/button.svelte';
-  import Input from '$lib/components/ui/input/input.svelte';
-  import Label from '$lib/components/ui/label/label.svelte';
-  import * as Select from "$lib/components/ui/select";
-  import type { PageData } from './$types';
-  import TenantList from './TenantList.svelte';
-  import { tenantSchema, tenantStatusEnum } from './formSchema';
+  import type { ExtendedTenant, Room, Profile, EmergencyContact } from './types';
   import { browser } from '$app/environment';
+  import { Button } from '$lib/components/ui/button';
+  import { Label } from '$lib/components/ui/label';
+  import { Input } from '$lib/components/ui/input';
+  import { Textarea } from '$lib/components/ui/textarea';
+  import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '$lib/components/ui/select';
+  import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import TenantList from './TenantList.svelte';
+  import { tenantSchema, tenantStatusEnum, leaseTypeEnum, type TenantFormData } from './formSchema';
+  import { formatCurrency, formatDate } from './formSchema';
 
-  export let data: PageData;
+  interface PageState {
+    form: SuperValidated<TenantFormData>;
+    tenants: ExtendedTenant[];
+    rooms: Room[];
+    properties: any[];
+    users: Profile[];
+    user: { id: string };
+    userRole: string;
+    isAdminLevel: boolean;
+    isStaffLevel: boolean;
+  }
 
-  const defaultEmergencyContact = {
-    name: '',
-    relationship: '',
-    phone: '',
-    email: '',
-    address: ''
-  };
-
-  const { form, errors, enhance, reset, submit } = superForm(data.form, {
-    id: 'tenant-form',
-    validators: zodClient(tenantSchema),
-    resetForm: true,
-    defaultValues: {
-      property_id: 0,
-      room_id: 0,
-      user_id: '',
-      tenant_status: 'PENDING' as const,
-      contract_start_date: new Date().toISOString().split('T')[0],
-      contract_end_date: new Date().toISOString().split('T')[0],
-      monthly_rate: 0,
-      security_deposit: 0,
-      emergency_contact: null,
-      notes: null,
-      created_by: ''
-    },
-    onResult: ({ result }) => {
-      if (result.type === 'success') {
-        reset();
-        editMode = false;
-      }
-    },
-  });
-
+  export let data: PageState;
+  let showForm = false;
   let editMode = false;
-  let showForm = true;
   let showEmergencyContact = false;
 
-  function handleDeleteSuccess() {
-    if (editMode) {
-      reset();
+  const { form, errors, enhance } = superForm(data.form, {
+    validators: zodClient(tenantSchema),
+    taintedMessage: null,
+    resetForm: true,
+    onResult: ({ result }) => {
+      if (result.type === 'success') {
+        showForm = false;
+        editMode = false;
+      }
     }
+  });
+
+  $: availableRooms = data.rooms?.filter((room: Room) => 
+    !$form.location_id || room.id === $form.location_id
+  ) ?? [];
+
+  function handleEdit(tenant: ExtendedTenant) {
+    editMode = true;
+    showForm = true;
+    const formData: TenantFormData = {
+      id: tenant.id,
+      name: tenant.name,
+      contact_number: tenant.contact_number,
+      email: tenant.email,
+      auth_id: tenant.auth_id,
+      tenant_status: tenant.status as TenantFormData['tenant_status'],
+      lease_status: tenant.lease?.status ?? 'INACTIVE',
+      lease_type: tenant.type as TenantFormData['lease_type'],
+      lease_id: tenant.lease?.id,
+      location_id: tenant.lease?.location?.id,
+      start_date: tenant.lease?.start_date || new Date().toISOString().split('T')[0],
+      end_date: tenant.lease?.end_date || new Date().toISOString().split('T')[0],
+      rent_amount: tenant.lease?.rent_amount ?? 0,
+      security_deposit: tenant.lease?.security_deposit ?? 0,
+      outstanding_balance: tenant.lease?.outstanding_balance ?? 0,
+      notes: tenant.lease?.notes ?? '',
+      last_payment_date: tenant.lease?.last_payment_date ?? null,
+      next_payment_due: tenant.lease?.next_payment_due ?? null,
+      created_by: tenant.created_by ?? data.user.id,
+      emergency_contact: tenant.emergency_contact,
+      payment_schedules: tenant.lease?.payment_schedules ?? [],
+      status_history: tenant.status_history ?? []
+    };
+    form.set(formData);
+  }
+
+  function handleCreate() {
     editMode = false;
+    showForm = true;
+    form.set({
+      name: '',
+      contact_number: null,
+      email: null,
+      auth_id: null,
+      tenant_status: 'PENDING',
+      lease_status: 'INACTIVE',
+      lease_type: 'BEDSPACER',
+      location_id: null,
+      start_date: new Date().toISOString().split('T')[0],
+      end_date: new Date().toISOString().split('T')[0],
+      rent_amount: 0,
+      security_deposit: 0,
+      outstanding_balance: 0,
+      notes: '',
+      last_payment_date: null,
+      next_payment_due: null,
+      created_by: data.user.id,
+      emergency_contact: {
+        name: '',
+        relationship: '',
+        phone: '',
+        email: '',
+        address: ''
+      },
+      payment_schedules: [],
+      status_history: []
+    });
   }
 
   function toggleForm() {
     showForm = !showForm;
     if (!showForm) {
-      cancelEdit();
-    }
-  }
-
-  function updatePropertyId(selected: { value: string } | undefined) {
-    if (selected?.value) {
-      $form.property_id = parseInt(selected.value);
-      // Reset room when property changes
-      $form.room_id = 0;
-    }
-  }
-
-  function updateRoomId(selected: { value: string } | undefined) {
-    if (selected?.value) {
-      $form.room_id = parseInt(selected.value);
-    }
-  }
-
-  function updateUserId(selected: { value: string } | undefined) {
-    if (selected?.value) {
-      $form.user_id = selected.value;
-    }
-  }
-
-  function updateTenantStatus(selected: { value: string } | undefined) {
-    if (selected?.value) {
-      $form.tenant_status = selected.value as typeof tenantStatusEnum._type;
+      form.reset();
     }
   }
 
   function toggleEmergencyContact() {
     showEmergencyContact = !showEmergencyContact;
-    if (!showEmergencyContact) {
-      $form.emergency_contact = null;
-    } else if (!$form.emergency_contact) {
-      $form.emergency_contact = defaultEmergencyContact;
+  }
+
+  function handleDeleteSuccess() {
+    showForm = false;
+    editMode = false;
+  }
+
+  function getNestedError(path: string): string | undefined {
+    const parts = path.split('.');
+    let current = $errors as any;
+    for (const part of parts) {
+      if (!current || typeof current !== 'object') return undefined;
+      current = current[part];
+    }
+    return current?._errors?.[0];
+  }
+
+  function handleRoomSelect(value: { value: Room }) {
+    if (value?.value) {
+      form.update($form => ({
+        ...$form,
+        location_id: value.value.id
+      }));
     }
   }
 
-  function editTenant(tenant: any) {
-    editMode = true;
-    form.set({
-      id: tenant.id,
-      property_id: tenant.property_id,
-      room_id: tenant.room_id,
-      user_id: tenant.user_id,
-      tenant_status: tenant.tenant_status,
-      contract_start_date: tenant.contract_start_date,
-      contract_end_date: tenant.contract_end_date,
-      monthly_rate: tenant.monthly_rate,
-      security_deposit: tenant.security_deposit,
-      emergency_contact: tenant.emergency_contact,
-      notes: tenant.notes,
-      created_by: tenant.created_by
-    });
-    showForm = true;
-    showEmergencyContact = !!tenant.emergency_contact;
+  function handleStatusSelect(value: { value: string }) {
+    if (value?.value) {
+      form.update($form => ({
+        ...$form,
+        tenant_status: value.value as TenantFormData['tenant_status']
+      }));
+    }
   }
-
-  function cancelEdit() {
-    editMode = false;
-    reset();
-  }
-
-  $: tenants = data.tenants ?? [];
-  $: availableRooms = data.rooms?.filter(room => 
-    !$form.property_id || room.property_id === $form.property_id
-  ) ?? [];
 </script>
 
 <div class="container mx-auto p-4 flex">
   <TenantList 
-    tenants={tenants}
-    on:edit={event => editTenant(event.detail)}
+    {data}
+    on:edit={event => handleEdit(event.detail)}
     on:deleteSuccess={handleDeleteSuccess}
   />
 
-  <!-- Tenant Form -->
   <div class="w-1/3 pl-4">
     {#if showForm}
       <div class="flex justify-between items-center mb-4">
@@ -149,139 +175,99 @@
         {/if}
 
         <div class="space-y-2">
-          <Label for="property">Property</Label>
-          <Select.Root onSelectedChange={updatePropertyId}>
-            <Select.Trigger class="w-full">
-              <Select.Value placeholder="Select property" />
-            </Select.Trigger>
-            <Select.Content>
-              {#each data.properties ?? [] as property}
-                <Select.Item value={property.id.toString()}>
-                  {property.name}
-                </Select.Item>
-              {/each}
-            </Select.Content>
-          </Select.Root>
-          {#if $errors.property_id}
-            <span class="text-red-500 text-sm">{$errors.property_id}</span>
-          {/if}
+          <Label>Name</Label>
+          <Input name="name" bind:value={$form.name} class={$errors.name ? 'border-red-500' : ''} />
+          {#if $errors.name}<span class="text-red-500 text-sm">{$errors.name[0]}</span>{/if}
         </div>
 
         <div class="space-y-2">
-          <Label for="room">Room</Label>
-          <Select.Root onSelectedChange={updateRoomId}>
-            <Select.Trigger class="w-full" disabled={!$form.property_id}>
-              <Select.Value placeholder="Select room" />
-            </Select.Trigger>
-            <Select.Content>
+          <Label>Contact Number</Label>
+          <Input name="contact_number" bind:value={$form.contact_number} class={$errors.contact_number ? 'border-red-500' : ''} />
+          {#if $errors.contact_number}<span class="text-red-500 text-sm">{$errors.contact_number[0]}</span>{/if}
+        </div>
+
+        <div class="space-y-2">
+          <Label>Email</Label>
+          <Input name="email" type="email" bind:value={$form.email} class={$errors.email ? 'border-red-500' : ''} />
+          {#if $errors.email}<span class="text-red-500 text-sm">{$errors.email[0]}</span>{/if}
+        </div>
+
+        <div class="space-y-2">
+          <Label>Room</Label>
+          <Select onSelectedChange={handleRoomSelect}>
+            <SelectTrigger class={$errors.location_id ? 'border-red-500' : ''}>
+              <SelectValue placeholder="Select a room" />
+            </SelectTrigger>
+            <SelectContent>
               {#each availableRooms as room}
-                <Select.Item value={room.id.toString()}>
-                  Room {room.room_number}
-                </Select.Item>
+                <SelectItem value={room}>
+                  Room {room.number} ({room.name})
+                </SelectItem>
               {/each}
-            </Select.Content>
-          </Select.Root>
-          {#if $errors.room_id}
-            <span class="text-red-500 text-sm">{$errors.room_id}</span>
-          {/if}
+            </SelectContent>
+          </Select>
+          {#if $errors.location_id}<span class="text-red-500 text-sm">{$errors.location_id[0]}</span>{/if}
         </div>
 
         <div class="space-y-2">
-          <Label for="user">User</Label>
-          <Select.Root onSelectedChange={updateUserId}>
-            <Select.Trigger class="w-full">
-              <Select.Value placeholder="Select user" />
-            </Select.Trigger>
-            <Select.Content>
-              {#each data.users ?? [] as user}
-                <Select.Item value={user.id}>
-                  {user.full_name}
-                </Select.Item>
-              {/each}
-            </Select.Content>
-          </Select.Root>
-          {#if $errors.user_id}
-            <span class="text-red-500 text-sm">{$errors.user_id}</span>
-          {/if}
-        </div>
-
-        <div class="space-y-2">
-          <Label for="tenant_status">Status</Label>
-          <Select.Root onSelectedChange={updateTenantStatus}>
-            <Select.Trigger class="w-full">
-              <Select.Value placeholder="Select status" />
-            </Select.Trigger>
-            <Select.Content>
-              {#each Object.values(tenantStatusEnum.Values) as status}
-                <Select.Item value={status}>
+          <Label>Status</Label>
+          <Select onSelectedChange={handleStatusSelect}>
+            <SelectTrigger class={$errors.tenant_status ? 'border-red-500' : ''}>
+              <SelectValue placeholder="Select status" />
+            </SelectTrigger>
+            <SelectContent>
+              {#each tenantStatusEnum as status}
+                <SelectItem value={status}>
                   {status}
-                </Select.Item>
+                </SelectItem>
               {/each}
-            </Select.Content>
-          </Select.Root>
-          {#if $errors.tenant_status}
-            <span class="text-red-500 text-sm">{$errors.tenant_status}</span>
-          {/if}
+            </SelectContent>
+          </Select>
+          {#if $errors.tenant_status}<span class="text-red-500 text-sm">{$errors.tenant_status[0]}</span>{/if}
         </div>
 
-        <div class="grid grid-cols-2 gap-4">
-          <div class="space-y-2">
-            <Label for="contract_start_date">Start Date</Label>
-            <Input
-              type="date"
-              id="contract_start_date"
-              name="contract_start_date"
-              bind:value={$form.contract_start_date}
-            />
-            {#if $errors.contract_start_date}
-              <span class="text-red-500 text-sm">{$errors.contract_start_date}</span>
-            {/if}
-          </div>
-
-          <div class="space-y-2">
-            <Label for="contract_end_date">End Date</Label>
-            <Input
-              type="date"
-              id="contract_end_date"
-              name="contract_end_date"
-              bind:value={$form.contract_end_date}
-            />
-            {#if $errors.contract_end_date}
-              <span class="text-red-500 text-sm">{$errors.contract_end_date}</span>
-            {/if}
-          </div>
+        <div class="space-y-2">
+          <Label>Start Date</Label>
+          <Input
+            name="start_date"
+            type="date"
+            bind:value={$form.start_date}
+            class={$errors.start_date ? 'border-red-500' : ''}
+          />
+          {#if $errors.start_date}<span class="text-red-500 text-sm">{$errors.start_date[0]}</span>{/if}
         </div>
 
-        <div class="grid grid-cols-2 gap-4">
-          <div class="space-y-2">
-            <Label for="monthly_rate">Monthly Rate</Label>
-            <Input
-              type="number"
-              id="monthly_rate"
-              name="monthly_rate"
-              bind:value={$form.monthly_rate}
-              min="0"
-              step="0.01"
-            />
-            {#if $errors.monthly_rate}
-              <span class="text-red-500 text-sm">{$errors.monthly_rate}</span>
-            {/if}
-          </div>
+        <div class="space-y-2">
+          <Label>End Date</Label>
+          <Input
+            name="end_date"
+            type="date"
+            bind:value={$form.end_date}
+            class={$errors.end_date ? 'border-red-500' : ''}
+          />
+          {#if $errors.end_date}<span class="text-red-500 text-sm">{$errors.end_date[0]}</span>{/if}
+        </div>
 
-          <div class="space-y-2">
-            <Label for="security_deposit">Security Deposit</Label>
-            <Input
-              type="number"
-              id="security_deposit"
-              name="security_deposit"
-              bind:value={$form.security_deposit}
-              min="0"
-              step="0.01"
-            />
-            {#if $errors.security_deposit}
-              <span class="text-red-500 text-sm">{$errors.security_deposit}</span>
-            {/if}
-          </div>
+        <div class="space-y-2">
+          <Label>Rent Amount</Label>
+          <Input
+            name="rent_amount"
+            type="number"
+            bind:value={$form.rent_amount}
+            class={$errors.rent_amount ? 'border-red-500' : ''}
+          />
+          {#if $errors.rent_amount}<span class="text-red-500 text-sm">{$errors.rent_amount[0]}</span>{/if}
+        </div>
+
+        <div class="space-y-2">
+          <Label>Security Deposit</Label>
+          <Input
+            name="security_deposit"
+            type="number"
+            bind:value={$form.security_deposit}
+            class={$errors.security_deposit ? 'border-red-500' : ''}
+          />
+          {#if $errors.security_deposit}<span class="text-red-500 text-sm">{$errors.security_deposit[0]}</span>{/if}
         </div>
 
         <div class="space-y-2">
@@ -292,81 +278,73 @@
             </Button>
           </div>
 
-          {#if showEmergencyContact && $form.emergency_contact}
-            <div class="space-y-4 border p-4 rounded">
+          {#if showEmergencyContact}
+            <div class="space-y-4 mt-2">
               <div class="space-y-2">
-                <Label for="emergency_contact_name">Name</Label>
+                <Label>Name</Label>
                 <Input
-                  type="text"
-                  id="emergency_contact_name"
+                  name="emergency_contact.name"
                   bind:value={$form.emergency_contact.name}
+                  class={getNestedError('emergency_contact.name') ? 'border-red-500' : ''}
                 />
+                {#if getNestedError('emergency_contact.name')}<span class="text-red-500 text-sm">{getNestedError('emergency_contact.name')}</span>{/if}
               </div>
 
               <div class="space-y-2">
-                <Label for="emergency_contact_relationship">Relationship</Label>
+                <Label>Relationship</Label>
                 <Input
-                  type="text"
-                  id="emergency_contact_relationship"
+                  name="emergency_contact.relationship"
                   bind:value={$form.emergency_contact.relationship}
+                  class={getNestedError('emergency_contact.relationship') ? 'border-red-500' : ''}
                 />
+                {#if getNestedError('emergency_contact.relationship')}<span class="text-red-500 text-sm">{getNestedError('emergency_contact.relationship')}</span>{/if}
               </div>
 
               <div class="space-y-2">
-                <Label for="emergency_contact_phone">Phone</Label>
+                <Label>Phone</Label>
                 <Input
-                  type="tel"
-                  id="emergency_contact_phone"
+                  name="emergency_contact.phone"
                   bind:value={$form.emergency_contact.phone}
+                  class={getNestedError('emergency_contact.phone') ? 'border-red-500' : ''}
                 />
+                {#if getNestedError('emergency_contact.phone')}<span class="text-red-500 text-sm">{getNestedError('emergency_contact.phone')}</span>{/if}
               </div>
 
               <div class="space-y-2">
-                <Label for="emergency_contact_email">Email</Label>
+                <Label>Email</Label>
                 <Input
+                  name="emergency_contact.email"
                   type="email"
-                  id="emergency_contact_email"
                   bind:value={$form.emergency_contact.email}
+                  class={getNestedError('emergency_contact.email') ? 'border-red-500' : ''}
                 />
+                {#if getNestedError('emergency_contact.email')}<span class="text-red-500 text-sm">{getNestedError('emergency_contact.email')}</span>{/if}
               </div>
 
               <div class="space-y-2">
-                <Label for="emergency_contact_address">Address</Label>
+                <Label>Address</Label>
                 <Input
-                  type="text"
-                  id="emergency_contact_address"
+                  name="emergency_contact.address"
                   bind:value={$form.emergency_contact.address}
+                  class={getNestedError('emergency_contact.address') ? 'border-red-500' : ''}
                 />
+                {#if getNestedError('emergency_contact.address')}<span class="text-red-500 text-sm">{getNestedError('emergency_contact.address')}</span>{/if}
               </div>
             </div>
-          {/if}
-          {#if $errors.emergency_contact}
-            <span class="text-red-500 text-sm">{$errors.emergency_contact}</span>
           {/if}
         </div>
 
         <div class="space-y-2">
-          <Label for="notes">Notes</Label>
-          <Input
-            type="text"
-            id="notes"
-            name="notes"
-            bind:value={$form.notes}
+          <Label>Notes</Label>
+          <Input 
+            name="notes" 
+            bind:value={$form.notes} 
+            class={$errors.notes ? 'border-red-500' : ''} 
           />
-          {#if $errors.notes}
-            <span class="text-red-500 text-sm">{$errors.notes}</span>
-          {/if}
+          {#if $errors.notes}<span class="text-red-500 text-sm">{$errors.notes[0]}</span>{/if}
         </div>
 
-        <div class="flex justify-end gap-2">
-          {#if editMode}
-            <Button type="button" variant="outline" on:click={cancelEdit}>
-              Cancel
-            </Button>
-            <Button type="submit" formaction="?/delete" variant="destructive">
-              Delete
-            </Button>
-          {/if}
+        <div class="flex justify-end space-x-2">
           <Button type="submit">
             {editMode ? 'Update' : 'Create'} Tenant
           </Button>

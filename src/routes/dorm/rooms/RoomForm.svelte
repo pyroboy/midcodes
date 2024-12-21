@@ -1,69 +1,128 @@
-<!-- src/routes/locations/LocationForm.svelte -->
+<!-- src/routes/rooms/RoomForm.svelte -->
 <script lang="ts">
   import { superForm } from 'sveltekit-superforms/client';
   import { zodClient } from 'sveltekit-superforms/adapters';
-  import { locations } from '$lib/db/schema';
   import Button from '$lib/components/ui/button/button.svelte';
   import Input from '$lib/components/ui/input/input.svelte';
   import Label from '$lib/components/ui/label/label.svelte';
   import * as Select from "$lib/components/ui/select";
   import { createEventDispatcher } from 'svelte';
-	import { sub } from 'date-fns';
+  import { roomSchema, type Room } from './formSchema';
 
+  interface PageData {
+    rooms: Array<Room & {
+      property: { name: string };
+      floor: { floor_number: number; wing?: string };
+    }>;
+    properties: Array<{ id: number; name: string }>;
+    floors: Array<{ id: number; property_id: number; floor_number: number; wing?: string }>;
+    form: any;
+  }
 
-  export let data: any;
+  interface SelectItem {
+    value: string;
+    label: string;
+  }
+
+  export let data: PageData;
   export let editMode = false;
-  export let currentLocation: any = undefined;
+  export let selectedRoom: (Room & { 
+    property: { name: string }; 
+    floor: { floor_number: number; wing?: string } 
+  }) | undefined = undefined;
 
   const dispatch = createEventDispatcher();
 
-  const { form, errors, enhance, submitting,reset,submit } = superForm(data, {
-    id: 'locationForm',
-    validators: zodClient(),
+  const { form, errors, enhance, submitting, reset } = superForm(data.form, {
+    id: 'roomForm',
+    validators: zodClient(roomSchema),
     applyAction: true,
     resetForm: true,
     taintedMessage: null,
-    onUpdated: ({ form }) => {
-      // You can add any logic here that should run when the form is updated
-    },
-    onSubmit: ({ formData, cancel }) => {
-      console.log('Form data before submit:', $form);
-    },
     onResult: ({ result }) => {
       if (result.type === 'success') {
- 
-        dispatch('locationAdded');
+        dispatch('roomSaved');
       }
     },
   });
 
   $: {
-    if (currentLocation && editMode) {
-      form.set(currentLocation);
-      locationStatusSelected = { value: currentLocation.locationStatus, label: currentLocation.locationStatus };
+    if (selectedRoom && editMode) {
+      form.set(selectedRoom);
+      roomStatusSelected = { value: selectedRoom.room_status, label: selectedRoom.room_status };
+      propertySelected = { value: selectedRoom.property_id.toString(), label: data.properties.find(p => p.id === selectedRoom.property_id)?.name || '' };
+      floorSelected = { value: selectedRoom.floor_id.toString(), label: getFloorLabel(selectedRoom.floor_id) };
     }
   }
 
-  $: locationStatusSelected = $form.locationStatus 
-    ? { value: $form.locationStatus, label: $form.locationStatus }
-    : { value: '', label: 'Select a status' };
+  let roomStatusSelected: SelectItem = { value: 'VACANT', label: 'VACANT' };
+  let propertySelected: SelectItem = { value: '', label: 'Select a property' };
+  let floorSelected: SelectItem = { value: '', label: 'Select a floor' };
 
-  const locationStatuses = ['VACANT', 'OCCUPIED', 'FULL_OCCUPANCY', 'RESERVED'];
+  function handlePropertyChange(selected: unknown) {
+    const s = selected as SelectItem;
+    if (s?.value) {
+      $form.property_id = Number(s.value);
+      propertySelected = s;
+      // Reset floor when property changes
+      $form.floor_id = undefined;
+      floorSelected = { value: '', label: 'Select a floor' };
+    }
+  }
 
+  function handleFloorChange(selected: unknown) {
+    const s = selected as SelectItem;
+    if (s?.value) {
+      $form.floor_id = Number(s.value);
+      floorSelected = s;
+    }
+  }
+
+  function handleTypeChange(selected: unknown) {
+    const s = selected as SelectItem;
+    if (s?.value) {
+      $form.type = s.value;
+      propertySelected = s;
+    }
+  }
+
+  function handleStatusChange(selected: unknown) {
+    const s = selected as SelectItem;
+    if (s?.value) {
+      $form.room_status = s.value;
+      roomStatusSelected = s;
+    }
+  }
+
+  $: availableFloors = data.floors.filter(f => 
+    f.property_id === Number($form.property_id)
+  );
+
+  function getFloorLabel(floorId: number): string {
+    const floor = data.floors.find(f => f.id === floorId);
+    if (!floor) return '';
+    return `Floor ${floor.floor_number}${floor.wing ? ` - ${floor.wing}` : ''}`;
+  }
+
+  const roomStatuses = ['VACANT', 'OCCUPIED', 'RESERVED'];
+  const roomTypes = ['SINGLE', 'DOUBLE', 'TRIPLE', 'QUAD', 'SUITE'];
   
+  function handleCancel() {
+    dispatch('cancel');
+    reset();
+  }
 
-function handleRandomData(event: CustomEvent) {
-  const randomData = event.detail;
-  form.set(randomData);
+  let amenityInput = '';
   
-  // i dont konw why but this is needed to make the form submit
-  setTimeout(() => {
-    submit();
-  }, 1); 
-}
+  function addAmenity() {
+    if (amenityInput.trim()) {
+      $form.amenities = [...$form.amenities, amenityInput.trim()];
+      amenityInput = '';
+    }
+  }
 
-  function handleSubmit() {
-    submit();  // This will submit the form programmatically
+  function removeAmenity(index: number): void {
+    $form.amenities = $form.amenities.filter((_: string, i: number) => i !== index);
   }
 </script>
 
@@ -71,7 +130,6 @@ function handleRandomData(event: CustomEvent) {
   method="POST" 
   action={editMode ? "?/update" : "?/create"} 
   use:enhance
-  on:submit|preventDefault={handleSubmit}
   class="space-y-4 mb-8"
 >
   {#if editMode && $form.id}
@@ -79,66 +137,148 @@ function handleRandomData(event: CustomEvent) {
   {/if}
 
   <div class="flex justify-between items-center mb-4">
-    <h1 class="text-2xl font-bold">Location Form</h1>
+    <h1 class="text-2xl font-bold">Room Form</h1>
   </div>
 
   <div>
-    <Label for="locationName">Location Name</Label>
-    <Input id="locationName" name="locationName" bind:value={$form.locationName} />
-    {#if $errors.locationName}<span class="text-red-500">{$errors.locationName}</span>{/if}
-  </div>
-
-  <div>
-    <Label for="locationFloorLevel">Floor Level</Label>
-    <Input type="number" id="locationFloorLevel" name="locationFloorLevel" bind:value={$form.locationFloorLevel} />
-    {#if $errors.locationFloorLevel}<span class="text-red-500">{$errors.locationFloorLevel}</span>{/if}
-  </div>
-
-  <div>
-    <Label for="locationCapacity">Capacity</Label>
-    <Input type="number" id="locationCapacity" name="locationCapacity" bind:value={$form.locationCapacity} />
-    {#if $errors.locationCapacity}<span class="text-red-500">{$errors.locationCapacity}</span>{/if}
-  </div>
-
-  <div>
-    <Label for="locationRentRate">Rent Rate</Label>
-    <Input type="number" id="locationRentRate" name="locationRentRate" bind:value={$form.locationRentRate} />
-    {#if $errors.locationRentRate}<span class="text-red-500">{$errors.locationRentRate}</span>{/if}
-  </div>
-
-  <div>
-    <Label for="locationStatus">Status</Label>
+    <Label for="property">Property</Label>
     <Select.Root    
-      selected={locationStatusSelected}
-      onSelectedChange={(s) => {
-        if (s) {
-          $form.locationStatus = s.value;
-          locationStatusSelected = { value: s.value, label: s.value };
-        }
-      }}
+      selected={propertySelected}
+      onSelectedChange={handlePropertyChange}
+    >
+      <Select.Trigger>
+        <Select.Value placeholder="Select a property" />
+      </Select.Trigger>
+      <Select.Content>
+        {#each data.properties as property}
+          <Select.Item value={property.id.toString()} label={property.name} />
+        {/each}
+      </Select.Content>
+    </Select.Root>
+    {#if $errors.property_id}<span class="text-red-500">{$errors.property_id}</span>{/if}
+  </div>
+
+  <div>
+    <Label for="floor">Floor</Label>
+    <Select.Root    
+      selected={floorSelected}
+      onSelectedChange={handleFloorChange}
+    >
+      <Select.Trigger>
+        <Select.Value placeholder="Select a floor" />
+      </Select.Trigger>
+      <Select.Content>
+        {#each availableFloors as floor}
+          <Select.Item 
+            value={floor.id.toString()} 
+            label={getFloorLabel(floor.id)} 
+          />
+        {/each}
+      </Select.Content>
+    </Select.Root>
+    {#if $errors.floor_id}<span class="text-red-500">{$errors.floor_id}</span>{/if}
+  </div>
+
+  <div>
+    <Label for="name">Room Name</Label>
+    <Input id="name" name="name" bind:value={$form.name} />
+    {#if $errors.name}<span class="text-red-500">{$errors.name}</span>{/if}
+  </div>
+
+  <div>
+    <Label for="number">Room Number</Label>
+    <Input type="number" id="number" name="number" bind:value={$form.number} />
+    {#if $errors.number}<span class="text-red-500">{$errors.number}</span>{/if}
+  </div>
+
+  <div>
+    <Label for="type">Room Type</Label>
+    <Select.Root    
+      selected={{ value: $form.type || '', label: $form.type || 'Select a type' }}
+      onSelectedChange={handleTypeChange}
+    >
+      <Select.Trigger>
+        <Select.Value placeholder="Select a type" />
+      </Select.Trigger>
+      <Select.Content>
+        {#each roomTypes as type}
+          <Select.Item value={type} label={type} />
+        {/each}
+      </Select.Content>
+    </Select.Root>
+    {#if $errors.type}<span class="text-red-500">{$errors.type}</span>{/if}
+  </div>
+
+  <div>
+    <Label for="capacity">Capacity</Label>
+    <Input type="number" id="capacity" name="capacity" bind:value={$form.capacity} />
+    {#if $errors.capacity}<span class="text-red-500">{$errors.capacity}</span>{/if}
+  </div>
+
+  <div>
+    <Label for="base_rate">Base Rate</Label>
+    <Input type="number" id="base_rate" name="base_rate" bind:value={$form.base_rate} />
+    {#if $errors.base_rate}<span class="text-red-500">{$errors.base_rate}</span>{/if}
+  </div>
+
+  <div>
+    <Label for="room_status">Status</Label>
+    <Select.Root    
+      selected={roomStatusSelected}
+      onSelectedChange={handleStatusChange}
     >
       <Select.Trigger>
         <Select.Value placeholder="Select a status" />
       </Select.Trigger>
       <Select.Content>
-        {#each locationStatuses as status}
+        {#each roomStatuses as status}
           <Select.Item value={status} label={status} />
         {/each}
       </Select.Content>
     </Select.Root>
-    <input type="hidden" name="locationStatus" bind:value={$form.locationStatus} />
-    {#if $errors.locationStatus}<span class="text-red-500">{$errors.locationStatus}</span>{/if}
+    {#if $errors.room_status}<span class="text-red-500">{$errors.room_status}</span>{/if}
+  </div>
+
+  <div>
+    <Label for="amenities">Amenities</Label>
+    <div class="flex gap-2 mb-2">
+      <Input 
+        id="amenity-input" 
+        bind:value={amenityInput} 
+        placeholder="Add amenity"
+        on:keydown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            addAmenity();
+          }
+        }}
+      />
+      <Button type="button" on:click={addAmenity}>Add</Button>
+    </div>
+    {#if $form.amenities?.length}
+      <div class="flex flex-wrap gap-2 mt-2">
+        {#each $form.amenities as amenity, i}
+          <div class="flex items-center gap-1 bg-secondary p-1 rounded">
+            <span>{amenity}</span>
+            <button 
+              type="button" 
+              class="text-destructive hover:text-destructive-foreground"
+              on:click={() => removeAmenity(i)}
+            >
+              ×
+            </button>
+          </div>
+        {/each}
+      </div>
+    {/if}
   </div>
 
   <div class="flex justify-end space-x-2">
-    <Button type="submit" disabled={$submitting} class="border-2 border-green-300 rounded-full text-[10px] font-bold bg-green-500 hover:bg-green-600 text-white">
-      {$submitting ? 'Submitting...' : (editMode ? 'Update' : 'Add') + ' Location'}
+    <Button type="submit" disabled={$submitting}>
+      {$submitting ? 'Submitting...' : (editMode ? 'Update' : 'Add') + ' Room'}
     </Button>
     {#if editMode}
-      <Button type="button" on:click={() => {
-        editMode = false;
-        reset();
-      }} class="border-2 border-red-300 rounded-full text-[10px] font-bold bg-red-500 hover:bg-red-600 text-white">
+      <Button type="button" variant="destructive" on:click={handleCancel}>
         Cancel
       </Button>
     {/if}

@@ -85,7 +85,9 @@ CREATE TABLE public.tenants (
     email character varying(255),
     created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
     updated_at timestamp with time zone,
-    auth_id uuid
+    auth_id uuid REFERENCES auth.users(id),                    -- New column
+    tenant_status tenant_status NOT NULL DEFAULT 'PENDING',    -- New column
+    created_by uuid REFERENCES auth.users(id)                  -- New column
 );
 ```
 
@@ -102,9 +104,10 @@ CREATE TABLE public.leases (
     rent_amount numeric(10,2) NOT NULL,
     security_deposit numeric(10,2) NOT NULL,
     balance numeric(10,2) DEFAULT 0,
-    notes text,
+    notes text,                                               -- New column
     created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
-    updated_at timestamp with time zone
+    updated_at timestamp with time zone,
+    created_by uuid REFERENCES auth.users(id)                 -- New column
 );
 ```
 
@@ -166,7 +169,7 @@ CREATE TABLE public.payment_schedules (
     lease_id integer NOT NULL,
     due_date date NOT NULL,
     expected_amount numeric(10,2) NOT NULL,
-    type billing_type NOT NULL,
+    type billing_type NOT NULL DEFAULT 'RENT',               -- New column with default
     frequency payment_frequency NOT NULL,
     status payment_status DEFAULT 'PENDING',
     notes text,
@@ -335,8 +338,6 @@ CREATE TABLE public.role_emulation_sessions (
 
 ## Enums Used
 
-## Enums Used
-
 1. billing_type
    - RENT
    - UTILITY
@@ -434,3 +435,14 @@ CREATE TABLE public.role_emulation_sessions (
     - property_guest
     - id_gen_admin
     - id_gen_user
+
+## Added Type Definitions
+```sql
+CREATE TYPE tenant_status AS ENUM (
+    'ACTIVE',
+    'INACTIVE',
+    'PENDING',
+    'BLACKLISTED'
+);
+```
+
