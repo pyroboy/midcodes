@@ -5,8 +5,9 @@
   import Input from '$lib/components/ui/input/input.svelte';
   import Label from '$lib/components/ui/label/label.svelte';
   import * as Select from '$lib/components/ui/select';
+  import { Badge } from '$lib/components/ui/badge';
   import { createEventDispatcher } from 'svelte';
-  import type { PaymentSchema } from './formSchema';
+  import { paymentSchema, type PaymentSchema } from './formSchema';
   import Textarea from '$lib/components/ui/textarea/textarea.svelte';
 
   export let data: any;
@@ -15,6 +16,7 @@
   export let payment: PaymentSchema | undefined = undefined;
 
   const dispatch = createEventDispatcher();
+  const rows = 3;
 
   $: {
     if (payment && editMode) {
@@ -26,7 +28,7 @@
 
   const { form, errors, enhance, submitting, reset } = superForm(data.form, {
     id: 'paymentForm',
-    validators: zodClient(PaymentSchema),
+    validators: zodClient(paymentSchema),
     resetForm: true,
     taintedMessage: null,
     onResult: ({ result }) => {
@@ -40,184 +42,241 @@
   $: canEdit = data.isAdminLevel || data.isAccountant || data.isFrontdesk;
   $: canUpdateStatus = data.isAdminLevel || data.isAccountant;
   $: selectedBilling = billings.find(b => b.id === $form.billing_id);
+
+  function getMethodBadgeVariant(method: string): 'default' | 'destructive' | 'outline' | 'secondary' {
+    switch (method) {
+      case 'CASH':
+        return 'default';
+      case 'BANK':
+        return 'secondary';
+      case 'GCASH':
+        return 'outline';
+      default:
+        return 'destructive';
+    }
+  }
+
+  function formatCurrency(amount: number): string {
+    return new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP'
+    }).format(amount);
+  }
+
+  function parseNumberInput(value: string): number {
+    return parseFloat(value) || 0;
+  }
 </script>
 
 <form
   method="POST"
   action={editMode ? "?/update" : "?/create"}
   use:enhance
-  class="space-y-4 p-4 bg-white rounded-lg shadow"
+  class="space-y-4 w-full max-w-xl mx-auto p-4 bg-card rounded-lg border shadow"
 >
-  <input type="hidden" name="id" value={$form.id} />
-
-  {#if !editMode}
-    <div class="space-y-2">
-      <Label for="billing_id">Billing</Label>
-      <Select.Root selected={$form.billing_id} onSelectedChange={(val) => form.update($form => ({ ...$form, billing_id: val }))} disabled={!canEdit || editMode}>
-        <Select.Trigger class="w-full">
-          <Select.Value placeholder="Select a billing" />
-        </Select.Trigger>
-        <Select.Content>
+  {#if editMode}
+    <input type="hidden" name="id" bind:value={$form.id} />
+  {/if}
+  
+  <!-- Billing Selection -->
+  <div class="space-y-2">
+    <Label for="billing_id">Billing</Label>
+    <Select.Root>
+      <Select.Trigger 
+        id="billing_id" 
+        disabled={!canEdit || editMode}
+        class="w-full"
+      >
+        <Select.Value>
+          {#if selectedBilling}
+            {selectedBilling.lease.name} - {selectedBilling.type} - {formatCurrency(selectedBilling.balance)}
+          {:else}
+            Select a billing
+          {/if}
+        </Select.Value>
+      </Select.Trigger>
+      <Select.Content>
+        <Select.Group>
           {#each billings as billing}
-            <Select.Item value={billing.id}>
-              {billing.type} 
-              {#if billing.utility_type}
-                - {billing.utility_type}
-              {/if}
-              ({billing.lease.name})
-              - Balance: ₱{billing.balance.toFixed(2)}
-              {#if billing.lease.room}
-                - Room {billing.lease.room.room_number}
-                {#if billing.lease.room.floor}
-                  Floor {billing.lease.room.floor.floor_number}
-                  {#if billing.lease.room.floor.wing}
-                    Wing {billing.lease.room.floor.wing}
-                  {/if}
-                  ({billing.lease.room.floor.property?.name})
-                {/if}
-              {/if}
+            <Select.Item 
+              value={billing.id} 
+              on:click={() => form.update($form => ({ ...$form, billing_id: billing.id }))}
+            >
+              {billing.lease.name} - {billing.type} - {formatCurrency(billing.balance)}
             </Select.Item>
           {/each}
-        </Select.Content>
-      </Select.Root>
-      {#if $errors.billing_id}
-        <p class="text-red-500 text-sm">{$errors.billing_id}</p>
-      {/if}
-    </div>
+        </Select.Group>
+      </Select.Content>
+    </Select.Root>
+    {#if $errors.billing_id}
+      <p class="text-sm text-destructive">{$errors.billing_id}</p>
+    {/if}
+  </div>
 
-    <div class="space-y-2">
-      <Label for="amount">Amount</Label>
+  <!-- Amount -->
+  <div class="space-y-2">
+    <Label for="amount">Amount</Label>
+    <div class="relative">
       <Input
         type="number"
         id="amount"
         name="amount"
-        value={$form.amount}
-        on:input={(e) => form.update($form => ({ ...$form, amount: parseFloat(e.currentTarget.value) }))}
         min="0"
-        max={selectedBilling?.balance || 0}
         step="0.01"
-        disabled={!canEdit || editMode}
+        bind:value={$form.amount}
+        disabled={!canEdit}
+        style={$form.amount > (selectedBilling?.balance || 0) ? 'border-color: var(--destructive)' : ''}
       />
-      {#if $errors.amount}
-        <p class="text-red-500 text-sm">{$errors.amount}</p>
-      {/if}
     </div>
-  {/if}
-
-  <div class="space-y-2">
-    <Label for="payment_method">Payment Method</Label>
-    <Select.Root selected={$form.payment_method} onSelectedChange={(val) => form.update($form => ({ ...$form, payment_method: val }))} disabled={!canEdit}>
-      <Select.Trigger class="w-full">
-        <Select.Value placeholder="Select payment method" />
-      </Select.Trigger>
-      <Select.Content>
-        <Select.Item value="CASH">Cash</Select.Item>
-        <Select.Item value="BANK_TRANSFER">Bank Transfer</Select.Item>
-        <Select.Item value="CREDIT_CARD">Credit Card</Select.Item>
-        <Select.Item value="GCASH">GCash</Select.Item>
-        <Select.Item value="MAYA">Maya</Select.Item>
-        <Select.Item value="CHECK">Check</Select.Item>
-      </Select.Content>
-    </Select.Root>
-    {#if $errors.payment_method}
-      <p class="text-red-500 text-sm">{$errors.payment_method}</p>
+    {#if $errors.amount}
+      <p class="text-sm text-destructive">{$errors.amount}</p>
+    {/if}
+    {#if selectedBilling}
+      <p class="text-sm text-muted-foreground">
+        Balance: {formatCurrency(selectedBilling.balance)}
+        {#if $form.amount > selectedBilling.balance}
+          <span class="text-destructive">Amount exceeds balance</span>
+        {/if}
+      </p>
     {/if}
   </div>
 
-  {#if !editMode}
-    <div class="space-y-2">
-      <Label for="payment_date">Payment Date</Label>
-      <Input
-        type="date"
-        id="payment_date"
-        name="payment_date"
-        value={$form.payment_date}
-        on:input={(e) => form.update($form => ({ ...$form, payment_date: e.currentTarget.value }))}
+  <!-- Payment Method -->
+  <div class="space-y-2">
+    <Label for="method">Payment Method</Label>
+    <Select.Root>
+      <Select.Trigger 
+        id="method"
         disabled={!canEdit}
-      />
-      {#if $errors.payment_date}
-        <p class="text-red-500 text-sm">{$errors.payment_date}</p>
-      {/if}
-    </div>
-  {/if}
+        class="w-full"
+      >
+        <Select.Value>
+          {#if $form.method}
+            <Badge variant={getMethodBadgeVariant($form.method)}>{$form.method}</Badge>
+          {:else}
+            Select payment method
+          {/if}
+        </Select.Value>
+      </Select.Trigger>
+      <Select.Content>
+        <Select.Group>
+          {#each ['CASH', 'BANK', 'GCASH', 'OTHER'] as method}
+            <Select.Item 
+              value={method}
+              on:click={() => form.update($form => ({ ...$form, method }))}
+            >
+              <Badge variant={getMethodBadgeVariant(method)}>{method}</Badge>
+            </Select.Item>
+          {/each}
+        </Select.Group>
+      </Select.Content>
+    </Select.Root>
+    {#if $errors.method}
+      <p class="text-sm text-destructive">{$errors.method}</p>
+    {/if}
+  </div>
 
+  <!-- Reference Number -->
   <div class="space-y-2">
     <Label for="reference_number">Reference Number</Label>
     <Input
       type="text"
       id="reference_number"
       name="reference_number"
-      value={$form.reference_number ?? ''}
-      on:input={(e) => form.update($form => ({ ...$form, reference_number: e.currentTarget.value }))}
+      bind:value={$form.reference_number}
       disabled={!canEdit}
+      placeholder="Enter reference number"
     />
     {#if $errors.reference_number}
-      <p class="text-red-500 text-sm">{$errors.reference_number}</p>
+      <p class="text-sm text-destructive">{$errors.reference_number}</p>
     {/if}
   </div>
 
+  <!-- Receipt URL -->
   <div class="space-y-2">
     <Label for="receipt_url">Receipt URL</Label>
-    <Input
-      type="url"
-      id="receipt_url"
-      name="receipt_url"
-      value={$form.receipt_url ?? ''}
-      on:input={(e) => form.update($form => ({ ...$form, receipt_url: e.currentTarget.value }))}
-      disabled={!canEdit}
-    />
+    <div class="flex gap-2">
+      <Input
+        type="url"
+        id="receipt_url"
+        name="receipt_url"
+        placeholder="https://example.com/receipt.pdf"
+        bind:value={$form.receipt_url}
+        disabled={!canEdit}
+      />
+      {#if $form.receipt_url}
+        <a 
+          href={$form.receipt_url} 
+          target="_blank" 
+          rel="noopener noreferrer"
+          class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2"
+        >
+          View
+        </a>
+      {/if}
+    </div>
     {#if $errors.receipt_url}
-      <p class="text-red-500 text-sm">{$errors.receipt_url}</p>
+      <p class="text-sm text-destructive">{$errors.receipt_url}</p>
     {/if}
   </div>
 
+  <!-- Paid By -->
+  <div class="space-y-2">
+    <Label for="paid_by">Paid By</Label>
+    <Input
+      type="text"
+      id="paid_by"
+      name="paid_by"
+      bind:value={$form.paid_by}
+      disabled={!canEdit}
+      placeholder="Enter payer's name"
+    />
+    {#if $errors.paid_by}
+      <p class="text-sm text-destructive">{$errors.paid_by}</p>
+    {/if}
+  </div>
+
+  <!-- Payment Date -->
+  <div class="space-y-2">
+    <Label for="paid_at">Payment Date</Label>
+    <Input
+      type="datetime-local"
+      id="paid_at"
+      name="paid_at"
+      bind:value={$form.paid_at}
+      disabled={!canEdit}
+    />
+    {#if $errors.paid_at}
+      <p class="text-sm text-destructive">{$errors.paid_at}</p>
+    {/if}
+  </div>
+
+  <!-- Notes -->
   <div class="space-y-2">
     <Label for="notes">Notes</Label>
     <Textarea
       id="notes"
       name="notes"
-      value={$form.notes ?? ''}
-      on:input={(e) => form.update($form => ({ ...$form, notes: e.currentTarget.value }))}
+      rows={rows}
+      bind:value={$form.notes}
       disabled={!canEdit}
-      rows="3"
+      placeholder="Enter any additional notes"
     />
     {#if $errors.notes}
-      <p class="text-red-500 text-sm">{$errors.notes}</p>
+      <p class="text-sm text-destructive">{$errors.notes}</p>
     {/if}
   </div>
 
-  {#if editMode && canUpdateStatus}
-    <div class="space-y-2">
-      <Label for="status">Status</Label>
-      <Select.Root selected={$form.status} onSelectedChange={(val) => form.update($form => ({ ...$form, status: val }))} disabled={!canUpdateStatus}>
-        <Select.Trigger class="w-full">
-          <Select.Value placeholder="Select status" />
-        </Select.Trigger>
-        <Select.Content>
-          <Select.Item value="PENDING">Pending</Select.Item>
-          <Select.Item value="PAID">Paid</Select.Item>
-          <Select.Item value="FAILED">Failed</Select.Item>
-          <Select.Item value="REFUNDED">Refunded</Select.Item>
-          <Select.Item value="CANCELLED">Cancelled</Select.Item>
-        </Select.Content>
-      </Select.Root>
-      {#if $errors.status}
-        <p class="text-red-500 text-sm">{$errors.status}</p>
+  <!-- Submit Button -->
+  <div class="flex justify-end">
+    <Button type="submit" disabled={!canEdit || $submitting}>
+      {#if $submitting}
+        Processing...
+      {:else if editMode}
+        Update Payment
+      {:else}
+        Create Payment
       {/if}
-    </div>
-  {/if}
-
-  <div class="flex justify-end space-x-2">
-    {#if editMode}
-      {#if canUpdateStatus}
-        <Button type="submit" disabled={$submitting}>
-          Update
-        </Button>
-      {/if}
-    {:else if canEdit}
-      <Button type="submit" disabled={$submitting}>
-        Create
-      </Button>
-    {/if}
+    </Button>
   </div>
 </form>

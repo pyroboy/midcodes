@@ -1,8 +1,17 @@
 import { fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
-import { paymentSchema } from './formSchema';
-import { supabase } from '$lib/supabase';
+import { paymentSchema, type UserRole } from './formSchema';
+import { supabase } from '$lib/supabaseClient';
+import {
+  calculatePenalty,
+  getPenaltyConfig,
+  createPenaltyBilling,
+  updateBillingStatus,
+  determinePaymentStatus,
+  getUTCTimestamp,
+  logAuditEvent
+} from './utils';
 
 export const load = async ({ locals }) => {
   const session = await locals.getSession();
@@ -10,7 +19,7 @@ export const load = async ({ locals }) => {
     return fail(401, { message: 'Unauthorized' });
   }
 
-  const [{ data: userRole }, { data: payments }, { data: billings }, { data: properties }, { data: tenants }] = await Promise.all([
+  const [{ data: userRole }, { data: payments }, { data: billings }] = await Promise.all([
     supabase
       .from('profiles')
       .select('role')
@@ -21,14 +30,33 @@ export const load = async ({ locals }) => {
       .from('payments')
       .select(`
         *,
-        property:properties(name),
-        tenant:tenants(
-          user:profiles(full_name),
-          room:rooms(room_number, floor:floors(floor_number, wing))
-        ),
-        created_by_user:profiles!created_by(full_name)
+        created_by:profiles!created_by(name),
+        billing:billings(
+          id,
+          type,
+          utility_type,
+          amount,
+          paid_amount,
+          balance,
+          status,
+          due_date,
+          lease:leases(
+            id,
+            name,
+            room:rooms(
+              room_number,
+              floor:floors(
+                floor_number,
+                wing,
+                property:properties(
+                  name
+                )
+              )
+            )
+          )
+        )
       `)
-      .order('payment_date', { ascending: false }),
+      .order('paid_at', { ascending: false }),
 
     supabase
       .from('billings')
@@ -37,6 +65,7 @@ export const load = async ({ locals }) => {
         type,
         utility_type,
         amount,
+        paid_amount,
         balance,
         status,
         due_date,
@@ -56,42 +85,27 @@ export const load = async ({ locals }) => {
           )
         )
       `)
-      .eq('status', 'PENDING')
-      .order('due_date'),
-
-    supabase
-      .from('properties')
-      .select('id, name')
-      .eq('status', 'ACTIVE')
-      .order('name'),
-
-    supabase
-      .from('tenants')
-      .select(`
-        id,
-        user:profiles(full_name),
-        room:rooms(room_number),
-        property_id
-      `)
-      .eq('tenant_status', 'ACTIVE')
-      .order('property_id')
+      .in('status', ['PENDING', 'PARTIAL', 'OVERDUE'])
+      .order('due_date')
   ]);
 
   const form = await superValidate(zod(paymentSchema));
   const isAdminLevel = ['super_admin', 'property_admin'].includes(userRole?.role || '');
   const isAccountant = userRole?.role === 'property_accountant';
+  const isUtility = userRole?.role === 'property_utility';
   const isFrontdesk = userRole?.role === 'property_frontdesk';
+  const isResident = userRole?.role === 'property_resident';
 
   return {
     form,
     payments,
     billings,
-    properties,
-    tenants,
     userRole: userRole?.role || 'user',
     isAdminLevel,
     isAccountant,
-    isFrontdesk
+    isUtility,
+    isFrontdesk,
+    isResident
   };
 };
 
@@ -99,78 +113,214 @@ export const actions = {
   create: async ({ request, locals }) => {
     const session = await locals.getSession();
     if (!session) {
-      return fail(401, { message: 'Unauthorized' });
+      return fail(401, { 
+        form: null,
+        error: 'You must be logged in to create payments' 
+      });
+    }
+
+    const form = await superValidate(request, zod(paymentSchema));
+    if (!form.valid) {
+      return fail(400, { 
+        form,
+        error: 'Invalid form data. Please check your input.' 
+      });
+    }
+
+    // Get billing details first
+    const { data: billing, error: billingError } = await supabase
+      .from('billings')
+      .select('*, lease:leases(name, room:rooms(room_number, floor:floors(floor_number, wing)))')
+      .eq('id', form.data.billing_id)
+      .single();
+
+    if (billingError || !billing) {
+      console.error('Failed to fetch billing:', billingError);
+      return fail(404, { 
+        form,
+        error: `Billing #${form.data.billing_id} not found or has been deleted` 
+      });
     }
 
     const { data: userRole } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, name')
       .eq('id', session.user.id)
       .single();
 
-    if (!['super_admin', 'property_admin', 'property_accountant', 'property_frontdesk'].includes(userRole?.role || '')) {
-      return fail(403, { message: 'Insufficient permissions' });
+    const canCreate = ['super_admin', 'property_admin', 'property_accountant', 'property_frontdesk'] as UserRole[];
+    if (!canCreate.includes(userRole?.role as UserRole)) {
+      await logAuditEvent(supabase, {
+        action: 'payment_create_denied',
+        user_id: session.user.id,
+        user_role: userRole?.role,
+        details: {
+          billing_id: billing.id,
+          amount: form.data.amount,
+          method: form.data.method
+        }
+      });
+      return fail(403, { 
+        form,
+        error: 'You do not have permission to create payments' 
+      });
     }
 
-    const form = await superValidate(request, zod(paymentSchema));
-
-    if (!form.valid) {
-      return fail(400, { form });
-    }
-
-    const { data: billing } = await supabase
-      .from('billings')
-      .select('amount, balance, status')
-      .eq('id', form.data.billing_id)
-      .single();
-
-    if (!billing) {
-      return fail(404, { form, message: 'Billing not found' });
-    }
-
-    if (billing.status !== 'PENDING') {
-      return fail(400, { form, message: 'Cannot add payment to a non-pending billing' });
+    if (!['PENDING', 'PARTIAL', 'OVERDUE'].includes(billing.status)) {
+      await logAuditEvent(supabase, {
+        action: 'payment_create_invalid_status',
+        user_id: session.user.id,
+        user_role: userRole?.role,
+        details: {
+          billing_id: billing.id,
+          billing_status: billing.status,
+          amount: form.data.amount
+        }
+      });
+      return fail(400, { 
+        form,
+        error: `Cannot process payment for billing in ${billing.status} status. Only PENDING, PARTIAL, or OVERDUE billings can receive payments.` 
+      });
     }
 
     if (form.data.amount > billing.balance) {
-      return fail(400, { form, message: 'Payment amount cannot exceed billing balance' });
+      await logAuditEvent(supabase, {
+        action: 'payment_create_amount_exceeded',
+        user_id: session.user.id,
+        user_role: userRole?.role,
+        details: {
+          billing_id: billing.id,
+          attempted_amount: form.data.amount,
+          billing_balance: billing.balance
+        }
+      });
+      return fail(400, { 
+        form,
+        error: `Payment amount (${form.data.amount}) exceeds billing balance (${billing.balance}). Please enter an amount less than or equal to the balance.` 
+      });
     }
 
+    // Check for late payment and calculate penalty
+    const penaltyConfig = await getPenaltyConfig(supabase, billing.type);
+    let penaltyAmount = 0;
+    
+    if (penaltyConfig && new Date(form.data.paid_at) > new Date(billing.due_date)) {
+      penaltyAmount = await calculatePenalty(billing, penaltyConfig, new Date(form.data.paid_at));
+    }
+
+    let createdPayment;
     try {
-      const { error: paymentError } = await supabase
+      const timestamp = getUTCTimestamp();
+      const { data, error: paymentError } = await supabase
         .from('payments')
         .insert({
           ...form.data,
-          created_by: session.user.id
-        });
-
-      if (paymentError) throw paymentError;
-
-      const newBalance = billing.balance - form.data.amount;
-      const newStatus = newBalance === 0 ? 'PAID' : 'PENDING';
-
-      const { error: billingError } = await supabase
-        .from('billings')
-        .update({
-          balance: newBalance,
-          status: newStatus,
-          paid_amount: billing.amount - newBalance
+          created_by: session.user.id,
+          updated_by: session.user.id,
+          created_at: timestamp,
+          updated_at: timestamp
         })
-        .eq('id', form.data.billing_id);
+        .select(`
+          *,
+          billing:billings!inner(
+            id,
+            type,
+            utility_type,
+            lease:leases(
+              name,
+              room:rooms(
+                room_number,
+                floor:floors(
+                  floor_number,
+                  wing
+                )
+              )
+            )
+          )
+        `)
+        .single();
 
-      if (billingError) throw billingError;
+      if (paymentError) {
+        console.error('Failed to create payment:', paymentError);
+        await logAuditEvent(supabase, {
+          action: 'payment_create_failed',
+          user_id: session.user.id,
+          user_role: userRole?.role,
+          details: {
+            billing_id: billing.id,
+            error: paymentError.message,
+            amount: form.data.amount
+          }
+        });
+        throw new Error('Failed to create payment record');
+      }
 
-      return { form };
-    } catch (err) {
-      console.error(err);
-      return fail(500, { form });
+      createdPayment = data;
+
+      // Log successful payment creation
+      await logAuditEvent(supabase, {
+        action: 'payment_created',
+        user_id: session.user.id,
+        user_role: userRole?.role,
+        details: {
+          payment_id: createdPayment.id,
+          billing_id: billing.id,
+          amount: form.data.amount,
+          method: form.data.method,
+          location: `${billing.lease.room.floor.wing} - Floor ${billing.lease.room.floor.floor_number} - Room ${billing.lease.room.room_number}`
+        }
+      });
+
+      // Update billing status
+      await updateBillingStatus(supabase, billing, billing.paid_amount + form.data.amount);
+
+      // Create penalty billing if needed
+      if (penaltyAmount > 0) {
+        await createPenaltyBilling(supabase, billing, penaltyAmount);
+      }
+
+      return { 
+        form,
+        success: true,
+        message: `Payment of ${form.data.amount} successfully processed for ${billing.lease.name}`
+      };
+    } catch (error) {
+      console.error('Transaction failed:', error);
+      
+      // Attempt to rollback payment if it was created
+      try {
+        if (createdPayment?.id) {
+          await supabase
+            .from('payments')
+            .delete()
+            .eq('id', createdPayment.id);
+        }
+      } catch (rollbackError) {
+        console.error('Failed to rollback payment:', rollbackError);
+      }
+
+      return fail(500, { 
+        form,
+        error: 'Failed to process payment. Please try again or contact support if the issue persists.' 
+      });
     }
   },
 
   update: async ({ request, locals }) => {
     const session = await locals.getSession();
     if (!session) {
-      return fail(401, { message: 'Unauthorized' });
+      return fail(401, { 
+        form: null,
+        error: 'You must be logged in to update payments' 
+      });
+    }
+
+    const form = await superValidate(request, zod(paymentSchema));
+    if (!form.valid) {
+      return fail(400, { 
+        form,
+        error: 'Invalid form data. Please check your input.' 
+      });
     }
 
     const { data: userRole } = await supabase
@@ -179,94 +329,47 @@ export const actions = {
       .eq('id', session.user.id)
       .single();
 
-    if (!['super_admin', 'property_admin', 'property_accountant'].includes(userRole?.role || '')) {
-      return fail(403, { message: 'Insufficient permissions' });
+    const canUpdate = ['super_admin', 'property_admin', 'property_accountant'] as UserRole[];
+    if (!canUpdate.includes(userRole?.role as UserRole)) {
+      return fail(403, { 
+        form,
+        error: 'You do not have permission to update payments' 
+      });
     }
 
-    const form = await superValidate(request, zod(paymentSchema));
-
-    if (!form.valid) {
-      return fail(400, { form });
-    }
-
-    try {
-      const { error } = await supabase
-        .from('payments')
-        .update({
-          payment_method: form.data.payment_method,
-          reference_number: form.data.reference_number,
-          receipt_url: form.data.receipt_url,
-          notes: form.data.notes,
-          status: form.data.status
-        })
-        .eq('id', form.data.id);
-
-      if (error) throw error;
-
-      // If payment is cancelled or refunded, update billing
-      if (['CANCELLED', 'REFUNDED'].includes(form.data.status)) {
-        const { data: payment } = await supabase
-          .from('payments')
-          .select('amount, billing:billings!inner(balance, amount)')
-          .eq('id', form.data.id)
-          .single();
-
-        if (payment) {
-          const newBalance = payment.billing.balance + payment.amount;
-          const { error: billingError } = await supabase
-            .from('billings')
-            .update({
-              balance: newBalance,
-              status: 'PENDING',
-              paid_amount: payment.billing.amount - newBalance
-            })
-            .eq('id', form.data.billing_id);
-
-          if (billingError) throw billingError;
-        }
-      }
-
-      return { form };
-    } catch (err) {
-      console.error(err);
-      return fail(500, { form });
-    }
-  },
-
-  delete: async ({ request, locals }) => {
-    const session = await locals.getSession();
-    if (!session) {
-      return fail(401, { message: 'Unauthorized' });
-    }
-
-    const { data: userRole } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', session.user.id)
+    // Get existing payment
+    const { data: existingPayment, error: existingError } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('id', form.data.id)
       .single();
 
-    if (!['super_admin', 'property_admin', 'property_accountant'].includes(userRole?.role || '')) {
-      return fail(403, { message: 'Insufficient permissions' });
+    if (existingError || !existingPayment) {
+      console.error('Failed to fetch existing payment:', existingError);
+      return fail(404, { 
+        form,
+        error: 'Payment not found or has been deleted' 
+      });
     }
 
-    const form = await superValidate(request, zod(paymentSchema));
+    // Update payment with tracking fields
+    const { error: updateError } = await supabase
+      .from('payments')
+      .update({
+        ...form.data,
+        updated_by: session.user.id,
+        updated_at: getUTCTimestamp()
+      })
+      .eq('id', form.data.id);
 
-    if (!form.valid) {
-      return fail(400, { form });
+    if (updateError) {
+      console.error('Failed to update payment:', updateError);
+      return fail(500, { 
+        form,
+        error: 'Failed to update payment record' 
+      });
     }
 
-    try {
-      const { error } = await supabase
-        .from('payments')
-        .delete()
-        .eq('id', form.data.id);
-
-      if (error) throw error;
-
-      return { form };
-    } catch (err) {
-      console.error(err);
-      return fail(500, { form });
-    }
+    return { form };
   }
 };

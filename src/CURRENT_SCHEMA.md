@@ -148,10 +148,14 @@ CREATE TABLE public.payments (
     amount numeric(10,2) NOT NULL,
     method payment_method NOT NULL,
     reference_number text,
+    receipt_url text,
     paid_by text NOT NULL,
     paid_at timestamp with time zone NOT NULL,
     notes text,
-    created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now())
+    created_by uuid,
+    created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
+    updated_by uuid,
+    updated_at timestamp with time zone
 );
 ```
 

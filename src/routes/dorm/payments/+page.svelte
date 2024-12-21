@@ -5,7 +5,7 @@
   import Button from '$lib/components/ui/button/button.svelte';
   import type { PageData } from './$types';
   import type { z } from 'zod';
-  import type { paymentSchema } from './formSchema';
+  import { paymentSchema } from './formSchema';
 
   type Payment = z.infer<typeof paymentSchema> & {
     billing?: {
@@ -36,7 +36,7 @@
   let selectedPayment: Payment | undefined = undefined;
 
   function handlePaymentClick(payment: Payment) {
-    if (data.isAdminLevel || data.isAccountant) {
+    if (data.isAdminLevel || data.isAccountant || data.isFrontdesk) {
       selectedPayment = payment;
       showForm = true;
     }
@@ -50,33 +50,15 @@
   function getStatusVariant(status: string): 'default' | 'destructive' | 'outline' | 'secondary' {
     switch (status) {
       case 'PAID':
-        return 'secondary';
+        return 'default';
       case 'PENDING':
+        return 'secondary';
+      case 'PARTIAL':
         return 'outline';
-      case 'FAILED':
+      case 'OVERDUE':
         return 'destructive';
-      case 'REFUNDED':
-      case 'CANCELLED':
-        return 'secondary';
       default:
-        return 'default';
-    }
-  }
-
-  function getMethodVariant(method: string): 'default' | 'destructive' | 'outline' | 'secondary' {
-    switch (method) {
-      case 'CASH':
-        return 'secondary';
-      case 'BANK_TRANSFER':
-      case 'GCASH':
-      case 'MAYA':
         return 'outline';
-      case 'CREDIT_CARD':
-        return 'destructive';
-      case 'CHECK':
-        return 'secondary';
-      default:
-        return 'default';
     }
   }
 </script>
@@ -85,78 +67,77 @@
   {#if !showForm}
     <div class="flex justify-between items-center">
       <h1 class="text-2xl font-bold">Payments</h1>
-      {#if data.isAdminLevel || data.isAccountant || data.isFrontdesk}
-        <Button on:click={() => showForm = true}>Add Payment</Button>
+      {#if data.isAdminLevel || data.isAccountant || data.isFrontdesk || data.isResident}
+        <Button on:click={() => {
+          showForm = true;
+          selectedPayment = undefined;
+        }}>
+          Create Payment
+        </Button>
       {/if}
     </div>
 
-    <div class="grid gap-4">
-      {#each data.payments || [] as payment}
-        <Card.Root 
-          class="cursor-pointer {(data.isAdminLevel || data.isAccountant) ? 'hover:bg-gray-50' : ''}"
-          on:click={() => handlePaymentClick(payment)}
-        >
-          <Card.Header>
-            <Card.Title class="flex justify-between items-center">
-              <span>
-                ₱{payment.amount.toFixed(2)}
-                <Badge variant={getStatusVariant(payment.status)} class="ml-2">
-                  {payment.status}
+    {#if data.payments}
+      <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {#each data.payments as payment}
+          <Card.Root class="cursor-pointer" on:click={() => handlePaymentClick(payment)}>
+            <Card.Header>
+              <Card.Title class="flex justify-between items-center">
+                {payment.billing?.lease?.name ?? 'Unknown'}
+                <Badge variant={getStatusVariant(payment.billing?.status)}>
+                  {payment.billing?.status}
                 </Badge>
-                <Badge variant={getMethodVariant(payment.payment_method)} class="ml-2">
-                  {payment.payment_method}
-                </Badge>
-              </span>
-              <span class="text-sm font-normal">
-                {#if payment.billing?.lease?.room}
-                  Room {payment.billing.lease.room.room_number}
-                  {#if payment.billing.lease.room.floor}
-                    - Floor {payment.billing.lease.room.floor.floor_number}
-                    {#if payment.billing.lease.room.floor.wing}
-                      Wing {payment.billing.lease.room.floor.wing}
-                    {/if}
-                  {/if}
+              </Card.Title>
+              <Card.Description>
+                {payment.billing?.type}
+                {#if payment.billing?.utility_type}
+                  - {payment.billing.utility_type}
                 {/if}
-              </span>
-            </Card.Title>
-            <Card.Description>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <div>
-                  <strong>Property:</strong> {payment.billing?.lease?.room?.floor?.property?.name}
+              </Card.Description>
+            </Card.Header>
+            <Card.Content>
+              <div class="space-y-2">
+                <div class="flex justify-between">
+                  <span class="text-muted-foreground">Amount:</span>
+                  <span class="font-medium">${payment.amount}</span>
                 </div>
-                <div>
-                  <strong>Lease:</strong> {payment.billing?.lease?.name}
+                <div class="flex justify-between">
+                  <span class="text-muted-foreground">Method:</span>
+                  <span class="font-medium">{payment.method}</span>
                 </div>
-                <div>
-                  <strong>Billing Type:</strong> {payment.billing?.type}
-                  {#if payment.billing?.utility_type}
-                    - {payment.billing.utility_type}
-                  {/if}
+                <div class="flex justify-between">
+                  <span class="text-muted-foreground">Date:</span>
+                  <span class="font-medium">
+                    {new Date(payment.paid_at).toLocaleDateString()}
+                  </span>
                 </div>
-                <div>
-                  <strong>Payment Date:</strong> {new Date(payment.payment_date).toLocaleDateString()}
-                </div>
-                {#if payment.reference_number}
-                  <div>
-                    <strong>Reference:</strong> {payment.reference_number}
+                {#if payment.billing?.room}
+                  <div class="flex justify-between">
+                    <span class="text-muted-foreground">Room:</span>
+                    <span class="font-medium">
+                      {payment.billing.room.room_number}
+                      {#if payment.billing.room.floor}
+                        - Floor {payment.billing.room.floor.floor_number}
+                        {#if payment.billing.room.floor.wing}
+                          Wing {payment.billing.room.floor.wing}
+                        {/if}
+                      {/if}
+                    </span>
                   </div>
                 {/if}
               </div>
-            </Card.Description>
-          </Card.Header>
-          {#if payment.notes}
-            <Card.Content>
-              <div class="text-sm">
-                <strong>Notes:</strong> {payment.notes}
-              </div>
             </Card.Content>
-          {/if}
-        </Card.Root>
-      {/each}
-    </div>
+          </Card.Root>
+        {/each}
+      </div>
+    {:else}
+      <div class="text-center py-8 text-muted-foreground">
+        No payments found
+      </div>
+    {/if}
   {:else}
-    <div class="flex justify-between items-center mb-4">
-      <h1 class="text-2xl font-bold">{selectedPayment ? 'Edit' : 'Add'} Payment</h1>
+    <div class="flex justify-between items-center">
+      <h1 class="text-2xl font-bold">{selectedPayment ? 'Edit' : 'Create'} Payment</h1>
       <Button variant="outline" on:click={() => {
         showForm = false;
         selectedPayment = undefined;
@@ -167,7 +148,7 @@
 
     <PaymentForm
       {data}
-      billings={data.billings}
+      billings={data.billings ?? []}
       editMode={!!selectedPayment}
       payment={selectedPayment}
       on:paymentAdded={handlePaymentAdded}
@@ -175,7 +156,7 @@
   {/if}
 </div>
 
-{#if !data.isAdminLevel && !data.isAccountant && !data.isFrontdesk}
+{#if !data.isAdminLevel && !data.isAccountant && !data.isFrontdesk && !data.isResident}
   <div class="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
     <p class="text-yellow-800">
       You are viewing this page in read-only mode. Contact an administrator if you need to make changes.
