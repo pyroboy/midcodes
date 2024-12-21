@@ -15,6 +15,7 @@
   import * as Tabs from '$lib/components/ui/tabs';
   import * as Dialog from '$lib/components/ui/dialog';
   import { Separator } from '$lib/components/ui/separator';
+  import { defaultEmergencyContact } from './constants';
 
   type Property = Database['public']['Tables']['properties']['Row'];
   type User = Database['public']['Tables']['profiles']['Row'];
@@ -39,13 +40,6 @@
   export let form: SuperForm<TenantFormData>;
   export let editMode = false;
   export let tenant: TenantFormData | undefined = undefined;
-  export let defaultEmergencyContact = {
-    name: '',
-    relationship: '',
-    phone: '',
-    email: '',
-    address: ''
-  };
 
   const dispatch = createEventDispatcher();
   const { form: formData, errors, enhance, submitting } = form;
@@ -107,15 +101,11 @@
     }
   }
 
-  let emergencyContact = defaultEmergencyContact;
-
-  $: {
-    if ($formData.emergency_contact) {
-      emergencyContact = $formData.emergency_contact;
-    } else {
-      formData.update($formData => ({ ...$formData, emergency_contact: emergencyContact }));
-    }
-  }
+  $: emergencyContact = {
+    ...defaultEmergencyContact,
+    ...$formData.emergency_contact,
+    email: $formData.emergency_contact?.email || ''
+  };
 
   function getStatusColor(status: string) {
     switch (status) {

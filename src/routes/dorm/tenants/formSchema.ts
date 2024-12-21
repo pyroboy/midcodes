@@ -89,36 +89,70 @@ export const baseTenantSchema = z.object({
 });
 
 // Form Schema (extends base schema with additional validation)
-export const tenantSchema = baseTenantSchema.superRefine((data, ctx) => {
-  // Validate date ranges
-  if (data.start_date && data.end_date) {
-    const start = new Date(data.start_date);
-    const end = new Date(data.end_date);
-    if (start > end) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Start date must be before end date',
-        path: ['start_date']
-      });
-    }
+export const tenantSchema = z.object({
+  id: z.number().optional(),
+  name: z.string().min(1, 'Name is required'),
+  contact_number: z.string().nullable(),
+  email: z.string().email('Invalid email').nullable(),
+  auth_id: z.string().uuid('Invalid user ID').nullable(),
+  tenant_status: z.enum(tenantStatusEnum),
+  lease_status: z.enum(leaseStatusEnum),
+  lease_type: z.enum(leaseTypeEnum),
+  lease_id: z.number().nullable(),
+  location_id: z.number().nullable(),
+  start_date: z.string(),
+  end_date: z.string(),
+  rent_amount: z.number().min(0, 'Rent amount must be positive'),
+  security_deposit: z.number().min(0, 'Security deposit must be positive'),
+  outstanding_balance: z.number().default(0),
+  notes: z.string().nullable(),
+  last_payment_date: z.string().nullable(),
+  next_payment_due: z.string().nullable(),
+  created_by: z.string(),
+  emergency_contact: z.object({
+    name: z.string().min(1, 'Emergency contact name is required'),
+    relationship: z.string().min(1, 'Relationship is required'),
+    phone: z.string().min(1, 'Phone number is required'),
+    email: z.string().email('Invalid email').optional().nullable(),
+    address: z.string().min(1, 'Address is required')
+  }),
+  payment_schedules: z.array(z.object({
+    id: z.number(),
+    due_date: z.string(),
+    amount: z.number(),
+    type: z.enum(['RENT', 'UTILITY', 'MAINTENANCE']),
+    status: z.enum(['PENDING', 'PAID', 'OVERDUE']),
+    created_at: z.string(),
+    updated_at: z.string()
+  })).default([]),
+  status_history: z.array(z.object({
+    status: z.enum(tenantStatusEnum),
+    reason: z.string(),
+    changed_at: z.string(),
+    changed_by: z.string()
+  })).default([])
+}).refine(
+  data => {
+    if (!data.start_date || !data.end_date) return true;
+    return new Date(data.start_date) < new Date(data.end_date);
+  },
+  {
+    message: 'End date must be after start date',
+    path: ['end_date']
   }
-
-  // Validate payment schedules
-  if (data.payment_schedules?.length) {
-    data.payment_schedules.forEach((schedule, index) => {
-      const dueDate = new Date(schedule.due_date);
-      if (data.start_date && data.end_date) {
-        if (dueDate < new Date(data.start_date) || dueDate > new Date(data.end_date)) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: 'Payment schedule due date must be within lease period',
-            path: [`payment_schedules.${index}.due_date`]
-          });
-        }
-      }
-    });
+).refine(
+  data => {
+    if (!data.start_date) return true;
+    const startDate = new Date(data.start_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return startDate >= today;
+  },
+  {
+    message: 'Start date cannot be in the past',
+    path: ['start_date']
   }
-});
+);
 
 // Helper function to format date strings
 export const formatDate = (date: string | null | undefined): string => {

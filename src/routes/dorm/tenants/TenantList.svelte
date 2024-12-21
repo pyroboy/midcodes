@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import Button from '$lib/components/ui/button/button.svelte';
+  import type { ExtendedTenant, Room, Floor, Property, Profile } from './types';
   import type { TenantFormData } from './formSchema';
   import * as Table from '$lib/components/ui/table';
   import {
@@ -13,44 +14,11 @@
   import type { Database } from '$lib/database.types';
   import { Badge } from '$lib/components/ui/badge';
 
-  type DbRoom = Database['public']['Tables']['rooms']['Row'];
-  type DbProperty = Database['public']['Tables']['properties']['Row'];
-  type DbProfile = Database['public']['Tables']['profiles']['Row'];
-
-  type Room = DbRoom & {
-    floor?: {
-      wing: string | null;
-      floor_number: number;
-    };
-    property: DbProperty;
-  };
-
-  type Profile = DbProfile & {
-    full_name: string;
-    contact_number?: string;
-  };
-
-  interface ExtendedTenant extends Omit<TenantFormData, 'lease_id' | 'location_id'> {
-    id: number;
-    created_at: string;
-    updated_at: string | null;
-    lease?: {
-      id: number;
-      location: Room;
-      user: Profile;
-      start_date: string;
-      end_date: string;
-      rent_amount: number;
-      security_deposit: number;
-      notes: string | null;
-    };
-  }
-
   interface PageState {
     form: any;
     tenants: ExtendedTenant[];
     rooms: Room[];
-    properties: DbProperty[];
+    properties: Property[];
     users: Profile[];
     userRole: string;
     isAdminLevel: boolean;
@@ -111,6 +79,21 @@
     }
   }
 
+  function getRoomStatusColor(status: string): string {
+    switch (status) {
+      case 'VACANT':
+        return 'bg-green-100 text-green-800';
+      case 'OCCUPIED':
+        return 'bg-blue-100 text-blue-800';
+      case 'MAINTENANCE':
+        return 'bg-orange-100 text-orange-800';
+      case 'RESERVED':
+        return 'bg-purple-100 text-purple-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  }
+
   function formatDate(date: string | undefined) {
     if (!date) return '-';
     return new Date(date).toLocaleDateString();
@@ -120,6 +103,20 @@
     if (amount === undefined) return '-';
     return `₱${amount.toLocaleString()}`;
   }
+
+  $: sortedTenants = filteredTenants.sort((a, b) => {
+    // Sort by status first (ACTIVE first, then others)
+    if (a.tenant_status === 'ACTIVE' && b.tenant_status !== 'ACTIVE') return -1;
+    if (a.tenant_status !== 'ACTIVE' && b.tenant_status === 'ACTIVE') return 1;
+    
+    // Then sort by outstanding balance (highest first)
+    if (a.outstanding_balance !== b.outstanding_balance) {
+      return b.outstanding_balance - a.outstanding_balance;
+    }
+    
+    // Finally sort by name
+    return a.name.localeCompare(b.name);
+  });
 </script>
 
 <div class="w-2/3">
@@ -172,69 +169,71 @@
       <Table.Root>
         <Table.Header>
           <Table.Row>
-            <Table.Head>Property</Table.Head>
+            <Table.Head class="w-[200px]">Name</Table.Head>
             <Table.Head>Room</Table.Head>
-            <Table.Head>Tenant</Table.Head>
             <Table.Head>Status</Table.Head>
-            <Table.Head>Contract Period</Table.Head>
-            <Table.Head>Financial</Table.Head>
-            <Table.Head>Actions</Table.Head>
+            <Table.Head class="text-right">Balance</Table.Head>
+            <Table.Head class="text-right">Actions</Table.Head>
           </Table.Row>
         </Table.Header>
         <Table.Body>
-          {#each filteredTenants as tenant}
+          {#each sortedTenants as tenant (tenant.id)}
             <Table.Row>
-              <Table.Cell>{tenant.lease?.location.property.name ?? '-'}</Table.Cell>
-              <Table.Cell>
-                {#if tenant.lease?.location}
-                  {tenant.lease.location.floor?.wing ? `${tenant.lease.location.floor.wing} Wing, ` : ''}
-                  Floor {tenant.lease.location.floor?.floor_number}, Room {tenant.lease.location.number}
-                {:else}
-                  -
-                {/if}
+              <Table.Cell class="font-medium">
+                {tenant.name}
+                <div class="text-sm text-gray-500">
+                  {tenant.contact_number || 'No contact'}
+                </div>
               </Table.Cell>
               <Table.Cell>
-                {#if tenant.lease?.user}
-                  <div>
-                    <div class="font-medium">{tenant.lease.user.full_name}</div>
-                    <div class="text-sm text-gray-500">{tenant.lease.user.email}</div>
-                    {#if tenant.lease.user.contact_number}
-                      <div class="text-sm text-gray-500">{tenant.lease.user.contact_number}</div>
-                    {/if}
+                {#if tenant.lease?.location}
+                  <div class="flex flex-col">
+                    <span>Room {tenant.lease.location.number}</span>
+                    <div class="flex items-center gap-2 text-sm text-gray-500">
+                      <Badge variant="outline" class={getRoomStatusColor(tenant.lease.location.room_status)}>
+                        {tenant.lease.location.room_status}
+                      </Badge>
+                      {#if tenant.lease.location.floor}
+                        <span>Floor {tenant.lease.location.floor.floor_number}</span>
+                        {#if tenant.lease.location.floor.wing}
+                          <span>Wing {tenant.lease.location.floor.wing}</span>
+                        {/if}
+                      {/if}
+                    </div>
                   </div>
                 {:else}
-                  -
+                  <span class="text-gray-500">No room assigned</span>
                 {/if}
               </Table.Cell>
               <Table.Cell>
                 <Badge variant="outline" class={getStatusColor(tenant.tenant_status)}>
                   {tenant.tenant_status}
                 </Badge>
+                {#if tenant.lease?.status}
+                  <Badge variant="outline" class={getStatusColor(tenant.lease.status)}>
+                    {tenant.lease.status}
+                  </Badge>
+                {/if}
               </Table.Cell>
-              <Table.Cell>
-                <div class="text-sm">
-                  {formatDate(tenant.lease?.start_date)} -
-                  {formatDate(tenant.lease?.end_date)}
-                </div>
-                <div class="text-xs text-gray-500">
-                  {formatCurrency(tenant.lease?.rent_amount)} / month
-                </div>
-              </Table.Cell>
-              <Table.Cell>
-                <div class="text-sm">
-                  <div>Deposit: {formatCurrency(tenant.lease?.security_deposit)}</div>
-                  {#if tenant.lease?.notes}
-                    <div class="text-xs text-gray-500">{tenant.lease.notes}</div>
+              <Table.Cell class="text-right">
+                <div class="flex flex-col items-end">
+                  <span class={tenant.outstanding_balance > 0 ? 'text-red-600' : 'text-green-600'}>
+                    ₱{tenant.outstanding_balance.toLocaleString()}
+                  </span>
+                  {#if tenant.lease?.next_payment_due}
+                    <span class="text-sm text-gray-500">
+                      Due {formatDate(tenant.lease.next_payment_due)}
+                    </span>
                   {/if}
                 </div>
               </Table.Cell>
-              <Table.Cell>
-                <div class="flex gap-2">
-                  <Button size="sm" variant="outline" on:click={() => handleEdit(tenant)}>
+              <Table.Cell class="text-right">
+                <div class="flex justify-end gap-2">
+                  <Button variant="outline" size="sm" on:click={() => handleEdit(tenant)}>
                     Edit
                   </Button>
                   {#if data.isAdminLevel}
-                    <Button size="sm" variant="destructive" on:click={() => handleDelete(tenant)}>
+                    <Button variant="destructive" size="sm" on:click={() => handleDelete(tenant)}>
                       Delete
                     </Button>
                   {/if}

@@ -4,7 +4,7 @@
   import { superForm } from 'sveltekit-superforms/client';
   import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
   import { zodClient } from 'sveltekit-superforms/adapters';
-  import type { ExtendedTenant, Room, Profile, EmergencyContact } from './types';
+  import type { ExtendedTenant, Room, Profile, EmergencyContact, Selected } from './types';
   import { browser } from '$app/environment';
   import { Button } from '$lib/components/ui/button';
   import { Label } from '$lib/components/ui/label';
@@ -15,6 +15,7 @@
   import TenantList from './TenantList.svelte';
   import { tenantSchema, tenantStatusEnum, leaseTypeEnum, type TenantFormData } from './formSchema';
   import { formatCurrency, formatDate } from './formSchema';
+  import { defaultEmergencyContact } from './constants';
 
   interface PageState {
     form: SuperValidated<TenantFormData>;
@@ -22,7 +23,7 @@
     rooms: Room[];
     properties: any[];
     users: Profile[];
-    user: { id: string };
+    user: { id: string; full_name: string };
     userRole: string;
     isAdminLevel: boolean;
     isStaffLevel: boolean;
@@ -41,6 +42,29 @@
       if (result.type === 'success') {
         showForm = false;
         editMode = false;
+        form.set({
+          name: '',
+          contact_number: null,
+          email: null,
+          auth_id: null,
+          tenant_status: 'PENDING',
+          lease_status: 'INACTIVE',
+          lease_type: 'BEDSPACER',
+          lease_id: null,
+          location_id: null,
+          start_date: new Date().toISOString().split('T')[0],
+          end_date: new Date().toISOString().split('T')[0],
+          rent_amount: 0,
+          security_deposit: 0,
+          outstanding_balance: 0,
+          notes: '',
+          last_payment_date: null,
+          next_payment_due: null,
+          created_by: data.user.id,
+          emergency_contact: defaultEmergencyContact,
+          payment_schedules: [],
+          status_history: []
+        });
       }
     }
   });
@@ -58,20 +82,20 @@
       contact_number: tenant.contact_number,
       email: tenant.email,
       auth_id: tenant.auth_id,
-      tenant_status: tenant.status as TenantFormData['tenant_status'],
+      tenant_status: tenant.tenant_status,
       lease_status: tenant.lease?.status ?? 'INACTIVE',
-      lease_type: tenant.type as TenantFormData['lease_type'],
-      lease_id: tenant.lease?.id,
-      location_id: tenant.lease?.location?.id,
-      start_date: tenant.lease?.start_date || new Date().toISOString().split('T')[0],
-      end_date: tenant.lease?.end_date || new Date().toISOString().split('T')[0],
+      lease_type: tenant.lease_type,
+      lease_id: tenant.lease?.id ?? null,
+      location_id: tenant.lease?.location?.id ?? null,
+      start_date: tenant.start_date,
+      end_date: tenant.end_date,
       rent_amount: tenant.lease?.rent_amount ?? 0,
       security_deposit: tenant.lease?.security_deposit ?? 0,
-      outstanding_balance: tenant.lease?.outstanding_balance ?? 0,
+      outstanding_balance: tenant.outstanding_balance,
       notes: tenant.lease?.notes ?? '',
       last_payment_date: tenant.lease?.last_payment_date ?? null,
       next_payment_due: tenant.lease?.next_payment_due ?? null,
-      created_by: tenant.created_by ?? data.user.id,
+      created_by: tenant.created_by,
       emergency_contact: tenant.emergency_contact,
       payment_schedules: tenant.lease?.payment_schedules ?? [],
       status_history: tenant.status_history ?? []
@@ -90,6 +114,7 @@
       tenant_status: 'PENDING',
       lease_status: 'INACTIVE',
       lease_type: 'BEDSPACER',
+      lease_id: null,
       location_id: null,
       start_date: new Date().toISOString().split('T')[0],
       end_date: new Date().toISOString().split('T')[0],
@@ -100,13 +125,7 @@
       last_payment_date: null,
       next_payment_due: null,
       created_by: data.user.id,
-      emergency_contact: {
-        name: '',
-        relationship: '',
-        phone: '',
-        email: '',
-        address: ''
-      },
+      emergency_contact: defaultEmergencyContact,
       payment_schedules: [],
       status_history: []
     });
@@ -115,7 +134,29 @@
   function toggleForm() {
     showForm = !showForm;
     if (!showForm) {
-      form.reset();
+      form.set({
+        name: '',
+        contact_number: null,
+        email: null,
+        auth_id: null,
+        tenant_status: 'PENDING',
+        lease_status: 'INACTIVE',
+        lease_type: 'BEDSPACER',
+        lease_id: null,
+        location_id: null,
+        start_date: new Date().toISOString().split('T')[0],
+        end_date: new Date().toISOString().split('T')[0],
+        rent_amount: 0,
+        security_deposit: 0,
+        outstanding_balance: 0,
+        notes: '',
+        last_payment_date: null,
+        next_payment_due: null,
+        created_by: data.user.id,
+        emergency_contact: defaultEmergencyContact,
+        payment_schedules: [],
+        status_history: []
+      });
     }
   }
 
@@ -138,7 +179,7 @@
     return current?._errors?.[0];
   }
 
-  function handleRoomSelect(value: { value: Room }) {
+  function handleRoomSelect(value: Selected<Room> | undefined) {
     if (value?.value) {
       form.update($form => ({
         ...$form,
@@ -147,11 +188,11 @@
     }
   }
 
-  function handleStatusSelect(value: { value: string }) {
+  function handleStatusSelect(value: Selected<TenantFormData['tenant_status']> | undefined) {
     if (value?.value) {
       form.update($form => ({
         ...$form,
-        tenant_status: value.value as TenantFormData['tenant_status']
+        tenant_status: value.value
       }));
     }
   }
