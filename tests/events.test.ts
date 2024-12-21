@@ -31,10 +31,12 @@ describe('Event Page', () => {
             location: 'Test location'
         },
         ticketing_data: [{
+            name: 'Regular Ticket',
             type: 'regular',
             price: 100,
             available: 50
         }],
+        payment_timeout_minutes: 30,
         is_public: true,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

@@ -41,7 +41,14 @@
     let processing = false;
 
     // Type the scan logs properly
-    let scanLogs = data.scanLogs as AttendeeWithScanInfo[];
+    let scanLogs = (data.scanLogs as unknown as AttendeeWithScanInfo[]).map(log => ({
+        ...log,
+        attendance_status: log.attendance_status || 'registered'
+    }));
+
+    function getAttendeeDisplayName(basicInfo: { firstName: string; lastName: string; email: string; phone: string }) {
+        return `${basicInfo.firstName} ${basicInfo.lastName}`;
+    }
 
     // Format date
     const formatDate = (date: string) => {
@@ -218,7 +225,7 @@
                                     <TableCell>
                                         <div class="flex flex-col">
                                             <span class="font-medium">
-                                                {attendee.basic_info?.name || 'Unknown'}
+                                                {getAttendeeDisplayName(attendee.basic_info)}
                                             </span>
                                             <span class="text-xs text-gray-500">
                                                 {attendee.reference_code_url}
@@ -245,8 +252,6 @@
                                                     {attendee.qr_scan_info[attendee.qr_scan_info.length - 1].scan_type}
                                                 </span>
                                             </div>
-                                        {:else}
-                                            <span class="text-gray-500">No scans</span>
                                         {/if}
                                     </TableCell>
                                 </TableRow>

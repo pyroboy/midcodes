@@ -1,22 +1,18 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import { supabase } from '$lib/supabaseClient';
-    import type { User } from '@supabase/supabase-js';
+    import type { UserProfile } from '$lib/stores/auth';
     import TemplateForm from '$lib/TemplateForm.svelte';
     import TemplateList from '$lib/TemplateList.svelte';
     import { uploadImage } from '$lib/database';
     import { templateData } from '$lib/stores/templateStore';
     import type { TemplateData, TemplateElement } from '$lib/stores/templateStore';
-    import { auth, session, user } from '$lib/stores/auth';
+    import { auth, session, profile } from '$lib/stores/auth';
 
     // Add data prop from server
     export let data: {
         templates: TemplateData[],
-        user: {
-            id: string;
-            role: string;
-            org_id: string | null;
-        }
+        user: UserProfile
     };
 
     let frontBackground: File | null = null;
@@ -85,13 +81,13 @@
             backElementsCount: backElements.length,
             authStatus: {
                 hasSession: !!$session,
-                hasUser: !!$user,
-                userId: $user?.id
+                hasUser: !!$profile,
+                userId: $profile?.id
             }
         });
 
-        if (!$session || !$user) {
-            console.error('❌ Auth check failed:', { session: !!$session, user: !!$user });
+        if (!$session || !$profile) {
+            console.error('❌ Auth check failed:', { session: !!$session, user: !!$profile });
             errorMessage = 'User is not authenticated.';
             return;
         }
@@ -113,23 +109,24 @@
             });
 
             if (frontBackground) {
-                frontUrl = await uploadImage(frontBackground, 'front', $user.id);
+                frontUrl = await uploadImage(frontBackground, 'front', $profile.id);
                 console.log('✅ Front background uploaded:', frontUrl);
             }
             if (backBackground) {
-                backUrl = await uploadImage(backBackground, 'back', $user.id);
+                backUrl = await uploadImage(backBackground, 'back', $profile.id);
                 console.log('✅ Back background uploaded:', backUrl);
             }
 
             const templateDataToSave: TemplateData = {
                 id: $templateData.id || crypto.randomUUID(),
-                user_id: $user.id,
-                name: $templateData.name || 'My Template',
-                front_background: frontUrl!,
-                back_background: backUrl!,
-                orientation: 'landscape' as const,
-                template_elements: [...frontElements, ...backElements],
-                created_at: $templateData.created_at || new Date().toISOString()
+                user_id: $profile?.id ?? '',
+                name: $templateData.name,
+                front_background: $templateData.front_background,
+                back_background: $templateData.back_background,
+                orientation: $templateData.orientation,
+                template_elements: $templateData.template_elements,
+                created_at: $templateData.created_at || new Date().toISOString(),
+                org_id: $profile?.org_id ?? ''
             };
 
             console.log('📋 Template data to save:', {
@@ -291,13 +288,14 @@
         errorMessage = '';
         templateData.set({
             id: '',
-            user_id: $user?.id ?? '',
+            user_id: $profile?.id ?? '',
             name: '',
             front_background: '',
             back_background: '',
             orientation: 'landscape' as const,
             template_elements: [],
-            created_at: new Date().toISOString()
+            created_at: new Date().toISOString(),
+            org_id: $profile?.org_id ?? ''
         });
         console.log('✅ EditTemplate: Form cleared');
     }

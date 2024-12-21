@@ -526,11 +526,12 @@
                 text = formData[element.variableName] || '';
             }
 
-            if (element.textTransform === 'uppercase') {
+            const transform = element.textTransform || 'none';
+            if (transform === 'uppercase') {
                 text = text.toUpperCase();
-            } else if (element.textTransform === 'lowercase') {
+            } else if (transform === 'lowercase') {
                 text = text.toLowerCase();
-            } else if (element.textTransform === 'capitalize') {
+            } else if (transform === 'capitalize') {
                 text = text.split(' ')
                     .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
                     .join(' ');
@@ -551,11 +552,9 @@
             const textHeight = measureTextHeight(ctx, fontOptions);
             const y = elementY + (elementHeight / 2); // Center vertically within element height
 
-            if (element.textDecoration === 'underline' || element.textDecoration === 'line-through') {
+            if (element.textDecoration === 'underline') {
                 const metrics = ctx.measureText(text);
-                const lineY = element.textDecoration === 'underline' 
-                    ? y + textHeight/2  // Adjust underline position
-                    : y;  // Line-through stays at center
+                const lineY = y + textHeight/2; // Adjust underline position
                 ctx.beginPath();
                 ctx.moveTo(x - (element.alignment === 'right' ? metrics.width : 0), lineY);
                 ctx.lineTo(x + (element.alignment === 'left' ? metrics.width : 0), lineY);

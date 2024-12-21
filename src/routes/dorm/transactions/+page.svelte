@@ -1,294 +1,135 @@
 <script lang="ts">
-  import { superForm } from 'sveltekit-superforms/client';
-  import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
+  import { formatCurrency, formatDateTime } from '$lib/utils';
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
   import { Button } from '$lib/components/ui/button';
-  import { Checkbox } from '$lib/components/ui/checkbox';
-  import * as Table from "$lib/components/ui/table";
-  import * as Select from "$lib/components/ui/select";
-  import TransactionList from './TransactionList.svelte';
-  import { ArrowLeftRight } from 'lucide-svelte';
+  import { superForm } from 'sveltekit-superforms/client';
   import type { PageData } from './$types';
-  import { transactionTypeEnum } from '$lib/schemas/transactions';
-  import { formatCurrency } from '$lib/utils';
   import type { Database } from '$lib/database.types';
+  import { transactionFilterSchema, type TransactionFilterData } from './schema';
+  import { paymentMethodEnum } from './types';
+  import type { ExtendedPayment } from './types';
 
-  type Account = Database['public']['Tables']['accounts']['Row'] & {
-    lease: {
-      id: number;
-      lease_name: string;
-      tenant: {
-        id: string;
-        email: string;
-      };
-      room: {
-        id: number;
-        name: string;
-        property_id: number;
-      };
+  export let data: {
+    form: PageData['form'];
+    transactions: ExtendedPayment[];
+    user: {
+      role: string;
     };
   };
 
-  export let data: PageData;
-  
-  const { form, errors, enhance, delayed, message } = superForm(data.form, {
-    resetForm: true,
-    onUpdated: ({ form }) => {
-      if (form.data.id) {
-        showTransactionList = true;
-      }
-    }
-  });
-  
+  const { form } = superForm(data.form);
+
   let searchTerm = '';
-  let selectedAccounts: number[] = [];
-  let totalCharges = 0;
-  let amountPaid = 0;
-  let change = 0;
-  const partialPaymentThreshold = 0.2; // 20% threshold
-  let isPartialPaymentValid = false;
-  let amountValidationMessage = '';
-  let showTransactionList = true;
-  
-  $: filteredAccounts = (data.accounts as Account[]).filter(account => 
-    account.lease.lease_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    account.type.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-  
-  $: {
-    totalCharges = selectedAccounts.reduce((total, id) => {
-      const account = (data.accounts as Account[]).find(a => a.id === id);
-      return total + (account ? account.amount : 0);
-    }, 0);
-    $form.total_charges = totalCharges;
-    change = amountPaid - totalCharges;
-    $form.change_amount = Math.abs(change);
-    $form.amount_paid = amountPaid;
-    isPartialPaymentValid = amountPaid >= totalCharges * partialPaymentThreshold;
-    
-    if (amountPaid < totalCharges * partialPaymentThreshold) {
-      const minAmount = (totalCharges * partialPaymentThreshold).toFixed(2);
-      amountValidationMessage = `Minimum payment of ${formatCurrency(parseFloat(minAmount))} required (${(partialPaymentThreshold * 100).toFixed(0)}% of total charges)`;
-    } else {
-      amountValidationMessage = '';
+  let startDate: string = '';
+  let endDate: string = '';
+  let selectedMethod: keyof typeof paymentMethodEnum.Values | null = null;
+
+  $: filteredTransactions = data.transactions.filter(transaction => {
+    // Search filter
+    const searchMatch = searchTerm ? (
+      transaction.billing?.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      transaction.billing?.lease?.tenant?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      transaction.reference_number?.toLowerCase().includes(searchTerm.toLowerCase())
+    ) : true;
+
+    // Date filter
+    const dateMatch = (!startDate || new Date(transaction.paid_at) >= new Date(startDate)) &&
+                     (!endDate || new Date(transaction.paid_at) <= new Date(endDate));
+
+    // Method filter
+    const methodMatch = !selectedMethod || transaction.method === selectedMethod;
+
+    return searchMatch && dateMatch && methodMatch;
+  });
+
+  function handleMethodSelect(value: string) {
+    if (value in paymentMethodEnum.Values) {
+      selectedMethod = value as keyof typeof paymentMethodEnum.Values;
     }
-  }
-  
-  function toggleAccount(accountId: number) {
-    if (selectedAccounts.includes(accountId)) {
-      selectedAccounts = selectedAccounts.filter(id => id !== accountId);
-    } else {
-      selectedAccounts = [...selectedAccounts, accountId];
-    }
-    updateSelectedAccounts();
-  }
-
-  function toggleAllAccounts(checked: boolean | 'indeterminate') {
-    if (checked === true) {
-      selectedAccounts = filteredAccounts.map(account => account.id);
-    } else {
-      selectedAccounts = [];
-    }
-    updateSelectedAccounts();
-  }
-
-  function updateSelectedAccounts() {
-    $form.selected_accounts = filteredAccounts
-      .filter(account => selectedAccounts.includes(account.id))
-      .map(account => ({
-        id: account.id,
-        lease_id: account.lease_id,
-        type: account.type,
-        amount: account.amount,
-        balance: account.balance,
-        date_issued: account.date_issued,
-        due_date: account.due_date
-      }));
-  }
-
-  function setExactAmount() {
-    amountPaid = totalCharges;
-  }
-
-  function toggleTransactionList() {
-    showTransactionList = !showTransactionList;
   }
 </script>
 
-<div class="container mx-auto py-4 flex">
-  <button
-    class="absolute top-30 left-5 bg-gray-400 hover:bg-gray-600 text-white rounded-full p-2"
-    on:click={toggleTransactionList}
-  >
-    <ArrowLeftRight class="h-5 w-5" />
-  </button>
+<div class="container mx-auto p-4">
+  <div class="mb-8">
+    <h2 class="text-2xl font-bold mb-4">Transaction History</h2>
+    
+    <!-- Filters -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+      <!-- Search -->
+      <div>
+        <Label for="search">Search</Label>
+        <Input
+          id="search"
+          type="text"
+          placeholder="Search transactions..."
+          bind:value={searchTerm}
+        />
+      </div>
 
-  {#if showTransactionList}
-    <div class="w-1/3 pr-4">
-      <TransactionList transactions={data.transactions} />
+      <!-- Start Date -->
+      <div>
+        <Label for="startDate">Start Date</Label>
+        <Input
+          id="startDate"
+          type="date"
+          bind:value={startDate}
+        />
+      </div>
+
+      <!-- End Date -->
+      <div>
+        <Label for="endDate">End Date</Label>
+        <Input
+          id="endDate"
+          type="date"
+          bind:value={endDate}
+        />
+      </div>
+
+      <!-- Payment Method -->
+      <div>
+        <Label>Payment Method</Label>
+        <select 
+          class="w-full p-2 border rounded"
+          bind:value={selectedMethod}
+        >
+          <option value="">All Methods</option>
+          {#each Object.entries(paymentMethodEnum.Values) as [key, value]}
+            <option {value}>{key}</option>
+          {/each}
+        </select>
+      </div>
     </div>
-  {/if}
 
-  <div class="flex-grow {showTransactionList ? 'pl-10' : ''}">
-    <h1 class="text-3xl font-bold mb-4">Create Transaction</h1>
-  
-    <form method="POST" use:enhance class="space-y-4">
-      <div class="flex justify-between items-end">
-        <div class="flex-grow flex items-end space-x-2">
-          <div class="w-1/3">
-            <Label for="total_charges" class="text-lg font-semibold">Total Charges</Label>
-            <Input
-              type="number"
-              id="total_charges"
-              bind:value={$form.total_charges}
-              readonly
-            />
-          </div>
-          <div class="w-1/3">
-            <Label for="amount_paid" class="text-lg font-semibold">Amount Paid</Label>
-            <Input
-              type="number"
-              id="amount_paid"
-              bind:value={amountPaid}
-              min="0"
-              step="0.01"
-              required
-            />
-            {#if amountValidationMessage}
-              <p class="text-destructive text-sm mt-1">{amountValidationMessage}</p>
-            {/if}
-          </div>
-          <div class="w-1/3">
-            <Label for="change_amount" class="text-lg font-semibold">Change</Label>
-            <Input
-              type="number"
-              id="change_amount"
-              bind:value={$form.change_amount}
-              readonly
-            />
-          </div>
-          <Button type="button" on:click={setExactAmount}>
-            Set Exact
-          </Button>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-2 gap-4">
-        <div>
-          <Label for="transaction_type">Transaction Type</Label>
-          <Select.Root
-            selected={{ 
-              label: $form.transaction_type ?? 'Select type',
-              value: $form.transaction_type ?? ''
-            }}
-            onSelectedChange={(s) => {
-              if (s) {
-                $form.transaction_type = s.value as typeof transactionTypeEnum._type;
-              }
-            }}
-          >
-            <Select.Trigger class="w-full">
-              <Select.Value placeholder="Select type" />
-            </Select.Trigger>
-            <Select.Content>
-              {#each Object.values(transactionTypeEnum.enum) as type}
-                <Select.Item value={type}>{type}</Select.Item>
-              {/each}
-            </Select.Content>
-          </Select.Root>
-          {#if $errors.transaction_type}<span class="text-red-500">{$errors.transaction_type}</span>{/if}
-        </div>
-
-        <div>
-          <Label for="transaction_date">Transaction Date</Label>
-          <Input
-            type="date"
-            id="transaction_date"
-            bind:value={$form.transaction_date}
-            required
-          />
-          {#if $errors.transaction_date}<span class="text-red-500">{$errors.transaction_date}</span>{/if}
-        </div>
-
-        <div>
-          <Label for="paid_by">Paid By</Label>
-          <Input
-            type="text"
-            id="paid_by"
-            bind:value={$form.paid_by}
-          />
-          {#if $errors.paid_by}<span class="text-red-500">{$errors.paid_by}</span>{/if}
-        </div>
-
-        <div>
-          <Label for="notes">Notes</Label>
-          <Input
-            type="text"
-            id="notes"
-            bind:value={$form.notes}
-          />
-          {#if $errors.notes}<span class="text-red-500">{$errors.notes}</span>{/if}
-        </div>
-      </div>
-
-      <div class="space-y-2">
-        <div class="flex items-center space-x-2">
-          <Input
-            type="text"
-            placeholder="Search accounts..."
-            bind:value={searchTerm}
-          />
-        </div>
-
-        <Table.Root>
-          <Table.Caption>Select accounts for this transaction</Table.Caption>
-          <Table.Header>
-            <Table.Row>
-              <Table.Head class="w-[50px]">
-                <Checkbox
-                  checked={selectedAccounts.length === filteredAccounts.length && filteredAccounts.length > 0}
-                  onCheckedChange={toggleAllAccounts}
-                />
-              </Table.Head>
-              <Table.Head>Lease</Table.Head>
-              <Table.Head>Type</Table.Head>
-              <Table.Head>Amount</Table.Head>
-              <Table.Head>Balance</Table.Head>
-              <Table.Head>Due Date</Table.Head>
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {#each filteredAccounts as account}
-              <Table.Row>
-                <Table.Cell>
-                  <Checkbox
-                    checked={selectedAccounts.includes(account.id)}
-                    onCheckedChange={() => toggleAccount(account.id)}
-                  />
-                </Table.Cell>
-                <Table.Cell>{account.lease.lease_name}</Table.Cell>
-                <Table.Cell>{account.type}</Table.Cell>
-                <Table.Cell>{formatCurrency(account.amount)}</Table.Cell>
-                <Table.Cell>{account.balance !== null ? formatCurrency(account.balance) : 'N/A'}</Table.Cell>
-                <Table.Cell>{account.due_date ? new Date(account.due_date).toLocaleDateString() : 'N/A'}</Table.Cell>
-              </Table.Row>
-            {/each}
-          </Table.Body>
-        </Table.Root>
-      </div>
-
-      <Button type="submit" disabled={$delayed || !isPartialPaymentValid || selectedAccounts.length === 0}>
-        {#if $delayed}
-          Saving...
-        {:else}
-          Create Transaction
-        {/if}
-      </Button>
-    </form>
+    <!-- Transaction Table -->
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead>
+          <tr class="border-b">
+            <th class="p-2 text-left">Date</th>
+            <th class="p-2 text-left">Type</th>
+            <th class="p-2 text-left">Paid By</th>
+            <th class="p-2 text-left">Amount</th>
+            <th class="p-2 text-left">Method</th>
+            <th class="p-2 text-left">Reference</th>
+            <th class="p-2 text-left">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each filteredTransactions as transaction}
+            <tr class="border-b">
+              <td class="p-2">{formatDateTime(transaction.paid_at)}</td>
+              <td class="p-2">{transaction.billing?.type ?? 'N/A'}</td>
+              <td class="p-2">{transaction.billing?.lease?.tenant?.name ?? 'N/A'}</td>
+              <td class="p-2">{formatCurrency(transaction.amount_paid)}</td>
+              <td class="p-2">{transaction.method}</td>
+              <td class="p-2">{transaction.reference_number ?? 'N/A'}</td>
+              <td class="p-2">{transaction.status}</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
-
-{#if import.meta.env.DEV}
-  <SuperDebug data={$form} />
-{/if}

@@ -1,10 +1,10 @@
 <!-- src/routes/transactions/TransactionList.svelte -->
 <script lang="ts">
   import * as Table from "$lib/components/ui/table/index.js";
-  import type { Transaction } from "./types";
+  import type { ExtendedPayment } from "./types";
   import { format } from "date-fns";
   
-  export let transactions: Transaction[];
+  export let transactions: ExtendedPayment[];
 
   function formatAmount(amount: number): string {
     return new Intl.NumberFormat('en-PH', {
@@ -40,10 +40,7 @@
           </Table.Cell>
           <Table.Cell>{transaction.method}</Table.Cell>
           <Table.Cell>
-            {transaction.paid_by}
-            {#if transaction.billing?.lease?.tenant}
-              ({transaction.billing.lease.tenant.name})
-            {/if}
+            {transaction.billing?.lease?.tenant?.name ?? 'N/A'}
           </Table.Cell>
           <Table.Cell>{transaction.reference_number ?? 'N/A'}</Table.Cell>
         </Table.Row>

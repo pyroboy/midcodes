@@ -1,6 +1,6 @@
 <script lang="ts">
     import { createEventDispatcher } from 'svelte';
-    import type { TemplateElement } from '../stores/templateStore';
+    import type { TemplateElement } from './stores/templateStore';
     import { 
         Type, Bold, Italic, Underline, AlignLeft, AlignCenter, 
         AlignRight, AlignJustify, ChevronsUpDown, MoveHorizontal, 

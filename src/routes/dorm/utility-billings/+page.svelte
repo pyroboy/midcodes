@@ -5,25 +5,45 @@
   import { Label } from '$lib/components/ui/label';
   import { Button } from '$lib/components/ui/button';
   import * as Table from "$lib/components/ui/table";
-  import * as Select from "$lib/components/ui/select";
+  import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+  } from "$lib/components/ui/select";
   import { formatCurrency } from '$lib/utils';
   import type { PageData } from './$types';
-  import { utilityBillingTypeEnum } from '$lib/schemas/utility-billings';
+  import { utilityBillingTypeEnum, utilityBillingSchema } from '$lib/schemas/utility-billings';
+
+  type UtilityType = keyof typeof utilityBillingTypeEnum.enum;
+
+  interface Reading {
+    meter_id: number;
+    reading_date: string;
+    reading_value: number;
+  }
+
+  interface Room {
+    id: number;
+    name: string;
+    number: string;
+  }
+
+  interface Meter {
+    id: number;
+    name: string;
+    type: string;
+    room: Room[];
+  }
 
   export let data: PageData;
   
-  const { form, errors, enhance, delayed } = superForm(data.form, {
-    resetForm: true,
-    onUpdated: ({ form }) => {
-      if (form.data.id) {
-        calculateBillings();
-      }
-    }
-  });
+  const { form, errors, enhance, delayed } = superForm(data.form);
 
   let selectedStartDate: string | null = null;
   let selectedEndDate: string | null = null;
-  let selectedType: keyof typeof utilityBillingTypeEnum.enum | null = null;
+  let selectedType: UtilityType | null = null;
   let costPerUnit = 0;
   let meterBillings: Array<{
     meter_id: number;
@@ -36,16 +56,34 @@
     per_tenant_cost: number;
   }> = [];
 
-  $: availableEndDates = data.availableReadingDates.filter(
-    date => !selectedStartDate || new Date(date) > new Date(selectedStartDate)
+  $: relevantMeters = (data.meters as unknown as Meter[]).filter(meter => meter?.id != null);
+  $: availableEndDates = data.availableReadingDates.filter(date => 
+    selectedStartDate ? new Date(date.reading_date) > new Date(selectedStartDate) : true
   );
 
-  $: relevantMeters = data.meters.filter(
-    meter => !selectedType || meter.type === selectedType
-  );
+  function handleStartDateChange(event: CustomEvent<string>) {
+    selectedStartDate = event.detail;
+    calculateBillings();
+  }
 
-  function getReadingValue(meterId: number, date: string) {
-    const reading = data.readings.find(
+  function handleEndDateChange(event: CustomEvent<string>) {
+    selectedEndDate = event.detail;
+    calculateBillings();
+  }
+
+  function handleTypeChange(event: CustomEvent<UtilityType>) {
+    selectedType = event.detail;
+    calculateBillings();
+  }
+
+  function handleCostPerUnitChange(event: Event) {
+    const target = event.target as HTMLInputElement;
+    costPerUnit = parseFloat(target.value) || 0;
+    calculateBillings();
+  }
+
+  function getReadingValue(meterId: number, date: string): number {
+    const reading = (data.readings as Reading[]).find(
       r => r.meter_id === meterId && r.reading_date === date
     );
     return reading?.reading_value || 0;
@@ -57,12 +95,16 @@
       return;
     }
 
+    const startDate = new Date(selectedStartDate);
+    const endDate = new Date(selectedEndDate);
+
     meterBillings = relevantMeters.map(meter => {
-      const startReading = getReadingValue(meter.id, selectedStartDate);
-      const endReading = getReadingValue(meter.id, selectedEndDate);
+      const startReading = getReadingValue(meter.id, selectedStartDate!);
+      const endReading = getReadingValue(meter.id, selectedEndDate!);
       const consumption = endReading - startReading;
       const totalCost = consumption * costPerUnit;
-      const tenantCount = data.roomTenantCounts[meter.room.id] || 0;
+      const room = meter.room[0]; // Get first room since it's an array
+      const tenantCount = room ? (data.roomTenantCounts[room.id] || 0) : 0;
       const perTenantCost = tenantCount > 0 ? totalCost / tenantCount : 0;
 
       return {
@@ -77,8 +119,8 @@
       };
     });
 
-    $form.start_date = new Date(selectedStartDate);
-    $form.end_date = new Date(selectedEndDate);
+    $form.start_date = startDate;
+    $form.end_date = endDate;
     $form.type = selectedType;
     $form.cost_per_unit = costPerUnit;
     $form.meter_billings = meterBillings;
@@ -103,83 +145,56 @@
       <div class="grid grid-cols-2 gap-4">
         <div>
           <Label for="start_date">Start Date</Label>
-          <Select.Root
-            selected={selectedStartDate ? { 
-              label: new Date(selectedStartDate).toLocaleDateString(),
-              value: selectedStartDate
-            } : null}
-            onSelectedChange={(s) => {
-              if (s) {
-                selectedStartDate = s.value;
-                calculateBillings();
-              }
-            }}
-          >
-            <Select.Trigger>
-              <Select.Value placeholder="Select start date" />
-            </Select.Trigger>
-            <Select.Content>
-              {#each data.availableReadingDates as date}
-                <Select.Item value={date}>
-                  {new Date(date).toLocaleDateString()}
-                </Select.Item>
+          <Select on:change={handleStartDateChange}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select start date">
+                {selectedStartDate ? new Date(selectedStartDate).toLocaleDateString() : ''}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {#each data.availableReadingDates as { reading_date }}
+                <SelectItem value={reading_date}>
+                  {new Date(reading_date).toLocaleDateString()}
+                </SelectItem>
               {/each}
-            </Select.Content>
-          </Select.Root>
+            </SelectContent>
+          </Select>
           {#if $errors.start_date}<span class="text-destructive text-sm">{$errors.start_date}</span>{/if}
         </div>
 
         <div>
           <Label for="end_date">End Date</Label>
-          <Select.Root
-            selected={selectedEndDate ? { 
-              label: new Date(selectedEndDate).toLocaleDateString(),
-              value: selectedEndDate
-            } : null}
-            onSelectedChange={(s) => {
-              if (s) {
-                selectedEndDate = s.value;
-                calculateBillings();
-              }
-            }}
-          >
-            <Select.Trigger>
-              <Select.Value placeholder="Select end date" />
-            </Select.Trigger>
-            <Select.Content>
-              {#each availableEndDates as date}
-                <Select.Item value={date}>
-                  {new Date(date).toLocaleDateString()}
-                </Select.Item>
+          <Select on:change={handleEndDateChange}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select end date">
+                {selectedEndDate ? new Date(selectedEndDate).toLocaleDateString() : ''}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {#each availableEndDates as { reading_date }}
+                <SelectItem value={reading_date}>
+                  {new Date(reading_date).toLocaleDateString()}
+                </SelectItem>
               {/each}
-            </Select.Content>
-          </Select.Root>
+            </SelectContent>
+          </Select>
           {#if $errors.end_date}<span class="text-destructive text-sm">{$errors.end_date}</span>{/if}
         </div>
 
         <div>
           <Label for="type">Utility Type</Label>
-          <Select.Root
-            selected={selectedType ? { 
-              label: selectedType,
-              value: selectedType
-            } : null}
-            onSelectedChange={(s) => {
-              if (s) {
-                selectedType = s.value as keyof typeof utilityBillingTypeEnum.enum;
-                calculateBillings();
-              }
-            }}
-          >
-            <Select.Trigger>
-              <Select.Value placeholder="Select utility type" />
-            </Select.Trigger>
-            <Select.Content>
-              {#each Object.values(utilityBillingTypeEnum.enum) as type}
-                <Select.Item value={type}>{type}</Select.Item>
+          <Select on:change={handleTypeChange}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select utility type">
+                {selectedType || ''}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {#each Object.entries(utilityBillingTypeEnum.enum) as [key, value]}
+                <SelectItem value={key}>{value}</SelectItem>
               {/each}
-            </Select.Content>
-          </Select.Root>
+            </SelectContent>
+          </Select>
           {#if $errors.type}<span class="text-destructive text-sm">{$errors.type}</span>{/if}
         </div>
 
@@ -191,7 +206,7 @@
             bind:value={costPerUnit}
             min="0"
             step="0.01"
-            on:input={calculateBillings}
+            on:input={handleCostPerUnitChange}
           />
           {#if $errors.cost_per_unit}<span class="text-destructive text-sm">{$errors.cost_per_unit}</span>{/if}
         </div>

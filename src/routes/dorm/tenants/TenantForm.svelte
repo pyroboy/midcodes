@@ -1,87 +1,105 @@
 <script lang="ts">
-  import { z } from 'zod';
-  import Button from '$lib/components/ui/button/button.svelte';
-  import Input from '$lib/components/ui/input/input.svelte';
-  import Label from '$lib/components/ui/label/label.svelte';
-  import * as Select from '$lib/components/ui/select';
-  import { createEventDispatcher } from 'svelte';
-  import { tenantSchema, leaseStatusEnum, tenantStatusEnum, leaseTypeEnum } from './formSchema';
-  import Textarea from '$lib/components/ui/textarea/textarea.svelte';
-  import type { SuperForm } from 'sveltekit-superforms';
-  import type { Database } from '$lib/database.types';
-  import { format } from 'date-fns';
-  import { Badge } from '$lib/components/ui/badge';
-  import * as Card from '$lib/components/ui/card';
+  import type { PageData } from './$types';
+  import type { SuperValidated } from 'sveltekit-superforms';
+  import { superForm } from 'sveltekit-superforms/client';
+  import { tenantSchema } from './formSchema';
+  import type { Room } from './types';
+  import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+  } from "$lib/components/ui/select";
+  import { Input } from "$lib/components/ui/input";
+  import { Label } from "$lib/components/ui/label";
+  import { Button } from "$lib/components/ui/button";
+  import { Badge } from "$lib/components/ui/badge";
   import * as Tabs from '$lib/components/ui/tabs';
+  import { format } from 'date-fns';
+  import type { z } from 'zod';
+  import { zod } from 'sveltekit-superforms/adapters';
+  import { createEventDispatcher } from 'svelte';
+  import { leaseStatusEnum, tenantStatusEnum, leaseTypeEnum } from './formSchema';
+  import Textarea from '$lib/components/ui/textarea/textarea.svelte';
+  import type { Database } from '$lib/database.types';
+  import { defaultEmergencyContact } from './constants';
+  import * as Card from '$lib/components/ui/card';
   import * as Dialog from '$lib/components/ui/dialog';
   import { Separator } from '$lib/components/ui/separator';
-  import { defaultEmergencyContact } from './constants';
 
   type Property = Database['public']['Tables']['properties']['Row'];
   type User = Database['public']['Tables']['profiles']['Row'];
-  type TenantFormData = z.infer<typeof tenantSchema>;
-
-  interface Room {
-    id: number;
-    property_id: number;
-    number: number;
-    room_status: string;
-  }
-
-  interface PageData {
-    properties: Property[];
-    rooms: Room[];
-    users: User[];
-    isAdminLevel: boolean;
-    isStaffLevel: boolean;
-  }
 
   export let data: PageData;
-  export let form: SuperForm<TenantFormData>;
+  export let form: SuperValidated<z.infer<typeof tenantSchema>>;
   export let editMode = false;
-  export let tenant: TenantFormData | undefined = undefined;
+  export let tenant: z.infer<typeof tenantSchema> | undefined = undefined;
 
   const dispatch = createEventDispatcher();
-  const { form: formData, errors, enhance, submitting } = form;
+  type FormSchema = z.infer<typeof tenantSchema>;
+  const { form: formData, errors, enhance, submitting } = superForm<FormSchema>(form, {
+    validators: zod(tenantSchema)
+  });
 
+  let selectedPropertyId: number | null = null;
+  let availableRooms: Room[] = data.rooms;
   let showStatusDialog = false;
   let statusChangeReason = '';
-
-  $: {
-    if (tenant && editMode) {
-      formData.update($formData => ({ ...$formData, ...tenant }));
-    }
-  }
-
-  $: availableRooms = data.rooms?.filter(room => 
-    !$formData.location_id || room.id === $formData.location_id
-  ) ?? [];
 
   $: canEdit = data.isAdminLevel || (data.isStaffLevel && !editMode);
   $: canDelete = data.isAdminLevel;
 
-  function updateLocationId(selected: { value: string } | undefined) {
-    if (selected?.value) {
-      formData.update($formData => ({ ...$formData, location_id: parseInt(selected.value) }));
+  $: if (tenant && editMode) {
+    formData.update($formData => ({ ...$formData, ...tenant }));
+  }
+
+  $: filteredRooms = selectedPropertyId 
+    ? availableRooms.filter(room => 
+        room.property_id === selectedPropertyId && 
+        room.room_status === 'VACANT'
+      )
+    : availableRooms;
+
+  function handlePropertyChange(event: CustomEvent<string>) {
+    const propertyId = parseInt(event.detail);
+    if (!isNaN(propertyId)) {
+      selectedPropertyId = propertyId;
+      if (formData) {
+        $formData.location_id = null;
+      }
     }
   }
 
-  function updateTenantStatus(selected: { value: string } | undefined) {
-    if (selected?.value) {
+  function handleRoomChange(event: CustomEvent<string>) {
+    const roomId = parseInt(event.detail);
+    if (!isNaN(roomId) && formData) {
+      $formData.location_id = roomId;
+    }
+  }
+
+  function updateLocationId(event: CustomEvent<string>) {
+    if (event.detail) {
+      formData.update($formData => ({ ...$formData, location_id: parseInt(event.detail) }));
+    }
+  }
+
+  function updateTenantStatus(event: CustomEvent<string>) {
+    if (event.detail) {
       showStatusDialog = true;
-      formData.update($formData => ({ ...$formData, tenant_status: selected.value as TenantFormData['tenant_status'] }));
+      formData.update($formData => ({ ...$formData, tenant_status: event.detail as FormSchema['tenant_status'] }));
     }
   }
 
-  function updateLeaseStatus(selected: { value: string } | undefined) {
-    if (selected?.value) {
-      formData.update($formData => ({ ...$formData, lease_status: selected.value as TenantFormData['lease_status'] }));
+  function updateLeaseStatus(event: CustomEvent<string>) {
+    if (event.detail) {
+      formData.update($formData => ({ ...$formData, lease_status: event.detail as FormSchema['lease_status'] }));
     }
   }
 
-  function updateLeaseType(selected: { value: string } | undefined) {
-    if (selected?.value) {
-      formData.update($formData => ({ ...$formData, lease_type: selected.value as TenantFormData['lease_type'] }));
+  function updateLeaseType(event: CustomEvent<string>) {
+    if (event.detail) {
+      formData.update($formData => ({ ...$formData, lease_type: event.detail as FormSchema['lease_type'] }));
     }
   }
 
@@ -186,9 +204,9 @@
 
         <div class="space-y-2">
           <Label for="tenant_status">Tenant Status</Label>
-          <Select.Root onSelectedChange={updateTenantStatus} disabled={!canEdit}>
-            <Select.Trigger class="w-full">
-              <Select.Value>
+          <Select on:change={updateTenantStatus} disabled={!canEdit}>
+            <SelectTrigger>
+              <SelectValue>
                 {#if $formData.tenant_status}
                   <Badge variant="outline" class={getStatusColor($formData.tenant_status)}>
                     {$formData.tenant_status}
@@ -196,18 +214,18 @@
                 {:else}
                   Select status
                 {/if}
-              </Select.Value>
-            </Select.Trigger>
-            <Select.Content>
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
               {#each tenantStatusEnum as status}
-                <Select.Item value={status}>
+                <SelectItem value={status}>
                   <Badge variant="outline" class={getStatusColor(status)}>
                     {status}
                   </Badge>
-                </Select.Item>
+                </SelectItem>
               {/each}
-            </Select.Content>
-          </Select.Root>
+            </SelectContent>
+          </Select>
           {#if $errors.tenant_status}
             <p class="text-sm text-red-500">{$errors.tenant_status}</p>
           {/if}
@@ -289,36 +307,55 @@
     <Tabs.Content value="lease" class="p-4 border rounded-lg mt-4">
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div class="space-y-2">
-          <Label for="location_id">Room</Label>
-          <Select.Root onSelectedChange={updateLocationId} disabled={!canEdit}>
-            <Select.Trigger class="w-full">
-              <Select.Value placeholder="Select room" />
-            </Select.Trigger>
-            <Select.Content>
-              {#each availableRooms as room}
-                <Select.Item value={room.id.toString()}>
-                  Room {room.number}
-                </Select.Item>
+          <Label>Property</Label>
+          <Select on:change={handlePropertyChange}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select property" />
+            </SelectTrigger>
+            <SelectContent>
+              {#each data.properties as property}
+                <SelectItem value={property.id.toString()}>{property.name}</SelectItem>
               {/each}
-            </Select.Content>
-          </Select.Root>
-          {#if $errors.location_id}
-            <p class="text-sm text-red-500">{$errors.location_id}</p>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div class="space-y-2">
+          <Label>Room</Label>
+          <Select on:change={handleRoomChange} disabled={!selectedPropertyId}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select room" />
+            </SelectTrigger>
+            <SelectContent>
+              {#each filteredRooms as room}
+                <SelectItem value={room.id.toString()}>
+                  Room {room.number}
+                  <Badge variant="outline" class="ml-2">
+                    {room.room_status}
+                  </Badge>
+                </SelectItem>
+              {/each}
+            </SelectContent>
+          </Select>
+          {#if !selectedPropertyId}
+            <p class="text-sm text-gray-500">Select a property first</p>
+          {:else if filteredRooms.length === 0}
+            <p class="text-sm text-red-500">No available rooms in this property</p>
           {/if}
         </div>
 
         <div class="space-y-2">
           <Label for="lease_type">Lease Type</Label>
-          <Select.Root onSelectedChange={updateLeaseType} disabled={!canEdit}>
-            <Select.Trigger class="w-full">
-              <Select.Value placeholder="Select lease type" />
-            </Select.Trigger>
-            <Select.Content>
+          <Select on:change={updateLeaseType} disabled={!canEdit}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select lease type" />
+            </SelectTrigger>
+            <SelectContent>
               {#each leaseTypeEnum as type}
-                <Select.Item value={type}>{type}</Select.Item>
+                <SelectItem value={type}>{type}</SelectItem>
               {/each}
-            </Select.Content>
-          </Select.Root>
+            </SelectContent>
+          </Select>
           {#if $errors.lease_type}
             <p class="text-sm text-red-500">{$errors.lease_type}</p>
           {/if}
@@ -326,9 +363,9 @@
 
         <div class="space-y-2">
           <Label for="lease_status">Lease Status</Label>
-          <Select.Root onSelectedChange={updateLeaseStatus} disabled={!canEdit}>
-            <Select.Trigger class="w-full">
-              <Select.Value>
+          <Select on:change={updateLeaseStatus} disabled={!canEdit}>
+            <SelectTrigger>
+              <SelectValue>
                 {#if $formData.lease_status}
                   <Badge variant="outline" class={getStatusColor($formData.lease_status)}>
                     {$formData.lease_status}
@@ -336,18 +373,18 @@
                 {:else}
                   Select status
                 {/if}
-              </Select.Value>
-            </Select.Trigger>
-            <Select.Content>
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
               {#each leaseStatusEnum as status}
-                <Select.Item value={status}>
+                <SelectItem value={status}>
                   <Badge variant="outline" class={getStatusColor(status)}>
                     {status}
                   </Badge>
-                </Select.Item>
+                </SelectItem>
               {/each}
-            </Select.Content>
-          </Select.Root>
+            </SelectContent>
+          </Select>
           {#if $errors.lease_status}
             <p class="text-sm text-red-500">{$errors.lease_status}</p>
           {/if}

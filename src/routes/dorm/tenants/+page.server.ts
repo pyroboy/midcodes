@@ -201,7 +201,23 @@ export const actions: Actions = {
     }
 
     try {
-      // 1. Update tenant record
+      // Get current tenant data for comparison
+      const { data: currentTenant, error: currentTenantError } = await supabase
+        .from('tenants')
+        .select(`
+          *,
+          lease:leases (
+            id,
+            location_id,
+            status
+          )
+        `)
+        .eq('id', formData.data.id)
+        .single();
+
+      if (currentTenantError) throw currentTenantError;
+
+      // Update tenant record
       const { error: tenantError } = await supabase
         .from('tenants')
         .update({
@@ -209,13 +225,50 @@ export const actions: Actions = {
           contact_number: formData.data.contact_number,
           email: formData.data.email,
           auth_id: formData.data.auth_id,
-          tenant_status: formData.data.tenant_status
+          tenant_status: formData.data.tenant_status,
+          updated_at: new Date().toISOString()
         })
         .eq('id', formData.data.id);
 
       if (tenantError) throw tenantError;
 
-      // 2. Update lease record
+      // Handle room status updates
+      if (currentTenant?.lease?.location_id !== formData.data.location_id) {
+        // Update old room to VACANT if it exists
+        if (currentTenant?.lease?.location_id) {
+          const { error: oldRoomError } = await supabase
+            .from('rooms')
+            .update({ room_status: 'VACANT' })
+            .eq('id', currentTenant.lease.location_id);
+
+          if (oldRoomError) throw oldRoomError;
+        }
+
+        // Update new room to OCCUPIED if it exists
+        if (formData.data.location_id) {
+          const { error: newRoomError } = await supabase
+            .from('rooms')
+            .update({ room_status: 'OCCUPIED' })
+            .eq('id', formData.data.location_id);
+
+          if (newRoomError) throw newRoomError;
+        }
+      }
+
+      // Update lease status and handle room status
+      if (formData.data.lease_status === 'TERMINATED' || formData.data.lease_status === 'EXPIRED') {
+        // Set room to VACANT if lease is terminated or expired
+        if (currentTenant?.lease?.location_id) {
+          const { error: roomError } = await supabase
+            .from('rooms')
+            .update({ room_status: 'VACANT' })
+            .eq('id', currentTenant.lease.location_id);
+
+          if (roomError) throw roomError;
+        }
+      }
+
+      // Update lease record
       const { error: leaseError } = await supabase
         .from('leases')
         .update({
@@ -225,7 +278,8 @@ export const actions: Actions = {
           start_date: formData.data.start_date,
           end_date: formData.data.end_date,
           rent_amount: formData.data.rent_amount,
-          security_deposit: formData.data.security_deposit
+          security_deposit: formData.data.security_deposit,
+          updated_at: new Date().toISOString()
         })
         .eq('tenant_id', formData.data.id);
 

@@ -105,6 +105,7 @@ export interface Attendee {
         price: number;
         includes: string[];
     };
+    is_printed: boolean;
     is_paid: boolean;
     qr_link: string | null;
     reference_code_url: string | null;
@@ -115,12 +116,28 @@ export interface Attendee {
     created_at: string;
     updated_at: string;
     org_id: string;
-    attendance_status: 'registered' | 'paymentPending' | 'expired';
+    attendance_status: 'registered' | 'paymentPending' | 'expired' | 'present' | 'exited';
 }
 
 export interface AttendeeWithStatus extends Attendee {
     status: 'registered' | 'paymentPending' | 'expired';
     time_remaining_minutes: number | null;
+}
+
+export interface AttendeeWithScanInfo extends Attendee {
+    qr_scan_info: Array<{
+        scan_time: string;
+        scan_type: string;
+        scanned_by: string;
+        location?: string;
+    }>;
+    attendance_status: 'registered' | 'paymentPending' | 'expired' | 'present' | 'exited';
+}
+
+export interface ActionResultData {
+    success: boolean;
+    message: string;
+    data?: any;
 }
 
 export interface PaymentDetails {
@@ -138,6 +155,15 @@ export interface PaymentSummary {
     totalPaid: number;
     totalUnpaid: number;
     totalByReceiver: Record<string, number>;
+}
+
+export interface User {
+    id: string;
+    email: string;
+    name?: string;
+    org_id: string;
+    created_at: string;
+    updated_at?: string;
 }
 
 export interface Account {

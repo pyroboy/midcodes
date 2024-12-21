@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { TemplateElement } from '../stores/templateStore';
+    import type { TemplateElement } from './stores/templateStore';
     import PositionGroup from './PositionGroup.svelte';
     import FontSettings from './FontSettings.svelte';
     import * as Select from "$lib/components/ui/select";
@@ -9,6 +9,7 @@
     
     export let elements: TemplateElement[];
     export let fontOptions: string[];
+    export let side: 'front' | 'back';
     
     import { createEventDispatcher } from 'svelte';
     const dispatch = createEventDispatcher();
@@ -30,25 +31,26 @@
 
     function addElement(type: 'text' | 'photo' | 'signature' | 'selection') {
         const newElement: TemplateElement = {
+            id: `new_${type}_${Date.now()}`,
             variableName: `new_${type}_${Date.now()}`,
             type,
-            side: 'front',
             x: 10,
             y: 10,
             width: 100,
             height: 100,
+            side,
             ...(type === 'text' ? {
                 content: 'New Text',
-                font: 'Arial',
-                size: 16,
+                fontFamily: 'Arial',
+                fontSize: 16,
                 color: '#ffffff',
-                alignment: 'left'
+                textAlign: 'left'
             } : type === 'selection' ? {
                 options: ['Option 1', 'Option 2', 'Option 3'],
-                font: 'Arial',
-                size: 16,
+                fontFamily: 'Arial',
+                fontSize: 16,
                 color: '#ffffff',
-                alignment: 'left'
+                textAlign: 'left'
             } : {})
         };
         elements = [...elements, newElement];

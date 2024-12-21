@@ -17,7 +17,7 @@ interface RoleEmulationClaim {
     context: Record<string, unknown>
 }
 
-interface UserProfile {
+export interface UserProfile {
     id: string
     email: string
     role: UserRole
@@ -27,7 +27,7 @@ interface UserProfile {
     context: Record<string, unknown> | null
 }
 
-export interface EmulationSessionDatabaseRow {
+interface EmulationSessionDatabaseRow {
     id: string;
     user_id: string;
     original_role: UserRole;

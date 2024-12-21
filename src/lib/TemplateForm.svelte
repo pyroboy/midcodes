@@ -1,10 +1,10 @@
 <script lang="ts">
     import { onMount, createEventDispatcher } from 'svelte';
-    import { templateData } from '$lib/stores/templateStore';
-    import type { TemplateData, TemplateElement } from '$lib/stores/templateStore';
+    import { templateData } from './stores/templateStore';
+    import type { TemplateData, TemplateElement } from './stores/templateStore';
     import ElementList from './ElementList.svelte';
     import PositionGroup from './PositionGroup.svelte';
-    import { Button } from '$lib/components/ui/button';
+    import { Button } from './components/ui/button';
     import { Upload, Image, Plus, X } from 'lucide-svelte';
     import { loadGoogleFonts, getAllFontFamilies, isFontLoaded, fonts } from './config/fonts';
 
@@ -276,21 +276,179 @@
 
     // Your existing default elements...
     const defaultFrontElements: TemplateElement[] = [
-        { variableName: 'licenseNo', type: 'text', side: 'front', content: '75-005-24', x: 293, y: 159, font: 'Arial', size: 16, color: '#000000', alignment: 'left' },
-        { variableName: 'valid', type: 'text', side: 'front', content: '01/01/2026', x: 295, y: 179, font: 'Arial', size: 16, color: '#000000', alignment: 'left' },
-        { variableName: 'name', type: 'text', side: 'front', content: 'Junifer D. Oban', x: 256, y: 246, font: 'Arial', size: 21, color: '#000000', alignment: 'left' },
-        { variableName: 'photo', type: 'photo', side: 'front', x: 50, y: 131, width: 119, height: 158 },
-        { variableName: 'signature', type: 'signature', side: 'front', x: 263, y: 196, width: 152, height: 65 },
-        { variableName: 'idType', type: 'selection', side: 'front', options: ['Ministerial License', 'Ordination License', 'Local License'], x: 198, y: 131, font: 'Arial', size: 16, color: '#000000', alignment: 'left' },
-        { variableName: 'position', type: 'selection', side: 'front', options: ['General Treasurer', 'General Secretary', 'District Superintendent', 'Pastor'], x: 276, y: 270, font: 'Arial', size: 16, color: '#000000', alignment: 'left' }
+        { 
+            id: 'licenseNo',
+            variableName: 'licenseNo', 
+            type: 'text', 
+            content: '75-005-24', 
+            x: 293, 
+            y: 159, 
+            width: 100,
+            height: 20,
+            fontFamily: 'Arial', 
+            fontSize: 16, 
+            color: '#000000', 
+            textAlign: 'left',
+            side: 'front'
+        },
+        { 
+            id: 'valid',
+            variableName: 'valid', 
+            type: 'text', 
+            content: '01/01/2026', 
+            x: 295, 
+            y: 179, 
+            width: 100,
+            height: 20,
+            fontFamily: 'Arial', 
+            fontSize: 16, 
+            color: '#000000', 
+            textAlign: 'left',
+            side: 'front'
+        },
+        { 
+            id: 'name',
+            variableName: 'name', 
+            type: 'text', 
+            content: 'Junifer D. Oban', 
+            x: 256, 
+            y: 246, 
+            width: 100,
+            height: 20,
+            fontFamily: 'Arial', 
+            fontSize: 21, 
+            color: '#000000', 
+            textAlign: 'left',
+            side: 'front'
+        },
+        { 
+            id: 'photo',
+            variableName: 'photo', 
+            type: 'photo', 
+            x: 50, 
+            y: 131, 
+            width: 119,
+            height: 158,
+            side: 'front'
+        },
+        { 
+            id: 'signature',
+            variableName: 'signature', 
+            type: 'signature', 
+            x: 263, 
+            y: 196, 
+            width: 152,
+            height: 65,
+            side: 'front'
+        },
+        { 
+            id: 'idType',
+            variableName: 'idType', 
+            type: 'selection', 
+            options: ['Ministerial License', 'Ordination License', 'Local License'], 
+            x: 198, 
+            y: 131, 
+            width: 100,
+            height: 20,
+            fontFamily: 'Arial', 
+            fontSize: 16, 
+            color: '#000000', 
+            textAlign: 'left',
+            side: 'front'
+        },
+        { 
+            id: 'position',
+            variableName: 'position', 
+            type: 'selection', 
+            options: ['General Treasurer', 'General Secretary', 'District Superintendent', 'Pastor'], 
+            x: 276, 
+            y: 270, 
+            width: 100,
+            height: 20,
+            fontFamily: 'Arial', 
+            fontSize: 16, 
+            color: '#000000', 
+            textAlign: 'left',
+            side: 'front'
+        }
     ];
 
     const defaultBackElements: TemplateElement[] = [
-        { variableName: 'contactName', type: 'text', side: 'back', content: 'Ralph Steven D. Trigo', x: 113, y: 36, font: 'Arial', size: 13, color: '#000000', alignment: 'left' },
-        { variableName: 'addresss', type: 'text', side: 'back', content: 'San Isidro District', x: 112, y: 55, font: 'Arial', size: 13, color: '#000000', alignment: 'left' },
-        { variableName: 'contactNo', type: 'text', side: 'back', content: '9478920644', x: 112, y: 74, font: 'Arial', size: 13, color: '#000000', alignment: 'left' },
-        { variableName: 'tin', type: 'text', side: 'back', content: '943-403-393', x: 133, y: 115, font: 'Arial', size: 13, color: '#000000', alignment: 'left' },
-        { variableName: 'sss', type: 'text', side: 'back', content: '943-403-393', x: 133, y: 138, font: 'Arial', size: 13, color: '#000000', alignment: 'left' }
+        { 
+            id: 'contactName',
+            variableName: 'contactName', 
+            type: 'text', 
+            content: 'Ralph Steven D. Trigo', 
+            x: 113, 
+            y: 36, 
+            width: 100,
+            height: 20,
+            fontFamily: 'Arial', 
+            fontSize: 13, 
+            color: '#000000', 
+            textAlign: 'left',
+            side: 'back'
+        },
+        { 
+            id: 'addresss',
+            variableName: 'addresss', 
+            type: 'text', 
+            content: 'San Isidro District', 
+            x: 112, 
+            y: 55, 
+            width: 100,
+            height: 20,
+            fontFamily: 'Arial', 
+            fontSize: 13, 
+            color: '#000000', 
+            textAlign: 'left',
+            side: 'back'
+        },
+        { 
+            id: 'contactNo',
+            variableName: 'contactNo', 
+            type: 'text', 
+            content: '9478920644', 
+            x: 112, 
+            y: 74, 
+            width: 100,
+            height: 20,
+            fontFamily: 'Arial', 
+            fontSize: 13, 
+            color: '#000000', 
+            textAlign: 'left',
+            side: 'back'
+        },
+        { 
+            id: 'tin',
+            variableName: 'tin', 
+            type: 'text', 
+            content: '943-403-393', 
+            x: 133, 
+            y: 115, 
+            width: 100,
+            height: 20,
+            fontFamily: 'Arial', 
+            fontSize: 13, 
+            color: '#000000', 
+            textAlign: 'left',
+            side: 'back'
+        },
+        { 
+            id: 'sss',
+            variableName: 'sss', 
+            type: 'text', 
+            content: '943-403-393', 
+            x: 133, 
+            y: 138, 
+            width: 100,
+            height: 20,
+            fontFamily: 'Arial', 
+            fontSize: 13, 
+            color: '#000000', 
+            textAlign: 'left',
+            side: 'back'
+        }
     ];
 </script>
 
@@ -370,6 +528,7 @@
         <ElementList 
             {elements} 
             {fontOptions} 
+            {side}
             on:update={handleElementsUpdate}
         />
     {/if}

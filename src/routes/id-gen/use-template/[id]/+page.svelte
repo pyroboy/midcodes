@@ -13,23 +13,16 @@
     import { Loader } from 'lucide-svelte';
     import { goto } from '$app/navigation';
     import { enhance } from '$app/forms';
+    import type { TemplateElement as StoreTemplateElement } from '$lib/stores/templateStore';
 
     interface SelectOption {
         value: string;
         label: string;
     }
 
-    interface TemplateElement {
-        id: string;
-        type: 'text' | 'photo' | 'signature' | 'selection';
-        side: 'front' | 'back';
-        x: number;
-        y: number;
-        width?: number;
-        height?: number;
-        variableName: string;
-        content?: string;
-        options?: string[];
+    interface TemplateElement extends Omit<StoreTemplateElement, 'width' | 'height'> {
+        width: number;
+        height: number;
     }
 
     interface Template {
@@ -54,10 +47,27 @@
         [key: string]: File | null;
     }
 
-    export let data: { template: Template };
-    
+    export let data: {
+        template: {
+            id: string;
+            name: string;
+            org_id: string;
+            template_elements: StoreTemplateElement[];
+            front_background: string;
+            back_background: string;
+            orientation: 'landscape' | 'portrait';
+        };
+    };
+
     let templateId = $page.params.id;
-    let template: Template = data.template;
+    let template: Template = {
+        ...data.template,
+        template_elements: data.template.template_elements.map(element => ({
+            ...element,
+            width: element.width ?? 100,
+            height: element.height ?? 100
+        }))
+    };
     let loading = false;
     let error: string | null = null;
     let formElement: HTMLFormElement;
@@ -412,8 +422,8 @@
 
                                     {:else if element.type === 'photo' || element.type === 'signature'}
                                         <ThumbnailInput
-                                            width={element.width || 100}
-                                            height={element.height || 100}
+                                            width={element.width}
+                                            height={element.height}
                                             fileUrl={fileUrls[element.variableName]}
                                             initialScale={imagePositions[element.variableName]?.scale ?? 1}
                                             initialX={imagePositions[element.variableName]?.x ?? 0}

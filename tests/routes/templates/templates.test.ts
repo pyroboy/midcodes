@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { load } from '../../../src/routes/templates/+page.server';
+import { load } from '../../../src/routes/id-gen/use-template/[id]/+page.server';
 import { supabase } from '../../../src/lib/supabaseClient';
 import { redirect, error } from '@sveltejs/kit';
 
