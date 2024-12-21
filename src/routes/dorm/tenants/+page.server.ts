@@ -8,6 +8,8 @@ import { zod } from 'sveltekit-superforms/adapters';
 import type { Database } from '$lib/database.types';
 
 type Tenant = Database['public']['Tables']['tenants']['Row'];
+type Property = Database['public']['Tables']['properties']['Row'];
+type Room = Database['public']['Tables']['rooms']['Row'];
 type EmergencyContact = {
   name: string;
   relationship: string;
@@ -23,85 +25,209 @@ type PaymentSchedule = {
   status: 'PENDING' | 'PAID' | 'OVERDUE';
 };
 
-export const load: PageServerLoad = async ({ locals: { getSession, supabase } }) => {
-  const session = await getSession();
+interface RawLeaseData {
+  id: string | number;
+  tenant: {
+    id: string | number;
+  }[];
+  location: {
+    id: string | number;
+    number: string | number;
+    property: {
+      id: string | number;
+      name: string;
+    }[];
+  }[];
+}
 
-  if (!session) {
+interface LeaseWithRelations {
+  id: string;
+  tenant: {
+    id: string;
+  };
+  location: {
+    id: string;
+    number: string;
+    property: {
+      id: string;
+      name: string;
+    } | null;
+  } | null;
+}
+
+export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase } }) => {
+  const { session, user } = await safeGetSession();
+
+  if (!session || !user) {
     throw error(401, { message: 'Unauthorized' });
   }
 
   const form = await superValidate(zod(tenantSchema));
 
   // Fetch properties for room selection
-  const { data: properties, error: propertiesError } = await supabase
+  const { data: propertiesData, error: propertiesError } = await supabase
     .from('properties')
     .select('*')
     .order('name');
 
+  const properties = propertiesData || [];
+
   if (propertiesError) {
     console.error('Error fetching properties:', propertiesError);
-    throw error(500, { message: 'Error fetching properties' });
   }
 
   // Fetch rooms for assignment
-  const { data: rooms, error: roomsError } = await supabase
+  let { data: rooms = [], error: roomsError } = await supabase
     .from('rooms')
     .select('*')
     .order('number');
 
   if (roomsError) {
     console.error('Error fetching rooms:', roomsError);
-    throw error(500, { message: 'Error fetching rooms' });
+    rooms = [];
   }
 
   // Fetch user profiles for admin/staff check
-  const { data: profiles, error: profilesError } = await supabase
+  const { data: profilesData, error: profilesError } = await supabase
     .from('profiles')
     .select('*');
 
+  const profiles = profilesData || [];
+
   if (profilesError) {
     console.error('Error fetching profiles:', profilesError);
-    throw error(500, { message: 'Error fetching profiles' });
   }
 
-  const userProfile = profiles.find(profile => profile.id === session.user.id);
+  // Fetch tenants with basic data first
+  const { data: tenantsData, error: tenantsError } = await supabase
+    .from('tenants')
+    .select('*')
+    .order('name');
+
+  const tenantsBasic: Tenant[] = tenantsData || [];
+
+  if (tenantsError) {
+    console.error('Error fetching tenants:', tenantsError);
+    return {
+      form,
+      tenants: [],
+      rooms,
+      properties,
+      profiles,
+      userProfile: null,
+      isAdminLevel: false,
+      isStaffLevel: false
+    };
+  }
+
+  // Fetch leases separately
+  const { data: leasesData, error: leasesError } = await supabase
+    .from('leases')
+    .select(`
+      id,
+      tenant:tenants!inner (
+        id
+      ),
+      location:rooms (
+        id,
+        number,
+        property:properties (
+          id,
+          name
+        )
+      )
+    `);
+
+  // Transform the raw data
+  const rawLeases = (leasesData || []) as RawLeaseData[];
+  const leases: LeaseWithRelations[] = rawLeases.map(lease => ({
+    id: String(lease.id),
+    tenant: {
+      id: String(lease.tenant?.[0]?.id || '')
+    },
+    location: lease.location?.[0] ? {
+      id: String(lease.location[0].id),
+      number: String(lease.location[0].number),
+      property: lease.location[0].property?.[0] ? {
+        id: String(lease.location[0].property[0].id),
+        name: lease.location[0].property[0].name
+      } : null
+    } : null
+  }));
+
+  if (leasesError) {
+    console.error('Error fetching leases:', leasesError);
+  }
+
+  // Combine the data safely
+  const tenants = tenantsBasic.map((tenant: Tenant) => {
+    const matchingLease = leases.find(lease => 
+      lease.tenant && lease.tenant.id === String(tenant.id)
+    );
+    return {
+      ...tenant,
+      lease: matchingLease || null
+    };
+  });
+
+  const userProfile = profiles.find(profile => profile.id === user.id);
   const isAdminLevel = userProfile?.role === 'ADMIN';
   const isStaffLevel = userProfile?.role === 'STAFF' || isAdminLevel;
 
   return {
     form,
-    properties,
+    tenants,
     rooms,
+    properties,
     profiles,
+    userProfile,
     isAdminLevel,
     isStaffLevel
   };
 };
 
 export const actions: Actions = {
-  create: async ({ request, locals: { supabase, getSession } }) => {
-    const session = await getSession();
-    if (!session) {
+  create: async ({ request, locals: { supabase, safeGetSession } }) => {
+    const { session, user } = await safeGetSession();
+    if (!session || !user) {
       return fail(401, { message: 'Unauthorized' });
     }
 
-    const formData = await superValidate(request, zod(tenantSchema));
-    if (!formData.valid) {
-      return fail(400, { form: formData });
+    const form = await superValidate(request, zod(tenantSchema));
+    console.log('POST', form);
+
+    if (!form.valid) {
+      return fail(400, { form });
+    }
+
+    let { data: profilesData, error: profilesError } = await supabase
+      .from('profiles')
+      .select('*');
+
+    const profiles = profilesData || [];
+
+    if (profilesError) {
+      console.error('Error fetching profiles:', profilesError);
+    }
+
+    const userProfile = profiles.find(profile => profile.id === user.id);
+    const isAdminLevel = userProfile?.role === 'ADMIN';
+    const isStaffLevel = userProfile?.role === 'STAFF' || isAdminLevel;
+
+    if (!isStaffLevel) {
+      return fail(403, { message: 'Insufficient permissions' });
     }
 
     try {
-      // 1. Create tenant record
       const { data: tenant, error: tenantError } = await supabase
         .from('tenants')
-        .insert({
-          name: formData.data.name,
-          contact_number: formData.data.contact_number,
-          email: formData.data.email,
-          auth_id: formData.data.auth_id,
-          tenant_status: formData.data.tenant_status,
-          created_by: session.user.id
-        })
+        .insert([
+          {
+            ...form.data,
+            created_by: user.id,
+            updated_by: user.id,
+          },
+        ])
         .select()
         .single();
 
@@ -112,20 +238,20 @@ export const actions: Actions = {
         .from('leases')
         .insert({
           tenant_id: tenant.id,
-          location_id: formData.data.location_id,
-          lease_type: formData.data.lease_type,
-          lease_status: formData.data.lease_status,
-          start_date: formData.data.start_date,
-          end_date: formData.data.end_date,
-          rent_amount: formData.data.rent_amount,
-          security_deposit: formData.data.security_deposit,
-          created_by: session.user.id
+          location_id: form.data.location_id,
+          lease_type: form.data.lease_type,
+          lease_status: form.data.lease_status,
+          start_date: form.data.start_date,
+          end_date: form.data.end_date,
+          rent_amount: form.data.rent_amount,
+          security_deposit: form.data.security_deposit,
+          created_by: user.id
         });
 
       if (leaseError) throw leaseError;
 
       // 3. Create emergency contact record
-      const emergencyContact = formData.data.emergency_contact as EmergencyContact;
+      const emergencyContact = form.data.emergency_contact as EmergencyContact;
       const { error: emergencyContactError } = await supabase
         .from('emergency_contacts')
         .insert({
@@ -144,25 +270,25 @@ export const actions: Actions = {
         .from('tenant_status_history')
         .insert({
           tenant_id: tenant.id,
-          status: formData.data.tenant_status,
-          changed_by: session.user.id,
+          status: form.data.tenant_status,
+          changed_by: user.id,
           reason: 'Initial tenant creation'
         });
 
       if (statusHistoryError) throw statusHistoryError;
 
       // 5. Update room status if location is assigned
-      if (formData.data.location_id) {
+      if (form.data.location_id) {
         const { error: roomError } = await supabase
           .from('rooms')
           .update({ room_status: 'OCCUPIED' })
-          .eq('id', formData.data.location_id);
+          .eq('id', form.data.location_id);
 
         if (roomError) throw roomError;
       }
 
       // 6. Create payment schedules if provided
-      const paymentSchedules = formData.data.payment_schedules as PaymentSchedule[] | undefined;
+      const paymentSchedules = form.data.payment_schedules as PaymentSchedule[] | undefined;
       if (paymentSchedules?.length) {
         const { error: paymentScheduleError } = await supabase
           .from('payment_schedules')
@@ -179,44 +305,30 @@ export const actions: Actions = {
         if (paymentScheduleError) throw paymentScheduleError;
       }
 
-      return { form: formData };
+      return { form: form };
     } catch (err) {
       console.error('Error creating tenant:', err);
       return fail(500, {
-        form: formData,
+        form: form,
         message: 'Error creating tenant. Transaction rolled back.'
       });
     }
   },
 
-  update: async ({ request, locals: { supabase, getSession } }) => {
-    const session = await getSession();
-    if (!session) {
+  update: async ({ request, locals: { supabase, safeGetSession } }) => {
+    const { session, user } = await safeGetSession();
+    if (!session || !user) {
       return fail(401, { message: 'Unauthorized' });
     }
 
     const formData = await superValidate(request, zod(tenantSchema));
+    console.log('PUT', formData);
+
     if (!formData.valid) {
       return fail(400, { form: formData });
     }
 
     try {
-      // Get current tenant data for comparison
-      const { data: currentTenant, error: currentTenantError } = await supabase
-        .from('tenants')
-        .select(`
-          *,
-          lease:leases (
-            id,
-            location_id,
-            status
-          )
-        `)
-        .eq('id', formData.data.id)
-        .single();
-
-      if (currentTenantError) throw currentTenantError;
-
       // Update tenant record
       const { error: tenantError } = await supabase
         .from('tenants')
@@ -226,11 +338,28 @@ export const actions: Actions = {
           email: formData.data.email,
           auth_id: formData.data.auth_id,
           tenant_status: formData.data.tenant_status,
-          updated_at: new Date().toISOString()
+          updated_by: user.id
         })
         .eq('id', formData.data.id);
 
       if (tenantError) throw tenantError;
+
+      // Get current tenant data for comparison
+      let { data: currentTenant = null, error: currentTenantError } = await supabase
+        .from('tenants')
+        .select(`
+          *,
+          lease:leases (
+            location_id
+          )
+        `)
+        .eq('id', formData.data.id)
+        .single();
+
+      if (currentTenantError) {
+        console.error('Error fetching current tenant:', currentTenantError);
+        currentTenant = null;
+      }
 
       // Handle room status updates
       if (currentTenant?.lease?.location_id !== formData.data.location_id) {
@@ -309,7 +438,7 @@ export const actions: Actions = {
           .insert({
             tenant_id: formData.data.id,
             status: latestStatus.status,
-            changed_by: session.user.id,
+            changed_by: user.id,
             reason: latestStatus.reason
           });
 

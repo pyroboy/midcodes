@@ -7,7 +7,9 @@
   import Label from '$lib/components/ui/label/label.svelte';
   import * as Select from "$lib/components/ui/select";
   import { createEventDispatcher } from 'svelte';
-  import { roomSchema, type Room } from './formSchema';
+  import { roomSchema, type Room, locationStatusEnum } from './formSchema';
+  import type { SuperValidated, SuperForm } from 'sveltekit-superforms';
+  import type { AnyZodObject } from 'zod';
 
   interface PageData {
     rooms: Array<Room & {
@@ -16,7 +18,7 @@
     }>;
     properties: Array<{ id: number; name: string }>;
     floors: Array<{ id: number; property_id: number; floor_number: number; wing?: string }>;
-    form: any;
+    form: SuperValidated<any>;
   }
 
   interface SelectItem {
@@ -33,8 +35,7 @@
 
   const dispatch = createEventDispatcher();
 
-  const { form, errors, enhance, submitting, reset } = superForm(data.form, {
-    id: 'roomForm',
+  const { form, errors, enhance, submitting } = superForm(data.form, {
     validators: zodClient(roomSchema),
     applyAction: true,
     resetForm: true,
@@ -46,18 +47,17 @@
     },
   });
 
+  let propertySelected: SelectItem | undefined;
+  let floorSelected: SelectItem | undefined;
+  let roomStatusSelected: SelectItem | undefined;
+
   $: {
     if (selectedRoom && editMode) {
-      form.set(selectedRoom);
-      roomStatusSelected = { value: selectedRoom.room_status, label: selectedRoom.room_status };
-      propertySelected = { value: selectedRoom.property_id.toString(), label: data.properties.find(p => p.id === selectedRoom.property_id)?.name || '' };
-      floorSelected = { value: selectedRoom.floor_id.toString(), label: getFloorLabel(selectedRoom.floor_id) };
+      $form = selectedRoom;
     }
   }
 
-  let roomStatusSelected: SelectItem = { value: 'VACANT', label: 'VACANT' };
-  let propertySelected: SelectItem = { value: '', label: 'Select a property' };
-  let floorSelected: SelectItem = { value: '', label: 'Select a floor' };
+  const roomTypes = ['SINGLE', 'DOUBLE', 'TRIPLE', 'QUAD', 'SUITE'] as const;
 
   function handlePropertyChange(selected: unknown) {
     const s = selected as SelectItem;
@@ -89,7 +89,7 @@
   function handleStatusChange(selected: unknown) {
     const s = selected as SelectItem;
     if (s?.value) {
-      $form.room_status = s.value;
+      $form.room_status = s.value as typeof locationStatusEnum._type;
       roomStatusSelected = s;
     }
   }
@@ -100,29 +100,26 @@
 
   function getFloorLabel(floorId: number): string {
     const floor = data.floors.find(f => f.id === floorId);
-    if (!floor) return '';
-    return `Floor ${floor.floor_number}${floor.wing ? ` - ${floor.wing}` : ''}`;
+    return floor ? `Floor ${floor.floor_number}${floor.wing ? ` Wing ${floor.wing}` : ''}` : '';
   }
-
-  const roomStatuses = ['VACANT', 'OCCUPIED', 'RESERVED'];
-  const roomTypes = ['SINGLE', 'DOUBLE', 'TRIPLE', 'QUAD', 'SUITE'];
   
   function handleCancel() {
     dispatch('cancel');
-    reset();
   }
 
   let amenityInput = '';
   
   function addAmenity() {
     if (amenityInput.trim()) {
-      $form.amenities = [...$form.amenities, amenityInput.trim()];
+      $form.amenities = [...($form.amenities || []), amenityInput.trim()];
       amenityInput = '';
     }
   }
-
+  
   function removeAmenity(index: number): void {
-    $form.amenities = $form.amenities.filter((_: string, i: number) => i !== index);
+    if ($form.amenities) {
+      $form.amenities = $form.amenities.filter((_: string, i: number) => i !== index);
+    }
   }
 </script>
 
@@ -136,14 +133,10 @@
     <input type="hidden" name="id" bind:value={$form.id} />
   {/if}
 
-  <div class="flex justify-between items-center mb-4">
-    <h1 class="text-2xl font-bold">Room Form</h1>
-  </div>
-
   <div>
-    <Label for="property">Property</Label>
+    <Label for="property_id">Property</Label>
     <Select.Root    
-      selected={propertySelected}
+      selected={{ value: $form.property_id?.toString() || '', label: data.properties.find(p => p.id === $form.property_id)?.name || 'Select a property' }}
       onSelectedChange={handlePropertyChange}
     >
       <Select.Trigger>
@@ -151,7 +144,9 @@
       </Select.Trigger>
       <Select.Content>
         {#each data.properties as property}
-          <Select.Item value={property.id.toString()} label={property.name} />
+          <Select.Item value={property.id.toString()}>
+            {property.name}
+          </Select.Item>
         {/each}
       </Select.Content>
     </Select.Root>
@@ -159,9 +154,9 @@
   </div>
 
   <div>
-    <Label for="floor">Floor</Label>
+    <Label for="floor_id">Floor</Label>
     <Select.Root    
-      selected={floorSelected}
+      selected={{ value: $form.floor_id?.toString() || '', label: getFloorLabel($form.floor_id) || 'Select a floor' }}
       onSelectedChange={handleFloorChange}
     >
       <Select.Trigger>
@@ -169,10 +164,12 @@
       </Select.Trigger>
       <Select.Content>
         {#each availableFloors as floor}
-          <Select.Item 
-            value={floor.id.toString()} 
-            label={getFloorLabel(floor.id)} 
-          />
+          <Select.Item value={floor.id.toString()}>
+            Floor {floor.floor_number}
+            {#if floor.wing}
+              Wing {floor.wing}
+            {/if}
+          </Select.Item>
         {/each}
       </Select.Content>
     </Select.Root>
@@ -180,19 +177,19 @@
   </div>
 
   <div>
-    <Label for="name">Room Name</Label>
+    <Label for="name">Name</Label>
     <Input id="name" name="name" bind:value={$form.name} />
     {#if $errors.name}<span class="text-red-500">{$errors.name}</span>{/if}
   </div>
 
   <div>
-    <Label for="number">Room Number</Label>
+    <Label for="number">Number</Label>
     <Input type="number" id="number" name="number" bind:value={$form.number} />
     {#if $errors.number}<span class="text-red-500">{$errors.number}</span>{/if}
   </div>
 
   <div>
-    <Label for="type">Room Type</Label>
+    <Label for="type">Type</Label>
     <Select.Root    
       selected={{ value: $form.type || '', label: $form.type || 'Select a type' }}
       onSelectedChange={handleTypeChange}
@@ -202,7 +199,9 @@
       </Select.Trigger>
       <Select.Content>
         {#each roomTypes as type}
-          <Select.Item value={type} label={type} />
+          <Select.Item value={type}>
+            {type}
+          </Select.Item>
         {/each}
       </Select.Content>
     </Select.Root>
@@ -224,15 +223,17 @@
   <div>
     <Label for="room_status">Status</Label>
     <Select.Root    
-      selected={roomStatusSelected}
+      selected={{ value: $form.room_status || '', label: $form.room_status || 'Select a status' }}
       onSelectedChange={handleStatusChange}
     >
       <Select.Trigger>
         <Select.Value placeholder="Select a status" />
       </Select.Trigger>
       <Select.Content>
-        {#each roomStatuses as status}
-          <Select.Item value={status} label={status} />
+        {#each locationStatusEnum.options as status}
+          <Select.Item value={status}>
+            {status}
+          </Select.Item>
         {/each}
       </Select.Content>
     </Select.Root>
@@ -240,11 +241,11 @@
   </div>
 
   <div>
-    <Label for="amenities">Amenities</Label>
-    <div class="flex gap-2 mb-2">
-      <Input 
-        id="amenity-input" 
-        bind:value={amenityInput} 
+    <Label>Amenities</Label>
+    <div class="flex gap-2">
+      <Input
+        type="text"
+        bind:value={amenityInput}
         placeholder="Add amenity"
         on:keydown={(e) => {
           if (e.key === 'Enter') {
@@ -261,8 +262,8 @@
           <div class="flex items-center gap-1 bg-secondary p-1 rounded">
             <span>{amenity}</span>
             <button 
-              type="button" 
-              class="text-destructive hover:text-destructive-foreground"
+              type="button"
+              class="text-sm hover:text-destructive"
               on:click={() => removeAmenity(i)}
             >
               ×

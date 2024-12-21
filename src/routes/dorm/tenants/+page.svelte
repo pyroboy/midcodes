@@ -2,7 +2,7 @@
   import type { PageData } from './$types';
   import type { SuperValidated } from 'sveltekit-superforms';
   import { superForm } from 'sveltekit-superforms/client';
-  import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
+  // import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
   import { zodClient } from 'sveltekit-superforms/adapters';
   import type { ExtendedTenant, Room, Profile, EmergencyContact, Selected } from './types';
   import { browser } from '$app/environment';
@@ -22,9 +22,8 @@
     tenants: ExtendedTenant[];
     rooms: Room[];
     properties: any[];
-    users: Profile[];
-    user: { id: string; full_name: string };
-    userRole: string;
+    profiles: Profile[];
+    userProfile: Profile;
     isAdminLevel: boolean;
     isStaffLevel: boolean;
   }
@@ -38,6 +37,7 @@
     validators: zodClient(tenantSchema),
     taintedMessage: null,
     resetForm: true,
+    dataType: 'json',
     onResult: ({ result }) => {
       if (result.type === 'success') {
         showForm = false;
@@ -60,7 +60,7 @@
           notes: '',
           last_payment_date: null,
           next_payment_due: null,
-          created_by: data.user.id,
+          created_by: data.userProfile.id,
           emergency_contact: defaultEmergencyContact,
           payment_schedules: [],
           status_history: []
@@ -124,7 +124,7 @@
       notes: '',
       last_payment_date: null,
       next_payment_due: null,
-      created_by: data.user.id,
+      created_by: data.userProfile.id,
       emergency_contact: defaultEmergencyContact,
       payment_schedules: [],
       status_history: []
@@ -152,7 +152,7 @@
         notes: '',
         last_payment_date: null,
         next_payment_due: null,
-        created_by: data.user.id,
+        created_by: data.userProfile.id,
         emergency_contact: defaultEmergencyContact,
         payment_schedules: [],
         status_history: []
@@ -399,6 +399,6 @@
   </div>
 </div>
 
-{#if browser}
+<!-- {#if browser}
   <SuperDebug data={$form} />
-{/if}
+{/if} -->

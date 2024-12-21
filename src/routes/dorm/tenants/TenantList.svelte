@@ -19,8 +19,8 @@
     tenants: ExtendedTenant[];
     rooms: Room[];
     properties: Property[];
-    users: Profile[];
-    userRole: string;
+    profiles: Profile[];
+    userProfile: Profile;
     isAdminLevel: boolean;
     isStaffLevel: boolean;
   }
@@ -37,12 +37,12 @@
   let searchQuery = '';
 
   $: filteredTenants = data.tenants.filter(tenant => {
-    const matchesProperty = !selectedProperty || tenant.lease?.location.property.id.toString() === selectedProperty;
+    const matchesProperty = !selectedProperty || 
+      (tenant.lease?.location?.property?.id?.toString() === selectedProperty);
     const matchesStatus = !selectedStatus || tenant.tenant_status === selectedStatus;
     const matchesSearch = !searchQuery || 
       tenant.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      tenant.lease?.user.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      tenant.lease?.user.email?.toLowerCase().includes(searchQuery.toLowerCase());
+      tenant.email?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesProperty && matchesStatus && matchesSearch;
   });
 
@@ -169,71 +169,48 @@
       <Table.Root>
         <Table.Header>
           <Table.Row>
-            <Table.Head class="w-[200px]">Name</Table.Head>
+            <Table.Head>Name</Table.Head>
+            <Table.Head>Email</Table.Head>
+            <Table.Head>Contact Number</Table.Head>
+            <Table.Head>Property</Table.Head>
             <Table.Head>Room</Table.Head>
             <Table.Head>Status</Table.Head>
-            <Table.Head class="text-right">Balance</Table.Head>
             <Table.Head class="text-right">Actions</Table.Head>
           </Table.Row>
         </Table.Header>
         <Table.Body>
           {#each sortedTenants as tenant (tenant.id)}
             <Table.Row>
-              <Table.Cell class="font-medium">
-                {tenant.name}
-                <div class="text-sm text-gray-500">
-                  {tenant.contact_number || 'No contact'}
-                </div>
-              </Table.Cell>
+              <Table.Cell>{tenant.name}</Table.Cell>
+              <Table.Cell>{tenant.email || 'N/A'}</Table.Cell>
+              <Table.Cell>{tenant.contact_number || 'N/A'}</Table.Cell>
               <Table.Cell>
-                {#if tenant.lease?.location}
-                  <div class="flex flex-col">
-                    <span>Room {tenant.lease.location.number}</span>
-                    <div class="flex items-center gap-2 text-sm text-gray-500">
-                      <Badge variant="outline" class={getRoomStatusColor(tenant.lease.location.room_status)}>
-                        {tenant.lease.location.room_status}
-                      </Badge>
-                      {#if tenant.lease.location.floor}
-                        <span>Floor {tenant.lease.location.floor.floor_number}</span>
-                        {#if tenant.lease.location.floor.wing}
-                          <span>Wing {tenant.lease.location.floor.wing}</span>
-                        {/if}
-                      {/if}
-                    </div>
-                  </div>
+                {#if tenant.lease?.location?.property?.name}
+                  {tenant.lease.location.property.name}
                 {:else}
-                  <span class="text-gray-500">No room assigned</span>
+                  Not Assigned
                 {/if}
               </Table.Cell>
               <Table.Cell>
-                <Badge variant="outline" class={getStatusColor(tenant.tenant_status)}>
+                {#if tenant.lease?.location?.number}
+                  {tenant.lease.location.number}
+                {:else}
+                  Not Assigned
+                {/if}
+              </Table.Cell>
+              <Table.Cell>
+                <Badge variant={tenant.tenant_status === 'ACTIVE' ? 'secondary' : 
+                  tenant.tenant_status === 'PENDING' ? 'outline' : 'destructive'}>
                   {tenant.tenant_status}
                 </Badge>
-                {#if tenant.lease?.status}
-                  <Badge variant="outline" class={getStatusColor(tenant.lease.status)}>
-                    {tenant.lease.status}
-                  </Badge>
-                {/if}
-              </Table.Cell>
-              <Table.Cell class="text-right">
-                <div class="flex flex-col items-end">
-                  <span class={tenant.outstanding_balance > 0 ? 'text-red-600' : 'text-green-600'}>
-                    ₱{tenant.outstanding_balance.toLocaleString()}
-                  </span>
-                  {#if tenant.lease?.next_payment_due}
-                    <span class="text-sm text-gray-500">
-                      Due {formatDate(tenant.lease.next_payment_due)}
-                    </span>
-                  {/if}
-                </div>
               </Table.Cell>
               <Table.Cell class="text-right">
                 <div class="flex justify-end gap-2">
-                  <Button variant="outline" size="sm" on:click={() => handleEdit(tenant)}>
+                  <Button size="sm" variant="outline" on:click={() => handleEdit(tenant)}>
                     Edit
                   </Button>
                   {#if data.isAdminLevel}
-                    <Button variant="destructive" size="sm" on:click={() => handleDelete(tenant)}>
+                    <Button size="sm" variant="destructive" on:click={() => handleDelete(tenant)}>
                       Delete
                     </Button>
                   {/if}

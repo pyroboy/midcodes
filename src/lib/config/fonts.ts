@@ -100,7 +100,7 @@ export const fonts: FontConfig[] = [...googleFonts, ...systemFonts];
 
 export function getFontUrl(fonts: FontConfig[]): string {
     if (!fonts.length) {
-        console.log('No fonts provided to getFontUrl');
+        // console.log('No fonts provided to getFontUrl');
         return '';
     }
     
@@ -109,10 +109,10 @@ export function getFontUrl(fonts: FontConfig[]): string {
         const hasItalic = font.styles?.includes('italic');
         const weights = font.weights.join(';');
 
-        console.log(`Processing font: ${font.family}`);
-        console.log(`Encoded family: ${encodedFamily}`);
-        console.log(`Has italic: ${hasItalic}`);
-        console.log(`Weights: ${weights}`);
+        // console.log(`Processing font: ${font.family}`);
+        // console.log(`Encoded family: ${encodedFamily}`);
+        // console.log(`Has italic: ${hasItalic}`);
+        // console.log(`Weights: ${weights}`);
 
         let fontUrl = '';
         if (hasItalic) {
@@ -123,33 +123,33 @@ export function getFontUrl(fonts: FontConfig[]): string {
             fontUrl = `family=${encodedFamily}:wght@${weights}`;
         }
 
-        console.log(`Generated URL part for ${font.family}:`, fontUrl);
+        // console.log(`Generated URL part for ${font.family}:`, fontUrl);
         return fontUrl;
     });
 
     const finalUrl = `https://fonts.googleapis.com/css2?${fontFamilies.join('&')}&display=swap`;
-    console.log('Final generated URL:', finalUrl);
+    // console.log('Final generated URL:', finalUrl);
     return finalUrl;
 }
 
 export function loadGoogleFonts(): Promise<void> {
-    console.log('Starting loadGoogleFonts');
+    // console.log('Starting loadGoogleFonts');
     
     if (typeof window === 'undefined') {
-        console.log('Window is undefined, skipping font loading');
+        // console.log('Window is undefined, skipping font loading');
         return Promise.resolve();
     }
 
     return new Promise((resolve, reject) => {
-        console.log('Checking for existing font stylesheet');
+        // console.log('Checking for existing font stylesheet');
         const existingLink = document.querySelector('link[href*="fonts.googleapis.com/css2"]');
         if (existingLink) {
-            console.log('Font stylesheet already exists, resolving');
+            // console.log('Font stylesheet already exists, resolving');
             resolve();
             return;
         }
 
-        console.log('Creating preconnect links');
+        // console.log('Creating preconnect links');
         const preconnectGoogle = document.createElement('link');
         preconnectGoogle.rel = 'preconnect';
         preconnectGoogle.href = 'https://fonts.googleapis.com';
@@ -159,7 +159,7 @@ export function loadGoogleFonts(): Promise<void> {
         preconnectGstatic.href = 'https://fonts.gstatic.com';
         preconnectGstatic.crossOrigin = 'anonymous';
 
-        console.log('Creating font stylesheet link');
+        // console.log('Creating font stylesheet link');
         const link = document.createElement('link');
         const fontUrl = getFontUrl(googleFonts);
         link.href = fontUrl;
@@ -172,9 +172,9 @@ export function loadGoogleFonts(): Promise<void> {
 
         const loadFonts = async () => {
             try {
-                console.log('Waiting for document.fonts.ready');
+                // console.log('Waiting for document.fonts.ready');
                 await document.fonts.ready;
-                console.log('Fonts loaded successfully');
+                // console.log('Fonts loaded successfully');
                 clearTimeout(loadTimeout);
                 resolve();
             } catch (err) {
@@ -185,7 +185,7 @@ export function loadGoogleFonts(): Promise<void> {
         };
 
         link.onload = () => {
-            console.log('Font stylesheet loaded successfully');
+            // console.log('Font stylesheet loaded successfully');
             loadFonts();
         };
 
@@ -196,7 +196,7 @@ export function loadGoogleFonts(): Promise<void> {
             reject(new Error('Failed to load font stylesheet'));
         };
 
-        console.log('Appending links to document head');
+        // console.log('Appending links to document head');
         document.head.appendChild(preconnectGoogle);
         document.head.appendChild(preconnectGstatic);
         document.head.appendChild(link);
@@ -226,12 +226,12 @@ export function isValidFontFamily(family: string): boolean {
 
 export async function isFontLoaded(family: string): Promise<boolean> {
     if (typeof window === 'undefined') {
-        console.log('Window is undefined, cannot check font loading');
+        // console.log('Window is undefined, cannot check font loading');
         return false;
     }
     
     try {
-        console.log(`Checking if font '${family}' is loaded`);
+        // console.log(`Checking if font '${family}' is loaded`);
         await document.fonts.ready;
         const isLoaded = document.fonts.check(`1em "${family}"`);
         console.log(`Font '${family}' loaded status:`, isLoaded);

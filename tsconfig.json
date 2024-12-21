@@ -9,6 +9,13 @@
 	  "resolveJsonModule": true,
 	  "skipLibCheck": true,
 	  "sourceMap": true,
-	  "typeRoots": ["./node_modules/@types", "./src/types"]
+	  "typeRoots": ["./node_modules/@types", "./src/types"],
+	  "paths": {
+	    "$lib": ["./src/lib"],
+	    "$lib/*": ["./src/lib/*"],
+	    "$app/*": ["./tests/mocks/$app/*"],
+	    "$env/*": ["./tests/mocks/$env/*"],
+	    "@test/*": ["./tests/*"]
+	  }
 	}
   }
