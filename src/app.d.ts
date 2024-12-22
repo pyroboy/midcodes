@@ -21,12 +21,13 @@ declare global {
 			safeGetSession: () => Promise<{
 				session: SupabaseSession | null;
 				error: Error | null;
+				user: User | null;
+				profile: ProfileData | EmulatedProfile | null;
+				roleEmulation: RoleEmulationClaim | null;
 			}>;
 			session: SupabaseSession | null;
-			user: {
-				// role: string;
-				// roleConfig: any;
-			} | null;
+			user: User | null;
+			profile?: ProfileData | EmulatedProfile | null;
 		}
 		interface PageData {
 			session: Session | null;

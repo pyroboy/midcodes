@@ -23,12 +23,13 @@ export const PublicPaths = {
     error: '/error',
     home: '/',
     register: '/register',
-    eventPattern: /\/EVNT-\d{4}-[A-Z0-9]{5}$/
+    eventPattern: /\/EVNT-\d{4}-[A-Z0-9]{5}$/,
+    constrack: '/constrack'
 }
 
 // Helper to check if a path is public
 export function isPublicPath(path: string): boolean {
-    if (path.startsWith(PublicPaths.auth)) return true
+    if (path.startsWith(PublicPaths.auth) || path.startsWith(PublicPaths.constrack)) return true
     const eventUrlMatch = path.match(/^\/([^/]+)/)
     const eventUrl = eventUrlMatch ? eventUrlMatch[1] : null
     return !!(eventUrl && (

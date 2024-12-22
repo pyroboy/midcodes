@@ -25,13 +25,19 @@ export interface PaymentSummary {
 }
 
 export const load = (async ({ locals: { safeGetSession, supabase }, params }) => {
+
+    // if (!locals.session) {
+    //     throw new Error('Unauthorized access, no session found');
+    // }
+
+
     const sessionInfo = await safeGetSession();
     // console.log('Session info:', { 
     //     hasSession: !!sessionInfo.session, 
     //     userId: sessionInfo.session?.user?.id 
     // });
     
-    if (!sessionInfo.session || !sessionInfo.profile) {
+    if (!sessionInfo.session ) {
         throw error(401, 'Unauthorized');
     }
 
@@ -122,7 +128,7 @@ export const load = (async ({ locals: { safeGetSession, supabase }, params }) =>
 export const actions: Actions = {
     updatePayment: async ({ request, locals: { safeGetSession, supabase }}) => {
         const sessionInfo = await safeGetSession();
-        if (!sessionInfo.session || !sessionInfo.profile) {
+        if (!sessionInfo.session ) {
             return fail(401, { message: 'Unauthorized' });
         }
 
@@ -188,7 +194,7 @@ export const actions: Actions = {
         console.log('[Server] Starting cleanup operation');
         
         const sessionInfo = await safeGetSession();
-        if (!sessionInfo.session || !sessionInfo.profile) {
+        if (!sessionInfo.session) {
             console.log('[Server] Cleanup failed: Unauthorized');
             return fail(401, { message: 'Unauthorized' });
         }
