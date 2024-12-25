@@ -5,9 +5,9 @@ import type { ProfileData, EmulatedProfile } from '$lib/types/roleEmulation';
 export const DELETE: RequestHandler = async ({ params, locals: { supabase, safeGetSession } }) => {
     try {
         // Get session info which includes user and profile
-        const sessionInfo = await safeGetSession();
-        const { user, session } = sessionInfo;
-        let userProfile: ProfileData | EmulatedProfile | null = sessionInfo.profile;
+        const { session,roleEmulation ,user,profile} = await safeGetSession();
+        // const { user, session } = sessionInfo;
+        let userProfile: ProfileData | EmulatedProfile | null = profile;
 
         if (!user || !session) {
             throw error(401, { message: 'Unauthorized' });
@@ -34,8 +34,8 @@ export const DELETE: RequestHandler = async ({ params, locals: { supabase, safeG
         }
 
         // Get the effective organization ID (either emulated or actual)
-        const effectiveOrgId = session?.roleEmulation?.active ? 
-            session.roleEmulation.emulated_org_id : 
+        const effectiveOrgId = roleEmulation?.active ? 
+            roleEmulation.emulated_org_id : 
             userProfile.org_id;
         
         if (!effectiveOrgId) {

@@ -24,6 +24,7 @@ declare global {
 				user: User | null;
 				profile: ProfileData | EmulatedProfile | null;
 				roleEmulation: RoleEmulationClaim | null;
+				navigation?: NavigationState;
 			}>;
 			session: SupabaseSession | null;
 			user: User | null;

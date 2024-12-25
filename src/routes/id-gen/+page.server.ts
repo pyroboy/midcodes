@@ -2,8 +2,8 @@ import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase } }) => {
-    const session = await safeGetSession();
-    const { user, profile } = session;
+    const {session ,user,profile,roleEmulation}= await safeGetSession();
+    // const { user, profile } = session;
 
     if (!user) {
         throw error(401, 'Unauthorized');
@@ -14,11 +14,11 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
     }
 
     // Get the effective organization ID (either emulated or actual)
-    const effectiveOrgId = session.session?.roleEmulation?.active ? 
-        session.session.roleEmulation.emulated_org_id : 
+    const effectiveOrgId = roleEmulation?.active ? 
+        roleEmulation.emulated_org_id : 
         profile.org_id;
 
-    console.log('roleEmulation:', session.session?.roleEmulation);
+    console.log('roleEmulation:', roleEmulation);
     console.log('effectiveOrgId:', effectiveOrgId);
 
     if (!effectiveOrgId) {

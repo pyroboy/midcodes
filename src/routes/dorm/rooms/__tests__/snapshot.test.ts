@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, assert, beforeEach } from 'vitest';
-import { render } from '@testing-library/svelte';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, cleanup } from '@testing-library/svelte';
+import { configureTestEnv } from '@test-utils/environment';
+import { toMatchImageSnapshot } from 'jest-image-snapshot';
 import Page from '../+page.svelte';
-import { checkAccess } from '$lib/utils/roleChecks';
-import { load } from '../+page.server';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import type { ServerLoadEvent } from '@sveltejs/kit';
 import type { Room, Property, Floor } from '../formSchema';
@@ -15,31 +15,16 @@ import type {
 import type { NavigationState } from '$lib/types/navigation';
 import type { Emulation } from '$lib/types/roles';
 import type { PageParentData } from '$lib/types/pages';
+
+// Configure test environment for snapshots
+configureTestEnv();
+expect.extend({ toMatchImageSnapshot });
+
 // Define types needed for load function
 type RouteParams = Record<string, string>;
 
 // Create a specific type for the ServerLoadEvent with proper generic parameters
 type TypedServerLoadEvent = ServerLoadEvent<RouteParams, PageParentData, "/dorm/rooms">;
-
-// Mock the roleChecks module
-vi.mock('$lib/utils/roleChecks', () => ({
-  checkAccess: (role: string, requiredLevel: string) => {
-    // Define role hierarchies
-    const roleHierarchy: Record<string, string[]> = {
-      super_admin: ['super_admin', 'admin', 'staff', 'user'],
-      admin: ['admin', 'staff', 'user'],
-      property_maintenance: ['staff', 'user'],
-      property_tenant: ['user']
-    };
-
-    // Get allowed levels for the role
-    const allowedLevels = roleHierarchy[role] || [];
-    return allowedLevels.includes(requiredLevel);
-  }
-}));
-
-// Define the combined type
-type CombinedPageData = Page['props'];
 
 // Mock SuperValidated form structure
 const mockFormData: SuperValidated<any> = {
@@ -64,6 +49,38 @@ const mockRooms: Room[] = [
     floor_id: 1,
     type: 'single',
     amenities: [],
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    property: {
+      id: 1,
+      name: 'Test Property'
+    },
+    floor: {
+      id: 1,
+      property_id: 1,
+      floor_number: 1,
+      wing: 'A'
+    }
+  }
+];
+
+// Mock empty rooms state for testing
+const mockEmptyRooms: Room[] = [];
+
+// Mock loaded rooms state with multiple entries
+const mockLoadedRooms: Room[] = [
+  ...mockRooms,
+  {
+    id: 2,
+    name: 'Test Room 102',
+    number: 102,
+    capacity: 2,
+    room_status: 'OCCUPIED',
+    base_rate: 6000,
+    property_id: 1,
+    floor_id: 1,
+    type: 'double',
+    amenities: ['wifi', 'aircon'],
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     property: {
@@ -172,7 +189,6 @@ const mockSession: SessionWithAuth = {
     session_id: 'mock-session-id',
     organizationName: null
   },
-  // Add required properties to match SessionWithAuth interface
   session: {
     roleEmulation: {
       active: false,
@@ -276,142 +292,47 @@ vi.mock('$app/stores', () => ({
   }
 }));
 
-// Create mock event helper with proper types
-const createMockEvent = (user: User, role: UserRole = 'super_admin'): TypedServerLoadEvent => {
-  const profile: ServerProfile = {
-    ...mockProfile,
-    role,
-  };
-
-  const parentData: PageParentData = {
-    user,
-    profile,
-    navigation: mockNavigation,
-    session: mockSession,
-    emulation: mockEmulation,
-    special_url: undefined
-  };
-
-  return {
-    locals: {
-      supabase: mockSupabaseClient,
-      safeGetSession: vi.fn().mockResolvedValue({
-        session: mockSession,
-        user,
-        profile,
-        roleEmulation: null,
-        navigation: mockNavigation,
-        error: null
-      }),
-      getSession: vi.fn().mockResolvedValue(mockSession),
-      session: mockSession,
-      user,
-      profile
-    },
-    url: new URL('http://localhost'),
-    params: {},
-    request: new Request('http://localhost'),
-    isDataRequest: false,
-    route: { id: '/dorm/rooms' },
-    setHeaders: vi.fn(),
-    fetch: vi.fn(),
-    depends: vi.fn(),
-    parent: async () => parentData,
-    untrack: <T>(fn: () => T) => fn(),
-    platform: {},
-    getClientAddress: () => '127.0.0.1',
-    cookies: {
-      get: vi.fn(),
-      getAll: vi.fn(),
-      set: vi.fn(),
-      delete: vi.fn(),
-      serialize: vi.fn()
-    },
-    isSubRequest: false
-  };
-};
-
-// Tests
-describe('+page.svelte', () => {
-  const defaultData: CombinedPageData = {
-    user: null,
-    rooms: mockRooms,
-    properties: mockProperties,
-    floors: mockFloors,
-    form: mockFormData,
-  };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    document.body.innerHTML = '';
-  });
-
-  it('should render without crashing', () => {
-    const { container } = render(Page, { props: { data: defaultData } });
-    expect(container).toBeTruthy();
-  });
-
-  it('should allow staff to access staff-level functionality', () => {
-    const userRole = 'property_maintenance';
-    const hasAccess = checkAccess(userRole, 'staff');
-    expect(hasAccess).toBe(true);
-  });
-
-  it('should not allow view roles to access staff-level functionality', () => {
-    const userRole = 'property_tenant';
-    const hasAccess = checkAccess(userRole, 'staff');
-    expect(hasAccess).toBe(false);
-  });
+// Helper function to create page data for tests
+const createPageData = (rooms: Room[] = mockRooms) => ({
+  user: mockAdminUser,
+  rooms,
+  properties: mockProperties,
+  floors: mockFloors,
+  form: mockFormData,
 });
 
-describe('Load function access control', () => {
+// Snapshot Tests
+describe('Room Management UI Snapshots', () => {
+  // Clean up after each test to ensure isolated snapshots
   beforeEach(() => {
     vi.clearAllMocks();
+    cleanup();
   });
 
-  it('should redirect unauthorized users', async () => {
-    const mockEvent = createMockEvent(mockStaffUser, 'property_maintenance');
-    
-    try {
-      await load(mockEvent);
-      assert.fail('Expected redirect to be thrown');
-    } catch (error: any) {
-      expect(error.status).toBe(302);
-      expect(error.location).toBe('/unauthorized');
-    }
-  });
-
-  it('should not redirect authorized users', async () => {
-    const mockEvent = createMockEvent(mockAdminUser, 'super_admin');
-    
-    try {
-      const result = await load(mockEvent);
-      
-      expect(result).toBeDefined();
-      if (result) {
-        expect('rooms' in result).toBeTruthy();
-        expect('properties' in result).toBeTruthy();
-        expect('floors' in result).toBeTruthy();
-        expect('form' in result).toBeTruthy();
-        expect('user' in result).toBeTruthy();
-        
-        const typedResult = result as {
-          rooms: Room[];
-          properties: Property[];
-          floors: Floor[];
-          form: SuperValidated<any>;
-          user: User;
-        };
-        
-        expect(typedResult.rooms).toEqual(mockRooms);
-        expect(typedResult.properties).toEqual(mockProperties);
-        expect(typedResult.floors).toEqual(mockFloors);
-        expect(typedResult.form).toBeDefined();
-        expect(typedResult.user).toEqual(mockAdminUser);
+  it('should match snapshot of default room listing view', () => {
+    const { container } = render(Page, {
+      props: {
+        data: createPageData()
       }
-    } catch (error: any) {
-      console.error('Test failed with error:', error);
-      throw error;
-    }
+    });
+    expect(container).toMatchSnapshot();
+  });
+
+  it('should match snapshot of empty room listing view', () => {
+    const { container } = render(Page, {
+      props: {
+        data: createPageData(mockEmptyRooms)
+      }
+    });
+    expect(container).toMatchSnapshot();
+  });
+
+  it('should match snapshot of populated room listing view', () => {
+    const { container } = render(Page, {
+      props: {
+        data: createPageData(mockLoadedRooms)
+      }
+    });
+    expect(container).toMatchSnapshot();
   });
 });

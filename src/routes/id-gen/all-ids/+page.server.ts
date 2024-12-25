@@ -1,7 +1,4 @@
 import { redirect, error } from '@sveltejs/kit';
-import type { SupabaseClient, User } from '@supabase/supabase-js';
-import type { ProfileData, EmulatedProfile } from '$lib/types/roleEmulation';
-import type { Session } from '../../../app';
 import type { PageServerLoad } from './$types';
 
 interface IDCardField {
@@ -54,8 +51,8 @@ interface DataRow {
 
 type IDCardResponse = [HeaderRow, ...DataRow[]];
 
-export const load = (async ({ locals: { supabase, safeGetSession, user, profile }, url }) => {
-    const { session } = await safeGetSession();
+export const load = (async ({ locals: { supabase, safeGetSession, profile }, url }) => {
+    const { session,roleEmulation } = await safeGetSession();
     if (!session) {
         throw error(401, 'Unauthorized');
     }
@@ -65,8 +62,8 @@ export const load = (async ({ locals: { supabase, safeGetSession, user, profile 
     }
 
     // Get the effective organization ID (either emulated or actual)
-    const effectiveOrgId = session?.roleEmulation?.active ? 
-        session.roleEmulation.emulated_org_id : 
+    const effectiveOrgId = roleEmulation?.active ? 
+        roleEmulation.emulated_org_id : 
         profile.org_id;
     
     if (!effectiveOrgId) {

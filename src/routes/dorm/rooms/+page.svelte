@@ -1,16 +1,15 @@
 <script lang="ts">
   import RoomForm from './RoomForm.svelte';
-  import { page } from '$app/stores';
-  import * as Card from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
   import Button from '$lib/components/ui/button/button.svelte';
   import type { Room } from './formSchema';
   import { checkAccess } from '$lib/utils/roleChecks';
-  import { enhance } from '$app/forms';
   import { superForm } from 'sveltekit-superforms/client';
   import { zodClient } from 'sveltekit-superforms/adapters';
   import { roomSchema } from './formSchema';
+  import type { SuperValidated } from 'sveltekit-superforms';
 
+  // Using the same type structure as RoomForm.svelte
   interface PageData {
     rooms: Array<Room & {
       property: { name: string };
@@ -18,13 +17,31 @@
     }>;
     properties: Array<{ id: number; name: string }>;
     floors: Array<{ id: number; property_id: number; floor_number: number; wing?: string }>;
-    form: any;
+    form: SuperValidated<any>;
     user: { role: string } | null;
   }
 
   export let data: PageData;
 
-  let selectedRoom: (Room & { property: { name: string }; floor: { floor_number: number; wing?: string } }) | undefined = undefined;
+  const { form, errors, enhance: superEnhance } = superForm(data.form, {
+    validators: zodClient(roomSchema),
+    applyAction: true,
+    resetForm: true,
+    taintedMessage: null,
+    onResult: ({ result }) => {
+      if (result.type === 'success') {
+        showForm = false;
+        selectedRoom = undefined;
+      }
+    }
+  });
+
+  // Using the same type as defined in PageData for consistency
+  let selectedRoom: (Room & { 
+    property: { name: string }; 
+    floor: { floor_number: number; wing?: string } 
+  }) | undefined = undefined;
+
   let editMode = false;
   let showForm = false;
 
@@ -131,32 +148,16 @@
 
   <!-- Right side: Form -->
   <div class="w-1/3 pl-4">
-    {#if showForm}
-      <div class="card-container">
-        <Card.Root>
-          <Card.Header class="flex justify-between items-start">
-            <Card.Title>{selectedRoom ? 'Edit' : 'Add'} Room</Card.Title>
-            {#if selectedRoom && checkAccess(data.user?.role, 'admin')}
-              <form action="?/delete" method="POST" use:enhance>
-                <input type="hidden" name="id" value={selectedRoom.id} />
-                <Button variant="destructive" type="submit">Delete Room</Button>
-              </form>
-            {/if}
-          </Card.Header>
-          <Card.Content>
-            <div class:pointer-events-none={!checkAccess(data.user?.role, 'staff')}
-                 class:opacity-75={!checkAccess(data.user?.role, 'staff')}>
-              <RoomForm
-                {data}
-                {editMode}
-                {selectedRoom}
-                on:roomSaved={handleRoomSaved}
-                on:cancel={handleCancel}
-              />
-            </div>
-          </Card.Content>
-        </Card.Root>
+      <div class="flex justify-between items-center mb-4">
+        <h1 class="text-2xl font-bold">{editMode ? 'Edit' : 'Add'} Room</h1>
       </div>
-    {/if}
+      <RoomForm
+        {data}
+        {editMode}
+        {selectedRoom}
+        on:cancel={() => {
+          selectedRoom = undefined;
+        }}
+      />
   </div>
 </div>

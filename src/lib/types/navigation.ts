@@ -3,4 +3,4 @@ export interface NavigationState {
     showHeader: boolean;
     allowedPaths: string[];
     showRoleEmulation: boolean;
-}
+  }

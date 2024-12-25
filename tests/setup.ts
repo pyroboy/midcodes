@@ -23,12 +23,6 @@ vi.mock('$app/forms', () => ({
     enhance: vi.fn()
 }));
 
-// Mock environment variables
-vi.mock('$env/dynamic/private', () => ({
-    SUPABASE_URL: 'http://localhost:54321',
-    SUPABASE_ANON_KEY: 'test-key'
-}));
-
 // Mock custom components
 vi.mock('$lib/components/RoomForm.svelte', () => ({
     default: vi.fn()
