@@ -3,7 +3,6 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import type { Room } from '../formSchema';
 import type { RequestEvent } from '@sveltejs/kit';
-import type { DefaultBodyType, PathParams, HttpHandler } from 'msw';
 import { actions } from '../+page.server';
 
 // Define specific route types

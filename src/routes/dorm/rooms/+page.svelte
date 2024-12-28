@@ -10,7 +10,8 @@
   import type { SuperValidated } from 'sveltekit-superforms';
   import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '$lib/components/ui/card';
   import type { z } from 'zod';
-  // Types
+  import { page } from '$app/stores';
+
   interface PageData {
     rooms: Array<Room & {
       property: { name: string };
@@ -24,52 +25,72 @@
 
   export let data: PageData;
 
-  // Form handling
-  const { form, enhance } = superForm<z.infer<typeof roomSchema>>(data.form, {
-  validators: zodClient(roomSchema),
-  dataType: 'json',
-  taintedMessage: null,
-  onResult: ({ result }) => {
-    if (result.type === 'success') {
-      selectedRoom = undefined;
+  const { form, enhance, message } = superForm(data.form, {
+    id: 'room-form', // Provide a unique ID for the form
+    validators: zodClient(roomSchema),
+    dataType: 'json',
+    taintedMessage: null,
+    resetForm: true,
+    onResult: ({ result }) => {
+      if (result.type === 'success') {
+        selectedRoom = undefined;
+      }
     }
-  }
-});
-
-  let selectedRoom: (Room & { 
-    property: { name: string }; 
-    floor: { floor_number: number; wing?: string } 
-  }) | undefined = undefined;
+  });
 
   let editMode = false;
+  let selectedRoom: z.infer<typeof roomSchema> | undefined = undefined;
 
-  // Event handlers
-  function handleRoomClick(room: PageData['rooms'][number]) {
-    selectedRoom = room;
-    editMode = true;
-  }
+    function handleRoomClick(room: PageData['rooms'][number]) {
+  selectedRoom = room;
+  editMode = true;
+  
+  const updatedForm: SuperValidated<z.infer<typeof roomSchema>> = {
+    valid: true,
+    posted: false,
+    errors: {},
+    id: 'room-form', // Add the form ID here
+    data: {
+      ...room,
+      property_id: room.property_id,
+      floor_id: room.floor_id
+    }
+  };
+  
+  form.set(updatedForm);
+}
+ function handleAddRoom() {
+  selectedRoom = undefined;
+  editMode = false;
+  
+  const updatedForm: SuperValidated<z.infer<typeof roomSchema>> = {
+    valid: true,
+    posted: false,
+    errors: {},
+    id: 'room-form', // Add the form ID here
+    data: {
+      id: 0,
+      property_id: 0,
+      floor_id: 0,
+      name: '',
+      number: 0,
+      type: 'SINGLE',
+      capacity: 1,
+      base_rate: 0,
+      room_status: 'VACANT',
+      property: { id: 0, name: '' },
+      floor: {
+        id: 0,
+        floor_number: 0,
+        property_id: 0
+      },
+      amenities: []
+    }
+  };
+  
+  form.set(updatedForm);
+}
 
-  function handleAddRoom() {
-    selectedRoom = undefined;
-    editMode = false;
-    form.set({
-		name: '',
-		number: 0,
-		type: 'SINGLE',
-		capacity: 1,
-		base_rate: 0,
-		room_status: 'VACANT',
-		property_id: 0,
-		property: { id: 0, name: '' },
-		floor: {
-			id: 0, floor_number: 0, wing: '',
-			property_id: 0
-		},
-		floor_id: 0,
-		amenities: [],
-		id: 0
-	});
-  }
 
   function handleCancel() {
     selectedRoom = undefined;
@@ -99,6 +120,13 @@
         <Button on:click={handleAddRoom}>Add Room</Button>
       {/if}
     </div>
+
+    <!-- Display form-level errors if any -->
+    {#if $message}
+      <div class="bg-destructive/15 text-destructive p-3 rounded-md mb-4">
+        {$message}
+      </div>
+    {/if}
 
     <Card>
       <CardContent class="p-0">
@@ -164,14 +192,13 @@
         {data}
         {editMode}
         {selectedRoom}
-        form={data.form}  
-        submitEnhancer={enhance} 
+        form={$form}  
+        {enhance}
         on:cancel={handleCancel}
         on:roomSaved={() => {
           selectedRoom = undefined;
         }}
       />
-      
       </CardContent>
     </Card>
   </div>

@@ -18,6 +18,30 @@ import type { PageParentData } from '$lib/types/pages';
 // Define types needed for load function
 type RouteParams = Record<string, string>;
 
+
+
+// next we have to test the auth server side, because we can insert no problem
+// so what if they are under a policy.
+// so that falls onto integration testing, 
+
+// this test checks to see auth works with this page, so far so good we can test who is logged in
+
+// what else do we need to test,we need to have
+// create me a flow chart for testing
+// 1. create a mock event
+// 2. create a mock session
+// 3. create a mock user
+// 4. create a mock supabase client
+// 5. create a mock form data
+// 6. create a mock profile
+// 7. create a mock navigation
+// 8. create a mock emulation
+// 9. create a mock properties
+// 10. create a mock floors
+// 11. create a mock rooms
+// 12. render the page
+// 13. check that the page is rendered  
+
 // Create a specific type for the ServerLoadEvent with proper generic parameters
 type TypedServerLoadEvent = ServerLoadEvent<RouteParams, PageParentData, "/dorm/rooms">;
 
