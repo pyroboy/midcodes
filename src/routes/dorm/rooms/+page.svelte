@@ -2,14 +2,14 @@
   import RoomForm from './RoomForm.svelte';
   import { Badge } from '$lib/components/ui/badge';
   import { Button } from '$lib/components/ui/button';
-  import type { Room } from './formSchema';
-  import { checkAccess } from '$lib/utils/roleChecks';
   import { superForm } from 'sveltekit-superforms/client';
   import { zodClient } from 'sveltekit-superforms/adapters';
   import { roomSchema } from './formSchema';
   import type { SuperValidated } from 'sveltekit-superforms';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import type { z } from 'zod';
+  import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
+  import type { Room } from './formSchema';
 
   interface PageData {
     rooms: Array<Room & {
@@ -24,63 +24,77 @@
 
   export let data: PageData;
 
-  const { form, enhance, message } = superForm(data.form, {
-    id: 'room-form', // Provide a unique ID for the form
+  const { form, enhance, message, errors, constraints } = superForm(data.form, {
+    id: 'room-form',
     validators: zodClient(roomSchema),
     dataType: 'json',
-    taintedMessage: null,
-    resetForm: true,
+    validationMethod: 'auto',
+    clearOnSubmit: 'message',
+    onSubmit: ({ formData, cancel }) => {
+      console.log('Form submitted with data:', Object.fromEntries(formData));
+      const validationResult = roomSchema.safeParse(Object.fromEntries(formData));
+      console.log('Validation result:', validationResult);
+      if (!validationResult.success) {
+        console.log('Validation failed:', validationResult.error);
+        cancel();
+      }
+    },
     onResult: ({ result }) => {
+      console.log('Form submission result:', result);
       if (result.type === 'success') {
         selectedRoom = undefined;
+        editMode = false;
+      } else if (result.type === 'error') {
+        console.log('Form submission error:', result.error);
       }
+    },
+    onError: (err) => {
+      console.error('Form submission error:', err);
     }
   });
 
   let editMode = false;
-  let selectedRoom: z.infer<typeof roomSchema> | undefined = undefined;
+  let selectedRoom: Room | undefined = undefined;
 
-    function handleRoomClick(room: PageData['rooms'][number]) {
-      selectedRoom = room;
-      editMode = true;
-      
-      form.update(($form) => ({
-        ...$form,
-        data: {
-          ...room,
-          property_id: room.property_id,
-          floor_id: room.floor_id
-        }
-      }));
-    }
-  
-    function handleAddRoom() {
-      selectedRoom = undefined;
-      editMode = false;
-      
-      form.update(($form) => ({
-        ...$form,
-        data: {
-          id: 0,
-          property_id: 0,
-          floor_id: 0,
-          name: '',
-          number: 0,
-          type: 'SINGLE',
-          capacity: 1,
-          base_rate: 0,
-          room_status: 'VACANT',
-          property: { id: 0, name: '' },
-          floor: {
-            id: 0,
-            floor_number: 0,
-            property_id: 0
-          },
-          amenities: []
-        }
-      }));
-    }
+  function handleRoomClick(room: PageData['rooms'][number]) {
+    selectedRoom = room;
+    editMode = true;
+    
+    $form = {
+      ...room,
+      property_id: room.property_id,
+      floor_id: room.floor_id,
+      amenities: room.amenities || []
+    };
+  }
 
+  function handleAddRoom() {
+    selectedRoom = undefined;
+    editMode = false;
+    
+    $form = {
+      id: 0,
+      property_id: 0,
+      floor_id: 0,
+      name: '',
+      number: 0,
+      type: 'SINGLE',
+      capacity: 1,
+      base_rate: 0,
+      room_status: 'VACANT',
+      property: {
+        id: 0,
+        name: ''
+      },
+      floor: {
+        id: 0,
+        floor_number: 0,
+        property_id: 0,
+        wing: ''
+      },
+      amenities: []
+    };
+  }
 
   function handleCancel() {
     selectedRoom = undefined;
@@ -102,16 +116,14 @@
 </script>
 
 <div class="container mx-auto p-4 flex">
-  <!-- Left side: List -->
   <div class="w-2/3">
     <div class="flex justify-between items-center mb-4">
       <h1 class="text-2xl font-bold">Rooms</h1>
-      {#if checkAccess(data.user?.role, 'staff')}
+      {#if data.user?.role === 'staff'}
         <Button on:click={handleAddRoom}>Add Room</Button>
       {/if}
     </div>
 
-    <!-- Display form-level errors if any -->
     {#if $message}
       <div class="bg-destructive/15 text-destructive p-3 rounded-md mb-4">
         {$message}
@@ -132,7 +144,7 @@
             <button 
               type="button"
               class="grid grid-cols-4 gap-4 p-4 text-left hover:bg-muted/50 w-full border-b last:border-b-0"
-              class:pointer-events-none={!checkAccess(data.user?.role, 'staff')}
+              class:pointer-events-none={data.user?.role !== 'staff'}
               on:click={() => handleRoomClick(room)}
             >
               <div>
@@ -171,7 +183,6 @@
     </Card>
   </div>
 
-  <!-- Right side: Form -->
   <div class="w-1/3 pl-4">
     <Card>
       <CardHeader>
@@ -179,17 +190,21 @@
       </CardHeader>
       <CardContent>
         <RoomForm
-        {data}
-        {editMode}
-        {selectedRoom}
-        form={$form}  
-        {enhance}
-        on:cancel={handleCancel}
-        on:roomSaved={() => {
-          selectedRoom = undefined;
-        }}
-      />
+          {data}
+          {editMode}
+          {form}
+          {errors}
+          {constraints}
+          {enhance}
+          on:cancel={handleCancel}
+          on:roomSaved={() => {
+            selectedRoom = undefined;
+            editMode = false;
+          }}
+        />
       </CardContent>
     </Card>
   </div>
 </div>
+
+<SuperDebug data={$form} />

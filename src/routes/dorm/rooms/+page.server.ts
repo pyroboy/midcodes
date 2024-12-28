@@ -1,65 +1,26 @@
-// src/routes/rooms/+page.server.ts
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import type { RequestEvent } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
-import { roomSchema, type Floor } from './formSchema';
-import { supabase } from '$lib/supabaseClient';
+import { roomSchema } from './formSchema';
 import { checkAccess } from '$lib/utils/roleChecks';
 
-// Define expected database types that align with formSchema
-interface DatabaseFloor extends Omit<Floor, 'wing'> {
+interface DatabaseFloor {
   id: number;
   property_id: number;
+  floor_number: number;
   wing?: string;
 }
-
-// Debug helper to log Supabase responses
-const logSupabaseResponse = (operation: string, response: { data: any, error: any, status?: number }) => {
-  console.log(`[Supabase Debug] ${operation} response:`, {
-    hasData: !!response.data,
-    dataLength: Array.isArray(response.data) ? response.data.length : null,
-    data: response.data,
-    error: response.error,
-    status: response.status,
-    errorMessage: response.error?.message,
-    errorCode: response.error?.code,
-    errorDetails: response.error?.details
-  });
-};
 
 export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase } }) => {
   const { session, user, profile } = await safeGetSession();
 
-  console.log('\n=== Load Function Start ===');
-  
-  // Authorization check logging
-  {
-    console.log('[Auth Debug] User details:', {
-      role: profile?.role,
-      id: user?.id,
-      email: user?.email
-    });
-    
-    console.log('[Auth Debug] Access check parameters:', {
-      role: profile?.role,
-      requiredLevel: 'admin'
-    });
-    
-    const hasAccess = checkAccess(profile?.role, 'admin');
-    console.log('[Auth Debug] Access check result:', { hasAccess });
-    
-    if (!hasAccess) {
-      console.log('[Auth Debug] Access denied, redirecting to unauthorized');
-      throw redirect(302, '/unauthorized');
-    }
-    console.log('[Auth Debug] Access granted, proceeding with data fetch');
+  const hasAccess = checkAccess(profile?.role, 'admin');
+  if (!hasAccess) {
+    throw redirect(302, '/unauthorized');
   }
 
-  console.log('[Query Debug] Starting Supabase queries');
-  
-  // Execute all queries with detailed logging
   const [roomsResponse, propertiesResponse, floorsResponse] = await Promise.all([
     supabase
       .from('rooms')
@@ -68,125 +29,49 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
         property:properties(name),
         floor:floors(floor_number, wing)
       `)
-      .order('property_id, floor_id, number')
-      .then(response => {
-        logSupabaseResponse('rooms', response);
-        return response;
-      }),
+      .order('property_id, floor_id, number'),
     
     supabase
       .from('properties')
       .select('id, name')
-      .order('name')
-      .then(response => {
-        logSupabaseResponse('properties', response);
-        return response;
-      }),
+      .order('name'),
 
     supabase
       .from('floors')
       .select('id, property_id, floor_number, wing')
       .order('property_id, floor_number')
-      .then(response => {
-        logSupabaseResponse('floors', response);
-        return response as { 
-          data: DatabaseFloor[] | null, 
-          error: any 
-        };
-      })
   ]);
 
   const { data: rooms, error: roomsError } = roomsResponse;
   const { data: properties, error: propertiesError } = propertiesResponse;
   const { data: floors, error: floorsError } = floorsResponse;
 
-  // Error handling with detailed logging
-  console.log('[Error Debug] Checking for errors in responses');
-  
-  if (roomsError) {
-    console.error('[Error Debug] Rooms query error:', {
-      error: roomsError,
-      code: roomsError.code,
-      message: roomsError.message,
-      details: roomsError.details
-    });
-    throw fail(403, { message: roomsError.message });
-  }
-  
-  if (propertiesError) {
-    console.error('[Error Debug] Properties query error:', {
-      error: propertiesError,
-      code: propertiesError.code,
-      message: propertiesError.message,
-      details: propertiesError.details
-    });
-    throw fail(403, { message: propertiesError.message });
-  }
-  
-  if (floorsError) {
-    console.error('[Error Debug] Floors query error:', {
-      error: floorsError,
-      code: floorsError.code,
-      message: floorsError.message,
-      details: floorsError.details
-    });
-    throw fail(403, { message: floorsError.message });
-  }
+  if (roomsError) throw fail(403, { message: roomsError.message });
+  if (propertiesError) throw fail(403, { message: propertiesError.message });
+  if (floorsError) throw fail(403, { message: floorsError.message });
 
-  console.log('[Form Debug] Creating form with room schema');
   const form = await superValidate(zod(roomSchema));
-  console.log('[Form Debug] Form creation result:', {
-    isValid: form.valid,
-    hasErrors: !!form.errors,
-    errorCount: Object.keys(form.errors || {}).length
-  });
 
-  const result = {
+  return {
     rooms,
     properties,
     floors: floors as DatabaseFloor[],
     form,
     user
   };
-
-  console.log('[Response Debug] Load function return value:', {
-    hasRooms: !!rooms && Array.isArray(rooms),
-    roomCount: rooms?.length,
-    hasProperties: !!properties && Array.isArray(properties),
-    propertyCount: properties?.length,
-    hasFloors: !!floors && Array.isArray(floors),
-    floorCount: floors?.length,
-    hasForm: !!form,
-    hasUser: !!result.user
-  });
-
-  console.log('=== Load Function End ===\n');
-  return result;
 }
 
-// Actions with enhanced error handling and validation
 export const actions: Actions = {
   create: async ({ request, locals: { supabase } }: RequestEvent) => {
-    console.log('\n=== Create Action Start ===');
-    
-    console.log('[Form Debug] Validating create request');
     const form = await superValidate(request, zod(roomSchema));
     
-    console.log('[Form Debug] Create validation result:', {
-      isValid: form.valid,
-      hasErrors: !!form.errors,
-      formData: form.data
-    });
-    
     if (!form.valid) {
-      console.log('[Form Debug] Create validation failed', form.errors);
       return fail(400, { 
         form,
         message: 'Please check the form for errors'
       });
     }
 
-    // Required fields validation
     if (!form.data.property_id || !form.data.floor_id) {
       return fail(400, {
         form,
@@ -194,30 +79,20 @@ export const actions: Actions = {
       });
     }
 
-    // Check for existing room
-    console.log('[Query Debug] Checking for existing room:', {
-      floor_id: form.data.floor_id,
-      number: form.data.number
-    });
-    
     const existingRoomResponse = await supabase
       .from('rooms')
       .select('id')
       .eq('floor_id', form.data.floor_id)
       .eq('number', form.data.number)
       .single();
-      
-    logSupabaseResponse('check existing room', existingRoomResponse);
 
     if (existingRoomResponse.data) {
-      console.log('[Error Debug] Room already exists');
       return fail(400, {
         form,
         message: 'Room number already exists on this floor'
       });
     }
 
-    console.log('[Query Debug] Inserting new room:', form.data);
     const insertResponse = await supabase
       .from('rooms')
       .insert({
@@ -232,17 +107,8 @@ export const actions: Actions = {
         amenities: form.data.amenities
       })
       .select();
-      
-    logSupabaseResponse('insert room', insertResponse);
 
     if (insertResponse.error) {
-      console.error('[Error Debug] Room creation failed:', {
-        error: insertResponse.error,
-        code: insertResponse.error.code,
-        message: insertResponse.error.message
-      });
-      
-      // Handle specific error codes
       if (insertResponse.error.code === '23505') {
         return fail(400, {
           form,
@@ -257,17 +123,12 @@ export const actions: Actions = {
         });
       }
 
-      // Default error handling
       return fail(500, { 
         form,
         message: insertResponse.error.message || 'Failed to create room'
       });
     }
 
-    console.log('[Success Debug] Room created successfully');
-    console.log('=== Create Action End ===\n');
-    
-    // Return a clean form after successful creation
     const newForm = await superValidate(zod(roomSchema));
     return { 
       form: newForm,
@@ -276,26 +137,15 @@ export const actions: Actions = {
   },
 
   update: async ({ request, locals: { supabase } }: RequestEvent) => {
-    console.log('\n=== Update Action Start ===');
-    
-    console.log('[Form Debug] Validating update request');
     const form = await superValidate(request, zod(roomSchema));
     
-    console.log('[Form Debug] Update validation result:', {
-      isValid: form.valid,
-      hasId: !!form.data.id,
-      formData: form.data
-    });
-    
     if (!form.valid || !form.data.id) {
-      console.log('[Form Debug] Update validation failed');
       return fail(400, { 
         form,
         message: 'Please check the form for errors'
       });
     }
 
-    // Required fields validation
     if (!form.data.property_id || !form.data.floor_id) {
       return fail(400, {
         form,
@@ -303,13 +153,6 @@ export const actions: Actions = {
       });
     }
 
-    // Check for existing room
-    console.log('[Query Debug] Checking for conflicting room:', {
-      floor_id: form.data.floor_id,
-      number: form.data.number,
-      excluding_id: form.data.id
-    });
-    
     const existingRoomResponse = await supabase
       .from('rooms')
       .select('id')
@@ -317,22 +160,14 @@ export const actions: Actions = {
       .eq('number', form.data.number)
       .neq('id', form.data.id)
       .single();
-      
-    logSupabaseResponse('check existing room', existingRoomResponse);
 
     if (existingRoomResponse.data) {
-      console.log('[Error Debug] Conflicting room exists');
       return fail(400, {
         form,
         message: 'Room number already exists on this floor'
       });
     }
 
-    console.log('[Query Debug] Updating room:', {
-      id: form.data.id,
-      data: form.data
-    });
-    
     const updateResponse = await supabase
       .from('rooms')
       .update({
@@ -348,16 +183,8 @@ export const actions: Actions = {
       })
       .eq('id', form.data.id)
       .select();
-      
-    logSupabaseResponse('update room', updateResponse);
 
     if (updateResponse.error) {
-      console.error('[Error Debug] Room update failed:', {
-        error: updateResponse.error,
-        code: updateResponse.error.code,
-        message: updateResponse.error.message
-      });
-      
       if (updateResponse.error.code === '23505') {
         return fail(400, {
           form,
@@ -378,8 +205,6 @@ export const actions: Actions = {
       });
     }
 
-    console.log('[Success Debug] Room updated successfully');
-    console.log('=== Update Action End ===\n');
     return { 
       form,
       message: 'Room updated successfully'
@@ -387,51 +212,28 @@ export const actions: Actions = {
   },
 
   delete: async ({ request, locals: { supabase } }: RequestEvent) => {
-    console.log('\n=== Delete Action Start ===');
-    
-    console.log('[Form Debug] Validating delete request');
     const form = await superValidate(request, zod(roomSchema));
     
-    console.log('[Form Debug] Delete validation result:', {
-      isValid: form.valid,
-      hasId: !!form.data.id,
-      roomId: form.data.id
-    });
-    
     if (!form.valid || !form.data.id) {
-      console.log('[Form Debug] Delete validation failed');
       return fail(400, { 
         form,
         message: 'Invalid room data'
       });
     }
 
-    console.log('[Query Debug] Deleting room:', { id: form.data.id });
     const deleteResponse = await supabase
       .from('rooms')
       .delete()
       .eq('id', form.data.id)
       .select();
-      
-    logSupabaseResponse('delete room', deleteResponse);
 
     if (deleteResponse.error) {
-      console.error('[Error Debug] Room deletion failed:', {
-        error: deleteResponse.error,
-        code: deleteResponse.error.code,
-        message: deleteResponse.error.message
-      });
-      
       return fail(deleteResponse.error.code === '42501' ? 403 : 500, { 
         form,
         message: deleteResponse.error.message || 'Failed to delete room'
       });
     }
 
-    console.log('[Success Debug] Room deleted successfully');
-    console.log('=== Delete Action End ===\n');
-    
-    // Return a clean form after successful deletion
     const newForm = await superValidate(zod(roomSchema));
     return { 
       form: newForm,

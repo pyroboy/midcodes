@@ -1,14 +1,14 @@
 <script lang="ts">
-  import { superForm } from 'sveltekit-superforms/client';
   import Button from '$lib/components/ui/button/button.svelte';
   import Input from '$lib/components/ui/input/input.svelte';
   import Label from '$lib/components/ui/label/label.svelte';
   import * as Select from "$lib/components/ui/select";
   import { createEventDispatcher } from 'svelte';
-  import { roomSchema, type Room, locationStatusEnum } from './formSchema';
-  import type { SuperValidated } from 'sveltekit-superforms';
+  import type { Room } from './formSchema';
+  import { locationStatusEnum } from './formSchema';
+  import type { SuperForm } from 'sveltekit-superforms';
   import type { z } from 'zod';
-  import { zodClient } from 'sveltekit-superforms/adapters';
+  import type { roomSchema } from './formSchema';
 
   interface PageData {
     rooms: Array<Room & {
@@ -26,45 +26,13 @@
 
   export let data: PageData;
   export let editMode = false;
-  export let selectedRoom: (Room & { 
-    property: { name: string }; 
-    floor: { floor_number: number; wing?: string } 
-  }) | undefined = undefined;
-  export let form: z.infer<typeof roomSchema>;
+  export let form: SuperForm<z.infer<typeof roomSchema>>['form'];
+  export let errors: SuperForm<z.infer<typeof roomSchema>>['errors'];
+  export let constraints: SuperForm<z.infer<typeof roomSchema>>['constraints'];
   export let enhance: (node: HTMLFormElement) => void;
 
   const dispatch = createEventDispatcher();
-
-  const { form: formData, errors, submitting, message } = superForm(form, {
-    id: 'room-form',
-    validators: zodClient(roomSchema),
-    validationMethod: 'submit-only',
-    dataType: 'json',
-    taintedMessage: null,
-    resetForm: false,
-    onResult: ({ result }) => {
-      if (result.type === 'success') {
-        dispatch('roomSaved');
-      }
-    },
-    onError: (error) => {
-      console.error('Form validation error:', error);
-    }
-  });
-
-  let propertySelected: SelectItem | undefined;
-  let floorSelected: SelectItem | undefined;
-  let roomStatusSelected: SelectItem | undefined;
-
-  $: {
-    if (selectedRoom && editMode) {
-      $formData = {
-        ...selectedRoom,
-        property_id: selectedRoom.property_id,
-        floor_id: selectedRoom.floor_id,
-      };
-    }
-  }
+  let submitted = false;
 
   const roomTypes = ['SINGLE', 'DOUBLE', 'TRIPLE', 'QUAD', 'SUITE'] as const;
 
@@ -73,17 +41,11 @@
     if (s?.value) {
       const propertyId = parseInt(s.value, 10);
       if (!isNaN(propertyId)) {
-        $formData = {
-          ...$formData,
-          property_id: propertyId
-        };
-        propertySelected = s;
-        // Reset floor when property changes
-        $formData = {
-          ...$formData,
+        $form = {
+          ...$form,
+          property_id: propertyId,
           floor_id: 0
         };
-        floorSelected = { value: '', label: 'Select a floor' };
       }
     }
   }
@@ -93,11 +55,10 @@
     if (s?.value) {
       const floorId = parseInt(s.value, 10);
       if (!isNaN(floorId)) {
-        $formData = {
-          ...$formData,
+        $form = {
+          ...$form,
           floor_id: floorId
         };
-        floorSelected = s;
       }
     }
   }
@@ -105,27 +66,25 @@
   function handleTypeChange(selected: unknown) {
     const s = selected as SelectItem;
     if (s?.value) {
-      $formData = {
-        ...$formData,
+      $form = {
+        ...$form,
         type: s.value
       };
-      propertySelected = s;
     }
   }
 
   function handleStatusChange(selected: unknown) {
     const s = selected as SelectItem;
     if (s?.value) {
-      $formData = {
-        ...$formData,
+      $form = {
+        ...$form,
         room_status: s.value as typeof locationStatusEnum._type
       };
-      roomStatusSelected = s;
     }
   }
 
   $: availableFloors = data.floors.filter(f => 
-    f.property_id === Number($formData.property_id)
+    f.property_id === Number($form.property_id)
   );
 
   function getFloorLabel(floorId: number): string {
@@ -141,30 +100,35 @@
   
   function addAmenity() {
     if (amenityInput.trim()) {
-      $formData = {
-        ...$formData,
-        amenities: [...($formData.amenities || []), amenityInput.trim()]
+      $form = {
+        ...$form,
+        amenities: [...($form.amenities || []), amenityInput.trim()]
       };
       amenityInput = '';
     }
   }
   
   function removeAmenity(index: number): void {
-    if ($formData.amenities) {
-      $formData = {
-        ...$formData,
-        amenities: $formData.amenities.filter((_, i) => i !== index)
+    if ($form.amenities) {
+      $form = {
+        ...$form,
+        amenities: $form.amenities.filter((_, i) => i !== index)
       };
     }
   }
 
   function getSelectTriggerClasses(error: boolean): string {
-    const baseClasses = 'flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
-    return error ? `${baseClasses} border-destructive` : baseClasses;
+    const baseClasses = 'flex h-10 w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
+    return error 
+      ? `${baseClasses} border-destructive ring-destructive` 
+      : `${baseClasses} border-input`;
   }
 
   function getInputErrorClass(error: boolean): string {
-    return error ? 'border-destructive' : '';
+    const baseClasses = 'w-full';
+    return error 
+      ? `${baseClasses} border-destructive focus-visible:ring-destructive` 
+      : `${baseClasses} border-input`;
   }
 </script>
 
@@ -172,32 +136,39 @@
   method="POST" 
   action={editMode ? "?/update" : "?/create"} 
   use:enhance
+  on:submit={() => {
+    submitted = true;
+  }}
   class="space-y-4 mb-8"
 >
-  <!-- Form-level errors -->
-  {#if Object.keys($errors).length > 0}
-    <div class="bg-destructive/15 border-l-4 border-destructive text-destructive px-4 py-3 rounded-md">
+  {#if submitted && Object.keys($errors).length > 0}
+    <div class="p-4 mb-4 rounded-md bg-destructive/10 text-destructive">
       <p class="font-medium">Please fix the following errors:</p>
-      <ul class="mt-2 list-disc list-inside text-sm">
+      <ul class="mt-2 list-disc list-inside">
         {#each Object.entries($errors) as [field, error]}
-          <li>{field}: {error}</li>
+          <li>{error}</li>
         {/each}
       </ul>
     </div>
   {/if}
 
-  {#if editMode && $formData.id}
-    <input type="hidden" name="id" bind:value={$formData.id} />
+  {#if editMode && $form.id}
+    <input type="hidden" name="id" bind:value={$form.id} />
   {/if}
 
-  <div>
-    <Label for="property_id">Property <span class="text-destructive">*</span></Label>
-    <div class={getSelectTriggerClasses(!!$errors.property_id)}>
+  <div class="space-y-2">
+    <Label for="property_id">Property</Label>
+    <div class={getSelectTriggerClasses(submitted && !!$errors.property_id)}>
       <Select.Root    
-        selected={{ value: $formData.property_id?.toString() || '', label: data.properties.find(p => p.id === $formData.property_id)?.name || 'Select a property' }}
+        selected={{ 
+          value: $form.property_id?.toString() || '', 
+          label: data.properties.find(p => p.id === $form.property_id)?.name || 'Select a property' 
+        }}
         onSelectedChange={handlePropertyChange}
       >
-        <Select.Trigger>
+        <Select.Trigger 
+          class={submitted && $errors.property_id ? 'border-destructive ring-destructive' : ''}
+        >
           <Select.Value placeholder="Select a property" />
         </Select.Trigger>
         <Select.Content>
@@ -209,17 +180,24 @@
         </Select.Content>
       </Select.Root>
     </div>
-    {#if $errors.property_id}<span class="text-destructive text-sm mt-1">{$errors.property_id}</span>{/if}
+    {#if submitted && $errors.property_id}
+      <p class="text-sm font-medium text-destructive">{$errors.property_id}</p>
+    {/if}
   </div>
 
-  <div>
-    <Label for="floor_id">Floor <span class="text-destructive">*</span></Label>
-    <div class={getSelectTriggerClasses(!!$errors.floor_id)}>
+  <div class="space-y-2">
+    <Label for="floor_id">Floor</Label>
+    <div class={getSelectTriggerClasses(submitted && !!$errors.floor_id)}>
       <Select.Root    
-        selected={{ value: $formData.floor_id?.toString() || '', label: getFloorLabel($formData.floor_id) || 'Select a floor' }}
+        selected={{ 
+          value: $form.floor_id?.toString() || '', 
+          label: getFloorLabel($form.floor_id) || 'Select a floor' 
+        }}
         onSelectedChange={handleFloorChange}
       >
-        <Select.Trigger>
+        <Select.Trigger 
+          class={submitted && $errors.floor_id ? 'border-destructive ring-destructive' : ''}
+        >
           <Select.Value placeholder="Select a floor" />
         </Select.Trigger>
         <Select.Content>
@@ -234,43 +212,56 @@
         </Select.Content>
       </Select.Root>
     </div>
-    {#if $errors.floor_id}<span class="text-destructive text-sm mt-1">{$errors.floor_id}</span>{/if}
+    {#if submitted && $errors.floor_id}
+      <p class="text-sm font-medium text-destructive">{$errors.floor_id}</p>
+    {/if}
   </div>
 
-  <div>
-    <Label for="name">Name <span class="text-destructive">*</span></Label>
+  <div class="space-y-2">
+    <Label for="name">Name</Label>
     <Input 
       id="name" 
       name="name" 
-      bind:value={$formData.name}
-      class={getInputErrorClass(!!$errors.name)}
-      aria-invalid={$errors.name ? 'true' : undefined}
+      bind:value={$form.name}
+      class={getInputErrorClass(submitted && !!$errors.name)}
+      aria-invalid={submitted && $errors.name ? 'true' : undefined}
+      {...$constraints.name}
     />
-    {#if $errors.name}<span class="text-destructive text-sm mt-1">{$errors.name}</span>{/if}
+    {#if submitted && $errors.name}
+      <p class="text-sm font-medium text-destructive">{$errors.name}</p>
+    {/if}
   </div>
 
-  <div>
-    <Label for="number">Number <span class="text-destructive">*</span></Label>
+  <div class="space-y-2">
+    <Label for="number">Number</Label>
     <Input 
       type="number" 
       id="number" 
       name="number" 
       min="1"
-      bind:value={$formData.number}
-      class={getInputErrorClass(!!$errors.number)}
-      aria-invalid={$errors.number ? 'true' : undefined}
+      bind:value={$form.number}
+      class={getInputErrorClass(submitted && !!$errors.number)}
+      aria-invalid={submitted && $errors.number ? 'true' : undefined}
+      {...$constraints.number}
     />
-    {#if $errors.number}<span class="text-destructive text-sm mt-1">{$errors.number}</span>{/if}
+    {#if submitted && $errors.number}
+      <p class="text-sm font-medium text-destructive">{$errors.number}</p>
+    {/if}
   </div>
 
-  <div>
-    <Label for="type">Type <span class="text-destructive">*</span></Label>
-    <div class={getSelectTriggerClasses(!!$errors.type)}>
+  <div class="space-y-2">
+    <Label for="type">Type</Label>
+    <div class={getSelectTriggerClasses(submitted && !!$errors.type)}>
       <Select.Root    
-        selected={{ value: $formData.type || '', label: $formData.type || 'Select a type' }}
+        selected={{ 
+          value: $form.type || '', 
+          label: $form.type || 'Select a type' 
+        }}
         onSelectedChange={handleTypeChange}
       >
-        <Select.Trigger>
+        <Select.Trigger 
+          class={submitted && $errors.type ? 'border-destructive ring-destructive' : ''}
+        >
           <Select.Value placeholder="Select a type" />
         </Select.Trigger>
         <Select.Content>
@@ -282,45 +273,58 @@
         </Select.Content>
       </Select.Root>
     </div>
-    {#if $errors.type}<span class="text-destructive text-sm mt-1">{$errors.type}</span>{/if}
+    {#if submitted && $errors.type}
+      <p class="text-sm font-medium text-destructive">{$errors.type}</p>
+    {/if}
   </div>
 
-  <div>
-    <Label for="capacity">Capacity <span class="text-destructive">*</span></Label>
+  <div class="space-y-2">
+    <Label for="capacity">Capacity</Label>
     <Input 
       type="number" 
       id="capacity" 
       name="capacity" 
       min="1"
-      bind:value={$formData.capacity}
-      class={getInputErrorClass(!!$errors.capacity)}
-      aria-invalid={$errors.capacity ? 'true' : undefined}
+      bind:value={$form.capacity}
+      class={getInputErrorClass(submitted && !!$errors.capacity)}
+      aria-invalid={submitted && $errors.capacity ? 'true' : undefined}
+      {...$constraints.capacity}
     />
-    {#if $errors.capacity}<span class="text-destructive text-sm mt-1">{$errors.capacity}</span>{/if}
+    {#if submitted && $errors.capacity}
+      <p class="text-sm font-medium text-destructive">{$errors.capacity}</p>
+    {/if}
   </div>
 
-  <div>
-    <Label for="base_rate">Base Rate <span class="text-destructive">*</span></Label>
+  <div class="space-y-2">
+    <Label for="base_rate">Base Rate</Label>
     <Input 
       type="number" 
       id="base_rate" 
       name="base_rate" 
       min="0"
-      bind:value={$formData.base_rate}
-      class={getInputErrorClass(!!$errors.base_rate)}
-      aria-invalid={$errors.base_rate ? 'true' : undefined}
+      bind:value={$form.base_rate}
+      class={getInputErrorClass(submitted && !!$errors.base_rate)}
+      aria-invalid={submitted && $errors.base_rate ? 'true' : undefined}
+      {...$constraints.base_rate}
     />
-    {#if $errors.base_rate}<span class="text-destructive text-sm mt-1">{$errors.base_rate}</span>{/if}
+    {#if submitted && $errors.base_rate}
+      <p class="text-sm font-medium text-destructive">{$errors.base_rate}</p>
+    {/if}
   </div>
 
-  <div>
-    <Label for="room_status">Status <span class="text-destructive">*</span></Label>
-    <div class={getSelectTriggerClasses(!!$errors.room_status)}>
+  <div class="space-y-2">
+    <Label for="room_status">Status</Label>
+    <div class={getSelectTriggerClasses(submitted && !!$errors.room_status)}>
       <Select.Root    
-        selected={{ value: $formData.room_status || '', label: $formData.room_status || 'Select a status' }}
+        selected={{ 
+          value: $form.room_status || '', 
+          label: $form.room_status || 'Select a status' 
+        }}
         onSelectedChange={handleStatusChange}
       >
-        <Select.Trigger>
+        <Select.Trigger 
+          class={submitted && $errors.room_status ? 'border-destructive ring-destructive' : ''}
+        >
           <Select.Value placeholder="Select a status" />
         </Select.Trigger>
         <Select.Content>
@@ -332,10 +336,12 @@
         </Select.Content>
       </Select.Root>
     </div>
-    {#if $errors.room_status}<span class="text-destructive text-sm mt-1">{$errors.room_status}</span>{/if}
+    {#if submitted && $errors.room_status}
+      <p class="text-sm font-medium text-destructive">{$errors.room_status}</p>
+    {/if}
   </div>
 
-  <div>
+  <div class="space-y-2">
     <Label>Amenities</Label>
     <div class="flex gap-2">
       <Input
@@ -351,9 +357,9 @@
       />
       <Button type="button" variant="secondary" on:click={addAmenity}>Add</Button>
     </div>
-    {#if $formData.amenities?.length}
+    {#if $form.amenities?.length}
       <div class="flex flex-wrap gap-2 mt-2">
-        {#each $formData.amenities as amenity, i}
+        {#each $form.amenities as amenity, i}
           <div class="flex items-center gap-1 bg-secondary/50 p-1 rounded">
             <span>{amenity}</span>
             <button 
@@ -370,8 +376,8 @@
   </div>
 
   <div class="flex justify-end space-x-2">
-    <Button type="submit" disabled={$submitting}>
-      {$submitting ? 'Submitting...' : (editMode ? 'Update' : 'Add') + ' Room'}
+    <Button type="submit">
+      {editMode ? 'Update' : 'Add'} Room
     </Button>
     {#if editMode}
       <Button type="button" variant="destructive" on:click={handleCancel}>
@@ -383,10 +389,14 @@
 
 <style>
   :global(.error) {
-    border-color: hsl(var(--destructive));
+    @apply border-destructive ring-destructive;
   }
   
   :global(.error:hover) {
-    border-color: hsl(var(--destructive));
+    @apply border-destructive;
+  }
+
+  :global(.select-trigger.error) {
+    @apply border-destructive;
   }
 </style>
