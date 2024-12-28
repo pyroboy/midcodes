@@ -1,4 +1,3 @@
-# src/routes/rooms/RoomForm.svelte
 <script lang="ts">
   import { superForm } from 'sveltekit-superforms/client';
   import Button from '$lib/components/ui/button/button.svelte';
@@ -31,7 +30,7 @@
     property: { name: string }; 
     floor: { floor_number: number; wing?: string } 
   }) | undefined = undefined;
-  export let form: SuperValidated<z.infer<typeof roomSchema>>;
+  export let form: z.infer<typeof roomSchema>;
   export let enhance: (node: HTMLFormElement) => void;
 
   const dispatch = createEventDispatcher();

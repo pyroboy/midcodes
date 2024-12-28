@@ -8,9 +8,8 @@
   import { zodClient } from 'sveltekit-superforms/adapters';
   import { roomSchema } from './formSchema';
   import type { SuperValidated } from 'sveltekit-superforms';
-  import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import type { z } from 'zod';
-  import { page } from '$app/stores';
 
   interface PageData {
     rooms: Array<Room & {
@@ -42,54 +41,45 @@
   let selectedRoom: z.infer<typeof roomSchema> | undefined = undefined;
 
     function handleRoomClick(room: PageData['rooms'][number]) {
-  selectedRoom = room;
-  editMode = true;
-  
-  const updatedForm: SuperValidated<z.infer<typeof roomSchema>> = {
-    valid: true,
-    posted: false,
-    errors: {},
-    id: 'room-form', // Add the form ID here
-    data: {
-      ...room,
-      property_id: room.property_id,
-      floor_id: room.floor_id
+      selectedRoom = room;
+      editMode = true;
+      
+      form.update(($form) => ({
+        ...$form,
+        data: {
+          ...room,
+          property_id: room.property_id,
+          floor_id: room.floor_id
+        }
+      }));
     }
-  };
   
-  form.set(updatedForm);
-}
- function handleAddRoom() {
-  selectedRoom = undefined;
-  editMode = false;
-  
-  const updatedForm: SuperValidated<z.infer<typeof roomSchema>> = {
-    valid: true,
-    posted: false,
-    errors: {},
-    id: 'room-form', // Add the form ID here
-    data: {
-      id: 0,
-      property_id: 0,
-      floor_id: 0,
-      name: '',
-      number: 0,
-      type: 'SINGLE',
-      capacity: 1,
-      base_rate: 0,
-      room_status: 'VACANT',
-      property: { id: 0, name: '' },
-      floor: {
-        id: 0,
-        floor_number: 0,
-        property_id: 0
-      },
-      amenities: []
+    function handleAddRoom() {
+      selectedRoom = undefined;
+      editMode = false;
+      
+      form.update(($form) => ({
+        ...$form,
+        data: {
+          id: 0,
+          property_id: 0,
+          floor_id: 0,
+          name: '',
+          number: 0,
+          type: 'SINGLE',
+          capacity: 1,
+          base_rate: 0,
+          room_status: 'VACANT',
+          property: { id: 0, name: '' },
+          floor: {
+            id: 0,
+            floor_number: 0,
+            property_id: 0
+          },
+          amenities: []
+        }
+      }));
     }
-  };
-  
-  form.set(updatedForm);
-}
 
 
   function handleCancel() {

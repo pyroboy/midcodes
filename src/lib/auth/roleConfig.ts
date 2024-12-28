@@ -44,12 +44,12 @@ export function hasPathAccess(role: UserRole, path: string, originalRole?: UserR
     if (!roleConfig) return false
 
     // Debug logging
-    console.log('[Path Debug] Checking access:', {
-        role,
-        path,
-        originalRole,
-        allowedPaths: roleConfig.allowedPaths
-    })
+    // console.log('[Path Debug] Checking access:', {
+    //     role,
+    //     path,
+    //     originalRole,
+    //     allowedPaths: roleConfig.allowedPaths
+    // })
 
     // 1. User is super_admin (original role)
     // 2. There's an active emulation session (originalRole exists)
@@ -76,12 +76,12 @@ export function hasPathAccess(role: UserRole, path: string, originalRole?: UserR
         const regex = new RegExp('^' + regexPattern + '$')
         
         // Debug logging
-        console.log('[Path Debug] Pattern match:', {
-            cleanPath,
-            pattern,
-            regexPattern,
-            matches: regex.test(cleanPath)
-        })
+        // console.log('[Path Debug] Pattern match:', {
+        //     cleanPath,
+        //     pattern,
+        //     regexPattern,
+        //     matches: regex.test(cleanPath)
+        // })
 
         if (regex.test(cleanPath)) return true
     }
@@ -174,12 +174,12 @@ export function isPathAllowedForRole(path: string, role: UserRole | null, origin
         const regex = new RegExp('^' + regexPattern + '$')
         
         // Debug logging
-        console.log('[Path Debug] Pattern match:', {
-            cleanPath,
-            pattern,
-            regexPattern,
-            matches: regex.test(cleanPath)
-        })
+        // console.log('[Path Debug] Pattern match:', {
+        //     cleanPath,
+        //     pattern,
+        //     regexPattern,
+        //     matches: regex.test(cleanPath)
+        // })
 
         if (regex.test(cleanPath)) return true
     }
