@@ -2,8 +2,8 @@ import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { getMonthlyBalances } from '$lib/server/rpc';
 
-export const load = (async ({ locals: { supabase, getSession } }) => {
-  const session = await getSession();
+export const load = (async ({ locals: { supabase, safeGetSession } }) => {
+  const {session,user} = await safeGetSession();
 
   if (!session) {
     throw error(401, { message: 'Unauthorized' });
@@ -13,9 +13,10 @@ export const load = (async ({ locals: { supabase, getSession } }) => {
   const { data: profile } = await supabase
     .from('profiles')
     .select('*')
-    .eq('id', session.user.id)
+    .eq('id', user?.id)
     .single();
 
+    // assign context
   if (!profile?.property_id) {
     throw error(400, { message: 'No property assigned to user' });
   }

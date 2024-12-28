@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/svelte';
-import { configureTestEnv } from '@test-utils/environment';
+import { configureTestEnv, normalizeHtml } from '@test-utils/environment';
 import { toMatchImageSnapshot } from 'jest-image-snapshot';
 import Page from '../+page.svelte';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
@@ -8,25 +8,37 @@ import type { ServerLoadEvent } from '@sveltejs/kit';
 import type { Room, Property, Floor } from '../formSchema';
 import type { SuperValidated } from 'sveltekit-superforms';
 import type { UserRole } from '$lib/auth/roleConfig';
-import type { 
-  SessionWithAuth, 
-  ServerProfile 
-} from '$lib/types/auth';
+import type { SessionWithAuth, ServerProfile } from '$lib/types/auth';
 import type { NavigationState } from '$lib/types/navigation';
 import type { Emulation } from '$lib/types/roles';
 import type { PageParentData } from '$lib/types/pages';
 
-// Configure test environment for snapshots
+// Helper function to normalize HTML and remove dynamic content
+const normalizeSnapshot = (html: string): string => {
+  return normalizeHtml(html)
+    // Replace dynamic IDs
+    .replace(/aria-controls="[^"]*"/g, 'aria-controls="test-id"')
+    .replace(/aria-labelledby="[^"]*"/g, 'aria-labelledby="test-label"')
+    .replace(/id="[^"]*"/g, 'id="test-id"')
+    // Replace dynamic dates
+    .replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z/g, 'TEST_DATE');
+};
+
+interface PageData {
+  user: User & { role: string };
+  rooms: Room[];
+  properties: Property[];
+  floors: Floor[];
+  form: SuperValidated<any>;
+}
+
+// Configure test environment
 configureTestEnv();
 expect.extend({ toMatchImageSnapshot });
 
-// Define types needed for load function
 type RouteParams = Record<string, string>;
-
-// Create a specific type for the ServerLoadEvent with proper generic parameters
 type TypedServerLoadEvent = ServerLoadEvent<RouteParams, PageParentData, "/dorm/rooms">;
 
-// Mock SuperValidated form structure
 const mockFormData: SuperValidated<any> = {
   id: 'test-form',
   valid: true,
@@ -49,8 +61,8 @@ const mockRooms: Room[] = [
     floor_id: 1,
     type: 'single',
     amenities: [],
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: '2024-01-01T00:00:00.000Z', // Fixed date for consistent snapshots
+    updated_at: '2024-01-01T00:00:00.000Z', // Fixed date for consistent snapshots
     property: {
       id: 1,
       name: 'Test Property'
@@ -64,10 +76,8 @@ const mockRooms: Room[] = [
   }
 ];
 
-// Mock empty rooms state for testing
 const mockEmptyRooms: Room[] = [];
 
-// Mock loaded rooms state with multiple entries
 const mockLoadedRooms: Room[] = [
   ...mockRooms,
   {
@@ -81,8 +91,8 @@ const mockLoadedRooms: Room[] = [
     floor_id: 1,
     type: 'double',
     amenities: ['wifi', 'aircon'],
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: '2024-01-01T00:00:00.000Z', // Fixed date for consistent snapshots
+    updated_at: '2024-01-01T00:00:00.000Z', // Fixed date for consistent snapshots
     property: {
       id: 1,
       name: 'Test Property'
@@ -102,8 +112,8 @@ const mockProfile: ServerProfile = {
   role: 'super_admin',
   org_id: 'mock-org-id',
   context: {},
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
+  created_at: '2024-01-01T00:00:00.000Z',
+  updated_at: '2024-01-01T00:00:00.000Z',
   isEmulated: false,
   originalRole: 'user',
   originalOrgId: null,
@@ -139,15 +149,15 @@ const mockFloors: Floor[] = [
   }
 ];
 
-// Mock User data with full User type
-const createMockUser = (id: string, email: string): User => ({
+const createMockUser = (id: string, email: string): User & { role: string } => ({
   id,
   email,
+  role: 'user',
   aud: 'authenticated',
   app_metadata: {},
   user_metadata: {},
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
+  created_at: '2024-01-01T00:00:00.000Z',
+  updated_at: '2024-01-01T00:00:00.000Z',
   phone: '',
   confirmed_at: '',
   email_confirmed_at: '',
@@ -157,11 +167,9 @@ const createMockUser = (id: string, email: string): User => ({
   invited_at: '',
 });
 
-// Mock users with proper User type
 const mockStaffUser = createMockUser('mock-staff-id', 'staff@example.com');
 const mockAdminUser = createMockUser('mock-admin-id', 'admin@example.com');
 
-// Helper to create proper Supabase response structure
 const createSupabaseResponse = <T>(data: T) => ({
   data,
   error: null,
@@ -171,12 +179,11 @@ const createSupabaseResponse = <T>(data: T) => ({
   body: data
 });
 
-// Mock session with proper User type
 const mockSession: SessionWithAuth = {
   access_token: 'mock-token',
   refresh_token: 'mock-refresh',
   expires_in: 3600,
-  expires_at: new Date().getTime() + 3600000,
+  expires_at: new Date('2024-01-01T00:00:00.000Z').getTime() + 3600000,
   token_type: 'bearer',
   user: mockAdminUser,
   roleEmulation: {
@@ -185,7 +192,7 @@ const mockSession: SessionWithAuth = {
     emulated_role: 'super_admin',
     original_org_id: null,
     emulated_org_id: null,
-    expires_at: new Date(Date.now() + 3600000).toISOString(),
+    expires_at: '2024-01-01T01:00:00.000Z',
     session_id: 'mock-session-id',
     organizationName: null
   },
@@ -199,7 +206,6 @@ const mockSession: SessionWithAuth = {
   error: null
 };
 
-// Mock Supabase client
 const mockSupabaseClient = {
   from: vi.fn().mockImplementation((table: string) => ({
     select: vi.fn().mockReturnValue({
@@ -230,7 +236,7 @@ const mockSupabaseClient = {
   rpc: vi.fn().mockReturnValue(Promise.resolve(createSupabaseResponse(null)))
 } as unknown as SupabaseClient;
 
-// Mock SvelteKit functionality
+// Mocks
 vi.mock('@sveltejs/kit', async () => {
   const actual = await vi.importActual('@sveltejs/kit');
   return {
@@ -249,7 +255,6 @@ vi.mock('@sveltejs/kit', async () => {
   };
 });
 
-// Mock form handling
 vi.mock('sveltekit-superforms/server', () => ({
   superValidate: vi.fn().mockResolvedValue({
     data: {},
@@ -282,7 +287,6 @@ vi.mock('sveltekit-superforms/client', () => ({
   })
 }));
 
-// Mock stores
 vi.mock('$app/stores', () => ({
   page: {
     subscribe: (fn: (value: any) => void) => {
@@ -292,8 +296,7 @@ vi.mock('$app/stores', () => ({
   }
 }));
 
-// Helper function to create page data for tests
-const createPageData = (rooms: Room[] = mockRooms) => ({
+const createPageData = (rooms: Room[] = mockRooms): PageData => ({
   user: mockAdminUser,
   rooms,
   properties: mockProperties,
@@ -301,12 +304,16 @@ const createPageData = (rooms: Room[] = mockRooms) => ({
   form: mockFormData,
 });
 
-// Snapshot Tests
 describe('Room Management UI Snapshots', () => {
-  // Clean up after each test to ensure isolated snapshots
   beforeEach(() => {
     vi.clearAllMocks();
     cleanup();
+    // Set a fixed date for consistent snapshots
+    vi.setSystemTime(new Date('2024-01-01T00:00:00.000Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('should match snapshot of default room listing view', () => {
@@ -315,7 +322,7 @@ describe('Room Management UI Snapshots', () => {
         data: createPageData()
       }
     });
-    expect(container).toMatchSnapshot();
+    expect(normalizeSnapshot(container.innerHTML)).toMatchSnapshot();
   });
 
   it('should match snapshot of empty room listing view', () => {
@@ -324,7 +331,7 @@ describe('Room Management UI Snapshots', () => {
         data: createPageData(mockEmptyRooms)
       }
     });
-    expect(container).toMatchSnapshot();
+    expect(normalizeSnapshot(container.innerHTML)).toMatchSnapshot();
   });
 
   it('should match snapshot of populated room listing view', () => {
@@ -333,6 +340,6 @@ describe('Room Management UI Snapshots', () => {
         data: createPageData(mockLoadedRooms)
       }
     });
-    expect(container).toMatchSnapshot();
+    expect(normalizeSnapshot(container.innerHTML)).toMatchSnapshot();
   });
 });

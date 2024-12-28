@@ -15,6 +15,7 @@
 	    "$lib/*": ["./src/lib/*"],
 	    "$app/*": ["./tests/mocks/$app/*"],
 	    "$env/*": ["./tests/mocks/$env/*"],
+		"@test-utils/*": ["./src/lib/test-utils/*"],
 	    "@test/*": ["./tests/*"]
 	  }
 	}

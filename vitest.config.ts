@@ -15,7 +15,7 @@ export default defineConfig({
       $lib: path.resolve(__dirname, './src/lib'),
       $app: path.resolve(__dirname, './tests/mocks/$app'),
       $env: path.resolve(__dirname, './tests/mocks/$env'),
-      '@test-utils': path.resolve(__dirname, 'src/lib/test-utils'),
+      '@test-utils': path.resolve(__dirname, './src/lib/test-utils'),
       '@test': path.resolve(__dirname, './tests')
     }
   }

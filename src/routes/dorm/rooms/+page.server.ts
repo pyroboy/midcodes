@@ -15,17 +15,18 @@ interface DatabaseFloor extends Omit<Floor, 'wing'> {
 }
 
 // Debug helper to log Supabase responses
-const logSupabaseResponse = (operation: string, { data, error }: { data: any, error: any }) => {
+const logSupabaseResponse = (operation: string, response: { data: any, error: any, status?: number }) => {
   console.log(`[Supabase Debug] ${operation} response:`, {
-    hasData: !!data,
-    dataLength: Array.isArray(data) ? data.length : null,
-    data,
-    error,
-    errorMessage: error?.message,
-    errorCode: error?.code
+    hasData: !!response.data,
+    dataLength: Array.isArray(response.data) ? response.data.length : null,
+    data: response.data,
+    error: response.error,
+    status: response.status,
+    errorMessage: response.error?.message,
+    errorCode: response.error?.code,
+    errorDetails: response.error?.details
   });
 };
-
 export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase } }) => {
  
   const { session, user ,profile } = await safeGetSession();
@@ -200,7 +201,9 @@ export const actions: Actions = {
       console.log('[Error Debug] Room already exists');
       return fail(400, {
         form,
-        error: 'Room number already exists on this floor'
+        error: 'Room number already exists on this floor',
+        details: 'unique_violation',
+        hint: 'Choose a different room number'
       });
     }
 
@@ -228,7 +231,27 @@ export const actions: Actions = {
         message: insertResponse.error.message
       });
       
-      return fail(insertResponse.error.code === '42501' ? 403 : 500, { 
+      // Handle specific error codes
+      if (insertResponse.error.code === '23505') {
+        return fail(400, {
+          form,
+          error: 'Room number already exists on this floor',
+          details: 'unique_violation',
+          hint: 'Choose a different room number'
+        });
+      }
+
+      if (insertResponse.error.code === '23502') {
+        return fail(500, {
+          form,
+          error: 'Property ID and Floor ID are required',
+          details: 'not_null_violation',
+          hint: 'Required fields are missing'
+        });
+      }
+
+      // Default error handling
+      return fail(500, { 
         form,
         error: insertResponse.error.message || 'Failed to create room'
       });

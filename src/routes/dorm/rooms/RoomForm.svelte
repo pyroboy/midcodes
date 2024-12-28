@@ -10,6 +10,8 @@
   import { roomSchema, type Room, locationStatusEnum } from './formSchema';
   import type { SuperValidated, SuperForm } from 'sveltekit-superforms';
   import type { AnyZodObject } from 'zod';
+  import type { z } from 'zod';
+  import { zod } from 'sveltekit-superforms/adapters';
 
   interface PageData {
     rooms: Array<Room & {
@@ -27,6 +29,23 @@
   }
 
   export let data: PageData;
+  interface Props {
+  data: PageData;
+  editMode?: boolean;
+  selectedRoom?: Room & { 
+    property: { name: string }; 
+    floor: { floor_number: number; wing?: string } 
+  };
+  form: SuperValidated<z.infer<typeof roomSchema>>;
+  submitEnhancer: (form: HTMLFormElement) => void;
+}
+
+export let form: Props['form'];
+export let submitEnhancer: Props['submitEnhancer'];
+
+// Update form initialization
+
+
   export let editMode = false;
   export let selectedRoom: (Room & { 
     property: { name: string }; 
@@ -35,17 +54,11 @@
 
   const dispatch = createEventDispatcher();
 
-  const { form, errors, enhance, submitting } = superForm(data.form, {
-    validators: zodClient(roomSchema),
-    applyAction: true,
-    resetForm: true,
-    taintedMessage: null,
-    onResult: ({ result }) => {
-      if (result.type === 'success') {
-        dispatch('roomSaved');
-      }
-    },
-  });
+  const { form: formData, errors, submitting } = superForm(form, {
+  validators: zod(roomSchema),
+  dataType: 'json',
+  id: editMode ? 'edit-room' : 'add-room'  // Add this line
+});
 
   let propertySelected: SelectItem | undefined;
   let floorSelected: SelectItem | undefined;
@@ -53,7 +66,7 @@
 
   $: {
     if (selectedRoom && editMode) {
-      $form = selectedRoom;
+      $formData = selectedRoom;
     }
   }
 
@@ -62,10 +75,10 @@
   function handlePropertyChange(selected: unknown) {
     const s = selected as SelectItem;
     if (s?.value) {
-      $form.property_id = Number(s.value);
+      $formData.property_id = Number(s.value);
       propertySelected = s;
       // Reset floor when property changes
-      $form.floor_id = undefined;
+      $formData.floor_id = 0;
       floorSelected = { value: '', label: 'Select a floor' };
     }
   }
@@ -73,7 +86,7 @@
   function handleFloorChange(selected: unknown) {
     const s = selected as SelectItem;
     if (s?.value) {
-      $form.floor_id = Number(s.value);
+      $formData.floor_id = Number(s.value);
       floorSelected = s;
     }
   }
@@ -81,7 +94,7 @@
   function handleTypeChange(selected: unknown) {
     const s = selected as SelectItem;
     if (s?.value) {
-      $form.type = s.value;
+      $formData.type = s.value;
       propertySelected = s;
     }
   }
@@ -89,13 +102,13 @@
   function handleStatusChange(selected: unknown) {
     const s = selected as SelectItem;
     if (s?.value) {
-      $form.room_status = s.value as typeof locationStatusEnum._type;
+      $formData.room_status = s.value as typeof locationStatusEnum._type;
       roomStatusSelected = s;
     }
   }
 
   $: availableFloors = data.floors.filter(f => 
-    f.property_id === Number($form.property_id)
+    f.property_id === Number($formData.property_id)
   );
 
   function getFloorLabel(floorId: number): string {
@@ -111,14 +124,14 @@
   
   function addAmenity() {
     if (amenityInput.trim()) {
-      $form.amenities = [...($form.amenities || []), amenityInput.trim()];
+      $formData.amenities = [...($formData.amenities || []), amenityInput.trim()];
       amenityInput = '';
     }
   }
   
   function removeAmenity(index: number): void {
-    if ($form.amenities) {
-      $form.amenities = $form.amenities.filter((_: string, i: number) => i !== index);
+    if ($formData.amenities) {
+      $formData.amenities = $formData.amenities.filter((_: string, i: number) => i !== index);
     }
   }
 </script>
@@ -126,17 +139,18 @@
 <form 
   method="POST" 
   action={editMode ? "?/update" : "?/create"} 
-  use:enhance
+  use:submitEnhancer
   class="space-y-4 mb-8"
 >
-  {#if editMode && $form.id}
-    <input type="hidden" name="id" bind:value={$form.id} />
+
+  {#if editMode && $formData.id}
+    <input type="hidden" name="id" bind:value={$formData.id} />
   {/if}
 
   <div>
     <Label for="property_id">Property</Label>
     <Select.Root    
-      selected={{ value: $form.property_id?.toString() || '', label: data.properties.find(p => p.id === $form.property_id)?.name || 'Select a property' }}
+      selected={{ value: $formData.property_id?.toString() || '', label: data.properties.find(p => p.id === $formData.property_id)?.name || 'Select a property' }}
       onSelectedChange={handlePropertyChange}
     >
       <Select.Trigger>
@@ -156,7 +170,7 @@
   <div>
     <Label for="floor_id">Floor</Label>
     <Select.Root    
-      selected={{ value: $form.floor_id?.toString() || '', label: getFloorLabel($form.floor_id) || 'Select a floor' }}
+      selected={{ value: $formData.floor_id?.toString() || '', label: getFloorLabel($formData.floor_id) || 'Select a floor' }}
       onSelectedChange={handleFloorChange}
     >
       <Select.Trigger>
@@ -178,20 +192,20 @@
 
   <div>
     <Label for="name">Name</Label>
-    <Input id="name" name="name" bind:value={$form.name} />
+    <Input id="name" name="name" bind:value={$formData.name} />
     {#if $errors.name}<span class="text-red-500">{$errors.name}</span>{/if}
   </div>
 
   <div>
     <Label for="number">Number</Label>
-    <Input type="number" id="number" name="number" bind:value={$form.number} />
+    <Input type="number" id="number" name="number" bind:value={$formData.number} />
     {#if $errors.number}<span class="text-red-500">{$errors.number}</span>{/if}
   </div>
 
   <div>
     <Label for="type">Type</Label>
     <Select.Root    
-      selected={{ value: $form.type || '', label: $form.type || 'Select a type' }}
+      selected={{ value: $formData.type || '', label: $formData.type || 'Select a type' }}
       onSelectedChange={handleTypeChange}
     >
       <Select.Trigger>
@@ -210,20 +224,20 @@
 
   <div>
     <Label for="capacity">Capacity</Label>
-    <Input type="number" id="capacity" name="capacity" bind:value={$form.capacity} />
+    <Input type="number" id="capacity" name="capacity" bind:value={$formData.capacity} />
     {#if $errors.capacity}<span class="text-red-500">{$errors.capacity}</span>{/if}
   </div>
 
   <div>
     <Label for="base_rate">Base Rate</Label>
-    <Input type="number" id="base_rate" name="base_rate" bind:value={$form.base_rate} />
+    <Input type="number" id="base_rate" name="base_rate" bind:value={$formData.base_rate} />
     {#if $errors.base_rate}<span class="text-red-500">{$errors.base_rate}</span>{/if}
   </div>
 
   <div>
     <Label for="room_status">Status</Label>
     <Select.Root    
-      selected={{ value: $form.room_status || '', label: $form.room_status || 'Select a status' }}
+      selected={{ value: $formData.room_status || '', label: $formData.room_status || 'Select a status' }}
       onSelectedChange={handleStatusChange}
     >
       <Select.Trigger>
@@ -256,9 +270,9 @@
       />
       <Button type="button" on:click={addAmenity}>Add</Button>
     </div>
-    {#if $form.amenities?.length}
+    {#if $formData.amenities?.length}
       <div class="flex flex-wrap gap-2 mt-2">
-        {#each $form.amenities as amenity, i}
+        {#each $formData.amenities as amenity, i}
           <div class="flex items-center gap-1 bg-secondary p-1 rounded">
             <span>{amenity}</span>
             <button 
