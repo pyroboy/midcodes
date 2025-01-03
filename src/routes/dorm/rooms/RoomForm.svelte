@@ -28,12 +28,10 @@
   export let editMode = false;
   export let form: SuperForm<z.infer<typeof roomSchema>>['form'];
   export let errors: SuperForm<z.infer<typeof roomSchema>>['errors'];
+  export let enhance: SuperForm<z.infer<typeof roomSchema>>['enhance'];
   export let constraints: SuperForm<z.infer<typeof roomSchema>>['constraints'];
-  export let enhance: (node: HTMLFormElement) => void;
 
   const dispatch = createEventDispatcher();
-  let submitted = false;
-
   const roomTypes = ['SINGLE', 'DOUBLE', 'TRIPLE', 'QUAD', 'SUITE'] as const;
 
   function handlePropertyChange(selected: unknown) {
@@ -116,106 +114,76 @@
       };
     }
   }
-
-  function getSelectTriggerClasses(error: boolean): string {
-    const baseClasses = 'flex h-10 w-full items-center justify-between rounded-md border bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
-    return error 
-      ? `${baseClasses} border-destructive ring-destructive` 
-      : `${baseClasses} border-input`;
-  }
-
-  function getInputErrorClass(error: boolean): string {
-    const baseClasses = 'w-full';
-    return error 
-      ? `${baseClasses} border-destructive focus-visible:ring-destructive` 
-      : `${baseClasses} border-input`;
-  }
 </script>
 
-<form 
-  method="POST" 
-  action={editMode ? "?/update" : "?/create"} 
+<form
+  method="POST"
+  action={editMode ? "?/update" : "?/create"}
   use:enhance
-  on:submit={() => {
-    submitted = true;
-  }}
-  class="space-y-4 mb-8"
+  class="space-y-4"
+  novalidate
 >
-  {#if submitted && Object.keys($errors).length > 0}
-    <div class="p-4 mb-4 rounded-md bg-destructive/10 text-destructive">
-      <p class="font-medium">Please fix the following errors:</p>
-      <ul class="mt-2 list-disc list-inside">
-        {#each Object.entries($errors) as [field, error]}
-          <li>{error}</li>
-        {/each}
-      </ul>
-    </div>
-  {/if}
-
   {#if editMode && $form.id}
     <input type="hidden" name="id" bind:value={$form.id} />
   {/if}
 
   <div class="space-y-2">
     <Label for="property_id">Property</Label>
-    <div class={getSelectTriggerClasses(submitted && !!$errors.property_id)}>
-      <Select.Root    
-        selected={{ 
-          value: $form.property_id?.toString() || '', 
-          label: data.properties.find(p => p.id === $form.property_id)?.name || 'Select a property' 
-        }}
-        onSelectedChange={handlePropertyChange}
-      >
-        <Select.Trigger 
-          class={submitted && $errors.property_id ? 'border-destructive ring-destructive' : ''}
-        >
-          <Select.Value placeholder="Select a property" />
-        </Select.Trigger>
-        <Select.Content>
-          {#each data.properties as property}
-            <Select.Item value={property.id.toString()}>
-              {property.name}
-            </Select.Item>
-          {/each}
-        </Select.Content>
-      </Select.Root>
-    </div>
-    {#if submitted && $errors.property_id}
+    <Select.Root    
+      selected={{ 
+        value: $form.property_id?.toString() || '', 
+        label: data.properties.find(p => p.id === $form.property_id)?.name || 'Select a property' 
+      }}
+      onSelectedChange={handlePropertyChange}
+    >
+      <Select.Trigger data-error={$errors.property_id && $form.property_id !== undefined}>
+        <Select.Value placeholder="Select a property" />
+      </Select.Trigger>
+      <Select.Content>
+        {#each data.properties as property}
+          <Select.Item value={property.id.toString()}>
+            {property.name}
+          </Select.Item>
+        {/each}
+      </Select.Content>
+    </Select.Root>
+    {#if $errors.property_id && $form.property_id !== undefined}
       <p class="text-sm font-medium text-destructive">{$errors.property_id}</p>
     {/if}
   </div>
 
+  
   <div class="space-y-2">
     <Label for="floor_id">Floor</Label>
-    <div class={getSelectTriggerClasses(submitted && !!$errors.floor_id)}>
-      <Select.Root    
-        selected={{ 
-          value: $form.floor_id?.toString() || '', 
-          label: getFloorLabel($form.floor_id) || 'Select a floor' 
-        }}
-        onSelectedChange={handleFloorChange}
+    <Select.Root    
+      selected={{ 
+        value: $form.floor_id?.toString() || '', 
+        label: getFloorLabel($form.floor_id) || 'Select a floor' 
+      }}
+      onSelectedChange={handleFloorChange}
+    >
+      <Select.Trigger 
+        data-error={$errors.floor_id && $form.floor_id !== undefined}
+        {...$constraints.floor_id}
       >
-        <Select.Trigger 
-          class={submitted && $errors.floor_id ? 'border-destructive ring-destructive' : ''}
-        >
-          <Select.Value placeholder="Select a floor" />
-        </Select.Trigger>
-        <Select.Content>
-          {#each availableFloors as floor}
-            <Select.Item value={floor.id.toString()}>
-              Floor {floor.floor_number}
-              {#if floor.wing}
-                Wing {floor.wing}
-              {/if}
-            </Select.Item>
-          {/each}
-        </Select.Content>
-      </Select.Root>
-    </div>
-    {#if submitted && $errors.floor_id}
+        <Select.Value placeholder="Select a floor" />
+      </Select.Trigger>
+      <Select.Content>
+        {#each availableFloors as floor}
+          <Select.Item value={floor.id.toString()}>
+            Floor {floor.floor_number}
+            {#if floor.wing}
+              Wing {floor.wing}
+            {/if}
+          </Select.Item>
+        {/each}
+      </Select.Content>
+    </Select.Root>
+    {#if $errors.floor_id && $form.floor_id !== undefined}
       <p class="text-sm font-medium text-destructive">{$errors.floor_id}</p>
     {/if}
   </div>
+
 
   <div class="space-y-2">
     <Label for="name">Name</Label>
@@ -223,11 +191,12 @@
       id="name" 
       name="name" 
       bind:value={$form.name}
-      class={getInputErrorClass(submitted && !!$errors.name)}
-      aria-invalid={submitted && $errors.name ? 'true' : undefined}
+      class="w-full"
+      data-error={$errors.name && $form.name !== undefined}
+      aria-invalid={$errors.name ? 'true' : undefined}
       {...$constraints.name}
     />
-    {#if submitted && $errors.name}
+    {#if $errors.name && $form.name !== undefined}
       <p class="text-sm font-medium text-destructive">{$errors.name}</p>
     {/if}
   </div>
@@ -240,40 +209,40 @@
       name="number" 
       min="1"
       bind:value={$form.number}
-      class={getInputErrorClass(submitted && !!$errors.number)}
-      aria-invalid={submitted && $errors.number ? 'true' : undefined}
+      class="w-full"
+      data-error={$errors.number && $form.number !== undefined}
+      aria-invalid={$errors.number ? 'true' : undefined}
       {...$constraints.number}
     />
-    {#if submitted && $errors.number}
+    {#if $errors.number && $form.number !== undefined}
       <p class="text-sm font-medium text-destructive">{$errors.number}</p>
     {/if}
   </div>
 
   <div class="space-y-2">
     <Label for="type">Type</Label>
-    <div class={getSelectTriggerClasses(submitted && !!$errors.type)}>
-      <Select.Root    
-        selected={{ 
-          value: $form.type || '', 
-          label: $form.type || 'Select a type' 
-        }}
-        onSelectedChange={handleTypeChange}
+    <Select.Root    
+      selected={{ 
+        value: $form.type || '', 
+        label: $form.type || 'Select a type' 
+      }}
+      onSelectedChange={handleTypeChange}
+    >
+      <Select.Trigger 
+        data-error={$errors.type && $form.type !== undefined}
+        {...$constraints.type}
       >
-        <Select.Trigger 
-          class={submitted && $errors.type ? 'border-destructive ring-destructive' : ''}
-        >
-          <Select.Value placeholder="Select a type" />
-        </Select.Trigger>
-        <Select.Content>
-          {#each roomTypes as type}
-            <Select.Item value={type}>
-              {type}
-            </Select.Item>
-          {/each}
-        </Select.Content>
-      </Select.Root>
-    </div>
-    {#if submitted && $errors.type}
+        <Select.Value placeholder="Select a type" />
+      </Select.Trigger>
+      <Select.Content>
+        {#each roomTypes as type}
+          <Select.Item value={type}>
+            {type}
+          </Select.Item>
+        {/each}
+      </Select.Content>
+    </Select.Root>
+    {#if $errors.type && $form.type !== undefined}
       <p class="text-sm font-medium text-destructive">{$errors.type}</p>
     {/if}
   </div>
@@ -286,11 +255,12 @@
       name="capacity" 
       min="1"
       bind:value={$form.capacity}
-      class={getInputErrorClass(submitted && !!$errors.capacity)}
-      aria-invalid={submitted && $errors.capacity ? 'true' : undefined}
+      class="w-full"
+      data-error={$errors.capacity && $form.capacity !== undefined}
+      aria-invalid={$errors.capacity ? 'true' : undefined}
       {...$constraints.capacity}
     />
-    {#if submitted && $errors.capacity}
+    {#if $errors.capacity && $form.capacity !== undefined}
       <p class="text-sm font-medium text-destructive">{$errors.capacity}</p>
     {/if}
   </div>
@@ -303,40 +273,40 @@
       name="base_rate" 
       min="0"
       bind:value={$form.base_rate}
-      class={getInputErrorClass(submitted && !!$errors.base_rate)}
-      aria-invalid={submitted && $errors.base_rate ? 'true' : undefined}
+      class="w-full"
+      data-error={$errors.base_rate && $form.base_rate !== undefined}
+      aria-invalid={$errors.base_rate ? 'true' : undefined}
       {...$constraints.base_rate}
     />
-    {#if submitted && $errors.base_rate}
+    {#if $errors.base_rate && $form.base_rate !== undefined}
       <p class="text-sm font-medium text-destructive">{$errors.base_rate}</p>
     {/if}
   </div>
 
   <div class="space-y-2">
     <Label for="room_status">Status</Label>
-    <div class={getSelectTriggerClasses(submitted && !!$errors.room_status)}>
-      <Select.Root    
-        selected={{ 
-          value: $form.room_status || '', 
-          label: $form.room_status || 'Select a status' 
-        }}
-        onSelectedChange={handleStatusChange}
+    <Select.Root    
+      selected={{ 
+        value: $form.room_status || '', 
+        label: $form.room_status || 'Select a status' 
+      }}
+      onSelectedChange={handleStatusChange}
+    >
+      <Select.Trigger 
+        data-error={$errors.room_status && $form.room_status !== undefined}
+        {...$constraints.room_status}
       >
-        <Select.Trigger 
-          class={submitted && $errors.room_status ? 'border-destructive ring-destructive' : ''}
-        >
-          <Select.Value placeholder="Select a status" />
-        </Select.Trigger>
-        <Select.Content>
-          {#each locationStatusEnum.options as status}
-            <Select.Item value={status}>
-              {status}
-            </Select.Item>
-          {/each}
-        </Select.Content>
-      </Select.Root>
-    </div>
-    {#if submitted && $errors.room_status}
+        <Select.Value placeholder="Select a status" />
+      </Select.Trigger>
+      <Select.Content>
+        {#each locationStatusEnum.options as status}
+          <Select.Item value={status}>
+            {status}
+          </Select.Item>
+        {/each}
+      </Select.Content>
+    </Select.Root>
+    {#if $errors.room_status && $form.room_status !== undefined}
       <p class="text-sm font-medium text-destructive">{$errors.room_status}</p>
     {/if}
   </div>
@@ -373,6 +343,9 @@
         {/each}
       </div>
     {/if}
+    {#if $errors.amenities && $form.amenities !== undefined}
+      <p class="text-sm font-medium text-destructive">{$errors.amenities}</p>
+    {/if}
   </div>
 
   <div class="flex justify-end space-x-2">
@@ -388,15 +361,19 @@
 </form>
 
 <style>
-  :global(.error) {
-    @apply border-destructive ring-destructive;
-  }
-  
-  :global(.error:hover) {
-    @apply border-destructive;
+  :global(.select-error) {
+    border-color: hsl(var(--destructive)) !important;
+    --tw-ring-color: hsl(var(--destructive)) !important;
   }
 
-  :global(.select-trigger.error) {
-    @apply border-destructive;
+  :global([data-error="true"]) {
+    border-color: hsl(var(--destructive)) !important;
+    --tw-ring-color: hsl(var(--destructive)) !important;
+    outline: none !important;
+  }
+  
+  :global(.input-error) {
+    border-color: hsl(var(--destructive));
+    --tw-ring-color: hsl(var(--destructive));
   }
 </style>

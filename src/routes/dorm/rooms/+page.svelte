@@ -8,7 +8,6 @@
   import type { SuperValidated } from 'sveltekit-superforms';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import type { z } from 'zod';
-  import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
   import type { Room } from './formSchema';
 
   interface PageData {
@@ -24,34 +23,27 @@
 
   export let data: PageData;
 
-  const { form, enhance, message, errors, constraints } = superForm(data.form, {
-    id: 'room-form',
-    validators: zodClient(roomSchema),
-    dataType: 'json',
-    validationMethod: 'auto',
-    clearOnSubmit: 'message',
-    onSubmit: ({ formData, cancel }) => {
-      console.log('Form submitted with data:', Object.fromEntries(formData));
-      const validationResult = roomSchema.safeParse(Object.fromEntries(formData));
-      console.log('Validation result:', validationResult);
-      if (!validationResult.success) {
-        console.log('Validation failed:', validationResult.error);
-        cancel();
-      }
-    },
-    onResult: ({ result }) => {
-      console.log('Form submission result:', result);
-      if (result.type === 'success') {
-        selectedRoom = undefined;
-        editMode = false;
-      } else if (result.type === 'error') {
-        console.log('Form submission error:', result.error);
-      }
-    },
-    onError: (err) => {
-      console.error('Form submission error:', err);
+  const { form, enhance, errors, constraints } = superForm(data.form, {
+  id: 'room-form',
+  validators: zodClient(roomSchema),
+  validationMethod: 'auto', // Changed from 'auto' to 'onsubmit'
+  dataType: 'json',
+  delayMs: 10, // Add this line to remove debounce delay
+  taintedMessage: null,
+  // onSubmit: ({ formData, cancel }) => {
+  //   // Remove this validation logic since superForm will handle it
+  //   // The zodClient validator will automatically validate the form
+  // },
+  onError: ({ result }) => {
+    console.log('Validation errors:', result.error);
+  },
+  onResult: ({ result }) => {
+    if (result.type === 'success') {
+      selectedRoom = undefined;
+      editMode = false;
     }
-  });
+  }
+});
 
   let editMode = false;
   let selectedRoom: Room | undefined = undefined;
@@ -124,12 +116,6 @@
       {/if}
     </div>
 
-    {#if $message}
-      <div class="bg-destructive/15 text-destructive p-3 rounded-md mb-4">
-        {$message}
-      </div>
-    {/if}
-
     <Card>
       <CardContent class="p-0">
         <div class="grid grid-cols-4 gap-4 p-4 font-medium border-b bg-muted/50">
@@ -194,8 +180,8 @@
           {editMode}
           {form}
           {errors}
-          {constraints}
           {enhance}
+          {constraints}
           on:cancel={handleCancel}
           on:roomSaved={() => {
             selectedRoom = undefined;
@@ -206,5 +192,3 @@
     </Card>
   </div>
 </div>
-
-<SuperDebug data={$form} />

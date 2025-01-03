@@ -14,7 +14,7 @@ interface DatabaseFloor {
 }
 
 export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase } }) => {
-  const { session, user, profile } = await safeGetSession();
+  const {  user, profile } = await safeGetSession();
 
   const hasAccess = checkAccess(profile?.role, 'admin');
   if (!hasAccess) {

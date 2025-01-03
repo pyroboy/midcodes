@@ -1,14 +1,21 @@
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { floorSchema } from './formSchema';
 import { supabase } from '$lib/supabaseClient';
+import { checkAccess } from '$lib/utils/roleChecks';
+import type { Actions, PageServerLoad } from './$types';
 
-export const load = async ({ locals }) => {
-  const session = await locals.getSession();
-  if (!session) {
-    return fail(401, { message: 'Unauthorized' });
+
+
+export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase } }) => {
+  const {  user, profile } = await safeGetSession();
+
+  const hasAccess = checkAccess(profile?.role, 'admin');
+  if (!hasAccess) {
+    throw redirect(302, '/unauthorized');
   }
+
 
   const [{ data: floors }, { data: properties }, { data: userRole }] = await Promise.all([
     supabase
@@ -16,16 +23,15 @@ export const load = async ({ locals }) => {
       .select('*, property:properties(name)')
       .order('property_id, floor_number'),
     
-    supabase
+      supabase
       .from('properties')
       .select('id, name')
-      .eq('status', 'ACTIVE')
       .order('name'),
 
     supabase
       .from('profiles')
       .select('role')
-      .eq('id', session.user.id)
+      .eq('id', user?.id)
       .single()
   ]);
 
