@@ -21,6 +21,8 @@
     properties: Property[];
     form: SuperValidated<z.infer<typeof floorSchema>>;
     user: { role: string } | null;
+    isAdminLevel: boolean;
+    isStaffLevel: boolean;
   }
 
   export let data: PageData;
@@ -89,6 +91,38 @@
         return 'default';
     }
   }
+
+  async function handleDeleteFloor(floor: FloorWithProperty) {
+    if (confirm(`Are you sure you want to delete floor ${floor.floor_number}?`)) {
+      const formData = new FormData();
+      formData.append('id', floor.id.toString());
+      
+      try {
+        const result = await fetch('?/delete', {
+          method: 'POST',
+          body: formData
+        });
+        
+        const response = await result.json();
+        
+        if (result.ok && response.type === 'success') {
+          // Remove deleted floor from the list
+          data.floors = data.floors.filter(f => f.id !== floor.id);
+          // Reset form and selection
+          selectedFloor = undefined;
+          editMode = false;
+          // Show success message
+          alert('Floor deleted successfully');
+        } else {
+          console.error('Delete failed with status:', result.status, response);
+          alert(`Failed to delete floor (status ${result.status}): ${response.message || 'Unknown error'}`);
+        }
+      } catch (error) {
+        console.error('Error deleting floor:', error);
+        alert(`Error deleting floor: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+  }
 </script>
 
 <div class="container mx-auto p-4 flex">
@@ -102,21 +136,18 @@
 
     <Card>
       <CardContent class="p-0">
-        <div class="grid grid-cols-4 gap-4 p-4 font-medium border-b bg-muted/50">
-          <div>Property</div>
-          <div>Floor</div>
-          <div>Wing</div>
-          <div>Status</div>
+        <div class="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_2fr] gap-4 p-4 font-medium border-b bg-muted/50">
+          <div class="flex items-center">Property</div>
+          <div class="flex items-center">Floor</div>
+          <div class="flex items-center">Wing</div>
+          <div class="flex items-center">Status</div>
+          <div class="flex items-center justify-center">Rooms</div>
+          <div class="flex items-center">Actions</div>
         </div>
 
         {#if data.floors && data.floors.length > 0}
           {#each data.floors as floor (floor.id)}
-            <button 
-              type="button"
-              class="grid grid-cols-4 gap-4 p-4 text-left hover:bg-muted/50 w-full border-b last:border-b-0"
-              class:pointer-events-none={data.user?.role !== 'staff'}
-              on:click={() => handleFloorClick(floor)}
-            >
+            <div class="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_2fr] gap-4 p-4 text-left hover:bg-muted/50 w-full border-b last:border-b-0">
               <div class="font-medium">{floor.property.name}</div>
               <div>Floor {floor.floor_number}</div>
               <div>{floor.wing || '-'}</div>
@@ -125,7 +156,38 @@
                   {floor.status}
                 </Badge>
               </div>
-            </button>
+              <div class="flex items-center justify-center">
+                {floor.rooms?.length || 0}
+              </div>
+              <div class="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  on:click={() => handleFloorClick(floor)}
+                  disabled={!data.isAdminLevel && !data.isStaffLevel && data.user?.role !== 'staff'}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                  Edit
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  on:click={() => handleDeleteFloor(floor)}
+                  disabled={!data.isAdminLevel && data.user?.role !== 'staff'}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
+                    <path d="M3 6h18"/>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                    <path d="M10 11v6"/>
+                    <path d="M14 11v6"/>
+                  </svg>
+                  Delete
+                </Button>
+              </div>
+            </div>
           {/each}
         {:else}
           <div class="p-4 text-center text-muted-foreground">

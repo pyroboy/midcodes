@@ -144,6 +144,16 @@
         return 'bg-gray-100 text-gray-800';
     }
   }
+
+  function handleRentInput(e: Event) {
+    const target = e.target as HTMLInputElement;
+    if (target) {
+      const value = parseFloat(target.value);
+      if (!isNaN(value)) {
+        $formData.rent_amount = value;
+      }
+    }
+  }
 </script>
 
 <form
@@ -437,10 +447,23 @@
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div class="space-y-2">
           <Label for="rent_amount">Monthly Rent</Label>
+          <script>
+            function handleRentInput(e: Event) {
+              const target = e.target as HTMLInputElement;
+              if (target) {
+                const value = parseFloat(target.value);
+                if (!isNaN(value)) {
+                  $formData.rent_amount = value;
+                }
+              }
+            }
+          </script>
+          
           <Input
             type="number"
             name="rent_amount"
             bind:value={$formData.rent_amount}
+            on:input={handleRentInput}
             min="0"
             step="0.01"
             disabled={!canEdit}

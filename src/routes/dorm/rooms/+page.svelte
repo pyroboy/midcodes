@@ -44,7 +44,7 @@
         console.error('Form submission failed:', result);
       }
     }
-});
+  });
 
   let editMode = false;
   let selectedRoom: Room | undefined = undefined;
@@ -57,7 +57,17 @@
       ...room,
       property_id: room.property_id,
       floor_id: room.floor_id,
-      amenities: room.amenities || []
+      amenities: room.amenities || [],
+      property: {
+        id: room.property_id,
+        name: room.property.name
+      },
+      floor: {
+        id: room.floor_id,
+        property_id: room.property_id,
+        floor_number: room.floor.floor_number,
+        wing: room.floor.wing || undefined
+      }
     };
   }
 
@@ -96,6 +106,41 @@
     editMode = false;
   }
 
+  async function handleDeleteRoom(room: Room) {
+    if (confirm(`Are you sure you want to delete ${room.name}?`)) {
+      const formData = new FormData();
+      formData.append('id', room.id.toString());
+      
+      try {
+        console.log('[DEBUG] Attempting to delete room:', room.id);
+        const result = await fetch('?/delete', {
+          method: 'POST',
+          body: formData
+        });
+        
+        const response = await result.json();
+        console.log('[DEBUG] Delete response:', response);
+        
+        if (result.ok && response.type === 'success') {
+          console.log('[DEBUG] Room deleted successfully, updating UI');
+          // Remove deleted room from the list
+          data.rooms = data.rooms.filter(r => r.id !== room.id);
+          // Reset form and selection
+          selectedRoom = undefined;
+          editMode = false;
+          // Show success message
+          alert('Room deleted successfully');
+        } else {
+          console.error('Delete failed with status:', result.status, response);
+          alert(`Failed to delete room (status ${result.status}): ${response.message || 'Unknown error'}\nDetails: ${JSON.stringify(response, null, 2)}`);
+        }
+      } catch (error) {
+        console.error('Error deleting room:', error);
+        alert(`Error deleting room: ${error instanceof Error ? error.message : 'Unknown error'}\nPlease check the console for more details.`);
+      }
+    }
+  }
+
   function getStatusVariant(status: string): "default" | "destructive" | "outline" | "secondary" {
     switch (status) {
       case 'VACANT':
@@ -121,21 +166,19 @@
 
     <Card>
       <CardContent class="p-0">
-        <div class="grid grid-cols-4 gap-4 p-4 font-medium border-b bg-muted/50">
+        <div class="grid grid-cols-7 gap-4 p-4 font-medium border-b bg-muted/50">
           <div>Room</div>
           <div>Type</div>
           <div>Status</div>
           <div>Rate</div>
+          <div>Capacity</div>
+          <div>Amenities</div>
+          <div>Actions</div>
         </div>
 
         {#if data.rooms && data.rooms.length > 0}
           {#each data.rooms as room (room.id)}
-            <button 
-              type="button"
-              class="grid grid-cols-4 gap-4 p-4 text-left hover:bg-muted/50 w-full border-b last:border-b-0"
-              class:pointer-events-none={data.user?.role !== 'staff'}
-              on:click={() => handleRoomClick(room)}
-            >
+            <div class="grid grid-cols-7 gap-4 p-4 text-left hover:bg-muted/50 w-full border-b last:border-b-0 items-center">
               <div>
                 <div class="font-medium">{room.name}</div>
                 <div class="text-sm text-muted-foreground">
@@ -147,11 +190,6 @@
               </div>
               <div class="flex items-center">
                 <span class="capitalize">{room.type.toLowerCase()}</span>
-                {#if room.capacity > 1}
-                  <span class="text-sm text-muted-foreground ml-1">
-                    ({room.capacity} pax)
-                  </span>
-                {/if}
               </div>
               <div>
                 <Badge variant={getStatusVariant(room.room_status)}>
@@ -161,7 +199,31 @@
               <div>
                 ₱{room.base_rate.toLocaleString()}/mo
               </div>
-            </button>
+              <div>
+                {room.capacity} pax
+              </div>
+              <div class="flex flex-wrap gap-1">
+                {#each room.amenities as amenity}
+                  <Badge variant="outline">{amenity}</Badge>
+                {/each}
+              </div>
+              <div class="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  on:click={() => handleRoomClick(room)}
+                >
+                  Edit
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  on:click={() => handleDeleteRoom(room)}
+                >
+                  Delete
+                </Button>
+              </div>
+            </div>
           {/each}
         {:else}
           <div class="p-4 text-center text-muted-foreground">

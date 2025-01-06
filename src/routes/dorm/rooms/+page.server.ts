@@ -236,31 +236,35 @@ export const actions: Actions = {
   },
 
   delete: async ({ request, locals: { supabase } }: RequestEvent) => {
-    const form = await superValidate(request, zod(roomSchema));
+    const formData = await request.formData();
+    const id = formData.get('id');
     
-    if (!form.valid || !form.data.id) {
-      return fail(400, { 
-        form,
-        message: 'Invalid room data'
+    if (!id) {
+      return fail(400, {
+        message: 'Room ID is required'
+      });
+    }
+
+    const roomId = parseInt(id.toString(), 10);
+    if (isNaN(roomId)) {
+      return fail(400, {
+        message: 'Invalid room ID'
       });
     }
 
     const deleteResponse = await supabase
       .from('rooms')
       .delete()
-      .eq('id', form.data.id)
-      .select();
+      .eq('id', roomId);
 
     if (deleteResponse.error) {
-      return fail(deleteResponse.error.code === '42501' ? 403 : 500, { 
-        form,
+      console.error('Delete error:', deleteResponse.error);
+      return fail(deleteResponse.error.code === '42501' ? 403 : 500, {
         message: deleteResponse.error.message || 'Failed to delete room'
       });
     }
 
-    const newForm = await superValidate(zod(roomSchema));
-    return { 
-      form: newForm,
+    return {
       message: 'Room deleted successfully'
     };
   }

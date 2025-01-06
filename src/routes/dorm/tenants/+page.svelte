@@ -29,7 +29,6 @@
   }
 
   export let data: PageState;
-  let showForm = false;
   let editMode = false;
   let showEmergencyContact = false;
 
@@ -40,7 +39,6 @@
     dataType: 'json',
     onResult: ({ result }) => {
       if (result.type === 'success') {
-        showForm = false;
         editMode = false;
         form.set({
           name: '',
@@ -75,7 +73,6 @@
 
   function handleEdit(tenant: ExtendedTenant) {
     editMode = true;
-    showForm = true;
     const formData: TenantFormData = {
       id: tenant.id,
       name: tenant.name,
@@ -105,7 +102,6 @@
 
   function handleCreate() {
     editMode = false;
-    showForm = true;
     form.set({
       name: '',
       contact_number: null,
@@ -132,8 +128,6 @@
   }
 
   function toggleForm() {
-    showForm = !showForm;
-    if (!showForm) {
       form.set({
         name: '',
         contact_number: null,
@@ -157,7 +151,6 @@
         payment_schedules: [],
         status_history: []
       });
-    }
   }
 
   function toggleEmergencyContact() {
@@ -165,7 +158,6 @@
   }
 
   function handleDeleteSuccess() {
-    showForm = false;
     editMode = false;
   }
 
@@ -206,7 +198,6 @@
   />
 
   <div class="w-1/3 pl-4">
-    {#if showForm}
       <div class="flex justify-between items-center mb-4">
         <h1 class="text-2xl font-bold">Tenant Form</h1>
       </div>
@@ -391,11 +382,7 @@
           </Button>
         </div>
       </form>
-    {:else}
-      <Button on:click={toggleForm}>
-        Show Form
-      </Button>
-    {/if}
+
   </div>
 </div>
 
