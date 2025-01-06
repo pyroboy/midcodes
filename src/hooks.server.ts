@@ -67,7 +67,7 @@ async function getActiveRoleEmulation(userId: string, supabase: SupabaseClient) 
     .single()
 
   if (emulation) {
-    console.log('[Session] Emulated Role:', emulation.emulated_role)
+    // console.log('[Session] Emulated Role:', emulation.emulated_role)
   }
   return emulation
 }

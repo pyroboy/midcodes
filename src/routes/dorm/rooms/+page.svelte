@@ -23,26 +23,27 @@
 
   export let data: PageData;
 
-  const { form, enhance, errors, constraints } = superForm(data.form, {
-  id: 'room-form',
-  validators: zodClient(roomSchema),
-  validationMethod: 'auto', // Changed from 'auto' to 'onsubmit'
-  dataType: 'json',
-  delayMs: 10, // Add this line to remove debounce delay
-  taintedMessage: null,
-  // onSubmit: ({ formData, cancel }) => {
-  //   // Remove this validation logic since superForm will handle it
-  //   // The zodClient validator will automatically validate the form
-  // },
-  onError: ({ result }) => {
-    console.log('Validation errors:', result.error);
-  },
-  onResult: ({ result }) => {
-    if (result.type === 'success') {
-      selectedRoom = undefined;
-      editMode = false;
+  const { form, enhance, errors, constraints, message } = superForm(data.form, {
+    id: 'room-form',
+    validators: zodClient(roomSchema),
+    validationMethod: 'oninput',
+    dataType: 'json',
+    delayMs: 10,
+    taintedMessage: null,
+    onError: ({ result }) => {
+      console.error('Form submission error:', result.error);
+      if (result.error) {
+        console.error('Server error:', result.error.message);
+      }
+    },
+    onResult: ({ result }) => {
+      if (result.type === 'success') {
+        selectedRoom = undefined;
+        editMode = false;
+      } else if (result.type === 'failure') {
+        console.error('Form submission failed:', result);
+      }
     }
-  }
 });
 
   let editMode = false;
@@ -61,6 +62,7 @@
   }
 
   function handleAddRoom() {
+    console.log('[DEBUG] Add Room button clicked');
     selectedRoom = undefined;
     editMode = false;
     
@@ -86,6 +88,7 @@
       },
       amenities: []
     };
+    console.log('[DEBUG] Form reset to default values:', $form);
   }
 
   function handleCancel() {

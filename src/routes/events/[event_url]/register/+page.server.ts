@@ -111,7 +111,7 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession,
 };
 
 export const actions = {
-    default: async ({ request, locals: { supabase, safeGetSession, user, profile }, params }) => {
+    default: async ({ request, locals: { supabase,  profile }, params }) => {
         console.log('Starting registration process...');
         try {
             const formData = await request.formData();

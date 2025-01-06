@@ -4,10 +4,35 @@ export const floorStatusEnum = z.enum(['ACTIVE', 'INACTIVE', 'MAINTENANCE']);
 
 export const floorSchema = z.object({
   id: z.number().optional(),
-  property_id: z.number(),
-  floor_number: z.number().int(),
+  property_id: z.coerce.number({
+    required_error: 'Property selection is required',
+    invalid_type_error: 'Property must be selected'
+  }),
+  floor_number: z.coerce.number({
+    required_error: 'Floor number is required',
+    invalid_type_error: 'Floor number must be a valid number'
+  }).int('Floor number must be an integer'),
   wing: z.string().optional(),
-  status: floorStatusEnum
+  status: floorStatusEnum.default('ACTIVE')
 });
 
 export type FloorSchema = typeof floorSchema;
+
+// Database types
+export interface Floor {
+  id: number;
+  property_id: number;
+  floor_number: number;
+  wing: string | null;
+  status: 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE';
+  created_at: string;
+  updated_at: string | null;
+}
+
+// Extended type with property relation
+export interface FloorWithProperty extends Floor {
+  property: {
+    id: number;
+    name: string;
+  };
+}

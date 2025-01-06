@@ -44,7 +44,7 @@ type SessionWithAuth = {
 };
 
 export const load: LayoutServerLoad = async ({ locals: { safeGetSession, profile, supabase, special_url }, url }) => {
-  console.log('[Layout Server] Starting load for:', url.pathname);
+  // console.log('[Layout Server] Starting load for:', url.pathname);
   const session = await safeGetSession() as SessionWithAuth;
   const user = session?.user ?? null;
 
@@ -64,14 +64,14 @@ export const load: LayoutServerLoad = async ({ locals: { safeGetSession, profile
 
 
   // console.log the context
-  console.log('[Layout Server] Context:', currentProfile?.context);
+  // console.log('[Layout Server] Context:', currentProfile?.context);
   // console.log('[Layout Server] Full Profile:', JSON.stringify(currentProfile, null, 2));
   
   // Navigation state
   const navigation: NavigationState = {
     homeUrl: (() => {
       const context = currentProfile?.context || {};  // Ensure we always pass an object
-      console.log('[Layout Server] Role:', currentProfile?.role);
+      // console.log('[Layout Server] Role:', currentProfile?.role);
       // console.log('[Layout Server] Context being passed:', context);
       if (!currentProfile?.role) return '/';
       const path = RoleConfig[currentProfile.role].defaultPath(context);

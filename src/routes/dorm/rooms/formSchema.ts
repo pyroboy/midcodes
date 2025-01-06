@@ -9,7 +9,7 @@ export const leaseTypeEnum = z.enum(['BEDSPACER', 'PRIVATEROOM']);
 
 export const propertyBasicSchema = z.object({
   id: z.number(),
-  name: z.string().min(1, 'Property name is required')
+  name: z.string().min(1, 'Property name is required').optional()
 });
 
 export const floorBasicSchema = z.object({
@@ -24,7 +24,7 @@ const baseRoomSchema = z.object({
   property_id: z.number({
     required_error: 'Property selection is required',
     invalid_type_error: 'Property must be selected'
-  }),
+  }).min(1, 'Please select a property'),
   floor_id: z.number({
     required_error: 'Floor selection is required',
     invalid_type_error: 'Floor must be selected'

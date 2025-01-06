@@ -1,192 +1,161 @@
 <script lang="ts">
+  import FloorForm from './FloorForm.svelte';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Button } from '$lib/components/ui/button';
   import { superForm } from 'sveltekit-superforms/client';
   import { zodClient } from 'sveltekit-superforms/adapters';
-  import Button from '$lib/components/ui/button/button.svelte';
-  import Input from '$lib/components/ui/input/input.svelte';
-  import Label from '$lib/components/ui/label/label.svelte';
-  import * as Select from '$lib/components/ui/select';
-  import { createEventDispatcher } from 'svelte';
-  import { z } from 'zod';
-  import type { PageData } from './$types';
-  import type { Database } from '$lib/database.types';
+  import { floorSchema } from './formSchema';
   import type { SuperValidated } from 'sveltekit-superforms';
-  
-  const floorStatusEnum = z.enum(['ACTIVE', 'INACTIVE', 'MAINTENANCE']);
-  
-  const floorSchema = z.object({
-    id: z.number().optional(),
-    property_id: z.number(),
-    floor_number: z.number().int(),
-    wing: z.string().optional().nullable(),
-    status: floorStatusEnum
-  });
-  
-  type Property = Database['public']['Tables']['properties']['Row'];
-  type BaseFloor = Database['public']['Tables']['floors']['Row'];
-  
-  interface Floor extends BaseFloor {
-    property: {
-      name: string;
-    } | null;
+  import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+  import type { z } from 'zod';
+  import type { Floor, FloorWithProperty } from './formSchema';
+  // Define types based on your database schema
+  interface Property {
+    id: number;
+    name: string;
   }
-  
-  type FormData = z.infer<typeof floorSchema> & {
-    [key: string]: unknown;
-  };
-  
-  // Using type intersection instead of interface extension
-  type ExtendedPageData = PageData & {
-    form: SuperValidated<FormData>;
-    isAdminLevel: boolean;
-    isStaffLevel: boolean;
-  };
-  
-  export let data: ExtendedPageData;
-  export let properties: Property[] = [];
-  export let editMode = false;
-  export let floor: Floor | undefined = undefined;
-  
-  const dispatch = createEventDispatcher();
-  
-  const { form, errors, enhance, submitting, reset } = superForm<FormData>(data.form, {
-    id: 'floorForm',
+
+
+  interface PageData {
+    floors: FloorWithProperty[];
+    properties: Property[];
+    form: SuperValidated<z.infer<typeof floorSchema>>;
+    user: { role: string } | null;
+  }
+
+  export let data: PageData;
+
+  const { form, enhance, errors, constraints } = superForm(data.form, {
+    id: 'floor-form',
     validators: zodClient(floorSchema),
-    resetForm: true,
+    validationMethod: 'auto',
+    dataType: 'json',
+    delayMs: 10,
     taintedMessage: null,
+    onError: ({ result }) => {
+      console.log('Validation errors:', result.error);
+    },
     onResult: ({ result }) => {
       if (result.type === 'success') {
-        dispatch('floorAdded');
-        reset();
+        selectedFloor = undefined;
+        editMode = false;
       }
-    },
+    }
   });
-  
-  $: {
-    if (floor && editMode) {
-      form.update($form => ({
-        ...$form,
-        id: floor.id,
-        property_id: floor.property_id,
-        floor_number: floor.floor_number,
-        wing: floor.wing || undefined,
-        status: floor.status
-      }));
+
+  let editMode = false;
+  let selectedFloor: FloorWithProperty | undefined = undefined;
+
+  function handleFloorClick(floor: FloorWithProperty) {
+    selectedFloor = floor;
+    editMode = true;
+    
+    $form = {
+      id: floor.id,
+      property_id: floor.property_id,
+      floor_number: floor.floor_number,
+      wing: floor.wing || undefined,
+      status: floor.status
+    };
+  }
+
+  function handleAddFloor() {
+    selectedFloor = undefined;
+    editMode = false;
+    
+    $form = {
+      id: undefined,
+      property_id: 0,
+      floor_number: 0,
+      wing: undefined,
+      status: 'ACTIVE'
+    };
+  }
+
+  function handleCancel() {
+    selectedFloor = undefined;
+    editMode = false;
+  }
+
+  function getStatusVariant(status: Floor['status']): "default" | "destructive" | "outline" | "secondary" {
+    switch (status) {
+      case 'ACTIVE':
+        return 'secondary';
+      case 'INACTIVE':
+        return 'destructive';
+      case 'MAINTENANCE':
+        return 'outline';
+      default:
+        return 'default';
     }
   }
-  
-  $: canEdit = data.isAdminLevel || data.isStaffLevel;
-  $: canDelete = data.isAdminLevel;
-  </script>
-  
-  <form
-    method="POST"
-    action={editMode ? "?/update" : "?/create"}
-    use:enhance
-    class="space-y-4 p-4 bg-white rounded-lg shadow"
-  >
-    <input type="hidden" name="id" bind:value={$form.id} />
-  
-    <div class="space-y-2">
-      <Label for="property_id">Property</Label>
-      <Select.Root>
-        <Select.Trigger class="w-full" disabled={!canEdit}>
-          <Select.Value>{properties.find(p => p.id === $form.property_id)?.name ?? 'Select property'}</Select.Value>
-        </Select.Trigger>
-        <Select.Content>
-          {#each properties as property}
-            <Select.Item 
-              value={property.id.toString()} 
-              on:click={() => form.update($form => ({ ...$form, property_id: property.id }))}
+</script>
+
+<div class="container mx-auto p-4 flex">
+  <div class="w-2/3">
+    <div class="flex justify-between items-center mb-4">
+      <h1 class="text-2xl font-bold">Floors</h1>
+      {#if data.user?.role === 'staff'}
+        <Button on:click={handleAddFloor}>Add Floor</Button>
+      {/if}
+    </div>
+
+    <Card>
+      <CardContent class="p-0">
+        <div class="grid grid-cols-4 gap-4 p-4 font-medium border-b bg-muted/50">
+          <div>Property</div>
+          <div>Floor</div>
+          <div>Wing</div>
+          <div>Status</div>
+        </div>
+
+        {#if data.floors && data.floors.length > 0}
+          {#each data.floors as floor (floor.id)}
+            <button 
+              type="button"
+              class="grid grid-cols-4 gap-4 p-4 text-left hover:bg-muted/50 w-full border-b last:border-b-0"
+              class:pointer-events-none={data.user?.role !== 'staff'}
+              on:click={() => handleFloorClick(floor)}
             >
-              {property.name}
-            </Select.Item>
+              <div class="font-medium">{floor.property.name}</div>
+              <div>Floor {floor.floor_number}</div>
+              <div>{floor.wing || '-'}</div>
+              <div>
+                <Badge variant={getStatusVariant(floor.status)}>
+                  {floor.status}
+                </Badge>
+              </div>
+            </button>
           {/each}
-        </Select.Content>
-      </Select.Root>
-      {#if $errors.property_id}
-        <p class="text-red-500 text-sm">{$errors.property_id}</p>
-      {/if}
-    </div>
-  
-    <div class="space-y-2">
-      <Label for="floor_number">Floor Number</Label>
-      <Input
-        type="number"
-        id="floor_number"
-        name="floor_number"
-        bind:value={$form.floor_number}
-        disabled={!canEdit}
-      />
-      {#if $errors.floor_number}
-        <p class="text-red-500 text-sm">{$errors.floor_number}</p>
-      {/if}
-    </div>
-  
-    <div class="space-y-2">
-      <Label for="wing">Wing</Label>
-      <Input
-        type="text"
-        id="wing"
-        name="wing"
-        bind:value={$form.wing}
-        disabled={!canEdit}
-        placeholder="Optional"
-      />
-      {#if $errors.wing}
-        <p class="text-red-500 text-sm">{$errors.wing}</p>
-      {/if}
-    </div>
-  
-    <div class="space-y-2">
-      <Label for="status">Status</Label>
-      <Select.Root>
-        <Select.Trigger class="w-full" disabled={!canEdit}>
-          <Select.Value>{$form.status ?? 'Select status'}</Select.Value>
-        </Select.Trigger>
-        <Select.Content>
-          <Select.Item 
-            value="ACTIVE" 
-            on:click={() => form.update($form => ({ ...$form, status: 'ACTIVE' }))}
-          >
-            Active
-          </Select.Item>
-          <Select.Item 
-            value="INACTIVE" 
-            on:click={() => form.update($form => ({ ...$form, status: 'INACTIVE' }))}
-          >
-            Inactive
-          </Select.Item>
-          <Select.Item 
-            value="MAINTENANCE" 
-            on:click={() => form.update($form => ({ ...$form, status: 'MAINTENANCE' }))}
-          >
-            Maintenance
-          </Select.Item>
-        </Select.Content>
-      </Select.Root>
-      {#if $errors.status}
-        <p class="text-red-500 text-sm">{$errors.status}</p>
-      {/if}
-    </div>
-  
-    <div class="flex justify-end gap-2">
-      {#if editMode}
-        {#if canDelete}
-          <Button
-            type="submit"
-            formaction="?/delete"
-            variant="destructive"
-            disabled={$submitting}
-          >
-            Delete
-          </Button>
+        {:else}
+          <div class="p-4 text-center text-muted-foreground">
+            No floors found
+          </div>
         {/if}
-        <Button variant="outline" on:click={() => dispatch('floorAdded')} disabled={$submitting}>
-          Cancel
-        </Button>
-      {/if}
-      <Button type="submit" disabled={$submitting || !canEdit}>
-        {editMode ? 'Update' : 'Create'} Floor
-      </Button>
-    </div>
-  </form>
+      </CardContent>
+    </Card>
+  </div>
+
+  <div class="w-1/3 pl-4">
+    <Card>
+      <CardHeader>
+        <CardTitle>{editMode ? 'Edit' : 'Add'} Floor</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <FloorForm
+          {data}
+          {editMode}
+          {form}
+          {errors}
+          {enhance}
+          {constraints}
+          on:cancel={handleCancel}
+          on:floorSaved={() => {
+            selectedFloor = undefined;
+            editMode = false;
+          }}
+        />
+      </CardContent>
+    </Card>
+  </div>
+</div>

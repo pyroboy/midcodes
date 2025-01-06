@@ -1,4 +1,4 @@
-# Room Management Module Instructions
+np# Room Management Module Instructions
 
 ## Overview
 The Room Management module is a core component of the dormitory management system that handles room operations and tracking. It enables staff to create, update, and manage rooms across different properties and floors, including their status, capacity, and rates.

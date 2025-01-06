@@ -14,10 +14,6 @@
     import { loadGoogleFonts } from '$lib/config/fonts';
     import { navigating } from '$app/stores';
     
-    // Initialize config immediately with page data
-
-
-    // Get navigation links based on role
     function getNavLinks(role?: UserRole): { path: string; label: string }[] {
         if (!role) return [];
         const roleConfig = RoleConfig[role];
@@ -26,7 +22,7 @@
         return roleConfig.allowedPaths
             .filter(path => path.showInNav)
             .map(path => ({
-                path: path.path.replace(/\[.*?\]/g, ''), // Remove dynamic parts
+                path: path.path.replace(/\[.*?\]/g, ''),
                 label: path.label || path.path
             }));
     }
@@ -35,7 +31,8 @@
     let isUserMenuOpen = false;
     let showProgress = false;
     let progressValue = 0;
-    let progressInterval: ReturnType<typeof setTimeout> | undefined;
+    let progressInterval: ReturnType<typeof setInterval> | undefined;
+    let progressTimeout: ReturnType<typeof setTimeout> | undefined;
 
     $: path = $page.url.pathname;
     $: role = $page.data.profile?.role as UserRole | undefined;
@@ -49,19 +46,6 @@
     $: userProfile = $page.data.profile;
     $: special_url = $page.data.special_url;
 
-    
-    $: console.log('[Role Debug] Special URL:', special_url, 'Emulation:', emulation);
-    $: console.log('[Role Debug] Current Role:', emulation?.emulated_role ?? userProfile?.role);
-    $: console.log('[Role Debug] Is Emulating:', emulation?.active);
-    $: console.log('[Role Debug] Emulated Org:', emulation?.emulated_org_id);
-
-    $: console.log('[Layout Debug] Auth State:', {
-        showHeader,
-        hasSession: !!pageSession,
-        navigation,
-        path
-    });
-
     // Update session when server data changes
     $: if (userProfile && $session) {
         if (userProfile.isEmulated !== emulation?.active) {
@@ -69,74 +53,60 @@
         }
     }
 
-    // Debug logging
-    $: {
-        console.log('[Role Debug] Emulation:', emulation);
-        console.log('[Role Debug] Current Role:', emulation?.emulated_role ?? userProfile?.role);
-        console.log('[Role Debug] Is Emulating:', emulation?.active);
-        console.log('[Role Debug] Emulated Org:', emulation?.emulated_org_id);
-    }
-
-    // URL logging
-    $: {
-        console.log('[Page URL]', $page.url.pathname);
-    }
-
-    // Navigation progress bar
-    $: {
-        if ($navigating) {
-            showProgress = true;
-            progressValue = 0;
-            progressInterval = setInterval(() => {
-                if (progressValue < 90) {
-                    progressValue += 10;
-                }
-            }, 100);
-        } else {
-            progressValue = 100;
-            setTimeout(() => {
-                showProgress = false;
-                if (progressInterval) {
-                    clearInterval(progressInterval);
-                    progressInterval = undefined;
-                }
-            }, 300);
+    // Navigation progress bar with proper cleanup
+    $: if ($navigating) {
+        showProgress = true;
+        progressValue = 0;
+        
+        // Clear any existing intervals/timeouts
+        if (progressInterval) {
+            clearInterval(progressInterval);
+            progressInterval = undefined;
         }
-    }
-
-    $: {
-        console.log('[Navigation Debug] Current state:', {
-            path,
-            homeUrl: navigation?.homeUrl,
-            role,
-            navLinks,
-            showHeader: navigation?.showHeader
-        });
-    }
-
-    $: {
-        if (browser) {
-            console.log('[Page Load Debug]', {
-                url: $page.url.pathname,
-                data: $page.data,
-                params: $page.params
-            });
+        if (progressTimeout) {
+            clearTimeout(progressTimeout);
+            progressTimeout = undefined;
         }
+        
+        progressInterval = setInterval(() => {
+            progressValue = Math.min(progressValue + 10, 90);
+        }, 100);
+    } else {
+        progressValue = 100;
+        
+        // Clear existing timeout before setting a new one
+        if (progressTimeout) {
+            clearTimeout(progressTimeout);
+        }
+        
+        progressTimeout = setTimeout(() => {
+            showProgress = false;
+            if (progressInterval) {
+                clearInterval(progressInterval);
+                progressInterval = undefined;
+            }
+        }, 300);
     }
-
-
-
-    $: console.log('[Role Debug] Emulation:', emulation);
 
     onMount(async () => {
         if (browser) {
-            await loadGoogleFonts();
+            try {
+                await loadGoogleFonts();
+            } catch (error) {
+                console.error('Failed to load Google Fonts:', error);
+            }
         }
     });
 
+    // Cleanup all timers and intervals
     onDestroy(() => {
         if (progressInterval) {
             clearInterval(progressInterval);
+            progressInterval = undefined;
+        }
+        if (progressTimeout) {
+            clearTimeout(progressTimeout);
+            progressTimeout = undefined;
         }
     });
 
@@ -149,8 +119,11 @@
     }
     
     async function signOut() {
-        console.log('[Layout] Sign out clicked, calling auth.signOut()');
-        await auth.signOut();
+        try {
+            await auth.signOut();
+        } catch (error) {
+            console.error('Sign out failed:', error);
+        }
     }
 </script>
 
@@ -287,8 +260,6 @@
     </div>
 </header>
 {/if}
-
-
 
 <main class="min-h-screen">
     <slot />

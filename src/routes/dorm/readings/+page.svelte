@@ -5,6 +5,7 @@
   import type { Reading, meter_location_type, utility_type, meter_status, Meter } from './schema';
   import { readingFormSchema } from './schema';
   import type { z } from 'zod';
+  import { onMount, onDestroy } from 'svelte';
   import {
     Select,
     SelectContent,
@@ -91,7 +92,14 @@
   let selectedLocationType: meter_location_type | undefined;
   let showProgressBar = false;
   let progress = 0;
-  let progressInterval: ReturnType<typeof setInterval>;
+  let progressInterval: ReturnType<typeof setInterval> | undefined;
+  let progressTimeout: ReturnType<typeof setTimeout> | undefined;
+
+  // Cleanup function for timers
+  onDestroy(() => {
+    if (progressInterval) clearInterval(progressInterval);
+    if (progressTimeout) clearTimeout(progressTimeout);
+  });
 
   const {
     form,
@@ -113,34 +121,34 @@
   });
 
   function isValidProperty(property: unknown): property is Property {
-  if (!property || typeof property !== 'object') return false;
-  const p = property as Record<string, unknown>;
-  return Boolean(
-    typeof p.id === 'number' &&
-    typeof p.name === 'string'
-  );
-}
+    if (!property || typeof property !== 'object') return false;
+    const p = property as Record<string, unknown>;
+    return Boolean(
+      typeof p.id === 'number' &&
+      typeof p.name === 'string'
+    );
+  }
 
-function isValidFloor(floor: unknown): floor is Floor {
-  if (!floor || typeof floor !== 'object') return false;
-  const f = floor as Record<string, unknown>;
-  return Boolean(
-    typeof f.id === 'number' &&
-    typeof f.floor_number === 'number' &&
-    (f.wing === null || typeof f.wing === 'string') &&
-    f.property && isValidProperty(f.property)
-  );
-}
+  function isValidFloor(floor: unknown): floor is Floor {
+    if (!floor || typeof floor !== 'object') return false;
+    const f = floor as Record<string, unknown>;
+    return Boolean(
+      typeof f.id === 'number' &&
+      typeof f.floor_number === 'number' &&
+      (f.wing === null || typeof f.wing === 'string') &&
+      f.property && isValidProperty(f.property)
+    );
+  }
 
-function isValidRoom(room: unknown): room is Room {
-  if (!room || typeof room !== 'object') return false;
-  const r = room as Record<string, unknown>;
-  return Boolean(
-    typeof r.id === 'number' &&
-    typeof r.number === 'string' &&
-    r.floor && isValidFloor(r.floor)
-  );
-}
+  function isValidRoom(room: unknown): room is Room {
+    if (!room || typeof room !== 'object') return false;
+    const r = room as Record<string, unknown>;
+    return Boolean(
+      typeof r.id === 'number' &&
+      typeof r.number === 'string' &&
+      r.floor && isValidFloor(r.floor)
+    );
+  }
 
   function isMeterWithRoom(meter: unknown): meter is MeterWithRoom {
     if (!meter || typeof meter !== 'object') return false;
@@ -183,21 +191,27 @@ function isValidRoom(room: unknown): room is Room {
   $: isValidMeterType = Boolean(selectedMeterType);
   $: isValidLocationType = Boolean(selectedLocationType);
 
-  $: {
-    if ($delayed) {
-      showProgressBar = true;
-      if (progressInterval) clearInterval(progressInterval);
-      progressInterval = setInterval(() => {
-        progress = Math.min(progress + 1, 95);
-      }, 100);
-    } else if (showProgressBar) {
-      if (progressInterval) clearInterval(progressInterval);
-      progress = 100;
-      setTimeout(() => {
-        showProgressBar = false;
-        progress = 0;
-      }, 500);
+  // Progress bar reactivity with cleanup
+  $: if ($delayed) {
+    showProgressBar = true;
+    if (progressInterval) clearInterval(progressInterval);
+    progressInterval = setInterval(() => {
+      progress = Math.min(progress + 1, 95);
+    }, 100);
+  } else if (showProgressBar) {
+    if (progressInterval) {
+      clearInterval(progressInterval);
+      progressInterval = undefined;
     }
+    progress = 100;
+    if (progressTimeout) {
+      clearTimeout(progressTimeout);
+    }
+    progressTimeout = setTimeout(() => {
+      showProgressBar = false;
+      progress = 0;
+      progressTimeout = undefined;
+    }, 500);
   }
 
   function updateMeterType(value: { value: string } | undefined) {

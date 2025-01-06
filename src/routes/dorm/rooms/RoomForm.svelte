@@ -34,16 +34,28 @@
   const dispatch = createEventDispatcher();
   const roomTypes = ['SINGLE', 'DOUBLE', 'TRIPLE', 'QUAD', 'SUITE'] as const;
 
+  function handleFormSubmit(event: Event) {
+    event.preventDefault();
+    console.log('[DEBUG] Form submitted with data:', $form);
+    dispatch('submit', $form);
+  }
+
   function handlePropertyChange(selected: unknown) {
     const s = selected as SelectItem;
     if (s?.value) {
       const propertyId = parseInt(s.value, 10);
       if (!isNaN(propertyId)) {
+        const selectedProperty = data.properties.find(p => p.id === propertyId);
         $form = {
           ...$form,
           property_id: propertyId,
-          floor_id: 0
+          floor_id: 0,
+          property: {
+            id: selectedProperty?.id || 0,
+            name: selectedProperty?.name || ''
+          }
         };
+        console.log('[DEBUG] Property selected:', selectedProperty);
       }
     }
   }
@@ -81,9 +93,16 @@
     }
   }
 
-  $: availableFloors = data.floors.filter(f => 
-    f.property_id === Number($form.property_id)
-  );
+  $: availableFloors = data.floors;
+  
+  $: if ($form.property_id) {
+    availableFloors = data.floors.filter(f => f.property_id === Number($form.property_id));
+    if (availableFloors.length === 0) {
+      console.warn('No floors found for property:', $form.property_id);
+    }
+  }
+  
+  $: console.log('Available floors:', availableFloors);
 
   function getFloorLabel(floorId: number): string {
     const floor = data.floors.find(f => f.id === floorId);
@@ -155,28 +174,35 @@
   
   <div class="space-y-2">
     <Label for="floor_id">Floor</Label>
-    <Select.Root    
-      selected={{ 
-        value: $form.floor_id?.toString() || '', 
-        label: getFloorLabel($form.floor_id) || 'Select a floor' 
+    <Select.Root
+      selected={{
+        value: $form.floor_id?.toString() || '',
+        label: getFloorLabel($form.floor_id) || 'Select a floor'
       }}
       onSelectedChange={handleFloorChange}
     >
-      <Select.Trigger 
+      <Select.Trigger
         data-error={$errors.floor_id && $form.floor_id !== undefined}
         {...$constraints.floor_id}
+        disabled={!$form.property_id}
       >
-        <Select.Value placeholder="Select a floor" />
+        <Select.Value placeholder={$form.property_id ? 'Select a floor' : 'Select a property first'} />
       </Select.Trigger>
       <Select.Content>
-        {#each availableFloors as floor}
-          <Select.Item value={floor.id.toString()}>
-            Floor {floor.floor_number}
-            {#if floor.wing}
-              Wing {floor.wing}
-            {/if}
+        {#if $form.property_id}
+          {#each availableFloors as floor}
+            <Select.Item value={floor.id.toString()}>
+              Floor {floor.floor_number}
+              {#if floor.wing}
+                Wing {floor.wing}
+              {/if}
+            </Select.Item>
+          {/each}
+        {:else}
+          <Select.Item value="" disabled>
+            Please select a property first
           </Select.Item>
-        {/each}
+        {/if}
       </Select.Content>
     </Select.Root>
     {#if $errors.floor_id && $form.floor_id !== undefined}

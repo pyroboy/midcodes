@@ -91,13 +91,13 @@ export function hasPathAccess(role: UserRole, path: string, originalRole?: UserR
 
 // Helper to get redirect path
 export function getRedirectPath(role: UserRole, path: string, originalRole?: UserRole, context?: any): string | null {
-    console.log('\n[Redirect Check] ----------------');
-    console.log('1. Checking redirect for:', {
-        role,
-        path,
-        originalRole,
-        context
-    });
+    // console.log('\n[Redirect Check] ----------------');
+    // console.log('1. Checking redirect for:', {
+    //     role,
+    //     path,
+    //     originalRole,
+    //     context
+    // });
 
     const roleConfig = RoleConfig[role]
     if (!roleConfig) {
@@ -107,10 +107,10 @@ export function getRedirectPath(role: UserRole, path: string, originalRole?: Use
     
     // Don't redirect if user has access to the path
     const hasAccess = hasPathAccess(role, path, originalRole)
-    console.log('3. Path access check:', {
-        hasAccess,
-        path
-    });
+    // console.log('3. Path access check:', {
+    //     hasAccess,
+    //     path
+    // });
     
     if (hasAccess) return null
 

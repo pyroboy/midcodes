@@ -21,6 +21,7 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
     throw redirect(302, '/unauthorized');
   }
 
+  console.log('[DEBUG] Loading initial data for rooms page');
   const [roomsResponse, propertiesResponse, floorsResponse] = await Promise.all([
     supabase
       .from('rooms')
@@ -38,9 +39,18 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
 
     supabase
       .from('floors')
-      .select('id, property_id, floor_number, wing')
+      .select(`
+        id,
+        property_id,
+        floor_number,
+        wing,
+        property:properties!inner(id, name)
+      `)
       .order('property_id, floor_number')
   ]);
+
+  console.log('[DEBUG] Floors data loaded:', floorsResponse.data);
+  console.log('[DEBUG] Properties data loaded:', propertiesResponse.data);
 
   const { data: rooms, error: roomsError } = roomsResponse;
   const { data: properties, error: propertiesError } = propertiesResponse;
@@ -63,19 +73,33 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
 
 export const actions: Actions = {
   create: async ({ request, locals: { supabase } }: RequestEvent) => {
+    console.log('[DEBUG] Create room action triggered');
     const form = await superValidate(request, zod(roomSchema));
+    console.log('[DEBUG] Form data received:', form.data);
+    console.log('[DEBUG] Form validation status:', form.valid);
     
     if (!form.valid) {
-      return fail(400, { 
+      console.error('[DEBUG] Form validation failed:', form.errors);
+      return fail(400, {
         form,
-        message: 'Please check the form for errors'
+        message: 'Please check the form for errors',
+        errors: form.errors
       });
     }
 
     if (!form.data.property_id || !form.data.floor_id) {
+      console.error('[DEBUG] Missing required fields:', {
+        property_id: form.data.property_id,
+        floor_id: form.data.floor_id
+      });
+      console.log('[DEBUG] Current form data:', form.data);
       return fail(400, {
         form,
-        message: 'Property and Floor selection are required'
+        message: 'Property and Floor selection are required',
+        errors: {
+          property_id: !form.data.property_id ? 'Property is required' : undefined,
+          floor_id: !form.data.floor_id ? 'Floor is required' : undefined
+        }
       });
     }
 
