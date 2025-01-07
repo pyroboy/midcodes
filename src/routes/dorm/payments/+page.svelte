@@ -15,9 +15,9 @@
       lease?: {
         id: number;
         name: string;
-        room?: {
+        rental_unit?: {
           id: number;
-          room_number: string;
+          rental_unit_number: string;
           floor?: {
             floor_number: string;
             wing?: string;
@@ -111,15 +111,15 @@
                     {new Date(payment.paid_at).toLocaleDateString()}
                   </span>
                 </div>
-                {#if payment.billing?.room}
+                {#if payment.billing?.rental_unit}
                   <div class="flex justify-between">
-                    <span class="text-muted-foreground">Room:</span>
+                    <span class="text-muted-foreground">Rental_unit:</span>
                     <span class="font-medium">
-                      {payment.billing.room.room_number}
-                      {#if payment.billing.room.floor}
-                        - Floor {payment.billing.room.floor.floor_number}
-                        {#if payment.billing.room.floor.wing}
-                          Wing {payment.billing.room.floor.wing}
+                      {payment.billing.rental_unit.rental_unit_number}
+                      {#if payment.billing.rental_unit.floor}
+                        - Floor {payment.billing.rental_unit.floor.floor_number}
+                        {#if payment.billing.rental_unit.floor.wing}
+                          Wing {payment.billing.rental_unit.floor.wing}
                         {/if}
                       {/if}
                     </span>

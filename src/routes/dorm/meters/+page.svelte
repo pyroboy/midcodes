@@ -27,7 +27,7 @@
   type Floor = Database['public']['Tables']['floors']['Row'] & {
     property: Property | null;
   };
-  type Room = Database['public']['Tables']['rooms']['Row'] & {
+  type Rental_unit = Database['public']['Tables']['rental_unit']['Row'] & {
     floor: Floor | null;
   };
 
@@ -42,7 +42,7 @@
   let sortBy: 'name' | 'type' | 'status' | 'reading' = 'name';
   let sortOrder: 'asc' | 'desc' = 'asc';
 
-  $: ({ form, meters = [], properties = [], floors = [], rooms = [], isAdminLevel, isUtility, isMaintenance } = data);
+  $: ({ form, meters = [], properties = [], floors = [], rental_unit = [], isAdminLevel, isUtility, isMaintenance } = data);
 
   // Create a default form value
   const defaultForm: SuperValidated<MeterFormData, any> = {
@@ -57,7 +57,7 @@
       location_type: 'PROPERTY',
       property_id: null,
       floor_id: null,
-      rooms_id: null,
+      rental_unit_id: null,
       unit_rate: 0,
       initial_reading: 0,
       is_active: true,
@@ -95,11 +95,11 @@
         return floor 
           ? `Floor ${floor.floor_number}${floor.property ? ` - ${floor.property.name}` : ''}`
           : 'Unknown Floor';
-      case 'ROOM':
-        const room = rooms?.find(r => r.id === meter.rooms_id);
-        return room 
-          ? `Room ${room.room_number}${room.floor?.property ? ` - ${room.floor.property.name}` : ''}`
-          : 'Unknown Room';
+      case 'RENTAL_UNIT':
+        const rental_unit = rental_unit?.find(r => r.id === meter.rental_unit_id);
+        return rental_unit 
+          ? `Rental_unit ${rental_unit.rental_unit_number}${rental_unit.floor?.property ? ` - ${rental_unit.floor.property.name}` : ''}`
+          : 'Unknown Rental_unit';
       default:
         return 'Unknown Location';
     }
@@ -300,7 +300,7 @@
         form={form ?? defaultForm}
         properties={properties ?? []}
         floors={floors ?? []}
-        rooms={rooms ?? []}
+        rental_unit={rental_unit ?? []}
         meter={selectedMeter}
         on:meterAdded={handleMeterAdded}
         on:meterUpdated={handleMeterAdded}

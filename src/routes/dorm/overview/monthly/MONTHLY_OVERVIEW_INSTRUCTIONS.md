@@ -14,10 +14,10 @@ The Monthly Overview route serves as a comprehensive financial and occupancy das
    - Security deposit management
 
 2. **Occupancy Management**
-   - Room status (Vacant/Occupied/Reserved)
+   - Rental_unit status (Vacant/Occupied/Reserved)
    - Tenant assignments and capacity utilization
    - Lease status and expiration tracking
-   - Room type distribution
+   - Rental_unit type distribution
    - Floor-wise organization
    - Wing assignments
 
@@ -32,7 +32,7 @@ The Monthly Overview route serves as a comprehensive financial and occupancy das
    - Active maintenance issues
    - Issue resolution status
    - Completion tracking
-   - Room maintenance history
+   - Rental_unit maintenance history
    - Priority management
 
 ## Key Goals
@@ -41,13 +41,13 @@ The Monthly Overview route serves as a comprehensive financial and occupancy das
    - Track monthly revenue streams (rent, utilities, other charges)
    - Monitor payment compliance and identify delayed payments
    - Analyze payment patterns for better forecasting
-   - Calculate occupancy rates and revenue per room
+   - Calculate occupancy rates and revenue per rental_unit
    - Track property expenses and budgets
    - Monitor upcoming payment schedules
    - Manage security deposits effectively
 
 2. **Operational Efficiency**
-   - Quick identification of vacant rooms for marketing
+   - Quick identification of vacant rental_unit for marketing
    - Early warning for lease expirations
    - Streamlined utility billing process
    - Automated penalty calculations
@@ -57,7 +57,7 @@ The Monthly Overview route serves as a comprehensive financial and occupancy das
 
 3. **Decision Support**
    - Identify problematic payment patterns
-   - Guide room rate adjustments based on occupancy
+   - Guide rental_unit rate adjustments based on occupancy
    - Support maintenance scheduling decisions
    - Help optimize utility rate structures
    - Expense analysis and budgeting
@@ -92,7 +92,7 @@ The Monthly Overview route serves as a comprehensive financial and occupancy das
 ## Target Users
 1. **Property Managers**: Daily operations and tenant management
 2. **Financial Staff**: Revenue tracking and payment processing
-3. **Maintenance Staff**: Room status and utility monitoring
+3. **Maintenance Staff**: Rental_unit status and utility monitoring
 4. **Property Owners**: Financial performance overview
 5. **Accountants**: Expense tracking and reconciliation
 6. **Maintenance Supervisors**: Issue tracking and resource allocation
@@ -123,13 +123,13 @@ CREATE TABLE public.floors (
     updated_at timestamp with time zone
 );
 
--- Rooms Table
-CREATE TABLE public.rooms (
+-- Rental_Units Table
+CREATE TABLE public.rental_unit (
     id integer NOT NULL DEFAULT nextval('locations_id_seq'::regclass),
     name text NOT NULL,
     number integer NOT NULL,
     capacity integer NOT NULL,
-    room_status location_status NOT NULL DEFAULT 'VACANT',
+    rental_unit_status location_status NOT NULL DEFAULT 'VACANT',
     base_rate numeric(10,2) NOT NULL,
     created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
     updated_at timestamp with time zone,
@@ -263,7 +263,7 @@ CREATE TABLE public.meters (
     location_type meter_location_type NOT NULL,
     property_id integer,
     floor_id integer,
-    rooms_id integer,
+    rental_unit_id integer,
     type utility_type NOT NULL,
     is_active boolean DEFAULT true,
     status meter_status NOT NULL DEFAULT 'ACTIVE',
@@ -347,7 +347,7 @@ CREATE TYPE maintenance_status AS ENUM (
 CREATE TYPE meter_location_type AS ENUM (
     'PROPERTY',
     'FLOOR',
-    'ROOM'
+    'RENTAL_UNIT'
 );
 
 -- Meter Status
@@ -415,7 +415,7 @@ BEGIN
         FROM billings b
         JOIN leases l ON l.id = b.lease_id
         JOIN lease_tenants lt ON lt.lease_id = l.id
-        JOIN rooms r ON r.id = l.location_id
+        JOIN rental_unit r ON r.id = l.location_id
         WHERE r.property_id = p_property_id
         AND b.billing_date >= date_trunc('month', NOW()) - (p_months_back || ' months')::INTERVAL
         GROUP BY lt.tenant_id, date_trunc('month', b.billing_date)
@@ -444,15 +444,15 @@ $$ LANGUAGE plpgsql;
 
 ### 1. Data Loading (+page.server.ts)
 ```typescript
-// Load rooms with active leases
-const { data: rooms } = await supabase
-  .from('rooms')
+// Load rental_unit with active leases
+const { data: rental_unit } = await supabase
+  .from('rental_unit')
   .select(`
     id,
     name,
     number,
     capacity,
-    room_status,
+    rental_unit_status,
     base_rate,
     property_id,
     floor_id,
@@ -492,12 +492,12 @@ const { data: balances } = await supabase
 
 1. Data Organization
 ```typescript
-interface Room {
+interface Rental_unit {
   id: number;
   name: string;
   number: number;
   capacity: number;
-  room_status: 'VACANT' | 'OCCUPIED' | 'MAINTENANCE';
+  rental_unit_status: 'VACANT' | 'OCCUPIED' | 'MAINTENANCE';
   base_rate: number;
   property_id: number;
   floor_id: number;
@@ -536,7 +536,7 @@ interface Room {
       <!-- Table Headers -->
       <Table.Header>
         <Table.Row>
-          <Table.Head>Room</Table.Head>
+          <Table.Head>Rental_unit</Table.Head>
           <Table.Head>Type</Table.Head>
           <Table.Head>Status</Table.Head>
           <Table.Head>Tenant</Table.Head>
@@ -549,15 +549,15 @@ interface Room {
       
       <!-- Table Body -->
       <Table.Body>
-        {#each rooms as room}
-          {#each room.leases as lease}
+        {#each rental_unit as rental_unit}
+          {#each rental_unit.leases as lease}
             {#each lease.lease_tenants as tenant}
               <Table.Row>
-                <Table.Cell>{room.number}</Table.Cell>
-                <Table.Cell>{room.type}</Table.Cell>
+                <Table.Cell>{rental_unit.number}</Table.Cell>
+                <Table.Cell>{rental_unit.type}</Table.Cell>
                 <Table.Cell>
-                  <Badge variant={getStatusVariant(room.room_status)}>
-                    {room.room_status}
+                  <Badge variant={getStatusVariant(rental_unit.rental_unit_status)}>
+                    {rental_unit.rental_unit_status}
                   </Badge>
                 </Table.Cell>
                 <Table.Cell>
@@ -569,7 +569,7 @@ interface Room {
                     </span>
                   {/if}
                 </Table.Cell>
-                <Table.Cell>{formatCurrency(room.base_rate)}</Table.Cell>
+                <Table.Cell>{formatCurrency(rental_unit.base_rate)}</Table.Cell>
                 {#each months as month}
                   <Table.Cell>
                     {formatCurrency(balancesByTenant[tenant.tenant.id]?.[month] ?? 0)}
@@ -604,10 +604,10 @@ interface Room {
 ### Database Optimization
 1. Create indexes for commonly queried fields:
 ```sql
--- Indexes for rooms table
-CREATE INDEX idx_rooms_property_id ON rooms(property_id);
-CREATE INDEX idx_rooms_floor_id ON rooms(floor_id);
-CREATE INDEX idx_rooms_status ON rooms(room_status);
+-- Indexes for rental_unit table
+CREATE INDEX idx_rental_unit_property_id ON rental_unit(property_id);
+CREATE INDEX idx_rental_unit_floor_id ON rental_unit(floor_id);
+CREATE INDEX idx_rental_unit_status ON rental_unit(rental_unit_status);
 
 -- Indexes for leases table
 CREATE INDEX idx_leases_location_id ON leases(location_id);
@@ -632,7 +632,7 @@ SELECT
 FROM billings b
 JOIN leases l ON l.id = b.lease_id
 JOIN lease_tenants lt ON lt.lease_id = l.id
-JOIN rooms r ON r.id = l.location_id
+JOIN rental_unit r ON r.id = l.location_id
 GROUP BY lt.tenant_id, date_trunc('month', b.billing_date);
 
 CREATE INDEX idx_mtb_tenant_month 
@@ -665,7 +665,7 @@ ON monthly_tenant_balances(tenant_id, month);
 
 ### Planned Features
 1. Advanced filtering options:
-   - By room type
+   - By rental_unit type
    - By tenant status
    - By balance range
    - By date range

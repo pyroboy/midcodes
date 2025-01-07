@@ -46,24 +46,24 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Room Status Update Function and Trigger
-CREATE OR REPLACE FUNCTION update_room_status()
+-- Rental_unit Status Update Function and Trigger
+CREATE OR REPLACE FUNCTION update_rental_unit_status()
 RETURNS TRIGGER AS $$
 BEGIN
     IF TG_OP = 'INSERT' THEN
-        UPDATE rooms SET room_status = 'OCCUPIED'
+        UPDATE rental_unit SET rental_unit_status = 'OCCUPIED'
         WHERE id = NEW.location_id;
     ELSIF TG_OP = 'UPDATE' THEN
         IF OLD.location_id IS NOT NULL AND OLD.location_id != NEW.location_id THEN
-            UPDATE rooms SET room_status = 'VACANT'
+            UPDATE rental_unit SET rental_unit_status = 'VACANT'
             WHERE id = OLD.location_id;
         END IF;
         IF NEW.location_id IS NOT NULL THEN
-            UPDATE rooms SET room_status = 'OCCUPIED'
+            UPDATE rental_unit SET rental_unit_status = 'OCCUPIED'
             WHERE id = NEW.location_id;
         END IF;
     ELSIF TG_OP = 'DELETE' THEN
-        UPDATE rooms SET room_status = 'VACANT'
+        UPDATE rental_unit SET rental_unit_status = 'VACANT'
         WHERE id = OLD.location_id;
     END IF;
     RETURN NEW;
@@ -73,11 +73,11 @@ $$ LANGUAGE plpgsql;
 -- Only create trigger if it doesn't exist
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_room_status_on_lease') THEN
-        CREATE TRIGGER update_room_status_on_lease
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'update_rental_unit_status_on_lease') THEN
+        CREATE TRIGGER update_rental_unit_status_on_lease
         AFTER INSERT OR UPDATE OR DELETE ON leases
         FOR EACH ROW
-        EXECUTE FUNCTION update_room_status();
+        EXECUTE FUNCTION update_rental_unit_status();
     END IF;
 END $$;
 

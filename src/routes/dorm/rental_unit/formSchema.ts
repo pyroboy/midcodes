@@ -19,7 +19,7 @@ export const floorBasicSchema = z.object({
   wing: z.string().optional()
 });
 
-const baseRoomSchema = z.object({
+const baseRental_UnitSchema = z.object({
   id: z.number(),
   property_id: z.number({
     required_error: 'Property selection is required',
@@ -29,12 +29,12 @@ const baseRoomSchema = z.object({
     required_error: 'Floor selection is required',
     invalid_type_error: 'Floor must be selected'
   }),
-  name: z.string().min(1, 'Room name is required').max(100, 'Room name is too long'),
+  name: z.string().min(1, 'Rental_unit name is required').max(100, 'Rental_unit name is too long'),
   number: z.coerce.number({
-    required_error: 'Room number is required',
-    invalid_type_error: 'Room number must be a valid number'
-  }).min(1, 'Room number must be positive'),
-  room_status: locationStatusEnum.default('VACANT'),
+    required_error: 'Rental_unit number is required',
+    invalid_type_error: 'Rental_unit number must be a valid number'
+  }).min(1, 'Rental_unit number must be positive'),
+  rental_unit_status: locationStatusEnum.default('VACANT'),
   capacity: z.coerce.number({
     required_error: 'Capacity is required',
     invalid_type_error: 'Capacity must be a valid number'
@@ -43,13 +43,13 @@ const baseRoomSchema = z.object({
     required_error: 'Base rate is required',
     invalid_type_error: 'Base rate must be a valid number'
   }).min(0, 'Base rate cannot be negative'),
-  type: z.string().min(1, 'Room type is required'),
+  type: z.string().min(1, 'Rental_unit type is required'),
   amenities: z.array(z.string()).default([]),
   property: propertyBasicSchema,
   floor: floorBasicSchema,
 });
 
-export const roomSchema = baseRoomSchema.superRefine((data, ctx) => {
+export const rental_unitSchema = baseRental_UnitSchema.superRefine((data, ctx) => {
   if (!data.property_id || !data.floor_id) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -61,4 +61,4 @@ export const roomSchema = baseRoomSchema.superRefine((data, ctx) => {
   return true;
 });
 
-export type Room = z.infer<typeof roomSchema>;
+export type Rental_unit = z.infer<typeof rental_unitSchema>;

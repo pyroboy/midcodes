@@ -1,7 +1,8 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import Button from '$lib/components/ui/button/button.svelte';
-  import type { ExtendedTenant, Room, Floor, Property, Profile } from './types';
+  import type { ExtendedTenant, Rental_unit } from './types';
+  type Property = Database['public']['Tables']['properties']['Row'];
   import type { TenantFormData } from './formSchema';
   import * as Table from '$lib/components/ui/table';
   import {
@@ -17,13 +18,14 @@
   interface PageState {
     form: any;
     tenants: ExtendedTenant[];
-    rooms: Room[];
+    rental_unit: Rental_unit[];
     properties: Property[];
-    profiles: Profile[];
-    userProfile: Profile;
+    profile: ServerProfile | null;
     isAdminLevel: boolean;
     isStaffLevel: boolean;
   }
+
+  type ServerProfile = Database['public']['Tables']['profiles']['Row'];
 
   export let data: PageState;
 
@@ -79,7 +81,7 @@
     }
   }
 
-  function getRoomStatusColor(status: string): string {
+  function getRental_UnitStatusColor(status: string): string {
     switch (status) {
       case 'VACANT':
         return 'bg-green-100 text-green-800';
@@ -164,8 +166,6 @@
         </div>
       </div>
     </div>
-
-    <div class="p-4">
       <Table.Root>
         <Table.Header>
           <Table.Row>
@@ -173,7 +173,7 @@
             <Table.Head>Email</Table.Head>
             <Table.Head>Contact Number</Table.Head>
             <Table.Head>Property</Table.Head>
-            <Table.Head>Room</Table.Head>
+            <Table.Head>Rental_unit</Table.Head>
             <Table.Head>Status</Table.Head>
             <Table.Head class="text-right">Actions</Table.Head>
           </Table.Row>
@@ -222,4 +222,3 @@
       </Table.Root>
     </div>
   </div>
-</div>

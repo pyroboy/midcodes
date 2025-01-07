@@ -24,7 +24,7 @@ vi.mock('$app/forms', () => ({
 }));
 
 // Mock custom components
-vi.mock('$lib/components/RoomForm.svelte', () => ({
+vi.mock('$lib/components/Rental_UnitForm.svelte', () => ({
     default: vi.fn()
 }));
 

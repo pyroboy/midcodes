@@ -5,7 +5,7 @@ import { checkAccess } from '$lib/utils/roleChecks';
 import { load } from '../+page.server';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import type { ServerLoadEvent } from '@sveltejs/kit';
-import type { Room, Property, Floor } from '../formSchema';
+import type { Rental_unit, Property, Floor } from '../formSchema';
 import type { SuperValidated } from 'sveltekit-superforms';
 import type { UserRole } from '$lib/auth/roleConfig';
 import type { 
@@ -38,12 +38,12 @@ type RouteParams = Record<string, string>;
 // 8. create a mock emulation
 // 9. create a mock properties
 // 10. create a mock floors
-// 11. create a mock rooms
+// 11. create a mock rental_unit
 // 12. render the page
 // 13. check that the page is rendered  
 
 // Create a specific type for the ServerLoadEvent with proper generic parameters
-type TypedServerLoadEvent = ServerLoadEvent<RouteParams, PageParentData, "/dorm/rooms">;
+type TypedServerLoadEvent = ServerLoadEvent<RouteParams, PageParentData, "/dorm/rental_unit">;
 
 // Mock the roleChecks module
 vi.mock('$lib/utils/roleChecks', () => ({
@@ -76,13 +76,13 @@ const mockFormData: SuperValidated<any> = {
 };
 
 // Mock data using imported types
-const mockRooms: Room[] = [
+const mockRental_Units: Rental_unit[] = [
   {
     id: 1,
-    name: 'Test Room 101',
+    name: 'Test Rental_unit 101',
     number: 101,
     capacity: 1,
-    room_status: 'VACANT',
+    rental_unit_status: 'VACANT',
     base_rate: 5000,
     property_id: 1,
     floor_id: 1,
@@ -214,7 +214,7 @@ const mockSupabaseClient = {
       eq: vi.fn().mockReturnValue({
         order: vi.fn().mockImplementation(() => {
           return Promise.resolve(createSupabaseResponse(
-            table === 'rooms' ? mockRooms :
+            table === 'rental_unit' ? mockRental_Units :
             table === 'properties' ? mockProperties :
             table === 'floors' ? mockFloors :
             []
@@ -227,7 +227,7 @@ const mockSupabaseClient = {
       }),
       order: vi.fn().mockImplementation(() => {
         return Promise.resolve(createSupabaseResponse(
-          table === 'rooms' ? mockRooms :
+          table === 'rental_unit' ? mockRental_Units :
           table === 'properties' ? mockProperties :
           table === 'floors' ? mockFloors :
           []
@@ -336,7 +336,7 @@ const createMockEvent = (user: User, role: UserRole = 'super_admin'): TypedServe
     params: {},
     request: new Request('http://localhost'),
     isDataRequest: false,
-    route: { id: '/dorm/rooms' },
+    route: { id: '/dorm/rental_unit' },
     setHeaders: vi.fn(),
     fetch: vi.fn(),
     depends: vi.fn(),
@@ -359,7 +359,7 @@ const createMockEvent = (user: User, role: UserRole = 'super_admin'): TypedServe
 describe('+page.svelte', () => {
   const defaultData: CombinedPageData = {
     user: null,
-    rooms: mockRooms,
+    rental_unit: mockRental_Units,
     properties: mockProperties,
     floors: mockFloors,
     form: mockFormData,
@@ -413,21 +413,21 @@ describe('Load function access control', () => {
       
       expect(result).toBeDefined();
       if (result) {
-        expect('rooms' in result).toBeTruthy();
+        expect('rental_unit' in result).toBeTruthy();
         expect('properties' in result).toBeTruthy();
         expect('floors' in result).toBeTruthy();
         expect('form' in result).toBeTruthy();
         expect('user' in result).toBeTruthy();
         
         const typedResult = result as {
-          rooms: Room[];
+          rental_unit: Rental_unit[];
           properties: Property[];
           floors: Floor[];
           form: SuperValidated<any>;
           user: User;
         };
         
-        expect(typedResult.rooms).toEqual(mockRooms);
+        expect(typedResult.rental_unit).toEqual(mockRental_Units);
         expect(typedResult.properties).toEqual(mockProperties);
         expect(typedResult.floors).toEqual(mockFloors);
         expect(typedResult.form).toBeDefined();

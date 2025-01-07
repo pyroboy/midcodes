@@ -44,7 +44,7 @@ export interface Property {
 // Type for the property with counts
 export interface PropertyWithCounts extends Property {
   floor_count: number;
-  room_count: number;
+  rental_unit_count: number;
 }
 
 // Helper function to validate property data

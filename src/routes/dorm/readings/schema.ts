@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export type meter_location_type = 'PROPERTY' | 'FLOOR' | 'ROOM';
+export type meter_location_type = 'PROPERTY' | 'FLOOR' | 'RENTAL_UNIT';
 export type meter_status = 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE';
 export type utility_type = 'ELECTRICITY' | 'WATER' | 'INTERNET';
 
@@ -18,7 +18,7 @@ export interface Meter {
   location_type: meter_location_type;
   property_id: number | null;
   floor_id: number | null;
-  rooms_id: number | null;
+  rental_unit_id: number | null;
   type: utility_type;
   is_active: boolean;
   status: meter_status;
@@ -26,7 +26,7 @@ export interface Meter {
   unit_rate: number;
   notes: string | null;
   created_at: string;
-  room?: {
+  rental_unit?: {
     id: number;
     number: string;
     floor: {
@@ -65,7 +65,7 @@ export function readingFormSchema(
         message: `Reading date must be on or after ${latestOverallReadingDate}`,
       }),
     meter_type: z.enum(['ELECTRICITY', 'WATER', 'INTERNET']),
-    location_type: z.enum(['PROPERTY', 'FLOOR', 'ROOM']),
+    location_type: z.enum(['PROPERTY', 'FLOOR', 'RENTAL_UNIT']),
     readings: z.array(
       z.object({
         meter_id: z.number(),

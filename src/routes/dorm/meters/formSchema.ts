@@ -16,20 +16,20 @@ export const meterStatusEnum = z.enum([
 export const locationTypeEnum = z.enum([
   'PROPERTY',
   'FLOOR',
-  'ROOM'
+  'RENTAL_UNIT'
 ]);
 
 // Helper function to ensure only one location ID is set based on location_type
 const validateLocationConstraint = (data: any) => {
-  const { location_type, property_id, floor_id, rooms_id } = data;
+  const { location_type, property_id, floor_id, rental_unit_id } = data;
   
   switch (location_type) {
     case 'PROPERTY':
-      return property_id != null && floor_id == null && rooms_id == null;
+      return property_id != null && floor_id == null && rental_unit_id == null;
     case 'FLOOR':
-      return floor_id != null && property_id == null && rooms_id == null;
-    case 'ROOM':
-      return rooms_id != null && property_id == null && floor_id == null;
+      return floor_id != null && property_id == null && rental_unit_id == null;
+    case 'RENTAL_UNIT':
+      return rental_unit_id != null && property_id == null && floor_id == null;
     default:
       return false;
   }
@@ -42,7 +42,7 @@ const baseMeterSchema = z.object({
   location_type: locationTypeEnum,
   property_id: z.number().nullable(),
   floor_id: z.number().nullable(),
-  rooms_id: z.number().nullable(),
+  rental_unit_id: z.number().nullable(),
   type: utilityTypeEnum,
   is_active: z.boolean().default(true),
   status: meterStatusEnum.default('ACTIVE'),
@@ -70,7 +70,7 @@ export const meterQuerySchema = z.object({
   location_type: locationTypeEnum.optional(),
   property_id: z.number().optional(),
   floor_id: z.number().optional(),
-  rooms_id: z.number().optional(),
+  rental_unit_id: z.number().optional(),
   status: meterStatusEnum.optional(),
   type: utilityTypeEnum.optional(),
   page: z.number().min(1).default(1),
@@ -97,7 +97,7 @@ export interface LocationSelection {
   type: z.infer<typeof locationTypeEnum>;
   property_id?: number;
   floor_id?: number;
-  rooms_id?: number;
+  rental_unit_id?: number;
 }
 
 // Display interface for UI

@@ -1,24 +1,24 @@
 import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
-import type { Room } from '../formSchema';
+import type { Rental_unit } from '../formSchema';
 import type { RequestEvent } from '@sveltejs/kit';
 import { actions } from '../+page.server';
 
 // Define specific route types
 type RouteParams = Record<string, string>;
-type RouteId = "/dorm/rooms";
+type RouteId = "/dorm/rental_unit";
 type TypedRequestEvent = RequestEvent<RouteParams, RouteId>;
 
 // Define request body type for type safety
-interface RoomRequestBody {
+interface Rental_UnitRequestBody {
   id?: number;
   property_id?: number;
   floor_id?: number;
   number?: number;
   name?: string;
   capacity?: number;
-  room_status?: string;
+  rental_unit_status?: string;
   base_rate?: number;
   type?: string;
   amenities?: string[];
@@ -97,13 +97,13 @@ vi.mock('@supabase/supabase-js', () => ({
           });
         }
 
-        // Check for duplicate room
+        // Check for duplicate rental_unit
         if (data.number === 101 && data.floor_id === 1) {
           return Promise.resolve({
             data: null,
             error: {
               code: '23505',
-              message: 'Room number already exists on this floor',
+              message: 'Rental_unit number already exists on this floor',
               details: 'unique_violation'
             }
           });
@@ -127,8 +127,8 @@ vi.mock('@supabase/supabase-js', () => ({
 
 // Define MSW handlers
 const handlers = [
-  // Mock the rooms endpoint with logging
-  http.get(`${SUPABASE_API_URL}/rooms`, ({ request }) => {
+  // Mock the rental_unit endpoint with logging
+  http.get(`${SUPABASE_API_URL}/rental_unit`, ({ request }) => {
     debugLog('GET request intercepted', { url: request.url });
     const url = new URL(request.url);
     const floorId = url.searchParams.get('floor_id');
@@ -136,24 +136,24 @@ const handlers = [
 
     if (floorId === '1' && number === '101') {
       const response = [{ id: 1, floor_id: 1, number: 101 }];
-      debugLog('Returning existing room', response);
+      debugLog('Returning existing rental_unit', response);
       return HttpResponse.json(response, { 
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       });
     }
 
-    debugLog('No existing room found');
+    debugLog('No existing rental_unit found');
     return HttpResponse.json([], { 
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });
   }),
 
-  // Mock the POST request for creating rooms with proper error responses
-  http.post(`${SUPABASE_API_URL}/rooms`, async ({ request }) => {
+  // Mock the POST request for creating rental_unit with proper error responses
+  http.post(`${SUPABASE_API_URL}/rental_unit`, async ({ request }) => {
     debugLog('POST request intercepted', { url: request.url });
-    const body = await request.json() as RoomRequestBody;
+    const body = await request.json() as Rental_UnitRequestBody;
     debugLog('Request body:', body);
 
     // Check for required fields
@@ -167,12 +167,12 @@ const handlers = [
       }, { status: 400 });
     }
 
-    // Check for duplicate room
+    // Check for duplicate rental_unit
     if (body?.number === 101 && body?.floor_id === 1) {
-      debugLog('Duplicate room detected');
+      debugLog('Duplicate rental_unit detected');
       return HttpResponse.json({
         statusText: "Conflict",
-        error: "Room number already exists on this floor",
+        error: "Rental_unit number already exists on this floor",
         code: "23505",
         details: "unique_violation",
       }, { status: 409 });
@@ -192,7 +192,7 @@ const handlers = [
         valid: true
       }
     };
-    debugLog('Room created successfully', successResponse);
+    debugLog('Rental_unit created successfully', successResponse);
     return HttpResponse.json(successResponse, { status: 201 });
   })
 ];
@@ -201,7 +201,7 @@ const handlers = [
 const mswServer = setupServer(...handlers);
 
 // Create mock request event with proper structure
-const createMockRequestEvent = (formData: Partial<Room>): TypedRequestEvent => {
+const createMockRequestEvent = (formData: Partial<Rental_unit>): TypedRequestEvent => {
   debugLog('Creating mock request event', formData);
   const request = new Request('http://localhost', {
     method: 'POST',
@@ -228,13 +228,13 @@ const createMockRequestEvent = (formData: Partial<Room>): TypedRequestEvent => {
               });
             }
 
-            // Check for duplicate room
+            // Check for duplicate rental_unit
             if (data.number === 101 && data.floor_id === 1) {
               return Promise.resolve({
                 data: null,
                 error: {
                   code: '23505',
-                  message: 'Room number already exists on this floor',
+                  message: 'Rental_unit number already exists on this floor',
                   details: 'unique_violation'
                 }
               });
@@ -263,7 +263,7 @@ const createMockRequestEvent = (formData: Partial<Room>): TypedRequestEvent => {
     },
     url: new URL('http://localhost'),
     params: {},
-    route: { id: '/dorm/rooms' as RouteId },
+    route: { id: '/dorm/rental_unit' as RouteId },
     isDataRequest: false,
     isSubRequest: false,
     setHeaders: vi.fn(),
@@ -282,7 +282,7 @@ const createMockRequestEvent = (formData: Partial<Room>): TypedRequestEvent => {
   return event as unknown as TypedRequestEvent;
 };
 
-describe('Room Creation Tests', () => {
+describe('Rental_unit Creation Tests', () => {
   beforeAll(() => {
     mswServer.listen({ onUnhandledRequest: 'warn' });
     debugLog('MSW Server started');
@@ -299,12 +299,12 @@ describe('Room Creation Tests', () => {
     debugLog('MSW Server closed');
   });
 
-  it('should successfully create a new room', async () => {
-    const newRoom: Partial<Room> = {
-      name: 'New Test Room',
+  it('should successfully create a new rental_unit', async () => {
+    const newRental_Unit: Partial<Rental_unit> = {
+      name: 'New Test Rental_unit',
       number: 102,
       capacity: 2,
-      room_status: 'VACANT',
+      rental_unit_status: 'VACANT',
       base_rate: 6000,
       property_id: 1,
       floor_id: 1,
@@ -312,8 +312,8 @@ describe('Room Creation Tests', () => {
       amenities: ['WiFi', 'AC']
     };
 
-    debugLog('Testing successful room creation', newRoom);
-    const event = createMockRequestEvent(newRoom);
+    debugLog('Testing successful rental_unit creation', newRental_Unit);
+    const event = createMockRequestEvent(newRental_Unit);
     const result = await actions.create(event) as ActionResult;
     debugLog('Create action result', result);
 
@@ -321,49 +321,49 @@ describe('Room Creation Tests', () => {
     expect(result).toBeDefined();
     expect(result.form).toBeDefined();
     expect(result.form?.valid).toBe(true);
-    expect(result.form?.data).toMatchObject(newRoom);
+    expect(result.form?.data).toMatchObject(newRental_Unit);
     expect(result.form?.errors).toEqual({});
   });
 
-  it('should fail when creating a room with duplicate number on same floor', async () => {
-    const duplicateRoom: Partial<Room> = {
-      name: 'Duplicate Room',
+  it('should fail when creating a rental_unit with duplicate number on same floor', async () => {
+    const duplicateRental_Unit: Partial<Rental_unit> = {
+      name: 'Duplicate Rental_unit',
       number: 101,
       floor_id: 1,
       property_id: 1,
       capacity: 2,
-      room_status: 'VACANT',
+      rental_unit_status: 'VACANT',
       base_rate: 5000,
       type: 'SINGLE',
       amenities: []
     };
 
-    debugLog('Testing duplicate room creation', duplicateRoom);
-    const event = createMockRequestEvent(duplicateRoom);
+    debugLog('Testing duplicate rental_unit creation', duplicateRental_Unit);
+    const event = createMockRequestEvent(duplicateRental_Unit);
     const result = await actions.create(event) as ActionResult;
     debugLog('Create action result', result);
 
-    // Check for duplicate room error
+    // Check for duplicate rental_unit error
     expect(result).toEqual({
       status: 400,
       data: {
         form: expect.any(Object),
-        error: 'Room number already exists on this floor',
+        error: 'Rental_unit number already exists on this floor',
         details: 'unique_violation',
-        hint: 'Choose a different room number'
+        hint: 'Choose a different rental_unit number'
       }
     });
   });
 
   it('should fail when required fields are missing', async () => {
-    const invalidRoom: Partial<Room> = {
-      name: 'Invalid Room',
+    const invalidRental_Unit: Partial<Rental_unit> = {
+      name: 'Invalid Rental_unit',
       number: 103,
       capacity: 2
     };
 
-    debugLog('Testing invalid room creation', invalidRoom);
-    const event = createMockRequestEvent(invalidRoom);
+    debugLog('Testing invalid rental_unit creation', invalidRental_Unit);
+    const event = createMockRequestEvent(invalidRental_Unit);
     const result = await actions.create(event) as ActionResult;
     debugLog('Create action result', result);
 

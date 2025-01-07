@@ -13,14 +13,14 @@ type PostgrestResponse = {
   location_type: meter_location_type;
   property_id: number | null;
   floor_id: number | null;
-  rooms_id: number | null;
+  rental_unit_id: number | null;
   is_active: boolean;
   status: meter_status;
   initial_reading: number;
   unit_rate: number;
   notes: string | null;
   created_at: string;
-  room: {
+  rental_unit: {
     id: number;
     number: string;
     floor: {
@@ -64,14 +64,14 @@ export const load: PageServerLoad = async ({ locals }) => {
       location_type,
       property_id,
       floor_id,
-      rooms_id,
+      rental_unit_id,
       is_active,
       status,
       initial_reading,
       unit_rate,
       notes,
       created_at,
-      room:rooms (
+      rental_unit:rental_unit (
         id,
         number,
         floor:floors (
@@ -100,14 +100,14 @@ export const load: PageServerLoad = async ({ locals }) => {
     location_type: meter.location_type,
     property_id: meter.property_id,
     floor_id: meter.floor_id,
-    rooms_id: meter.rooms_id,
+    rental_unit_id: meter.rental_unit_id,
     is_active: meter.is_active,
     status: meter.status,
     initial_reading: meter.initial_reading,
     unit_rate: meter.unit_rate,
     notes: meter.notes,
     created_at: meter.created_at,
-    room: meter.room || undefined
+    rental_unit: meter.rental_unit || undefined
   }));
 
   const { data: latestReading } = await supabase

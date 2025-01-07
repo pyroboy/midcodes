@@ -11,7 +11,7 @@ type DBProperty = Database['public']['Tables']['properties']['Row'];
 
 type FloorsResponse = DBFloor & {
   property: Pick<DBProperty, 'id' | 'name'>;
-  rooms: Array<{
+  rental_unit: Array<{
     id: number;
     number: string;
   }>;
@@ -34,7 +34,7 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
           id,
           name
         ),
-        rooms:rooms!inner(
+        rental_unit:rental_unit!inner(
           id,
           number
         )
@@ -54,7 +54,7 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
       id: floor.property.id,
       name: floor.property.name
     },
-    rooms: floor.rooms || []
+    rental_unit: floor.rental_unit || []
   })) satisfies FloorWithProperty[];
 
   const properties = propertiesResult.data || [];

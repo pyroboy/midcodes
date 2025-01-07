@@ -7,7 +7,7 @@
   import { Tabs, TabsList, TabsTrigger, TabsContent } from '$lib/components/ui/tabs';
 
   interface PageData {
-    rooms: ServerRoom[];
+    rental_unit: ServerRental_Unit[];
     balances: Balance[];
     months: string[];
     lastMonthExpenses: Expense[];
@@ -18,12 +18,12 @@
   export let data: PageData;
 
   // Server response types
-  interface ServerRoom {
+  interface ServerRental_Unit {
     id: number;
     name: string;
     number: number;
     floor_number: number;
-    room_status: string;
+    rental_unit_status: string;
     property_id: number;
     leases: Array<{
       id: number;
@@ -42,12 +42,12 @@
     }>;
   }
 
-  interface Room {
+  interface Rental_unit {
     id: number;
     name: string;
     number: number;
     capacity: number;
-    room_status: 'VACANT' | 'OCCUPIED' | 'RESERVED';
+    rental_unit_status: 'VACANT' | 'OCCUPIED' | 'RESERVED';
     base_rate: number;
     property_id: number;
     floor_id: number;
@@ -103,7 +103,7 @@
     meters: Array<{
       id: number;
       name: string;
-      location_type: 'PROPERTY' | 'FLOOR' | 'ROOM';
+      location_type: 'PROPERTY' | 'FLOOR' | 'RENTAL_UNIT';
       type: 'ELECTRIC' | 'WATER' | 'GAS' | 'INTERNET';
       is_active: boolean;
       status: 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE';
@@ -149,17 +149,17 @@
     status: 'WITHIN_BUDGET' | 'OVER_BUDGET';
   }
 
-  // Convert server response to Room type
-  function convertToRoom(serverRoom: any): Room {
+  // Convert server response to Rental_unit type
+  function convertToRental_Unit(serverRental_Unit: any): Rental_unit {
     return {
-      ...serverRoom,
-      capacity: serverRoom.capacity || 0,
-      base_rate: serverRoom.base_rate || 0,
-      floor_id: serverRoom.floor_id || 0,
-      type: serverRoom.type || '',
-      amenities: serverRoom.amenities || {},
-      floors: serverRoom.floors || { floor_number: 0, wing: null, status: 'ACTIVE' },
-      leases: (serverRoom.leases || []).map((lease: any) => ({
+      ...serverRental_Unit,
+      capacity: serverRental_Unit.capacity || 0,
+      base_rate: serverRental_Unit.base_rate || 0,
+      floor_id: serverRental_Unit.floor_id || 0,
+      type: serverRental_Unit.type || '',
+      amenities: serverRental_Unit.amenities || {},
+      floors: serverRental_Unit.floors || { floor_number: 0, wing: null, status: 'ACTIVE' },
+      leases: (serverRental_Unit.leases || []).map((lease: any) => ({
         ...lease,
         name: lease.name || '',
         status: lease.status || lease.lease_status || 'ACTIVE',
@@ -201,7 +201,7 @@
           notes: ps.notes || null
         }))
       })),
-      meters: (serverRoom.meters || []).map((meter: any) => ({
+      meters: (serverRental_Unit.meters || []).map((meter: any) => ({
         id: meter.id,
         name: meter.name || '',
         location_type: meter.location_type || 'PROPERTY',
@@ -216,7 +216,7 @@
           reading_date: reading.reading_date || ''
         }))
       })),
-      maintenance: (serverRoom.maintenance || []).map((issue: any) => ({
+      maintenance: (serverRental_Unit.maintenance || []).map((issue: any) => ({
         id: issue.id,
         title: issue.title,
         description: issue.description,
@@ -227,11 +227,11 @@
     };
   }
 
-  // Group rooms by floor
-  $: roomsByFloor = data.rooms.map(convertToRoom).reduce<Record<number, Room[]>>((acc, room) => {
-    const floor = room.floors.floor_number;
+  // Group rental_unit by floor
+  $: rental_unitByFloor = data.rental_unit.map(convertToRental_Unit).reduce<Record<number, Rental_unit[]>>((acc, rental_unit) => {
+    const floor = rental_unit.floors.floor_number;
     if (!acc[floor]) acc[floor] = [];
-    acc[floor].push(room);
+    acc[floor].push(rental_unit);
     return acc;
   }, {});
 
@@ -242,17 +242,17 @@
     return acc;
   }, {});
 
-  // Calculate room statistics
-  $: roomStats = {
-    total: data.rooms.length,
-    occupied: data.rooms.filter(r => r.room_status === 'OCCUPIED').length,
-    vacant: data.rooms.filter(r => r.room_status === 'VACANT').length,
-    reserved: data.rooms.filter(r => r.room_status === 'RESERVED').length,
+  // Calculate rental_unit statistics
+  $: rental_unitStats = {
+    total: data.rental_unit.length,
+    occupied: data.rental_unit.filter(r => r.rental_unit_status === 'OCCUPIED').length,
+    vacant: data.rental_unit.filter(r => r.rental_unit_status === 'VACANT').length,
+    reserved: data.rental_unit.filter(r => r.rental_unit_status === 'RESERVED').length,
   };
 
   // Calculate financial statistics
-  $: financialStats = data.rooms.map(convertToRoom).reduce((acc, room) => {
-    room.leases.forEach(lease => {
+  $: financialStats = data.rental_unit.map(convertToRental_Unit).reduce((acc, rental_unit) => {
+    rental_unit.leases.forEach(lease => {
       acc.totalRent += lease.rent_amount;
       acc.totalDeposits += lease.security_deposit;
       acc.totalBalance += lease.balance;
@@ -339,25 +339,25 @@
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
     <Card.Root>
       <Card.Header>
-        <Card.Title>Room Statistics</Card.Title>
+        <Card.Title>Rental_unit Statistics</Card.Title>
       </Card.Header>
       <Card.Content>
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <p class="text-sm">Total Rooms</p>
-            <p class="text-2xl font-bold">{roomStats.total}</p>
+            <p class="text-sm">Total Rental_Units</p>
+            <p class="text-2xl font-bold">{rental_unitStats.total}</p>
           </div>
           <div>
             <p class="text-sm">Occupied</p>
-            <p class="text-2xl font-bold">{roomStats.occupied}</p>
+            <p class="text-2xl font-bold">{rental_unitStats.occupied}</p>
           </div>
           <div>
             <p class="text-sm">Vacant</p>
-            <p class="text-2xl font-bold">{roomStats.vacant}</p>
+            <p class="text-2xl font-bold">{rental_unitStats.vacant}</p>
           </div>
           <div>
             <p class="text-sm">Reserved</p>
-            <p class="text-2xl font-bold">{roomStats.reserved}</p>
+            <p class="text-2xl font-bold">{rental_unitStats.reserved}</p>
           </div>
         </div>
       </Card.Content>
@@ -460,7 +460,7 @@
     </TabsList>
 
     <TabsContent value="overview">
-      {#each Object.entries(roomsByFloor) as [floor, rooms]}
+      {#each Object.entries(rental_unitByFloor) as [floor, rental_unit]}
         <Card.Root class="mb-4">
           <Card.Header>
             <Card.Title>Floor {floor}</Card.Title>
@@ -469,7 +469,7 @@
             <Table.Root>
               <Table.Header>
                 <Table.Row>
-                  <Table.Head>Room</Table.Head>
+                  <Table.Head>Rental_unit</Table.Head>
                   <Table.Head>Type</Table.Head>
                   <Table.Head>Status</Table.Head>
                   <Table.Head>Tenant</Table.Head>
@@ -479,15 +479,15 @@
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                {#each rooms as room}
-                  {#each room.leases as lease}
+                {#each rental_unit as rental_unit}
+                  {#each rental_unit.leases as lease}
                     {#each lease.lease_tenants as { tenant }}
                       <Table.Row>
-                        <Table.Cell>{room.number}</Table.Cell>
-                        <Table.Cell>{room.type}</Table.Cell>
+                        <Table.Cell>{rental_unit.number}</Table.Cell>
+                        <Table.Cell>{rental_unit.type}</Table.Cell>
                         <Table.Cell>
-                          <Badge variant={getStatusVariant(room.room_status)}>
-                            {room.room_status}
+                          <Badge variant={getStatusVariant(rental_unit.rental_unit_status)}>
+                            {rental_unit.rental_unit_status}
                           </Badge>
                         </Table.Cell>
                         <Table.Cell>
@@ -498,7 +498,7 @@
                             {/if}
                           </div>
                         </Table.Cell>
-                        <Table.Cell>{formatCurrency(room.base_rate)}</Table.Cell>
+                        <Table.Cell>{formatCurrency(rental_unit.base_rate)}</Table.Cell>
                         <Table.Cell>
                           <Badge variant={lease.balance > 0 ? 'destructive' : 'default'}>
                             {formatCurrency(lease.balance)}
@@ -517,7 +517,7 @@
     </TabsContent>
 
     <TabsContent value="maintenance">
-      {#each Object.entries(roomsByFloor) as [floor, rooms]}
+      {#each Object.entries(rental_unitByFloor) as [floor, rental_unit]}
         <Card.Root class="mb-4">
           <Card.Header>
             <Card.Title>Floor {floor} - Maintenance Status</Card.Title>
@@ -526,7 +526,7 @@
             <Table.Root>
               <Table.Header>
                 <Table.Row>
-                  <Table.Head>Room</Table.Head>
+                  <Table.Head>Rental_unit</Table.Head>
                   <Table.Head>Issue</Table.Head>
                   <Table.Head>Description</Table.Head>
                   <Table.Head>Status</Table.Head>
@@ -534,10 +534,10 @@
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                {#each rooms as room}
-                  {#each room.maintenance as issue}
+                {#each rental_unit as rental_unit}
+                  {#each rental_unit.maintenance as issue}
                     <Table.Row>
-                      <Table.Cell>{room.number}</Table.Cell>
+                      <Table.Cell>{rental_unit.number}</Table.Cell>
                       <Table.Cell>{issue.title}</Table.Cell>
                       <Table.Cell>{issue.description}</Table.Cell>
                       <Table.Cell>
@@ -563,7 +563,7 @@
     </TabsContent>
 
     <TabsContent value="financial">
-      {#each Object.entries(roomsByFloor) as [floor, rooms]}
+      {#each Object.entries(rental_unitByFloor) as [floor, rental_unit]}
         <Card.Root class="mb-4">
           <Card.Header>
             <Card.Title>Floor {floor} - Financial Details</Card.Title>
@@ -573,7 +573,7 @@
               <Table.Root>
                 <Table.Header>
                   <Table.Row>
-                    <Table.Head>Room</Table.Head>
+                    <Table.Head>Rental_unit</Table.Head>
                     <Table.Head>Tenant</Table.Head>
                     {#each data.months as month}
                       <Table.Head>{month}</Table.Head>
@@ -581,11 +581,11 @@
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
-                  {#each rooms as room}
-                    {#each room.leases as lease}
+                  {#each rental_unit as rental_unit}
+                    {#each rental_unit.leases as lease}
                       {#each lease.lease_tenants as { tenant }}
                         <Table.Row>
-                          <Table.Cell>{room.number}</Table.Cell>
+                          <Table.Cell>{rental_unit.number}</Table.Cell>
                           <Table.Cell>{tenant.name}</Table.Cell>
                           {#each data.months as month}
                             <Table.Cell>
@@ -604,7 +604,7 @@
                 <Table.Root>
                   <Table.Header>
                     <Table.Row>
-                      <Table.Head>Room</Table.Head>
+                      <Table.Head>Rental_unit</Table.Head>
                       <Table.Head>Due Date</Table.Head>
                       <Table.Head>Amount</Table.Head>
                       <Table.Head>Type</Table.Head>
@@ -612,11 +612,11 @@
                     </Table.Row>
                   </Table.Header>
                   <Table.Body>
-                    {#each rooms as room}
-                      {#each room.leases as lease}
+                    {#each rental_unit as rental_unit}
+                      {#each rental_unit.leases as lease}
                         {#each lease.payment_schedules.filter(ps => new Date(ps.due_date) >= new Date()) as schedule}
                           <Table.Row>
-                            <Table.Cell>{room.number}</Table.Cell>
+                            <Table.Cell>{rental_unit.number}</Table.Cell>
                             <Table.Cell>{new Date(schedule.due_date).toLocaleDateString()}</Table.Cell>
                             <Table.Cell>{formatCurrency(schedule.expected_amount)}</Table.Cell>
                             <Table.Cell>{schedule.type}</Table.Cell>
@@ -639,7 +639,7 @@
     </TabsContent>
 
     <TabsContent value="utilities">
-      {#each Object.entries(roomsByFloor) as [floor, rooms]}
+      {#each Object.entries(rental_unitByFloor) as [floor, rental_unit]}
         <Card.Root class="mb-4">
           <Card.Header>
             <Card.Title>Floor {floor} - Utility Details</Card.Title>
@@ -648,7 +648,7 @@
             <Table.Root>
               <Table.Header>
                 <Table.Row>
-                  <Table.Head>Room</Table.Head>
+                  <Table.Head>Rental_unit</Table.Head>
                   <Table.Head>Meter</Table.Head>
                   <Table.Head>Type</Table.Head>
                   <Table.Head>Latest Reading</Table.Head>
@@ -657,10 +657,10 @@
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                {#each rooms as room}
-                  {#each room.meters as meter}
+                {#each rental_unit as rental_unit}
+                  {#each rental_unit.meters as meter}
                     <Table.Row>
-                      <Table.Cell>{room.number}</Table.Cell>
+                      <Table.Cell>{rental_unit.number}</Table.Cell>
                       <Table.Cell>{meter.name}</Table.Cell>
                       <Table.Cell>{meter.type}</Table.Cell>
                       <Table.Cell>

@@ -95,8 +95,8 @@
               <span>{property.floor_count}</span>
             </div>
             <div class="flex justify-between">
-              <span class="font-semibold">Rooms:</span>
-              <span>{property.room_count}</span>
+              <span class="font-semibold">Rental_Units:</span>
+              <span>{property.rental_unit_count}</span>
             </div>
             <div class="flex justify-between">
               <span class="font-semibold">Created:</span>
@@ -117,7 +117,7 @@
           <Button 
             variant="destructive" 
             on:click={() => deleteProperty(property)}
-            disabled={property.floor_count > 0 || property.room_count > 0}
+            disabled={property.floor_count > 0 || property.rental_unit_count > 0}
           >
             Delete
           </Button>

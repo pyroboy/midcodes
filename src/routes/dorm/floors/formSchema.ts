@@ -30,7 +30,7 @@ export interface Floor {
 }
 
 // Extended type with property relation
-export interface Room {
+export interface Rental_unit {
   id: number;
   number: string;
 }
@@ -40,5 +40,5 @@ export interface FloorWithProperty extends Floor {
     id: number;
     name: string;
   };
-  rooms: Room[];
+  rental_unit: Rental_unit[];
 }

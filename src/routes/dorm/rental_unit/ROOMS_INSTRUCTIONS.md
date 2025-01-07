@@ -1,18 +1,18 @@
-np# Room Management Module Instructions
+np# Rental_unit Management Module Instructions
 
 ## Overview
-The Room Management module is a core component of the dormitory management system that handles room operations and tracking. It enables staff to create, update, and manage rooms across different properties and floors, including their status, capacity, and rates.
+The Rental_unit Management module is a core component of the dormitory management system that handles rental_unit operations and tracking. It enables staff to create, update, and manage rental_unit across different properties and floors, including their status, capacity, and rates.
 
 ## Database Schema
 
-### Rooms Table
+### Rental_Units Table
 ```sql
-CREATE TABLE public.rooms (
+CREATE TABLE public.rental_unit (
     id integer NOT NULL DEFAULT nextval('locations_id_seq'::regclass),
     name text NOT NULL,
     number integer NOT NULL,
     capacity integer NOT NULL,
-    room_status location_status NOT NULL DEFAULT 'VACANT',
+    rental_unit_status location_status NOT NULL DEFAULT 'VACANT',
     base_rate numeric(10,2) NOT NULL,
     created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
     updated_at timestamp with time zone,
@@ -53,7 +53,7 @@ CREATE TABLE public.floors (
 
 ## Enums Used
 
-### location_status (room_status)
+### location_status (rental_unit_status)
 - VACANT
 - OCCUPIED
 - RESERVED
@@ -87,20 +87,20 @@ CREATE TABLE public.floors (
    - property_guest
 
 ### Access Level Permissions
-- **Admin**: Full CRUD operations on rooms
-- **Staff**: Create and update room information
-- **View**: Read-only access to room information
+- **Admin**: Full CRUD operations on rental_unit
+- **Staff**: Create and update rental_unit information
+- **View**: Read-only access to rental_unit information
 
 ## Core Features
 
-### 1. Room Management
-- Create new rooms with required details
-- Update existing room information
-- Delete rooms (with proper validation)
-- Track room status changes
+### 1. Rental_unit Management
+- Create new rental_unit with required details
+- Update existing rental_unit information
+- Delete rental_unit (with proper validation)
+- Track rental_unit status changes
 
-### 2. Room Properties
-- Room number assignment
+### 2. Rental_unit Properties
+- Rental_unit number assignment
 - Capacity configuration
 - Base rate setting
 - Amenities tracking
@@ -112,7 +112,7 @@ CREATE TABLE public.floors (
 - Wing specification (optional)
 
 ### 4. Data Validation
-- **Room Number**
+- **Rental_unit Number**
   - Must be unique within a floor
   - Required field
 - **Capacity**
@@ -127,15 +127,15 @@ CREATE TABLE public.floors (
 ## Data Input Flow
 
 ### User Input Sequence
-1. **Select Room Action**
-   - Create new room
-   - Edit existing room
-   - View room details
+1. **Select Rental_unit Action**
+   - Create new rental_unit
+   - Edit existing rental_unit
+   - View rental_unit details
 
-2. **Enter Room Details**
+2. **Enter Rental_unit Details**
    - Property selection
    - Floor selection
-   - Room information:
+   - Rental_unit information:
      - Name
      - Number
      - Type
@@ -168,21 +168,21 @@ graph TD
 
 ### Required Files
 1. **+page.server.ts**
-   - Load room data with relations
+   - Load rental_unit data with relations
    - Handle form actions:
-     - Create room
-     - Update room
-     - Delete room
+     - Create rental_unit
+     - Update rental_unit
+     - Delete rental_unit
    - Validate input data
    - Manage database operations
 
 2. **+page.svelte**
-   - Display room list
-   - Handle room selection
+   - Display rental_unit list
+   - Handle rental_unit selection
    - Manage edit/create modes
    - Status indicators
 
-3. **RoomForm.svelte**
+3. **Rental_UnitForm.svelte**
    - Form input fields
    - Validation feedback
    - Property/Floor selection
@@ -195,16 +195,16 @@ graph TD
 
 ### Form Implementation
 ```typescript
-const roomSchema = z.object({
+const rental_unitSchema = z.object({
   id: z.number().optional(),
   property_id: z.number(),
   floor_id: z.number(),
-  name: z.string().min(1, 'Room name is required'),
-  number: z.number().min(1, 'Room number is required'),
-  room_status: z.enum(['VACANT', 'OCCUPIED', 'RESERVED']),
+  name: z.string().min(1, 'Rental_unit name is required'),
+  number: z.number().min(1, 'Rental_unit number is required'),
+  rental_unit_status: z.enum(['VACANT', 'OCCUPIED', 'RESERVED']),
   capacity: z.number().min(1, 'Capacity must be at least 1'),
   base_rate: z.number().min(0, 'Rate must be 0 or greater'),
-  type: z.string().min(1, 'Room type is required'),
+  type: z.string().min(1, 'Rental_unit type is required'),
   amenities: z.array(z.string()).default([])
 });
 ```
@@ -213,12 +213,12 @@ const roomSchema = z.object({
 1. Use proper indexing on:
    - property_id
    - floor_id
-   - room_number
+   - rental_unit_number
 2. Implement efficient filtering and sorting
-3. Cache frequently accessed room data
+3. Cache frequently accessed rental_unit data
 
 ## Security Considerations
 1. Validate all user inputs
 2. Implement proper access control
 3. Sanitize data before display
-4. Log all room status changes
+4. Log all rental_unit status changes

@@ -66,7 +66,7 @@ export const selectMock = {
   Item: vi.fn(() => createMockComponent())
 };
 
-export const roomFormMock = {
+export const rental_unitFormMock = {
   default: vi.fn(() => createMockComponent())
 };
 
@@ -81,7 +81,7 @@ export const superformsClientMock = {
           type: 'SINGLE',
           property_id: 0,
           floor_id: 0,
-          room_status: 'VACANT',
+          rental_unit_status: 'VACANT',
           capacity: 1,
           base_rate: 0,
           amenities: []

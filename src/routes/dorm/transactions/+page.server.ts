@@ -40,7 +40,7 @@ export const load: PageServerLoad = async ({ locals }) => {
         lease:leases (
           id,
           name,
-          room:rooms (
+          rental_unit:rental_unit (
             id,
             name,
             number,

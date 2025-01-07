@@ -4,8 +4,8 @@ This document provides instructions for integrating the new database schema migr
 
 ## General Changes
 
-1. Update all references from `locations` to `rooms`
-2. Update all references from `status` to `room_status` when dealing with room status
+1. Update all references from `locations` to `rental_unit`
+2. Update all references from `status` to `rental_unit_status` when dealing with rental_unit status
 3. Ensure all database queries use the new table and column names
 4. Add RLS policy awareness to all routes:
    - Use proper role-based access control
@@ -18,19 +18,19 @@ This document provides instructions for integrating the new database schema migr
 
 ## Route-Specific Instructions
 
-### `/dorm/locations` → `/dorm/rooms`
+### `/dorm/locations` → `/dorm/rental_unit`
 
-1. Rename the directory from `locations` to `rooms`
+1. Rename the directory from `locations` to `rental_unit`
 2. Update `+page.server.ts`:
    ```typescript
    // Change queries from
    const { data: locations } = await supabase.from('locations').select('*')
    // to
-   const { data: rooms } = await supabase.from('rooms').select('*')
+   const { data: rental_unit } = await supabase.from('rental_unit').select('*')
    ```
 3. Update `+page.svelte`:
-   - Rename all variables and references from `location` to `room`
-   - Update form fields to use `room_status` instead of `status`
+   - Rename all variables and references from `location` to `rental_unit`
+   - Update form fields to use `rental_unit_status` instead of `status`
    - Add role-based UI controls:
      ```typescript
      {#if isAdminLevel}
@@ -39,8 +39,8 @@ This document provides instructions for integrating the new database schema migr
        <!-- Show staff controls -->
      {/if}
      ```
-4. Rename `LocationForm.svelte` to `RoomForm.svelte` and update its contents
-5. Rename `RandomLocation.svelte` to `RandomRoom.svelte` and update its contents
+4. Rename `LocationForm.svelte` to `Rental_UnitForm.svelte` and update its contents
+5. Rename `RandomLocation.svelte` to `RandomRental_Unit.svelte` and update its contents
 6. Implement RLS policies:
    - Admin levels: Full access
    - Staff: View access
@@ -57,14 +57,14 @@ This document provides instructions for integrating the new database schema migr
    // to
    const { data: leases } = await supabase
      .from('leases')
-     .select('*, room:rooms(*)')
+     .select('*, rental_unit:rental_unit(*)')
    ```
 2. Update `+page.svelte`:
-   - Update form references from `location_id` to `room_id`
-   - Update display of room information
+   - Update form references from `location_id` to `rental_unit_id`
+   - Update display of rental_unit information
    - Add role-based UI controls
 3. Update `LeaseList.svelte`:
-   - Change location references to room references
+   - Change location references to rental_unit references
    - Add tenant-specific filtering
 4. Update `formSchema.ts`:
    - Update validation schema to reflect new field names
@@ -85,13 +85,13 @@ This document provides instructions for integrating the new database schema migr
    // to
    const { data: meters } = await supabase
      .from('meters')
-     .select('*, room:rooms(*)')
+     .select('*, rental_unit:rental_unit(*)')
    ```
 2. Update `+page.svelte`:
-   - Change location selection to room selection
+   - Change location selection to rental_unit selection
    - Add role-based UI controls
 3. Update `MeterForm.svelte`:
-   - Update form fields from `location_id` to `room_id`
+   - Update form fields from `location_id` to `rental_unit_id`
    - Update labels and references
 4. Implement RLS policies:
    - Admin and Utility: Full access
@@ -101,16 +101,16 @@ This document provides instructions for integrating the new database schema migr
 ### `/dorm/readings`
 
 1. Update `schema.ts`:
-   - Update types to reflect new room terminology
+   - Update types to reflect new rental_unit terminology
 2. Update `+page.server.ts`:
    ```typescript
-   // Update queries to use new room references and respect RLS
+   // Update queries to use new rental_unit references and respect RLS
    const { data: readings } = await supabase
      .from('readings')
-     .select('*, meter:meters(*, room:rooms(*))')
+     .select('*, meter:meters(*, rental_unit:rental_unit(*))')
    ```
 3. Update `+page.svelte`:
-   - Update display of room information
+   - Update display of rental_unit information
    - Update form references
    - Add role-based UI controls
 4. Implement RLS policies:
@@ -122,13 +122,13 @@ This document provides instructions for integrating the new database schema migr
 
 1. Update `+page.server.ts`:
    ```typescript
-   // Update queries to use new room references and respect RLS
+   // Update queries to use new rental_unit references and respect RLS
    const { data: billings } = await supabase
      .from('billings')
-     .select('*, lease:leases(*, room:rooms(*))')
+     .select('*, lease:leases(*, rental_unit:rental_unit(*))')
    ```
 2. Update `+page.svelte`:
-   - Update room information display
+   - Update rental_unit information display
    - Update billing form references
    - Add role-based UI controls
 3. Implement RLS policies:
@@ -141,13 +141,13 @@ This document provides instructions for integrating the new database schema migr
 
 1. Update `+page.server.ts`:
    ```typescript
-   // Update queries to include room information and respect RLS
+   // Update queries to include rental_unit information and respect RLS
    const { data: tenants } = await supabase
      .from('lease_tenants')
-     .select('*, tenant:tenants(*), lease:leases(*, room:rooms(*))')
+     .select('*, tenant:tenants(*), lease:leases(*, rental_unit:rental_unit(*))')
    ```
 2. Update `+page.svelte` and `TenantList.svelte`:
-   - Update room information display
+   - Update rental_unit information display
    - Add role-based UI controls
 3. Implement RLS policies:
    - Admin levels: Full access
@@ -159,13 +159,13 @@ This document provides instructions for integrating the new database schema migr
 
 1. Update `+page.server.ts`:
    ```typescript
-   // Update payment queries to include room information and respect RLS
+   // Update payment queries to include rental_unit information and respect RLS
    const { data: payments } = await supabase
      .from('payments')
-     .select('*, billing:billings(*, lease:leases(*, room:rooms(*)))')
+     .select('*, billing:billings(*, lease:leases(*, rental_unit:rental_unit(*)))')
    ```
 2. Update `+page.svelte` and `TransactionList.svelte`:
-   - Update room information display
+   - Update rental_unit information display
    - Add role-based UI controls
 3. Implement RLS policies:
    - Admin and Accountant: Full access
@@ -177,13 +177,13 @@ This document provides instructions for integrating the new database schema migr
 
 1. Update `+page.server.ts`:
    ```typescript
-   // Update queries to use rooms instead of locations and respect RLS
-   const { data: roomStats } = await supabase
-     .from('rooms')
+   // Update queries to use rental_unit instead of locations and respect RLS
+   const { data: rental_unitStats } = await supabase
+     .from('rental_unit')
      .select('*')
    ```
 2. Update `+page.svelte`:
-   - Update statistics and charts to use room terminology
+   - Update statistics and charts to use rental_unit terminology
    - Add role-based UI controls
 3. Implement RLS policies:
    - Admin levels: Full access
@@ -305,7 +305,7 @@ This document provides instructions for integrating the new database schema migr
    // Update queries to use billings table instead of accounts
    const { data: billings } = await supabase
      .from('billings')
-     .select('*, lease:leases(*, room:rooms(*), tenant:tenants(*))')
+     .select('*, lease:leases(*, rental_unit:rental_unit(*), tenant:tenants(*))')
    ```
 
 3. Update `+page.svelte`:
@@ -330,7 +330,7 @@ This document provides instructions for integrating the new database schema migr
    - Added penalty amount support
    - Enhanced date handling for billing and due dates
    - Dynamic balance calculation based on amount and paidAmount
-   - Better integration with leases, rooms, and tenants
+   - Better integration with leases, rental_unit, and tenants
 
 ### Testing Instructions
 
@@ -355,7 +355,7 @@ This document provides instructions for integrating the new database schema migr
 
 3. Verify Data Relationships:
    - Properties appear in floor creation form
-   - Floor updates reflect in room management
+   - Floor updates reflect in rental_unit management
    - Status changes propagate correctly
 
 4. UI/UX Testing:
@@ -392,25 +392,25 @@ This document provides instructions for integrating the new database schema migr
 Update your database types file (if exists) to reflect the new schema:
 
 ```typescript
-interface Room {
+interface Rental_unit {
   id: number
   name: string
   floor_level: number
   capacity: number
-  room_status: 'VACANT' | 'OCCUPIED' | 'RESERVED'
+  rental_unit_status: 'VACANT' | 'OCCUPIED' | 'RESERVED'
   base_rate: number
   created_at: string
   updated_at: string | null
 }
 
-// Update all references to Location with Room
+// Update all references to Location with Rental_unit
 type Database = {
   public: {
     Tables: {
-      rooms: {
-        Row: Room
-        Insert: Omit<Room, 'id' | 'created_at' | 'updated_at'>
-        Update: Partial<Omit<Room, 'id' | 'created_at' | 'updated_at'>>
+      rental_unit: {
+        Row: Rental_unit
+        Insert: Omit<Rental_unit, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<Rental_unit, 'id' | 'created_at' | 'updated_at'>>
       }
       // ... other tables
     }
@@ -449,8 +449,8 @@ In case of issues, the following rollback steps can be taken:
 
 1. Revert the second migration:
    ```sql
-   ALTER TABLE public.rooms RENAME TO locations;
-   ALTER TABLE public.locations RENAME COLUMN room_status TO status;
+   ALTER TABLE public.rental_unit RENAME TO locations;
+   ALTER TABLE public.locations RENAME COLUMN rental_unit_status TO status;
    ```
 2. Update all code changes back to original names
 3. Restore original indexes and constraints

@@ -13,7 +13,7 @@ CREATE TABLE public.meters (
     location_type meter_location_type NOT NULL,
     property_id integer,
     floor_id integer,
-    rooms_id integer,
+    rental_unit_id integer,
     type utility_type NOT NULL,
     is_active boolean DEFAULT true,
     status meter_status NOT NULL DEFAULT 'ACTIVE',
@@ -40,7 +40,7 @@ CREATE TABLE public.readings (
 ### meter_location_type
 - PROPERTY
 - FLOOR
-- ROOM
+- RENTAL_UNIT
 
 ### meter_status
 - ACTIVE
@@ -74,7 +74,7 @@ CREATE TABLE public.readings (
 ### 1. Meter Management
 - Track utility types (ELECTRICITY, WATER, INTERNET)
 - Maintain meter status (ACTIVE, INACTIVE, MAINTENANCE)
-- Support different location types (PROPERTY, FLOOR, ROOM)
+- Support different location types (PROPERTY, FLOOR, RENTAL_UNIT)
 - Track initial readings and unit rates
 
 ### 2. Reading Records
@@ -97,7 +97,7 @@ CREATE TABLE public.readings (
 ### User Input Sequence
 1. **Select Filters**
    - Choose Utility Type (ELECTRICITY/WATER/INTERNET)
-   - Choose Location Type (PROPERTY/FLOOR/ROOM)
+   - Choose Location Type (PROPERTY/FLOOR/RENTAL_UNIT)
    - System filters and displays relevant meters
 
 2. **Enter Reading Details**
@@ -193,7 +193,7 @@ const readingFormSchema = z.object({
 
 2. **Filter Section**
    - Meter type selection (ELECTRICITY/WATER/INTERNET)
-   - Location type filter (PROPERTY/FLOOR/ROOM)
+   - Location type filter (PROPERTY/FLOOR/RENTAL_UNIT)
    - Date selection
 
 3. **Reading Entry Section**

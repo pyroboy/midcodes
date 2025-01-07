@@ -5,7 +5,7 @@ import { toMatchImageSnapshot } from 'jest-image-snapshot';
 import Page from '../+page.svelte';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import type { ServerLoadEvent } from '@sveltejs/kit';
-import type { Room, Property, Floor } from '../formSchema';
+import type { Rental_unit, Property, Floor } from '../formSchema';
 import type { SuperValidated } from 'sveltekit-superforms';
 import type { UserRole } from '$lib/auth/roleConfig';
 import type { SessionWithAuth, ServerProfile } from '$lib/types/auth';
@@ -26,7 +26,7 @@ const normalizeSnapshot = (html: string): string => {
 
 interface PageData {
   user: User & { role: string };
-  rooms: Room[];
+  rental_unit: Rental_unit[];
   properties: Property[];
   floors: Floor[];
   form: SuperValidated<any>;
@@ -37,7 +37,7 @@ configureTestEnv();
 expect.extend({ toMatchImageSnapshot });
 
 type RouteParams = Record<string, string>;
-type TypedServerLoadEvent = ServerLoadEvent<RouteParams, PageParentData, "/dorm/rooms">;
+type TypedServerLoadEvent = ServerLoadEvent<RouteParams, PageParentData, "/dorm/rental_unit">;
 
 const mockFormData: SuperValidated<any> = {
   id: 'test-form',
@@ -49,13 +49,13 @@ const mockFormData: SuperValidated<any> = {
 };
 
 // Mock data using imported types
-const mockRooms: Room[] = [
+const mockRental_Units: Rental_unit[] = [
   {
     id: 1,
-    name: 'Test Room 101',
+    name: 'Test Rental_unit 101',
     number: 101,
     capacity: 1,
-    room_status: 'VACANT',
+    rental_unit_status: 'VACANT',
     base_rate: 5000,
     property_id: 1,
     floor_id: 1,
@@ -76,16 +76,16 @@ const mockRooms: Room[] = [
   }
 ];
 
-const mockEmptyRooms: Room[] = [];
+const mockEmptyRental_Units: Rental_unit[] = [];
 
-const mockLoadedRooms: Room[] = [
-  ...mockRooms,
+const mockLoadedRental_Units: Rental_unit[] = [
+  ...mockRental_Units,
   {
     id: 2,
-    name: 'Test Room 102',
+    name: 'Test Rental_unit 102',
     number: 102,
     capacity: 2,
-    room_status: 'OCCUPIED',
+    rental_unit_status: 'OCCUPIED',
     base_rate: 6000,
     property_id: 1,
     floor_id: 1,
@@ -212,7 +212,7 @@ const mockSupabaseClient = {
       eq: vi.fn().mockReturnValue({
         order: vi.fn().mockImplementation(() => {
           return Promise.resolve(createSupabaseResponse(
-            table === 'rooms' ? mockRooms :
+            table === 'rental_unit' ? mockRental_Units :
             table === 'properties' ? mockProperties :
             table === 'floors' ? mockFloors :
             []
@@ -225,7 +225,7 @@ const mockSupabaseClient = {
       }),
       order: vi.fn().mockImplementation(() => {
         return Promise.resolve(createSupabaseResponse(
-          table === 'rooms' ? mockRooms :
+          table === 'rental_unit' ? mockRental_Units :
           table === 'properties' ? mockProperties :
           table === 'floors' ? mockFloors :
           []
@@ -296,15 +296,15 @@ vi.mock('$app/stores', () => ({
   }
 }));
 
-const createPageData = (rooms: Room[] = mockRooms): PageData => ({
+const createPageData = (rental_unit: Rental_unit[] = mockRental_Units): PageData => ({
   user: mockAdminUser,
-  rooms,
+  rental_unit,
   properties: mockProperties,
   floors: mockFloors,
   form: mockFormData,
 });
 
-describe('Room Management UI Snapshots', () => {
+describe('Rental_unit Management UI Snapshots', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     cleanup();
@@ -316,7 +316,7 @@ describe('Room Management UI Snapshots', () => {
     vi.useRealTimers();
   });
 
-  it('should match snapshot of default room listing view', () => {
+  it('should match snapshot of default rental_unit listing view', () => {
     const { container } = render(Page, {
       props: {
         data: createPageData()
@@ -325,19 +325,19 @@ describe('Room Management UI Snapshots', () => {
     expect(normalizeSnapshot(container.innerHTML)).toMatchSnapshot();
   });
 
-  it('should match snapshot of empty room listing view', () => {
+  it('should match snapshot of empty rental_unit listing view', () => {
     const { container } = render(Page, {
       props: {
-        data: createPageData(mockEmptyRooms)
+        data: createPageData(mockEmptyRental_Units)
       }
     });
     expect(normalizeSnapshot(container.innerHTML)).toMatchSnapshot();
   });
 
-  it('should match snapshot of populated room listing view', () => {
+  it('should match snapshot of populated rental_unit listing view', () => {
     const { container } = render(Page, {
       props: {
-        data: createPageData(mockLoadedRooms)
+        data: createPageData(mockLoadedRental_Units)
       }
     });
     expect(normalizeSnapshot(container.innerHTML)).toMatchSnapshot();

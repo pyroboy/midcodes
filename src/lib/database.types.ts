@@ -108,13 +108,13 @@ export type Database = {
           updated_at?: string | null
         }
       }
-      rooms: {
+      rental_unit: {
         Row: {
           id: number
           name: string
           number: number
           capacity: number
-          room_status: Database['public']['Enums']['location_status']
+          rental_unit_status: Database['public']['Enums']['location_status']
           base_rate: number
           created_at: string
           updated_at: string | null
@@ -128,7 +128,7 @@ export type Database = {
           name: string
           number: number
           capacity: number
-          room_status?: Database['public']['Enums']['location_status']
+          rental_unit_status?: Database['public']['Enums']['location_status']
           base_rate: number
           created_at?: string
           updated_at?: string | null
@@ -142,7 +142,7 @@ export type Database = {
           name?: string
           number?: number
           capacity?: number
-          room_status?: Database['public']['Enums']['location_status']
+          rental_unit_status?: Database['public']['Enums']['location_status']
           base_rate?: number
           created_at?: string
           updated_at?: string | null

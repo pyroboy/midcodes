@@ -37,7 +37,7 @@ CREATE TABLE public.payments (
 - View comprehensive list of all payments
   - Filter by date range
   - Filter by payment method
-  - Search by tenant or room
+  - Search by tenant or rental_unit
   - Sort by various fields
   - Export transaction data
 
@@ -47,7 +47,7 @@ CREATE TABLE public.payments (
   - Reference numbers
   - Receipt information
   - Related billing details
-  - Tenant and room information
+  - Tenant and rental_unit information
 
 ### 3. Receipt Management
 - View payment receipts

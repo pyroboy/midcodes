@@ -1,7 +1,7 @@
 # Tenant Management Module Instructions
 
 ## Overview
-The Tenant Management module is a core component of the dormitory management system that handles tenant operations, including tenant registration, contract management, and room assignments. It enables staff to create, update, and manage tenant information while maintaining proper relationships with rooms and properties.
+The Tenant Management module is a core component of the dormitory management system that handles tenant operations, including tenant registration, contract management, and rental_unit assignments. It enables staff to create, update, and manage tenant information while maintaining proper relationships with rental_unit and properties.
 
 ## Database Schema
 
@@ -109,14 +109,14 @@ CREATE TABLE public.payments (
 
 ### Related Tables
 
-#### Rooms Table
+#### Rental_Units Table
 ```sql
-CREATE TABLE public.rooms (
+CREATE TABLE public.rental_unit (
     id integer NOT NULL DEFAULT nextval('locations_id_seq'::regclass),
     name text NOT NULL,
     number integer NOT NULL,
     capacity integer NOT NULL,
-    room_status location_status NOT NULL DEFAULT 'VACANT',
+    rental_unit_status location_status NOT NULL DEFAULT 'VACANT',
     base_rate numeric(10,2) NOT NULL,
     created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
     updated_at timestamp with time zone,
@@ -173,7 +173,7 @@ CREATE TYPE lease_status AS ENUM (
     'TERMINATED'
 );
 
--- Room Status (location_status)
+-- Rental_unit Status (location_status)
 CREATE TYPE location_status AS ENUM (
     'VACANT',
     'OCCUPIED',
@@ -279,11 +279,11 @@ CREATE TYPE user_role AS ENUM (
 - Manage tenant status changes
 - Handle emergency contact information
 
-### 2. Room Assignment
-- Property selection with filtered rooms
-- Room status management
+### 2. Rental_unit Assignment
+- Property selection with filtered rental_unit
+- Rental_unit status management
 - Automatic status updates
-- Property-based room filtering
+- Property-based rental_unit filtering
 
 ### 3. Contract Management
 - Contract date validation
@@ -301,12 +301,12 @@ CREATE TYPE user_role AS ENUM (
 
 ### Create/Update Flow
 1. Property Selection
-   - Triggers room list filtering
-   - Updates available rooms
+   - Triggers rental_unit list filtering
+   - Updates available rental_unit
 
-2. Room Assignment
-   - Validates room availability
-   - Updates room status
+2. Rental_unit Assignment
+   - Validates rental_unit availability
+   - Updates rental_unit status
 
 3. User Association
    - Links to profile
@@ -318,10 +318,10 @@ CREATE TYPE user_role AS ENUM (
 
 5. Status Management
    - Updates tenant status
-   - Handles room status changes
+   - Handles rental_unit status changes
 
-### Room Status Flow
-1. Room Selection
+### Rental_unit Status Flow
+1. Rental_unit Selection
 2. Status Validation
 3. Status Update
 4. Error Handling
@@ -345,8 +345,8 @@ CREATE TYPE user_role AS ENUM (
    - Required phone numbers
    - Complete addresses
 
-4. Room Assignment
-   - Room availability
+4. Rental_unit Assignment
+   - Rental_unit availability
    - Property association
    - Status compatibility
 
@@ -381,7 +381,7 @@ CREATE TYPE user_role AS ENUM (
 ## UI/UX Guidelines
 
 ### List View
-- Tenant name and room
+- Tenant name and rental_unit
 - Contract dates
 - Tenant status
 - Monthly rate
@@ -394,7 +394,7 @@ CREATE TYPE user_role AS ENUM (
 
 ### Form View
 - Logical field grouping
-- Dynamic room selection
+- Dynamic rental_unit selection
 - Clear validation feedback
 - Status change confirmation
 - Cancel/Save actions

@@ -4,14 +4,14 @@
   import Label from '$lib/components/ui/label/label.svelte';
   import * as Select from "$lib/components/ui/select";
   import { createEventDispatcher } from 'svelte';
-  import type { Room } from './formSchema';
+  import type { Rental_unit } from './formSchema';
   import { locationStatusEnum } from './formSchema';
   import type { SuperForm } from 'sveltekit-superforms';
   import type { z } from 'zod';
-  import type { roomSchema } from './formSchema';
+  import type { rental_unitSchema } from './formSchema';
 
   interface PageData {
-    rooms: Array<Room & {
+    rental_unit: Array<Rental_unit & {
       property: { name: string };
       floor: { floor_number: number; wing?: string };
     }>;
@@ -26,13 +26,13 @@
 
   export let data: PageData;
   export let editMode = false;
-  export let form: SuperForm<z.infer<typeof roomSchema>>['form'];
-  export let errors: SuperForm<z.infer<typeof roomSchema>>['errors'];
-  export let enhance: SuperForm<z.infer<typeof roomSchema>>['enhance'];
-  export let constraints: SuperForm<z.infer<typeof roomSchema>>['constraints'];
+  export let form: SuperForm<z.infer<typeof rental_unitSchema>>['form'];
+  export let errors: SuperForm<z.infer<typeof rental_unitSchema>>['errors'];
+  export let enhance: SuperForm<z.infer<typeof rental_unitSchema>>['enhance'];
+  export let constraints: SuperForm<z.infer<typeof rental_unitSchema>>['constraints'];
 
   const dispatch = createEventDispatcher();
-  const roomTypes = ['SINGLE', 'DOUBLE', 'TRIPLE', 'QUAD', 'SUITE'] as const;
+  const rental_unitTypes = ['SINGLE', 'DOUBLE', 'TRIPLE', 'QUAD', 'SUITE'] as const;
 
   function handleFormSubmit(event: Event) {
     event.preventDefault();
@@ -88,7 +88,7 @@
     if (s?.value) {
       $form = {
         ...$form,
-        room_status: s.value as typeof locationStatusEnum._type
+        rental_unit_status: s.value as typeof locationStatusEnum._type
       };
     }
   }
@@ -261,7 +261,7 @@
         <Select.Value placeholder="Select a type" />
       </Select.Trigger>
       <Select.Content>
-        {#each roomTypes as type}
+        {#each rental_unitTypes as type}
           <Select.Item value={type}>
             {type}
           </Select.Item>
@@ -310,17 +310,17 @@
   </div>
 
   <div class="space-y-2">
-    <Label for="room_status">Status</Label>
+    <Label for="rental_unit_status">Status</Label>
     <Select.Root    
       selected={{ 
-        value: $form.room_status || '', 
-        label: $form.room_status || 'Select a status' 
+        value: $form.rental_unit_status || '', 
+        label: $form.rental_unit_status || 'Select a status' 
       }}
       onSelectedChange={handleStatusChange}
     >
       <Select.Trigger 
-        data-error={$errors.room_status && $form.room_status !== undefined}
-        {...$constraints.room_status}
+        data-error={$errors.rental_unit_status && $form.rental_unit_status !== undefined}
+        {...$constraints.rental_unit_status}
       >
         <Select.Value placeholder="Select a status" />
       </Select.Trigger>
@@ -332,8 +332,8 @@
         {/each}
       </Select.Content>
     </Select.Root>
-    {#if $errors.room_status && $form.room_status !== undefined}
-      <p class="text-sm font-medium text-destructive">{$errors.room_status}</p>
+    {#if $errors.rental_unit_status && $form.rental_unit_status !== undefined}
+      <p class="text-sm font-medium text-destructive">{$errors.rental_unit_status}</p>
     {/if}
   </div>
 
@@ -376,7 +376,7 @@
 
   <div class="flex justify-end space-x-2">
     <Button type="submit">
-      {editMode ? 'Update' : 'Add'} Room
+      {editMode ? 'Update' : 'Add'} Rental_unit
     </Button>
     {#if editMode}
       <Button type="button" variant="destructive" on:click={handleCancel}>

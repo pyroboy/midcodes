@@ -26,7 +26,7 @@ The Payments module manages all financial transactions within the dormitory mana
 
 - **View Payments**
   - Display comprehensive payment information
-  - Show related property, floor, and room details
+  - Show related property, floor, and rental_unit details
   - Present payment status with visual indicators
   - Support read-only mode for non-administrative users
 
@@ -184,7 +184,7 @@ CREATE TYPE utility_type AS ENUM (
 - Show key payment information:
   - Amount and status
   - Payment method with visual indicators
-  - Property, floor, and room details
+  - Property, floor, and rental_unit details
   - Reference numbers and receipts
   - Payment dates
   - Notes (if any)

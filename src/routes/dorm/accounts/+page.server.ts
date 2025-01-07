@@ -17,7 +17,7 @@ export const load = async () => {
       *,
       lease:leases (
         *,
-        room:rooms (*),
+        rental_unit:rental_unit (*),
         lease_tenants (
           tenant:tenants (*)
         )
@@ -35,7 +35,7 @@ export const load = async () => {
     .from('leases')
     .select(`
       *,
-      room:rooms (*),
+      rental_unit:rental_unit (*),
       lease_tenants (
         tenant:tenants (*)
       )

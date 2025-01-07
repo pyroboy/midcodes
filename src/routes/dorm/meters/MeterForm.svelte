@@ -16,14 +16,14 @@
   type Floor = Database['public']['Tables']['floors']['Row'] & {
     property: Property | null;
   };
-  type Room = Database['public']['Tables']['rooms']['Row'] & {
+  type Rental_unit = Database['public']['Tables']['rental_unit']['Row'] & {
     floor: Floor | null;
   };
 
   export let form: SuperValidated<MeterFormData, any>;
   export let properties: Property[] = [];
   export let floors: Floor[] = [];
-  export let rooms: Room[] = [];
+  export let rental_unit: Rental_unit[] = [];
   export let meter: MeterFormData | undefined = undefined;
 
   const dispatch = createEventDispatcher<{
@@ -55,9 +55,9 @@
       case 'FLOOR':
         const floor = floors.find(f => f.id === id);
         return floor ? `${floor.property?.name || ''} - Floor ${floor.floor_number} ${floor.wing || ''}` : '';
-      case 'ROOM':
-        const room = rooms.find(r => r.id === id);
-        return room ? `${room.floor?.property?.name || ''} - Floor ${room.floor?.floor_number || ''} - Room ${room.number}` : '';
+      case 'RENTAL_UNIT':
+        const rental_unit = rental_unit.find(r => r.id === id);
+        return rental_unit ? `${rental_unit.floor?.property?.name || ''} - Floor ${rental_unit.floor?.floor_number || ''} - Rental_unit ${rental_unit.number}` : '';
       default:
         return '';
     }
@@ -65,21 +65,21 @@
 
   $: filteredProperties = properties.filter(p => p.status === 'ACTIVE');
   $: filteredFloors = floors.filter(f => f.status === 'ACTIVE');
-  $: filteredRooms = rooms.filter(r => r.room_status === 'VACANT' || r.room_status === 'OCCUPIED');
+  $: filteredRental_Units = rental_unit.filter(r => r.rental_unit_status === 'VACANT' || r.rental_unit_status === 'OCCUPIED');
 
   $: locationLabel = $formData.location_type ? 
     getLocationLabel($formData.location_type, 
       $formData.location_type === 'PROPERTY' ? Number($formData.property_id) : 
       $formData.location_type === 'FLOOR' ? Number($formData.floor_id) : 
-      Number($formData.rooms_id)
+      Number($formData.rental_unit_id)
     ) : '';
 
   function handleLocationTypeChange(type: string) {
-    if (type === 'PROPERTY' || type === 'FLOOR' || type === 'ROOM') {
+    if (type === 'PROPERTY' || type === 'FLOOR' || type === 'RENTAL_UNIT') {
       $formData.location_type = type;
       $formData.property_id = null;
       $formData.floor_id = null;
-      $formData.rooms_id = null;
+      $formData.rental_unit_id = null;
     }
   }
 
@@ -92,8 +92,8 @@
       case 'FLOOR':
         $formData.floor_id = numId;
         break;
-      case 'ROOM':
-        $formData.rooms_id = numId;
+      case 'RENTAL_UNIT':
+        $formData.rental_unit_id = numId;
         break;
     }
   }
@@ -132,7 +132,7 @@
         <Select.Content>
           <Select.Item value="PROPERTY">Property</Select.Item>
           <Select.Item value="FLOOR">Floor</Select.Item>
-          <Select.Item value="ROOM">Room</Select.Item>
+          <Select.Item value="RENTAL_UNIT">Rental_unit</Select.Item>
         </Select.Content>
       </Select.Root>
       {#if $errors.location_type}<span class="text-red-500">{$errors.location_type}</span>{/if}
@@ -190,13 +190,13 @@
         </Select.Root>
         {#if $errors.floor_id}<span class="text-red-500">{$errors.floor_id}</span>{/if}
       </div>
-    {:else if $formData.location_type === 'ROOM'}
+    {:else if $formData.location_type === 'RENTAL_UNIT'}
       <div>
-        <Label for="rooms_id">Room</Label>
+        <Label for="rental_unit_id">Rental_unit</Label>
         <Select.Root
           selected={{
-            label: $formData.rooms_id ? getLocationLabel('ROOM', Number($formData.rooms_id)) : 'Select room',
-            value: $formData.rooms_id?.toString() || ''
+            label: $formData.rental_unit_id ? getLocationLabel('RENTAL_UNIT', Number($formData.rental_unit_id)) : 'Select rental_unit',
+            value: $formData.rental_unit_id?.toString() || ''
           }}
           onSelectedChange={(s) => {
             if (s?.value) {
@@ -205,20 +205,20 @@
           }}
         >
           <Select.Trigger class="w-full">
-            <Select.Value placeholder="Select room" />
+            <Select.Value placeholder="Select rental_unit" />
           </Select.Trigger>
           <Select.Content>
-            {#each filteredRooms as room}
-              <Select.Item value={room.id.toString()}>
-                Room {room.number}
-                {#if room.floor?.property}
-                  - {room.floor.property.name}
+            {#each filteredRental_Units as rental_unit}
+              <Select.Item value={rental_unit.id.toString()}>
+                Rental_unit {rental_unit.number}
+                {#if rental_unit.floor?.property}
+                  - {rental_unit.floor.property.name}
                 {/if}
               </Select.Item>
             {/each}
           </Select.Content>
         </Select.Root>
-        {#if $errors.rooms_id}<span class="text-red-500">{$errors.rooms_id}</span>{/if}
+        {#if $errors.rental_unit_id}<span class="text-red-500">{$errors.rental_unit_id}</span>{/if}
       </div>
     {/if}
 

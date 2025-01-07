@@ -9,7 +9,7 @@ export const superForm = () => ({
         type: 'SINGLE',
         property_id: 0,
         floor_id: 0,
-        room_status: 'VACANT',
+        rental_unit_status: 'VACANT',
         capacity: 1,
         base_rate: 0,
         amenities: []

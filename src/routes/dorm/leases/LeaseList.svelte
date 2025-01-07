@@ -60,11 +60,11 @@
             </Badge>
           </span>
           <span class="text-sm font-normal">
-            Room {lease.room?.room_number}
-            {#if lease.room?.floor}
-              - Floor {lease.room.floor.floor_number}
-              {#if lease.room.floor.wing}
-                Wing {lease.room.floor.wing}
+            Rental_unit {lease.rental_unit?.rental_unit_number}
+            {#if lease.rental_unit?.floor}
+              - Floor {lease.rental_unit.floor.floor_number}
+              {#if lease.rental_unit.floor.wing}
+                Wing {lease.rental_unit.floor.wing}
               {/if}
             {/if}
           </span>
@@ -72,7 +72,7 @@
         <Card.Description>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
             <div>
-              <strong>Property:</strong> {lease.room?.property?.name}
+              <strong>Property:</strong> {lease.rental_unit?.property?.name}
             </div>
             <div>
               <strong>Type:</strong> {lease.type}

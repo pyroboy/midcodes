@@ -26,24 +26,24 @@ CREATE TABLE floors (
     updated_at TIMESTAMP WITH TIME ZONE
 );
 
--- Add property_id and floor_id to rooms table
-ALTER TABLE rooms 
+-- Add property_id and floor_id to rental_unit table
+ALTER TABLE rental_unit 
 ADD COLUMN property_id INTEGER REFERENCES properties(id),
 ADD COLUMN floor_id INTEGER REFERENCES floors(id),
 ADD COLUMN type TEXT,
 ADD COLUMN amenities JSONB DEFAULT '{}'::jsonb;
 
 -- Rename floor_level to number for consistency
-ALTER TABLE rooms RENAME COLUMN floor_level TO number;
+ALTER TABLE rental_unit RENAME COLUMN floor_level TO number;
 
--- Create a default property for existing rooms
+-- Create a default property for existing rental_unit
 INSERT INTO properties (name, address, type, status)
 VALUES ('Default Property', 'Default Address', 'dormitory', 'ACTIVE');
 
--- Create default floors for existing rooms
+-- Create default floors for existing rental_unit
 WITH distinct_floors AS (
     SELECT DISTINCT number as floor_number
-    FROM rooms
+    FROM rental_unit
     ORDER BY floor_number
 )
 INSERT INTO floors (property_id, floor_number, status)
@@ -53,24 +53,24 @@ SELECT
     'ACTIVE'
 FROM distinct_floors;
 
--- Update existing rooms with property_id and floor_id
-UPDATE rooms r
+-- Update existing rental_unit with property_id and floor_id
+UPDATE rental_unit r
 SET 
     property_id = (SELECT id FROM properties WHERE name = 'Default Property'),
     floor_id = f.id,
-    type = 'standard' -- default type for existing rooms
+    type = 'standard' -- default type for existing rental_unit
 FROM floors f
 WHERE f.floor_number = r.number;
 
 -- Make property_id and floor_id NOT NULL after populating data
-ALTER TABLE rooms 
+ALTER TABLE rental_unit 
 ALTER COLUMN property_id SET NOT NULL,
 ALTER COLUMN floor_id SET NOT NULL,
 ALTER COLUMN type SET NOT NULL;
 
 -- Add indexes for better query performance
-CREATE INDEX idx_rooms_property ON rooms(property_id);
-CREATE INDEX idx_rooms_floor ON rooms(floor_id);
+CREATE INDEX idx_rental_unit_property ON rental_unit(property_id);
+CREATE INDEX idx_rental_unit_floor ON rental_unit(floor_id);
 CREATE INDEX idx_floors_property ON floors(property_id);
 
 -- Add triggers for updated_at columns

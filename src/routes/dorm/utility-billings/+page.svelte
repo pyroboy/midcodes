@@ -24,7 +24,7 @@
     reading_value: number;
   }
 
-  interface Room {
+  interface Rental_unit {
     id: number;
     name: string;
     number: string;
@@ -34,7 +34,7 @@
     id: number;
     name: string;
     type: string;
-    room: Room[];
+    rental_unit: Rental_unit[];
   }
 
   export let data: PageData;
@@ -103,8 +103,8 @@
       const endReading = getReadingValue(meter.id, selectedEndDate!);
       const consumption = endReading - startReading;
       const totalCost = consumption * costPerUnit;
-      const room = meter.room[0]; // Get first room since it's an array
-      const tenantCount = room ? (data.roomTenantCounts[room.id] || 0) : 0;
+      const rental_unit = meter.rental_unit[0]; // Get first rental_unit since it's an array
+      const tenantCount = rental_unit ? (data.rental_unitTenantCounts[rental_unit.id] || 0) : 0;
       const perTenantCost = tenantCount > 0 ? totalCost / tenantCount : 0;
 
       return {

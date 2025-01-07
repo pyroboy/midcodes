@@ -29,7 +29,7 @@ export const createSchema = (latestOverallReadingDate: string) => z.object({
       message: "Invalid meter type"
     }),
   location_type: z.custom<meter_location_type>()
-    .refine((val) => ['PROPERTY', 'FLOOR', 'ROOM'].includes(val), {
+    .refine((val) => ['PROPERTY', 'FLOOR', 'RENTAL_UNIT'].includes(val), {
       message: "Invalid location type"
     }),
   readings: z.array(z.object({

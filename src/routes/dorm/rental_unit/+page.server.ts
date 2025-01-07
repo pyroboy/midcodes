@@ -3,7 +3,7 @@ import type { Actions, PageServerLoad } from './$types';
 import type { RequestEvent } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
-import { roomSchema } from './formSchema';
+import { rental_unitSchema } from './formSchema';
 import { checkAccess } from '$lib/utils/roleChecks';
 
 interface DatabaseFloor {
@@ -21,10 +21,10 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
     throw redirect(302, '/unauthorized');
   }
 
-  console.log('[DEBUG] Loading initial data for rooms page');
-  const [roomsResponse, propertiesResponse, floorsResponse] = await Promise.all([
+  console.log('[DEBUG] Loading initial data for rental_unit page');
+  const [rental_unitResponse, propertiesResponse, floorsResponse] = await Promise.all([
     supabase
-      .from('rooms')
+      .from('rental_unit')
       .select(`
         *,
         property:properties(name),
@@ -52,18 +52,18 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
   console.log('[DEBUG] Floors data loaded:', floorsResponse.data);
   console.log('[DEBUG] Properties data loaded:', propertiesResponse.data);
 
-  const { data: rooms, error: roomsError } = roomsResponse;
+  const { data: rental_unit, error: rental_unitError } = rental_unitResponse;
   const { data: properties, error: propertiesError } = propertiesResponse;
   const { data: floors, error: floorsError } = floorsResponse;
 
-  if (roomsError) throw fail(403, { message: roomsError.message });
+  if (rental_unitError) throw fail(403, { message: rental_unitError.message });
   if (propertiesError) throw fail(403, { message: propertiesError.message });
   if (floorsError) throw fail(403, { message: floorsError.message });
 
-  const form = await superValidate(zod(roomSchema));
+  const form = await superValidate(zod(rental_unitSchema));
 
   return {
-    rooms,
+    rental_unit,
     properties,
     floors: floors as DatabaseFloor[],
     form,
@@ -73,8 +73,8 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
 
 export const actions: Actions = {
   create: async ({ request, locals: { supabase } }: RequestEvent) => {
-    console.log('[DEBUG] Create room action triggered');
-    const form = await superValidate(request, zod(roomSchema));
+    console.log('[DEBUG] Create rental_unit action triggered');
+    const form = await superValidate(request, zod(rental_unitSchema));
     console.log('[DEBUG] Form data received:', form.data);
     console.log('[DEBUG] Form validation status:', form.valid);
     
@@ -103,28 +103,28 @@ export const actions: Actions = {
       });
     }
 
-    const existingRoomResponse = await supabase
-      .from('rooms')
+    const existingRental_UnitResponse = await supabase
+      .from('rental_unit')
       .select('id')
       .eq('floor_id', form.data.floor_id)
       .eq('number', form.data.number)
       .single();
 
-    if (existingRoomResponse.data) {
+    if (existingRental_UnitResponse.data) {
       return fail(400, {
         form,
-        message: 'Room number already exists on this floor'
+        message: 'Rental_unit number already exists on this floor'
       });
     }
 
     const insertResponse = await supabase
-      .from('rooms')
+      .from('rental_unit')
       .insert({
         property_id: form.data.property_id,
         floor_id: form.data.floor_id,
         name: form.data.name,
         number: form.data.number,
-        room_status: form.data.room_status,
+        rental_unit_status: form.data.rental_unit_status,
         capacity: form.data.capacity,
         base_rate: form.data.base_rate,
         type: form.data.type,
@@ -136,7 +136,7 @@ export const actions: Actions = {
       if (insertResponse.error.code === '23505') {
         return fail(400, {
           form,
-          message: 'Room number already exists on this floor'
+          message: 'Rental_unit number already exists on this floor'
         });
       }
 
@@ -149,19 +149,19 @@ export const actions: Actions = {
 
       return fail(500, { 
         form,
-        message: insertResponse.error.message || 'Failed to create room'
+        message: insertResponse.error.message || 'Failed to create rental_unit'
       });
     }
 
-    const newForm = await superValidate(zod(roomSchema));
+    const newForm = await superValidate(zod(rental_unitSchema));
     return { 
       form: newForm,
-      message: 'Room created successfully'
+      message: 'Rental_unit created successfully'
     };
   },
 
   update: async ({ request, locals: { supabase } }: RequestEvent) => {
-    const form = await superValidate(request, zod(roomSchema));
+    const form = await superValidate(request, zod(rental_unitSchema));
     
     if (!form.valid || !form.data.id) {
       return fail(400, { 
@@ -177,29 +177,29 @@ export const actions: Actions = {
       });
     }
 
-    const existingRoomResponse = await supabase
-      .from('rooms')
+    const existingRental_UnitResponse = await supabase
+      .from('rental_unit')
       .select('id')
       .eq('floor_id', form.data.floor_id)
       .eq('number', form.data.number)
       .neq('id', form.data.id)
       .single();
 
-    if (existingRoomResponse.data) {
+    if (existingRental_UnitResponse.data) {
       return fail(400, {
         form,
-        message: 'Room number already exists on this floor'
+        message: 'Rental_unit number already exists on this floor'
       });
     }
 
     const updateResponse = await supabase
-      .from('rooms')
+      .from('rental_unit')
       .update({
         property_id: form.data.property_id,
         floor_id: form.data.floor_id,
         name: form.data.name,
         number: form.data.number,
-        room_status: form.data.room_status,
+        rental_unit_status: form.data.rental_unit_status,
         capacity: form.data.capacity,
         base_rate: form.data.base_rate,
         type: form.data.type,
@@ -212,7 +212,7 @@ export const actions: Actions = {
       if (updateResponse.error.code === '23505') {
         return fail(400, {
           form,
-          message: 'Room number already exists on this floor'
+          message: 'Rental_unit number already exists on this floor'
         });
       }
 
@@ -225,13 +225,13 @@ export const actions: Actions = {
 
       return fail(updateResponse.error.code === '42501' ? 403 : 500, { 
         form,
-        message: updateResponse.error.message || 'Failed to update room'
+        message: updateResponse.error.message || 'Failed to update rental_unit'
       });
     }
 
     return { 
       form,
-      message: 'Room updated successfully'
+      message: 'Rental_unit updated successfully'
     };
   },
 
@@ -241,31 +241,31 @@ export const actions: Actions = {
     
     if (!id) {
       return fail(400, {
-        message: 'Room ID is required'
+        message: 'Rental_unit ID is required'
       });
     }
 
-    const roomId = parseInt(id.toString(), 10);
-    if (isNaN(roomId)) {
+    const rental_unitId = parseInt(id.toString(), 10);
+    if (isNaN(rental_unitId)) {
       return fail(400, {
-        message: 'Invalid room ID'
+        message: 'Invalid rental_unit ID'
       });
     }
 
     const deleteResponse = await supabase
-      .from('rooms')
+      .from('rental_unit')
       .delete()
-      .eq('id', roomId);
+      .eq('id', rental_unitId);
 
     if (deleteResponse.error) {
       console.error('Delete error:', deleteResponse.error);
       return fail(deleteResponse.error.code === '42501' ? 403 : 500, {
-        message: deleteResponse.error.message || 'Failed to delete room'
+        message: deleteResponse.error.message || 'Failed to delete rental_unit'
       });
     }
 
     return {
-      message: 'Room deleted successfully'
+      message: 'Rental_unit deleted successfully'
     };
   }
 };

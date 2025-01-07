@@ -21,9 +21,9 @@ export const load = (async ({ locals: { supabase, safeGetSession } }) => {
     throw error(400, { message: 'No property assigned to user' });
   }
 
-  // Get rooms with their leases and tenants
-  const { data: rooms, error: roomsError } = await supabase
-    .from('rooms')
+  // Get rental_unit with their leases and tenants
+  const { data: rental_unit, error: rental_unitError } = await supabase
+    .from('rental_unit')
     .select(`
       *,
       floors!inner (
@@ -100,8 +100,8 @@ export const load = (async ({ locals: { supabase, safeGetSession } }) => {
     `)
     .eq('property_id', profile.property_id);
 
-  if (roomsError) {
-    throw error(500, { message: roomsError.message });
+  if (rental_unitError) {
+    throw error(500, { message: rental_unitError.message });
   }
 
   // Get expenses for the last month
@@ -136,7 +136,7 @@ export const load = (async ({ locals: { supabase, safeGetSession } }) => {
   const isStaffLevel = ['property_manager', 'property_maintenance', 'property_accountant'].includes(profile.role);
 
   return {
-    rooms: rooms || [],
+    rental_unit: rental_unit || [],
     balances: balances || [],
     months,
     lastMonthExpenses: lastMonthExpenses || [],

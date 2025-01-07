@@ -28,14 +28,14 @@ export const load = async ({ locals }) => {
   }
 
   // Fetch all required data in parallel
-  const [{ data: meters }, { data: properties }, { data: floors }, { data: rooms }] = await Promise.all([
+  const [{ data: meters }, { data: properties }, { data: floors }, { data: rental_unit }] = await Promise.all([
     supabase
       .from('meters')
       .select(`
         *,
         property:properties(name),
         floor:floors(floor_number, wing, property:properties(name)),
-        room:rooms(number, floor:floors(floor_number, wing, property:properties(name))),
+        rental_unit:rental_unit(number, floor:floors(floor_number, wing, property:properties(name))),
         readings:readings(id, reading, reading_date)
       `)
       .order('created_at', { ascending: false }),
@@ -59,7 +59,7 @@ export const load = async ({ locals }) => {
       .order('floor_number'),
     
     supabase
-      .from('rooms')
+      .from('rental_unit')
       .select(`
         *,
         floor:floors(
@@ -72,7 +72,7 @@ export const load = async ({ locals }) => {
           )
         )
       `)
-      .in('room_status', ['VACANT', 'OCCUPIED'])
+      .in('rental_unit_status', ['VACANT', 'OCCUPIED'])
       .order('number')
   ]);
 
@@ -84,7 +84,7 @@ export const load = async ({ locals }) => {
     location_type: 'PROPERTY',
     property_id: null,
     floor_id: null,
-    rooms_id: null,
+    rental_unit_id: null,
     unit_rate: 0,
     initial_reading: 0,
     is_active: true,
@@ -96,7 +96,7 @@ export const load = async ({ locals }) => {
     meters,
     properties,
     floors,
-    rooms,
+    rental_unit,
     isAdminLevel,
     isUtility,
     isMaintenance
@@ -129,7 +129,7 @@ export const actions = {
     }
 
     // Validate location constraints
-    const { location_type, property_id, floor_id, rooms_id } = form.data;
+    const { location_type, property_id, floor_id, rental_unit_id } = form.data;
     let locationValid = false;
     let locationQuery;
     
@@ -150,12 +150,12 @@ export const actions = {
           .eq('status', 'ACTIVE')
           .single();
         break;
-      case 'ROOM':
+      case 'RENTAL_UNIT':
         locationQuery = supabase
-          .from('rooms')
+          .from('rental_unit')
           .select('id')
-          .eq('id', rooms_id)
-          .in('room_status', ['VACANT', 'OCCUPIED'])
+          .eq('id', rental_unit_id)
+          .in('rental_unit_status', ['VACANT', 'OCCUPIED'])
           .single();
         break;
     }
@@ -185,8 +185,8 @@ export const actions = {
       case 'FLOOR':
         duplicateQuery = duplicateQuery.eq('floor_id', floor_id);
         break;
-      case 'ROOM':
-        duplicateQuery = duplicateQuery.eq('rooms_id', rooms_id);
+      case 'RENTAL_UNIT':
+        duplicateQuery = duplicateQuery.eq('rental_unit_id', rental_unit_id);
         break;
     }
 
@@ -255,7 +255,7 @@ export const actions = {
     }
 
     // Validate location constraints
-    const { location_type, property_id, floor_id, rooms_id } = updateData;
+    const { location_type, property_id, floor_id, rental_unit_id } = updateData;
     let locationValid = false;
     let locationQuery;
     
@@ -276,12 +276,12 @@ export const actions = {
           .eq('status', 'ACTIVE')
           .single();
         break;
-      case 'ROOM':
+      case 'RENTAL_UNIT':
         locationQuery = supabase
-          .from('rooms')
+          .from('rental_unit')
           .select('id')
-          .eq('id', rooms_id)
-          .in('room_status', ['VACANT', 'OCCUPIED'])
+          .eq('id', rental_unit_id)
+          .in('rental_unit_status', ['VACANT', 'OCCUPIED'])
           .single();
         break;
     }
@@ -312,8 +312,8 @@ export const actions = {
       case 'FLOOR':
         duplicateQuery = duplicateQuery.eq('floor_id', floor_id);
         break;
-      case 'ROOM':
-        duplicateQuery = duplicateQuery.eq('rooms_id', rooms_id);
+      case 'RENTAL_UNIT':
+        duplicateQuery = duplicateQuery.eq('rental_unit_id', rental_unit_id);
         break;
     }
 

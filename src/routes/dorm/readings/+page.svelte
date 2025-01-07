@@ -32,7 +32,7 @@
     property: Property;
   }
 
-  interface Room {
+  interface Rental_unit {
     id: number;
     number: string;
     floor: Floor;
@@ -48,7 +48,7 @@
     initial_reading: number;
     unit_rate: number;
     floor_id?: number;
-    room: {
+    rental_unit: {
       id: number;
       number: string;
       floor: {
@@ -64,10 +64,10 @@
   }
 
   interface ExtendedMeter extends MeterBase {
-    room: Room | null;
+    rental_unit: Rental_unit | null;
   }
 
-  type MeterWithRoom = {
+  type MeterWithRental_Unit = {
     id: number;
     name: string;
     type: utility_type;
@@ -76,7 +76,7 @@
     status: string;
     initial_reading: number;
     unit_rate: number;
-    room: Room | null;
+    rental_unit: Rental_unit | null;
     floor_id?: number;
   }
 
@@ -140,9 +140,9 @@
     );
   }
 
-  function isValidRoom(room: unknown): room is Room {
-    if (!room || typeof room !== 'object') return false;
-    const r = room as Record<string, unknown>;
+  function isValidRental_Unit(rental_unit: unknown): rental_unit is Rental_unit {
+    if (!rental_unit || typeof rental_unit !== 'object') return false;
+    const r = rental_unit as Record<string, unknown>;
     return Boolean(
       typeof r.id === 'number' &&
       typeof r.number === 'string' &&
@@ -150,7 +150,7 @@
     );
   }
 
-  function isMeterWithRoom(meter: unknown): meter is MeterWithRoom {
+  function isMeterWithRental_Unit(meter: unknown): meter is MeterWithRental_Unit {
     if (!meter || typeof meter !== 'object') return false;
     const m = meter as Record<string, unknown>;
     
@@ -166,15 +166,15 @@
 
     if (!hasRequiredProperties) return false;
 
-    if ('room' in m && m.room !== null) {
-      if (!isValidRoom(m.room)) return false;
+    if ('rental_unit' in m && m.rental_unit !== null) {
+      if (!isValidRental_Unit(m.rental_unit)) return false;
     }
 
     return true;
   }
 
   function assertMeter(meter: unknown): asserts meter is ExtendedMeter {
-    if (!isMeterWithRoom(meter)) {
+    if (!isMeterWithRental_Unit(meter)) {
       throw new Error('Invalid meter data');
     }
   }
@@ -222,7 +222,7 @@
   }
 
   function updateLocationType(value: { value: string } | undefined) {
-    if (value?.value === 'PROPERTY' || value?.value === 'FLOOR' || value?.value === 'ROOM') {
+    if (value?.value === 'PROPERTY' || value?.value === 'FLOOR' || value?.value === 'RENTAL_UNIT') {
       selectedLocationType = value.value as meter_location_type;
       $form.location_type = value.value as meter_location_type;
     }
@@ -313,7 +313,7 @@
             <SelectContent>
               <SelectItem value="PROPERTY">Property</SelectItem>
               <SelectItem value="FLOOR">Floor</SelectItem>
-              <SelectItem value="ROOM">Room</SelectItem>
+              <SelectItem value="RENTAL_UNIT">Rental_unit</SelectItem>
             </SelectContent>
           </Select>
           {#if $errors.location_type}
@@ -332,13 +332,13 @@
                   <div>
                     <h3 class="font-medium">{meter.name}</h3>
                     <p class="text-sm text-muted-foreground">
-                      {#if meter.room}
-                        Room {meter.room.number},
-                        Floor {meter.room.floor.floor_number}
-                        {#if meter.room.floor.wing}
-                          Wing {meter.room.floor.wing},
+                      {#if meter.rental_unit}
+                        Rental_unit {meter.rental_unit.number},
+                        Floor {meter.rental_unit.floor.floor_number}
+                        {#if meter.rental_unit.floor.wing}
+                          Wing {meter.rental_unit.floor.wing},
                         {/if}
-                        {meter.room.floor.property.name}
+                        {meter.rental_unit.floor.property.name}
                       {:else if meter.floor_id}
                         Floor {meter.floor_id}
                       {:else}

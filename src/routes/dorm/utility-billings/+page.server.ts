@@ -38,7 +38,7 @@ export const load: PageServerLoad = async ({ locals: { supabase, getSession } })
       id,
       name,
       type,
-      room:rooms (
+      rental_unit:rental_unit (
         id,
         name,
         number
@@ -69,11 +69,11 @@ export const load: PageServerLoad = async ({ locals: { supabase, getSession } })
 
   if (datesError) throw error(500, 'Error fetching reading dates');
 
-  // Get tenant counts per room
+  // Get tenant counts per rental_unit
   const { data: tenantCounts, error: tenantsError } = await supabase
     .from('leases')
     .select(`
-      room_id,
+      rental_unit_id,
       tenants:lease_tenants (
         tenant:profiles (
           id
@@ -86,8 +86,8 @@ export const load: PageServerLoad = async ({ locals: { supabase, getSession } })
   if (tenantsError) throw error(500, 'Error fetching tenant counts');
 
   // Process tenant counts
-  const roomTenantCounts = tenantCounts.reduce((acc, lease) => {
-    acc[lease.room_id] = (lease.tenants?.length || 0);
+  const rental_unitTenantCounts = tenantCounts.reduce((acc, lease) => {
+    acc[lease.rental_unit_id] = (lease.tenants?.length || 0);
     return acc;
   }, {} as Record<number, number>);
 
@@ -96,7 +96,7 @@ export const load: PageServerLoad = async ({ locals: { supabase, getSession } })
     meters,
     readings,
     availableReadingDates: availableReadingDates?.map(d => d.reading_date) || [],
-    roomTenantCounts,
+    rental_unitTenantCounts,
     org_id: profile.org_id,
     role: profile.role
   };

@@ -266,7 +266,7 @@ export const RoleConfig: Record<UserRole, RoleConfiguration> = {
             { path: '/dorm/overview/monthly', showInNav: true, label: 'Overview' },
             { path: '/dorm/properties', showInNav: true, label: 'Properties' },
             { path: '/dorm/floors', showInNav: true, label: 'Floors' },
-            { path: '/dorm/rooms', showInNav: true, label: 'Rooms' },
+            { path: '/dorm/rental_unit', showInNav: true, label: 'Rental_Units' },
             { path: '/dorm/tenants', showInNav: true, label: 'Tenants' },
             { path: '/dorm/leases', showInNav: true, label: 'Leases' },
             { path: '/dorm/payments', showInNav: true, label: 'Payments' },

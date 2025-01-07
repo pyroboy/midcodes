@@ -43,8 +43,8 @@ export const load = async ({ locals }) => {
           lease:leases(
             id,
             name,
-            room:rooms(
-              room_number,
+            rental_unit:rental_unit(
+              rental_unit_number,
               floor:floors(
                 floor_number,
                 wing,
@@ -72,9 +72,9 @@ export const load = async ({ locals }) => {
         lease:leases(
           id,
           name,
-          room:rooms(
+          rental_unit:rental_unit(
             id,
-            room_number,
+            rental_unit_number,
             floor:floors(
               floor_number,
               wing,
@@ -130,7 +130,7 @@ export const actions = {
     // Get billing details first
     const { data: billing, error: billingError } = await supabase
       .from('billings')
-      .select('*, lease:leases(name, room:rooms(room_number, floor:floors(floor_number, wing)))')
+      .select('*, lease:leases(name, rental_unit:rental_unit(rental_unit_number, floor:floors(floor_number, wing)))')
       .eq('id', form.data.billing_id)
       .single();
 
@@ -228,8 +228,8 @@ export const actions = {
             utility_type,
             lease:leases(
               name,
-              room:rooms(
-                room_number,
+              rental_unit:rental_unit(
+                rental_unit_number,
                 floor:floors(
                   floor_number,
                   wing
@@ -267,7 +267,7 @@ export const actions = {
           billing_id: billing.id,
           amount: form.data.amount,
           method: form.data.method,
-          location: `${billing.lease.room.floor.wing} - Floor ${billing.lease.room.floor.floor_number} - Room ${billing.lease.room.room_number}`
+          location: `${billing.lease.rental_unit.floor.wing} - Floor ${billing.lease.rental_unit.floor.floor_number} - Rental_unit ${billing.lease.rental_unit.rental_unit_number}`
         }
       });
 

@@ -1,7 +1,7 @@
 # Meters Management Route
 
 ## Overview
-This route manages utility meters (electricity, water, internet) for properties, floors, and rooms in the dorm management system. It provides functionality to create, read, update, and delete meters with proper access control.
+This route manages utility meters (electricity, water, internet) for properties, floors, and rental_unit in the dorm management system. It provides functionality to create, read, update, and delete meters with proper access control.
 
 ## Database Schema
 
@@ -13,7 +13,7 @@ CREATE TABLE public.meters (
     location_type meter_location_type NOT NULL,
     property_id integer,
     floor_id integer,
-    rooms_id integer,
+    rental_unit_id integer,
     type utility_type NOT NULL,
     is_active boolean DEFAULT true,
     status meter_status NOT NULL DEFAULT 'ACTIVE',
@@ -37,7 +37,7 @@ CREATE TABLE public.readings (
 
 ### Relevant Enums
 ```sql
-CREATE TYPE meter_location_type AS ENUM ('PROPERTY', 'FLOOR', 'ROOM');
+CREATE TYPE meter_location_type AS ENUM ('PROPERTY', 'FLOOR', 'RENTAL_UNIT');
 CREATE TYPE meter_status AS ENUM ('ACTIVE', 'INACTIVE', 'MAINTENANCE');
 CREATE TYPE utility_type AS ENUM ('ELECTRICITY', 'WATER', 'INTERNET');
 ```
@@ -54,7 +54,7 @@ Based on user_role enum:
 - Assign meters to:
   - Entire property (property_id)
   - Specific floor (floor_id)
-  - Individual room (rooms_id)
+  - Individual rental_unit (rental_unit_id)
   
 Note: Only one location type should be set based on meter_location_type
 
@@ -71,8 +71,8 @@ Note: Only one location type should be set based on meter_location_type
 ### 4. Required Fields
 - name: Unique identifier for the meter
 - type: utility_type (ELECTRICITY/WATER/INTERNET)
-- location_type: meter_location_type (PROPERTY/FLOOR/ROOM)
-- location_id: Based on location_type (property_id/floor_id/rooms_id)
+- location_type: meter_location_type (PROPERTY/FLOOR/RENTAL_UNIT)
+- location_id: Based on location_type (property_id/floor_id/rental_unit_id)
 - initial_reading: Starting meter reading (numeric(10,2))
 - unit_rate: Cost per unit of consumption (numeric(10,2))
 
@@ -86,7 +86,7 @@ Note: Only one location type should be set based on meter_location_type
 1. Location Type Constraints:
    - If location_type = 'PROPERTY': Only property_id should be set
    - If location_type = 'FLOOR': Only floor_id should be set
-   - If location_type = 'ROOM': Only rooms_id should be set
+   - If location_type = 'RENTAL_UNIT': Only rental_unit_id should be set
 
 2. Numeric Validations:
    - initial_reading >= 0
@@ -99,10 +99,10 @@ Note: Only one location type should be set based on meter_location_type
 1. Hierarchical Selection:
    ```typescript
    interface LocationSelection {
-     type: 'PROPERTY' | 'FLOOR' | 'ROOM';
+     type: 'PROPERTY' | 'FLOOR' | 'RENTAL_UNIT';
      property_id?: number;
      floor_id?: number;
-     rooms_id?: number;
+     rental_unit_id?: number;
    }
    ```
 
@@ -114,8 +114,8 @@ Note: Only one location type should be set based on meter_location_type
      type: 'ELECTRICITY' | 'WATER' | 'INTERNET';
      status: 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE';
      location: {
-       type: 'PROPERTY' | 'FLOOR' | 'ROOM';
-       details: string; // e.g., "Floor 2, Wing A" or "Room 201"
+       type: 'PROPERTY' | 'FLOOR' | 'RENTAL_UNIT';
+       details: string; // e.g., "Floor 2, Wing A" or "Rental_unit 201"
      };
      latest_reading?: {
        value: number;
@@ -126,7 +126,7 @@ Note: Only one location type should be set based on meter_location_type
 
 ### Error Handling
 1. Database Constraints:
-   - Foreign key violations for property_id, floor_id, rooms_id
+   - Foreign key violations for property_id, floor_id, rental_unit_id
    - Unique constraint on name within property scope
    - Check constraints on numeric fields
 
@@ -146,10 +146,10 @@ Using the built-in timestamp fields:
 Query Parameters:
 ```typescript
 interface MeterQuery {
-  location_type?: 'PROPERTY' | 'FLOOR' | 'ROOM';
+  location_type?: 'PROPERTY' | 'FLOOR' | 'RENTAL_UNIT';
   property_id?: number;
   floor_id?: number;
-  rooms_id?: number;
+  rental_unit_id?: number;
   status?: 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE';
   type?: 'ELECTRICITY' | 'WATER' | 'INTERNET';
   page?: number;
@@ -162,10 +162,10 @@ Request Body:
 ```typescript
 interface CreateMeterRequest {
   name: string;
-  location_type: 'PROPERTY' | 'FLOOR' | 'ROOM';
+  location_type: 'PROPERTY' | 'FLOOR' | 'RENTAL_UNIT';
   property_id?: number;
   floor_id?: number;
-  rooms_id?: number;
+  rental_unit_id?: number;
   type: 'ELECTRICITY' | 'WATER' | 'INTERNET';
   initial_reading: number;
   unit_rate: number;

@@ -1,10 +1,8 @@
 <script lang="ts">
   import type { PageData } from './$types';
-  import type { SuperValidated } from 'sveltekit-superforms';
+  import type {  SuperFormData } from 'sveltekit-superforms/client';
   import type { Database } from '$lib/database.types';
   import { superForm } from 'sveltekit-superforms/client';
-  import { tenantSchema } from './formSchema';
-  import type { Room } from './types';
   import {
     Select,
     SelectContent,
@@ -17,11 +15,9 @@
   import { Button } from "$lib/components/ui/button";
   import { Badge } from "$lib/components/ui/badge";
   import * as Tabs from '$lib/components/ui/tabs';
-  import { format } from 'date-fns';
   import type { z } from 'zod';
-  import { zod } from 'sveltekit-superforms/adapters';
   import { createEventDispatcher } from 'svelte';
-  import { leaseStatusEnum, tenantStatusEnum, leaseTypeEnum } from './formSchema';
+  import { TenantStatusEnum,tenantFormSchema } from './formSchema';
   import Textarea from '$lib/components/ui/textarea/textarea.svelte';
   import { defaultEmergencyContact } from './constants';
   import * as Card from '$lib/components/ui/card';
@@ -32,19 +28,15 @@
   type User = Database['public']['Tables']['profiles']['Row'];
 
   export let data: PageData;
-  export let form: SuperValidated<z.infer<typeof tenantSchema>>;
+  export let formData: SuperFormData<z.infer<typeof tenantFormSchema>>;
+  export let errors: ReturnType<typeof superForm<z.infer<typeof tenantFormSchema>>>['errors'];
+  export let enhance: ReturnType<typeof superForm<z.infer<typeof tenantFormSchema>>>['enhance'];
+  export let submitting: ReturnType<typeof superForm<z.infer<typeof tenantFormSchema>>>['submitting'];
   export let editMode = false;
-  export let tenant: z.infer<typeof tenantSchema> | undefined = undefined;
+  export let tenant: z.infer<typeof tenantFormSchema> | undefined = undefined;
 
   const dispatch = createEventDispatcher();
-  type FormSchema = z.infer<typeof tenantSchema>;
-  const { form: formData, errors, enhance, submitting } = superForm<FormSchema>(form, {
-    validators: zod(tenantSchema)
-  });
 
-  let selectedPropertyId: number | null = null;
-  type Room = Database['public']['Tables']['rooms']['Row'];
-  let availableRooms: Room[] | null = data.rooms;
   let showStatusDialog = false;
   let statusChangeReason = '';
 
@@ -52,77 +44,24 @@
   $: canDelete = data.isAdminLevel;
 
   $: if (tenant && editMode) {
-    formData.update($formData => ({ ...$formData, ...tenant }));
+    formData.update($data => ({ ...$data, ...tenant }));
   }
 
-  $: filteredRooms = selectedPropertyId 
-    ? (availableRooms?.filter(room => 
-        room.property_id === selectedPropertyId && 
-        room.room_status === 'VACANT'
-      ) ?? [])
-    : [];
+  // Fix: Convert ZodEnum to array of status options
+  $: tenantStatusOptions = Object.values(TenantStatusEnum.Values);
 
-  function handlePropertyChange(event: CustomEvent<string>) {
-    const propertyId = parseInt(event.detail);
-    if (!isNaN(propertyId)) {
-      selectedPropertyId = propertyId;
-      if (formData) {
-        $formData.location_id = null;
-      }
-    }
-  }
+  type TenantStatus = "ACTIVE" | "INACTIVE" | "PENDING" | "BLACKLISTED";
 
-  function handleRoomChange(event: CustomEvent<string>) {
-    const roomId = parseInt(event.detail);
-    if (!isNaN(roomId) && formData) {
-      $formData.location_id = roomId;
-    }
-  }
-
-  function updateLocationId(event: CustomEvent<string>) {
-    if (event.detail) {
-      formData.update($formData => ({ ...$formData, location_id: parseInt(event.detail) }));
-    }
-  }
-
-  function updateTenantStatus(event: CustomEvent<string>) {
+  function updateTenantStatus(event: CustomEvent<TenantStatus>) {
     if (event.detail) {
       showStatusDialog = true;
-      formData.update($formData => ({ ...$formData, tenant_status: event.detail as FormSchema['tenant_status'] }));
-    }
-  }
-
-  function updateLeaseStatus(event: CustomEvent<string>) {
-    if (event.detail) {
-      formData.update($formData => ({ ...$formData, lease_status: event.detail as FormSchema['lease_status'] }));
-    }
-  }
-
-  function updateLeaseType(event: CustomEvent<string>) {
-    if (event.detail) {
-      formData.update($formData => ({ ...$formData, lease_type: event.detail as FormSchema['lease_type'] }));
-    }
-  }
-
-  function handleStatusChange() {
-    if (statusChangeReason) {
-      const now = new Date().toISOString();
-      const history = $formData.status_history || [];
-      history.push({
-        status: $formData.tenant_status,
-        changed_at: now,
-        changed_by: $formData.created_by,
-        reason: statusChangeReason
-      });
-      formData.update($formData => ({ ...$formData, status_history: history }));
-      showStatusDialog = false;
-      statusChangeReason = '';
+      formData.update($data => ({ ...$data, tenant_status: event.detail }));
     }
   }
 
   $: emergencyContact = {
     ...defaultEmergencyContact,
-    ...$formData.emergency_contact,
+    ...($formData.emergency_contact || {}),
     email: $formData.emergency_contact?.email || ''
   };
 
@@ -144,16 +83,6 @@
         return 'bg-gray-100 text-gray-800';
     }
   }
-
-  function handleRentInput(e: Event) {
-    const target = e.target as HTMLInputElement;
-    if (target) {
-      const value = parseFloat(target.value);
-      if (!isNaN(value)) {
-        $formData.rent_amount = value;
-      }
-    }
-  }
 </script>
 
 <form
@@ -167,9 +96,6 @@
   <Tabs.Root value="details" class="w-full">
     <Tabs.List>
       <Tabs.Trigger value="details">Tenant Details</Tabs.Trigger>
-      <Tabs.Trigger value="lease">Lease Information</Tabs.Trigger>
-      <Tabs.Trigger value="financial">Financial</Tabs.Trigger>
-      <Tabs.Trigger value="history">History</Tabs.Trigger>
     </Tabs.List>
 
     <Tabs.Content value="details" class="p-4 border rounded-lg mt-4">
@@ -228,7 +154,7 @@
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {#each tenantStatusEnum as status}
+              {#each tenantStatusOptions as status}
                 <SelectItem value={status}>
                   <Badge variant="outline" class={getStatusColor(status)}>
                     {status}
@@ -315,263 +241,6 @@
       </div>
     </Tabs.Content>
 
-    <Tabs.Content value="lease" class="p-4 border rounded-lg mt-4">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="space-y-2">
-          <Label>Property</Label>
-          <Select on:change={handlePropertyChange}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select property" />
-            </SelectTrigger>
-            <SelectContent>
-              {#each data.properties as property}
-                <SelectItem value={property.id.toString()}>{property.name}</SelectItem>
-              {/each}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div class="space-y-2">
-          <Label>Room</Label>
-          <Select on:change={handleRoomChange} disabled={!selectedPropertyId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select room" />
-            </SelectTrigger>
-            <SelectContent>
-              {#each filteredRooms as room (room.id)}
-                <SelectItem value={room.id.toString()}>
-                  Room {room.number}
-                  <Badge variant="outline" class="ml-2">
-                    {room.room_status}
-                  </Badge>
-                </SelectItem>
-              {/each}
-            </SelectContent>
-          </Select>
-          {#if !selectedPropertyId}
-            <p class="text-sm text-gray-500">Select a property first</p>
-          {:else if filteredRooms?.length === 0}
-            <p class="text-sm text-red-500">No available rooms in this property</p>
-          {/if}
-        </div>
-
-        <div class="space-y-2">
-          <Label for="lease_type">Lease Type</Label>
-          <Select on:change={updateLeaseType} disabled={!canEdit}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select lease type" />
-            </SelectTrigger>
-            <SelectContent>
-              {#each leaseTypeEnum as type}
-                <SelectItem value={type}>{type}</SelectItem>
-              {/each}
-            </SelectContent>
-          </Select>
-          {#if $errors.lease_type}
-            <p class="text-sm text-red-500">{$errors.lease_type}</p>
-          {/if}
-        </div>
-
-        <div class="space-y-2">
-          <Label for="lease_status">Lease Status</Label>
-          <Select on:change={updateLeaseStatus} disabled={!canEdit}>
-            <SelectTrigger>
-              <SelectValue>
-                {#if $formData.lease_status}
-                  <Badge variant="outline" class={getStatusColor($formData.lease_status)}>
-                    {$formData.lease_status}
-                  </Badge>
-                {:else}
-                  Select status
-                {/if}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {#each leaseStatusEnum as status}
-                <SelectItem value={status}>
-                  <Badge variant="outline" class={getStatusColor(status)}>
-                    {status}
-                  </Badge>
-                </SelectItem>
-              {/each}
-            </SelectContent>
-          </Select>
-          {#if $errors.lease_status}
-            <p class="text-sm text-red-500">{$errors.lease_status}</p>
-          {/if}
-        </div>
-
-        <div class="space-y-2">
-          <Label for="start_date">Start Date</Label>
-          <Input
-            type="date"
-            name="start_date"
-            bind:value={$formData.start_date}
-            min={format(new Date(), 'yyyy-MM-dd')}
-            disabled={!canEdit}
-          />
-          {#if $errors.start_date}
-            <p class="text-sm text-red-500">{$errors.start_date}</p>
-          {/if}
-        </div>
-
-        <div class="space-y-2">
-          <Label for="end_date">End Date</Label>
-          <Input
-            type="date"
-            name="end_date"
-            bind:value={$formData.end_date}
-            min={$formData.start_date || format(new Date(), 'yyyy-MM-dd')}
-            disabled={!canEdit}
-          />
-          {#if $errors.end_date}
-            <p class="text-sm text-red-500">{$errors.end_date}</p>
-          {/if}
-        </div>
-
-        <div class="col-span-2 space-y-2">
-          <Label for="notes">Notes</Label>
-          <Textarea
-            name="notes"
-            bind:value={$formData.notes}
-            disabled={!canEdit}
-          />
-          {#if $errors.notes}
-            <p class="text-sm text-red-500">{$errors.notes}</p>
-          {/if}
-        </div>
-      </div>
-    </Tabs.Content>
-
-    <Tabs.Content value="financial" class="p-4 border rounded-lg mt-4">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="space-y-2">
-          <Label for="rent_amount">Monthly Rent</Label>
-          <script>
-            function handleRentInput(e: Event) {
-              const target = e.target as HTMLInputElement;
-              if (target) {
-                const value = parseFloat(target.value);
-                if (!isNaN(value)) {
-                  $formData.rent_amount = value;
-                }
-              }
-            }
-          </script>
-          
-          <Input
-            type="number"
-            name="rent_amount"
-            bind:value={$formData.rent_amount}
-            on:input={handleRentInput}
-            min="0"
-            step="0.01"
-            disabled={!canEdit}
-          />
-          {#if $errors.rent_amount}
-            <p class="text-sm text-red-500">{$errors.rent_amount}</p>
-          {/if}
-        </div>
-
-        <div class="space-y-2">
-          <Label for="security_deposit">Security Deposit</Label>
-          <Input
-            type="number"
-            name="security_deposit"
-            bind:value={$formData.security_deposit}
-            min="0"
-            step="0.01"
-            disabled={!canEdit}
-          />
-          {#if $errors.security_deposit}
-            <p class="text-sm text-red-500">{$errors.security_deposit}</p>
-          {/if}
-        </div>
-
-        {#if $formData.payment_schedules?.length}
-          <div class="col-span-2">
-            <Label>Payment Schedule</Label>
-            <Card.Root class="mt-2">
-              <Card.Content class="pt-6">
-                <table class="w-full">
-                  <thead>
-                    <tr>
-                      <th class="text-left">Due Date</th>
-                      <th class="text-left">Type</th>
-                      <th class="text-right">Amount</th>
-                      <th class="text-right">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {#each $formData.payment_schedules as payment}
-                      <tr>
-                        <td>{format(new Date(payment.due_date), 'MMM d, yyyy')}</td>
-                        <td>{payment.type}</td>
-                        <td class="text-right">₱{payment.amount.toLocaleString()}</td>
-                        <td class="text-right">
-                          <Badge variant="outline" class={getStatusColor(payment.status)}>
-                            {payment.status}
-                          </Badge>
-                        </td>
-                      </tr>
-                    {/each}
-                  </tbody>
-                </table>
-              </Card.Content>
-            </Card.Root>
-          </div>
-        {/if}
-
-        {#if $formData.outstanding_balance !== undefined}
-          <div class="col-span-2">
-            <Card.Root>
-              <Card.Content class="pt-6">
-                <div class="flex justify-between items-center">
-                  <div>
-                    <p class="text-sm text-gray-500">Outstanding Balance</p>
-                    <p class="text-2xl font-bold">₱{$formData.outstanding_balance.toLocaleString()}</p>
-                  </div>
-                  <div>
-                    <p class="text-sm text-gray-500">Next Payment Due</p>
-                    <p class="text-lg">{$formData.next_payment_due ? format(new Date($formData.next_payment_due), 'MMM d, yyyy') : '-'}</p>
-                  </div>
-                  <div>
-                    <p class="text-sm text-gray-500">Last Payment</p>
-                    <p class="text-lg">{$formData.last_payment_date ? format(new Date($formData.last_payment_date), 'MMM d, yyyy') : '-'}</p>
-                  </div>
-                </div>
-              </Card.Content>
-            </Card.Root>
-          </div>
-        {/if}
-      </div>
-    </Tabs.Content>
-
-    <Tabs.Content value="history" class="p-4 border rounded-lg mt-4">
-      {#if $formData.status_history?.length}
-        <div class="space-y-4">
-          {#each $formData.status_history as change}
-            <Card.Root>
-              <Card.Content class="pt-6">
-                <div class="flex items-center gap-4">
-                  <Badge variant="outline" class={getStatusColor(change.status)}>
-                    {change.status}
-                  </Badge>
-                  <div class="flex-1">
-                    <p class="text-sm text-gray-500">{change.reason}</p>
-                    <p class="text-xs text-gray-400">
-                      Changed on {format(new Date(change.changed_at), 'MMM d, yyyy h:mm a')}
-                    </p>
-                  </div>
-                </div>
-              </Card.Content>
-            </Card.Root>
-          {/each}
-        </div>
-      {:else}
-        <p class="text-gray-500">No status changes recorded</p>
-      {/if}
-    </Tabs.Content>
   </Tabs.Root>
 
   <div class="flex justify-end gap-4 pt-4">
@@ -610,7 +279,14 @@
       <Button type="button" variant="outline" on:click={() => showStatusDialog = false}>
         Cancel
       </Button>
-      <Button type="button" on:click={handleStatusChange} disabled={!statusChangeReason}>
+      <Button type="button" on:click={() => {
+        formData.update($formData => ({
+          ...$formData,
+          status_change_reason: statusChangeReason
+        }));
+        showStatusDialog = false;
+        statusChangeReason = '';
+      }} disabled={!statusChangeReason}>
         Confirm Change
       </Button>
     </Dialog.Footer>

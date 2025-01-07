@@ -141,7 +141,7 @@
           <div class="flex items-center">Floor</div>
           <div class="flex items-center">Wing</div>
           <div class="flex items-center">Status</div>
-          <div class="flex items-center justify-center">Rooms</div>
+          <div class="flex items-center justify-center">Rental_Units</div>
           <div class="flex items-center">Actions</div>
         </div>
 
@@ -157,7 +157,7 @@
                 </Badge>
               </div>
               <div class="flex items-center justify-center">
-                {floor.rooms?.length || 0}
+                {floor.rental_unit?.length || 0}
               </div>
               <div class="flex items-center gap-2">
                 <Button

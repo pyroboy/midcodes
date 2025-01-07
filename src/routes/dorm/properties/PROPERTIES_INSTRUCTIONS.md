@@ -1,7 +1,7 @@
 # Properties Module Instructions
 
 ## Overview
-The Properties module is the foundation of the dormitory management system. It manages property creation, updates, and management, serving as the top-level organizational unit for floors, rooms, and all related entities.
+The Properties module is the foundation of the dormitory management system. It manages property creation, updates, and management, serving as the top-level organizational unit for floors, rental_unit, and all related entities.
 
 ## Core Functionality
 
@@ -20,12 +20,12 @@ The Properties module is the foundation of the dormitory management system. It m
   - Modify property details
   - Update status
   - Track modification timestamp
-  - Validate changes against active floors/rooms
+  - Validate changes against active floors/rental_unit
 
 - **View Properties**
   - List all properties with status
   - Show floor count
-  - Show room count
+  - Show rental_unit count
   - Support filtering and sorting
 
 ### 2. Property-Floor Relationship
@@ -37,9 +37,9 @@ The Properties module is the foundation of the dormitory management system. It m
   - Status (floor_status: ACTIVE/INACTIVE/MAINTENANCE)
   - Creation/update timestamps (UTC)
 
-### 3. Property-Room Relationship
-- Rooms linked to property via floors
-- Track per room:
+### 3. Property-Rental_unit Relationship
+- Rental_Units linked to property via floors
+- Track per rental_unit:
   - Name (required, text)
   - Number (required, integer)
   - Capacity (required, integer)
@@ -77,13 +77,13 @@ CREATE TABLE public.floors (
     updated_at timestamp with time zone
 );
 
--- Rooms Table (Matches CURRENT_SCHEMA.md exactly)
-CREATE TABLE public.rooms (
+-- Rental_Units Table (Matches CURRENT_SCHEMA.md exactly)
+CREATE TABLE public.rental_unit (
     id integer NOT NULL DEFAULT nextval('locations_id_seq'::regclass),
     name text NOT NULL,
     number integer NOT NULL,
     capacity integer NOT NULL,
-    room_status location_status NOT NULL DEFAULT 'VACANT',
+    rental_unit_status location_status NOT NULL DEFAULT 'VACANT',
     base_rate numeric(10,2) NOT NULL,
     created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now()),
     updated_at timestamp with time zone,
@@ -109,7 +109,7 @@ CREATE TYPE floor_status AS ENUM (
     'MAINTENANCE'
 );
 
--- Room Status Type
+-- Rental_unit Status Type
 CREATE TYPE location_status AS ENUM (
     'VACANT',
     'OCCUPIED',
@@ -127,7 +127,7 @@ okay
   - Name and status
   - Address and type
   - Floor count
-  - Room count
+  - Rental_unit count
 
 ### 2. Property Form
 - Input fields for:
@@ -139,14 +139,14 @@ okay
 ### 3. Property Details
 - Property information
 - Floor list with status
-- Room summary by status
+- Rental_unit summary by status
 
 ## Core Features
 
 ### 1. Basic Analytics
 - Count of properties by status
 - Count of floors per property
-- Count of rooms by status
+- Count of rental_unit by status
 - Basic occupancy tracking
 
 ### 2. Status Management

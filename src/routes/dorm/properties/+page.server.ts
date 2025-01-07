@@ -5,13 +5,13 @@ import { supabase } from '$lib/supabaseClient';
 import { propertySchema, type PropertyWithCounts, preparePropertyData } from './formSchema';
 
 export const load = async () => {
-  // Get properties with floor and room counts
+  // Get properties with floor and rental_unit counts
   const { data: properties, error } = await supabase
     .from('properties')
     .select(`
       *,
       floors:floors(count),
-      rooms:rooms(count)
+      rental_unit:rental_unit(count)
     `)
     .order('name');
 
@@ -27,7 +27,7 @@ export const load = async () => {
   const propertiesWithCounts: PropertyWithCounts[] = properties.map(property => ({
     ...property,
     floor_count: property.floors?.[0]?.count ?? 0,
-    room_count: property.rooms?.[0]?.count ?? 0
+    rental_unit_count: property.rental_unit?.[0]?.count ?? 0
   }));
 
   const form = await superValidate(zod(propertySchema));
@@ -95,7 +95,7 @@ export const actions = {
       return fail(400, { form });
     }
 
-    // Check for existing floors/rooms
+    // Check for existing floors/rental_unit
     const { data: floors } = await supabase
       .from('floors')
       .select('id')
@@ -105,7 +105,7 @@ export const actions = {
     if (floors && floors.length > 0) {
       return fail(400, {
         form,
-        error: 'Cannot delete property with existing floors/rooms. Please delete them first.'
+        error: 'Cannot delete property with existing floors/rental_unit. Please delete them first.'
       });
     }
 
