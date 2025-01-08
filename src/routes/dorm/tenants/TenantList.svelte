@@ -1,9 +1,8 @@
 <script lang="ts">
+    import type { PageData } from './$types';
   import { createEventDispatcher } from 'svelte';
   import Button from '$lib/components/ui/button/button.svelte';
-  import type { ExtendedTenant, Rental_unit } from './types';
-  type Property = Database['public']['Tables']['properties']['Row'];
-  import type { TenantFormData } from './formSchema';
+  import type { ExtendedTenant } from './types';
   import * as Table from '$lib/components/ui/table';
   import {
     Select,
@@ -15,19 +14,8 @@
   import type { Database } from '$lib/database.types';
   import { Badge } from '$lib/components/ui/badge';
 
-  interface PageState {
-    form: any;
-    tenants: ExtendedTenant[];
-    rental_unit: Rental_unit[];
-    properties: Property[];
-    profile: ServerProfile | null;
-    isAdminLevel: boolean;
-    isStaffLevel: boolean;
-  }
 
-  type ServerProfile = Database['public']['Tables']['profiles']['Row'];
-
-  export let data: PageState;
+  export let data: PageData;
 
   const dispatch = createEventDispatcher<{
     edit: ExtendedTenant;
@@ -124,7 +112,10 @@
 <div class="w-2/3">
   <div class="bg-white shadow rounded-lg">
     <div class="p-4 border-b">
-      <h2 class="text-xl font-semibold mb-4">Tenants</h2>
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-semibold">Tenants</h2>
+
+      </div>
       
       <div class="flex gap-4 mb-4">
         <div class="flex-1">

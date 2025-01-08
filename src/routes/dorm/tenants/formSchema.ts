@@ -96,7 +96,11 @@ export const tenantFormSchema = z.object({
   last_payment_date: z.string().nullable().optional(),
   next_payment_due: z.string().nullable().optional(),
   payment_schedules: z.array(z.any()).optional(),
-  status_history: z.array(z.any()).optional()
+  status_history: z.array(z.any()).optional(),
+  status_change_reason: z.string()
+    .max(500, 'Reason must be less than 500 characters')
+    .nullable()
+    .optional()
 });
 
 // Export all type definitions

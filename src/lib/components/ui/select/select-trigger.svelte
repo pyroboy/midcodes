@@ -3,7 +3,9 @@
 	import ChevronDown from "lucide-svelte/icons/chevron-down";
 	import { cn } from "$lib/utils.js";
 
-	type $$Props = SelectPrimitive.TriggerProps;
+	type $$Props = SelectPrimitive.TriggerProps & {
+		"data-error"?: boolean;
+	};
 	type $$Events = SelectPrimitive.TriggerEvents;
 
 	let className: $$Props["class"] = undefined;
@@ -15,6 +17,7 @@
 		"border-input bg-background ring-offset-background focus-visible:ring-ring aria-[invalid]:border-destructive data-[placeholder]:[&>span]:text-muted-foreground flex h-10 w-full items-center justify-between rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
 		className
 	)}
+	data-error={$$restProps["data-error"]}
 	{...$$restProps}
 	let:builder
 	on:click

@@ -12,12 +12,16 @@ export const propertyBasicSchema = z.object({
   name: z.string().min(1, 'Property name is required').optional()
 });
 
+export type Property = z.infer<typeof propertyBasicSchema>;
+
 export const floorBasicSchema = z.object({
   id: z.number(),
   property_id: z.number(),
   floor_number: z.number(),
   wing: z.string().optional()
 });
+
+export type Floor = z.infer<typeof floorBasicSchema>;
 
 const baseRental_UnitSchema = z.object({
   id: z.number(),
@@ -47,6 +51,8 @@ const baseRental_UnitSchema = z.object({
   amenities: z.array(z.string()).default([]),
   property: propertyBasicSchema,
   floor: floorBasicSchema,
+  created_at: z.string().optional(),
+  updated_at: z.string().optional()
 });
 
 export const rental_unitSchema = baseRental_UnitSchema.superRefine((data, ctx) => {

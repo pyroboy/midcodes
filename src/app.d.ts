@@ -32,6 +32,11 @@ declare global {
 		}
 		interface PageData {
 			session: Session | null;
+			user: User | null;
+			profile: ProfileData | EmulatedProfile | null;
+			navigation: NavigationState;
+			special_url: string | undefined;
+			emulation: { active: boolean; emulated_org_id: string | null; } | null;
 		}
 		interface Error {
 			message: string

@@ -58,12 +58,3 @@ export interface ExtendedTenant {
 
 export type Rental_unit = Database['public']['Tables']['rental_unit']['Row'];
 
-export interface PageState {
-  form: SuperValidated<z.infer<typeof tenantFormSchema>>;
-  tenants: ExtendedTenant[];
-  rental_unit: Rental_unit[];
-  properties: Database['public']['Tables']['properties']['Row'][];
-  profile: ServerProfile | null;
-  isAdminLevel: boolean;
-  isStaffLevel: boolean;
-}

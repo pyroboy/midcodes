@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { PageData } from './$types';
+    import { supabase } from '$lib/supabaseClient';
     import { superForm } from 'sveltekit-superforms/client';
     import type { QrScanSchema } from './+page.server';
     import type { ActionResultData, AttendeeWithScanInfo } from '$lib/types/database';
@@ -94,7 +95,7 @@
             const referenceNumber = urlParts[urlParts.length - 1];
             
             // Find attendee by reference number
-            const { data: attendeeData, error } = await data.supabase
+            const { data: attendeeData, error } = await supabase
                 .from('attendees')
                 .select('id, basic_info')
                 .eq('reference_code_url', referenceNumber)

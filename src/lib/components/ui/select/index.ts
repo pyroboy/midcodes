@@ -1,4 +1,5 @@
 import { Select as SelectPrimitive } from "bits-ui";
+import type { SvelteComponent } from "svelte";
 
 import Label from "./select-label.svelte";
 import Item from "./select-item.svelte";
@@ -10,6 +11,13 @@ const Root = SelectPrimitive.Root;
 const Group = SelectPrimitive.Group;
 const Input = SelectPrimitive.Input;
 const Value = SelectPrimitive.Value;
+
+interface SelectProps {
+  "data-error"?: boolean;
+  [key: string]: any;
+}
+
+const Select: typeof SvelteComponent<SelectProps> = SelectPrimitive.Root;
 
 export {
 	Root,

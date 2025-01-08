@@ -48,7 +48,8 @@
 
     // Update session when server data changes
     $: if (userProfile && $session) {
-        if (userProfile.isEmulated !== emulation?.active) {
+        const isProfileEmulated = 'isEmulated' in userProfile ? userProfile.isEmulated : false;
+        if (isProfileEmulated !== emulation?.active) {
             auth.refreshSession();
         }
     }
@@ -141,7 +142,7 @@
     <div class="container mx-auto px-4">
         <div class="flex h-16 items-center justify-between">
             <div class="flex items-center space-x-4">
-                {#if special_url !== '/'}
+                {#if special_url && special_url !== '/'}
                     <a href={special_url} class="flex items-center">
                         <span class="hidden font-bold sm:inline-block">
                             {(special_url.split('/').pop() || 'Admin').charAt(0).toUpperCase() + 

@@ -5,7 +5,6 @@ import { superValidate } from 'sveltekit-superforms/server';
 import { tenantFormSchema, tenantResponseSchema, type TenantFormData, type EmergencyContact } from './formSchema';
 import type { Actions, PageServerLoad } from './$types';
 import { zod } from 'sveltekit-superforms/adapters';
-import type { Database } from '$lib/database.types';
 import { checkAccess } from '$lib/utils/roleChecks';
 
 // Type definitions aligned with database schema
@@ -16,15 +15,13 @@ type BaseTenant = {
   email: string | null;
   tenant_status: 'ACTIVE' | 'INACTIVE' | 'PENDING' | 'BLACKLISTED';
   auth_id: string | null;
-  created_by: string | null;
   created_at: string;
   updated_at: string | null;
+  created_by: string | null;
   emergency_contact: EmergencyContact | null;
 };
 
 type Tenant = BaseTenant;
-type Property = Database['public']['Tables']['properties']['Row'];
-type Rental_unit = Database['public']['Tables']['rental_unit']['Row'];
 
 // Keeping necessary interface definitions for relationships
 interface RawLeaseData {
@@ -75,6 +72,7 @@ interface LeaseWithRelations {
 
 export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase } }) => {
   const { session, user, profile } = await safeGetSession();
+  console.log('Session data:', { session, user, profile });
 
   if (!session || !user) {
     throw error(401, { message: 'Unauthorized' });
@@ -156,7 +154,7 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
       tenants: [],
       rental_unit,
       properties,
-      userProfile: null,
+      profile: null,
       isAdminLevel: false,
       isStaffLevel: false
     };
@@ -222,7 +220,8 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
       lease_status: lease?.status || 'INACTIVE',
       start_date: lease?.start_date || new Date().toISOString().split('T')[0],
       end_date: lease?.end_date || new Date().toISOString().split('T')[0],
-      outstanding_balance: lease?.balance || 0
+      outstanding_balance: lease?.balance || 0,
+      created_by: tenant.created_by
     };
   });
 
@@ -236,7 +235,8 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
     rental_unit,
     properties,
     isAdminLevel,
-    isStaffLevel
+    isStaffLevel,
+    profile
   };
 };
 

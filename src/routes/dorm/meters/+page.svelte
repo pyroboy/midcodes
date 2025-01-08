@@ -96,9 +96,9 @@
           ? `Floor ${floor.floor_number}${floor.property ? ` - ${floor.property.name}` : ''}`
           : 'Unknown Floor';
       case 'RENTAL_UNIT':
-        const rental_unit = rental_unit?.find(r => r.id === meter.rental_unit_id);
-        return rental_unit 
-          ? `Rental_unit ${rental_unit.rental_unit_number}${rental_unit.floor?.property ? ` - ${rental_unit.floor.property.name}` : ''}`
+        const unit = rental_unit?.find(r => r.id === meter.rental_unit_id);
+        return unit 
+          ? `Rental_unit ${unit.number}${unit.floor?.property ? ` - ${unit.floor.property.name}` : ''}`
           : 'Unknown Rental_unit';
       default:
         return 'Unknown Location';

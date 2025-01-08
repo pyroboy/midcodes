@@ -56,8 +56,8 @@
         const floor = floors.find(f => f.id === id);
         return floor ? `${floor.property?.name || ''} - Floor ${floor.floor_number} ${floor.wing || ''}` : '';
       case 'RENTAL_UNIT':
-        const rental_unit = rental_unit.find(r => r.id === id);
-        return rental_unit ? `${rental_unit.floor?.property?.name || ''} - Floor ${rental_unit.floor?.floor_number || ''} - Rental_unit ${rental_unit.number}` : '';
+        const unit = rental_unit.find(r => r.id === id);
+        return unit ? `${unit.floor?.property?.name || ''} - Floor ${unit.floor?.floor_number || ''} - Rental_unit ${unit.number}` : '';
       default:
         return '';
     }

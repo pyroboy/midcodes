@@ -1,13 +1,18 @@
 <script lang="ts">
   import { superForm } from 'sveltekit-superforms/client';
   import { zodClient } from 'sveltekit-superforms/adapters';
-  import type { PageData } from './$types';
-  import type { SuperValidated } from 'sveltekit-superforms';
   import { tenantFormSchema, type TenantFormData } from './formSchema';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import TenantList from './TenantList.svelte';
   import TenantForm from './TenantForm.svelte';
   import type { ExtendedTenant } from './types';
+  import type { SuperValidated } from 'sveltekit-superforms';
+  import type { z } from 'zod';
+  import type { Rental_unit } from '../rental_unit/formSchema';
+  import type { Database } from '$lib/database.types';
+  import type { PageData } from './$types';
+
+
 
   export let data: PageData;
   
@@ -30,6 +35,7 @@
     delayMs: 10,
     taintedMessage: null,
     resetForm: true,
+
     onError: ({ result }) => {
       console.error('Form validation errors:', result.error);
     },
@@ -37,6 +43,8 @@
       if (result.type === 'success') {
         selectedTenant = undefined;
         editMode = false;
+        // Reset form to initial values
+        handleCreate();
       }
     }
   });
@@ -52,22 +60,8 @@
       email: tenant.email,
       auth_id: tenant.auth_id,
       tenant_status: tenant.tenant_status,
-      lease_status: tenant.lease_status,
-      lease_type: tenant.lease_type,
-      lease_id: tenant.lease?.id ? parseInt(tenant.lease.id) : null,
-      location_id: tenant.lease?.location?.id ? parseInt(tenant.lease.location.id) : null,
-      start_date: tenant.start_date,
-      end_date: tenant.end_date,
-      rent_amount: tenant.lease?.rent_amount ?? 0,
-      security_deposit: tenant.lease?.security_deposit ?? 0,
-      outstanding_balance: tenant.outstanding_balance,
-      notes: tenant.lease?.notes ?? '',
-      last_payment_date: null,
-      next_payment_due: null,
       created_by: tenant.created_by,
-      emergency_contact: tenant.emergency_contact ?? defaultEmergencyContact,
-      payment_schedules: [],
-      status_history: []
+      emergency_contact: tenant.emergency_contact ?? defaultEmergencyContact
     };
   }
 
@@ -82,22 +76,8 @@
       email: null,
       auth_id: null,
       tenant_status: 'PENDING',
-      lease_status: 'INACTIVE',
-      lease_type: 'BEDSPACER',
-      lease_id: null,
-      location_id: null,
-      start_date: new Date().toISOString().split('T')[0],
-      end_date: new Date().toISOString().split('T')[0],
-      rent_amount: 0,
-      security_deposit: 0,
-      outstanding_balance: 0,
-      notes: '',
-      last_payment_date: null,
-      next_payment_due: null,
       created_by: data.profile?.id ?? null,
-      emergency_contact: defaultEmergencyContact,
-      payment_schedules: [],
-      status_history: []
+      emergency_contact: defaultEmergencyContact
     };
   }
 
@@ -128,10 +108,11 @@
         <TenantForm
           {data}
           {editMode}
-          formData={form}
-          errors={errors}
-          enhance={enhance}
-          submitting={submitting}
+          {form}
+          {errors}
+          {enhance}
+          {constraints}
+          {submitting}
           tenant={selectedTenant}
           on:cancel={handleCancel}
           on:tenantSaved={() => {
