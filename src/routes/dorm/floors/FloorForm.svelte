@@ -79,7 +79,7 @@
       }}
       onSelectedChange={handlePropertyChange}
     >
-      <Select.Trigger data-error={$errors.property_id && $form.property_id !== undefined}>
+      <Select.Trigger data-error={!!$errors.property_id}>
         <Select.Value placeholder="Select a property" />
       </Select.Trigger>
       <Select.Content>
@@ -90,7 +90,7 @@
         {/each}
       </Select.Content>
     </Select.Root>
-    {#if $errors.property_id && $form.property_id !== undefined}
+    {#if $errors.property_id}
       <p class="text-sm font-medium text-destructive">{$errors.property_id}</p>
     {/if}
   </div>
@@ -104,11 +104,11 @@
       min="1"
       bind:value={$form.floor_number}
       class="w-full"
-      data-error={$errors.floor_number && $form.floor_number !== undefined}
-      aria-invalid={$errors.floor_number ? 'true' : undefined}
+      data-error={!!$errors.floor_number}
+      aria-invalid={!!$errors.floor_number}
       {...$constraints.floor_number}
     />
-    {#if $errors.floor_number && $form.floor_number !== undefined}
+    {#if $errors.floor_number}
       <p class="text-sm font-medium text-destructive">{$errors.floor_number}</p>
     {/if}
   </div>
@@ -121,12 +121,12 @@
       name="wing" 
       bind:value={$form.wing}
       class="w-full"
-      data-error={$errors.wing && $form.wing !== undefined}
-      aria-invalid={$errors.wing ? 'true' : undefined}
+      data-error={!!$errors.wing}
+      aria-invalid={!!$errors.wing}
       {...$constraints.wing}
       placeholder="Optional"
     />
-    {#if $errors.wing && $form.wing !== undefined}
+    {#if $errors.wing}
       <p class="text-sm font-medium text-destructive">{$errors.wing}</p>
     {/if}
   </div>
@@ -141,7 +141,7 @@
       onSelectedChange={handleStatusChange}
     >
       <Select.Trigger 
-        data-error={$errors.status && $form.status !== undefined}
+        data-error={!!$errors.status}
         {...$constraints.status}
       >
         <Select.Value placeholder="Select a status" />
@@ -154,7 +154,7 @@
         {/each}
       </Select.Content>
     </Select.Root>
-    {#if $errors.status && $form.status !== undefined}
+    {#if $errors.status}
       <p class="text-sm font-medium text-destructive">{$errors.status}</p>
     {/if}
   </div>

@@ -30,7 +30,7 @@
   const { form, enhance, errors, constraints, submitting } = superForm<TenantFormData>(data.form, {
     id: 'tenant-form',
     validators: zodClient(tenantFormSchema),
-    validationMethod: 'auto',
+    validationMethod: 'onblur',
     dataType: 'json',
     delayMs: 10,
     taintedMessage: null,

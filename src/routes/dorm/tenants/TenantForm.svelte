@@ -104,11 +104,11 @@
       bind:value={$form.name}
       class="w-full"
       disabled={!canEdit}
-      data-error={$errors.name && $form.name !== undefined}
+      data-error={$errors.name}
       aria-invalid={$errors.name ? 'true' : undefined}
       {...$constraints.name}
       />
-      {#if $errors.name && $form.name !== undefined}
+      {#if $errors.name}
         <p class="text-sm font-medium text-destructive">{$errors.name}</p>
       {/if}
     </div>

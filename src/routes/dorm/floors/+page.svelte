@@ -30,12 +30,15 @@
   const { form, enhance, errors, constraints } = superForm(data.form, {
     id: 'floor-form',
     validators: zodClient(floorSchema),
-    validationMethod: 'auto',
+    validationMethod: 'oninput',
     dataType: 'json',
     delayMs: 10,
     taintedMessage: null,
     onError: ({ result }) => {
-      console.log('Validation errors:', result.error);
+      console.error('Form submission error:', result.error);
+      if (result.error) {
+        console.error('Server error:', result.error.message);
+      }
     },
     onResult: ({ result }) => {
       if (result.type === 'success') {
@@ -65,11 +68,12 @@
     selectedFloor = undefined;
     editMode = false;
     
+    // Set form values that will trigger validation
     $form = {
-      id: undefined,
-      property_id: 0,
-      floor_number: 0,
-      wing: undefined,
+      id: 0,
+      property_id: 0, // This will trigger validation since it's required
+      floor_number: 0, // This will trigger validation since it must be positive
+      wing: '',
       status: 'ACTIVE'
     };
   }

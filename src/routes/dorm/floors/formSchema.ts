@@ -7,11 +7,12 @@ export const floorSchema = z.object({
   property_id: z.coerce.number({
     required_error: 'Property selection is required',
     invalid_type_error: 'Property must be selected'
-  }),
+  }).min(1, 'Property must be selected'),
   floor_number: z.coerce.number({
     required_error: 'Floor number is required',
     invalid_type_error: 'Floor number must be a valid number'
-  }).int('Floor number must be an integer'),
+  }).int('Floor number must be an integer')
+    .min(1, 'Floor number must be greater than 0'),
   wing: z.string().optional(),
   status: floorStatusEnum.default('ACTIVE')
 });
