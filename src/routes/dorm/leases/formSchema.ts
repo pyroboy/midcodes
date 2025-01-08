@@ -18,9 +18,9 @@ export type LeaseStatus = z.infer<typeof leaseStatusEnum>;
 export type LeaseType = z.infer<typeof leaseTypeEnum>;
 
 export const leaseSchema = z.object({
-  id: z.string().optional(),
-  tenantIds: z.array(z.string()).min(1, 'At least one tenant must be selected'),
-  locationId: z.string().min(1, 'a Location must be selected'),
+  id: z.number().optional(),
+  tenantIds: z.array(z.number()).min(1, 'At least one tenant must be selected'),
+  locationId: z.number().min(1, 'a Location must be selected'),
   leaseStatus: leaseStatusEnum,
   leaseType: leaseTypeEnum,
   leaseStartDate: z.string()

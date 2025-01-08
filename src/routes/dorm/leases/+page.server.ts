@@ -1,335 +1,260 @@
-// src/routes/dorm/leases/+page.server.ts
-
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
+import type { Actions, PageServerLoad } from './$types';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
+import { checkAccess } from '$lib/utils/roleChecks';
 import { leaseSchema } from './formSchema';
-import type { Actions, PageServerLoad } from './$types';
+import type { Database } from '$lib/database.types';
 
-export const load = async ({ locals }) => {
-  const { session, user } = await locals.safeGetSession();
+// Type definitions following template pattern
+type DBLease = Database['public']['Tables']['leases']['Row'];
+type DBTenant = Database['public']['Tables']['tenants']['Row'];
+type DBRentalUnit = Database['public']['Tables']['rental_unit']['Row'];
+type DBProperty = Database['public']['Tables']['properties']['Row'];
 
-  if (!session || !user) {
-    return fail(401, { message: 'Unauthorized' });
-  }
+interface LeaseResponse extends DBLease {
+tenant: Pick<DBTenant, 'id' | 'name' | 'email' | 'contact_number'>;
+rental_unit: Pick<DBRentalUnit, 'id' | 'name'> & {
+  property: Pick<DBProperty, 'id' | 'name'>;
+};
+}
 
-  const [{ data: userRole }, { data: leases }, { data: locations }, { data: tenants }] = await Promise.all([
-    locals.supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single(),
+export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase } }) => {
+const { profile } = await safeGetSession();
 
-    locals.supabase
-      .from('leases')
-      .select(`
-        *,
-        tenant:tenants (
-          id,
-          tenantName,
-          email,
-          contactNumber
-        ),
-        location:locations (
-          id,
-          locationName,
-          property:properties (
-            id,
-            propertyName
-          )
-        )
-      `)
-      .order('leaseStartDate', { ascending: false }),
+if (!profile?.role || !checkAccess(profile.role, 'staff')) {
+  throw redirect(302, '/unauthorized');
+}
 
-    locals.supabase
-      .from('locations')
-      .select(`
+// Fetch all required data in parallel following template pattern
+const [{ data: leases }, { data: rental_units }, { data: tenants }] = await Promise.all([
+  supabase
+    .from('leases')
+    .select(`
+      *,
+      tenant:tenants (
         id,
-        locationName,
+        name,
+        email,
+        contact_number
+      ),
+      rental_unit:rental_unit (
+        id,
+        name,
         property:properties (
           id,
-          propertyName
+          name
         )
-      `)
-      .in('locationStatus', ['VACANT', 'RESERVED'])
-      .order('locationName'),
+      )
+    `)
+    .order('start_date', { ascending: false }),
 
-    locals.supabase
-      .from('tenants')
-      .select('id, tenantName, email, contactNumber')
-      .order('tenantName')
-  ]);
+  supabase
+    .from('rental_unit')
+    .select(`
+      id,
+      name,
+      property:properties (
+        id,
+        name
+      )
+    `)
+    .in('rental_unit_status', ['VACANT', 'RESERVED'])
+    .order('name'),
 
-  console.log('Server response:', { userRole, leases, locations, tenants });
+  supabase
+    .from('tenants')
+    .select('id, name, email, contact_number')
+    .order('name')
+]);
 
-  const form = await superValidate(zod(leaseSchema));
-  const isAdminLevel = ['super_admin', 'property_admin'].includes(userRole?.role || '');
-  const isAccountant = userRole?.role === 'property_accountant';
-  const isFrontdesk = userRole?.role === 'property_frontdesk';
+const isAdminLevel = profile?.role && checkAccess(profile.role, 'admin');
+const isAccountant = profile?.role === 'property_accountant' || isAdminLevel;
 
-  return {
-    form,
-    leases: leases || [],
-    locations: locations || [],
-    tenants: tenants || [],
-    userRole: userRole?.role || 'USER',
-    isAdminLevel,
-    isAccountant,
-    isFrontdesk
-  };
+return {
+  form: await superValidate(zod(leaseSchema)),
+  leases: leases ?? [],
+  rental_units: rental_units ?? [],
+  tenants: tenants ?? [],
+  isAdminLevel,
+  isAccountant
+};
 };
 
 export const actions: Actions = {
-  create: async ({ request, locals }) => {
-    const { session, user } = await locals.safeGetSession();
-    if (!session || !user) {
-      return fail(401, { message: 'Unauthorized' });
-    }
-
-    const form = await superValidate(request, zod(leaseSchema));
-    if (!form.valid) {
-      return fail(400, { form });
-    }
-
-    const { data: userRole } = await locals.supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (!['super_admin', 'property_admin', 'property_accountant', 'property_frontdesk'].includes(userRole?.role || '')) {
-      return fail(403, { message: 'Insufficient permissions' });
-    }
-
-    try {
-      const { data: location } = await locals.supabase
-        .from('locations')
-        .select('locationStatus')
-        .eq('id', form.data.locationId)
-        .single();
-
-      if (!location || !['VACANT', 'RESERVED'].includes(location.locationStatus)) {
-        return fail(400, { 
-          form,
-          message: 'Selected location is not available for new leases'
-        });
-      }
-
-      // Start a transaction
-      const { error: locationError } = await locals.supabase
-        .from('locations')
-        .update({ locationStatus: 'OCCUPIED' })
-        .eq('id', form.data.locationId);
-
-      if (locationError) throw locationError;
-
-      const { data: lease, error: leaseError } = await locals.supabase
-        .from('leases')
-        .insert({
-          location_id: form.data.locationId,
-          lease_type: form.data.leaseType,
-          lease_status: form.data.leaseStatus,
-          lease_start_date: form.data.leaseStartDate,
-          lease_end_date: form.data.leaseEndDate,
-          lease_terminate_date: form.data.leaseTerminateDate,
-          lease_terms_month: form.data.leaseTermsMonth,
-          lease_security_deposit: form.data.leaseSecurityDeposit,
-          lease_rent_rate: form.data.leaseRentRate,
-          lease_notes: form.data.leaseNotes,
-          created_by: form.data.createdBy
-        })
-        .select()
-        .single();
-
-      if (leaseError) {
-        // Rollback location status if lease creation fails
-        await locals.supabase
-          .from('locations')
-          .update({ locationStatus: location.locationStatus })
-          .eq('id', form.data.locationId);
-        throw leaseError;
-      }
-
-      // Create lease-tenant relationships
-      const leaseTenants = form.data.tenantIds.map(tenantId => ({
-        leaseId: lease.id,
-        tenantId
-      }));
-
-      const { error: tenantError } = await locals.supabase
-        .from('lease_tenants')
-        .insert(leaseTenants);
-
-      if (tenantError) {
-        // Rollback lease and location status if tenant assignment fails
-        await locals.supabase.from('leases').delete().eq('id', lease.id);
-        await locals.supabase
-          .from('locations')
-          .update({ locationStatus: location.locationStatus })
-          .eq('id', form.data.locationId);
-        throw tenantError;
-      }
-
-      return { form };
-    } catch (err) {
-      console.error(err);
-      return fail(500, { form });
-    }
-  },
-
-  update: async ({ request, locals }) => {
-    const { session, user } = await locals.safeGetSession();
-    if (!session || !user) {
-      return fail(401, { message: 'Unauthorized' });
-    }
-
-    const form = await superValidate(request, zod(leaseSchema));
-    if (!form.valid) {
-      return fail(400, { form });
-    }
-
-    const { data: userRole } = await locals.supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (!['super_admin', 'property_admin', 'property_accountant'].includes(userRole?.role || '')) {
-      return fail(403, { message: 'Insufficient permissions' });
-    }
-
-    try {
-      const { data: currentLease } = await locals.supabase
-        .from('leases')
-        .select('locationId')
-        .eq('id', form.data.id)
-        .single();
-
-      // If location is changing, update both old and new location statuses
-      if (currentLease && currentLease.locationId !== form.data.locationId) {
-        const { error: oldLocationError } = await locals.supabase
-          .from('locations')
-          .update({ locationStatus: 'VACANT' })
-          .eq('id', currentLease.locationId);
-
-        if (oldLocationError) throw oldLocationError;
-
-        const { error: newLocationError } = await locals.supabase
-          .from('locations')
-          .update({ locationStatus: 'OCCUPIED' })
-          .eq('id', form.data.locationId);
-
-        if (newLocationError) throw newLocationError;
-      }
-
-      const { data: lease, error: leaseError } = await locals.supabase
-        .from('leases')
-        .update({
-          location_id: form.data.locationId,
-          lease_type: form.data.leaseType,
-          lease_status: form.data.leaseStatus,
-          lease_start_date: form.data.leaseStartDate,
-          lease_end_date: form.data.leaseEndDate,
-          lease_terminate_date: form.data.leaseTerminateDate,
-          lease_terms_month: form.data.leaseTermsMonth,
-          lease_security_deposit: form.data.leaseSecurityDeposit,
-          lease_rent_rate: form.data.leaseRentRate,
-          lease_notes: form.data.leaseNotes,
-          updated_by: user.id
-        })
-        .eq('id', form.data.id)
-        .select()
-        .single();
-
-      if (leaseError) throw leaseError;
-
-      // Update lease-tenant relationships
-      const { error: deleteTenantError } = await locals.supabase
-        .from('lease_tenants')
-        .delete()
-        .eq('leaseId', form.data.id);
-
-      if (deleteTenantError) throw deleteTenantError;
-
-      const leaseTenants = form.data.tenantIds.map(tenantId => ({
-        leaseId: form.data.id,
-        tenantId
-      }));
-
-      const { error: tenantError } = await locals.supabase
-        .from('lease_tenants')
-        .insert(leaseTenants);
-
-      if (tenantError) throw tenantError;
-
-      return { form };
-    } catch (err) {
-      console.error(err);
-      return fail(500, { form });
-    }
-  },
-
-  delete: async ({ request, locals }) => {
-    const { session, user } = await locals.safeGetSession();
-    if (!session || !user) {
-      return fail(401, { message: 'Unauthorized' });
-    }
-
-    const form = await superValidate(request, zod(leaseSchema));
-    if (!form.valid) {
-      return fail(400, { form });
-    }
-
-    const { data: userRole } = await locals.supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (!userRole || (userRole.role !== 'super_admin' && userRole.role !== 'property_admin')) {
-      return fail(403, { message: 'Forbidden' });
-    }
-
-    try {
-      const { data: lease } = await locals.supabase
-        .from('leases')
-        .select('locationId')
-        .eq('id', form.data.id)
-        .single();
-
-      if (lease) {
-        // Update location status back to vacant
-        const { error: locationError } = await locals.supabase
-          .from('locations')
-          .update({ locationStatus: 'VACANT' })
-          .eq('id', lease.locationId);
-
-        if (locationError) throw locationError;
-      }
-
-      // Delete lease-tenant relationships first
-      const { error: tenantError } = await locals.supabase
-        .from('lease_tenants')
-        .delete()
-        .eq('leaseId', form.data.id);
-
-      if (tenantError) throw tenantError;
-
-      // Then delete the lease
-      const { error: leaseError } = await locals.supabase
-        .from('leases')
-        .delete()
-        .eq('id', form.data.id);
-
-      if (leaseError) throw leaseError;
-
-      return {
-        form,
-        success: true
-      };
-    } catch (error) {
-      console.error('Error deleting lease:', error);
-      return fail(500, { message: 'Failed to delete lease' });
-    }
+create: async ({ request, locals: { supabase, safeGetSession } }) => {
+  const { profile } = await safeGetSession();
+  if (!profile?.role || !checkAccess(profile.role, 'staff')) {
+    return fail(403, { message: 'Insufficient permissions' });
   }
+
+  const form = await superValidate(request, zod(leaseSchema));
+  if (!form.valid) return fail(400, { form });
+
+  try {
+    const { data: rental_unit } = await supabase
+      .from('rental_unit')
+      .select('rental_unit_status')
+      .eq('id', form.data.locationId)
+      .single();
+
+    if (!rental_unit || !['VACANT', 'RESERVED'].includes(rental_unit.rental_unit_status)) {
+      return fail(400, { form, message: 'Selected rental unit is not available' });
+    }
+
+    const { data: lease, error: leaseError } = await supabase
+      .from('leases')
+      .insert({
+        location_id: form.data.locationId,
+        lease_type: form.data.leaseType,
+        lease_status: form.data.leaseStatus,
+        lease_start_date: form.data.leaseStartDate,
+        lease_end_date: form.data.leaseEndDate,
+        lease_terminate_date: form.data.leaseTerminateDate,
+        lease_terms_month: form.data.leaseTermsMonth,
+        lease_security_deposit: form.data.leaseSecurityDeposit,
+        lease_rent_rate: form.data.leaseRentRate,
+        lease_notes: form.data.leaseNotes,
+        created_by: profile.id
+      })
+      .select()
+      .single();
+
+    if (leaseError) throw leaseError;
+
+    await Promise.all([
+      supabase
+        .from('rental_unit')
+        .update({ rental_unit_status: 'OCCUPIED' })
+        .eq('id', form.data.locationId),
+
+      supabase
+        .from('lease_tenants')
+        .insert(form.data.tenantIds.map(tenantId => ({
+          leaseId: lease.id,
+          tenantId
+        })))
+    ]);
+
+    return { form };
+  } catch (error) {
+    console.error('Create lease error:', error);
+    return fail(500, { form, message: 'Failed to create lease' });
+  }
+},
+
+update: async ({ request, locals: { supabase, safeGetSession } }) => {
+  const { profile } = await safeGetSession();
+  if (!profile?.role || !checkAccess(profile.role, 'admin')) {
+    return fail(403, { message: 'Insufficient permissions' });
+  }
+
+  const form = await superValidate(request, zod(leaseSchema));
+  if (!form.valid) return fail(400, { form });
+
+  try {
+    const { data: currentLease } = await supabase
+      .from('leases')
+      .select('locationId')
+      .eq('id', form.data.id)
+      .single();
+
+    if (currentLease) {
+      if (currentLease.locationId !== form.data.locationId) {
+        await Promise.all([
+          supabase
+            .from('rental_unit')
+            .update({ rental_unit_status: 'VACANT' })
+            .eq('id', currentLease.locationId),
+          
+          supabase
+            .from('rental_unit')
+            .update({ rental_unit_status: 'OCCUPIED' })
+            .eq('id', form.data.locationId)
+        ]);
+      }
+    }
+
+    const { error: leaseError } = await supabase
+      .from('leases')
+      .update({
+        ...form.data,
+        updated_by: profile.id,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', form.data.id);
+
+    if (leaseError) throw leaseError;
+
+    await Promise.all([
+      supabase
+        .from('lease_tenants')
+        .delete()
+        .eq('leaseId', form.data.id),
+      
+      supabase
+        .from('lease_tenants')
+        .insert(form.data.tenantIds.map(tenantId => ({
+          leaseId: form.data.id,
+          tenantId
+        })))
+    ]);
+
+    return { form };
+  } catch (error) {
+    console.error('Update lease error:', error);
+    return fail(500, { form, message: 'Update failed' });
+  }
+},
+
+delete: async ({ request, locals: { supabase, safeGetSession } }) => {
+  const { profile } = await safeGetSession();
+  if (!profile?.role || !checkAccess(profile.role, 'admin')) {
+    return fail(403, { message: 'Insufficient permissions' });
+  }
+
+  const form = await superValidate(request, zod(leaseSchema));
+  if (!form.valid) return fail(400, { form });
+
+  // Check for dependencies
+  const { data: dependencies } = await supabase
+    .from('lease_tenants')
+    .select('id')
+    .eq('leaseId', form.data.id)
+    .limit(1);
+
+  if (dependencies && dependencies.length > 0) {
+    return fail(400, {
+      form,
+      message: 'Cannot delete lease with existing tenant relationships'
+    });
+  }
+
+  try {
+    const { data: lease } = await supabase
+      .from('leases')
+      .select('locationId')
+      .eq('id', form.data.id)
+      .single();
+
+    if (lease) {
+      await Promise.all([
+        supabase
+          .from('rental_unit')
+          .update({ rental_unit_status: 'VACANT' })
+          .eq('id', lease.locationId),
+
+        supabase
+          .from('leases')
+          .delete()
+          .eq('id', form.data.id)
+      ]);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Delete lease error:', error);
+    return fail(500, { message: 'Deletion failed' });
+  }
+}
 };
