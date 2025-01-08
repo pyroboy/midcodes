@@ -72,37 +72,15 @@ interface LeaseWithRelations {
 
 export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase } }) => {
   const { session, user, profile } = await safeGetSession();
-  console.log('Session data:', { session, user, profile });
 
   if (!session || !user) {
     throw error(401, { message: 'Unauthorized' });
   }
 
   // Initialize form with schema and default values
-  const form = await superValidate({
-    id: 0,
-    name: '',
-    contact_number: null,
-    email: null,
-    auth_id: null,
-    tenant_status: 'PENDING',
-    lease_status: 'INACTIVE',
-    lease_type: 'BEDSPACER',
-    lease_id: null,
-    location_id: null,
-    start_date: new Date().toISOString().split('T')[0],
-    end_date: new Date().toISOString().split('T')[0],
-    rent_amount: 0,
-    security_deposit: 0,
-    outstanding_balance: 0,
-    notes: '',
-    last_payment_date: null,
-    next_payment_due: null,
-    created_by: profile?.id || null,
-    emergency_contact: null,
-    payment_schedules: [],
-    status_history: []
-  }, zod(tenantFormSchema));
+
+  const form = await superValidate(zod(tenantFormSchema))
+
 
   // Fetch properties (maintaining existing functionality)
   const { data: propertiesData, error: propertiesError } = await supabase
@@ -113,7 +91,6 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
   const properties = propertiesData || [];
 
   if (propertiesError) {
-    console.error('Error fetching properties:', propertiesError);
   }
 
   // Fetch rental_unit (maintaining existing functionality)
@@ -292,6 +269,7 @@ export const actions: Actions = {
     if (!session || !user) {
       return fail(401, { message: 'Unauthorized' });
     }
+
 
     const form = await superValidate(request, zod(tenantResponseSchema));
     console.log('PUT', form);

@@ -40,10 +40,7 @@
     if (s?.value) {
       const propertyId = parseInt(s.value, 10);
       if (!isNaN(propertyId)) {
-        $form = {
-          ...$form,
-          property_id: propertyId
-        };
+        $form.property_id = propertyId;
       }
     }
   }
@@ -51,10 +48,7 @@
   function handleStatusChange(selected: unknown) {
     const s = selected as SelectItem;
     if (s?.value) {
-      $form = {
-        ...$form,
-        status: s.value as typeof floorStatusEnum._type
-      };
+      $form.status = s.value as typeof floorStatusEnum._type;
     }
   }
 </script>
@@ -72,6 +66,7 @@
 
   <div class="space-y-2">
     <Label for="property_id">Property</Label>
+    <input type="hidden" name="property_id" bind:value={$form.property_id} />
     <Select.Root    
       selected={{ 
         value: $form.property_id?.toString() || '', 

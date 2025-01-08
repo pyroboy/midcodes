@@ -2,6 +2,15 @@ import { z } from 'zod';
 
 export const floorStatusEnum = z.enum(['ACTIVE', 'INACTIVE', 'MAINTENANCE']);
 
+export const deleteFloorSchema = z.object({
+  id: z.coerce.number({
+    required_error: 'Floor ID is required',
+    invalid_type_error: 'Invalid floor ID'
+  }).positive('Invalid floor ID')
+});
+
+export type DeleteFloorSchema = typeof deleteFloorSchema
+
 export const floorSchema = z.object({
   id: z.number().optional(),
   property_id: z.coerce.number({

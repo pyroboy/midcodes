@@ -16,10 +16,10 @@ export const load = (async ({ locals: { supabase, safeGetSession } }) => {
     .eq('id', user?.id)
     .single();
 
-    // assign context
-  if (!profile?.property_id) {
-    throw error(400, { message: 'No property assigned to user' });
-  }
+    // assign context TODO
+  // if (!profile?.property_id) {
+  //   throw error(400, { message: 'No property assigned to user' });
+  // }
 
   // Get rental_unit with their leases and tenants
   const { data: rental_unit, error: rental_unitError } = await supabase

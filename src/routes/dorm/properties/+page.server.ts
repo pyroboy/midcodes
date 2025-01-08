@@ -1,19 +1,28 @@
-import { fail } from '@sveltejs/kit';
+import { fail, redirect } from '@sveltejs/kit';
+import type { Actions, PageServerLoad } from './$types';
+import type { RequestEvent } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
-import { supabase } from '$lib/supabaseClient';
-import { propertySchema, type PropertyWithCounts, preparePropertyData } from './formSchema';
+import { checkAccess } from '$lib/utils/roleChecks';
+import { propertySchema, type PropertyData, preparePropertyData } from './formSchema';
 
-export const load = async () => {
-  // Get properties with floor and rental_unit counts
+export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase } }) => {
+  const {  user, profile } = await safeGetSession();
+
+  const hasAccess = checkAccess(profile?.role, 'admin');
+  if (!hasAccess) {
+    throw redirect(302, '/unauthorized');
+  }
+
+  console.log('Starting properties load function');
+  
   const { data: properties, error } = await supabase
     .from('properties')
-    .select(`
-      *,
-      floors:floors(count),
-      rental_unit:rental_unit(count)
-    `)
+    .select('*')
     .order('name');
+  
+  console.log('Raw properties data:', properties);
+  console.log('Query error if any:', error);
 
   if (error) {
     console.error('Error loading properties:', error);
@@ -23,23 +32,16 @@ export const load = async () => {
     };
   }
 
-  // Transform the data to include counts
-  const propertiesWithCounts: PropertyWithCounts[] = properties.map(property => ({
-    ...property,
-    floor_count: property.floors?.[0]?.count ?? 0,
-    rental_unit_count: property.rental_unit?.[0]?.count ?? 0
-  }));
-
   const form = await superValidate(zod(propertySchema));
 
   return {
     form,
-    properties: propertiesWithCounts
+    properties: properties ?? []
   };
 };
 
 export const actions = {
-  create: async ({ request }) => {
+  create: async ({ request, locals: { supabase } }: RequestEvent) => {
     const form = await superValidate(request, zod(propertySchema));
 
     if (!form.valid) {
@@ -62,8 +64,7 @@ export const actions = {
 
     return { form };
   },
-
-  update: async ({ request }) => {
+  update: async ({ request, locals: { supabase } }: RequestEvent) => {
     const form = await superValidate(request, zod(propertySchema));
 
     if (!form.valid) {
@@ -88,7 +89,7 @@ export const actions = {
     return { form };
   },
 
-  delete: async ({ request }) => {
+  delete: async ({ request, locals: { supabase } }: RequestEvent) => {
     const form = await superValidate(request, zod(propertySchema));
 
     if (!form.valid) {

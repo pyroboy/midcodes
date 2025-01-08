@@ -41,11 +41,8 @@ export interface Property {
   updated_at: string | null;
 }
 
-// Type for the property with counts
-export interface PropertyWithCounts extends Property {
-  floor_count: number;
-  rental_unit_count: number;
-}
+// Type for property data
+export type PropertyData = Property;
 
 // Helper function to validate property data
 export function validateProperty(data: unknown): PropertyFormData {
