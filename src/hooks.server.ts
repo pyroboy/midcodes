@@ -231,13 +231,18 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
 const { error: throwError } = await import('@sveltejs/kit');
 
 const authGuard: Handle = async ({ event, resolve }) => {
-  // Skip auth check for dokmutyatirol.ph domain
   const host = event.request.headers.get('host');
+  const path = event.url.pathname;
+
+  // Skip auth check for dokmutyatirol.ph domain and allow only /dokmutya route
   if (host === 'dokmutyatirol.ph') {
+    if (path !== '/dokmutya') {
+      throw redirect(303, '/dokmutya');
+    }
     return resolve(event);
   }
 
-  if (event.url.pathname.startsWith('/api')) {
+  if (path.startsWith('/api')) {
     const sessionInfo = await event.locals.safeGetSession() as GetSessionResult
     
     if (!sessionInfo.user) {
@@ -253,7 +258,6 @@ const authGuard: Handle = async ({ event, resolve }) => {
     return resolve(event)
   }
 
-  const path = event.url.pathname
   const isAuthPath = path === '/auth'
 
   const sessionInfo = await event.locals.safeGetSession() as GetSessionResult
