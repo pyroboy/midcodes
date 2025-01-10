@@ -7,6 +7,7 @@
   import { createEventDispatcher } from 'svelte';
   import { Button } from "$lib/components/ui/button";
   import { Label } from "$lib/components/ui/label";
+  import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import MultiSelect from "$lib/components/ui/multiSelect.svelte";
   import type { PageData } from './$types';
 
@@ -26,19 +27,37 @@
     };
   }
 
+  interface FormError {
+    error?: string;
+    message?: string;
+  }
+
+  type FormData = z.infer<typeof leaseSchema>;
+
+  interface Props {
+    data: PageData;
+    editMode?: boolean;
+    form: SuperForm<FormData>['form'];
+    errors: SuperForm<FormData>['errors'];
+    enhance: SuperForm<FormData>['enhance'];
+    constraints: SuperForm<FormData>['constraints'];
+    submitting: SuperForm<FormData>['submitting'];
+    entity?: FormData | undefined;
+  }
+
   export let data: PageData;
   export let editMode = false;
-  export let form: SuperForm<z.infer<typeof leaseSchema>>['form'];
-  export let errors: SuperForm<z.infer<typeof leaseSchema>>['errors'];
-  export let enhance: SuperForm<z.infer<typeof leaseSchema>>['enhance'];
-  export let constraints: SuperForm<z.infer<typeof leaseSchema>>['constraints'];
-  export let submitting: SuperForm<z.infer<typeof leaseSchema>>['submitting'];
-  export let entity: z.infer<typeof leaseSchema> | undefined = undefined;
+  export let form: SuperForm<FormData>['form'];
+  export let errors: SuperForm<FormData>['errors'];
+  export let enhance: SuperForm<FormData>['enhance'];
+  export let constraints: SuperForm<FormData>['constraints'];
+  export let submitting: SuperForm<FormData>['submitting'];
+  export let entity: FormData | undefined = undefined;
 
   const dispatch = createEventDispatcher();
 
-  function getRentalUnitName(rentalUnitId: number): string | undefined {
-    return data.rental_units?.find((r: RentalUnit) => r.id === rentalUnitId)?.name;
+  function getRentalUnitName(rental_unit_id: number): string | undefined {
+    return data.rental_units?.find((r) => r.id === rental_unit_id)?.name;
   }
 
   function getTenantName(tenantId: number): string | undefined {
@@ -55,7 +74,7 @@
   $: currentTenants = ($form.tenantIds?.map((id: number) => data.tenants?.find((t: Tenant) => t.id === id)) || [])
     .filter((t): t is Tenant => t !== undefined);
 
-  $: currentRentalUnit = data.rental_units?.find((r: RentalUnit) => r.id === $form.locationId);
+  $: currentRentalUnit = data.rental_units?.find((r) => r.id === $form.rental_unit_id);
 
   // Dispatch changes to parent
   $: {
@@ -70,18 +89,34 @@
     };
   }
 
-  function mapRentalUnit(rental_unit: RentalUnit) {
-    return rental_unit;
+  function mapRentalUnit(rental_unit: unknown): RentalUnit {
+    if (
+      typeof rental_unit === 'object' && 
+      rental_unit !== null && 
+      'id' in rental_unit && 
+      'name' in rental_unit && 
+      'property' in rental_unit &&
+      typeof rental_unit.property === 'object' &&
+      rental_unit.property !== null &&
+      'id' in rental_unit.property &&
+      'name' in rental_unit.property
+    ) {
+      return rental_unit as RentalUnit;
+    }
+    throw new Error('Invalid rental unit data structure');
   }
 
-  $: {
-    if ($form.leaseStartDate && $form.leaseTermsMonth) {
-      const startDate = new Date($form.leaseStartDate as string);
-      const endDate = new Date(startDate);
-      endDate.setMonth(endDate.getMonth() + Number($form.leaseTermsMonth));
-      $form.leaseEndDate = endDate.toISOString().split('T')[0];
-    }
+  $: if ($form.start_date && $form.terms_month) {
+    const startDate = new Date($form.start_date);
+    const endDate = new Date(startDate);
+    endDate.setMonth(endDate.getMonth() + Number($form.terms_month));
+    const year = endDate.getFullYear();
+    const month = String(endDate.getMonth() + 1).padStart(2, '0');
+    const day = String(endDate.getDate()).padStart(2, '0');
+    $form.end_date = `${year}-${month}-${day}`;
   }
+
+  $: formErrors = $errors as unknown as FormError;
 </script>
 
 <form 
@@ -90,14 +125,23 @@
   use:enhance
   class="space-y-4"
 >
+  {#if formErrors?.message || formErrors?.error}
+    <Alert variant="destructive">
+      <AlertDescription>
+        {formErrors.message || formErrors.error || 'An error occurred'}
+      </AlertDescription>
+    </Alert>
+  {/if}
+
   {#if entity}
     <div class="text-sm text-muted-foreground mb-4">
-      Editing lease for {getRentalUnitName(entity.locationId)}
+      Editing lease for {getRentalUnitName(entity.rental_unit_id)}
       {#if entity.tenantIds.length > 0}
         - Tenants: {getTenantNames(entity.tenantIds)}
       {/if}
     </div>
   {/if}
+
   {#if editMode}
     <input type="hidden" name="id" bind:value={$form.id} />
   {/if}
@@ -109,23 +153,21 @@
         options={data.tenants?.map(mapTenantToOption) || []}
         bind:selected={$form.tenantIds}
         placeholder="Select tenants..."
-        on:change={({ detail }) => {
-          $form.tenantIds = detail;
-        }}
       />
+      <input type="hidden" name="tenantIds" value={JSON.stringify($form.tenantIds)} />
       {#if $errors.tenantIds}
-        <p class="text-destructive text-sm mt-1">{$errors.tenantIds}</p>
+        <p class="error-message">{$errors.tenantIds}</p>
       {/if}
     </div>
 
     <div class="form-field">
-      <Label for="locationId">Rental Unit</Label>
+      <Label for="rental_unit_id">Rental Unit</Label>
       <select 
-        id="locationId"
-        name="locationId" 
-        bind:value={$form.locationId}
+        id="rental_unit_id"
+        name="rental_unit_id" 
+        bind:value={$form.rental_unit_id}
         class="w-full"
-        {...$constraints.locationId}
+        {...$constraints.rental_unit_id}
       >
         <option value="">Select rental unit</option>
         {#each data.rental_units?.map(mapRentalUnit) || [] as rental_unit}
@@ -134,126 +176,128 @@
           </option>
         {/each}
       </select>
-      {#if $errors.locationId}
-        <p class="text-destructive text-sm mt-1">{$errors.locationId}</p>
+      {#if $errors.rental_unit_id}
+        <p class="error-message">{$errors.rental_unit_id}</p>
       {/if}
     </div>
 
     <div class="form-field">
-      <Label for="leaseType">Type</Label>
+      <Label for="type">Type</Label>
       <select 
-        id="leaseType"
-        name="leaseType" 
-        bind:value={$form.leaseType}
+        id="type"
+        name="type" 
+        bind:value={$form.type}
         class="w-full"
-        {...$constraints.leaseType}
+        {...$constraints.type}
       >
         <option value="">Select type</option>
-        {#each Object.values(leaseSchema.shape.leaseType.options) as type}
+        {#each Object.values(leaseSchema.shape.type.options) as type}
           <option value={type}>{type}</option>
         {/each}
       </select>
-      {#if $errors.leaseType}
-        <p class="text-destructive text-sm mt-1">{$errors.leaseType}</p>
+      {#if $errors.type}
+        <p class="error-message">{$errors.type}</p>
       {/if}
     </div>
 
     <div class="form-field">
-      <Label for="leaseStatus">Status</Label>
+      <Label for="status">Status</Label>
       <select 
-        id="leaseStatus"
-        name="leaseStatus" 
-        bind:value={$form.leaseStatus}
+        id="status"
+        name="status" 
+        bind:value={$form.status}
         class="w-full"
-        {...$constraints.leaseStatus}
+        {...$constraints.status}
       >
         <option value="">Select status</option>
-        {#each Object.values(leaseSchema.shape.leaseStatus.options) as status}
+        {#each Object.values(leaseSchema.shape.status.options) as status}
           <option value={status}>{status}</option>
         {/each}
       </select>
-      {#if $errors.leaseStatus}
-        <p class="text-destructive text-sm mt-1">{$errors.leaseStatus}</p>
+      {#if $errors.status}
+        <p class="error-message">{$errors.status}</p>
       {/if}
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div class="form-field">
-        <Label for="leaseStartDate">Start Date</Label>
+        <Label for="start_date">Start Date</Label>
         <input
-        type="date"
-        id="leaseStartDate"
-        name="leaseStartDate"
-        bind:value={$form.leaseStartDate}
-        {...$constraints.leaseStartDate}
+          type="date"
+          id="start_date"
+          name="start_date"
+          bind:value={$form.start_date}
+          {...$constraints.start_date}
         />
-        {#if $errors.leaseStartDate}
-          <p class="text-destructive text-sm mt-1">{$errors.leaseStartDate}</p>
+        {#if $errors.start_date}
+          <p class="error-message">{$errors.start_date}</p>
         {/if}
       </div>
 
       <div class="form-field">
-        <Label for="leaseTermsMonth">Terms (months)</Label>
+        <Label for="terms_month">Terms (months)</Label>
         <input
-        type="number"
-        id="leaseTermsMonth"
-        name="leaseTermsMonth"
-        bind:value={$form.leaseTermsMonth}
-        min="1"
-        max="60"
-        {...$constraints.leaseTermsMonth}
+          type="number"
+          id="terms_month"
+          name="terms_month"
+          bind:value={$form.terms_month}
+          min="1"
+          max="60"
+          {...$constraints.terms_month}
         />
-        {#if $errors.leaseTermsMonth}
-          <p class="text-destructive text-sm mt-1">{$errors.leaseTermsMonth}</p>
+        {#if $errors.terms_month}
+          <p class="error-message">{$errors.terms_month}</p>
         {/if}
       </div>
     </div>
 
+    <input type="hidden" name="end_date" bind:value={$form.end_date} />
+
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div class="form-field">
-        <Label for="leaseRentRate">Monthly Rent</Label>
+        <Label for="rent_amount">Monthly Rent</Label>
         <input
-        type="number"
-        id="leaseRentRate"
-        name="leaseRentRate"
-        bind:value={$form.leaseRentRate}
-        min="0"
-        step="0.01"
-        {...$constraints.leaseRentRate}
+          type="number"
+          id="rent_amount"
+          name="rent_amount"
+          bind:value={$form.rent_amount}
+          min="0"
+          step="0.01"
+          {...$constraints.rent_amount}
         />
-        {#if $errors.leaseRentRate}
-          <p class="text-destructive text-sm mt-1">{$errors.leaseRentRate}</p>
+        {#if $errors.rent_amount}
+          <p class="error-message">{$errors.rent_amount}</p>
         {/if}
       </div>
 
       <div class="form-field">
-        <Label for="leaseSecurityDeposit">Security Deposit</Label>
+        <Label for="security_deposit">Security Deposit</Label>
         <input
-        type="number"
-        id="leaseSecurityDeposit"
-        name="leaseSecurityDeposit"
-        bind:value={$form.leaseSecurityDeposit}
-        min="0"
-        step="0.01"
-        {...$constraints.leaseSecurityDeposit}
+          type="number"
+          id="security_deposit"
+          name="security_deposit"
+          bind:value={$form.security_deposit}
+          min="0"
+          step="0.01"
+          {...$constraints.security_deposit}
         />
-        {#if $errors.leaseSecurityDeposit}
-          <p class="text-destructive text-sm mt-1">{$errors.leaseSecurityDeposit}</p>
+        {#if $errors.security_deposit}
+          <p class="error-message">{$errors.security_deposit}</p>
         {/if}
       </div>
     </div>
 
     <div class="form-field">
-      <Label for="leaseNotes">Notes</Label>
+      <Label for="notes">Notes</Label>
       <textarea
-        id="leaseNotes"
-        name="leaseNotes"
-        bind:value={$form.leaseNotes}
+        id="notes"
+        name="notes"
+        bind:value={$form.notes}
         rows={3}
-        {...$constraints.leaseNotes}
+        {...$constraints.notes}
       />
-      {#if $errors.leaseNotes}
-        <p class="text-destructive text-sm mt-1">{$errors.leaseNotes}</p>
+      {#if $errors.notes}
+        <p class="error-message">{$errors.notes}</p>
       {/if}
     </div>
 
@@ -282,27 +326,31 @@
 </form>
 
 <style lang="postcss">
-.form-field {
-  @apply space-y-2;
-}
+  .form-field {
+    @apply space-y-2;
+  }
 
-:global(.form-field select) {
-  @apply w-full rounded-md border border-input bg-background px-3 py-2 text-sm;
-}
+  :global(.form-field select) {
+    @apply w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background;
+  }
 
-:global(.form-field select[multiple]) {
-  @apply h-32;
-}
+  :global(.form-field select[multiple]) {
+    @apply h-32;
+  }
 
-:global(.form-field select option) {
-  @apply py-1;
-}
+  :global(.form-field select option) {
+    @apply py-1;
+  }
 
-:global(.form-field input) {
-  @apply w-full rounded-md border border-input bg-background px-3 py-2 text-sm;
-}
+  :global(.form-field input) {
+    @apply w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background;
+  }
 
-:global(.form-field textarea) {
-  @apply w-full rounded-md border border-input bg-background px-3 py-2 text-sm;
-}
+  :global(.form-field textarea) {
+    @apply w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background;
+  }
+
+  :global(.error-message) {
+    @apply text-destructive text-sm mt-1;
+  }
 </style>

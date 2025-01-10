@@ -18,18 +18,16 @@
     const dispatch = createEventDispatcher();
   
     function handleSelect(value: string | number) {
-      console.log('Selecting value:', value);
+      const numValue = typeof value === 'string' ? parseInt(value) : value;
       if (multiSelect) {
-        if (selected.includes(value)) {
-          selected = selected.filter((item) => item !== value);
+        if (selected.includes(numValue)) {
+          selected = selected.filter((item) => item !== numValue);
         } else {
-          selected = [...selected, value];
+          selected = [...selected, numValue];
         }
       } else {
-        selected = [value];
+        selected = [numValue];
       }
-      dispatch('change', selected);
-      console.log('Updated selected:', selected);
     }
   
     $: filteredOptions = options.filter((option) =>
@@ -39,7 +37,6 @@
     $: {
       if (!multiSelect && selected.length > 1) {
         selected = [selected[0]];
-        dispatch('change', selected);
       }
     }
   
@@ -56,7 +53,6 @@
   
     function handleOpenChange(isOpen: boolean) {
       open = isOpen;
-      console.log('Dropdown open state:', open);
     }
   </script>
   

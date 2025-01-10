@@ -39,6 +39,25 @@ declare global {
   }
 }
 
+const domainHandler: Handle = async ({ event, resolve }) => {
+  const host = event.request.headers.get('host');
+  const path = event.url.pathname;
+
+  if (host === 'dokmutyatirol.ph') {
+    // If not already on /dokmutya, redirect there
+    if (path !== '/dokmutya') {
+      throw redirect(303, '/dokmutya');
+    }
+  } else if (path === '/dokmutya') {
+    // If trying to access /dokmutya from a different domain, block access
+    if (host !== 'dokmutyatirol.ph') {
+      throw redirect(303, '/');
+    }
+  }
+
+  return resolve(event);
+}
+
 function isValidUserRole(role: string): role is UserRole {
   return Object.keys(RoleConfig).includes(role as UserRole)
 }
@@ -202,6 +221,12 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
 const { error: throwError } = await import('@sveltejs/kit');
 
 const authGuard: Handle = async ({ event, resolve }) => {
+  // Skip auth check for dokmutyatirol.ph domain
+  const host = event.request.headers.get('host');
+  if (host === 'dokmutyatirol.ph') {
+    return resolve(event);
+  }
+
   if (event.url.pathname.startsWith('/api')) {
     const sessionInfo = await event.locals.safeGetSession() as GetSessionResult
     
@@ -286,6 +311,12 @@ const authGuard: Handle = async ({ event, resolve }) => {
 }
 
 const roleEmulationGuard: Handle = async ({ event, resolve }) => {
+  // Skip role emulation check for dokmutyatirol.ph domain
+  const host = event.request.headers.get('host');
+  if (host === 'dokmutyatirol.ph') {
+    return resolve(event);
+  }
+
   if (event.url.pathname.startsWith('/api')) {
     return resolve(event)
   }
@@ -314,4 +345,4 @@ const roleEmulationGuard: Handle = async ({ event, resolve }) => {
   return resolve(event)
 }
 
-export const handle = sequence(initializeSupabase, roleEmulationGuard, authGuard)
+export const handle = sequence(domainHandler, initializeSupabase, roleEmulationGuard, authGuard)

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { superForm } from 'sveltekit-superforms/client';
+  import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
   import { zod } from 'sveltekit-superforms/adapters';
   import type { PageData } from './$types';
   import { Button } from "$lib/components/ui/button";
@@ -28,25 +29,43 @@
   const { form, errors, enhance, reset, delayed, constraints, submitting } = superForm(data.form ?? {
     id: undefined,
     tenantIds: [],
-    locationId: undefined,
-    leaseStatus: 'ACTIVE',
-    leaseType: 'MONTHLY',
-    leaseStartDate: '',
-    leaseEndDate: '',
-    leaseTermsMonth: 1,
-    leaseSecurityDeposit: 0,
-    leaseRentRate: 0,
-    leaseNotes: ''
+    rental_unit_id: undefined,
+    name: '',
+    status: 'ACTIVE',
+    type: 'MONTHLY',
+    start_date: '',
+    end_date: '',
+    terms_month: 1,
+    security_deposit: 0,
+    rent_amount: 0,
+    notes: '',
+    balance: 0
   }, {
     validators: zod(leaseSchema),
     resetForm: true,
+    taintedMessage: null,
     onUpdated: ({ form }) => {
+      if (!form.valid) {
+        // Access error messages from the result
+        const formData = form.data as Record<string, any>;
+        const errorMessage = formData.error?.message || 'Failed to save lease';
+        toast.error(errorMessage);
+        return;
+      }
       if ('success' in form.data && form.data.success) {
         toast.success('Lease saved successfully');
         showForm = false;
         editMode = false;
         reset();
       }
+    },
+    onSubmit: () => {
+      console.log('Form submitted with values:', $form);
+    },
+    onError: ({ result }) => {
+      console.error('Form submission error:', result.error);
+      const errorMessage = result.error?.message || 'An error occurred';
+      toast.error(errorMessage);
     }
   });
 
@@ -57,15 +76,17 @@
     $form = {
       id: lease.id,
       tenantIds: lease.tenantIds,
-      locationId: lease.locationId,
-      leaseStatus: lease.leaseStatus,
-      leaseType: lease.leaseType,
-      leaseStartDate: lease.leaseStartDate,
-      leaseEndDate: lease.leaseEndDate,
-      leaseTermsMonth: lease.leaseTermsMonth,
-      leaseSecurityDeposit: lease.leaseSecurityDeposit,
-      leaseRentRate: lease.leaseRentRate,
-      leaseNotes: lease.leaseNotes || ''
+      rental_unit_id: lease.rental_unit_id,
+      name: lease.name,
+      status: lease.status,
+      type: lease.type,
+      start_date: lease.start_date,
+      end_date: lease.end_date,
+      terms_month: lease.terms_month,
+      security_deposit: lease.security_deposit,
+      rent_amount: lease.rent_amount,
+      notes: lease.notes || '',
+      balance: lease.balance
     };
   }
 
@@ -148,8 +169,8 @@
           >
             <div>
               {lease.rental_unit?.name}
-              <span class={`badge ${getStatusBadgeVariant(lease.leaseStatus)}`}>
-                {lease.leaseStatus}
+              <span class={`badge ${getStatusBadgeVariant(lease.status)}`}>
+                {lease.status}
               </span>
             </div>
             <div>
@@ -158,16 +179,16 @@
                 {#if lease.tenantIds.indexOf(id) !== lease.tenantIds.length - 1}, {/if}
               {/each}
             </div>
-            <div>{lease.leaseType}</div>
+            <div>{lease.type}</div>
             <div class="text-sm">
-              {formatDate(lease.leaseStartDate)} - {formatDate(lease.leaseEndDate)}
+              {formatDate(lease.start_date)} - {formatDate(lease.end_date)}
               <br>
-              {lease.leaseTermsMonth} months
+              {lease.terms_month} months
             </div>
             <div>
-              <div>₱{lease.leaseRentRate}/mo</div>
+              <div>₱{lease.rent_amount}/mo</div>
               <div class="text-sm text-muted-foreground">
-                Deposit: ₱{lease.leaseSecurityDeposit}
+                Deposit: ₱{lease.security_deposit}
               </div>
             </div>
           </button>
@@ -182,22 +203,22 @@
 
   <!-- Right side: Form -->
   <div class="w-1/3 pl-4">
-      <div class="flex justify-between items-center mb-4">
-        <h1 class="text-2xl font-bold">{editMode ? 'Edit' : 'Add'} Lease</h1>
-      </div>
+    <div class="flex justify-between items-center mb-4">
+      <h1 class="text-2xl font-bold">{editMode ? 'Edit' : 'Add'} Lease</h1>
+    </div>
 
-      <LeaseForm
-        {data}
-        {editMode}
-        {form}
-        {errors}
-        {enhance}
-        {constraints}
-        {submitting}
-        entity={selectedLease}
-        on:cancel={handleCancel}
-        on:delete={handleDelete}
-      />
+    <LeaseForm
+      {data}
+      {editMode}
+      {form}
+      {errors}
+      {enhance}
+      {constraints}
+      {submitting}
+      entity={selectedLease}
+      on:cancel={handleCancel}
+      on:delete={handleDelete}
+    />
   </div>
 </div>
 
@@ -220,3 +241,5 @@
     </div>
   </Dialog.Content>
 </Dialog.Root>
+
+<SuperDebug data={$form} />
