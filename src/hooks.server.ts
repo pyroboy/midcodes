@@ -321,6 +321,12 @@ const authGuard: Handle = async ({ event, resolve }) => {
 
   // Handle different redirect scenarios
   if (redirectPath === PublicPaths.error) {
+    event.locals = {
+      ...event.locals,
+      session: null,
+      user: null,
+      profile: null
+    };
     throw throwError(404, { message: 'Not found' });
   }
 

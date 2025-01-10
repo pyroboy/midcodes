@@ -23,6 +23,23 @@ type ServerProfile = Database['public']['Tables']['profiles']['Row'] & {
 export const load: LayoutLoad = async ({ data }) => {
   console.log('[Layout] Initializing with data:', data);
 
+  // Handle case when data is null (like in error pages)
+  if (!data) {
+    return {
+      user: null,
+      profile: null,
+      navigation: {
+        homeUrl: '/',
+        showHeader: false,
+        allowedPaths: [],
+        showRoleEmulation: false
+      } as NavigationState,
+      emulation: null,
+      special_url: undefined,
+      session: null
+    };
+  }
+
   // Extract the session data we need
   const { user, profile: serverProfile, navigation, emulation, special_url, session } = data;
   
