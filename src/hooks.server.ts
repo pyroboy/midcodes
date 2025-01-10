@@ -39,34 +39,34 @@ declare global {
   }
 }
 
-const domainHandler: Handle = async ({ event, resolve }) => {
-  const host = event.request.headers.get('host');
-  const path = event.url.pathname;
+// const domainHandler: Handle = async ({ event, resolve }) => {
+//   const host = event.request.headers.get('host');
+//   const path = event.url.pathname;
 
-  // Domain-specific handling that always skips layout
-  if (host === 'dokmutyatirol.ph') {
-    if (path !== '/dokmutya') {
-      throw redirect(303, '/dokmutya');
-    }
-    return resolve(event, {
-      transformPageChunk: ({ html }) => html
-    });
-  } 
+//   // Domain-specific handling that always skips layout
+//   if (host === 'dokmutyatirol.ph') {
+//     if (path !== '/dokmutya') {
+//       throw redirect(303, '/dokmutya');
+//     }
+//     return resolve(event, {
+//       transformPageChunk: ({ html }) => html
+//     });
+//   } 
   
-  if (path === '/dokmutya') {
-    if (!host?.includes('localhost') && 
-        host !== 'id-card-generator.vercel.app' && 
-        host !== 'midcodes.one') {
-      throw redirect(303, '/');
-    }
-    return resolve(event, {
-      transformPageChunk: ({ html }) => html
-    });
-  }
+//   if (path === '/dokmutya') {
+//     if (!host?.includes('localhost') && 
+//         host !== 'id-card-generator.vercel.app' && 
+//         host !== 'midcodes.one') {
+//       throw redirect(303, '/');
+//     }
+//     return resolve(event, {
+//       transformPageChunk: ({ html }) => html
+//     });
+//   }
 
-  // For other paths, let authGuard handle layout skipping
-  return resolve(event);
-}
+//   // For other paths, let authGuard handle layout skipping
+//   return resolve(event);
+// }
 
 const initializeSupabase: Handle = async ({ event, resolve }) => {
   event.locals.supabase = createServerClient(
@@ -341,4 +341,4 @@ const authGuard: Handle = async ({ event, resolve }) => {
   return resolve(event);
 }
 
-export const handle = sequence(domainHandler, initializeSupabase, roleEmulationGuard, authGuard)
+export const handle = sequence( initializeSupabase, roleEmulationGuard, authGuard)
