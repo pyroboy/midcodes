@@ -49,8 +49,10 @@ const domainHandler: Handle = async ({ event, resolve }) => {
       throw redirect(303, '/dokmutya');
     }
   } else if (path === '/dokmutya') {
-    // If trying to access /dokmutya from a different domain, block access
-    if (host !== 'dokmutyatirol.ph') {
+    // Allow access from localhost, main domain, and midcodes.one
+    if (!host?.includes('localhost') && 
+        host !== 'id-card-generator.vercel.app' && 
+        host !== 'midcodes.one') {
       throw redirect(303, '/');
     }
   }
