@@ -234,7 +234,12 @@ const authGuard: Handle = async ({ event, resolve }) => {
   const host = event.request.headers.get('host');
   const path = event.url.pathname;
 
-  // Skip auth check for dokmutyatirol.ph domain and allow only /dokmutya route
+  // First check if it's a public path
+  if (isPublicPath(path)) {
+    return resolve(event);
+  }
+
+  // Then check domain-specific rules
   if (host === 'dokmutyatirol.ph') {
     if (path !== '/dokmutya') {
       throw redirect(303, '/dokmutya');
@@ -270,10 +275,6 @@ const authGuard: Handle = async ({ event, resolve }) => {
   }
 
   if (!sessionInfo.user) {
-    if (isPublicPath(path)) {
-      return resolve(event);
-    }
-    
     if (!isAuthPath) {
       throw redirect(303, `/auth`);
     }
@@ -288,10 +289,6 @@ const authGuard: Handle = async ({ event, resolve }) => {
     if (config) {
       throw redirect(303, config.defaultPath(sessionInfo.profile.context));
     }
-  }
-
-  if (isPublicPath(path)) {
-    return resolve(event);
   }
 
   if (!sessionInfo.profile?.role || !isValidUserRole(sessionInfo.profile.role)) {
