@@ -1,12 +1,12 @@
 import { createServerClient } from '@supabase/ssr'
 import type { SupabaseClient, User, Session } from '@supabase/supabase-js'
 import { sequence } from '@sveltejs/kit/hooks'
-import { redirect } from '@sveltejs/kit'
+import { redirect, error as throwError } from '@sveltejs/kit'
 import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public'
 import { ADMIN_URL } from '$env/static/private'
 import type { Handle } from '@sveltejs/kit'
 import type { RoleEmulationData, RoleEmulationClaim, EmulatedProfile, ProfileData, LocalsSession } from '$lib/types/roleEmulation'
-import { RoleConfig, type UserRole, isPublicPath, getRedirectPath, PublicPaths } from '$lib/auth/roleConfig'
+import { RoleConfig, type UserRole, isPublicPath, getRedirectPath, PublicPaths, isValidUserRole,shouldSkipLayout } from '$lib/auth/roleConfig'
 
 interface SessionInfo {
   session: LocalsSession | null
@@ -43,62 +43,29 @@ const domainHandler: Handle = async ({ event, resolve }) => {
   const host = event.request.headers.get('host');
   const path = event.url.pathname;
 
+  // Domain-specific handling that always skips layout
   if (host === 'dokmutyatirol.ph') {
-    // If not already on /dokmutya, redirect there
     if (path !== '/dokmutya') {
       throw redirect(303, '/dokmutya');
     }
-    // Skip layout for dokmutyatirol.ph
     return resolve(event, {
       transformPageChunk: ({ html }) => html
     });
-  } else if (path === '/dokmutya') {
-    // Allow access from localhost, main domain, and midcodes.one
+  } 
+  
+  if (path === '/dokmutya') {
     if (!host?.includes('localhost') && 
         host !== 'id-card-generator.vercel.app' && 
         host !== 'midcodes.one') {
       throw redirect(303, '/');
     }
-    // Skip layout for /dokmutya route on allowed domains
     return resolve(event, {
       transformPageChunk: ({ html }) => html
     });
   }
 
+  // For other paths, let authGuard handle layout skipping
   return resolve(event);
-}
-
-function isValidUserRole(role: string): role is UserRole {
-  return Object.keys(RoleConfig).includes(role as UserRole)
-}
-
-async function getUserProfile(userId: string, supabase: SupabaseClient): Promise<ProfileData | null> {
-  const { data: profile, error } = await supabase
-  .from('profiles')
-  .select('*, organizations(id, name), context')
-  .eq('id', userId)
-  .single();
-
-  if (error) {
-    console.error('Error fetching profile:', error);
-    return null;
-  }
-  return profile
-}
-
-async function getActiveRoleEmulation(userId: string, supabase: SupabaseClient) {
-  const { data: emulation } = await supabase
-    .from('role_emulation_sessions')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('status', 'active')
-    .gt('expires_at', new Date().toISOString())
-    .single()
-
-  if (emulation) {
-    // console.log('[Session] Emulated Role:', emulation.emulated_role)
-  }
-  return emulation
 }
 
 const initializeSupabase: Handle = async ({ event, resolve }) => {
@@ -120,6 +87,11 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
       }
     }
   )
+
+  event.locals.getSession = async () => {
+    const { data: { session } } = await event.locals.supabase.auth.getSession()
+    return session
+  }
 
   event.locals.safeGetSession = async () => {
     let session = event.locals.session
@@ -172,7 +144,6 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
     }
 
     const user = session.user
-
     const [profile, activeEmulation] = await Promise.all([
       getUserProfile(user.id, event.locals.supabase),
       getActiveRoleEmulation(user.id, event.locals.supabase)
@@ -228,101 +199,33 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
   return resolve(event)
 }
 
-const { error: throwError } = await import('@sveltejs/kit');
+async function getUserProfile(userId: string, supabase: SupabaseClient): Promise<ProfileData | null> {
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('*, organizations(id, name), context')
+    .eq('id', userId)
+    .single();
 
-const authGuard: Handle = async ({ event, resolve }) => {
-  const host = event.request.headers.get('host');
-  const path = event.url.pathname;
-
-  // First check if it's a public path
-  if (isPublicPath(path)) {
-    return resolve(event);
+  if (error) {
+    console.error('Error fetching profile:', error);
+    return null;
   }
+  return profile
+}
 
-  // Then check domain-specific rules
-  if (host === 'dokmutyatirol.ph') {
-    if (path !== '/dokmutya') {
-      throw redirect(303, '/dokmutya');
-    }
-    return resolve(event);
-  }
+async function getActiveRoleEmulation(userId: string, supabase: SupabaseClient) {
+  const { data: emulation } = await supabase
+    .from('role_emulation_sessions')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .gt('expires_at', new Date().toISOString())
+    .single()
 
-  if (path.startsWith('/api')) {
-    const sessionInfo = await event.locals.safeGetSession() as GetSessionResult
-    
-    if (!sessionInfo.user) {
-      throw throwError(401, 'Unauthorized')
-    }
-    
-    event.locals = {
-      ...event.locals,
-      session: sessionInfo.session,
-      user: sessionInfo.user
-    }
-    
-    return resolve(event)
-  }
-
-  const isAuthPath = path === '/auth'
-
-  const sessionInfo = await event.locals.safeGetSession() as GetSessionResult
-
-  event.locals = {
-    ...event.locals,
-    session: sessionInfo.session,
-    user: sessionInfo.user,
-    profile: sessionInfo.profile,
-  }
-
-  if (!sessionInfo.user) {
-    if (!isAuthPath) {
-      throw redirect(303, `/auth`);
-    }
-    return resolve(event);
-  }
-
-  if (isAuthPath && sessionInfo.profile?.role && isValidUserRole(sessionInfo.profile.role)) {
-    if (sessionInfo.profile.role === 'super_admin') {
-      throw redirect(303, `/${ADMIN_URL}`);
-    }
-    const config = RoleConfig[sessionInfo.profile.role as UserRole];
-    if (config) {
-      throw redirect(303, config.defaultPath(sessionInfo.profile.context));
-    }
-  }
-
-  if (!sessionInfo.profile?.role || !isValidUserRole(sessionInfo.profile.role)) {
-    throw throwError(400, 'Invalid user role')
-  }
-
-  const originalRole = (sessionInfo.profile as EmulatedProfile)?.originalRole
-  const context = sessionInfo.roleEmulation?.metadata?.context || sessionInfo.profile?.context || {}
-
-  if (path === `/${ADMIN_URL}` && 
-      ((!originalRole && sessionInfo.profile.role === 'super_admin') || originalRole === 'super_admin')) {
-    return resolve(event);
-  }
-
-  const redirectPath = getRedirectPath(
-    sessionInfo.profile.role,
-    path,
-    originalRole,
-    context
-  );
-
-  if (redirectPath === PublicPaths.auth) {
-    throw throwError(404, { message: 'Not found' });
-  }
-
-  if (redirectPath) {
-    throw redirect(303, redirectPath)
-  }
-
-  return resolve(event)
+  return emulation
 }
 
 const roleEmulationGuard: Handle = async ({ event, resolve }) => {
-  // Skip role emulation check for dokmutyatirol.ph domain
   const host = event.request.headers.get('host');
   if (host === 'dokmutyatirol.ph') {
     return resolve(event);
@@ -354,6 +257,82 @@ const roleEmulationGuard: Handle = async ({ event, resolve }) => {
   }
 
   return resolve(event)
+}
+
+const authGuard: Handle = async ({ event, resolve }) => {
+  const path = event.url.pathname;
+
+  // Check for public path and skip layout
+  if (shouldSkipLayout(path)) {
+    return resolve(event, {
+      transformPageChunk: ({ html }) => html
+    });
+  }
+
+  // Handle API routes
+  if (path.startsWith('/api')) {
+    const sessionInfo = await event.locals.safeGetSession() as GetSessionResult
+    if (!sessionInfo.user) {
+      throw throwError(401, 'Unauthorized')
+    }
+    event.locals = {
+      ...event.locals,
+      session: sessionInfo.session,
+      user: sessionInfo.user
+    }
+    return resolve(event)
+  }
+
+  const sessionInfo = await event.locals.safeGetSession() as GetSessionResult
+
+  event.locals = {
+    ...event.locals,
+    session: sessionInfo.session,
+    user: sessionInfo.user,
+    profile: sessionInfo.profile,
+  }
+
+  // Redirect to auth if no user
+  if (!sessionInfo.user) {
+    throw redirect(303, PublicPaths.auth);
+  }
+
+  // Validate user role
+  if (!sessionInfo.profile?.role || !isValidUserRole(sessionInfo.profile.role)) {
+    throw throwError(400, 'Invalid user role')
+  }
+
+  const originalRole = (sessionInfo.profile as EmulatedProfile)?.originalRole
+  const context = sessionInfo.roleEmulation?.metadata?.context || sessionInfo.profile?.context || {}
+
+  // Special handling for admin path
+  if (path === `/${ADMIN_URL}` && 
+      ((!originalRole && sessionInfo.profile.role === 'super_admin') || originalRole === 'super_admin')) {
+    return resolve(event);
+  }
+
+  // Get redirect path based on role access
+  const redirectPath = getRedirectPath(
+    sessionInfo.profile.role,
+    path,
+    originalRole,
+    context
+  );
+
+  // Handle different redirect scenarios
+  if (redirectPath === PublicPaths.error) {
+    throw throwError(404, { message: 'Not found' });
+  }
+
+  if (redirectPath === PublicPaths.auth) {
+    throw throwError(403, { message: 'Forbidden' });
+  }
+
+  if (redirectPath) {
+    throw redirect(303, redirectPath);
+  }
+
+  return resolve(event);
 }
 
 export const handle = sequence(domainHandler, initializeSupabase, roleEmulationGuard, authGuard)

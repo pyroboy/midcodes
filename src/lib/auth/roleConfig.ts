@@ -1,5 +1,10 @@
 import { get } from 'svelte/store'
 
+// Function to validate if a role is valid
+export function isValidUserRole(role: string): role is UserRole {
+    return Object.keys(RoleConfig).includes(role as UserRole)
+}
+
 export type UserRole =
   | 'super_admin'
   | 'org_admin'
@@ -17,9 +22,6 @@ export type UserRole =
   | 'id_gen_admin'
   | 'id_gen_user';
 
-// Define the type for public paths
-type PublicPathValue = typeof PublicPaths[keyof typeof PublicPaths]
-
 export const PublicPaths = {
     auth: '/auth',
     error: '/error',
@@ -28,6 +30,8 @@ export const PublicPaths = {
     constrack: '/constrack',
     dokmutya: '/dokmutya'
 } as const
+
+type PublicPathValue = typeof PublicPaths[keyof typeof PublicPaths]
 
 export function isPublicPathValue(path: string): path is PublicPathValue {
     return Object.values(PublicPaths).includes(path as PublicPathValue)
@@ -53,6 +57,11 @@ export function isPublicPath(path: string): boolean {
     return false
 }
 
+// Helper to determine if layout should be skipped
+export function shouldSkipLayout(path: string): boolean {
+    return isPublicPath(path)
+}
+
 export function hasPathAccess(role: UserRole, path: string, originalRole?: UserRole): boolean {
     if (isPublicPath(path)) return true
 
@@ -75,12 +84,27 @@ export function hasPathAccess(role: UserRole, path: string, originalRole?: UserR
 }
 
 export function getRedirectPath(role: UserRole, path: string, originalRole?: UserRole, context?: any): string | null {
+    // If it's a public path, no redirection needed
     if (isPublicPath(path)) return null
 
     const roleConfig = RoleConfig[role]
     if (!roleConfig) return PublicPaths.auth
     
+    // If user has access, no redirection needed
     if (hasPathAccess(role, path, originalRole)) return null
+
+    // Check if path matches any known pattern across all roles
+    const isKnownPath = Object.values(RoleConfig).some(config => 
+        config.allowedPaths.some(allowedPath => {
+            const pattern = allowedPath.path.replace(/\/$/, '')
+                .replace(/\*\*/g, '.*')
+                .replace(/\*/g, '[^/]+')
+            return new RegExp('^' + pattern + '$').test(path)
+        })
+    )
+
+    // If path doesn't match any known pattern, it's a 404
+    if (!isKnownPath) return PublicPaths.error
 
     const defaultRedirect = roleConfig.defaultPath(context)
     
@@ -92,8 +116,20 @@ export function getRedirectPath(role: UserRole, path: string, originalRole?: Use
 }
 
 export function isPathAllowedForRole(path: string, role: UserRole | null, originalRole?: UserRole): boolean {
+    // Check if it's a public path first
     if (isPublicPath(path)) return true
-    if (!role) return false
+    
+    // If no role, check if path exists in any role config
+    if (!role) {
+        return Object.values(RoleConfig).some(config => 
+            config.allowedPaths.some(allowedPath => {
+                const pattern = allowedPath.path.replace(/\/$/, '')
+                    .replace(/\*\*/g, '.*')
+                    .replace(/\*/g, '[^/]+')
+                return new RegExp('^' + pattern + '$').test(path)
+            })
+        )
+    }
     
     const adminPath = `/midcodes`
     if (path === adminPath && (originalRole === 'super_admin' || originalRole)) {
