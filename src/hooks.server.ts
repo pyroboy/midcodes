@@ -48,6 +48,10 @@ const domainHandler: Handle = async ({ event, resolve }) => {
     if (path !== '/dokmutya') {
       throw redirect(303, '/dokmutya');
     }
+    // Skip layout for dokmutyatirol.ph
+    return resolve(event, {
+      transformPageChunk: ({ html }) => html
+    });
   } else if (path === '/dokmutya') {
     // Allow access from localhost, main domain, and midcodes.one
     if (!host?.includes('localhost') && 
@@ -55,6 +59,10 @@ const domainHandler: Handle = async ({ event, resolve }) => {
         host !== 'midcodes.one') {
       throw redirect(303, '/');
     }
+    // Skip layout for /dokmutya route on allowed domains
+    return resolve(event, {
+      transformPageChunk: ({ html }) => html
+    });
   }
 
   return resolve(event);
