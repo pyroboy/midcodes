@@ -1,9 +1,19 @@
 import { supabase } from '$lib/supabaseClient';
 import type { LayoutLoad } from './$types';
-import type { Session } from '@supabase/supabase-js';
+import type { Session, User } from '@supabase/supabase-js';
 import type { ProfileData, EmulatedProfile } from '$lib/types/roleEmulation';
 import type { Database } from '$lib/database.types';
 import type { NavigationState } from '$lib/types/navigation';
+
+type PageData = {
+  user: User | null;
+  profile: ProfileData | EmulatedProfile | null;
+  navigation: NavigationState;
+  emulation: { active: boolean; emulated_org_id: string | null } | null;
+  special_url: string | undefined;
+  session: Session | null;
+  shouldShowDokmutya: boolean;
+};
 
 type ServerSession = {
   session: Session | null;
@@ -20,7 +30,7 @@ type ServerProfile = Database['public']['Tables']['profiles']['Row'] & {
   context?: Record<string, any>;
 };
 
-export const load: LayoutLoad = async ({ data }) => {
+export const load: LayoutLoad<PageData> = async ({ data }) => {
   console.log('[Layout] Initializing with data:', data);
 
   // Handle case when data is null (like in error pages)
@@ -36,8 +46,9 @@ export const load: LayoutLoad = async ({ data }) => {
       } as NavigationState,
       emulation: null,
       special_url: undefined,
-      session: null
-    };
+      session: null,
+      shouldShowDokmutya: false
+    } satisfies PageData;
   }
 
   // Extract the session data we need
@@ -77,9 +88,10 @@ export const load: LayoutLoad = async ({ data }) => {
     profile,
     navigation,
     emulation: transformedEmulation,
-    special_url,
-    session: (session as ServerSession)?.session ?? null
-  };
+    special_url: special_url ?? undefined,
+    session: (session as ServerSession)?.session ?? null,
+    shouldShowDokmutya: data.shouldShowDokmutya ?? false
+  } satisfies PageData;
 };
 
 export const ssr = false;

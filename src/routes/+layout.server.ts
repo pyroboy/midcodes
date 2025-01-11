@@ -43,12 +43,62 @@ type SessionWithAuth = {
   error: Error | null;
 };
 
-export const load: LayoutServerLoad = async ({ locals: { safeGetSession, profile, supabase, special_url }, url }) => {
-  // console.log('[Layout Server] Starting load for:', url.pathname);
+const isDokmutyaDomain = (host?: string | null): boolean => {
+  if (!host) return false;
+  const baseHostname = host.split(':')[0].replace(/^www\./, '');
+  return baseHostname === 'dokmutyatirol.ph';
+};
+
+export const load: LayoutServerLoad = async ({ locals: { safeGetSession, profile, supabase, special_url }, url, request }) => {
+  // Check for Dokmutya domain first
+  // const isDev = process.env.NODE_ENV === 'development';
+  const isDev = false
+  const actualHost = request.headers.get('host')?.trim().toLowerCase() || '';
+  const forcedHost = isDev ? 'dokmutyatirol.ph' : '';
+  
+  console.log('[Layout Server] Domain Check:', {
+    isDev,
+    actualHost,
+    forcedHost,
+    pathname: url.pathname,
+    currentHost: isDev ? forcedHost : actualHost,
+    headers: Object.fromEntries(request.headers.entries())
+  });
+
+  // In dev mode, we'll consider either the actual host being dokmutyatirol.ph
+  // or when we're forcing it via isDev
+  const isDokmutya = isDev ? 
+    (actualHost === 'dokmutyatirol.ph' || actualHost === 'www.dokmutyatirol.ph' || forcedHost === 'dokmutyatirol.ph') :
+    (actualHost === 'dokmutyatirol.ph' || actualHost === 'www.dokmutyatirol.ph');
+
+  const shouldShowDokmutya = isDokmutya && url.pathname === '/';
+
+  console.log('[Layout Server] Result:', {
+    isDokmutya,
+    shouldShowDokmutya,
+    pathname: url.pathname
+  });
+  
+  // If it's the Dokmutya domain at root path, return early with just that data
+  if (shouldShowDokmutya) {
+    return {
+      shouldShowDokmutya,
+      user: null,
+      profile: null,
+      navigation: {
+        homeUrl: '/',
+        showHeader: false,
+        allowedPaths: [],
+        showRoleEmulation: false
+      },
+      session: null,
+      emulation: null,
+      special_url: null
+    };
+  }
+
   const session = await safeGetSession() as SessionWithAuth;
   const user = session?.user ?? null;
-
-  // console.log('[Layout Server] User profile:', profile);
 
   // Set security headers
   const response = new Response();
@@ -62,38 +112,22 @@ export const load: LayoutServerLoad = async ({ locals: { safeGetSession, profile
   let emulationData: EmulationData | null = null;
   let organizationName: string | null = null;
 
-
-  // console.log the context
-  // console.log('[Layout Server] Context:', currentProfile?.context);
-  // console.log('[Layout Server] Full Profile:', JSON.stringify(currentProfile, null, 2));
-  
   // Navigation state
   const navigation: NavigationState = {
     homeUrl: (() => {
-      const context = currentProfile?.context || {};  // Ensure we always pass an object
-      // console.log('[Layout Server] Role:', currentProfile?.role);
-      // console.log('[Layout Server] Context being passed:', context);
+      const context = currentProfile?.context || {};
       if (!currentProfile?.role) return '/';
       const path = RoleConfig[currentProfile.role].defaultPath(context);
-      // console.log('[Layout Server] Generated path:', path);
       return path;
     })(),
-    showHeader: false, // Default to false
+    showHeader: false,
     allowedPaths: [],
     showRoleEmulation: currentProfile?.role === 'super_admin'
   };
-// 
-  // console.log('[Layout Server] Navigation and Session:', {
-  //   hasSession: !!session,
-  //   session,
-  //   navigation,
-  //   url: url.pathname
-  // });
 
   if (session && currentProfile) {
-    navigation.showHeader = true; // Only show header if authenticated
+    navigation.showHeader = true;
 
-    // Check for active role emulation session for super_admin users
     if (currentProfile.role === 'super_admin') {
       const { data: activeEmulation } = await supabase
         .from('role_emulation_sessions')
@@ -103,12 +137,9 @@ export const load: LayoutServerLoad = async ({ locals: { safeGetSession, profile
         .gt('expires_at', new Date().toISOString())
         .single();
 
-      // console.log('[Layout Server Debug] Active emulation:', activeEmulation);
-
       if (activeEmulation) {
         isEmulated = true;
         
-        // Fetch organization name
         const { data: org } = await supabase
           .from('organizations')
           .select('name')
@@ -125,9 +156,6 @@ export const load: LayoutServerLoad = async ({ locals: { safeGetSession, profile
           organizationName
         };
         
-        // console.log('[Layout Server Debug] Emulation data:', emulationData);
-        
-        // Update profile with emulated data
         currentProfile = {
           ...currentProfile,
           role: activeEmulation.emulated_role,
@@ -137,24 +165,13 @@ export const load: LayoutServerLoad = async ({ locals: { safeGetSession, profile
           isEmulated: true
         } as ServerProfile;
 
-        // console.log('[Layout Server Debug] Updated profile:', currentProfile);
+        navigation.showRoleEmulation = true;
       }
-      navigation.showRoleEmulation = true;
     }
-
-    // Show nav for all authenticated users
-    // navigation.allowedPaths = ['/templates', '/all-ids'];
   }
 
-  // console.log('[Layout Server Debug] Final result:', {
-  //   user,
-  //   profile: currentProfile,
-  //   navigation,
-  //   session,
-  //   emulation: emulationData
-  // });
-
   return {
+    shouldShowDokmutya,
     user,
     profile: currentProfile,
     navigation,

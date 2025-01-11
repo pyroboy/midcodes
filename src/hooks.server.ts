@@ -39,43 +39,43 @@ declare global {
   }
 }
 
+// Utility function to check if it's the Dokmutya domain
+const isDokmutyaDomain = (host?: string | null): boolean => {
+  if (!host) return false;
+  const baseHostname = host.split(':')[0].replace(/^www\./, '');
+  return baseHostname === 'dokmutyatirol.ph';
+};
+
+// Host router that handles domain-specific routing
 const hostRouter: Handle = async ({ event, resolve }) => {
-  const host = event.request.headers.get('host')?.trim().toLowerCase();
-  const userAgent = event.request.headers.get('user-agent');
-  const protocol = event.request.headers.get('x-forwarded-proto') || 'http';
+  const isDev = process.env.NODE_ENV === 'development';
+  const originalHost = event.request.headers.get('host')?.trim().toLowerCase();
+  const host = isDev ? 'dokmutyatirol.ph' : originalHost;
   
-  console.log(`[Host Router] Processing request:`, {
-    host,
+  console.log(`[Host Router] Initial request:`, {
     path: event.url.pathname,
-    protocol,
-    userAgent
+    host,
+    isDev
   });
 
-  // Safety check for empty or missing hostname
-  if (!host) {
-    console.log('[Host Router] No host found, proceeding with default routing');
-    return resolve(event);
-  }
-  
-  // Extract base hostname without port and handle www
-  const baseHostname = host.split(':')[0].replace(/^www\./, '');
-  
-  // Specific handling for Dokmutya domain
-  if (baseHostname === 'dokmutyatirol.ph') {
-    // Only modify the path if we're at the root
-    if (event.url.pathname === '/') {
-      event.url.pathname = '/dokmutya';
-      console.log(`[Host Router] Routing ${host} to /dokmutya`);
-    } else {
-      console.log(`[Host Router] Keeping original path ${event.url.pathname} for ${host}`);
-    }
-  } else {
-    console.log(`[Host Router] Using default routing for ${host}`);
+  if (isDokmutyaDomain(host) && event.url.pathname === '/') {
+    // Instead of modifying the request, we'll resolve with a transform
+    return resolve(event, {
+      transformPageChunk: ({ html }) => {
+        // If we're at root, fetch and inject the dokmutya content
+        return html.replace(
+          '<div id="app">',
+          '<div id="app" data-dokmutya="true">'
+        );
+      }
+    });
   }
   
   return resolve(event);
-}
+};
 
+
+// Initialize Supabase client
 const initializeSupabase: Handle = async ({ event, resolve }) => {
   event.locals.supabase = createServerClient(
     PUBLIC_SUPABASE_URL,
@@ -117,7 +117,6 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
       }
     }
 
-    // Refresh session if access token is expired
     if (session?.expires_at) {
       const expiresAt = Math.floor(new Date(session.expires_at).getTime() / 1000)
       const now = Math.floor(Date.now() / 1000)
@@ -125,7 +124,6 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
       if (now > expiresAt) {
         try {
           const { access_token, refresh_token } = session
-
           const { data: { session: refreshedSession }, error } = 
             await event.locals.supabase.auth.setSession({
               access_token,
@@ -157,7 +155,7 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
       getActiveRoleEmulation(user.id, event.locals.supabase)
     ])
 
-    let emulatedProfile = profile
+    let emulatedProfile: ProfileData | EmulatedProfile | null = profile
     let roleEmulation: RoleEmulationClaim | null = null
 
     if (profile?.role === 'super_admin') {
@@ -207,138 +205,107 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
   return resolve(event)
 }
 
-async function getUserProfile(userId: string, supabase: SupabaseClient): Promise<ProfileData | null> {
-  const { data: profile, error } = await supabase
-    .from('profiles')
-    .select('*, organizations(id, name), context')
-    .eq('id', userId)
-    .single();
-
-  if (error) {
-    console.error('Error fetching profile:', error);
-    return null;
-  }
-  return profile
-}
-
-async function getActiveRoleEmulation(userId: string, supabase: SupabaseClient) {
-  const { data: emulation } = await supabase
-    .from('role_emulation_sessions')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('status', 'active')
-    .gt('expires_at', new Date().toISOString())
-    .single()
-
-  return emulation
-}
-
+// Role emulation guard
 const roleEmulationGuard: Handle = async ({ event, resolve }) => {
-  const host = event.request.headers.get('host')?.split(':')[0].toLowerCase();
-  if (host === 'dokmutyatirol.ph') {
+  const isDev = process.env.NODE_ENV === 'development';
+  const host = isDev ? 'dokmutyatirol.ph' : event.request.headers.get('host')?.trim().toLowerCase();
+  
+  if (isDokmutyaDomain(host) || event.url.pathname.startsWith('/dokmutya')) {
     return resolve(event);
   }
 
   if (event.url.pathname.startsWith('/api')) {
-    return resolve(event)
+    return resolve(event);
   }
 
-  const sessionInfo = await event.locals.safeGetSession() as GetSessionResult
+  const sessionInfo = await event.locals.safeGetSession() as GetSessionResult;
 
   if (sessionInfo.roleEmulation?.active) {
-    const now = new Date()
-    const expiresAt = new Date(sessionInfo.roleEmulation.expires_at)
+    const now = new Date();
+    const expiresAt = new Date(sessionInfo.roleEmulation.expires_at);
 
     if (now > expiresAt) {
       await event.locals.supabase
         .from('role_emulation_sessions')
         .update({ status: 'expired' })
-        .eq('id', sessionInfo.roleEmulation.session_id)
+        .eq('id', sessionInfo.roleEmulation.session_id);
 
-      event.cookies.delete('role_emulation', { path: '/' })
+      event.cookies.delete('role_emulation', { path: '/' });
       if (sessionInfo.session) {
-        delete (sessionInfo.session as LocalsSession).roleEmulation
+        delete (sessionInfo.session as LocalsSession).roleEmulation;
       }
 
-      throw redirect(303, event.url.pathname)
+      throw redirect(303, event.url.pathname);
     }
   }
 
-  return resolve(event)
-}
+  return resolve(event);
+};
 
+// Auth guard
 const authGuard: Handle = async ({ event, resolve }) => {
-  const path = event.url.pathname;
-  const host = event.request.headers.get('host')?.split(':')[0].toLowerCase();
-
-  // Special handling for dokmutyatirol.ph domain
-  if (host === 'dokmutyatirol.ph') {
+  const isDev = process.env.NODE_ENV === 'development';
+  const host = isDev ? 'dokmutyatirol.ph' : event.request.headers.get('host')?.trim().toLowerCase();
+  
+  if (isDokmutyaDomain(host) || event.url.pathname.startsWith('/dokmutya')) {
     return resolve(event);
   }
 
-  // Check for public path and skip layout
-  if (shouldSkipLayout(path)) {
+  if (shouldSkipLayout(event.url.pathname)) {
     return resolve(event, {
       transformPageChunk: ({ html }) => html
     });
   }
 
-  // Handle API routes
-  if (path.startsWith('/api')) {
-    const sessionInfo = await event.locals.safeGetSession() as GetSessionResult
+  if (event.url.pathname.startsWith('/api')) {
+    const sessionInfo = await event.locals.safeGetSession() as GetSessionResult;
     if (!sessionInfo.user) {
-      throw throwError(401, 'Unauthorized')
+      throw throwError(401, 'Unauthorized');
     }
     event.locals = {
       ...event.locals,
       session: sessionInfo.session,
       user: sessionInfo.user
-    }
-    return resolve(event)
+    };
+    return resolve(event);
   }
 
-  const sessionInfo = await event.locals.safeGetSession() as GetSessionResult
+  const sessionInfo = await event.locals.safeGetSession() as GetSessionResult;
 
   event.locals = {
     ...event.locals,
     session: sessionInfo.session,
     user: sessionInfo.user,
     profile: sessionInfo.profile,
-  }
+  };
 
-  // Redirect to auth if no user
   if (!sessionInfo.user) {
     throw redirect(303, PublicPaths.auth);
   }
 
-  // Validate user role
   if (!sessionInfo.profile?.role || !isValidUserRole(sessionInfo.profile.role)) {
-    throw throwError(400, 'Invalid user role')
+    throw throwError(400, 'Invalid user role');
   }
 
-  const originalRole = (sessionInfo.profile as EmulatedProfile)?.originalRole
-  const context = sessionInfo.roleEmulation?.metadata?.context || sessionInfo.profile?.context || {}
+  const originalRole = (sessionInfo.profile as EmulatedProfile)?.originalRole;
+  const context = sessionInfo.roleEmulation?.metadata?.context || sessionInfo.profile?.context || {};
 
-  // Special handling for admin path and root path for super_admin
   if (sessionInfo.profile.role === 'super_admin' || originalRole === 'super_admin') {
-    if (path === `/${ADMIN_URL}`) {
+    if (event.url.pathname === `/${ADMIN_URL}`) {
       return resolve(event);
     }
-    // Redirect super_admin from root to admin path
-    if (path === '/') {
+    if (event.url.pathname === '/') {
       throw redirect(303, `/${ADMIN_URL}`);
     }
   }
 
-  // Get redirect path based on role access
   const redirectPath = getRedirectPath(
     sessionInfo.profile.role,
-    path,
+    event.url.pathname,
     originalRole,
     context
   );
 
-  // Handle different redirect scenarios
   if (redirectPath === PublicPaths.error) {
     event.locals = {
       ...event.locals,
@@ -358,6 +325,33 @@ const authGuard: Handle = async ({ event, resolve }) => {
   }
 
   return resolve(event);
+};
+
+// Helper functions
+async function getUserProfile(userId: string, supabase: SupabaseClient): Promise<ProfileData | null> {
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('*, organizations(id, name), context')
+    .eq('id', userId)
+    .single();
+
+  if (error) {
+    console.error('Error fetching profile:', error);
+    return null;
+  }
+  return profile;
 }
 
-export const handle = sequence(hostRouter, initializeSupabase, roleEmulationGuard, authGuard)
+async function getActiveRoleEmulation(userId: string, supabase: SupabaseClient) {
+  const { data: emulation } = await supabase
+    .from('role_emulation_sessions')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .gt('expires_at', new Date().toISOString())
+    .single();
+
+  return emulation;
+}
+
+export const handle = sequence(hostRouter, initializeSupabase, roleEmulationGuard, authGuard);

@@ -1,31 +1,11 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
     import { session } from '$lib/stores/auth';
     import { Button } from "$lib/components/ui/button";
     import { goto } from '$app/navigation';
     import DokmutyaLanding from '$lib/components/DokmutyaLanding.svelte';
+    import { page } from '$app/stores';
 
-    let isDokmutyaDomain = false;
-    let hostInfo = {
-        hostname: '',
-        fullUrl: '',
-        protocol: '',
-        pathname: ''
-    };
-
-    onMount(() => {
-        // Detailed logging of all location information
-        hostInfo = {
-            hostname: window.location.hostname,
-            fullUrl: window.location.href,
-            protocol: window.location.protocol,
-            pathname: window.location.pathname
-        };
-        console.log('Host Information:', hostInfo);
-        
-        isDokmutyaDomain = window.location.hostname === 'dokmutyatirol.ph';
-        console.log('Is Dokmutya Domain:', isDokmutyaDomain);
-    });
+    $: isDokmutyaDomain = $page.data.shouldShowDokmutya;
 
     async function handleNavigation(path: string) {
         try {
@@ -40,7 +20,7 @@
 </script>
 
 <svelte:head>
-    {#if isDokmutyaDomain}
+    {#if $page.data.shouldShowDokmutya}
         <title>Dr. Maria Santos - Healthcare Leadership for Bohol</title>
         <meta name="description" content="Building a Healthier First District - Dr. Maria Santos for Board Member" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -50,7 +30,7 @@
     {/if}
 </svelte:head>
 
-{#if isDokmutyaDomain}
+{#if $page.data.shouldShowDokmutya}
     <DokmutyaLanding />
 {:else}
     <div class="container py-8 md:py-12">

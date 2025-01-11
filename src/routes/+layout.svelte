@@ -13,7 +13,9 @@
     import { settings } from '$lib/stores/settings';
     import { loadGoogleFonts } from '$lib/config/fonts';
     import { navigating } from '$app/stores';
-    
+    import DokmutyaLanding from '$lib/components/DokmutyaLanding.svelte';
+
+
     function getNavLinks(role?: UserRole): { path: string; label: string }[] {
         if (!role) return [];
         const roleConfig = RoleConfig[role];
@@ -45,7 +47,10 @@
     $: emulation = $page.data.session?.roleEmulation as RoleEmulationClaim | null;
     $: userProfile = $page.data.profile;
     $: special_url = $page.data.special_url;
+    $: isDokMutya = $page.data.shouldShowDokmutya;
 
+
+    console.log(' [get data]',isDokMutya)
     // Update session when server data changes
     $: if (userProfile && $session) {
         const isProfileEmulated = 'isEmulated' in userProfile ? userProfile.isEmulated : false;
@@ -263,7 +268,12 @@
 {/if}
 
 <main class="min-h-screen">
-    <slot />
+{#if $page.data.shouldShowDokmutya}
+  <DokmutyaLanding />
+{:else}
+rat
+  <slot />
+{/if}
 </main>
 
 <style>
