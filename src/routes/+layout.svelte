@@ -1,7 +1,8 @@
+
 <script lang="ts">
     import '../app.css';
     import { page } from '$app/stores';
-    import { RoleConfig, type UserRole } from '$lib/auth/roleConfig';
+    import type { NavigationPath } from '$lib/types/navigation';
     import { browser } from '$app/environment';
     import type { RoleEmulationClaim } from '$lib/types/roleEmulation';
     import { Progress } from '$lib/components/ui/progress';
@@ -16,19 +17,6 @@
     import DokmutyaLanding from '$lib/components/DokmutyaLanding.svelte';
 
 
-    function getNavLinks(role?: UserRole): { path: string; label: string }[] {
-        if (!role) return [];
-        const roleConfig = RoleConfig[role];
-        if (!roleConfig) return [];
-        
-        return roleConfig.allowedPaths
-            .filter(path => path.showInNav)
-            .map(path => ({
-                path: path.path.replace(/\[.*?\]/g, ''),
-                label: path.label || path.path
-            }));
-    }
-
     let isMenuOpen = false;
     let isUserMenuOpen = false;
     let showProgress = false;
@@ -37,11 +25,24 @@
     let progressTimeout: ReturnType<typeof setTimeout> | undefined;
 
     $: path = $page.url.pathname;
-    $: role = $page.data.profile?.role as UserRole | undefined;
-    $: navLinks = getNavLinks(role);
+    $: navLinks = $page.data.navigation.allowedPaths
+        .filter((p: NavigationPath) => p.showInNav)
+        .map((p: NavigationPath) => ({
+            path: p.path.replace(/\[.*?\]/g, ''),
+            label: p.label || p.path
+        }));
     $: navigation = $page.data.navigation;
     $: pageSession = $page.data.session;
-    $: showHeader = !!pageSession && !!navigation?.showHeader;
+    $: showHeader = navigation?.showHeader;
+    $: {
+        console.log('[Layout Debug]', {
+            pageSession,
+            navigationShowHeader: navigation?.showHeader,
+            showHeader,
+            path,
+            navLinks
+        });
+    }
     $: isDark = $settings.theme === 'dark';
     $: userEmail = $page.data.user?.email ?? '';
     $: emulation = $page.data.session?.roleEmulation as RoleEmulationClaim | null;
@@ -50,7 +51,6 @@
     $: isDokMutya = $page.data.shouldShowDokmutya;
 
 
-    console.log(' [get data]',isDokMutya)
     // Update session when server data changes
     $: if (userProfile && $session) {
         const isProfileEmulated = 'isEmulated' in userProfile ? userProfile.isEmulated : false;
@@ -145,8 +145,8 @@
 {#if showHeader}
 <header class="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
     <div class="container mx-auto px-4">
-        <div class="flex h-16 items-center justify-between">
-            <div class="flex items-center space-x-4">
+        <div class="flex h-16 items-center justify-between gap-4">
+            <div class="flex items-center space-x-4 flex-shrink-0">
                 {#if special_url && special_url !== '/'}
                     <a href={special_url} class="flex items-center">
                         <span class="hidden font-bold sm:inline-block">
@@ -165,19 +165,23 @@
                 {/if}
             </div>
 
-            <nav class="hidden space-x-8 md:flex">
-                {#each navLinks as link}
-                    <a 
-                        href={link.path}
-                        class="text-sm font-medium transition-colors hover:text-foreground/80"
-                        class:text-primary={path === link.path}
-                    >
-                        {link.label}
-                    </a>
-                {/each}
+            <nav class="hidden space-x-8 md:flex md:flex-1 md:justify-center">
+                {#if navLinks.length > 0}
+                    {#each navLinks as link}
+                        <a 
+                            href={link.path}
+                            class="text-sm font-medium transition-colors hover:text-foreground/80"
+                            class:text-primary={path === link.path}
+                        >
+                            {link.label}
+                        </a>
+                    {/each}
+                {:else}
+                    <div class="text-sm text-muted-foreground">No navigation links available</div>
+                {/if}
             </nav>
 
-            <div class="flex items-center space-x-4">
+            <div class="flex items-center space-x-4 flex-shrink-0">
                 <div class="hidden md:flex md:items-center">
                     <DropdownMenu>
                         <DropdownMenuTrigger>
@@ -233,15 +237,19 @@
         {#if isMenuOpen}
         <div class="border-t md:hidden">
             <div class="space-y-4 px-2 py-4">
-                {#each navLinks as link}
-                    <a 
-                        href={link.path}
-                        class="block px-3 py-2 text-base font-medium transition-colors hover:bg-muted"
-                        class:text-primary={path === link.path}
-                    >
-                        {link.label}
-                    </a>
-                {/each}
+                {#if navLinks.length > 0}
+                    {#each navLinks as link}
+                        <a 
+                            href={link.path}
+                            class="block px-3 py-2 text-base font-medium transition-colors hover:bg-muted"
+                            class:text-primary={path === link.path}
+                        >
+                            {link.label}
+                        </a>
+                    {/each}
+                {:else}
+                    <div class="px-3 py-2 text-sm text-muted-foreground">No navigation links available</div>
+                {/if}
                 <div class="px-3 py-2">
                     <div class="flex items-center justify-between">
                         <span class="text-sm">Theme</span>
@@ -268,12 +276,9 @@
 {/if}
 
 <main class="min-h-screen">
-{#if $page.data.shouldShowDokmutya}
-  <DokmutyaLanding />
-{:else}
-rat
+
   <slot />
-{/if}
+
 </main>
 
 <style>

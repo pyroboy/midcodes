@@ -3,12 +3,7 @@ import type { Database } from '$lib/database.types';
 import type { User } from '@supabase/supabase-js';
 import { RoleConfig, type UserRole } from '$lib/auth/roleConfig';
 
-type NavigationState = {
-  homeUrl: string;
-  showHeader: boolean;
-  allowedPaths: string[];
-  showRoleEmulation: boolean;
-}
+import type { NavigationPath, NavigationState } from '$lib/types/navigation';
 
 type ServerProfile = Database['public']['Tables']['profiles']['Row'] & {
   isEmulated?: boolean;
@@ -49,7 +44,7 @@ const isDokmutyaDomain = (host?: string | null): boolean => {
   return baseHostname === 'dokmutyatirol.ph';
 };
 
-export const load: LayoutServerLoad = async ({ locals: { safeGetSession, profile, supabase, special_url }, url, request }) => {
+export const load: LayoutServerLoad = async ({ locals: { safeGetSession, supabase, special_url }, url, request }) => {
   // Check for Dokmutya domain first
   // const isDev = process.env.NODE_ENV === 'development';
   const isDev = false
@@ -88,7 +83,7 @@ export const load: LayoutServerLoad = async ({ locals: { safeGetSession, profile
       navigation: {
         homeUrl: '/',
         showHeader: false,
-        allowedPaths: [],
+        allowedPaths: [] as NavigationPath[],
         showRoleEmulation: false
       },
       session: null,
@@ -97,8 +92,7 @@ export const load: LayoutServerLoad = async ({ locals: { safeGetSession, profile
     };
   }
 
-  const session = await safeGetSession() as SessionWithAuth;
-  const user = session?.user ?? null;
+  const { session, user, profile: sessionProfile } = await safeGetSession() as SessionWithAuth;
 
   // Set security headers
   const response = new Response();
@@ -107,7 +101,7 @@ export const load: LayoutServerLoad = async ({ locals: { safeGetSession, profile
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   response.headers.set('Permissions-Policy', 'geolocation=(), microphone=()');
 
-  let currentProfile = profile ? { ...profile } as ServerProfile : null;
+  let currentProfile = sessionProfile ? { ...sessionProfile } as ServerProfile : null;
   let isEmulated = false;
   let emulationData: EmulationData | null = null;
   let organizationName: string | null = null;
@@ -121,12 +115,19 @@ export const load: LayoutServerLoad = async ({ locals: { safeGetSession, profile
       return path;
     })(),
     showHeader: false,
-    allowedPaths: [],
+    allowedPaths: currentProfile?.role ? RoleConfig[currentProfile.role].allowedPaths : [],
     showRoleEmulation: currentProfile?.role === 'super_admin'
   };
 
   if (session && currentProfile) {
     navigation.showHeader = true;
+
+    console.log('[Layout Server] Navigation Debug:', {
+      role: currentProfile?.role,
+      allowedPaths: currentProfile?.role ? RoleConfig[currentProfile?.role].allowedPaths : [],
+      showHeader: navigation?.showHeader,
+      navLinks: currentProfile?.role ? RoleConfig[currentProfile?.role].allowedPaths.filter(p => p.showInNav) : []
+    });
 
     if (currentProfile.role === 'super_admin') {
       const { data: activeEmulation } = await supabase
@@ -165,7 +166,16 @@ export const load: LayoutServerLoad = async ({ locals: { safeGetSession, profile
           isEmulated: true
         } as ServerProfile;
 
+        const emulatedRole = activeEmulation.emulated_role as UserRole;
+        // Update navigation paths for emulated role
+        navigation.allowedPaths = RoleConfig[emulatedRole].allowedPaths;
         navigation.showRoleEmulation = true;
+
+        console.log('[Layout Server] Emulation Navigation Debug:', {
+          emulatedRole,
+          allowedPaths: RoleConfig[emulatedRole].allowedPaths,
+          navLinks: RoleConfig[emulatedRole].allowedPaths.filter(p => p.showInNav)
+        });
       }
     }
   }

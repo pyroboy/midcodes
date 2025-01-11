@@ -93,5 +93,3 @@ export const load: LayoutLoad<PageData> = async ({ data }) => {
     shouldShowDokmutya: data.shouldShowDokmutya ?? false
   } satisfies PageData;
 };
-
-export const ssr = false;
