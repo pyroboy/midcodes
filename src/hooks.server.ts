@@ -218,10 +218,10 @@ async function getActiveRoleEmulation(userId: string, supabase: SupabaseClient) 
 }
 
 const roleEmulationGuard: Handle = async ({ event, resolve }) => {
-  // const host = event.request.headers.get('host');
-  // if (host === 'dokmutyatirol.ph') {
-  //   return resolve(event);
-  // }
+  const host = event.request.headers.get('host')?.split(':')[0].toLowerCase();
+  if (host === 'dokmutyatirol.ph') {
+    return resolve(event);
+  }
 
   if (event.url.pathname.startsWith('/api')) {
     return resolve(event)
@@ -253,6 +253,12 @@ const roleEmulationGuard: Handle = async ({ event, resolve }) => {
 
 const authGuard: Handle = async ({ event, resolve }) => {
   const path = event.url.pathname;
+  const host = event.request.headers.get('host')?.split(':')[0].toLowerCase();
+
+  // Special handling for dokmutyatirol.ph domain
+  if (host === 'dokmutyatirol.ph') {
+    return resolve(event);
+  }
 
   // Check for public path and skip layout
   if (shouldSkipLayout(path)) {
