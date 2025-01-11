@@ -133,10 +133,10 @@
     }
 </script>
 
-<svelte:head>
+<!-- <svelte:head>
     <title>March of Faith Incorporated</title>
     <link rel="icon" href="/favicon.ico" />
-</svelte:head>
+</svelte:head> -->
 
 {#if showProgress}
     <Progress value={progressValue} class="fixed top-0 left-0 right-0 z-50 h-1 w-full" />

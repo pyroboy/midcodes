@@ -21,7 +21,7 @@
 
 <svelte:head>
     {#if $page.data.shouldShowDokmutya}
-        <title>Dr. Maria Santos - Healthcare Leadership for Bohol</title>
+        <title>DokMutya - Healthcare Leadership for Bohol</title>
         <meta name="description" content="Building a Healthier First District - Dr. Maria Santos for Board Member" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     {:else}
