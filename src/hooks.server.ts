@@ -6,7 +6,7 @@ import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/publi
 import { ADMIN_URL } from '$env/static/private'
 import type { Handle } from '@sveltejs/kit'
 import type { RoleEmulationData, RoleEmulationClaim, EmulatedProfile, ProfileData, LocalsSession } from '$lib/types/roleEmulation'
-import { RoleConfig, type UserRole, isPublicPath, getRedirectPath, PublicPaths, isValidUserRole,shouldSkipLayout } from '$lib/auth/roleConfig'
+import { RoleConfig, type UserRole, isPublicPath, getRedirectPath, PublicPaths, isValidUserRole, shouldSkipLayout } from '$lib/auth/roleConfig'
 
 interface SessionInfo {
   session: LocalsSession | null
@@ -39,6 +39,13 @@ declare global {
   }
 }
 
+const hostRouter: Handle = async ({ event, resolve }) => {
+  const hostname = event.request.headers.get('host');
+  if (hostname === 'dokmutyatirol.ph') {
+    event.url.pathname = '/dokmutya';
+  }
+  return resolve(event);
+}
 
 const initializeSupabase: Handle = async ({ event, resolve }) => {
   event.locals.supabase = createServerClient(
@@ -198,10 +205,10 @@ async function getActiveRoleEmulation(userId: string, supabase: SupabaseClient) 
 }
 
 const roleEmulationGuard: Handle = async ({ event, resolve }) => {
-  const host = event.request.headers.get('host');
-  if (host === 'dokmutyatirol.ph') {
-    return resolve(event);
-  }
+  // const host = event.request.headers.get('host');
+  // if (host === 'dokmutyatirol.ph') {
+  //   return resolve(event);
+  // }
 
   if (event.url.pathname.startsWith('/api')) {
     return resolve(event)
@@ -313,4 +320,4 @@ const authGuard: Handle = async ({ event, resolve }) => {
   return resolve(event);
 }
 
-export const handle = sequence( initializeSupabase, roleEmulationGuard, authGuard)
+export const handle = sequence(hostRouter, initializeSupabase, roleEmulationGuard, authGuard)
