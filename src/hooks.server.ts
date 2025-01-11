@@ -303,10 +303,15 @@ const authGuard: Handle = async ({ event, resolve }) => {
   const originalRole = (sessionInfo.profile as EmulatedProfile)?.originalRole
   const context = sessionInfo.roleEmulation?.metadata?.context || sessionInfo.profile?.context || {}
 
-  // Special handling for admin path
-  if (path === `/${ADMIN_URL}` && 
-      ((!originalRole && sessionInfo.profile.role === 'super_admin') || originalRole === 'super_admin')) {
-    return resolve(event);
+  // Special handling for admin path and root path for super_admin
+  if (sessionInfo.profile.role === 'super_admin' || originalRole === 'super_admin') {
+    if (path === `/${ADMIN_URL}`) {
+      return resolve(event);
+    }
+    // Redirect super_admin from root to admin path
+    if (path === '/') {
+      throw redirect(303, `/${ADMIN_URL}`);
+    }
   }
 
   // Get redirect path based on role access

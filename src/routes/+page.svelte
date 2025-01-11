@@ -6,16 +6,34 @@
     import DokmutyaLanding from '$lib/components/DokmutyaLanding.svelte';
 
     let isDokmutyaDomain = false;
+    let hostInfo = {
+        hostname: '',
+        fullUrl: '',
+        protocol: '',
+        pathname: ''
+    };
 
     onMount(() => {
+        // Detailed logging of all location information
+        hostInfo = {
+            hostname: window.location.hostname,
+            fullUrl: window.location.href,
+            protocol: window.location.protocol,
+            pathname: window.location.pathname
+        };
+        console.log('Host Information:', hostInfo);
+        
         isDokmutyaDomain = window.location.hostname === 'dokmutyatirol.ph';
+        console.log('Is Dokmutya Domain:', isDokmutyaDomain);
     });
 
     async function handleNavigation(path: string) {
         try {
+            console.log('Navigating to:', path);
             await goto(path);
         } catch (error) {
             console.error('Navigation error:', error);
+            console.log('Falling back to direct navigation');
             window.location.href = path;
         }
     }
