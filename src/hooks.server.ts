@@ -40,10 +40,23 @@ declare global {
 }
 
 const hostRouter: Handle = async ({ event, resolve }) => {
-  const hostname = event.request.headers.get('host');
-  if (hostname === 'dokmutyatirol.ph') {
-    event.url.pathname = '/dokmutya';
+  const hostname = event.request.headers.get('host')?.trim();
+  
+  // Safety check for empty or missing hostname
+  if (!hostname) {
+    return resolve(event);
   }
+  
+  // Extract base hostname without port
+  const baseHostname = hostname.split(':')[0].toLowerCase();
+  
+  if (baseHostname === 'dokmutyatirol.ph') {
+    event.url.pathname = '/dokmutya';
+    
+    // Log the routing for debugging (optional)
+    console.log(`[Host Router] Routing ${hostname} to ${event.url.pathname}`);
+  }
+  
   return resolve(event);
 }
 
