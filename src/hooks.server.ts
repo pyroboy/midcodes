@@ -40,19 +40,37 @@ declare global {
 }
 
 const hostRouter: Handle = async ({ event, resolve }) => {
-  const hostname = event.request.headers.get('host')?.trim().toLowerCase();
-  console.log(`[Host Router] Checking ${hostname} to ${event.url.pathname}`);
+  const host = event.request.headers.get('host')?.trim().toLowerCase();
+  const userAgent = event.request.headers.get('user-agent');
+  const protocol = event.request.headers.get('x-forwarded-proto') || 'http';
+  
+  console.log(`[Host Router] Processing request:`, {
+    host,
+    path: event.url.pathname,
+    protocol,
+    userAgent
+  });
+
   // Safety check for empty or missing hostname
-  if (!hostname) {
+  if (!host) {
+    console.log('[Host Router] No host found, proceeding with default routing');
     return resolve(event);
   }
   
-  // Extract base hostname without port and remove www. if present
-  const baseHostname = hostname.split(':')[0].replace(/^www\./, '');
+  // Extract base hostname without port and handle www
+  const baseHostname = host.split(':')[0].replace(/^www\./, '');
   
+  // Specific handling for Dokmutya domain
   if (baseHostname === 'dokmutyatirol.ph') {
-    event.url.pathname = '/dokmutya';
-    console.log(`[Host Router] Routing ${hostname} to ${event.url.pathname}`);
+    // Only modify the path if we're at the root
+    if (event.url.pathname === '/') {
+      event.url.pathname = '/dokmutya';
+      console.log(`[Host Router] Routing ${host} to /dokmutya`);
+    } else {
+      console.log(`[Host Router] Keeping original path ${event.url.pathname} for ${host}`);
+    }
+  } else {
+    console.log(`[Host Router] Using default routing for ${host}`);
   }
   
   return resolve(event);
