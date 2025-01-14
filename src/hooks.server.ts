@@ -8,12 +8,15 @@ import type { Handle } from '@sveltejs/kit'
 import type { RoleEmulationData, RoleEmulationClaim, EmulatedProfile, ProfileData, LocalsSession } from '$lib/types/roleEmulation'
 import { RoleConfig, type UserRole, isPublicPath, getRedirectPath, PublicPaths, isValidUserRole, shouldSkipLayout } from '$lib/auth/roleConfig'
 
-interface SessionInfo {
-  session: LocalsSession | null
-  user: User | null
-  profile: ProfileData | EmulatedProfile | null
-  roleEmulation: RoleEmulationClaim | null
-}
+// Cache configuration
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
+const SESSION_CACHE_TTL = 60 * 1000; // 1 minute in milliseconds
+
+// Module-level caches
+let supabaseClientCache: SupabaseClient | null = null;
+const sessionCache = new Map<string, { data: GetSessionResult; timestamp: number }>();
+const profileCache = new Map<string, { data: ProfileData | null; timestamp: number }>();
+const roleEmulationCache = new Map<string, { data: RoleEmulationData | null; timestamp: number }>();
 
 type GetSessionResult = {
   session: Session | null;
@@ -59,10 +62,8 @@ const hostRouter: Handle = async ({ event, resolve }) => {
   });
 
   if (isDokmutyaDomain(host) && event.url.pathname === '/') {
-    // Instead of modifying the request, we'll resolve with a transform
     return resolve(event, {
       transformPageChunk: ({ html }) => {
-        // If we're at root, fetch and inject the dokmutya content
         return html.replace(
           '<div id="app">',
           '<div id="app" data-dokmutya="true">'
@@ -74,27 +75,31 @@ const hostRouter: Handle = async ({ event, resolve }) => {
   return resolve(event);
 };
 
-
-// Initialize Supabase client
+// Initialize Supabase client with caching
 const initializeSupabase: Handle = async ({ event, resolve }) => {
-  event.locals.supabase = createServerClient(
-    PUBLIC_SUPABASE_URL,
-    PUBLIC_SUPABASE_ANON_KEY,
-    {
-      cookies: {
-        get: (key) => event.cookies.get(key),
-        set: (key, value, options) => {
-          event.cookies.set(key, value, { 
-            ...options,
-            path: '/',
-            sameSite: 'lax',
-            secure: true
-          })
-        },
-        remove: (key, options) => event.cookies.delete(key, { path: '/', ...options })
+  // Reuse cached client if available
+  if (!supabaseClientCache) {
+    supabaseClientCache = createServerClient(
+      PUBLIC_SUPABASE_URL,
+      PUBLIC_SUPABASE_ANON_KEY,
+      {
+        cookies: {
+          get: (key) => event.cookies.get(key),
+          set: (key, value, options) => {
+            event.cookies.set(key, value, { 
+              ...options,
+              path: '/',
+              sameSite: 'lax',
+              secure: true
+            })
+          },
+          remove: (key, options) => event.cookies.delete(key, { path: '/', ...options })
+        }
       }
-    }
-  )
+    )
+  }
+
+  event.locals.supabase = supabaseClientCache
 
   event.locals.getSession = async () => {
     const { data: { session } } = await event.locals.supabase.auth.getSession()
@@ -102,6 +107,15 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
   }
 
   event.locals.safeGetSession = async () => {
+    const sessionId = event.locals.session?.access_token || 'anonymous';
+    const now = Date.now();
+
+    // Check cache first
+    const cachedSession = sessionCache.get(sessionId);
+    if (cachedSession && (now - cachedSession.timestamp) < SESSION_CACHE_TTL) {
+      return cachedSession.data;
+    }
+
     let session = event.locals.session
     let sessionError: Error | null = null
 
@@ -140,13 +154,15 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
     }
 
     if (sessionError || !session?.user) {
-      return {
+      const result = {
         session: null,
         error: sessionError,
         user: null,
         profile: null,
         roleEmulation: null
-      }
+      };
+      sessionCache.set(sessionId, { data: result, timestamp: now });
+      return result;
     }
 
     const user = session.user
@@ -193,19 +209,24 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
       ;(session as LocalsSession).roleEmulation = roleEmulation
     }
 
-    return {
+    const result = {
       session,
       error: null,
       user,
       profile: emulatedProfile,
       roleEmulation
-    }
+    };
+
+    // Cache the session result
+    sessionCache.set(sessionId, { data: result, timestamp: now });
+
+    return result;
   }
 
   return resolve(event)
 }
 
-// Role emulation guard
+// Role emulation guard with caching
 const roleEmulationGuard: Handle = async ({ event, resolve }) => {
   const isDev = process.env.NODE_ENV === 'development';
   const host = isDev ? 'dokmutyatirol.ph' : event.request.headers.get('host')?.trim().toLowerCase();
@@ -235,6 +256,11 @@ const roleEmulationGuard: Handle = async ({ event, resolve }) => {
         delete (sessionInfo.session as LocalsSession).roleEmulation;
       }
 
+      // Clear role emulation cache for this user
+      if (sessionInfo.user) {
+        roleEmulationCache.delete(sessionInfo.user.id);
+      }
+
       throw redirect(303, event.url.pathname);
     }
   }
@@ -242,7 +268,7 @@ const roleEmulationGuard: Handle = async ({ event, resolve }) => {
   return resolve(event);
 };
 
-// Auth guard
+// Auth guard with caching
 const authGuard: Handle = async ({ event, resolve }) => {
   const isDev = process.env.NODE_ENV === 'development';
   const host = isDev ? 'dokmutyatirol.ph' : event.request.headers.get('host')?.trim().toLowerCase();
@@ -327,8 +353,15 @@ const authGuard: Handle = async ({ event, resolve }) => {
   return resolve(event);
 };
 
-// Helper functions
+// Helper functions with caching
 async function getUserProfile(userId: string, supabase: SupabaseClient): Promise<ProfileData | null> {
+  const now = Date.now();
+  const cachedProfile = profileCache.get(userId);
+  
+  if (cachedProfile && (now - cachedProfile.timestamp) < CACHE_TTL) {
+    return cachedProfile.data;
+  }
+
   const { data: profile, error } = await supabase
     .from('profiles')
     .select('*, organizations(id, name), context')
@@ -337,12 +370,22 @@ async function getUserProfile(userId: string, supabase: SupabaseClient): Promise
 
   if (error) {
     console.error('Error fetching profile:', error);
+    profileCache.set(userId, { data: null, timestamp: now });
     return null;
   }
+
+  profileCache.set(userId, { data: profile, timestamp: now });
   return profile;
 }
 
 async function getActiveRoleEmulation(userId: string, supabase: SupabaseClient) {
+  const now = Date.now();
+  const cachedEmulation = roleEmulationCache.get(userId);
+  
+  if (cachedEmulation && (now - cachedEmulation.timestamp) < CACHE_TTL) {
+    return cachedEmulation.data;
+  }
+
   const { data: emulation } = await supabase
     .from('role_emulation_sessions')
     .select('*')
@@ -351,6 +394,7 @@ async function getActiveRoleEmulation(userId: string, supabase: SupabaseClient) 
     .gt('expires_at', new Date().toISOString())
     .single();
 
+  roleEmulationCache.set(userId, { data: emulation || null, timestamp: now });
   return emulation;
 }
 
