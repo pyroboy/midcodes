@@ -1,0 +1,1 @@
+export { default as component } from "../../../../src/routes/events/[event_url]/[reference_number]/+page.svelte";

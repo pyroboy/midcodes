@@ -1,0 +1,207 @@
+{
+	"/(admin)": [
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/": [
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/api/config": [
+		"src/routes/api/config/+server.ts"
+	],
+	"/api/events": [
+		"src/routes/api/events/+server.ts"
+	],
+	"/api/id-cards/[id]": [
+		"src/routes/api/id-cards/[id]/+server.ts"
+	],
+	"/api/organizations": [
+		"src/routes/api/organizations/+server.ts"
+	],
+	"/api/role-emulation": [
+		"src/routes/api/role-emulation/+server.ts"
+	],
+	"/api/templates/[id]": [
+		"src/routes/api/templates/[id]/+server.ts"
+	],
+	"/auth": [
+		"src/routes/auth/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/auth/callback": [
+		"src/routes/auth/callback/+server.ts"
+	],
+	"/auth/forgot-password": [
+		"src/routes/auth/forgot-password/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/auth/reset-password": [
+		"src/routes/auth/reset-password/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/auth/signout": [
+		"src/routes/auth/signout/+server.ts"
+	],
+	"/constrack": [
+		"src/routes/constrack/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/constrack/cart": [
+		"src/routes/constrack/cart/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/constrack/checkout/success": [
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/dorm": [
+		"src/routes/dorm/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/dorm/accounts": [
+		"src/routes/dorm/accounts/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/dorm/budgets": [
+		"src/routes/dorm/budgets/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/dorm/expenses": [
+		"src/routes/dorm/expenses/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/dorm/floors": [
+		"src/routes/dorm/floors/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/dorm/leases": [
+		"src/routes/dorm/leases/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/dorm/meters": [
+		"src/routes/dorm/meters/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/dorm/overview/monthly": [
+		"src/routes/dorm/overview/monthly/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/dorm/payments": [
+		"src/routes/dorm/payments/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/dorm/properties": [
+		"src/routes/dorm/properties/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/dorm/readings": [
+		"src/routes/dorm/readings/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/dorm/rental_unit": [
+		"src/routes/dorm/rental_unit/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/dorm/tenants": [
+		"src/routes/dorm/tenants/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/dorm/transactions": [
+		"src/routes/dorm/transactions/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/dorm/utility-billings": [
+		"src/routes/dorm/utility-billings/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/events/[event_url]": [
+		"src/routes/events/[event_url]/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/events/[event_url]/name-tags": [
+		"src/routes/events/[event_url]/name-tags/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/events/[event_url]/payments": [
+		"src/routes/events/[event_url]/payments/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/events/[event_url]/qr-checker": [
+		"src/routes/events/[event_url]/qr-checker/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/events/[event_url]/register": [
+		"src/routes/events/[event_url]/register/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/events/[event_url]/test": [
+		"src/routes/events/[event_url]/test/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/events/[event_url]/[reference_number]": [
+		"src/routes/events/[event_url]/[reference_number]/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/id-gen": [
+		"src/routes/id-gen/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/id-gen/all-ids": [
+		"src/routes/id-gen/all-ids/+page.ts",
+		"src/routes/id-gen/all-ids/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/id-gen/templates": [
+		"src/routes/id-gen/templates/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/id-gen/use-template": [
+		"src/routes/id-gen/use-template/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/id-gen/use-template/[id]": [
+		"src/routes/id-gen/use-template/[id]/+page.ts",
+		"src/routes/id-gen/use-template/[id]/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/(admin)/midcodes": [
+		"src/routes/(admin)/midcodes/+page.server.ts",
+		"src/routes/+layout.ts",
+		"src/routes/+layout.server.ts"
+	]
+}
