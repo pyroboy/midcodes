@@ -3,7 +3,7 @@ import "../../../../../chunks/formData.js";
 import { s as superValidate, m as message } from "../../../../../chunks/superValidate.js";
 import "ts-deepmerge";
 import "memoize-weak";
-import { z as zod } from "../../../../../chunks/zod.js";
+import { a as zod } from "../../../../../chunks/zod.js";
 import { r as registrationSchema } from "../../../../../chunks/schema3.js";
 import { b as PUBLIC_RECAPTCHA_SITE_KEY } from "../../../../../chunks/public.js";
 import { R as RECAPTCHA_SECRET_KEY } from "../../../../../chunks/private.js";

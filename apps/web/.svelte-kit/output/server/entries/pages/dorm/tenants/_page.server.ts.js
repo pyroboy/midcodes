@@ -4,7 +4,7 @@ import { s as superValidate } from "../../../../chunks/superValidate.js";
 import { t as tenantFormSchema, a as tenantResponseSchema } from "../../../../chunks/formSchema9.js";
 import "ts-deepmerge";
 import "memoize-weak";
-import { z as zod } from "../../../../chunks/zod.js";
+import { a as zod } from "../../../../chunks/zod.js";
 import { c as checkAccess } from "../../../../chunks/roleChecks.js";
 const load = async ({ locals: { safeGetSession, supabase } }) => {
   const { session, user, profile } = await safeGetSession();

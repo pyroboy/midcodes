@@ -192,6 +192,6 @@ function _zodClient(schema, options) {
 const zod = /* @__PURE__ */ memoize(_zod);
 const zodClient = /* @__PURE__ */ memoize(_zodClient);
 export {
-  zodClient as a,
-  zod as z
+  zod as a,
+  zodClient as z
 };

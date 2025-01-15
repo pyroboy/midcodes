@@ -1,10 +1,10 @@
 import { y as setContext, g as getContext, c as create_ssr_component, s as subscribe, k as compute_rest_props, l as spread, o as escape_object, a as add_attribute, v as validate_component, m as escape_attribute_value } from "./ssr.js";
 import "dequal";
-import { o as omit, w as withGet, m as makeElement, f as executeCallbacks, b as addMeltEventListener, k as kbd, s as styleToString, u as useEscapeKeydown, x as effect, B as portalAttr, c as createElHelpers, a as isHTMLElement, n as noop, d as isBrowser } from "./create.js";
+import { o as omit, w as withGet, m as makeElement, f as executeCallbacks, d as addMeltEventListener, k as kbd, s as styleToString, u as useEscapeKeydown, x as effect, B as portalAttr, c as createElHelpers, a as isHTMLElement, n as noop, b as isBrowser } from "./create.js";
 import { i as is_void } from "./names.js";
 import { c as cn, d as flyAndScale } from "./utils.js";
 import { c as createDispatcher } from "./events.js";
-import { f as fade } from "./index6.js";
+import { f as fade } from "./index7.js";
 import { I as Icon } from "./Icon.js";
 import { d as derived, w as writable } from "./index4.js";
 import { t as tick } from "./scheduler.js";

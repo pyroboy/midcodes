@@ -1,9 +1,9 @@
-import { c as create_ssr_component, k as compute_rest_props, l as spread, m as escape_attribute_value, o as escape_object, f as createEventDispatcher, a as add_attribute, v as validate_component, b as each, e as escape, s as subscribe, t as set_store_value } from "../../../../chunks/ssr.js";
+import { c as create_ssr_component, k as compute_rest_props, l as spread, m as escape_attribute_value, o as escape_object, e as escape, f as createEventDispatcher, a as add_attribute, v as validate_component, b as each, s as subscribe, t as set_store_value } from "../../../../chunks/ssr.js";
 import { s as superForm } from "../../../../chunks/superForm.js";
 import "ts-deepmerge";
 import "../../../../chunks/formData.js";
 import "memoize-weak";
-import { a as zodClient } from "../../../../chunks/zod.js";
+import { z as zodClient } from "../../../../chunks/zod.js";
 import { T as TenantStatusEnum, t as tenantFormSchema } from "../../../../chunks/formSchema9.js";
 import { C as Card } from "../../../../chunks/card.js";
 import { C as Card_content } from "../../../../chunks/card-content.js";
@@ -11,15 +11,33 @@ import "clsx";
 import { C as Card_header, a as Card_title } from "../../../../chunks/card-title.js";
 import { B as Button } from "../../../../chunks/button.js";
 import { T as Table, a as Table_header, b as Table_row, c as Table_head, d as Table_body, e as Table_cell } from "../../../../chunks/table-row.js";
-import { R as Root, S as Select_trigger, V as Value, a as Select_content, b as Select_item } from "../../../../chunks/index7.js";
+import { R as Root, S as Select_trigger, V as Value, a as Select_content, b as Select_item } from "../../../../chunks/index6.js";
 import { B as Badge } from "../../../../chunks/index9.js";
 import { g as globals } from "../../../../chunks/globals.js";
 import { I as Input } from "../../../../chunks/input.js";
 import { L as Label } from "../../../../chunks/label.js";
 import "../../../../chunks/index2.js";
-import { T as Textarea } from "../../../../chunks/textarea.js";
-import { R as Root$1, D as Dialog_content, a as Dialog_header, b as Dialog_title, c as Dialog_description } from "../../../../chunks/index10.js";
 import { c as cn } from "../../../../chunks/utils.js";
+import { R as Root$1, D as Dialog_content, a as Dialog_header, b as Dialog_title, c as Dialog_description } from "../../../../chunks/index10.js";
+const Textarea = create_ssr_component(($$result, $$props, $$bindings, slots) => {
+  let $$restProps = compute_rest_props($$props, ["class", "value", "readonly"]);
+  let { class: className = void 0 } = $$props;
+  let { value = void 0 } = $$props;
+  let { readonly = void 0 } = $$props;
+  if ($$props.class === void 0 && $$bindings.class && className !== void 0) $$bindings.class(className);
+  if ($$props.value === void 0 && $$bindings.value && value !== void 0) $$bindings.value(value);
+  if ($$props.readonly === void 0 && $$bindings.readonly && readonly !== void 0) $$bindings.readonly(readonly);
+  return `<textarea${spread(
+    [
+      {
+        class: escape_attribute_value(cn("border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-[80px] w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50", className))
+      },
+      { readonly: readonly || null },
+      escape_object($$restProps)
+    ],
+    {}
+  )}>${escape(value || "")}</textarea>`;
+});
 const Dialog_footer = create_ssr_component(($$result, $$props, $$bindings, slots) => {
   let $$restProps = compute_rest_props($$props, ["class"]);
   let { class: className = void 0 } = $$props;

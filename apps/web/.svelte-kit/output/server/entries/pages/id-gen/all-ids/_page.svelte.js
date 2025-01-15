@@ -1,4 +1,4 @@
-import { q as onDestroy, g as getContext, y as setContext, c as create_ssr_component, s as subscribe, v as validate_component, C as get_current_component, k as compute_rest_props, a as add_attribute, e as escape, b as each } from "../../../../chunks/ssr.js";
+import { q as onDestroy, g as getContext, y as setContext, c as create_ssr_component, s as subscribe, v as validate_component, B as get_current_component, k as compute_rest_props, a as add_attribute, e as escape, b as each } from "../../../../chunks/ssr.js";
 import "mitt";
 import * as THREE from "three";
 import { PerspectiveCamera, REVISION, Vector3, Matrix4, Mesh, ShaderChunk } from "three";

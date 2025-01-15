@@ -5,6 +5,6 @@ let component_cache;
 export const component = async () => component_cache ??= (await import('../entries/pages/dorm/budgets/_page.svelte.js')).default;
 export { server };
 export const server_id = "src/routes/dorm/budgets/+page.server.ts";
-export const imports = ["_app/immutable/nodes/13.CWoQ0xyC.js","_app/immutable/chunks/scheduler.Bl--k1HL.js","_app/immutable/chunks/index.DR8de1tj.js"];
+export const imports = ["_app/immutable/nodes/13.DupJ5gWk.js","_app/immutable/chunks/scheduler.O3yElrGi.js","_app/immutable/chunks/index.ZL6-Qda4.js"];
 export const stylesheets = [];
 export const fonts = [];

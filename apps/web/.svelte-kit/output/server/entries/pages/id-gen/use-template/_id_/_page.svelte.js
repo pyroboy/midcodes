@@ -7,7 +7,7 @@ import "../../../../../chunks/index2.js";
 import { C as Card } from "../../../../../chunks/card.js";
 import "clsx";
 import { L as Label } from "../../../../../chunks/label.js";
-import { R as Root, S as Select_trigger, V as Value, a as Select_content, b as Select_item } from "../../../../../chunks/index7.js";
+import { R as Root, S as Select_trigger, V as Value, a as Select_content, b as Select_item } from "../../../../../chunks/index6.js";
 import { w as writable } from "../../../../../chunks/index4.js";
 import { I as Icon } from "../../../../../chunks/Icon.js";
 import "../../../../../chunks/client.js";

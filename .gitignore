@@ -1,20 +1,23 @@
+# Dependencies
 node_modules
 
-# Output
-.output
-.vercel
+# Build directories
 /.svelte-kit
 /build
+/package
+.output
+.turbo
+.vercel
 
-# OS
-.DS_Store
-Thumbs.db
-
-# Env
+# Environment
 .env
 .env.*
 !.env.example
 !.env.test
+
+# OS
+.DS_Store
+Thumbs.db
 
 # Vite
 vite.config.js.timestamp-*

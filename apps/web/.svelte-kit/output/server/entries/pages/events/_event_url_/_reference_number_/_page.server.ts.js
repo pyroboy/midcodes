@@ -4,7 +4,7 @@ import { s as superValidate } from "../../../../../chunks/superValidate.js";
 import { z } from "zod";
 import "ts-deepmerge";
 import "memoize-weak";
-import { z as zod } from "../../../../../chunks/zod.js";
+import { a as zod } from "../../../../../chunks/zod.js";
 const emailReceiptSchema = z.object({
   email: z.string().email("Invalid email address")
 });

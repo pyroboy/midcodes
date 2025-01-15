@@ -1,6 +1,6 @@
 import { w as writable } from "./index4.js";
 import { w as wrapArray } from "./array.js";
-import { d as isBrowser, a as isHTMLElement, w as withGet } from "./create.js";
+import { b as isBrowser, a as isHTMLElement, w as withGet } from "./create.js";
 import { s as sleep } from "./helpers.js";
 import { x as get_store_value } from "./ssr.js";
 function addHighlight(element) {

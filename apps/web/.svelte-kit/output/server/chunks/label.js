@@ -1,10 +1,28 @@
 import { c as create_ssr_component, k as compute_rest_props, s as subscribe, l as spread, o as escape_object, a as add_attribute, v as validate_component } from "./ssr.js";
 import "dequal";
-import "./create.js";
-import { c as createLabel } from "./create2.js";
+import { m as makeElement, d as addMeltEventListener } from "./create.js";
 import { c as createBitAttrs } from "./attrs.js";
 import { c as createDispatcher } from "./events.js";
 import { c as cn } from "./utils.js";
+function createLabel() {
+  const root = makeElement("label", {
+    action: (node) => {
+      const mouseDown = addMeltEventListener(node, "mousedown", (e) => {
+        if (!e.defaultPrevented && e.detail > 1) {
+          e.preventDefault();
+        }
+      });
+      return {
+        destroy: mouseDown
+      };
+    }
+  });
+  return {
+    elements: {
+      root
+    }
+  };
+}
 function getLabelData() {
   const NAME = "label";
   const PARTS = ["root"];
@@ -56,5 +74,6 @@ const Label = create_ssr_component(($$result, $$props, $$bindings, slots) => {
   )}`;
 });
 export {
-  Label as L
+  Label as L,
+  createLabel as c
 };

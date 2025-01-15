@@ -88,9 +88,6 @@ function setContext(key, context) {
 function getContext(key) {
   return get_current_component().$$.context.get(key);
 }
-function hasContext(key) {
-  return get_current_component().$$.context.has(key);
-}
 function ensure_array_like(array_like_or_iterator) {
   return array_like_or_iterator?.length !== void 0 ? array_like_or_iterator : Array.from(array_like_or_iterator);
 }
@@ -281,10 +278,9 @@ function add_styles(style_object) {
 }
 export {
   merge_ssr_styles as A,
-  hasContext as B,
-  get_current_component as C,
-  add_classes as D,
-  is_promise as E,
+  get_current_component as B,
+  add_classes as C,
+  is_promise as D,
   add_attribute as a,
   each as b,
   create_ssr_component as c,

@@ -7,7 +7,7 @@
     import * as Select from '$lib/components/ui/select';
     import { Input } from '$lib/components/ui/input';
     import { Textarea } from '$lib/components/ui/textarea';
-    import { Field, Control, Label, FieldErrors } from "formsnap";
+    // import { Field, Control, Label, FieldErrors } from "formsnap";
     import type { PageData } from './$types';
     import { browser } from "$app/environment";
     import { billingSchema, billingTypeEnum, utilityTypeEnum, paymentStatusEnum } from './formSchema';
@@ -112,7 +112,7 @@
             <input type="hidden" name="id" bind:value={$formData.id} />
           {/if}
   
-          <Field {form} name="leaseId">
+          <!-- <Field {form} name="leaseId">
             <Control let:attrs>
               <Label>Lease</Label>
               <Select.Root
@@ -194,10 +194,10 @@
               <Input type="number" {...attrs} bind:value={$formData.paidAmount} min="0" step="0.01" />
             </Control>
             <FieldErrors class="text-red-500 text-sm mt-1" />
-          </Field>
+          </Field> -->
 
           <div class="space-y-2">
-            <Label>Balance</Label>
+            <!-- <Label>Balance</Label> -->
             <Input 
               type="number" 
               value={($formData.amount || 0) - ($formData.paidAmount || 0)} 
@@ -206,7 +206,7 @@
             />
           </div>
   
-          <Field {form} name="status">
+          <!-- <Field {form} name="status">
             <Control let:attrs>
               <Label>Status</Label>
               <Select.Root
@@ -250,7 +250,7 @@
               <Textarea {...attrs} bind:value={$formData.notes} />
             </Control>
             <FieldErrors class="text-red-500 text-sm mt-1" />
-          </Field>
+          </Field> -->
   
           <Button type="submit">{editMode ? 'Update' : 'Add'} Account</Button>
           {#if editMode}
