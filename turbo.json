@@ -1,6 +1,11 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "globalDependencies": ["**/.env.*local"],
+  "globalEnv": [
+    "ADMIN_URL",
+    "PRIVATE_SERVICE_ROLE",
+    "RECAPTCHA_SECRET_KEY"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
