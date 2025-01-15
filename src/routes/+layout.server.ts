@@ -51,14 +51,14 @@ export const load: LayoutServerLoad = async ({ locals: { safeGetSession, supabas
   const actualHost = request.headers.get('host')?.trim().toLowerCase() || '';
   const forcedHost = isDev ? 'dokmutyatirol.ph' : '';
   
-  console.log('[Layout Server] Domain Check:', {
-    isDev,
-    actualHost,
-    forcedHost,
-    pathname: url.pathname,
-    currentHost: isDev ? forcedHost : actualHost,
-    headers: Object.fromEntries(request.headers.entries())
-  });
+  // console.log('[Layout Server] Domain Check:', {
+  //   isDev,
+  //   actualHost,
+  //   forcedHost,
+  //   pathname: url.pathname,
+  //   currentHost: isDev ? forcedHost : actualHost,
+  //   headers: Object.fromEntries(request.headers.entries())
+  // });
 
   // In dev mode, we'll consider either the actual host being dokmutyatirol.ph
   // or when we're forcing it via isDev
@@ -68,11 +68,11 @@ export const load: LayoutServerLoad = async ({ locals: { safeGetSession, supabas
 
   const shouldShowDokmutya = isDokmutya && url.pathname === '/';
 
-  console.log('[Layout Server] Result:', {
-    isDokmutya,
-    shouldShowDokmutya,
-    pathname: url.pathname
-  });
+  // console.log('[Layout Server] Result:', {
+  //   isDokmutya,
+  //   shouldShowDokmutya,
+  //   pathname: url.pathname
+  // });
   
   // If it's the Dokmutya domain at root path, return early with just that data
   if (shouldShowDokmutya) {
@@ -122,12 +122,12 @@ export const load: LayoutServerLoad = async ({ locals: { safeGetSession, supabas
   if (session && currentProfile) {
     navigation.showHeader = true;
 
-    console.log('[Layout Server] Navigation Debug:', {
-      role: currentProfile?.role,
-      allowedPaths: currentProfile?.role ? RoleConfig[currentProfile?.role].allowedPaths : [],
-      showHeader: navigation?.showHeader,
-      navLinks: currentProfile?.role ? RoleConfig[currentProfile?.role].allowedPaths.filter(p => p.showInNav) : []
-    });
+    // console.log('[Layout Server] Navigation Debug:', {
+    //   role: currentProfile?.role,
+    //   allowedPaths: currentProfile?.role ? RoleConfig[currentProfile?.role].allowedPaths : [],
+    //   showHeader: navigation?.showHeader,
+    //   navLinks: currentProfile?.role ? RoleConfig[currentProfile?.role].allowedPaths.filter(p => p.showInNav) : []
+    // });
 
     if (currentProfile.role === 'super_admin') {
       const { data: activeEmulation } = await supabase
@@ -171,11 +171,11 @@ export const load: LayoutServerLoad = async ({ locals: { safeGetSession, supabas
         navigation.allowedPaths = RoleConfig[emulatedRole].allowedPaths;
         navigation.showRoleEmulation = true;
 
-        console.log('[Layout Server] Emulation Navigation Debug:', {
-          emulatedRole,
-          allowedPaths: RoleConfig[emulatedRole].allowedPaths,
-          navLinks: RoleConfig[emulatedRole].allowedPaths.filter(p => p.showInNav)
-        });
+        // console.log('[Layout Server] Emulation Navigation Debug:', {
+        //   emulatedRole,
+        //   allowedPaths: RoleConfig[emulatedRole].allowedPaths,
+        //   navLinks: RoleConfig[emulatedRole].allowedPaths.filter(p => p.showInNav)
+        // });
       }
     }
   }

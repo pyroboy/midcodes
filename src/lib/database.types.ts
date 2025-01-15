@@ -229,48 +229,52 @@ export type Database = {
         Row: {
           id: number
           location_id: number
-          user_id: string
+          name: string
+          status: Database['public']['Enums']['lease_status']
+          type: Database['public']['Enums']['lease_type']
           start_date: string
           end_date: string
+          terms_month: number
           rent_amount: number
           security_deposit: number
+          balance: number
           notes: string | null
-          status: Database['public']['Enums']['lease_status']
-          outstanding_balance: number
-          last_payment_date: string | null
-          next_payment_due: string | null
           created_at: string
-          updated_at: string
+          updated_at: string | null
           created_by: string
         }
         Insert: {
           id?: number
-          location_id: number
-          user_id: string
+          rental_unit_id: number
+          name: string
+          status?: Database['public']['Enums']['lease_status']
+          type: Database['public']['Enums']['lease_type']
           start_date: string
           end_date: string
+          terms_month: number
           rent_amount: number
           security_deposit: number
+          balance?: number
           notes?: string | null
-          status?: Database['public']['Enums']['lease_status']
-          outstanding_balance?: number
-          last_payment_date?: string | null
-          next_payment_due?: string | null
+          created_at?: string
+          updated_at?: string | null
           created_by: string
         }
         Update: {
           id?: number
-          location_id?: number
-          user_id?: string
+          rental_unit_id?: number
+          name?: string
+          status?: Database['public']['Enums']['lease_status']
+          type?: Database['public']['Enums']['lease_type']
           start_date?: string
           end_date?: string
+          terms_month?: number
           rent_amount?: number
           security_deposit?: number
+          balance?: number
           notes?: string | null
-          status?: Database['public']['Enums']['lease_status']
-          outstanding_balance?: number
-          last_payment_date?: string | null
-          next_payment_due?: string | null
+          created_at?: string
+          updated_at?: string | null
           created_by?: string
         }
       }
@@ -315,7 +319,7 @@ export type Database = {
       property_status: 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE'
       floor_status: 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE'
       location_status: 'VACANT' | 'OCCUPIED' | 'RESERVED'
-      lease_status: 'ACTIVE' | 'INACTIVE' | 'EXPIRED' | 'TERMINATED'
+      lease_status: 'ACTIVE' | 'INACTIVE' | 'EXPIRED' | 'TERMINATED' | 'PENDING'
       lease_type: 'BEDSPACER' | 'PRIVATEROOM'
       maintenance_status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED'
       utility_type: 'ELECTRICITY' | 'WATER' | 'INTERNET'

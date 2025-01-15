@@ -193,8 +193,8 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
     return {
       ...tenant,
       lease,
-      lease_type: lease?.type || 'BEDSPACER',
-      lease_status: lease?.status || 'INACTIVE',
+      // lease_type: lease?.type || 'BEDSPACER',
+      status: lease?.status || 'INACTIVE',
       start_date: lease?.start_date || new Date().toISOString().split('T')[0],
       end_date: lease?.end_date || new Date().toISOString().split('T')[0],
       outstanding_balance: lease?.balance || 0,

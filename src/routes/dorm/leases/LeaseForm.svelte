@@ -145,7 +145,7 @@
   {#if editMode}
     <input type="hidden" name="id" bind:value={$form.id} />
   {/if}
-
+  <input type="hidden" name="name" value=""/>
   <div class="space-y-4">
     <div class="form-field">
       <Label for="tenantIds">Tenants</Label>
@@ -178,25 +178,6 @@
       </select>
       {#if $errors.rental_unit_id}
         <p class="error-message">{$errors.rental_unit_id}</p>
-      {/if}
-    </div>
-
-    <div class="form-field">
-      <Label for="type">Type</Label>
-      <select 
-        id="type"
-        name="type" 
-        bind:value={$form.type}
-        class="w-full"
-        {...$constraints.type}
-      >
-        <option value="">Select type</option>
-        {#each Object.values(leaseSchema.shape.type.options) as type}
-          <option value={type}>{type}</option>
-        {/each}
-      </select>
-      {#if $errors.type}
-        <p class="error-message">{$errors.type}</p>
       {/if}
     </div>
 

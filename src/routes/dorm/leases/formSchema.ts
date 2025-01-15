@@ -7,23 +7,16 @@ export const leaseStatusEnum = z.enum([
   'EXPIRED'
 ]);
 
-export const leaseTypeEnum = z.enum([
-  'MONTHLY',
-  'QUARTERLY',
-  'SEMI_ANNUAL',
-  'ANNUAL'
-]);
+
 
 export type LeaseStatus = z.infer<typeof leaseStatusEnum>;
-export type LeaseType = z.infer<typeof leaseTypeEnum>;
 
 export const leaseSchema = z.object({
   id: z.coerce.number().optional(),
   tenantIds: z.array(z.number()).min(1, 'At least one tenant must be selected'),
   rental_unit_id: z.coerce.number().min(1, 'A rental unit must be selected'),
-  name: z.string().min(1, 'Name is required'),
+  name: z.string().optional(),
   status: leaseStatusEnum,
-  type: leaseTypeEnum,
   start_date: z.string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, { message: 'Invalid date format' })
     .refine(val => val.trim() !== '', { message: 'Date is required' }),

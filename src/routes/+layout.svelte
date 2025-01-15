@@ -34,15 +34,15 @@
     $: navigation = $page.data.navigation;
     $: pageSession = $page.data.session;
     $: showHeader = navigation?.showHeader;
-    $: {
-        console.log('[Layout Debug]', {
-            pageSession,
-            navigationShowHeader: navigation?.showHeader,
-            showHeader,
-            path,
-            navLinks
-        });
-    }
+    // $: {
+    //     console.log('[Layout Debug]', {
+    //         pageSession,
+    //         navigationShowHeader: navigation?.showHeader,
+    //         showHeader,
+    //         path,
+    //         navLinks
+    //     });
+    // }
     $: isDark = $settings.theme === 'dark';
     $: userEmail = $page.data.user?.email ?? '';
     $: emulation = $page.data.session?.roleEmulation as RoleEmulationClaim | null;

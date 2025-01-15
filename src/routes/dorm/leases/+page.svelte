@@ -9,38 +9,21 @@
   import type { z } from 'zod';
   import { leaseSchema } from './formSchema';
   import LeaseForm from './LeaseForm.svelte';
+  import LeaseList from './LeaseList.svelte';
 
-  type FormType = z.infer<typeof leaseSchema>;
-
-  interface Tenant {
-    id: number;
-    name: string;
-    email: string | null;
-    contact_number: string | null;
-  }
 
   export let data: PageData;
+  type FormType = z.infer<typeof leaseSchema>;
+
+
+
   
   let showForm = false;
   let editMode = false;
   let selectedLease: FormType | undefined = undefined;
   let showDeleteConfirm = false;
 
-  const { form, errors, enhance, reset, delayed, constraints, submitting } = superForm(data.form ?? {
-    id: undefined,
-    tenantIds: [],
-    rental_unit_id: undefined,
-    name: '',
-    status: 'ACTIVE',
-    type: 'MONTHLY',
-    start_date: '',
-    end_date: '',
-    terms_month: 1,
-    security_deposit: 0,
-    rent_amount: 0,
-    notes: '',
-    balance: 0
-  }, {
+  const { form, errors, enhance, reset, delayed, constraints, submitting } = superForm(data.form, {
     validators: zod(leaseSchema),
     resetForm: true,
     taintedMessage: null,
@@ -62,6 +45,10 @@
     onSubmit: () => {
       console.log('Form submitted with values:', $form);
     },
+    onResult: ({ result }) => {
+    console.log('Server response:', result);
+  },
+
     onError: ({ result }) => {
       console.error('Form submission error:', result.error);
       const errorMessage = result.error?.message || 'An error occurred';
@@ -79,7 +66,6 @@
       rental_unit_id: lease.rental_unit_id,
       name: lease.name,
       status: lease.status,
-      type: lease.type,
       start_date: lease.start_date,
       end_date: lease.end_date,
       terms_month: lease.terms_month,
@@ -90,17 +76,7 @@
     };
   }
 
-  function toggleForm() {
-    showForm = !showForm;
-    if (!showForm) {
-      reset();
-      editMode = false;
-    }
-  }
 
-  function getTenantName(id: number) {
-    return data.tenants?.find((t: Tenant) => t.id === id)?.name;
-  }
 
   function handleCancel() {
     showForm = false;
@@ -112,37 +88,6 @@
     showDeleteConfirm = true;
   }
 
-  $: canEditLease = data.isAdminLevel || data.isAccountant;
-
-  function getStatusBadgeVariant(status: string): "default" | "destructive" | "outline" | "secondary" {
-    switch (status) {
-      case 'ACTIVE':
-        return 'default';
-      case 'INACTIVE':
-        return 'secondary';
-      case 'TERMINATED':
-        return 'destructive';
-      case 'EXPIRED':
-        return 'outline';
-      default:
-        return 'secondary';
-    }
-  }
-
-  function formatDate(dateString: string): string {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  }
-
-  function formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-PH', {
-      style: 'currency',
-      currency: 'PHP'
-    }).format(amount);
-  }
 </script>
 
 <div class="container mx-auto p-4 flex">
@@ -152,53 +97,10 @@
       <h1 class="text-2xl font-bold">Leases</h1>
     </div>
 
-    <div class="rounded-md border">
-      <div class="grid grid-cols-5 gap-4 p-4 font-medium border-b bg-muted/50">
-        <div>Location</div>
-        <div>Tenant(s)</div>
-        <div>Type</div>
-        <div>Duration</div>
-        <div>Amount</div>
-      </div>
-
-      {#if data.leases && data.leases.length > 0}
-        {#each data.leases as lease (lease.id)}
-          <button 
-            class="grid grid-cols-5 gap-4 p-4 text-left hover:bg-muted/50 w-full border-b last:border-b-0"
-            on:click={() => handleEdit(lease)}
-          >
-            <div>
-              {lease.rental_unit?.name}
-              <span class={`badge ${getStatusBadgeVariant(lease.status)}`}>
-                {lease.status}
-              </span>
-            </div>
-            <div>
-              {#each lease.tenantIds as id}
-                {getTenantName(id)}
-                {#if lease.tenantIds.indexOf(id) !== lease.tenantIds.length - 1}, {/if}
-              {/each}
-            </div>
-            <div>{lease.type}</div>
-            <div class="text-sm">
-              {formatDate(lease.start_date)} - {formatDate(lease.end_date)}
-              <br>
-              {lease.terms_month} months
-            </div>
-            <div>
-              <div>₱{lease.rent_amount}/mo</div>
-              <div class="text-sm text-muted-foreground">
-                Deposit: ₱{lease.security_deposit}
-              </div>
-            </div>
-          </button>
-        {/each}
-      {:else}
-        <div class="p-4 text-center text-muted-foreground">
-          No leases found
-        </div>
-      {/if}
-    </div>
+    <LeaseList 
+    leases={data.leases} 
+    {data} 
+  />
   </div>
 
   <!-- Right side: Form -->

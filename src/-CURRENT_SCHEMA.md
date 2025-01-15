@@ -96,12 +96,13 @@
     ```sql
     CREATE TABLE public.leases (
         id integer NOT NULL DEFAULT nextval('leases_id_seq'::regclass),
-        location_id integer NOT NULL,
+        rental_unit_id integer NOT NULL,
         name text NOT NULL,
         status lease_status NOT NULL DEFAULT 'ACTIVE',
         type lease_type NOT NULL,
         start_date date NOT NULL,
         end_date date NOT NULL,
+         terms_month integer NOT NULL,
         rent_amount numeric(10,2) NOT NULL,
         security_deposit numeric(10,2) NOT NULL,
         balance numeric(10,2) DEFAULT 0,

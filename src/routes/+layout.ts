@@ -31,7 +31,7 @@ type ServerProfile = Database['public']['Tables']['profiles']['Row'] & {
 };
 
 export const load: LayoutLoad<PageData> = async ({ data }) => {
-  console.log('[Layout] Initializing with data:', data);
+  // console.log('[Layout] Initializing with data:', data);
 
   // Handle case when data is null (like in error pages)
   if (!data) {

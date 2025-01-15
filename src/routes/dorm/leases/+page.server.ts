@@ -31,23 +31,25 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
   }
 
   try {
-    console.log('Fetching data from Supabase');
+    // console.log('Fetching data from Supabase');
     // Fetch all required data in parallel
     const [{ data: leases }, { data: rental_units }, { data: tenants }] = await Promise.all([
       supabase
         .from('leases')
         .select(`
           *,
-          tenant:tenants (
-            id,
-            name,
-            email,
-            contact_number
+          lease_tenants!inner (
+            tenant:tenants (
+              id,
+              name,
+              email,
+              contact_number
+            )
           ),
-          rental_unit:rental_unit (
+          rental_unit:rental_unit!inner (
             id,
             name,
-            property:properties (
+            property:properties!inner (
               id,
               name
             )
@@ -102,71 +104,101 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
 
 export const actions: Actions = {
   create: async ({ request, locals: { supabase, safeGetSession } }) => {
-
-    console.log('Starting create lease action');
+    console.log('🚀 Starting create lease action');
     
-    const { profile } = await safeGetSession();
-    console.log('User profile:', profile);
-
-    if (!profile?.role || !checkAccess(profile.role, 'staff')) {
-      console.error('Permission denied - User role:', profile?.role);
-      return fail(403, { message: 'Insufficient permissions' });
-    }
-
-    const formData = await request.formData();
-    const tenantIdsStr = formData.get('tenantIds');
-    const tenantIds = tenantIdsStr ? JSON.parse(tenantIdsStr as string) : [];
-    
-    // Convert form data to object and parse numeric fields
-    const formObject = Object.fromEntries(formData);
-    const parsedData = {
-      ...formObject,
-      tenantIds,
-      locationId: formObject.locationId ? Number(formObject.locationId) : undefined,
-      leaseTermsMonth: formObject.leaseTermsMonth ? Number(formObject.leaseTermsMonth) : undefined,
-      leaseSecurityDeposit: formObject.leaseSecurityDeposit ? Number(formObject.leaseSecurityDeposit) : undefined,
-      leaseRentRate: formObject.leaseRentRate ? Number(formObject.leaseRentRate) : undefined
-    };
-    
-    const form = await superValidate(parsedData, zod(leaseSchema));
-    
-    console.log('Form validation result:', {
-      valid: form.valid,
-      data: form.data,
-      errors: form.errors
-    });
-
-    if (!form.valid) {
-      console.error('Form validation failed:', form.errors);
-      return fail(400, { form });
-    }
-
     try {
-      console.log('Checking rental unit availability for ID:', form.data.rental_unit_id);
+      const { profile } = await safeGetSession();
+      if (!profile?.role || !checkAccess(profile.role, 'staff')) {
+        return fail(403, { message: 'Insufficient permissions', error: true });
+      }
+
+      const formData = await request.formData();
+      const tenantIdsStr = formData.get('tenantIds');
+      let tenantIds: number[] = [];
+
+      try {
+        if (tenantIdsStr) {
+          const parsed = JSON.parse(tenantIdsStr as string);
+          if (Array.isArray(parsed)) {
+            tenantIds = parsed.map(Number).filter(id => !isNaN(id));
+          }
+        }
+        if (tenantIds.length === 0) {
+          return fail(400, { message: 'At least one valid tenant ID is required', error: true });
+        }
+        console.log('Parsed tenant IDs:', tenantIds);
+      } catch (error) {
+        return fail(400, { message: 'Invalid tenant data format', error: true });
+      }
+
+      const rental_unit_id = Number(formData.get('rental_unit_id'));
+      if (isNaN(rental_unit_id)) {
+        return fail(400, { message: 'Invalid rental unit ID', error: true });
+      }
+
       const { data: rental_unit, error: unitError } = await supabase
         .from('rental_unit')
-        .select('rental_unit_status')
-        .eq('id', form.data.rental_unit_id)
+        .select(`
+          id,
+          name,
+          floor:floors!floor_id(
+            floor_number,
+            wing
+          ),
+          rental_unit_status,
+          property:properties!property_id(
+            name
+          )
+        `)
+        .eq('id', rental_unit_id)
         .single();
-      
-      if (unitError) {
-        console.error('Error fetching rental unit:', unitError);
-        throw unitError;
+
+      if (unitError || !rental_unit) {
+        console.error('Unit error:', unitError);
+        return fail(400, { message: 'Failed to fetch rental unit details', error: true });
       }
 
-      console.log('Rental unit status:', rental_unit?.rental_unit_status);
-      if (!rental_unit || !['VACANT', 'RESERVED'].includes(rental_unit.rental_unit_status)) {
-        console.error('Invalid rental unit status:', rental_unit?.rental_unit_status);
-        return fail(400, { form, message: 'Selected rental unit is not available' });
+      const { data: tenants, error: tenantsError } = await supabase
+        .from('tenants')
+        .select('id, name')
+        .in('id', tenantIds);
+
+      if (tenantsError || !tenants || tenants.length === 0) {
+        console.error('Tenants error:', tenantsError);
+        return fail(400, { message: 'Failed to fetch tenant details', error: true });
       }
 
-      console.log('Creating new lease record');
+      // Generate lease name
+      const floor = Array.isArray(rental_unit.floor) ? rental_unit.floor[0] : rental_unit.floor;
+      const floorInfo = floor?.wing 
+        ? `${floor.floor_number}F ${floor.wing}` 
+        : `${floor?.floor_number}F`;
+      const leaseName = `${floorInfo} - ${rental_unit.name}`;
+
+      const form = await superValidate(
+        { ...Object.fromEntries(formData), tenantIds },
+        zod(leaseSchema)
+      );
+
+      if (!form.valid) {
+        console.error('Form validation failed:', form.errors);
+        return fail(400, { form, message: 'Validation failed', error: true });
+      }
+
+      if (rental_unit.rental_unit_status !== 'VACANT') {
+        return fail(400, {
+          form,
+          message: 'Selected rental unit is not available',
+          error: true
+        });
+      }
+
+      // Create lease
       const { data: lease, error: leaseError } = await supabase
         .from('leases')
         .insert({
-          rental_unit_id: form.data.rental_unit_id,
-          name: form.data.name,
-          type: form.data.type,
+          rental_unit_id: rental_unit_id,
+          name: leaseName,
           status: form.data.status,
           start_date: form.data.start_date,
           end_date: form.data.end_date,
@@ -174,250 +206,131 @@ export const actions: Actions = {
           security_deposit: form.data.security_deposit,
           rent_amount: form.data.rent_amount,
           notes: form.data.notes,
-          balance: form.data.balance,
+          balance: form.data.rent_amount,
           created_by: profile.id
         })
         .select()
         .single();
 
-      if (leaseError) {
-        console.error('Error creating lease:', leaseError);
-        throw leaseError;
-      }
-      
-      console.log('Lease created successfully:', lease);
-
-      console.log('Updating rental unit status and creating tenant relationships');
-      try {
-        await Promise.all([
-          supabase
-            .from('rental_unit')
-            .update({ rental_unit_status: 'OCCUPIED' })
-            .eq('id', form.data.rental_unit_id),
-
-          supabase
-            .from('lease_tenants')
-            .insert(form.data.tenantIds.map(tenantId => ({
-              leaseId: lease.id,
-              tenantId
-            })))
-        ]);
-        
-        console.log('Related records updated successfully');
-      } catch (relationError) {
-        console.error('Error updating related records:', relationError);
-        // Attempt to rollback lease creation
-        try {
-          console.log('Attempting to rollback lease creation');
-          await supabase
-            .from('leases')
-            .delete()
-            .eq('id', lease.id);
-          console.log('Lease rollback successful');
-        } catch (rollbackError) {
-          console.error('Rollback failed:', rollbackError);
-        }
-        throw relationError;
+      if (leaseError || !lease) {
+        console.error('Lease creation error:', leaseError);
+        return fail(500, {
+          form,
+          message: 'Failed to create lease record',
+          error: true,
+          details: leaseError?.message
+        });
       }
 
-      console.log('Create lease action completed successfully');
-      return { form };
-      
-    } catch (error: unknown) {
-      console.error('Create lease error:', error);
-      
-      let errorMessage = 'Failed to create lease';
-      if (error instanceof Error) {
-        errorMessage = error.message;
+      console.log('Created lease:', lease);
+
+      // Create tenant relationships - removed the id field since it's serial
+      const lease_tenants = tenantIds.map(tenant_id => ({
+        lease_id: lease.id,
+        tenant_id,
+        created_at: new Date().toISOString()
+      }));
+
+      const { error: relationError } = await supabase
+        .from('lease_tenants')
+        .insert(lease_tenants)
+        .select();
+
+      if (relationError) {
+        console.error('Relation error:', relationError);
+        await supabase.from('leases').delete().eq('id', lease.id);
+        return fail(500, {
+          form,
+          message: 'Failed to create lease relationships',
+          error: true,
+          details: relationError.message
+        });
       }
-      
-      return fail(500, { 
-        form, 
-        message: 'Failed to create lease',
-        details: errorMessage 
+
+      return { 
+        form,
+        success: true
+      };
+
+    } catch (error) {
+      console.error('💥 Unhandled error in create lease action:', error);
+      const form = await superValidate(zod(leaseSchema));
+      return fail(500, {
+        form,
+        message: 'An unexpected error occurred',
+        error: true,
+        details: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   },
 
   update: async ({ request, locals: { supabase, safeGetSession } }) => {
-    console.log('Starting update lease action');
-    
     const { profile } = await safeGetSession();
-    console.log('User profile:', profile);
-
     if (!profile?.role || !checkAccess(profile.role, 'admin')) {
-      console.error('Permission denied - User role:', profile?.role);
       return fail(403, { message: 'Insufficient permissions' });
     }
 
-    const formData = await request.formData();
-    const tenantIdsStr = formData.get('tenantIds');
-    const tenantIds = tenantIdsStr ? JSON.parse(tenantIdsStr as string) : [];
-    
-    const form = await superValidate(
-      { ...Object.fromEntries(formData), tenantIds },
-      zod(leaseSchema)
-    );
-    
-    console.log('Form validation result:', {
-      valid: form.valid,
-      data: form.data,
-      errors: form.errors
-    });
-    
-    if (!form.valid) {
-      console.error('Form validation failed:', form.errors);
-      return fail(400, { form });
-    }
-
     try {
-      console.log('Fetching current lease details for ID:', form.data.id);
-      const { data: currentLease } = await supabase
-        .from('leases')
-        .select('rental_unit_id')
-        .eq('id', form.data.id)
-        .single();
-
-      if (currentLease) {
-        if (currentLease.rental_unit_id !== form.data.rental_unit_id) {
-          console.log('Rental unit change detected. Updating statuses');
-          await Promise.all([
-            supabase
-              .from('rental_unit')
-              .update({ rental_unit_status: 'VACANT' })
-              .eq('id', currentLease.rental_unit_id),
-            
-            supabase
-              .from('rental_unit')
-              .update({ rental_unit_status: 'OCCUPIED' })
-              .eq('id', form.data.rental_unit_id)
-          ]);
-        }
+      const formData = await request.formData();
+      const form = await superValidate(formData, zod(leaseSchema));
+      
+      if (!form.valid) {
+        return fail(400, { form });
       }
 
-      console.log('Updating lease record');
       const { error: leaseError } = await supabase
         .from('leases')
         .update({
-          ...form.data,
-          updated_by: profile.id,
+          status: form.data.status,
+          start_date: form.data.start_date,
+          end_date: form.data.end_date,
+          terms_month: form.data.terms_month,
+          rent_amount: form.data.rent_amount,
+          security_deposit: form.data.security_deposit,
+          notes: form.data.notes,
           updated_at: new Date().toISOString()
         })
         .eq('id', form.data.id);
 
-      if (leaseError) {
-        console.error('Error updating lease:', leaseError);
-        throw leaseError;
-      }
+      if (leaseError) throw leaseError;
 
-      console.log('Updating tenant relationships');
-      await Promise.all([
-        supabase
-          .from('lease_tenants')
-          .delete()
-          .eq('leaseId', form.data.id),
-        
-        supabase
-          .from('lease_tenants')
-          .insert(form.data.tenantIds.map(tenantId => ({
-            leaseId: form.data.id,
-            tenantId
-          })))
-      ]);
-
-      console.log('Update completed successfully');
-      return { form };
-    } catch (error: unknown) {
+      return { form, success: true };
+    } catch (error) {
       console.error('Update lease error:', error);
-      
-      let errorMessage = 'Failed to update lease';
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      
       return fail(500, { 
-        form, 
         message: 'Failed to update lease',
-        details: errorMessage 
+        error: true
       });
     }
   },
 
   delete: async ({ request, locals: { supabase, safeGetSession } }) => {
-    console.log('Starting delete lease action');
-    
     const { profile } = await safeGetSession();
-    console.log('User profile:', profile);
-
     if (!profile?.role || !checkAccess(profile.role, 'admin')) {
-      console.error('Permission denied - User role:', profile?.role);
       return fail(403, { message: 'Insufficient permissions' });
     }
 
     const formData = await request.formData();
-    const tenantIdsStr = formData.get('tenantIds');
-    const tenantIds = tenantIdsStr ? JSON.parse(tenantIdsStr as string) : [];
-    
-    const form = await superValidate(
-      { ...Object.fromEntries(formData), tenantIds },
-      zod(leaseSchema)
-    );
-    if (!form.valid) {
-      console.error('Form validation failed:', form.errors);
-      return fail(400, { form });
-    }
+    const leaseId = formData.get('id');
 
-    console.log('Checking for lease dependencies');
-    const { data: dependencies } = await supabase
-      .from('lease_tenants')
-      .select('id')
-      .eq('leaseId', form.data.id)
-      .limit(1);
-
-    if (dependencies && dependencies.length > 0) {
-      console.error('Delete blocked - existing tenant relationships found');
-      return fail(400, {
-        form,
-        message: 'Cannot delete lease with existing tenant relationships'
-      });
+    if (!leaseId) {
+      return fail(400, { message: 'Lease ID is required' });
     }
 
     try {
-      console.log('Fetching lease details for cleanup');
-      const { data: lease } = await supabase
+      const { error: leaseError } = await supabase
         .from('leases')
-        .select('rental_unit_id')
-        .eq('id', form.data.id)
-        .single();
+        .delete()
+        .eq('id', leaseId);
 
-      if (lease) {
-        console.log('Updating rental unit status and deleting lease');
-        await Promise.all([
-          supabase
-            .from('rental_unit')
-            .update({ rental_unit_status: 'VACANT' })
-            .eq('id', lease.rental_unit_id),
+      if (leaseError) throw leaseError;
 
-          supabase
-            .from('leases')
-            .delete()
-            .eq('id', form.data.id)
-        ]);
-      }
-
-      console.log('Delete completed successfully');
       return { success: true };
-    } catch (error: unknown) {
+    } catch (error) {
       console.error('Delete lease error:', error);
-      
-      let errorMessage = 'Failed to delete lease';
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      
       return fail(500, { 
         message: 'Failed to delete lease',
-        details: errorMessage 
+        error: true
       });
     }
   }

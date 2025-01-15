@@ -6,24 +6,23 @@ import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/publi
 import { ADMIN_URL } from '$env/static/private'
 import type { Handle } from '@sveltejs/kit'
 import type { RoleEmulationData, RoleEmulationClaim, EmulatedProfile, ProfileData, LocalsSession } from '$lib/types/roleEmulation'
-import { RoleConfig, type UserRole, isPublicPath, getRedirectPath, PublicPaths, isValidUserRole, shouldSkipLayout } from '$lib/auth/roleConfig'
+import { isPublicPath, getRedirectPath, PublicPaths, isValidUserRole, shouldSkipLayout } from '$lib/auth/roleConfig'
 
 // Cache configuration
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
-const SESSION_CACHE_TTL = 60 * 1000; // 1 minute in milliseconds
+const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+const SESSION_CACHE_TTL = 60 * 1000 // 1 minute
 
 // Module-level caches
-let supabaseClientCache: SupabaseClient | null = null;
-const sessionCache = new Map<string, { data: GetSessionResult; timestamp: number }>();
-const profileCache = new Map<string, { data: ProfileData | null; timestamp: number }>();
-const roleEmulationCache = new Map<string, { data: RoleEmulationData | null; timestamp: number }>();
+const sessionCache = new Map<string, { data: GetSessionResult; timestamp: number }>()
+const profileCache = new Map<string, { data: ProfileData | null; timestamp: number }>()
+const roleEmulationCache = new Map<string, { data: RoleEmulationData | null; timestamp: number }>()
 
 type GetSessionResult = {
-  session: Session | null;
-  error: Error | null;
-  user: User | null;
-  profile: ProfileData | EmulatedProfile | null;
-  roleEmulation: RoleEmulationClaim | null;
+  session: Session | null
+  error: Error | null
+  user: User | null
+  profile: ProfileData | EmulatedProfile | null
+  roleEmulation: RoleEmulationClaim | null
 }
 
 interface AppLocals {
@@ -42,130 +41,141 @@ declare global {
   }
 }
 
-// Utility function to check if it's the Dokmutya domain
 const isDokmutyaDomain = (host?: string | null): boolean => {
-  if (!host) return false;
-  const baseHostname = host.split(':')[0].replace(/^www\./, '');
-  return baseHostname === 'dokmutyatirol.ph';
-};
+  if (!host) return false
+  const baseHostname = host.split(':')[0].replace(/^www\./, '')
+  return baseHostname === 'dokmutyatirol.ph'
+}
 
-// Host router that handles domain-specific routing
 const hostRouter: Handle = async ({ event, resolve }) => {
-  const isDev = process.env.NODE_ENV === 'development';
-  const originalHost = event.request.headers.get('host')?.trim().toLowerCase();
-  const host = isDev ? 'dokmutyatirol.ph' : originalHost;
+  const isDev = process.env.NODE_ENV === 'development'
+  const originalHost = event.request.headers.get('host')?.trim().toLowerCase()
+  const host = isDev ? 'dokmutyatirol.ph' : originalHost
   
-  console.log(`[Host Router] Initial request:`, {
-    path: event.url.pathname,
-    host,
-    isDev
-  });
-
   if (isDokmutyaDomain(host) && event.url.pathname === '/') {
     return resolve(event, {
-      transformPageChunk: ({ html }) => {
-        return html.replace(
-          '<div id="app">',
-          '<div id="app" data-dokmutya="true">'
-        );
-      }
-    });
+      transformPageChunk: ({ html }) => html.replace(
+        '<div id="app">',
+        '<div id="app" data-dokmutya="true">'
+      )
+    })
   }
   
-  return resolve(event);
-};
+  return resolve(event)
+}
 
-// Initialize Supabase client with caching
 const initializeSupabase: Handle = async ({ event, resolve }) => {
-  // Reuse cached client if available
-  if (!supabaseClientCache) {
-    supabaseClientCache = createServerClient(
-      PUBLIC_SUPABASE_URL,
-      PUBLIC_SUPABASE_ANON_KEY,
-      {
-        cookies: {
-          get: (key) => event.cookies.get(key),
-          set: (key, value, options) => {
+  event.locals.supabase = createServerClient(
+    PUBLIC_SUPABASE_URL,
+    PUBLIC_SUPABASE_ANON_KEY,
+    {
+      cookies: {
+        get: (key) => event.cookies.get(key),
+        set: (key, value, options) => {
+          try {
             event.cookies.set(key, value, { 
               ...options,
               path: '/',
               sameSite: 'lax',
-              secure: true
+              secure: process.env.NODE_ENV === 'production'
             })
-          },
-          remove: (key, options) => event.cookies.delete(key, { path: '/', ...options })
+          } catch (error) {
+            console.debug('Cookie could not be set:', error)
+          }
+        },
+        remove: (key, options) => {
+          try {
+            event.cookies.delete(key, { path: '/', ...options })
+          } catch (error) {
+            console.debug('Cookie could not be removed:', error)
+          }
         }
       }
-    )
-  }
-
-  event.locals.supabase = supabaseClientCache
+    }
+  )
 
   event.locals.getSession = async () => {
-    const { data: { session } } = await event.locals.supabase.auth.getSession()
+    // Always verify the session with the server
+    const { data: { user }, error: userError } = await event.locals.supabase.auth.getUser()
+    if (userError || !user) return null
+    
+    const { data: { session }, error: sessionError } = await event.locals.supabase.auth.getSession()
+    if (sessionError) return null
+    
     return session
   }
 
   event.locals.safeGetSession = async () => {
-    const sessionId = event.locals.session?.access_token || 'anonymous';
-    const now = Date.now();
+    const sessionId = event.locals.session?.access_token || 'anonymous'
+    const now = Date.now()
 
-    // Check cache first
-    const cachedSession = sessionCache.get(sessionId);
+    const cachedSession = sessionCache.get(sessionId)
     if (cachedSession && (now - cachedSession.timestamp) < SESSION_CACHE_TTL) {
-      return cachedSession.data;
+      return cachedSession.data
     }
 
-    let session = event.locals.session
-    let sessionError: Error | null = null
-
-    if (!session) {
-      try {
-        const { data: { session: initialSession }, error: initialError } = 
-          await event.locals.supabase.auth.getSession()
-        session = initialSession
-        sessionError = initialError
-      } catch (err) {
-        console.error('Error getting session:', err)
-        sessionError = err instanceof Error ? err : new Error('Unknown error occurred')
+    // Always verify user authentication first
+    const { data: { user }, error: userError } = await event.locals.supabase.auth.getUser()
+    
+    if (userError || !user) {
+      const result = {
+        session: null,
+        error: userError || new Error('User not authenticated'),
+        user: null,
+        profile: null,
+        roleEmulation: null
       }
+      sessionCache.set(sessionId, { data: result, timestamp: now })
+      return result
     }
 
-    if (session?.expires_at) {
-      const expiresAt = Math.floor(new Date(session.expires_at).getTime() / 1000)
+    // Only after verifying user, get the session
+    const { data: { session: initialSession }, error: sessionError } = await event.locals.supabase.auth.getSession()
+    
+    if (sessionError || !initialSession) {
+      const result = {
+        session: null,
+        error: sessionError || new Error('Invalid session'),
+        user: null,
+        profile: null,
+        roleEmulation: null
+      }
+      sessionCache.set(sessionId, { data: result, timestamp: now })
+      return result
+    }
+
+    // Handle session expiration
+    let currentSession = initialSession
+    if (currentSession.expires_at) {
+      const expiresAt = Math.floor(new Date(currentSession.expires_at).getTime() / 1000)
       const now = Math.floor(Date.now() / 1000)
 
       if (now > expiresAt) {
         try {
-          const { access_token, refresh_token } = session
           const { data: { session: refreshedSession }, error } = 
             await event.locals.supabase.auth.setSession({
-              access_token,
-              refresh_token
+              access_token: currentSession.access_token,
+              refresh_token: currentSession.refresh_token
             })
 
           if (!error && refreshedSession) {
-            session = refreshedSession
+            currentSession = refreshedSession
           }
         } catch (err) {
           console.error('Error refreshing session:', err)
+          const result = {
+            session: null,
+            error: err instanceof Error ? err : new Error('Session refresh failed'),
+            user: null,
+            profile: null,
+            roleEmulation: null
+          }
+          sessionCache.set(sessionId, { data: result, timestamp: now })
+          return result
         }
       }
     }
 
-    if (sessionError || !session?.user) {
-      const result = {
-        session: null,
-        error: sessionError,
-        user: null,
-        profile: null,
-        roleEmulation: null
-      };
-      sessionCache.set(sessionId, { data: result, timestamp: now });
-      return result;
-    }
-
-    const user = session.user
     const [profile, activeEmulation] = await Promise.all([
       getUserProfile(user.id, event.locals.supabase),
       getActiveRoleEmulation(user.id, event.locals.supabase)
@@ -175,9 +185,9 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
     let roleEmulation: RoleEmulationClaim | null = null
 
     if (profile?.role === 'super_admin') {
-      event.locals.special_url = '/' + ADMIN_URL;
+      event.locals.special_url = '/' + ADMIN_URL
     } else {
-      event.locals.special_url = '/';
+      event.locals.special_url = '/'
     }
 
     if (activeEmulation && profile) {
@@ -185,7 +195,7 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
         .from('organizations')
         .select('name')
         .eq('id', activeEmulation.emulated_org_id)
-        .single();
+        .single()
 
       roleEmulation = {
         active: true,
@@ -206,122 +216,115 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
         isEmulated: true
       } as EmulatedProfile
 
-      ;(session as LocalsSession).roleEmulation = roleEmulation
+      ;(currentSession as LocalsSession).roleEmulation = roleEmulation
     }
 
-    const result = {
-      session,
-      error: null,
-      user,
-      profile: emulatedProfile,
-      roleEmulation
-    };
-
-    // Cache the session result
-    sessionCache.set(sessionId, { data: result, timestamp: now });
-
-    return result;
+    const result = { session: currentSession, error: null, user, profile: emulatedProfile, roleEmulation }
+    sessionCache.set(sessionId, { data: result, timestamp: now })
+    return result
   }
 
   return resolve(event)
 }
 
-// Role emulation guard with caching
 const roleEmulationGuard: Handle = async ({ event, resolve }) => {
-  const isDev = process.env.NODE_ENV === 'development';
-  const host = isDev ? 'dokmutyatirol.ph' : event.request.headers.get('host')?.trim().toLowerCase();
+  const isDev = process.env.NODE_ENV === 'development'
+  const host = isDev ? 'dokmutyatirol.ph' : event.request.headers.get('host')?.trim().toLowerCase()
   
   if (isDokmutyaDomain(host) || event.url.pathname.startsWith('/dokmutya')) {
-    return resolve(event);
+    return resolve(event)
   }
 
   if (event.url.pathname.startsWith('/api')) {
-    return resolve(event);
+    return resolve(event)
   }
 
-  const sessionInfo = await event.locals.safeGetSession() as GetSessionResult;
+  const sessionInfo = await event.locals.safeGetSession()
 
   if (sessionInfo.roleEmulation?.active) {
-    const now = new Date();
-    const expiresAt = new Date(sessionInfo.roleEmulation.expires_at);
+    const now = new Date()
+    const expiresAt = new Date(sessionInfo.roleEmulation.expires_at)
 
     if (now > expiresAt) {
       await event.locals.supabase
         .from('role_emulation_sessions')
         .update({ status: 'expired' })
-        .eq('id', sessionInfo.roleEmulation.session_id);
+        .eq('id', sessionInfo.roleEmulation.session_id)
 
-      event.cookies.delete('role_emulation', { path: '/' });
+      try {
+        event.cookies.delete('role_emulation', { path: '/' })
+      } catch (error) {
+        console.debug('Could not delete role_emulation cookie:', error)
+      }
+
       if (sessionInfo.session) {
-        delete (sessionInfo.session as LocalsSession).roleEmulation;
+        delete (sessionInfo.session as LocalsSession).roleEmulation
       }
 
-      // Clear role emulation cache for this user
       if (sessionInfo.user) {
-        roleEmulationCache.delete(sessionInfo.user.id);
+        roleEmulationCache.delete(sessionInfo.user.id)
       }
 
-      throw redirect(303, event.url.pathname);
+      throw redirect(303, event.url.pathname)
     }
   }
 
-  return resolve(event);
-};
+  return resolve(event)
+}
 
-// Auth guard with caching
 const authGuard: Handle = async ({ event, resolve }) => {
-  const isDev = process.env.NODE_ENV === 'development';
-  const host = isDev ? 'dokmutyatirol.ph' : event.request.headers.get('host')?.trim().toLowerCase();
+  const isDev = process.env.NODE_ENV === 'development'
+  const host = isDev ? 'dokmutyatirol.ph' : event.request.headers.get('host')?.trim().toLowerCase()
   
   if (isDokmutyaDomain(host) || event.url.pathname.startsWith('/dokmutya')) {
-    return resolve(event);
+    return resolve(event)
   }
 
   if (shouldSkipLayout(event.url.pathname)) {
     return resolve(event, {
       transformPageChunk: ({ html }) => html
-    });
+    })
   }
 
   if (event.url.pathname.startsWith('/api')) {
-    const sessionInfo = await event.locals.safeGetSession() as GetSessionResult;
+    const sessionInfo = await event.locals.safeGetSession()
     if (!sessionInfo.user) {
-      throw throwError(401, 'Unauthorized');
+      throw throwError(401, 'Unauthorized')
     }
     event.locals = {
       ...event.locals,
       session: sessionInfo.session,
       user: sessionInfo.user
-    };
-    return resolve(event);
+    }
+    return resolve(event)
   }
 
-  const sessionInfo = await event.locals.safeGetSession() as GetSessionResult;
+  const sessionInfo = await event.locals.safeGetSession()
 
   event.locals = {
     ...event.locals,
     session: sessionInfo.session,
     user: sessionInfo.user,
     profile: sessionInfo.profile,
-  };
+  }
 
   if (!sessionInfo.user) {
-    throw redirect(303, PublicPaths.auth);
+    throw redirect(303, PublicPaths.auth)
   }
 
   if (!sessionInfo.profile?.role || !isValidUserRole(sessionInfo.profile.role)) {
-    throw throwError(400, 'Invalid user role');
+    throw throwError(400, 'Invalid user role')
   }
 
-  const originalRole = (sessionInfo.profile as EmulatedProfile)?.originalRole;
-  const context = sessionInfo.roleEmulation?.metadata?.context || sessionInfo.profile?.context || {};
+  const originalRole = (sessionInfo.profile as EmulatedProfile)?.originalRole
+  const context = sessionInfo.roleEmulation?.metadata?.context || sessionInfo.profile?.context || {}
 
   if (sessionInfo.profile.role === 'super_admin' || originalRole === 'super_admin') {
     if (event.url.pathname === `/${ADMIN_URL}`) {
-      return resolve(event);
+      return resolve(event)
     }
     if (event.url.pathname === '/') {
-      throw redirect(303, `/${ADMIN_URL}`);
+      throw redirect(303, `/${ADMIN_URL}`)
     }
   }
 
@@ -330,7 +333,7 @@ const authGuard: Handle = async ({ event, resolve }) => {
     event.url.pathname,
     originalRole,
     context
-  );
+  )
 
   if (redirectPath === PublicPaths.error) {
     event.locals = {
@@ -338,52 +341,51 @@ const authGuard: Handle = async ({ event, resolve }) => {
       session: null,
       user: null,
       profile: null
-    };
-    throw throwError(404, { message: 'Not found' });
+    }
+    throw throwError(404, { message: 'Not found' })
   }
 
   if (redirectPath === PublicPaths.auth) {
-    throw throwError(403, { message: 'Forbidden' });
+    throw throwError(403, { message: 'Forbidden' })
   }
 
   if (redirectPath) {
-    throw redirect(303, redirectPath);
+    throw redirect(303, redirectPath)
   }
 
-  return resolve(event);
-};
+  return resolve(event)
+}
 
-// Helper functions with caching
 async function getUserProfile(userId: string, supabase: SupabaseClient): Promise<ProfileData | null> {
-  const now = Date.now();
-  const cachedProfile = profileCache.get(userId);
+  const now = Date.now()
+  const cachedProfile = profileCache.get(userId)
   
   if (cachedProfile && (now - cachedProfile.timestamp) < CACHE_TTL) {
-    return cachedProfile.data;
+    return cachedProfile.data
   }
 
   const { data: profile, error } = await supabase
     .from('profiles')
     .select('*, organizations(id, name), context')
     .eq('id', userId)
-    .single();
+    .single()
 
   if (error) {
-    console.error('Error fetching profile:', error);
-    profileCache.set(userId, { data: null, timestamp: now });
-    return null;
+    console.error('Error fetching profile:', error)
+    profileCache.set(userId, { data: null, timestamp: now })
+    return null
   }
 
-  profileCache.set(userId, { data: profile, timestamp: now });
-  return profile;
+  profileCache.set(userId, { data: profile, timestamp: now })
+  return profile
 }
 
 async function getActiveRoleEmulation(userId: string, supabase: SupabaseClient) {
-  const now = Date.now();
-  const cachedEmulation = roleEmulationCache.get(userId);
+  const now = Date.now()
+  const cachedEmulation = roleEmulationCache.get(userId)
   
   if (cachedEmulation && (now - cachedEmulation.timestamp) < CACHE_TTL) {
-    return cachedEmulation.data;
+    return cachedEmulation.data
   }
 
   const { data: emulation } = await supabase
@@ -392,10 +394,10 @@ async function getActiveRoleEmulation(userId: string, supabase: SupabaseClient) 
     .eq('user_id', userId)
     .eq('status', 'active')
     .gt('expires_at', new Date().toISOString())
-    .single();
+    .single()
 
-  roleEmulationCache.set(userId, { data: emulation || null, timestamp: now });
-  return emulation;
+  roleEmulationCache.set(userId, { data: emulation || null, timestamp: now })
+  return emulation
 }
 
-export const handle = sequence(hostRouter, initializeSupabase, roleEmulationGuard, authGuard);
+export const handle = sequence(hostRouter, initializeSupabase, roleEmulationGuard, authGuard)
