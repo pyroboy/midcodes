@@ -10,7 +10,7 @@ return {
 	assets: new Set(["app.css"]),
 	mimeTypes: {".css":"text/css"},
 	_: {
-		client: {"start":"_app/immutable/entry/start.BNDhkV0L.js","app":"_app/immutable/entry/app.CvhIia5r.js","imports":["_app/immutable/entry/start.BNDhkV0L.js","_app/immutable/chunks/entry.Dw7epz9C.js","_app/immutable/chunks/scheduler.DiXKfncd.js","_app/immutable/entry/app.CvhIia5r.js","_app/immutable/chunks/scheduler.DiXKfncd.js","_app/immutable/chunks/index.BgLdwERb.js"],"stylesheets":[],"fonts":[],"uses_env_dynamic_public":false},
+		client: {"start":"_app/immutable/entry/start.CP_65s5E.js","app":"_app/immutable/entry/app.BMHFY0c0.js","imports":["_app/immutable/entry/start.CP_65s5E.js","_app/immutable/chunks/entry.B_S4jhmL.js","_app/immutable/chunks/scheduler.DiXKfncd.js","_app/immutable/entry/app.BMHFY0c0.js","_app/immutable/chunks/scheduler.DiXKfncd.js","_app/immutable/chunks/index.BgLdwERb.js"],"stylesheets":[],"fonts":[],"uses_env_dynamic_public":false},
 		nodes: [
 			__memo(() => import('./nodes/0.js')),
 			__memo(() => import('./nodes/1.js')),
