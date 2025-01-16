@@ -1,6 +1,6 @@
 {
     "framework": "sveltekit",
-    "buildCommand": "cd apps/dokmutya && npm run build",
-    "outputDirectory": "apps/dokmutya/.svelte-kit/output",
+    "buildCommand": "npm run build",
+    "outputDirectory": ".svelte-kit/output",
     "regions": ["sin1"]
   }
