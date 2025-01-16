@@ -76,5 +76,8 @@
 		"tailwind-variants": "^0.2.1",
 		"three": "^0.171.0",
 		"three-inspect": "^0.7.2"
-	}
+	},
+	"engines": {
+		"node": "^20.0.0"
+	  }
 }
