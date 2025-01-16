@@ -53,7 +53,7 @@ const restartAnimation = () => {
         bind:this={logoElement}
         src="https://ucarecdn.com/58c1e01e-1959-4f3a-bd04-00aed947f020/-/preview/200x200/" 
         alt="Logo" 
-        class="h-24 w-auto beating-heart  -mb-10" 
+        class="h-12 md:h-24 w-auto beating-heart object-cover -mb-2 md:-mb-10" 
       />
       </a>
       
