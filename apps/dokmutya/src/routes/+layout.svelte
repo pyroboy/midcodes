@@ -1,11 +1,18 @@
 <script>
-  import '../app.css';
-  /**
-   * @typedef {Object} Props
-   * @property {import('svelte').Snippet} [children]
-   */
-
-  /** @type {Props} */
+  import { base } from "$app/paths";
+  import "../app.css";
   let { children } = $props();
 </script>
-{@render children?.()}
+
+<nav>
+  <ul class="flex space-x-8 mb-4">
+    <li>
+      <a href="{base}/">Home</a>
+    </li>
+    <li>
+      <a href="{base}/about">About</a>
+    </li>
+  </ul>
+</nav>
+
+{@render children()}
