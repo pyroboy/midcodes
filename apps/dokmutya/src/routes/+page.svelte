@@ -35,9 +35,9 @@
 </script>
 
 <main class="font-inter">
-    <section class="relative bg-cover bg-center text-white pt-40 pb-20 -mt-20" style="background-image: url('https://images.unsplash.com/photo-1551076805-e1869033e561?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80')">
+    <section class="min-h-[100svh] relative bg-cover bg-center text-white flex items-center" style="background-image: url('https://images.unsplash.com/photo-1551076805-e1869033e561?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80')">
         <div class="absolute inset-0 bg-gradient-to-br from-blue-900/90 to-cyan-800/80"></div>
-        <div class="relative z-10 container mx-auto px-4 text-center">
+        <div class="relative z-10 container mx-auto px-4 text-center py-20">
             <h1 class="text-5xl md:text-6xl font-bold mb-4">Building a Healthier First District</h1>
             <p class="text-xl md:text-2xl font-light mb-12">Leadership that Heals, Experience that Matters</p>
             <div class="flex flex-col md:flex-row justify-center gap-16 my-12">
@@ -55,7 +55,7 @@
         </div>
     </section>
 
-    <section id="about" class="py-20">
+    <section id="about" class="min-h-[100svh] flex items-center py-20">
         <div class="container mx-auto px-4">
             <div class="text-center mb-16">
                 <h2 class="text-3xl font-bold">Mission & Vision</h2>
@@ -74,7 +74,7 @@
         </div>
     </section>
 
-    <section id="priorities" class="bg-gray-50 py-20">
+    <section id="priorities" class="min-h-[100svh] bg-gray-50 flex items-center py-20">
         <div class="container mx-auto px-4">
             <div class="text-center mb-16">
                 <h2 class="text-3xl font-bold">Healthcare Priorities</h2>
@@ -92,7 +92,7 @@
         </div>
     </section>
 
-    <section id="events" class="py-20">
+    <section id="events" class="min-h-[100svh] flex items-center py-20">
         <div class="container mx-auto px-4">
             <div class="text-center mb-16">
                 <h2 class="text-3xl font-bold">Upcoming Events</h2>
@@ -111,7 +111,7 @@
         </div>
     </section>
 
-    <section id="contact" class="bg-gray-50 py-20">
+    <section id="contact" class="min-h-[100svh] bg-gray-50 flex items-center py-20">
         <div class="container mx-auto px-4">
             <div class="text-center mb-16">
                 <h2 class="text-3xl font-bold">Contact Us</h2>
