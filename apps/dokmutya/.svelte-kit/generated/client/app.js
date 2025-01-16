@@ -6,7 +6,7 @@ export const nodes = [
 	() => import('./nodes/2')
 ];
 
-export const server_loads = [];
+export const server_loads = [0];
 
 export const dictionary = {
 		"/": [2]
@@ -25,4 +25,4 @@ export const hash = false;
 
 export const decode = (type, value) => decoders[type](value);
 
-export { default as root } from '../root.svelte';
+export { default as root } from '../root.js';
