@@ -1,5 +1,7 @@
 # Dependencies
 node_modules
+.svelte-kit
+
 
 # Build directories for apps
 apps/*/.svelte-kit
