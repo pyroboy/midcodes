@@ -80,114 +80,148 @@ function toggleView() {
   }
 }
 </script>
-
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 <div class="container mx-auto px-4 py-24 min-h-screen relative">
   <div class="grid grid-cols-1 gap-8 mb-24">
-    <!-- Images Column -->
-
-
     <!-- CV Content -->
-      <div id="cv-section" 
-           class="bg-white/80 backdrop-blur rounded-xl p-8 shadow-xl"
-           transition:fly={{ y: 50, duration: 500 }}>
-        <div class="space-y-12">
-          <header class="space-y-4">
-            <h1 class="text-3xl font-bold">{profile.name}</h1>
-            <div class="space-y-2 text-gray-600">
-              <p>PRC License Number: {profile.prcLicense}</p>
-              <p>Email: {profile.email}</p>
-              <p>Contact: {profile.contact}</p>
-            </div>
-          </header>
-
-          <section>
-            <h2 class="text-2xl font-semibold mb-4">Educational Background</h2>
-            <div class="space-y-4">
-              {#each profile.education as edu}
-                <div>
-                  <h3 class="font-medium">{edu.level}</h3>
-                  <p class="text-gray-600">{edu.school} {edu.year ? `– ${edu.year}` : ''}</p>
-                </div>
-              {/each}
-            </div>
-          </section>
-
-          <section>
-            <h2 class="text-2xl font-semibold mb-4">Work Experience</h2>
-            <div class="space-y-4">
-              {#each profile.experience as exp}
-                <div>
-                  <h3 class="font-medium">{exp.position}</h3>
-                  <p>{exp.company}</p>
-                  <p class="text-gray-600">{exp.period}</p>
-                </div>
-              {/each}
-            </div>
-          </section>
-
-          <section>
-            <h2 class="text-2xl font-semibold mb-4">Training Programs Attended</h2>
-            <div class="space-y-4">
-              {#each profile.training as training}
-                <div>
-                  <h3 class="font-medium">{training.name}</h3>
-                  <p class="text-gray-600">{training.date}</p>
-                </div>
-              {/each}
-            </div>
-          </section>
-
-          <section>
-            <h2 class="text-2xl font-semibold mb-4">Voluntary Work / Involvement in Civic Organizations</h2>
-            <div class="space-y-4">
-              {#each profile.voluntary as vol}
-                <div>
-                  <h3 class="font-medium">{vol.position}</h3>
-                  <p>{vol.organization}</p>
-                  {#if vol.period}
-                    <p class="text-gray-600">{vol.period}</p>
-                  {/if}
-                </div>
-              {/each}
-            </div>
-          </section>
-
-          <section class="grid md:grid-cols-2 gap-8">
-            <div>
-              <h2 class="text-2xl font-semibold mb-4">Interests</h2>
-              <ul class="list-disc list-inside space-y-1">
-                {#each profile.interests as interest}
-                  <li>{interest}</li>
-                {/each}
-              </ul>
-            </div>
-
-            <div>
-              <h2 class="text-2xl font-semibold mb-4">Awards</h2>
-              <ul class="list-disc list-inside space-y-1">
-                {#each profile.awards as award}
-                  <li>{award}</li>
-                {/each}
-              </ul>
-            </div>
-          </section>
-
-          <footer class="pt-8 border-t">
-            <p class="text-sm text-gray-600">
-              I hereby certify that all the information mentioned above are true.
+    <div id="cv-section" 
+         class="bg-white/80 backdrop-blur rounded-xl p-8 shadow-xl"
+         transition:fly={{ y: 50, duration: 500 }}>
+      <div class="space-y-12">
+        <!-- Header Section -->
+        <header class="space-y-4">
+          <h1 class="text-3xl font-bold flex items-center gap-2">
+            <i class="fas fa-user text-2xl text-blue-500"></i>
+            {profile.name}
+          </h1>
+          <div class="space-y-2 text-gray-600">
+            <p class="flex items-center gap-2">
+              <i class="fas fa-id-card text-blue-500"></i>
+              PRC License Number: {profile.prcLicense}
             </p>
-            <p class="mt-4 font-medium">
-              {profile.name}<br>
-              Medical Center Chief II<br>
-              Governor Celestino Gallares Memorial Medical Center
+            <p class="flex items-center gap-2">
+              <i class="fas fa-envelope text-blue-500"></i>
+              Email: {profile.email}
             </p>
-          </footer>
-        </div>
+            <p class="flex items-center gap-2">
+              <i class="fas fa-phone text-blue-500"></i>
+              Contact: {profile.contact}
+            </p>
+          </div>
+        </header>
+
+        <!-- Educational Background -->
+        <section>
+          <h2 class="text-2xl font-semibold mb-4 flex items-center gap-2">
+            <i class="fas fa-graduation-cap text-blue-500"></i>
+            Educational Background
+          </h2>
+          <div class="space-y-4">
+            {#each profile.education as edu}
+              <div>
+                <h3 class="font-medium">{edu.level}</h3>
+                <p class="text-gray-600">{edu.school} {edu.year ? `– ${edu.year}` : ''}</p>
+              </div>
+            {/each}
+          </div>
+        </section>
+
+        <!-- Work Experience -->
+        <section>
+          <h2 class="text-2xl font-semibold mb-4 flex items-center gap-2">
+            <i class="fas fa-briefcase text-blue-500"></i>
+            Work Experience
+          </h2>
+          <div class="space-y-4">
+            {#each profile.experience as exp}
+              <div>
+                <h3 class="font-medium">{exp.position}</h3>
+                <p>{exp.company}</p>
+                <p class="text-gray-600">{exp.period}</p>
+              </div>
+            {/each}
+          </div>
+        </section>
+
+        <!-- Training Programs Attended -->
+        <section>
+          <h2 class="text-2xl font-semibold mb-4 flex items-center gap-2">
+            <i class="fas fa-certificate text-blue-500"></i>
+            Training Programs Attended
+          </h2>
+          <div class="space-y-4">
+            {#each profile.training as training}
+              <div>
+                <h3 class="font-medium">{training.name}</h3>
+                <p class="text-gray-600">{training.date}</p>
+              </div>
+            {/each}
+          </div>
+        </section>
+
+        <!-- Voluntary Work / Involvement in Civic Organizations -->
+        <section>
+          <h2 class="text-2xl font-semibold mb-4 flex items-center gap-2">
+            <i class="fas fa-hands-helping text-blue-500"></i>
+            Voluntary Work / Involvement in Civic Organizations
+          </h2>
+          <div class="space-y-4">
+            {#each profile.voluntary as vol}
+              <div>
+                <h3 class="font-medium">{vol.position}</h3>
+                <p>{vol.organization}</p>
+                {#if vol.period}
+                  <p class="text-gray-600">{vol.period}</p>
+                {/if}
+              </div>
+            {/each}
+          </div>
+        </section>
+
+        <!-- Interests and Awards -->
+        <section class="grid md:grid-cols-2 gap-8">
+          <div>
+            <h2 class="text-2xl font-semibold mb-4 flex items-center gap-2">
+              <i class="fas fa-heart text-blue-500"></i>
+              Interests
+            </h2>
+            <ul class="list-disc list-inside space-y-1">
+              {#each profile.interests as interest}
+                <li>{interest}</li>
+              {/each}
+            </ul>
+          </div>
+
+          <div>
+            <h2 class="text-2xl font-semibold mb-4 flex items-center gap-2">
+              <i class="fas fa-trophy text-blue-500"></i>
+              Awards
+            </h2>
+            <ul class="list-disc list-inside space-y-1">
+              {#each profile.awards as award}
+                <li>{award}</li>
+              {/each}
+            </ul>
+          </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="pt-8 border-t">
+          <p class="text-sm text-gray-600">
+            I hereby certify that all the information mentioned above are true.
+          </p>
+          <p class="mt-4 font-medium">
+            {profile.name}<br>
+            Medical Center Chief II<br>
+            Governor Celestino Gallares Memorial Medical Center
+          </p>
+        </footer>
       </div>
+    </div>
   </div>
-
-
 </div>
+
+
 
 <style>
   :global(html) {

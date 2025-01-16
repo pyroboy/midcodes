@@ -10,11 +10,13 @@ return {
 	assets: new Set(["app.css","favicon.png"]),
 	mimeTypes: {".css":"text/css",".png":"image/png"},
 	_: {
-		client: {"start":"_app/immutable/entry/start.C1laR7TC.js","app":"_app/immutable/entry/app.B4VYKyqq.js","imports":["_app/immutable/entry/start.C1laR7TC.js","_app/immutable/chunks/entry.Uc0ZAp3f.js","_app/immutable/chunks/runtime.DLo6uQS5.js","_app/immutable/chunks/paths.COcRFZjt.js","_app/immutable/chunks/index-client.BSGpTFrV.js","_app/immutable/entry/app.B4VYKyqq.js","_app/immutable/chunks/runtime.DLo6uQS5.js","_app/immutable/chunks/render.CZlMgkAb.js","_app/immutable/chunks/disclose-version.D83qhv8K.js","_app/immutable/chunks/index-client.BSGpTFrV.js"],"stylesheets":[],"fonts":[],"uses_env_dynamic_public":false},
+		client: {"start":"_app/immutable/entry/start.DmIzB2jZ.js","app":"_app/immutable/entry/app.Bpp7_zWL.js","imports":["_app/immutable/entry/start.DmIzB2jZ.js","_app/immutable/chunks/entry.xQLXoURG.js","_app/immutable/chunks/runtime.Dvs5Ud68.js","_app/immutable/chunks/paths.9NbgWD2o.js","_app/immutable/chunks/index-client.DrWtTyZV.js","_app/immutable/entry/app.Bpp7_zWL.js","_app/immutable/chunks/runtime.Dvs5Ud68.js","_app/immutable/chunks/disclose-version.B5GWarkr.js","_app/immutable/chunks/if.wNEY2zMS.js","_app/immutable/chunks/this.Mvv0QzSo.js","_app/immutable/chunks/index-client.DrWtTyZV.js"],"stylesheets":[],"fonts":[],"uses_env_dynamic_public":false},
 		nodes: [
 			__memo(() => import('./nodes/0.js')),
 			__memo(() => import('./nodes/1.js')),
-			__memo(() => import('./nodes/2.js'))
+			__memo(() => import('./nodes/2.js')),
+			__memo(() => import('./nodes/3.js')),
+			__memo(() => import('./nodes/4.js'))
 		],
 		routes: [
 			{
@@ -22,6 +24,20 @@ return {
 				pattern: /^\/$/,
 				params: [],
 				page: { layouts: [0,], errors: [1,], leaf: 2 },
+				endpoint: null
+			},
+			{
+				id: "/about",
+				pattern: /^\/about\/?$/,
+				params: [],
+				page: { layouts: [0,], errors: [1,], leaf: 3 },
+				endpoint: null
+			},
+			{
+				id: "/cv",
+				pattern: /^\/cv\/?$/,
+				params: [],
+				page: { layouts: [0,], errors: [1,], leaf: 4 },
 				endpoint: null
 			}
 		],

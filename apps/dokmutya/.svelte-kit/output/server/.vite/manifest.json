@@ -5,7 +5,15 @@
     "src": ".svelte-kit/generated/server/internal.js",
     "isEntry": true,
     "imports": [
-      "_internal.js"
+      "_internal.js",
+      "_paths.js"
+    ]
+  },
+  "_attributes.js": {
+    "file": "chunks/attributes.js",
+    "name": "attributes",
+    "imports": [
+      "_escaping.js"
     ]
   },
   "_equality.js": {
@@ -32,8 +40,13 @@
     "name": "internal",
     "imports": [
       "_equality.js",
-      "_index.js"
+      "_index.js",
+      "_paths.js"
     ]
+  },
+  "_paths.js": {
+    "file": "chunks/paths.js",
+    "name": "paths"
   },
   "node_modules/@sveltejs/kit/src/runtime/components/svelte-5/error.svelte": {
     "file": "entries/fallbacks/error.svelte.js",
@@ -54,6 +67,7 @@
     "isEntry": true,
     "imports": [
       "_internal.js",
+      "_paths.js",
       "_exports.js"
     ]
   },
@@ -69,10 +83,12 @@
     "src": "src/routes/+layout.svelte",
     "isEntry": true,
     "imports": [
-      "_index.js"
+      "_index.js",
+      "_paths.js",
+      "_attributes.js"
     ],
     "css": [
-      "_app/immutable/assets/_layout.yU0dDjZp.css"
+      "_app/immutable/assets/_layout.B-qOqHWr.css"
     ]
   },
   "src/routes/+page.svelte": {
@@ -83,6 +99,44 @@
     "imports": [
       "_index.js",
       "_escaping.js"
+    ]
+  },
+  "src/routes/about/+page.server.ts": {
+    "file": "entries/pages/about/_page.server.ts.js",
+    "name": "entries/pages/about/_page.server.ts",
+    "src": "src/routes/about/+page.server.ts",
+    "isEntry": true
+  },
+  "src/routes/about/+page.svelte": {
+    "file": "entries/pages/about/_page.svelte.js",
+    "name": "entries/pages/about/_page.svelte",
+    "src": "src/routes/about/+page.svelte",
+    "isEntry": true,
+    "imports": [
+      "_index.js",
+      "_attributes.js"
+    ],
+    "css": [
+      "_app/immutable/assets/_page.C6XpIQV4.css"
+    ]
+  },
+  "src/routes/cv/+page.server.ts": {
+    "file": "entries/pages/cv/_page.server.ts.js",
+    "name": "entries/pages/cv/_page.server.ts",
+    "src": "src/routes/cv/+page.server.ts",
+    "isEntry": true
+  },
+  "src/routes/cv/+page.svelte": {
+    "file": "entries/pages/cv/_page.svelte.js",
+    "name": "entries/pages/cv/_page.svelte",
+    "src": "src/routes/cv/+page.svelte",
+    "isEntry": true,
+    "imports": [
+      "_index.js",
+      "_escaping.js"
+    ],
+    "css": [
+      "_app/immutable/assets/_page.C6XpIQV4.css"
     ]
   }
 }
