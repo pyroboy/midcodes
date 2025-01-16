@@ -4,7 +4,7 @@
   let { children } = $props();
 </script>
 
-<nav>
+<!-- <nav>
   <ul class="flex space-x-8 mb-4">
     <li>
       <a href="{base}/">Home</a>
@@ -13,6 +13,6 @@
       <a href="{base}/about">About</a>
     </li>
   </ul>
-</nav>
+</nav> -->
 
 {@render children()}
