@@ -6,6 +6,7 @@ import adapter from '@sveltejs/adapter-vercel';
 const config = {
 	kit: {
 		adapter: adapter({
+         runtime: 'nodejs20.x'
 			// see below for options that can be set here
 		})
 	},

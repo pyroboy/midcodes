@@ -1,0 +1,10 @@
+{
+    "framework": "sveltekit",
+    "buildCommand": "turbo run build --filter={apps/dokmutya}",
+    "devCommand": "turbo run dev --filter={apps/dokmutya}",
+    "outputDirectory": "apps/dokmutya/.svelte-kit/output",
+    "regions": ["iad1"],
+    "nodejs": {
+      "version": 20
+    }
+  }
