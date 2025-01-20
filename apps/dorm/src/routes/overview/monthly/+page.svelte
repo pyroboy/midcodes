@@ -1,6 +1,6 @@
 <!-- @migration-task Error while migrating Svelte code: Identifier 'PageData' has already been declared
 https://svelte.dev/e/js_parse_error -->
-<script lang="ts">
+<!-- <script lang="ts">
   import type { PageData } from './$types';
   import { formatCurrency } from '$lib/utils/format';
   import * as Card from '$lib/components/ui/card';
@@ -688,4 +688,4 @@ https://svelte.dev/e/js_parse_error -->
       {/each}
     </TabsContent>
   </Tabs>
-</div>
+</div> -->
