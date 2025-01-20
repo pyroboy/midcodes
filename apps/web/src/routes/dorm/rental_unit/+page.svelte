@@ -21,7 +21,11 @@
       user: { role: string } | null;
     }
 
-    export let data: PageData;
+  interface Props {
+    data: PageData;
+  }
+
+  let { data = $bindable() }: Props = $props();
 
     const { form, enhance, errors, constraints, message } = superForm(data.form, {
       id: 'rental_unit-form',
@@ -46,8 +50,8 @@
       }
     });
 
-    let editMode = false;
-    let selectedRental_Unit: Rental_unit | undefined = undefined;
+    let editMode = $state(false);
+    let selectedRental_Unit: Rental_unit | undefined = $state(undefined);
 
     function handleRental_UnitClick(rental_unit: PageData['rental_unit'][number]) {
       selectedRental_Unit = rental_unit;

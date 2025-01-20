@@ -1,12 +1,21 @@
 <script lang="ts">
+    import { run } from 'svelte/legacy';
+
     import { page } from '$app/stores';
     import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
+    interface Props {
+        children?: import('svelte').Snippet;
+    }
+
+    let { children }: Props = $props();
     
     // Ensure we're using the admin layout
-    $: console.log('[Admin Layout]', {
-        path: $page.url.pathname,
-        data: $page.data
+    run(() => {
+        console.log('[Admin Layout]', {
+            path: $page.url.pathname,
+            data: $page.data
+        });
     });
 
     onMount(() => {
@@ -18,7 +27,7 @@
 </script>
 
 <div class="admin-layout">
-    <slot />
+    {@render children?.()}
 </div>
 
 <style>

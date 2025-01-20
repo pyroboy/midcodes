@@ -4,7 +4,11 @@ import { Root as Card, Content as CardContent, Description as CardDescription, H
 import { Button } from '$lib/components/ui/button';
 import { CalendarDays, Users, CreditCard, QrCode, Tag, Settings } from 'lucide-svelte';
 
-export let data: PageData;
+    interface Props {
+        data: PageData;
+    }
+
+    let { data }: Props = $props();
 
 function formatPercentage(value: number, total: number): string {
     if (!total) return '0%';
@@ -92,7 +96,7 @@ const formatCurrency = (amount: number) => {
                     <Card class={`${route.color} text-white transform transition-all duration-200 hover:scale-[1.02] hover:shadow-lg`}>
                         <CardHeader>
                             <div class="flex items-center gap-3">
-                                <svelte:component this={route.icon} class="w-6 h-6" />
+                                <route.icon class="w-6 h-6" />
                                 <div>
                                     <CardTitle class="text-lg">{route.name}</CardTitle>
                                     <CardDescription class="text-white/80">{route.description}</CardDescription>
@@ -191,7 +195,7 @@ const formatCurrency = (amount: number) => {
                                         <div
                                             class="h-full bg-primary"
                                             style="width: {formatPercentage(count, data.stats.totalRegistrations)}"
-                                        />
+></div>
                                     </div>
                                 </div>
                             {/each}

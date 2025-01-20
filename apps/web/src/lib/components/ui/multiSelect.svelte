@@ -1,5 +1,7 @@
 <!-- MultiSelect.svelte -->
 <script lang="ts">
+  import { run } from 'svelte/legacy';
+
     import { createEventDispatcher, onMount } from 'svelte';
     import * as Command from '$lib/components/ui/command';
     import * as Popover from '$lib/components/ui/popover';
@@ -7,13 +9,22 @@
     import { Check, ChevronsUpDown } from 'lucide-svelte';
     import { cn } from '$lib/utils';
   
-    export let options: { value: string | number; label: string }[] = [];
-    export let selected: (string | number)[] = [];
-    export let placeholder = 'Select items...';
-    export let multiSelect = true;
+  interface Props {
+    options?: { value: string | number; label: string }[];
+    selected?: (string | number)[];
+    placeholder?: string;
+    multiSelect?: boolean;
+  }
+
+  let {
+    options = [],
+    selected = $bindable([]),
+    placeholder = 'Select items...',
+    multiSelect = true
+  }: Props = $props();
   
-    let open = false;
-    let search = '';
+    let open = $state(false);
+    let search = $state('');
   
     const dispatch = createEventDispatcher();
   
@@ -30,15 +41,15 @@
       }
     }
   
-    $: filteredOptions = options.filter((option) =>
+    let filteredOptions = $derived(options.filter((option) =>
       option.label.toLowerCase().includes(search.toLowerCase())
-    );
+    ));
   
-    $: {
+    run(() => {
       if (!multiSelect && selected.length > 1) {
         selected = [selected[0]];
       }
-    }
+    });
   
     // onMount(() => {
     //   console.log('MultiSelect mounted. Options:', options);
@@ -57,27 +68,29 @@
   </script>
   
   <Popover.Root bind:open>
-    <Popover.Trigger asChild let:builder>
-      <Button
-        builders={[builder]}
-        variant="outline"
-        role="combobox"
-        aria-expanded={open}
-        class="w-full justify-between"
-      >
-        <div class="flex gap-2 justify-start overflow-x-hidden">
-          {#if selected.length > 0}
-            {#each selected as value}
-              <div class="px-2 py-1 rounded-xl border bg-slate-200 text-xs font-medium">
-                {options.find((option) => option.value === value)?.label || value}
-              </div>
-            {/each}
-          {:else}
-            {placeholder}
-          {/if}
-        </div>
-        <ChevronsUpDown class="ml-2 h-4 w-4 shrink-0 opacity-50" />
-      </Button>
+    <Popover.Trigger asChild >
+      {#snippet children({ builder })}
+        <Button
+          builders={[builder]}
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          class="w-full justify-between"
+        >
+          <div class="flex gap-2 justify-start overflow-x-hidden">
+            {#if selected.length > 0}
+              {#each selected as value}
+                <div class="px-2 py-1 rounded-xl border bg-slate-200 text-xs font-medium">
+                  {options.find((option) => option.value === value)?.label || value}
+                </div>
+              {/each}
+            {:else}
+              {placeholder}
+            {/if}
+          </div>
+          <ChevronsUpDown class="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+            {/snippet}
     </Popover.Trigger>
     <Popover.Content class="w-[200px] p-0">
       <Command.Root>

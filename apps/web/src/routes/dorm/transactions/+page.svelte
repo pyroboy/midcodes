@@ -10,22 +10,26 @@
   import { paymentMethodEnum } from './types';
   import type { ExtendedPayment } from './types';
 
-  export let data: {
+  interface Props {
+    data: {
     form: PageData['form'];
     transactions: ExtendedPayment[];
     user: {
       role: string;
     };
   };
+  }
+
+  let { data }: Props = $props();
 
   const { form } = superForm(data.form);
 
-  let searchTerm = '';
-  let startDate: string = '';
-  let endDate: string = '';
-  let selectedMethod: keyof typeof paymentMethodEnum.Values | null = null;
+  let searchTerm = $state('');
+  let startDate: string = $state('');
+  let endDate: string = $state('');
+  let selectedMethod: keyof typeof paymentMethodEnum.Values | null = $state(null);
 
-  $: filteredTransactions = data.transactions.filter(transaction => {
+  let filteredTransactions = $derived(data.transactions.filter(transaction => {
     // Search filter
     const searchMatch = searchTerm ? (
       transaction.billing?.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -41,7 +45,7 @@
     const methodMatch = !selectedMethod || transaction.method === selectedMethod;
 
     return searchMatch && dateMatch && methodMatch;
-  });
+  }));
 
   function handleMethodSelect(value: string) {
     if (value in paymentMethodEnum.Values) {

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { run } from 'svelte/legacy';
+
   import { superForm } from 'sveltekit-superforms/client';
   import { zodClient } from 'sveltekit-superforms/adapters';
   import Button from '$lib/components/ui/button/button.svelte';
@@ -50,10 +52,19 @@
     status: any;
   };
   
-  export let data: ExtendedPageData;
-  export let properties: Property[] = [];
-  export let editMode = false;
-  export let floor: Floor | undefined = undefined;
+  interface Props {
+    data: ExtendedPageData;
+    properties?: Property[];
+    editMode?: boolean;
+    floor?: Floor | undefined;
+  }
+
+  let {
+    data,
+    properties = [],
+    editMode = false,
+    floor = undefined
+  }: Props = $props();
   
   const dispatch = createEventDispatcher();
   
@@ -70,7 +81,7 @@
     },
   });
   
-  $: {
+  run(() => {
     if (floor && editMode) {
       form.update($form => ({
         ...$form,
@@ -81,10 +92,10 @@
         status: floor.status
       }));
     }
-  }
+  });
   
-  $: canEdit = data.isAdminLevel || data.isStaffLevel;
-  $: canDelete = data.isAdminLevel;
+  let canEdit = $derived(data.isAdminLevel || data.isStaffLevel);
+  let canDelete = $derived(data.isAdminLevel);
   </script>
   
   <form

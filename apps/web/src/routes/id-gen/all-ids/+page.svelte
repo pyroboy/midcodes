@@ -1,39 +1,33 @@
 <script lang="ts">
+    import { run, stopPropagation } from 'svelte/legacy';
+
     import type { HeaderRow, DataRow } from '$lib/types';
     import ImagePreviewModal from '$lib/components/ImagePreviewModal.svelte';
     import { getSupabaseStorageUrl } from '$lib/utils/supabase';
     import JSZip from 'jszip';
     
-    export let data: { idCards: (HeaderRow | DataRow)[] };
+    interface Props {
+        data: { idCards: (HeaderRow | DataRow)[] };
+    }
+
+    let { data }: Props = $props();
     const [headerRow, ...allRows] = data.idCards;
     const header = headerRow as HeaderRow;
     
-    $: templateFields = header?.metadata?.templates || {};
 
-    let searchQuery = '';
-    let dataRows: DataRow[] = [];
+    let searchQuery = $state('');
+    let dataRows: DataRow[] = $state([]);
     let errorMessage = '';
-    let selectedFrontImage: string | null = null;
-    let selectedBackImage: string | null = null;
-    let downloadingCards = new Set<string>();
-    let deletingCards = new Set<string>();
-    let selectedCards = new Set<string>();
-    let selectedCount = 0;
+    let selectedFrontImage: string | null = $state(null);
+    let selectedBackImage: string | null = $state(null);
+    let downloadingCards = $state(new Set<string>());
+    let deletingCards = $state(new Set<string>());
+    let selectedCards = $state(new Set<string>());
+    let selectedCount = $state(0);
 
     // Create a map to store each group's selection state
-    let groupSelectionStates = new Map<string, boolean>();
+    let groupSelectionStates = $state(new Map<string, boolean>());
 
-    $: {
-        // Update group selection states whenever selectedCards changes
-        Object.entries(groupedCards).forEach(([templateName, cards]) => {
-            groupSelectionStates.set(
-                templateName, 
-                cards.every(card => selectedCards.has(getCardId(card)))
-            );
-        });
-        groupSelectionStates = groupSelectionStates;
-        selectedCount = selectedCards.size;
-    }
 
     interface SelectionState {
         isSelected: (cardId: string) => boolean;
@@ -93,29 +87,7 @@
         }
     };
 
-    $: groupedCards = (() => {
-        const groups: Record<string, DataRow[]> = {};
-        dataRows.forEach(card => {
-            if (!groups[card.template_name]) {
-                groups[card.template_name] = [];
-            }
-            groups[card.template_name].push(card);
-        });
-        return groups;
-    })();
 
-    $: {
-        const query = searchQuery.toLowerCase();
-        dataRows = allRows.filter((row): row is DataRow => {
-            if (row.is_header) return false;
-            
-            if (row.template_name.toLowerCase().includes(query)) return true;
-            
-            return Object.values(row.fields || {}).some(field => 
-                field.value.toLowerCase().includes(query)
-            );
-        });
-    }
 
     function getCardId(card: DataRow): string {
         const id = card.idcard_id?.toString();
@@ -392,6 +364,40 @@
         event.stopPropagation();
         selectionManager.toggleGroupSelection(cards);
     }
+    let templateFields = $derived(header?.metadata?.templates || {});
+    run(() => {
+        const query = searchQuery.toLowerCase();
+        dataRows = allRows.filter((row): row is DataRow => {
+            if (row.is_header) return false;
+            
+            if (row.template_name.toLowerCase().includes(query)) return true;
+            
+            return Object.values(row.fields || {}).some(field => 
+                field.value.toLowerCase().includes(query)
+            );
+        });
+    });
+    let groupedCards = $derived((() => {
+        const groups: Record<string, DataRow[]> = {};
+        dataRows.forEach(card => {
+            if (!groups[card.template_name]) {
+                groups[card.template_name] = [];
+            }
+            groups[card.template_name].push(card);
+        });
+        return groups;
+    })());
+    run(() => {
+        // Update group selection states whenever selectedCards changes
+        Object.entries(groupedCards).forEach(([templateName, cards]) => {
+            groupSelectionStates.set(
+                templateName, 
+                cards.every(card => selectedCards.has(getCardId(card)))
+            );
+        });
+        groupSelectionStates = groupSelectionStates;
+        selectedCount = selectedCards.size;
+    });
 </script>
 
 <div class="mb-4 flex justify-between items-center">
@@ -405,13 +411,13 @@
         <div class="ml-4 flex gap-2">
             <button
                 class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                on:click={downloadSelectedCards}
+                onclick={downloadSelectedCards}
             >
                 Download Selected ({selectedCount})
             </button>
             <button
                 class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-                on:click={deleteSelectedCards}
+                onclick={deleteSelectedCards}
             >
                 Delete Selected ({selectedCount})
             </button>
@@ -432,7 +438,7 @@
                                     type="checkbox"
                                     class="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
                                     checked={groupSelectionStates.get(templateName)}
-                                    on:change={(e) => handleGroupCheckboxClick(e, cards)}
+                                    onchange={(e) => handleGroupCheckboxClick(e, cards)}
                                 />
                             </div>
                         </th>
@@ -455,7 +461,7 @@
                     {#each cards as card}
                     <tr
                     class="group hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
-                    on:click={(e) => openPreview(e, card)}
+                    onclick={(e) => openPreview(e, card)}
                 >
                     <td class="sticky left-0 z-20 w-16 px-4 py-2 bg-white dark:bg-gray-900 group-hover:bg-gray-100 dark:group-hover:bg-gray-700">
                         <div class="flex items-center justify-center">
@@ -463,7 +469,7 @@
                                 type="checkbox"
                                 class="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
                                 checked={selectionManager.isSelected(getCardId(card))}
-                                on:change={(e) => handleCheckboxClick(e, card)}
+                                onchange={(e) => handleCheckboxClick(e, card)}
                             />
                         </div>
                     </td>
@@ -488,14 +494,14 @@
                     <td class="sticky right-0 z-20 px-4 py-2 bg-white dark:bg-gray-900 group-hover:bg-gray-100 dark:group-hover:bg-gray-700 flex gap-2 items-center">
                         <button
                             class="px-3 py-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-150"
-                            on:click|stopPropagation={() => downloadCard(card)}
+                            onclick={stopPropagation(() => downloadCard(card))}
                             disabled={downloadingCards.has(getCardId(card))}
                         >
                             {downloadingCards.has(getCardId(card)) ? 'Downloading...' : 'Download'}
                         </button>
                         <button
                             class="px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors duration-150"
-                            on:click|stopPropagation={() => handleDelete(card)}
+                            onclick={stopPropagation(() => handleDelete(card))}
                             disabled={deletingCards.has(getCardId(card))}
                         >
                             {deletingCards.has(getCardId(card)) ? 'Deleting...' : 'Delete'}

@@ -37,14 +37,18 @@
     rental_unit: Rental_unit[];
   }
 
-  export let data: PageData;
+  interface Props {
+    data: PageData;
+  }
+
+  let { data }: Props = $props();
   
   const { form, errors, enhance, delayed } = superForm(data.form);
 
-  let selectedStartDate: string | null = null;
-  let selectedEndDate: string | null = null;
-  let selectedType: UtilityType | null = null;
-  let costPerUnit = 0;
+  let selectedStartDate: string | null = $state(null);
+  let selectedEndDate: string | null = $state(null);
+  let selectedType: UtilityType | null = $state(null);
+  let costPerUnit = $state(0);
   let meterBillings: Array<{
     meter_id: number;
     meter_name: string;
@@ -54,12 +58,12 @@
     total_cost: number;
     tenant_count: number;
     per_tenant_cost: number;
-  }> = [];
+  }> = $state([]);
 
-  $: relevantMeters = (data.meters as unknown as Meter[]).filter(meter => meter?.id != null);
-  $: availableEndDates = data.availableReadingDates.filter(date => 
+  let relevantMeters = $derived((data.meters as unknown as Meter[]).filter(meter => meter?.id != null));
+  let availableEndDates = $derived(data.availableReadingDates.filter(date => 
     selectedStartDate ? new Date(date.reading_date) > new Date(selectedStartDate) : true
-  );
+  ));
 
   function handleStartDateChange(event: CustomEvent<string>) {
     selectedStartDate = event.detail;
@@ -128,8 +132,8 @@
   }
 
   // Role-based access control
-  $: canCreateBillings = ['super_admin', 'property_admin', 'accountant'].includes(data.role);
-  $: canViewBillings = ['super_admin', 'property_admin', 'accountant', 'manager', 'frontdesk'].includes(data.role);
+  let canCreateBillings = $derived(['super_admin', 'property_admin', 'accountant'].includes(data.role));
+  let canViewBillings = $derived(['super_admin', 'property_admin', 'accountant', 'manager', 'frontdesk'].includes(data.role));
 </script>
 
 <div class="container mx-auto py-4">

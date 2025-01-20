@@ -21,7 +21,11 @@
     import type { Html5QrcodeScanner } from 'html5-qrcode';
     import { z } from 'zod';
 
-    export let data: PageData;
+    interface Props {
+        data: PageData;
+    }
+
+    let { data }: Props = $props();
     const { form, enhance, message } = superForm<z.infer<QrScanSchema>>(data.form, {
         onResult: ({ result }) => {
             if (result.type === 'success') {
@@ -34,11 +38,11 @@
         }
     });
 
-    let scannerElement: HTMLDivElement;
+    let scannerElement: HTMLDivElement = $state();
     let scanner: Html5QrcodeScanner | null = null;
-    let scannerActive = false;
-    let lastScannedUrl: string | null = null;
-    let scanType: 'entry' | 'exit' = 'entry';
+    let scannerActive = $state(false);
+    let lastScannedUrl: string | null = $state(null);
+    let scanType: 'entry' | 'exit' = $state('entry');
     let processing = false;
 
     // Type the scan logs properly

@@ -6,8 +6,12 @@
     import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '$lib/components/ui/card';
     import { Loader2 } from 'lucide-svelte';
 
-    export let form: ActionData;
-    let isLoading = false;
+    interface Props {
+        form: ActionData;
+    }
+
+    let { form }: Props = $props();
+    let isLoading = $state(false);
 </script>
 
 <div class="container mx-auto flex h-screen w-screen flex-col items-center justify-center">

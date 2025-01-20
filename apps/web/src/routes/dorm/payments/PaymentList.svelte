@@ -11,8 +11,12 @@
   } from '$lib/components/ui/card';
   import { createEventDispatcher } from 'svelte';
 
-  export let payments: any[] = [];
-  export let canEdit = false;
+  interface Props {
+    payments?: any[];
+    canEdit?: boolean;
+  }
+
+  let { payments = [], canEdit = false }: Props = $props();
 
   const dispatch = createEventDispatcher();
 

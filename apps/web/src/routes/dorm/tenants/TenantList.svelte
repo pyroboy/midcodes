@@ -15,18 +15,22 @@
   import { Badge } from '$lib/components/ui/badge';
 
 
-  export let data: PageData;
+  interface Props {
+    data: PageData;
+  }
+
+  let { data }: Props = $props();
 
   const dispatch = createEventDispatcher<{
     edit: ExtendedTenant;
     delete: ExtendedTenant;
   }>();
 
-  let selectedProperty: string | undefined;
-  let selectedStatus: string | undefined;
-  let searchQuery = '';
+  let selectedProperty: string | undefined = $state();
+  let selectedStatus: string | undefined = $state();
+  let searchQuery = $state('');
 
-  $: filteredTenants = data.tenants.filter(tenant => {
+  let filteredTenants = $derived(data.tenants.filter(tenant => {
     const matchesProperty = !selectedProperty || 
       (tenant.lease?.location?.property?.id?.toString() === selectedProperty);
     const matchesStatus = !selectedStatus || tenant.tenant_status === selectedStatus;
@@ -34,7 +38,7 @@
       tenant.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       tenant.email?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesProperty && matchesStatus && matchesSearch;
-  });
+  }));
 
   function handleEdit(tenant: ExtendedTenant) {
     dispatch('edit', tenant);
@@ -94,7 +98,7 @@
     return `₱${amount.toLocaleString()}`;
   }
 
-  $: sortedTenants = filteredTenants.sort((a, b) => {
+  let sortedTenants = $derived(filteredTenants.sort((a, b) => {
     // Sort by status first (ACTIVE first, then others)
     if (a.tenant_status === 'ACTIVE' && b.tenant_status !== 'ACTIVE') return -1;
     if (a.tenant_status !== 'ACTIVE' && b.tenant_status === 'ACTIVE') return 1;
@@ -106,7 +110,7 @@
     
     // Finally sort by name
     return a.name.localeCompare(b.name);
-  });
+  }));
 </script>
 
 <div class="w-2/3">

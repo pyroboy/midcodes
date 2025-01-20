@@ -1,4 +1,6 @@
 <script lang="ts">
+    import { run } from 'svelte/legacy';
+
     import { onMount } from 'svelte';
     import { supabase } from '$lib/supabaseClient';
     import type { UserProfile } from '$lib/stores/auth';
@@ -9,24 +11,29 @@
     import type { TemplateData, TemplateElement } from '$lib/stores/templateStore';
     import { auth, session, profile } from '$lib/stores/auth';
 
-    // Add data prop from server
-    export let data: {
+    
+    interface Props {
+        // Add data prop from server
+        data: {
         templates: TemplateData[],
         user: UserProfile
     };
+    }
+
+    let { data }: Props = $props();
 
     let frontBackground: File | null = null;
     let backBackground: File | null = null;
-    let frontPreview: string | null = null;
-    let backPreview: string | null = null;
-    let errorMessage = '';
+    let frontPreview: string | null = $state(null);
+    let backPreview: string | null = $state(null);
+    let errorMessage = $state('');
 
-    let frontElements: TemplateElement[] = [];
-    let backElements: TemplateElement[] = [];
+    let frontElements: TemplateElement[] = $state([]);
+    let backElements: TemplateElement[] = $state([]);
 
     // Add view mode state
-    let isLoading = false;
-    let isEditMode = false;
+    let isLoading = $state(false);
+    let isEditMode = $state(false);
 
     onMount(async () => {
         if (!$session) {
@@ -301,7 +308,7 @@
     }
 
     // Reactive declarations for template elements
-    $: {
+    run(() => {
         if ($templateData && $templateData.template_elements) {
             frontElements = $templateData.template_elements.filter(el => el.side === 'front');
             backElements = $templateData.template_elements.filter(el => el.side === 'back');
@@ -327,7 +334,7 @@
                 }
             });
         }
-    }
+    });
 </script>
 
 <main class="h-full">
@@ -338,7 +345,7 @@
             <div class="template-form-container active">
                 <div class="back-button-container">
                     <button 
-                        on:click={handleBack}
+                        onclick={handleBack}
                         class="back-button inline-flex items-center text-lg dark:text-gray-300 text-gray-700 hover:text-primary dark:hover:text-primary-400"
                     >
                         <svg 
@@ -408,13 +415,13 @@
 
                         <div class="mt-6 flex gap-4">
                             <button 
-                                on:click={saveTemplate}
+                                onclick={saveTemplate}
                                 class="inline-flex justify-center rounded-md border-0 bg-blue-600 dark:bg-blue-500 px-4 py-2 text-sm font-medium text-white shadow-md hover:bg-blue-700 dark:hover:bg-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 dark:focus:ring-blue-400 transition-colors duration-200 dark:shadow-blue-900/30"
                             >
                                 Save Template
                             </button>
                             <button 
-                                on:click={clearForm}
+                                onclick={clearForm}
                                 class="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
                             >
                                 Clear Form

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { run } from 'svelte/legacy';
+
   import type { PageData } from './$types';
   import type { SuperForm } from 'sveltekit-superforms';
   import type { Database } from '$lib/database.types';
@@ -24,30 +26,45 @@
   type Property = Database['public']['Tables']['properties']['Row'];
   type User = Database['public']['Tables']['profiles']['Row'];
 
-  export let data: PageData;
 
-  export let form: SuperForm<z.infer<typeof tenantFormSchema>>['form'];
-  export let errors: SuperForm<z.infer<typeof tenantFormSchema>>['errors'];
-  export let enhance: SuperForm<z.infer<typeof tenantFormSchema>>['enhance'];
-  export let constraints: SuperForm<z.infer<typeof tenantFormSchema>>['constraints'];
-  export let submitting: SuperForm<z.infer<typeof tenantFormSchema>>['submitting'];
-  export let editMode = false;
-  export let tenant: z.infer<typeof tenantFormSchema> | undefined = undefined;
+  interface Props {
+    data: PageData;
+    form: SuperForm<z.infer<typeof tenantFormSchema>>['form'];
+    errors: SuperForm<z.infer<typeof tenantFormSchema>>['errors'];
+    enhance: SuperForm<z.infer<typeof tenantFormSchema>>['enhance'];
+    constraints: SuperForm<z.infer<typeof tenantFormSchema>>['constraints'];
+    submitting: SuperForm<z.infer<typeof tenantFormSchema>>['submitting'];
+    editMode?: boolean;
+    tenant?: z.infer<typeof tenantFormSchema> | undefined;
+  }
+
+  let {
+    data,
+    form,
+    errors,
+    enhance,
+    constraints,
+    submitting,
+    editMode = false,
+    tenant = undefined
+  }: Props = $props();
 
   const dispatch = createEventDispatcher();
 
-  let showStatusDialog = false;
-  let statusChangeReason = '';
+  let showStatusDialog = $state(false);
+  let statusChangeReason = $state('');
 
-  $: canEdit = data.isAdminLevel || (data.isStaffLevel && !editMode);
-  $: canDelete = data.isAdminLevel;
+  let canEdit = $derived(data.isAdminLevel || (data.isStaffLevel && !editMode));
+  let canDelete = $derived(data.isAdminLevel);
 
-  $: if (tenant && editMode) {
-    $form = { ...$form, ...tenant };
-  }
+  run(() => {
+    if (tenant && editMode) {
+      $form = { ...$form, ...tenant };
+    }
+  });
 
   // Convert ZodEnum to array of status options
-  $: tenantStatusOptions = Object.values(TenantStatusEnum.Values);
+  let tenantStatusOptions = $derived(Object.values(TenantStatusEnum.Values));
 
   type TenantStatus = "ACTIVE" | "INACTIVE" | "PENDING" | "BLACKLISTED";
 
@@ -58,11 +75,11 @@
     }
   }
 
-  $: emergencyContact = {
+  let emergencyContact = $derived({
     ...defaultEmergencyContact,
     ...($form.emergency_contact || {}),
     email: $form.emergency_contact?.email || ''
-  };
+  });
 
   function getStatusColor(status: string) {
     switch (status) {

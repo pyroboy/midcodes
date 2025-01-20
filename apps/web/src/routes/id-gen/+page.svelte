@@ -2,7 +2,11 @@
     import type { PageData } from './$types';
     import { RoleConfig } from '$lib/auth/roleConfig';
 
-    export let data: PageData;
+    interface Props {
+        data: PageData;
+    }
+
+    let { data }: Props = $props();
 
     const role = data.profile?.role || 'id_gen_user';
     const roleConfig = RoleConfig[role];

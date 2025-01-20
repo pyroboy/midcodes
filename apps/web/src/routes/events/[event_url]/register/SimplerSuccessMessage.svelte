@@ -4,12 +4,16 @@
     import { fade } from 'svelte/transition';
     import type { RegistrationResponse } from './schema';
     
-    export let data: RegistrationResponse;
+    interface Props {
+        data: RegistrationResponse;
+    }
+
+    let { data }: Props = $props();
     
-    let visible = false;
-    let showCheck = false;
-    let showText = false;
-    let typedText = '';
+    let visible = $state(false);
+    let showCheck = $state(false);
+    let showText = $state(false);
+    let typedText = $state('');
     const fullText = `Please complete payment within ${data.paymentTimeoutMinutes} minutes`;
     
     onMount(() => {

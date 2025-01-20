@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { run } from 'svelte/legacy';
+
   import { superForm } from 'sveltekit-superforms/client';
   import type { SuperValidated } from 'sveltekit-superforms';
   import { page } from '$app/stores';
@@ -80,20 +82,24 @@
     floor_id?: number;
   }
 
-  export let data: {
+  interface Props {
+    data: {
     meters: Meter[];
     canEdit: boolean;
     form: SuperValidated<z.output<ReturnType<typeof readingFormSchema>>>;
     latestOverallReadingDate: string;
     previousReadings: Record<number, Reading>;
   };
+  }
 
-  let selectedMeterType: utility_type | undefined;
-  let selectedLocationType: meter_location_type | undefined;
-  let showProgressBar = false;
-  let progress = 0;
-  let progressInterval: ReturnType<typeof setInterval> | undefined;
-  let progressTimeout: ReturnType<typeof setTimeout> | undefined;
+  let { data }: Props = $props();
+
+  let selectedMeterType: utility_type | undefined = $state();
+  let selectedLocationType: meter_location_type | undefined = $state();
+  let showProgressBar = $state(false);
+  let progress = $state(0);
+  let progressInterval: ReturnType<typeof setInterval> | undefined = $state();
+  let progressTimeout: ReturnType<typeof setTimeout> | undefined = $state();
 
   // Cleanup function for timers
   onDestroy(() => {
@@ -179,40 +185,42 @@
     }
   }
 
-  $: filteredMeters = (data.meters ?? []).filter(meter => {
+  let filteredMeters = $derived((data.meters ?? []).filter(meter => {
     return (
       meter.is_active &&
       meter.status === 'ACTIVE' &&
       (!selectedMeterType || meter.type === selectedMeterType) &&
       (!selectedLocationType || meter.location_type === selectedLocationType)
     );
-  });
+  }));
 
-  $: isValidMeterType = Boolean(selectedMeterType);
-  $: isValidLocationType = Boolean(selectedLocationType);
+  let isValidMeterType = $derived(Boolean(selectedMeterType));
+  let isValidLocationType = $derived(Boolean(selectedLocationType));
 
   // Progress bar reactivity with cleanup
-  $: if ($delayed) {
-    showProgressBar = true;
-    if (progressInterval) clearInterval(progressInterval);
-    progressInterval = setInterval(() => {
-      progress = Math.min(progress + 1, 95);
-    }, 100);
-  } else if (showProgressBar) {
-    if (progressInterval) {
-      clearInterval(progressInterval);
-      progressInterval = undefined;
+  run(() => {
+    if ($delayed) {
+      showProgressBar = true;
+      if (progressInterval) clearInterval(progressInterval);
+      progressInterval = setInterval(() => {
+        progress = Math.min(progress + 1, 95);
+      }, 100);
+    } else if (showProgressBar) {
+      if (progressInterval) {
+        clearInterval(progressInterval);
+        progressInterval = undefined;
+      }
+      progress = 100;
+      if (progressTimeout) {
+        clearTimeout(progressTimeout);
+      }
+      progressTimeout = setTimeout(() => {
+        showProgressBar = false;
+        progress = 0;
+        progressTimeout = undefined;
+      }, 500);
     }
-    progress = 100;
-    if (progressTimeout) {
-      clearTimeout(progressTimeout);
-    }
-    progressTimeout = setTimeout(() => {
-      showProgressBar = false;
-      progress = 0;
-      progressTimeout = undefined;
-    }, 500);
-  }
+  });
 
   function updateMeterType(value: { value: string } | undefined) {
     if (value?.value === 'ELECTRICITY' || value?.value === 'WATER' || value?.value === 'INTERNET') {
@@ -228,14 +236,14 @@
     }
   }
 
-  let formReadings: Record<number, { reading_value: number }> = {};
-  $: {
+  let formReadings: Record<number, { reading_value: number }> = $state({});
+  run(() => {
     filteredMeters.forEach(meter => {
       if (!formReadings[meter.id]) {
         formReadings[meter.id] = { reading_value: 0 };
       }
     });
-  }
+  });
 
   type FormErrorsType = {
     readings: Record<number, {
@@ -245,7 +253,7 @@
     }>;
   };
 
-  $: formErrors = $form as unknown as FormErrorsType;
+  let formErrors = $derived($form as unknown as FormErrorsType);
 </script>
 
 <div class="container mx-auto p-4">

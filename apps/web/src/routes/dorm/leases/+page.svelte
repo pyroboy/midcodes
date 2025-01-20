@@ -12,16 +12,20 @@
   import LeaseList from './LeaseList.svelte';
 
 
-  export let data: PageData;
+  interface Props {
+    data: PageData;
+  }
+
+  let { data }: Props = $props();
   type FormType = z.infer<typeof leaseSchema>;
 
 
 
   
   let showForm = false;
-  let editMode = false;
-  let selectedLease: FormType | undefined = undefined;
-  let showDeleteConfirm = false;
+  let editMode = $state(false);
+  let selectedLease: FormType | undefined = $state(undefined);
+  let showDeleteConfirm = $state(false);
 
   const { form, errors, enhance, reset, delayed, constraints, submitting } = superForm(data.form, {
     validators: zod(leaseSchema),

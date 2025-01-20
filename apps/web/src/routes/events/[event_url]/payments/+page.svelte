@@ -25,7 +25,11 @@
     import { onMount, onDestroy } from 'svelte';
     import { AlertTriangle, Check, Clock, Trash2 } from 'lucide-svelte';
 
-    export let data: PageData;
+    interface Props {
+        data: PageData;
+    }
+
+    let { data }: Props = $props();
 
     const { form, enhance } = superForm<z.infer<PaymentUpdateSchema>>(data.form, {
         onSubmit: ({ formData }) => {
@@ -78,14 +82,14 @@
         });
     };
 
-    let searchQuery = '';
-    let showPaidOnly = false;
-    let showUnpaidOnly = false;
-    let showArchived = false;
-    let isUpdating = false;
+    let searchQuery = $state('');
+    let showPaidOnly = $state(false);
+    let showUnpaidOnly = $state(false);
+    let showArchived = $state(false);
+    let isUpdating = $state(false);
 
     // Filter attendees based on search and payment status
-    $: filteredAttendees = data.attendees
+    let filteredAttendees = $derived(data.attendees
         .filter(attendee => 
             // Handle archived entries based on toggle
             (showArchived || attendee.attendance_status !== 'archived') &&
@@ -99,10 +103,10 @@
             (!showPaidOnly || attendee.is_paid) &&
             (!showUnpaidOnly || !attendee.is_paid)
         )
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
 
     // Get count of archived entries
-    $: archivedCount = data.attendees.filter(a => a.attendance_status === 'archived').length;
+    let archivedCount = $derived(data.attendees.filter(a => a.attendance_status === 'archived').length);
 
     // Handle payment toggle
     const handlePaymentToggle = async (attendeeId: string, isPaid: boolean) => {
@@ -121,7 +125,7 @@
     };
 
     // Timer state
-    let timers: { [key: string]: { timeLeft: string; interval: ReturnType<typeof setInterval>; isExpired: boolean } } = {};
+    let timers: { [key: string]: { timeLeft: string; interval: ReturnType<typeof setInterval>; isExpired: boolean } } = $state({});
 
     function calculateTimeLeft(createdAt: string) {
         const created = new Date(createdAt).getTime();
@@ -190,12 +194,12 @@
 
     const paymentsByReceiver: Record<string, number> = data.paymentSummary.totalByReceiver;
 
-    $: expiredIds = filteredAttendees
+    let expiredIds = $derived(filteredAttendees
         .filter(attendee => {
             const timer = timers[attendee.id];
             return (timer?.timeLeft && Number(timer.timeLeft) <= 0) || timer?.isExpired || attendee.attendance_status === 'expired';
         })
-        .map(attendee => attendee.id);
+        .map(attendee => attendee.id));
 
     async function handleClearExpired() {
         if (!expiredIds.length) return;
@@ -398,9 +402,9 @@
                                     </span>
                                 </div>
                             {:else}
+                                {@const SvelteComponent = attendee.is_paid ? Check : Clock}
                                 <div class="flex items-center gap-2">
-                                    <svelte:component 
-                                        this={attendee.is_paid ? Check : Clock} 
+                                    <SvelteComponent 
                                         class="w-4 h-4 {attendee.is_paid ? 'text-green-500' : 'text-yellow-500'}" 
                                     />
                                     <span class="px-2 py-1 rounded-full text-xs font-semibold {attendee.is_paid ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { run } from 'svelte/legacy';
+
   import type { SvelteComponentTyped } from "svelte";
   import { superForm } from 'sveltekit-superforms/client';
   import type { SuperForm } from 'sveltekit-superforms';
@@ -45,14 +47,27 @@
     entity?: FormData | undefined;
   }
 
-  export let data: PageData;
-  export let editMode = false;
-  export let form: SuperForm<FormData>['form'];
-  export let errors: SuperForm<FormData>['errors'];
-  export let enhance: SuperForm<FormData>['enhance'];
-  export let constraints: SuperForm<FormData>['constraints'];
-  export let submitting: SuperForm<FormData>['submitting'];
-  export let entity: FormData | undefined = undefined;
+  interface Props {
+    data: PageData;
+    editMode?: boolean;
+    form: SuperForm<FormData>['form'];
+    errors: SuperForm<FormData>['errors'];
+    enhance: SuperForm<FormData>['enhance'];
+    constraints: SuperForm<FormData>['constraints'];
+    submitting: SuperForm<FormData>['submitting'];
+    entity?: FormData | undefined;
+  }
+
+  let {
+    data,
+    editMode = false,
+    form,
+    errors,
+    enhance,
+    constraints,
+    submitting,
+    entity = undefined
+  }: Props = $props();
 
   const dispatch = createEventDispatcher();
 
@@ -71,16 +86,16 @@
       .join(', ');
   }
 
-  $: currentTenants = ($form.tenantIds?.map((id: number) => data.tenants?.find((t: Tenant) => t.id === id)) || [])
-    .filter((t): t is Tenant => t !== undefined);
+  let currentTenants = $derived(($form.tenantIds?.map((id: number) => data.tenants?.find((t: Tenant) => t.id === id)) || [])
+    .filter((t): t is Tenant => t !== undefined));
 
-  $: currentRentalUnit = data.rental_units?.find((r) => r.id === $form.rental_unit_id);
+  let currentRentalUnit = $derived(data.rental_units?.find((r) => r.id === $form.rental_unit_id));
 
   // Dispatch changes to parent
-  $: {
+  run(() => {
     dispatch('tenantsChange', currentTenants);
     dispatch('rentalUnitChange', currentRentalUnit);
-  }
+  });
 
   function mapTenantToOption(tenant: Tenant) {
     return {
@@ -106,17 +121,19 @@
     throw new Error('Invalid rental unit data structure');
   }
 
-  $: if ($form.start_date && $form.terms_month) {
-    const startDate = new Date($form.start_date);
-    const endDate = new Date(startDate);
-    endDate.setMonth(endDate.getMonth() + Number($form.terms_month));
-    const year = endDate.getFullYear();
-    const month = String(endDate.getMonth() + 1).padStart(2, '0');
-    const day = String(endDate.getDate()).padStart(2, '0');
-    $form.end_date = `${year}-${month}-${day}`;
-  }
+  run(() => {
+    if ($form.start_date && $form.terms_month) {
+      const startDate = new Date($form.start_date);
+      const endDate = new Date(startDate);
+      endDate.setMonth(endDate.getMonth() + Number($form.terms_month));
+      const year = endDate.getFullYear();
+      const month = String(endDate.getMonth() + 1).padStart(2, '0');
+      const day = String(endDate.getDate()).padStart(2, '0');
+      $form.end_date = `${year}-${month}-${day}`;
+    }
+  });
 
-  $: formErrors = $errors as unknown as FormError;
+  let formErrors = $derived($errors as unknown as FormError);
 </script>
 
 <form 
@@ -276,7 +293,7 @@
         bind:value={$form.notes}
         rows={3}
         {...$constraints.notes}
-      />
+></textarea>
       {#if $errors.notes}
         <p class="error-message">{$errors.notes}</p>
       {/if}

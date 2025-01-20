@@ -1,14 +1,23 @@
 <script lang="ts">
-    export let x: number;
-    export let y: number;
-    export let width: number | undefined;
-    export let height: number | undefined;
     
     function dispatchUpdate() {
         dispatch('update', { x, y, width, height });
     }
 
     import { createEventDispatcher } from 'svelte';
+    interface Props {
+        x: number;
+        y: number;
+        width: number | undefined;
+        height: number | undefined;
+    }
+
+    let {
+        x = $bindable(),
+        y = $bindable(),
+        width = $bindable(),
+        height = $bindable()
+    }: Props = $props();
     const dispatch = createEventDispatcher();
 </script>
 
@@ -16,21 +25,21 @@
     <div class="input-group position-group">
         <label>
             <span>X</span>
-            <input type="number" bind:value={x} on:input={dispatchUpdate}>
+            <input type="number" bind:value={x} oninput={dispatchUpdate}>
         </label>
         <label>
             <span>Y</span>
-            <input type="number" bind:value={y} on:input={dispatchUpdate}>
+            <input type="number" bind:value={y} oninput={dispatchUpdate}>
         </label>
     </div>
     <div class="input-group position-group">
         <label>
             <span>W</span>
-            <input type="number" bind:value={width} on:input={dispatchUpdate}>
+            <input type="number" bind:value={width} oninput={dispatchUpdate}>
         </label>
         <label>
             <span>H</span>
-            <input type="number" bind:value={height} on:input={dispatchUpdate}>
+            <input type="number" bind:value={height} oninput={dispatchUpdate}>
         </label>
     </div>
 </div>

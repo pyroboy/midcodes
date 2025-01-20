@@ -1,3 +1,5 @@
+<!-- @migration-task Error while migrating Svelte code: Identifier 'PageData' has already been declared
+https://svelte.dev/e/js_parse_error -->
 <script lang="ts">
   import type { PageData } from './$types';
   import { formatCurrency } from '$lib/utils/format';
@@ -6,14 +8,14 @@
   import { Badge } from '$lib/components/ui/badge';
   import { Tabs, TabsList, TabsTrigger, TabsContent } from '$lib/components/ui/tabs';
 
-  interface PageData {
-    rental_unit: ServerRental_Unit[];
-    balances: Balance[];
-    months: string[];
-    lastMonthExpenses: Expense[];
-    isAdminLevel: boolean;
-    isStaffLevel: boolean;
-  }
+  // interface PageData {
+  //   rental_unit: ServerRental_Unit[];
+  //   balances: Balance[];
+  //   months: string[];
+  //   lastMonthExpenses: Expense[];
+  //   isAdminLevel: boolean;
+  //   isStaffLevel: boolean;
+  // }
 
   export let data: PageData;
 

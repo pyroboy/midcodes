@@ -14,7 +14,9 @@ const config = {
       // instead of creating a single one for the entire app
       split: false
     })
-  }
+  },
+  
+  extensions: [".svelte"],
 };
 
 export default config;

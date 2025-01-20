@@ -14,7 +14,11 @@
 
 
 
-  export let data: PageData;
+  interface Props {
+    data: PageData;
+  }
+
+  let { data }: Props = $props();
   
   const defaultEmergencyContact = {
     name: '',
@@ -24,8 +28,8 @@
     address: ''
   };
 
-  let editMode = false;
-  let selectedTenant: ExtendedTenant | undefined;
+  let editMode = $state(false);
+  let selectedTenant: ExtendedTenant | undefined = $state();
 
   const { form, enhance, errors, constraints, submitting } = superForm<TenantFormData>(data.form, {
     id: 'tenant-form',

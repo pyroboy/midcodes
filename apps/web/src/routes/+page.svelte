@@ -5,7 +5,7 @@
     import DokmutyaLanding from '$lib/components/DokmutyaLanding.svelte';
     import { page } from '$app/stores';
 
-    $: isDokmutyaDomain = $page.data.shouldShowDokmutya;
+    let isDokmutyaDomain = $derived($page.data.shouldShowDokmutya);
 
     async function handleNavigation(path: string) {
         try {

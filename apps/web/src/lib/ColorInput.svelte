@@ -2,9 +2,13 @@
     import { createEventDispatcher } from 'svelte';
     import { Eye, EyeOff, Minus } from 'lucide-svelte';
 
-    export let color: string = '#000000';
-    export let opacity: number = 100;
-    export let visible: boolean = true;
+    interface Props {
+        color?: string;
+        opacity?: number;
+        visible?: boolean;
+    }
+
+    let { color = $bindable('#000000'), opacity = $bindable(100), visible = $bindable(true) }: Props = $props();
 
     const dispatch = createEventDispatcher();
 
@@ -37,18 +41,18 @@
         <input 
             type="color" 
             value={color}
-            on:input={handleColorPickerChange}
+            oninput={handleColorPickerChange}
             class="color-picker"
         >
     </div>
     <input 
         type="text" 
         bind:value={color} 
-        on:input={() => updateColor(color)}
+        oninput={() => updateColor(color)}
         maxlength="7"
     >
     <span class="opacity">{opacity}%</span>
-    <button class="icon-button" on:click={toggleVisibility}>
+    <button class="icon-button" onclick={toggleVisibility}>
         {#if visible}
             <Eye size={18} />
         {:else}

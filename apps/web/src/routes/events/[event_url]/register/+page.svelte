@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { run } from 'svelte/legacy';
+
     import { registrationSchema, type RegistrationSchema, type RegistrationResponse } from './schema';
     import type { PageData } from './$types';
     import { superForm } from 'sveltekit-superforms/client';
@@ -16,16 +18,20 @@
     import SimplerSuccessMessage from './SimplerSuccessMessage.svelte';
   
     
-    export let data: PageData;
+  interface Props {
+    data: PageData;
+  }
+
+  let { data }: Props = $props();
     
-    let retoken = '';
-    let recaptchaError = '';
+    let retoken = $state('');
+    let recaptchaError = $state('');
     const RecaptchaUrl = 'https://www.google.com/recaptcha/api.js';
     const isAdmin = data.profile?.role && ['super_admin', 'event_admin', 'org_admin'].includes(data.profile.role);
     
-    let showConfirmation = false;
-    let registrationData: RegistrationResponse | null = null;
-    let isSubmitting = false;
+    let showConfirmation = $state(false);
+    let registrationData: RegistrationResponse | null = $state(null);
+    let isSubmitting = $state(false);
     
     function startRedirect(referenceCode: string) {
         toast.success('Registration successful!');
@@ -95,16 +101,16 @@
         available: number;
     }
     
-    let ticketTypes: DisplayTicket[] = [];
-    $: {
+    let ticketTypes: DisplayTicket[] = $state([]);
+    run(() => {
         ticketTypes = Array.isArray(data.event.ticketing_data) 
             ? data.event.ticketing_data
                 .filter((ticket: EventTicketType): ticket is DisplayTicket => 
                     typeof ticket.available === 'number' && ticket.available > 0)
             : [];
-    }
+    });
     
-    $: availableTickets = ticketTypes.length > 0;
+    let availableTickets = $derived(ticketTypes.length > 0);
     
     onMount(() => {
         if (!isAdmin && data.local.recaptcha) {
@@ -264,7 +270,7 @@
                                 data-callback="onRecaptchaSuccess"
                                 data-error-callback="onRecaptchaError"
                                 data-expired-callback="onRecaptchaExpired"
-                            />
+></div>
                             {#if recaptchaError}
                                 <p class="text-sm text-destructive mt-1">{recaptchaError}</p>
                             {/if}

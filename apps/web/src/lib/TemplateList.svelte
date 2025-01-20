@@ -9,10 +9,14 @@
     import { page } from '$app/stores';
     import { invalidate } from '$app/navigation';
     
-    export let templates: TemplateData[] = [];
+    interface Props {
+        templates?: TemplateData[];
+    }
+
+    let { templates = $bindable([]) }: Props = $props();
     let selectedTemplate: TemplateData | null = null;
-    let notification: string | null = null;
-    let hoveredTemplate: string | null = null;
+    let notification: string | null = $state(null);
+    let hoveredTemplate: string | null = $state(null);
     const dispatch = createEventDispatcher();
     
     // Get user profile from page store
@@ -145,8 +149,8 @@
                 class="bg-card text-card-foreground dark:bg-gray-800 rounded-lg shadow-md overflow-hidden relative group"
                 role="article"
                 aria-label={`Template card for ${template.name}`}
-                on:mouseenter={() => hoveredTemplate = template.id}
-                on:mouseleave={() => hoveredTemplate = null}
+                onmouseenter={() => hoveredTemplate = template.id}
+                onmouseleave={() => hoveredTemplate = null}
             >
                 <a 
                     href="/id-gen/use-template/{template.id}"

@@ -5,10 +5,14 @@
     import { goto } from '$app/navigation';
     import { onMount } from 'svelte';
     
-    export let data: PageData;
-    let currentView: 'dashboard' | 'event-manager' = 'dashboard';
-    let loading = true;
-    let error: string | null = null;
+    interface Props {
+        data: PageData;
+    }
+
+    let { data }: Props = $props();
+    let currentView: 'dashboard' | 'event-manager' = $state('dashboard');
+    let loading = $state(true);
+    let error: string | null = $state(null);
 
     onMount(() => {
         // Only redirect if there's no session

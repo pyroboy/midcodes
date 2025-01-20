@@ -1,5 +1,7 @@
 
 <script lang="ts">
+  import { run } from 'svelte/legacy';
+
     import '../app.css';
     import { page } from '$app/stores';
     import type { NavigationPath } from '$lib/types/navigation';
@@ -15,25 +17,30 @@
     import { loadGoogleFonts } from '$lib/config/fonts';
     import { navigating } from '$app/stores';
     import DokmutyaLanding from '$lib/components/DokmutyaLanding.svelte';
+  interface Props {
+    children?: import('svelte').Snippet;
+  }
+
+  let { children }: Props = $props();
 
 
-    let isMenuOpen = false;
+    let isMenuOpen = $state(false);
     let isUserMenuOpen = false;
-    let showProgress = false;
-    let progressValue = 0;
-    let progressInterval: ReturnType<typeof setInterval> | undefined;
-    let progressTimeout: ReturnType<typeof setTimeout> | undefined;
+    let showProgress = $state(false);
+    let progressValue = $state(0);
+    let progressInterval: ReturnType<typeof setInterval> | undefined = $state();
+    let progressTimeout: ReturnType<typeof setTimeout> | undefined = $state();
 
-    $: path = $page.url.pathname;
-    $: navLinks = $page.data.navigation.allowedPaths
+    let path = $derived($page.url.pathname);
+    let navLinks = $derived($page.data.navigation.allowedPaths
         .filter((p: NavigationPath) => p.showInNav)
         .map((p: NavigationPath) => ({
             path: p.path.replace(/\[.*?\]/g, ''),
             label: p.label || p.path
-        }));
-    $: navigation = $page.data.navigation;
-    $: pageSession = $page.data.session;
-    $: showHeader = navigation?.showHeader;
+        })));
+    let navigation = $derived($page.data.navigation);
+    let pageSession = $derived($page.data.session);
+    let showHeader = $derived(navigation?.showHeader);
     // $: {
     //     console.log('[Layout Debug]', {
     //         pageSession,
@@ -43,56 +50,60 @@
     //         navLinks
     //     });
     // }
-    $: isDark = $settings.theme === 'dark';
-    $: userEmail = $page.data.user?.email ?? '';
-    $: emulation = $page.data.session?.roleEmulation as RoleEmulationClaim | null;
-    $: userProfile = $page.data.profile;
-    $: special_url = $page.data.special_url;
-    $: isDokMutya = $page.data.shouldShowDokmutya;
+    let isDark = $derived($settings.theme === 'dark');
+    let userEmail = $derived($page.data.user?.email ?? '');
+    let emulation = $derived($page.data.session?.roleEmulation as RoleEmulationClaim | null);
+    let userProfile = $derived($page.data.profile);
+    let special_url = $derived($page.data.special_url);
+    let isDokMutya = $derived($page.data.shouldShowDokmutya);
 
 
     // Update session when server data changes
-    $: if (userProfile && $session) {
-        const isProfileEmulated = 'isEmulated' in userProfile ? userProfile.isEmulated : false;
-        if (isProfileEmulated !== emulation?.active) {
-            auth.refreshSession();
-        }
-    }
+    run(() => {
+    if (userProfile && $session) {
+          const isProfileEmulated = 'isEmulated' in userProfile ? userProfile.isEmulated : false;
+          if (isProfileEmulated !== emulation?.active) {
+              auth.refreshSession();
+          }
+      }
+  });
 
     // Navigation progress bar with proper cleanup
-    $: if ($navigating) {
-        showProgress = true;
-        progressValue = 0;
-        
-        // Clear any existing intervals/timeouts
-        if (progressInterval) {
-            clearInterval(progressInterval);
-            progressInterval = undefined;
-        }
-        if (progressTimeout) {
-            clearTimeout(progressTimeout);
-            progressTimeout = undefined;
-        }
-        
-        progressInterval = setInterval(() => {
-            progressValue = Math.min(progressValue + 10, 90);
-        }, 100);
-    } else {
-        progressValue = 100;
-        
-        // Clear existing timeout before setting a new one
-        if (progressTimeout) {
-            clearTimeout(progressTimeout);
-        }
-        
-        progressTimeout = setTimeout(() => {
-            showProgress = false;
-            if (progressInterval) {
-                clearInterval(progressInterval);
-                progressInterval = undefined;
-            }
-        }, 300);
-    }
+    run(() => {
+    if ($navigating) {
+          showProgress = true;
+          progressValue = 0;
+          
+          // Clear any existing intervals/timeouts
+          if (progressInterval) {
+              clearInterval(progressInterval);
+              progressInterval = undefined;
+          }
+          if (progressTimeout) {
+              clearTimeout(progressTimeout);
+              progressTimeout = undefined;
+          }
+          
+          progressInterval = setInterval(() => {
+              progressValue = Math.min(progressValue + 10, 90);
+          }, 100);
+      } else {
+          progressValue = 100;
+          
+          // Clear existing timeout before setting a new one
+          if (progressTimeout) {
+              clearTimeout(progressTimeout);
+          }
+          
+          progressTimeout = setTimeout(() => {
+              showProgress = false;
+              if (progressInterval) {
+                  clearInterval(progressInterval);
+                  progressInterval = undefined;
+              }
+          }, 300);
+      }
+  });
 
     onMount(async () => {
         if (browser) {
@@ -264,7 +275,7 @@
                 </div>
                 <button 
                     class="block w-full px-3 py-2 text-base font-medium text-left text-red-500 transition-colors hover:bg-muted"
-                    on:click={signOut}
+                    onclick={signOut}
                 >
                     Sign Out
                 </button>
@@ -277,7 +288,7 @@
 
 <main class="min-h-screen">
 
-  <slot />
+  {@render children?.()}
 
 </main>
 

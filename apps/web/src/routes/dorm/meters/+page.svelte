@@ -31,18 +31,22 @@
     floor: Floor | null;
   };
 
-  export let data: PageData;
-  let showForm = false;
-  let selectedMeter: MeterFormData | undefined;
+  interface Props {
+    data: PageData;
+  }
+
+  let { data }: Props = $props();
+  let showForm = $state(false);
+  let selectedMeter: MeterFormData | undefined = $state();
   let loading = false;
   let error: string | null = null;
-  let selectedType: z.infer<typeof utilityTypeEnum> | undefined = undefined;
-  let selectedStatus: z.infer<typeof meterStatusEnum> | undefined = undefined;
-  let searchQuery = '';
-  let sortBy: 'name' | 'type' | 'status' | 'reading' = 'name';
-  let sortOrder: 'asc' | 'desc' = 'asc';
+  let selectedType: z.infer<typeof utilityTypeEnum> | undefined = $state(undefined);
+  let selectedStatus: z.infer<typeof meterStatusEnum> | undefined = $state(undefined);
+  let searchQuery = $state('');
+  let sortBy: 'name' | 'type' | 'status' | 'reading' = $state('name');
+  let sortOrder: 'asc' | 'desc' = $state('asc');
 
-  $: ({ form, meters = [], properties = [], floors = [], rental_unit = [], isAdminLevel, isUtility, isMaintenance } = data);
+  let { form, meters = [], properties = [], floors = [], rental_unit = [], isAdminLevel, isUtility, isMaintenance } = $derived(data);
 
   // Create a default form value
   const defaultForm: SuperValidated<MeterFormData, any> = {
@@ -144,7 +148,7 @@
     }
   }
 
-  $: filteredMeters = (meters ?? []).filter(meter => {
+  let filteredMeters = $derived((meters ?? []).filter(meter => {
     if (!meter) return false;
     const matchesType = !selectedType || meter.type === selectedType;
     const matchesStatus = !selectedStatus || meter.status === selectedStatus;
@@ -168,7 +172,7 @@
       default:
         return 0;
     }
-  }) || [];
+  }) || []);
 </script>
 
 <div class="space-y-6">

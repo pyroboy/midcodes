@@ -4,10 +4,19 @@
     import NameTagLayout from './NameTagLayout.svelte';
     import { onMount } from 'svelte';
 
-    export let attendees: Attendee[];
-    export let eventName: string;
-    export let onClose: () => void;
-    export let onPrinted: () => void;
+    interface Props {
+        attendees: Attendee[];
+        eventName: string;
+        onClose: () => void;
+        onPrinted: () => void;
+    }
+
+    let {
+        attendees,
+        eventName,
+        onClose,
+        onPrinted
+    }: Props = $props();
 
     onMount(() => {
         // Automatically trigger print when component mounts

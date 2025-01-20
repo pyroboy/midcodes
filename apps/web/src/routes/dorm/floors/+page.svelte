@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { run } from 'svelte/legacy';
+
   import FloorForm from './FloorForm.svelte';
   import { Badge } from '$lib/components/ui/badge';
   import { Button } from '$lib/components/ui/button';
@@ -26,18 +28,27 @@
     isStaffLevel: boolean;
   }
 
-  export let data: PageData;
+  interface Props {
+    data: PageData;
+  }
+
+  let { data }: Props = $props();
 
   // Make data reactive
-  $: ({ floors, properties, form, user, isAdminLevel, isStaffLevel } = data);
+  let floors;
+  run(() => {
+    ({ floors, properties, form, user, isAdminLevel, isStaffLevel } = data);
+  });
 
   // Debug reactive statement
-  $: if (floors) {
-    console.log('Floors data updated:', {
-      count: floors.length,
-      floorIds: floors.map(f => f.id)
-    });
-  }
+  run(() => {
+    if (floors) {
+      console.log('Floors data updated:', {
+        count: floors.length,
+        floorIds: floors.map(f => f.id)
+      });
+    }
+  });
 
   const { form: formData, enhance, errors, constraints } = superForm(data.form, {
     id: 'floor-form',
@@ -66,8 +77,8 @@
     }
   });
 
-  let editMode = false;
-  let selectedFloor: FloorWithProperty | undefined = undefined;
+  let editMode = $state(false);
+  let selectedFloor: FloorWithProperty | undefined = $state(undefined);
 
   function handleFloorClick(floor: FloorWithProperty) {
     console.log('Floor selected for editing:', {

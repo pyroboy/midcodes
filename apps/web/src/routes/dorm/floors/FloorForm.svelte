@@ -26,12 +26,23 @@
     label: string;
   }
 
-  export let data: PageData;
-  export let editMode = false;
-  export let form: SuperForm<z.infer<typeof floorSchema>>['form'];
-  export let errors: SuperForm<z.infer<typeof floorSchema>>['errors'];
-  export let enhance: SuperForm<z.infer<typeof floorSchema>>['enhance'];
-  export let constraints: SuperForm<z.infer<typeof floorSchema>>['constraints'];
+  interface Props {
+    data: PageData;
+    editMode?: boolean;
+    form: SuperForm<z.infer<typeof floorSchema>>['form'];
+    errors: SuperForm<z.infer<typeof floorSchema>>['errors'];
+    enhance: SuperForm<z.infer<typeof floorSchema>>['enhance'];
+    constraints: SuperForm<z.infer<typeof floorSchema>>['constraints'];
+  }
+
+  let {
+    data,
+    editMode = false,
+    form,
+    errors,
+    enhance,
+    constraints
+  }: Props = $props();
 
   const dispatch = createEventDispatcher();
 

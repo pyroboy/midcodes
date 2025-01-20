@@ -1,4 +1,6 @@
 <script lang="ts">
+    import { run, preventDefault } from 'svelte/legacy';
+
     import { onMount, onDestroy } from 'svelte';
     import { page } from '$app/stores';
     import { auth, session, user } from '$lib/stores/auth';
@@ -47,7 +49,8 @@
         [key: string]: File | null;
     }
 
-    export let data: {
+    interface Props {
+        data: {
         template: {
             id: string;
             name: string;
@@ -58,6 +61,9 @@
             orientation: 'landscape' | 'portrait';
         };
     };
+    }
+
+    let { data }: Props = $props();
 
     let templateId = $page.params.id;
     let template: Template = {
@@ -68,27 +74,27 @@
             height: element.height ?? 100
         }))
     };
-    let loading = false;
-    let error: string | null = null;
-    let formElement: HTMLFormElement;
-    let debugMessages: string[] = [];
-    let formData: Record<string, string> = {};
-    let fileUploads: FileUploads = {};
-    let imagePositions: Record<string, ImagePosition> = {};
-    let selectedOptions: Record<string, SelectOption> = {};
-    let frontCanvasComponent: IdCanvas;
-    let backCanvasComponent: IdCanvas;
+    let loading = $state(false);
+    let error: string | null = $state(null);
+    let formElement: HTMLFormElement = $state();
+    let debugMessages: string[] = $state([]);
+    let formData: Record<string, string> = $state({});
+    let fileUploads: FileUploads = $state({});
+    let imagePositions: Record<string, ImagePosition> = $state({});
+    let selectedOptions: Record<string, SelectOption> = $state({});
+    let frontCanvasComponent: IdCanvas = $state();
+    let backCanvasComponent: IdCanvas = $state();
     let frontCanvasReady = false;
     let backCanvasReady = false;
     let fullResolution = false;
-    let mouseMoving = false;
-    let formErrors: Record<string, boolean> = {};
-    let fileUrls: Record<string, string> = {};
+    let mouseMoving = $state(false);
+    let formErrors: Record<string, boolean> = $state({});
+    let fileUrls: Record<string, string> = $state({});
 
-    $: {
+    run(() => {
         console.log('Use Template Page: Session exists:', !!$session);
         console.log('Use Template Page: User exists:', !!$user);
-    }
+    });
 
     function initializeFormData() {
         if (!template?.template_elements) return;
@@ -353,14 +359,14 @@
                         action="?/saveIdCard"
                         method="POST"
                         enctype="multipart/form-data"
-                        on:submit|preventDefault={handleSubmit}
+                        onsubmit={preventDefault(handleSubmit)}
                         use:enhance
                     >
                         {#each template.template_elements as element (element.variableName)}
                             {#if element.variableName}
                                 <div role="button" tabindex="-1" class="grid grid-cols-[auto,1fr] gap-4 items-center" 
-                                    on:mousedown={handleMouseDown} 
-                                    on:mouseup={handleMouseUp}>
+                                    onmousedown={handleMouseDown} 
+                                    onmouseup={handleMouseUp}>
                                     <Label for={element.variableName} class="text-right">
                                         {element.variableName}
                                         {#if element.type === 'text' || element.type === 'selection'}

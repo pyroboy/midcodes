@@ -21,15 +21,19 @@
     import { onMount } from 'svelte';
     import { page } from '$app/stores';
 
-    export let data: PageData;
+    interface Props {
+        data: PageData;
+    }
+
+    let { data }: Props = $props();
 
     const { form, enhance } = superForm<PrintStatusSchema>(data.form);
 
-    let searchQuery = '';
-    let showPrintedOnly = false;
-    let showUnprintedOnly = true; // Default to showing unprinted only
-    let selectedAttendees: Attendee[] = [];
-    let showPrintPreview = false;
+    let searchQuery = $state('');
+    let showPrintedOnly = $state(false);
+    let showUnprintedOnly = $state(true); // Default to showing unprinted only
+    let selectedAttendees: Attendee[] = $state([]);
+    let showPrintPreview = $state(false);
 
     // Format date
     const formatDate = (date: string) => {
@@ -60,7 +64,7 @@
 
 
     // Filter attendees based on search and print status
-    $: filteredAttendees = (data.attendees as Attendee[]).filter(attendee => {
+    let filteredAttendees = $derived((data.attendees as Attendee[]).filter(attendee => {
         const matchesSearch = searchQuery === '' || 
             Object.values(attendee.basic_info).some(value => 
                 value?.toString().toLowerCase().includes(searchQuery.toLowerCase())
@@ -72,7 +76,7 @@
             (showUnprintedOnly && !attendee.is_printed);
         
         return matchesSearch && matchesPrintStatus;
-    });
+    }));
 </script>
 
 <svelte:head>

@@ -9,8 +9,12 @@
     import { Loader } from 'lucide-svelte';
     import { invalidateAll } from '$app/navigation';
 
-    export let form: AuthActionData;
-    let isLoading = false;
+    interface Props {
+        form: AuthActionData;
+    }
+
+    let { form }: Props = $props();
+    let isLoading = $state(false);
 
     const handleSubmit: SubmitFunction = () => {
         isLoading = true;

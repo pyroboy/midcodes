@@ -3,8 +3,12 @@
   import { Badge } from '$lib/components/ui/badge';
   import { createEventDispatcher } from 'svelte';
 
-  export let leases: any[] = [];
-  export let data: any;
+  interface Props {
+    leases?: any[];
+    data: any;
+  }
+
+  let { leases = [], data }: Props = $props();
 
   const dispatch = createEventDispatcher();
 

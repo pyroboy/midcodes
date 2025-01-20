@@ -5,17 +5,21 @@
     import { OrbitControls } from '@threlte/extras';
     import * as THREE from 'three';
 
-    export let frontImageUrl: string | null = null;
-    export let backImageUrl: string | null = null;
-    export let onClose: () => void;
+    interface Props {
+        frontImageUrl?: string | null;
+        backImageUrl?: string | null;
+        onClose: () => void;
+    }
 
-    let meshRef: THREE.Mesh;
-    let canvasError: string | null = null;
-    let canvasInitialized = false;
-    let debugMode = false;
-    let modalRef: HTMLDialogElement;
+    let { frontImageUrl = null, backImageUrl = null, onClose }: Props = $props();
 
-    let rotationY = 0;
+    let meshRef: THREE.Mesh = $state();
+    let canvasError: string | null = $state(null);
+    let canvasInitialized = $state(false);
+    let debugMode = $state(false);
+    let modalRef: HTMLDialogElement = $state();
+
+    let rotationY = $state(0);
     let animationFrameId: number | null = null;
     let autoRotateId: number | null = null;
     let isFlipping = false;
@@ -225,28 +229,28 @@
         }
     }
 
-    let sceneState = {
+    let sceneState = $state({
         frontTextureLoaded: false,
         backTextureLoaded: false,
         meshInitialized: false,
         lastError: null as string | null
-    };
+    });
 </script>
 
-<svelte:window on:keydown={handleKeydown} />
+<svelte:window onkeydown={handleKeydown} />
 
 {#if frontImageUrl || backImageUrl}
 <dialog
     bind:this={modalRef}
     class="modal-dialog"
-    on:close={onClose}
+    onclose={onClose}
     aria-labelledby="modal-title"
 >
     <div 
         class="modal-backdrop"
         role="presentation"
-        on:click={handleModalClose}
-        on:keydown={handleKeydown}
+        onclick={handleModalClose}
+        onkeydown={handleKeydown}
     >
         <div 
             class="modal-content"
@@ -257,7 +261,7 @@
             <button 
                 type="button"
                 class="close-button"
-                on:click={onClose}
+                onclick={onClose}
                 aria-label="Close preview">
                 ✕
             </button>
@@ -426,7 +430,7 @@
                 <button 
                     type="button"
                     class="control-button"
-                    on:click={handleFlip}
+                    onclick={handleFlip}
                     aria-label="Flip card to see {rotationY > Math.PI ? 'front' : 'back'} side">
                     Flip Card
                 </button>

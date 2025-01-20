@@ -3,11 +3,15 @@
     import type { PageData } from './$types';
     import type { CartItem } from '$lib/types/constrack';
     
-    export let data: PageData;
+    interface Props {
+        data: PageData;
+    }
+
+    let { data }: Props = $props();
     
-    $: subtotal = data.cartItems.reduce((sum: number, item: CartItem) => sum + item.price * item.quantity, 0);
-    $: deliveryFee = 150; // Fixed delivery fee
-    $: total = subtotal + deliveryFee;
+    let subtotal = $derived(data.cartItems.reduce((sum: number, item: CartItem) => sum + item.price * item.quantity, 0));
+    let deliveryFee = $derived(150); // Fixed delivery fee
+    let total = $derived(subtotal + deliveryFee);
 </script>
 
 <div class="min-h-screen bg-gray-100">

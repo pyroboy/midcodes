@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { run } from 'svelte/legacy';
+
   import { superForm } from 'sveltekit-superforms/client';
   import { zodClient } from 'sveltekit-superforms/adapters';
   import Button from '$lib/components/ui/button/button.svelte';
@@ -10,21 +12,23 @@
   import { paymentSchema, type PaymentSchema } from './formSchema';
   import Textarea from '$lib/components/ui/textarea/textarea.svelte';
 
-  export let data: any;
-  export let billings: any[] = [];
-  export let editMode = false;
-  export let payment: PaymentSchema | undefined = undefined;
+  interface Props {
+    data: any;
+    billings?: any[];
+    editMode?: boolean;
+    payment?: PaymentSchema | undefined;
+  }
+
+  let {
+    data,
+    billings = [],
+    editMode = false,
+    payment = undefined
+  }: Props = $props();
 
   const dispatch = createEventDispatcher();
   const rows = 3;
 
-  $: {
-    if (payment && editMode) {
-      form.set({
-        ...payment
-      });
-    }
-  }
 
   const { form, errors, enhance, submitting, reset } = superForm(data.form, {
     id: 'paymentForm',
@@ -39,9 +43,6 @@
     },
   });
 
-  $: canEdit = data.isAdminLevel || data.isAccountant || data.isFrontdesk;
-  $: canUpdateStatus = data.isAdminLevel || data.isAccountant;
-  $: selectedBilling = billings.find(b => b.id === $form.billing_id);
 
   function getMethodBadgeVariant(method: string): 'default' | 'destructive' | 'outline' | 'secondary' {
     switch (method) {
@@ -66,6 +67,16 @@
   function parseNumberInput(value: string): number {
     return parseFloat(value) || 0;
   }
+  run(() => {
+    if (payment && editMode) {
+      form.set({
+        ...payment
+      });
+    }
+  });
+  let canEdit = $derived(data.isAdminLevel || data.isAccountant || data.isFrontdesk);
+  let canUpdateStatus = $derived(data.isAdminLevel || data.isAccountant);
+  let selectedBilling = $derived(billings.find(b => b.id === $form.billing_id));
 </script>
 
 <form

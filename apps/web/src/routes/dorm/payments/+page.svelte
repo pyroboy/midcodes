@@ -30,10 +30,14 @@
     };
   };
 
-  export let data: PageData;
+  interface Props {
+    data: PageData;
+  }
 
-  let showForm = false;
-  let selectedPayment: Payment | undefined = undefined;
+  let { data }: Props = $props();
+
+  let showForm = $state(false);
+  let selectedPayment: Payment | undefined = $state(undefined);
 
   function handlePaymentClick(payment: Payment) {
     if (data.isAdminLevel || data.isAccountant || data.isFrontdesk) {

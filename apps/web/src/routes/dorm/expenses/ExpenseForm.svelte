@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { run } from 'svelte/legacy';
+
   import { superForm } from 'sveltekit-superforms/client';
   import { zodClient } from 'sveltekit-superforms/adapters';
   import Button from '$lib/components/ui/button/button.svelte';
@@ -22,9 +24,13 @@
     user: User;
   }
 
-  export let data: PageData;
-  export let editMode = false;
-  export let expense: ExpenseSchema | undefined = undefined;
+  interface Props {
+    data: PageData;
+    editMode?: boolean;
+    expense?: ExpenseSchema | undefined;
+  }
+
+  let { data, editMode = false, expense = undefined }: Props = $props();
 
   const dispatch = createEventDispatcher();
 
@@ -41,16 +47,16 @@
     },
   });
 
-  $: {
+  run(() => {
     if (expense && editMode) {
       $form = expense;
     }
-  }
+  });
 
-  $: isAdminLevel = data.user?.role === 'super_admin' || data.user?.role === 'property_admin';
-  $: isStaffLevel = data.user?.role === 'staff' || data.user?.role === 'frontdesk';
-  $: canEdit = isAdminLevel || (isStaffLevel && !editMode);
-  $: canApprove = isAdminLevel && editMode;
+  let isAdminLevel = $derived(data.user?.role === 'super_admin' || data.user?.role === 'property_admin');
+  let isStaffLevel = $derived(data.user?.role === 'staff' || data.user?.role === 'frontdesk');
+  let canEdit = $derived(isAdminLevel || (isStaffLevel && !editMode));
+  let canApprove = $derived(isAdminLevel && editMode);
 
   function updatePropertyId(selected: { value: string } | undefined) {
     if (selected?.value) {

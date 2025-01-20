@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { run } from 'svelte/legacy';
+
   import { superForm } from 'sveltekit-superforms/client';
   import type { SuperValidated } from 'sveltekit-superforms';
   import { zod } from 'sveltekit-superforms/adapters';
@@ -20,11 +22,21 @@
     floor: Floor | null;
   };
 
-  export let form: SuperValidated<MeterFormData, any>;
-  export let properties: Property[] = [];
-  export let floors: Floor[] = [];
-  export let rental_unit: Rental_unit[] = [];
-  export let meter: MeterFormData | undefined = undefined;
+  interface Props {
+    form: SuperValidated<MeterFormData, any>;
+    properties?: Property[];
+    floors?: Floor[];
+    rental_unit?: Rental_unit[];
+    meter?: MeterFormData | undefined;
+  }
+
+  let {
+    form,
+    properties = [],
+    floors = [],
+    rental_unit = [],
+    meter = undefined
+  }: Props = $props();
 
   const dispatch = createEventDispatcher<{
     meterAdded: void;
@@ -40,11 +52,13 @@
     }
   });
 
-  $: if (meter) {
-    $formData = {
-      ...meter
-    };
-  }
+  run(() => {
+    if (meter) {
+      $formData = {
+        ...meter
+      };
+    }
+  });
 
   function getLocationLabel(type: string, id: number | null): string {
     if (!id) return '';
@@ -63,16 +77,16 @@
     }
   }
 
-  $: filteredProperties = properties.filter(p => p.status === 'ACTIVE');
-  $: filteredFloors = floors.filter(f => f.status === 'ACTIVE');
-  $: filteredRental_Units = rental_unit.filter(r => r.rental_unit_status === 'VACANT' || r.rental_unit_status === 'OCCUPIED');
+  let filteredProperties = $derived(properties.filter(p => p.status === 'ACTIVE'));
+  let filteredFloors = $derived(floors.filter(f => f.status === 'ACTIVE'));
+  let filteredRental_Units = $derived(rental_unit.filter(r => r.rental_unit_status === 'VACANT' || r.rental_unit_status === 'OCCUPIED'));
 
-  $: locationLabel = $formData.location_type ? 
+  let locationLabel = $derived($formData.location_type ? 
     getLocationLabel($formData.location_type, 
       $formData.location_type === 'PROPERTY' ? Number($formData.property_id) : 
       $formData.location_type === 'FLOOR' ? Number($formData.floor_id) : 
       Number($formData.rental_unit_id)
-    ) : '';
+    ) : '');
 
   function handleLocationTypeChange(type: string) {
     if (type === 'PROPERTY' || type === 'FLOOR' || type === 'RENTAL_UNIT') {

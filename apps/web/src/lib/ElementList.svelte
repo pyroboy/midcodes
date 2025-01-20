@@ -1,4 +1,6 @@
 <script lang="ts">
+    import { stopPropagation } from 'svelte/legacy';
+
     import type { TemplateElement } from './stores/templateStore';
     import PositionGroup from './PositionGroup.svelte';
     import FontSettings from './FontSettings.svelte';
@@ -7,11 +9,15 @@
     import { ChevronDown, ChevronUp } from 'lucide-svelte';
     import { slide } from 'svelte/transition';
     
-    export let elements: TemplateElement[];
-    export let fontOptions: string[];
-    export let side: 'front' | 'back';
     
     import { createEventDispatcher } from 'svelte';
+    interface Props {
+        elements: TemplateElement[];
+        fontOptions: string[];
+        side: 'front' | 'back';
+    }
+
+    let { elements = $bindable(), fontOptions, side }: Props = $props();
     const dispatch = createEventDispatcher();
 
     // Type predicate for selection option safety
@@ -76,7 +82,7 @@
         updateElement(index, { options });
     }
 
-    let expandedElementIndex: number | null = null;
+    let expandedElementIndex: number | null = $state(null);
 
     function toggleElement(index: number) {
         expandedElementIndex = expandedElementIndex === index ? null : index;
@@ -89,8 +95,8 @@
             <div class="element-header" 
                 role="button"
                 tabindex="0"
-                on:click={() => toggleElement(i)}
-                on:keydown={(e) => {
+                onclick={() => toggleElement(i)}
+                onkeydown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
                         toggleElement(i);
@@ -108,7 +114,7 @@
                     <span class="element-type">{element.type.charAt(0).toUpperCase() + element.type.slice(1)}</span>
                     <span class="element-name">{element.variableName}</span>
                 </div>
-                <button class="remove-element" on:click|stopPropagation={() => removeElement(i)}>×</button>
+                <button class="remove-element" onclick={stopPropagation(() => removeElement(i))}>×</button>
             </div>
             {#if expandedElementIndex === i}
                 <div class="element-inputs" transition:slide={{ duration: 200 }}>
@@ -167,7 +173,7 @@
                                 id="options-{i}"
                                 class="options-textarea"
                                 value={getOptionsString(element.options)}
-                                on:input={(event) => handleOptionsInput(event, i)}
+                                oninput={(event) => handleOptionsInput(event, i)}
                                 rows="4"
                             ></textarea>
                         </div>
@@ -190,10 +196,10 @@
         </div>
     {/each}
     <div class="add-elements">
-        <button on:click={() => addElement('text')}>Add Text</button>
-        <button on:click={() => addElement('photo')}>Add Photo</button>
-        <button on:click={() => addElement('signature')}>Add Signature</button>
-        <button on:click={() => addElement('selection')}>Add Selection</button>
+        <button onclick={() => addElement('text')}>Add Text</button>
+        <button onclick={() => addElement('photo')}>Add Photo</button>
+        <button onclick={() => addElement('signature')}>Add Signature</button>
+        <button onclick={() => addElement('selection')}>Add Selection</button>
     </div>
 </div>
 

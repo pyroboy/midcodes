@@ -1,18 +1,32 @@
 <script lang="ts">
+    import { run } from 'svelte/legacy';
+
     import { createEventDispatcher, onMount } from 'svelte';
     import { Move, Scaling } from "lucide-svelte";
     import { debounce } from 'lodash-es';
 
-    export let width: number;
-    export let height: number;
-    export let fileUrl: string | null = null;
-    export let initialScale = 1;
-    export let initialX = 0;
-    export let initialY = 0;
-    export let isSignature = false;
+    interface Props {
+        width: number;
+        height: number;
+        fileUrl?: string | null;
+        initialScale?: number;
+        initialX?: number;
+        initialY?: number;
+        isSignature?: boolean;
+    }
+
+    let {
+        width,
+        height,
+        fileUrl = null,
+        initialScale = 1,
+        initialX = 0,
+        initialY = 0,
+        isSignature = false
+    }: Props = $props();
 
     const dispatch = createEventDispatcher();
-    let canvas: HTMLCanvasElement;
+    let canvas: HTMLCanvasElement = $state();
     let ctx: CanvasRenderingContext2D;
     let imageScale = initialScale;
     let imageX = initialX;
@@ -30,11 +44,6 @@
         drawPlaceholder();
     });
 
-    $: if (fileUrl) {
-        const img = new Image();
-        img.onload = () => drawImage(img);
-        img.src = fileUrl;
-    }
 
     function drawPlaceholder() {
         ctx.fillStyle = '#f0f0f0';
@@ -147,6 +156,13 @@
         window.addEventListener('touchend', handleEnd);
         window.addEventListener('touchcancel', handleEnd);
     }
+    run(() => {
+        if (fileUrl) {
+            const img = new Image();
+            img.onload = () => drawImage(img);
+            img.src = fileUrl;
+        }
+    });
 </script>
 
 <div class="flex items-center touch-none">
@@ -155,15 +171,15 @@
             bind:this={canvas}
             width={thumbnailWidth}
             height={thumbnailHeight}
-            on:click={handleClick}
+            onclick={handleClick}
             class="cursor-pointer"
         ></canvas>
     </div>
     <div class="ml-2 flex flex-col gap-2">
         <div 
             class="w-6 h-6 bg-gray-200 flex items-center justify-center cursor-move active:bg-gray-300"
-            on:mousedown={(e) => handleStart(e, 'move')}
-            on:touchstart={(e) => handleStart(e, 'move')}
+            onmousedown={(e) => handleStart(e, 'move')}
+            ontouchstart={(e) => handleStart(e, 'move')}
             role="button"
             tabindex="0"
             aria-label="Move image"
@@ -172,8 +188,8 @@
         </div>
         <div 
             class="w-6 h-6 bg-gray-200 flex items-center justify-center cursor-se-resize active:bg-gray-300"
-            on:mousedown={(e) => handleStart(e, 'resize')}
-            on:touchstart={(e) => handleStart(e, 'resize')}
+            onmousedown={(e) => handleStart(e, 'resize')}
+            ontouchstart={(e) => handleStart(e, 'resize')}
             role="button"
             tabindex="0"
             aria-label="Resize image"

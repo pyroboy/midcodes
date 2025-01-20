@@ -1,4 +1,6 @@
 <script lang="ts">
+   import { run } from 'svelte/legacy';
+
     import { Button } from "$lib/components/ui/button";
     import {
         Select,
@@ -24,39 +26,43 @@
         org_id: string;
     }
     
-    let selectedRole: UserRole | undefined = undefined;
-    let selectedOrgId: string | undefined = undefined;
-    let selectedEventId: string | undefined = undefined;
-    let loading = false;
-    let organizations: Organization[] = [];
-    let events: Event[] = [];
+    let selectedRole: UserRole | undefined = $state(undefined);
+    let selectedOrgId: string | undefined = $state(undefined);
+    let selectedEventId: string | undefined = $state(undefined);
+    let loading = $state(false);
+    let organizations: Organization[] = $state([]);
+    let events: Event[] = $state([]);
     let orgIdInput = '';
-    let selectedOrg: Organization | null = null;
-    let selectedEvent: Event | null = null;
+    let selectedOrg: Organization | null = $state(null);
+    let selectedEvent: Event | null = $state(null);
     
-    $: emulation = $page.data.session?.roleEmulation as RoleEmulationClaim | null;
-    $: isEmulating = emulation?.active ?? false;
-    $: if (selectedOrg) selectedOrgId = selectedOrg.id;
-    $: if (selectedEvent) selectedEventId = selectedEvent.id;
-    $: filteredEvents = selectedOrgId 
+    let emulation = $derived($page.data.session?.roleEmulation as RoleEmulationClaim | null);
+    let isEmulating = $derived(emulation?.active ?? false);
+    run(() => {
+      if (selectedOrg) selectedOrgId = selectedOrg.id;
+   });
+    run(() => {
+      if (selectedEvent) selectedEventId = selectedEvent.id;
+   });
+    let filteredEvents = $derived(selectedOrgId 
         ? events.filter(e => e.org_id === selectedOrgId)
-        : events;
-    $: roleConfig = selectedRole ? RoleConfig[selectedRole as UserRole] : null;
-    $: requiresOrgId = roleConfig?.requiresOrgId ?? false;
-    $: requiresEventId = selectedRole === 'event_admin' || selectedRole === 'event_qr_checker';
-    $: isValidForm = selectedRole && 
+        : events);
+    let roleConfig = $derived(selectedRole ? RoleConfig[selectedRole as UserRole] : null);
+    let requiresOrgId = $derived(roleConfig?.requiresOrgId ?? false);
+    let requiresEventId = $derived(selectedRole === 'event_admin' || selectedRole === 'event_qr_checker');
+    let isValidForm = $derived(selectedRole && 
         (!requiresOrgId || selectedOrgId) &&
-        (!requiresEventId || selectedEventId);
-    $: currentRole = emulation?.emulated_role;
-    $: contextData = emulation?.metadata?.context ?? null;
+        (!requiresEventId || selectedEventId));
+    let currentRole = $derived(emulation?.emulated_role);
+    let contextData = $derived(emulation?.metadata?.context ?? null);
     
     // Debug log to check emulation data
-    $: {
+    run(() => {
         if (emulation) {
             console.log('Emulation data:', emulation);
             console.log('Context data:', contextData);
         }
-    }
+    });
 
     // Get available roles from RoleConfig
     const roles = Object.keys(RoleConfig) as UserRole[];

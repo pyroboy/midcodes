@@ -18,14 +18,19 @@
   //   approved_by_user: { full_name: string } | null;
   // };
 
-  // type Property = Database['public']['Tables']['properties']['Row'];
+  
 
-  export let data: PageData;
+  interface Props {
+    // type Property = Database['public']['Tables']['properties']['Row'];
+    data: PageData;
+  }
+
+  let { data }: Props = $props();
 
   const { form, errors, enhance } = superForm<ExpenseSchema>(data.form);
 
-  let typeSelected = { value: '', label: 'Select expense type' };
-  let statusSelected = { value: '', label: 'Select status' };
+  let typeSelected = $state({ value: '', label: 'Select expense type' });
+  let statusSelected = $state({ value: '', label: 'Select status' });
 
   function isValidExpenseType(value: string): value is typeof expenseTypeEnum._type {
     return Object.values(expenseTypeEnum.enum).includes(value as any);
@@ -35,8 +40,8 @@
     return Object.values(expenseStatusEnum.enum).includes(value as any);
   }
 
-  $: expenses = data.expenses ?? [];
-  $: properties = data.properties ?? [];
+  let expenses = $derived(data.expenses ?? []);
+  let properties = $derived(data.properties ?? []);
 </script>
 
 <div class="flex">

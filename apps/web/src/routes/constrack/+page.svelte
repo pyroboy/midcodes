@@ -2,16 +2,20 @@
     import { enhance } from '$app/forms';
     import type { PageData } from './$types';
     
-    export let data: PageData;
+    interface Props {
+        data: PageData;
+    }
+
+    let { data }: Props = $props();
     
-    let searchQuery = '';
-    let selectedCategory = 'all';
+    let searchQuery = $state('');
+    let selectedCategory = $state('all');
     
-    $: filteredProducts = data.products.filter(product => {
+    let filteredProducts = $derived(data.products.filter(product => {
         const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
         const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory;
         return matchesSearch && matchesCategory;
-    });
+    }));
 </script>
 
 <div class="min-h-screen bg-gray-100">

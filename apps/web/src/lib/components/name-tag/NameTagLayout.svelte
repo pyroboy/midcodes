@@ -5,9 +5,13 @@
     import type { Attendee } from '$lib/types/database';
     import { page } from '$app/stores';
 
-    export let attendee: Attendee;
-    export let eventName: string;
-    let qrCodeContainer: HTMLDivElement;
+    interface Props {
+        attendee: Attendee;
+        eventName: string;
+    }
+
+    let { attendee, eventName }: Props = $props();
+    let qrCodeContainer: HTMLDivElement = $state();
 
     onMount(() => {
         if (!attendee.reference_code_url) return;

@@ -11,7 +11,11 @@
     import PaymentInstructions from '../register/PaymentInstructions.svelte';
     import { Check, Clock, AlertTriangle } from 'lucide-svelte';
 
-    export let data: PageData;
+    interface Props {
+        data: PageData;
+    }
+
+    let { data }: Props = $props();
 
     const { form, enhance, message } = superForm<EmailReceiptSchema>(data.form);
     let qrContainer;
@@ -60,7 +64,7 @@
         return timeString.trim();
     }
 
-    let timeLeft = '';
+    let timeLeft = $state('');
     let countdownInterval: number;
 
     onMount(() => {
@@ -80,7 +84,7 @@
         if (countdownInterval) clearInterval(countdownInterval);
     });
 
-    $: amount = data.attendee.ticket_info.price?.toString() || '0';
+    let amount = $derived(data.attendee.ticket_info.price?.toString() || '0');
 </script>
 
 <svelte:head>

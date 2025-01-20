@@ -8,9 +8,13 @@
   import type { PageData } from './$types';
   import { PropertyStatus, PropertyType } from './formSchema';
 
-  export let data: PageData;
-  export let editMode = false;
-  export let property: any | undefined = undefined;
+  interface Props {
+    data: PageData;
+    editMode?: boolean;
+    property?: any | undefined;
+  }
+
+  let { data, editMode = false, property = $bindable(undefined) }: Props = $props();
 
   const dispatch = createEventDispatcher();
 
@@ -22,7 +26,7 @@
     }
   });
 
-  $: action = editMode ? '?/update' : '?/create';
+  let action = $derived(editMode ? '?/update' : '?/create');
 
   const propertyTypes = Object.entries(PropertyType).map(([value]) => ({
     value,

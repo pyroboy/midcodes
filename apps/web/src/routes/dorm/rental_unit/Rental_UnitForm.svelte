@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { run } from 'svelte/legacy';
+
   import Button from '$lib/components/ui/button/button.svelte';
   import Input from '$lib/components/ui/input/input.svelte';
   import Label from '$lib/components/ui/label/label.svelte';
@@ -24,12 +26,23 @@
     label: string;
   }
 
-  export let data: PageData;
-  export let editMode = false;
-  export let form: SuperForm<z.infer<typeof rental_unitSchema>>['form'];
-  export let errors: SuperForm<z.infer<typeof rental_unitSchema>>['errors'];
-  export let enhance: SuperForm<z.infer<typeof rental_unitSchema>>['enhance'];
-  export let constraints: SuperForm<z.infer<typeof rental_unitSchema>>['constraints'];
+  interface Props {
+    data: PageData;
+    editMode?: boolean;
+    form: SuperForm<z.infer<typeof rental_unitSchema>>['form'];
+    errors: SuperForm<z.infer<typeof rental_unitSchema>>['errors'];
+    enhance: SuperForm<z.infer<typeof rental_unitSchema>>['enhance'];
+    constraints: SuperForm<z.infer<typeof rental_unitSchema>>['constraints'];
+  }
+
+  let {
+    data,
+    editMode = false,
+    form,
+    errors,
+    enhance,
+    constraints
+  }: Props = $props();
 
   const dispatch = createEventDispatcher();
   const rental_unitTypes = ['SINGLE', 'DOUBLE', 'TRIPLE', 'QUAD', 'SUITE'] as const;
@@ -93,16 +106,23 @@
     }
   }
 
-  $: availableFloors = data.floors;
+  let availableFloors;
+  run(() => {
+    availableFloors = data.floors;
+  });
   
-  $: if ($form.property_id) {
-    availableFloors = data.floors.filter(f => f.property_id === Number($form.property_id));
-    if (availableFloors.length === 0) {
-      console.warn('No floors found for property:', $form.property_id);
+  run(() => {
+    if ($form.property_id) {
+      availableFloors = data.floors.filter(f => f.property_id === Number($form.property_id));
+      if (availableFloors.length === 0) {
+        console.warn('No floors found for property:', $form.property_id);
+      }
     }
-  }
+  });
   
-  $: console.log('Available floors:', availableFloors);
+  run(() => {
+    console.log('Available floors:', availableFloors);
+  });
 
   function getFloorLabel(floorId: number): string {
     const floor = data.floors.find(f => f.id === floorId);
@@ -113,7 +133,7 @@
     dispatch('cancel');
   }
 
-  let amenityInput = '';
+  let amenityInput = $state('');
   
   function addAmenity() {
     if (amenityInput.trim()) {
@@ -361,7 +381,7 @@
             <button 
               type="button"
               class="text-sm hover:text-destructive"
-              on:click={() => removeAmenity(i)}
+              onclick={() => removeAmenity(i)}
             >
               ×
             </button>

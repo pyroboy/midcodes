@@ -6,7 +6,11 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
 
-  export let data: PageData;
+  interface Props {
+    data: PageData;
+  }
+
+  let { data }: Props = $props();
 
   const role = (data.profile?.role || 'property_admin') as UserRole;
   const roleConfig = RoleConfig[role];
@@ -15,8 +19,8 @@
     .sort((a: AllowedPath, b: AllowedPath) => (a.label || '').localeCompare(b.label || ''));
 
   // Get the current section from the URL
-  $: currentPath = $page.url.pathname;
-  $: currentSection = currentPath.split('/')[2] || 'overview';
+  let currentPath = $derived($page.url.pathname);
+  let currentSection = $derived(currentPath.split('/')[2] || 'overview');
 </script>
 
 <div class="container mx-auto px-4 py-8">

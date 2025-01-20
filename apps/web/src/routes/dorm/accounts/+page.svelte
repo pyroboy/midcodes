@@ -14,9 +14,13 @@
     import type { Infer } from "sveltekit-superforms";
     import { zodClient } from 'sveltekit-superforms/adapters';
 
-    export let data: PageData & { form: Infer<typeof billingSchema> };
-    let editMode = false;
-    let showForm = true;
+  interface Props {
+    data: PageData & { form: Infer<typeof billingSchema> };
+  }
+
+  let { data }: Props = $props();
+    let editMode = $state(false);
+    let showForm = $state(true);
 
     const form = superForm(data.form, {
       validators: zodClient(billingSchema),
@@ -55,12 +59,12 @@
       showForm = true;
     }
   
-    $: billingTypeSelected = $formData.type ? { value: $formData.type, label: $formData.type } : undefined;
-    $: utilityTypeSelected = $formData.utilityType ? { value: $formData.utilityType, label: $formData.utilityType } : undefined;
-    $: statusSelected = $formData.status ? { value: $formData.status, label: $formData.status } : undefined;
-    $: leaseSelected = $formData.leaseId ? { value: $formData.leaseId, label: data.leases.find(l => l.id === $formData.leaseId)?.leaseName ?? 'Select a lease' } : undefined;
-    $: balance = ($formData.amount || 0) - ($formData.paidAmount || 0);
-    $: showUtilityType = $formData.type === 'UTILITY';
+    let billingTypeSelected = $derived($formData.type ? { value: $formData.type, label: $formData.type } : undefined);
+    let utilityTypeSelected = $derived($formData.utilityType ? { value: $formData.utilityType, label: $formData.utilityType } : undefined);
+    let statusSelected = $derived($formData.status ? { value: $formData.status, label: $formData.status } : undefined);
+    let leaseSelected = $derived($formData.leaseId ? { value: $formData.leaseId, label: data.leases.find(l => l.id === $formData.leaseId)?.leaseName ?? 'Select a lease' } : undefined);
+    let balance = $derived(($formData.amount || 0) - ($formData.paidAmount || 0));
+    let showUtilityType = $derived($formData.type === 'UTILITY');
 </script>
   
 <div class="container mx-auto p-4 flex">

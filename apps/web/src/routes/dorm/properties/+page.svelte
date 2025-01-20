@@ -8,13 +8,17 @@
   import { formatDateTime } from '$lib/utils';
   import { invalidate } from '$app/navigation';
 
-  export let data: PageData;
+  interface Props {
+    data: PageData;
+  }
+
+  let { data }: Props = $props();
 
   // Make data reactive
-  $: ({ properties, form } = data);
+  let { properties, form } = $derived(data);
 
-  let editMode = false;
-  let selectedProperty: any | undefined;
+  let editMode = $state(false);
+  let selectedProperty: any | undefined = $state();
 
   function handlePropertyClick(property: any) {
     console.log('Property selected for editing:', {

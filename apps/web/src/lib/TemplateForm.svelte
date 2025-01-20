@@ -1,4 +1,6 @@
 <script lang="ts">
+    import { run, stopPropagation } from 'svelte/legacy';
+
     import { onMount, createEventDispatcher } from 'svelte';
     import { templateData } from './stores/templateStore';
     import type { TemplateData, TemplateElement } from './stores/templateStore';
@@ -8,43 +10,15 @@
     import { Upload, Image, Plus, X } from 'lucide-svelte';
     import { loadGoogleFonts, getAllFontFamilies, isFontLoaded, fonts } from './config/fonts';
 
-    export let side: 'front' | 'back';
-    export let preview: string | null = null;
-    export let elements: TemplateElement[] = [];
-
-    $: {
-        if (elements) {
-            console.log(`📝 TemplateForm [${side}]:`, {
-                preview: preview ? 'present' : 'none',
-                elements: {
-                    count: elements.length,
-                    details: elements.map(e => ({
-                        name: e.variableName,
-                        type: e.type,
-                        content: e.content,
-                        position: { x: e.x, y: e.y },
-                        style: {
-                            font: e.font,
-                            size: e.size,
-                            color: e.color
-                        }
-                    }))
-                }
-            });
-        }
+    interface Props {
+        side: 'front' | 'back';
+        preview?: string | null;
+        elements?: TemplateElement[];
     }
 
-    $: {
-        console.log(`🔄 TemplateForm (${side}):`, {
-            preview,
-            elements: elements?.map(e => ({
-                name: e.variableName,
-                content: e.content,
-                x: e.x,
-                y: e.y
-            }))
-        });
-    }
+    let { side, preview = null, elements = $bindable([]) }: Props = $props();
+
+
 
     const dispatch = createEventDispatcher();
     const BASE_WIDTH = 506.5;
@@ -55,14 +29,14 @@
     let startX: number, startY: number;
     let currentElementIndex: number | null = null;
     let resizeHandle: string | null = null;
-    let templateContainer: HTMLElement;
-    let fontOptions: string[] = [];
+    let templateContainer: HTMLElement = $state();
+    let fontOptions: string[] = $state([]);
     let fontsLoaded = false;
-    let previewDimensions = {
+    let previewDimensions = $state({
         width: BASE_WIDTH,
         height: BASE_HEIGHT,
         scale: 1
-    };
+    });
 
     function updatePreviewDimensions() {
         if (!templateContainer?.parentElement) return;
@@ -108,28 +82,7 @@
         return () => resizeObserver.disconnect();
     });
 
-    $: elementStyle = (element: TemplateElement) => ({
-        left: `${(element.x || 0) * previewDimensions.scale}px`,
-        top: `${(element.y || 0) * previewDimensions.scale}px`,
-        width: `${((element.width || 0) * previewDimensions.scale)}px`,
-        height: `${((element.height || 0) * previewDimensions.scale)}px`
-    });
 
-    $: textStyle = (element: TemplateElement) => ({
-        'font-family': `"${element.font || 'Arial'}", ${getFontFallback(element.font || 'Arial')}`,
-        'font-weight': element.fontWeight || '400',
-        'font-style': element.fontStyle || 'normal',
-        'font-size': `${((element.size || 16) * previewDimensions.scale)}px`,
-        'color': element.color || '#000000',
-        'text-align': element.alignment || 'left',
-        'text-transform': element.textTransform || 'none',
-        'text-decoration': element.textDecoration || 'none',
-        'letter-spacing': element.letterSpacing ? `${element.letterSpacing * previewDimensions.scale}px` : 'normal',
-        'line-height': element.lineHeight || 'normal',
-        'opacity': element.opacity || 1,
-        'display': 'block',
-        'width': '100%'
-    });
 
     function getFontFallback(font: string): string {
         const fontConfig = fonts.find(f => f.family === font);
@@ -450,9 +403,62 @@
             side: 'back'
         }
     ];
+    run(() => {
+        if (elements) {
+            console.log(`📝 TemplateForm [${side}]:`, {
+                preview: preview ? 'present' : 'none',
+                elements: {
+                    count: elements.length,
+                    details: elements.map(e => ({
+                        name: e.variableName,
+                        type: e.type,
+                        content: e.content,
+                        position: { x: e.x, y: e.y },
+                        style: {
+                            font: e.font,
+                            size: e.size,
+                            color: e.color
+                        }
+                    }))
+                }
+            });
+        }
+    });
+    run(() => {
+        console.log(`🔄 TemplateForm (${side}):`, {
+            preview,
+            elements: elements?.map(e => ({
+                name: e.variableName,
+                content: e.content,
+                x: e.x,
+                y: e.y
+            }))
+        });
+    });
+    let elementStyle = $derived((element: TemplateElement) => ({
+        left: `${(element.x || 0) * previewDimensions.scale}px`,
+        top: `${(element.y || 0) * previewDimensions.scale}px`,
+        width: `${((element.width || 0) * previewDimensions.scale)}px`,
+        height: `${((element.height || 0) * previewDimensions.scale)}px`
+    }));
+    let textStyle = $derived((element: TemplateElement) => ({
+        'font-family': `"${element.font || 'Arial'}", ${getFontFallback(element.font || 'Arial')}`,
+        'font-weight': element.fontWeight || '400',
+        'font-style': element.fontStyle || 'normal',
+        'font-size': `${((element.size || 16) * previewDimensions.scale)}px`,
+        'color': element.color || '#000000',
+        'text-align': element.alignment || 'left',
+        'text-transform': element.textTransform || 'none',
+        'text-decoration': element.textDecoration || 'none',
+        'letter-spacing': element.letterSpacing ? `${element.letterSpacing * previewDimensions.scale}px` : 'normal',
+        'line-height': element.lineHeight || 'normal',
+        'opacity': element.opacity || 1,
+        'display': 'block',
+        'width': '100%'
+    }));
 </script>
 
-<svelte:window on:mousemove={onMouseMove} on:mouseup={onMouseUp} />
+<svelte:window onmousemove={onMouseMove} onmouseup={onMouseUp} />
 
 <div class="template-section">
     <h2 class="text-2xl font-semibold mb-4 text-foreground">{side.charAt(0).toUpperCase() + side.slice(1)} Template</h2>
@@ -474,14 +480,14 @@
                             <h3 class="text-lg font-medium text-foreground/80 mb-1">Add Template Background</h3>
                             <p class="text-sm text-muted-foreground mb-4">Recommended size: 1013x638 pixels</p>
                             <label class="upload-button">
-                                <input type="file" accept="image/*" on:change={handleImageUpload} />
+                                <input type="file" accept="image/*" onchange={handleImageUpload} />
                                 <span class="upload-text">
                                     <Upload class="w-4 h-4 mr-2" />
                                     Choose File
                                 </span>
                             </label>
                         </div>
-                        <div class="placeholder-grid" />
+                        <div class="placeholder-grid"></div>
                     </div>
                 {:else}
                     {#each elements as element, i}
@@ -490,7 +496,7 @@
                             style={Object.entries(elementStyle(element))
                                 .map(([key, value]) => `${key}: ${value}`)
                                 .join(';')}
-                            on:mousedown={(e) => onMouseDown(e, i)}
+                            onmousedown={(e) => onMouseDown(e, i)}
                             role="button"
                             tabindex="0"
                             aria-label="{element.type} element"
@@ -511,10 +517,10 @@
                             </div>
                         {/if}
                         <div class="resize-handles">
-                            <div class="resize-handle top-left" on:mousedown|stopPropagation={(e) => onMouseDown(e, i, 'top-left')} role="button" tabindex="0" aria-label="Resize top left"></div>
-                            <div class="resize-handle top-right" on:mousedown|stopPropagation={(e) => onMouseDown(e, i, 'top-right')} role="button" tabindex="0" aria-label="Resize top right"></div>
-                            <div class="resize-handle bottom-left" on:mousedown|stopPropagation={(e) => onMouseDown(e, i, 'bottom-left')} role="button" tabindex="0" aria-label="Resize bottom left"></div>
-                            <div class="resize-handle bottom-right" on:mousedown|stopPropagation={(e) => onMouseDown(e, i, 'bottom-right')} role="button" tabindex="0" aria-label="Resize bottom right"></div>
+                            <div class="resize-handle top-left" onmousedown={stopPropagation((e) => onMouseDown(e, i, 'top-left'))} role="button" tabindex="0" aria-label="Resize top left"></div>
+                            <div class="resize-handle top-right" onmousedown={stopPropagation((e) => onMouseDown(e, i, 'top-right'))} role="button" tabindex="0" aria-label="Resize top right"></div>
+                            <div class="resize-handle bottom-left" onmousedown={stopPropagation((e) => onMouseDown(e, i, 'bottom-left'))} role="button" tabindex="0" aria-label="Resize bottom left"></div>
+                            <div class="resize-handle bottom-right" onmousedown={stopPropagation((e) => onMouseDown(e, i, 'bottom-right'))} role="button" tabindex="0" aria-label="Resize bottom right"></div>
                         </div>
                     </div>
                 {/each}

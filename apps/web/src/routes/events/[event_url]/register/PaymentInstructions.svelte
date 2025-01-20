@@ -2,13 +2,17 @@
     import { CreditCard, Camera, Smartphone, MapPin, AlertCircle } from 'lucide-svelte';
     import { onMount } from 'svelte';
     
-    export let amount: string;
-    export let referenceCode: string;
+    interface Props {
+        amount: string;
+        referenceCode: string;
+    }
 
-    let visible = false;
-    let gcashVisible = false;
-    let onsiteVisible = false;
-    let importantVisible = false;
+    let { amount, referenceCode }: Props = $props();
+
+    let visible = $state(false);
+    let gcashVisible = $state(false);
+    let onsiteVisible = $state(false);
+    let importantVisible = $state(false);
 
     onMount(() => {
         setTimeout(() => visible = true, 500);

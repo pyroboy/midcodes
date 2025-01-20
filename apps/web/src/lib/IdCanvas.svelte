@@ -1,3 +1,4 @@
+<!-- @migration-task Error while migrating Svelte code: Can't migrate code with afterUpdate. Please migrate by hand. -->
 <script lang="ts">
     import { onMount, createEventDispatcher, afterUpdate, onDestroy } from 'svelte';
     import { browser } from '$app/environment';
@@ -735,7 +736,7 @@
 <canvas 
     bind:this={displayCanvas} 
     class="id-canvas"
-/>
+></canvas>
 
 <style lang="postcss">
     .id-canvas {
@@ -743,7 +744,7 @@
         image-rendering: -webkit-optimize-contrast;
         image-rendering: crisp-edges;
         width: 100%; /* Make it stretch to its container's width */
-  height: auto; /* Maintain aspect ratio */
-  display: block; /* Avoid inline gap */
+        height: auto; /* Maintain aspect ratio */
+        display: block; /* Avoid inline gap */
     }
 </style>

@@ -1,9 +1,13 @@
 <script lang="ts">
   import { page } from '$app/stores';
   import SelectRole from './EmulateRole.svelte';
-  export let currentView: 'dashboard' | 'event-manager' = 'dashboard';
+  interface Props {
+    currentView?: 'dashboard' | 'event-manager'; // Get user role from page data
+  }
 
-  // Get user role from page data
+  let { currentView = $bindable('dashboard') }: Props = $props();
+
+  
 </script>
 
 <nav class="flex flex-col gap-2 p-4 min-w-[200px]">
@@ -15,13 +19,13 @@
 
   
   <button 
-    on:click={() => currentView = 'dashboard'}
+    onclick={() => currentView = 'dashboard'}
     class="p-3 text-left hover:bg-gray-100 rounded-lg transition-colors {currentView === 'dashboard' ? 'bg-gray-100' : ''}"
   >
     Id Card Gen
   </button>
   <button 
-    on:click={() => currentView = 'event-manager'}
+    onclick={() => currentView = 'event-manager'}
     class="p-3 text-left hover:bg-gray-100 rounded-lg transition-colors {currentView === 'event-manager' ? 'bg-gray-100' : ''}"
   >
     Event Manager

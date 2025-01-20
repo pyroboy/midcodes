@@ -8,8 +8,12 @@
     } from 'lucide-svelte';
     import ColorInput from './ColorInput.svelte';
 
-    export let element: TemplateElement;
-    export let fontOptions: string[];
+    interface Props {
+        element: TemplateElement;
+        fontOptions: string[];
+    }
+
+    let { element = $bindable(), fontOptions }: Props = $props();
 
     const dispatch = createEventDispatcher();
 
@@ -46,38 +50,38 @@
 
 <div class="font-settings">
     <div class="settings-row">
-        <select bind:value={element.font} on:change={() => updateElement({ font: element.font })}>
+        <select bind:value={element.font} onchange={() => updateElement({ font: element.font })}>
             {#each fontOptions as font}
                 <option value={font}>{font}</option>
             {/each}
         </select>
-        <input type="number" bind:value={element.size} on:input={() => updateElement({ size: element.size })}>
-        <select bind:value={element.fontWeight} on:change={() => updateElement({ fontWeight: element.fontWeight })}>
+        <input type="number" bind:value={element.size} oninput={() => updateElement({ size: element.size })}>
+        <select bind:value={element.fontWeight} onchange={() => updateElement({ fontWeight: element.fontWeight })}>
             {#each fontWeightOptions as weight}
                 <option value={weight}>{weight}</option>
             {/each}
         </select>
     </div>
     <div class="settings-row">
-        <button class="icon-button" on:click={() => updateElement({ alignment: 'left' })}>
+        <button class="icon-button" onclick={() => updateElement({ alignment: 'left' })}>
             <AlignLeft size={18} color={element.alignment === 'left' ? '#ffffff' : '#888888'} />
         </button>
-        <button class="icon-button" on:click={() => updateElement({ alignment: 'center' })}>
+        <button class="icon-button" onclick={() => updateElement({ alignment: 'center' })}>
             <AlignCenter size={18} color={element.alignment === 'center' ? '#ffffff' : '#888888'} />
         </button>
-        <button class="icon-button" on:click={() => updateElement({ alignment: 'right' })}>
+        <button class="icon-button" onclick={() => updateElement({ alignment: 'right' })}>
             <AlignRight size={18} color={element.alignment === 'right' ? '#ffffff' : '#888888'} />
         </button>
-        <button class="icon-button" on:click={() => updateElement({ alignment: 'justify' })}>
+        <button class="icon-button" onclick={() => updateElement({ alignment: 'justify' })}>
             <AlignJustify size={18} color={element.alignment === 'justify' ? '#ffffff' : '#888888'} />
         </button>
-        <button class="icon-button" on:click={toggleBold}>
+        <button class="icon-button" onclick={toggleBold}>
             <Bold size={18} color={element.fontWeight === 'bold' ? '#ffffff' : '#888888'} />
         </button>
-        <button class="icon-button" on:click={toggleItalic}>
+        <button class="icon-button" onclick={toggleItalic}>
             <Italic size={18} color={element.fontStyle === 'italic' ? '#ffffff' : '#888888'} />
         </button>
-        <button class="icon-button" on:click={toggleUnderline}>
+        <button class="icon-button" onclick={toggleUnderline}>
             <Underline size={18} color={element.textDecoration === 'underline' ? '#ffffff' : '#888888'} />
         </button>
     </div>
@@ -88,7 +92,7 @@
         <button class="icon-button">
             <ArrowUpNarrowWide size={18} color="#888888" />
         </button>
-        <button class="icon-button" on:click={() => updateElement({ textTransform: element.textTransform === 'uppercase' ? 'none' : 'uppercase' })}>
+        <button class="icon-button" onclick={() => updateElement({ textTransform: element.textTransform === 'uppercase' ? 'none' : 'uppercase' })}>
             <Type size={18} color={element.textTransform === 'uppercase' ? '#ffffff' : '#888888'} />
         </button>
         <button class="icon-button">

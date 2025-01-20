@@ -4,7 +4,11 @@
   import type { ExtendedPayment } from "./types";
   import { format } from "date-fns";
   
-  export let transactions: ExtendedPayment[];
+  interface Props {
+    transactions: ExtendedPayment[];
+  }
+
+  let { transactions }: Props = $props();
 
   function formatAmount(amount: number): string {
     return new Intl.NumberFormat('en-PH', {
