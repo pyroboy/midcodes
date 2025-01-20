@@ -3,7 +3,7 @@ import { onMount } from 'svelte';
 import { fly } from 'svelte/transition';
 
 const images = [
-  "https://ucarecdn.com/0ff3b3b7-da02-425c-9941-7d17707cf88f/-/preview/1294x2000/-/quality/lightest/",
+  "https://ucarecdn.com/0ff3b3b7-da02-425c-9941-7d17707cf88f/-/preview/1294x2000/-/quality/smart/",
   "https://ucarecdn.com/a6095a9e-807f-4f89-b9e3-a18de617fa90/-/preview/1294x2000/-/quality/smart/"
 ];
 
