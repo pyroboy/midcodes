@@ -1,6 +1,6 @@
 import { redirect } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { ADMIN_URL } from '$env/static/private';
+import { PRIVATE_ADMIN_URL } from '$env/static/private';
 
 export const GET: RequestHandler = async ({ url, locals: { supabase } }) => {
     const code = url.searchParams.get('code');
@@ -24,13 +24,13 @@ export const GET: RequestHandler = async ({ url, locals: { supabase } }) => {
             profile,
             role: profile?.role,
             isSuperAdmin: profile?.role === 'super_admin',
-            adminUrl: ADMIN_URL
+            adminUrl: PRIVATE_ADMIN_URL
         });
 
         // Redirect based on role
         if (profile?.role === 'super_admin') {
-            console.log('[Auth Callback] Redirecting super_admin to:', ADMIN_URL);
-            throw redirect(303, ADMIN_URL);
+            console.log('[Auth Callback] Redirecting super_admin to:', PRIVATE_ADMIN_URL);
+            throw redirect(303, PRIVATE_ADMIN_URL);
         }
     }
 

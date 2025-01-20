@@ -1,7 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { AuthApiError } from '@supabase/supabase-js';
-import { ADMIN_URL } from '$env/static/private';
+import { PRIVATE_ADMIN_URL } from '$env/static/private';
 
 export const load: PageServerLoad = async ({ locals: { safeGetSession }, url }) => {
     const { session, profile } = await safeGetSession();
@@ -15,7 +15,7 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession }, url }) 
 
         switch (profile.role) {
             case 'super_admin':
-                throw redirect(303, ADMIN_URL);
+                throw redirect(303, PRIVATE_ADMIN_URL);
             default:
                 throw redirect(303, '/');
         }
@@ -97,8 +97,8 @@ export const actions: Actions = {
 
         // Redirect based on role
         if (profile?.role === 'super_admin') {
-            console.log('[Auth] Redirecting super_admin to:', ADMIN_URL);
-            throw redirect(303, ADMIN_URL);
+            console.log('[Auth] Redirecting super_admin to:', PRIVATE_ADMIN_URL);
+            throw redirect(303, PRIVATE_ADMIN_URL);
         }
 
         throw redirect(303, '/');

@@ -3,7 +3,7 @@ import type { SupabaseClient, User, Session } from '@supabase/supabase-js'
 import { sequence } from '@sveltejs/kit/hooks'
 import { redirect, error as throwError } from '@sveltejs/kit'
 import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public'
-import { ADMIN_URL } from '$env/static/private'
+import { PRIVATE_ADMIN_URL } from '$env/static/private'
 import type { Handle } from '@sveltejs/kit'
 import type { RoleEmulationData, RoleEmulationClaim, EmulatedProfile, ProfileData, LocalsSession } from '$lib/types/roleEmulation'
 import { isPublicPath, getRedirectPath, PublicPaths, isValidUserRole, shouldSkipLayout } from '$lib/auth/roleConfig'
@@ -185,7 +185,7 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
     let roleEmulation: RoleEmulationClaim | null = null
 
     if (profile?.role === 'super_admin') {
-      event.locals.special_url = '/' + ADMIN_URL
+      event.locals.special_url = '/' + PRIVATE_ADMIN_URL
     } else {
       event.locals.special_url = '/'
     }
@@ -320,11 +320,11 @@ const authGuard: Handle = async ({ event, resolve }) => {
   const context = sessionInfo.roleEmulation?.metadata?.context || sessionInfo.profile?.context || {}
 
   if (sessionInfo.profile.role === 'super_admin' || originalRole === 'super_admin') {
-    if (event.url.pathname === `/${ADMIN_URL}`) {
+    if (event.url.pathname === `/${PRIVATE_ADMIN_URL}`) {
       return resolve(event)
     }
     if (event.url.pathname === '/') {
-      throw redirect(303, `/${ADMIN_URL}`)
+      throw redirect(303, `/${PRIVATE_ADMIN_URL}`)
     }
   }
 

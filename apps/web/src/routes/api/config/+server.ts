@@ -1,5 +1,5 @@
 import { json, error } from '@sveltejs/kit';
-import { ADMIN_URL } from '$env/static/private';
+import { PRIVATE_ADMIN_URL } from '$env/static/private';
 import type { RequestEvent } from '@sveltejs/kit';
 
 export async function GET({ locals: { safeGetSession } }: RequestEvent) {
@@ -10,6 +10,6 @@ export async function GET({ locals: { safeGetSession } }: RequestEvent) {
     }
 
     return json({
-        adminUrl: ADMIN_URL
+        adminUrl: PRIVATE_ADMIN_URL
     });
 }

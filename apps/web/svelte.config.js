@@ -5,17 +5,18 @@ import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 const config = {
   preprocess: vitePreprocess(),
   kit: {
-		adapter: adapter({
-         runtime: 'nodejs20.x',
-      // Remove the runtime specification
-      // Vercel will automatically choose the appropriate runtime
-
-      // if true, will split your app into multiple functions
-      // instead of creating a single one for the entire app
+    adapter: adapter({
+      runtime: 'nodejs20.x',
       split: false
-    })
+    }),
+    alias: {
+      // $lib is built-in, but included for completeness
+      // '$app/*': './tests/mocks/$app/*',
+      // '$env/*': './tests/mocks/$env/*',
+      '@test-utils/*': './src/lib/test-utils/*',
+      '@test/*': './tests/*'
+    }
   },
-  
   extensions: [".svelte"],
 };
 
