@@ -71,8 +71,6 @@
 		"jszip": "^3.10.1",
 		"jwt-decode": "^4.0.0",
 		"lodash-es": "^4.17.21",
-		"qr-code-styling": "^1.8.4",
-		"svelte-french-toast": "^1.2.0",
 		"svelte-radix": "^1.1.1",
 		"sveltekit-superforms": "^2.19.1",
 		"three": "^0.171.0",
