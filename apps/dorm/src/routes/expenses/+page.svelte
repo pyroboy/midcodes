@@ -81,7 +81,7 @@
 
           <div>
             <Label for="expense_type">Type</Label>
-            <Select.Root
+            <!-- <Select.Root
               selected={{value: $form.expense_type ?? '', label: $form.expense_type ?? 'Select expense type'}}
               onSelectedChange={(s) => {
                 if (s?.value && isValidExpenseType(s.value)) {
@@ -98,13 +98,13 @@
                   <Select.Item value={type}>{type}</Select.Item>
                 {/each}
               </Select.Content>
-            </Select.Root>
+            </Select.Root> -->
             {#if $errors.expense_type}<span class="text-red-500">{$errors.expense_type}</span>{/if}
           </div>
 
           <div>
             <Label for="expense_status">Status</Label>
-            <Select.Root
+            <!-- <Select.Root
               selected={{value: $form.expense_status ?? '', label: $form.expense_status ?? 'Select status'}}
               onSelectedChange={(s) => {
                 if (s?.value && isValidExpenseStatus(s.value)) {
@@ -121,13 +121,13 @@
                   <Select.Item value={status}>{status}</Select.Item>
                 {/each}
               </Select.Content>
-            </Select.Root>
+            </Select.Root> -->
             {#if $errors.expense_status}<span class="text-red-500">{$errors.expense_status}</span>{/if}
           </div>
 
           <div>
             <Label for="property_id">Property</Label>
-            <Select.Root
+            <!-- <Select.Root
               selected={{value: ($form.property_id ?? '').toString(), label: properties.find(p => p.id === $form.property_id)?.name ?? 'Select property'}}
               onSelectedChange={(s) => {
                 if (s) {
@@ -143,7 +143,7 @@
                   <Select.Item value={property.id.toString()}>{property.name}</Select.Item>
                 {/each}
               </Select.Content>
-            </Select.Root>
+            </Select.Root> -->
             {#if $errors.property_id}<span class="text-red-500">{$errors.property_id}</span>{/if}
           </div>
 

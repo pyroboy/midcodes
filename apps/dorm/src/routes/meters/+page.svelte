@@ -11,7 +11,6 @@
     SelectContent,
     SelectItem,
     SelectTrigger,
-    SelectValue,
   } from "$lib/components/ui/select";
   import { utilityTypeEnum, meterStatusEnum, type MeterFormData, meterFormSchema } from './formSchema';
   import { Loader2 } from 'lucide-svelte';
@@ -187,7 +186,7 @@
       <div class="flex justify-between items-center">
         <h1 class="text-2xl font-bold">Meters</h1>
         {#if isAdminLevel || isUtility}
-          <Button on:click={() => {
+          <Button onclick={() => {
             selectedMeter = undefined;
             showForm = true;
           }}>Add Meter</Button>
@@ -201,36 +200,32 @@
             type="text"
             placeholder="Search meters..."
             value={searchQuery}
-            on:input={(e) => searchQuery = e.currentTarget.value}
+            oninput={(e) => searchQuery = e.currentTarget.value}
           />
         </div>
         <div>
           <Label for="type">Type</Label>
-          <Select onSelectedChange={handleTypeSelect}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select type" />
-            </SelectTrigger>
+          <!-- <Select onValueChange={handleTypeSelect}>
+
             <SelectContent>
               <SelectItem value="">All Types</SelectItem>
               {#each Object.values(utilityTypeEnum.Values) as type}
                 <SelectItem value={type}>{type}</SelectItem>
               {/each}
             </SelectContent>
-          </Select>
+          </Select> -->
         </div>
         <div>
           <Label for="status">Status</Label>
-          <Select onSelectedChange={handleStatusSelect}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select status" />
-            </SelectTrigger>
+          <!-- <Select onValueChange={handleStatusSelect}>
+
             <SelectContent>
               <SelectItem value="">All Statuses</SelectItem>
               {#each Object.values(meterStatusEnum.Values) as status}
                 <SelectItem value={status}>{status}</SelectItem>
               {/each}
             </SelectContent>
-          </Select>
+          </Select> -->
         </div>
       </div>
 
@@ -248,7 +243,7 @@
           {#each filteredMeters as meter (meter.id)}
             <Card.Root 
               class="cursor-pointer {(isAdminLevel || isUtility) ? 'hover:bg-gray-50' : ''}"
-              on:click={() => handleMeterClick(meter)}
+              onclick={() => handleMeterClick(meter)}
             >
               <Card.Header>
                 <Card.Title class="flex justify-between items-center">
@@ -295,7 +290,7 @@
     <div class="space-y-4">
       <div class="flex justify-between items-center">
         <h2 class="text-xl font-bold">{selectedMeter ? 'Edit' : 'Add'} Meter</h2>
-        <Button variant="outline" on:click={() => {
+        <Button variant="outline" onclick={() => {
           showForm = false;
           selectedMeter = undefined;
         }}>Cancel</Button>

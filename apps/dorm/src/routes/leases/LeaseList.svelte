@@ -53,7 +53,7 @@
   {#each leases as lease}
     <Card.Root 
       class="cursor-pointer {(data.isAdminLevel || data.isAccountant) ? 'hover:bg-gray-50' : ''}"
-      on:click={() => handleLeaseClick(lease)}
+      onclick={() => handleLeaseClick(lease)}
     >
       <Card.Header>
         <Card.Title class="flex justify-between items-center">

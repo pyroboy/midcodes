@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { run } from 'svelte/legacy';
-
   import FloorForm from './FloorForm.svelte';
   import { Badge } from '$lib/components/ui/badge';
   import { Button } from '$lib/components/ui/button';
@@ -33,22 +31,22 @@
   }
 
   let { data }: Props = $props();
-
+	let floors = $state(data.floors);
   // Make data reactive
-  let floors;
-  run(() => {
-    ({ floors, properties, form, user, isAdminLevel, isStaffLevel } = data);
-  });
+  // let floors;
+  // run(() => {
+  //   ({ floors, properties, form, user, isAdminLevel, isStaffLevel } = data);
+  // });
 
-  // Debug reactive statement
-  run(() => {
-    if (floors) {
-      console.log('Floors data updated:', {
-        count: floors.length,
-        floorIds: floors.map(f => f.id)
-      });
-    }
-  });
+  // // Debug reactive statement
+  // run(() => {
+  //   if (floors) {
+  //     console.log('Floors data updated:', {
+  //       count: floors.length,
+  //       floorIds: floors.map(f => f.id)
+  //     });
+  //   }
+  // });
 
   const { form: formData, enhance, errors, constraints } = superForm(data.form, {
     id: 'floor-form',
@@ -161,7 +159,7 @@
       
       if (result.ok) {
         // Remove deleted floor from the list
-        floors = floors.filter(f => f.id !== floor.id);
+        floors = data.floors.filter(f => f.id !== floor.id);
         // Reset form state
         selectedFloor = undefined;
         editMode = false;
@@ -230,7 +228,7 @@
                 <Button
                   size="sm"
                   variant="outline"
-                  on:click={() => handleFloorClick(floor)}
+                  onclick={() => handleFloorClick(floor)}
                   disabled={!data.isAdminLevel && !data.isStaffLevel}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
@@ -242,7 +240,7 @@
                 <Button
                   size="sm"
                   variant="destructive"
-                  on:click={() => handleDeleteFloor(floor)}
+                  onclick={() => handleDeleteFloor(floor)}
                   disabled={!data.isAdminLevel}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">

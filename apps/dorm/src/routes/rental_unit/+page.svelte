@@ -164,7 +164,7 @@
       <div class="flex justify-between items-center mb-4">
         <h1 class="text-2xl font-bold">Rental_Units</h1>
         {#if data.user?.role === 'staff'}
-          <Button on:click={handleAddRental_Unit}>Add Rental_unit</Button>
+          <Button onclick={handleAddRental_Unit}>Add Rental_unit</Button>
         {/if}
       </div>
 
@@ -215,14 +215,14 @@
                   <Button
                     size="sm"
                     variant="outline"
-                    on:click={() => handleRental_UnitClick(rental_unit)}
+                    onclick={() => handleRental_UnitClick(rental_unit)}
                   >
                     Edit
                   </Button>
                   <Button
                     size="sm"
                     variant="destructive"
-                    on:click={() => handleDeleteRental_Unit(rental_unit)}
+                    onclick={() => handleDeleteRental_Unit(rental_unit)}
                   >
                     Delete
                   </Button>

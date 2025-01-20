@@ -6,10 +6,8 @@ import { redirect, error as throwError } from '@sveltejs/kit'
 import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public'
 import { PRIVATE_ADMIN_URL } from '$env/static/private'
 import type { Handle } from '@sveltejs/kit'
+// import { ProfileData } from '../../web/src/lib/types/roleEmulation';
 import type { 
-  RoleEmulationData, 
-  RoleEmulationClaim, 
-  EmulatedProfile, 
   ProfileData, 
   LocalsSession 
 } from '$lib/types/roleEmulation'
@@ -28,14 +26,12 @@ const SESSION_CACHE_TTL = 60 * 1000 // 1 minute
 // Module-level caches using state
 const sessionCache = $state(new Map<string, { data: GetSessionResult; timestamp: number }>())
 const profileCache = $state(new Map<string, { data: ProfileData | null; timestamp: number }>())
-const roleEmulationCache = $state(new Map<string, { data: RoleEmulationData | null; timestamp: number }>())
 
 type GetSessionResult = {
   session: Session | null
   error: Error | null
   user: User | null
-  profile: ProfileData | EmulatedProfile | null
-  roleEmulation: RoleEmulationClaim | null
+  profile: ProfileData | null
 }
 
 interface AppLocals {
@@ -44,7 +40,7 @@ interface AppLocals {
   safeGetSession: () => Promise<GetSessionResult>
   session?: LocalsSession | null
   user?: User | null
-  profile?: ProfileData | EmulatedProfile | null
+  profile?: ProfileData  | null
   special_url?: string
 }
 
@@ -73,12 +69,7 @@ $effect(() => {
       }
     }
     
-    // Clean role emulation cache
-    for (const [key, value] of roleEmulationCache) {
-      if (now - value.timestamp > CACHE_TTL) {
-        roleEmulationCache.delete(key)
-      }
-    }
+
   }, CACHE_TTL)
 
   return () => clearInterval(cleanup)
@@ -131,25 +122,6 @@ async function getUserProfile(userId: string, supabase: SupabaseClient): Promise
   return profile
 }
 
-async function getActiveRoleEmulation(userId: string, supabase: SupabaseClient): Promise<RoleEmulationData | null> {
-  const now = Date.now()
-  const cachedEmulation = roleEmulationCache.get(userId)
-  
-  if (cachedEmulation && (now - cachedEmulation.timestamp) < CACHE_TTL) {
-    return cachedEmulation.data
-  }
-
-  const { data: emulation } = await supabase
-    .from('role_emulation_sessions')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('status', 'active')
-    .gt('expires_at', new Date().toISOString())
-    .single()
-
-  roleEmulationCache.set(userId, { data: emulation || null, timestamp: now })
-  return emulation
-}
 
 const initializeSupabase: Handle = async ({ event, resolve }) => {
   event.locals.supabase = createServerClient(
@@ -208,7 +180,6 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
         error: userError || new Error('User not authenticated'),
         user: null,
         profile: null,
-        roleEmulation: null
       }
       sessionCache.set(sessionId, { data: result, timestamp: now })
       return result
@@ -222,7 +193,6 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
         error: sessionError || new Error('Invalid session'),
         user: null,
         profile: null,
-        roleEmulation: null
       }
       sessionCache.set(sessionId, { data: result, timestamp: now })
       return result
@@ -250,7 +220,6 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
             error: err instanceof Error ? err : new Error('Session refresh failed'),
             user: null,
             profile: null,
-            roleEmulation: null
           }
           sessionCache.set(sessionId, { data: result, timestamp: now })
           return result
@@ -258,13 +227,10 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
       }
     }
 
-    const [profile, activeEmulation] = await Promise.all([
+    const [profile] = await Promise.all([
       getUserProfile(user.id, event.locals.supabase),
-      getActiveRoleEmulation(user.id, event.locals.supabase)
     ])
 
-    let emulatedProfile: ProfileData | EmulatedProfile | null = profile
-    let roleEmulation: RoleEmulationClaim | null = null
 
     if (profile?.role === 'super_admin') {
       event.locals.special_url = '/' + PRIVATE_ADMIN_URL
@@ -272,41 +238,13 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
       event.locals.special_url = '/'
     }
 
-    if (activeEmulation && profile) {
-      const { data: org } = await event.locals.supabase
-        .from('organizations')
-        .select('name')
-        .eq('id', activeEmulation.emulated_org_id)
-        .single()
-
-      roleEmulation = {
-        active: true,
-        original_role: activeEmulation.original_role,
-        emulated_role: activeEmulation.emulated_role,
-        original_org_id: profile.organization_id || null,
-        emulated_org_id: activeEmulation.emulated_org_id,
-        expires_at: activeEmulation.expires_at,
-        session_id: activeEmulation.id,
-        metadata: activeEmulation.metadata,
-        organizationName: org?.name ?? null
-      }
-
-      emulatedProfile = {
-        ...profile,
-        role: activeEmulation.emulated_role,
-        originalRole: profile.role,
-        isEmulated: true
-      } as EmulatedProfile
-
-      ;(currentSession as LocalsSession).roleEmulation = roleEmulation
-    }
+   
 
     const result: GetSessionResult = {
       session: currentSession,
       error: null,
       user,
-      profile: emulatedProfile,
-      roleEmulation
+      profile
     }
     sessionCache.set(sessionId, { data: result, timestamp: now })
     return result
@@ -315,50 +253,6 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
   return resolve(event)
 }
 
-const roleEmulationGuard: Handle = async ({ event, resolve }) => {
-  const isDev = process.env.NODE_ENV === 'development'
-  const host = isDev ? 'dokmutyatirol.ph' : event.request.headers.get('host')?.trim().toLowerCase()
-  
-  if (isDokmutyaDomain(host) || event.url.pathname.startsWith('/dokmutya')) {
-    return resolve(event)
-  }
-
-  if (event.url.pathname.startsWith('/api')) {
-    return resolve(event)
-  }
-
-  const sessionInfo = await event.locals.safeGetSession()
-
-  if (sessionInfo.roleEmulation?.active) {
-    const now = new Date()
-    const expiresAt = new Date(sessionInfo.roleEmulation.expires_at)
-
-    if (now > expiresAt) {
-      await event.locals.supabase
-        .from('role_emulation_sessions')
-        .update({ status: 'expired' })
-        .eq('id', sessionInfo.roleEmulation.session_id)
-
-      try {
-        event.cookies.delete('role_emulation', { path: '/' })
-      } catch (error) {
-        console.debug('Could not delete role_emulation cookie:', error)
-      }
-
-      if (sessionInfo.session) {
-        delete (sessionInfo.session as LocalsSession).roleEmulation
-      }
-
-      if (sessionInfo.user) {
-        roleEmulationCache.delete(sessionInfo.user.id)
-      }
-
-      throw redirect(303, event.url.pathname)
-    }
-  }
-
-  return resolve(event)
-}
 
 const authGuard: Handle = async ({ event, resolve }) => {
   const isDev = process.env.NODE_ENV === 'development'
@@ -404,10 +298,10 @@ const authGuard: Handle = async ({ event, resolve }) => {
     throw throwError(400, 'Invalid user role')
   }
 
-  const originalRole = (sessionInfo.profile as EmulatedProfile)?.originalRole
-  const context = sessionInfo.roleEmulation?.metadata?.context || sessionInfo.profile?.context || {}
+  // const originalRole = (sessionInfo.profile as ProfileData)?.originalRole
+  const context = sessionInfo.profile?.context 
 
-  if (sessionInfo.profile.role === 'super_admin' || originalRole === 'super_admin') {
+  if (sessionInfo.profile.role === 'super_admin') {
     if (event.url.pathname === `/${PRIVATE_ADMIN_URL}`) {
       return resolve(event)
     }
@@ -419,7 +313,6 @@ const authGuard: Handle = async ({ event, resolve }) => {
   const redirectPath = getRedirectPath(
     sessionInfo.profile.role,
     event.url.pathname,
-    originalRole,
     context
   )
 
@@ -445,4 +338,4 @@ const authGuard: Handle = async ({ event, resolve }) => {
 }
 
 // Export the sequence of hooks
-export const handle = sequence(hostRouter, initializeSupabase, roleEmulationGuard, authGuard)
+export const handle = sequence(hostRouter, initializeSupabase, authGuard)

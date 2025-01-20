@@ -10,7 +10,6 @@
   import { Button } from "$lib/components/ui/button";
   import { Label } from "$lib/components/ui/label";
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
-  import MultiSelect from "$lib/components/ui/multiSelect.svelte";
   import type { PageData } from './$types';
 
   interface Tenant {
@@ -166,11 +165,11 @@
   <div class="space-y-4">
     <div class="form-field">
       <Label for="tenantIds">Tenants</Label>
-      <MultiSelect
+      <!-- <MultiSelect
         options={data.tenants?.map(mapTenantToOption) || []}
         bind:selected={$form.tenantIds}
         placeholder="Select tenants..."
-      />
+      /> -->
       <input type="hidden" name="tenantIds" value={JSON.stringify($form.tenantIds)} />
       {#if $errors.tenantIds}
         <p class="error-message">{$errors.tenantIds}</p>
@@ -304,12 +303,12 @@
         <Button
           type="button"
           variant="destructive"
-          on:click={() => dispatch('delete')}
+          onclick={() => dispatch('delete')}
         >
           Delete
         </Button>
       {/if}
-      <Button type="button" variant="outline" on:click={() => dispatch('cancel')}>
+      <Button type="button" variant="outline" onclick={() => dispatch('cancel')}>
         Cancel
       </Button>
       <Button type="submit" variant="default" disabled={$submitting}>

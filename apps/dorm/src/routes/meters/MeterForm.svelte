@@ -129,7 +129,7 @@
 
     <div>
       <Label for="location_type">Location Type</Label>
-      <Select.Root
+      <!-- <Select.Root
         selected={{
           label: $formData.location_type || 'Select location type',
           value: $formData.location_type || ''
@@ -148,14 +148,14 @@
           <Select.Item value="FLOOR">Floor</Select.Item>
           <Select.Item value="RENTAL_UNIT">Rental_unit</Select.Item>
         </Select.Content>
-      </Select.Root>
+      </Select.Root> -->
       {#if $errors.location_type}<span class="text-red-500">{$errors.location_type}</span>{/if}
     </div>
 
     {#if $formData.location_type === 'PROPERTY'}
       <div>
         <Label for="property_id">Property</Label>
-        <Select.Root
+        <!-- <Select.Root
           selected={{
             label: $formData.property_id ? getLocationLabel('PROPERTY', Number($formData.property_id)) : 'Select property',
             value: $formData.property_id?.toString() || ''
@@ -174,13 +174,13 @@
               <Select.Item value={property.id.toString()}>{property.name}</Select.Item>
             {/each}
           </Select.Content>
-        </Select.Root>
+        </Select.Root> -->
         {#if $errors.property_id}<span class="text-red-500">{$errors.property_id}</span>{/if}
       </div>
     {:else if $formData.location_type === 'FLOOR'}
       <div>
         <Label for="floor_id">Floor</Label>
-        <Select.Root
+        <!-- <Select.Root
           selected={{
             label: $formData.floor_id ? getLocationLabel('FLOOR', Number($formData.floor_id)) : 'Select floor',
             value: $formData.floor_id?.toString() || ''
@@ -201,13 +201,13 @@
               </Select.Item>
             {/each}
           </Select.Content>
-        </Select.Root>
+        </Select.Root> -->
         {#if $errors.floor_id}<span class="text-red-500">{$errors.floor_id}</span>{/if}
       </div>
     {:else if $formData.location_type === 'RENTAL_UNIT'}
       <div>
         <Label for="rental_unit_id">Rental_unit</Label>
-        <Select.Root
+        <!-- <Select.Root
           selected={{
             label: $formData.rental_unit_id ? getLocationLabel('RENTAL_UNIT', Number($formData.rental_unit_id)) : 'Select rental_unit',
             value: $formData.rental_unit_id?.toString() || ''
@@ -231,14 +231,14 @@
               </Select.Item>
             {/each}
           </Select.Content>
-        </Select.Root>
+        </Select.Root> -->
         {#if $errors.rental_unit_id}<span class="text-red-500">{$errors.rental_unit_id}</span>{/if}
       </div>
     {/if}
 
     <div>
       <Label for="type">Utility Type</Label>
-      <Select.Root
+      <!-- <Select.Root
         selected={{
           label: $formData.type || 'Select utility type',
           value: $formData.type || ''
@@ -257,7 +257,7 @@
           <Select.Item value="WATER">Water</Select.Item>
           <Select.Item value="INTERNET">Internet</Select.Item>
         </Select.Content>
-      </Select.Root>
+      </Select.Root> -->
       {#if $errors.type}<span class="text-red-500">{$errors.type}</span>{/if}
     </div>
 
@@ -289,7 +289,7 @@
 
     <div>
       <Label for="status">Status</Label>
-      <Select.Root
+      <!-- <Select.Root
         selected={{
           label: $formData.status || 'Select status',
           value: $formData.status || ''
@@ -308,7 +308,7 @@
           <Select.Item value="INACTIVE">Inactive</Select.Item>
           <Select.Item value="MAINTENANCE">Maintenance</Select.Item>
         </Select.Content>
-      </Select.Root>
+      </Select.Root> -->
       {#if $errors.status}<span class="text-red-500">{$errors.status}</span>{/if}
     </div>
 

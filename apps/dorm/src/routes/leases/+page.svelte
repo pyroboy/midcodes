@@ -137,7 +137,7 @@
       </Dialog.Description>
     </Dialog.Header>
     <div class="flex justify-end space-x-2">
-      <Button variant="outline" on:click={() => showDeleteConfirm = false}>
+      <Button variant="outline" onclick={() => showDeleteConfirm = false}>
         Cancel
       </Button>
       <form method="POST" action="?/delete" use:enhance>

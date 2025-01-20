@@ -9,7 +9,6 @@
     SelectContent,
     SelectItem,
     SelectTrigger,
-    SelectValue,
   } from "$lib/components/ui/select";
   import { Input } from "$lib/components/ui/input";
   import { Label } from "$lib/components/ui/label";
@@ -168,20 +167,13 @@
       <Label for="tenant_status">Tenant Status</Label>
       <div class:error-class={$errors.tenant_status}>
         <Select 
-          on:change={updateTenantStatus} 
+            type="single"
+          name="tenant_status"
           disabled={!canEdit}
           {...$constraints.tenant_status}
         >
           <SelectTrigger>
-            <SelectValue>
-              {#if $form.tenant_status}
-                <Badge variant="outline" class={getStatusColor($form.tenant_status)}>
-                  {$form.tenant_status}
-                </Badge>
-              {:else}
-                Select status
-              {/if}
-            </SelectValue>
+      
           </SelectTrigger>
           <SelectContent>
             {#each tenantStatusOptions as status}
@@ -292,7 +284,7 @@
   </div>
 
   <div class="flex justify-end space-x-2 pt-4">
-    <Button type="button" variant="outline" on:click={() => dispatch('cancel')}>
+    <Button type="button" variant="outline" onclick={() => dispatch('cancel')}>
       Cancel
     </Button>
     <Button type="submit" disabled={!canEdit || $submitting}>
@@ -324,10 +316,10 @@
     </div>
 
     <Dialog.Footer>
-      <Button type="button" variant="outline" on:click={() => showStatusDialog = false}>
+      <Button type="button" variant="outline" onclick={() => showStatusDialog = false}>
         Cancel
       </Button>
-      <Button type="button" on:click={() => {
+      <Button type="button" onclick={() => {
         $form = {
           ...$form,
           status_change_reason: statusChangeReason

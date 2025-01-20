@@ -71,7 +71,7 @@
 
     <div class="space-y-2">
       <Label for="type">Type</Label>
-      <Select.Root
+      <!-- <Select.Root
         name="type"
         items={propertyTypes}
         selected={property?.type}
@@ -84,7 +84,7 @@
             <Select.Item value={type.value}>{type.label}</Select.Item>
           {/each}
         </Select.Content>
-      </Select.Root>
+      </Select.Root> -->
       {#if $errors.type}
         <p class="text-sm text-red-500">{$errors.type[0]}</p>
       {/if}
@@ -92,7 +92,7 @@
 
     <div class="space-y-2">
       <Label for="status">Status</Label>
-      <Select.Root
+      <!-- <Select.Root
         name="status"
         items={statusOptions}
         selected={property?.status ?? 'ACTIVE'}
@@ -105,7 +105,7 @@
             <Select.Item value={status.value}>{status.label}</Select.Item>
           {/each}
         </Select.Content>
-      </Select.Root>
+      </Select.Root> -->
       {#if $errors.status}
         <p class="text-sm text-red-500">{$errors.status[0]}</p>
       {/if}

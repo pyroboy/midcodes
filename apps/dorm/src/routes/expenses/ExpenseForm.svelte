@@ -87,7 +87,7 @@
 
   <div class="space-y-2">
     <Label for="property_id">Property</Label>
-    <Select.Root onSelectedChange={updatePropertyId}>
+    <!-- <Select.Root onSelectedChange={updatePropertyId}>
       <Select.Trigger class="w-full" disabled={!canEdit}>
         <Select.Value placeholder="Select property" />
       </Select.Trigger>
@@ -98,7 +98,7 @@
           </Select.Item>
         {/each}
       </Select.Content>
-    </Select.Root>
+    </Select.Root> -->
     {#if $errors.property_id}
       <span class="text-red-500 text-sm">{$errors.property_id}</span>
     {/if}
@@ -107,7 +107,7 @@
   <div class="grid grid-cols-2 gap-4">
     <div class="space-y-2">
       <Label for="expense_type">Type</Label>
-      <Select.Root onSelectedChange={updateExpenseType}>
+      <!-- <Select.Root onSelectedChange={updateExpenseType}>
         <Select.Trigger class="w-full" disabled={!canEdit}>
           <Select.Value placeholder="Select type" />
         </Select.Trigger>
@@ -118,7 +118,7 @@
           <Select.Item value="SALARY">Salary</Select.Item>
           <Select.Item value="OTHERS">Others</Select.Item>
         </Select.Content>
-      </Select.Root>
+      </Select.Root> -->
       {#if $errors.expense_type}
         <span class="text-red-500 text-sm">{$errors.expense_type}</span>
       {/if}
@@ -127,7 +127,7 @@
     {#if editMode && canApprove}
       <div class="space-y-2">
         <Label for="expense_status">Status</Label>
-        <Select.Root onSelectedChange={updateExpenseStatus}>
+        <!-- <Select.Root onSelectedChange={updateExpenseStatus}>
           <Select.Trigger class="w-full">
             <Select.Value placeholder="Select status" />
           </Select.Trigger>
@@ -136,7 +136,7 @@
             <Select.Item value="APPROVED">Approved</Select.Item>
             <Select.Item value="REJECTED">Rejected</Select.Item>
           </Select.Content>
-        </Select.Root>
+        </Select.Root> -->
         {#if $errors.expense_status}
           <span class="text-red-500 text-sm">{$errors.expense_status}</span>
         {/if}

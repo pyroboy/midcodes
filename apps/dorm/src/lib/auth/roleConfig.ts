@@ -83,7 +83,7 @@ export function hasPathAccess(role: UserRole, path: string, originalRole?: UserR
     })
 }
 
-export function getRedirectPath(role: UserRole, path: string, originalRole?: UserRole, context?: any): string | null {
+export function getRedirectPath(role: UserRole, path: string, context?: any): string | null {
     // If it's a public path, no redirection needed
     if (isPublicPath(path)) return null
 
@@ -91,7 +91,7 @@ export function getRedirectPath(role: UserRole, path: string, originalRole?: Use
     if (!roleConfig) return PublicPaths.auth
     
     // If user has access, no redirection needed
-    if (hasPathAccess(role, path, originalRole)) return null
+    if (hasPathAccess(role, path)) return null
 
     // Check if path matches any known pattern across all roles
     const isKnownPath = Object.values(RoleConfig).some(config => 
@@ -108,7 +108,7 @@ export function getRedirectPath(role: UserRole, path: string, originalRole?: Use
 
     const defaultRedirect = roleConfig.defaultPath(context)
     
-    if (!hasPathAccess(role, defaultRedirect, originalRole)) {
+    if (!hasPathAccess(role, defaultRedirect)) {
         return PublicPaths.auth
     }
     

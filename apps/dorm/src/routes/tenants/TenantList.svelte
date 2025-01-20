@@ -9,7 +9,6 @@
     SelectContent,
     SelectItem,
     SelectTrigger,
-    SelectValue,
   } from "$lib/components/ui/select";
   import type { Database } from '$lib/database.types';
   import { Badge } from '$lib/components/ui/badge';
@@ -132,7 +131,7 @@
         </div>
         
         <div class="w-48">
-          <Select onSelectedChange={updatePropertyFilter}>
+          <!-- <Select onSelectedChange={updatePropertyFilter}>
             <SelectTrigger>
               <SelectValue placeholder="Filter by property" />
             </SelectTrigger>
@@ -142,11 +141,11 @@
                 <SelectItem value={property.id.toString()}>{property.name}</SelectItem>
               {/each}
             </SelectContent>
-          </Select>
+          </Select> -->
         </div>
 
         <div class="w-48">
-          <Select onSelectedChange={updateStatusFilter}>
+          <!-- <Select onSelectedChange={updateStatusFilter}>
             <SelectTrigger>
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
@@ -157,7 +156,7 @@
               <SelectItem value="INACTIVE">Inactive</SelectItem>
               <SelectItem value="BLACKLISTED">Blacklisted</SelectItem>
             </SelectContent>
-          </Select>
+          </Select> -->
         </div>
       </div>
     </div>
@@ -201,11 +200,11 @@
               </Table.Cell>
               <Table.Cell class="text-right">
                 <div class="flex justify-end gap-2">
-                  <Button size="sm" variant="outline" on:click={() => handleEdit(tenant)}>
+                  <Button size="sm" variant="outline" onclick={() => handleEdit(tenant)}>
                     Edit
                   </Button>
                   {#if data.isAdminLevel}
-                    <Button size="sm" variant="destructive" on:click={() => handleDelete(tenant)}>
+                    <Button size="sm" variant="destructive" onclick={() => handleDelete(tenant)}>
                       Delete
                     </Button>
                   {/if}

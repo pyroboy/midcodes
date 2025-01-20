@@ -72,7 +72,7 @@
     <div class="flex justify-between items-center">
       <h1 class="text-2xl font-bold">Payments</h1>
       {#if data.isAdminLevel || data.isAccountant || data.isFrontdesk || data.isResident}
-        <Button on:click={() => {
+        <Button onclick={() => {
           showForm = true;
           selectedPayment = undefined;
         }}>
@@ -84,7 +84,7 @@
     {#if data.payments}
       <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {#each data.payments as payment}
-          <Card.Root class="cursor-pointer" on:click={() => handlePaymentClick(payment)}>
+          <Card.Root class="cursor-pointer" onclick={() => handlePaymentClick(payment)}>
             <Card.Header>
               <Card.Title class="flex justify-between items-center">
                 {payment.billing?.lease?.name ?? 'Unknown'}
@@ -142,7 +142,7 @@
   {:else}
     <div class="flex justify-between items-center">
       <h1 class="text-2xl font-bold">{selectedPayment ? 'Edit' : 'Create'} Payment</h1>
-      <Button variant="outline" on:click={() => {
+      <Button variant="outline" onclick={() => {
         showForm = false;
         selectedPayment = undefined;
       }}>

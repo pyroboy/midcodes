@@ -14,8 +14,6 @@
     name: string;
   }
 
-
-
   interface PageData {
     properties: Property[];
     floors: Array<Floor & { property: Property }>;
@@ -79,14 +77,12 @@
     <Label for="property_id">Property</Label>
     <input type="hidden" name="property_id" bind:value={$form.property_id} />
     <Select.Root    
-      selected={{ 
-        value: $form.property_id?.toString() || '', 
-        label: data.properties.find(p => p.id === $form.property_id)?.name || 'Select a property' 
-      }}
-      onSelectedChange={handlePropertyChange}
+    value={data.properties.map((property) => property.id.toString())}
+type="multiple"
+      onValueChange={handlePropertyChange}
     >
       <Select.Trigger data-error={!!$errors.property_id}>
-        <Select.Value placeholder="Select a property" />
+        <!-- <Select.Value placeholder="Select a property" /> -->
       </Select.Trigger>
       <Select.Content>
         {#each data.properties as property}
@@ -140,17 +136,14 @@
   <div class="space-y-2">
     <Label for="status">Status</Label>
     <Select.Root    
-      selected={{ 
-        value: $form.status || '', 
-        label: $form.status || 'Select a status' 
-      }}
-      onSelectedChange={handleStatusChange}
+    value={data.floors.map((property) => property.id.toString())}
+    type="multiple"
+      onValueChange={handleStatusChange}
     >
       <Select.Trigger 
         data-error={!!$errors.status}
         {...$constraints.status}
       >
-        <Select.Value placeholder="Select a status" />
       </Select.Trigger>
       <Select.Content>
         {#each floorStatusEnum.options as status}
@@ -170,7 +163,7 @@
       {editMode ? 'Update' : 'Add'} Floor
     </Button>
     {#if editMode}
-      <Button type="button" variant="destructive" on:click={() => dispatch('cancel')}>
+      <Button type="button" variant="destructive" onclick={() => dispatch('cancel')}>
         Cancel
       </Button>
     {/if}

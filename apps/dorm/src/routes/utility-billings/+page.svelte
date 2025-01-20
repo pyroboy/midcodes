@@ -10,9 +10,9 @@
     SelectContent,
     SelectItem,
     SelectTrigger,
-    SelectValue,
+    // SelectValue,
   } from "$lib/components/ui/select";
-  import { formatCurrency } from '$lib/utils';
+  // import { formatCurrency } from '$lib/utils';
   import type { PageData } from './$types';
   import { utilityBillingTypeEnum, utilityBillingSchema } from '$lib/schemas/utility-billings';
 
@@ -47,7 +47,7 @@
 
   let selectedStartDate: string | null = $state(null);
   let selectedEndDate: string | null = $state(null);
-  let selectedType: UtilityType | null = $state(null);
+  let selectedType: string | null = $state(null);
   let costPerUnit = $state(0);
   let meterBillings: Array<{
     meter_id: number;
@@ -75,7 +75,7 @@
     calculateBillings();
   }
 
-  function handleTypeChange(event: CustomEvent<UtilityType>) {
+  function handleTypeChange(event: CustomEvent<string>) {
     selectedType = event.detail;
     calculateBillings();
   }
@@ -149,56 +149,19 @@
       <div class="grid grid-cols-2 gap-4">
         <div>
           <Label for="start_date">Start Date</Label>
-          <Select on:change={handleStartDateChange}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select start date">
-                {selectedStartDate ? new Date(selectedStartDate).toLocaleDateString() : ''}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {#each data.availableReadingDates as { reading_date }}
-                <SelectItem value={reading_date}>
-                  {new Date(reading_date).toLocaleDateString()}
-                </SelectItem>
-              {/each}
-            </SelectContent>
-          </Select>
+
           {#if $errors.start_date}<span class="text-destructive text-sm">{$errors.start_date}</span>{/if}
         </div>
 
         <div>
           <Label for="end_date">End Date</Label>
-          <Select on:change={handleEndDateChange}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select end date">
-                {selectedEndDate ? new Date(selectedEndDate).toLocaleDateString() : ''}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {#each availableEndDates as { reading_date }}
-                <SelectItem value={reading_date}>
-                  {new Date(reading_date).toLocaleDateString()}
-                </SelectItem>
-              {/each}
-            </SelectContent>
-          </Select>
+
           {#if $errors.end_date}<span class="text-destructive text-sm">{$errors.end_date}</span>{/if}
         </div>
 
         <div>
           <Label for="type">Utility Type</Label>
-          <Select on:change={handleTypeChange}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select utility type">
-                {selectedType || ''}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {#each Object.entries(utilityBillingTypeEnum.enum) as [key, value]}
-                <SelectItem value={key}>{value}</SelectItem>
-              {/each}
-            </SelectContent>
-          </Select>
+
           {#if $errors.type}<span class="text-destructive text-sm">{$errors.type}</span>{/if}
         </div>
 
@@ -210,7 +173,7 @@
             bind:value={costPerUnit}
             min="0"
             step="0.01"
-            on:input={handleCostPerUnitChange}
+            oninput={handleCostPerUnitChange}
           />
           {#if $errors.cost_per_unit}<span class="text-destructive text-sm">{$errors.cost_per_unit}</span>{/if}
         </div>
@@ -237,9 +200,9 @@
                 <Table.Cell>{billing.start_reading}</Table.Cell>
                 <Table.Cell>{billing.end_reading}</Table.Cell>
                 <Table.Cell>{billing.consumption}</Table.Cell>
-                <Table.Cell>{formatCurrency(billing.total_cost)}</Table.Cell>
+                <!-- <Table.Cell>{formatCurrency(billing.total_cost)}</Table.Cell> -->
                 <Table.Cell>{billing.tenant_count}</Table.Cell>
-                <Table.Cell>{formatCurrency(billing.per_tenant_cost)}</Table.Cell>
+                <!-- <Table.Cell>{formatCurrency(billing.per_tenant_cost)}</Table.Cell> -->
               </Table.Row>
             {/each}
           </Table.Body>

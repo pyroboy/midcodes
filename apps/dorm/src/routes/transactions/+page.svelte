@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { formatCurrency, formatDateTime } from '$lib/utils';
+  // import { formatCurrency, formatDateTime } from '$lib/utils';
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
   import { Button } from '$lib/components/ui/button';
@@ -123,10 +123,10 @@
         <tbody>
           {#each filteredTransactions as transaction}
             <tr class="border-b">
-              <td class="p-2">{formatDateTime(transaction.paid_at)}</td>
+              <!-- <td class="p-2">{formatDateTime(transaction.paid_at)}</td> -->
               <td class="p-2">{transaction.billing?.type ?? 'N/A'}</td>
               <td class="p-2">{transaction.billing?.lease?.tenant?.name ?? 'N/A'}</td>
-              <td class="p-2">{formatCurrency(transaction.amount_paid)}</td>
+              <!-- <td class="p-2">{formatCurrency(transaction.amount_paid)}</td> -->
               <td class="p-2">{transaction.method}</td>
               <td class="p-2">{transaction.reference_number ?? 'N/A'}</td>
               <td class="p-2">{transaction.status}</td>

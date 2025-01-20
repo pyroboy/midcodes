@@ -107,22 +107,6 @@
   }
 
   let availableFloors;
-  run(() => {
-    availableFloors = data.floors;
-  });
-  
-  run(() => {
-    if ($form.property_id) {
-      availableFloors = data.floors.filter(f => f.property_id === Number($form.property_id));
-      if (availableFloors.length === 0) {
-        console.warn('No floors found for property:', $form.property_id);
-      }
-    }
-  });
-  
-  run(() => {
-    console.log('Available floors:', availableFloors);
-  });
 
   function getFloorLabel(floorId: number): string {
     const floor = data.floors.find(f => f.id === floorId);
@@ -168,7 +152,7 @@
 
   <div class="space-y-2">
     <Label for="property_id">Property</Label>
-    <Select.Root    
+    <!-- <Select.Root    
       selected={{ 
         value: $form.property_id?.toString() || '', 
         label: data.properties.find(p => p.id === $form.property_id)?.name || 'Select a property' 
@@ -185,7 +169,7 @@
           </Select.Item>
         {/each}
       </Select.Content>
-    </Select.Root>
+    </Select.Root> -->
     {#if $errors.property_id && $form.property_id !== undefined}
       <p class="text-sm font-medium text-destructive">{$errors.property_id}</p>
     {/if}
@@ -194,7 +178,7 @@
   
   <div class="space-y-2">
     <Label for="floor_id">Floor</Label>
-    <Select.Root
+    <!-- <Select.Root
       selected={{
         value: $form.floor_id?.toString() || '',
         label: getFloorLabel($form.floor_id) || 'Select a floor'
@@ -224,7 +208,7 @@
           </Select.Item>
         {/if}
       </Select.Content>
-    </Select.Root>
+    </Select.Root> -->
     {#if $errors.floor_id && $form.floor_id !== undefined}
       <p class="text-sm font-medium text-destructive">{$errors.floor_id}</p>
     {/if}
@@ -267,7 +251,7 @@
 
   <div class="space-y-2">
     <Label for="type">Type</Label>
-    <Select.Root    
+    <!-- <Select.Root    
       selected={{ 
         value: $form.type || '', 
         label: $form.type || 'Select a type' 
@@ -287,7 +271,7 @@
           </Select.Item>
         {/each}
       </Select.Content>
-    </Select.Root>
+    </Select.Root> -->
     {#if $errors.type && $form.type !== undefined}
       <p class="text-sm font-medium text-destructive">{$errors.type}</p>
     {/if}
@@ -331,7 +315,7 @@
 
   <div class="space-y-2">
     <Label for="rental_unit_status">Status</Label>
-    <Select.Root    
+    <!-- <Select.Root    
       selected={{ 
         value: $form.rental_unit_status || '', 
         label: $form.rental_unit_status || 'Select a status' 
@@ -342,7 +326,6 @@
         data-error={$errors.rental_unit_status && $form.rental_unit_status !== undefined}
         {...$constraints.rental_unit_status}
       >
-        <Select.Value placeholder="Select a status" />
       </Select.Trigger>
       <Select.Content>
         {#each locationStatusEnum.options as status}
@@ -351,7 +334,7 @@
           </Select.Item>
         {/each}
       </Select.Content>
-    </Select.Root>
+    </Select.Root> -->
     {#if $errors.rental_unit_status && $form.rental_unit_status !== undefined}
       <p class="text-sm font-medium text-destructive">{$errors.rental_unit_status}</p>
     {/if}
@@ -364,14 +347,14 @@
         type="text"
         bind:value={amenityInput}
         placeholder="Add amenity"
-        on:keydown={(e) => {
+        onkeydown={(e) => {
           if (e.key === 'Enter') {
             e.preventDefault();
             addAmenity();
           }
         }}
       />
-      <Button type="button" variant="secondary" on:click={addAmenity}>Add</Button>
+      <Button type="button" variant="secondary" onclick={addAmenity}>Add</Button>
     </div>
     {#if $form.amenities?.length}
       <div class="flex flex-wrap gap-2 mt-2">
@@ -399,7 +382,7 @@
       {editMode ? 'Update' : 'Add'} Rental_unit
     </Button>
     {#if editMode}
-      <Button type="button" variant="destructive" on:click={handleCancel}>
+      <Button type="button" variant="destructive" onclick={handleCancel}>
         Cancel
       </Button>
     {/if}

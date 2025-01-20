@@ -92,7 +92,7 @@
   <!-- Billing Selection -->
   <div class="space-y-2">
     <Label for="billing_id">Billing</Label>
-    <Select.Root>
+    <!-- <Select.Root>
       <Select.Trigger 
         id="billing_id" 
         disabled={!canEdit || editMode}
@@ -118,7 +118,7 @@
           {/each}
         </Select.Group>
       </Select.Content>
-    </Select.Root>
+    </Select.Root> -->
     {#if $errors.billing_id}
       <p class="text-sm text-destructive">{$errors.billing_id}</p>
     {/if}
@@ -155,7 +155,7 @@
   <!-- Payment Method -->
   <div class="space-y-2">
     <Label for="method">Payment Method</Label>
-    <Select.Root>
+    <!-- <Select.Root>
       <Select.Trigger 
         id="method"
         disabled={!canEdit}
@@ -181,7 +181,7 @@
           {/each}
         </Select.Group>
       </Select.Content>
-    </Select.Root>
+    </Select.Root> -->
     {#if $errors.method}
       <p class="text-sm text-destructive">{$errors.method}</p>
     {/if}

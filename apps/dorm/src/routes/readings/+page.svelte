@@ -13,7 +13,6 @@
     SelectContent,
     SelectItem,
     SelectTrigger,
-    SelectValue,
   } from "$lib/components/ui/select";
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
@@ -297,7 +296,7 @@
 
         <div class="space-y-2">
           <Label for="meter_type">Meter Type</Label>
-          <Select onSelectedChange={updateMeterType} disabled={!data.canEdit}>
+          <!-- <Select onSelectedChange={updateMeterType} disabled={!data.canEdit}>
             <SelectTrigger>
               <SelectValue placeholder="Select meter type" />
             </SelectTrigger>
@@ -306,7 +305,7 @@
               <SelectItem value="WATER">Water</SelectItem>
               <SelectItem value="INTERNET">Internet</SelectItem>
             </SelectContent>
-          </Select>
+          </Select> -->
           {#if $errors.meter_type}
             <p class="text-sm text-red-500">{$errors.meter_type}</p>
           {/if}
@@ -314,7 +313,7 @@
 
         <div class="space-y-2">
           <Label for="location_type">Location Type</Label>
-          <Select onSelectedChange={updateLocationType} disabled={!data.canEdit}>
+          <!-- <Select onSelectedChange={updateLocationType} disabled={!data.canEdit}>
             <SelectTrigger>
               <SelectValue placeholder="Select location type" />
             </SelectTrigger>
@@ -323,7 +322,7 @@
               <SelectItem value="FLOOR">Floor</SelectItem>
               <SelectItem value="RENTAL_UNIT">Rental_unit</SelectItem>
             </SelectContent>
-          </Select>
+          </Select> -->
           {#if $errors.location_type}
             <p class="text-sm text-red-500">{$errors.location_type}</p>
           {/if}

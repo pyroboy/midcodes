@@ -13,7 +13,7 @@ declare global {
         error: Error | null;
         user: User | null;
         profile: ProfileData | EmulatedProfile | null;
-        roleEmulation: RoleEmulationClaim | null;
+        // roleEmulation: RoleEmulationClaim | null;
       }>;
       session?: Session | null;
       user?: User | null;
@@ -28,7 +28,7 @@ declare global {
       profile?: ProfileData | EmulatedProfile | null;
       navigation?: NavigationState;
       special_url?: string | undefined;
-      emulation?: { active: boolean; emulated_org_id: string | null; } | null;
+      // emulation?: { active: boolean; emulated_org_id: string | null; } | null;
     }
 
     // Error type for consistent error handling
