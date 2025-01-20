@@ -83,7 +83,7 @@
                 <span class="text-green-600">{account.category}</span>
               </div>
               <div>
-                <Button on:click={() => editBilling(account)} class="mr-2">Edit</Button>
+                <Button onclick={() => editBilling(account)} class="mr-2">Edit</Button>
                 <form method="POST" action="?/delete" use:enhance class="inline">
                   <input type="hidden" name="id" value={account.id} />
                   <Button type="submit" variant="destructive">Delete</Button>
@@ -258,7 +258,7 @@
   
           <Button type="submit">{editMode ? 'Update' : 'Add'} Account</Button>
           {#if editMode}
-            <Button type="button" on:click={cancelEdit}>Cancel</Button>
+            <Button type="button" onclick={cancelEdit}>Cancel</Button>
           {/if}
         </form>
       {:else}
@@ -269,7 +269,7 @@
   
   <!-- Sticky Add Button -->
   <div class="fixed bottom-4 right-4">
-    <Button on:click={toggleForm} class="rounded-full w-16 h-16 flex items-center justify-center text-2xl">
+    <Button onclick={toggleForm} class="rounded-full w-16 h-16 flex items-center justify-center text-2xl">
       {showForm ? '×' : '+'}
     </Button>
   </div>
