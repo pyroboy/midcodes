@@ -14,7 +14,8 @@
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
 		"test:integration": "playwright test",
-		"test:unit": "vitest"
+		"test:unit": "vitest",
+		    "clean": "rm -rf .svelte-kit build node_modules/.cache/turbo"
 	},
 	"devDependencies": {
 		"@playwright/test": "^1.49.1",
