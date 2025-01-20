@@ -3,7 +3,6 @@ import type { Actions, PageServerLoad } from './$types';
 import type { RequestEvent } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
-import { checkAccess } from '$lib/utils/roleChecks';
 import { rental_unitSchema } from './formSchema';
 
 interface DatabaseFloor {
@@ -13,17 +12,18 @@ interface DatabaseFloor {
   wing?: string;
 }
 
-export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase } }) => {
-  const {  user, profile } = await safeGetSession();
+export const load: PageServerLoad = async ({ locals}) => {
+  const {  user ,permissions } = await locals.safeGetSession();
 
-  const hasAccess = checkAccess(profile?.role, 'admin');
+  // console.log('[DEBUG] User permissions:', permissions);
+  const hasAccess = permissions.includes('properties.create');
   if (!hasAccess) {
     throw redirect(302, '/unauthorized');
   }
 
   console.log('[DEBUG] Loading initial data for rental_unit page');
   const [rental_unitResponse, propertiesResponse, floorsResponse] = await Promise.all([
-    supabase
+    locals.supabase
       .from('rental_unit')
       .select(`
         *,
@@ -32,12 +32,12 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
       `)
       .order('property_id, floor_id, number'),
     
-    supabase
+    locals.supabase
       .from('properties')
       .select('id, name')
       .order('name'),
 
-    supabase
+    locals.supabase
       .from('floors')
       .select(`
         id,

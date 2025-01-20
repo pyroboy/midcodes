@@ -39,7 +39,7 @@ const ADMIN_ROLES = ['super_admin', 'property_admin', 'property_manager'] as con
 const STAFF_ROLES = ['property_maintenance', 'property_utility', 'property_frontdesk'] as const;
 
 export const load: PageServerLoad = async ({ locals }) => {
-  const session = await locals.getSession();
+  const session = await locals.safeGetSession();
   if (!session) {
     return fail(401, { message: 'Unauthorized' });
   }
@@ -151,7 +151,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 export const actions: Actions = {
   create: async ({ request, locals }) => {
-    const session = await locals.getSession();
+    const session = await locals.safeGetSession();
     if (!session) {
       return fail(401, { message: 'Unauthorized' });
     }

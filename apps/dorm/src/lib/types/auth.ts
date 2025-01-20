@@ -1,40 +1,26 @@
 import type { Session as SupabaseSession } from '@supabase/supabase-js';
-import type { UserRole } from '../auth/roleConfig';
 
-export interface SessionWithAuth extends SupabaseSession {
-  roleEmulation?: RoleEmulationInfo;
-  session: SessionInfo | null;
-  profile: ServerProfile | null;
-  error: Error | null;
+
+// src/lib/types/auth.ts
+export interface UserJWTPayload {
+  user_roles: string[];
+  // add other JWT payload fields as needed
 }
 
-export interface RoleEmulationInfo {
-  active: boolean;
-  original_role: UserRole;
-  emulated_role: UserRole;
-  original_org_id: string | null;
-  emulated_org_id: string | null;
-  expires_at: string;
-  session_id: string;
-  organizationName: string | null;
+
+// Database table interface
+export interface RolePermissionRecord {
+  id: number;
+  role: string;
+  permission: string;
 }
 
-export interface ServerProfile {
-  id: string;
-  email: string;
-  role: UserRole;
-  org_id: string | null;
-  context: Record<string, any>;
-  created_at: string;
-  updated_at: string;
-  isEmulated: boolean;
-  originalRole: UserRole;
-  originalOrgId: string | null;
+// Cache interfaces
+export interface CacheEntry {
+  permissions: string[];
+  timestamp: number;
 }
 
-export interface SessionInfo {
-  roleEmulation?: {
-    active: boolean;
-    emulated_org_id: string | null;
-  } | null;
+export interface PermissionCache {
+  [roleKey: string]: CacheEntry;
 }

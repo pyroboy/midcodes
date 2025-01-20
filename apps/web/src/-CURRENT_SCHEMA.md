@@ -428,13 +428,7 @@
         - event_admin
         - event_qr_checker
         - property_admin
-        - property_manager
-        - property_accountant
-        - property_maintenance
-        - property_utility
-        - property_frontdesk
-        - property_tenant
-        - property_guest
+        - property_user
         - id_gen_admin
         - id_gen_user
 

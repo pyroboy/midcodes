@@ -7,7 +7,7 @@ import { meterFormSchema, meterSchema } from './formSchema';
 import { supabase } from '$lib/supabaseClient';
 
 export const load = async ({ locals }) => {
-  const session = await locals.getSession();
+  const session = await locals.safeGetSession();
   if (!session) {
     return fail(401, { message: 'Unauthorized' });
   }
@@ -105,7 +105,7 @@ export const load = async ({ locals }) => {
 
 export const actions = {
   create: async ({ request, locals }) => {
-    const session = await locals.getSession();
+    const session = await locals.safeGetSession();
     if (!session) {
       return fail(401, { message: 'Unauthorized' });
     }
@@ -215,7 +215,7 @@ export const actions = {
   },
 
   update: async ({ request, locals }) => {
-    const session = await locals.getSession();
+    const session = await locals.safeGetSession();
     if (!session) {
       return fail(401, { message: 'Unauthorized' });
     }
@@ -343,7 +343,7 @@ export const actions = {
   },
 
   delete: async ({ request, locals }) => {
-    const session = await locals.getSession();
+    const session = await locals.safeGetSession();
     if (!session) {
       return fail(401, { message: 'Unauthorized' });
     }

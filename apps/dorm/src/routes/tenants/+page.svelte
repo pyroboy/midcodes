@@ -8,7 +8,7 @@
   import type { ExtendedTenant } from './types';
   import type { SuperValidated } from 'sveltekit-superforms';
   import type { z } from 'zod';
-  import type { Rental_unit } from '../rental_unit/formSchema';
+  // import type { Rental_unit } from '../rental-unit/formSchema';
   import type { Database } from '$lib/database.types';
   import type { PageData } from './$types';
 

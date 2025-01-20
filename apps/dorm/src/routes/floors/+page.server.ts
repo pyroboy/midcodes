@@ -1,9 +1,8 @@
-import { fail, redirect } from '@sveltejs/kit';
+import { fail, error } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { floorSchema, deleteFloorSchema, type Floor, type FloorWithProperty } from './formSchema';
 import type { Actions, PageServerLoad } from './$types';
-import { checkAccess } from '$lib/utils/roleChecks';
 import type { Database } from '$lib/database.types';
 
 type DBFloor = Database['public']['Tables']['floors']['Row'];
@@ -17,33 +16,27 @@ type FloorsResponse = DBFloor & {
   }> | null;
 };
 
-export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase } }) => {
+export const load: PageServerLoad = async ({ locals }) => {
   console.log('🔄 Starting server-side load function');
   
-  const { user, profile } = await safeGetSession();
-  console.log('👤 Session data:', { 
-    userId: user?.id, 
-    role: profile?.role,
-    timestamp: new Date().toISOString()
-  });
+  const { user, decodedToken } = await locals.safeGetSession();
 
-  const hasAccess = checkAccess(profile?.role, 'staff');
-  console.log('🔑 Access check result:', { 
-    hasAccess, 
-    role: profile?.role,
-    requiredLevel: 'staff' 
-  });
-
-  if (!hasAccess) {
-    console.log('⛔ Access denied, redirecting to unauthorized');
-    throw redirect(302, '/unauthorized');
+  if (!user) {
+    throw error(401, 'Unauthorized');
   }
+
+  // console.log('👤 Session data:', { 
+  //   userId: user?.id,
+  //   email: user?.email,
+  //   roles: decodedToken?.user_roles,
+  //   timestamp: new Date().toISOString()
+  // });
 
   console.log('📊 Initiating database queries for floors and properties');
   const startTime = performance.now();
   
   const [floorsResult, propertiesResult] = await Promise.all([
-    supabase
+    locals.supabase
       .from('floors')
       .select(`
         *,
@@ -58,47 +51,31 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
       `)
       .order('property_id, floor_number'),
     
-    supabase
+    locals.supabase
       .from('properties')
       .select('id, name')
       .order('name')
   ]);
 
+  // If access is denied by RLS, handle it
+  if (floorsResult.error) {
+    console.error('Floors query error:', {
+      error: floorsResult.error,
+      message: floorsResult.error.message,
+      details: floorsResult.error.details,
+      hint: floorsResult.error.hint,
+      code: floorsResult.error.code
+    });
+  }
+
   const queryTime = performance.now() - startTime;
   console.log('🏢 Database query results:', {
     floorsCount: floorsResult.data?.length || 0,
     propertiesCount: propertiesResult.data?.length || 0,
-    floorsError: floorsResult.error,
-    propertiesError: propertiesResult.error,
     queryExecutionTime: `${queryTime.toFixed(2)}ms`
   });
 
-  if (floorsResult.error) {
-    console.error('❌ Error fetching floors:', {
-      error: floorsResult.error,
-      statusCode: floorsResult.status,
-      statusText: floorsResult.statusText
-    });
-  }
-
-  if (propertiesResult.error) {
-    console.error('❌ Error fetching properties:', {
-      error: propertiesResult.error,
-      statusCode: propertiesResult.status,
-      statusText: propertiesResult.statusText
-    });
-  }
-
-  // Type assertion with proper type checking and null handling
   const floors = (floorsResult.data as FloorsResponse[] || []).map(floor => {
-    console.log(`🏗️ Processing floor ${floor.id}:`, {
-      propertyId: floor.property_id,
-      floorNumber: floor.floor_number,
-      unitCount: floor.rental_unit?.length || 0,
-      hasProperty: !!floor.property,
-      propertyName: floor.property?.name || 'Unknown'
-    });
-    
     return {
       ...floor,
       property: floor.property ? {
@@ -110,62 +87,26 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
       },
       rental_unit: (floor.rental_unit || []).map(unit => ({
         ...unit,
-        number: unit.number.toString() // Convert number to string
+        number: unit.number.toString()
       }))
     };
   });
 
-  console.log('📈 Processed floors data:', {
-    totalFloors: floors.length,
-    propertiesRepresented: new Set(floors.map(f => f.property.id)).size,
-    floorsWithoutProperty: floors.filter(f => !f.property).length,
-    totalUnits: floors.reduce((sum, floor) => sum + floor.rental_unit.length, 0)
-  });
-
   const properties = propertiesResult.data || [];
-
   const form = await superValidate(zod(floorSchema));
-  const isAdminLevel = checkAccess(profile?.role, 'admin');
-  const isStaffLevel = checkAccess(profile?.role, 'staff') && !isAdminLevel;
-
-  console.log('✅ Final load data preparation:', {
-    formValid: form.valid,
-    isAdminLevel,
-    isStaffLevel,
-    totalProperties: properties.length,
-    loadTime: `${(performance.now() - startTime).toFixed(2)}ms`
-  });
 
   return {
     form,
     floors,
     properties,
-    user: {
-      role: profile?.role || 'user'
-    },
-    isAdminLevel,
-    isStaffLevel
+
   };
 };
 
 export const actions: Actions = {
-  create: async ({ request, locals: { supabase, safeGetSession } }) => {
+  create: async ({ request, locals: { supabase } }) => {
     console.log('➕ Starting floor creation process');
     const startTime = performance.now();
-
-    const { profile } = await safeGetSession();
-    const hasAccess = checkAccess(profile?.role, 'admin');
-    
-    console.log('🔑 Create access check:', {
-      role: profile?.role,
-      hasAccess,
-      requiredLevel: 'admin'
-    });
-
-    if (!hasAccess) {
-      console.log('⛔ Create access denied');
-      return fail(403, { message: 'Insufficient permissions' });
-    }
 
     const form = await superValidate(request, zod(floorSchema));
     console.log('📝 CREATE form validation:', {
@@ -175,16 +116,10 @@ export const actions: Actions = {
     });
 
     if (!form.valid) {
-      console.log('❌ Form validation failed');
       return fail(400, { form });
     }
 
     try {
-      console.log('🏗️ Attempting to create floor:', {
-        propertyId: form.data.property_id,
-        floorNumber: form.data.floor_number
-      });
-
       const { error } = await supabase
         .from('floors')
         .insert({
@@ -194,7 +129,13 @@ export const actions: Actions = {
           status: form.data.status
         } satisfies Database['public']['Tables']['floors']['Insert']);
 
-      if (error) throw error;
+      if (error) {
+        // Handle RLS policy failure
+        if (error.message?.includes('Policy check failed')) {
+          return fail(403, { form, message: 'You do not have permission to create floors' });
+        }
+        throw error;
+      }
 
       console.log('✅ Floor created successfully', {
         executionTime: `${(performance.now() - startTime).toFixed(2)}ms`
@@ -202,32 +143,14 @@ export const actions: Actions = {
       
       return { form };
     } catch (err) {
-      console.error('❌ Error creating floor:', {
-        error: err,
-        formData: form.data,
-        timestamp: new Date().toISOString()
-      });
+      console.error('❌ Error creating floor:', err);
       return fail(500, { form, message: 'Failed to create floor' });
     }
   },
 
-  update: async ({ request, locals: { supabase, safeGetSession } }) => {
+  update: async ({ request, locals: { supabase } }) => {
     console.log('🔄 Starting floor update process');
     const startTime = performance.now();
-
-    const { profile } = await safeGetSession();
-    const hasAccess = checkAccess(profile?.role, 'staff');
-    
-    console.log('🔑 Update access check:', {
-      role: profile?.role,
-      hasAccess,
-      requiredLevel: 'staff'
-    });
-
-    if (!hasAccess) {
-      console.log('⛔ Update access denied');
-      return fail(403, { message: 'Insufficient permissions' });
-    }
 
     const form = await superValidate(request, zod(floorSchema));
     console.log('📝 UPDATE form validation:', {
@@ -237,17 +160,10 @@ export const actions: Actions = {
     });
 
     if (!form.valid) {
-      console.log('❌ Form validation failed');
       return fail(400, { form });
     }
 
     try {
-      console.log('🏗️ Attempting to update floor:', {
-        id: form.data.id,
-        propertyId: form.data.property_id,
-        floorNumber: form.data.floor_number
-      });
-
       const { error } = await supabase
         .from('floors')
         .update({
@@ -259,7 +175,13 @@ export const actions: Actions = {
         } satisfies Database['public']['Tables']['floors']['Update'])
         .eq('id', form.data.id);
 
-      if (error) throw error;
+      if (error) {
+        // Handle RLS policy failure
+        if (error.message?.includes('Policy check failed')) {
+          return fail(403, { form, message: 'You do not have permission to update floors' });
+        }
+        throw error;
+      }
 
       console.log('✅ Floor updated successfully', {
         executionTime: `${(performance.now() - startTime).toFixed(2)}ms`
@@ -267,35 +189,15 @@ export const actions: Actions = {
       
       return { form };
     } catch (err) {
-      console.error('❌ Error updating floor:', {
-        error: err,
-        floorId: form.data.id,
-        formData: form.data,
-        timestamp: new Date().toISOString()
-      });
+      console.error('❌ Error updating floor:', err);
       return fail(500, { form, message: 'Failed to update floor' });
     }
   },
 
-  delete: async ({ request, locals: { supabase, safeGetSession } }) => {
+  delete: async ({ request, locals: { supabase } }) => {
     console.log('🗑️ Starting floor deletion process');
     const startTime = performance.now();
 
-    const { profile } = await safeGetSession();
-    const hasAccess = checkAccess(profile?.role, 'staff');
-    
-    console.log('🔑 Delete access check:', {
-      role: profile?.role,
-      hasAccess,
-      requiredLevel: 'staff'
-    });
-
-    if (!hasAccess) {
-      console.log('⛔ Delete access denied');
-      return fail(403, { message: 'Insufficient permissions' });
-    }
-
-    // Use the simplified delete schema instead of the full floor schema
     const deleteForm = await superValidate(request, zod(deleteFloorSchema));
     console.log('📝 DELETE form validation:', {
       valid: deleteForm.valid,
@@ -304,7 +206,6 @@ export const actions: Actions = {
     });
 
     if (!deleteForm.valid) {
-      console.log('❌ Delete validation failed:', deleteForm.errors);
       return fail(400, { 
         message: 'Invalid delete request',
         errors: deleteForm.errors 
@@ -312,16 +213,18 @@ export const actions: Actions = {
     }
 
     try {
-      console.log('🗑️ Attempting to delete floor:', {
-        id: deleteForm.data.id
-      });
-
       const { error } = await supabase
         .from('floors')
         .delete()
         .eq('id', deleteForm.data.id);
 
-      if (error) throw error;
+      if (error) {
+        // Handle RLS policy failure
+        if (error.message?.includes('Policy check failed')) {
+          return fail(403, { message: 'You do not have permission to delete floors' });
+        }
+        throw error;
+      }
 
       console.log('✅ Floor deleted successfully', {
         executionTime: `${(performance.now() - startTime).toFixed(2)}ms`
@@ -329,11 +232,7 @@ export const actions: Actions = {
       
       return { success: true };
     } catch (err) {
-      console.error('❌ Error deleting floor:', {
-        error: err,
-        floorId: deleteForm.data.id,
-        timestamp: new Date().toISOString()
-      });
+      console.error('❌ Error deleting floor:', err);
       return fail(500, { message: 'Failed to delete floor' });
     }
   }

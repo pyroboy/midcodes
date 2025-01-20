@@ -1,6 +1,4 @@
-import type { UserRole } from '$lib/auth/roleConfig';
 
-export type { UserRole } from '$lib/auth/roleConfig';
 
 export interface Organization {
     id: string;  // UUID
@@ -9,29 +7,8 @@ export interface Organization {
     updated_at: string;
 }
 
-export interface Profile {
-    id: string;  // UUID, matches auth.users.id
-    email: string | null;
-    role: UserRole;
-    org_id: string | null;  // UUID reference to organizations.id
-    created_at: string;
-    updated_at: string;
-    // Emulation-related fields
-    isEmulated?: boolean;
-    originalRole?: UserRole;
-    originalOrgId?: string | null;
-}
 
-export interface RoleEmulationSession {
-    id: string;  // UUID
-    user_id: string;  // UUID
-    original_role: UserRole;
-    emulated_role: UserRole;
-    created_at: string;
-    expires_at: string;
-    status: string;
-    metadata: Record<string, any>;
-}
+
 
 export interface Template {
     id: string;  // UUID
@@ -188,16 +165,7 @@ export interface Database {
                 Insert: Omit<Organization, 'id' | 'created_at' | 'updated_at'>;
                 Update: Partial<Omit<Organization, 'id'>>;
             };
-            profiles: {
-                Row: Profile;
-                Insert: Omit<Profile, 'created_at' | 'updated_at'>;
-                Update: Partial<Omit<Profile, 'id'>>;
-            };
-            role_emulation_sessions: {
-                Row: RoleEmulationSession;
-                Insert: Omit<RoleEmulationSession, 'id' | 'created_at'>;
-                Update: Partial<Omit<RoleEmulationSession, 'id'>>;
-            };
+       
             templates: {
                 Row: Template;
                 Insert: Omit<Template, 'id' | 'created_at' | 'updated_at'>;
@@ -247,18 +215,6 @@ export interface Database {
                 Row: PaymentSummary;
             };
         };
-        Functions: {
-            get_effective_role: {
-                Args: { user_uuid: string };
-                Returns: UserRole;
-            };
-            get_template_by_id: {
-                Args: { p_template_id: string; p_user_id: string };
-                Returns: Template[];
-            };
-        };
-        Enums: {
-            user_role: UserRole;
-        };
+  
     };
 }

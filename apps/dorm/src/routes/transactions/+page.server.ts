@@ -6,7 +6,7 @@ import { transactionFilterSchema } from './schema';
 import { supabase } from '$lib/supabaseClient';
 
 export const load: PageServerLoad = async ({ locals }) => {
-  const session = await locals.getSession();
+  const session = await locals.safeGetSession();
   if (!session) {
     throw error(401, 'Unauthorized');
   }

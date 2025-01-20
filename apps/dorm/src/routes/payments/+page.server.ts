@@ -14,7 +14,7 @@ import {
 } from './utils';
 
 export const load = async ({ locals }) => {
-  const session = await locals.getSession();
+  const session = await locals.safeGetSession();
   if (!session) {
     return fail(401, { message: 'Unauthorized' });
   }
@@ -111,7 +111,7 @@ export const load = async ({ locals }) => {
 
 export const actions = {
   create: async ({ request, locals }) => {
-    const session = await locals.getSession();
+    const session = await locals.safeGetSession();
     if (!session) {
       return fail(401, { 
         form: null,
@@ -307,7 +307,7 @@ export const actions = {
   },
 
   update: async ({ request, locals }) => {
-    const session = await locals.getSession();
+    const session = await locals.safeGetSession();
     if (!session) {
       return fail(401, { 
         form: null,

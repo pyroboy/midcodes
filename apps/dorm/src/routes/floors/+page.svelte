@@ -22,8 +22,6 @@
     properties: Property[];
     form: SuperValidated<z.infer<typeof floorSchema>>;
     user: { role: string } | null;
-    isAdminLevel: boolean;
-    isStaffLevel: boolean;
   }
 
   interface Props {
@@ -229,7 +227,6 @@
                   size="sm"
                   variant="outline"
                   onclick={() => handleFloorClick(floor)}
-                  disabled={!data.isAdminLevel && !data.isStaffLevel}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -241,7 +238,6 @@
                   size="sm"
                   variant="destructive"
                   onclick={() => handleDeleteFloor(floor)}
-                  disabled={!data.isAdminLevel}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
                     <path d="M3 6h18"/>

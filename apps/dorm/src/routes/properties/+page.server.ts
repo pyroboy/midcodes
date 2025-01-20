@@ -6,17 +6,18 @@ import { zod } from 'sveltekit-superforms/adapters';
 import { checkAccess } from '$lib/utils/roleChecks';
 import { propertySchema, type PropertyData, preparePropertyData } from './formSchema';
 
-export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase } }) => {
-  const {  user, profile } = await safeGetSession();
+export const load: PageServerLoad = async ({ locals }) => {
+  const {   permissions } = await locals.safeGetSession();
 
-  const hasAccess = checkAccess(profile?.role, 'admin');
+  // console.log('[DEBUG] User permissions:', permissions);
+  const hasAccess = permissions.includes('properties.create');
   if (!hasAccess) {
     throw redirect(302, '/unauthorized');
   }
 
   console.log('Starting properties load function');
   
-  const { data: properties, error } = await supabase
+  const { data: properties, error } = await locals.supabase
     .from('properties')
     .select('*')
     .order('name');
