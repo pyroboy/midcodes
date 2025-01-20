@@ -1,1 +1,0 @@
-export { default as component } from "../../../../src/routes/events/[event_url]/name-tags/+page.svelte";

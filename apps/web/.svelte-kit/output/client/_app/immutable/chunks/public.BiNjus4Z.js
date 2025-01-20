@@ -1,1 +1,0 @@
-const I="https://wnkqlrfmtiibrqnncgqu.supabase.co",s="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indua3FscmZtdGlpYnJxbm5jZ3F1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjIyMjEzNzMsImV4cCI6MjAzNzc5NzM3M30.lsv6u5gwVMHDIqJ2bjUy0elxoYn-q62j6ZbKQ4a_Ru0";export{I as P,s as a};
