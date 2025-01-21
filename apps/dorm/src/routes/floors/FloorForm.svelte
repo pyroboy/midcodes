@@ -7,22 +7,12 @@
   import { floorStatusEnum } from './formSchema';
   import type { SuperForm } from 'sveltekit-superforms';
   import type { z } from 'zod';
-  import type { floorSchema } from './formSchema';
-  import type { Floor, FloorWithProperty } from './formSchema';
-  interface Property {
-    id: number;
-    name: string;
-  }
-
-  interface PageData {
-    properties: Property[];
-    floors: Array<Floor & { property: Property }>;
-  }
-
-  interface SelectItem {
-    value: string;
-    label: string;
-  }
+  import type { floorSchema , Property,Floor} from './formSchema';
+  import type {PageData} from './$types';
+  // interface PageData {
+  //   properties: Property[];
+  //   floors: Array<Floor & { property: Property }>;
+  // }
 
   interface Props {
     data: PageData;
@@ -44,22 +34,40 @@
 
   const dispatch = createEventDispatcher();
 
-  function handlePropertyChange(selected: unknown) {
-    const s = selected as SelectItem;
-    if (s?.value) {
-      const propertyId = parseInt(s.value, 10);
-      if (!isNaN(propertyId)) {
-        $form.property_id = propertyId;
+  // Initialize with the form value or default to undefined
+  let selectedPropertyId = $state($form.property_id?.toString() || undefined);
+
+  let derivedProperties = $derived(data.properties.map((f) => ({ 
+    value: f.id.toString(), 
+    label: f.name 
+  })));
+
+  // Update the form when selectedPropertyId changes
+  $effect(() => {
+    if (selectedPropertyId) {
+      const parsedId = parseInt(selectedPropertyId);
+      if (!isNaN(parsedId)) {
+        $form.property_id = parsedId;
       }
     }
-  }
+  });
 
-  function handleStatusChange(selected: unknown) {
-    const s = selected as SelectItem;
-    if (s?.value) {
-      $form.status = s.value as typeof floorStatusEnum._type;
+  // Update selectedPropertyId when form.property_id changes
+  $effect(() => {
+    const newValue = $form.property_id?.toString();
+    if (newValue !== selectedPropertyId) {
+      selectedPropertyId = newValue;
     }
-  }
+  });
+
+  // Compute trigger content based on selected property
+  let triggerContent = $derived(
+    !selectedPropertyId ? 
+    "Select a property" : 
+    data.properties.find(p => p.id.toString() === selectedPropertyId)?.name ?? "Select a property"
+  );
+
+  let triggerStatus = $derived($form.status || "Select a Status");
 </script>
 
 <form
@@ -75,19 +83,23 @@
 
   <div class="space-y-2">
     <Label for="property_id">Property</Label>
-    <input type="hidden" name="property_id" bind:value={$form.property_id} />
     <Select.Root    
-    value={data.properties.map((property) => property.id.toString())}
-type="multiple"
-      onValueChange={handlePropertyChange}
+      type="single"
+      name="property_id"
+      value={selectedPropertyId}
+      onValueChange={(value: string) => selectedPropertyId = value}
     >
-      <Select.Trigger data-error={!!$errors.property_id}>
-        <!-- <Select.Value placeholder="Select a property" /> -->
+      <Select.Trigger 
+        class="w-full"
+        data-error={!!$errors.property_id}
+        {...$constraints.property_id}
+      >
+        {triggerContent}
       </Select.Trigger>
       <Select.Content>
-        {#each data.properties as property}
-          <Select.Item value={property.id.toString()}>
-            {property.name}
+        {#each derivedProperties as property}
+          <Select.Item value={property.value}>
+            {property.label}
           </Select.Item>
         {/each}
       </Select.Content>
@@ -136,14 +148,16 @@ type="multiple"
   <div class="space-y-2">
     <Label for="status">Status</Label>
     <Select.Root    
-    value={data.floors.map((property) => property.id.toString())}
-    type="multiple"
-      onValueChange={handleStatusChange}
+      type="single"
+      name="status"
+      bind:value={$form.status}
     >
       <Select.Trigger 
+        class="w-full"
         data-error={!!$errors.status}
         {...$constraints.status}
       >
+        {triggerStatus}
       </Select.Trigger>
       <Select.Content>
         {#each floorStatusEnum.options as status}

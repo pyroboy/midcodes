@@ -5,53 +5,26 @@
   import { superForm } from 'sveltekit-superforms/client';
   import { zodClient } from 'sveltekit-superforms/adapters';
   import { floorSchema } from './formSchema';
-  import type { SuperValidated } from 'sveltekit-superforms';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
-  import type { z } from 'zod';
   import type { Floor, FloorWithProperty } from './formSchema';
   import { invalidate } from '$app/navigation';
   import { onMount } from 'svelte';
+  import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
+  import { browser } from "$app/environment";
+import type {PageData} from './$types';
 
-  interface Property {
-    id: number;
-    name: string;
-  }
 
-  interface PageData {
-    floors: FloorWithProperty[];
-    properties: Property[];
-    form: SuperValidated<z.infer<typeof floorSchema>>;
-    user: { role: string } | null;
-  }
-
-  interface Props {
-    data: PageData;
-  }
-
+  interface Props {data: PageData;}
   let { data }: Props = $props();
-	let floors = $state(data.floors);
-  // Make data reactive
-  // let floors;
-  // run(() => {
-  //   ({ floors, properties, form, user, isAdminLevel, isStaffLevel } = data);
-  // });
+  let floors = $state(data.floors);
+  $effect(() => { floors = data.floors;});
+  let editMode = $state(false);
 
-  // // Debug reactive statement
-  // run(() => {
-  //   if (floors) {
-  //     console.log('Floors data updated:', {
-  //       count: floors.length,
-  //       floorIds: floors.map(f => f.id)
-  //     });
-  //   }
-  // });
-
-  const { form: formData, enhance, errors, constraints } = superForm(data.form, {
+  const { form: formData, enhance, errors, constraints ,reset} = superForm(data.form, {
     id: 'floor-form',
     validators: zodClient(floorSchema),
     validationMethod: 'oninput',
     dataType: 'json',
-    delayMs: 10,
     taintedMessage: null,
     resetForm: true,
     onError: ({ result }) => {
@@ -64,58 +37,27 @@
       }
     },
     onResult: async ({ result }) => {
-      console.log('Form submission result:', result);
-      if (result.type === 'success') {
-        selectedFloor = undefined;
-        editMode = false;
-        await invalidate('app:floors');
-      }
+    if (result.type === 'success') {
+      editMode = false;
+      await invalidate('app:floors');
     }
+  
+  }
   });
 
-  let editMode = $state(false);
-  let selectedFloor: FloorWithProperty | undefined = $state(undefined);
 
   function handleFloorClick(floor: FloorWithProperty) {
-    console.log('Floor selected for editing:', {
-      id: floor.id,
-      property: floor.property.name,
-      floorNumber: floor.floor_number
-    });
-    
-    selectedFloor = floor;
-    editMode = true;
-    
-    $formData = {
-      id: floor.id,
-      property_id: floor.property_id,
-      floor_number: floor.floor_number,
-      wing: floor.wing ?? '',
-      status: floor.status || 'ACTIVE'
-    };
-  }
+  editMode = true;
+  $formData = {
+    id: floor.id,
+    property_id: floor.property_id,
+    floor_number: floor.floor_number,
+    wing: floor.wing ?? '',
+    status: floor.status || 'ACTIVE'
+  };
+}
 
- 
 
-  function handleAddFloor() {
-    console.log('Adding new floor');
-    selectedFloor = undefined;
-    editMode = false;
-    
-    // Reset form to default values
-    $formData = {
-      property_id: 0,
-      floor_number: 0,
-      wing: '',
-      status: 'ACTIVE'
-    };
-  }
-
-  function handleCancel() {
-    console.log('Cancelling floor operation');
-    selectedFloor = undefined;
-    editMode = false;
-  }
 
   function getStatusVariant(status: Floor['status']): "default" | "destructive" | "outline" | "secondary" {
     switch (status) {
@@ -131,61 +73,58 @@
   }
 
   async function handleDeleteFloor(floor: FloorWithProperty) {
-    console.log('Delete requested for floor:', {
-      id: floor.id,
-      property: floor.property.name,
-      floorNumber: floor.floor_number
-    });
+  console.log('Delete requested for floor:', {
+    id: floor.id,
+    property: floor.property.name,
+    floorNumber: floor.floor_number
+  });
 
-    if (!confirm(`Are you sure you want to delete floor ${floor.floor_number}?`)) {
-      console.log('Delete cancelled by user');
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append('id', floor.id.toString());
-    
-    try {
-      console.log('Sending delete request for floor:', floor.id);
-      const result = await fetch('?/delete', {
-        method: 'POST',
-        body: formData
-      });
-      
-      const response = await result.json();
-      console.log('Delete response:', response);
-      
-      if (result.ok) {
-        // Remove deleted floor from the list
-        floors = data.floors.filter(f => f.id !== floor.id);
-        // Reset form state
-        selectedFloor = undefined;
-        editMode = false;
-        
-        // Invalidate and refresh the data
-        await Promise.all([
-          invalidate('app:floors'),
-          invalidate((url) => url.pathname.includes('/floors'))
-        ]);
-        
-        alert('Floor deleted successfully');
-      } else {
-        console.error('Delete failed:', {
-          status: result.status,
-          response,
-          error: response.message
-        });
-        alert(`Failed to delete floor: ${response.message || 'Unknown error'}`);
-      }
-    } catch (error) {
-      console.error('Error deleting floor:', error);
-      alert(`Error deleting floor: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+  if (!confirm(`Are you sure you want to delete floor ${floor.floor_number}?`)) {
+    console.log('Delete cancelled by user');
+    return;
   }
 
-  // Initial data load
+  const formData = new FormData();
+  formData.append('id', String(floor.id));  // Convert to string
+  
+  try {
+    console.log('Sending delete request for floor:', floor.id);
+    const result = await fetch('?/delete', {
+      method: 'POST',
+      body: formData
+    });
+    
+    const response = await result.json();
+    console.log('Delete response:', response);
+    
+    if (result.ok) {
+      // Remove deleted floor from the list
+      floors = floors.filter(f => f.id !== floor.id);
+      // Reset form state
+      editMode = false;
+      
+      // Invalidate and refresh the data
+      await Promise.all([
+        invalidate('app:floors'),
+        invalidate((url) => url.pathname.includes('/floors'))
+      ]);
+      
+      // alert('Floor deleted successfully');
+    } else {
+      console.error('Delete failed:', {
+        status: result.status,
+        response,
+        error: response.message
+      });
+      alert(`Failed to delete floor: ${response.message || 'Unknown error'}`);
+    }
+  } catch (error) {
+    console.error('Error deleting floor:', error);
+    alert(`Error deleting floor: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
   onMount(() => {
-    console.log('Component mounted, invalidating floors data');
     invalidate('app:floors');
   });
 </script>
@@ -272,9 +211,8 @@
           {errors}
           {enhance}
           {constraints}
-          on:cancel={handleCancel}
+          on:cancel={()=>{editMode = false;reset();}}
           on:floorSaved={async () => {
-            selectedFloor = undefined;
             editMode = false;
             await invalidate('app:floors');
           }}
@@ -282,4 +220,10 @@
       </CardContent>
     </Card>
   </div>
+
+
 </div>
+
+{#if browser}
+<SuperDebug data={$formData} />
+{/if}

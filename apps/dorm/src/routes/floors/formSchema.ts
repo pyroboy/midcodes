@@ -45,10 +45,12 @@ export interface Rental_unit {
   number: string;
 }
 
+
+export interface Property {
+  id: number;
+  name: string;
+}
 export interface FloorWithProperty extends Floor {
-  property: {
-    id: number;
-    name: string;
-  };
+  property: Property;
   rental_unit: Rental_unit[];
 }

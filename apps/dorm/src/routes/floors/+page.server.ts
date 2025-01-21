@@ -25,13 +25,6 @@ export const load: PageServerLoad = async ({ locals }) => {
     throw error(401, 'Unauthorized');
   }
 
-  // console.log('👤 Session data:', { 
-  //   userId: user?.id,
-  //   email: user?.email,
-  //   roles: decodedToken?.user_roles,
-  //   timestamp: new Date().toISOString()
-  // });
-
   console.log('📊 Initiating database queries for floors and properties');
   const startTime = performance.now();
   
@@ -91,6 +84,9 @@ export const load: PageServerLoad = async ({ locals }) => {
       }))
     };
   });
+
+
+
 
   const properties = propertiesResult.data || [];
   const form = await superValidate(zod(floorSchema));
