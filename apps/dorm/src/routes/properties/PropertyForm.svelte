@@ -7,107 +7,182 @@
   import { createEventDispatcher } from 'svelte';
   import type { PageData } from './$types';
   import { PropertyStatus, PropertyType } from './formSchema';
+  import type { propertySchema } from './formSchema';
+  import type { SuperForm } from 'sveltekit-superforms';
+  import type { z } from 'zod';
 
   interface Props {
     data: PageData;
     editMode?: boolean;
-    property?: any | undefined;
+    form: SuperForm<z.infer<typeof propertySchema>>['form'];
+    errors: SuperForm<z.infer<typeof propertySchema>>['errors'];
+    enhance: SuperForm<z.infer<typeof propertySchema>>['enhance'];
+    constraints: SuperForm<z.infer<typeof propertySchema>>['constraints'];
   }
 
-  let { data, editMode = false, property = $bindable(undefined) }: Props = $props();
+  let {
+    data,
+    editMode = false,
+    form,
+    errors,
+    enhance,
+    constraints
+  }: Props = $props();
 
   const dispatch = createEventDispatcher();
 
-  const { form, errors, enhance } = superForm(data.form, {
-    onResult: ({ result }) => {
-      if (result.type === 'success') {
-        dispatch('propertyAdded');
-      }
+  // Initialize state for select fields with proper typing
+  let selectedType = $state<string>($form.type || '');
+  let selectedStatus = $state<string>($form.status || 'ACTIVE');
+
+  // Create derived properties for select options
+  const propertyTypes = Object.entries(PropertyType).map(([key]) => ({
+    value: PropertyType[key as keyof typeof PropertyType],
+    label: key.replace('_', ' ')
+  }));
+
+  const statusOptions = Object.entries(PropertyStatus).map(([key]) => ({
+    value: PropertyStatus[key as keyof typeof PropertyStatus],
+    label: key
+  }));
+
+  // Compute trigger content for select fields
+
+
+  let triggerStatus = $derived($form.status || "Select a Status");
+let triggerType = $derived($form.type || "Select a Type");
+
+  // Effects to sync form state with select values
+  $effect(() => {
+  if (selectedType) {
+    $form.type = selectedType as keyof typeof PropertyType;
+  }
+});
+
+$effect(() => {
+  if (selectedStatus) {
+    $form.status = selectedStatus as keyof typeof PropertyStatus;
+  }
+});
+
+
+  // Effects to sync select values with form state
+  $effect(() => {
+    const newType = $form.type;
+    if (newType !== selectedType) {
+      selectedType = newType;
     }
   });
 
-  let action = $derived(editMode ? '?/update' : '?/create');
+  $effect(() => {
+    const newStatus = $form.status;
+    if (newStatus !== selectedStatus) {
+      selectedStatus = newStatus;
+    }
+  });
 
-  const propertyTypes = Object.entries(PropertyType).map(([value]) => ({
-    value,
-    label: value.replace('_', ' ')
-  }));
-
-  const statusOptions = Object.entries(PropertyStatus).map(([value]) => ({
-    value,
-    label: value
-  }));
+  function handleCancel() {
+    dispatch('cancel');
+  }
 </script>
 
-<form method="POST" {action} use:enhance>
-  {#if editMode && property}
-    <input type="hidden" name="id" bind:value={property.id} />
+<form
+  method="POST"
+  action={editMode ? "?/update" : "?/create"}
+  use:enhance
+  class="space-y-4"
+  novalidate
+>
+  {#if editMode && $form.id}
+    <input type="hidden" name="id" bind:value={$form.id} />
   {/if}
 
   <div class="space-y-4">
     <div class="space-y-2">
       <Label for="name">Name</Label>
       <Input
+        type="text"
         id="name"
         name="name"
-        value={property?.name ?? ''}
+        bind:value={$form.name}
+        class="w-full"
+        data-error={!!$errors.name}
+        aria-invalid={!!$errors.name}
+        {...$constraints.name}
       />
       {#if $errors.name}
-        <p class="text-sm text-red-500">{$errors.name[0]}</p>
+        <p class="text-sm font-medium text-destructive">{$errors.name}</p>
       {/if}
     </div>
 
     <div class="space-y-2">
       <Label for="address">Address</Label>
       <Input
+        type="text"
         id="address"
         name="address"
-        value={property?.address ?? ''}
+        bind:value={$form.address}
+        class="w-full"
+        data-error={!!$errors.address}
+        aria-invalid={!!$errors.address}
+        {...$constraints.address}
       />
       {#if $errors.address}
-        <p class="text-sm text-red-500">{$errors.address[0]}</p>
+        <p class="text-sm font-medium text-destructive">{$errors.address}</p>
       {/if}
     </div>
 
     <div class="space-y-2">
       <Label for="type">Type</Label>
-      <!-- <Select.Root
+      <Select.Root    
+        type="single"
         name="type"
-        items={propertyTypes}
-        selected={property?.type}
+        bind:value={selectedType}
       >
-        <Select.Trigger class="w-full">
-          <Select.Value placeholder="Select property type" />
+        <Select.Trigger 
+          class="w-full"
+          data-error={!!$errors.type}
+          {...$constraints.type}
+        >
+          {triggerType}
         </Select.Trigger>
         <Select.Content>
           {#each propertyTypes as type}
-            <Select.Item value={type.value}>{type.label}</Select.Item>
+            <Select.Item value={type.value}>
+              {type.label}
+            </Select.Item>
           {/each}
         </Select.Content>
-      </Select.Root> -->
+      </Select.Root>
       {#if $errors.type}
-        <p class="text-sm text-red-500">{$errors.type[0]}</p>
+        <p class="text-sm font-medium text-destructive">{$errors.type}</p>
       {/if}
     </div>
 
     <div class="space-y-2">
       <Label for="status">Status</Label>
-      <!-- <Select.Root
+      <Select.Root    
+        type="single"
         name="status"
-        items={statusOptions}
-        selected={property?.status ?? 'ACTIVE'}
+        bind:value={selectedStatus}
       >
-        <Select.Trigger class="w-full">
-          <Select.Value placeholder="Select status" />
+        <Select.Trigger 
+          class="w-full"
+          data-error={!!$errors.status}
+          {...$constraints.status}
+        >
+          {triggerStatus}
         </Select.Trigger>
         <Select.Content>
           {#each statusOptions as status}
-            <Select.Item value={status.value}>{status.label}</Select.Item>
+            <Select.Item value={status.value}>
+              {status.label}
+            </Select.Item>
           {/each}
         </Select.Content>
-      </Select.Root> -->
+      </Select.Root>
       {#if $errors.status}
-        <p class="text-sm text-red-500">{$errors.status[0]}</p>
+        <p class="text-sm font-medium text-destructive">{$errors.status}</p>
       {/if}
     </div>
 
@@ -115,6 +190,23 @@
       <Button type="submit">
         {editMode ? 'Update' : 'Create'} Property
       </Button>
+      {#if editMode}
+        <Button 
+          type="button" 
+          variant="destructive" 
+          onclick={handleCancel}
+        >
+          Cancel
+        </Button>
+      {/if}
     </div>
   </div>
 </form>
+
+<style>
+  :global([data-error="true"]) {
+    border-color: hsl(var(--destructive)) !important;
+    --tw-ring-color: hsl(var(--destructive)) !important;
+    outline: none !important;
+  }
+</style>

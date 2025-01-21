@@ -1,76 +1,61 @@
-import { fail, redirect } from '@sveltejs/kit';
+import { fail, error } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import type { RequestEvent } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
-import { checkAccess } from '$lib/utils/roleChecks';
 import { propertySchema, type PropertyData, preparePropertyData } from './formSchema';
 
 export const load: PageServerLoad = async ({ locals }) => {
-  const {   permissions } = await locals.safeGetSession();
-
-  // console.log('[DEBUG] User permissions:', permissions);
-  const hasAccess = permissions.includes('properties.create');
+  const { permissions } = await locals.safeGetSession();
+  const hasAccess: boolean = permissions.includes('properties.create');
   if (!hasAccess) {
-    throw redirect(302, '/unauthorized');
+    throw error(401, 'Unauthorized');
   }
-
-  console.log('Starting properties load function');
-  
-  const { data: properties, error } = await locals.supabase
+  const protertiesResult = await locals.supabase
     .from('properties')
     .select('*')
     .order('name');
   
-  console.log('Raw properties data:', properties);
-  console.log('Query error if any:', error);
-
-  if (error) {
-    console.error('Error loading properties:', error);
+  if (protertiesResult.error) {
+    console.error('Error loading properties:', protertiesResult.error);
     return {
       form: await superValidate(zod(propertySchema)),
       properties: []
     };
   }
-
   const form = await superValidate(zod(propertySchema));
-
   return {
     form,
-    properties: properties ?? []
+    properties: protertiesResult.data ?? []
   };
 };
-
 export const actions = {
-  create: async ({ request, locals: { supabase } }: RequestEvent) => {
+  
+  create: async ({ request, locals: { supabase } }) => {
     const form = await superValidate(request, zod(propertySchema));
 
-    if (!form.valid) {
-      return fail(400, { form });
-    }
+    if (!form.valid) {return fail(400, { form });}
 
-    const propertyData = preparePropertyData(form.data);
-
+    // remove id, created_at, updated_at
+    const { id, created_at, updated_at, ...propertyData } = form.data;
     const { error } = await supabase
       .from('properties')
       .insert(propertyData);
 
     if (error) {
-      console.error('Error creating property:', error);
-      return fail(500, { 
-        form, 
-        error: 'Failed to create property' 
-      });
+      if (error.message?.includes('Policy check failed')) {
+        return fail(403, { form, message: 'You do not have permission to create properties' });
+      }
+      return fail(500, {  form,  message: 'Failed to create property'  });
     }
 
     return { form };
   },
   update: async ({ request, locals: { supabase } }: RequestEvent) => {
+
     const form = await superValidate(request, zod(propertySchema));
 
-    if (!form.valid) {
-      return fail(400, { form });
-    }
+    if (!form.valid) {return fail(400, { form }); }
 
     const propertyData = preparePropertyData(form.data);
 
@@ -91,6 +76,8 @@ export const actions = {
   },
 
   delete: async ({ request, locals: { supabase } }: RequestEvent) => {
+
+    
     const form = await superValidate(request, zod(propertySchema));
 
     if (!form.valid) {

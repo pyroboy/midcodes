@@ -5,29 +5,56 @@
   import PropertyForm from './PropertyForm.svelte';
   import * as Card from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
-  // import { formatDateTime } from '$lib/utils';
+  import { zodClient } from 'sveltekit-superforms/adapters';
+  import { propertySchema } from './formSchema';
   import { invalidate } from '$app/navigation';
+	import type { Property } from './formSchema';
+  import { browser } from "$app/environment";
+  import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
 
-  interface Props {
-    data: PageData;
-  }
 
+  interface Props { data: PageData; }
   let { data }: Props = $props();
-
-  // Make data reactive
   let { properties, form } = $derived(data);
-
   let editMode = $state(false);
   let selectedProperty: any | undefined = $state();
 
-  function handlePropertyClick(property: any) {
-    console.log('Property selected for editing:', {
-      id: property.id,
-      name: property.name
-    });
-    
-    selectedProperty = property;
+
+  const { form: formData, enhance, errors, constraints ,reset} = superForm(data.form, {
+    id: 'property-form',
+    validators: zodClient(propertySchema),
+    validationMethod: 'oninput',
+    dataType: 'json',
+    taintedMessage: null,
+    resetForm: true,
+    onError: ({ result }) => {
+      console.error('Form submission error:', {
+        error: result.error,
+        status: result.status
+      });
+      if (result.error) {
+        console.error('Server error:', result.error.message);
+      }
+    },
+    onResult: async ({ result }) => {
+    if (result.type === 'success') {
+      editMode = false;
+      await invalidate('app:floors');
+    }
+  }
+  });
+
+
+
+  function handlePropertyClick(property: Property) {
     editMode = true;
+$formData = {
+  id: property.id,
+  name: property.name,
+  address: property.address,
+  type: property.type,
+  status: property.status
+}
   }
 
 
@@ -63,14 +90,17 @@
       const response = await result.json();
       
       if (result.ok) {
-        selectedProperty = undefined;
         editMode = false;
         await invalidate('app:properties');
         alert('Property deleted successfully');
       } else {
-        console.error('Delete failed:', response);
-        alert(`Failed to delete property: ${response.error || 'Unknown error'}`);
-      }
+      console.error('Delete failed:', {
+        status: result.status,
+        response,
+        error: response.message
+      });
+      alert(`Failed to delete floor: ${response.message || 'Unknown error'}`);
+    }
     } catch (error) {
       console.error('Error deleting property:', error);
       alert(`Error deleting property: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -151,11 +181,14 @@
       </Card.Header>
       <Card.Content>
         <PropertyForm
-          {data}
-          {editMode}
-          property={selectedProperty}
+        {data}
+        {editMode}
+        form={formData}
+        {errors}
+        {enhance}
+        {constraints}
+        on:cancel={()=>{editMode = false;reset();}}
           on:propertyAdded={async () => {
-            selectedProperty = undefined;
             editMode = false;
             await invalidate('app:properties');
           }}
@@ -164,3 +197,6 @@
     </Card.Root>
   </div>
 </div>
+{#if browser}
+<SuperDebug data={$formData} />
+{/if}

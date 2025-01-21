@@ -1,7 +1,7 @@
 import { fail, error } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
-import { floorSchema, deleteFloorSchema, type Floor, type FloorWithProperty } from './formSchema';
+import { floorSchema, deleteFloorSchema } from './formSchema';
 import type { Actions, PageServerLoad } from './$types';
 import type { Database } from '$lib/database.types';
 
@@ -102,64 +102,32 @@ export const load: PageServerLoad = async ({ locals }) => {
 export const actions: Actions = {
   create: async ({ request, locals: { supabase } }) => {
     console.log('➕ Starting floor creation process');
-    const startTime = performance.now();
-
     const form = await superValidate(request, zod(floorSchema));
-    console.log('📝 CREATE form validation:', {
-      valid: form.valid,
-      data: form.data,
-      errors: form.errors
-    });
+    if (!form.valid) {return fail(400, { form });}
+    const { error } = await supabase
+      .from('floors')
+      .insert({
+        property_id: form.data.property_id,
+        floor_number: form.data.floor_number,
+        wing: form.data.wing || null,
+        status: form.data.status
+      } satisfies Database['public']['Tables']['floors']['Insert']);
 
-    if (!form.valid) {
-      return fail(400, { form });
-    }
-
-    try {
-      const { error } = await supabase
-        .from('floors')
-        .insert({
-          property_id: form.data.property_id,
-          floor_number: form.data.floor_number,
-          wing: form.data.wing || null,
-          status: form.data.status
-        } satisfies Database['public']['Tables']['floors']['Insert']);
-
-      if (error) {
-        // Handle RLS policy failure
-        if (error.message?.includes('Policy check failed')) {
-          return fail(403, { form, message: 'You do not have permission to create floors' });
-        }
-        throw error;
+    if (error) {
+      if (error.message?.includes('Policy check failed')) {
+        return fail(403, { form, message: 'You do not have permission to create floors' });
       }
-
-      console.log('✅ Floor created successfully', {
-        executionTime: `${(performance.now() - startTime).toFixed(2)}ms`
-      });
-      
-      return { form };
-    } catch (err) {
-      console.error('❌ Error creating floor:', err);
       return fail(500, { form, message: 'Failed to create floor' });
     }
+    return { form };
   },
 
   update: async ({ request, locals: { supabase } }) => {
-    console.log('🔄 Starting floor update process');
-    const startTime = performance.now();
 
     const form = await superValidate(request, zod(floorSchema));
-    console.log('📝 UPDATE form validation:', {
-      valid: form.valid,
-      data: form.data,
-      errors: form.errors
-    });
 
-    if (!form.valid) {
-      return fail(400, { form });
-    }
+    if (!form.valid) {return fail(400, { form });}
 
-    try {
       const { error } = await supabase
         .from('floors')
         .update({
@@ -172,34 +140,20 @@ export const actions: Actions = {
         .eq('id', form.data.id);
 
       if (error) {
-        // Handle RLS policy failure
         if (error.message?.includes('Policy check failed')) {
           return fail(403, { form, message: 'You do not have permission to update floors' });
         }
-        throw error;
+          return fail(500, { form, message: 'Failed to update floor' });
       }
 
-      console.log('✅ Floor updated successfully', {
-        executionTime: `${(performance.now() - startTime).toFixed(2)}ms`
-      });
-      
       return { form };
-    } catch (err) {
-      console.error('❌ Error updating floor:', err);
-      return fail(500, { form, message: 'Failed to update floor' });
-    }
+ 
   },
 
   delete: async ({ request, locals: { supabase } }) => {
-    console.log('🗑️ Starting floor deletion process');
-    const startTime = performance.now();
 
     const deleteForm = await superValidate(request, zod(deleteFloorSchema));
-    console.log('📝 DELETE form validation:', {
-      valid: deleteForm.valid,
-      data: deleteForm.data,
-      errors: deleteForm.errors
-    });
+
 
     if (!deleteForm.valid) {
       return fail(400, { 
@@ -208,7 +162,6 @@ export const actions: Actions = {
       });
     }
 
-    try {
       const { error } = await supabase
         .from('floors')
         .delete()
@@ -219,17 +172,12 @@ export const actions: Actions = {
         if (error.message?.includes('Policy check failed')) {
           return fail(403, { message: 'You do not have permission to delete floors' });
         }
-        throw error;
+        return fail(500, { message: 'Failed to delete floor' });
+
       }
 
-      console.log('✅ Floor deleted successfully', {
-        executionTime: `${(performance.now() - startTime).toFixed(2)}ms`
-      });
-      
+
       return { success: true };
-    } catch (err) {
-      console.error('❌ Error deleting floor:', err);
-      return fail(500, { message: 'Failed to delete floor' });
-    }
+
   }
 };

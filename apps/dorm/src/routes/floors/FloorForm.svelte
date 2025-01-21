@@ -7,7 +7,7 @@
   import { floorStatusEnum } from './formSchema';
   import type { SuperForm } from 'sveltekit-superforms';
   import type { z } from 'zod';
-  import type { floorSchema , Property,Floor} from './formSchema';
+  import type { floorSchema } from './formSchema';
   import type {PageData} from './$types';
   // interface PageData {
   //   properties: Property[];
@@ -36,12 +36,10 @@
 
   // Initialize with the form value or default to undefined
   let selectedPropertyId = $state($form.property_id?.toString() || undefined);
-
   let derivedProperties = $derived(data.properties.map((f) => ({ 
     value: f.id.toString(), 
     label: f.name 
   })));
-
   // Update the form when selectedPropertyId changes
   $effect(() => {
     if (selectedPropertyId) {
@@ -51,7 +49,6 @@
       }
     }
   });
-
   // Update selectedPropertyId when form.property_id changes
   $effect(() => {
     const newValue = $form.property_id?.toString();
@@ -59,7 +56,6 @@
       selectedPropertyId = newValue;
     }
   });
-
   // Compute trigger content based on selected property
   let triggerContent = $derived(
     !selectedPropertyId ? 

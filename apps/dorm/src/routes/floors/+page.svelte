@@ -9,9 +9,9 @@
   import type { Floor, FloorWithProperty } from './formSchema';
   import { invalidate } from '$app/navigation';
   import { onMount } from 'svelte';
-  import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
   import { browser } from "$app/environment";
-import type {PageData} from './$types';
+  import type {PageData} from './$types';
+  import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
 
 
   interface Props {data: PageData;}
@@ -41,7 +41,6 @@ import type {PageData} from './$types';
       editMode = false;
       await invalidate('app:floors');
     }
-  
   }
   });
 
@@ -73,14 +72,8 @@ import type {PageData} from './$types';
   }
 
   async function handleDeleteFloor(floor: FloorWithProperty) {
-  console.log('Delete requested for floor:', {
-    id: floor.id,
-    property: floor.property.name,
-    floorNumber: floor.floor_number
-  });
 
   if (!confirm(`Are you sure you want to delete floor ${floor.floor_number}?`)) {
-    console.log('Delete cancelled by user');
     return;
   }
 
@@ -88,14 +81,12 @@ import type {PageData} from './$types';
   formData.append('id', String(floor.id));  // Convert to string
   
   try {
-    console.log('Sending delete request for floor:', floor.id);
     const result = await fetch('?/delete', {
       method: 'POST',
       body: formData
     });
     
     const response = await result.json();
-    console.log('Delete response:', response);
     
     if (result.ok) {
       // Remove deleted floor from the list
