@@ -74,38 +74,43 @@ $formData = {
 
   async function handleDeleteProperty(property: any) {
     if (!confirm(`Are you sure you want to delete property ${property.name}? This action cannot be undone.`)) {
-      return;
+        return;
     }
-
     
     const formData = new FormData();
     formData.append('id', property.id.toString());
     
     try {
-      const result = await fetch('?/delete', {
-        method: 'POST',
-        body: formData
-      });
-      
-      const response = await result.json();
-      
-      if (result.ok) {
+        const result = await fetch('?/delete', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const response = await result.json();
+        
+        if (response.error) {
+            // Handle the error from fail() responses
+            console.error('Delete failed:', {
+                status: result.status,
+                error: response.error
+            });
+            alert(`Failed to delete property: ${response.error}`);
+            return;
+        }
+        
+        if (!response.success) {
+            alert('Failed to delete property: Unknown error');
+            return;
+        }
+
         editMode = false;
         await invalidate('app:properties');
         alert('Property deleted successfully');
-      } else {
-      console.error('Delete failed:', {
-        status: result.status,
-        response,
-        error: response.message
-      });
-      alert(`Failed to delete floor: ${response.message || 'Unknown error'}`);
-    }
     } catch (error) {
-      console.error('Error deleting property:', error);
-      alert(`Error deleting property: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        console.error('Error deleting property:', error);
+        alert(`Error deleting property: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-  }
+}
 </script>
 
 <div class="container mx-auto p-4 flex flex-col lg:flex-row gap-4">

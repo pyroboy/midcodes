@@ -168,6 +168,7 @@ export const actions: Actions = {
         .eq('id', deleteForm.data.id);
 
       if (error) {
+        console.error('❌ Error deleting floor:', error);
         // Handle RLS policy failure
         if (error.message?.includes('Policy check failed')) {
           return fail(403, { message: 'You do not have permission to delete floors' });

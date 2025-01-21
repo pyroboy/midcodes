@@ -76,41 +76,45 @@ export const actions = {
   },
 
   delete: async ({ request, locals: { supabase } }: RequestEvent) => {
-
-    
     const form = await superValidate(request, zod(propertySchema));
 
     if (!form.valid) {
-      return fail(400, { form });
+        return fail(400, { form });
     }
 
-    // Check for existing floors/rental_unit
-    const { data: floors } = await supabase
-      .from('floors')
-      .select('id')
-      .eq('property_id', form.data.id)
-      .limit(1);
 
-    if (floors && floors.length > 0) {
-      return fail(400, {
+    const { error: deleteError } = await supabase
+        .from('properties')
+        .delete()
+        .eq('id', form.data.id);
+
+    if (deleteError) {
+        console.error('Error deleting property:', deleteError);
+        
+        // Handle specific error cases
+        if (deleteError.message?.includes('Policy check failed')) {
+            return fail(403, {
+                form,
+                error: 'You do not have permission to delete this property'
+            });
+        }
+
+        if (deleteError.code === '23503') { // Foreign key violation
+            return fail(400, {
+                form,
+                error: 'Cannot delete property because it is referenced by other records'
+            });
+        }
+
+        return fail(500, {
+            form,
+            error: 'Failed to delete property'
+        });
+    }
+
+    return { 
         form,
-        error: 'Cannot delete property with existing floors/rental_unit. Please delete them first.'
-      });
-    }
-
-    const { error } = await supabase
-      .from('properties')
-      .delete()
-      .eq('id', form.data.id);
-
-    if (error) {
-      console.error('Error deleting property:', error);
-      return fail(500, { 
-        form, 
-        error: 'Failed to delete property' 
-      });
-    }
-
-    return { form };
-  }
-};
+        success: true 
+    };
+}
+}
