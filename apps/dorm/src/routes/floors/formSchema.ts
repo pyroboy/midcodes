@@ -34,7 +34,7 @@ export interface Floor {
   property_id: number;
   floor_number: number;
   wing: string | null;
-  status: 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE';
+  status: z.infer<typeof floorStatusEnum>;
   created_at: string;
   updated_at: string | null;
 }

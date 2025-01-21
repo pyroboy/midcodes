@@ -1,34 +1,39 @@
-import { fail, redirect } from '@sveltejs/kit';
+import { fail, error } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import type { RequestEvent } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { rental_unitSchema } from './formSchema';
+import type { Database } from '$lib/database.types';
 
-interface DatabaseFloor {
-  id: number;
-  property_id: number;
-  floor_number: number;
-  wing?: string;
-}
+type DBRentalUnit = Database['public']['Tables']['rental_unit']['Row'];
+type DBProperty = Database['public']['Tables']['properties']['Row'];
+type DBFloor = Database['public']['Tables']['floors']['Row'];
 
-export const load: PageServerLoad = async ({ locals}) => {
-  const {  user ,permissions } = await locals.safeGetSession();
-
-  // console.log('[DEBUG] User permissions:', permissions);
+export type RentalUnitResponse = DBRentalUnit & {
+  property: Pick<DBProperty, 'id' | 'name'> | null;
+  floor: Pick<DBFloor, 'id' | 'floor_number' | 'wing'> | null;
+};
+export const load: PageServerLoad = async ({ locals }) => {
+  console.log('🔄 Starting server-side load function for rental units');
+  
+  const { user, permissions } = await locals.safeGetSession();
   const hasAccess = permissions.includes('properties.create');
+  
   if (!hasAccess) {
-    throw redirect(302, '/unauthorized');
+    throw error(401, 'Unauthorized');
   }
 
-  console.log('[DEBUG] Loading initial data for rental_unit page');
-  const [rental_unitResponse, propertiesResponse, floorsResponse] = await Promise.all([
+  console.log('📊 Initiating database queries');
+  const startTime = performance.now();
+
+  const [rentalUnitsResult, propertiesResult, floorsResult] = await Promise.all([
     locals.supabase
       .from('rental_unit')
       .select(`
         *,
-        property:properties(name),
-        floor:floors(floor_number, wing)
+        property:properties(id, name),
+        floor:floors(id, floor_number, wing)
       `)
       .order('property_id, floor_id, number'),
     
@@ -36,88 +41,68 @@ export const load: PageServerLoad = async ({ locals}) => {
       .from('properties')
       .select('id, name')
       .order('name'),
-
+    
     locals.supabase
       .from('floors')
-      .select(`
-        id,
-        property_id,
-        floor_number,
-        wing,
-        property:properties!inner(id, name)
-      `)
+      .select('id, property_id, floor_number, wing')
       .order('property_id, floor_number')
   ]);
 
-  console.log('[DEBUG] Floors data loaded:', floorsResponse.data);
-  console.log('[DEBUG] Properties data loaded:', propertiesResponse.data);
+  const queryTime = performance.now() - startTime;
+  console.log('🏢 Database queries completed:', {
+    rentalUnitsCount: rentalUnitsResult.data?.length || 0,
+    propertiesCount: propertiesResult.data?.length || 0,
+    floorsCount: floorsResult.data?.length || 0,
+    queryExecutionTime: `${queryTime.toFixed(2)}ms`
+  });
 
-  const { data: rental_unit, error: rental_unitError } = rental_unitResponse;
-  const { data: properties, error: propertiesError } = propertiesResponse;
-  const { data: floors, error: floorsError } = floorsResponse;
+  if (rentalUnitsResult.error) {
+    console.error('Error loading rental units:', rentalUnitsResult.error);
+    throw error(500, 'Failed to load rental units');
+  }
 
-  if (rental_unitError) throw fail(403, { message: rental_unitError.message });
-  if (propertiesError) throw fail(403, { message: propertiesError.message });
-  if (floorsError) throw fail(403, { message: floorsError.message });
+  const rentalUnits = (rentalUnitsResult.data as RentalUnitResponse[] || []).map(unit => ({
+    ...unit,
+    property: unit.property || { id: unit.property_id, name: 'Unknown Property' },
+    floor: unit.floor || { id: unit.floor_id, floor_number: 0, wing: null }
+  }));
 
   const form = await superValidate(zod(rental_unitSchema));
 
   return {
-    rental_unit,
-    properties,
-    floors: floors as DatabaseFloor[],
     form,
-    user
+    rentalUnits,
+    properties: propertiesResult.data || [],
+    floors: floorsResult.data || []
   };
-}
+};
 
 export const actions: Actions = {
   create: async ({ request, locals: { supabase } }: RequestEvent) => {
-    console.log('[DEBUG] Create rental_unit action triggered');
+    console.log('➕ Starting rental unit creation process');
     const form = await superValidate(request, zod(rental_unitSchema));
-    console.log('[DEBUG] Form data received:', form.data);
-    console.log('[DEBUG] Form validation status:', form.valid);
-    
+
     if (!form.valid) {
-      console.error('[DEBUG] Form validation failed:', form.errors);
-      return fail(400, {
-        form,
-        message: 'Please check the form for errors',
-        errors: form.errors
-      });
+      console.error('Form validation failed:', form.errors);
+      return fail(400, { form });
     }
 
-    if (!form.data.property_id || !form.data.floor_id) {
-      console.error('[DEBUG] Missing required fields:', {
-        property_id: form.data.property_id,
-        floor_id: form.data.floor_id
-      });
-      console.log('[DEBUG] Current form data:', form.data);
-      return fail(400, {
-        form,
-        message: 'Property and Floor selection are required',
-        errors: {
-          property_id: !form.data.property_id ? 'Property is required' : undefined,
-          floor_id: !form.data.floor_id ? 'Floor is required' : undefined
-        }
-      });
-    }
-
-    const existingRental_UnitResponse = await supabase
+    // Check for duplicate rental unit number
+    const existingUnit = await supabase
       .from('rental_unit')
       .select('id')
       .eq('floor_id', form.data.floor_id)
       .eq('number', form.data.number)
       .single();
 
-    if (existingRental_UnitResponse.data) {
+    if (existingUnit.data) {
       return fail(400, {
         form,
-        message: 'Rental_unit number already exists on this floor'
+        message: 'A rental unit with this number already exists on this floor'
       });
     }
 
-    const insertResponse = await supabase
+    const { error: insertError } = await supabase
       .from('rental_unit')
       .insert({
         property_id: form.data.property_id,
@@ -129,55 +114,28 @@ export const actions: Actions = {
         base_rate: form.data.base_rate,
         type: form.data.type,
         amenities: form.data.amenities
-      })
-      .select();
+      } satisfies Database['public']['Tables']['rental_unit']['Insert']);
 
-    if (insertResponse.error) {
-      if (insertResponse.error.code === '23505') {
-        return fail(400, {
-          form,
-          message: 'Rental_unit number already exists on this floor'
-        });
+    if (insertError) {
+      console.error('Error creating rental unit:', insertError);
+      if (insertError.message?.includes('Policy check failed')) {
+        return fail(403, { form, message: 'You do not have permission to create rental units' });
       }
-
-      if (insertResponse.error.code === '23502') {
-        return fail(400, {
-          form,
-          message: 'Required fields are missing'
-        });
-      }
-
-      return fail(500, { 
-        form,
-        message: insertResponse.error.message || 'Failed to create rental_unit'
-      });
+      return fail(500, { form, message: 'Failed to create rental unit' });
     }
 
-    const newForm = await superValidate(zod(rental_unitSchema));
-    return { 
-      form: newForm,
-      message: 'Rental_unit created successfully'
-    };
+    return { form };
   },
 
   update: async ({ request, locals: { supabase } }: RequestEvent) => {
     const form = await superValidate(request, zod(rental_unitSchema));
-    
-    if (!form.valid || !form.data.id) {
-      return fail(400, { 
-        form,
-        message: 'Please check the form for errors'
-      });
+
+    if (!form.valid) {
+      return fail(400, { form });
     }
 
-    if (!form.data.property_id || !form.data.floor_id) {
-      return fail(400, {
-        form,
-        message: 'Property and Floor selection are required'
-      });
-    }
-
-    const existingRental_UnitResponse = await supabase
+    // Check for duplicate rental unit number, excluding current unit
+    const existingUnit = await supabase
       .from('rental_unit')
       .select('id')
       .eq('floor_id', form.data.floor_id)
@@ -185,14 +143,14 @@ export const actions: Actions = {
       .neq('id', form.data.id)
       .single();
 
-    if (existingRental_UnitResponse.data) {
+    if (existingUnit.data) {
       return fail(400, {
         form,
-        message: 'Rental_unit number already exists on this floor'
+        message: 'A rental unit with this number already exists on this floor'
       });
     }
 
-    const updateResponse = await supabase
+    const { error: updateError } = await supabase
       .from('rental_unit')
       .update({
         property_id: form.data.property_id,
@@ -203,69 +161,51 @@ export const actions: Actions = {
         capacity: form.data.capacity,
         base_rate: form.data.base_rate,
         type: form.data.type,
-        amenities: form.data.amenities
-      })
-      .eq('id', form.data.id)
-      .select();
+        amenities: form.data.amenities,
+        updated_at: new Date().toISOString()
+      } satisfies Database['public']['Tables']['rental_unit']['Update'])
+      .eq('id', form.data.id);
 
-    if (updateResponse.error) {
-      if (updateResponse.error.code === '23505') {
-        return fail(400, {
-          form,
-          message: 'Rental_unit number already exists on this floor'
-        });
+    if (updateError) {
+      console.error('Error updating rental unit:', updateError);
+      if (updateError.message?.includes('Policy check failed')) {
+        return fail(403, { form, message: 'You do not have permission to update rental units' });
       }
-
-      if (updateResponse.error.code === '23502') {
-        return fail(400, {
-          form,
-          message: 'Required fields are missing'
-        });
-      }
-
-      return fail(updateResponse.error.code === '42501' ? 403 : 500, { 
-        form,
-        message: updateResponse.error.message || 'Failed to update rental_unit'
-      });
+      return fail(500, { form, message: 'Failed to update rental unit' });
     }
 
-    return { 
-      form,
-      message: 'Rental_unit updated successfully'
-    };
+    return { form };
   },
 
   delete: async ({ request, locals: { supabase } }: RequestEvent) => {
     const formData = await request.formData();
     const id = formData.get('id');
-    
-    if (!id) {
-      return fail(400, {
-        message: 'Rental_unit ID is required'
-      });
+
+    if (!id || typeof id !== 'string') {
+      return fail(400, { message: 'Invalid rental unit ID' });
     }
 
-    const rental_unitId = parseInt(id.toString(), 10);
-    if (isNaN(rental_unitId)) {
-      return fail(400, {
-        message: 'Invalid rental_unit ID'
-      });
+    const rentalUnitId = parseInt(id, 10);
+    if (isNaN(rentalUnitId)) {
+      return fail(400, { message: 'Invalid rental unit ID format' });
     }
 
-    const deleteResponse = await supabase
+    const { error: deleteError } = await supabase
       .from('rental_unit')
       .delete()
-      .eq('id', rental_unitId);
+      .eq('id', rentalUnitId);
 
-    if (deleteResponse.error) {
-      console.error('Delete error:', deleteResponse.error);
-      return fail(deleteResponse.error.code === '42501' ? 403 : 500, {
-        message: deleteResponse.error.message || 'Failed to delete rental_unit'
-      });
+    if (deleteError) {
+      console.error('Error deleting rental unit:', deleteError);
+      if (deleteError.message?.includes('Policy check failed')) {
+        return fail(403, { message: 'You do not have permission to delete rental units' });
+      }
+      if (deleteError.code === '23503') {
+        return fail(400, { message: 'Cannot delete rental unit because it is referenced by other records' });
+      }
+      return fail(500, { message: 'Failed to delete rental unit' });
     }
 
-    return {
-      message: 'Rental_unit deleted successfully'
-    };
+    return { success: true };
   }
 };

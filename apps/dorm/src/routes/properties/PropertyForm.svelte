@@ -1,12 +1,11 @@
 <script lang="ts">
-  import { superForm } from 'sveltekit-superforms/client';
   import * as Select from '$lib/components/ui/select';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
   import { createEventDispatcher } from 'svelte';
   import type { PageData } from './$types';
-  import { PropertyStatus, PropertyType } from './formSchema';
+  import { propertyStatus, propertyType } from './formSchema';
   import type { propertySchema } from './formSchema';
   import type { SuperForm } from 'sveltekit-superforms';
   import type { z } from 'zod';
@@ -31,56 +30,9 @@
 
   const dispatch = createEventDispatcher();
 
-  // Initialize state for select fields with proper typing
-  let selectedType = $state<string>($form.type || '');
-  let selectedStatus = $state<string>($form.status || 'ACTIVE');
-
-  // Create derived properties for select options
-  const propertyTypes = Object.entries(PropertyType).map(([key]) => ({
-    value: PropertyType[key as keyof typeof PropertyType],
-    label: key.replace('_', ' ')
-  }));
-
-  const statusOptions = Object.entries(PropertyStatus).map(([key]) => ({
-    value: PropertyStatus[key as keyof typeof PropertyStatus],
-    label: key
-  }));
-
-  // Compute trigger content for select fields
-
 
   let triggerStatus = $derived($form.status || "Select a Status");
-let triggerType = $derived($form.type || "Select a Type");
-
-  // Effects to sync form state with select values
-  $effect(() => {
-  if (selectedType) {
-    $form.type = selectedType as keyof typeof PropertyType;
-  }
-});
-
-$effect(() => {
-  if (selectedStatus) {
-    $form.status = selectedStatus as keyof typeof PropertyStatus;
-  }
-});
-
-
-  // Effects to sync select values with form state
-  $effect(() => {
-    const newType = $form.type;
-    if (newType !== selectedType) {
-      selectedType = newType;
-    }
-  });
-
-  $effect(() => {
-    const newStatus = $form.status;
-    if (newStatus !== selectedStatus) {
-      selectedStatus = newStatus;
-    }
-  });
-
+  let triggerType = $derived($form.type || "Select a Type");
   function handleCancel() {
     dispatch('cancel');
   }
@@ -137,7 +89,7 @@ $effect(() => {
       <Select.Root    
         type="single"
         name="type"
-        bind:value={selectedType}
+        bind:value={$form.type}
       >
         <Select.Trigger 
           class="w-full"
@@ -147,9 +99,9 @@ $effect(() => {
           {triggerType}
         </Select.Trigger>
         <Select.Content>
-          {#each propertyTypes as type}
-            <Select.Item value={type.value}>
-              {type.label}
+          {#each propertyType.options as type}
+            <Select.Item value={type}>
+              {type}
             </Select.Item>
           {/each}
         </Select.Content>
@@ -164,7 +116,7 @@ $effect(() => {
       <Select.Root    
         type="single"
         name="status"
-        bind:value={selectedStatus}
+        bind:value={$form.status}
       >
         <Select.Trigger 
           class="w-full"
@@ -174,10 +126,10 @@ $effect(() => {
           {triggerStatus}
         </Select.Trigger>
         <Select.Content>
-          {#each statusOptions as status}
-            <Select.Item value={status.value}>
-              {status.label}
-            </Select.Item>
+          {#each propertyStatus.options as status}
+          <Select.Item value={status}>
+            {status}
+          </Select.Item>
           {/each}
         </Select.Content>
       </Select.Root>

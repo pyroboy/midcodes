@@ -49,8 +49,8 @@ const baseRental_UnitSchema = z.object({
   }).min(0, 'Base rate cannot be negative'),
   type: z.string().min(1, 'Rental_unit type is required'),
   amenities: z.array(z.string()).default([]),
-  property: propertyBasicSchema,
-  floor: floorBasicSchema,
+  property: propertyBasicSchema.optional(),
+  floor: floorBasicSchema.optional(),
   created_at: z.string().optional(),
   updated_at: z.string().optional()
 });

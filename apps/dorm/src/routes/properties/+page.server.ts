@@ -1,9 +1,9 @@
 import { fail, error } from '@sveltejs/kit';
-import type { Actions, PageServerLoad } from './$types';
-import type { RequestEvent } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
+import type {  PageServerLoad } from './$types';
+import type { RequestEvent } from '@sveltejs/kit';
 import { zod } from 'sveltekit-superforms/adapters';
-import { propertySchema, type PropertyData, preparePropertyData } from './formSchema';
+import { propertySchema, preparePropertyData } from './formSchema';
 
 export const load: PageServerLoad = async ({ locals }) => {
   const { permissions } = await locals.safeGetSession();

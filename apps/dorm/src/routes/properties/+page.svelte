@@ -52,8 +52,8 @@ $formData = {
   id: property.id,
   name: property.name,
   address: property.address,
-  type: property.type,
-  status: property.status
+  type: property.type || 'DORMITORY',
+  status: property.status || 'ACTIVE'
 }
   }
 
