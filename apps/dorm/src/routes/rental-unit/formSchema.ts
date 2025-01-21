@@ -5,7 +5,7 @@ export const propertyStatusEnum = z.enum(['ACTIVE', 'INACTIVE', 'MAINTENANCE']);
 export const floorStatusEnum = z.enum(['ACTIVE', 'INACTIVE', 'MAINTENANCE']);
 export const maintenanceStatusEnum = z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED']);
 export const leaseStatusEnum = z.enum(['ACTIVE', 'INACTIVE', 'EXPIRED', 'TERMINATED']);
-export const leaseTypeEnum = z.enum(['BEDSPACER', 'PRIVATEROOM']);
+export const rentalUnitTypeEnum = z.enum(['BEDSPACER', 'PRIVATEROOM']);
 
 export const propertyBasicSchema = z.object({
   id: z.number(),

@@ -30,9 +30,12 @@
 
   const dispatch = createEventDispatcher();
 
-
+  // PATTERN FOR ENUM BASED SELECTION ITEMS
   let triggerStatus = $derived($form.status || "Select a Status");
   let triggerType = $derived($form.type || "Select a Type");
+  // PATTERN FOR ENUM BASED SELECTION ITEMS
+
+
   function handleCancel() {
     dispatch('cancel');
   }

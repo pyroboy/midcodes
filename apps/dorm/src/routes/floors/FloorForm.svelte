@@ -9,10 +9,7 @@
   import type { z } from 'zod';
   import type { floorSchema } from './formSchema';
   import type {PageData} from './$types';
-  // interface PageData {
-  //   properties: Property[];
-  //   floors: Array<Floor & { property: Property }>;
-  // }
+
 
   interface Props {
     data: PageData;
@@ -34,13 +31,11 @@
 
   const dispatch = createEventDispatcher();
 
-  // Initialize with the form value or default to undefined
+
+     // START : PATTERN FOR DATABASE BASED SELECTION ITEMS
   let selectedPropertyId = $state($form.property_id?.toString() || undefined);
-  let derivedProperties = $derived(data.properties.map((f) => ({ 
-    value: f.id.toString(), 
-    label: f.name 
-  })));
-  // Update the form when selectedPropertyId changes
+  let derivedProperties = $derived(data.properties.map((f) => ({ value: f.id.toString(), label: f.name })));
+  
   $effect(() => {
     if (selectedPropertyId) {
       const parsedId = parseInt(selectedPropertyId);
@@ -49,21 +44,23 @@
       }
     }
   });
-  // Update selectedPropertyId when form.property_id changes
   $effect(() => {
     const newValue = $form.property_id?.toString();
     if (newValue !== selectedPropertyId) {
       selectedPropertyId = newValue;
     }
   });
-  // Compute trigger content based on selected property
   let triggerContent = $derived(
     !selectedPropertyId ? 
     "Select a property" : 
     data.properties.find(p => p.id.toString() === selectedPropertyId)?.name ?? "Select a property"
   );
+    // END : PATTERN FOR DATABASE BASED SELECTION ITEMS
 
+
+  // START: PATTERN FOR ENUM BASED SELECTION ITEMS
   let triggerStatus = $derived($form.status || "Select a Status");
+  // END: PATTERN FOR ENUM BASED SELECTION ITEMS
 </script>
 
 <form
@@ -82,8 +79,7 @@
     <Select.Root    
       type="single"
       name="property_id"
-      value={selectedPropertyId}
-      onValueChange={(value: string) => selectedPropertyId = value}
+      bind:value={selectedPropertyId}
     >
       <Select.Trigger 
         class="w-full"
