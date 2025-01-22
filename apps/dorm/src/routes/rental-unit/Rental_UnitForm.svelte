@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { run } from 'svelte/legacy';
   import Button from '$lib/components/ui/button/button.svelte';
   import Input from '$lib/components/ui/input/input.svelte';
   import Label from '$lib/components/ui/label/label.svelte';
@@ -10,6 +9,7 @@
   import type { SuperForm } from 'sveltekit-superforms';
   import type { z } from 'zod';
   import type { rental_unitSchema } from './formSchema';
+  import type { Writable } from 'svelte/store';
 
   interface PageData {
     rental_unit: Array<Rental_unit & {
@@ -18,11 +18,6 @@
     }>;
     properties: Array<{ id: number; name: string }>;
     floors: Array<{ id: number; property_id: number; floor_number: number; wing?: string }>;
-  }
-
-  interface SelectItem {
-    value: string;
-    label: string;
   }
 
   interface Props {
@@ -40,61 +35,36 @@
     form,
     errors,
     enhance,
-    constraints
+    constraints,
   }: Props = $props();
 
   const dispatch = createEventDispatcher();
 
-  // Database-based select for property_id
-  let selectedPropertyId = $state($form.property_id?.toString() || undefined);
-  let derivedProperties = $derived(data.properties.map((p) => ({ value: p.id.toString(), label: p.name })));
-
-  $effect(() => {
-    if (selectedPropertyId) {
-      const parsedId = parseInt(selectedPropertyId);
-      if (!isNaN(parsedId)) {
-        $form.property_id = parsedId;
-      }
-    }
-  });
-
-  $effect(() => {
-    const newValue = $form.property_id?.toString();
-    if (newValue !== selectedPropertyId) {
-      selectedPropertyId = newValue;
-    }
-  });
-
+  // START : PATTERN FOR DATABASE BASED SELECTION ITEMS - Property
+  let derivedProperties = $derived(data.properties.map(p => ({ value: p.id.toString(), label: p.name })));
+  let selectedProperty = {
+    get value() { return $form.property_id?.toString() || undefined },
+    set value(id) { $form.property_id = id ? Number(id) || 0 : 0 }
+  };
   let triggerPropertyContent = $derived(
-    !selectedPropertyId ?
-    "Select a property" :
-    data.properties.find(p => p.id.toString() === selectedPropertyId)?.name ?? "Select a property"
+    selectedProperty.value 
+      ? data.properties.find(p => p.id.toString() === selectedProperty.value)?.name ?? "Select a property"
+      : "Select a property"
   );
 
-  // Database-based select for floor_id
-  let selectedFloorId = $state($form.floor_id?.toString() || undefined);
-  let derivedFloors = $derived(data.floors.map((f) => ({ value: f.id.toString(), label: `Floor ${f.floor_number}${f.wing ? ` (${f.wing})` : ''}` })));
-
-  $effect(() => {
-    if (selectedFloorId) {
-      const parsedId = parseInt(selectedFloorId);
-      if (!isNaN(parsedId)) {
-        $form.floor_id = parsedId;
-      }
-    }
-  });
-
-  $effect(() => {
-    const newValue = $form.floor_id?.toString();
-    if (newValue !== selectedFloorId) {
-      selectedFloorId = newValue;
-    }
-  });
-
+  // START : PATTERN FOR DATABASE BASED SELECTION ITEMS - Floor
+  let derivedFloors = $derived(data.floors.map(f => ({ 
+    value: f.id.toString(), 
+    label: `Floor ${f.floor_number}${f.wing ? ` (${f.wing})` : ''}`
+  })));
+  let selectedFloor = {
+    get value() { return $form.floor_id?.toString() || undefined },
+    set value(id) { $form.floor_id = id ? Number(id) || 0 : 0 }
+  };
   let triggerFloorContent = $derived(
-    !selectedFloorId ?
-    "Select a floor" :
-    data.floors.find(f => f.id.toString() === selectedFloorId)?.floor_number ?? "Select a floor"
+    selectedFloor.value 
+      ? data.floors.find(f => f.id.toString() === selectedFloor.value)?.floor_number ?? "Select a floor"
+      : "Select a floor"
   );
 
   // Enum-based select for type
@@ -104,26 +74,16 @@
   let triggerStatus = $derived($form.rental_unit_status || "Select a status");
 
   // Amenities handling
-  let amenityInput = $state('');
+  // State management
+let amenities = { get value() { return $form.amenities || [] }, set value(v) { $form.amenities = v } };
+let currentAmenity = $state('');
 
-  function addAmenity() {
-    if (amenityInput.trim()) {
-      $form = {
-        ...$form,
-        amenities: [...($form.amenities || []), amenityInput.trim()]
-      };
-      amenityInput = '';
-    }
+function addAmenity() {
+  if (currentAmenity.trim()) {
+    amenities.value = [...amenities.value, currentAmenity.trim()];
+    currentAmenity = '';
   }
-
-  function removeAmenity(index: number): void {
-    if ($form.amenities) {
-      $form = {
-        ...$form,
-        amenities: $form.amenities.filter((_, i) => i !== index)
-      };
-    }
-  }
+}
 
   function handleCancel() {
     dispatch('cancel');
@@ -147,7 +107,7 @@
     <Select.Root
       type="single"
       name="property_id"
-      bind:value={selectedPropertyId}
+      bind:value={selectedProperty.value}
     >
       <Select.Trigger
         class="w-full"
@@ -175,7 +135,7 @@
     <Select.Root
       type="single"
       name="floor_id"
-      bind:value={selectedFloorId}
+      bind:value={selectedFloor.value}
     >
       <Select.Trigger
         class="w-full"
@@ -327,44 +287,47 @@
     {/if}
   </div>
 
-  <!-- Amenities Input -->
-  <div class="space-y-2">
-    <Label>Amenities</Label>
-    <div class="flex gap-2">
-      <Input
-        type="text"
-        bind:value={amenityInput}
-        placeholder="Add amenity"
-        onkeydown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            addAmenity();
-          }
-        }}
-      />
-      <Button type="button" variant="secondary" onclick={addAmenity}>Add</Button>
-    </div>
-    {#if $form.amenities?.length}
-      <div class="flex flex-wrap gap-2 mt-2">
-        {#each $form.amenities as amenity, i}
-          <div class="flex items-center gap-1 bg-secondary/50 p-1 rounded">
-            <span>{amenity}</span>
-            <button
-              type="button"
-              class="text-sm hover:text-destructive"
-              onclick={() => removeAmenity(i)}
-            >
-              ×
-            </button>
-          </div>
-        {/each}
-      </div>
-    {/if}
-    {#if $errors.amenities}
-      <p class="text-sm font-medium text-destructive">{$errors.amenities}</p>
-    {/if}
+ <!-- Amenities Input -->
+<div class="space-y-2">
+  <Label>Amenities</Label>
+  <div class="flex gap-2">
+    <Input
+      type="text"
+      bind:value={currentAmenity}
+      placeholder="Add amenity" 
+      onkeydown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          addAmenity();
+        }
+      }}
+    />
+    <Button type="button" variant="secondary" onclick={addAmenity}>Add</Button>
   </div>
+  {#if amenities.value.length}
+    <div class="flex flex-wrap gap-2 mt-2">
+      {#each amenities.value as amenity, i}
+        <div class="flex items-center gap-1 bg-secondary/50 p-1 rounded">
+          <span>{amenity}</span>
+          <button
+            type="button"
+            class="text-sm hover:text-destructive"
+            onclick={() => amenities.value = amenities.value.filter((_, idx) => idx !== i)}
+          >×</button>
+        </div>
+      {/each}
+    </div>
+  {/if}
+  {#if $errors.amenities}
+    <p class="text-sm font-medium text-destructive">{$errors.amenities}</p>
+  {/if}
+</div>
 
+{#if $errors._errors}
+  <div class="p-3 rounded-md bg-destructive/15 text-destructive text-sm">
+    {$errors._errors}
+  </div>
+{/if}
   <!-- Submit and Cancel Buttons -->
   <div class="flex justify-end space-x-2">
     <Button type="submit">

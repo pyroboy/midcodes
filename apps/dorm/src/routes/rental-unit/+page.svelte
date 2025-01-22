@@ -7,17 +7,17 @@
   import { rental_unitSchema, type Rental_unit } from './formSchema';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { invalidate } from '$app/navigation';
-  import { browser } from "$app/environment";
   import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
   import type { PageData } from './$types';
   import type { SuperValidated } from 'sveltekit-superforms';
   import type { RentalUnitResponse } from './+page.server';
+  import { browser } from "$app/environment";
 
   let { data } = $props<{ data: PageData }>();
   let rentalUnits = $state<RentalUnitResponse[]>(data.rentalUnits);
   $effect(() => { rentalUnits = data.rentalUnits; });
   let editMode = $state(false);
-
+  let formError = $state('');
   const { form: formData, enhance, errors, constraints, reset } = superForm(data.form, {
     id: 'rental-unit-form',
     validators: zodClient(rental_unitSchema),
@@ -39,6 +39,10 @@
         editMode = false;
         await invalidate('app:rentalUnits');
       }
+      else if (result.type === 'failure') {
+      // Handle the error message from the server
+      formError = result.data?.message || 'An unknown error occurred';
+    }
     }
   });
 

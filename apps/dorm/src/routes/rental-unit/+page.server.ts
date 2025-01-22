@@ -79,7 +79,6 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 export const actions: Actions = {
   create: async ({ request, locals: { supabase } }: RequestEvent) => {
-    console.log('➕ Starting rental unit creation process');
     const form = await superValidate(request, zod(rental_unitSchema));
 
     if (!form.valid) {
@@ -96,10 +95,9 @@ export const actions: Actions = {
       .single();
 
     if (existingUnit.data) {
-      return fail(400, {
-        form,
-        message: 'A rental unit with this number already exists on this floor'
-      });
+      form.errors.number = ['A rental unit with this number already exists on this floor'];
+      form.errors.floor_id = [''];
+      return fail(400, { form });
     }
 
     const { error: insertError } = await supabase
@@ -117,11 +115,14 @@ export const actions: Actions = {
       } satisfies Database['public']['Tables']['rental_unit']['Insert']);
 
     if (insertError) {
-      console.error('Error creating rental unit:', insertError);
+      console.error('Failed to create rental unit:', insertError);
+      // form.errors._errors = [insertError.message]; ;
       if (insertError.message?.includes('Policy check failed')) {
-        return fail(403, { form, message: 'You do not have permission to create rental units' });
+        form.errors._errors = ['You do not have permission to create rental units' ];
+        return fail(403, { form });
       }
-      return fail(500, { form, message: 'Failed to create rental unit' });
+      form.errors._errors = ['Failed to create rental unit' ];
+      return fail(500, { form});
     }
 
     return { form };
@@ -143,12 +144,11 @@ export const actions: Actions = {
       .neq('id', form.data.id)
       .single();
 
-    if (existingUnit.data) {
-      return fail(400, {
-        form,
-        message: 'A rental unit with this number already exists on this floor'
-      });
-    }
+      if (existingUnit.data) {
+        form.errors.number = ['A rental unit with this number already exists on this floor'];
+        form.errors.floor_id = [''];
+        return fail(400, { form });
+      }
 
     const { error: updateError } = await supabase
       .from('rental_unit')
@@ -169,7 +169,8 @@ export const actions: Actions = {
     if (updateError) {
       console.error('Error updating rental unit:', updateError);
       if (updateError.message?.includes('Policy check failed')) {
-        return fail(403, { form, message: 'You do not have permission to update rental units' });
+        form.errors._errors = ['You do not have permission to update rental units' ];
+        return fail(403, { form });
       }
       return fail(500, { form, message: 'Failed to update rental unit' });
     }

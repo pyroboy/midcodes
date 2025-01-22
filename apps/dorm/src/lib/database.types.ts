@@ -228,54 +228,51 @@ export type Database = {
       leases: {
         Row: {
           id: number
-          location_id: number
+          rental_unit_id: number
           name: string
-          status: Database['public']['Enums']['lease_status']
-          type: Database['public']['Enums']['lease_type']
           start_date: string
           end_date: string
-          terms_month: number
           rent_amount: number
           security_deposit: number
-          balance: number
+          balance: number | null
           notes: string | null
           created_at: string
           updated_at: string | null
-          created_by: string
+          created_by: string | null
+          terms_month: number | null
+          status: Database['public']['Enums']['lease_status']
         }
         Insert: {
           id?: number
           rental_unit_id: number
           name: string
-          status?: Database['public']['Enums']['lease_status']
-          type: Database['public']['Enums']['lease_type']
           start_date: string
           end_date: string
-          terms_month: number
           rent_amount: number
           security_deposit: number
-          balance?: number
+          balance?: number | null
           notes?: string | null
           created_at?: string
           updated_at?: string | null
-          created_by: string
+          created_by?: string | null
+          terms_month?: number | null
+          status?: Database['public']['Enums']['lease_status']
         }
         Update: {
           id?: number
           rental_unit_id?: number
           name?: string
-          status?: Database['public']['Enums']['lease_status']
-          type?: Database['public']['Enums']['lease_type']
           start_date?: string
           end_date?: string
-          terms_month?: number
           rent_amount?: number
           security_deposit?: number
-          balance?: number
+          balance?: number | null
           notes?: string | null
           created_at?: string
           updated_at?: string | null
-          created_by?: string
+          created_by?: string | null
+          terms_month?: number | null
+          status?: Database['public']['Enums']['lease_status']
         }
       }
       lease_tenants: {

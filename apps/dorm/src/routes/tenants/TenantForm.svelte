@@ -1,9 +1,6 @@
 <script lang="ts">
-  import { run } from 'svelte/legacy';
-
   import type { PageData } from './$types';
   import type { SuperForm } from 'sveltekit-superforms';
-  import type { Database } from '$lib/database.types';
   import {
     Select,
     SelectContent,
@@ -18,13 +15,9 @@
   import { createEventDispatcher } from 'svelte';
   import { TenantStatusEnum, tenantFormSchema } from './formSchema';
   import Textarea from '$lib/components/ui/textarea/textarea.svelte';
-  import { defaultEmergencyContact } from './constants';
+  import { defaultEmergencyContact } from './formSchema';
   import * as Card from '$lib/components/ui/card';
   import * as Dialog from '$lib/components/ui/dialog';
-
-  type Property = Database['public']['Tables']['properties']['Row'];
-  type User = Database['public']['Tables']['profiles']['Row'];
-
 
   interface Props {
     data: PageData;
@@ -45,7 +38,6 @@
     constraints,
     submitting,
     editMode = false,
-    tenant = undefined
   }: Props = $props();
 
   const dispatch = createEventDispatcher();
@@ -53,32 +45,39 @@
   let showStatusDialog = $state(false);
   let statusChangeReason = $state('');
 
-  let canEdit = $derived(data.isAdminLevel || (data.isStaffLevel && !editMode));
-  let canDelete = $derived(data.isAdminLevel);
-
-  run(() => {
-    if (tenant && editMode) {
-      $form = { ...$form, ...tenant };
-    }
-  });
 
   // Convert ZodEnum to array of status options
   let tenantStatusOptions = $derived(Object.values(TenantStatusEnum.Values));
 
-  type TenantStatus = "ACTIVE" | "INACTIVE" | "PENDING" | "BLACKLISTED";
+  let triggerStatus = $derived($form.tenant_status || "Select a status");
 
-  function updateTenantStatus(event: CustomEvent<TenantStatus>) {
-    if (event.detail) {
-      showStatusDialog = true;
-      $form = { ...$form, tenant_status: event.detail };
-    }
-  }
 
-  let emergencyContact = $derived({
-    ...defaultEmergencyContact,
-    ...($form.emergency_contact || {}),
-    email: $form.emergency_contact?.email || ''
+  // so far this is the best way to 
+  // set each Objects Values with getter/setter
+  // a merge between $form and defaultEmergencyContact
+function createEmergencyContactBindings() {
+  const fields = ['name', 'relationship', 'phone', 'email', 'address'] as const;
+  const bindings = {} as Record<typeof fields[number], string>;
+
+  fields.forEach(field => {
+    Object.defineProperty(bindings, field, {
+      get() {
+        return $form.emergency_contact?.[field] || '';
+      },
+      set(value: string) {
+        if (!$form.emergency_contact) {
+          $form.emergency_contact = { ...defaultEmergencyContact };
+        }
+        $form.emergency_contact[field] = value;
+      },
+      enumerable: true
+    });
   });
+
+  return bindings;
+}
+
+const emergencyContact = createEmergencyContactBindings();
 
   function getStatusColor(status: string) {
     switch (status) {
@@ -119,7 +118,6 @@
         name="name"
       bind:value={$form.name}
       class="w-full"
-      disabled={!canEdit}
       data-error={$errors.name}
       aria-invalid={$errors.name ? 'true' : undefined}
       {...$constraints.name}
@@ -136,12 +134,11 @@
         name="email"
       bind:value={$form.email}
       class="w-full"
-      disabled={!canEdit}
       data-error={$errors.email && $form.email !== undefined}
       aria-invalid={$errors.email ? 'true' : undefined}
       {...$constraints.email}
       />
-      {#if $errors.email && $form.email !== undefined}
+      {#if $errors.email}
         <p class="text-sm font-medium text-destructive">{$errors.email}</p>
       {/if}
     </div>
@@ -153,7 +150,6 @@
         name="contact_number"
       bind:value={$form.contact_number}
       class="w-full"
-      disabled={!canEdit}
       data-error={$errors.contact_number && $form.contact_number !== undefined}
       aria-invalid={$errors.contact_number ? 'true' : undefined}
       {...$constraints.contact_number}
@@ -169,11 +165,11 @@
         <Select 
             type="single"
           name="tenant_status"
-          disabled={!canEdit}
+          bind:value={$form.tenant_status}
           {...$constraints.tenant_status}
         >
           <SelectTrigger>
-      
+      {triggerStatus}
           </SelectTrigger>
           <SelectContent>
             {#each tenantStatusOptions as status}
@@ -203,7 +199,6 @@
             name="emergency_contact.name"
       bind:value={emergencyContact.name}
       class="w-full"
-            disabled={!canEdit}
             data-error={$errors.emergency_contact?.name && emergencyContact.name !== undefined}
             aria-invalid={$errors.emergency_contact?.name ? 'true' : undefined}
             {...$constraints.emergency_contact?.name}
@@ -220,7 +215,6 @@
             name="emergency_contact.relationship"
       bind:value={emergencyContact.relationship}
       class="w-full"
-            disabled={!canEdit}
             data-error={$errors.emergency_contact?.relationship && emergencyContact.relationship !== undefined}
             aria-invalid={$errors.emergency_contact?.relationship ? 'true' : undefined}
             {...$constraints.emergency_contact?.relationship}
@@ -237,7 +231,6 @@
             name="emergency_contact.phone"
       bind:value={emergencyContact.phone}
       class="w-full"
-            disabled={!canEdit}
             data-error={$errors.emergency_contact?.phone && emergencyContact.phone !== undefined}
             aria-invalid={$errors.emergency_contact?.phone ? 'true' : undefined}
             {...$constraints.emergency_contact?.phone}
@@ -254,7 +247,6 @@
             name="emergency_contact.email"
       bind:value={emergencyContact.email}
       class="w-full"
-            disabled={!canEdit}
             data-error={$errors.emergency_contact?.email && emergencyContact.email !== undefined}
             aria-invalid={$errors.emergency_contact?.email ? 'true' : undefined}
             {...$constraints.emergency_contact?.email}
@@ -270,7 +262,6 @@
             name="emergency_contact.address"
       bind:value={emergencyContact.address}
       class="w-full"
-            disabled={!canEdit}
             data-error={$errors.emergency_contact?.address && emergencyContact.address !== undefined}
             aria-invalid={$errors.emergency_contact?.address ? 'true' : undefined}
             {...$constraints.emergency_contact?.address}
@@ -287,7 +278,7 @@
     <Button type="button" variant="outline" onclick={() => dispatch('cancel')}>
       Cancel
     </Button>
-    <Button type="submit" disabled={!canEdit || $submitting}>
+    <Button type="submit" disabled={ $submitting}>
       {#if $submitting}
         Saving...
       {:else}

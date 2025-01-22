@@ -6,19 +6,22 @@
   import TenantList from './TenantList.svelte';
   import TenantForm from './TenantForm.svelte';
   import type { ExtendedTenant } from './types';
-  import type { SuperValidated } from 'sveltekit-superforms';
-  import type { z } from 'zod';
-  // import type { Rental_unit } from '../rental-unit/formSchema';
-  import type { Database } from '$lib/database.types';
   import type { PageData } from './$types';
-
-
+  import { browser } from "$app/environment";
+  import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
+  import { invalidate } from '$app/navigation';
 
   interface Props {
     data: PageData;
   }
 
   let { data }: Props = $props();
+  let tenants = $state(data.tenants);
+
+  $effect(() => {
+  tenants = structuredClone(data.tenants);
+});
+
   
   const defaultEmergencyContact = {
     name: '',
@@ -30,25 +33,30 @@
 
   let editMode = $state(false);
   let selectedTenant: ExtendedTenant | undefined = $state();
+  let formError = $state('');
 
-  const { form, enhance, errors, constraints, submitting } = superForm<TenantFormData>(data.form, {
+  const { form, enhance, errors, constraints, submitting, reset } = superForm<TenantFormData>(data.form, {
     id: 'tenant-form',
     validators: zodClient(tenantFormSchema),
-    validationMethod: 'onblur',
+    validationMethod: 'oninput',
     dataType: 'json',
     delayMs: 10,
     taintedMessage: null,
     resetForm: true,
-
     onError: ({ result }) => {
       console.error('Form validation errors:', result.error);
+      if (result.error) {
+        console.error('Server error:', result.error.message);
+      }
     },
-    onResult: ({ result }) => {
+    onResult: async ({ result }) => {
       if (result.type === 'success') {
         selectedTenant = undefined;
         editMode = false;
-        // Reset form to initial values
-        handleCreate();
+        await invalidate('app:tenants');
+        reset();
+      } else if (result.type === 'failure') {
+        formError = result.data?.message || 'An unknown error occurred';
       }
     }
   });
@@ -56,6 +64,8 @@
   function handleEdit(tenant: ExtendedTenant) {
     editMode = true;
     selectedTenant = tenant;
+    
+    const emergencyContact = tenant.emergency_contact ?? defaultEmergencyContact;
     
     $form = {
       id: tenant.id,
@@ -65,42 +75,89 @@
       auth_id: tenant.auth_id,
       tenant_status: tenant.tenant_status,
       created_by: tenant.created_by,
-      emergency_contact: tenant.emergency_contact ?? defaultEmergencyContact
+      emergency_contact: {
+        ...defaultEmergencyContact,
+        ...emergencyContact,
+        email: emergencyContact.email ?? null
+      }
     };
   }
 
-  function handleCreate() {
-    selectedTenant = undefined;
-    editMode = false;
-    
-    $form = {
-      id: 0,
-      name: '',
-      contact_number: null,
-      email: null,
-      auth_id: null,
-      tenant_status: 'PENDING',
-      created_by: data.profile?.id ?? null,
-      emergency_contact: defaultEmergencyContact
-    };
-  }
+  async function handleDeleteTenant(tenant: ExtendedTenant) {
+    console.log('Starting delete process for tenant:', tenant);
 
+    if (!confirm(`Are you sure you want to delete tenant ${tenant.name}?`)) {
+        console.log('Delete cancelled by user');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('id', String(tenant.id));
+    console.log('Form data prepared:', { tenantId: tenant.id });
+
+    try {
+        console.log('Sending delete request...');
+        const result = await fetch('?/delete', {
+            method: 'POST',
+            body: formData
+        });
+
+        const response = await result.json();
+        console.log('Received response:', response);
+
+        if (response.type === 'failure') {
+            // Parse the data string if it's a string
+            let errorData;
+            try {
+                errorData = typeof response.data === 'string' 
+                    ? JSON.parse(response.data) 
+                    : response.data;
+            } catch (e) {
+                errorData = response.data;
+            }
+
+            // Extract error message
+            const errorMessage = Array.isArray(errorData) 
+                ? errorData[1] 
+                : response.message || 'Unknown error';
+                
+            console.error('Delete failed:', {
+                status: response.status,
+                response,
+                error: errorMessage
+            });
+            alert(errorMessage);
+            return;
+        }
+
+        console.log('Delete successful, updating local state');
+        tenants = tenants.filter(t => t.id !== tenant.id);
+        selectedTenant = undefined;
+        editMode = false;
+
+        console.log('Invalidating caches...');
+        await Promise.all([
+            invalidate('app:tenants'),
+            invalidate((url) => url.pathname.includes('/tenants'))
+        ]);
+        console.log('Cache invalidation complete');
+    } catch (error) {
+        console.error('Error deleting tenant:', error);
+        alert(`Error deleting tenant: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+}
   function handleCancel() {
     selectedTenant = undefined;
     editMode = false;
-  }
-
-  function handleDeleteSuccess() {
-    selectedTenant = undefined;
-    editMode = false;
+    reset();
   }
 </script>
 
 <div class="container mx-auto p-4 flex">
   <TenantList
-    {data}
+  {tenants}
     on:edit={event => handleEdit(event.detail)}
-    on:deleteSuccess={handleDeleteSuccess}
+    on:delete={event => handleDeleteTenant(event.detail)}
   />
 
   <div class="w-1/3 pl-4">
@@ -112,19 +169,24 @@
         <TenantForm
           {data}
           {editMode}
-          {form}
+          form={form}
           {errors}
           {enhance}
           {constraints}
           {submitting}
           tenant={selectedTenant}
           on:cancel={handleCancel}
-          on:tenantSaved={() => {
+          on:tenantSaved={async () => {
             selectedTenant = undefined;
             editMode = false;
+            await invalidate('app:tenants');
           }}
         />
       </CardContent>
     </Card>
   </div>
 </div>
+
+{#if browser}
+  <SuperDebug data={form} />
+{/if}

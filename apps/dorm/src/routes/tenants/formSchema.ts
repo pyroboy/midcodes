@@ -8,6 +8,33 @@ export const TenantStatusEnum = z.enum([
     'BLACKLISTED'
 ]);
 
+
+export interface EmergencyContact {
+  name: string;
+  relationship: string;
+  phone: string;
+  email: string | null;
+  address: string;
+}
+
+
+
+
+export const defaultEmergencyContact: {
+  name: string;
+  relationship: string;
+  phone: string;
+  email: string | null;
+  address: string;
+} = {
+  name: '',
+  relationship: '',
+  phone: '',
+  email: null, // Now explicitly string | null
+  address: ''
+};
+
+
 // Emergency contact schema
 export const emergencyContactSchema = z.object({
     name: z.string().min(1, 'Emergency contact name is required'),
@@ -17,33 +44,79 @@ export const emergencyContactSchema = z.object({
     address: z.string().min(1, 'Address is required')
 });
 
-// Schema for creating a new tenant - this is your base schema
+// Base tenant type definition
+export interface BaseTenant {
+  id: number;
+  name: string;
+  contact_number: string | null;
+  email: string | null;
+  tenant_status: 'ACTIVE' | 'INACTIVE' | 'PENDING' | 'BLACKLISTED';
+  auth_id: string | null;
+  updated_at: string | null;
+  created_by: string | null;
+  emergency_contact: EmergencyContact | null;
+}
+
+// Lease relationship types
+export interface LeaseWithRelations {
+  id: string;
+  type: 'BEDSPACER' | 'PRIVATEROOM';
+  status: 'ACTIVE' | 'INACTIVE' | 'EXPIRED' | 'TERMINATED';
+  start_date: string;
+  end_date: string;
+  rent_amount: number;
+  security_deposit: number;
+  balance: number;
+  notes: string | null;
+  tenant: {
+    id: string;
+  };
+  location: {
+    id: string;
+    number: string;
+    property: {
+      id: string;
+      name: string;
+    } | null;
+  } | null;
+}
+
+// Extended tenant type with lease information
+export interface TenantWithLease extends BaseTenant {
+  lease: LeaseWithRelations | null;
+  status?: string;
+  start_date?: string;
+  end_date?: string;
+  outstanding_balance?: number;
+}
+
+// Schema for creating a new tenant
 export const tenantSchema = z.object({
   id: z.number(),
-    name: z.string()
-        .min(1, 'Name is required')
-        .max(255, 'Name must be less than 255 characters'),
-    contact_number: z.string()
-        .nullable()
-        .optional(),
-    email: z.string()
-        .email('Invalid email address')
-        .max(255, 'Email must be less than 255 characters')
-        .nullable()
-        .optional(),
-    tenant_status: TenantStatusEnum
-        .default('PENDING'),
-    auth_id: z.string()
-        .uuid('Invalid UUID format')
-        .nullable()
-        .optional(),
-    created_by: z.string()
-        .uuid('Invalid UUID format')
-        .nullable()
-        .optional(),
-    emergency_contact: emergencyContactSchema
-        .optional()
-        .nullable()
+  name: z.string()
+    .min(1, 'Name is required')
+    .max(255, 'Name must be less than 255 characters'),
+  contact_number: z.string()
+    .nullable()
+    .optional(),
+  email: z.string()
+    .email('Invalid email address')
+    .max(255, 'Email must be less than 255 characters')
+    .nullable()
+    .optional(),
+  tenant_status: TenantStatusEnum
+    .default('PENDING'),
+  auth_id: z.string()
+    .uuid('Invalid UUID format')
+    .nullable()
+    .optional(),
+  created_by: z.string()
+    .uuid('Invalid UUID format')
+    .nullable()
+    .optional(),
+  emergency_contact: emergencyContactSchema
+    .optional()
+    .nullable()
 });
 
 // Schema for updating an existing tenant
@@ -52,11 +125,10 @@ export const updateTenantSchema = tenantSchema.partial();
 // Schema for tenant response (including system-generated fields)
 export const tenantResponseSchema = tenantSchema.extend({
     id: z.number(),
-    created_at: z.string().datetime(),
     updated_at: z.string().datetime().nullable().optional()
 });
 
-// Schema specifically for the form - this matches your form fields
+// Schema specifically for the form
 export const tenantFormSchema = z.object({
   id: z.number(),
   name: z.string()
@@ -103,11 +175,10 @@ export const tenantFormSchema = z.object({
     .optional()
 });
 
-// Export all type definitions
+// Export type definitions
 export type CreateTenantInput = z.infer<typeof tenantSchema>;
 export type UpdateTenantInput = z.infer<typeof updateTenantSchema>;
 export type TenantResponse = z.infer<typeof tenantResponseSchema>;
-export type EmergencyContact = z.infer<typeof emergencyContactSchema>;
 export type TenantFormData = z.infer<typeof tenantFormSchema>;
 
 // Validation helper functions
@@ -118,17 +189,16 @@ export const validateTenantForm = (data: unknown) => {
 // Transform form data to database input
 export const transformFormToDbInput = (formData: TenantFormData): CreateTenantInput => {
     return {
-      id:formData.id,
-        name: formData.name,
-        contact_number: formData.contact_number,
-        email: formData.email,
-        emergency_contact: formData.emergency_contact || null,
-        tenant_status: 'PENDING',
-        // auth_id and created_by will be handled by the backend
+      id: formData.id,
+      name: formData.name,
+      contact_number: formData.contact_number,
+      email: formData.email,
+      emergency_contact: formData.emergency_contact || null,
+      tenant_status: 'PENDING',
     };
 };
 
-// Re-export everything in a single object if needed
+// Re-export everything in a single object
 export const TenantSchemas = {
     tenantSchema,
     tenantFormSchema,
