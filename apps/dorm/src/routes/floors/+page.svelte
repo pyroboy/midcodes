@@ -203,10 +203,7 @@
           {enhance}
           {constraints}
           on:cancel={()=>{editMode = false;reset();}}
-          on:floorSaved={async () => {
-            editMode = false;
-            await invalidate('app:floors');
-          }}
+          on:floorSaved={async () => { editMode = false; await invalidate('app:floors'); }}
         />
       </CardContent>
     </Card>

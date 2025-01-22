@@ -20,40 +20,20 @@
     constraints: SuperForm<z.infer<typeof floorSchema>>['constraints'];
   }
 
-  let {
-    data,
-    editMode = false,
-    form,
-    errors,
-    enhance,
-    constraints
-  }: Props = $props();
+  let { data, editMode = false, form, errors, enhance, constraints }: Props = $props();
 
   const dispatch = createEventDispatcher();
 
-
      // START : PATTERN FOR DATABASE BASED SELECTION ITEMS
-  let selectedPropertyId = $state($form.property_id?.toString() || undefined);
-  let derivedProperties = $derived(data.properties.map((f) => ({ value: f.id.toString(), label: f.name })));
-  
-  $effect(() => {
-    if (selectedPropertyId) {
-      const parsedId = parseInt(selectedPropertyId);
-      if (!isNaN(parsedId)) {
-        $form.property_id = parsedId;
-      }
-    }
-  });
-  $effect(() => {
-    const newValue = $form.property_id?.toString();
-    if (newValue !== selectedPropertyId) {
-      selectedPropertyId = newValue;
-    }
-  });
+  let derivedProperties = $derived( data.properties.map(p => ({ value: p.id.toString(), label: p.name })) );
+  let selectedProperty = {
+    get value() { return $form.property_id?.toString() || undefined },
+    set value(id) { $form.property_id = id ? Number(id) || 0 : 0 }
+  };
   let triggerContent = $derived(
-    !selectedPropertyId ? 
-    "Select a property" : 
-    data.properties.find(p => p.id.toString() === selectedPropertyId)?.name ?? "Select a property"
+    selectedProperty.value 
+      ? data.properties.find(p => p.id.toString() === selectedProperty.value)?.name ?? "Select a property"
+      : "Select a property"
   );
     // END : PATTERN FOR DATABASE BASED SELECTION ITEMS
 
@@ -63,13 +43,7 @@
   // END: PATTERN FOR ENUM BASED SELECTION ITEMS
 </script>
 
-<form
-  method="POST"
-  action={editMode ? "?/update" : "?/create"}
-  use:enhance
-  class="space-y-4"
-  novalidate
->
+<form method="POST" action={editMode ? "?/update" : "?/create"} use:enhance class="space-y-4" novalidate >
   {#if editMode && $form.id}
     <input type="hidden" name="id" bind:value={$form.id} />
   {/if}
@@ -79,7 +53,7 @@
     <Select.Root    
       type="single"
       name="property_id"
-      bind:value={selectedPropertyId}
+      bind:value={selectedProperty.value}
     >
       <Select.Trigger 
         class="w-full"
