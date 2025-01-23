@@ -8,7 +8,17 @@
     total: 0
   })
 
-  let recentRequests = $state([]);
+  interface Request {
+    id: string;
+    studentId: string;
+    studentName: string;
+    requestDate: string;
+    status: string;
+    copies: number;
+    deliveryMethod: string;
+  }
+
+  let recentRequests = $state<Request[]>([]);
   let isLoading = $state(true);
   let error = $state('');
 
@@ -23,20 +33,25 @@
         completed: 12,
         total: 20
       };
+      
       recentRequests = [
         {
           id: '1',
           studentId: 'ST001',
           studentName: 'John Doe',
           requestDate: '2024-01-15',
-          status: 'pending'
+          status: 'pending',
+          copies: 2,
+          deliveryMethod: 'pickup'
         },
         {
           id: '2',
           studentId: 'ST002',
           studentName: 'Jane Smith',
           requestDate: '2024-01-14',
-          status: 'processing'
+          status: 'processing',
+          copies: 1,
+          deliveryMethod: 'email'
         }
       ];
     } catch (e) {
@@ -46,7 +61,7 @@
     }
   });
 
-  function getStatusBadgeClass(status) {
+  function getStatusBadgeClass(status: string): string {
     switch (status) {
       case 'pending':
         return 'bg-yellow-100 text-yellow-800';

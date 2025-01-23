@@ -2,9 +2,9 @@
   import "../app.css";
   import { page } from "$app/stores";
   import { onMount } from "svelte";
-
+  
   let isAdmin = false;
-
+  
   onMount(() => {
     // TODO: Implement authentication and role check
     // This will be replaced with actual auth logic

@@ -4,7 +4,17 @@
   let studentId = '';
   let isLoading = false;
   let error = '';
-  let requests = [];
+  interface Request {
+    id: string;
+    studentId: string;
+    studentName: string;
+    requestDate: string;
+    status: string;
+    copies: number;
+    deliveryMethod: string;
+  }
+
+  let requests: Request[] = [];
   let hasSearched = false;
 
   async function searchRequests() {
@@ -24,6 +34,8 @@
       requests = [
         {
           id: '1',
+          studentId: 'ST001',
+          studentName: 'John Doe',
           status: 'processing',
           requestDate: '2024-01-15',
           copies: 2,
@@ -31,6 +43,8 @@
         },
         {
           id: '2',
+          studentId: 'ST002',
+          studentName: 'Jane Smith',
           status: 'completed',
           requestDate: '2024-01-10',
           copies: 1,
@@ -45,7 +59,7 @@
     }
   }
 
-  function getStatusBadgeClass(status) {
+  function getStatusBadgeClass(status: string): string {
     switch (status) {
       case 'processing':
         return 'bg-yellow-100 text-yellow-800';

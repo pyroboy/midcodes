@@ -10,6 +10,8 @@ const config = {
       split: false
     }),
     alias: {
+      "@/*": "./src/lib/*",
+      "@ui": "./src/lib/components/ui",
       // $lib is built-in, but included for completeness
       // '$app/*': './tests/mocks/$app/*',
       // '$env/*': './tests/mocks/$env/*',
