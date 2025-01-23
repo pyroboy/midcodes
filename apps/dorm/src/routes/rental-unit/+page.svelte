@@ -9,7 +9,6 @@
   import { invalidate } from '$app/navigation';
   import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
   import type { PageData } from './$types';
-  import type { SuperValidated } from 'sveltekit-superforms';
   import type { RentalUnitResponse } from './+page.server';
   import { browser } from "$app/environment";
 

@@ -17,7 +17,6 @@
   let { data }: Props = $props();
   let { properties, form } = $derived(data);
   let editMode = $state(false);
-  let selectedProperty: any | undefined = $state();
 
 
   const { form: formData, enhance, errors, constraints ,reset} = superForm(data.form, {

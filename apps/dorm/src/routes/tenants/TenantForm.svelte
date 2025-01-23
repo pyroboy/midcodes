@@ -52,9 +52,12 @@
   let triggerStatus = $derived($form.tenant_status || "Select a status");
 
 
+
+    // START: PATTERN FOR OBJECT BASED SELECTION ITEMS
   // so far this is the best way to 
   // set each Objects Values with getter/setter
   // a merge between $form and defaultEmergencyContact
+
 function createEmergencyContactBindings() {
   const fields = ['name', 'relationship', 'phone', 'email', 'address'] as const;
   const bindings = {} as Record<typeof fields[number], string>;
@@ -78,6 +81,9 @@ function createEmergencyContactBindings() {
 }
 
 const emergencyContact = createEmergencyContactBindings();
+
+    // END: PATTERN FOR OBJECT BASED SELECTION ITEMS
+
 
   function getStatusColor(status: string) {
     switch (status) {

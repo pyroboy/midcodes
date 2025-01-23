@@ -1,118 +1,116 @@
 <script lang="ts">
   import { superForm } from 'sveltekit-superforms/client';
+  import { zodClient } from 'sveltekit-superforms/adapters';
+  import { browser } from "$app/environment";
+  import { invalidate } from '$app/navigation';
   import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
-  import { zod } from 'sveltekit-superforms/adapters';
-  import type { PageData } from './$types';
-  import { Button } from "$lib/components/ui/button";
-  import * as Dialog from "$lib/components/ui/dialog";
-  import { toast } from "svelte-french-toast";
-  import type { z } from 'zod';
-  import { leaseSchema } from './formSchema';
   import LeaseForm from './LeaseForm.svelte';
   import LeaseList from './LeaseList.svelte';
-
+  import type { PageData } from './$types';
+  import { leaseSchema } from './formSchema';
+  import type { z } from 'zod';
 
   interface Props {
     data: PageData;
   }
 
-  let { data }: Props = $props();
   type FormType = z.infer<typeof leaseSchema>;
-
-
-
   
-  let showForm = false;
+  let { data }: Props = $props();
+  let leases = $state(data.leases);
   let editMode = $state(false);
-  let selectedLease: FormType | undefined = $state(undefined);
-  let showDeleteConfirm = $state(false);
+  let selectedLease: FormType | undefined = $state();
 
-  const { form, errors, enhance, reset, delayed, constraints, submitting } = superForm(data.form, {
-    validators: zod(leaseSchema),
-    resetForm: true,
+  $effect(() => {
+    leases = structuredClone(data.leases);
+  });
+
+  const { form, enhance, errors, constraints, submitting, reset } = superForm(data.form, {
+    id: 'lease-form',
+    validators: zodClient(leaseSchema),
+    validationMethod: 'oninput',
+    dataType: 'json',
     taintedMessage: null,
-    onUpdated: ({ form }) => {
-      if (!form.valid) {
-        // Access error messages from the result
-        const formData = form.data as Record<string, any>;
-        const errorMessage = formData.error?.message || 'Failed to save lease';
-        toast.error(errorMessage);
-        return;
+    resetForm: true,
+    onError: ({ result }) => {
+      console.error('Form submission error:', {
+        error: result.error,
+        status: result.status
+      });
+      if (result.error) {
+        console.error('Server error:', result.error.message);
       }
-      if ('success' in form.data && form.data.success) {
-        toast.success('Lease saved successfully');
-        showForm = false;
+    },
+    onResult: async ({ result }) => {
+      if (result.type === 'success') {
         editMode = false;
+        selectedLease = undefined;
+        await invalidate('app:leases');
         reset();
       }
-    },
-    onSubmit: () => {
-      console.log('Form submitted with values:', $form);
-    },
-    onResult: ({ result }) => {
-    console.log('Server response:', result);
-  },
-
-    onError: ({ result }) => {
-      console.error('Form submission error:', result.error);
-      const errorMessage = result.error?.message || 'An error occurred';
-      toast.error(errorMessage);
     }
   });
 
   function handleEdit(lease: FormType) {
     editMode = true;
-    showForm = true;
     selectedLease = lease;
-    $form = {
-      id: lease.id,
-      tenantIds: lease.tenantIds,
-      rental_unit_id: lease.rental_unit_id,
-      name: lease.name,
-      status: lease.status,
-      start_date: lease.start_date,
-      end_date: lease.end_date,
-      terms_month: lease.terms_month,
-      security_deposit: lease.security_deposit,
-      rent_amount: lease.rent_amount,
-      notes: lease.notes || '',
-      balance: lease.balance
-    };
+    $form = { ...lease };
   }
 
+  async function handleDeleteLease(lease: FormType) {
+    if (!confirm(`Are you sure you want to delete lease ${lease.name}?`)) return;
 
+    const formData = new FormData();
+    formData.append('id', String(lease.id));
+    
+    try {
+      const result = await fetch('?/delete', {
+        method: 'POST',
+        body: formData
+      });
+      const response = await result.json();
+
+      if (result.ok) {
+        leases = leases.filter(l => l.id !== lease.id);
+        editMode = false;
+        selectedLease = undefined;
+        await Promise.all([
+          invalidate('app:leases'),
+          invalidate(url => url.pathname.includes('/leases'))
+        ]);
+      } else {
+        console.error('Delete failed:', response);
+        alert(response.message || 'Failed to delete lease');
+      }
+    } catch (error) {
+      console.error('Error deleting lease:', error);
+      alert(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
 
   function handleCancel() {
-    showForm = false;
+    selectedLease = undefined;
     editMode = false;
     reset();
   }
-
-  function handleDelete() {
-    showDeleteConfirm = true;
-  }
-
 </script>
 
-<div class="container mx-auto p-4 flex">
-  <!-- Left side: List -->
-  <div class="w-2/3">
+<div class="container mx-auto p-4 flex flex-col lg:flex-row gap-4">
+  <div class="w-full lg:w-2/3">
     <div class="flex justify-between items-center mb-4">
       <h1 class="text-2xl font-bold">Leases</h1>
     </div>
-
-    <LeaseList 
-    leases={data.leases} 
-    {data} 
-  />
+    <LeaseList
+      {leases}
+      on:edit={event => handleEdit(event.detail)}
+      on:delete={event => handleDeleteLease(event.detail)}
+    />
   </div>
 
-  <!-- Right side: Form -->
-  <div class="w-1/3 pl-4">
+  <div class="w-full lg:w-1/3">
     <div class="flex justify-between items-center mb-4">
       <h1 class="text-2xl font-bold">{editMode ? 'Edit' : 'Add'} Lease</h1>
     </div>
-
     <LeaseForm
       {data}
       {editMode}
@@ -121,31 +119,11 @@
       {enhance}
       {constraints}
       {submitting}
-      entity={selectedLease}
       on:cancel={handleCancel}
-      on:delete={handleDelete}
     />
   </div>
 </div>
 
-<Dialog.Root bind:open={showDeleteConfirm}>
-  <Dialog.Content>
-    <Dialog.Header>
-      <Dialog.Title>Delete Lease</Dialog.Title>
-      <Dialog.Description>
-        Are you sure you want to delete this lease? This action cannot be undone.
-      </Dialog.Description>
-    </Dialog.Header>
-    <div class="flex justify-end space-x-2">
-      <Button variant="outline" onclick={() => showDeleteConfirm = false}>
-        Cancel
-      </Button>
-      <form method="POST" action="?/delete" use:enhance>
-        <input type="hidden" name="id" value={$form.id} />
-        <Button type="submit" variant="destructive">Delete</Button>
-      </form>
-    </div>
-  </Dialog.Content>
-</Dialog.Root>
-
-<SuperDebug data={$form} />
+{#if browser}
+  <SuperDebug data={form} />
+{/if}
