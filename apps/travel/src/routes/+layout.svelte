@@ -1,12 +1,19 @@
 <script>
 	import Header from './Header.svelte';
 	import '../app.css';
+	/**
+	 * @typedef {Object} Props
+	 * @property {import('svelte').Snippet} [children]
+	 */
+
+	/** @type {Props} */
+	let { children } = $props();
 </script>
 
 <div class="app">
 	<Header />
 	<main>
-		<slot />
+		{@render children?.()}
 	</main>
 </div>
 
@@ -19,6 +26,6 @@
 
 	main {
 		flex: 1;
-		margin-top: 4rem;
+		/* Remove margin-top since Header is not being used */
 	}
 </style>

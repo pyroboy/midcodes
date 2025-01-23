@@ -1,111 +1,121 @@
 <script>
 	import { page } from '$app/stores';
-</script>
-
-<header>
-	<div class="container">
-		<a href="/" class="logo">
-			Cabilao Cliff Diving
+	import { browser } from '$app/environment';
+	let isScrolled = false;
+  
+	if (browser) {
+	  window.addEventListener('scroll', () => {
+		isScrolled = window.scrollY > 50;
+	  });
+	}
+  </script>
+  
+  <header class:scrolled={isScrolled}>
+	<div class="header-container">
+	  <a href="/" class="logo">
+		<img src="https://i.ibb.co/9q9XKrt/clipart1133673.png" alt="clipart1133673" >
+	  </a>
+  
+	  <nav>
+		<a href="/" class:active={$page.url.pathname === '/'}>HOME</a>
+		<a href="/about" class:active={$page.url.pathname === '/about'}>ABOUT</a>
+		<!-- <a href="/waves" class:active={$page.url.pathname === '/waves'}>WAVES</a> -->
+		<a href="/gallery" class:active={$page.url.pathname === '/gallery'}>GALLERY</a>
+	  </nav>
+  
+	  <div class="cta-buttons">
+		<a href="https://wa.me/yourphonenumber" class="whatsapp-btn">
+		  WHATSAPP
 		</a>
-
-		<nav>
-			<ul>
-				<li aria-current={$page.url.pathname === '/' ? 'page' : undefined}>
-					<a href="/">Home</a>
-				</li>
-				<li aria-current={$page.url.pathname === '/packages' ? 'page' : undefined}>
-					<a href="/packages">Packages</a>
-				</li>
-				<li aria-current={$page.url.pathname === '/gallery' ? 'page' : undefined}>
-					<a href="/gallery">Gallery</a>
-				</li>
-				<li aria-current={$page.url.pathname === '/contact' ? 'page' : undefined}>
-					<a href="/contact">Contact</a>
-				</li>
-			</ul>
-		</nav>
+		<!-- <a href="/book" class="book-btn">BOOK NOW</a> -->
+	  </div>
 	</div>
-</header>
-
-<style>
+  </header>
+  
+  <style>
 	header {
-		background: rgba(255, 255, 255, 0.95);
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-		position: fixed;
-		top: 0;
-		left: 0;
-		right: 0;
-		z-index: 1000;
-		backdrop-filter: blur(10px);
+	  position: fixed;
+	  top: 0;
+	  left: 0;
+	  right: 0;
+	  z-index: 1000;
+	  padding: 1rem 2rem;
+	  transition: all 0.3s ease;
+	  background: transparent;
 	}
-
-	.container {
-		max-width: 1200px;
-		margin: 0 auto;
-		padding: 1rem 2rem;
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
+  
+	header.scrolled {
+	  background: rgba(255, 255, 255, 0.95);
+	  backdrop-filter: blur(10px);
+	  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 	}
-
-	.logo {
-		font-size: 1.5rem;
-		font-weight: 700;
-		color: var(--color-theme-1);
-		text-decoration: none;
-		letter-spacing: -0.5px;
+  
+	.header-container {
+	  max-width: 1400px;
+	  margin: 0 auto;
+	  display: flex;
+	  justify-content: space-between;
+	  align-items: center;
 	}
-
+  
+	.logo img {
+	  height: 40px;
+	}
+  
 	nav {
-		display: flex;
-		align-items: center;
+	  display: flex;
+	  gap: 2.5rem;
 	}
-
-	ul {
-		display: flex;
-		gap: 2rem;
-		list-style: none;
-		margin: 0;
-		padding: 0;
-	}
-
-	li {
-		position: relative;
-	}
-
-	li[aria-current='page']::after {
-		content: '';
-		position: absolute;
-		left: 0;
-		right: 0;
-		bottom: -4px;
-		height: 2px;
-		background: var(--color-theme-1);
-	}
-
+  
 	nav a {
-		color: #333;
-		text-decoration: none;
-		font-weight: 500;
-		font-size: 1rem;
-		transition: color 0.2s;
+	  color: white;
+	  text-decoration: none;
+	  font-weight: 500;
+	  letter-spacing: 1px;
+	  transition: color 0.3s ease;
 	}
-
-	nav a:hover {
-		color: var(--color-theme-1);
+  
+	.scrolled nav a {
+	  color: #333;
 	}
-
-	@media (max-width: 768px) {
-		.container {
-			padding: 1rem;
-		}
-
-		ul {
-			gap: 1rem;
-		}
-
-		.logo {
-			font-size: 1.2rem;
-		}
+  
+	nav a:hover, nav a.active {
+	  color: var(--color-theme-1);
 	}
-</style>
+  
+	.cta-buttons {
+	  display: flex;
+	  gap: 1rem;
+	  align-items: center;
+	}
+  
+	.whatsapp-btn, .book-btn {
+	  padding: 0.5rem 1rem;
+	  text-decoration: none;
+	  font-weight: 500;
+	  letter-spacing: 1px;
+	  border-radius: 4px;
+	  transition: all 0.3s ease;
+	}
+  
+	.whatsapp-btn {
+	  color: white;
+	  display: flex;
+	  align-items: center;
+	  gap: 0.5rem;
+	}
+  
+	.book-btn {
+	  background: #ff4b4b;
+	  color: white;
+	}
+  
+	.book-btn:hover {
+	  background: #ff3333;
+	  transform: translateY(-2px);
+	}
+  
+	.scrolled .whatsapp-btn {
+	  color: #333;
+	}
+  </style>
