@@ -1435,7 +1435,7 @@ const options = {
   root,
   service_worker: false,
   templates: {
-    app: ({ head, body, assets, nonce, env }) => '<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8" />\n  <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n  <meta name="description" content="Dokmutya - Building a Healthier First District" />\n  <title>Dokmutya</title>\n  <link rel="icon" href="/favicon.png" />\n  <link rel="stylesheet" href="' + assets + '/app.css" />\n  ' + head + '\n</head>\n<body>\n  <div id="app">' + body + "</div>\n</body>\n</html>\n",
+    app: ({ head, body, assets, nonce, env }) => '<!DOCTYPE html>\r\n<html lang="en">\r\n<head>\r\n  <meta charset="UTF-8" />\r\n  <meta name="viewport" content="width=device-width, initial-scale=1.0" />\r\n  <meta name="description" content="Dokmutya - Building a Healthier First District" />\r\n  <title>Dokmutya</title>\r\n  <link rel="icon" href="/favicon.png" />\r\n  <link rel="stylesheet" href="' + assets + '/app.css" />\r\n  ' + head + '\r\n</head>\r\n<body>\r\n  <div id="app">' + body + "</div>\r\n</body>\r\n</html>\r\n",
     error: ({ status, message }) => '<!doctype html>\n<html lang="en">\n	<head>\n		<meta charset="utf-8" />\n		<title>' + message + `</title>
 
 		<style>
@@ -1507,7 +1507,7 @@ const options = {
 		<div class="error">
 			<span class="status">` + status + '</span>\n			<div class="message">\n				<h1>' + message + "</h1>\n			</div>\n		</div>\n	</body>\n</html>\n"
   },
-  version_hash: "1y39dxy"
+  version_hash: "ugmdfg"
 };
 async function get_hooks() {
   let handle;

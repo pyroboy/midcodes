@@ -88,18 +88,14 @@
       "_attributes.js"
     ],
     "css": [
-      "_app/immutable/assets/_layout.BNrPH085.css"
+      "_app/immutable/assets/_layout.owFFD8Sx.css"
     ]
   },
   "src/routes/+page.svelte": {
     "file": "entries/pages/_page.svelte.js",
     "name": "entries/pages/_page.svelte",
     "src": "src/routes/+page.svelte",
-    "isEntry": true,
-    "imports": [
-      "_index.js",
-      "_escaping.js"
-    ]
+    "isEntry": true
   },
   "src/routes/about/+page.server.ts": {
     "file": "entries/pages/about/_page.server.ts.js",

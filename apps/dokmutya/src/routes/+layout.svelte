@@ -80,8 +80,8 @@ const handleScroll = () => {
       <ul class="hidden md:flex space-x-8">
         <li><a href="{base}/about" class="transition-colors {hasScrolled ? 'text-gray-700 hover:text-blue-600' : 'text-white/90 hover:text-white'}">About</a></li>
         <li><a href="{base}/cv" class="transition-colors {hasScrolled ? 'text-gray-700 hover:text-blue-600' : 'text-white/90 hover:text-white'}">Priorities</a></li>
-        <li><a href="{base}/#events" class="transition-colors {hasScrolled ? 'text-gray-700 hover:text-blue-600' : 'text-white/90 hover:text-white'}">Events</a></li>
-        <li><a href="{base}/#contact" class="transition-colors {hasScrolled ? 'text-gray-700 hover:text-blue-600' : 'text-white/90 hover:text-white'}">Contact</a></li>
+        <li><a href="{base}/#priorities" class="transition-colors {hasScrolled ? 'text-gray-700 hover:text-blue-600' : 'text-white/90 hover:text-white'}">Events</a></li>
+        <li><a href="{base}/#biography" class="transition-colors {hasScrolled ? 'text-gray-700 hover:text-blue-600' : 'text-white/90 hover:text-white'}">Contact</a></li>
       </ul>
     </div>
 
@@ -90,8 +90,8 @@ const handleScroll = () => {
         <ul class="space-y-4">
           <li><a href="{base}/about" class="block px-2 py-1 {hasScrolled ? 'text-gray-700 hover:text-blue-600' : 'text-white hover:text-white/80'}" onclick={closeMenu}>About</a></li>
           <li><a href="{base}/cv" class="block px-2 py-1 {hasScrolled ? 'text-gray-700 hover:text-blue-600' : 'text-white hover:text-white/80'}" onclick={closeMenu}>Priorities</a></li>
-          <li><a href="{base}/#events" class="block px-2 py-1 {hasScrolled ? 'text-gray-700 hover:text-blue-600' : 'text-white hover:text-white/80'}" onclick={closeMenu}>Events</a></li>
-          <li><a href="{base}/#contact" class="block px-2 py-1 {hasScrolled ? 'text-gray-700 hover:text-blue-600' : 'text-white hover:text-white/80'}" onclick={closeMenu}>Contact</a></li>
+          <li><a href="{base}/#priorities" class="block px-2 py-1 {hasScrolled ? 'text-gray-700 hover:text-blue-600' : 'text-white hover:text-white/80'}" onclick={closeMenu}>Events</a></li>
+          <li><a href="{base}/#biography" class="block px-2 py-1 {hasScrolled ? 'text-gray-700 hover:text-blue-600' : 'text-white hover:text-white/80'}" onclick={closeMenu}>Contact</a></li>
         </ul>
       </div>
     {/if}

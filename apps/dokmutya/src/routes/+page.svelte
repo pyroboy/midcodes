@@ -80,7 +80,7 @@
 <!-- Navigation Menu -->
 <!-- Navigation Menu -->
 <div class="w-full grid grid-cols-3">
-    <a href="#education" class="flex flex-col items-center justify-center py-6 bg-[#3CB4AC] text-white hover:brightness-95 transition-all">
+    <a href="#biography" class="flex flex-col items-center justify-center py-6 bg-[#3CB4AC] text-white hover:brightness-95 transition-all">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
             <path d="M8 7h8" />
@@ -90,7 +90,7 @@
         <span class="text-lg font-medium">Education</span>
     </a>
     
-    <a href="#public-service" class="flex flex-col items-center justify-center py-6 bg-[#CC0001] text-white hover:brightness-95 transition-all">
+    <a href="#biography" class="flex flex-col items-center justify-center py-6 bg-[#CC0001] text-white hover:brightness-95 transition-all">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
         </svg>
@@ -246,16 +246,16 @@
 <div class="relative bg-[#3CB4AC] min-h-[600px]">
     <!-- Navigation Tabs -->
     <div class="grid grid-cols-4 text-white">
-        <a href="#mothers" class="bg-[#3CB4AC] py-4 text-center hover:bg-opacity-90 transition-all text-xl font-medium">
+        <a href="#biography" class="bg-[#3CB4AC] py-4 text-center hover:bg-opacity-90 transition-all text-xl font-medium">
             Mothers
         </a>
-        <a href="#tourism" class="bg-[#1B4D4C] py-4 text-center hover:bg-opacity-90 transition-all text-xl font-medium">
+        <a href="#biography" class="bg-[#1B4D4C] py-4 text-center hover:bg-opacity-90 transition-all text-xl font-medium">
             Tourism
         </a>
-        <a href="#youth" class="bg-[#3CB4AC] py-4 text-center hover:bg-opacity-90 transition-all text-xl font-medium">
+        <a href="#biography" class="bg-[#3CB4AC] py-4 text-center hover:bg-opacity-90 transition-all text-xl font-medium">
             Youth
         </a>
-        <a href="#agriculture" class="bg-[#1A4D3E] py-4 text-center hover:bg-opacity-90 transition-all text-xl font-medium">
+        <a href="#biography" class="bg-[#1A4D3E] py-4 text-center hover:bg-opacity-90 transition-all text-xl font-medium">
             Agriculture
         </a>
     </div>
