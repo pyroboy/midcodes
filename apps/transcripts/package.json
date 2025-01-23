@@ -1,0 +1,54 @@
+{
+	"name": "transripts",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"serve:edge": "supabase functions serve role-emulation --env-file .env.local",
+		"deploy:edge": "supabase functions deploy role-emulation",
+		"build": "vite build",
+		"preview": "vite preview",
+		"test": "npm run test:integration && npm run test:unit",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"lint": "prettier --check . && eslint .",
+		"format": "prettier --write .",
+		"test:integration": "playwright test",
+		"test:unit": "vitest",
+		"clean": "rm -rf .svelte-kit build node_modules/.cache/turbo"
+	},
+  "devDependencies": {
+    "@sveltejs/adapter-vercel": "^5.5.0",
+		
+    "@sveltejs/kit": "^2.12.1",
+    "@sveltejs/vite-plugin-svelte": "^4.0.0",
+    "@tailwindcss/typography": "^0.5.15",
+    "tailwind-merge": "^2.5.4",
+    "tailwind-variants": "^0.3.1",
+    "tailwindcss": "^3.4.9",
+    "tailwindcss-animate": "^1.0.7",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.31",
+    "prettier": "^3.1.0",
+    "prettier-plugin-svelte": "^3.1.0",
+  "svelte": "^5.0.0",
+    "svelte-check": "^3.6.0",
+	"typescript": "^5.5.0",
+		"vite": "^5.4.11",
+		"vitest": "^1.0.0",
+		"zod": "^3.23.8"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.5.2",
+    "@supabase/supabase-js": "^2.46.1",
+    "echarts": "^5.4.3",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.0.0",
+    "tailwind-merge": "^2.0.0"
+  
+  },
+	"engines": {
+		"node": "^20.0.0"
+	}
+}
