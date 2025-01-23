@@ -35,120 +35,275 @@
 </script>
 
 <main class="font-inter">
-    <section class="relative bg-cover bg-center text-white pt-40 pb-20 -mt-20" style="background-image: url('https://images.unsplash.com/photo-1551076805-e1869033e561?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80')">
-        <div class="absolute inset-0 bg-gradient-to-br from-blue-900/90 to-cyan-800/80"></div>
-        <div class="relative z-10 container mx-auto px-4 text-center">
-            <h1 class="text-5xl md:text-6xl font-bold mb-4">Building a Healthier First District</h1>
-            <p class="text-xl md:text-2xl font-light mb-12">Leadership that Heals, Experience that Matters</p>
-            <div class="flex flex-col md:flex-row justify-center gap-16 my-12">
-                {#each stats as stat}
-                    <div class="flex flex-col items-center">
-                        <span class="text-4xl font-bold text-yellow-400">{stat.number}</span>
-                        <span class="text-base text-white/90">{stat.label}</span>
-                    </div>
-                {/each}
-            </div>
-            <div class="flex flex-col md:flex-row gap-4 justify-center">
-                <a href="#contact" class="inline-block px-8 py-4 bg-blue-600 text-white font-semibold uppercase tracking-wider text-sm rounded hover:bg-blue-500 transform hover:-translate-y-0.5 transition-all">Join Our Campaign</a>
-                <a href="#priorities" class="inline-block px-8 py-4 border-2 border-white text-white font-semibold uppercase tracking-wider text-sm rounded hover:bg-white/10 transform hover:-translate-y-0.5 transition-all">Learn More</a>
-            </div>
+    <section class="relative h-screen w-full overflow-hidden">
+        <!-- Background Image Container -->
+        <div 
+            class="absolute inset-0 w-full h-full bg-cover bg-center bg-no-repeat"
+            style="background-image: url('https://i.ibb.co/sjwDsCJ/anang.jpg'); background-size: cover;"
+        ></div>
+        <div class="absolute inset-0 bg-emerald-600 opacity-30 md:opacity-0"></div>
+        <!-- Contact Information - Top Right -->
+        <div class="absolute top-4 right-4 md:top-8 md:right-8 text-right z-20">
+            <p class="text-white text-base md:text-lg mb-1 md:mb-2">To support, please contact:</p>
+            <p class="text-white text-2xl md:text-4xl font-bold mb-1">09188888888</p>
+            <p class="text-white text-xl md:text-2xl">mktm@gmail.com</p>
         </div>
-    </section>
-
-    <section id="about" class="py-20">
-        <div class="container mx-auto px-4">
-            <div class="text-center mb-16">
-                <h2 class="text-3xl font-bold">Mission & Vision</h2>
-                <div class="w-16 h-1 bg-blue-600 mx-auto mt-4"></div>
-            </div>
-            <div class="grid md:grid-cols-2 gap-12">
-                <div class="bg-white p-8 rounded-lg shadow-lg hover:-translate-y-1 transition-transform">
-                    <div class="text-2xl font-semibold text-blue-600 mb-4">Mission</div>
-                    <p class="text-gray-700">To provide accessible, quality healthcare services to every citizen of Bohol's First District through innovative programs and dedicated leadership.</p>
+        
+        <!-- Main Content -->
+        <div class="relative z-10 container px-4 h-full flex items-center justify-start ml-[5%] md:ml-[15%]">
+            <div class="max-w-2xl">
+                <div class="text-white">
+                    <p class="text-3xl md:text-5xl font-bold mb-2 md:mb-3">Dok</p>
+                    <h1 class="text-5xl md:text-8xl -mt-4 font-bold mb-3 md:mb-4">MUTYA TIROL</h1>
+                    <div class="flex items-center gap-2 -mt-4 md:gap-4 mb-3 md:mb-4">
+                        <span class="text-xl md:text-3xl font-medium">For FIRST DISTRICT</span>
+                        <div class="h-0.5 bg-white flex-none md:flex-grow"></div>
+                    </div>
+                    <h2 class="text-4xl md:text-6xl font-bold mb-4 md:mb-6">BOARD MEMBER</h2>
+                    <p class="text-lg md:text-2xl font-light leading-relaxed max-w-xl">
+                        With a passion for service, Dok Mutya believes that true wellness comes from nurturing both body and community.
+                    </p>
+                    <button
+                        class="mt-6 md:mt-8 px-6 md:px-8 py-3 md:py-4 bg-black/20 border-2 border-white text-white text-lg md:text-xl font-semibold hover:bg-black/30 transition-all"
+                    >
+                        Support Her Cause
+                    </button>
                 </div>
-                <div class="bg-white p-8 rounded-lg shadow-lg hover:-translate-y-1 transition-transform">
-                    <div class="text-2xl font-semibold text-blue-600 mb-4">Vision</div>
-                    <p class="text-gray-700">A First District where every resident has access to modern, efficient, and compassionate healthcare services.</p>
+            </div>
+        </div>
+        
+        
+        
+        
+    </section>
+    <section id="about" >
+<!-- Navigation Menu -->
+<!-- Navigation Menu -->
+<div class="w-full grid grid-cols-3">
+    <a href="#education" class="flex flex-col items-center justify-center py-6 bg-[#3CB4AC] text-white hover:brightness-95 transition-all">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z" />
+            <path d="M8 7h8" />
+            <path d="M8 11h8" />
+            <path d="M8 15h5" />
+        </svg>
+        <span class="text-lg font-medium">Education</span>
+    </a>
+    
+    <a href="#public-service" class="flex flex-col items-center justify-center py-6 bg-[#CC0001] text-white hover:brightness-95 transition-all">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+        </svg>
+        <span class="text-lg font-medium">Public Service</span>
+    </a>
+    
+    <a href="#biography" class="flex flex-col items-center justify-center py-6 bg-[#1B4D4C] text-white hover:brightness-95 transition-all">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mb-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
+        </svg>
+        <span class="text-lg font-medium">Biography</span>
+    </a>
+</div>
+
+<!-- Content Sections -->
+<div class="container mx-auto px-4 py-12">
+    <!-- First Achievement Block -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
+        <div class="bg-[#EDF1F1] aspect-video">
+            <div class="w-full h-full flex items-center justify-center text-[#3CB4AC]">
+                IMAGE HERE
+            </div>
+        </div>
+        <div class="flex flex-col justify-center">
+            <h2 class="text-3xl md:text-4xl font-bold text-[#1B4D4C] mb-4">
+                Founded the largest hospital in Bohol
+            </h2>
+            <p class="text-gray-700">
+                Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+            </p>
+        </div>
+    </div>
+
+    <!-- Second Achievement Block -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div class="flex flex-col justify-center md:order-1 order-2">
+            <h2 class="text-3xl md:text-4xl font-bold text-[#1B4D4C] mb-4">
+                Headed 3 Major Hospitals in Bohol
+            </h2>
+            <p class="text-gray-700 mb-6">
+                Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat.
+            </p>
+            <button class="text-[#3CB4AC] border-2 border-[#3CB4AC] px-8 py-2 w-fit hover:bg-[#3CB4AC] hover:text-white transition-all">
+                See Statistic
+            </button>
+        </div>
+        <div class="bg-[#EDF1F1] aspect-video md:order-2 order-1">
+            <div class="w-full h-full flex items-center justify-center text-[#3CB4AC]">
+                IMAGE HERE
+            </div>
+        </div>
+    </div>
+</div>
+    </section>
+
+    <section id="priorities">
+      <!-- Career Highlights Section -->
+<div class="bg-[#3CB4AC] p-8 md:p-12">
+    <div class="container mx-auto">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+            <!-- Left Content -->
+            <div class="text-white">
+                <h3 class="uppercase text-sm font-medium mb-4">CAREER HIGHLIGHTS</h3>
+                <h2 class="text-4xl md:text-5xl font-bold mb-4">Put the Title of the Photo Here</h2>
+                <p class="text-lg opacity-90">
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore
+                </p>
+            </div>
+            <!-- Right Image -->
+            <div class="relative">
+                <img 
+                    src="https://i.ibb.co/sjwDsCJ/anang.jpg" 
+                    alt="Career Highlight" 
+                    class="w-full rounded-lg"
+                />
+                <!-- Dots Navigation -->
+                <div class="flex justify-center mt-4 gap-1">
+                    <div class="h-2 w-2 rounded-full bg-white"></div>
+                    <div class="h-2 w-2 rounded-full bg-white opacity-50"></div>
+                    <div class="h-2 w-2 rounded-full bg-white opacity-50"></div>
+                    <div class="h-2 w-2 rounded-full bg-white opacity-50"></div>
+                    <div class="h-2 w-2 rounded-full bg-white opacity-50"></div>
                 </div>
             </div>
         </div>
-    </section>
+    </div>
+</div>
 
-    <section id="priorities" class="bg-gray-50 py-20">
-        <div class="container mx-auto px-4">
-            <div class="text-center mb-16">
-                <h2 class="text-3xl font-bold">Healthcare Priorities</h2>
-                <div class="w-16 h-1 bg-blue-600 mx-auto mt-4"></div>
-            </div>
-            <div class="grid md:grid-cols-3 gap-8">
-                {#each priorities as priority}
-                    <div class="bg-white p-8 rounded-lg shadow-md hover:-translate-y-1 transition-transform">
-                        <h3 class="text-xl font-semibold mb-4">{priority.title}</h3>
-                        <div class="w-10 h-0.5 bg-blue-600 mb-4"></div>
-                        <p class="text-gray-600">{priority.description}</p>
-                    </div>
-                {/each}
-            </div>
+<!-- Statistics Section -->
+<div class="container mx-auto py-12">
+    <div class="grid grid-cols-3 gap-4 text-center">
+        <!-- Years in Healthcare -->
+        <div>
+            <h3 class="text-[#CC0001] text-4xl md:text-5xl font-bold mb-2">20+</h3>
+            <p class="text-[#3CB4AC] text-sm">Years in Healthcare</p>
         </div>
-    </section>
-
-    <section id="events" class="py-20">
-        <div class="container mx-auto px-4">
-            <div class="text-center mb-16">
-                <h2 class="text-3xl font-bold">Upcoming Events</h2>
-                <div class="w-16 h-1 bg-blue-600 mx-auto mt-4"></div>
-            </div>
-            <div class="grid md:grid-cols-2 gap-8">
-                {#each events as event}
-                    <div class="bg-white p-8 rounded-lg shadow-md">
-                        <div class="text-lg font-semibold text-blue-600">{event.date}</div>
-                        <h3 class="text-xl font-semibold mt-2">{event.title}</h3>
-                        <div class="w-10 h-0.5 bg-blue-600 my-4"></div>
-                        <p class="text-gray-600">{event.location}</p>
-                    </div>
-                {/each}
-            </div>
+        <!-- Municipalities Served -->
+        <div>
+            <h3 class="text-[#CC0001] text-4xl md:text-5xl font-bold mb-2">30</h3>
+            <p class="text-[#3CB4AC] text-sm">Municipalities Served</p>
         </div>
-    </section>
+        <!-- Health Outreach -->
+        <div>
+            <h3 class="text-[#CC0001] text-4xl md:text-5xl font-bold mb-2">300+</h3>
+            <p class="text-[#3CB4AC] text-sm">Health Outreach</p>
+        </div>
+    </div>
+</div>
+</section>
 
-    <section id="contact" class="bg-gray-50 py-20">
-        <div class="container mx-auto px-4">
-            <div class="text-center mb-16">
-                <h2 class="text-3xl font-bold">Contact Us</h2>
-                <div class="w-16 h-1 bg-blue-600 mx-auto mt-4"></div>
-            </div>
-            <div class="grid md:grid-cols-2 gap-16">
-                <div>
-                    <div class="bg-white p-8 rounded-lg shadow-md mb-8">
-                        <h3 class="text-xl font-semibold mb-4">Campaign Headquarters</h3>
-                        <div class="w-10 h-0.5 bg-blue-600 mb-4"></div>
-                        <p class="text-gray-600 mb-2">123 Main Street, Tagbilaran City, Bohol</p>
-                        <p class="text-gray-600 mb-2">Hotline: (038) 411-2345</p>
-                        <p class="text-gray-600 mb-2">Mobile: +63 912 345 6789</p>
-                        <p class="text-gray-600">Email: info@mariasantos.ph</p>
-                    </div>
-                    <div class="flex gap-4">
-                        <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" class="flex-1 px-6 py-3 bg-white text-blue-600 font-medium rounded shadow-sm hover:bg-blue-600 hover:text-white transition-colors text-center">Facebook</a>
-                        <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" class="flex-1 px-6 py-3 bg-white text-blue-600 font-medium rounded shadow-sm hover:bg-blue-600 hover:text-white transition-colors text-center">Twitter</a>
-                        <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" class="flex-1 px-6 py-3 bg-white text-blue-600 font-medium rounded shadow-sm hover:bg-blue-600 hover:text-white transition-colors text-center">LinkedIn</a>
+<section id="biography">
+<!-- Short Bio Section -->
+<div class="bg-[#EDF1F1] p-8 md:p-12">
+    <div class="container mx-auto">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-12">
+            <!-- Left Images -->
+            <div class="space-y-6">
+                <div class="bg-white p-4 aspect-square">
+                    <div class="w-full h-full flex items-center justify-center text-[#3CB4AC]">
+                        IMAGE HERE
                     </div>
                 </div>
-                <form class="space-y-6">
-                    <div>
-                        <label for="name" class="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
-                        <input type="text" id="name" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent" required />
+                <div class="bg-white p-4 aspect-square">
+                    <div class="w-full h-full flex items-center justify-center text-[#3CB4AC]">
+                        IMAGE HERE
                     </div>
-                    <div>
-                        <label for="email" class="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
-                        <input type="email" id="email" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent" required />
-                    </div>
-                    <div>
-                        <label for="message" class="block text-sm font-medium text-gray-700 mb-2">Message</label>
-                        <textarea id="message" rows="4" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent" required></textarea>
-                    </div>
-                    <button type="submit" class="w-full px-8 py-4 bg-blue-600 text-white font-semibold uppercase tracking-wider text-sm rounded hover:bg-blue-500 transform hover:-translate-y-0.5 transition-all">Send Message</button>
-                </form>
+                </div>
+            </div>
+            <!-- Right Content -->
+            <div>
+                <h3 class="uppercase text-[#3CB4AC] text-sm font-medium mb-4">SHORT BIO</h3>
+                <h2 class="text-3xl md:text-4xl text-[#1B4D4C] font-bold mb-6">
+                    Service runs in their family
+                </h2>
+                <div class="space-y-4 text-gray-700">
+                    <p>
+                        Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+                    </p>
+                    <p>
+                        Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+                    </p>
+                </div>
             </div>
         </div>
+    </div>
+</div>
+    </section>
+
+    <section id="contact">
+       <!-- Final Section Container -->
+<!-- Final Section Container -->
+<div class="relative bg-[#3CB4AC] min-h-[600px]">
+    <!-- Navigation Tabs -->
+    <div class="grid grid-cols-4 text-white">
+        <a href="#mothers" class="bg-[#3CB4AC] py-4 text-center hover:bg-opacity-90 transition-all text-xl font-medium">
+            Mothers
+        </a>
+        <a href="#tourism" class="bg-[#1B4D4C] py-4 text-center hover:bg-opacity-90 transition-all text-xl font-medium">
+            Tourism
+        </a>
+        <a href="#youth" class="bg-[#3CB4AC] py-4 text-center hover:bg-opacity-90 transition-all text-xl font-medium">
+            Youth
+        </a>
+        <a href="#agriculture" class="bg-[#1A4D3E] py-4 text-center hover:bg-opacity-90 transition-all text-xl font-medium">
+            Agriculture
+        </a>
+    </div>
+
+    <!-- Content Container -->
+    <div class="container mx-auto px-4 md:px-8 relative">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center py-12">
+            <!-- Left Content -->
+            <div class="text-white z-10">
+                <h2 class="text-5xl md:text-6xl font-bold leading-tight mb-12">
+                    Healthier and<br />
+                    Happier 2025 Sa<br />
+                    Tanang Bol-anon!
+                </h2>
+                
+                <!-- Buttons -->
+                <div class="space-y-4">
+                    <button class="block w-full md:w-72 bg-[#1B4D4C] text-white py-3 text-xl font-medium hover:bg-opacity-90 transition-all">
+                        Support Dok Mutya
+                    </button>
+                    <button class="block w-full md:w-72 bg-[#1B4D4C] text-white py-3 text-xl font-medium hover:bg-opacity-90 transition-all">
+                        Follow Our Socials
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right Image -->
+            <div class="relative">
+                <img 
+                    src="https://i.ibb.co/sjwDsCJ/anang.jpg" 
+                    alt="Dok Mutya" 
+                    class="w-full h-auto"
+                />
+                <!-- Number 8 Overlay -->
+                <div class="absolute -right-4 -top-8 text-white text-[320px] font-bold opacity-20 leading-none">
+                    8
+                </div>
+                <!-- Heart Logo -->
+                <div class="absolute bottom-4 right-4 bg-[#CC0001] text-white p-3 rounded-full transform rotate-[-15deg]">
+                    <div class="text-center leading-tight">
+                        <div class="text-sm">DOK</div>
+                        <div class="text-sm font-bold">MUTYA</div>
+                        <div class="text-sm font-bold">TIROL</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
     </section>
 </main>
