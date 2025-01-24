@@ -27,6 +27,14 @@
 </script>
 
 <div class="admin-layout">
+    <nav class="bg-gray-800 p-4 mb-4">
+        <div class="container mx-auto">
+            <div class="flex space-x-4">
+                <a href="/admin/document-types" class="text-white hover:text-gray-300">Document Types List</a>
+                <a href="/admin/document-types/new" class="text-white hover:text-gray-300">Create Document Type</a>
+            </div>
+        </div>
+    </nav>
     {@render children?.()}
 </div>
 

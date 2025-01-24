@@ -1,15 +1,31 @@
 <script lang="ts">
   import "../app.css";
   import { page } from "$app/stores";
-  import { onMount } from "svelte";
-  
-  let isAdmin = false;
-  
-  onMount(() => {
-    // TODO: Implement authentication and role check
-    // This will be replaced with actual auth logic
-    isAdmin = $page.url.pathname.startsWith('/admin');
-  });
+  import PublicNavLinks from "$lib/components/nav/PublicNavLinks.svelte";
+  import AdminNavLinks from "$lib/components/nav/AdminNavLinks.svelte";
+  import StaffNavLinks from "$lib/components/nav/StaffNavLinks.svelte";
+
+  let currentRole: 'public' | 'admin' | 'staff' = 'public';
+
+  $: {
+    if ($page.url.pathname.startsWith('/admin/staff')) {
+      currentRole = 'staff';
+    } else if ($page.url.pathname.startsWith('/admin')) {
+      currentRole = 'admin';
+    } else {
+      currentRole = 'public';
+    }
+  }
+
+  function handleRoleChange(role: 'public' | 'admin' | 'staff') {
+    currentRole = role;
+    const paths = {
+      public: '/',
+      admin: '/admin/dashboard',
+      staff: '/admin/staff'
+    };
+    window.location.href = paths[role];
+  }
 </script>
 
 <div class="min-h-screen bg-gray-50">
@@ -20,38 +36,43 @@
           <div class="flex-shrink-0 flex items-center">
             <a href="/" class="text-xl font-bold text-gray-900">Transcript System</a>
           </div>
-          <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
-            {#if isAdmin}
-              <a
-                href="/admin/dashboard"
-                class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-              >
-                Dashboard
-              </a>
-              <a
-                href="/admin/orders"
-                class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-              >
-                Requests
-              </a>
-            {:else}
-              <a
-                href="/request"
-                class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-              >
-                Request Transcript
-              </a>
-              <a
-                href="/status"
-                class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-              >
-                Check Status
-              </a>
-            {/if}
-          </div>
+          
+          {#if currentRole === 'public'}
+            <PublicNavLinks currentPath={$page.url.pathname} />
+          {:else if currentRole === 'admin'}
+            <AdminNavLinks currentPath={$page.url.pathname} />
+          {:else}
+            <StaffNavLinks currentPath={$page.url.pathname} />
+          {/if}
         </div>
-        <div class="hidden sm:ml-6 sm:flex sm:items-center">
-          <!-- Add authentication UI components here -->
+
+        <div class="flex items-center space-x-4">
+          <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
+            <button
+              class={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-md ${
+                currentRole === 'public' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+              }`}
+              on:click={() => handleRoleChange('public')}
+            >
+              Public
+            </button>
+            <button
+              class={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-md ${
+                currentRole === 'staff' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+              }`}
+              on:click={() => handleRoleChange('staff')}
+            >
+              Staff
+            </button>
+            <button
+              class={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-md ${
+                currentRole === 'admin' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+              }`}
+              on:click={() => handleRoleChange('admin')}
+            >
+              Admin
+            </button>
+          </div>
         </div>
       </div>
     </nav>

@@ -16,7 +16,6 @@
     import { settings } from '$lib/stores/settings';
     import { loadGoogleFonts } from '$lib/config/fonts';
     import { navigating } from '$app/stores';
-    import DokmutyaLanding from '$lib/components/DokmutyaLanding.svelte';
   interface Props {
     children?: import('svelte').Snippet;
   }
@@ -32,8 +31,9 @@
     let progressTimeout: ReturnType<typeof setTimeout> | undefined = $state();
 
     let path = $derived($page.url.pathname);
+    let isAdminMode = $state(false);
     let navLinks = $derived($page.data.navigation.allowedPaths
-        .filter((p: NavigationPath) => p.showInNav)
+        .filter((p: NavigationPath) => p.showInNav && (!p.path.startsWith('/admin') || isAdminMode))
         .map((p: NavigationPath) => ({
             path: p.path.replace(/\[.*?\]/g, ''),
             label: p.label || p.path
@@ -222,7 +222,13 @@
                                 {/if}
                                 Toggle Theme
                             </DropdownMenuItem>
-                          
+                            <DropdownMenuItem on:click={() => isAdminMode = !isAdminMode}>
+                                {#if isAdminMode}
+                                    <span class="text-primary">Disable Admin Mode</span>
+                                {:else}
+                                    <span>Enable Admin Mode</span>
+                                {/if}
+                            </DropdownMenuItem>
                             <DropdownMenuItem on:click={signOut}>
                                 Sign Out
                             </DropdownMenuItem>
