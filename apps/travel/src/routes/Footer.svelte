@@ -31,10 +31,7 @@
       <ul class="space-y-2">
         <li><a href="/promotions" class="text-gray-600 hover:text-blue-600">Promotional Offerings</a></li>
         <li><a href="/transport" class="text-gray-600 hover:text-blue-600">Transportation Services</a></li>
-        <li><a href="/menu" class="text-gray-600 hover:text-blue-600">MENU</a></li>
         <li><a href="/reviews" class="text-gray-600 hover:text-blue-600">Reviews</a></li>
-        <li><a href="/careers" class="text-gray-600 hover:text-blue-600">Careers</a></li>
-        <li><a href="/sustainability" class="text-gray-600 hover:text-blue-600">Towards sustainable sourcing</a></li>
         <li><a href="/privacy" class="text-gray-600 hover:text-blue-600">Privacy notice</a></li>
         <li><a href="/terms" class="text-gray-600 hover:text-blue-600">Conditions of Use</a></li>
       </ul>
