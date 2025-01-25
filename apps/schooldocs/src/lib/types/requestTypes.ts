@@ -2,17 +2,8 @@ export type FlagType = 'blocking' | 'nonBlocking';
 
 export interface FlagOption {
   id: string;
-  label: string;
-}
-
-export interface Flags {
-  blocking: string[];
-  nonBlocking: string[];
-}
-
-export interface ProcessingStep {
-  step: string;
-  done: boolean;
+  text: string;
+  timestamp: string;
 }
 
 export interface FlagOptions {
@@ -20,8 +11,19 @@ export interface FlagOptions {
   nonBlocking: FlagOption[];
 }
 
+export interface Flags {
+  blocking: FlagOption[];
+  nonBlocking: FlagOption[];
+  notes: string;
+}
+
+export interface ProcessingStep {
+  step: string;
+  done: boolean;
+}
+
 export interface FlagEventDetail {
-  type: FlagType;
-  flagId?: string;
+  type: 'blocking' | 'nonBlocking';
   flag?: string;
+  id?: string;
 }

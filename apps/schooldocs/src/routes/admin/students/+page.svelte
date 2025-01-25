@@ -1,7 +1,7 @@
 <script lang="ts">
-  import VerifyStudentModal from './components/VerifyStudentModal.svelte';
-  import PendingStudentsTable from './components/PendingStudentsTable.svelte';
-  import FlaggedStudentsTable from './components/FlaggedStudentsTable.svelte';
+  import VerifyStudentModal from '$lib/components/modals/students/VerifyStudentModal.svelte';
+  import PendingStudentsTable from '$lib/components/students/PendingStudentsTable.svelte';
+  import FlaggedStudentsTable from '$lib/components/students/FlaggedStudentsTable.svelte';
 
   let selectedStudent: any = null;
   let showModal = false;

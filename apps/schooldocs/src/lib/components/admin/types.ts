@@ -1,4 +1,1 @@
-export interface FlagOption {
-  id: string;
-  label: string;
-}
+// Types moved to /lib/types/requestTypes.ts
