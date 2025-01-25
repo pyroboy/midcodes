@@ -42,16 +42,18 @@
       <h3 class="text-lg font-semibold mb-4">Contact us</h3>
       <div class="space-y-4">
         <div>
-          <p class="font-medium">Get in touch</p>
-        </div>
-        <div>
           <p class="font-medium">Contact numbers</p>
-          <p class="text-gray-600">(+63) 4124124124124</p>
+          <p class="text-gray-600">(+63) 919 333 5452</p>
         </div>
         <div>
           <p class="font-medium">Email address</p>
-          <p class="text-gray-600">reception.cabilaocliffs@gmail.com</p>
+          <p class="text-gray-600">eomortal@gmail.com</p>
         </div>
+        <div>
+            <p class="font-medium">Contact Person</p>
+            <p class="text-gray-600">Ellarose O. Mortal</p>
+            <p class="text-gray-500 text-sm">General Manager</p>
+          </div>
         <div class="flex gap-4">
           <a 
             href="https://facebook.com/hresort" 
