@@ -4,11 +4,17 @@
   import PublicNavLinks from "$lib/components/nav/PublicNavLinks.svelte";
   import AdminNavLinks from "$lib/components/nav/AdminNavLinks.svelte";
   import StaffNavLinks from "$lib/components/nav/StaffNavLinks.svelte";
+  import FinanceNavLinks from "$lib/components/nav/FinanceNavLinks.svelte";
+  import SuperAdminNavLinks from "$lib/components/nav/SuperAdminNavLinks.svelte";
 
-  let currentRole: 'public' | 'admin' | 'staff' = 'public';
+  let currentRole: 'public' | 'admin' | 'staff' | 'finance' | 'super-admin' = 'public';
 
   $: {
-    if ($page.url.pathname.startsWith('/admin/staff')) {
+    if ($page.url.pathname.startsWith('/admin/super')) {
+      currentRole = 'super-admin';
+    } else if ($page.url.pathname.startsWith('/admin/finance')) {
+      currentRole = 'finance';
+    } else if ($page.url.pathname.startsWith('/admin/staff')) {
       currentRole = 'staff';
     } else if ($page.url.pathname.startsWith('/admin')) {
       currentRole = 'admin';
@@ -17,12 +23,14 @@
     }
   }
 
-  function handleRoleChange(role: 'public' | 'admin' | 'staff') {
+  function handleRoleChange(role: 'public' | 'admin' | 'staff' | 'finance' | 'super-admin') {
     currentRole = role;
     const paths = {
       public: '/',
       admin: '/admin/dashboard',
-      staff: '/admin/staff'
+      staff: '/admin/staff',
+      finance: '/admin/finance/dashboard',
+      'super-admin': '/admin/super/dashboard'
     };
     window.location.href = paths[role];
   }
@@ -41,8 +49,12 @@
             <PublicNavLinks currentPath={$page.url.pathname} />
           {:else if currentRole === 'admin'}
             <AdminNavLinks currentPath={$page.url.pathname} />
-          {:else}
+          {:else if currentRole === 'staff'}
             <StaffNavLinks currentPath={$page.url.pathname} />
+          {:else if currentRole === 'finance'}
+            <FinanceNavLinks currentPath={$page.url.pathname} />
+          {:else}
+            <SuperAdminNavLinks currentPath={$page.url.pathname} />
           {/if}
         </div>
 
@@ -71,6 +83,22 @@
               on:click={() => handleRoleChange('admin')}
             >
               Admin
+            </button>
+            <button
+              class={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-md ${
+                currentRole === 'finance' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+              }`}
+              on:click={() => handleRoleChange('finance')}
+            >
+              Finance
+            </button>
+            <button
+              class={`inline-flex items-center px-3 py-1 text-sm font-medium rounded-md ${
+                currentRole === 'super-admin' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+              }`}
+              on:click={() => handleRoleChange('super-admin')}
+            >
+              Super Admin
             </button>
           </div>
         </div>
