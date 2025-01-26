@@ -1,7 +1,7 @@
 <script lang="ts">
     import { stopPropagation } from 'svelte/legacy';
 
-    import type { TemplateElement } from './stores/templateStore';
+    import type { TemplateElement } from '../stores/templateStore';
     import PositionGroup from './PositionGroup.svelte';
     import FontSettings from './FontSettings.svelte';
     import * as Select from "$lib/components/ui/select";
@@ -17,8 +17,12 @@
         side: 'front' | 'back';
     }
 
+    type Events = {
+        update: { elements: TemplateElement[] };
+    }
+
     let { elements = $bindable(), fontOptions, side }: Props = $props();
-    const dispatch = createEventDispatcher();
+    const dispatch = createEventDispatcher<Events>();
 
     // Type predicate for selection option safety
     function isValidOption(value: unknown): value is string {
@@ -123,7 +127,7 @@
                         <Input 
                             id="variable-name-{i}"
                             bind:value={element.variableName} 
-                            on:input={() => updateElement(i, { variableName: element.variableName })}
+                            oninput={() => updateElement(i, { variableName: element.variableName })}
                         />
                     </div>
 
@@ -133,18 +137,17 @@
                             <Input 
                                 id="text-content-{i}"
                                 bind:value={element.content} 
-                                on:input={() => updateElement(i, { content: element.content })}
+                                oninput={() => updateElement(i, { content: element.content })}
                             />
                         </div>
                         <FontSettings 
                             {element} 
                             {fontOptions} 
-                            on:update={(event) => updateElement(i, event.detail)}
                         />
                     {:else if element.type === 'selection'}
                         <div class="input-group">
                             <label for="select-{i}">Options</label>
-                            <Select.Root
+                            <!-- <Select.Root
                                 selected={getSelectedState(element)}
                                 onSelectedChange={(selection) => {
                                     if (selection && isValidOption(selection.value)) {
@@ -165,7 +168,7 @@
                                         </Select.Item>
                                     {/each}
                                 </Select.Content>
-                            </Select.Root>
+                            </Select.Root> -->
                         </div>
                         <div class="input-group">
                             <label for="options-{i}">Edit Options (one per line)</label>
@@ -180,7 +183,6 @@
                         <FontSettings 
                             {element} 
                             {fontOptions} 
-                            on:update={(event) => updateElement(i, event.detail)}
                         />
                     {/if}
 
@@ -189,7 +191,6 @@
                         y={element.y} 
                         width={element.width} 
                         height={element.height} 
-                        on:update={({ detail }) => updateElement(i, detail)} 
                     />
                 </div>
             {/if}

@@ -9,13 +9,17 @@
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
   import { page } from '$app/stores';
 
-  export let form: ActionData;
-  let loading = false;
+  interface Props {
+    form: ActionData;
+  }
 
-  $: error = form?.error;
-  $: message = form?.message;
-  $: success = form?.success;
-  $: email = form?.email || '';
+  let { form }: Props = $props();
+  let loading = $state(false);
+
+  let error = $derived(form?.error);
+  let message = $derived(form?.message);
+  let success = $derived(form?.success);
+  let email = $derived(form?.email || '');
 </script>
 
 <div class="container mx-auto flex h-screen w-screen flex-col items-center justify-center">

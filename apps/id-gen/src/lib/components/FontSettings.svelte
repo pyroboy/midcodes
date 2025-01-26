@@ -1,6 +1,6 @@
 <script lang="ts">
     import { createEventDispatcher } from 'svelte';
-    import type { TemplateElement } from './stores/templateStore';
+    import type { TemplateElement } from '../stores/templateStore';
     import { 
         Type, Bold, Italic, Underline, AlignLeft, AlignCenter, 
         AlignRight, AlignJustify, ChevronsUpDown, MoveHorizontal, 
@@ -15,12 +15,11 @@
 
     let { element = $bindable(), fontOptions }: Props = $props();
 
-    const dispatch = createEventDispatcher();
 
     const fontWeightOptions = ['normal', 'bold', '100', '200', '300', '400', '500', '600', '700', '800', '900'];
 
     function updateElement(updates: Partial<TemplateElement>) {
-        dispatch('update', { ...element, ...updates });
+        element = { ...element, ...updates };
     }
 
     function toggleBold() {

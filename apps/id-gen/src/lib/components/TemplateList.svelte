@@ -4,7 +4,7 @@
     import { supabase } from '$lib/supabaseClient';
     import { Button } from "$lib/components/ui/button";
     import { Copy, Trash2, ExternalLink, Edit } from 'lucide-svelte';
-    import type { TemplateData } from './stores/templateStore';
+    import type { TemplateData } from '../stores/templateStore';
     import { goto } from '$app/navigation';
     import { page } from '$app/stores';
     import { invalidate } from '$app/navigation';
@@ -180,7 +180,7 @@
                         variant="ghost" 
                         size="sm"
                         class="h-8 w-8 p-0 hover:bg-gray-200 dark:hover:bg-gray-700 text-foreground dark:text-gray-200"
-                        on:click={(e) => handleActionClick(e, template, 'edit')}
+                        onclick={(e) => handleActionClick(e, template, 'edit')}
                         aria-label={`Edit ${template.name}`}
                     >
                         <Edit class="h-4 w-4" />
@@ -189,7 +189,7 @@
                         variant="ghost" 
                         size="sm"
                         class="h-8 w-8 p-0 hover:bg-gray-200 dark:hover:bg-gray-700 text-foreground dark:text-gray-200"
-                        on:click={(e) => handleActionClick(e, template, 'duplicate')}
+                        onclick={(e) => handleActionClick(e, template, 'duplicate')}
                         aria-label={`Duplicate ${template.name}`}
                     >
                         <Copy class="h-4 w-4" />
@@ -198,7 +198,7 @@
                         variant="ghost" 
                         size="sm"
                         class="h-8 w-8 p-0 hover:bg-gray-200 dark:hover:bg-gray-700 text-foreground dark:text-gray-200"
-                        on:click={(e) => handleActionClick(e, template, 'delete')}
+                        onclick={(e) => handleActionClick(e, template, 'delete')}
                         aria-label={`Delete ${template.name}`}
                     >
                         <Trash2 class="h-4 w-4" />

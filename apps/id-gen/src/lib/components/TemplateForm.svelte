@@ -1,26 +1,31 @@
 <script lang="ts">
-    import { run, stopPropagation } from 'svelte/legacy';
-
-    import { onMount, createEventDispatcher } from 'svelte';
-    import { templateData } from './stores/templateStore';
-    import type { TemplateData, TemplateElement } from './stores/templateStore';
+    import { onMount } from 'svelte';
+    import { templateData } from '../stores/templateStore';
+    import type { TemplateData, TemplateElement } from '../stores/templateStore';
     import ElementList from './ElementList.svelte';
     import PositionGroup from './PositionGroup.svelte';
-    import { Button } from './components/ui/button';
+    import { Button } from '$lib/components/ui/button';
     import { Upload, Image, Plus, X } from 'lucide-svelte';
-    import { loadGoogleFonts, getAllFontFamilies, isFontLoaded, fonts } from './config/fonts';
+    import { loadGoogleFonts, getAllFontFamilies, isFontLoaded, fonts } from '../config/fonts';
 
     interface Props {
         side: 'front' | 'back';
         preview?: string | null;
         elements?: TemplateElement[];
+        onUpdate?: (data: { elements: TemplateElement[], side: 'front' | 'back' }) => void;
+        onImageUpload?: (data: { event: Event, side: 'front' | 'back' }) => void;
+        onRemoveImage?: (data: { side: 'front' | 'back' }) => void;
     }
 
-    let { side, preview = $bindable(), elements = $bindable([]) }: Props = $props();
+    let { 
+        side, 
+        preview = $bindable(), 
+        elements = $bindable([]),
+        onUpdate = $bindable(),
+        onImageUpload = $bindable(),
+        onRemoveImage = $bindable()
+    }: Props = $props();
 
-
-
-    const dispatch = createEventDispatcher();
     const BASE_WIDTH = 506.5;
     const BASE_HEIGHT = 319;
 
@@ -29,7 +34,7 @@
     let startX: number, startY: number;
     let currentElementIndex: number | null = null;
     let resizeHandle: string | null = null;
-    let templateContainer: HTMLElement = $state();
+    let templateContainer: HTMLElement | undefined = $state();
     let fontOptions: string[] = $state([]);
     let fontsLoaded = false;
     let previewDimensions = $state({
@@ -82,8 +87,6 @@
         return () => resizeObserver.disconnect();
     });
 
-
-
     function getFontFallback(font: string): string {
         const fontConfig = fonts.find(f => f.family === font);
         return fontConfig?.category || 'sans-serif';
@@ -123,15 +126,15 @@
             return el;
         });
         updateStore();
-        dispatch('update', { elements, side });
+        onUpdate?.({ elements, side });
     }
 
     function handleImageUpload(event: Event) {
-        dispatch('imageUpload', { event, side });
+        onImageUpload?.({ event, side });
     }
 
     function removeImage() {
-        dispatch('removeImage', { side });
+        onRemoveImage?.({ side });
     }
 
     function onMouseDown(event: MouseEvent, index: number, handle: string | null = null) {
@@ -153,7 +156,6 @@
         const dx = event.clientX - startX;
         const dy = event.clientY - startY;
 
-        // Apply inverse scaling to mouse movement
         const scaledDx = dx / previewDimensions.scale;
         const scaledDy = dy / previewDimensions.scale;
 
@@ -224,223 +226,192 @@
     function handleElementsUpdate(event: CustomEvent) {
         elements = event.detail.elements;
         updateStore();
-        dispatch('update', { elements, side });
+        onUpdate?.({ elements, side });
     }
 
-    // Your existing default elements...
     const defaultFrontElements: TemplateElement[] = [
-        { 
-            id: 'licenseNo',
-            variableName: 'licenseNo', 
-            type: 'text', 
-            content: '75-005-24', 
-            x: 293, 
-            y: 159, 
-            width: 100,
-            height: 20,
-            fontFamily: 'Arial', 
-            fontSize: 16, 
-            color: '#000000', 
-            textAlign: 'left',
-            side: 'front'
-        },
-        { 
-            id: 'valid',
-            variableName: 'valid', 
-            type: 'text', 
-            content: '01/01/2026', 
-            x: 295, 
-            y: 179, 
-            width: 100,
-            height: 20,
-            fontFamily: 'Arial', 
-            fontSize: 16, 
-            color: '#000000', 
-            textAlign: 'left',
-            side: 'front'
-        },
-        { 
-            id: 'name',
-            variableName: 'name', 
-            type: 'text', 
-            content: 'Junifer D. Oban', 
-            x: 256, 
-            y: 246, 
-            width: 100,
-            height: 20,
-            fontFamily: 'Arial', 
-            fontSize: 21, 
-            color: '#000000', 
-            textAlign: 'left',
-            side: 'front'
-        },
-        { 
-            id: 'photo',
-            variableName: 'photo', 
-            type: 'photo', 
-            x: 50, 
-            y: 131, 
-            width: 119,
-            height: 158,
-            side: 'front'
-        },
-        { 
-            id: 'signature',
-            variableName: 'signature', 
-            type: 'signature', 
-            x: 263, 
-            y: 196, 
-            width: 152,
-            height: 65,
-            side: 'front'
-        },
-        { 
-            id: 'idType',
-            variableName: 'idType', 
-            type: 'selection', 
-            options: ['Ministerial License', 'Ordination License', 'Local License'], 
-            x: 198, 
-            y: 131, 
-            width: 100,
-            height: 20,
-            fontFamily: 'Arial', 
-            fontSize: 16, 
-            color: '#000000', 
-            textAlign: 'left',
-            side: 'front'
-        },
-        { 
-            id: 'position',
-            variableName: 'position', 
-            type: 'selection', 
-            options: ['General Treasurer', 'General Secretary', 'District Superintendent', 'Pastor'], 
-            x: 276, 
-            y: 270, 
-            width: 100,
-            height: 20,
-            fontFamily: 'Arial', 
-            fontSize: 16, 
-            color: '#000000', 
-            textAlign: 'left',
-            side: 'front'
-        }
-    ];
+    { 
+        id: 'licenseNo',
+        variableName: 'licenseNo', 
+        type: 'text', 
+        content: '75-005-24', 
+        x: 293, 
+        y: 159, 
+        width: 100,
+        height: 20,
+        font: 'Arial', 
+        size: 16, 
+        color: '#000000', 
+        alignment: 'left',
+        side: 'front'
+    },
+    { 
+        id: 'valid',
+        variableName: 'valid', 
+        type: 'text', 
+        content: '01/01/2026', 
+        x: 295, 
+        y: 179, 
+        width: 100,
+        height: 20,
+        font: 'Arial', 
+        size: 16, 
+        color: '#000000', 
+        alignment: 'left',
+        side: 'front'
+    },
+    { 
+        id: 'name',
+        variableName: 'name', 
+        type: 'text', 
+        content: 'Junifer D. Oban', 
+        x: 256, 
+        y: 246, 
+        width: 100,
+        height: 20,
+        font: 'Arial', 
+        size: 21, 
+        color: '#000000', 
+        alignment: 'left',
+        side: 'front'
+    },
+    { 
+        id: 'photo',
+        variableName: 'photo', 
+        type: 'photo', 
+        x: 50, 
+        y: 131, 
+        width: 119,
+        height: 158,
+        side: 'front'
+    },
+    { 
+        id: 'signature',
+        variableName: 'signature', 
+        type: 'signature', 
+        x: 263, 
+        y: 196, 
+        width: 152,
+        height: 65,
+        side: 'front'
+    },
+    { 
+        id: 'idType',
+        variableName: 'idType', 
+        type: 'selection', 
+        options: ['Ministerial License', 'Ordination License', 'Local License'], 
+        x: 198, 
+        y: 131, 
+        width: 100,
+        height: 20,
+        font: 'Arial', 
+        size: 16, 
+        color: '#000000', 
+        alignment: 'left',
+        side: 'front'
+    },
+    { 
+        id: 'position',
+        variableName: 'position', 
+        type: 'selection', 
+        options: ['General Treasurer', 'General Secretary', 'District Superintendent', 'Pastor'], 
+        x: 276, 
+        y: 270, 
+        width: 100,
+        height: 20,
+        font: 'Arial', 
+        size: 16, 
+        color: '#000000', 
+        alignment: 'left',
+        side: 'front'
+    }
+];
 
-    const defaultBackElements: TemplateElement[] = [
-        { 
-            id: 'contactName',
-            variableName: 'contactName', 
-            type: 'text', 
-            content: 'Ralph Steven D. Trigo', 
-            x: 113, 
-            y: 36, 
-            width: 100,
-            height: 20,
-            fontFamily: 'Arial', 
-            fontSize: 13, 
-            color: '#000000', 
-            textAlign: 'left',
-            side: 'back'
-        },
-        { 
-            id: 'addresss',
-            variableName: 'addresss', 
-            type: 'text', 
-            content: 'San Isidro District', 
-            x: 112, 
-            y: 55, 
-            width: 100,
-            height: 20,
-            fontFamily: 'Arial', 
-            fontSize: 13, 
-            color: '#000000', 
-            textAlign: 'left',
-            side: 'back'
-        },
-        { 
-            id: 'contactNo',
-            variableName: 'contactNo', 
-            type: 'text', 
-            content: '9478920644', 
-            x: 112, 
-            y: 74, 
-            width: 100,
-            height: 20,
-            fontFamily: 'Arial', 
-            fontSize: 13, 
-            color: '#000000', 
-            textAlign: 'left',
-            side: 'back'
-        },
-        { 
-            id: 'tin',
-            variableName: 'tin', 
-            type: 'text', 
-            content: '943-403-393', 
-            x: 133, 
-            y: 115, 
-            width: 100,
-            height: 20,
-            fontFamily: 'Arial', 
-            fontSize: 13, 
-            color: '#000000', 
-            textAlign: 'left',
-            side: 'back'
-        },
-        { 
-            id: 'sss',
-            variableName: 'sss', 
-            type: 'text', 
-            content: '943-403-393', 
-            x: 133, 
-            y: 138, 
-            width: 100,
-            height: 20,
-            fontFamily: 'Arial', 
-            fontSize: 13, 
-            color: '#000000', 
-            textAlign: 'left',
-            side: 'back'
-        }
-    ];
-    run(() => {
-        if (elements) {
-            console.log(`📝 TemplateForm [${side}]:`, {
-                preview: preview ? 'present' : 'none',
-                elements: {
-                    count: elements.length,
-                    details: elements.map(e => ({
-                        name: e.variableName,
-                        type: e.type,
-                        content: e.content,
-                        position: { x: e.x, y: e.y },
-                        style: {
-                            font: e.font,
-                            size: e.size,
-                            color: e.color
-                        }
-                    }))
-                }
-            });
-        }
-    });
-    run(() => {
-        console.log(`🔄 TemplateForm (${side}):`, {
-            preview,
-            elements: elements?.map(e => ({
-                name: e.variableName,
-                content: e.content,
-                x: e.x,
-                y: e.y
-            }))
-        });
-    });
+const defaultBackElements: TemplateElement[] = [
+    { 
+        id: 'contactName',
+        variableName: 'contactName', 
+        type: 'text', 
+        content: 'Ralph Steven D. Trigo', 
+        x: 113, 
+        y: 36, 
+        width: 100,
+        height: 20,
+        font: 'Arial', 
+        size: 13, 
+        color: '#000000', 
+        alignment: 'left',
+        side: 'back'
+    },
+    { 
+        id: 'addresss',
+        variableName: 'addresss', 
+        type: 'text', 
+        content: 'San Isidro District', 
+        x: 112, 
+        y: 55, 
+        width: 100,
+        height: 20,
+        font: 'Arial', 
+        size: 13, 
+        color: '#000000', 
+        alignment: 'left',
+        side: 'back'
+    },
+    { 
+        id: 'contactNo',
+        variableName: 'contactNo', 
+        type: 'text', 
+        content: '9478920644', 
+        x: 112, 
+        y: 74, 
+        width: 100,
+        height: 20,
+        font: 'Arial', 
+        size: 13, 
+        color: '#000000', 
+        alignment: 'left',
+        side: 'back'
+    },
+    { 
+        id: 'tin',
+        variableName: 'tin', 
+        type: 'text', 
+        content: '943-403-393', 
+        x: 133, 
+        y: 115, 
+        width: 100,
+        height: 20,
+        font: 'Arial', 
+        size: 13, 
+        color: '#000000', 
+        alignment: 'left',
+        side: 'back'
+    },
+    { 
+        id: 'sss',
+        variableName: 'sss', 
+        type: 'text', 
+        content: '943-403-393', 
+        x: 133, 
+        y: 138, 
+        width: 100,
+        height: 20,
+        font: 'Arial', 
+        size: 13, 
+        color: '#000000', 
+        alignment: 'left',
+        side: 'back'
+    }
+];
+
     let elementStyle = $derived((element: TemplateElement) => ({
         left: `${(element.x || 0) * previewDimensions.scale}px`,
         top: `${(element.y || 0) * previewDimensions.scale}px`,
         width: `${((element.width || 0) * previewDimensions.scale)}px`,
         height: `${((element.height || 0) * previewDimensions.scale)}px`
     }));
+
     let textStyle = $derived((element: TemplateElement) => ({
         'font-family': `"${element.font || 'Arial'}", ${getFontFallback(element.font || 'Arial')}`,
         'font-weight': element.fontWeight || '400',
@@ -456,8 +427,14 @@
         'display': 'block',
         'width': '100%'
     }));
-</script>
 
+    function stopPropagation(fn: (e: MouseEvent) => void) {
+        return (e: MouseEvent) => {
+            e.stopPropagation();
+            fn(e);
+        };
+    }
+</script>
 <svelte:window onmousemove={onMouseMove} onmouseup={onMouseUp} />
 
 <div class="template-section">
@@ -524,7 +501,7 @@
                         </div>
                     </div>
                 {/each}
-                <Button variant="destructive" size="icon" class="remove-image" on:click={removeImage}>
+                <Button variant="destructive" size="icon" class="remove-image" onclick={removeImage}>
                     <X class="w-4 h-4" />
                 </Button>
             {/if}
@@ -535,7 +512,6 @@
             {elements} 
             {fontOptions} 
             {side}
-            on:update={handleElementsUpdate}
         />
     {/if}
 </div>

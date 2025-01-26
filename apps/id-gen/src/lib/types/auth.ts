@@ -1,4 +1,4 @@
-import type { User } from '@supabase/supabase-js';
+import type { Session, User } from '@supabase/supabase-js';
 
 export interface UserJWTPayload {
   aud: string;

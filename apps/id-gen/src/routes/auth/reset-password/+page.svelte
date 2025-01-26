@@ -6,12 +6,16 @@
     import { Label } from '$lib/components/ui/label';
     import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '$lib/components/ui/card';
 
-    export let form: ActionData;
-    let loading = false;
+    interface Props {
+        form: ActionData;
+    }
 
-    $: error = form?.error;
-    $: message = form?.message;
-    $: success = form?.success;
+    let { form }: Props = $props();
+    let loading = $state(false);
+
+    let error = $derived(form?.error);
+    let message = $derived(form?.message);
+    let success = $derived(form?.success);
 </script>
 
 <div class="container mx-auto flex h-screen w-screen flex-col items-center justify-center">

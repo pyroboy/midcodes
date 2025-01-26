@@ -1,9 +1,14 @@
 <script lang="ts">
     import { run } from 'svelte/legacy';
-
-    import { createEventDispatcher, onMount } from 'svelte';
+    import { onMount } from 'svelte';
     import { Move, Scaling } from "lucide-svelte";
     import { debounce } from 'lodash-es';
+    import { createEventDispatcher } from 'svelte';
+
+    const dispatch = createEventDispatcher<{
+        selectfile: void;
+        update: { scale: number; x: number; y: number };
+    }>();
 
     interface Props {
         width: number;
@@ -22,16 +27,15 @@
         initialScale = 1,
         initialX = 0,
         initialY = 0,
-        isSignature = false
+        isSignature = false,
     }: Props = $props();
 
-    const dispatch = createEventDispatcher();
-    let canvas: HTMLCanvasElement = $state();
-    let ctx: CanvasRenderingContext2D;
-    let imageScale = initialScale;
-    let imageX = initialX;
-    let imageY = initialY;
-    let isDragging = false;
+    let canvas = $state<HTMLCanvasElement | undefined>(undefined);
+    let ctx = $state<CanvasRenderingContext2D | null>(null);
+    let imageScale = $state(initialScale);
+    let imageX = $state(initialX);
+    let imageY = $state(initialY);
+    let isDragging = $state(false);
 
     const MAX_HEIGHT = 100;
     const aspectRatio = width / height;
@@ -40,12 +44,17 @@
     const scale = thumbnailHeight / height;
 
     onMount(() => {
-        ctx = canvas.getContext('2d')!;
-        drawPlaceholder();
+        if (canvas) {
+            ctx = canvas.getContext('2d');
+            if (ctx) {
+                drawPlaceholder();
+            }
+        }
     });
 
-
     function drawPlaceholder() {
+        if (!ctx) return;
+        
         ctx.fillStyle = '#f0f0f0';
         ctx.fillRect(0, 0, thumbnailWidth, thumbnailHeight);
         ctx.strokeStyle = '#999';
@@ -58,6 +67,8 @@
     }
 
     function drawImage(img: HTMLImageElement) {
+        if (!ctx) return;
+
         const imgAspectRatio = img.width / img.height;
         let drawWidth = width * imageScale;
         let drawHeight = height * imageScale;
@@ -90,10 +101,10 @@
     }
 
     function handleClick() {
-        dispatch('selectFile');
+        dispatch('selectfile');
     }
 
-    const debouncedDispatch = debounce((scale: number, x: number, y: number) => {
+    const debouncedUpdate = debounce((scale: number, x: number, y: number) => {
         dispatch('update', { scale, x, y });
     }, 16);
 
@@ -111,7 +122,7 @@
         
         const startPoint = 'touches' in event ? 
             { x: event.touches[0].clientX, y: event.touches[0].clientY } :
-            { x: (event as MouseEvent).clientX, y: (event as MouseEvent).clientY };
+            { x: event.clientX, y: event.clientY };
 
         const startValues = {
             scale: imageScale,
@@ -138,7 +149,7 @@
             }
 
             requestAnimationFrame(updateImage);
-            debouncedDispatch(imageScale, imageX, imageY);
+            debouncedUpdate(imageScale, imageX, imageY);
         }
 
         function handleEnd() {
@@ -156,6 +167,7 @@
         window.addEventListener('touchend', handleEnd);
         window.addEventListener('touchcancel', handleEnd);
     }
+
     run(() => {
         if (fileUrl) {
             const img = new Image();

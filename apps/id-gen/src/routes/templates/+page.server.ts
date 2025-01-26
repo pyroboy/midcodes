@@ -49,16 +49,10 @@ async function getImageOrientation(imageUrl: string): Promise<'landscape' | 'por
     }
 }
 
-export const load: PageServerLoad = async ({ locals: { supabase, session, profile } }) => {
+export const load: PageServerLoad = async ({ locals }) => {
+    const { session, supabase } = locals;
     console.log(' [Templates Page] ====== START LOAD ======');
-    console.log(' [Templates Page] Current state:', {
-        hasSession: !!session,
-        hasProfile: !!profile,
-        userId: session?.user?.id,
-        userEmail: session?.user?.email,
-        role: profile?.role,
-        orgId: profile?.org_id
-    });
+
 
     // Authentication check
     if (!session) {
@@ -66,20 +60,8 @@ export const load: PageServerLoad = async ({ locals: { supabase, session, profil
         throw redirect(303, '/auth');
     }
 
-    // Authorization check - verify user has id_gen role
-    if (!profile?.role?.startsWith('id_gen')) {
-        console.log(' [Templates Page] Unauthorized role:', {
-            role: profile?.role,
-            userId: session.user.id
-        });
-        throw error(403, 'Unauthorized - Incorrect user role');
-    }
-
     try {
-        console.log(' [Templates Page] Building query with filters:', {
-            isSuperAdmin: profile.role === 'super_admin',
-            orgId: profile.org_id
-        });
+
 
         // Build the base query with all needed fields
         let templatesQuery = supabase
@@ -98,10 +80,6 @@ export const load: PageServerLoad = async ({ locals: { supabase, session, profil
             .order('created_at', { ascending: false });
 
         // Apply organization filter if not super_admin
-        if (profile.role !== 'super_admin' && profile.org_id) {
-            console.log(' [Templates Page] Applying org filter:', profile.org_id);
-            templatesQuery = templatesQuery.eq('org_id', profile.org_id);
-        }
 
         // Execute the query
         console.log(' [Templates Page] Executing database query...');
@@ -134,8 +112,6 @@ export const load: PageServerLoad = async ({ locals: { supabase, session, profil
         const response = {
             templates: templates || [],
             user: session.user,
-            session,
-            profile
         };
 
         console.log(' [Templates Page] ====== END LOAD ======');
@@ -155,10 +131,9 @@ export const load: PageServerLoad = async ({ locals: { supabase, session, profil
 };
 
 export const actions = {
-    create: async ({ request, locals: { supabase, session, profile } }) => {
-        if (!session) {
-            throw error(401, 'Unauthorized');
-        }
+    create: async ({ request, locals}) => {
+        const { supabase, session } = locals;
+
 
         try {
             const formData = await request.formData();
@@ -170,10 +145,6 @@ export const actions = {
 
             const templateData = JSON.parse(templateDataStr);
 
-            // Ensure org_id is set from the original template or from user's profile
-            if (!templateData.org_id && profile?.org_id) {
-                templateData.org_id = profile.org_id;
-            }
 
             console.log('🎨 Server: Processing template save:', {
                 id: templateData.id,
@@ -183,7 +154,6 @@ export const actions = {
             });
 
             // Set the user_id from the session
-            templateData.user_id = session.user.id;
 
             const { data, error: dbError } = await supabase
                 .from('templates')

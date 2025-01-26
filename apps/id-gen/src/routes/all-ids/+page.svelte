@@ -111,8 +111,8 @@
             return;
         }
 
-        selectedFrontImage = card.front_image;
-        selectedBackImage = card.back_image;
+        selectedFrontImage = card.front_image ?? null;
+        selectedBackImage = card.back_image ?? null;
     }
 
     function closePreview() {
@@ -367,15 +367,16 @@
     let templateFields = $derived(header?.metadata?.templates || {});
     run(() => {
         const query = searchQuery.toLowerCase();
-        dataRows = allRows.filter((row): row is DataRow => {
-            if (row.is_header) return false;
+        dataRows = allRows.filter((row) => {
+            if (!('is_header' in row) || row.is_header) return false;
             
-            if (row.template_name.toLowerCase().includes(query)) return true;
+            const dataRow = row as DataRow;
+            if (dataRow.template_name.toLowerCase().includes(query)) return true;
             
-            return Object.values(row.fields || {}).some(field => 
+            return Object.values(dataRow.fields || {}).some(field => 
                 field.value.toLowerCase().includes(query)
             );
-        });
+        }) as DataRow[];
     });
     let groupedCards = $derived((() => {
         const groups: Record<string, DataRow[]> = {};

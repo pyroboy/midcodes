@@ -11,16 +11,11 @@ declare global {
       supabase: SupabaseClient<Database>;
       safeGetSession: () => Promise<GetSessionResult>;
       session?: Session | null;
-      user?: User | null;
-      profile: ProfileData | null;
       decodedToken?: UserJWTPayload;
       permissions?: string[];
     }
 
     interface PageData {
-      session: Session | null;
-      user?: User | null;
-      profile: ProfileData | null;
       permissions?: string[];
     }
 

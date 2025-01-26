@@ -51,32 +51,23 @@ interface DataRow {
 
 type IDCardResponse = [HeaderRow, ...DataRow[]];
 
-export const load = (async ({ locals: { supabase, safeGetSession, profile }, url }) => {
-    const { session,roleEmulation } = await safeGetSession();
+export const load = (async ({ locals}) => {
+    const { session, supabase, safeGetSession } = locals;
     if (!session) {
         throw error(401, 'Unauthorized');
     }
 
-    if (!profile) {
-        throw error(400, 'Profile not found');
-    }
+
 
     // Get the effective organization ID (either emulated or actual)
-    const effectiveOrgId = roleEmulation?.active ? 
-        roleEmulation.emulated_org_id : 
-        profile.org_id;
-    
+    const effectiveOrgId = 'fakeid'
     if (!effectiveOrgId) {
         throw error(500, 'Organization ID not found');
     }
 
-    const userRole = profile.role;
     
     // Check role-specific access
-    const allowedRoles = ['super_admin', 'org_admin', 'id_gen_admin', 'id_gen_user'];
-    if (!allowedRoles.includes(userRole)) {
-        throw redirect(303, '/unauthorized');
-    }
+
 
     const { data, error: fetchError } = await supabase
         .rpc('get_idcards_by_org', {

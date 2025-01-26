@@ -14,15 +14,13 @@
     import { Loader } from 'lucide-svelte';
     import { goto } from '$app/navigation';
     import { enhance } from '$app/forms';
-    import type { TemplateElement  } from '$lib/stores/templateStore';
+    import type { TemplateElement } from '$lib/stores/templateStore';
 
     // Enhanced type definitions for better type safety
     interface SelectOption {
         value: string;
         label: string;
     }
-
-
 
     interface Template {
         id: string;
@@ -74,31 +72,31 @@
         }))
     };
 
-    // Component state declarations
+    // Component state declarations with $state
     let loading = $state(false);
-    let error: string | null = $state(null);
-    let formElement: HTMLFormElement;
-    let debugMessages: string[] = $state([]);
-    let formData: Record<string, string> = $state({});
-    let fileUploads: FileUploads = $state({});
-    let imagePositions: Record<string, ImagePosition> = $state({});
-    let frontCanvasComponent: IdCanvas;
-    let backCanvasComponent: IdCanvas;
-    let frontCanvasReady = false;
-    let backCanvasReady = false;
-    let fullResolution = false;
+    let error = $state<string | null>(null);
+    let formElement = $state<HTMLFormElement | null>(null);
+    let debugMessages = $state<string[]>([]);
+    let formData = $state<Record<string, string>>({});
+    let fileUploads = $state<FileUploads>({});
+    let imagePositions = $state<Record<string, ImagePosition>>({});
+    let frontCanvasComponent = $state<IdCanvas | null>(null);
+    let backCanvasComponent = $state<IdCanvas | null>(null);
+    let frontCanvasReady = $state(false);
+    let backCanvasReady = $state(false);
+    let fullResolution = $state(false);
     let mouseMoving = $state(false);
-    let formErrors: Record<string, boolean> = $state({});
-    let fileUrls: Record<string, string> = $state({});
+    let formErrors = $state<Record<string, boolean>>({});
+    let fileUrls = $state<Record<string, string>>({});
 
-    // Enhanced Select handling using patterns from file 2
+    // Enhanced Select handling
     interface SelectState {
         value: string | undefined;
         label: string;
         options: SelectOption[];
     }
 
-    let selectStates: Record<string, SelectState> = $state({});
+    let selectStates = $state<Record<string, SelectState>>({});
 
     // Initialize select states with getters and setters
     function initializeSelectStates() {
@@ -118,11 +116,10 @@
         });
     }
 
-    // Derived content for select triggers
-    let triggerContent = $derived(
-        (variableName: string) => formData[variableName] || "Select an option"
+    // Derived content for select triggers using $derived
+    let triggerContent = $derived((variableName: string) => 
+        formData[variableName] || "Select an option"
     );
-
 
     // Lifecycle hooks
     run(() => {
@@ -196,7 +193,7 @@
         }
     }
 
-    function handleImageUpdate(event: CustomEvent, variableName: string) {
+    function handleImageUpdate(event: CustomEvent<{ scale: number; x: number; y: number }>, variableName: string) {
         const { scale, x, y } = event.detail;
         imagePositions[variableName] = {
             ...imagePositions[variableName],
@@ -419,111 +416,106 @@
                                             />
                                             {#if formErrors[element.variableName]}
                                                 <p class="mt-1 text-sm text-destructive">This field is required</p>
-                                            {/if}
-                                        </div>
-                                    {:else if element.type === 'selection' && element.options}
-                                        <div class="relative w-full">
-                                            <Select.Root
-                                                type="single"
-                                                value={selectStates[element.variableName]?.value}
-                                                onValueChange={(value) => handleSelectionChange(value, element.variableName)}
-                                            >
-                                                <Select.Trigger
-                                                    class="w-full"
+                                                {/if}
+                                            </div>
+                                        {:else if element.type === 'selection' && element.options}
+                                            <div class="relative w-full">
+                                                <Select.Root
+                                                    type="single"
+                                                    value={selectStates[element.variableName]?.value}
+                                                    onValueChange={(value) => handleSelectionChange(value, element.variableName)}
                                                 >
-                                                {triggerContent}
-                                               
-                                                </Select.Trigger>
-                                                <Select.Content>
-                                                    {#each element.options as option}
-                                                        <Select.Item 
-                                                            value={option}
-                                                        >
-                                                            {option}
-                                                        </Select.Item>
-                                                    {/each}
-                                                </Select.Content>
-                                            </Select.Root>
-                                            {#if formErrors[element.variableName]}
-                                                <p class="mt-1 text-sm text-destructive">Please select an option</p>
-                                            {/if}
-                                        </div>
-                                    {:else if element.type === 'photo' || element.type === 'signature'}
-                                        <ThumbnailInput
-                                            width={element.width}
-                                            height={element.height}
-                                            fileUrl={fileUrls[element.variableName]}
-                                            initialScale={imagePositions[element.variableName]?.scale ?? 1}
-                                            initialX={imagePositions[element.variableName]?.x ?? 0}
-                                            initialY={imagePositions[element.variableName]?.y ?? 0}
-                                            isSignature={element.type === 'signature'}
-                                            on:selectFile={() => handleSelectFile(element.variableName)}
-                                            on:update={(e) => handleImageUpdate(e, element.variableName)}
-                                        />
-                                    {/if}
-                                </div>
-                            {/if}
-                        {/each}
-                        
-                        <div class="mt-6 space-y-4">
-                            <Button 
-                                type="submit" 
-                                class="w-full" 
-                                disabled={loading}
-                            >
-                                {#if loading}
-                                    <Loader class="mr-2 h-4 w-4 animate-spin" />
+                                                    <Select.Trigger class="w-full">
+                                                        {triggerContent(element.variableName)}
+                                                    </Select.Trigger>
+                                                    <Select.Content>
+                                                        {#each element.options as option}
+                                                            <Select.Item value={option}>
+                                                                {option}
+                                                            </Select.Item>
+                                                        {/each}
+                                                    </Select.Content>
+                                                </Select.Root>
+                                                {#if formErrors[element.variableName]}
+                                                    <p class="mt-1 text-sm text-destructive">Please select an option</p>
+                                                {/if}
+                                            </div>
+                                        {:else if element.type === 'photo' || element.type === 'signature'}
+                                            <ThumbnailInput
+                                                width={element.width}
+                                                height={element.height}
+                                                fileUrl={fileUrls[element.variableName]}
+                                                initialScale={imagePositions[element.variableName]?.scale ?? 1}
+                                                initialX={imagePositions[element.variableName]?.x ?? 0}
+                                                initialY={imagePositions[element.variableName]?.y ?? 0}
+                                                isSignature={element.type === 'signature'}
+                                                on:selectfile={() => handleSelectFile(element.variableName)}
+                                                on:update={(e) => handleImageUpdate(e, element.variableName)}
+                                            />
+                                        {/if}
+                                    </div>
                                 {/if}
-                                Generate and Save ID Card
-                            </Button>
-                            
-                            {#if error}
-                                <p class="text-sm text-destructive">{error}</p>
-                            {/if}
-                        </div>
-                    </form>
-                {/if}
-
-                {#if debugMessages.length > 0}
-                    <div class="mt-6 p-4 rounded-lg bg-secondary/10">
-                        <h3 class="font-bold mb-2">Debug Messages:</h3>
-                        <div class="space-y-1">
-                            {#each debugMessages as message}
-                                <div class="py-1 text-muted-foreground">{message}</div>
                             {/each}
+                            
+                            <div class="mt-6 space-y-4">
+                                <Button 
+                                    type="submit" 
+                                    class="w-full" 
+                                    disabled={loading}
+                                >
+                                    {#if loading}
+                                        <Loader class="mr-2 h-4 w-4 animate-spin" />
+                                    {/if}
+                                    Generate and Save ID Card
+                                </Button>
+                                
+                                {#if error}
+                                    <p class="text-sm text-destructive">{error}</p>
+                                {/if}
+                            </div>
+                        </form>
+                    {/if}
+    
+                    {#if debugMessages.length > 0}
+                        <div class="mt-6 p-4 rounded-lg bg-secondary/10">
+                            <h3 class="font-bold mb-2">Debug Messages:</h3>
+                            <div class="space-y-1">
+                                {#each debugMessages as message}
+                                    <div class="py-1 text-muted-foreground">{message}</div>
+                                {/each}
+                            </div>
                         </div>
-                    </div>
-                {/if}
-            </div>
-        </Card>
+                    {/if}
+                </div>
+            </Card>
+        </div>
     </div>
-</div>
-
-<style>
-    :global(.dark) {
-        color-scheme: dark;
-    }
     
-    .canvas-wrapper {
-        display: flex;
-        gap: 20px;
-    }
+    <style>
+        :global(.dark) {
+            color-scheme: dark;
+        }
+        
+        .canvas-wrapper {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .canvas-wrapper.landscape {
+            flex-direction: column;
+        }
+        
+        .canvas-wrapper.portrait {
+            flex-direction: row;
+        }
     
-    .canvas-wrapper.landscape {
-        flex-direction: column;
-    }
+        :global(.select-error) {
+            border-color: hsl(var(--destructive));
+            --tw-ring-color: hsl(var(--destructive));
+        }
     
-    .canvas-wrapper.portrait {
-        flex-direction: row;
-    }
-
-    :global(.select-error) {
-        border-color: hsl(var(--destructive));
-        --tw-ring-color: hsl(var(--destructive));
-    }
-
-    :global(.input-error) {
-        border-color: hsl(var(--destructive));
-        --tw-ring-color: hsl(var(--destructive));
-    }
-</style>
+        :global(.input-error) {
+            border-color: hsl(var(--destructive));
+            --tw-ring-color: hsl(var(--destructive));
+        }
+    </style>

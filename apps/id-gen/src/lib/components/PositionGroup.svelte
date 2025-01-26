@@ -1,10 +1,6 @@
 <script lang="ts">
     
-    function dispatchUpdate() {
-        dispatch('update', { x, y, width, height });
-    }
 
-    import { createEventDispatcher } from 'svelte';
     interface Props {
         x: number;
         y: number;
@@ -18,28 +14,27 @@
         width = $bindable(),
         height = $bindable()
     }: Props = $props();
-    const dispatch = createEventDispatcher();
 </script>
 
 <div class="position-container">
     <div class="input-group position-group">
         <label>
             <span>X</span>
-            <input type="number" bind:value={x} oninput={dispatchUpdate}>
+            <input type="number" bind:value={x}>
         </label>
         <label>
             <span>Y</span>
-            <input type="number" bind:value={y} oninput={dispatchUpdate}>
+            <input type="number" bind:value={y}>
         </label>
     </div>
     <div class="input-group position-group">
         <label>
             <span>W</span>
-            <input type="number" bind:value={width} oninput={dispatchUpdate}>
+            <input type="number" bind:value={width}>
         </label>
         <label>
             <span>H</span>
-            <input type="number" bind:value={height} oninput={dispatchUpdate}>
+            <input type="number" bind:value={height}>
         </label>
     </div>
 </div>

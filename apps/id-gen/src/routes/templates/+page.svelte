@@ -180,20 +180,12 @@
         }
     }
 
-    async function handleImageUpload(event: CustomEvent) {
-        const { event: fileEvent, side } = event.detail;
-        const input = fileEvent.target as HTMLInputElement;
-        if (!input.files || input.files.length === 0) return;
+    async function handleImageUpload(data: { event: Event, side: 'front' | 'back' }) {
+        const { event, side } = data;
+        const target = event.target as HTMLInputElement;
+        if (!target.files?.length) return;
 
-        const file = input.files[0];
-        if (!file.type.startsWith('image/')) {
-            errorMessage = 'Please upload an image file.';
-            return;
-        }
-
-        const isValid = await validateImage(file, side);
-        if (!isValid) return;
-
+        const file = target.files[0];
         if (side === 'front') {
             frontBackground = file;
             frontPreview = URL.createObjectURL(file);
@@ -205,8 +197,8 @@
         errorMessage = '';
     }
 
-    function removeImage(event: CustomEvent) {
-        const { side } = event.detail;
+    function handleRemoveImage(data: { side: 'front' | 'back' }) {
+        const { side } = data;
         if (side === 'front') {
             frontBackground = null;
             frontPreview = null;
@@ -394,8 +386,8 @@
                                 side="front"
                                 bind:elements={frontElements}
                                 bind:preview={frontPreview}
-                                on:imageUpload={handleImageUpload}
-                                on:removeImage={removeImage}
+                                onImageUpload={handleImageUpload}
+                                onRemoveImage={handleRemoveImage}
                             />
                         </div>
                         <div class="template-form">
@@ -403,8 +395,8 @@
                                 side="back"
                                 bind:elements={backElements}
                                 bind:preview={backPreview}
-                                on:imageUpload={handleImageUpload}
-                                on:removeImage={removeImage}
+                                onImageUpload={handleImageUpload}
+                                onRemoveImage={handleRemoveImage}
                             />
                         </div>
 

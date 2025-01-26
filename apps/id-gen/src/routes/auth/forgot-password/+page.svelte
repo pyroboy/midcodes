@@ -7,13 +7,17 @@
     import { Label } from '$lib/components/ui/label';
     import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '$lib/components/ui/card';
 
-    export let form: ActionData & ForgotPasswordFormData;
-    let loading = false;
+    interface Props {
+        form: ActionData & ForgotPasswordFormData;
+    }
 
-    $: error = form?.error;
-    $: message = form?.message;
-    $: success = form?.success;
-    $: email = (form?.email as string) || '';
+    let { form }: Props = $props();
+    let loading = $state(false);
+
+    let error = $derived(form?.error);
+    let message = $derived(form?.message);
+    let success = $derived(form?.success);
+    let email = $derived((form?.email as string) || '');
 </script>
 
 <div class="container mx-auto flex h-screen w-screen flex-col items-center justify-center">

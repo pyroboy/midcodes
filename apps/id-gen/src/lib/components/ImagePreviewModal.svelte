@@ -13,11 +13,11 @@
 
     let { frontImageUrl = null, backImageUrl = null, onClose }: Props = $props();
 
-    let meshRef: THREE.Mesh = $state();
+    let meshRef: THREE.Mesh | undefined = $state();
     let canvasError: string | null = $state(null);
     let canvasInitialized = $state(false);
     let debugMode = $state(false);
-    let modalRef: HTMLDialogElement = $state();
+    let modalRef: HTMLDialogElement | undefined = $state();
 
     let rotationY = $state(0);
     let animationFrameId: number | null = null;
