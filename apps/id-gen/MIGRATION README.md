@@ -53,11 +53,11 @@ The following components need to be available in the new app:
    - `$lib/components/ui/input` - Input component
    - `$lib/components/ui/label` - Label component
    - `$lib/components/ui/select` - Select component
-   - `$lib/IdCanvas.svelte` - Canvas for ID card rendering
-   - `$lib/ThumbnailInput.svelte` - Image upload component
+   - `$lib/components/IdCanvas.svelte` - Canvas for ID card rendering
+   - `$lib/components/ThumbnailInput.svelte` - Image upload component
    - `$lib/components/ImagePreviewModal.svelte` - Modal for image preview
-   - `$lib/TemplateForm.svelte` - Template creation form
-   - `$lib/TemplateList.svelte` - Template listing component
+   - `$lib/components/TemplateForm.svelte` - Template creation form
+   - `$lib/components/TemplateList.svelte` - Template listing component
    - Table components with sorting and filtering
    - Modal components for image preview
    - Form input components with validation

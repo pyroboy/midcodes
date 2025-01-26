@@ -1,18 +1,13 @@
-# ID Generator Routes Migration Plan
+# Events Management Routes Migration Plan
 
-This document outlines the plan to migrate the ID Generator routes from `apps/web/src/routes/id-gen` to `apps/id-gen/src/routes`, with special focus on dependencies and shared components.
+This document outlines the plan to migrate the ID Generator routes from `apps/web/src/routes/events` to `apps/id-gen/src/routes`, with special focus on dependencies and shared components.
 
 ## Current Structure
 
-Source Directory (`apps/web/src/routes/id-gen/`):
-- `+page.server.ts` - Server-side logic
-- `+page.svelte` - Frontend component
-- `ID_GEN_ROLE_INSTRUCTIONS.md` - Documentation
-- `all-ids/` - Directory containing ID listing functionality
-- `templates/` - Directory containing template-related functionality
-- `use-template/` - Directory containing template usage functionality
+Source Directory (`apps/web/src/routes/events/`):
 
-Target Directory (`apps/id-gen/src/routes/`):
+
+Target Directory (`apps/events/src/routes/`):
 - Currently contains only a basic `+page.svelte`
 
 ## Dependencies Analysis
