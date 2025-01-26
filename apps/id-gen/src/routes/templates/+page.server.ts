@@ -133,11 +133,9 @@ export const load: PageServerLoad = async ({ locals: { supabase, session, profil
 
         const response = {
             templates: templates || [],
-            user: {
-                id: session.user.id,
-                role: profile.role,
-                org_id: profile.org_id
-            }
+            user: session.user,
+            session,
+            profile
         };
 
         console.log(' [Templates Page] ====== END LOAD ======');
@@ -152,6 +150,8 @@ export const load: PageServerLoad = async ({ locals: { supabase, session, profil
         });
         throw error(500, 'An unexpected error occurred while loading templates');
     }
+
+
 };
 
 export const actions = {

@@ -1,17 +1,16 @@
 <script lang="ts">
     import { run, preventDefault } from 'svelte/legacy';
-
     import { onMount, onDestroy } from 'svelte';
     import { page } from '$app/stores';
     import { auth, session, user } from '$lib/stores/auth';
-    import IdCanvas from '$lib/IdCanvas.svelte';
+    import IdCanvas from '$lib/components/IdCanvas.svelte';
     import { Button } from "$lib/components/ui/button";
     import { Card } from "$lib/components/ui/card";
     import { Input } from "$lib/components/ui/input";
     import { Label } from "$lib/components/ui/label";
     import * as Select from "$lib/components/ui/select";
-    import { darkMode } from '../../../../stores/darkMode';
-    import ThumbnailInput from '$lib/ThumbnailInput.svelte';
+    import { darkMode } from '$lib/stores/darkMode';
+    import ThumbnailInput from '$lib/components/ThumbnailInput.svelte';
     import { Loader } from 'lucide-svelte';
     import { goto } from '$app/navigation';
     import { enhance } from '$app/forms';

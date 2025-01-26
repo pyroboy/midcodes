@@ -1,6 +1,5 @@
 import { error, fail, redirect } from '@sveltejs/kit';
-import type { SupabaseClient, User } from '@supabase/supabase-js';
-import type { ProfileData, EmulatedProfile } from '$lib/types/roleEmulation';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Session } from '../../../../app';
 import { handleImageUploads, saveIdCardData, deleteFromStorage } from '$lib/utils/idCardHelpers';
 import type { PageServerLoad, Actions } from './$types';

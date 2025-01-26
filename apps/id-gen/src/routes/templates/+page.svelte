@@ -2,10 +2,9 @@
     import { run } from 'svelte/legacy';
 
     import { onMount } from 'svelte';
-    import { supabase } from '$lib/supabaseClient';
     import type { UserProfile } from '$lib/stores/auth';
-    import TemplateForm from '$lib/TemplateForm.svelte';
-    import TemplateList from '$lib/TemplateList.svelte';
+    import TemplateForm from '$lib/components/TemplateForm.svelte';
+    import TemplateList from '$lib/components/TemplateList.svelte';
     import { uploadImage } from '$lib/database';
     import { templateData } from '$lib/stores/templateStore';
     import type { TemplateData, TemplateElement } from '$lib/stores/templateStore';

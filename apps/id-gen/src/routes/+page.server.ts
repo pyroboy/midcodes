@@ -2,28 +2,22 @@ import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase } }) => {
-    const {session ,user,profile,roleEmulation}= await safeGetSession();
+    const {session ,user,}= await safeGetSession();
     // const { user, profile } = session;
 
     if (!user) {
         throw error(401, 'Unauthorized');
     }
 
-    if (!profile) {
-        throw error(400, 'Profile not found');
-    }
+
 
     // Get the effective organization ID (either emulated or actual)
-    const effectiveOrgId = roleEmulation?.active ? 
-        roleEmulation.emulated_org_id : 
-        profile.org_id;
 
-    console.log('roleEmulation:', roleEmulation);
-    console.log('effectiveOrgId:', effectiveOrgId);
+    // console.log('effectiveOrgId:', effectiveOrgId);
 
-    if (!effectiveOrgId) {
-        throw error(500, 'Organization ID not found - User is not associated with any organization');
-    }
+    // if (!effectiveOrgId) {
+    //     throw error(500, 'Organization ID not found - User is not associated with any organization');
+    // }
 
     // Get statistics for the dashboard
     const { data: recentCards, error: cardsError } = await supabase
@@ -48,7 +42,6 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
 
     return {
         user,
-        profile,
         recentCards: recentCards || [],
         totalCards: totalCards || 0,
         error: cardsError || countError
