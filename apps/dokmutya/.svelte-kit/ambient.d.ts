@@ -33,6 +33,7 @@ declare module '$env/static/private' {
 	export const HOMEBREW_REPOSITORY: string;
 	export const INFOPATH: string;
 	export const LOGNAME: string;
+	export const LaunchInstanceID: string;
 	export const MANPATH: string;
 	export const MallocNanoZone: string;
 	export const NVM_BIN: string;
@@ -43,6 +44,7 @@ declare module '$env/static/private' {
 	export const ORIGINAL_XDG_CURRENT_DESKTOP: string;
 	export const PATH: string;
 	export const PWD: string;
+	export const SECURITYSESSIONID: string;
 	export const SHELL: string;
 	export const SHLVL: string;
 	export const SSH_AUTH_SOCK: string;
@@ -111,6 +113,7 @@ declare module '$env/dynamic/private' {
 		HOMEBREW_REPOSITORY: string;
 		INFOPATH: string;
 		LOGNAME: string;
+		LaunchInstanceID: string;
 		MANPATH: string;
 		MallocNanoZone: string;
 		NVM_BIN: string;
@@ -121,6 +124,7 @@ declare module '$env/dynamic/private' {
 		ORIGINAL_XDG_CURRENT_DESKTOP: string;
 		PATH: string;
 		PWD: string;
+		SECURITYSESSIONID: string;
 		SHELL: string;
 		SHLVL: string;
 		SSH_AUTH_SOCK: string;
