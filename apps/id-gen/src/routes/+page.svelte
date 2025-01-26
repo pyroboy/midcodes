@@ -8,9 +8,7 @@
 
     let { data }: Props = $props();
 
-    const role = data.profile?.role || 'id_gen_user';
-    const roleConfig = RoleConfig[role];
-    const allowedPaths = roleConfig.allowedPaths.filter(path => path.showInNav);
+
 
     function formatDate(dateStr: string) {
         return new Date(dateStr).toLocaleDateString('en-US', {
@@ -48,11 +46,7 @@
 <div class="container mx-auto px-4 py-8">
     <!-- Welcome Section -->
     <div class="card-content bg-white rounded-lg shadow-md p-6 mb-8">
-        <h1 class="text-3xl font-bold mb-2">Welcome, {data.profile?.email || data.user?.email}</h1>
-        <p class="text-gray-600">Role: {roleConfig.label}</p>
-        {#if data.profile?.org_id}
-            <p class="text-gray-600">Organization ID: {data.profile.org_id}</p>
-        {/if}
+
     </div>
 
     <!-- Quick Stats -->
@@ -64,20 +58,7 @@
         <!-- Add more stat cards as needed -->
     </div>
 
-    <!-- Navigation Links -->
-    <div class="card-content rounded-lg shadow-md p-6 mb-8">
-        <h2 class="text-2xl font-bold mb-4">Quick Actions</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {#each allowedPaths as { path, label }}
-                <a 
-                    href={path.replace('/**', '')} 
-                    class="block p-4 bg-muted hover:bg-muted/80 rounded-lg transition-colors duration-200"
-                >
-                    <h3 class="text-lg font-semibold mb-1">{label}</h3>
-                </a>
-            {/each}
-        </div>
-    </div>
+
 
     <!-- Recent Activity -->
     {#if data.error}

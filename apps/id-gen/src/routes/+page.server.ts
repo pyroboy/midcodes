@@ -1,14 +1,13 @@
 import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
 
-export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase } }) => {
-    const {session ,user,}= await safeGetSession();
+export const load: PageServerLoad = async ({ locals}) => {
+
+    const { supabase, safeGetSession } = locals;
     // const { user, profile } = session;
 
-    if (!user) {
-        throw error(401, 'Unauthorized');
-    }
 
+    const effectiveOrgId = 'org_id';
 
 
     // Get the effective organization ID (either emulated or actual)
@@ -41,7 +40,6 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
     }
 
     return {
-        user,
         recentCards: recentCards || [],
         totalCards: totalCards || 0,
         error: cardsError || countError

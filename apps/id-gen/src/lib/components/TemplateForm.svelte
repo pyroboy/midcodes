@@ -16,7 +16,7 @@
         elements?: TemplateElement[];
     }
 
-    let { side, preview = null, elements = $bindable([]) }: Props = $props();
+    let { side, preview = $bindable(), elements = $bindable([]) }: Props = $props();
 
 
 
