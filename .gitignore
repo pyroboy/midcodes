@@ -1,8 +1,8 @@
 # Dependencies
 node_modules
 .svelte-kit
-
-
+.vercel
+.turbo
 # Build directories for apps
 apps/*/.svelte-kit
 apps/*/build
