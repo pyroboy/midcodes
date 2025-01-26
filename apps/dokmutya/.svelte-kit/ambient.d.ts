@@ -64,6 +64,7 @@ declare module '$env/static/private' {
 	export const __CFBundleIdentifier: string;
 	export const __CF_USER_TEXT_ENCODING: string;
 	export const ELECTRON_RUN_AS_NODE: string;
+	export const VSCODE_L10N_BUNDLE_LOCATION: string;
 	export const VITEST_VSCODE_LOG: string;
 	export const VITEST_VSCODE: string;
 	export const TEST: string;
@@ -143,6 +144,7 @@ declare module '$env/dynamic/private' {
 		__CFBundleIdentifier: string;
 		__CF_USER_TEXT_ENCODING: string;
 		ELECTRON_RUN_AS_NODE: string;
+		VSCODE_L10N_BUNDLE_LOCATION: string;
 		VITEST_VSCODE_LOG: string;
 		VITEST_VSCODE: string;
 		TEST: string;
