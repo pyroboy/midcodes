@@ -19,7 +19,7 @@
   import { Label } from '$lib/components/ui/label';
   import { Progress } from '$lib/components/ui/progress';
   import { format } from 'date-fns';
-  import toast, { Toaster } from 'svelte-french-toast';
+  import toast, { Toaster } from 'svelte-5-french-toast';
 
   interface Property {
     id: number;
