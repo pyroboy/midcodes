@@ -3,11 +3,13 @@ import { error } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ locals}) => {
 
-    const { supabase, safeGetSession } = locals;
+    const { supabase, session, user, org_id, permissions } = locals;
     // const { user, profile } = session;
+console.log('session:', session);
+console.log('user:', user);
+console.log('org_id:', org_id);
 
-
-    const effectiveOrgId = 'org_id';
+    const effectiveOrgId = org_id;
 
 
     // Get the effective organization ID (either emulated or actual)

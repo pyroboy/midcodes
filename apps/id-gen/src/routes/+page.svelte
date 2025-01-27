@@ -46,7 +46,24 @@
 <div class="container mx-auto px-4 py-8">
     <!-- Welcome Section -->
     <div class="card-content bg-white rounded-lg shadow-md p-6 mb-8">
-
+        <h1 class="text-3xl font-bold mb-4">Welcome to ID Generator</h1>
+        <p class="text-gray-600 mb-6">Generate and manage ID cards efficiently with our easy-to-use platform.</p>
+        
+        <div class="flex flex-wrap gap-4">
+            <a href="/templates" class="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4z" />
+                    <path fill-rule="evenodd" d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clip-rule="evenodd" />
+                </svg>
+                Browse Templates
+            </a>
+            <a href="/all-ids" class="inline-flex items-center px-4 py-2 bg-secondary text-white rounded-lg hover:bg-secondary/90">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" />
+                </svg>
+                View All IDs
+            </a>
+        </div>
     </div>
 
     <!-- Quick Stats -->

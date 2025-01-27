@@ -50,9 +50,8 @@ async function getImageOrientation(imageUrl: string): Promise<'landscape' | 'por
 }
 
 export const load: PageServerLoad = async ({ locals }) => {
-    const { session, supabase } = locals;
+    const { session, supabase, org_id } = locals;
     console.log(' [Templates Page] ====== START LOAD ======');
-
 
     // Authentication check
     if (!session) {
@@ -61,9 +60,8 @@ export const load: PageServerLoad = async ({ locals }) => {
     }
 
     try {
-
-
         // Build the base query with all needed fields
+        console.log(' [Templates Page] Querying templates for org_id:', org_id);
         let templatesQuery = supabase
             .from('templates')
             .select(`
@@ -77,9 +75,8 @@ export const load: PageServerLoad = async ({ locals }) => {
                 back_background,
                 template_elements
             `)
+            .eq('org_id', org_id)
             .order('created_at', { ascending: false });
-
-        // Apply organization filter if not super_admin
 
         // Execute the query
         console.log(' [Templates Page] Executing database query...');
@@ -126,14 +123,11 @@ export const load: PageServerLoad = async ({ locals }) => {
         });
         throw error(500, 'An unexpected error occurred while loading templates');
     }
-
-
 };
 
 export const actions = {
     create: async ({ request, locals}) => {
-        const { supabase, session } = locals;
-
+        const { supabase, session, org_id } = locals;
 
         try {
             const formData = await request.formData();
@@ -145,6 +139,9 @@ export const actions = {
 
             const templateData = JSON.parse(templateDataStr);
 
+            // Set the org_id and user_id from the session
+            templateData.user_id = session?.user?.id;
+            templateData.org_id = org_id;
 
             console.log('🎨 Server: Processing template save:', {
                 id: templateData.id,

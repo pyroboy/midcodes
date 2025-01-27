@@ -5,7 +5,16 @@ import { redirect, error as throwError } from '@sveltejs/kit'
 import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public'
 import type { Handle } from '@sveltejs/kit'
 import { jwtDecode } from 'jwt-decode'
+import { getUserPermissions } from '$lib/services/permissions'
 import type { UserJWTPayload } from '$lib/types/auth'
+
+export interface GetSessionResult {
+  session: Session | null;
+  error: Error | null;
+  user: User | null;
+  org_id: string | null;
+  permissions?: string[];
+}
 
 const initializeSupabase: Handle = async ({ event, resolve }) => {
   event.locals.supabase = createServerClient(
@@ -50,9 +59,9 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
     if (userError || !user) {
       return {
         session: null,
-        error: userError || new Error('User not authenticated'),
+        error: userError || new Error('User not found'),
         user: null,
-        decodedToken: null,
+        org_id: null,
         permissions: []
       };
     }
@@ -60,9 +69,9 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
     if (sessionError || !initialSession) {
       return {
         session: null,
-        error: sessionError || new Error('Invalid session'),
+        error: sessionError || new Error('Session not found'),
         user: null,
-        decodedToken: null,
+        org_id: null,
         permissions: []
       };
     }
@@ -90,41 +99,79 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
       }
     }
 
-    let decodedToken: UserJWTPayload | null = null;
-    try {
-      decodedToken = jwtDecode(currentSession.access_token) as UserJWTPayload;
-    } catch (err) {
-      console.error('Failed to decode JWT:', err);
-    }
+    // Decode JWT and get permissions
+    const decodedToken = currentSession.access_token ? 
+      jwtDecode<UserJWTPayload>(currentSession.access_token) : null;
 
+    const permissions = decodedToken ? 
+      await getUserPermissions(decodedToken.user_roles, event.locals.supabase) : 
+      [];
+    console.log('USERROLES:', decodedToken?.user_roles);
+    console.log('USER_METADATA:', user.user_metadata);
     return {
       session: currentSession,
       error: null,
       user,
-      decodedToken,
-      permissions: []
+      org_id: user.user_metadata.org_id,
+      decodedToken: decodedToken || null,
+      permissions
     };
-  };
+  }
 
-  return resolve(event);
-};
+  return resolve(event)
+}
 
 const authGuard: Handle = async ({ event, resolve }) => {
-  const { pathname } = event.url;
-  const { session } = await event.locals.safeGetSession();
+  console.log(' [Auth Guard] Checking session for path:', event.url.pathname);
+  const sessionInfo = await event.locals.safeGetSession();
+  
+  console.log(' [Auth Guard] Session info:', {
+    hasSession: !!sessionInfo.session,
+    hasUser: !!sessionInfo.user,
+    hasOrgId: !!sessionInfo.org_id,
+    permissions: sessionInfo.permissions?.length || 0
+  });
 
-  const publicRoutes = ['/auth', '/auth/forgot-password', '/auth/reset-password'];
-  const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route));
+  // Set all info in locals
+  event.locals = {
+    ...event.locals,
+    session: sessionInfo.session,
+    user: sessionInfo.user,
+    permissions: sessionInfo.permissions,
+    org_id: sessionInfo.org_id ?? undefined
+  };
 
-  if (!session && !isPublicRoute) {
-    throw redirect(303, `/auth?returnTo=${pathname}`);
+  // Handle API routes
+  if (event.url.pathname.startsWith('/api')) {
+    if (!sessionInfo.user) {
+      console.log(' [Auth Guard] API route unauthorized');
+      throw throwError(401, 'Unauthorized');
+    }
+    return resolve(event);
   }
 
-  if (session && pathname === '/auth') {
-    throw redirect(303, '/');
+  // Allow access to auth routes when not authenticated
+  if (event.url.pathname.startsWith('/auth')) {
+    console.log(' [Auth Guard] Auth route access');
+    // If user is already authenticated and trying to access auth routes (except signout),
+    // handle role-based redirects
+    if (sessionInfo.session && event.url.pathname !== '/auth/signout') {
+      const returnTo = event.url.searchParams.get('returnTo');
+      if (returnTo) {
+        console.log(' [Auth Guard] Redirecting authenticated user to:', returnTo);
+        throw redirect(303, returnTo);
+      }
+    }
+    return resolve(event);
+  }
+
+  // Require authentication for all other routes
+  if (!sessionInfo.session && !event.url.pathname.startsWith('/auth')) {
+    console.log(' [Auth Guard] No session, redirecting to auth');
+    throw redirect(303, `/auth?returnTo=${event.url.pathname}`);
   }
 
   return resolve(event);
-};
+}
 
 export const handle = sequence(initializeSupabase, authGuard);

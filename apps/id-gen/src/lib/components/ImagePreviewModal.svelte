@@ -2,7 +2,9 @@
     import { onMount } from 'svelte';
     import { Canvas } from '@threlte/core';
     import { T } from '@threlte/core';
-    import { OrbitControls } from '@threlte/extras';
+    import { Mesh } from 'three'
+
+  import { OrbitControls } from '@threlte/extras'
     import * as THREE from 'three';
 
     interface Props {
@@ -11,7 +13,7 @@
         onClose: () => void;
     }
 
-    let { frontImageUrl = null, backImageUrl = null, onClose }: Props = $props();
+    let { frontImageUrl = null, backImageUrl = null, onClose } = $props();
 
     let meshRef: THREE.Mesh | undefined = $state();
     let canvasError: string | null = $state(null);
@@ -153,10 +155,6 @@
         return { frontGeometry, backGeometry, edgeGeometry };
     }
 
-    function handleCanvasCreated() {
-        canvasInitialized = true;
-    }
-
     function handleKeydown(event: KeyboardEvent) {
         if (event.key === 'Escape') {
             onClose();
@@ -169,6 +167,30 @@
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         sceneState.lastError = `Error loading ${isFront ? 'front' : 'back'} image: ${errorMessage}`;
         canvasError = sceneState.lastError;
+    }
+
+    function createTexture(url: string): THREE.Texture {
+        const texture = new THREE.TextureLoader().load(
+            url,
+            (tex) => {
+                tex.flipY = false;
+                tex.colorSpace = THREE.SRGBColorSpace;
+                tex.repeat.set(1, 1);
+                tex.center.set(0.5, 0.5);
+                tex.magFilter = THREE.LinearFilter;
+                tex.minFilter = THREE.LinearFilter;
+                tex.needsUpdate = true;
+                
+                if (url === frontImageUrl) {
+                    handleImageLoad(true);
+                } else {
+                    handleImageLoad(false);
+                }
+            },
+            undefined,
+            (error) => handleImageError(url === frontImageUrl, error)
+        );
+        return texture;
     }
 
     onMount(() => {
@@ -271,126 +293,63 @@
                     <p class="error-message" role="alert">Error: {canvasError}</p>
                 {/if}
 
-                <Canvas 
-                    shadows 
-                    on:created={handleCanvasCreated}
-                >
+                <Canvas>
                     <T.Scene>
                         <T.Color attach="background" args={[0, 0, 0, 0]} transparent={true} />
                     </T.Scene>
                     
-                    <T.PerspectiveCamera 
-                        position={[0, 0, 3]} 
-                        fov={50}
+                    <T.PerspectiveCamera
                         makeDefault
+                        position={[0, 0, 3]}
+                        fov={50}
                     >
-                        <OrbitControls 
-                            enableZoom={true}
-                            enablePan={true}
-                            enableRotate={true}
-                            target={[0, 0, 0]}
-                            maxDistance={5}
-                            minDistance={1}
-                        />
+                        {#snippet children({ ref })}
+                        <OrbitControls enableDamping />
+                        {/snippet}
                     </T.PerspectiveCamera>
 
-                    <T.AmbientLight intensity={1.9} />
-                    <T.DirectionalLight position={[5, 5, 5]} intensity={0.7} castShadow />
-                    <T.DirectionalLight position={[-5, 5, -5]} intensity={0.3} />
-                    <T.DirectionalLight position={[0, -5, 0]} intensity={0.2} />
-                    
-                    <T.SpotLight 
-                        position={[1, 1, 2]} 
-                        intensity={2}
-                        angle={Math.PI / 6}
-                        penumbra={0.9}
-                        decay={1.5}
-                        distance={10}
-                    />
-                    
-                    <T.SpotLight 
-                        position={[-1,0.7,-2]} 
-                        intensity={1.5}
-                        angle={Math.PI / 6}
-                        penumbra={0.9}
-                        decay={1.5}
-                        distance={10}
-                    />
-                    
-                    <T.PointLight position={[4, 0, 0]} intensity={0.5} distance={8} />
-                    <T.PointLight position={[-4, 0, 0]} intensity={0.5} distance={8} />
-                    <T.PointLight position={[0, 4, 0]} intensity={0.5} distance={8} />
-                    <T.PointLight position={[0, -4, 0]} intensity={0.5} distance={8} />
-                    
-                    {#if debugMode}
-                        <T.GridHelper args={[10, 10]} />
-                        <T.AxesHelper args={[5]} />
-                    {/if}
+                    <T.AmbientLight intensity={0.5} />
+                    <T.DirectionalLight position={[5, 5, 5]} intensity={1} />
 
                     <T.Group rotation.y={rotationY}>
                         {#if frontImageUrl}
-                            <T.Mesh 
-                                bind:ref={meshRef}
-                                castShadow
-                                receiveShadow
-                            >
+                        <T is={Mesh}>
                                 <T.BufferGeometry
-                                    on:create={({ ref }) => {
-                                        const { frontGeometry } = createRoundedRectCard();
-                                        ref.copy(frontGeometry);
-                                        sceneState.meshInitialized = true;
+                            
+                                    oncreate={(ref) => {
+                                        if (ref) {
+                                            const { frontGeometry } = createRoundedRectCard();
+                                            ref.copy(frontGeometry);
+                                        }
+                                        return () => {
+                                            // Cleanup
+                                        }
                                     }}
                                 />
                                 <T.MeshStandardMaterial
-                                    map={new THREE.TextureLoader().load(
-                                        frontImageUrl,
-                                        (texture) => {
-                                            texture.flipY = false;
-                                            texture.colorSpace = THREE.SRGBColorSpace;
-                                            texture.repeat.set(1, 1);
-                                            texture.center.set(0.5, 0.5);
-                                            texture.magFilter = THREE.LinearFilter;
-                                            texture.minFilter = THREE.LinearFilter;
-                                            texture.needsUpdate = true;
-                                            handleImageLoad(true);
-                                        },
-                                        undefined,
-                                        (error) => handleImageError(true, error)
-                                    )}
+                                    map={createTexture(frontImageUrl)}
                                     transparent={true}
                                     metalness={0}
                                     roughness={0.23}
                                 />
-                            </T.Mesh>
+                            </T>
                         {/if}
                         
-                        <T.Mesh 
-                            castShadow
-                            receiveShadow
-                        >
+                        <T.Mesh position={[0, 0, -0.001]}>
                             <T.BufferGeometry
-                                on:create={({ ref }) => {
-                                    const { backGeometry } = createRoundedRectCard();
-                                    ref.copy(backGeometry);
+                                oncreate={(ref) => {
+                                    if (ref) {
+                                        const { edgeGeometry } = createRoundedRectCard();
+                                        ref.copy(edgeGeometry);
+                                    }
+                                    return () => {
+                                        // Cleanup
+                                    }
                                 }}
                             />
                             {#if backImageUrl}
                                 <T.MeshStandardMaterial
-                                    map={new THREE.TextureLoader().load(
-                                        backImageUrl,
-                                        (texture) => {
-                                            texture.flipY = false;
-                                            texture.colorSpace = THREE.SRGBColorSpace;
-                                            texture.repeat.set(1, 1);
-                                            texture.center.set(0.5, 0.5);
-                                            texture.magFilter = THREE.LinearFilter;
-                                            texture.minFilter = THREE.LinearFilter;
-                                            texture.needsUpdate = true;
-                                            handleImageLoad(false);
-                                        },
-                                        undefined,
-                                        (error) => handleImageError(false, error)
-                                    )}
+                                    map={createTexture(backImageUrl)}
                                     transparent={true}
                                     metalness={0}
                                     roughness={0.2}
@@ -406,14 +365,16 @@
                             {/if}
                         </T.Mesh>
 
-                        <T.Mesh 
-                            castShadow
-                            receiveShadow
-                        >
+                        <T.Mesh>
                             <T.BufferGeometry
-                                on:create={({ ref }) => {
-                                    const { edgeGeometry } = createRoundedRectCard();
-                                    ref.copy(edgeGeometry);
+                                oncreate={(ref) => {
+                                    if (ref) {
+                                        const { edgeGeometry } = createRoundedRectCard();
+                                        ref.copy(edgeGeometry);
+                                    }
+                                    return () => {
+                                        // Cleanup
+                                    }
                                 }}
                             />
                             <T.MeshStandardMaterial

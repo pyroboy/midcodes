@@ -1,31 +1,14 @@
 import type { Session, User } from '@supabase/supabase-js';
 
-export interface UserJWTPayload {
-  aud: string;
-  exp: number;
-  sub: string;
-  email: string;
-  phone: string;
-  app_metadata: {
-    provider: string;
-    [key: string]: any;
-  };
-  user_metadata: {
-    [key: string]: any;
-  };
-  role: string;
-  aal: string;
-  amr: Array<{
-    method: string;
-    timestamp: number;
-  }>;
-  session_id: string;
+export interface  UserJWTPayload {
+  user_roles: string[];
+  // add other JWT payload fields as needed
 }
 
 export interface GetSessionResult {
   session: Session | null;
   error: Error | null;
   user: User | null;
-  decodedToken: UserJWTPayload | null;
+  org_id: string | null;
   permissions?: string[];
 }

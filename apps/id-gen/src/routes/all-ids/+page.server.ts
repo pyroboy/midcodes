@@ -52,26 +52,21 @@ interface DataRow {
 type IDCardResponse = [HeaderRow, ...DataRow[]];
 
 export const load = (async ({ locals}) => {
-    const { session, supabase, safeGetSession } = locals;
+    const { session, supabase, org_id } = locals;
     if (!session) {
         throw error(401, 'Unauthorized');
     }
 
-
-
-    // Get the effective organization ID (either emulated or actual)
-    const effectiveOrgId = 'fakeid'
-    if (!effectiveOrgId) {
-        throw error(500, 'Organization ID not found');
+    if (!org_id) {
+        throw error(403, 'No organization context found');
     }
 
-    
     // Check role-specific access
 
 
     const { data, error: fetchError } = await supabase
         .rpc('get_idcards_by_org', {
-            org_id: effectiveOrgId,
+            org_id: org_id,
             page_limit: null,  // Fetch all records
             page_offset: 0
         });

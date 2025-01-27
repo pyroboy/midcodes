@@ -34,11 +34,6 @@
     let isLoading = $state(false);
     let isEditMode = $state(false);
 
-    onMount(async () => {
-        if (!$session) {
-            window.location.href = '/login';
-        }
-    });
 
     async function validateBackgrounds(): Promise<boolean> {
         if ((!frontBackground && !frontPreview) || (!backBackground && !backPreview)) {
