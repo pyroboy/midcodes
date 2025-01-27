@@ -1,8 +1,8 @@
-import { redirect, error } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
 interface IDCardField {
-    value: string;
+    value: string | null;
     side: 'front' | 'back';
 }
 
@@ -28,7 +28,7 @@ interface HeaderMetadata {
 interface HeaderRow {
     is_header: true;
     metadata: HeaderMetadata;
-    id: null;
+    idcard_id: null;
     template_name: null;
     front_image: null;
     back_image: null;
@@ -39,7 +39,7 @@ interface HeaderRow {
 interface DataRow {
     is_header: false;
     metadata: null;
-    id: string;
+    idcard_id: string;
     template_name: string;
     front_image: string | null;
     back_image: string | null;
@@ -51,41 +51,41 @@ interface DataRow {
 
 type IDCardResponse = [HeaderRow, ...DataRow[]];
 
-export const load = (async ({ locals}) => {
+export const load = (async ({ locals }) => {
     const { session, supabase, org_id } = locals;
-    if (!session) {
-        throw error(401, 'Unauthorized');
-    }
-
-    if (!org_id) {
-        throw error(403, 'No organization context found');
-    }
-
-    // Check role-specific access
-
+    if (!session) throw error(401, 'Unauthorized');
+    if (!org_id) throw error(403, 'No organization context found');
 
     const { data, error: fetchError } = await supabase
         .rpc('get_idcards_by_org', {
             org_id: org_id,
-            page_limit: null,  // Fetch all records
+            page_limit: null,
             page_offset: 0
         });
 
-    if (fetchError) {
-        throw error(500, fetchError.message);
-    }
-
+    if (fetchError) throw error(500, fetchError.message);
     if (!data || !Array.isArray(data) || data.length === 0) {
         throw error(404, 'No ID cards found');
     }
 
-    // Validate that the response matches our expected type
-    const [header, ...rows] = data as IDCardResponse;
-    if (!header.is_header || !header.metadata) {
-        throw error(500, 'Invalid response format');
+    // Validate response structure
+    const [header, ...rows] = data;
+    if (
+        !header?.is_header ||
+        !header.metadata ||
+        header.idcard_id !== null ||
+        !rows.every(row => 
+            !row.is_header &&
+            typeof row.idcard_id === 'string' &&
+            typeof row.template_name === 'string'
+        )
+    ) {
+        throw error(500, 'Invalid API response format');
     }
 
     return {
-        idCards: data as IDCardResponse
+        idCards: data as IDCardResponse,
+        organizationName: header.metadata.organization_name,
+        pagination: header.metadata.pagination
     };
 }) satisfies PageServerLoad;
