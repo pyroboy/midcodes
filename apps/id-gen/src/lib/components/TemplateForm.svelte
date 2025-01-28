@@ -23,8 +23,11 @@
         onUpdate = $bindable(),
         onImageUpload = $bindable(),
         onRemoveImage = $bindable()
+        
     }: Props = $props();
 
+
+    // let currentElements = $state(elements);
     const BASE_WIDTH = 506.5;
     const BASE_HEIGHT = 319;
 
@@ -412,20 +415,24 @@ const defaultBackElements: TemplateElement[] = [
     }));
 
     let textStyle = $derived((element: TemplateElement) => ({
-        'font-family': `"${element.font || 'Arial'}", ${getFontFallback(element.font || 'Arial')}`,
+        'font-family': `"${element.font || 'Arial'}", sans-serif`,
         'font-weight': element.fontWeight || '400',
         'font-style': element.fontStyle || 'normal',
         'font-size': `${((element.size || 16) * previewDimensions.scale)}px`,
         'color': element.color || '#000000',
         'text-align': element.alignment || 'left',
         'text-transform': element.textTransform || 'none',
-        'text-decoration': element.textDecoration || 'none',
+        'text-decoration-line': element.textDecoration || 'none',
         'letter-spacing': element.letterSpacing ? `${element.letterSpacing * previewDimensions.scale}px` : 'normal',
-        'line-height': element.lineHeight || 'normal',
-        'opacity': element.opacity || 1,
+        'line-height': element.lineHeight || '1.2',
+        'opacity': typeof element.opacity === 'number' ? element.opacity : 1,
         'display': 'block',
-        'width': '100%'
+        'width': '100%',
+        'white-space': 'pre-wrap',
+        'word-break': 'break-word'
     }));
+
+
 
     function stopPropagation(fn: (e: MouseEvent) => void) {
         return (e: MouseEvent) => {
@@ -508,7 +515,7 @@ const defaultBackElements: TemplateElement[] = [
     </div>
     {#if preview}
         <ElementList 
-            {elements} 
+           bind:elements
             {fontOptions} 
             {side}
         />

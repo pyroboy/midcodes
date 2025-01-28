@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { createEventDispatcher } from 'svelte';
     import type { TemplateElement } from '../stores/templateStore';
     import { 
         Type, Bold, Italic, Underline, AlignLeft, AlignCenter, 
@@ -19,7 +18,10 @@
     const fontWeightOptions = ['normal', 'bold', '100', '200', '300', '400', '500', '600', '700', '800', '900'];
 
     function updateElement(updates: Partial<TemplateElement>) {
+        console.log('Updating element with:', updates);
+        console.log('Before update:', element);
         element = { ...element, ...updates };
+        console.log('After update:', element);
     }
 
     function toggleBold() {
@@ -49,13 +51,13 @@
 
 <div class="font-settings">
     <div class="settings-row">
-        <select bind:value={element.font} onchange={() => updateElement({ font: element.font })}>
+        <select bind:value={element.font}>
             {#each fontOptions as font}
                 <option value={font}>{font}</option>
             {/each}
         </select>
-        <input type="number" bind:value={element.size} oninput={() => updateElement({ size: element.size })}>
-        <select bind:value={element.fontWeight} onchange={() => updateElement({ fontWeight: element.fontWeight })}>
+        <input type="number" bind:value={element.size}>
+        <select bind:value={element.fontWeight}>
             {#each fontWeightOptions as weight}
                 <option value={weight}>{weight}</option>
             {/each}

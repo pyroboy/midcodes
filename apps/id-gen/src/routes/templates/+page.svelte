@@ -23,6 +23,7 @@ console.log('TEMPLATES:', templates);
     let frontElements: TemplateElement[] = $state([]);
     let backElements: TemplateElement[] = $state([]);
 
+
     // Add view mode state
     let isLoading = $state(false);
     let isEditMode = $state(false);

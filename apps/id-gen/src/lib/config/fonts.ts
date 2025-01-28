@@ -83,16 +83,27 @@ export async function loadGoogleFonts(): Promise<void> {
   }
 
   return new Promise((resolve) => {
+    const fontFamilies = fonts.map(font => `${font.family}:${font.variants.join(',')}`);
+    console.log('Loading fonts:', fontFamilies);
+    
     WebFontLoader?.load({
       google: {
-        families: fonts.map(font => `${font.family}:${font.variants.join(',')}`)
+        families: fontFamilies
       },
       active: () => {
         fontsLoaded = true;
+        console.log('✅ All fonts loaded successfully:', fontFamilies);
         resolve();
       },
       inactive: () => {
-        console.warn('Some fonts failed to load');
+        console.warn('⚠️ Some fonts failed to load');
+        // Log which fonts failed to load
+        const failedFonts = fonts
+          .map(font => font.family)
+          .filter(family => !isFontLoaded(family));
+        if (failedFonts.length > 0) {
+          console.warn('Failed fonts:', failedFonts);
+        }
         resolve(); // Resolve anyway to prevent blocking
       },
       timeout: 5000 // 5 seconds timeout

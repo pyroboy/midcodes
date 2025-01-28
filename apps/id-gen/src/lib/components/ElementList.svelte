@@ -9,15 +9,9 @@
     import { ChevronDown, ChevronUp } from 'lucide-svelte';
     import { slide } from 'svelte/transition';
     
-
     let { elements = $bindable(), fontOptions, side } = $props();
 
 
-    let elementOptions: string[] = $state([]);
-    // Type predicate for selection option safety
-    function isValidOption(value: unknown): value is string {
-        return typeof value === 'string';
-    }
 
     function updateElement(index: number, updates: Partial<TemplateElement>) {
         elements[index] = { ...elements[index], ...updates };
@@ -70,7 +64,6 @@
             .filter(opt => opt.length > 0);
         updateElement(index, { options });
 
-        elementOptions = options;
     }
 
     let expandedElementIndex: number | null = $state(null);
@@ -128,7 +121,7 @@
                             />
                         </div>
                         <FontSettings 
-                            {element} 
+                            bind:element = {elements[i]}
                             {fontOptions} 
                         />
                     {:else if element.type === 'selection'}
@@ -165,7 +158,7 @@
                             ></textarea>
                         </div>
                         <FontSettings 
-                            {element} 
+                        bind:element = {elements[i]}
                             {fontOptions} 
                         />
                     {/if}

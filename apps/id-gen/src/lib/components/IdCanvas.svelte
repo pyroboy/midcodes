@@ -13,6 +13,7 @@
     export let imagePositions: { [key: string]: { x: number, y: number, width: number, height: number, scale: number } };
     export let fullResolution = false;
     export let isDragging = false;
+    export let showBoundingBoxes = true; // Flag to control bounding box visibility
 
     const dispatch = createEventDispatcher<{
         error: { message: string; code: string };
@@ -394,37 +395,37 @@
     ctx: CanvasRenderingContext2D, 
     options: FontOptions = {}
 ): number {
-    if (!browser) return 0;
-    
-    const previousFont = ctx.font;
-    // Use a test string that includes ascenders and descenders
-    const testString = 'WÁjpqy|{}();'; // This string includes various height cases
-    
-    try {
-        ctx.font = getFontString(options);
+        if (!browser) return 0;
         
-        const metrics = ctx.measureText(testString);
+        const previousFont = ctx.font;
+        // Use a test string that includes ascenders and descenders
+        const testString = 'WÁjpqy|{}();'; // This string includes various height cases
         
-        // Get the most accurate height measurements possible
-        const height = Math.abs(metrics.actualBoundingBoxAscent || 0) + 
-                      Math.abs(metrics.actualBoundingBoxDescent || 0);
-        
-        const fontHeight = Math.abs(metrics.fontBoundingBoxAscent || 0) + 
-                         Math.abs(metrics.fontBoundingBoxDescent || 0);
-        
-        // Use em height as a fallback if metrics are not available
-        const emHeight = (options.size || 16) * 1.2; // 1.2 is a typical line-height ratio
-        
-        // Return the largest of the available measurements to ensure text fits
-        return Math.max(height, fontHeight, emHeight);
-    } catch (error) {
-        console.error('Error measuring text height:', error);
-        // Fallback to a reasonable default based on font size
-        return (options.size || 16) * 1.2;
-    } finally {
-        ctx.font = previousFont;
+        try {
+            ctx.font = getFontString(options);
+            
+            const metrics = ctx.measureText(testString);
+            
+            // Get the most accurate height measurements possible
+            const height = Math.abs(metrics.actualBoundingBoxAscent || 0) + 
+                          Math.abs(metrics.actualBoundingBoxDescent || 0);
+            
+            const fontHeight = Math.abs(metrics.fontBoundingBoxAscent || 0) + 
+                             Math.abs(metrics.fontBoundingBoxDescent || 0);
+            
+            // Use em height as a fallback if metrics are not available
+            const emHeight = (options.size || 16) * 1.2; // 1.2 is a typical line-height ratio
+            
+            // Return the largest of the available measurements to ensure text fits
+            return Math.max(height, fontHeight, emHeight);
+        } catch (error) {
+            console.error('Error measuring text height:', error);
+            // Fallback to a reasonable default based on font size
+            return (options.size || 16) * 1.2;
+        } finally {
+            ctx.font = previousFont;
+        }
     }
-}
     const debouncedRender = debounce(() => {
         if (!renderRequested && browser) {
             renderRequested = true;
@@ -516,15 +517,16 @@
             const fontSize = (element.size || 12) * nScale;
             const fontOptions = {
                 family: element.font,
-                size: fontSize,  // Use scaled font size
+                size: fontSize,
                 weight: element.fontWeight,
                 style: element.fontStyle
             };
             ctx.font = getFontString(fontOptions);
+            // console.log(element.variableName,ctx.font);
             ctx.fillStyle = element.color || 'black';
             ctx.textAlign = element.alignment as CanvasTextAlign;
-            ctx.textBaseline = 'middle';  // Change to middle for better vertical centering
-        
+            ctx.textBaseline = 'middle';
+
             let text = '';
             if (element.type === 'selection') {
                 text = formData[element.variableName] || element.options?.[0] || '';
@@ -547,6 +549,13 @@
             const elementHeight = (element.height || 0) * nScale;
             const elementX = (element.x || 0) * nScale;
             const elementY = (element.y || 0) * nScale;
+        
+            // Draw red bounding box if enabled
+            if (showBoundingBoxes) {
+                ctx.strokeStyle = 'red';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(elementX, elementY, elementWidth, elementHeight);
+            }
         
             let x = elementX;
             if (element.alignment === 'center') {
@@ -596,6 +605,13 @@
             const elementWidth = (element.width || 100) * nScale;
             const elementHeight = (element.height || 100) * nScale;
         
+            // Draw red bounding box if enabled
+            if (showBoundingBoxes) {
+                ctx.strokeStyle = 'red';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(elementX, elementY, elementWidth, elementHeight);
+            }
+            
             ctx.save();
             ctx.beginPath();
             ctx.rect(elementX, elementY, elementWidth, elementHeight);
