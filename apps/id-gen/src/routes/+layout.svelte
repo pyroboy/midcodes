@@ -2,11 +2,24 @@
   import type { LayoutProps } from './$types';
   import '../app.css';
   import { onMount } from 'svelte';
+  import { loadGoogleFonts } from '$lib/config/fonts';
   
   let { data, children }: LayoutProps = $props();
 
-
+  onMount(async () => {
+    try {
+      await loadGoogleFonts();
+    } catch (error) {
+      console.error('Failed to load fonts:', error);
+    }
+  });
 </script>
+
+<svelte:head>
+  <link href="https://fonts.googleapis.com" rel="preconnect">
+  <link href="https://fonts.gstatic.com" rel="preconnect" crossorigin="anonymous">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Open+Sans:wght@300;400;600;700&family=Lato:wght@300;400;700&family=Montserrat:wght@300;400;500;700&family=Source+Sans+Pro:wght@300;400;600;700&family=Playfair+Display:wght@400;500;700&display=swap" rel="stylesheet">
+</svelte:head>
 
 <div class="min-h-screen bg-background">
     {#if data.user}

@@ -3,7 +3,6 @@
     import { templateData } from '../stores/templateStore';
     import type { TemplateData, TemplateElement } from '../stores/templateStore';
     import ElementList from './ElementList.svelte';
-    import PositionGroup from './PositionGroup.svelte';
     import { Button } from '$lib/components/ui/button';
     import { Upload, Image, Plus, X } from 'lucide-svelte';
     import { loadGoogleFonts, getAllFontFamilies, isFontLoaded, fonts } from '../config/fonts';

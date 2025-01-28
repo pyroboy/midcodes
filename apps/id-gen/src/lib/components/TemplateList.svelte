@@ -19,6 +19,8 @@
     let hoveredTemplate: string | null = $state(null);
     const dispatch = createEventDispatcher();
     
+
+    console.log('Templates LISTT:', templates);
     // Get user profile from page store
 
     async function deleteTemplate(template: TemplateData) {

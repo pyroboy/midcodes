@@ -1,32 +1,25 @@
 <script lang="ts">
-    import { run } from 'svelte/legacy';
-
+    import { goto } from '$app/navigation';
     import { onMount } from 'svelte';
-    import type { UserProfile } from '$lib/stores/auth';
+    import { beforeNavigate } from '$app/navigation';
     import TemplateForm from '$lib/components/TemplateForm.svelte';
     import TemplateList from '$lib/components/TemplateList.svelte';
     import { uploadImage } from '$lib/database';
-    import { templateData } from '$lib/stores/templateStore';
     import type { TemplateData, TemplateElement } from '$lib/stores/templateStore';
-    import { auth, session, profile } from '$lib/stores/auth';
 
-    
-    interface Props {
-        // Add data prop from server
-        data: {
-        templates: TemplateData[],
-        user: UserProfile
-    };
-    }
+let { data } = $props();
+let templates = $state(data.templates); 
+let selectedTemplate = $state(data.selectedTemplate);
+let user = $state(data.user);
+let org_id = $state(data.org_id);
 
-    let { data }: Props = $props();
-
+console.log('TEMPLATES:', templates);
     let frontBackground: File | null = null;
     let backBackground: File | null = null;
     let frontPreview: string | null = $state(null);
     let backPreview: string | null = $state(null);
     let errorMessage = $state('');
-
+    let currentTemplate: TemplateData | null = $state(null);
     let frontElements: TemplateElement[] = $state([]);
     let backElements: TemplateElement[] = $state([]);
 
@@ -77,21 +70,8 @@
     }
 
     async function saveTemplate() {
-        console.log('📝 Starting template save...', {
-            frontElementsCount: frontElements.length,
-            backElementsCount: backElements.length,
-            authStatus: {
-                hasSession: !!$session,
-                hasUser: !!$profile,
-                userId: $profile?.id
-            }
-        });
+  
 
-        if (!$session || !$profile) {
-            console.error('❌ Auth check failed:', { session: !!$session, user: !!$profile });
-            errorMessage = 'User is not authenticated.';
-            return;
-        }
 
         if (!(await validateBackgrounds())) {
             console.error('❌ Background validation failed');
@@ -110,24 +90,24 @@
             });
 
             if (frontBackground) {
-                frontUrl = await uploadImage(frontBackground, 'front', $profile.id);
+                frontUrl = await uploadImage(frontBackground, 'front', user?.id);
                 console.log('✅ Front background uploaded:', frontUrl);
             }
             if (backBackground) {
-                backUrl = await uploadImage(backBackground, 'back', $profile.id);
+                backUrl = await uploadImage(backBackground, 'back', user?.id);
                 console.log('✅ Back background uploaded:', backUrl);
             }
 
             const templateDataToSave: TemplateData = {
-                id: $templateData.id || crypto.randomUUID(),
-                user_id: $profile?.id ?? '',
-                name: $templateData.name,
-                front_background: $templateData.front_background,
-                back_background: $templateData.back_background,
-                orientation: $templateData.orientation,
-                template_elements: $templateData.template_elements,
-                created_at: $templateData.created_at || new Date().toISOString(),
-                org_id: $profile?.org_id ?? ''
+                id: currentTemplate?.id || crypto.randomUUID(),
+                user_id: user?.id ?? '',
+                name: currentTemplate?.name ?? '',
+                front_background: currentTemplate?.front_background ?? '',
+                back_background: currentTemplate?.back_background ?? '',
+                orientation: currentTemplate?.orientation ?? 'landscape',
+                template_elements: currentTemplate?.template_elements ?? [],
+                created_at: currentTemplate?.created_at || new Date().toISOString(),
+                org_id: org_id ?? ''
             };
 
             console.log('📋 Template data to save:', {
@@ -158,9 +138,14 @@
 
             const result = await response.json();
 
-            if (!response.ok) {
+            if (!response.ok || result.type === 'failure') {
                 console.error('❌ Server action failed:', result);
                 throw new Error(result.message || 'Failed to save template');
+            }
+
+            if (!result.data) {
+                console.error('❌ No template data received');
+                throw new Error('No template data received');
             }
 
             console.log('✅ Template saved successfully:', {
@@ -212,56 +197,31 @@
         } else {
             backElements = elements;
         }
-        templateData.update((data) => ({
-            ...data,
-            template_elements: [...frontElements, ...backElements]
-        }));
+        // selectedTemplate = { ...data, template_elements: [...frontElements, ...backElements] };
     }
 
     async function handleTemplateSelect(event: CustomEvent<{ id: string }>) {
-        const templateId = event.detail.id;
-        console.log('🔄 EditTemplate: Template select event received:', event.detail);
-        
-        // Immediately show loading state
-        isEditMode = true;
-        isLoading = true;
-        
         try {
-            const formData = new FormData();
-            formData.append('id', templateId);
+            isEditMode = true;
             
-            const response = await fetch('?/select', {
-                method: 'POST',
-                body: formData
-            });
+            // Push state when entering edit mode
+            history.pushState({ editing: true }, '', `/templates?id=${event.detail.id}`);
             
-            const result = await response.json();
+            // Navigate to new URL
+            await goto(`/templates?id=${event.detail.id}`, { replaceState: true });
             
-            if (!response.ok) {
-                throw new Error(result.error || 'Failed to fetch template');
+            if (data.selectedTemplate) {
+                currentTemplate = data.selectedTemplate;
+                frontPreview = data.selectedTemplate.front_background;
+                backPreview = data.selectedTemplate.back_background;
+                frontElements = (data.selectedTemplate.template_elements as TemplateElement[]).filter(el => el.side === 'front');
+                backElements = (data.selectedTemplate.template_elements as TemplateElement[]).filter(el => el.side === 'back');
             }
-            
-            const data = result.data.template;
-            console.log('📥 EditTemplate: Template data fetched:', {
-                id: data.id,
-                name: data.name,
-                elements: data.template_elements?.length || 0,
-                frontBackground: data.front_background?.substring(0, 50) + '...',
-                backBackground: data.back_background?.substring(0, 50) + '...'
-            });
-
-            // Update store which will trigger reactive updates
-            templateData.select(data);
-            frontBackground = null;
-            backBackground = null;
-            errorMessage = '';
         } catch (err: unknown) {
-            const error = err as Error;
+            const error = err instanceof Error ? err : new Error('An unexpected error occurred');
             console.error('❌ EditTemplate: Error:', error);
-            errorMessage = error.message || 'An unexpected error occurred. Please try again.';
+            errorMessage = error.message;
             isEditMode = false;
-        } finally {
-            isLoading = false;
         }
     }
 
@@ -279,54 +239,45 @@
         frontElements = [];
         backElements = [];
         errorMessage = '';
-        templateData.set({
+        currentTemplate = {
             id: '',
-            user_id: $profile?.id ?? '',
+            user_id: user?.id ?? '',
             name: '',
             front_background: '',
             back_background: '',
             orientation: 'landscape' as const,
             template_elements: [],
             created_at: new Date().toISOString(),
-            org_id: $profile?.org_id ?? ''
-        });
+            org_id: org_id ?? ''
+        };
         console.log('✅ EditTemplate: Form cleared');
     }
 
-    // Reactive declarations for template elements
-    run(() => {
-        if ($templateData && $templateData.template_elements) {
-            frontElements = $templateData.template_elements.filter(el => el.side === 'front');
-            backElements = $templateData.template_elements.filter(el => el.side === 'back');
-            frontPreview = $templateData.front_background;
-            backPreview = $templateData.back_background;
-            
-            console.log('📋 EditTemplate: Elements filtered:', {
-                front: {
-                    count: frontElements.length,
-                    elements: frontElements.map(e => ({
-                        name: e.variableName,
-                        type: e.type,
-                        position: { x: e.x, y: e.y }
-                    }))
-                },
-                back: {
-                    count: backElements.length,
-                    elements: backElements.map(e => ({
-                        name: e.variableName,
-                        type: e.type,
-                        position: { x: e.x, y: e.y }
-                    }))
-                }
-            });
-        }
+    onMount(() => {
+        const handlePopState = (event: PopStateEvent) => {
+            if (isEditMode) {
+                handleBack();
+                // Push a new state to prevent going back
+                history.pushState({ editing: true }, '', window.location.href);
+            }
+        };
+
+        window.addEventListener('popstate', handlePopState);
+
+        return () => {
+            window.removeEventListener('popstate', handlePopState);
+        };
     });
+
 </script>
 
 <main class="h-full">
     <div class="edit-template-container {isEditMode ? 'edit-mode' : ''}">
         {#if !isEditMode}
-            <TemplateList templates={data.templates} on:select={handleTemplateSelect} />
+            <TemplateList 
+                templates={templates??[]} 
+                on:select={handleTemplateSelect} 
+            />
         {:else}
             <div class="template-form-container active">
                 <div class="back-button-container">

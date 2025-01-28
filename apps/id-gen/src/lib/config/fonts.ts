@@ -1,4 +1,5 @@
-let WebFont: any;
+// Dynamically import webfontloader to avoid SSR issues
+let WebFontLoader: typeof import('webfontloader') | null = null;
 
 export interface FontConfig {
   family: string;
@@ -63,25 +64,38 @@ export function isFontLoaded(fontFamily: string): boolean {
   return baselineWidth !== fallbackWidth;
 }
 
+let fontsLoaded = false;
+
 export async function loadGoogleFonts(): Promise<void> {
   // Check if we're in a browser environment
-  if (typeof window === 'undefined') {
+  if (typeof window === 'undefined' || fontsLoaded) {
     return Promise.resolve();
   }
 
   // Dynamically import webfontloader only in browser
-  if (!WebFont) {
-    WebFont = (await import('webfontloader')).default;
+  if (!WebFontLoader) {
+    try {
+      WebFontLoader = await import('webfontloader');
+    } catch (error) {
+      console.error('Failed to load webfontloader:', error);
+      return Promise.resolve();
+    }
   }
 
-  return new Promise((resolve, reject) => {
-    WebFont.load({
+  return new Promise((resolve) => {
+    WebFontLoader?.load({
       google: {
         families: fonts.map(font => `${font.family}:${font.variants.join(',')}`)
       },
-      active: resolve,
-      inactive: reject,
-      timeout: 5000
+      active: () => {
+        fontsLoaded = true;
+        resolve();
+      },
+      inactive: () => {
+        console.warn('Some fonts failed to load');
+        resolve(); // Resolve anyway to prevent blocking
+      },
+      timeout: 5000 // 5 seconds timeout
     });
   });
 }

@@ -9,21 +9,11 @@
     import { ChevronDown, ChevronUp } from 'lucide-svelte';
     import { slide } from 'svelte/transition';
     
-    
-    import { createEventDispatcher } from 'svelte';
-    interface Props {
-        elements: TemplateElement[];
-        fontOptions: string[];
-        side: 'front' | 'back';
-    }
 
-    type Events = {
-        update: { elements: TemplateElement[] };
-    }
+    let { elements = $bindable(), fontOptions, side } = $props();
 
-    let { elements = $bindable(), fontOptions, side }: Props = $props();
-    const dispatch = createEventDispatcher<Events>();
 
+    let elementOptions: string[] = $state([]);
     // Type predicate for selection option safety
     function isValidOption(value: unknown): value is string {
         return typeof value === 'string';
@@ -31,12 +21,10 @@
 
     function updateElement(index: number, updates: Partial<TemplateElement>) {
         elements[index] = { ...elements[index], ...updates };
-        dispatch('update', { elements });
     }
 
     function removeElement(index: number) {
-        elements = elements.filter((_, i) => i !== index);
-        dispatch('update', { elements });
+        elements = elements.filter((_: TemplateElement, i: number) => i !== index);
     }
 
     function addElement(type: 'text' | 'photo' | 'signature' | 'selection') {
@@ -64,13 +52,10 @@
             } : {})
         };
         elements = [...elements, newElement];
-        dispatch('update', { elements });
     }
 
-    function getSelectedState(element: TemplateElement) {
-        return element.content 
-            ? { value: element.content, label: element.content }
-            : { value: '', label: 'Select option' };
+    const getTriggerContent = (element: TemplateElement) => {
+        return element.content || (element.options?.[0] ?? 'Select option');
     };
 
     function getOptionsString(options: string[] | undefined): string {
@@ -84,6 +69,8 @@
             .map(opt => opt.trim())
             .filter(opt => opt.length > 0);
         updateElement(index, { options });
+
+        elementOptions = options;
     }
 
     let expandedElementIndex: number | null = $state(null);
@@ -147,16 +134,13 @@
                     {:else if element.type === 'selection'}
                         <div class="input-group">
                             <label for="select-{i}">Options</label>
-                            <!-- <Select.Root
-                                selected={getSelectedState(element)}
-                                onSelectedChange={(selection) => {
-                                    if (selection && isValidOption(selection.value)) {
-                                        updateElement(i, { content: selection.value });
-                                    }
-                                }}
+                            <Select.Root
+                                name="select-{i}"
+                                type="single"
+                                bind:value={element.content}
                             >
                                 <Select.Trigger id="select-{i}">
-                                    <Select.Value placeholder="Select option" />
+                                    {getTriggerContent(element)}
                                 </Select.Trigger>
                                 <Select.Content>
                                     {#each element.options || [] as option}
@@ -168,7 +152,7 @@
                                         </Select.Item>
                                     {/each}
                                 </Select.Content>
-                            </Select.Root> -->
+                            </Select.Root>
                         </div>
                         <div class="input-group">
                             <label for="options-{i}">Edit Options (one per line)</label>
@@ -208,7 +192,7 @@
     .element-list {
         width: 400px;
         background-color: #1e1e1e;
-        color: #ffffff;
+        color: #000;
         padding: 0.75rem;
         border-radius: 0.5rem;
         max-height: calc(100vh - 2rem);

@@ -1,68 +1,32 @@
-import { error, redirect } from '@sveltejs/kit';
-import type { PageServerLoad } from './$types';
+import { error, fail } from '@sveltejs/kit';
 
-// Define types for better type safety and documentation
-interface Profile {
-    role?: string;
-    org_id?: string;
-}
 
-interface Template {
-    id: string;
-    name: string;
-    user_id: string;
-    org_id?: string;
-    orientation: 'landscape' | 'portrait';
-    front_background: string;
-    back_background: string;
-    template_elements: any[];
-    created_at: string;
-}
-
-// Custom error class with code
-class AppError extends Error {
-    code: string;
-    constructor(message: string, code: string) {
-        super(message);
-        this.code = code;
-        this.name = 'AppError';
-    }
-}
-
-// Function to determine orientation from image dimensions
-async function getImageOrientation(imageUrl: string): Promise<'landscape' | 'portrait'> {
-    try {
-        const response = await fetch(imageUrl);
-        const buffer = await response.arrayBuffer();
-        const blob = new Blob([buffer]);
-        const url = URL.createObjectURL(blob);
-        const img = new Image();
-        img.src = url;
-        await new Promise(resolve => img.onload = resolve);
-        const width = img.width;
-        const height = img.height;
-        URL.revokeObjectURL(url);
-        return width >= height ? 'landscape' : 'portrait';
-    } catch (err) {
-        console.error('Error determining image orientation:', err);
-        return 'landscape'; // default fallback
-    }
-}
-
-export const load: PageServerLoad = async ({ locals }) => {
-    const { session, supabase, org_id } = locals;
-    console.log(' [Templates Page] ====== START LOAD ======');
-
-    // Authentication check
+export const load = (async ({ locals: { supabase, session, org_id,user }, url }) => {
     if (!session) {
-        console.log(' [Templates Page] No session found, redirecting to auth');
-        throw redirect(303, '/auth');
+        throw error(401, 'Unauthorized');
     }
 
-    try {
-        // Build the base query with all needed fields
-        console.log(' [Templates Page] Querying templates for org_id:', org_id);
-        let templatesQuery = supabase
+    let templateId = url.searchParams.get('id');
+    let selectedTemplate = null;
+
+    if (templateId) {
+        const { data: template, error: templateError } = await supabase
+            .from('templates')
+            .select('*')
+            .eq('id', templateId)
+            .single();
+
+        if (templateError) {
+            console.error('Error fetching template:', templateError);
+            throw error(500, 'Failed to fetch template');
+    }
+
+        selectedTemplate = template;
+    }
+
+
+    // Fetch all templates for the list
+    const templates = await supabase
             .from('templates')
             .select(`
                 id,
@@ -78,52 +42,20 @@ export const load: PageServerLoad = async ({ locals }) => {
             .eq('org_id', org_id)
             .order('created_at', { ascending: false });
 
-        // Execute the query
-        console.log(' [Templates Page] Executing database query...');
-        const { data: templates, error: templatesError } = await templatesQuery;
-
-        // Handle query errors
-        if (templatesError) {
-            console.error(' [Templates Page] Database error:', {
-                error: templatesError,
-                details: templatesError.details,
-                hint: templatesError.hint,
-                code: templatesError.code
-            });
-            throw error(500, 'Error loading templates from database');
-        }
-
-        // Log success and return the data
-        console.log(' [Templates Page] Query successful:', {
-            totalTemplates: templates?.length || 0,
-            firstTemplateId: templates?.[0]?.id || 'no templates',
-            hasTemplateElements: templates?.[0]?.template_elements ? 'yes' : 'no'
-        });
-
-        console.log(' [Templates Page] Template sample:', templates?.[0] ? {
-            id: templates[0].id,
-            name: templates[0].name,
-            elementsCount: templates[0].template_elements?.length || 0
-        } : 'no templates');
-
-        const response = {
-            templates: templates || [],
-            user: session.user,
-        };
-
-        console.log(' [Templates Page] ====== END LOAD ======');
-        return response;
-
-    } catch (e) {
-        // Log any unexpected errors
-        console.error(' [Templates Page] Unexpected error:', {
-            error: e,
-            message: e instanceof Error ? e.message : 'Unknown error',
-            stack: e instanceof Error ? e.stack : undefined
-        });
-        throw error(500, 'An unexpected error occurred while loading templates');
+        if (templates.error) {
+        console.error('Error fetching templates:', templates.error);
+        throw error(500, 'Failed to fetch templates');
     }
-};
+
+    // console.log('Templates:', templates.data);
+
+    return {
+        templates: templates.data,
+        selectedTemplate,
+        user,
+        org_id
+    };
+}) 
 
 export const actions = {
     create: async ({ request, locals}) => {
@@ -243,31 +175,72 @@ export const actions = {
     },
     select: async ({ request, locals: { supabase, session } }) => {
         if (!session) {
-            throw error(401, 'Unauthorized');
+            return fail(401, { message: 'Unauthorized' });
         }
 
         const formData = await request.formData();
         const templateId = formData.get('id');
 
         if (!templateId) {
-            throw error(400, 'Template ID is required');
+            return fail(400, { message: 'Template ID is required' });
         }
 
-        const { data: template, error: templateError } = await supabase
-            .from('templates')
-            .select('*')
-            .eq('id', templateId)
-            .single();
+        try {
+            const { data: template, error: templateError } = await supabase
+                .from('templates')
+                .select('*')
+                .eq('id', templateId)
+                .single();
 
-        if (templateError) {
-            console.error('Error fetching template:', templateError);
-            throw error(500, 'Failed to fetch template');
+            if (templateError) {
+                console.error('Error fetching template:', templateError);
+                return fail(500, { message: 'Failed to fetch template' });
+            }
+
+            if (!template) {
+                return fail(404, { message: 'Template not found' });
+            }
+
+            // Return a properly structured form action response
+            return {
+                type: 'success',
+                data: {
+                    id: template.id,
+                    user_id: template.user_id,
+                    name: template.name,
+                    front_background: template.front_background,
+                    back_background: template.back_background,
+                    orientation: template.orientation,
+                    created_at: template.created_at,
+                    updated_at: template.updated_at,
+                    template_elements: template.template_elements,
+                    org_id: template.org_id
+                }
+            };
+        } catch (err) {
+            console.error('Server error:', err);
+            return fail(500, { message: 'Internal server error' });
         }
-
-        if (!template) {
-            throw error(404, 'Template not found');
-        }
-
-        return { template };
     },
 };
+
+
+// Function to determine orientation from image dimensions
+async function getImageOrientation(imageUrl: string): Promise<'landscape' | 'portrait'> {
+    try {
+        const response = await fetch(imageUrl);
+        const buffer = await response.arrayBuffer();
+        const blob = new Blob([buffer]);
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        img.src = url;
+        await new Promise(resolve => img.onload = resolve);
+        const width = img.width;
+        const height = img.height;
+        URL.revokeObjectURL(url);
+        return width >= height ? 'landscape' : 'portrait';
+    } catch (err) {
+        console.error('Error determining image orientation:', err);
+        return 'landscape'; // default fallback
+    }
+}
