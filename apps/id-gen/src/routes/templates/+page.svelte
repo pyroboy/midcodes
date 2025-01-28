@@ -227,21 +227,21 @@
         isLoading = true;
         
         try {
-            const response = await fetch(`/api/templates/${templateId}`, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json'
-                },
-                credentials: 'include'
+            const formData = new FormData();
+            formData.append('id', templateId);
+            
+            const response = await fetch('?/select', {
+                method: 'POST',
+                body: formData
             });
             
+            const result = await response.json();
+            
             if (!response.ok) {
-                const errorText = await response.text();
-                console.error('❌ EditTemplate: Server response:', errorText);
-                throw new Error('Failed to fetch template. Please try again.');
+                throw new Error(result.error || 'Failed to fetch template');
             }
             
-            const data = await response.json();
+            const data = result.data.template;
             console.log('📥 EditTemplate: Template data fetched:', {
                 id: data.id,
                 name: data.name,

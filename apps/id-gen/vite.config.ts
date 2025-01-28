@@ -5,6 +5,10 @@ import { resolve } from 'path';
 
 export default defineConfig({
     plugins: [sveltekit()],
+    server: {
+        host: true, // Allows access on the local network
+        port: 5731, // Optional: Specify your port
+      },
     // optimizeDeps: {
     //     include: ['three']
     // },

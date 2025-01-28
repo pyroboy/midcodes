@@ -242,7 +242,7 @@
             console.log('Save response:', result);
 
             if (response.ok && (result.type === 'success' || (result.data && result.data[0]?.success))) {
-                goto('/id-gen/all-ids');
+                goto('/all-ids');
             } else {
                 error = (result.data && result.data[0]?.error) || 'Failed to save ID card';
                 console.error('Save error:', error);

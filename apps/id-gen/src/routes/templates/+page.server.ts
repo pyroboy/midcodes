@@ -240,5 +240,34 @@ export const actions = {
                 err instanceof Error ? err.message : 'Error deleting template'
             );
         }
-    }
+    },
+    select: async ({ request, locals: { supabase, session } }) => {
+        if (!session) {
+            throw error(401, 'Unauthorized');
+        }
+
+        const formData = await request.formData();
+        const templateId = formData.get('id');
+
+        if (!templateId) {
+            throw error(400, 'Template ID is required');
+        }
+
+        const { data: template, error: templateError } = await supabase
+            .from('templates')
+            .select('*')
+            .eq('id', templateId)
+            .single();
+
+        if (templateError) {
+            console.error('Error fetching template:', templateError);
+            throw error(500, 'Failed to fetch template');
+        }
+
+        if (!template) {
+            throw error(404, 'Template not found');
+        }
+
+        return { template };
+    },
 };

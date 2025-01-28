@@ -1,23 +1,21 @@
 <script lang="ts">
-    import { run, stopPropagation } from 'svelte/legacy';
 
     import type { HeaderRow, DataRow } from '$lib/types';
     import ImagePreviewModal from '$lib/components/ImagePreviewModal.svelte';
     import { getSupabaseStorageUrl } from '$lib/utils/supabase';
     import JSZip from 'jszip';
     
-    interface Props {
-        data: { idCards: (HeaderRow | DataRow)[] };
-    }
+import type { PageData } from './$types';
+	import type { IDCard } from './+page.server';
 
-    let { data }: Props = $props();
+    let { data }: { data: PageData } = $props();
+    const { idCards, metadata } = data;
 
-    const [headerRow, ...allRows] = data.idCards;
-    const header = headerRow as HeaderRow;
-    
+    console.log("Id cards",idCards);
+
 
     let searchQuery = $state('');
-    let dataRows: DataRow[] = $state([]);
+    let dataRows = $state(idCards);
     let errorMessage = '';
     let selectedFrontImage: string | null = $state(null);
     let selectedBackImage: string | null = $state(null);
@@ -32,15 +30,15 @@
 
     interface SelectionState {
         isSelected: (cardId: string) => boolean;
-        isGroupSelected: (cards: DataRow[]) => boolean;
+        isGroupSelected: (cards: IDCard[]) => boolean;
         toggleSelection: (cardId: string) => void;
-        toggleGroupSelection: (cards: DataRow[]) => void;
+        toggleGroupSelection: (cards: IDCard[]) => void;
         getSelectedCount: () => number;
         clearSelection: () => void;
     }
 
     let isSelected = (cardId: string) => selectedCards.has(cardId);
-    let isGroupSelected = (cards: DataRow[]) => {
+    let isGroupSelected = (cards: IDCard[]) => {
         return cards.every(card => {
             const cardId = getCardId(card);
             return cardId && selectedCards.has(cardId);
@@ -61,7 +59,7 @@
             }
             selectedCards = newSelectedCards;
         },
-        toggleGroupSelection: (cards: DataRow[]) => {
+        toggleGroupSelection: (cards: IDCard[]) => {
             const validCards = cards.filter(card => {
                 const cardId = getCardId(card);
                 return !!cardId;
@@ -90,17 +88,17 @@
 
 
 
-    function getCardId(card: DataRow): string {
+    function getCardId(card:IDCard): string {
         const id = card.idcard_id?.toString();
         if (!id) return '';
         return id;
     }
 
-    function getAllSelectedCards(): DataRow[] {
+    function getAllSelectedCards() {
         return dataRows.filter(card => selectionManager.isSelected(getCardId(card)));
     }
 
-    async function openPreview(event: MouseEvent, card: DataRow) {
+    async function openPreview(event: MouseEvent, card: IDCard) {
         // Don't open preview if clicking on a checkbox, button, or their containers
         const target = event.target as HTMLElement;
         if (
@@ -112,6 +110,9 @@
             return;
         }
 
+
+        console.log("Front image",card.front_image);
+        console.log("Back image",card.back_image);
         selectedFrontImage = card.front_image ?? null;
         selectedBackImage = card.back_image ?? null;
     }
@@ -121,7 +122,7 @@
         selectedBackImage = null;
     }
 
-    async function downloadCard(card: DataRow) {
+    async function downloadCard(card: IDCard) {
         const cardId = getCardId(card);
         downloadingCards.add(cardId);
         downloadingCards = downloadingCards;
@@ -284,7 +285,7 @@
         }
     }
 
-    async function handleDelete(card: DataRow) {
+    async function handleDelete(card: IDCard) {
         const cardId = getCardId(card);
         deletingCards.add(cardId);
         deletingCards = deletingCards;
@@ -354,33 +355,21 @@
         }
     }
 
-    function handleCheckboxClick(event: Event, card: DataRow) {
+    function handleCheckboxClick(event: Event, card: IDCard) {
         event.stopPropagation();
         const cardId = getCardId(card);
         if (!cardId) return;
         selectionManager.toggleSelection(cardId);
     }
 
-    function handleGroupCheckboxClick(event: Event, cards: DataRow[]) {
+    function handleGroupCheckboxClick(event: Event, cards: IDCard[]) {
         event.stopPropagation();
         selectionManager.toggleGroupSelection(cards);
     }
-    let templateFields = $derived(header?.metadata?.templates || {});
-    run(() => {
-        const query = searchQuery.toLowerCase();
-        dataRows = allRows.filter((row) => {
-            if (!('is_header' in row) || row.is_header) return false;
-            
-            const dataRow = row as DataRow;
-            if (dataRow.template_name.toLowerCase().includes(query)) return true;
-            
-            return Object.values(dataRow.fields || {}).some(field => 
-                field.value.toLowerCase().includes(query)
-            );
-        }) as DataRow[];
-    });
+    let templateFields = $derived(metadata?.templates || {});
+
     let groupedCards = $derived((() => {
-        const groups: Record<string, DataRow[]> = {};
+        const groups: Record<string, IDCard[]> = {};
         dataRows.forEach(card => {
             if (!groups[card.template_name]) {
                 groups[card.template_name] = [];
@@ -389,17 +378,17 @@
         });
         return groups;
     })());
-    run(() => {
-        // Update group selection states whenever selectedCards changes
-        Object.entries(groupedCards).forEach(([templateName, cards]) => {
-            groupSelectionStates.set(
-                templateName, 
-                cards.every(card => selectedCards.has(getCardId(card)))
-            );
-        });
-        groupSelectionStates = groupSelectionStates;
-        selectedCount = selectedCards.size;
-    });
+    // run(() => {
+    //     // Update group selection states whenever selectedCards changes
+    //     Object.entries(groupedCards).forEach(([templateName, cards]) => {
+    //         groupSelectionStates.set(
+    //             templateName, 
+    //             cards.every(card => selectedCards.has(getCardId(card)))
+    //         );
+    //     });
+    //     groupSelectionStates = groupSelectionStates;
+    //     selectedCount = selectedCards.size;
+    // });
 </script>
 
 <div class="mb-4 flex justify-between items-center">
@@ -475,16 +464,16 @@
                             />
                         </div>
                     </td>
-                    <td class="sticky left-[57px] z-20 px-4 py-2 bg-white dark:bg-gray-900 group-hover:bg-gray-100 dark:group-hover:bg-gray-700">
-                        <div class="flex items-center space-x-2">
+                    <td class="sticky left-[57px] z-20 px-4 py-2 bg-white dark:bg-gray-900 group-hover:bg-gray-100 dark:group-hover:bg-gray-700"
+                    >
                             {#if card.front_image}
                                 <img
                                     src={getSupabaseStorageUrl(card.front_image,'rendered-id-cards')}
                                     alt="Front Preview"
                                     class="w-8 h-8 object-cover rounded"
+                                    
                                 />
                             {/if}
-                        </div>
                     </td>
                     {#if templateFields[templateName]}
                         {#each templateFields[templateName] || [] as field (field.variableName)}
@@ -496,14 +485,14 @@
                     <td class="sticky right-0 z-20 px-4 py-2 bg-white dark:bg-gray-900 group-hover:bg-gray-100 dark:group-hover:bg-gray-700 flex gap-2 items-center">
                         <button
                             class="px-3 py-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-150"
-                            onclick={stopPropagation(() => downloadCard(card))}
+                            onclick={() => downloadCard(card)}
                             disabled={downloadingCards.has(getCardId(card))}
                         >
                             {downloadingCards.has(getCardId(card)) ? 'Downloading...' : 'Download'}
                         </button>
                         <button
                             class="px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors duration-150"
-                            onclick={stopPropagation(() => handleDelete(card))}
+                            onclick={() => handleDelete(card)}
                             disabled={deletingCards.has(getCardId(card))}
                         >
                             {deletingCards.has(getCardId(card)) ? 'Deleting...' : 'Delete'}
@@ -517,10 +506,10 @@
 </div>
 {/each}
 
-{#if selectedFrontImage}
+{#if selectedFrontImage || selectedBackImage}
 <ImagePreviewModal
-frontImageUrl={selectedFrontImage ? getSupabaseStorageUrl(selectedFrontImage,'rendered-id-cards') : null}
-backImageUrl={selectedBackImage ? getSupabaseStorageUrl(selectedBackImage,'rendered-id-cards') : null}
-onClose={closePreview}
+    frontImageUrl={selectedFrontImage ? getSupabaseStorageUrl(selectedFrontImage,'rendered-id-cards') : null}
+    backImageUrl={selectedBackImage ? getSupabaseStorageUrl(selectedBackImage,'rendered-id-cards') : null}
+    onClose={closePreview}
 />
 {/if}

@@ -3,19 +3,21 @@
     import { Canvas } from '@threlte/core';
     import { T } from '@threlte/core';
     import { Mesh } from 'three'
-
-  import { OrbitControls } from '@threlte/extras'
+    import { AsciiRenderer, OrbitControls } from '@threlte/extras'
     import * as THREE from 'three';
 
-    interface Props {
-        frontImageUrl?: string | null;
-        backImageUrl?: string | null;
-        onClose: () => void;
-    }
+    // Enable proper color management
+    THREE.ColorManagement.enabled = true;
 
     let { frontImageUrl = null, backImageUrl = null, onClose } = $props();
+    let sceneState = $state({
+        frontTextureLoaded: false,
+        backTextureLoaded: false,
+        meshInitialized: false,
+        lastError: null as string | null
+    });
 
-    let meshRef: THREE.Mesh | undefined = $state();
+
     let canvasError: string | null = $state(null);
     let canvasInitialized = $state(false);
     let debugMode = $state(false);
@@ -174,7 +176,7 @@
             url,
             (tex) => {
                 tex.flipY = false;
-                tex.colorSpace = THREE.SRGBColorSpace;
+                tex.colorSpace = THREE.SRGBColorSpace;  // Explicitly set sRGB for color textures
                 tex.repeat.set(1, 1);
                 tex.center.set(0.5, 0.5);
                 tex.magFilter = THREE.LinearFilter;
@@ -251,12 +253,7 @@
         }
     }
 
-    let sceneState = $state({
-        frontTextureLoaded: false,
-        backTextureLoaded: false,
-        meshInitialized: false,
-        lastError: null as string | null
-    });
+
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -293,33 +290,82 @@
                     <p class="error-message" role="alert">Error: {canvasError}</p>
                 {/if}
 
-                <Canvas>
-                    <T.Scene>
-                        <T.Color attach="background" args={[0, 0, 0, 0]} transparent={true} />
-                    </T.Scene>
+                <Canvas  >
+                        <T.Scene>
+                            <T.Color attach="background" args={[0, 0, 0, 0]} transparent={true} />
+                       
+                        <T.PerspectiveCamera
+                            makeDefault
+                            position={[0,0,5]}
                     
-                    <T.PerspectiveCamera
-                        makeDefault
-                        position={[0, 0, 3]}
-                        fov={50}
-                    >
-                        {#snippet children({ ref })}
-                        <OrbitControls enableDamping />
-                        {/snippet}
-                    </T.PerspectiveCamera>
-
-                    <T.AmbientLight intensity={0.5} />
-                    <T.DirectionalLight position={[5, 5, 5]} intensity={1} />
-
-                    <T.Group rotation.y={rotationY}>
-                        {#if frontImageUrl}
-                        <T is={Mesh}>
-                                <T.BufferGeometry
                             
+                            fov={35}
+                        >
+                        <OrbitControls enableDamping />
+                        <T.HemisphereLight skyColor="#ffffff" groundColor="#ffffff"  intensity={0.2} />
+                        <T.AmbientLight color={0xffffff} intensity={0.5} />
+                        <T.DirectionalLight position={[5, 1.5, 5]} intensity={0.7} />
+                        <T.DirectionalLight position={[-5, 3, 5]} intensity={0.3} color="#b1e1ff" />
+                        <T.DirectionalLight position={[-6, -3, 3]} intensity={0.2} color="#ffecd1" />
+                        <!-- <T.SpotLight position={[0, 0, 6]} intensity={100} color="#ffffff" /> -->
+                        </T.PerspectiveCamera>
+           
+                        <T.Group rotation.y={rotationY}>
+                            <!-- <T.RoundedBox radius={0.15} smoothness={16} castShadow rotation={[0, 0.5, 0]} position={[0, 0.705, 0]}>
+                                <T.MeshTransmissionMaterial thickness={2} anisotropy={0.1} chromaticAberration={0.04} />
+                              </T.RoundedBox> -->
+                            {#if frontImageUrl}
+                            <T is={Mesh}>
+                                    <T.BufferGeometry
+
+                                        oncreate={(ref) => {
+                                            if (ref) {
+                                                const { frontGeometry } = createRoundedRectCard();
+                                                ref.copy(frontGeometry);
+                                            }
+                                            return () => {
+                                                // Cleanup
+                                            }
+                                        }}
+                                    />
+                                    <T.MeshStandardMaterial
+                                    envMap={null}
+                                    color="#ffffff"
+                                        map={createTexture(frontImageUrl)}
+                                        metalness={0.1}
+                                        roughness={0.1}
+                            
+                                    />
+                                </T>
+                            {/if}
+                            {#if backImageUrl}
+                            <T is={Mesh} position={[0, 0, -0.001]}>
+                                <T.BufferGeometry
                                     oncreate={(ref) => {
                                         if (ref) {
-                                            const { frontGeometry } = createRoundedRectCard();
-                                            ref.copy(frontGeometry);
+                                            const { backGeometry } = createRoundedRectCard();
+                                            ref.copy(backGeometry);
+                                        }
+                                        return () => {
+                                            // Cleanup
+                                        }
+                                    }}
+                                />
+                              
+                                <T.MeshStandardMaterial
+                                    map={createTexture(backImageUrl)}
+                                             envMap={null}
+                                    metalness={0.1}
+                                    roughness={0.1}
+                                />
+                            </T>
+                            {/if}
+                            <T.Mesh>
+                                <T.BufferGeometry
+                                    oncreate={(ref) => {
+                                        if (ref) {
+                                            const { edgeGeometry } = createRoundedRectCard();
+                                            ref.copy(edgeGeometry);
                                         }
                                         return () => {
                                             // Cleanup
@@ -327,63 +373,13 @@
                                     }}
                                 />
                                 <T.MeshStandardMaterial
-                                    map={createTexture(frontImageUrl)}
-                                    transparent={true}
-                                    metalness={0}
-                                    roughness={0.23}
-                                />
-                            </T>
-                        {/if}
-                        
-                        <T.Mesh position={[0, 0, -0.001]}>
-                            <T.BufferGeometry
-                                oncreate={(ref) => {
-                                    if (ref) {
-                                        const { edgeGeometry } = createRoundedRectCard();
-                                        ref.copy(edgeGeometry);
-                                    }
-                                    return () => {
-                                        // Cleanup
-                                    }
-                                }}
-                            />
-                            {#if backImageUrl}
-                                <T.MeshStandardMaterial
-                                    map={createTexture(backImageUrl)}
-                                    transparent={true}
+                                    color="#ffffff"
                                     metalness={0}
                                     roughness={0.2}
                                 />
-                            {:else}
-                                <T.MeshStandardMaterial
-                                    color="#e24a4a"
-                                    transparent={true}
-                                    metalness={0}
-                                    roughness={0.23}
-                                    opacity={1}
-                                />
-                            {/if}
-                        </T.Mesh>
-
-                        <T.Mesh>
-                            <T.BufferGeometry
-                                oncreate={(ref) => {
-                                    if (ref) {
-                                        const { edgeGeometry } = createRoundedRectCard();
-                                        ref.copy(edgeGeometry);
-                                    }
-                                    return () => {
-                                        // Cleanup
-                                    }
-                                }}
-                            />
-                            <T.MeshStandardMaterial
-                                color="#ffffff"
-                                metalness={0}
-                                roughness={0.2}
-                            />
-                        </T.Mesh>
-                    </T.Group>
+                            </T.Mesh>
+                        </T.Group>
+                    </T.Scene>
                 </Canvas>
             </div>
 

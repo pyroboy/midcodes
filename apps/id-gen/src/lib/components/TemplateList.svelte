@@ -32,7 +32,7 @@
             formData.append('templateId', template.id);
 
             // Call server action
-            const response = await fetch('/id-gen/templates?/delete', {
+            const response = await fetch('/templates?/delete', {
                 method: 'POST',
                 body: formData
             });
@@ -78,7 +78,7 @@
             formData.append('templateData', JSON.stringify(newTemplate));
 
             // Call server action
-            const response = await fetch('/id-gen/templates?/create', {
+            const response = await fetch('/templates?/create', {
                 method: 'POST',
                 body: formData
             });
@@ -103,7 +103,7 @@
 
     function useTemplate(id: string) {
         // Use data-sveltekit-reload="off" to prevent full page reload
-        goto(`/id-gen/use-template/${id}`, { replaceState: false });
+        goto(`/use-template/${id}`, { replaceState: false });
     }
 
     function showNotification(message: string) {
@@ -153,7 +153,7 @@
                 onmouseleave={() => hoveredTemplate = null}
             >
                 <a 
-                    href="/id-gen/use-template/{template.id}"
+                    href="/use-template/{template.id}"
                     class="block w-full text-left"
                     data-sveltekit-preload-data="hover"
                     data-sveltekit-noscroll

@@ -1,4 +1,4 @@
-import WebFont from 'webfontloader';
+let WebFont: any;
 
 export interface FontConfig {
   family: string;
@@ -44,6 +44,10 @@ export function getAllFontFamilies(): string[] {
 }
 
 export function isFontLoaded(fontFamily: string): boolean {
+  if (typeof window === 'undefined') {
+    return true; // During SSR, assume fonts are loaded
+  }
+
   const testString = 'mmmmmmmmmmlli';
   const testSize = '72px';
   const canvas = document.createElement('canvas');
@@ -60,6 +64,16 @@ export function isFontLoaded(fontFamily: string): boolean {
 }
 
 export async function loadGoogleFonts(): Promise<void> {
+  // Check if we're in a browser environment
+  if (typeof window === 'undefined') {
+    return Promise.resolve();
+  }
+
+  // Dynamically import webfontloader only in browser
+  if (!WebFont) {
+    WebFont = (await import('webfontloader')).default;
+  }
+
   return new Promise((resolve, reject) => {
     WebFont.load({
       google: {

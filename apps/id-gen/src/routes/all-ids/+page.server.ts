@@ -17,7 +17,7 @@ interface PaginationInfo {
     limit: number | null;
 }
 
-interface HeaderMetadata {
+interface Metadata {
     organization_name: string;
     templates: {
         [templateName: string]: TemplateVariable[];
@@ -25,20 +25,7 @@ interface HeaderMetadata {
     pagination: PaginationInfo;
 }
 
-interface HeaderRow {
-    is_header: true;
-    metadata: HeaderMetadata;
-    idcard_id: null;
-    template_name: null;
-    front_image: null;
-    back_image: null;
-    created_at: null;
-    fields: null;
-}
-
-interface DataRow {
-    is_header: false;
-    metadata: null;
+export interface IDCard {
     idcard_id: string;
     template_name: string;
     front_image: string | null;
@@ -49,7 +36,10 @@ interface DataRow {
     };
 }
 
-type IDCardResponse = [HeaderRow, ...DataRow[]];
+interface IDCardResponse {
+    metadata: Metadata;
+    idcards: IDCard[];
+}
 
 export const load = (async ({ locals }) => {
     const { session, supabase, org_id } = locals;
@@ -64,28 +54,21 @@ export const load = (async ({ locals }) => {
         });
 
     if (fetchError) throw error(500, fetchError.message);
-    if (!data || !Array.isArray(data) || data.length === 0) {
-        throw error(404, 'No ID cards found');
-    }
+    if (!data) throw error(404, 'No ID cards found');
 
-    // Validate response structure
-    const [header, ...rows] = data;
+    // Type guard for the response structure
+    const response = data as IDCardResponse;
     if (
-        !header?.is_header ||
-        !header.metadata ||
-        header.idcard_id !== null ||
-        !rows.every(row => 
-            !row.is_header &&
-            typeof row.idcard_id === 'string' &&
-            typeof row.template_name === 'string'
-        )
+        !response.metadata?.organization_name ||
+        !Array.isArray(response.idcards) ||
+        !response.metadata.templates ||
+        !response.metadata.pagination
     ) {
         throw error(500, 'Invalid API response format');
     }
 
     return {
-        idCards: data as IDCardResponse,
-        organizationName: header.metadata.organization_name,
-        pagination: header.metadata.pagination
+        idCards: response.idcards,
+        metadata: response.metadata,
     };
 }) satisfies PageServerLoad;

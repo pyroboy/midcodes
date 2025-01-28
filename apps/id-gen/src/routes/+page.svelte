@@ -1,6 +1,5 @@
 <script lang="ts">
     import type { PageData } from './$types';
-    import { RoleConfig } from '$lib/auth/roleConfig';
 
     interface Props {
         data: PageData;
