@@ -391,36 +391,40 @@
     }
 
     function measureTextHeight(
-        ctx: CanvasRenderingContext2D, 
-        options: FontOptions = {}
-    ): number {
-        if (!browser) return 0;
+    ctx: CanvasRenderingContext2D, 
+    options: FontOptions = {}
+): number {
+    if (!browser) return 0;
+    
+    const previousFont = ctx.font;
+    // Use a test string that includes ascenders and descenders
+    const testString = 'WÁjpqy|{}();'; // This string includes various height cases
+    
+    try {
+        ctx.font = getFontString(options);
         
-        const previousFont = ctx.font;
-        const testString = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ';
+        const metrics = ctx.measureText(testString);
         
-        try {
-            ctx.font = getFontString(options);
-            
-            const metrics = ctx.measureText(testString);
-            const height = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
-            
-            const fontBoundingBoxAscent = metrics.fontBoundingBoxAscent || 0;
-            const fontBoundingBoxDescent = metrics.fontBoundingBoxDescent || 0;
-            const totalHeight = Math.max(
-                height,
-                fontBoundingBoxAscent + fontBoundingBoxDescent
-            );
-
-            return totalHeight;
-        } catch (error) {
-            console.error('Error measuring text height:', error);
-            return 0;
-        } finally {
-            ctx.font = previousFont;
-        }
+        // Get the most accurate height measurements possible
+        const height = Math.abs(metrics.actualBoundingBoxAscent || 0) + 
+                      Math.abs(metrics.actualBoundingBoxDescent || 0);
+        
+        const fontHeight = Math.abs(metrics.fontBoundingBoxAscent || 0) + 
+                         Math.abs(metrics.fontBoundingBoxDescent || 0);
+        
+        // Use em height as a fallback if metrics are not available
+        const emHeight = (options.size || 16) * 1.2; // 1.2 is a typical line-height ratio
+        
+        // Return the largest of the available measurements to ensure text fits
+        return Math.max(height, fontHeight, emHeight);
+    } catch (error) {
+        console.error('Error measuring text height:', error);
+        // Fallback to a reasonable default based on font size
+        return (options.size || 16) * 1.2;
+    } finally {
+        ctx.font = previousFont;
     }
-
+}
     const debouncedRender = debounce(() => {
         if (!renderRequested && browser) {
             renderRequested = true;
