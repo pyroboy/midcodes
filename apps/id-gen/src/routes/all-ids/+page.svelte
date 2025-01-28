@@ -11,6 +11,7 @@
     }
 
     let { data }: Props = $props();
+
     const [headerRow, ...allRows] = data.idCards;
     const header = headerRow as HeaderRow;
     
@@ -478,7 +479,7 @@
                         <div class="flex items-center space-x-2">
                             {#if card.front_image}
                                 <img
-                                    src={getSupabaseStorageUrl(card.front_image)}
+                                    src={getSupabaseStorageUrl(card.front_image,'rendered-id-cards')}
                                     alt="Front Preview"
                                     class="w-8 h-8 object-cover rounded"
                                 />
@@ -518,8 +519,8 @@
 
 {#if selectedFrontImage}
 <ImagePreviewModal
-frontImageUrl={selectedFrontImage ? getSupabaseStorageUrl(selectedFrontImage) : null}
-backImageUrl={selectedBackImage ? getSupabaseStorageUrl(selectedBackImage) : null}
+frontImageUrl={selectedFrontImage ? getSupabaseStorageUrl(selectedFrontImage,'rendered-id-cards') : null}
+backImageUrl={selectedBackImage ? getSupabaseStorageUrl(selectedBackImage,'rendered-id-cards') : null}
 onClose={closePreview}
 />
 {/if}
