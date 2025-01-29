@@ -1,40 +1,63 @@
 <script lang="ts">
-    
 
-    interface Props {
-        x: number;
-        y: number;
-        width: number | undefined;
-        height: number | undefined;
+    let { x, y, width, height, onUpdate } = $props();
+
+    function handleXChange(event: Event) {
+        const value = Number((event.target as HTMLInputElement).value);
+        onUpdate({ x: value });
     }
 
-    let {
-        x = $bindable(),
-        y = $bindable(),
-        width = $bindable(),
-        height = $bindable()
-    }: Props = $props();
+    function handleYChange(event: Event) {
+        const value = Number((event.target as HTMLInputElement).value);
+        onUpdate({ y: value });
+    }
+
+    function handleWidthChange(event: Event) {
+        const value = Number((event.target as HTMLInputElement).value);
+        onUpdate({ width: value });
+    }
+
+    function handleHeightChange(event: Event) {
+        const value = Number((event.target as HTMLInputElement).value);
+        onUpdate({ height: value });
+    }
 </script>
 
 <div class="position-container">
     <div class="input-group position-group">
         <label>
             <span>X</span>
-            <input type="number" bind:value={x}>
+            <input 
+                type="number" 
+                value={x}
+                oninput={handleXChange}
+            >
         </label>
         <label>
             <span>Y</span>
-            <input type="number" bind:value={y}>
+            <input 
+                type="number" 
+                value={y}
+                oninput={handleYChange}
+            >
         </label>
     </div>
     <div class="input-group position-group">
         <label>
             <span>W</span>
-            <input type="number" bind:value={width}>
+            <input 
+                type="number" 
+                value={width}
+                oninput={handleWidthChange}
+            >
         </label>
         <label>
             <span>H</span>
-            <input type="number" bind:value={height}>
+            <input 
+                type="number" 
+                value={height}
+                oninput={handleHeightChange}
+            >
         </label>
     </div>
 </div>
@@ -82,7 +105,4 @@
         -webkit-appearance: none;
         margin: 0;
     }
-    /* .position-group input[type="number"] {
-        -moz-appearance: textfield;
-    } */
 </style>

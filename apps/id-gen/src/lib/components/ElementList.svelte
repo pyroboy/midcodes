@@ -1,6 +1,5 @@
 <script lang="ts">
     import { stopPropagation } from 'svelte/legacy';
-
     import type { TemplateElement } from '../stores/templateStore';
     import PositionGroup from './PositionGroup.svelte';
     import FontSettings from './FontSettings.svelte';
@@ -9,16 +8,31 @@
     import { ChevronDown, ChevronUp } from 'lucide-svelte';
     import { slide } from 'svelte/transition';
     
-    let { elements = $bindable(), fontOptions, side } = $props();
+    let { 
+        elements,
+        onUpdateElements,
+        fontOptions, 
+        side 
+    } = $props<{
+        elements: TemplateElement[];
+        onUpdateElements: (elements: TemplateElement[], side: 'front' | 'back') => void;
+        fontOptions: string[];
+        side: 'front' | 'back';
+    }>();
 
+    let variableNameErrors: { [key: number]: string } = $state({});
 
-
-    function updateElement(index: number, updates: Partial<TemplateElement>) {
-        elements[index] = { ...elements[index], ...updates };
+    // Helper function to create a new element array with an update at specific index
+    function updateElementAtIndex(index: number, updates: Partial<TemplateElement>) {
+        const updatedElements = elements.map((el: TemplateElement, i: number) => 
+            i === index ? { ...el, ...updates } : el
+        );
+        onUpdateElements(updatedElements, side);
     }
 
     function removeElement(index: number) {
-        elements = elements.filter((_: TemplateElement, i: number) => i !== index);
+        const updatedElements = elements.filter((_: TemplateElement, i: number) => i !== index);
+        onUpdateElements(updatedElements, side);
     }
 
     function addElement(type: 'text' | 'photo' | 'signature' | 'selection') {
@@ -36,40 +50,71 @@
                 fontFamily: 'Arial',
                 fontSize: 16,
                 color: '#ffffff',
-                textAlign: 'left'
+                alignment: 'left'
             } : type === 'selection' ? {
                 options: ['Option 1', 'Option 2', 'Option 3'],
                 fontFamily: 'Arial',
                 fontSize: 16,
                 color: '#ffffff',
-                textAlign: 'left'
+                alignment: 'left'
             } : {})
         };
-        elements = [...elements, newElement];
+        onUpdateElements([...elements, newElement], side);
     }
 
-    const getTriggerContent = (element: TemplateElement) => {
-        return element.content || (element.options?.[0] ?? 'Select option');
-    };
-
-    function getOptionsString(options: string[] | undefined): string {
-        return options?.join('\n') || '';
+    function isDuplicateVariableName(name: string, currentIndex: number): boolean {
+        return elements.some((el: TemplateElement, index: number) => index !== currentIndex && el.variableName === name);
     }
 
-    function handleOptionsInput(event: Event, index: number) {
-        const target = event.target as HTMLTextAreaElement;
-        const options = target.value
+    function handleVariableNameChange(index: number, newName: string) {
+        // Always update the element first for immediate feedback
+        updateElementAtIndex(index, { variableName: newName });
+        
+        // Then check for duplicates
+        if (isDuplicateVariableName(newName, index)) {
+            variableNameErrors[index] = 'Variable name must be unique';
+            variableNameErrors = { ...variableNameErrors }; // Trigger reactivity
+        } else {
+        // Clear error if it exists
+        if (variableNameErrors[index]) {
+            variableNameErrors[index] = '';
+                variableNameErrors = { ...variableNameErrors }; // Trigger reactivity
+            }
+        }
+    }
+
+    function handleContentChange(index: number, newValue: string) {
+        updateElementAtIndex(index, { content: newValue });
+    }
+
+    function handleOptionsChange(index: number, optionsString: string) {
+        const options = optionsString
             .split('\n')
             .map(opt => opt.trim())
             .filter(opt => opt.length > 0);
-        updateElement(index, { options });
+        updateElementAtIndex(index, { options });
+    }
 
+    function handlePositionChange(index: number, position: { x?: number; y?: number; width?: number; height?: number }) {
+        updateElementAtIndex(index, position);
+    }
+
+    function handleSelectionChange(index: number, value: string) {
+        updateElementAtIndex(index, { content: value });
     }
 
     let expandedElementIndex: number | null = $state(null);
 
     function toggleElement(index: number) {
         expandedElementIndex = expandedElementIndex === index ? null : index;
+    }
+
+    function getOptionsString(options: string[] | undefined): string {
+        return options?.join('\n') || '';
+    }
+
+    function hasNameDuplicate(name: string): boolean {
+        return elements.filter((el: TemplateElement) => el.variableName === name).length > 1;
     }
 </script>
 
@@ -96,19 +141,28 @@
                         {/if}
                     </span>
                     <span class="element-type">{element.type.charAt(0).toUpperCase() + element.type.slice(1)}</span>
-                    <span class="element-name">{element.variableName}</span>
+                    <span class="element-name" class:duplicate={hasNameDuplicate(element.variableName)}>
+                        {element.variableName}
+                    </span>
                 </div>
-                <button class="remove-element" onclick={stopPropagation(() => removeElement(i))}>×</button>
+                <button 
+                    class="remove-element" 
+                    onclick={stopPropagation(() => removeElement(i))}
+                >×</button>
             </div>
+
             {#if expandedElementIndex === i}
                 <div class="element-inputs" transition:slide={{ duration: 200 }}>
                     <div class="input-group">
                         <label for="variable-name-{i}">Variable Name</label>
                         <Input 
                             id="variable-name-{i}"
-                            bind:value={element.variableName} 
-                            oninput={() => updateElement(i, { variableName: element.variableName })}
+                            value={element.variableName}
+                            oninput={(e) => handleVariableNameChange(i, e.currentTarget.value)}
                         />
+                        {#if variableNameErrors[i]}
+                            <span class="error-message">{variableNameErrors[i]}</span>
+                        {/if}
                     </div>
 
                     {#if element.type === 'text'}
@@ -116,31 +170,33 @@
                             <label for="text-content-{i}">Text</label>
                             <Input 
                                 id="text-content-{i}"
-                                bind:value={element.content} 
-                                oninput={() => updateElement(i, { content: element.content })}
+                                value={element.content}
+                                oninput={(e) => handleContentChange(i, e.currentTarget.value)}
                             />
                         </div>
                         <FontSettings 
-                            bind:element = {elements[i]}
-                            {fontOptions} 
+                            element={element}
+                            {onUpdateElements}
+                            {elements}
+                            {fontOptions}
+                            {side}
                         />
                     {:else if element.type === 'selection'}
                         <div class="input-group">
-                            <label for="select-{i}">Options</label>
+                            <label for="select-{i}">Current Selection</label>
                             <Select.Root
                                 name="select-{i}"
                                 type="single"
-                                bind:value={element.content}
+                                value={element.content}
+
+                                onValueChange={(value) => handleSelectionChange(i, value)}
                             >
                                 <Select.Trigger id="select-{i}">
-                                    {getTriggerContent(element)}
+                                    {element.content || (element.options?.[0] ?? 'Select option')}
                                 </Select.Trigger>
                                 <Select.Content>
                                     {#each element.options || [] as option}
-                                        <Select.Item 
-                                            value={option}
-                                            label={option}
-                                        >
+                                        <Select.Item value={option}>
                                             {option}
                                         </Select.Item>
                                     {/each}
@@ -153,26 +209,31 @@
                                 id="options-{i}"
                                 class="options-textarea"
                                 value={getOptionsString(element.options)}
-                                oninput={(event) => handleOptionsInput(event, i)}
+                                oninput={(e) => handleOptionsChange(i, e.currentTarget.value)}
                                 rows="4"
                             ></textarea>
                         </div>
                         <FontSettings 
-                        bind:element = {elements[i]}
-                            {fontOptions} 
+                            element={element}
+                            {onUpdateElements}
+                            {elements}
+                            {fontOptions}
+                            {side}
                         />
                     {/if}
 
-                    <PositionGroup 
-                        x={element.x} 
-                        y={element.y} 
-                        width={element.width} 
-                        height={element.height} 
+                    <PositionGroup
+                        x={element.x}
+                        y={element.y}
+                        width={element.width}
+                        height={element.height}
+                        onUpdate={(updates: Record<'x' | 'y' | 'width' | 'height', number | undefined>) => handlePositionChange(i, updates)}
                     />
                 </div>
             {/if}
         </div>
     {/each}
+
     <div class="add-elements">
         <button onclick={() => addElement('text')}>Add Text</button>
         <button onclick={() => addElement('photo')}>Add Photo</button>
@@ -235,6 +296,11 @@
     .element-name {
         color: #a0a0a0;
         font-size: 0.75rem;
+    }
+
+    .element-name.duplicate {
+        color: #ff4444;
+        font-weight: 500;
     }
 
     .element-inputs {
@@ -306,5 +372,11 @@
 
     .add-elements button:hover {
         background-color: #5d5d5d;
+    }
+
+    .error-message {
+        color: #ff4444;
+        font-size: 0.8rem;
+        margin-top: 4px;
     }
 </style>

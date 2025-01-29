@@ -11,7 +11,6 @@ export interface TemplateElement {
     fontFamily?: string;
     fontWeight?: string;
     fontStyle?: 'normal' | 'italic' | 'oblique';
-    textAlign?: 'left' | 'center' | 'right' | 'justify';
     color?: string;
     textDecoration?: 'none' | 'underline';
     textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
@@ -79,4 +78,31 @@ export interface DataRow {
     fields: {
         [fieldName: string]: IDCardField;
     };
+}
+
+export interface TemplateElement {
+    id: string;
+    type: 'text' | 'image' | 'qr' | 'photo' | 'signature' | 'selection';
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    content?: string;
+    variableName: string;
+    fontSize?: number;
+    fontFamily?: string;
+    fontWeight?: string;
+    fontStyle?: 'normal' | 'italic' | 'oblique';
+    color?: string;
+    textDecoration?: 'none' | 'underline';
+    textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
+    opacity?: number;
+    visible?: boolean;
+    font?: string;
+    size?: number;
+    alignment?: 'left' | 'center' | 'right' | 'justify';
+    options?: string[];
+    side: 'front' | 'back';
+    letterSpacing?: number;
+    lineHeight?: number | string;
 }

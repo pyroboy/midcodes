@@ -7,21 +7,44 @@
     } from 'lucide-svelte';
     import ColorInput from './ColorInput.svelte';
 
-    interface Props {
+    let { 
+        element,
+        fontOptions,
+        onUpdateElements,
+        elements,
+        side
+     } = $props<{
         element: TemplateElement;
         fontOptions: string[];
-    }
-
-    let { element = $bindable(), fontOptions }: Props = $props();
-
+        onUpdateElements: (elements: TemplateElement[], side: 'front' | 'back') => void;
+        elements: TemplateElement[];
+        side: 'front' | 'back';
+    }>();
 
     const fontWeightOptions = ['normal', 'bold', '100', '200', '300', '400', '500', '600', '700', '800', '900'];
 
+console.log(elements);
+
     function updateElement(updates: Partial<TemplateElement>) {
-        console.log('Updating element with:', updates);
-        console.log('Before update:', element);
-        element = { ...element, ...updates };
-        console.log('After update:', element);
+        const updatedElements = elements.map((el: { variableName: string; }) => 
+            el.variableName === element.variableName ? { ...el, ...updates } : el
+        );
+        onUpdateElements(updatedElements, side);
+    }
+
+    function handleFontChange(e: Event) {
+        const target = e.target as HTMLSelectElement;
+        updateElement({ font: target.value });
+    }
+
+    function handleFontSizeChange(e: Event) {
+        const target = e.target as HTMLInputElement;
+        updateElement({ size: Number(target.value) });
+    }
+
+    function handleFontWeightChange(e: Event) {
+        const target = e.target as HTMLSelectElement;
+        updateElement({ fontWeight: target.value });
     }
 
     function toggleBold() {
@@ -51,13 +74,23 @@
 
 <div class="font-settings">
     <div class="settings-row">
-        <select bind:value={element.font}>
+        <select 
+            value={element.font}
+            onchange={handleFontChange}
+        >
             {#each fontOptions as font}
                 <option value={font}>{font}</option>
             {/each}
         </select>
-        <input type="number" bind:value={element.size}>
-        <select bind:value={element.fontWeight}>
+        <input 
+            type="number" 
+            value={element.size}
+            onchange={handleFontSizeChange}
+        >
+        <select 
+            value={element.fontWeight}
+            onchange={handleFontWeightChange}
+        >
             {#each fontWeightOptions as weight}
                 <option value={weight}>{weight}</option>
             {/each}

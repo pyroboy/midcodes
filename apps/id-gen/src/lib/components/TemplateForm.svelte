@@ -1,36 +1,30 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { templateData } from '../stores/templateStore';
-    import type { TemplateData, TemplateElement } from '../stores/templateStore';
+    import type { TemplateElement } from '$lib/types/types';
     import ElementList from './ElementList.svelte';
     import { Button } from '$lib/components/ui/button';
     import { Upload, Image, Plus, X } from 'lucide-svelte';
     import { loadGoogleFonts, getAllFontFamilies, isFontLoaded, fonts } from '../config/fonts';
 
-    interface Props {
-        side: 'front' | 'back';
-        preview?: string | null;
-        elements?: TemplateElement[];
-        onUpdate?: (data: { elements: TemplateElement[], side: 'front' | 'back' }) => void;
-        onImageUpload?: (data: { event: Event, side: 'front' | 'back' }) => void;
-        onRemoveImage?: (data: { side: 'front' | 'back' }) => void;
-    }
+
 
     let { 
         side, 
-        preview = $bindable(), 
-        elements = $bindable([]),
-        onUpdate = $bindable(),
-        onImageUpload = $bindable(),
-        onRemoveImage = $bindable()
-        
-    }: Props = $props();
+        preview, 
+        elements,
+        onUpdateElements, // (elements:TemplateElement[], side: 'front' | 'back')
+        onImageUpload, // (files: File[], side: 'front' | 'back')
+        onRemoveImage  // (side: 'front' | 'back')
+    }= $props();
 
 
     // let currentElements = $state(elements);
     const BASE_WIDTH = 506.5;
     const BASE_HEIGHT = 319;
 
+
+
+    let files: File[] = $state([]);
     let isDragging = false;
     let isResizing = false;
     let startX: number, startY: number;
@@ -65,7 +59,6 @@
     onMount(() => {
         if (elements.length === 0) {
             elements = side === 'front' ? [...defaultFrontElements] : [...defaultBackElements];
-            updateStore();
         }
         
         loadGoogleFonts().then(() => {
@@ -89,24 +82,13 @@
         return () => resizeObserver.disconnect();
     });
 
-    function getFontFallback(font: string): string {
-        const fontConfig = fonts.find(f => f.family === font);
-        return fontConfig?.category || 'sans-serif';
-    }
 
-    function updateStore() {
-        templateData.update((data: TemplateData) => {
-            const updatedElements = data.template_elements.filter((el: TemplateElement) => el.side !== side);
-            return {
-                ...data,
-                template_elements: [...updatedElements, ...elements.map(el => ({ ...el, side }))],
-                fonts: fontOptions
-            };
-        });
+    function updateElements() {
+        onUpdateElements?.(elements.map((el: TemplateElement) => ({ ...el, side })), side);
     }
 
     function limitDragBounds(index: number, x: number, y: number, width?: number, height?: number, metrics?: TextMetrics) {
-        elements = elements.map((el, i) => {
+        elements = elements.map((el: TemplateElement, i: number) => {
             if (i === index) {
                 let newEl = { ...el, side };
                 if (templateContainer) {
@@ -127,16 +109,7 @@
             }
             return el;
         });
-        updateStore();
-        onUpdate?.({ elements, side });
-    }
-
-    function handleImageUpload(event: Event) {
-        onImageUpload?.({ event, side });
-    }
-
-    function removeImage() {
-        onRemoveImage?.({ side });
+        updateElements();
     }
 
     function onMouseDown(event: MouseEvent, index: number, handle: string | null = null) {
@@ -163,6 +136,9 @@
 
         const element = elements[currentElementIndex];
         if (!element) return;
+
+        const updatedElements = [...elements];
+        const updatedElement = { ...element };
 
         if (isResizing && element.width !== undefined && element.height !== undefined) {
             let newWidth = element.width;
@@ -196,26 +172,24 @@
             newX = Math.max(0, Math.min(newX, BASE_WIDTH - newWidth));
             newY = Math.max(0, Math.min(newY, BASE_HEIGHT - newHeight));
 
-            element.x = newX;
-            element.y = newY;
-            element.width = Math.max(20, newWidth);
-            element.height = Math.max(20, newHeight);
+            updatedElement.x = newX;
+            updatedElement.y = newY;
+            updatedElement.width = Math.max(20, newWidth);
+            updatedElement.height = Math.max(20, newHeight);
         } else {
-            const newX = (element.x || 0) + scaledDx;
-            const newY = (element.y || 0) + scaledDy;
+            // Just update position during dragging, maintain original size
+            const newX = Math.max(0, Math.min((element.x || 0) + scaledDx, BASE_WIDTH - (element.width || 0)));
+            const newY = Math.max(0, Math.min((element.y || 0) + scaledDy, BASE_HEIGHT - (element.height || 0)));
             
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            if (context) {
-                context.font = `${element.size || 16}px ${element.font || 'Arial'}`;
-                const metrics = context.measureText(element.content || '');
-                limitDragBounds(currentElementIndex, newX, newY, element.width, element.height, metrics);
-            }
+            updatedElement.x = newX;
+            updatedElement.y = newY;
         }
+
+        updatedElements[currentElementIndex] = updatedElement;
+        onUpdateElements(updatedElements, side);
 
         startX = event.clientX;
         startY = event.clientY;
-        updateStore();
     }
 
     function onMouseUp() {
@@ -225,11 +199,6 @@
         resizeHandle = null;
     }
 
-    function handleElementsUpdate(event: CustomEvent) {
-        elements = event.detail.elements;
-        updateStore();
-        onUpdate?.({ elements, side });
-    }
 
     const defaultFrontElements: TemplateElement[] = [
     { 
@@ -463,7 +432,7 @@ const defaultBackElements: TemplateElement[] = [
                             <h3 class="text-lg font-medium text-foreground/80 mb-1">Add Template Background</h3>
                             <p class="text-sm text-muted-foreground mb-4">Recommended size: 1013x638 pixels</p>
                             <label class="upload-button">
-                                <input type="file" accept="image/*" onchange={handleImageUpload} />
+                                <input type="file" accept="image/*" onchange={(e) => onImageUpload(e,side)} />
                                 <span class="upload-text">
                                     <Upload class="w-4 h-4 mr-2" />
                                     Choose File
@@ -507,7 +476,7 @@ const defaultBackElements: TemplateElement[] = [
                         </div>
                     </div>
                 {/each}
-                <Button variant="destructive" size="icon" class="remove-image" onclick={removeImage}>
+                <Button variant="destructive" size="icon" class="remove-image" onclick={onRemoveImage}>
                     <X class="w-4 h-4" />
                 </Button>
             {/if}
@@ -515,7 +484,8 @@ const defaultBackElements: TemplateElement[] = [
     </div>
     {#if preview}
         <ElementList 
-           bind:elements
+           {elements}
+           {onUpdateElements}
             {fontOptions} 
             {side}
         />

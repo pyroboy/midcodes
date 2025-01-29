@@ -1,5 +1,5 @@
-import { error } from '@sveltejs/kit';
-import type { PageServerLoad } from './$types';
+import { error, fail } from '@sveltejs/kit';
+import type { PageServerLoad, Actions } from './$types';
 
 interface IDCardField {
     value: string | null;
@@ -72,3 +72,124 @@ export const load = (async ({ locals }) => {
         metadata: response.metadata,
     };
 }) satisfies PageServerLoad;
+
+export const actions: Actions = {
+    deleteCard: async ({ request, locals: { supabase } }) => {
+        const formData = await request.formData();
+        const cardId = formData.get('cardId')?.toString();
+
+        if (!cardId) {
+            return fail(400, { error: 'Card ID is required' });
+        }
+
+        try {
+            // First get the card details to get the image paths
+            const { data: card, error: fetchError } = await supabase
+                .from('idcards')
+                .select('front_image, back_image')
+                .eq('id', cardId)
+                .single();
+
+            if (fetchError) {
+                console.error('Error fetching card:', fetchError);
+                return fail(500, { error: 'Failed to fetch card details' });
+            }
+
+            // Delete images from storage if they exist
+            const imagesToDelete = [];
+            if (card.front_image) imagesToDelete.push(card.front_image);
+            if (card.back_image) imagesToDelete.push(card.back_image);
+
+            if (imagesToDelete.length > 0) {
+                const { error: storageError } = await supabase
+                    .storage
+                    .from('rendered-id-cards')
+                    .remove(imagesToDelete);
+
+                if (storageError) {
+                    console.error('Error deleting images:', storageError);
+                    return fail(500, { error: 'Failed to delete images' });
+                }
+            }
+
+            // Delete the card record
+            const { error: deleteError } = await supabase
+                .from('idcards')
+                .delete()
+                .eq('id', cardId);
+
+            if (deleteError) {
+                console.error('Error deleting card:', deleteError);
+                return fail(500, { error: 'Failed to delete card' });
+            }
+
+            return { success: true };
+        } catch (error) {
+            console.error('Error in delete action:', error);
+            return fail(500, { error: 'Internal server error' });
+        }
+    },
+
+    deleteMultiple: async ({ request, locals: { supabase } }) => {
+        const formData = await request.formData();
+        const cardIds = formData.get('cardIds')?.toString();
+
+        if (!cardIds) {
+            return fail(400, { error: 'Card IDs are required' });
+        }
+
+        try {
+            const ids = JSON.parse(cardIds);
+            if (!Array.isArray(ids)) {
+                return fail(400, { error: 'Invalid card IDs format' });
+            }
+
+            // First get all cards to get their image paths
+            const { data: cards, error: fetchError } = await supabase
+                .from('idcards')
+                .select('id, front_image, back_image')
+                .in('id', ids);
+
+            if (fetchError) {
+                console.error('Error fetching cards:', fetchError);
+                return fail(500, { error: 'Failed to fetch card details' });
+            }
+
+            // Collect all image paths to delete
+            const imagesToDelete = [];
+            for (const card of cards || []) {
+                if (card.front_image) imagesToDelete.push(card.front_image);
+                if (card.back_image) imagesToDelete.push(card.back_image);
+            }
+
+            // Delete all images from storage in one batch
+            if (imagesToDelete.length > 0) {
+                const { error: storageError } = await supabase
+                    .storage
+                    .from('rendered-id-cards')
+                    .remove(imagesToDelete);
+
+                if (storageError) {
+                    console.error('Error deleting images:', storageError);
+                    return fail(500, { error: 'Failed to delete images' });
+                }
+            }
+
+            // Delete all card records
+            const { error: deleteError } = await supabase
+                .from('idcards')
+                .delete()
+                .in('id', ids);
+
+            if (deleteError) {
+                console.error('Error deleting cards:', deleteError);
+                return fail(500, { error: 'Failed to delete cards' });
+            }
+
+            return { success: true };
+        } catch (error) {
+            console.error('Error in delete multiple action:', error);
+            return fail(500, { error: 'Internal server error' });
+        }
+    }
+};

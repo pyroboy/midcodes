@@ -13,7 +13,7 @@
     export let imagePositions: { [key: string]: { x: number, y: number, width: number, height: number, scale: number } };
     export let fullResolution = false;
     export let isDragging = false;
-    export let showBoundingBoxes = true; // Flag to control bounding box visibility
+    export let showBoundingBoxes = false; // Flag to control bounding box visibility
 
     const dispatch = createEventDispatcher<{
         error: { message: string; code: string };

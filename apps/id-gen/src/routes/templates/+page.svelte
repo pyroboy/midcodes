@@ -1,19 +1,21 @@
 <script lang="ts">
     import { goto } from '$app/navigation';
     import { onMount } from 'svelte';
-    import { beforeNavigate } from '$app/navigation';
-    import TemplateForm from '$lib/components/TemplateForm.svelte';
     import TemplateList from '$lib/components/TemplateList.svelte';
+    import TemplateEdit from '$lib/components/TemplateEdit.svelte';
     import { uploadImage } from '$lib/database';
+    import { pushState } from '$app/navigation';
     import type { TemplateData, TemplateElement } from '$lib/stores/templateStore';
 
-let { data } = $props();
-let templates = $state(data.templates); 
-let selectedTemplate = $state(data.selectedTemplate);
-let user = $state(data.user);
-let org_id = $state(data.org_id);
+    // data means get data from server
+    let { data } = $props();
 
-console.log('TEMPLATES:', templates);
+    let templates = $state(data.templates); 
+   
+    let user = $state(data.user);
+    let org_id = $state(data.org_id);
+
+
     let frontBackground: File | null = null;
     let backBackground: File | null = null;
     let frontPreview: string | null = $state(null);
@@ -44,7 +46,6 @@ console.log('TEMPLATES:', templates);
             const backValid = await validateImage(backBackground, 'back');
             if (!backValid) return false;
         }
-
         return true;
     }
 
@@ -71,24 +72,12 @@ console.log('TEMPLATES:', templates);
     }
 
     async function saveTemplate() {
-  
-
-
         if (!(await validateBackgrounds())) {
-            console.error('❌ Background validation failed');
             return;
         }
-
         try {
             let frontUrl = frontPreview;
             let backUrl = backPreview;
-
-            console.log('🖼️ Processing backgrounds:', {
-                hasFrontBackground: !!frontBackground,
-                hasBackBackground: !!backBackground,
-                currentFrontUrl: frontUrl,
-                currentBackUrl: backUrl
-            });
 
             if (frontBackground) {
                 frontUrl = await uploadImage(frontBackground, 'front', user?.id);
@@ -99,30 +88,33 @@ console.log('TEMPLATES:', templates);
                 console.log('✅ Back background uploaded:', backUrl);
             }
 
+            // Combine front and back elements
+            const allElements = [...frontElements, ...backElements];
+
+            // Validate elements
+            if (allElements.length === 0) {
+                console.error('❌ No template elements found');
+                throw new Error('No template elements provided');
+            }
+
             const templateDataToSave: TemplateData = {
                 id: currentTemplate?.id || crypto.randomUUID(),
                 user_id: user?.id ?? '',
-                name: currentTemplate?.name ?? '',
-                front_background: currentTemplate?.front_background ?? '',
-                back_background: currentTemplate?.back_background ?? '',
+                name: currentTemplate?.name || 'Untitled Template',
+                front_background: frontUrl || '',  // Provide default empty string
+                back_background: backUrl || '',    // Provide default empty string
                 orientation: currentTemplate?.orientation ?? 'landscape',
-                template_elements: currentTemplate?.template_elements ?? [],
+                template_elements: allElements,  // Use the combined elements
                 created_at: currentTemplate?.created_at || new Date().toISOString(),
                 org_id: org_id ?? ''
             };
 
-            console.log('📋 Template data to save:', {
-                id: templateDataToSave.id,
-                name: templateDataToSave.name,
-                userId: templateDataToSave.user_id,
-                elementsCount: templateDataToSave.template_elements.length,
-                frontElements: frontElements.map(el => ({ type: el.type, name: el.variableName })),
-                backElements: backElements.map(el => ({ type: el.type, name: el.variableName }))
-            });
+            if (!templateDataToSave.user_id) {
+                throw new Error('User ID is required');
+            }
 
-            if (templateDataToSave.template_elements.length === 0) {
-                console.error('❌ No template elements found');
-                throw new Error('No template elements provided');
+            if (!templateDataToSave.org_id) {
+                throw new Error('Organization ID is required');
             }
 
             console.log('💾 Saving to database...');
@@ -137,9 +129,15 @@ console.log('TEMPLATES:', templates);
                 body: formData
             });
 
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('❌ Server error:', errorText);
+                throw new Error(`Server error: ${errorText}`);
+            }
+
             const result = await response.json();
 
-            if (!response.ok || result.type === 'failure') {
+            if (result.type === 'failure') {
                 console.error('❌ Server action failed:', result);
                 throw new Error(result.message || 'Failed to save template');
             }
@@ -161,12 +159,8 @@ console.log('TEMPLATES:', templates);
         }
     }
 
-    async function handleImageUpload(data: { event: Event, side: 'front' | 'back' }) {
-        const { event, side } = data;
-        const target = event.target as HTMLInputElement;
-        if (!target.files?.length) return;
-
-        const file = target.files[0];
+    async function handleImageUpload(files:File[], side: 'front' | 'back' ) {
+        const file = files[0];
         if (side === 'front') {
             frontBackground = file;
             frontPreview = URL.createObjectURL(file);
@@ -174,12 +168,9 @@ console.log('TEMPLATES:', templates);
             backBackground = file;
             backPreview = URL.createObjectURL(file);
         }
-
-        errorMessage = '';
     }
 
-    function handleRemoveImage(data: { side: 'front' | 'back' }) {
-        const { side } = data;
+    function handleRemoveImage( side: 'front' | 'back' ) {
         if (side === 'front') {
             frontBackground = null;
             frontPreview = null;
@@ -191,25 +182,16 @@ console.log('TEMPLATES:', templates);
         }
     }
 
-    function updateElements(event: CustomEvent<{ elements: TemplateElement[], side: 'front' | 'back' }>) {
-        const { elements, side } = event.detail;
-        if (side === 'front') {
-            frontElements = elements;
-        } else {
-            backElements = elements;
-        }
-        // selectedTemplate = { ...data, template_elements: [...frontElements, ...backElements] };
-    }
 
-    async function handleTemplateSelect(event: CustomEvent<{ id: string }>) {
+    async function handleTemplateSelect( id: string ) {
         try {
             isEditMode = true;
             
             // Push state when entering edit mode
-            history.pushState({ editing: true }, '', `/templates?id=${event.detail.id}`);
+            pushState( `/templates?id=${id}`,{ editing: true });
             
             // Navigate to new URL
-            await goto(`/templates?id=${event.detail.id}`, { replaceState: true });
+            await goto(`/templates?id=${id}`, { replaceState: true });
             
             if (data.selectedTemplate) {
                 currentTemplate = data.selectedTemplate;
@@ -218,6 +200,9 @@ console.log('TEMPLATES:', templates);
                 frontElements = (data.selectedTemplate.template_elements as TemplateElement[]).filter(el => el.side === 'front');
                 backElements = (data.selectedTemplate.template_elements as TemplateElement[]).filter(el => el.side === 'back');
             }
+
+
+
         } catch (err: unknown) {
             const error = err instanceof Error ? err : new Error('An unexpected error occurred');
             console.error('❌ EditTemplate: Error:', error);
@@ -225,6 +210,16 @@ console.log('TEMPLATES:', templates);
             isEditMode = false;
         }
     }
+
+    function updateElements( elements: TemplateElement[], side: 'front' | 'back' ) {
+        if (side === 'front') {
+            frontElements = elements;
+        } else {
+            backElements = elements;
+        }
+    }
+
+
 
     function handleBack() {
         isEditMode = false;
@@ -277,7 +272,7 @@ console.log('TEMPLATES:', templates);
         {#if !isEditMode}
             <TemplateList 
                 templates={templates??[]} 
-                on:select={handleTemplateSelect} 
+                onSelect={(id: string) => handleTemplateSelect(id)} 
             />
         {:else}
             <div class="template-form-container active">
@@ -328,43 +323,20 @@ console.log('TEMPLATES:', templates);
                             </div>
                         </div>
                     {:else}
-                        <div class="template-form">
-                            <TemplateForm
-                                side="front"
-                                bind:elements={frontElements}
-                                bind:preview={frontPreview}
-                                onImageUpload={handleImageUpload}
-                                onRemoveImage={handleRemoveImage}
-                            />
-                        </div>
-                        <div class="template-form">
-                            <TemplateForm
-                                side="back"
-                                bind:elements={backElements}
-                                bind:preview={backPreview}
-                                onImageUpload={handleImageUpload}
-                                onRemoveImage={handleRemoveImage}
-                            />
-                        </div>
-
-                        {#if errorMessage}
-                            <p class="mt-4 text-sm text-red-600">{errorMessage}</p>
-                        {/if}
-
-                        <div class="mt-6 flex gap-4">
-                            <button 
-                                onclick={saveTemplate}
-                                class="inline-flex justify-center rounded-md border-0 bg-blue-600 dark:bg-blue-500 px-4 py-2 text-sm font-medium text-white shadow-md hover:bg-blue-700 dark:hover:bg-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 dark:focus:ring-blue-400 transition-colors duration-200 dark:shadow-blue-900/30"
-                            >
-                                Save Template
-                            </button>
-                            <button 
-                                onclick={clearForm}
-                                class="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                            >
-                                Clear Form
-                            </button>
-                        </div>
+                        <TemplateEdit 
+                            {isLoading}
+                            {frontElements}
+                            {backElements}
+                            {frontPreview}
+                            {backPreview}
+                            {errorMessage}
+                            onBack={handleBack}
+                            onSave={saveTemplate}
+                            onClear={clearForm}
+                            onUpdateElements={(elements, side) => updateElements(elements, side)}
+                            onImageUpload={(files, side) => handleImageUpload(files, side)}
+                            onRemoveImage={(side) => handleRemoveImage(side)}
+                        />
                     {/if}
                 </div>
             </div>

@@ -22,11 +22,57 @@ import type { PageData } from './$types';
     let downloadingCards = $state(new Set<string>());
     let deletingCards = $state(new Set<string>());
     let selectedCards = $state(new Set<string>());
-    let selectedCount = $state(0);
+    let selectedCount = $derived(selectedCards.size);
 
     // Create a map to store each group's selection state
     let groupSelectionStates = $state(new Map<string, boolean>());
 
+    $effect(() => {
+        const states = new Map<string, boolean>();
+        Object.entries(groupedCards).forEach(([templateName, cards]) => {
+            states.set(
+                templateName, 
+                cards.every(card => selectedCards.has(getCardId(card)))
+            );
+        });
+        groupSelectionStates = states;
+    });
+
+    function handleCheckboxClick(event: Event, card: IDCard) {
+        event.stopPropagation();
+        const cardId = getCardId(card);
+        if (!cardId) return;
+        
+        const newSelectedCards = new Set(selectedCards);
+        if (newSelectedCards.has(cardId)) {
+            newSelectedCards.delete(cardId);
+        } else {
+            newSelectedCards.add(cardId);
+        }
+        selectedCards = newSelectedCards;
+    }
+
+    function handleGroupCheckboxClick(event: Event, cards: IDCard[]) {
+        event.stopPropagation();
+        const validCards = cards.filter(card => {
+            const cardId = getCardId(card);
+            return !!cardId;
+        });
+        
+        const allSelected = validCards.every(card => selectedCards.has(getCardId(card)));
+        const newSelectedCards = new Set(selectedCards);
+        
+        validCards.forEach(card => {
+            const cardId = getCardId(card);
+            if (allSelected) {
+                newSelectedCards.delete(cardId);
+            } else {
+                newSelectedCards.add(cardId);
+            }
+        });
+        
+        selectedCards = newSelectedCards;
+    }
 
     interface SelectionState {
         isSelected: (cardId: string) => boolean;
@@ -82,7 +128,6 @@ import type { PageData } from './$types';
         getSelectedCount: () => selectedCards.size,
         clearSelection: () => {
             selectedCards = new Set();
-            selectedCount = 0;
         }
     };
 
@@ -124,6 +169,8 @@ import type { PageData } from './$types';
 
     async function downloadCard(card: IDCard) {
         const cardId = getCardId(card);
+        console.log('Starting download for card:', { cardId, frontImage: card.front_image, backImage: card.back_image });
+        
         downloadingCards.add(cardId);
         downloadingCards = downloadingCards;
 
@@ -135,29 +182,63 @@ import type { PageData } from './$types';
                             card.fields?.['Full Name']?.value || 
                             `id-${cardId}`;
             
+            console.log('Creating folder for:', { nameField });
             const folder = zip.folder(nameField);
             if (!folder) throw new Error('Failed to create folder');
             
             if (card.front_image) {
-                const frontImageUrl = getSupabaseStorageUrl(card.front_image);
+                const frontImageUrl = getSupabaseStorageUrl(card.front_image, 'rendered-id-cards');
+                console.log('Downloading front image:', { frontImageUrl });
+                
                 if (frontImageUrl) {
-                    const frontResponse = await fetch(frontImageUrl);
-                    if (!frontResponse.ok) throw new Error('Failed to download front image');
-                    const frontBlob = await frontResponse.blob();
-                    folder.file(`${nameField}_front.jpg`, frontBlob);
+                    try {
+                        const frontResponse = await fetch(frontImageUrl);
+                        console.log('Front image response:', { 
+                            status: frontResponse.status, 
+                            ok: frontResponse.ok,
+                            contentType: frontResponse.headers.get('content-type')
+                        });
+                        
+                        if (!frontResponse.ok) {
+                            throw new Error(`Failed to download front image: ${frontResponse.status} ${frontResponse.statusText}`);
+                        }
+                        const frontBlob = await frontResponse.blob();
+                        folder.file(`${nameField}_front.jpg`, frontBlob);
+                        console.log('Front image downloaded successfully');
+                    } catch (frontError) {
+                        console.error('Error downloading front image:', frontError);
+                        throw frontError;
+                    }
                 }
             }
 
             if (card.back_image) {
-                const backImageUrl = getSupabaseStorageUrl(card.back_image);
+                const backImageUrl = getSupabaseStorageUrl(card.back_image, 'rendered-id-cards');
+                console.log('Downloading back image:', { backImageUrl });
+                
                 if (backImageUrl) {
-                    const backResponse = await fetch(backImageUrl);
-                    if (!backResponse.ok) throw new Error('Failed to download back image');
-                    const backBlob = await backResponse.blob();
-                    folder.file(`${nameField}_back.jpg`, backBlob);
+                    try {
+                        const backResponse = await fetch(backImageUrl);
+                        console.log('Back image response:', { 
+                            status: backResponse.status, 
+                            ok: backResponse.ok,
+                            contentType: backResponse.headers.get('content-type')
+                        });
+                        
+                        if (!backResponse.ok) {
+                            throw new Error(`Failed to download back image: ${backResponse.status} ${backResponse.statusText}`);
+                        }
+                        const backBlob = await backResponse.blob();
+                        folder.file(`${nameField}_back.jpg`, backBlob);
+                        console.log('Back image downloaded successfully');
+                    } catch (backError) {
+                        console.error('Error downloading back image:', backError);
+                        throw backError;
+                    }
                 }
             }
 
+            console.log('Generating zip file...');
             const zipBlob = await zip.generateAsync({ type: 'blob' });
             const url = window.URL.createObjectURL(zipBlob);
             const a = document.createElement('a');
@@ -167,9 +248,10 @@ import type { PageData } from './$types';
             a.click();
             document.body.removeChild(a);
             window.URL.revokeObjectURL(url);
+            console.log('Download completed successfully');
         } catch (error) {
             console.error('Error downloading ID card:', error);
-            errorMessage = 'Failed to download ID card';
+            errorMessage = `Failed to download ID card: ${error instanceof Error ? error.message : String(error)}`;
         } finally {
             downloadingCards.delete(cardId);
             downloadingCards = downloadingCards;
@@ -231,7 +313,7 @@ import type { PageData } from './$types';
 
                     // Download front image
                     if (card.front_image) {
-                        const frontImageUrl = getSupabaseStorageUrl(card.front_image);
+                        const frontImageUrl = getSupabaseStorageUrl(card.front_image, 'rendered-id-cards');
                         if (frontImageUrl) {
                             const frontResponse = await fetch(frontImageUrl);
                             if (!frontResponse.ok) {
@@ -245,7 +327,7 @@ import type { PageData } from './$types';
 
                     // Download back image
                     if (card.back_image) {
-                        const backImageUrl = getSupabaseStorageUrl(card.back_image);
+                        const backImageUrl = getSupabaseStorageUrl(card.back_image, 'rendered-id-cards');
                         if (backImageUrl) {
                             const backResponse = await fetch(backImageUrl);
                             if (!backResponse.ok) {
@@ -278,7 +360,6 @@ import type { PageData } from './$types';
             // Clear selection after successful download
             selectedCards.clear();
             selectedCards = new Set();
-            selectedCount = 0;
         } catch (error) {
             console.error('Error downloading ID cards:', error);
             errorMessage = 'Failed to download ID cards';
@@ -287,22 +368,32 @@ import type { PageData } from './$types';
 
     async function handleDelete(card: IDCard) {
         const cardId = getCardId(card);
+        if (!cardId) return;
+
         deletingCards.add(cardId);
         deletingCards = deletingCards;
 
         try {
-            const response = await fetch(`/api/id-cards/${cardId}`, {
-                method: 'DELETE'
+            const formData = new FormData();
+            formData.append('cardId', cardId);
+
+            const response = await fetch('?/deleteCard', {
+                method: 'POST',
+                body: formData
             });
 
-            if (!response.ok) throw new Error('Failed to delete ID card');
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || 'Failed to delete ID card');
+            }
 
             dataRows = dataRows.filter(row => getCardId(row) !== cardId);
             selectedCards.delete(cardId);
             selectedCards = new Set(selectedCards);
         } catch (error) {
             console.error('Error deleting ID card:', error);
-            errorMessage = 'Failed to delete ID card';
+            errorMessage = error instanceof Error ? error.message : 'Failed to delete ID card';
         } finally {
             deletingCards.delete(cardId);
             deletingCards = deletingCards;
@@ -318,54 +409,39 @@ import type { PageData } from './$types';
         }
 
         try {
-            for (const card of selectedRows) {
-                const cardId = getCardId(card);
-                if (!cardId) continue;
+            const cardIds = selectedRows.map(card => getCardId(card)).filter(Boolean);
+            
+            // Mark all cards as deleting
+            cardIds.forEach(id => {
+                deletingCards.add(id);
+            });
+            deletingCards = deletingCards;
 
-                deletingCards.add(cardId);
-                deletingCards = deletingCards;
+            const formData = new FormData();
+            formData.append('cardIds', JSON.stringify(cardIds));
 
-                try {
-                    const response = await fetch(`/api/id-cards/${cardId}`, {
-                        method: 'DELETE'
-                    });
+            const response = await fetch('?/deleteMultiple', {
+                method: 'POST',
+                body: formData
+            });
 
-                    if (!response.ok) {
-                        throw new Error(`Failed to delete ID card: ${response.statusText}`);
-                    }
-                } catch (cardError) {
-                    console.error(`Error deleting card ${cardId}:`, cardError);
-                    errorMessage = 'Failed to delete some ID cards';
-                } finally {
-                    deletingCards.delete(cardId);
-                    deletingCards = deletingCards;
-                }
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || 'Failed to delete ID cards');
             }
 
             // Refresh the data after deletion
             window.location.reload();
-
-            // Clear selection and update UI
-            selectedCards.clear();
-            selectedCards = new Set();
-            selectedCount = 0;
         } catch (error) {
             console.error('Error deleting ID cards:', error);
-            errorMessage = 'Failed to delete ID cards';
+            errorMessage = error instanceof Error ? error.message : 'Failed to delete ID cards';
+        } finally {
+            // Clear deleting states
+            deletingCards = new Set();
         }
     }
 
-    function handleCheckboxClick(event: Event, card: IDCard) {
-        event.stopPropagation();
-        const cardId = getCardId(card);
-        if (!cardId) return;
-        selectionManager.toggleSelection(cardId);
-    }
-
-    function handleGroupCheckboxClick(event: Event, cards: IDCard[]) {
-        event.stopPropagation();
-        selectionManager.toggleGroupSelection(cards);
-    }
     let templateFields = $derived(metadata?.templates || {});
 
     let groupedCards = $derived((() => {
@@ -378,17 +454,6 @@ import type { PageData } from './$types';
         });
         return groups;
     })());
-    // run(() => {
-    //     // Update group selection states whenever selectedCards changes
-    //     Object.entries(groupedCards).forEach(([templateName, cards]) => {
-    //         groupSelectionStates.set(
-    //             templateName, 
-    //             cards.every(card => selectedCards.has(getCardId(card)))
-    //         );
-    //     });
-    //     groupSelectionStates = groupSelectionStates;
-    //     selectedCount = selectedCards.size;
-    // });
 </script>
 
 <div class="mb-4 flex justify-between items-center">

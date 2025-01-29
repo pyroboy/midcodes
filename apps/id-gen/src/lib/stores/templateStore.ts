@@ -13,7 +13,6 @@ export interface TemplateElement {
     fontFamily?: string;
     fontWeight?: string;
     fontStyle?: 'normal' | 'italic' | 'oblique';
-    textAlign?: 'left' | 'center' | 'right' | 'justify';
     color?: string;
     textDecoration?: 'none' | 'underline';
     textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';

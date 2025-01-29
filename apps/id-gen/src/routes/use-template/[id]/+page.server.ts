@@ -98,21 +98,14 @@ export const actions: Actions = {
 
             // Handle image uploads
             console.log('[Save ID Card] Processing image uploads...');
-            const effectiveOrgId = {} as string;
-
-
-
+            const effectiveOrgId = template.org_id;
+            
             if (!effectiveOrgId) {
                 console.log('[Save ID Card] No organization ID found');
                 return fail(400, { error: 'Organization ID is required' });
             }
 
-            const uploadResult = await handleImageUploads(
-                supabase,
-                formData,
-                effectiveOrgId,
-                templateId
-            );
+            const uploadResult = await handleImageUploads(supabase, formData, effectiveOrgId, templateId);
 
             console.log('[Save ID Card] Upload result:', {
                 success: !('error' in uploadResult),

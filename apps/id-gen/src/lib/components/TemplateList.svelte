@@ -1,27 +1,21 @@
 <script lang="ts">
-    import { createEventDispatcher } from 'svelte';
-    import { fade, slide } from 'svelte/transition';
-    import { supabase } from '$lib/supabaseClient';
+    import { fade } from 'svelte/transition';
     import { Button } from "$lib/components/ui/button";
-    import { Copy, Trash2, ExternalLink, Edit } from 'lucide-svelte';
+    import { Copy, Trash2, Edit } from 'lucide-svelte';
     import type { TemplateData } from '../stores/templateStore';
     import { goto } from '$app/navigation';
-    import { page } from '$app/stores';
     import { invalidate } from '$app/navigation';
     
-    interface Props {
-        templates?: TemplateData[];
-    }
 
-    let { templates = $bindable([]) }: Props = $props();
+    let { 
+        templates = $bindable([]),
+        onSelect
+     } = $props();
     let selectedTemplate: TemplateData | null = null;
     let notification: string | null = $state(null);
     let hoveredTemplate: string | null = $state(null);
-    const dispatch = createEventDispatcher();
     
 
-    console.log('Templates LISTT:', templates);
-    // Get user profile from page store
 
     async function deleteTemplate(template: TemplateData) {
         try {
@@ -117,8 +111,9 @@
 
     function selectTemplate(template: TemplateData) {
         selectedTemplate = template;
-        console.log(' TemplateList: Template selected:', template.id);
-        dispatch('select', { id: template.id });
+
+        onSelect(selectedTemplate.id);
+
     }
 
     function handleActionClick(e: Event, template: TemplateData, action: 'edit' | 'use' | 'duplicate' | 'delete') {
