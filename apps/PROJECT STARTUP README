@@ -1,0 +1,10 @@
+npm install
+npx shadcn-svelte@next init
+npx shadcn-svelte@next update
+npm i bits-ui@next
+npm uninstall cmdk-sv
+
+
+
+create app.css
+create tailwind.config.ts
