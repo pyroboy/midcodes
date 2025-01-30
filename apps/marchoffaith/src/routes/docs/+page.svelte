@@ -10,25 +10,25 @@
 		<h2>Resources</h2>
 		<ul class="docs-list">
 			<li>
-				<a href="#" class="doc-link">
+				<a href="/" class="doc-link">
 					<span class="doc-title">Weekly Bulletin</span>
 					<span class="doc-desc">Current week's announcements and events</span>
 				</a>
 			</li>
 			<li>
-				<a href="#" class="doc-link">
+				<a href="/" class="doc-link">
 					<span class="doc-title">Statement of Faith</span>
 					<span class="doc-desc">Our core beliefs and doctrinal positions</span>
 				</a>
 			</li>
 			<li>
-				<a href="#" class="doc-link">
+				<a href="/" class="doc-link">
 					<span class="doc-title">Ministry Guidelines</span>
 					<span class="doc-desc">Information for ministry volunteers</span>
 				</a>
 			</li>
 			<li>
-				<a href="#" class="doc-link">
+				<a href="/" class="doc-link">
 					<span class="doc-title">Church Constitution</span>
 					<span class="doc-desc">Governing documents of our church</span>
 				</a>
