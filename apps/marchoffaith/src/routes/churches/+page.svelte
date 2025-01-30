@@ -38,7 +38,7 @@
     <div class="md:hidden">
       <div class="relative h-48 bg-gray-200">
         <img 
-          src="https://placehold.co/400x500"
+          src="/api/placeholder/400/500"
           alt="Church building"
           class="w-full h-full object-cover"
         />
@@ -169,7 +169,7 @@
       <!-- Left side - Image -->
       <div class="w-1/4 bg-gray-200">
         <img 
-          src="https://placehold.co/400x500"
+          src="/api/placeholder/400/500"
           alt="Church building"
           class="w-full h-full object-cover"
         />

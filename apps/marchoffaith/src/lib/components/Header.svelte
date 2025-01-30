@@ -65,11 +65,11 @@
 		height: 100%;
 	}
 
-	/* .corner img {
+	.corner img {
 		width: 2em;
 		height: 2em;
 		object-fit: contain;
-	} */
+	}
 
 	nav {
 		display: flex;
