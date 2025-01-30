@@ -1,8 +1,8 @@
 <script lang="ts">
     import type { TemplateElement } from '../stores/templateStore';
     import { 
-        Type, Bold, Italic, Underline, AlignLeft, AlignCenter, 
-        AlignRight, AlignJustify, ChevronsUpDown, MoveHorizontal, 
+        Type, Bold, Italic, Underline, AlignLeft, AlignRight, AlignCenter, 
+        AlignJustifyIcon, AlignJustify, ChevronsUpDown, MoveHorizontal,
         ArrowUpNarrowWide
     } from 'lucide-svelte';
     import ColorInput from './ColorInput.svelte';
@@ -164,9 +164,7 @@ console.log(elements);
         padding: 4px;
         border-radius: 2px;
     }
-    select {
-        grow: 1;
-    }
+  
     input[type="number"] {
         width: 60px;
     }
