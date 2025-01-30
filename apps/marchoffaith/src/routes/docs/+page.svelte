@@ -3,70 +3,36 @@
 	<meta name="description" content="Important documents and resources for our church community" />
 </svelte:head>
 
-<div class="text-column">
-	<h1>Church Documents</h1>
+<div class="max-w-3xl mx-auto px-4 py-8">
+	<h1 class="text-4xl font-bold text-gray-900 mb-8">Church Documents</h1>
 
-	<section class="docs-section">
-		<h2>Resources</h2>
-		<ul class="docs-list">
+	<section>
+		<h2 class="text-2xl font-semibold text-gray-800 mb-6">Resources</h2>
+		<ul class="space-y-4">
 			<li>
-				<a href="#" class="doc-link">
-					<span class="doc-title">Weekly Bulletin</span>
-					<span class="doc-desc">Current week's announcements and events</span>
+				<a href="/docs/weekly-bulletin" class="block p-4 bg-gray-50 rounded-lg transition-transform hover:translate-x-1 hover:bg-gray-100">
+					<span class="block font-bold text-purple-600 mb-2">Weekly Bulletin</span>
+					<span class="block text-sm text-gray-600">Current week's announcements and events</span>
 				</a>
 			</li>
 			<li>
-				<a href="#" class="doc-link">
-					<span class="doc-title">Statement of Faith</span>
-					<span class="doc-desc">Our core beliefs and doctrinal positions</span>
+				<a href="/docs/statement-of-faith" class="block p-4 bg-gray-50 rounded-lg transition-transform hover:translate-x-1 hover:bg-gray-100">
+					<span class="block font-bold text-purple-600 mb-2">Statement of Faith</span>
+					<span class="block text-sm text-gray-600">Our core beliefs and doctrinal positions</span>
 				</a>
 			</li>
 			<li>
-				<a href="#" class="doc-link">
-					<span class="doc-title">Ministry Guidelines</span>
-					<span class="doc-desc">Information for ministry volunteers</span>
+				<a href="/docs/ministry-guidelines" class="block p-4 bg-gray-50 rounded-lg transition-transform hover:translate-x-1 hover:bg-gray-100">
+					<span class="block font-bold text-purple-600 mb-2">Ministry Guidelines</span>
+					<span class="block text-sm text-gray-600">Information for ministry volunteers</span>
 				</a>
 			</li>
 			<li>
-				<a href="#" class="doc-link">
-					<span class="doc-title">Church Constitution</span>
-					<span class="doc-desc">Governing documents of our church</span>
+				<a href="/docs/constitution" class="block p-4 bg-gray-50 rounded-lg transition-transform hover:translate-x-1 hover:bg-gray-100">
+					<span class="block font-bold text-purple-600 mb-2">Church Constitution</span>
+					<span class="block text-sm text-gray-600">Governing documents of our church</span>
 				</a>
 			</li>
 		</ul>
 	</section>
 </div>
-
-<style>
-	.docs-list {
-		list-style: none;
-		padding: 0;
-	}
-
-	.doc-link {
-		display: block;
-		padding: 1rem;
-		margin-bottom: 1rem;
-		background-color: var(--color-bg-2);
-		border-radius: 4px;
-		transition: transform 0.2s ease;
-	}
-
-	.doc-link:hover {
-		transform: translateX(5px);
-		text-decoration: none;
-	}
-
-	.doc-title {
-		display: block;
-		font-weight: bold;
-		color: var(--color-theme-1);
-	}
-
-	.doc-desc {
-		display: block;
-		font-size: 0.9rem;
-		color: var(--color-text);
-		margin-top: 0.5rem;
-	}
-</style>

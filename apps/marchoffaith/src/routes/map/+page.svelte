@@ -3,70 +3,31 @@
 	<meta name="description" content="Find our church locations and get directions" />
 </svelte:head>
 
-<div class="text-column">
-	<h1>Find Us</h1>
+<div class="max-w-3xl mx-auto px-4 py-8">
+	<h1 class="text-4xl font-bold text-gray-900 mb-8">Find Us</h1>
 
-	<div class="map-container">
-		<div class="map-placeholder">
-			<p>Interactive Map Coming Soon</p>
-			<p class="map-note">We're located at: 123 Main Street, Cityville</p>
+	<div class="my-8">
+		<div class="h-96 bg-gray-50 rounded-lg flex flex-col items-center justify-center">
+			<p class="text-lg text-gray-600">Interactive Map Coming Soon</p>
+			<p class="mt-4 italic text-gray-500">We/'re located at: 123 Main Street, Cityville</p>
 		</div>
 	</div>
 
-	<div class="directions">
-		<h2>Getting Here</h2>
-		<div class="direction-methods">
-			<div class="method">
-				<h3>By Car</h3>
-				<p>Parking available in our main lot and street parking</p>
+	<div class="mt-8">
+		<h2 class="text-2xl font-semibold text-gray-800 mb-6">Getting Here</h2>
+		<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+			<div class="bg-gray-50 p-4 rounded-lg">
+				<h3 class="text-lg font-semibold text-purple-600 mb-2">By Car</h3>
+				<p class="text-gray-600">Parking available in our main lot and street parking</p>
 			</div>
-			<div class="method">
-				<h3>Public Transit</h3>
-				<p>Bus routes 10 and 15 stop directly in front of the church</p>
+			<div class="bg-gray-50 p-4 rounded-lg">
+				<h3 class="text-lg font-semibold text-purple-600 mb-2">Public Transit</h3>
+				<p class="text-gray-600">Bus routes 10 and 15 stop directly in front of the church</p>
 			</div>
-			<div class="method">
-				<h3>Accessibility</h3>
-				<p>Wheelchair accessible entrance and facilities available</p>
+			<div class="bg-gray-50 p-4 rounded-lg">
+				<h3 class="text-lg font-semibold text-purple-600 mb-2">Accessibility</h3>
+				<p class="text-gray-600">Wheelchair accessible entrance and facilities available</p>
 			</div>
 		</div>
 	</div>
 </div>
-
-<style>
-	.map-container {
-		margin: 2rem 0;
-	}
-
-	.map-placeholder {
-		background-color: var(--color-bg-2);
-		height: 400px;
-		display: flex;
-		flex-direction: column;
-		justify-content: center;
-		align-items: center;
-		border-radius: 8px;
-	}
-
-	.map-note {
-		margin-top: 1rem;
-		font-style: italic;
-	}
-
-	.direction-methods {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-		gap: 1.5rem;
-		margin-top: 1.5rem;
-	}
-
-	.method {
-		background-color: var(--color-bg-2);
-		padding: 1rem;
-		border-radius: 4px;
-	}
-
-	.method h3 {
-		color: var(--color-theme-1);
-		margin-bottom: 0.5rem;
-	}
-</style>
