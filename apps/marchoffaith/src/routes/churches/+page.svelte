@@ -64,7 +64,6 @@
             <a href="mailto:{c.contact.email}" class="ml-2 hover:text-red-600 transition-colors truncate">{c.contact.email}</a>
           </div>
         </div>
-
         <!-- Social Icons -->
         <div class="flex gap-4">
           <a href="https://facebook.com/{c.contact.social.facebook}" class="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center text-gray-500 hover:text-red-600 hover:bg-red-100 transition-colors">
