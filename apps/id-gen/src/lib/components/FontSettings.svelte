@@ -165,7 +165,7 @@ console.log(elements);
         border-radius: 2px;
     }
     select {
-        flex-grow: 1;
+        grow: 1;
     }
     input[type="number"] {
         width: 60px;

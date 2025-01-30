@@ -335,7 +335,7 @@
                     <div class="front-canvas">
                         <h3 class="text-lg font-semibold mb-2">Front</h3>
                         {#if template}
-                        <div class="w-full aspect-[1013/638]">
+                        <div class="w-full aspect-1013/638">
                             <IdCanvas
                                 bind:this={frontCanvasComponent}
                                 elements={template.template_elements.filter(el => el.side === 'front')}
@@ -394,7 +394,7 @@
                                 <div 
                                     role="button" 
                                     tabindex="-1" 
-                                    class="grid grid-cols-[auto,1fr] gap-4 items-center mb-4" 
+                                    class="grid grid-cols-[auto_1fr] gap-4 items-center mb-4" 
                                     onmousedown={handleMouseDown} 
                                     onmouseup={handleMouseUp}
                                 >

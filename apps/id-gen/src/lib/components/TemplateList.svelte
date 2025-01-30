@@ -172,7 +172,7 @@
                     </div>
                 </a>
 
-                <div class="absolute right-2 top-2 flex gap-1 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-md p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                <div class="absolute right-2 top-2 flex gap-1 bg-white/80 dark:bg-gray-800/80 backdrop-blur-xs rounded-md p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                     <Button 
                         variant="ghost" 
                         size="sm"
