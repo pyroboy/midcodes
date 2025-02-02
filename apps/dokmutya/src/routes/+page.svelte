@@ -34,7 +34,7 @@
 
 <main class="font-inter">
     <Hero />
-    
+ <div class="z-30">
     <!-- Stats Section -->
     <section class="py-16 md:py-24 bg-white">
         <div class="container mx-auto px-4">
@@ -150,4 +150,5 @@
             </div>
         </div>
     </section>
+</div>
 </main>

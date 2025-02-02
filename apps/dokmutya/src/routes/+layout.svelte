@@ -20,7 +20,7 @@
   <link rel="shortcut icon" href="/favicon.ico" />
 </svelte:head>
 
-<BreakPointIndicator />
+<!-- <BreakPointIndicator /> -->
 <Navigation />
 
 {@render children()}

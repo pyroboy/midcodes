@@ -18,25 +18,36 @@
 
     section {
         width: 100vw;
-        overflow-x: hidden;
+        overflow: hidden;
         position: relative;
+        mask-image: linear-gradient(to bottom, black 0%, black 100%);
+        -webkit-mask-image: linear-gradient(to bottom, black 0%, black 100%);
+    }
+
+    .content-container {
+        position: relative;
+        width: 100%;
+        height: 100vh;
+        overflow: hidden;
     }
 </style>
 
-<section class="relative min-h-screen bg-gradient-to-b from-[#15B392] to-[#264b45] overflow-hidden">
+<section class="relative min-h-screen bg-gradient-to-b from-[#15B392] to-[#264b45] z-10">
     <!-- Contact Information -->
-    <div class="absolute top-4 right-4 md:top-8 md:right-8 text-right z-30">
+    <div class="absolute top-4 right-4 md:top-8 md:right-8 text-right z-20">
         <p class="text-white text-sm md:text-base">Contact: <a href="tel:+639123456789" class="underline">+63 912 345 6789</a></p>
         <p class="text-white text-sm md:text-base">Email: <a href="mailto:info@dokmutya.com" class="underline">info@dokmutya.com</a></p>
     </div>
     
     <!-- Main Content -->
-    <div class="relative h-full px-4 md:px-8 lg:px-16 xl:px-24">
-        <div class="text-white leading-tight pt-[9%] relative z-30 max-w-4xl">
-            <p class="text-[2.5rem] sm:text-[3.5rem] md:text-[5.2rem] font-bold mb-2 md:mb-4">Dok</p>
+    <div class="content-container">
+        <div class="fixed text-white leading-tight max-w-[60%] transition-all duration-300 top-0 left-0
+             px-4 md:px-8 lg:px-16 xl:px-24 pt-[9vh]" 
+             style="transform: translateY({$scrollState.hasScrolled ? '0' : '0'}); z-index: {$scrollState.hasScrolled ? '5' : '30'}">
+            <p class="text-[2.5rem] sm:text-[3.5rem] md:text-[5.2rem] font-bold mb-2 md:mb-4 transition-transform duration-300">Dok</p>
             <h1 class="transition-all duration-300 
-                text-[2.5rem] sm:text-[3.5rem] md:text-[5.2rem]
-                -mt-2 sm:-mt-3 md:-mt-4 font-bold mb-3 md:mb-6">
+                text-[5.5rem] sm:text-[5.5rem] md:text-[8.2rem]
+                -mt-2 sm:-mt-3 md:-mt-4 font-bold mb-3 md:mb-6 leading-[5.5rem] sm:leading-[5.5rem] md:leading-[8.2rem]">
                 MUTYA TIROL
             </h1>
             
@@ -50,8 +61,8 @@
                 With a passion for service, Dok Mutya believes that true wellness comes from nurturing both body and community.
             </p>
             
-            <div class="flex flex-col space-y-3 mt-6 md:mt-10 w-[8rem] sm:w-[9rem] md:w-[10rem]">
-                <button class="px-4 sm:px-6 md:px-8 py-2 sm:py-3 md:py-4 bg-black/20 border-2 border-white text-white text-sm sm:text-base md:text-xl font-semibold hover:bg-black/30 transition-all">
+            <div class="flex flex-col space-y-3 mt-10 md:mt-[6rem] w-[8rem] sm:w-[9rem] md:w-[20rem] left-[20%] md:left-[40%]  translate-x-[20%]  md:translate-x-[40%] ">
+                <button class="px-4 sm:px-6 md:px-8 py-2 sm:py-3 md:py-4 bg-red-500 border-2 border-white text-white text-sm sm:text-base md:text-xl font-semibold hover:bg-black/30 transition-all">
                     Libreng Serbisyo
                 </button>
             </div>
@@ -59,22 +70,22 @@
     </div>
 
     <!-- Image Container -->
-    <div class="absolute bottom-0 w-screen overflow-visible z-20" 
-    style="height: calc(100% - 120px);">
+    <div class="absolute bottom-0 w-screen overflow-visible transition-all duration-300  {$scrollState.hasScrolled ? 'blur-sm' : ''}" 
+    style="height: calc(100% - 100px); z-index: {$scrollState.hasScrolled ? '1' : '40'}">
    <img 
        src="https://res.cloudinary.com/dexcw6vg0/image/upload/v1738468771/AOEwLogo_se84km.webp" 
        alt="AOEw Logo" 
        class="absolute bottom-0
               w-auto h-full
               object-contain object-bottom
-              transform -translate-x-1/2"
-       style="left: 75%"
+              transform -translate-x-1/2 transition-all duration-300"
+       style="left: 66%"
    />
 </div>
     
     <!-- Gradient Overlays -->
-    <div class="block md:hidden absolute inset-0 w-full h-full bg-gradient-to-tr from-[#34635b] to-[#15B392] z-10"></div>
-    <div class="block xl:hidden absolute inset-0 w-full h-full transition-opacity duration-300 bg-[#34635b] pointer-events-none z-15" 
-         style="opacity: {$scrollState.hasScrolled ? '0.5' : '0'}">
+    <!-- <div class="block md:hidden absolute inset-0 w-full h-full bg-gradient-to-tr from-[#34635b] to-[#15B392]" style="z-index: 2"></div> -->
+    <div class="block absolute inset-0 w-full h-full bg-[#34635b] pointer-events-none transition-opacity duration-1000"
+         style="opacity: {$scrollState.hasScrolled ? '0.5' : '0'}; z-index: {$scrollState.hasScrolled ? '3' : '0'}">
     </div>
 </section>
