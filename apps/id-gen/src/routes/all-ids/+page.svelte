@@ -466,13 +466,13 @@ import type { PageData } from './$types';
     {#if selectedCount > 0}
         <div class="ml-4 flex gap-2">
             <button
-                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                 onclick={downloadSelectedCards}
             >
                 Download Selected ({selectedCount})
             </button>
             <button
-                class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-hidden focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
                 onclick={deleteSelectedCards}
             >
                 Delete Selected ({selectedCount})

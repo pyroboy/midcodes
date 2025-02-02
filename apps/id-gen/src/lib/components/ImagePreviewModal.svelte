@@ -259,38 +259,36 @@
 <svelte:window onkeydown={handleKeydown} />
 
 {#if frontImageUrl || backImageUrl}
-<dialog
-    bind:this={modalRef}
-    class="modal-dialog"
-    onclose={onClose}
-    aria-labelledby="modal-title"
->
+<div class="fixed inset-0 z-50">
     <div 
-        class="modal-backdrop"
+        class="fixed inset-0 bg-black/80 backdrop-blur-sm"
         role="presentation"
         onclick={handleModalClose}
-        onkeydown={handleKeydown}
-    >
+    ></div>
+    
+    <div class="fixed inset-0 flex items-center justify-center p-4">
         <div 
-            class="modal-content"
-            role="document"
+            class="relative w-full max-w-5xl rounded-lg p-6 shadow-2xl"
+            role="dialog"
+            aria-labelledby="modal-title"
         >
-            <h2 id="modal-title" class="sr-only">Card Preview</h2>
-            
             <button 
                 type="button"
-                class="close-button"
+                class="absolute right-4 top-4 z-10 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
                 onclick={onClose}
-                aria-label="Close preview">
+                aria-label="Close preview"
+            >
                 ✕
             </button>
 
-            <div class="canvas-container">
+            <div class="h-[80vh] w-full">
                 {#if canvasError}
-                    <p class="error-message" role="alert">Error: {canvasError}</p>
+                    <p class="absolute inset-0 flex items-center justify-center bg-red-500/10 text-red-400" role="alert">
+                        Error: {canvasError}
+                    </p>
                 {/if}
 
-                <Canvas  >
+                <Canvas>
                         <T.Scene>
                             <T.Color attach="background" args={[0, 0, 0, 0]} transparent={true} />
                        
@@ -383,100 +381,31 @@
                 </Canvas>
             </div>
 
-            <div class="controls">
+            <div class="absolute bottom-6 left-1/2 -translate-x-1/2">
                 <button 
                     type="button"
-                    class="control-button"
+                    class="rounded-full bg-white/10 px-6 py-2 text-sm font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/20"
                     onclick={handleFlip}
-                    aria-label="Flip card to see {rotationY > Math.PI ? 'front' : 'back'} side">
+                >
                     Flip Card
                 </button>
-                {#if debugMode}
-                    <div 
-                        class="debug-overlay" 
-                        role="status" 
-                        aria-label="Debug information"
-                    >
-                        <pre>
+            </div>
+
+            {#if debugMode}
+                <div 
+                    class="fixed bottom-4 right-4 rounded-md bg-black/50 p-4 text-xs font-mono text-white backdrop-blur-sm" 
+                    role="status" 
+                >
+                    <pre>
 Canvas: {canvasInitialized ? '✓' : '✗'}
 Mesh: {sceneState.meshInitialized ? '✓' : '✗'}
-Front Texture: {sceneState.frontTextureLoaded ? '✓' : '✗'}
-Back Texture: {sceneState.backTextureLoaded ? '✓' : '✗'}
-Last Error: {sceneState.lastError || 'None'}
-                        </pre>
-                    </div>
-                {/if}
-            </div>
+Front: {sceneState.frontTextureLoaded ? '✓' : '✗'}
+Back: {sceneState.backTextureLoaded ? '✓' : '✗'}
+Error: {sceneState.lastError || 'None'}
+                    </pre>
+                </div>
+            {/if}
         </div>
     </div>
-</dialog>
+</div>
 {/if}
-
-<style lang="postcss">
-    .modal-dialog {
-        @apply fixed inset-0 p-0 m-0 w-full h-full bg-transparent;
-        border: none;
-        &::backdrop {
-            @apply bg-background/60 backdrop-blur-[2px];
-        }
-    }
-
-    .modal-backdrop {
-        @apply h-full w-full grid place-items-center p-4;
-    }
-
-    .modal-content {
-        @apply rounded-lg max-w-2xl w-full relative bg-transparent;
-        height: 80vh;
-        min-height: 300px;
-    }
-
-    .canvas-container {
-        @apply relative w-full h-full rounded-lg overflow-hidden;
-        background-color: transparent;
-    }
-
-    .debug-overlay {
-        @apply absolute top-4 left-4 bg-black/80 text-white p-3 rounded-md z-10;
-        font-family: monospace;
-        pointer-events: none;
-        font-size: 12px;
-        max-width: 300px;
-    }
-
-    pre {
-        @apply m-0 whitespace-pre-wrap;
-    }
-
-    .close-button {
-        @apply absolute top-2 right-2 p-2 hover:bg-muted rounded-full z-10 transition-colors;
-        background: rgba(0, 0, 0, 0.5);
-        color: white;
-    }
-
-    .close-button:focus-visible {
-        @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
-    }
-
-    .controls {
-        @apply absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10;
-    }
-
-    .control-button {
-        @apply px-4 py-2 bg-primary text-primary-foreground rounded-md 
-               hover:bg-primary/90 transition-colors
-               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring 
-               focus-visible:ring-offset-2 focus-visible:ring-offset-background;
-    }
-
-    .error-message {
-        @apply absolute top-4 left-4 bg-destructive text-destructive-foreground 
-               px-4 py-2 rounded-md z-10;
-    }
-
-    .sr-only {
-        @apply absolute w-px h-px p-0 -m-px overflow-hidden whitespace-nowrap border-0;
-        clip: rect(0, 0, 0, 0);
-        clip-path: inset(50%);
-    }
-</style>

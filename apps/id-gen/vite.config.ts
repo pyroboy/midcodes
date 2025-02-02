@@ -2,12 +2,15 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import type { UserConfig } from 'vite';
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
+import tailwind from 'tailwindcss';
 
 export default defineConfig({
-    plugins: [sveltekit()],
+    plugins: [
+        sveltekit(),
+        tailwind()
+    ],
     server: {
         host: true, // Allows access on the local network
-        port: 5731, // Optional: Specify your port
       },
     // optimizeDeps: {
     //     include: ['three']
