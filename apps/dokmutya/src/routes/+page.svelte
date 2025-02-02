@@ -90,14 +90,14 @@
             </h2>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <!-- Priority 1 -->
-                <div class="bg-white p-8 rounded-lg shadow-lg">
+                    <div class="bg-white p-8 rounded-lg shadow-lg">
                     <div class="text-4xl mb-4">🏥</div>
                     <h3 class="text-2xl font-bold mb-4 text-[#1B4D4C]">Healthcare for All</h3>
-                    <p class="text-gray-600 mb-6">
+                        <p class="text-gray-600 mb-6">
                         Ensuring accessible and quality healthcare services for every Boholano family.
-                    </p>
-                    <a href="/healthcare" class="text-[#1B4D4C] font-medium hover:underline">Learn More →</a>
-                </div>
+                        </p>
+                    <a href="/" class="text-[#1B4D4C] font-medium hover:underline">Learn More →</a>
+                    </div>
 
                 <!-- Priority 2 -->
                 <div class="bg-white p-8 rounded-lg shadow-lg">
@@ -106,7 +106,7 @@
                     <p class="text-gray-600 mb-6">
                         Supporting educational programs and scholarships for deserving students.
                     </p>
-                    <a href="/education" class="text-[#1B4D4C] font-medium hover:underline">Learn More →</a>
+                    <a href="/" class="text-[#1B4D4C] font-medium hover:underline">Learn More →</a>
                 </div>
 
                 <!-- Priority 3 -->
@@ -116,7 +116,7 @@
                     <p class="text-gray-600 mb-6">
                         Implementing sustainable projects that improve community well-being.
                     </p>
-                    <a href="/community" class="text-[#1B4D4C] font-medium hover:underline">Learn More →</a>
+                    <a href="/" class="text-[#1B4D4C] font-medium hover:underline">Learn More →</a>
                 </div>
             </div>
         </div>
@@ -134,7 +134,7 @@
                     <p class="text-gray-600 text-lg mb-8">
                         Her vision is to create a healthier, more prosperous Bohol where every family has access to quality healthcare and opportunities for growth.
                     </p>
-                    <a href="/about" class="inline-block bg-[#1B4D4C] text-white px-8 py-3 rounded-lg hover:bg-opacity-90 transition-all">
+                    <a href="/" class="inline-block bg-[#1B4D4C] text-white px-8 py-3 rounded-lg hover:bg-opacity-90 transition-all">
                         Read Full Biography
                     </a>
                 </div>

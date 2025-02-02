@@ -3,17 +3,17 @@
     import { Facebook, Twitter, Instagram, Phone, Mail, MapPin } from 'lucide-svelte';
 
     const quickLinks = [
-        { href: "/about", label: "About" },
-        { href: "/priorities", label: "Priorities" },
-        { href: "/events", label: "Events" },
-        { href: "/contact", label: "Contact" }
+        { href: "/", label: "About" },
+        { href: "/", label: "Priorities" },
+        { href: "/", label: "Events" },
+        { href: "/", label: "Contact" }
     ];
 
     const programs = [
-        { href: "/mothers", label: "Mothers" },
-        { href: "/tourism", label: "Tourism" },
-        { href: "/youth", label: "Youth" },
-        { href: "/agriculture", label: "Agriculture" }
+        { href: "/", label: "Mothers" },
+        { href: "/", label: "Tourism" },
+        { href: "/", label: "Youth" },
+        { href: "/", label: "Agriculture" }
     ];
 
     const socialLinks = [
