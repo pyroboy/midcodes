@@ -3,6 +3,6 @@
   "outputDirectory": ".svelte-kit/output",
   "regions": ["sin1"],
   "version": 2,
-  "buildCommand": "cd ../.. && turbo run build --filter={marchoffaith}...",
+  "buildCommand": "cd ../.. && turbo run build --filter=./apps/marchoffaith...",
   "ignoreCommand": "npx turbo-ignore"
 }

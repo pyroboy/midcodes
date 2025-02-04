@@ -3,6 +3,6 @@
     "outputDirectory": ".svelte-kit/output",
     "regions": ["sin1"],
     "version": 2,
-    "buildCommand": "cd ../.. && turbo run build --filter={travel}...",
+    "buildCommand": "cd ../.. && turbo run build --filter=./apps/travel...",
     "ignoreCommand": "npx turbo-ignore"
   }
