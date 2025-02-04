@@ -94,7 +94,7 @@
       {/each}
     </nav>
 
-    <div class="hidden lg:flex gap-4 items-center">
+    <!-- <div class="hidden lg:flex gap-4 items-center">
       <a 
         href="https://wa.me/yourphonenumber" 
         class={`px-4 py-2 font-medium tracking-wider rounded transition-colors
@@ -103,6 +103,6 @@
       >
         WHATSAPP
       </a>
-    </div>
+    </div> -->
   </div>
 </header>
