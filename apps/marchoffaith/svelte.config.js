@@ -7,14 +7,15 @@ const config = {
   kit: {
     adapter: adapter({
       runtime: 'nodejs20.x',
-      split: false
+      split: false,
+      // Make the output directory explicit
+      outDir: '.vercel/output'
     }),
     alias: {
-      // $lib is built-in, but included for completeness
-      // '$app/*': './tests/mocks/$app/*',
-      // '$env/*': './tests/mocks/$env/*',
-      '@test-utils/*': './src/lib/test-utils/*',
-      '@test/*': './tests/*'
+      "@/*": "./src/lib/*",
+      "@ui": "./src/lib/components/ui",
+      "@test-utils/*": './src/lib/test-utils/*',
+      "@test/*": './tests/*'
     }
   },
   extensions: [".svelte"],
