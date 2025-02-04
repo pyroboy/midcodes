@@ -3,8 +3,12 @@
     import { Button } from '$lib/components/ui/button';
     import { Check } from 'lucide-svelte';
 
-    export let referenceCode: string;
-    export let eventName: string;
+    interface Props {
+        referenceCode: string;
+        eventName: string;
+    }
+
+    let { referenceCode, eventName }: Props = $props();
 </script>
 
 <Card>

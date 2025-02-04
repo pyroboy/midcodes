@@ -2,9 +2,13 @@
     import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '$lib/components/ui/card';
     import type { Event } from '$lib/types/database';
 
-    export let event: Event;
-    export let referenceCode: string;
-    export let timeLeft: string;
+    interface Props {
+        event: Event;
+        referenceCode: string;
+        timeLeft: string;
+    }
+
+    let { event, referenceCode, timeLeft }: Props = $props();
 </script>
 
 <Card>

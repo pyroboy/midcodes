@@ -3,11 +3,15 @@
     import type { Attendee } from '$lib/types/database';
     import { onMount } from 'svelte';
 
-    export let attendees: Attendee[] = [];
-    export let eventName: string;
-    export let onClose: () => void;
+    interface Props {
+        attendees?: Attendee[];
+        eventName: string;
+        onClose: () => void;
+    }
 
-    let printContainer: HTMLElement;
+    let { attendees = [], eventName, onClose }: Props = $props();
+
+    let printContainer: HTMLElement = $state();
 
     onMount(() => {
         window.print();
@@ -18,7 +22,7 @@
     }
 </script>
 
-<svelte:window on:afterprint={handleAfterPrint} />
+<svelte:window onafterprint={handleAfterPrint} />
 
 <div bind:this={printContainer} class="print-container">
     {#each attendees as attendee, i}

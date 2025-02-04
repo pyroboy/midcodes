@@ -1,3 +1,5 @@
+<!-- @migration-task Error while migrating Svelte code: `$:` is not allowed in runes mode, use `$derived` or `$effect` instead
+https://svelte.dev/e/legacy_reactive_statement_invalid -->
 <script lang="ts">
     import { registrationSchema, type RegistrationSchema, type RegistrationResponse } from './schema';
     import type { PageData } from './$types';
