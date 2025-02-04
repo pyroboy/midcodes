@@ -27,6 +27,8 @@
       </div>
     </div>
 
+
+    
     <button 
       class="lg:hidden flex items-center justify-center w-10 h-10 rounded-full bg-gray-800/50 backdrop-blur z-50" 
       on:click={toggleMobileMenu} 
