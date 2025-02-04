@@ -13,7 +13,13 @@
     "build": {
       "dependsOn": ["^build"],
       "outputs": [".svelte-kit/**", ".vercel/**", ".next/**", "build/**", "dist/**", ".output/**"],
-      "inputs": ["src/**/*", "package.json", "svelte.config.js", "vite.config.ts"]
+      "inputs": [
+        "apps/*/src/**/*",
+        "apps/*/package.json",
+        "apps/*/svelte.config.js",
+        "apps/*/vite.config.ts",
+        "apps/*/README.md"
+      ]
     },
     "lint": {
       "outputs": []
@@ -25,7 +31,12 @@
     "test": {
       "dependsOn": ["build"],
       "outputs": ["coverage/**"],
-      "inputs": ["src/**/*.tsx", "src/**/*.ts", "test/**/*.ts", "test/**/*.tsx"]
+      "inputs": [
+  "apps/*/src/**/*.tsx",
+  "apps/*/src/**/*.ts",
+  "apps/*/test/**/*.ts",
+  "apps/*/test/**/*.tsx"
+]
     }
   }
 }
