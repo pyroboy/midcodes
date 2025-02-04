@@ -34,16 +34,18 @@
 
 <section class="relative min-h-screen bg-gradient-to-b from-[#15B392] to-[#264b45] z-10">
     <!-- Contact Information -->
-    <div class="absolute top-4 right-4 md:top-8 md:right-8 text-right z-20">
+    <!-- <div class="absolute top-4 right-4 md:top-8 md:right-8 text-right z-20">
         <p class="text-white text-sm md:text-base">Contact: <a href="tel:+639123456789" class="underline">+63 912 345 6789</a></p>
         <p class="text-white text-sm md:text-base">Email: <a href="mailto:info@dokmutya.com" class="underline">info@dokmutya.com</a></p>
-    </div>
+    </div> -->
     
+    <!-- {$scrollState.hasScrolled ? 'left-1/2 transform -translate-x-1/2 text-center' : 'left-0'}
+    px-4 md:px-8 lg:px-16 xl:px-24 pt-[9vh]"  -->
     <!-- Main Content -->
     <div class="content-container">
-        <div class="fixed text-white leading-tight max-w-[60%] transition-all duration-300 top-0 left-0
-             px-4 md:px-8 lg:px-16 xl:px-24 pt-[9vh]" 
-             style="transform: translateY({$scrollState.hasScrolled ? '0' : '0'}); z-index: {$scrollState.hasScrolled ? '5' : '30'}">
+        <div class="fixed text-white leading-tight  top-0 left-1/2 transform -translate-x-1/2 text-center pt-[4vh]"
+        
+             style="z-index: {$scrollState.hasScrolled ? '5' : '30'}">
             <p class="text-[2.5rem] sm:text-[3.5rem] md:text-[5.2rem] font-bold mb-2 md:mb-4 transition-transform duration-300">Dok</p>
             <h1 class="transition-all duration-300 
                 text-[5.5rem] sm:text-[5.5rem] md:text-[8.2rem]
@@ -71,13 +73,13 @@
 
     <!-- Image Container -->
     <div class="absolute bottom-0 w-screen overflow-visible transition-all duration-300  {$scrollState.hasScrolled ? 'blur-sm' : ''}" 
-    style="height: calc(100% - 100px); z-index: {$scrollState.hasScrolled ? '1' : '40'}">
+    style="height: calc(80%); z-index: {$scrollState.hasScrolled ? '1' : '40'}">
    <img 
        src="https://res.cloudinary.com/dexcw6vg0/image/upload/v1738468771/AOEwLogo_se84km.webp" 
        alt="AOEw Logo" 
        class="absolute bottom-0
               w-auto h-full
-              object-contain object-bottom
+              object-cover object-bottom
               transform -translate-x-1/2 transition-all duration-300"
        style="left: 66%"
    />

@@ -187,12 +187,12 @@
 		<div class="absolute inset-0 bg-black/40"></div>
 		
 		<!-- Content -->
-		<div class="relative h-full flex items-center justify-center">
-		  <div class="max-w-4xl px-8 text-center text-white">
-			<h1 class="text-6xl font-bold mb-6 tracking-wider md:text-4xl">DIVE INTO ADVENTURE</h1>
-			<p class="text-2xl mb-8 opacity-90 md:text-xl">Experience the thrill of cliff diving in paradise</p>
+		<div class="relative h-full flex items-center justify-center px-4">
+		  <div class="max-w-4xl text-center text-white">
+			<h1 class="text-4xl sm:text-5xl md:text-6xl font-bold mb-4 md:mb-6 tracking-wider">Cabilao Cliffs Dive Resort</h1>
+			<p class="text-lg sm:text-xl md:text-2xl mb-6 md:mb-8 opacity-90">Experience the thrill of cliff diving in paradise</p>
 			<button 
-			  class="bg-orange-600 text-white px-10 py-4 rounded font-medium tracking-wide transition-all hover:-translate-y-1 hover:opacity-90"
+			  class="bg-orange-600 text-white px-6 md:px-10 py-3 md:py-4 rounded text-sm md:text-base font-medium tracking-wide transition-all hover:-translate-y-1 hover:opacity-90"
 			  on:click={scrollToPackages}
 			>
 			  View Packages

@@ -6,6 +6,25 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  html {
+    font-size: 16px;
+    -webkit-text-size-adjust: 100%;
+  }
+  
+  @media (max-width: 768px) {
+    html {
+      font-size: 14px;
+    }
+  }
+  
+  @media (max-width: 640px) {
+    html {
+      font-size: 12px;
+    }
+  }
+}
+
 /* Custom animation */
 @keyframes slideIn {
   from {

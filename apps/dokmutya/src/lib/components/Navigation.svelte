@@ -40,22 +40,28 @@
   };
 </script>
 
+<!-- Logo Container - Separate from Nav -->
+<div class="fixed top-0 left-0 z-[9999] p-4 transition-opacity duration-300
+  {$scrollState.hasScrolled ? 'opacity-100' : 'opacity-0 pointer-events-none'}">
+  <a href="/" class="block relative" on:mouseenter={restartAnimation}>
+    <img 
+      bind:this={logoElement}
+      src="https://ucarecdn.com/58c1e01e-1959-4f3a-bd04-00aed947f020/-/preview/200x200/" 
+      alt="Logo" 
+      class="h-12 md:h-24 w-auto beating-heart object-cover" 
+      on:load={handleLogoLoad}
+      style="position: relative; z-index: 9999;"
+    />
+  </a>
+</div>
+
 <nav class="fixed md:top-0 bottom-0 md:bottom-auto left-0 right-0 z-40 
   {$scrollState.hasScrolled ? 'bg-white/90 backdrop-blur-sm shadow-sm' : 'bg-gradient-to-b from-[#32949199] to-transparent'} 
   {$scrollState.isHeroVisible ? 'md:opacity-0 md:pointer-events-none' : 'opacity-100'}"
 >
   <div class="container mx-auto px-4 max-w-7xl">
     <!-- Desktop Navigation -->
-    <div class="hidden md:flex items-center justify-between h-20 ">
-      <a href="/" class="flex items-center" on:mouseenter={restartAnimation}>
-        <img 
-          bind:this={logoElement}
-          src="https://ucarecdn.com/58c1e01e-1959-4f3a-bd04-00aed947f020/-/preview/200x200/" 
-          alt="Logo" 
-          class="h-12 md:h-24 w-auto beating-heart object-cover -mb-2 md:-mb-10 z-50 " 
-          on:load={handleLogoLoad}
-        />
-      </a>
+    <div class="hidden md:flex items-center justify-end h-20">
       <ul class="flex space-x-8 items-center">
         {#each links as link}
           <li>
