@@ -12,6 +12,7 @@
     "clean": "turbo run clean && rm -rf node_modules"
   },
   "devDependencies": {
+     "turbo-ignore": "latest",
     "autoprefixer": "^10.4.20",
     "clsx": "^2.1.1",
     "esbuild": "^0.24.2",
