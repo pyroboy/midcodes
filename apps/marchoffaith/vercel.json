@@ -1,6 +1,6 @@
 {
   "framework": "sveltekit",
-  "outputDirectory": ".vercel/output",
+  "outputDirectory": ".svelte-kit",
   "regions": ["sin1"],
   "version": 2,
   "buildCommand": "cd ../.. && turbo run build --filter={.}...",
