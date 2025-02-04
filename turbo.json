@@ -12,7 +12,8 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".svelte-kit/**", ".vercel/**", ".next/**", "build/**", "dist/**", ".output/**"]
+      "outputs": [".svelte-kit/**", ".vercel/**", ".next/**", "build/**", "dist/**", ".output/**"],
+      "inputs": ["src/**/*", "package.json", "svelte.config.js", "vite.config.ts"]
     },
     "lint": {
       "outputs": []

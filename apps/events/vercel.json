@@ -3,5 +3,5 @@
   "outputDirectory": ".svelte-kit/output",
   "regions": ["sin1"],
   "version": 2,
-  "ignoreCommand": "npx turbo-ignore"
+  "ignoreCommand": "cd ../.. && npx turbo-ignore"
 }
