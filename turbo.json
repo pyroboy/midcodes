@@ -12,7 +12,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".svelte-kit/**", ".vercel/**", "build/**", "dist/**"]
+      "outputs": [".svelte-kit/**", ".vercel/**", ".next/**", "build/**", "dist/**", ".output/**"]
     },
     "lint": {
       "outputs": []
