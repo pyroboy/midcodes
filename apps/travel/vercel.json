@@ -1,7 +1,8 @@
 {
-  "framework": "sveltekit",
-  "regions": ["sin1"],
-  "version": 2,
-  "buildCommand": "cd ../.. && turbo run build --filter={.}...",
-  "ignoreCommand": "npx turbo-ignore"
-}
+    "framework": "sveltekit",
+    "outputDirectory": ".svelte-kit/output",
+    "regions": ["sin1"],
+    "version": 2,
+    "buildCommand": "cd ../.. && turbo run build --filter={.}...",
+    "ignoreCommand": "npx turbo-ignore"
+  }

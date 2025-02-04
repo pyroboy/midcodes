@@ -79,7 +79,7 @@
        alt="AOEw Logo" 
        class="absolute bottom-0
               w-auto h-full
-              object-cover object-bottom
+                  object-bottom
               transform -translate-x-1/2 transition-all duration-300"
        style="left: 66%"
    />
