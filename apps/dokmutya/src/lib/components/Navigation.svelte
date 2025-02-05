@@ -78,8 +78,8 @@
 
     <!-- Mobile Navigation -->
     <div class="md:hidden transition-all duration-300 overflow-hidden border-t-4 border-gray-200 bg-white/90 backdrop-blur-sm" 
-      class:opacity-100={$scrollState.isHeroVisible} 
-      class:pointer-events-none={!$scrollState.isHeroVisible}>
+      class:opacity-100={$scrollState.hadReachedMiddle} 
+      class:pointer-events-none={!$scrollState.hadReachedMiddle}>
       <div class="relative">
         <!-- Hamburger Menu Button -->
         <button
