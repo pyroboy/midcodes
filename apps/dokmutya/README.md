@@ -3,3 +3,5 @@
 This is the Dokmutya application documentation.
 
 rat
+
+dokmutya only
