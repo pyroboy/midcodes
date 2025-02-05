@@ -4,5 +4,5 @@
   "regions": ["sin1"],
   "version": 2,
   "buildCommand": "cd ../.. && turbo run build --filter=dokmutya...",
-  "ignoreCommand": "git diff HEAD^ HEAD ."
+  "ignoreCommand": "git diff HEAD^ HEAD --quiet ."
 }
