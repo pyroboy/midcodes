@@ -1,0 +1,233 @@
+[1mdiff --git a/apps/dokmutya/src/lib/components/Hero.svelte b/apps/dokmutya/src/lib/components/Hero.svelte[m
+[1mindex 3ca7d22..cb9d666 100644[m
+[1m--- a/apps/dokmutya/src/lib/components/Hero.svelte[m
+[1m+++ b/apps/dokmutya/src/lib/components/Hero.svelte[m
+[36m@@ -1,94 +1,114 @@[m
+ <script lang="ts">[m
+[31m-    import { scrollState } from '$lib/stores/scrollStore';[m
+[32m+[m	[32mimport { scrollState } from '$lib/stores/scrollStore';[m
+ </script>[m
+ [m
+[31m-<style>[m
+[31m-    :global(body) {[m
+[31m-        margin: 0;[m
+[31m-        padding: 0;[m
+[31m-        width: 100%;[m
+[31m-        overflow-x: hidden;[m
+[31m-    }[m
+[31m-[m
+[31m-    :global(#app) {[m
+[31m-        overflow-x: hidden;[m
+[31m-        width: 100%;[m
+[31m-        position: relative;[m
+[31m-    }[m
+[31m-[m
+[31m-    section {[m
+[31m-        width: 100vw;[m
+[31m-        overflow: hidden;[m
+[31m-        position: relative;[m
+[31m-        mask-image: linear-gradient(to bottom, black 0%, black 100%);[m
+[31m-        -webkit-mask-image: linear-gradient(to bottom, black 0%, black 100%);[m
+[31m-    }[m
+[31m-[m
+[31m-    .content-container {[m
+[31m-        position: relative;[m
+[31m-        width: 100%;[m
+[31m-        height: 100vh;[m
+[31m-        overflow: hidden;[m
+[31m-    }[m
+[31m-</style>[m
+[31m-[m
+ <section class="relative min-h-screen bg-gradient-to-b from-[#15B392] to-[#264b45] z-10">[m
+[31m-    <!-- Contact Information -->[m
+[31m-    <!-- <div class="absolute top-4 right-4 md:top-8 md:right-8 text-right z-20">[m
+[32m+[m	[32m<!-- Contact Information -->[m
+[32m+[m	[32m<!-- <div class="absolute top-4 right-4 md:top-8 md:right-8 text-right z-20">[m
+         <p class="text-white text-sm md:text-base">Contact: <a href="tel:+639123456789" class="underline">+63 912 345 6789</a></p>[m
+         <p class="text-white text-sm md:text-base">Email: <a href="mailto:info@dokmutya.com" class="underline">info@dokmutya.com</a></p>[m
+     </div> -->[m
+[31m-    [m
+[31m-    <!-- {$scrollState.hasScrolled ? 'left-1/2 transform -translate-x-1/2 text-center' : 'left-0'}[m
+[32m+[m
+[32m+[m	[32m<!-- {$scrollState.hasScrolled ? 'left-1/2 transform -translate-x-1/2 text-center' : 'left-0'}[m
+     px-4 md:px-8 lg:px-16 xl:px-24 pt-[9vh]"  -->[m
+[31m-    <!-- Main Content -->[m
+[31m-    <div class="content-container">[m
+[31m-        <div class="fixed text-white leading-tight  top-0 left-1/2 transform -translate-x-1/2 text-center pt-[4vh]"[m
+[31m-        [m
+[31m-             style="z-index: {$scrollState.hasScrolled ? '5' : '30'}">[m
+[31m-            <p class="text-[2.5rem] sm:text-[3.5rem] md:text-[5.2rem] font-bold mb-2 md:mb-4 transition-transform duration-300">Dok</p>[m
+[31m-            <h1 class="transition-all duration-300 [m
+[32m+[m	[32m<!-- Main Content -->[m
+[32m+[m[32m    <div class="content-container flex flex-col items-center justify-center">[m
+[32m+[m		[32m<div[m
+[32m+[m			[32mclass="text-white leading-tight text-center"[m
+[32m+[m			[32mstyle="z-index: {$scrollState.hasScrolled ? '5' : '30'}"[m
+[32m+[m		[32m>[m
+[32m+[m			[32m<p[m
+[32m+[m				[32mclass="text-[2.5rem] sm:text-[3.5rem] md:text-[5.2rem] font-bold mb-2 md:mb-4 transition-transform duration-300"[m
+[32m+[m			[32m>[m
+[32m+[m				[32mDok[m
+[32m+[m			[32m</p>[m
+[32m+[m			[32m<h1[m
+[32m+[m				[32mclass="transition-all duration-300[m
+                 text-[5.5rem] sm:text-[5.5rem] md:text-[8.2rem][m
+[31m-                -mt-2 sm:-mt-3 md:-mt-4 font-bold mb-3 md:mb-6 leading-[5.5rem] sm:leading-[5.5rem] md:leading-[8.2rem]">[m
+[31m-                MUTYA[m
+[31m-                <span class="block text-red-500">TIROL</span>[m
+[31m-            </h1>[m
+[31m-            [m
+[31m-            <div class="flex items-center gap-2 sm:gap-3 md:gap-4 -mt-2 sm:-mt-3 md:mt-0 mb-3 md:mb-6 max-w-xl">[m
+[31m-                <span class="text-xl sm:text-2xl md:text-3xl font-medium whitespace-nowrap">For FIRST DISTRICT</span>[m
+[31m-                <div class="h-0.5 bg-white flex-grow"></div>[m
+[31m-            </div>[m
+[31m-            [m
+[31m-            <h2 class="text-3xl sm:text-4xl md:text-6xl font-bold mb-4 md:mb-8">BOARD MEMBER</h2>[m
+[31m-            <!-- <p class="text-base sm:text-lg md:text-2xl font-light leading-relaxed max-w-xl">[m
+[31m-                With a passion for service, Dok Mutya believes that true wellness comes from nurturing both body and community.[m
+[31m-            </p> -->[m
+[31m-            [m
+[31m-            <div class="flex flex-col space-y-3 mt-10 md:mt-[6rem] w-[8rem] sm:w-[9rem] md:w-[20rem] mx-auto"></div>[m
+[31m-                <button class="p-6 sm:p-6 md:p-8  sm:py-3 md:py-4 bg-red-500 border-2 border-white text-white text-sm sm:text-base md:text-xl font-semibold hover:bg-black/30 transition-all">[m
+[31m-                    Libreng Serbisyo[m
+[31m-                </button>[m
+[31m-          [m
+[32m+[m[32m                -mt-2 sm:-mt-3 md:-mt-4 font-bold mb-3 md:mb-6 leading-[5.5rem] sm:leading-[5.5rem] md:leading-[8.2rem]"[m
+[32m+[m			[32m>[m
+[32m+[m				[32mMUTYA[m
+[32m+[m				[32m<span class="block text-red-500">TIROL</span>[m
+[32m+[m			[32m</h1>[m
+[32m+[m
+[32m+[m			[32m<div[m
+[32m+[m				[32mclass="flex items-center gap-2 sm:gap-3 md:gap-4 -mt-2 sm:-mt-3 md:mt-0 mb-3 md:mb-6 max-w-xl"[m
+[32m+[m			[32m>[m
+[32m+[m				[32m<span class="text-xl sm:text-2xl md:text-3xl font-medium whitespace-nowrap"[m
+[32m+[m					[32m>For FIRST DISTRICT</span[m
+[32m+[m				[32m>[m
+[32m+[m				[32m<div class="h-0.5 bg-white flex-grow"></div>[m
+[32m+[m			[32m</div>[m
+[32m+[m
+[32m+[m			[32m<h2 class="text-3xl sm:text-4xl md:text-6xl font-bold mb-4 md:mb-8">BOARD MEMBER</h2>[m
+         </div>[m
+[31m-    </div>[m
+ [m
+[31m-    <!-- Image Container -->[m
+[31m-    <div class="absolute bottom-0 w-screen overflow-visible transition-all duration-300  {$scrollState.hasScrolled ? 'blur-sm' : ''}" [m
+[31m-    style="height: calc(85%); z-index: {$scrollState.hasScrolled ? '1' : '40'}">[m
+[31m-   <img [m
+[31m-       src="https://res.cloudinary.com/dexcw6vg0/image/upload/v1738468771/AOEwLogo_se84km.webp" [m
+[31m-       alt="AOEw Logo" [m
+[31m-       class="absolute bottom-0[m
+[32m+[m			[32m<div[m
+[32m+[m				[32mclass="flex flex-col space-y-3 mt-20 md:mt-[6rem] w-[8rem] sm:w-[15rem] md:w-[20rem] mx-auto"[m
+[32m+[m			[32mstyle="z-index: {$scrollState.hasScrolled ? '5' : '30'}"[m
+[32m+[m[32m                >[m
+[32m+[m			[32m<button[m
+[32m+[m				[32mclass="p-6 sm:p-6 md:p-8 sm:py-3 md:py-4 bg-red-500 border-2 border-white text-white text-sm sm:text-base md:text-xl font-semibold hover:bg-black/30 transition-all"[m
+[32m+[m			[32m>[m
+[32m+[m				[32mLibreng Serbisyo[m
+[32m+[m			[32m</button>[m
+[32m+[m[32m        </div>[m
+[32m+[m	[32m</div>[m
+[32m+[m
+[32m+[m	[32m<!-- Image Container -->[m
+[32m+[m	[32m<div[m
+[32m+[m		[32mclass="absolute bottom-0 w-screen overflow-visible transition-all duration-300 {$scrollState.hasScrolled[m
+[32m+[m			[32m? 'blur-sm'[m
+[32m+[m			[32m: ''}"[m
+[32m+[m		[32mstyle="height: calc(85%); z-index: {$scrollState.hasScrolled ? '1' : '40'}"[m
+[32m+[m	[32m>[m
+[32m+[m		[32m<img[m
+[32m+[m			[32msrc="https://res.cloudinary.com/dexcw6vg0/image/upload/v1738468771/AOEwLogo_se84km.webp"[m
+[32m+[m			[32malt="AOEw Logo"[m
+[32m+[m			[32mclass="absolute bottom-0[m
+               max-w-none h-full[m
+                   object-bottom[m
+               transform -translate-x-1/2 transition-all duration-300"[m
+[31m-       style="left: 66%"[m
+[31m-   />[m
+[31m-</div>[m
+[31m-    [m
+[31m-    <!-- Gradient Overlays -->[m
+[31m-    <!-- <div class="block md:hidden absolute inset-0 w-full h-full bg-gradient-to-tr from-[#34635b] to-[#15B392]" style="z-index: 2"></div> -->[m
+[31m-    <div class="block absolute inset-0 w-full h-full bg-[#34635b] pointer-events-none transition-opacity duration-1000"[m
+[31m-         style="opacity: {$scrollState.hasScrolled ? '0.5' : '0'}; z-index: {$scrollState.hasScrolled ? '3' : '0'}">[m
+[31m-    </div>[m
+[32m+[m			[32mstyle="left: 66%"[m
+[32m+[m		[32m/>[m
+[32m+[m	[32m</div>[m
+[32m+[m
+[32m+[m	[32m<!-- Gradient Overlays -->[m
+[32m+[m	[32m<!-- <div class="block md:hidden absolute inset-0 w-full h-full bg-gradient-to-tr from-[#34635b] to-[#15B392]" style="z-index: 2"></div> -->[m
+[32m+[m	[32m<div[m
+[32m+[m		[32mclass="block absolute inset-0 w-full h-full bg-[#34635b] pointer-events-none transition-opacity duration-1000"[m
+[32m+[m		[32mstyle="opacity: {$scrollState.hasScrolled ? '0.5' : '0'}; z-index: {$scrollState.hasScrolled[m
+[32m+[m			[32m? '3'[m
+[32m+[m			[32m: '0'}"[m
+[32m+[m	[32m></div>[m
+ </section>[m
+[32m+[m
+[32m+[m[32m<style>[m
+[32m+[m	[32m:global(body) {[m
+[32m+[m		[32mmargin: 0;[m
+[32m+[m		[32mpadding: 0;[m
+[32m+[m		[32mwidth: 100%;[m
+[32m+[m		[32moverflow-x: hidden;[m
+[32m+[m	[32m}[m
+[32m+[m
+[32m+[m	[32m:global(#app) {[m
+[32m+[m		[32moverflow-x: hidden;[m
+[32m+[m		[32mwidth: 100%;[m
+[32m+[m		[32mposition: relative;[m
+[32m+[m	[32m}[m
+[32m+[m
+[32m+[m	[32msection {[m
+[32m+[m		[32mwidth: 100vw;[m
+[32m+[m		[32moverflow: hidden;[m
+[32m+[m		[32mposition: relative;[m
+[32m+[m		[32mmask-image: linear-gradient(to bottom, black 0%, black 100%);[m
+[32m+[m		[32m-webkit-mask-image: linear-gradient(to bottom, black 0%, black 100%);[m
+[32m+[m	[32m}[m
+[32m+[m
+[32m+[m	[32m.content-container {[m
+[32m+[m		[32mposition: relative;[m
+[32m+[m		[32mwidth: 100%;[m
+[32m+[m		[32mheight: 100vh;[m
+[32m+[m		[32moverflow: hidden;[m
+[32m+[m	[32m}[m
+[32m+[m[32m</style>[m
+[1mdiff --git a/apps/dokmutya/src/lib/components/Navigation.svelte b/apps/dokmutya/src/lib/components/Navigation.svelte[m
+[1mindex b27c870..f617773 100644[m
+[1m--- a/apps/dokmutya/src/lib/components/Navigation.svelte[m
+[1m+++ b/apps/dokmutya/src/lib/components/Navigation.svelte[m
+[36m@@ -57,7 +57,7 @@[m
+ [m
+ <nav class="fixed md:top-0 bottom-0 md:bottom-auto left-0 right-0 z-40  transition-transform duration-300[m
+   {$scrollState.hasScrolled ? 'bg-white/90 backdrop-blur-sm shadow-sm' : 'hidden'} [m
+[31m-  {$scrollState.isHeroVisible ? 'md:opacity-0 md:pointer-events-none' : 'opacity-100'}"[m
+[32m+[m[32m  "[m
+ >[m
+   <div class="container mx-auto max-w-7xl">[m
+     <!-- Desktop Navigation -->[m
+[36m@@ -77,7 +77,7 @@[m
+     </div>[m
+ [m
+     <!-- Mobile Navigation -->[m
+[31m-    <div class="md:hidden transition-all duration-300 overflow-hidden border-t-2 border-gray-200 bg-white/90 backdrop-blur-sm" [m
+[32m+[m[32m    <div class="md:hidden transition-all duration-300 overflow-hidden border-t-4 border-gray-200 bg-white/90 backdrop-blur-sm"[m[41m [m
+       class:opacity-100={$scrollState.isHeroVisible} [m
+       class:pointer-events-none={!$scrollState.isHeroVisible}>[m
+       <div class="relative">[m
+[1mdiff --git a/apps/dokmutya/src/lib/stores/scrollStore.ts b/apps/dokmutya/src/lib/stores/scrollStore.ts[m
+[1mindex fe3f770..71a1917 100644[m
+[1m--- a/apps/dokmutya/src/lib/stores/scrollStore.ts[m
+[1m+++ b/apps/dokmutya/src/lib/stores/scrollStore.ts[m
+[36m@@ -16,7 +16,7 @@[m [mif (typeof window !== 'undefined') {[m
+     window.addEventListener('scroll', () => {[m
+         scrollState.update(state => ({[m
+             hasScrolled: window.scrollY > 10,[m
+[31m-            isHeroVisible: window.scrollY < window.innerHeight * 0.1[m
+[32m+[m[32m            isHeroVisible: window.scrollY > 1[m
+         }));[m
+     });[m
+ }[m

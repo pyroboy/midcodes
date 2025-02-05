@@ -12,14 +12,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".svelte-kit/**", ".vercel/**", ".next/**", "build/**", "dist/**", ".output/**"],
-      "inputs": [
-        "apps/*/src/**/*",
-        "apps/*/package.json",
-        "apps/*/svelte.config.js",
-        "apps/*/vite.config.ts",
-        "apps/*/README.md"
-      ]
+      "outputs": [".svelte-kit/**", ".vercel/**", ".next/**", "build/**", "dist/**", ".output/**"]
     },
     "lint": {
       "outputs": []
@@ -32,11 +25,11 @@
       "dependsOn": ["build"],
       "outputs": ["coverage/**"],
       "inputs": [
-  "apps/*/src/**/*.tsx",
-  "apps/*/src/**/*.ts",
-  "apps/*/test/**/*.ts",
-  "apps/*/test/**/*.tsx"
-]
+        "src/**/*.tsx",
+        "src/**/*.ts",
+        "test/**/*.ts",
+        "test/**/*.tsx"
+      ]
     }
   }
 }

@@ -3,6 +3,6 @@
   "outputDirectory": ".svelte-kit/output",
   "regions": ["sin1"],
   "version": 2,
-  "buildCommand": "cd ../.. && turbo run build --filter=./apps/dokmutya...",
-  "ignoreCommand": "cd ../.. && npx turbo-ignore dokmutya"
+  "buildCommand": "cd ../.. && turbo run build --filter=dokmutya...",
+  "ignoreCommand": "cd ../.. && git diff HEAD^ HEAD --quiet apps/dokmutya"
 }
