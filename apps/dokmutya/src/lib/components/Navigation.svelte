@@ -55,11 +55,11 @@
   </a>
 </div>
 
-<nav class="fixed md:top-0 bottom-0 md:bottom-auto left-0 right-0 z-40 
-  {$scrollState.hasScrolled ? 'bg-white/90 backdrop-blur-sm shadow-sm' : 'bg-gradient-to-b from-[#32949199] to-transparent'} 
+<nav class="fixed md:top-0 bottom-0 md:bottom-auto left-0 right-0 z-40  transition-transform duration-300
+  {$scrollState.hasScrolled ? 'bg-white/90 backdrop-blur-sm shadow-sm' : 'hidden'} 
   {$scrollState.isHeroVisible ? 'md:opacity-0 md:pointer-events-none' : 'opacity-100'}"
 >
-  <div class="container mx-auto px-4 max-w-7xl">
+  <div class="container mx-auto max-w-7xl">
     <!-- Desktop Navigation -->
     <div class="hidden md:flex items-center justify-end h-20">
       <ul class="flex space-x-8 items-center">
@@ -77,7 +77,7 @@
     </div>
 
     <!-- Mobile Navigation -->
-    <div class="md:hidden transition-all duration-300 overflow-hidden" 
+    <div class="md:hidden transition-all duration-300 overflow-hidden border-t-2 border-gray-200 bg-white/90 backdrop-blur-sm" 
       class:opacity-100={$scrollState.isHeroVisible} 
       class:pointer-events-none={!$scrollState.isHeroVisible}>
       <div class="relative">
@@ -136,7 +136,7 @@
         {/if}
 
         <!-- Bottom Navigation Bar -->
-        <div class="flex items-center justify-around h-16 {$scrollState.hasScrolled ? 'bg-[#32949199] backdrop-blur-sm' : ''}">
+        <div class="flex items-center justify-around h-12">
           {#each links as link}
             <a 
               href={link.path} 

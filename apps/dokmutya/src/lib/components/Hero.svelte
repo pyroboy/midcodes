@@ -50,7 +50,8 @@
             <h1 class="transition-all duration-300 
                 text-[5.5rem] sm:text-[5.5rem] md:text-[8.2rem]
                 -mt-2 sm:-mt-3 md:-mt-4 font-bold mb-3 md:mb-6 leading-[5.5rem] sm:leading-[5.5rem] md:leading-[8.2rem]">
-                MUTYA TIROL
+                MUTYA
+                <span class="block text-red-500">TIROL</span>
             </h1>
             
             <div class="flex items-center gap-2 sm:gap-3 md:gap-4 -mt-2 sm:-mt-3 md:mt-0 mb-3 md:mb-6 max-w-xl">
@@ -59,26 +60,26 @@
             </div>
             
             <h2 class="text-3xl sm:text-4xl md:text-6xl font-bold mb-4 md:mb-8">BOARD MEMBER</h2>
-            <p class="text-base sm:text-lg md:text-2xl font-light leading-relaxed max-w-xl">
+            <!-- <p class="text-base sm:text-lg md:text-2xl font-light leading-relaxed max-w-xl">
                 With a passion for service, Dok Mutya believes that true wellness comes from nurturing both body and community.
-            </p>
+            </p> -->
             
-            <div class="flex flex-col space-y-3 mt-10 md:mt-[6rem] w-[8rem] sm:w-[9rem] md:w-[20rem] left-[20%] md:left-[40%]  translate-x-[20%]  md:translate-x-[40%] ">
-                <button class="px-4 sm:px-6 md:px-8 py-2 sm:py-3 md:py-4 bg-red-500 border-2 border-white text-white text-sm sm:text-base md:text-xl font-semibold hover:bg-black/30 transition-all">
+            <div class="flex flex-col space-y-3 mt-10 md:mt-[6rem] w-[8rem] sm:w-[9rem] md:w-[20rem] mx-auto"></div>
+                <button class="p-6 sm:p-6 md:p-8  sm:py-3 md:py-4 bg-red-500 border-2 border-white text-white text-sm sm:text-base md:text-xl font-semibold hover:bg-black/30 transition-all">
                     Libreng Serbisyo
                 </button>
-            </div>
+          
         </div>
     </div>
 
     <!-- Image Container -->
     <div class="absolute bottom-0 w-screen overflow-visible transition-all duration-300  {$scrollState.hasScrolled ? 'blur-sm' : ''}" 
-    style="height: calc(80%); z-index: {$scrollState.hasScrolled ? '1' : '40'}">
+    style="height: calc(85%); z-index: {$scrollState.hasScrolled ? '1' : '40'}">
    <img 
        src="https://res.cloudinary.com/dexcw6vg0/image/upload/v1738468771/AOEwLogo_se84km.webp" 
        alt="AOEw Logo" 
        class="absolute bottom-0
-              w-auto h-full
+              max-w-none h-full
                   object-bottom
               transform -translate-x-1/2 transition-all duration-300"
        style="left: 66%"
