@@ -163,7 +163,7 @@
 		  <img
 			src="https://res.cloudinary.com/dexcw6vg0/image/upload/v1738737910/Libreng_Serbisyo_zcaggh.webp"
 			alt="Libreng Serbisyo"
-			class="w-[350px] h-[350px] object-contain hover:scale-105 transition-transform cursor-pointer"
+			class="w-[150px] h-[150px] md:w-[350px] md:h-[350px] object-contain hover:scale-105 transition-transform cursor-pointer"
 			style="filter: blur({$scrollState.hasScrolled ? '0px' : '10px'}); transition: filter 1000ms"
 		  />
 		</div>
