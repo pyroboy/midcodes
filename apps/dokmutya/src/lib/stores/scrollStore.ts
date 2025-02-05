@@ -16,7 +16,7 @@ if (typeof window !== 'undefined') {
     window.addEventListener('scroll', () => {
         scrollState.update(state => ({
             hasScrolled: window.scrollY > 10,
-            isHeroVisible: window.scrollY < window.innerHeight * 0.1
+            isHeroVisible: window.scrollY > 1
         }));
     });
 }

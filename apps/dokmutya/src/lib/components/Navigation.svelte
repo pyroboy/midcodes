@@ -57,7 +57,7 @@
 
 <nav class="fixed md:top-0 bottom-0 md:bottom-auto left-0 right-0 z-40  transition-transform duration-300
   {$scrollState.hasScrolled ? 'bg-white/90 backdrop-blur-sm shadow-sm' : 'hidden'} 
-  {$scrollState.isHeroVisible ? 'md:opacity-0 md:pointer-events-none' : 'opacity-100'}"
+  "
 >
   <div class="container mx-auto max-w-7xl">
     <!-- Desktop Navigation -->
@@ -77,7 +77,7 @@
     </div>
 
     <!-- Mobile Navigation -->
-    <div class="md:hidden transition-all duration-300 overflow-hidden border-t-2 border-gray-200 bg-white/90 backdrop-blur-sm" 
+    <div class="md:hidden transition-all duration-300 overflow-hidden border-t-4 border-gray-200 bg-white/90 backdrop-blur-sm" 
       class:opacity-100={$scrollState.isHeroVisible} 
       class:pointer-events-none={!$scrollState.isHeroVisible}>
       <div class="relative">
