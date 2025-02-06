@@ -27,54 +27,96 @@ export const load: PageServerLoad = async ({ locals }) => {
   console.log('📊 Initiating database queries');
   const startTime = performance.now();
 
-  const [rentalUnitsResult, propertiesResult, floorsResult] = await Promise.all([
-    locals.supabase
-      .from('rental_unit')
-      .select(`
-        *,
-        property:properties(id, name),
-        floor:floors(id, floor_number, wing)
-      `)
-      .order('property_id, floor_id, number'),
-    
-    locals.supabase
-      .from('properties')
-      .select('id, name')
-      .order('name'),
-    
-    locals.supabase
-      .from('floors')
-      .select('id, property_id, floor_number, wing')
-      .order('property_id, floor_number')
-  ]);
+  try {
+    const [rentalUnitsResult, propertiesResult, floorsResult] = await Promise.all([
+      locals.supabase
+        .from('rental_unit')
+        .select(`
+          id,
+          property_id,
+          floor_id,
+          name,
+          number,
+          rental_unit_status,
+          capacity,
+          base_rate,
+          type,
+          amenities,
+          created_at,
+          updated_at
+        `)
+        .order('property_id, floor_id, number'),
+      
+      locals.supabase
+        .from('properties')
+        .select('id, name')
+        .eq('status', 'ACTIVE')
+        .order('name'),
+      
+      locals.supabase
+        .from('floors')
+        .select(`
+          id,
+          property_id,
+          floor_number,
+          wing,
+          status
+        `)
+        .eq('status', 'ACTIVE')
+        .order('property_id, floor_number')
+    ]);
 
-  const queryTime = performance.now() - startTime;
-  console.log('🏢 Database queries completed:', {
-    rentalUnitsCount: rentalUnitsResult.data?.length || 0,
-    propertiesCount: propertiesResult.data?.length || 0,
-    floorsCount: floorsResult.data?.length || 0,
-    queryExecutionTime: `${queryTime.toFixed(2)}ms`
-  });
+    // Log any errors from the queries
+    if (rentalUnitsResult.error) {
+      console.error('Error loading rental units:', rentalUnitsResult.error);
+      throw error(500, 'Failed to load rental units');
+    }
 
-  if (rentalUnitsResult.error) {
-    console.error('Error loading rental units:', rentalUnitsResult.error);
-    throw error(500, 'Failed to load rental units');
+    if (propertiesResult.error) {
+      console.error('Error loading properties:', propertiesResult.error);
+      throw error(500, 'Failed to load properties');
+    }
+
+    if (floorsResult.error) {
+      console.error('Error loading floors:', floorsResult.error);
+      throw error(500, 'Failed to load floors');
+    }
+
+    // Create lookup maps for properties and floors
+    const propertiesMap = new Map(propertiesResult.data?.map(p => [p.id, p]) || []);
+    const floorsMap = new Map(floorsResult.data?.map(f => [f.id, f]) || []);
+
+    // Log the raw data
+    console.log('Raw rental units data:', rentalUnitsResult.data);
+    console.log('Raw properties data:', propertiesResult.data);
+    console.log('Raw floors data:', floorsResult.data);
+
+    const queryTime = performance.now() - startTime;
+    console.log('🏢 Database queries completed:', {
+      rentalUnitsCount: rentalUnitsResult.data?.length || 0,
+      propertiesCount: propertiesResult.data?.length || 0,
+      floorsCount: floorsResult.data?.length || 0,
+      queryTime: `${queryTime.toFixed(2)}ms`
+    });
+
+    const form = await superValidate(zod(rental_unitSchema));
+
+    return {
+      form,
+      rentalUnits: rentalUnitsResult.data?.map(unit => ({
+        ...unit,
+        base_rate: Number(unit.base_rate), // Convert numeric to number
+        amenities: unit.amenities || {}, // Ensure amenities is never null
+        property: propertiesMap.get(unit.property_id) || null,
+        floor: floorsMap.get(unit.floor_id) || null
+      })) || [],
+      properties: propertiesResult.data || [],
+      floors: floorsResult.data || []
+    };
+  } catch (err) {
+    console.error('Error in load function:', err);
+    throw error(500, 'Internal server error');
   }
-
-  const rentalUnits = (rentalUnitsResult.data as RentalUnitResponse[] || []).map(unit => ({
-    ...unit,
-    property: unit.property || { id: unit.property_id, name: 'Unknown Property' },
-    floor: unit.floor || { id: unit.floor_id, floor_number: 0, wing: null }
-  }));
-
-  const form = await superValidate(zod(rental_unitSchema));
-
-  return {
-    form,
-    rentalUnits,
-    properties: propertiesResult.data || [],
-    floors: floorsResult.data || []
-  };
 };
 
 export const actions: Actions = {
@@ -86,43 +128,30 @@ export const actions: Actions = {
       return fail(400, { form });
     }
 
-    // Check for duplicate rental unit number
-    const existingUnit = await supabase
+    // Check for duplicate rental unit number in the same property and floor
+    const { data: existingUnit } = await supabase
       .from('rental_unit')
       .select('id')
-      .eq('floor_id', form.data.floor_id)
+      .eq('property_id', form.data.property_id)
+      .eq('floor_id', form.data.floor_id || null)
       .eq('number', form.data.number)
-      .single();
+      .maybeSingle();
 
-    if (existingUnit.data) {
-      form.errors.number = ['A rental unit with this number already exists on this floor'];
-      form.errors.floor_id = [''];
+    if (existingUnit) {
+      form.errors.number = ['This unit number already exists on this floor'];
       return fail(400, { form });
     }
 
     const { error: insertError } = await supabase
       .from('rental_unit')
       .insert({
-        property_id: form.data.property_id,
-        floor_id: form.data.floor_id,
-        name: form.data.name,
-        number: form.data.number,
-        rental_unit_status: form.data.rental_unit_status,
-        capacity: form.data.capacity,
-        base_rate: form.data.base_rate,
-        type: form.data.type,
-        amenities: form.data.amenities
-      } satisfies Database['public']['Tables']['rental_unit']['Insert']);
+        ...form.data,
+        floor_id: form.data.floor_id || null
+      });
 
     if (insertError) {
-      console.error('Failed to create rental unit:', insertError);
-      // form.errors._errors = [insertError.message]; ;
-      if (insertError.message?.includes('Policy check failed')) {
-        form.errors._errors = ['You do not have permission to create rental units' ];
-        return fail(403, { form });
-      }
-      form.errors._errors = ['Failed to create rental unit' ];
-      return fail(500, { form});
+      console.error('Error creating rental unit:', insertError);
+      return fail(500, { form });
     }
 
     return { form };

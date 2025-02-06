@@ -17,7 +17,7 @@
       floor: { floor_number: number; wing?: string };
     }>;
     properties: Array<{ id: number; name: string }>;
-    floors: Array<{ id: number; property_id: number; floor_number: number; wing?: string }>;
+    floors: Array<{ id: number; property_id: number; floor_number: number; wing?: string; status: string }>;
   }
 
   interface Props {
@@ -43,8 +43,17 @@
   // START : PATTERN FOR DATABASE BASED SELECTION ITEMS - Property
   let derivedProperties = $derived(data.properties.map(p => ({ value: p.id.toString(), label: p.name })));
   let selectedProperty = {
-    get value() { return $form.property_id?.toString() || undefined },
-    set value(id) { $form.property_id = id ? Number(id) || 0 : 0 }
+    get value() { 
+      return $form.property_id ? $form.property_id.toString() : '';
+    },
+    set value(id: string) { 
+      $form.property_id = id ? Number(id) : 0;
+      // Reset floor_id when property changes
+      if (!id) {
+        $form.floor_id = undefined;
+        selectedFloor.value = '';
+      }
+    }
   };
   let triggerPropertyContent = $derived(
     selectedProperty.value 
@@ -53,25 +62,83 @@
   );
 
   // START : PATTERN FOR DATABASE BASED SELECTION ITEMS - Floor
-  let derivedFloors = $derived(data.floors.map(f => ({ 
-    value: f.id.toString(), 
-    label: `Floor ${f.floor_number}${f.wing ? ` (${f.wing})` : ''}`
-  })));
-  let selectedFloor = {
-    get value() { return $form.floor_id?.toString() || undefined },
-    set value(id) { $form.floor_id = id ? Number(id) || 0 : 0 }
-  };
-  let triggerFloorContent = $derived(
-    selectedFloor.value 
-      ? data.floors.find(f => f.id.toString() === selectedFloor.value)?.floor_number ?? "Select a floor"
-      : "Select a floor"
+  let derivedFloors = $derived(
+    selectedProperty.value 
+      ? data.floors
+          .filter(f => f.property_id === Number(selectedProperty.value) && f.status === 'ACTIVE')
+          .map(f => ({ 
+            value: f.id.toString(), 
+            label: `Floor ${f.floor_number}${f.wing ? ` (${f.wing})` : ''}`
+          }))
+      : []
   );
 
+  let selectedFloor = {
+    get value() { 
+      return $form.floor_id ? $form.floor_id.toString() : '';
+    },
+    set value(id: string) { 
+      $form.floor_id = id ? Number(id) : undefined;
+    }
+  };
+
+  let triggerFloorContent = $derived(
+    !selectedProperty.value 
+      ? "Select a property first"
+      : derivedFloors.length === 0
+        ? "No floors available"
+        : selectedFloor.value
+          ? `Floor ${data.floors.find(f => f.id.toString() === selectedFloor.value)?.floor_number}` +
+            `${data.floors.find(f => f.id.toString() === selectedFloor.value)?.wing ? 
+              ` (${data.floors.find(f => f.id.toString() === selectedFloor.value)?.wing})` : ''}`
+          : "Select a floor"
+  );
+
+  // Initialize form values
+  // $effect(() => {
+  //   if (!editMode) {
+  //     $form.property_id = 0;
+  //     $form.floor_id = undefined;
+  //     $form.type = '';
+  //     $form.rental_unit_status = 'VACANT';
+  //     $form.amenities = [];
+  //   }
+  // });
+
+
+  // // Reset floor selection when property changes
+  // $effect(() => {
+  //   if (selectedProperty.value) {
+  //     const currentFloor = data.floors.find(f => f.id === $form.floor_id);
+  //     if (currentFloor && currentFloor.property_id !== Number(selectedProperty.value)) {
+  //       selectedFloor.value = "";
+  //     }
+  //   } else {
+  //     selectedFloor.value = "";
+  //   }
+  // });
+
   // Enum-based select for type
-  let triggerType = $derived($form.type || "Select a type");
+  let typeValue = {
+    get value() { 
+      return $form.type as keyof typeof rentalUnitTypeEnum.Values || '';
+    },
+    set value(v: keyof typeof rentalUnitTypeEnum.Values | '') { 
+      $form.type = v || '';
+    }
+  };
+  let triggerType = $derived(typeValue.value || "Select a type");
 
   // Enum-based select for rental_unit_status
-  let triggerStatus = $derived($form.rental_unit_status || "Select a status");
+  let statusValue = {
+    get value() { 
+      return $form.rental_unit_status as keyof typeof locationStatusEnum.Values;
+    },
+    set value(v: keyof typeof locationStatusEnum.Values) { 
+      $form.rental_unit_status = v || 'VACANT';
+    }
+  };
+  let triggerStatus = $derived(statusValue.value || "Select a status");
 
   // Amenities handling
   // State management
@@ -136,6 +203,7 @@ function addAmenity() {
       type="single"
       name="floor_id"
       bind:value={selectedFloor.value}
+      disabled={!selectedProperty.value || derivedFloors.length === 0}
     >
       <Select.Trigger
         class="w-full"
@@ -199,7 +267,7 @@ function addAmenity() {
     <Select.Root
       type="single"
       name="type"
-      bind:value={$form.type}
+      bind:value={typeValue.value}
     >
       <Select.Trigger
         class="w-full"
@@ -265,7 +333,7 @@ function addAmenity() {
     <Select.Root
       type="single"
       name="rental_unit_status"
-      bind:value={$form.rental_unit_status}
+      bind:value={statusValue.value}
     >
       <Select.Trigger
         class="w-full"

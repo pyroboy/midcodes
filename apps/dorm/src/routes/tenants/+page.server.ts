@@ -37,79 +37,122 @@ export const load: PageServerLoad = async ({ locals }) => {
   console.log('📊 Initiating database queries');
   const startTime = performance.now();
 
-  const [tenantsResult, propertiesResult, rentalUnitsResult] = await Promise.all([
-    locals.supabase
-      .from('tenants')
-      .select(`
-        *,
-        lease:leases(
+  try {
+    const [tenantsResult, leasesResult, rentalUnitsResult, propertiesResult] = await Promise.all([
+      // Get tenants
+      locals.supabase
+        .from('tenants')
+        .select('*')
+        .order('name'),
+
+      // Get leases
+      locals.supabase
+        .from('leases')
+        .select('*')
+        .order('start_date'),
+
+      // Get rental units
+      locals.supabase
+        .from('rental_unit')
+        .select(`
           id,
-          rental_unit_id,
+          property_id,
           name,
-          start_date,
-          end_date,
-          rent_amount,
-          security_deposit,
-          balance,
-          notes,
-          terms_month,
-          status,
-          created_at,
-          location:rental_unit(
-            id,
-            number,
-            property:properties(
-              id,
-              name
-            )
-          )
-        )
-      `)
-      .order('name'),
-    
-    locals.supabase
-      .from('properties')
-      .select('id, name')
-      .order('name'),
-    
-    locals.supabase
-      .from('rental_unit')
-      .select('id, number, property_id')
-      .order('number')
-  ]);
+          number
+        `),
 
-  const queryTime = performance.now() - startTime;
-  console.log('🏢 Database queries completed:', {
-    tenantsCount: tenantsResult.data?.length || 0,
-    propertiesCount: propertiesResult.data?.length || 0,
-    rentalUnitsCount: rentalUnitsResult.data?.length || 0,
-    queryExecutionTime: `${queryTime.toFixed(2)}ms`
-  });
+      // Get properties
+      locals.supabase
+        .from('properties')
+        .select('id, name')
+        .eq('status', 'ACTIVE')
+    ]);
 
-  if (tenantsResult.error) {
-    console.error('Error loading tenants:', tenantsResult.error);
-    throw error(500, 'Failed to load tenants');
+    // Check for errors
+    if (tenantsResult.error) {
+      console.error('Error loading tenants:', tenantsResult.error);
+      throw error(500, 'Failed to load tenants');
+    }
+
+    if (leasesResult.error) {
+      console.error('Error loading leases:', leasesResult.error);
+      throw error(500, 'Failed to load leases');
+    }
+
+    if (rentalUnitsResult.error) {
+      console.error('Error loading rental units:', rentalUnitsResult.error);
+      throw error(500, 'Failed to load rental units');
+    }
+
+    if (propertiesResult.error) {
+      console.error('Error loading properties:', propertiesResult.error);
+      throw error(500, 'Failed to load properties');
+    }
+
+    // Create lookup maps
+    const leasesMap = new Map(leasesResult.data?.map(lease => [lease.id, lease]) || []);
+    const rentalUnitsMap = new Map(rentalUnitsResult.data?.map(unit => [unit.id, unit]) || []);
+    const propertiesMap = new Map(propertiesResult.data?.map(property => [property.id, property]) || []);
+
+    // Log the raw data
+    console.log('Raw tenants data:', tenantsResult.data);
+    console.log('Raw leases data:', leasesResult.data);
+    console.log('Raw rental units data:', rentalUnitsResult.data);
+    console.log('Raw properties data:', propertiesResult.data);
+
+    const queryTime = performance.now() - startTime;
+    console.log('👥 Database queries completed:', {
+      tenantsCount: tenantsResult.data?.length || 0,
+      leasesCount: leasesResult.data?.length || 0,
+      unitsCount: rentalUnitsResult.data?.length || 0,
+      propertiesCount: propertiesResult.data?.length || 0,
+      time: `${queryTime.toFixed(2)}ms`
+    });
+
+    const form = await superValidate(zod(tenantFormSchema));
+
+    // Map tenants with their relationships
+    const tenants = tenantsResult.data?.map(tenant => {
+      // Get the tenant's lease
+      const lease = leasesMap.get(tenant.lease_id);
+      
+      if (!lease) {
+        return {
+          ...tenant,
+          lease: null
+        };
+      }
+
+      // Get the rental unit for the lease
+      const rentalUnit = rentalUnitsMap.get(lease.rental_unit_id);
+      
+      // Get the property for the rental unit
+      const property = rentalUnit ? propertiesMap.get(rentalUnit.property_id) : null;
+
+      return {
+        ...tenant,
+        lease: {
+          ...lease,
+          location: rentalUnit ? {
+            id: rentalUnit.id,
+            number: rentalUnit.number,
+            property: property ? {
+              id: property.id,
+              name: property.name
+            } : null
+          } : null
+        }
+      };
+    }) || [];
+
+    return {
+      form,
+      tenants
+    };
+  } catch (err) {
+    console.error('Error in load function:', err);
+    throw error(500, 'Internal server error');
   }
-
-  const tenants = (tenantsResult.data || []).map(tenant => ({
-    ...tenant,
-    lease: Array.isArray(tenant.lease) ? tenant.lease[0] || null : tenant.lease,
-    status: Array.isArray(tenant.lease) 
-      ? tenant.lease[0]?.status || 'INACTIVE'
-      : tenant.lease?.status || 'INACTIVE',
-    outstanding_balance: Array.isArray(tenant.lease)
-      ? tenant.lease[0]?.balance || 0
-      : tenant.lease?.balance || 0
-  }));
-
-  const form = await superValidate(zod(tenantFormSchema));
-
-  return {
-    form,
-    tenants,
-    properties: propertiesResult.data || [],
-    rental_unit: rentalUnitsResult.data || []
-  };
 };
 
 

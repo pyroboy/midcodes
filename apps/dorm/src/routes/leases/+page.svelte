@@ -72,12 +72,11 @@
 
       if (result.ok) {
         leases = leases.filter(l => l.id !== lease.id);
+        // Reset form state properly
         editMode = false;
         selectedLease = undefined;
-        await Promise.all([
-          invalidate('app:leases'),
-          invalidate(url => url.pathname.includes('/leases'))
-        ]);
+        reset(); // Reset form before invalidating
+        await invalidate('app:leases');
       } else {
         console.error('Delete failed:', response);
         alert(response.message || 'Failed to delete lease');

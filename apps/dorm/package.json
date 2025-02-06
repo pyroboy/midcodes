@@ -82,7 +82,7 @@
 	},
 	"overrides": {
 		"ws": {
-		  "optional": false
+			"optional": false
 		}
-	  }
+	}
 }

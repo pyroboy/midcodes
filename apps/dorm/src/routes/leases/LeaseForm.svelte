@@ -56,25 +56,23 @@
       return $form.tenantIds?.map(id => id.toString()) || [] 
     },
     set value(ids: string[]) { 
-      $form.tenantIds = ids.map(id => parseInt(id, 10))
+      $form.tenantIds = ids?.map(id => parseInt(id, 10)) || []  // Handle empty array case
     }
   };
 
   // DATABASE BASED SELECTION - Single Select
-  let selectedRentalUnit = {
-    get value() { 
-      return $form.rental_unit_id?.toString() || undefined 
-    },
-    set value(id: string | undefined) { 
-      $form.rental_unit_id = id ? parseInt(id, 10) : 0 
-    }
-  };
-
+let selectedRentalUnit = {
+  get value() { 
+    return $form.rental_unit_id?.toString() || undefined;
+  },
+  set value(id: string | undefined) { 
+    $form.rental_unit_id = id ? parseInt(id, 10) : 0;
+  }
+};
   let triggerRentalUnit = $derived(
-    $form.rental_unit_id
-      ? data.rental_units?.find(r => r.id === $form.rental_unit_id)?.name ?? "Select a unit"
-      : "Select a unit"
-  );
+  $form.rental_unit_id?.toString() || "Select a unit"
+);
+
 
   let triggerStatus = $derived($form.status || "Select a status");
 
@@ -85,6 +83,30 @@
   function handleDelete() {
     dispatch('delete');
   }
+
+  // Add reactive stores for tracking changes
+  let startDate = $derived($form.start_date);
+  let termsMonths = $derived($form.terms_month);
+  let daysInMonth = $state(0);
+  let remainingDays = $state(0);
+  let proratedAmount = $state(0);
+  let storeProratedAmount = $state(0);
+
+  // Update end_date whenever either start_date or terms_month changes
+  $effect(() => {
+    if (startDate && termsMonths) {
+      try {
+        const start = new Date(startDate);
+        if (isNaN(start.getTime())) return;
+        
+        const end = new Date(start);
+        end.setMonth(end.getMonth() + Number(termsMonths));
+        $form.end_date = end.toISOString().split('T')[0];
+      } catch (error) {
+        console.error('Error calculating end date:', error);
+      }
+    }
+  });
 </script>
 
 <form
@@ -116,11 +138,13 @@
           : "Select tenants"}
       </Select.Trigger>
       <Select.Content>
-        {#each data.tenants as tenant}
-          <Select.Item value={tenant.id.toString()}>
-            {tenant.name}
-          </Select.Item>
-        {/each}
+        <div class="max-h-[200px] overflow-y-auto">
+          {#each data.tenants as tenant}
+            <Select.Item value={tenant.id.toString()}>
+              {tenant.name}
+            </Select.Item>
+          {/each}
+        </div>
       </Select.Content>
     </Select.Root>
     {#if $errors.tenantIds}
@@ -144,11 +168,13 @@
         {triggerRentalUnit}
       </Select.Trigger>
       <Select.Content>
-        {#each data.rental_units as unit}
-          <Select.Item value={unit.id.toString()}>
-            {unit.name} - {unit.property[0]?.name}
-          </Select.Item>
-        {/each}
+        <div class="max-h-[200px] overflow-y-auto">
+          {#each data.rental_units as unit}
+            <Select.Item value={unit.id.toString()}>
+              {unit.name} - {unit.property[0]?.name}
+            </Select.Item>
+          {/each}
+        </div>
       </Select.Content>
     </Select.Root>
     {#if $errors.rental_unit_id}
@@ -203,37 +229,35 @@
     </div>
 
     <div class="space-y-2">
-      <Label for="end_date">End Date</Label>
+      <Label for="terms_month">Terms (months)</Label>
       <Input
-        type="date"
-        id="end_date"
-        name="end_date"
-        bind:value={$form.end_date}
-        data-error={!!$errors.end_date}
-        {...$constraints.end_date}
+        type="number"
+        id="terms_month"
+        name="terms_month"
+        bind:value={$form.terms_month}
+        min="1"
+        max="60"
+        data-error={!!$errors.terms_month}
+        {...$constraints.terms_month}
       />
-      {#if $errors.end_date}
-        <p class="text-sm font-medium text-destructive">{$errors.end_date}</p>
+      {#if $errors.terms_month}
+        <p class="text-sm font-medium text-destructive">{$errors.terms_month}</p>
       {/if}
     </div>
   </div>
 
-  <!-- Terms -->
+  <!-- Add a read-only display of the calculated end date -->
   <div class="space-y-2">
-    <Label for="terms_month">Terms (months)</Label>
+    <Label for="end_date">End Date</Label>
     <Input
-      type="number"
-      id="terms_month"
-      name="terms_month"
-      bind:value={$form.terms_month}
-      min="1"
-      max="60"
-      data-error={!!$errors.terms_month}
-      {...$constraints.terms_month}
+      type="date"
+      id="end_date"
+      name="end_date"
+      value={$form.end_date}
+      readonly
+      disabled
+      class="bg-gray-50"
     />
-    {#if $errors.terms_month}
-      <p class="text-sm font-medium text-destructive">{$errors.terms_month}</p>
-    {/if}
   </div>
 
   <!-- Financial Details -->
@@ -270,6 +294,103 @@
       {#if $errors.security_deposit}
         <p class="text-sm font-medium text-destructive">{$errors.security_deposit}</p>
       {/if}
+    </div>
+  </div>
+
+  <!-- Replace the Prorate Button section -->
+  <div class="space-y-2">
+    <div class="flex justify-between items-center">
+      <div class="text-sm text-gray-600">
+        {#if daysInMonth && remainingDays && proratedAmount}
+          <p>Days in month: {daysInMonth}</p>
+          <p>Remaining days: {remainingDays}</p>
+          <p class="font-medium text-blue-600">Prorated amount: ₱{proratedAmount.toFixed(2)}</p>
+        {/if}
+      </div>
+      <div class="flex gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onclick={() => {
+            // Validate required fields
+            let hasErrors = false;
+            
+            if (!$form.start_date) {
+              $errors.start_date = ['Start date is required for proration'];
+              hasErrors = true;
+            }
+            
+            if (!$form.terms_month) {
+              $errors.terms_month = ['Terms (months) is required for proration'];
+              hasErrors = true;
+            }
+            
+            if (!$form.rent_amount) {
+              $errors.rent_amount = ['Monthly rent is required for proration'];
+              hasErrors = true;
+            }
+
+            if (hasErrors) return;
+
+            // Proceed with proration if no errors
+            const startDate = new Date($form.start_date);
+            daysInMonth = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0).getDate();
+            remainingDays = daysInMonth - startDate.getDate() + 1;
+            proratedAmount = ($form.rent_amount / daysInMonth) * remainingDays;
+            storeProratedAmount = proratedAmount;
+            $form.prorated_amount = proratedAmount;
+          }}
+        >
+          Prorate Rent
+        </Button>
+        <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onclick={() => {
+          daysInMonth = 0;
+          remainingDays = 0;
+          proratedAmount = 0;
+          storeProratedAmount = 0;
+          $form.prorated_amount = null;
+        }}
+      >
+        Cancel Prorate
+      </Button>
+      </div>
+    </div>
+    
+    <!-- Add Rounding Buttons -->
+    <div class="flex justify-end gap-2">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onclick={() => {
+          if (proratedAmount) {
+            const rounded = Math.ceil(storeProratedAmount / 100) * 100;
+            proratedAmount = rounded;
+            $form.prorated_amount = rounded;
+          }
+        }}
+      >
+        Round to 100s
+      </Button>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onclick={() => {
+          if (proratedAmount) {
+            const rounded = Math.ceil(storeProratedAmount / 500) * 500;
+            proratedAmount = rounded;
+            $form.prorated_amount = rounded;
+          }
+        }}
+      >
+        Round to 500s
+      </Button>
     </div>
   </div>
 

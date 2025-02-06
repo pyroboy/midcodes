@@ -2,10 +2,26 @@
   import type { LayoutProps } from './$types';
   import '../app.css';
   import { onMount } from 'svelte';
+  import { goto, preloadData } from '$app/navigation';
+  import { page } from '$app/stores';
   
   let { data, children }: LayoutProps = $props();
   let isLocationsOpen = $state(false);
   let isRentManagementOpen = $state(false);
+
+  const navigationLinks = {
+    locations: [
+      { href: '/properties', label: 'Properties' },
+      { href: '/rental-unit', label: 'Rental Units' },
+      { href: '/floors', label: 'Floors' }
+    ],
+    rentManagement: [
+      { href: '/tenants', label: 'Tenants' },
+      { href: '/leases', label: 'Leases' },
+      { href: '/overview', label: 'Overview/Monthly' },
+      { href: '/accounts', label: 'Accounts' }
+    ]
+  };
   
   function toggleLocations() {
     isLocationsOpen = !isLocationsOpen;
@@ -30,11 +46,28 @@
   }
   
   onMount(() => {
+    const allLinks = [
+      ...navigationLinks.locations,
+      ...navigationLinks.rentManagement,
+      { href: '/auth', label: 'Auth' },
+      { href: '/auth/signout', label: 'Sign out' }
+    ];
+
+    // Preload all routes in parallel
+    Promise.all(
+      allLinks.map(link => preloadData(link.href))
+    );
+
     document.addEventListener('click', handleClickOutside);
     return () => {
       document.removeEventListener('click', handleClickOutside);
     };
   });
+
+  // Helper function to check if link is active
+  const isActive = (href: string) => {
+    return $page.url.pathname === href || $page.url.pathname.startsWith(href + '/');
+  };
 </script>
 
 <div class="min-h-screen bg-gray-50">
@@ -76,24 +109,14 @@
                 class="absolute left-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10"
               >
                 <div class="py-1">
-                  <a
-                    href="/properties"
-                    class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    Properties
-                  </a>
-                  <a
-                    href="/rental-unit"
-                    class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    Rental Units
-                  </a>
-                  <a
-                    href="/floors"
-                    class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    Floors
-                  </a>
+                  {#each navigationLinks.locations as link}
+                    <a
+                      href={link.href}
+                      class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 {isActive(link.href) ? 'bg-gray-100 text-blue-600 font-medium' : ''}"
+                    >
+                      {link.label}
+                    </a>
+                  {/each}
                 </div>
               </div>
             {/if}
@@ -127,30 +150,14 @@
                 class="absolute left-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10"
               >
                 <div class="py-1">
-                  <a
-                  href="/tenants"
-                  class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                >
-                  Tenants
-                </a>
-                  <a
-                    href="/leases"
-                    class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    Leases
-                  </a>
-                  <a
-                    href="/overview"
-                    class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    Overview/Monthly
-                  </a>
-                  <a
-                    href="/accounts"
-                    class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    Accounts
-                  </a>
+                  {#each navigationLinks.rentManagement as link}
+                    <a
+                      href={link.href}
+                      class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 {isActive(link.href) ? 'bg-gray-100 text-blue-600 font-medium' : ''}"
+                    >
+                      {link.label}
+                    </a>
+                  {/each}
                 </div>
               </div>
             {/if}

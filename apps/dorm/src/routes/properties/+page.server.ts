@@ -82,39 +82,51 @@ export const actions = {
         return fail(400, { form });
     }
 
+    try {
+        // First check if property exist
 
-    const { error: deleteError } = await supabase
-        .from('properties')
-        .delete()
-        .eq('id', form.data.id);
+        // Attempt to delete the property directly
+        const { error: deleteError } = await supabase
+            .from('properties')
+            .delete()
+            .eq('id', form.data.id);
 
-    if (deleteError) {
-        console.error('Error deleting property:', deleteError);
-        
-        // Handle specific error cases
-        if (deleteError.message?.includes('Policy check failed')) {
-            return fail(403, {
-                form,
-                error: 'You do not have permission to delete this property'
+        if (deleteError) {
+            console.error('Delete error details:', {
+                message: deleteError.message,
+                code: deleteError.code,
+                details: deleteError.details,
+                hint: deleteError.hint
             });
+            throw deleteError;
         }
 
-        if (deleteError.code === '23503') { // Foreign key violation
-            return fail(400, {
-                form,
-                error: 'Cannot delete property because it is referenced by other records'
-            });
-        }
-
-        return fail(500, {
+        return { 
             form,
-            error: 'Failed to delete property'
-        });
-    }
+            success: true 
+        };
 
-    return { 
-        form,
-        success: true 
-    };
-}
-}
+    } catch (error: any) {
+        console.error('Delete error full details:', error);
+        
+        // Handle specific PostgreSQL error codes
+        switch (error?.code) {
+            case '23503':  // foreign key violation
+                return fail(400, {
+                    form,
+                    error: 'Cannot delete property because it has units or leases attached to it'
+                });
+            case '42501':  // permission denied
+                return fail(403, {
+                    form,
+                    error: 'You do not have permission to delete this property'
+                });
+            default:
+                return fail(500, {
+                    form,
+                    error: error.message || 'Failed to delete property'
+                });
+        }
+    }
+  }
+};

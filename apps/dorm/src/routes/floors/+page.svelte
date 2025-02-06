@@ -6,21 +6,36 @@
   import { zodClient } from 'sveltekit-superforms/adapters';
   import { floorSchema } from './formSchema';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
-  import type { Floor, FloorWithProperty } from './formSchema';
+  import type { FloorWithProperty } from './formSchema';
   import { invalidate } from '$app/navigation';
   import { onMount } from 'svelte';
-  import { browser } from "$app/environment";
-  import type {PageData} from './$types';
-  import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
+  import type { PageData } from './$types';
 
+  interface Props {
+    data: PageData;
+  }
 
-  interface Props {data: PageData;}
+  interface PropertyData {
+    id: number;
+    name: string;
+  }
+
+  interface FloorData {
+    id: number;
+    property_id: number;
+    floor_number: number;
+    wing: string | null;
+    status: 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE';
+    created_at: string;
+    updated_at: string | null;
+    property: PropertyData | null;
+  }
+
   let { data }: Props = $props();
-  let floors = $state(data.floors);
-  $effect(() => { floors = data.floors;});
+  
   let editMode = $state(false);
 
-  const { form: formData, enhance, errors, constraints ,reset} = superForm(data.form, {
+  const { form: formData, enhance, errors, constraints, reset } = superForm(data.form, {
     id: 'floor-form',
     validators: zodClient(floorSchema),
     validationMethod: 'oninput',
@@ -37,28 +52,25 @@
       }
     },
     onResult: async ({ result }) => {
-    if (result.type === 'success') {
-      editMode = false;
-      await invalidate('app:floors');
+      if (result.type === 'success') {
+        editMode = false;
+        await invalidate('app:floors');
+      }
     }
-  }
   });
 
-
   function handleFloorClick(floor: FloorWithProperty) {
-  editMode = true;
-  $formData = {
-    id: floor.id,
-    property_id: floor.property_id,
-    floor_number: floor.floor_number,
-    wing: floor.wing ?? '',
-    status: floor.status || 'ACTIVE'
-  };
-}
+    editMode = true;
+    $formData = {
+      id: floor.id,
+      property_id: floor.property_id,
+      floor_number: floor.floor_number,
+      wing: floor.wing ?? '',
+      status: floor.status || 'ACTIVE'
+    };
+  }
 
-
-
-  function getStatusVariant(status: Floor['status']): "default" | "destructive" | "outline" | "secondary" {
+  function getStatusVariant(status: FloorWithProperty['status']): "default" | "destructive" | "outline" | "secondary" {
     switch (status) {
       case 'ACTIVE':
         return 'secondary';
@@ -72,48 +84,40 @@
   }
 
   async function handleDeleteFloor(floor: FloorWithProperty) {
-
-  if (!confirm(`Are you sure you want to delete floor ${floor.floor_number}?`)) {
-    return;
-  }
-
-  const formData = new FormData();
-  formData.append('id', String(floor.id));  // Convert to string
-  
-  try {
-    const result = await fetch('?/delete', {
-      method: 'POST',
-      body: formData
-    });
-    
-    const response = await result.json();
-    
-    if (result.ok) {
-      // Remove deleted floor from the list
-      floors = floors.filter(f => f.id !== floor.id);
-      // Reset form state
-      editMode = false;
-      
-      // Invalidate and refresh the data
-      await Promise.all([
-        invalidate('app:floors'),
-        invalidate((url) => url.pathname.includes('/floors'))
-      ]);
-      
-      // alert('Floor deleted successfully');
-    } else {
-      console.error('Delete failed:', {
-        status: result.status,
-        response,
-        error: response.message
-      });
-      alert(`Failed to delete floor: ${response.message || 'Unknown error'}`);
+    if (!confirm(`Are you sure you want to delete floor ${floor.floor_number}?`)) {
+      return;
     }
-  } catch (error) {
-    console.error('Error deleting floor:', error);
-    alert(`Error deleting floor: ${error instanceof Error ? error.message : 'Unknown error'}`);
+
+    const formData = new FormData();
+    formData.append('id', String(floor.id));
+    
+    try {
+      const result = await fetch('?/delete', {
+        method: 'POST',
+        body: formData
+      });
+      
+      const response = await result.json();
+      
+      if (result.ok) {
+        editMode = false;
+        await Promise.all([
+          invalidate('app:floors'),
+          invalidate((url) => url.pathname.includes('/floors'))
+        ]);
+      } else {
+        console.error('Delete failed:', {
+          status: result.status,
+          response,
+          error: response.message
+        });
+        alert(`Failed to delete floor: ${response.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error deleting floor:', error);
+      alert(`Error deleting floor: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
-}
 
   onMount(() => {
     invalidate('app:floors');
@@ -124,7 +128,6 @@
   <div class="w-full lg:w-2/3">
     <div class="flex justify-between items-center mb-4">
       <h1 class="text-2xl font-bold">Floors</h1>
-
     </div>
 
     <Card>
@@ -138,8 +141,8 @@
           <div class="flex items-center">Actions</div>
         </div>
 
-        {#if floors?.length > 0}
-          {#each floors as floor (floor.id)}
+        {#if data.floors?.length > 0}
+          {#each data.floors as floor (floor.id)}
             <div class="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_2fr] gap-4 p-4 text-left hover:bg-muted/50 w-full border-b last:border-b-0">
               <div class="font-medium">{floor.property?.name || 'Unknown Property'}</div>
               <div>Floor {floor.floor_number}</div>
@@ -150,7 +153,7 @@
                 </Badge>
               </div>
               <div class="flex items-center justify-center">
-                {(floor.rental_unit && Array.isArray(floor.rental_unit) ? floor.rental_unit.length : 0) || 0}
+                {floor.rental_unit_count || 0}
               </div>
               <div class="flex items-center gap-2">
                 <Button
@@ -202,16 +205,8 @@
           {errors}
           {enhance}
           {constraints}
-          on:cancel={()=>{editMode = false;reset();}}
-          on:floorSaved={async () => { editMode = false; await invalidate('app:floors'); }}
         />
       </CardContent>
     </Card>
   </div>
-
-
 </div>
-
-{#if browser}
-<SuperDebug data={$formData} />
-{/if}

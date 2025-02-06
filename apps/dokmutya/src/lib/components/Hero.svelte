@@ -121,7 +121,7 @@
 			  class="transition-all duration-300 font-bold mb-3 md:mb-6 -mt-2 sm:-mt-3 md:-mt-4 w-full"
 			  style="--base-size: {containerWidth && containerHeight ? 
 				`${Math.min(containerWidth * 0.2, containerHeight * 0.2)}px` : '9.5rem'}; 
-				font-size: clamp(5.5rem, var(--base-size), 17.2rem);
+				font-size: clamp(5.5rem, var(--base-size), 16.2rem);
 				line-height: 0.6"
 			>
 			  MUTYA
@@ -131,7 +131,7 @@
 			  class="transition-all duration-300 font-bold mb-3 md:mb-6 w-full -mt-2 sm:-mt-3 md:-mt-4"
 			  style="--base-size: {containerWidth && containerHeight ? 
 				`${Math.min(containerWidth * 0.2, containerHeight * 0.2)}px` : '10.5rem'}; 
-				font-size: clamp(7.5rem, var(--base-size), 20.2rem);
+				font-size: clamp(7.5rem, var(--base-size), 22.2rem);
 				line-height: 1"
 			>
 			  TIROL

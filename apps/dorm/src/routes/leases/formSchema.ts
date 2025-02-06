@@ -31,6 +31,7 @@ export const leaseSchema = z.object({
   terms_month: z.coerce.number().int().min(1).max(60),
   security_deposit: z.coerce.number().min(0),
   rent_amount: z.coerce.number().min(0),
+  prorated_amount: z.number().nullable().optional(),
   notes: z.string().max(1000).optional().nullable(),
   balance: z.coerce.number().optional()
 });

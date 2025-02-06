@@ -22,13 +22,23 @@
 
   let { data, editMode = false, form, errors, enhance, constraints }: Props = $props();
 
+
+
   const dispatch = createEventDispatcher();
 
      // START : PATTERN FOR DATABASE BASED SELECTION ITEMS
-  let derivedProperties = $derived( data.properties.map(p => ({ value: p.id.toString(), label: p.name })) );
+  let derivedProperties = $derived(data.properties.map(p => ({ value: p.id.toString(), label: p.name })));
   let selectedProperty = {
-    get value() { return $form.property_id?.toString() || undefined },
-    set value(id) { $form.property_id = id ? Number(id) || 0 : 0 }
+    get value() { 
+      return $form.property_id ? $form.property_id.toString() : '';
+    },
+    set value(id: string) { 
+      $form.property_id = id ? Number(id) : 0;
+      // Reset validation errors when property changes
+      if ($errors.property_id) {
+        $errors.property_id = undefined;
+      }
+    }
   };
   let triggerContent = $derived(
     selectedProperty.value 
@@ -39,8 +49,36 @@
 
 
   // START: PATTERN FOR ENUM BASED SELECTION ITEMS
-  let triggerStatus = $derived($form.status || "Select a Status");
+  let derivedStatuses = $derived(
+    Object.values(floorStatusEnum.Values).map(status => ({
+      value: status,
+      label: status.replace('_', ' ')
+    }))
+  );
+  let selectedStatus = {
+    get value() { 
+      return $form.status as keyof typeof floorStatusEnum.Values;
+    },
+    set value(status: keyof typeof floorStatusEnum.Values) { 
+      $form.status = status || 'ACTIVE';
+    }
+  };
+  let triggerStatus = $derived(
+    selectedStatus.value
+      ? selectedStatus.value.replace('_', ' ')
+      : "Select a Status"
+  );
   // END: PATTERN FOR ENUM BASED SELECTION ITEMS
+
+  // For debugging
+  $effect(() => {
+    console.log('Form State:', {
+      property_id: $form.property_id,
+      floor_number: $form.floor_number,
+      wing: $form.wing,
+      status: $form.status
+    });
+  });
 </script>
 
 <form method="POST" action={editMode ? "?/update" : "?/create"} use:enhance class="space-y-4" novalidate >
@@ -116,7 +154,7 @@
     <Select.Root    
       type="single"
       name="status"
-      bind:value={$form.status}
+      bind:value={selectedStatus.value}
     >
       <Select.Trigger 
         class="w-full"
@@ -126,9 +164,9 @@
         {triggerStatus}
       </Select.Trigger>
       <Select.Content>
-        {#each floorStatusEnum.options as status}
-          <Select.Item value={status}>
-            {status}
+        {#each derivedStatuses as status}
+          <Select.Item value={status.value}>
+            {status.label}
           </Select.Item>
         {/each}
       </Select.Content>

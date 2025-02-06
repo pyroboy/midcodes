@@ -32,7 +32,7 @@ const baseRental_UnitSchema = z.object({
   floor_id: z.number({
     required_error: 'Floor selection is required',
     invalid_type_error: 'Floor must be selected'
-  }),
+  }).min(1, 'Please select a floor').optional(),
   name: z.string().min(1, 'Rental_unit name is required').max(100, 'Rental_unit name is too long'),
   number: z.coerce.number({
     required_error: 'Rental_unit number is required',
