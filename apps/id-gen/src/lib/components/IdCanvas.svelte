@@ -756,5 +756,5 @@
 
 <canvas 
     bind:this={displayCanvas} 
-    class="block w-full h-auto border border-slate-200 rounded-md shadow-sm [image-rendering:-webkit-optimize-contrast] [image-rendering:crisp-edges]"
+    class="block w-full h-auto border border-slate-200 rounded-md shadow-sm [image-rendering:crisp-edges]"
 ></canvas>

@@ -128,6 +128,7 @@ export const actions: Actions = {
       return fail(400, { form });
     }
 
+    console.log('Form data:', form.data);
     // Check for duplicate rental unit number in the same property and floor
     const { data: existingUnit } = await supabase
       .from('rental_unit')
@@ -145,8 +146,15 @@ export const actions: Actions = {
     const { error: insertError } = await supabase
       .from('rental_unit')
       .insert({
-        ...form.data,
-        floor_id: form.data.floor_id || null
+       property_id: form.data.property_id,
+        floor_id: form.data.floor_id || null,
+        name: form.data.name,
+        number: form.data.number,
+        rental_unit_status: form.data.rental_unit_status,
+        capacity: form.data.capacity,
+        base_rate: form.data.base_rate,
+        type: form.data.type,
+        amenities: form.data.amenities
       });
 
     if (insertError) {

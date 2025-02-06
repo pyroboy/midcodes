@@ -21,9 +21,9 @@
   let editMode = $state(false);
   let selectedLease: FormType | undefined = $state();
 
-  $effect(() => {
-    leases = structuredClone(data.leases);
-  });
+  // $effect(() => {
+  //   leases = structuredClone(data.leases);
+  // });
 
   const { form, enhance, errors, constraints, submitting, reset } = superForm(data.form, {
     id: 'lease-form',

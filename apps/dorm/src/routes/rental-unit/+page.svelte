@@ -143,14 +143,14 @@
           <div class="flex items-center">Actions</div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="divide-y">
           {#if !data.rentalUnits?.length}
-            <div class="col-span-full text-center py-8">
+            <div class="text-center py-8">
               <p class="text-gray-500">No rental units found</p>
             </div>
           {:else}
             {#each data.rentalUnits as unit (unit.id)}
-              <div class="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_2fr] gap-4 p-4 text-left hover:bg-muted/50 w-full border-b last:border-b-0">
+              <div class="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_2fr] gap-4 p-4 text-left hover:bg-muted/50">
                 <div>
                   <div class="font-medium">{unit.name}</div>
                   <div class="text-sm text-muted-foreground">{unit.property?.name || 'Unknown Property'}</div>

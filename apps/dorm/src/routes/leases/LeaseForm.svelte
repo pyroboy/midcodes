@@ -12,21 +12,7 @@
   import Textarea from '$lib/components/ui/textarea/textarea.svelte';
 
 
-  interface Tenant {
-    id: number;
-    name: string;
-  }
 
-  interface Property {
-    id: number;
-    name: string;
-  }
-
-  interface RentalUnit {
-    id: number;
-    name: string;
-    property: Property[];
-  }
 
   interface Props {
     data: PageData;
@@ -56,33 +42,39 @@
       return $form.tenantIds?.map(id => id.toString()) || [] 
     },
     set value(ids: string[]) { 
-      $form.tenantIds = ids?.map(id => parseInt(id, 10)) || []  // Handle empty array case
+      console.log('Setting tenant ids to:', ids);
+      // Use a new array to ensure reactivity
+      $form.tenantIds = ids?.length ? ids.map(id => parseInt(id, 10)) : [];
+      // Force validation update
+      $form.tenantIds = $form.tenantIds;
     }
   };
 
   // DATABASE BASED SELECTION - Single Select
-let selectedRentalUnit = {
-  get value() { 
-    return $form.rental_unit_id?.toString() || undefined;
-  },
-  set value(id: string | undefined) { 
-    $form.rental_unit_id = id ? parseInt(id, 10) : 0;
-  }
-};
-  let triggerRentalUnit = $derived(
-  $form.rental_unit_id?.toString() || "Select a unit"
-);
+  let selectedRentalUnit = {
+    get value() { 
+       return $form.rental_unit_id?.toString() ;
+    },
+    set value(id: string ) { 
+       $form.rental_unit_id = id ? parseInt(id) : 0;
+    }
+  };
 
+  let triggerRentalUnit = $derived.by(() => {
+    
+  const unit = data.rental_units?.find(r => r.id === $form.rental_unit_id);
+  if (!unit)
+   return "Select a unit";
+  const unitName: string = unit.name ?? "Unnamed Unit";
+  const propertyName: string = unit.property?.[0]?.name ?? "No property";
+  
+  return `${unitName} - ${propertyName}`;
+});
 
-  let triggerStatus = $derived($form.status || "Select a status");
+  // Form data for selections
+  let formData = $state<Record<string, string>>({});
 
-  function handleCancel() {
-    dispatch('cancel');
-  }
-
-  function handleDelete() {
-    dispatch('delete');
-  }
+  console.log('Initial formData:', formData);
 
   // Add reactive stores for tracking changes
   let startDate = $derived($form.start_date);
@@ -107,6 +99,14 @@ let selectedRentalUnit = {
       }
     }
   });
+
+  function handleCancel() {
+    dispatch('cancel');
+  }
+
+  function handleDelete() {
+    dispatch('delete');
+  }
 </script>
 
 <form
@@ -130,7 +130,7 @@ let selectedRentalUnit = {
     >
       <Select.Trigger 
         class="w-full" 
-        data-error={!!$errors.tenantIds}
+        data-error={!!$errors.tenantIds  && selectedTenants.value.length === 0}
         {...$constraints.tenantIds}
       >
         {$form.tenantIds?.length 
@@ -147,17 +147,23 @@ let selectedRentalUnit = {
         </div>
       </Select.Content>
     </Select.Root>
-    {#if $errors.tenantIds}
-      <p class="text-sm font-medium text-destructive">{$errors.tenantIds}</p>
+    {#if $errors.tenantIds && selectedTenants.value.length === 0}
+      <p class="text-sm font-medium text-destructive">
+        {Array.isArray($errors.tenantIds) 
+          ? $errors.tenantIds[0] 
+          : typeof $errors.tenantIds === 'string' 
+            ? $errors.tenantIds 
+            : 'At least one tenant must be selected'}
+      </p>
     {/if}
   </div>
 
   <!-- DATABASE BASED SELECTION - Single Select -->
   <div class="space-y-2">
-    <Label for="rental_unit_id">Rental Unit</Label>
+    <Label for="rental_unit_idaa">Rental Unit</Label>
     <Select.Root
       type="single"
-      name="rental_unit_id"
+      name="rental_unit_idaa"
       bind:value={selectedRentalUnit.value}
     >
       <Select.Trigger 
@@ -170,15 +176,21 @@ let selectedRentalUnit = {
       <Select.Content>
         <div class="max-h-[200px] overflow-y-auto">
           {#each data.rental_units as unit}
-            <Select.Item value={unit.id.toString()}>
-              {unit.name} - {unit.property[0]?.name}
+            <Select.Item value={unit.id.toString()} label={unit.name}>
+              {unit.name} - {unit.property[0]?.name || 'No property'}
             </Select.Item>
           {/each}
         </div>
       </Select.Content>
     </Select.Root>
     {#if $errors.rental_unit_id}
-      <p class="text-sm font-medium text-destructive">{$errors.rental_unit_id}</p>
+      <p class="text-sm font-medium text-destructive">
+        {Array.isArray($errors.rental_unit_id) 
+          ? $errors.rental_unit_id[0] 
+          : typeof $errors.rental_unit_id === 'string' 
+            ? $errors.rental_unit_id 
+            : 'A rental unit must be selected'}
+      </p>
     {/if}
   </div>
 
@@ -195,7 +207,7 @@ let selectedRentalUnit = {
         data-error={!!$errors.status}
         {...$constraints.status}
       >
-        {triggerStatus}
+        {$form.status || "Select a status"}
       </Select.Trigger>
       <Select.Content>
         {#each leaseStatusEnum.options as status}

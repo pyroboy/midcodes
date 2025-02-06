@@ -228,7 +228,7 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
     // Map rental units with floor information
     const rentalUnitsWithFloors = rentalUnits?.map(unit => ({
       id: unit.id,
-      name: unit.number || `Unit ${unit.id}`, // Use number as the name since that's what we display
+      name: unit.name,
       property: unit.property ? [{
         id: unit.property.id,
         name: unit.property.name
