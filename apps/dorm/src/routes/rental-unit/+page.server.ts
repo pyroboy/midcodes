@@ -32,18 +32,9 @@ export const load: PageServerLoad = async ({ locals }) => {
       locals.supabase
         .from('rental_unit')
         .select(`
-          id,
-          property_id,
-          floor_id,
-          name,
-          number,
-          rental_unit_status,
-          capacity,
-          base_rate,
-          type,
-          amenities,
-          created_at,
-          updated_at
+          *,
+          property:properties!rental_unit_property_id_fkey(id, name),
+          floor:floors!rental_unit_floor_id_fkey(id, floor_number, wing)
         `)
         .order('property_id, floor_id, number'),
       
@@ -55,67 +46,49 @@ export const load: PageServerLoad = async ({ locals }) => {
       
       locals.supabase
         .from('floors')
-        .select(`
-          id,
-          property_id,
-          floor_number,
-          wing,
-          status
-        `)
+        .select('id, property_id, floor_number, wing, status')
         .eq('status', 'ACTIVE')
         .order('property_id, floor_number')
     ]);
 
-    // Log any errors from the queries
     if (rentalUnitsResult.error) {
-      console.error('Error loading rental units:', rentalUnitsResult.error);
+      console.error('Rental Units Query Error:', rentalUnitsResult.error);
       throw error(500, 'Failed to load rental units');
     }
 
-    if (propertiesResult.error) {
-      console.error('Error loading properties:', propertiesResult.error);
-      throw error(500, 'Failed to load properties');
-    }
-
-    if (floorsResult.error) {
-      console.error('Error loading floors:', floorsResult.error);
-      throw error(500, 'Failed to load floors');
-    }
-
-    // Create lookup maps for properties and floors
-    const propertiesMap = new Map(propertiesResult.data?.map(p => [p.id, p]) || []);
-    const floorsMap = new Map(floorsResult.data?.map(f => [f.id, f]) || []);
-
-    // Log the raw data
-    console.log('Raw rental units data:', rentalUnitsResult.data);
-    console.log('Raw properties data:', propertiesResult.data);
-    console.log('Raw floors data:', floorsResult.data);
-
     const queryTime = performance.now() - startTime;
-    console.log('🏢 Database queries completed:', {
-      rentalUnitsCount: rentalUnitsResult.data?.length || 0,
-      propertiesCount: propertiesResult.data?.length || 0,
-      floorsCount: floorsResult.data?.length || 0,
-      queryTime: `${queryTime.toFixed(2)}ms`
+    console.log('🏢 Rental Units Query Result:', {
+      units: rentalUnitsResult.data,
+      error: rentalUnitsResult.error,
+      count: rentalUnitsResult.data?.length || 0,
+      time: `${queryTime.toFixed(2)}ms`
     });
+
+    // Map the relationships manually
+    const rentalUnits = (rentalUnitsResult.data || []).map(unit => ({
+      ...unit,
+      property: unit.property || null,
+      floor: unit.floor || null
+    }));
 
     const form = await superValidate(zod(rental_unitSchema));
 
     return {
       form,
-      rentalUnits: rentalUnitsResult.data?.map(unit => ({
-        ...unit,
-        base_rate: Number(unit.base_rate), // Convert numeric to number
-        amenities: unit.amenities || {}, // Ensure amenities is never null
-        property: propertiesMap.get(unit.property_id) || null,
-        floor: floorsMap.get(unit.floor_id) || null
-      })) || [],
+      rentalUnits,
       properties: propertiesResult.data || [],
       floors: floorsResult.data || []
     };
-  } catch (err) {
-    console.error('Error in load function:', err);
-    throw error(500, 'Internal server error');
+  } catch (error) {
+    console.error('Error in database queries:', error);
+    // Return empty data instead of throwing an error
+    const form = await superValidate(zod(rental_unitSchema));
+    return {
+      form,
+      rentalUnits: [],
+      properties: [],
+      floors: []
+    };
   }
 };
 
@@ -128,7 +101,6 @@ export const actions: Actions = {
       return fail(400, { form });
     }
 
-    console.log('Form data:', form.data);
     // Check for duplicate rental unit number in the same property and floor
     const { data: existingUnit } = await supabase
       .from('rental_unit')
@@ -146,15 +118,8 @@ export const actions: Actions = {
     const { error: insertError } = await supabase
       .from('rental_unit')
       .insert({
-       property_id: form.data.property_id,
-        floor_id: form.data.floor_id || null,
-        name: form.data.name,
-        number: form.data.number,
-        rental_unit_status: form.data.rental_unit_status,
-        capacity: form.data.capacity,
-        base_rate: form.data.base_rate,
-        type: form.data.type,
-        amenities: form.data.amenities
+        ...form.data,
+        floor_id: form.data.floor_id || null
       });
 
     if (insertError) {

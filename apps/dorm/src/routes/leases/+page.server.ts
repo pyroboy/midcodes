@@ -3,72 +3,11 @@ import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { leaseSchema, deleteLeaseSchema } from './formSchema';
 import type { Actions, PageServerLoad } from './$types';
-import type { Database } from '$lib/database.types';
 import type { PostgrestError } from '@supabase/postgrest-js';
 import { createPaymentSchedules } from './utils';
-import type { PaymentSchedule as DBPaymentSchedule } from '$lib/types/database';
+import { mapLeaseData, getLeaseData } from '$lib/utils/lease';
+import type { LeaseResponse } from '$lib/types/lease';
 
-type DBLease = Database['public']['Tables']['leases']['Row'];
-type DBTenant = Database['public']['Tables']['tenants']['Row'];
-type DBRentalUnit = Database['public']['Tables']['rental_unit']['Row'];
-type DBProperty = Database['public']['Tables']['properties']['Row'];
-type DBFloor = Database['public']['Tables']['floors']['Row'];
-
-interface LeaseResponse extends DBLease {
-  tenant: Pick<DBTenant, 'id' | 'name' | 'email' | 'contact_number'>;
-  rental_unit: Pick<DBRentalUnit, 'id' | 'name'> & {
-    property: Pick<DBProperty, 'id' | 'name'>;
-    floor: Pick<DBFloor, 'floor_number' | 'wing'>;
-  };
-  payment_schedules: DBPaymentSchedule[];
-  balance: number;
-}
-
-interface LeaseTenant {
-  lease_id: number;
-  tenant: DBTenant;
-}
-
-interface RentalUnit {
-  id: number;
-  rental_unit_number: string;
-  property_id: number;
-  floor_id?: number;
-}
-
-interface Property {
-  id: number;
-  name: string;
-}
-
-interface Floor {
-  id: number;
-  floor_number: string;
-  wing?: string;
-}
-
-interface PaymentSchedule {
-  id: number;
-  lease_id: number;
-  due_date: string;
-  expected_amount: number;
-  status: string;
-  type: string;
-  frequency: string;
-}
-
-interface Lease {
-  id: number;
-  name?: string;
-  status: string;
-  type: string;
-  start_date: string;
-  end_date: string;
-  rent_amount: number;
-  security_deposit: number;
-  notes?: string;
-  rental_unit_id: number;
-}
 export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase } }) => {
   console.log('🔄 Starting leases load');
   
@@ -79,170 +18,39 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
   const startTime = performance.now();
   
   try {
-    // Single query to fetch leases with all related data
-    const { data: leases, error: leasesError } = await supabase
-      .from('leases')
-      .select(`
-        *,
-        lease_tenants (
-          tenant:tenants (
-            id,
-            name,
-            email,
-            contact_number,
-            created_at,
-            updated_at,
-            auth_id
-          )
-        ),
-        rental_unit:rental_unit (
-          id,
-          name,
-          number,
-          floor_id,
-          property:properties!rooms_property_id_fkey (
-            id,
-            name
-          )
-        ),
-        payment_schedules (
-          *
-        )
-      `)
-      .order('created_at', { ascending: false });
+    const { leases, error: leasesError } = await getLeaseData(supabase);
+    if (leasesError) throw error(500, 'Failed to load leases');
 
-    if (leasesError) {
-      console.error('Error loading leases:', leasesError);
-      throw error(500, 'Failed to load leases');
-    }
-
-    // Fetch floors separately since there's no direct relationship
-    const { data: floors, error: floorsError } = await supabase
-      .from('floors')
-      .select('*');
-
-    if (floorsError) {
-      console.error('Error loading floors:', floorsError);
-      throw error(500, 'Failed to load floors');
-    }
-
-    // Create a floors lookup map
+    const { data: floors } = await supabase.from('floors').select('*');
     const floorsMap = new Map(floors?.map(floor => [floor.id, floor]));
 
-    // Transform the data structure
-    const mappedLeases = leases?.map(lease => {
-      interface LeaseTenant {
-        tenant: {
-          id: number;
-          name: string;
-          email: string | null;
-          contact_number: string | null;
-          created_at: string;
-          updated_at: string;
-          auth_id: string | null;
-        };
-      }
-      
-      const tenants = lease.lease_tenants?.map((lt: LeaseTenant) => lt.tenant) || [];
-      const paymentSchedules = lease.payment_schedules || [];
+    // Transform the data structure using utility function
+    const mappedLeases = leases?.map(lease => mapLeaseData(lease, floorsMap)) || [];
 
-      // Calculate total expected amount
-      const totalExpected = paymentSchedules.reduce((sum: number, schedule: PaymentSchedule) => {
-        return sum + (schedule.expected_amount || 0);
-      }, 0);
-
-      // Get floor information from the map
-      const floor = lease.rental_unit?.floor_id ? floorsMap.get(lease.rental_unit.floor_id) : null;
-
-      const mappedLease = {
-        ...lease,
-        name: lease.name || `Lease #${lease.id}`,
-        balance: totalExpected,
-        payment_schedules: paymentSchedules,
-        lease_tenants: tenants.map((tenant: LeaseTenant['tenant']) => ({
-          tenant: {
-            name: tenant.name,
-            contact_number: tenant.contact_number || undefined,
-            email: tenant.email || undefined
-          }
-        })),
-        rental_unit: lease.rental_unit ? {
-          rental_unit_number: lease.rental_unit.number || '',
-          property: lease.rental_unit.property ? {
-            name: lease.rental_unit.property.name
-          } : undefined,
-          floor: floor ? {
-            floor_number: floor.floor_number,
-            wing: floor.wing || ''
-          } : {
-            floor_number: '',
-            wing: ''
-          }
-        } : undefined,
-        type: lease.type || 'STANDARD',
-        status: lease.status || 'ACTIVE',
-        security_deposit: Number(lease.security_deposit || 0),
-        rent_amount: Number(lease.rent_amount || 0)
-      };
-
-      console.log('📋 Mapped Lease:', {
-        id: mappedLease.id,
-        name: mappedLease.name,
-        tenants: mappedLease.lease_tenants?.map((lt: { tenant: { name: string } }) => lt.tenant.name),
-        rentalUnitNumber: mappedLease.rental_unit?.rental_unit_number,
-        propertyName: mappedLease.rental_unit?.property?.name,
-        floorNumber: mappedLease.rental_unit?.floor?.floor_number,
-        wing: mappedLease.rental_unit?.floor?.wing,
-        balance: mappedLease.balance,
-        paymentSchedulesCount: mappedLease.payment_schedules?.length || 0
-      });
-
-      return mappedLease;
-    }) || [];
-
-    // Fetch additional data needed for forms
-    const { data: tenants, error: tenantsError } = await supabase
-      .from('tenants')
-      .select('id, name, email, contact_number');
-
-    if (tenantsError) {
-      console.error('Error loading tenants:', tenantsError);
-      throw error(500, 'Failed to load tenants');
-    }
-
-    const { data: rentalUnits, error: unitsError } = await supabase
-      .from('rental_unit')
-      .select(`
+    // Fetch form data with proper type handling
+    const [tenantsResponse, unitsResponse] = await Promise.all([
+      supabase.from('tenants').select('id, name, email, contact_number'),
+      supabase.from('rental_unit').select(`
         *,
-        property:properties!rooms_property_id_fkey (
-          id,
-          name
-        )
-      `);
-
-    if (unitsError) {
-      console.error('Error loading rental units:', unitsError);
-      throw error(500, 'Failed to load rental units');
-    }
-
-    // Map rental units with floor information
-    const rentalUnitsWithFloors = rentalUnits?.map(unit => ({
-      id: unit.id,
-      name: unit.name,
-      property: unit.property ? [{
-        id: unit.property.id,
-        name: unit.property.name
-      }] : [], // Wrap in array since form expects array
-      floor: unit.floor_id ? floorsMap.get(unit.floor_id) : null
-    }));
+        property:properties!rental_unit_property_id_fkey(id, name)
+      `)
+    ]);
 
     const queryTime = performance.now() - startTime;
     console.log('⏱️ Data fetch completed:', {
-      leases: mappedLeases.length,
-      units: rentalUnits?.length || 0,
-      tenants: tenants?.length || 0,
+      leases: mappedLeases?.length || 0,
+      units: unitsResponse.data?.length || 0,
+      tenants: tenantsResponse.data?.length || 0,
       time: `${queryTime.toFixed(2)}ms`
     });
+
+    if (tenantsResponse.error) {
+      throw error(500, 'Failed to load tenants');
+    }
+
+    if (unitsResponse.error) {
+      throw error(500, 'Failed to load rental units');
+    }
 
     const form = await superValidate(zod(leaseSchema));
     const deleteForm = await superValidate(zod(deleteLeaseSchema));
@@ -251,14 +59,15 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
       form,
       deleteForm,
       leases: mappedLeases,
-      tenants: tenants || [],
-      rental_units: rentalUnitsWithFloors || []
+      tenants: tenantsResponse.data || [],
+      rental_units: unitsResponse.data || []
     };
   } catch (err) {
     console.error('Error in load function:', err);
     throw error(500, 'Internal server error');
   }
 };
+
 export const actions: Actions = {
   create: async ({ request, locals: { supabase, safeGetSession } }) => {
     console.log('🚀 Creating lease');
