@@ -93,7 +93,7 @@
         if (isNaN(start.getTime())) return;
         
         const end = new Date(start);
-        end.setMonth(end.getMonth() + Number(termsMonths));
+        end.setMonth(end.getMonth() + Number(termsMonths) - 1);
         $form.end_date = end.toISOString().split('T')[0];
       } catch (error) {
         console.error('Error calculating end date:', error);
