@@ -1,4 +1,4 @@
-import { fail, error } from '@sveltejs/kit';
+import { fail, error, json } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { leaseSchema, deleteLeaseSchema } from './formSchema';
@@ -7,6 +7,30 @@ import type { PostgrestError } from '@supabase/postgrest-js';
 import { createPaymentSchedules } from './utils';
 import { mapLeaseData, getLeaseData } from '$lib/utils/lease';
 import type { LeaseResponse } from '$lib/types/lease';
+
+interface PaymentAllocation {
+  billingId: number;
+  amount: number;
+}
+
+interface BillingChange {
+  previous_amount: number;
+  new_amount: number;
+  allocated_amount: number;
+  previous_status: 'PENDING' | 'PARTIAL' | 'PAID' | 'OVERDUE';
+  new_status: 'PENDING' | 'PARTIAL' | 'PAID' | 'OVERDUE';
+}
+
+interface PaymentDetails {
+  amount: number;
+  method: 'CASH' | 'GCASH' | 'BANK_TRANSFER';
+  reference_number: string | null;
+  paid_by: string;
+  paid_at: string;
+  notes: string | null;
+  billing_ids: number[];
+  billing_changes: Record<number, BillingChange>;
+}
 
 export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase } }) => {
   console.log('🔄 Starting leases load');
@@ -83,16 +107,16 @@ export const actions: Actions = {
 
     try {
       // Validate rental unit status
-      const { data: rentalUnit } = await supabase
-        .from('rental_unit')
-        .select('rental_unit_status')
-        .eq('id', form.data.rental_unit_id)
-        .single();
+      // const { data: rentalUnit } = await supabase
+      //   .from('rental_unit')
+      //   .select('capacity')
+      //   .eq('id', form.data.rental_unit_id)
+      //   .single();
 
-      if (rentalUnit?.rental_unit_status !== 'VACANT') {
-        form.errors.rental_unit_id = ['Unit must be vacant to create lease'];
-        return fail(400, { form });
-      }
+      // if (rentalUnit?.capacity !== 10) {
+      //   form.errors.rental_unit_id = ['Unit must be not full to create lease'];
+      //   return fail(400, { form });
+      // }
 
       // Get unit details for lease name
       const { data: unit } = await supabase
@@ -133,6 +157,7 @@ export const actions: Actions = {
           created_by: user.id,
           terms_month: leaseData.terms_month,
           status: leaseData.status,
+          unit_type: leaseData.unit_type, // Add unit_type
           created_at: new Date().toISOString()
         })
         .select()
@@ -156,45 +181,66 @@ export const actions: Actions = {
         throw relationError;
       }
 
-      // Create payment schedules
-      // Calculate prorated rent for partial first month
+      // Billing creation
       const startDate = new Date(form.data.start_date);
       const endDate = new Date(form.data.end_date);
       const billings = [];
 
-      // Get total days in first month
-      const lastDayOfMonth = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0).getDate();
-      const daysInFirstMonth = lastDayOfMonth - startDate.getDate() + 1;
-      
-      // Calculate prorated amount for first month
-      const dailyRate = form.data.rent_amount / lastDayOfMonth;
-      const proratedAmount = Math.round(dailyRate * daysInFirstMonth);
+      if (form.data.prorated_first_month) {
+        // Calculate prorated first month
+        const lastDayOfMonth = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0).getDate();
+        const daysInFirstMonth = lastDayOfMonth - startDate.getDate() + 1;
+        const dailyRate = form.data.rent_amount / lastDayOfMonth;
+        const proratedAmount = form.data.prorated_amount || Math.round(dailyRate * daysInFirstMonth);
 
-      // Add prorated first month
-      billings.push({
-        lease_id: lease.id,
-        amount: proratedAmount,
-        due_date: startDate.toISOString().split('T')[0],
-        type: 'RENT',
-        status: 'PENDING',
-        created_by: user.id,
-        notes: `Prorated rent for ${daysInFirstMonth} days`
-      });
-
-      // Add full months starting from next month
-      const nextMonth = new Date(startDate);
-      nextMonth.setMonth(nextMonth.getMonth() + 1);
-      nextMonth.setDate(1);
-
-      for (let date = nextMonth; date <= endDate; date.setMonth(date.getMonth() + 1)) {
+        // Add prorated first month
         billings.push({
           lease_id: lease.id,
-          amount: form.data.rent_amount,
-          due_date: new Date(date).toISOString().split('T')[0],
+          amount: proratedAmount,
+          due_date: startDate.toISOString().split('T')[0],
           type: 'RENT',
           status: 'PENDING',
-          created_by: user.id
+          notes: `Prorated rent for ${daysInFirstMonth} days`,
+          billing_date: new Date().toISOString().split('T')[0],
+          balance: proratedAmount,
+          paid_amount: 0
         });
+
+        // Start full months from next month at same date
+        const nextMonth = new Date(startDate);
+        nextMonth.setMonth(nextMonth.getMonth() + 1);
+        // Keep same day of month for subsequent billings
+        nextMonth.setDate(1);
+
+        for (let date = nextMonth; date <= endDate; date.setMonth(date.getMonth() + 1)) {
+          billings.push({
+            lease_id: lease.id,
+            amount: form.data.rent_amount,
+            due_date: new Date(date).toISOString().split('T')[0],
+            type: 'RENT',
+            status: 'PENDING',
+            billing_date: new Date().toISOString().split('T')[0],
+            balance: form.data.rent_amount,
+            paid_amount: 0
+          });
+        }
+      } else {
+        // No proration - start with full amount from first month
+        let currentDate = new Date(startDate);
+        
+        while (currentDate <= endDate) {
+          billings.push({
+            lease_id: lease.id,
+            amount: form.data.rent_amount,
+            due_date: currentDate.toISOString().split('T')[0],
+            type: 'RENT',
+            status: 'PENDING',
+            billing_date: new Date().toISOString().split('T')[0],
+            balance: form.data.rent_amount,
+            paid_amount: 0
+          });
+          currentDate.setMonth(currentDate.getMonth() + 1);
+        }
       }
 
       const { error: billingsError } = await supabase
@@ -202,8 +248,6 @@ export const actions: Actions = {
         .insert(billings);
 
       if (billingsError) throw billingsError;
-
-      // Note: The trigger update_rental_unit_status_on_lease will handle unit status update
 
       return { form };
 
@@ -222,79 +266,6 @@ export const actions: Actions = {
       return fail(500, { 
         form, 
         message: ['Failed to create lease and payment schedules'],
-        errors: [error.message] 
-      });
-    }
-  },
-
-  update: async ({ request, locals: { supabase, safeGetSession } }) => {
-    const form = await superValidate(request, zod(leaseSchema));
-    
-    if (!form.valid) {
-      console.error('❌ Update validation failed:', form.errors);
-      return fail(400, { form });
-    }
-
-    const { user } = await safeGetSession();
-    if (!user) return fail(403, { form, message: ['Unauthorized'] });
-
-    try {
-      // Extract tenant IDs and prepare lease data
-      const { tenantIds, ...leaseData } = form.data;
-
-      // Update lease
-      const { error: updateError } = await supabase
-        .from('leases')
-        .update({
-          rental_unit_id: leaseData.rental_unit_id,
-          name: leaseData.name,
-          start_date: leaseData.start_date,
-          end_date: leaseData.end_date,
-          rent_amount: leaseData.rent_amount,
-          security_deposit: leaseData.security_deposit,
-          notes: leaseData.notes || null,
-          terms_month: leaseData.terms_month,
-          status: leaseData.status
-        })
-        .eq('id', leaseData.id);
-
-      if (updateError) throw updateError;
-
-      // Update tenant relationships
-      if (tenantIds && leaseData.id) {
-        // Delete existing relationships
-        await supabase
-          .from('lease_tenants')
-          .delete()
-          .eq('lease_id', leaseData.id);
-
-        // Create new relationships
-        const leaseTenants = tenantIds.map(tenant_id => ({
-          lease_id: leaseData.id!,
-          tenant_id
-        }));
-
-        const { error: relationError } = await supabase
-          .from('lease_tenants')
-          .insert(leaseTenants);
-
-        if (relationError) throw relationError;
-      }
-
-      // Note: Triggers will handle:
-      // - update_lease_status_on_change
-      // - update_leases_updated_at
-      // - update_rental_unit_status_on_lease
-
-      return { form };
-
-    } catch (err) {
-      console.error('💥 Lease update error:', err);
-      const error = err as PostgrestError;
-      
-      return fail(500, { 
-        form, 
-        message: ['Failed to update lease'],
         errors: [error.message] 
       });
     }
@@ -362,6 +333,158 @@ export const actions: Actions = {
       return fail(500, {
         message: 'Failed to delete lease and associated records'
       });
+    }
+  },
+
+  submitPayment: async ({ request, locals: { supabase, safeGetSession } }) => {
+    try {
+      const session = await safeGetSession();
+      // if (!session?.user?.id) {
+      //   console.error('No authenticated user found');
+      //   return fail(401, { error: 'Unauthorized' });
+      // }
+
+      const formData = await request.formData();
+      const paymentDetailsStr = formData.get('paymentDetails');
+      
+      if (!paymentDetailsStr) {
+        console.error('Missing payment details in request');
+        return fail(400, { error: 'Payment details are required' });
+      }
+
+      let paymentDetails: PaymentDetails;
+      try {
+        paymentDetails = JSON.parse(paymentDetailsStr.toString()) as PaymentDetails;
+      } catch (e) {
+        console.error('Failed to parse payment details:', e);
+        return fail(400, { error: 'Invalid payment details format' });
+      }
+
+      // Validate payment details
+      if (!paymentDetails.amount || paymentDetails.amount <= 0) {
+        console.error('Invalid payment amount:', paymentDetails.amount);
+        return fail(400, { error: 'Invalid payment amount' });
+      }
+
+      if (!paymentDetails.billing_ids?.length) {
+        console.error('No billing IDs provided');
+        return fail(400, { error: 'No billings selected for payment' });
+      }
+
+      if (!paymentDetails.billing_changes) {
+        console.error('No billing changes provided');
+        return fail(400, { error: 'Missing billing allocation details' });
+      }
+
+      console.log('Processing payment:', {
+        amount: paymentDetails.amount,
+        method: paymentDetails.method,
+        billings: paymentDetails.billing_ids.length
+      });
+
+      // Insert the payment record
+      const { data: payment, error: paymentError } = await supabase
+        .from('payments')
+        .insert({
+          amount: paymentDetails.amount,
+          method: paymentDetails.method,
+          reference_number: paymentDetails.reference_number,
+          paid_by: paymentDetails.paid_by,
+          paid_at: paymentDetails.paid_at,
+          notes: paymentDetails.notes,
+          billing_ids: paymentDetails.billing_ids,
+          billing_changes: paymentDetails.billing_changes,
+          created_by: session.user.id
+        })
+        .select()
+        .single();
+
+      if (paymentError) {
+        console.error('Database error creating payment:', paymentError);
+        return fail(500, { 
+          error: paymentError.message,
+          code: paymentError.code,
+          details: paymentError.details
+        });
+      }
+
+      console.log('Payment created successfully:', payment.id);
+      
+      // Make sure the response is properly structured
+      return {
+        type: 'success',
+        status: 200,
+        data: payment,
+        dependencies: ['app:leases', 'app:billings'] // Add dependencies for invalidation
+      };
+
+    } catch (error) {
+      console.error('Payment submission error:', error);
+      return fail(500, {
+        type: 'error',
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    }
+  },
+
+  updateName: async ({ request, locals: { supabase } }) => {
+    const data = await request.formData();
+    const id = data.get('id');
+    const name = data.get('name');
+
+    if (!id || !name) {
+      return fail(400, { error: 'Missing required fields' });
+    }
+
+    const { error } = await supabase
+      .from('leases')
+      .update({ name })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error updating lease name:', error);
+      return fail(500, { error: 'Failed to update lease name' });
+    }
+
+    return { success: true };
+  },
+
+  updateStatus: async ({ request, locals: { supabase } }) => {
+    console.log('🔄 Updating lease status');
+    const formData = await request.formData();
+    const id = formData.get('id');
+    const status = formData.get('status');
+
+    console.log('Update details:', { id, status });
+
+    if (!id || !status) {
+      return {
+        success: false,
+        message: 'Missing required fields'
+      };
+    }
+
+    try {
+      const { error: updateError } = await supabase
+        .from('leases')
+        .update({ status })
+        .eq('id', id);
+
+      if (updateError) throw updateError;
+
+      return {
+        success: true,
+        status: 200,
+        data: { id, status }
+      };
+
+    } catch (error) {
+      console.error('Error updating lease status:', error);
+      return {
+        success: false,
+        status: 500,
+        message: error instanceof Error ? error.message : 'Failed to update lease status'
+      };
     }
   }
 };

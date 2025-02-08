@@ -2,12 +2,13 @@
   import type { PageData } from './$types';
   import type { SuperForm } from 'sveltekit-superforms';
   import type { z } from 'zod';
-  import { leaseSchema, leaseStatusEnum } from './formSchema';
+  import { leaseSchema, leaseStatusEnum, unitTypeEnum } from './formSchema';
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import { Label } from "$lib/components/ui/label";
   import * as Select from "$lib/components/ui/select";
   import { createEventDispatcher } from 'svelte';
+  import { Switch } from "$lib/components/ui/switch";
 
   import Textarea from '$lib/components/ui/textarea/textarea.svelte';
 
@@ -194,6 +195,34 @@
     {/if}
   </div>
 
+  <!-- Add this section after the rental unit selection and before the status selection -->
+  <div class="space-y-2">
+    <Label for="unit_type">Unit Type</Label>
+    <Select.Root
+      type="single"
+      name="unit_type"
+      bind:value={$form.unit_type}
+    >
+      <Select.Trigger 
+        class="w-full"
+        data-error={!!$errors.unit_type}
+        {...$constraints.unit_type}
+      >
+        {$form.unit_type || "Select unit type"}
+      </Select.Trigger>
+      <Select.Content>
+        {#each unitTypeEnum.options as type}
+          <Select.Item value={type}>
+            {type.replace('_', ' ').toLowerCase()}
+          </Select.Item>
+        {/each}
+      </Select.Content>
+    </Select.Root>
+    {#if $errors.unit_type}
+      <p class="text-sm font-medium text-destructive">{$errors.unit_type}</p>
+    {/if}
+  </div>
+
   <!-- ENUM BASED SELECTION -->
   <div class="space-y-2">
     <Label for="status">Status</Label>
@@ -221,6 +250,11 @@
       <p class="text-sm font-medium text-destructive">{$errors.status}</p>
     {/if}
   </div>
+
+  <!-- Add this before the proration calculation section -->
+
+  <!-- Only show proration controls if prorated_first_month is true -->
+  
 
   <!-- Rest of the form remains the same -->
   <!-- Dates and Terms -->
@@ -309,103 +343,117 @@
     </div>
   </div>
 
-  <!-- Replace the Prorate Button section -->
   <div class="space-y-2">
-    <div class="flex justify-between items-center">
-      <div class="text-sm text-gray-600">
-        {#if daysInMonth && remainingDays && proratedAmount}
-          <p>Days in month: {daysInMonth}</p>
-          <p>Remaining days: {remainingDays}</p>
-          <p class="font-medium text-blue-600">Prorated amount: ₱{proratedAmount.toFixed(2)}</p>
-        {/if}
+    <div class="flex items-center justify-between">
+      <Label for="prorated_first_month">Prorate First Month</Label>
+      <Switch
+        id="prorated_first_month"
+        name="prorated_first_month"
+        bind:checked={$form.prorated_first_month}
+      />
+    </div>
+  </div>
+
+  {#if $form.prorated_first_month}
+  <div class="space-y-2">
+    <!-- Replace the Prorate Button section -->
+    <div class="space-y-2">
+      <div class="flex justify-between items-center">
+        <div class="text-sm text-gray-600">
+          {#if daysInMonth && remainingDays && proratedAmount}
+            <p>Days in month: {daysInMonth}</p>
+            <p>Remaining days: {remainingDays}</p>
+            <p class="font-medium text-blue-600">Prorated amount: ₱{proratedAmount.toFixed(2)}</p>
+          {/if}
+        </div>
+        <div class="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onclick={() => {
+              // Validate required fields
+              let hasErrors = false;
+              
+              if (!$form.start_date) {
+                $errors.start_date = ['Start date is required for proration'];
+                hasErrors = true;
+              }
+              
+              if (!$form.terms_month) {
+                $errors.terms_month = ['Terms (months) is required for proration'];
+                hasErrors = true;
+              }
+              
+              if (!$form.rent_amount) {
+                $errors.rent_amount = ['Monthly rent is required for proration'];
+                hasErrors = true;
+              }
+
+              if (hasErrors) return;
+
+              // Proceed with proration if no errors
+              const startDate = new Date($form.start_date);
+              daysInMonth = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0).getDate();
+              remainingDays = daysInMonth - startDate.getDate() + 1;
+              proratedAmount = ($form.rent_amount / daysInMonth) * remainingDays;
+              storeProratedAmount = proratedAmount;
+              $form.prorated_amount = proratedAmount;
+            }}
+          >
+            Prorate Rent
+          </Button>
+          <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onclick={() => {
+            daysInMonth = 0;
+            remainingDays = 0;
+            proratedAmount = 0;
+            storeProratedAmount = 0;
+            $form.prorated_amount = null;
+          }}
+        >
+          Cancel Prorate
+        </Button>
+        </div>
       </div>
-      <div class="flex gap-2">
+      
+      <!-- Add Rounding Buttons -->
+      <div class="flex justify-end gap-2">
         <Button
           type="button"
           variant="outline"
           size="sm"
           onclick={() => {
-            // Validate required fields
-            let hasErrors = false;
-            
-            if (!$form.start_date) {
-              $errors.start_date = ['Start date is required for proration'];
-              hasErrors = true;
+            if (proratedAmount) {
+              const rounded = Math.ceil(storeProratedAmount / 100) * 100;
+              proratedAmount = rounded;
+              $form.prorated_amount = rounded;
             }
-            
-            if (!$form.terms_month) {
-              $errors.terms_month = ['Terms (months) is required for proration'];
-              hasErrors = true;
-            }
-            
-            if (!$form.rent_amount) {
-              $errors.rent_amount = ['Monthly rent is required for proration'];
-              hasErrors = true;
-            }
-
-            if (hasErrors) return;
-
-            // Proceed with proration if no errors
-            const startDate = new Date($form.start_date);
-            daysInMonth = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0).getDate();
-            remainingDays = daysInMonth - startDate.getDate() + 1;
-            proratedAmount = ($form.rent_amount / daysInMonth) * remainingDays;
-            storeProratedAmount = proratedAmount;
-            $form.prorated_amount = proratedAmount;
           }}
         >
-          Prorate Rent
+          Round to 100s
         </Button>
         <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onclick={() => {
-          daysInMonth = 0;
-          remainingDays = 0;
-          proratedAmount = 0;
-          storeProratedAmount = 0;
-          $form.prorated_amount = null;
-        }}
-      >
-        Cancel Prorate
-      </Button>
+          type="button"
+          variant="outline"
+          size="sm"
+          onclick={() => {
+            if (proratedAmount) {
+              const rounded = Math.ceil(storeProratedAmount / 500) * 500;
+              proratedAmount = rounded;
+              $form.prorated_amount = rounded;
+            }
+          }}
+        >
+          Round to 500s
+        </Button>
       </div>
     </div>
-    
-    <!-- Add Rounding Buttons -->
-    <div class="flex justify-end gap-2">
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onclick={() => {
-          if (proratedAmount) {
-            const rounded = Math.ceil(storeProratedAmount / 100) * 100;
-            proratedAmount = rounded;
-            $form.prorated_amount = rounded;
-          }
-        }}
-      >
-        Round to 100s
-      </Button>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onclick={() => {
-          if (proratedAmount) {
-            const rounded = Math.ceil(storeProratedAmount / 500) * 500;
-            proratedAmount = rounded;
-            $form.prorated_amount = rounded;
-          }
-        }}
-      >
-        Round to 500s
-      </Button>
-    </div>
   </div>
-
+{/if}
   <!-- Notes -->
   <div class="space-y-2">
     <Label for="notes">Notes</Label>

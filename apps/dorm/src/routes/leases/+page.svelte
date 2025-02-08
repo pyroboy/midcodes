@@ -21,9 +21,9 @@
   let editMode = $state(false);
   let selectedLease: FormType | undefined = $state();
 
-  // $effect(() => {
-  //   leases = structuredClone(data.leases);
-  // });
+  $effect(() => {
+    leases = data.leases;
+  });
 
   const { form, enhance, errors, constraints, submitting, reset } = superForm(data.form, {
     id: 'lease-form',
@@ -92,6 +92,14 @@
     editMode = false;
     reset();
   }
+
+  function handleStatusChange(id: string, status: string) {
+    leases = leases.map(lease => 
+      lease.id === id 
+        ? { ...lease, status } 
+        : lease
+    );
+  }
 </script>
 
 <div class="container mx-auto p-4 flex flex-col lg:flex-row gap-4">
@@ -103,6 +111,7 @@
       {leases}
       on:edit={event => handleEdit(event.detail)}
       on:delete={event => handleDeleteLease(event.detail)}
+      onStatusChange={handleStatusChange}
     />
   </div>
 

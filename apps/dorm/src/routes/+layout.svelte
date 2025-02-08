@@ -19,7 +19,7 @@
       { href: '/tenants', label: 'Tenants' },
       { href: '/leases', label: 'Leases' },
       // { href: '/overview', label: 'Overview/Monthly' },
-      { href: '/accounts', label: 'Accounts' }
+      // { href: '/accounts', label: 'Accounts' }
     ]
   };
   

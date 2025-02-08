@@ -36,9 +36,10 @@
 
   interface Props {
     leases?: Lease[];
+    onStatusChange: (id: string, status: string) => void;
   }
 
-  let { leases = [] }: Props = $props();
+  let { leases = [], onStatusChange }: Props = $props();
 
   const dispatch = createEventDispatcher<{
     leaseClick: any;
@@ -55,7 +56,7 @@
   }
 </script>
 
-<div class="grid gap-4">
+<div class="">
   {#if leases.length === 0}
     <Alert>
       <AlertTitle>No Leases Available</AlertTitle>
@@ -64,11 +65,12 @@
       </AlertDescription>
     </Alert>
   {:else}
-    {#each leases as lease}
+    {#each leases as lease (lease.id)}
       <LeaseCard
         lease={lease}
         onLeaseClick={handleLeaseClick}
         onDelete={handleDelete}
+        {onStatusChange}
       />
     {/each}
   {/if}
