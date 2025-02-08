@@ -7,7 +7,7 @@
   import { Badge } from '$lib/components/ui/badge';
   import { zodClient } from 'sveltekit-superforms/adapters';
   import { propertySchema } from './formSchema';
-  import { invalidate } from '$app/navigation';
+  import { invalidate, invalidateAll } from '$app/navigation';
 	import type { Property } from './formSchema';
   import { browser } from "$app/environment";
   import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
@@ -73,43 +73,36 @@ $formData = {
 
   async function handleDeleteProperty(property: any) {
     if (!confirm(`Are you sure you want to delete property ${property.name}? This action cannot be undone.`)) {
-        return;
+      return;
     }
     
     const formData = new FormData();
     formData.append('id', property.id.toString());
     
     try {
-        const result = await fetch('?/delete', {
-            method: 'POST',
-            body: formData
-        });
-        
-        const response = await result.json();
-        
-        if (response.error) {
-            // Handle the error from fail() responses
-            console.error('Delete failed:', {
-                status: result.status,
-                error: response.error
-            });
-            alert(`Failed to delete property: ${response.error}`);
-            return;
-        }
-        
-        if (!response.success) {
-            alert('Failed to delete property: Unknown error');
-            return;
-        }
+      const result = await fetch('?/delete', {
+        method: 'POST',
+        body: formData
+      });
 
-        editMode = false;
-        await invalidate('app:properties');
-        alert('Property deleted successfully');
+      if (!result.ok) {
+        throw new Error(`HTTP error! status: ${result.status}`);
+      }
+      
+      const response = await result.json();
+      
+      if (response.error) {
+        throw new Error(response.error);
+      }
+
+      editMode = false;
+      // Invalidate all page data to force refresh
+      await invalidateAll();
     } catch (error) {
-        console.error('Error deleting property:', error);
-        alert(`Error deleting property: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('Error deleting property:', error);
+      alert(`Failed to delete property: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-}
+  }
 </script>
 
 <div class="container mx-auto p-4 flex flex-col lg:flex-row gap-4">

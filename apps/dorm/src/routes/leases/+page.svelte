@@ -2,7 +2,7 @@
   import { superForm } from 'sveltekit-superforms/client';
   import { zodClient } from 'sveltekit-superforms/adapters';
   import { browser } from "$app/environment";
-  import { invalidate } from '$app/navigation';
+  import { invalidate,invalidateAll } from '$app/navigation';
   import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
   import LeaseForm from './LeaseForm.svelte';
   import LeaseList from './LeaseList.svelte';
@@ -76,7 +76,7 @@
         editMode = false;
         selectedLease = undefined;
         reset(); // Reset form before invalidating
-        await invalidate('app:leases');
+        await invalidateAll();
       } else {
         console.error('Delete failed:', response);
         alert(response.message || 'Failed to delete lease');

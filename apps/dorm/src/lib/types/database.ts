@@ -6,8 +6,6 @@ export interface Organization {
 }
 
 
-
-
 export interface Template {
     id: string;  // UUID
     user_id: string | null;  // UUID
@@ -169,7 +167,6 @@ export interface Property {
 export interface RentalUnit {
     id: number;
     name: string;
-    number: number;
     capacity: number;
     rental_unit_status: LocationStatus;
     base_rate: number;

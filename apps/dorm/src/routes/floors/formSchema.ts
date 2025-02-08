@@ -1,4 +1,14 @@
+import type { Database } from '$lib/database.types';
 import { z } from 'zod';
+
+export type FloorSchema = z.infer<typeof floorSchema>;
+
+export type Floor = Database['public']['Tables']['floors']['Row'];
+export type Property = Database['public']['Tables']['properties']['Row'];
+export type FloorWithProperty = Floor & {
+  property: Property | null;  
+
+};
 
 export const floorStatusEnum = z.enum(['ACTIVE', 'INACTIVE', 'MAINTENANCE']);
 
@@ -34,30 +44,3 @@ export const floorSchema = z.object({
   status: floorStatusEnum.default('ACTIVE')
 });
 
-export type FloorSchema = z.infer<typeof floorSchema>;
-
-// Database types
-export interface Floor {
-  id: number;
-  property_id: number;
-  floor_number: number;
-  wing: string | null;
-  status: z.infer<typeof floorStatusEnum>;
-  created_at: string;
-  updated_at: string | null;
-}
-
-// Extended type with property relation
-export interface FloorWithProperty extends Floor {
-  property: {
-    id: number;
-    name: string;
-  } | null;
-  rental_unit_count?: number;
-}
-
-export interface Property {
-  id: number;
-  name: string;
-  status: string;
-}

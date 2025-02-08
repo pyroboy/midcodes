@@ -157,14 +157,51 @@ export const actions: Actions = {
       }
 
       // Create payment schedules
-      await createPaymentSchedules(
-        supabase,
-        lease.id,
-        form.data.start_date,
-        form.data.end_date,
-        form.data.rent_amount,
-        form.data.prorated_amount
-      );
+      // Calculate prorated rent for partial first month
+      const startDate = new Date(form.data.start_date);
+      const endDate = new Date(form.data.end_date);
+      const billings = [];
+
+      // Get total days in first month
+      const lastDayOfMonth = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0).getDate();
+      const daysInFirstMonth = lastDayOfMonth - startDate.getDate() + 1;
+      
+      // Calculate prorated amount for first month
+      const dailyRate = form.data.rent_amount / lastDayOfMonth;
+      const proratedAmount = Math.round(dailyRate * daysInFirstMonth);
+
+      // Add prorated first month
+      billings.push({
+        lease_id: lease.id,
+        amount: proratedAmount,
+        due_date: startDate.toISOString().split('T')[0],
+        type: 'RENT',
+        status: 'PENDING',
+        created_by: user.id,
+        notes: `Prorated rent for ${daysInFirstMonth} days`
+      });
+
+      // Add full months starting from next month
+      const nextMonth = new Date(startDate);
+      nextMonth.setMonth(nextMonth.getMonth() + 1);
+      nextMonth.setDate(1);
+
+      for (let date = nextMonth; date <= endDate; date.setMonth(date.getMonth() + 1)) {
+        billings.push({
+          lease_id: lease.id,
+          amount: form.data.rent_amount,
+          due_date: new Date(date).toISOString().split('T')[0],
+          type: 'RENT',
+          status: 'PENDING',
+          created_by: user.id
+        });
+      }
+
+      const { error: billingsError } = await supabase
+        .from('billings')
+        .insert(billings);
+
+      if (billingsError) throw billingsError;
 
       // Note: The trigger update_rental_unit_status_on_lease will handle unit status update
 

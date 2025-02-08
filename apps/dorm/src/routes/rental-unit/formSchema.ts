@@ -1,5 +1,11 @@
 import { z } from 'zod';
-
+import type { Database } from '$lib/database.types';
+export type Property = Database['public']['Tables']['properties']['Row'];
+export type Floor = Database['public']['Tables']['floors']['Row'];
+export type RentalUnit = Database['public']['Tables']['rental_unit']['Row'] & {
+  property?: Property;
+  floor?: Floor;
+};
 export const locationStatusEnum = z.enum(['VACANT', 'OCCUPIED', 'RESERVED']);
 export const propertyStatusEnum = z.enum(['ACTIVE', 'INACTIVE', 'MAINTENANCE']);
 export const floorStatusEnum = z.enum(['ACTIVE', 'INACTIVE', 'MAINTENANCE']);
@@ -12,7 +18,6 @@ export const propertyBasicSchema = z.object({
   name: z.string().min(1, 'Property name is required').optional()
 });
 
-export type Property = z.infer<typeof propertyBasicSchema>;
 
 export const floorBasicSchema = z.object({
   id: z.number(),
@@ -21,7 +26,7 @@ export const floorBasicSchema = z.object({
   wing: z.string().optional()
 });
 
-export type Floor = z.infer<typeof floorBasicSchema>;
+
 
 const baseRental_UnitSchema = z.object({
   id: z.number(),

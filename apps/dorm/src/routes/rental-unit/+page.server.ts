@@ -75,7 +75,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 
     return {
       form,
-      rentalUnits,
+      rental_unit: rentalUnits, // Added to satisfy the PageData type
+      rentalUnits, // kept for backward compatibility if used elsewhere
       properties: propertiesResult.data || [],
       floors: floorsResult.data || []
     };
@@ -131,39 +132,27 @@ export const actions: Actions = {
   },
 
   update: async ({ request, locals: { supabase } }: RequestEvent) => {
-    const form = await superValidate(request, zod(rental_unitSchema));
 
-    if (!form.valid) {
-      return fail(400, { form });
-    }
+    
+const formData = await request.formData();
+const rawForm = await superValidate(formData, zod(rental_unitSchema));
 
-    // Check for duplicate rental unit number, excluding current unit
-    const existingUnit = await supabase
-      .from('rental_unit')
-      .select('id')
-      .eq('floor_id', form.data.floor_id)
-      .eq('number', form.data.number)
-      .neq('id', form.data.id)
-      .single();
+// Remove embedded objects before validation
+const { property, floor, ...updateData } = rawForm.data;
 
-      if (existingUnit.data) {
-        form.errors.number = ['A rental unit with this number already exists on this floor'];
-        form.errors.floor_id = [''];
-        return fail(400, { form });
-      }
+// Validate only the update data
+const form = await superValidate(updateData, zod(rental_unitSchema));
 
+if (!form.valid) {
+  console.error('Form validation failed:', form.errors);
+  return fail(400, { form });
+}
+
+    
     const { error: updateError } = await supabase
       .from('rental_unit')
       .update({
-        property_id: form.data.property_id,
-        floor_id: form.data.floor_id,
-        name: form.data.name,
-        number: form.data.number,
-        rental_unit_status: form.data.rental_unit_status,
-        capacity: form.data.capacity,
-        base_rate: form.data.base_rate,
-        type: form.data.type,
-        amenities: form.data.amenities,
+        ...updateData,
         updated_at: new Date().toISOString()
       } satisfies Database['public']['Tables']['rental_unit']['Update'])
       .eq('id', form.data.id);

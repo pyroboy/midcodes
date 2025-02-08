@@ -28,6 +28,7 @@ export const load: PageServerLoad = async ({ locals }) => {
     form,
     properties: protertiesResult.data ?? []
   };
+  // Returns { form, properties } which become available in $page.data
 };
 export const actions = {
   
@@ -76,20 +77,21 @@ export const actions = {
   },
 
   delete: async ({ request, locals: { supabase } }: RequestEvent) => {
-    const form = await superValidate(request, zod(propertySchema));
+    const data = await request.formData();
+    const id = data.get('id');
 
-    if (!form.valid) {
-        return fail(400, { form });
+    if (!id) {
+      return fail(400, { 
+        form: null,
+        error: 'Property ID is required' 
+      });
     }
 
     try {
-        // First check if property exist
-
-        // Attempt to delete the property directly
         const { error: deleteError } = await supabase
             .from('properties')
             .delete()
-            .eq('id', form.data.id);
+            .eq('id', id);
 
         if (deleteError) {
             console.error('Delete error details:', {
@@ -101,10 +103,7 @@ export const actions = {
             throw deleteError;
         }
 
-        return { 
-            form,
-            success: true 
-        };
+        return { success: true };
 
     } catch (error: any) {
         console.error('Delete error full details:', error);
@@ -113,17 +112,14 @@ export const actions = {
         switch (error?.code) {
             case '23503':  // foreign key violation
                 return fail(400, {
-                    form,
                     error: 'Cannot delete property because it has units or leases attached to it'
                 });
             case '42501':  // permission denied
                 return fail(403, {
-                    form,
                     error: 'You do not have permission to delete this property'
                 });
             default:
                 return fail(500, {
-                    form,
                     error: error.message || 'Failed to delete property'
                 });
         }

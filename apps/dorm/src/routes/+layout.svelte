@@ -18,7 +18,7 @@
     rentManagement: [
       { href: '/tenants', label: 'Tenants' },
       { href: '/leases', label: 'Leases' },
-      { href: '/overview', label: 'Overview/Monthly' },
+      // { href: '/overview', label: 'Overview/Monthly' },
       { href: '/accounts', label: 'Accounts' }
     ]
   };
@@ -49,8 +49,8 @@
     const allLinks = [
       ...navigationLinks.locations,
       ...navigationLinks.rentManagement,
-      { href: '/auth', label: 'Auth' },
-      { href: '/auth/signout', label: 'Sign out' }
+      // { href: '/auth', label: 'Auth' },
+      // { href: '/auth/signout', label: 'Sign out' }
     ];
 
     // Preload all routes in parallel

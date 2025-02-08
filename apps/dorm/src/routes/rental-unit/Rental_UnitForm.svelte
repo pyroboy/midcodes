@@ -6,28 +6,7 @@
   import { createEventDispatcher } from 'svelte';
   import type { Rental_unit } from './formSchema';
   import { locationStatusEnum, rentalUnitTypeEnum } from './formSchema';
-  import type { SuperForm } from 'sveltekit-superforms';
-  import type { z } from 'zod';
-  import type { rental_unitSchema } from './formSchema';
-  import type { Writable } from 'svelte/store';
-
-  interface PageData {
-    rental_unit: Array<Rental_unit & {
-      property: { name: string };
-      floor: { floor_number: number; wing?: string };
-    }>;
-    properties: Array<{ id: number; name: string }>;
-    floors: Array<{ id: number; property_id: number; floor_number: number; wing?: string; status: string }>;
-  }
-
-  interface Props {
-    data: PageData;
-    editMode?: boolean;
-    form: SuperForm<z.infer<typeof rental_unitSchema>>['form'];
-    errors: SuperForm<z.infer<typeof rental_unitSchema>>['errors'];
-    enhance: SuperForm<z.infer<typeof rental_unitSchema>>['enhance'];
-    constraints: SuperForm<z.infer<typeof rental_unitSchema>>['constraints'];
-  }
+  import type { Property ,Floor} from './formSchema';
 
   let {
     data,
@@ -36,12 +15,12 @@
     errors,
     enhance,
     constraints,
-  }: Props = $props();
+  } = $props();
 
   const dispatch = createEventDispatcher();
 
   // START : PATTERN FOR DATABASE BASED SELECTION ITEMS - Property
-  let derivedProperties = $derived(data.properties.map(p => ({ value: p.id.toString(), label: p.name })));
+  let derivedProperties = $derived(data.properties.map((p: Property) => ({ value: p.id.toString(), label: p.name })));
   let selectedProperty = {
     get value() { 
       return $form.property_id ? $form.property_id.toString() : '';
@@ -57,7 +36,7 @@
   };
   let triggerPropertyContent = $derived(
     selectedProperty.value 
-      ? data.properties.find(p => p.id.toString() === selectedProperty.value)?.name ?? "Select a property"
+      ? data.properties.find((p: Property) => p.id.toString() === selectedProperty.value)?.name ?? "Select a property"
       : "Select a property"
   );
 
@@ -65,8 +44,8 @@
   let derivedFloors = $derived(
     selectedProperty.value 
       ? data.floors
-          .filter(f => f.property_id === Number(selectedProperty.value) && f.status === 'ACTIVE')
-          .map(f => ({ 
+          .filter((f: Floor) => f.property_id === Number(selectedProperty.value) && f.status === 'ACTIVE')
+          .map((f: Floor) => ({ 
             value: f.id.toString(), 
             label: `Floor ${f.floor_number}${f.wing ? ` (${f.wing})` : ''}`
           }))
@@ -88,9 +67,9 @@
       : derivedFloors.length === 0
         ? "No floors available"
         : selectedFloor.value
-          ? `Floor ${data.floors.find(f => f.id.toString() === selectedFloor.value)?.floor_number}` +
-            `${data.floors.find(f => f.id.toString() === selectedFloor.value)?.wing ? 
-              ` (${data.floors.find(f => f.id.toString() === selectedFloor.value)?.wing})` : ''}`
+          ? `Floor ${data.floors.find((f: Floor) => f.id.toString() === selectedFloor.value)?.floor_number}` +
+            `${data.floors.find((f: Floor) => f.id.toString() === selectedFloor.value)?.wing ? 
+              ` (${data.floors.find((f: Floor) => f.id.toString() === selectedFloor.value)?.wing})` : ''}`
           : "Select a floor"
   );
 
@@ -142,14 +121,23 @@
 
   // Amenities handling
   // State management
-let amenities = { get value() { return $form.amenities || [] }, set value(v) { $form.amenities = v } };
-let currentAmenity = $state('');
+let amenities = { 
+  get value(): string[] { return $form.amenities || [] }, 
+  set value(v: string[]) { $form.amenities = v } 
+};
+let currentAmenity: string = $state('');
 
-function addAmenity() {
+// Updated addAmenity to check and add a new amenity.
+function addAmenity(): void {
   if (currentAmenity.trim()) {
     amenities.value = [...amenities.value, currentAmenity.trim()];
-    currentAmenity = '';
+    currentAmenity = "";
   }
+}
+
+// A helper to remove an amenity given its index.
+function removeAmenity(idx: number): void {
+  amenities.value = amenities.value.filter((_, i: number) => i !== idx);
 }
 
   function handleCancel() {
@@ -164,8 +152,9 @@ function addAmenity() {
   class="space-y-4"
   novalidate
 >
-  {#if editMode && $form.id}
-    <input type="hidden" name="id" bind:value={$form.id} />
+  {#if editMode}
+    <!-- Always include hidden id in edit mode -->
+    <input type="hidden" name="id" value={$form.id || ''} />
   {/if}
 
   <!-- Property Select -->
@@ -380,7 +369,7 @@ function addAmenity() {
           <button
             type="button"
             class="text-sm hover:text-destructive"
-            onclick={() => amenities.value = amenities.value.filter((_, idx) => idx !== i)}
+            onclick={() => removeAmenity(i)}
           >×</button>
         </div>
       {/each}

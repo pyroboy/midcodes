@@ -1,24 +1,13 @@
 import { fail, error } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
-import { floorSchema, type FloorWithProperty } from './formSchema';
+import { floorSchema } from './formSchema';
 import type { Actions, PageServerLoad, RequestEvent } from './$types';
-import type { Database } from '$lib/database.types';
+import type {  FloorWithProperty, Property } from './formSchema';
 
-interface DBFloorResponse {
-  id: number;
-  property_id: number;
-  floor_number: number;
-  wing: string | null;
-  status: 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE';
-  created_at: string;
-  updated_at: string | null;
-  property: {
-    id: number;
-    name: string;
-  } | null;
-}
+// Declare - Database types
 
+// Declare - Load function
 export const load: PageServerLoad = async ({ locals }) => {
   console.log('🔄 Starting server-side load function for floors');
 
@@ -29,8 +18,6 @@ export const load: PageServerLoad = async ({ locals }) => {
     throw error(401, 'Unauthorized');
   }
 
-  console.log('📊 Initiating database queries');
-  const startTime = performance.now();
 
   try {
     const [floorsResult, propertiesResult] = await Promise.all([
@@ -44,7 +31,7 @@ export const load: PageServerLoad = async ({ locals }) => {
           status,
           created_at,
           updated_at,
-          property:properties(
+          property:properties!floors_property_id_fkey(
             id,
             name
           )
@@ -58,6 +45,8 @@ export const load: PageServerLoad = async ({ locals }) => {
         .order('name')
     ]);
 
+
+
     if (floorsResult.error) {
       console.error('Error loading floors:', floorsResult.error);
       throw error(500, 'Failed to load floors');
@@ -68,41 +57,23 @@ export const load: PageServerLoad = async ({ locals }) => {
       throw error(500, 'Failed to load properties');
     }
 
-    const queryTime = performance.now() - startTime;
-    console.log('🏢 Database queries completed:', {
-      floorsCount: floorsResult.data?.length || 0,
-      propertiesCount: propertiesResult.data?.length || 0,
-      queryExecutionTime: `${queryTime.toFixed(2)}ms`
-    });
-
-    // Map the relationships and add computed fields
-    const floors: FloorWithProperty[] = (floorsResult.data || []).map((floor): FloorWithProperty => ({
-      id: floor.id,
-      property_id: floor.property_id,
-      floor_number: floor.floor_number,
-      wing: floor.wing,
-      status: floor.status,
-      created_at: floor.created_at,
-      updated_at: floor.updated_at,
-      property: floor.property && floor.property.length > 0 ? {
-        id: floor.property[0].id,
-        name: floor.property[0].name
-      } : null,
-      rental_unit_count: 0
-    }));
 
     const form = await superValidate(zod(floorSchema));
 
     return {
       form,
-      floors,
-      properties: propertiesResult.data || []
+      floors: floorsResult.data as unknown as FloorWithProperty[],
+      properties: propertiesResult.data as Property[]
     };
   } catch (err) {
     console.error('Unexpected error in load function:', err);
     throw error(500, 'An unexpected error occurred while loading data');
   }
 };
+
+
+// Declare - Actions
+
 
 export const actions: Actions = {
   create: async ({ request, locals: { supabase } }: RequestEvent) => {

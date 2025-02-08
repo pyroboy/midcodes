@@ -9,7 +9,7 @@
   import type { PageData } from './$types';
   import { browser } from "$app/environment";
   import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
-  import { invalidate } from '$app/navigation';
+  import { invalidate,invalidateAll } from '$app/navigation';
 
   interface Props {
     data: PageData;
@@ -136,10 +136,7 @@
         editMode = false;
 
         console.log('Invalidating caches...');
-        await Promise.all([
-            invalidate('app:tenants'),
-            invalidate((url) => url.pathname.includes('/tenants'))
-        ]);
+        await invalidateAll();
         console.log('Cache invalidation complete');
     } catch (error) {
         console.error('Error deleting tenant:', error);

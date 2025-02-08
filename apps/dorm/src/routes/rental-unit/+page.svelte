@@ -6,25 +6,15 @@
   import { zodClient } from 'sveltekit-superforms/adapters';
   import { rental_unitSchema, type Rental_unit } from './formSchema';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
-  import { invalidate } from '$app/navigation';
+  import { invalidate,invalidateAll } from '$app/navigation';
   import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
-
   import { browser } from "$app/environment";
   import type { RentalUnitResponse } from './+page.server';
-  import type { Database } from '$lib/database.types';
-  import type { SuperValidated } from 'sveltekit-superforms';
-  import type { z } from 'zod';
+import type { RentalUnit } from './formSchema';
 
-  type DBProperty = Database['public']['Tables']['properties']['Row'];
-  type DBFloor = Database['public']['Tables']['floors']['Row'];
 
-  let { data } = $props<{  
-    rental_unit?: RentalUnitResponse;
-    form: SuperValidated<z.infer<typeof rental_unitSchema>>;
-    rentalUnits: RentalUnitResponse[];
-    properties: Pick<DBProperty, 'id' | 'name'>[];
-    floors: Pick<DBFloor, 'id' | 'floor_number' | 'wing'>[];
-  }>();
+
+  let { data } = $props();
 
   let editMode = $state(false);
   let formError = $state('');
@@ -55,7 +45,7 @@
     }
   });
 
-  function handleRentalUnitClick(rentalUnit: RentalUnitResponse) {
+  function handleRentalUnitClick(rentalUnit:RentalUnit) {
     editMode = true;
     $formData = {
       id: rentalUnit.id,
@@ -68,10 +58,10 @@
       base_rate: rentalUnit.base_rate,
       type: rentalUnit.type,
       amenities: Array.isArray(rentalUnit.amenities) ? rentalUnit.amenities : [],
-      property: rentalUnit.property,
-      floor: rentalUnit.floor,
+      property: rentalUnit.property ,
+      floor: rentalUnit.floor ? { ...rentalUnit.floor, wing: rentalUnit.floor.wing || undefined } : undefined,
       created_at: rentalUnit.created_at,
-      updated_at: rentalUnit.updated_at
+      updated_at: rentalUnit.updated_at ?? undefined
     };
   }
 
@@ -93,10 +83,7 @@
 
       if (result.ok) {
         editMode = false;
-        await Promise.all([
-          invalidate('app:rentalUnits'),
-          invalidate((url) => url.pathname.includes('/rental-units'))
-        ]);
+        await invalidateAll();
       } else {
         console.error('Delete failed:', {
           status: result.status,
