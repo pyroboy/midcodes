@@ -5,53 +5,58 @@ import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from "sveltekit-superforms/adapters";
 import { billingSchema } from './formSchema';
 
-export const load = async () => {
-  // RLS will automatically filter based on user's role:
-  // - Admin/Accountant: Full access
-  // - Manager: View and update
-  // - Frontdesk: View and create
-  // - Tenant: View own billings
-  const { data: billings, error: billingsError } = await supabase
-    .from('billings')
-    .select(`
-      *,
-      lease:leases (
+export const load = async ({ locals: { supabase } }) => {
+  const [billingsResult, leasesResult] = await Promise.all([
+    supabase
+      .from('billings')
+      .select(`
         *,
-        rental_unit:rental_unit (*),
-        lease_tenants (
-          tenant:tenants (*)
+        lease:leases (
+          id,
+          name,
+          start_date,
+          end_date,
+          rent_amount,
+          rental_unit:rental_unit (
+            name,
+            property:properties(name)
+          ),
+          lease_tenants (
+            tenant:tenants (
+              name,
+              email,
+              contact_number
+            )
+          )
         )
-      ),
-      payments (*)
-    `);
-
-  if (billingsError) {
-    console.error('Error fetching billings:', billingsError);
-    throw new Error('Failed to load billings');
-  }
-
-  // Only admin, accountant, manager, and frontdesk can see all leases
-  const { data: leases, error: leasesError } = await supabase
-    .from('leases')
-    .select(`
-      *,
-      rental_unit:rental_unit (*),
-      lease_tenants (
-        tenant:tenants (*)
-      )
-    `);
-
-  if (leasesError) {
-    console.error('Error fetching leases:', leasesError);
-    throw new Error('Failed to load leases');
-  }
+      `)
+      .order('created_at', { ascending: false }),
+    
+    supabase
+      .from('leases')
+      .select(`
+        id,
+        name,
+        rent_amount,
+        rental_unit:rental_unit (
+          name,
+          property:properties(name)
+        ),
+        lease_tenants (
+          tenant:tenants (
+            name
+          )
+        )
+      `)
+      .eq('status', 'ACTIVE')
+  ]);
 
   const form = await superValidate(zod(billingSchema));
 
   return {
     form,
-    billings,
-    leases
+    billings: billingsResult.data || [],
+    leases: leasesResult.data || []
   };
 };
 

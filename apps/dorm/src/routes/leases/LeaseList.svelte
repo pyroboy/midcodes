@@ -23,11 +23,10 @@
     rent_amount: number;
     security_deposit: number;
     lease_tenants: Array<{
-      tenant: {
         name: string;
         contact_number?: string;
         email?: string;
-      }
+
     }>;
     notes?: string;
     balance: number;

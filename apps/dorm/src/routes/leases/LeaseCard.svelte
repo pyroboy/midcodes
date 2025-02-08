@@ -12,37 +12,49 @@
       unpaidAmount: number;
   }
   
-  interface Lease {
-      id: string;
-      name: string;
-      status: string;
-      rental_unit?: {
-          rental_unit_number: string;
-          floor?: {
-              floor_number: string;
-              wing?: string;
-          };
-          property?: {
-              name: string;
-          }
-      };
-      type: string;
-      start_date: string;
-      end_date: string;
-      rent_amount: number;
-      security_deposit: number;  // Add this property
-      lease_tenants: Array<{
-          tenant: {
-              name: string;
-              contact_number?: string;
-              email?: string;
-          }
-      }>;
-      notes?: string;
-      balance: number;
-      billings?: any[];
-      payment_schedules?: any[];
-  }
+interface LeasePaymentSchedule {
+    due_date: string;
+    expected_amount: number;
+}
+
+interface LeaseBilling {
+    type: string;
+    amount: number;
+    paid_amount: number;
+    status: 'PAID' | 'PARTIAL' | 'OVERDUE' | 'PENDING';
+}
+
+interface Lease {
+    id: string;
+    name?: string;
+    status: string;
+    rental_unit?: {
+        rental_unit_number: string;
+        floor?: {
+            floor_number: string;
+            wing?: string;
+        };
+        property?: {
+            name: string;
+        }
+    };
+    type: string;
+    start_date: string;
+    end_date: string;
+    rent_amount: number;
+    security_deposit: number;
+    lease_tenants?: Array<{
+            name: string;
+            contact_number?: string;
+            email?: string;
+    }>;
+    notes?: string;
+    balance: number;
+    billings?: LeaseBilling[];
+    payment_schedules?: LeasePaymentSchedule[];
+}
+
+
   
   interface Props {
       lease: Lease;
@@ -51,7 +63,7 @@
   }
   
   let { lease, onLeaseClick, onDelete }: Props = $props();
-  
+console.log('LeaseCard.svelte', JSON.parse(JSON.stringify({lease})));
   // Keep all utility functions from before
   function formatDate(dateStr: string) {
       return new Date(dateStr).toLocaleDateString('en-US', {
@@ -154,9 +166,25 @@
   
       return Object.values(breakdown);
   }
+
+  // Add selected billing type state
+  let selectedBillingType = $state<'RENT' | 'UTILITY' | 'PENALTY'>('RENT');
+
+  // Add billing summary calculation
+  function getBillingSummary(billings: LeaseBilling[] = []) {
+    return billings.reduce((acc, billing) => {
+      const type = billing.type;
+      if (!acc[type]) {
+        acc[type] = { total: 0, unpaid: 0 };
+      }
+      acc[type].total += billing.amount;
+      acc[type].unpaid += billing.amount - (billing.paid_amount || 0);
+      return acc;
+    }, {} as Record<string, { total: number; unpaid: number }>);
+  }
   </script>
   
-  <Card.Root class="cursor-pointer hover:bg-gray-50" onclick={() => onLeaseClick(lease)}>
+  <Card.Root class="hover:bg-gray-50">
       <Card.Header class="pb-2">
           <div class="flex justify-between items-center mb-2">
               <Card.Title class="text-lg font-semibold flex items-center gap-2">
@@ -189,7 +217,9 @@
             {#if lease.lease_tenants?.length}
               <p class="mt-1">
                 Tenant{lease.lease_tenants.length > 1 ? 's' : ''}: 
-                {lease.lease_tenants.map(lt => lt.tenant.name).join(', ')}
+                {lease.lease_tenants
+                  .map(lt => lt?.name || 'Unnamed Tenant')
+                  .join(', ')}
               </p>
             {/if}
           </div>
@@ -224,49 +254,62 @@
                   </div>
               </div>
 
-              <!-- Column 2: Billing Details -->
+              <!-- Column 2: Billing Summary -->
               <div class="space-y-3">
-                  <h3 class="text-sm font-semibold pb-1 border-b">Billing Summary</h3>
-                  <div class="space-y-2">
-                      <div class="text-sm">
-                          <div class="flex justify-between items-center">
-                              <span class="text-gray-500">Security Deposit</span>
-                              <span class="font-medium">{formatCurrency(lease.security_deposit)}</span>
-                          </div>
-                          <div class="flex justify-between items-center">
-                              <span class="text-gray-500">Monthly Rent</span>
-                              <span class="font-medium">{formatCurrency(lease.rent_amount)}</span>
-                          </div>
-                          <div class="flex justify-between items-center">
-                              <span class="text-gray-500">Balance</span>
-                              <span class="font-medium">{formatCurrency(lease.balance)}</span>
-                          </div>
+                <h3 class="text-sm font-semibold pb-1 border-b">Billing Summary</h3>
+                <div class="space-y-2">
+                  <div class="text-sm">
+                    <div class="flex justify-between items-center">
+                      <span class="text-gray-500">Security Deposit</span>
+                      <span class="font-medium">{formatCurrency(lease.security_deposit)}</span>
+                    </div>
+                    
+                    <!-- Overall Balance -->
+                    <div class="flex justify-between items-center border-t border-b py-1 my-1">
+                      <span class="text-gray-500">Overall Balance</span>
+                      <span class={`font-medium ${lease.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        {formatCurrency(lease.balance)}
+                      </span>
+                    </div>
+
+                    <!-- Billing Type Summaries -->
+                    {#each Object.entries(getBillingSummary(lease.billings)) as [type, amounts]}
+                      <div 
+                        class="flex justify-between items-center py-1 cursor-pointer hover:bg-gray-100 rounded px-2"
+                        onclick={() => selectedBillingType = type as any}
+                      >
+                        <span class="text-gray-500">{type}</span>
+                        <div class="text-right">
+                          <div>{formatCurrency(amounts.total)}</div>
+                          {#if amounts.unpaid > 0}
+                            <div class="text-xs text-red-500">Unpaid: {formatCurrency(amounts.unpaid)}</div>
+                          {/if}
+                        </div>
                       </div>
+                    {/each}
                   </div>
+                </div>
               </div>
 
-              <!-- Column 3: Payment Schedule -->
+              <!-- Column 3: Billing Details -->
               <div class="space-y-3">
-                  <h3 class="text-sm font-semibold pb-1 border-b">Payment Schedule</h3>
-                  <div class="space-y-2">
-                      {#if lease.payment_schedules?.length}
-                          <div class="text-sm">
-                              {#each lease.payment_schedules.slice(0, 3) as schedule}
-                                  <div class="flex justify-between items-center">
-                                      <span class="text-gray-500">{formatDate(schedule.due_date)}</span>
-                                      <span class="font-medium">{formatCurrency(schedule.expected_amount)}</span>
-                                  </div>
-                              {/each}
-                              {#if lease.payment_schedules.length > 3}
-                                  <p class="text-sm text-gray-500 mt-2">
-                                      +{lease.payment_schedules.length - 3} more payments
-                                  </p>
-                              {/if}
-                          </div>
-                      {:else}
-                          <p class="text-sm text-gray-500">No payment schedule available</p>
-                      {/if}
-                  </div>
+                <h3 class="text-sm font-semibold pb-1 border-b">{selectedBillingType} Billings</h3>
+                <div class="space-y-2 max-h-[200px] overflow-y-auto">
+                  {#if lease.billings?.filter(b => b.type === selectedBillingType).length}
+                    <div class="text-sm">
+                      {#each lease.billings.filter(b => b.type === selectedBillingType) as billing}
+                        <div class="flex justify-between items-center py-1">
+                          <span class="text-gray-500">{formatCurrency(billing.amount)}</span>
+                          <span class={`px-2 py-0.5 rounded-full text-xs ${getBillingStatusColor(billing.status)}`}>
+                            {billing.status}
+                          </span>
+                        </div>
+                      {/each}
+                    </div>
+                  {:else}
+                    <p class="text-sm text-gray-500">No {selectedBillingType.toLowerCase()} billings available</p>
+                  {/if}
+                </div>
               </div>
           </div>
       </Card.Content>

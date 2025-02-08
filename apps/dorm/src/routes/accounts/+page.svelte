@@ -1,279 +1,121 @@
 <!-- src/routes/accounts/+page.svelte -->
 
 <script lang="ts">
-    import { superForm } from "sveltekit-superforms/client";
-    import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
-    import { Button } from '$lib/components/ui/button';
-    import * as Select from '$lib/components/ui/select';
-    import { Input } from '$lib/components/ui/input';
-    import { Textarea } from '$lib/components/ui/textarea';
-    // import { Field, Control, Label, FieldErrors } from "formsnap";
-    import type { PageData } from './$types';
-    import { browser } from "$app/environment";
-    import { billingSchema, billingTypeEnum, utilityTypeEnum, paymentStatusEnum } from './formSchema';
-    import type { Infer } from "sveltekit-superforms";
-    import { zodClient } from 'sveltekit-superforms/adapters';
+  import { superForm } from 'sveltekit-superforms/client';
+  import * as Card from '$lib/components/ui/card';
+  import * as Tabs from '$lib/components/ui/tabs';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import BillingForm from './BillingForm.svelte';
+  
+  let { data } = $props();
+  let selectedBillingType = $state<'RENT' | 'UTILITY' | 'PENALTY'>('RENT');
+  let editMode = $state(false);
+  let billingsByLease: Record<string, { lease: any; billings: any[] }> = {};
+  
+  // Group billings by lease
+  $effect(() => {
+    billingsByLease = data.billings.reduce((acc, billing) => {
+      if (!acc[billing.lease_id]) {
+        acc[billing.lease_id] = {
+          lease: billing.lease,
+          billings: []
+        };
+      }
+      acc[billing.lease_id].billings.push(billing);
+      return acc;
+    }, {});
+  });
 
-  interface Props {
-    data: PageData & { form: Infer<typeof billingSchema> };
+  function formatCurrency(amount: number) {
+    return new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP'
+    }).format(amount);
   }
 
-  let { data }: Props = $props();
-    let editMode = $state(false);
-    let showForm = $state(true);
+  function formatDate(date: string) {
+    return new Date(date).toLocaleDateString();
+  }
 
-    const form = superForm(data.form, {
-      validators: zodClient(billingSchema),
-      taintedMessage: null,
-      resetForm: true,
-      onSubmit: ({ formData, cancel }) => {
-        const formDataObj = Object.fromEntries(formData);
-        console.log("Form data being submitted:", formDataObj);
-        // console.log("Current form state:", $form);
-        // Don't cancel the submission
-        return;
-      }
-    });
-  
-    let { form: formData, enhance, reset } = form;
-
-    function cancelEdit() {
-      editMode = false;
-      reset();
+  function getBillingStatusColor(status: string) {
+    switch (status) {
+      case 'PAID': return 'bg-green-100 text-green-800';
+      case 'PARTIAL': return 'bg-yellow-100 text-yellow-800';
+      case 'OVERDUE': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
-
-    function toggleForm() {
-      showForm = !showForm;
-      if (!showForm) {
-        cancelEdit();
-      }
-    }
-
-    function editBilling(billing: any) {
-      editMode = true;
-      $formData = { 
-        ...billing,
-        dueDate: new Date(billing.dueDate),
-        billingDate: new Date(billing.billingDate)
-      };
-      showForm = true;
-    }
-  
-    let billingTypeSelected = $derived($formData.type ? { value: $formData.type, label: $formData.type } : undefined);
-    let utilityTypeSelected = $derived($formData.utilityType ? { value: $formData.utilityType, label: $formData.utilityType } : undefined);
-    let statusSelected = $derived($formData.status ? { value: $formData.status, label: $formData.status } : undefined);
-    let leaseSelected = $derived($formData.leaseId ? { value: $formData.leaseId, label: data.leases.find(l => l.id === $formData.leaseId)?.leaseName ?? 'Select a lease' } : undefined);
-    let balance = $derived(($formData.amount || 0) - ($formData.paidAmount || 0));
-    let showUtilityType = $derived($formData.type === 'UTILITY');
+  }
 </script>
-  
-<div class="container mx-auto p-4 flex">
-    <!-- Accounts List (Left Side) -->
-    <div class="w-2/3 pr-4">
-      <h2 class="text-xl font-bold mb-2">Accounts List</h2>
-      <ul class="space-y-2">
-        {#each data.billings as account}
-          <li class="bg-gray-100 p-4 rounded shadow">
-            <div class="flex justify-between items-start mb-2">
-              <div>
-                <span class="font-bold">{account.lease.leaseName}</span>
-                <span class="mx-2">|</span>
-                <span class="text-blue-600">{account.type}</span>
-                <span class="mx-2">|</span>
-                <span class="text-green-600">{account.category}</span>
-              </div>
-              <div>
-                <Button onclick={() => editBilling(account)} class="mr-2">Edit</Button>
-                <form method="POST" action="?/delete" use:enhance class="inline">
-                  <input type="hidden" name="id" value={account.id} />
-                  <Button type="submit" variant="destructive">Delete</Button>
-                </form>
-              </div>
-            </div>
-            <div class="grid grid-cols-2 gap-2 text-sm">
-              <div><strong>Amount:</strong> {account.amount}</div>
-              <div><strong>Paid:</strong> {account.paidAmount || 0}</div>
-              <div><strong>Balance:</strong> {account.amount - (account.paidAmount || 0)}</div>
-              <div><strong>Date Issued:</strong> {new Date(account.dateIssued).toLocaleDateString()}</div>
-              <div><strong>Due Date:</strong> {account.dueOn ? new Date(account.dueOn).toLocaleDateString() : 'N/A'}</div>
-            </div>
-            {#if account.notes}
-              <div class="mt-2">
-                <strong>Notes:</strong> {account.notes}
-              </div>
-            {/if}
-          </li>
-        {/each}
-      </ul>
-    </div>
-  
-    <!-- Account Form (Right Side) -->
-    <div class="w-1/3 pl-4">
-      {#if showForm}
-        <h1 class="text-2xl font-bold mb-4">{editMode ? 'Edit' : 'Add'} Account</h1>
-        <form method="POST" action={editMode ? "?/update" : "?/create"} use:enhance class="space-y-4 mb-8">
-          {#if editMode}
-            <input type="hidden" name="id" bind:value={$formData.id} />
-          {/if}
-  
-          <!-- <Field {form} name="leaseId">
-            <Control let:attrs>
-              <Label>Lease</Label>
-              <Select.Root
-                selected={leaseSelected}
-                onSelectedChange={(s) => {
-                  if (s) $formData.leaseId = s.value;
-                }}
-              >
-                <Select.Trigger {...attrs}>
-                  <Select.Value placeholder="Select a lease" />
-                </Select.Trigger>
-                <Select.Content>
-                  {#each data.leases as lease}
-                    <Select.Item value={lease.id} label={lease.leaseName} />
-                  {/each}
-                </Select.Content>
-              </Select.Root>
-            </Control>
-            <FieldErrors class="text-red-500 text-sm mt-1" />
-          </Field>
-  
-          <Field {form} name="type">
-            <Control let:attrs>
-              <Label>Account Type</Label>
-              <Select.Root
-                selected={billingTypeSelected}
-                onSelectedChange={(s) => {
-                  if (s) $formData.type = s.value;
-                }}
-              >
-                <Select.Trigger {...attrs}>
-                  <Select.Value placeholder="Select an account type" />
-                </Select.Trigger>
-                <Select.Content>
-                  {#each billingTypeEnum.enumValues as type}
-                    <Select.Item value={type} label={type} />
-                  {/each}
-                </Select.Content>
-              </Select.Root>
-            </Control>
-            <FieldErrors class="text-red-500 text-sm mt-1" />
-          </Field>
-  
-          {#if showUtilityType}
-            <Field {form} name="utilityType">
-              <Control let:attrs>
-                <Label>Utility Type</Label>
-                <Select.Root
-                  selected={utilityTypeSelected}
-                  onSelectedChange={(s) => {
-                    if (s) $formData.utilityType = s.value;
-                  }}
-                >
-                  <Select.Trigger {...attrs}>
-                    <Select.Value placeholder="Select a utility type" />
-                  </Select.Trigger>
-                  <Select.Content>
-                    {#each utilityTypeEnum.enumValues as type}
-                      <Select.Item value={type} label={type} />
-                    {/each}
-                  </Select.Content>
-                </Select.Root>
-              </Control>
-              <FieldErrors class="text-red-500 text-sm mt-1" />
-            </Field>
-          {/if}
-  
-          <Field {form} name="amount">
-            <Control let:attrs>
-              <Label>Amount</Label>
-              <Input type="number" {...attrs} bind:value={$formData.amount} min="0" step="0.01" />
-            </Control>
-            <FieldErrors class="text-red-500 text-sm mt-1" />
-          </Field>
-  
-          <Field {form} name="paidAmount">
-            <Control let:attrs>
-              <Label>Paid Amount</Label>
-              <Input type="number" {...attrs} bind:value={$formData.paidAmount} min="0" step="0.01" />
-            </Control>
-            <FieldErrors class="text-red-500 text-sm mt-1" />
-          </Field> -->
 
-          <div class="space-y-2">
-            <!-- <Label>Balance</Label> -->
-            <Input 
-              type="number" 
-              value={($formData.amount || 0) - ($formData.paidAmount || 0)} 
-              disabled 
-              class="bg-gray-100"
-            />
-          </div>
-  
-          <!-- <Field {form} name="status">
-            <Control let:attrs>
-              <Label>Status</Label>
-              <Select.Root
-                selected={statusSelected}
-                onSelectedChange={(s) => {
-                  if (s) $formData.status = s.value;
-                }}
-              >
-                <Select.Trigger {...attrs}>
-                  <Select.Value placeholder="Select a status" />
-                </Select.Trigger>
-                <Select.Content>
-                  {#each paymentStatusEnum.enumValues as status}
-                    <Select.Item value={status} label={status} />
-                  {/each}
-                </Select.Content>
-              </Select.Root>
-            </Control>
-            <FieldErrors class="text-red-500 text-sm mt-1" />
-          </Field>
-  
-          <Field {form} name="billingDate">
-            <Control let:attrs>
-              <Label>Billing Date</Label>
-              <Input type="date" {...attrs} bind:value={$formData.billingDate} />
-            </Control>
-            <FieldErrors class="text-red-500 text-sm mt-1" />
-          </Field>
-  
-          <Field {form} name="dueDate">
-            <Control let:attrs>
-              <Label>Due Date</Label>
-              <Input type="date" {...attrs} bind:value={$formData.dueDate} />
-            </Control>
-            <FieldErrors class="text-red-500 text-sm mt-1" />
-          </Field>
-  
-          <Field {form} name="notes">
-            <Control let:attrs>
-              <Label>Notes</Label>
-              <Textarea {...attrs} bind:value={$formData.notes} />
-            </Control>
-            <FieldErrors class="text-red-500 text-sm mt-1" />
-          </Field> -->
-  
-          <Button type="submit">{editMode ? 'Update' : 'Add'} Account</Button>
-          {#if editMode}
-            <Button type="button" onclick={cancelEdit}>Cancel</Button>
-          {/if}
-        </form>
-      {:else}
-        <p class="text-center text-gray-500 mt-8">Click "Add Account" to create a new entry</p>
-      {/if}
+<div class="container mx-auto p-4">
+  <div class="flex flex-col lg:flex-row gap-4">
+    <!-- Billings List -->
+    <div class="w-full lg:w-2/3 space-y-4">
+      <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold">Billings</h1>
+        <Tabs.Root value={selectedBillingType} onValueChange={(v: any) => selectedBillingType = v as 'RENT' | 'UTILITY' | 'PENALTY'}>
+          <Tabs.List>
+            <Tabs.Trigger value="RENT">Rent</Tabs.Trigger>
+            <Tabs.Trigger value="UTILITY">Utilities</Tabs.Trigger>
+            <Tabs.Trigger value="PENALTY">Penalties</Tabs.Trigger>
+          </Tabs.List>
+        </Tabs.Root>
+      </div>
+
+      {#each Object.values(billingsByLease) as { lease, billings }}
+        <Card.Root>
+          <Card.Header>
+            <Card.Title>
+              {lease.rental_unit.property.name} - {lease.rental_unit.name}
+            </Card.Title>
+            <Card.Description>
+              Tenant(s): {lease.lease_tenants.map((lt: { tenant: { name: string } }) => lt.tenant.name).join(', ')}
+            </Card.Description>
+          </Card.Header>
+          <Card.Content>
+            <div class="space-y-2">
+              {#each billings.filter(b => b.type === selectedBillingType) as billing}
+                <div class="flex justify-between items-center p-2 hover:bg-muted/50 rounded">
+                  <div>
+                    <div class="font-medium">
+                      {billing.type} 
+                      {#if billing.utility_type}
+                        - {billing.utility_type}
+                      {/if}
+                    </div>
+                    <div class="text-sm text-muted-foreground">
+                      Due: {formatDate(billing.due_date)}
+                    </div>
+                  </div>
+                  <div class="text-right">
+                    <div>{formatCurrency(billing.amount)}</div>
+                    <Badge variant={billing.status === 'PAID' ? 'default' : 'secondary'}>
+                      {billing.status}
+                    </Badge>
+                  </div>
+                </div>
+              {/each}
+            </div>
+          </Card.Content>
+        </Card.Root>
+      {/each}
+    </div>
+
+    <!-- Billing Form -->
+    <div class="w-full lg:w-1/3">
+      <Card.Root>
+        <Card.Header>
+          <Card.Title>{editMode ? 'Edit' : 'Add'} Billing</Card.Title>
+        </Card.Header>
+        <Card.Content>
+          <BillingForm 
+            {data}
+            {editMode}
+            on:cancel={() => editMode = false}
+          />
+        </Card.Content>
+      </Card.Root>
     </div>
   </div>
-  
-  <!-- Sticky Add Button -->
-  <div class="fixed bottom-4 right-4">
-    <Button onclick={toggleForm} class="rounded-full w-16 h-16 flex items-center justify-center text-2xl">
-      {showForm ? '×' : '+'}
-    </Button>
-  </div>
-  
-  {#if browser}
-    <SuperDebug data={$formData} />
-  {/if}
+</div>

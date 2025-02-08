@@ -45,11 +45,11 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
     });
 
     if (tenantsResponse.error) {
-      throw error(500, 'Failed to load tenants');
+      throw error(500, 'L-1000 - Failed to load tenants');
     }
 
     if (unitsResponse.error) {
-      throw error(500, 'Failed to load rental units');
+      throw error(500, 'L-1001 - Failed to load rental units');
     }
 
     const form = await superValidate(zod(leaseSchema));
@@ -63,8 +63,8 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
       rental_units: unitsResponse.data || []
     };
   } catch (err) {
-    console.error('Error in load function:', err);
-    throw error(500, 'Internal server error');
+    console.error('L-1002 -Error in load function:', err);
+    throw error(500, 'L-1002 - Internal server error');
   }
 };
 
@@ -74,7 +74,7 @@ export const actions: Actions = {
     const form = await superValidate(request, zod(leaseSchema));
     
     if (!form.valid) {
-      console.error('❌ Form validation failed:', form.errors);
+      console.error('L-1003 - ❌ Form validation failed:', form.errors);
       return fail(400, { form });
     }
 

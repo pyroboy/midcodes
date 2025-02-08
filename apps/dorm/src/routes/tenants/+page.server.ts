@@ -34,8 +34,7 @@ export const load: PageServerLoad = async ({ locals }) => {
     throw error(401, 'Unauthorized');
   }
 
-  console.log('📊 Initiating database queries');
-  const startTime = performance.now();
+
 
   try {
     const [tenantsResult, leasesResult, rentalUnitsResult, propertiesResult] = await Promise.all([
@@ -95,19 +94,11 @@ export const load: PageServerLoad = async ({ locals }) => {
     const propertiesMap = new Map(propertiesResult.data?.map(property => [property.id, property]) || []);
 
     // Log the raw data
-    console.log('Raw tenants data:', tenantsResult.data);
-    console.log('Raw leases data:', leasesResult.data);
-    console.log('Raw rental units data:', rentalUnitsResult.data);
-    console.log('Raw properties data:', propertiesResult.data);
+    // console.log('Raw tenants data:', tenantsResult.data);
+    // console.log('Raw leases data:', leasesResult.data);
+    // console.log('Raw rental units data:', rentalUnitsResult.data);
+    // console.log('Raw properties data:', propertiesResult.data);
 
-    const queryTime = performance.now() - startTime;
-    console.log('👥 Database queries completed:', {
-      tenantsCount: tenantsResult.data?.length || 0,
-      leasesCount: leasesResult.data?.length || 0,
-      unitsCount: rentalUnitsResult.data?.length || 0,
-      propertiesCount: propertiesResult.data?.length || 0,
-      time: `${queryTime.toFixed(2)}ms`
-    });
 
     const form = await superValidate(zod(tenantFormSchema));
 

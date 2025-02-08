@@ -1,18 +1,19 @@
-import type { LeaseTenant, PaymentSchedule } from '$lib/types/lease';
+import type { LeaseTenant } from '$lib/types/lease';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export function mapLeaseData(lease: any, floorsMap: Map<number, any>) {
-  const tenants = lease.lease_tenants?.map((lt: LeaseTenant) => lt.tenant) || [];
-  const paymentSchedules = lease.payment_schedules || [];
+  // Ensure lease_tenants exists and has tenant data
+  const tenants = lease.lease_tenants?.filter((lt: LeaseTenant) => lt?.tenant)?.map((lt: LeaseTenant) => lt.tenant) || [];
+  const billings = lease.billings || [];
 
-  const totalExpected = calculateTotalExpected(paymentSchedules);
+  const totalBalance = calculateTotalBalance(billings);
   const floor = lease.rental_unit?.floor_id ? floorsMap.get(lease.rental_unit.floor_id) : null;
 
   return {
     ...lease,
     name: lease.name || `Lease #${lease.id}`,
-    balance: totalExpected,
-    payment_schedules: paymentSchedules,
+    balance: totalBalance,
+    billings: billings,
     lease_tenants: mapTenants(tenants),
     rental_unit: mapRentalUnit(lease.rental_unit, floor),
     type: lease.type || 'STANDARD',
@@ -22,37 +23,25 @@ export function mapLeaseData(lease: any, floorsMap: Map<number, any>) {
   };
 }
 
-function calculateTotalExpected(schedules: PaymentSchedule[]): number {
-  return schedules.reduce((sum: number, schedule: PaymentSchedule) => {
-    return sum + (schedule.expected_amount || 0);
+function calculateTotalBalance(billings: any[]): number {
+  return billings.reduce((sum: number, billing: any) => {
+    return sum + Number(billing.balance || 0);
   }, 0);
 }
 
 function mapTenants(tenants: any[]) {
-  return tenants.map(tenant => ({
-    tenant: {
-      name: tenant.name,
-      contact_number: tenant.contact_number || undefined,
-      email: tenant.email || undefined
-    }
+  return tenants.filter(tenant => tenant).map((tenant) => ({
+    ...tenant,
+    name: tenant?.name || 'Unnamed Tenant'
   }));
 }
 
 function mapRentalUnit(unit: any, floor: any) {
-  if (!unit) return undefined;
-
+  if (!unit) return null;
   return {
-    rental_unit_number: unit.number || '',
-    property: unit.property ? {
-      name: unit.property.name
-    } : undefined,
-    floor: floor ? {
-      floor_number: floor.floor_number,
-      wing: floor.wing || ''
-    } : {
-      floor_number: '',
-      wing: ''
-    }
+    ...unit,
+    name: unit.name || `Unit ${unit.number}`,
+    floor: floor
   };
 }
 
@@ -79,7 +68,7 @@ export async function getLeaseData(supabase: SupabaseClient) {
         floor_id,
         property:properties!rental_unit_property_id_fkey(id, name)
       ),
-      payment_schedules (*)
+      billings!billings_lease_id_fkey(*)
     `)
     .order('created_at', { ascending: false });
 

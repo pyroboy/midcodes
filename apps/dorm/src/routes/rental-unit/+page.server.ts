@@ -24,8 +24,8 @@ export const load: PageServerLoad = async ({ locals }) => {
     throw error(401, 'Unauthorized');
   }
 
-  console.log('📊 Initiating database queries');
-  const startTime = performance.now();
+  // console.log('📊 Initiating database queries');
+  // const startTime = performance.now();
 
   try {
     const [rentalUnitsResult, propertiesResult, floorsResult] = await Promise.all([
@@ -56,13 +56,13 @@ export const load: PageServerLoad = async ({ locals }) => {
       throw error(500, 'Failed to load rental units');
     }
 
-    const queryTime = performance.now() - startTime;
-    console.log('🏢 Rental Units Query Result:', {
-      units: rentalUnitsResult.data,
-      error: rentalUnitsResult.error,
-      count: rentalUnitsResult.data?.length || 0,
-      time: `${queryTime.toFixed(2)}ms`
-    });
+    // const queryTime = performance.now() - startTime;
+    // console.log('🏢 Rental Units Query Result:', {
+    //   units: rentalUnitsResult.data,
+    //   error: rentalUnitsResult.error,
+    //   count: rentalUnitsResult.data?.length || 0,
+    //   time: `${queryTime.toFixed(2)}ms`
+    // });
 
     // Map the relationships manually
     const rentalUnits = (rentalUnitsResult.data || []).map(unit => ({
