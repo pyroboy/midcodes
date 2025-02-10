@@ -1,0 +1,8 @@
+{
+  "framework": "sveltekit",
+  "outputDirectory": ".svelte-kit/output",
+  "regions": ["sin1"],
+  "version": 2,
+  "buildCommand": "cd ../.. && turbo run build --filter=sideprojects...",
+  "ignoreCommand": "git diff HEAD^ HEAD --quiet ."
+}
