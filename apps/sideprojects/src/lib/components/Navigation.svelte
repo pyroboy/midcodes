@@ -9,8 +9,8 @@
   let logoElement: HTMLImageElement | null = null;
 
   const links = [
-    { path: '/about', text: 'About' },
-    { path: '/cv', text: 'Programs' },
+    { path: '/', text: 'About' },
+    { path: '/', text: 'Programs' },
     { path: '/', text: 'Contact' }
   ];
 

@@ -13,7 +13,7 @@
 </svelte:head>
 
 <!-- <BreakPointIndicator /> -->
-<Navigation />
+<!-- <Navigation /> -->
 
 {@render children()}
 
