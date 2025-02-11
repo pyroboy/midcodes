@@ -19,7 +19,7 @@
     title: "Cabilao Island Cliff Dive Resort - Package B",
     description: "Enjoy an extended stay at Cabilao Island with our Package B, which includes all the activities from Package A plus comfortable accommodation.",
     price: 10000,
-    duration: "2 Days, 1 Night",
+    duration: "Overnight",
     includes: [
       "Country side tour & Island Tour",
       "Snorkeling and Turtle watching",
