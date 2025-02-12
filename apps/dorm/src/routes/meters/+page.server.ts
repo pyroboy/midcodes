@@ -77,19 +77,7 @@ export const load = async ({ locals }) => {
   ]);
 
   // Initialize form with empty data
-  const form = await superValidate({
-    name: '',
-    type: 'ELECTRICITY',
-    status: 'ACTIVE',
-    location_type: 'PROPERTY',
-    property_id: null,
-    floor_id: null,
-    rental_unit_id: null,
-    unit_rate: 0,
-    initial_reading: 0,
-    is_active: true,
-    notes: null
-  }, zod(meterFormSchema));
+  const form =  await superValidate(zod(meterFormSchema));
 
   return {
     form,

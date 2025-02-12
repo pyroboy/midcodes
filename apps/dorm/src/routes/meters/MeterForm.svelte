@@ -1,16 +1,11 @@
 <script lang="ts">
   import { run } from 'svelte/legacy';
-
-  import { superForm } from 'sveltekit-superforms/client';
-  import type { SuperValidated } from 'sveltekit-superforms';
-  import { zod } from 'sveltekit-superforms/adapters';
-  import * as Alert from '$lib/components/ui/alert';
-  import * as Select from '$lib/components/ui/select';
-  import { Button } from '$lib/components/ui/button';
+  import type { SuperForm } from 'sveltekit-superforms';
+  import type { z } from 'zod';
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
   import { Textarea } from '$lib/components/ui/textarea';
-  import { utilityTypeEnum, meterStatusEnum, locationTypeEnum, type MeterFormData, meterFormSchema } from './formSchema';
+  import {  type MeterFormData, meterFormSchema } from './formSchema';
   import type { Database } from '$lib/database.types';
   import { createEventDispatcher } from 'svelte';
 
@@ -23,19 +18,31 @@
   };
 
   interface Props {
-    form: SuperValidated<MeterFormData, any>;
-    properties?: Property[];
-    floors?: Floor[];
-    rental_unit?: Rental_unit[];
-    meter?: MeterFormData | undefined;
+    editMode?: boolean;
+    data: {
+      properties: Property[];
+      floors: Floor[];
+      rental_unit: Rental_unit[];
+      meter?: MeterFormData;
+    };
+    form: SuperForm<z.infer<typeof meterFormSchema>>['form'];
+    errors: SuperForm<z.infer<typeof meterFormSchema>>['errors'];
+    enhance: SuperForm<z.infer<typeof meterFormSchema>>['enhance'];
+    constraints: SuperForm<z.infer<typeof meterFormSchema>>['constraints'];
+    submitting: SuperForm<z.infer<typeof meterFormSchema>>['submitting'];
   }
+
+ 
+
 
   let {
     form,
-    properties = [],
-    floors = [],
-    rental_unit = [],
-    meter = undefined
+    data,
+    editMode = false,
+    errors,
+    enhance,
+    constraints,
+    submitting,
   }: Props = $props();
 
   const dispatch = createEventDispatcher<{
@@ -43,71 +50,56 @@
     meterUpdated: void;
   }>();
 
-  const { enhance, errors, delayed, message, form: formData } = superForm(form, {
-    resetForm: true,
-    onResult: ({ result }) => {
-      if (result.type === 'success') {
-        dispatch(meter ? 'meterUpdated' : 'meterAdded');
-      }
-    }
-  });
 
-  run(() => {
-    if (meter) {
-      $formData = {
-        ...meter
-      };
-    }
-  });
 
   function getLocationLabel(type: string, id: number | null): string {
     if (!id) return '';
     
     switch (type) {
       case 'PROPERTY':
-        return properties.find(p => p.id === id)?.name || '';
+        return data.properties.find(p => p.id === id)?.name || '';
       case 'FLOOR':
-        const floor = floors.find(f => f.id === id);
+        const floor = data.floors.find(f => f.id === id);
         return floor ? `${floor.property?.name || ''} - Floor ${floor.floor_number} ${floor.wing || ''}` : '';
       case 'RENTAL_UNIT':
-        const unit = rental_unit.find(r => r.id === id);
+        const unit = data.rental_unit.find(r => r.id === id);
         return unit ? `${unit.floor?.property?.name || ''} - Floor ${unit.floor?.floor_number || ''} - Rental_unit ${unit.number}` : '';
       default:
         return '';
     }
   }
 
-  let filteredProperties = $derived(properties.filter(p => p.status === 'ACTIVE'));
-  let filteredFloors = $derived(floors.filter(f => f.status === 'ACTIVE'));
-  let filteredRental_Units = $derived(rental_unit.filter(r => r.rental_unit_status === 'VACANT' || r.rental_unit_status === 'OCCUPIED'));
+  let filteredProperties = $derived(data.properties.filter(p => p.status === 'ACTIVE'));
+  let filteredFloors = $derived(data.floors.filter(f => f.status === 'ACTIVE'));
+  let filteredRental_Units = $derived(data.rental_unit.filter(r => r.rental_unit_status === 'VACANT' || r.rental_unit_status === 'OCCUPIED'));
 
-  let locationLabel = $derived($formData.location_type ? 
-    getLocationLabel($formData.location_type, 
-      $formData.location_type === 'PROPERTY' ? Number($formData.property_id) : 
-      $formData.location_type === 'FLOOR' ? Number($formData.floor_id) : 
-      Number($formData.rental_unit_id)
+  let locationLabel = $derived($form.location_type ? 
+    getLocationLabel($form.location_type, 
+      $form.location_type === 'PROPERTY' ? Number($form.property_id) : 
+      $form.location_type === 'FLOOR' ? Number($form.floor_id) : 
+      Number($form.rental_unit_id)
     ) : '');
 
   function handleLocationTypeChange(type: string) {
     if (type === 'PROPERTY' || type === 'FLOOR' || type === 'RENTAL_UNIT') {
-      $formData.location_type = type;
-      $formData.property_id = null;
-      $formData.floor_id = null;
-      $formData.rental_unit_id = null;
+      $form.location_type = type;
+      $form.property_id = null;
+      $form.floor_id = null;
+      $form.rental_unit_id = null;
     }
   }
 
   function handleLocationChange(id: string) {
     const numId = Number(id);
-    switch ($formData.location_type) {
+    switch ($form.location_type) {
       case 'PROPERTY':
-        $formData.property_id = numId;
+        $form.property_id = numId;
         break;
       case 'FLOOR':
-        $formData.floor_id = numId;
+        $form.floor_id = numId;
         break;
       case 'RENTAL_UNIT':
-        $formData.rental_unit_id = numId;
+        $form.rental_unit_id = numId;
         break;
     }
   }
@@ -115,15 +107,9 @@
 
 <form method="POST" use:enhance>
   <div class="space-y-4">
-    {#if $message}
-      <Alert.Root>
-        <Alert.Title>{$message}</Alert.Title>
-      </Alert.Root>
-    {/if}
-
     <div>
       <Label for="name">Name</Label>
-      <Input type="text" id="name" bind:value={$formData.name} maxlength={255} required />
+      <Input type="text" id="name" bind:value={$form.name} maxlength={255} required />
       {#if $errors.name}<span class="text-red-500">{$errors.name}</span>{/if}
     </div>
 
@@ -131,8 +117,8 @@
       <Label for="location_type">Location Type</Label>
       <!-- <Select.Root
         selected={{
-          label: $formData.location_type || 'Select location type',
-          value: $formData.location_type || ''
+          label: $form.location_type || 'Select location type',
+          value: $form.location_type || ''
         }}
         onSelectedChange={(s) => {
           if (s?.value) {
@@ -152,13 +138,13 @@
       {#if $errors.location_type}<span class="text-red-500">{$errors.location_type}</span>{/if}
     </div>
 
-    {#if $formData.location_type === 'PROPERTY'}
+    {#if $form.location_type === 'PROPERTY'}
       <div>
         <Label for="property_id">Property</Label>
         <!-- <Select.Root
           selected={{
-            label: $formData.property_id ? getLocationLabel('PROPERTY', Number($formData.property_id)) : 'Select property',
-            value: $formData.property_id?.toString() || ''
+            label: $form.property_id ? getLocationLabel('PROPERTY', Number($form.property_id)) : 'Select property',
+            value: $form.property_id?.toString() || ''
           }}
           onSelectedChange={(s) => {
             if (s?.value) {
@@ -177,13 +163,13 @@
         </Select.Root> -->
         {#if $errors.property_id}<span class="text-red-500">{$errors.property_id}</span>{/if}
       </div>
-    {:else if $formData.location_type === 'FLOOR'}
+    {:else if $form.location_type === 'FLOOR'}
       <div>
         <Label for="floor_id">Floor</Label>
         <!-- <Select.Root
           selected={{
-            label: $formData.floor_id ? getLocationLabel('FLOOR', Number($formData.floor_id)) : 'Select floor',
-            value: $formData.floor_id?.toString() || ''
+            label: $form.floor_id ? getLocationLabel('FLOOR', Number($form.floor_id)) : 'Select floor',
+            value: $form.floor_id?.toString() || ''
           }}
           onSelectedChange={(s) => {
             if (s?.value) {
@@ -204,13 +190,13 @@
         </Select.Root> -->
         {#if $errors.floor_id}<span class="text-red-500">{$errors.floor_id}</span>{/if}
       </div>
-    {:else if $formData.location_type === 'RENTAL_UNIT'}
+    {:else if $form.location_type === 'RENTAL_UNIT'}
       <div>
         <Label for="rental_unit_id">Rental_unit</Label>
         <!-- <Select.Root
           selected={{
-            label: $formData.rental_unit_id ? getLocationLabel('RENTAL_UNIT', Number($formData.rental_unit_id)) : 'Select rental_unit',
-            value: $formData.rental_unit_id?.toString() || ''
+            label: $form.rental_unit_id ? getLocationLabel('RENTAL_UNIT', Number($form.rental_unit_id)) : 'Select rental_unit',
+            value: $form.rental_unit_id?.toString() || ''
           }}
           onSelectedChange={(s) => {
             if (s?.value) {
@@ -240,12 +226,12 @@
       <Label for="type">Utility Type</Label>
       <!-- <Select.Root
         selected={{
-          label: $formData.type || 'Select utility type',
-          value: $formData.type || ''
+          label: $form.type || 'Select utility type',
+          value: $form.type || ''
         }}
         onSelectedChange={(s) => {
           if (s?.value) {
-            $formData.type = s.value;
+            $form.type = s.value;
           }
         }}
       >
@@ -266,7 +252,7 @@
       <Input 
         type="number" 
         id="initial_reading" 
-        bind:value={$formData.initial_reading} 
+        bind:value={$form.initial_reading} 
         min="0" 
         step="0.01" 
         required 
@@ -279,7 +265,7 @@
       <Input 
         type="number" 
         id="unit_rate" 
-        bind:value={$formData.unit_rate} 
+        bind:value={$form.unit_rate} 
         min="0" 
         step="0.01" 
         required 
@@ -291,12 +277,12 @@
       <Label for="status">Status</Label>
       <!-- <Select.Root
         selected={{
-          label: $formData.status || 'Select status',
-          value: $formData.status || ''
+          label: $form.status || 'Select status',
+          value: $form.status || ''
         }}
         onSelectedChange={(s) => {
           if (s?.value) {
-            $formData.status = s.value;
+            $form.status = s.value;
           }
         }}
       >
@@ -314,18 +300,10 @@
 
     <div>
       <Label for="notes">Notes</Label>
-      <Textarea id="notes" bind:value={$formData.notes} />
+      <Textarea id="notes" bind:value={$form.notes} />
       {#if $errors.notes}<span class="text-red-500">{$errors.notes}</span>{/if}
     </div>
 
-    <div class="flex justify-end gap-2">
-      <Button type="submit" disabled={$delayed}>
-        {#if $delayed}
-          Saving...
-        {:else}
-          Save
-        {/if}
-      </Button>
-    </div>
+
   </div>
 </form>

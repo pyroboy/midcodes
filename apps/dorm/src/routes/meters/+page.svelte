@@ -5,13 +5,7 @@
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
-  import { page } from '$app/stores';
-  import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-  } from "$lib/components/ui/select";
+
   import { utilityTypeEnum, meterStatusEnum, type MeterFormData, meterFormSchema } from './formSchema';
   import { Loader2 } from 'lucide-svelte';
   import type { z } from 'zod';
@@ -21,7 +15,11 @@
   import { superValidate } from 'sveltekit-superforms/client';
   import { zod } from 'sveltekit-superforms/adapters';
   import MeterForm from './MeterForm.svelte';
+  import { superForm } from 'sveltekit-superforms/client';
+  import { zodClient } from 'sveltekit-superforms/adapters';
+  import { invalidate } from '$app/navigation';
 
+  // Type definitions
   type Property = Database['public']['Tables']['properties']['Row'];
   type Floor = Database['public']['Tables']['floors']['Row'] & {
     property: Property | null;
@@ -30,13 +28,19 @@
     floor: Floor | null;
   };
 
-  interface Props {
-    data: PageData;
+  interface LatestReading {
+    value: number;
+    date: string;
   }
 
-  let { data }: Props = $props();
+  type ExtendedMeterFormData = MeterFormData & {
+    latest_reading?: LatestReading;
+  };
+
+  // Component state
+  let { data } = $props();
   let showForm = $state(false);
-  let selectedMeter: MeterFormData | undefined = $state();
+  let selectedMeter: ExtendedMeterFormData | undefined = $state();
   let loading = false;
   let error: string | null = null;
   let selectedType: z.infer<typeof utilityTypeEnum> | undefined = $state(undefined);
@@ -44,11 +48,37 @@
   let searchQuery = $state('');
   let sortBy: 'name' | 'type' | 'status' | 'reading' = $state('name');
   let sortOrder: 'asc' | 'desc' = $state('asc');
+  let editMode = $state(false);
 
-  let { form, meters = [], properties = [], floors = [], rental_unit = [], isAdminLevel, isUtility, isMaintenance } = $derived(data);
+  let { meters = [], properties = [], floors = [], rental_unit = [], isAdminLevel, isUtility, isMaintenance } = $derived(data);
 
-  // Create a default form value
-  const defaultForm: SuperValidated<MeterFormData, any> = {
+  // Form handling
+  const { form, enhance, errors, constraints, submitting, reset } = superForm(data.form, {
+    id: 'lease-form',
+    validators: zodClient(meterFormSchema),
+    validationMethod: 'oninput',
+    dataType: 'json',
+    taintedMessage: null,
+    resetForm: true,
+    onError: ({ result }) => {
+      console.error('Form submission error:', {
+        error: result.error,
+        status: result.status
+      });
+      if (result.error) {
+        console.error('Server error:', result.error.message);
+      }
+    },
+    onResult: async ({ result }) => {
+      if (result.type === 'success') {
+        await invalidate('app:meters');
+        reset();
+      }
+    }
+  });
+
+  // Default form value
+  const defaultForm: SuperValidated<ExtendedMeterFormData, any> = {
     id: crypto.randomUUID(),
     valid: true,
     posted: false,
@@ -68,6 +98,12 @@
     }
   };
 
+  // Event handlers
+  function handleCancel() {
+    editMode = false;
+    reset();
+  }
+
   function handleTypeSelect(value: { value: string } | undefined) {
     selectedType = value?.value as z.infer<typeof utilityTypeEnum>;
   }
@@ -76,7 +112,7 @@
     selectedStatus = value?.value as z.infer<typeof meterStatusEnum>;
   }
 
-  function handleMeterClick(meter: MeterFormData) {
+  function handleMeterClick(meter: ExtendedMeterFormData) {
     if (isAdminLevel || isUtility) {
       selectedMeter = meter;
       showForm = true;
@@ -88,18 +124,19 @@
     selectedMeter = undefined;
   }
 
-  function getLocationDetails(meter: MeterFormData): string {
+  // Utility functions
+  function getLocationDetails(meter: ExtendedMeterFormData): string {
     switch (meter.location_type) {
       case 'PROPERTY':
-        const property = properties?.find(p => p.id === meter.property_id);
+        const property = properties?.find((p: Property) => p.id === meter.property_id);
         return property ? `Property: ${property.name}` : 'Unknown Property';
       case 'FLOOR':
-        const floor = floors?.find(f => f.id === meter.floor_id);
+        const floor = floors?.find((f: Floor) => f.id === meter.floor_id);
         return floor 
           ? `Floor ${floor.floor_number}${floor.property ? ` - ${floor.property.name}` : ''}`
           : 'Unknown Floor';
       case 'RENTAL_UNIT':
-        const unit = rental_unit?.find(r => r.id === meter.rental_unit_id);
+        const unit = rental_unit?.find((r: Rental_unit) => r.id === meter.rental_unit_id);
         return unit 
           ? `Rental_unit ${unit.number}${unit.floor?.property ? ` - ${unit.floor.property.name}` : ''}`
           : 'Unknown Rental_unit';
@@ -147,7 +184,8 @@
     }
   }
 
-  let filteredMeters = $derived((meters ?? []).filter(meter => {
+  // Filtered and sorted meters
+  let filteredMeters = $derived((meters ?? []).filter((meter: ExtendedMeterFormData) => {
     if (!meter) return false;
     const matchesType = !selectedType || meter.type === selectedType;
     const matchesStatus = !selectedStatus || meter.status === selectedStatus;
@@ -155,7 +193,7 @@
       meter.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       getLocationDetails(meter).toLowerCase().includes(searchQuery.toLowerCase());
     return matchesType && matchesStatus && matchesSearch;
-  }).sort((a, b) => {
+  }).sort((a: ExtendedMeterFormData, b: ExtendedMeterFormData) => {
     const order = sortOrder === 'asc' ? 1 : -1;
     switch (sortBy) {
       case 'name':
@@ -181,137 +219,111 @@
     </Alert.Root>
   {/if}
 
-  {#if !showForm}
-    <div class="space-y-4">
-      <div class="flex justify-between items-center">
-        <h1 class="text-2xl font-bold">Meters</h1>
-        {#if isAdminLevel || isUtility}
-          <Button onclick={() => {
-            selectedMeter = undefined;
-            showForm = true;
-          }}>Add Meter</Button>
-        {/if}
-      </div>
-
-      <!-- Filters -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-        <div>
-          <Input
-            type="text"
-            placeholder="Search meters..."
-            value={searchQuery}
-            oninput={(e) => searchQuery = e.currentTarget.value}
-          />
-        </div>
-        <div>
-          <Label for="type">Type</Label>
-          <!-- <Select onValueChange={handleTypeSelect}>
-
-            <SelectContent>
-              <SelectItem value="">All Types</SelectItem>
-              {#each Object.values(utilityTypeEnum.Values) as type}
-                <SelectItem value={type}>{type}</SelectItem>
-              {/each}
-            </SelectContent>
-          </Select> -->
-        </div>
-        <div>
-          <Label for="status">Status</Label>
-          <!-- <Select onValueChange={handleStatusSelect}>
-
-            <SelectContent>
-              <SelectItem value="">All Statuses</SelectItem>
-              {#each Object.values(meterStatusEnum.Values) as status}
-                <SelectItem value={status}>{status}</SelectItem>
-              {/each}
-            </SelectContent>
-          </Select> -->
-        </div>
-      </div>
-
-      <!-- Meters Grid -->
-      <div class="grid gap-4">
-        {#if loading}
-          <div class="flex justify-center items-center py-8">
-            <Loader2 class="h-8 w-8 animate-spin" />
-          </div>
-        {:else if filteredMeters.length === 0}
-          <div class="text-center py-8 text-gray-500">
-            No meters found matching your criteria
-          </div>
-        {:else}
-          {#each filteredMeters as meter (meter.id)}
-            <Card.Root 
-              class="cursor-pointer {(isAdminLevel || isUtility) ? 'hover:bg-gray-50' : ''}"
-              onclick={() => handleMeterClick(meter)}
-            >
-              <Card.Header>
-                <Card.Title class="flex justify-between items-center">
-                  <div class="flex items-center space-x-2">
-                    <span>{meter.name}</span>
-                    <Badge variant={getTypeVariant(meter.type)}>
-                      {meter.type}
-                    </Badge>
-                    <Badge class={getStatusColor(meter.status)}>
-                      {meter.status}
-                    </Badge>
-                  </div>
-                  {#if meter.latest_reading}
-                    <div class="text-sm text-gray-500">
-                      Latest Reading: {formatReading(meter.latest_reading.value)}
-                      <span class="text-xs">
-                        ({new Date(meter.latest_reading.date).toLocaleDateString()})
-                      </span>
-                    </div>
-                  {/if}
-                </Card.Title>
-              </Card.Header>
-              <Card.Content>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <p class="text-sm font-medium text-gray-500">Location</p>
-                    <p>{getLocationDetails(meter)}</p>
-                  </div>
-                  <div>
-                    <p class="text-sm font-medium text-gray-500">Unit Rate</p>
-                    <p>{formatReading(meter.unit_rate)} per unit</p>
-                  </div>
-                </div>
-                {#if meter.notes}
-                  <p class="mt-2 text-sm text-gray-500">{meter.notes}</p>
-                {/if}
-              </Card.Content>
-            </Card.Root>
-          {/each}
-        {/if}
-      </div>
-    </div>
-  {:else}
-    <div class="space-y-4">
-      <div class="flex justify-between items-center">
-        <h2 class="text-xl font-bold">{selectedMeter ? 'Edit' : 'Add'} Meter</h2>
-        <Button variant="outline" onclick={() => {
-          showForm = false;
-          selectedMeter = undefined;
-        }}>Cancel</Button>
-      </div>
-      <MeterForm
-        form={form ?? defaultForm}
-        properties={properties ?? []}
-        floors={floors ?? []}
-        rental_unit={rental_unit ?? []}
-        meter={selectedMeter}
-        on:meterAdded={handleMeterAdded}
-        on:meterUpdated={handleMeterAdded}
+  <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+    <div>
+      <Input
+        type="text"
+        placeholder="Search meters..."
+        value={searchQuery}
+        oninput={(e) => searchQuery = e.currentTarget.value}
       />
+    </div>
+    <div>
+      <Label for="type">Type</Label>
+      <!-- <Select onValueChange={handleTypeSelect}>
+        <SelectContent>
+          <SelectItem value="">All Types</SelectItem>
+          {#each Object.values(utilityTypeEnum.Values) as type}
+            <SelectItem value={type}>{type}</SelectItem>
+          {/each}
+        </SelectContent>
+      </Select> -->
+    </div>
+    <div>
+      <Label for="status">Status</Label>
+      <!-- <Select onValueChange={handleStatusSelect}>
+        <SelectContent>
+          <SelectItem value="">All Statuses</SelectItem>
+          {#each Object.values(meterStatusEnum.Values) as status}
+            <SelectItem value={status}>{status}</SelectItem>
+          {/each}
+        </SelectContent>
+      </Select> -->
+    </div>
+  </div>
+
+  <div class="grid gap-4">
+    {#if loading}
+      <div class="flex justify-center items-center py-8">
+        <Loader2 class="h-8 w-8 animate-spin" />
+      </div>
+    {:else if filteredMeters.length === 0}
+      <div class="text-center py-8 text-gray-500">
+        No meters found matching your criteria
+      </div>
+    {:else}
+      {#each filteredMeters as meter (meter.id)}
+        <Card.Root 
+          class="cursor-pointer {(isAdminLevel || isUtility) ? 'hover:bg-gray-50' : ''}"
+          onclick={() => handleMeterClick(meter)}
+        >
+          <Card.Header>
+            <Card.Title class="flex justify-between items-center">
+              <div class="flex items-center space-x-2">
+                <span>{meter.name}</span>
+                <Badge variant={getTypeVariant(meter.type)}>
+                  {meter.type}
+                </Badge>
+                <Badge class={getStatusColor(meter.status)}>
+                  {meter.status}
+                </Badge>
+              </div>
+              {#if meter.latest_reading}
+                <div class="text-sm text-gray-500">
+                  Latest Reading: {formatReading(meter.latest_reading.value)}
+                  <span class="text-xs">
+                    ({new Date(meter.latest_reading.date).toLocaleDateString()})
+                  </span>
+                </div>
+              {/if}
+            </Card.Title>
+          </Card.Header>
+          <Card.Content>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p class="text-sm font-medium text-gray-500">Location</p>
+                <p>{getLocationDetails(meter)}</p>
+              </div>
+              <div>
+                <p class="text-sm font-medium text-gray-500">Unit Rate</p>
+                <p>{formatReading(meter.unit_rate)} per unit</p>
+              </div>
+            </div>
+            {#if meter.notes}
+              <p class="mt-2 text-sm text-gray-500">{meter.notes}</p>
+            {/if}
+          </Card.Content>
+        </Card.Root>
+      {/each}
+    {/if}
+  </div>
+
+  <MeterForm
+    {data}
+    {editMode}
+    {form}
+    {errors}
+    {enhance}
+    {constraints}
+    {submitting}
+    on:cancel={handleCancel}
+  />
+
+  {#if !isAdminLevel && !isUtility && !isMaintenance}
+    <div class="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+      <p class="text-yellow-800">
+        You do not have permission to manage meters. Please contact your administrator.
+      </p>
     </div>
   {/if}
 </div>
-
-{#if !isAdminLevel && !isUtility && !isMaintenance}
-  <div class="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-    <p class="text-yellow-800">
-      You do not have permission to manage meters. Please contact your administrator.
-    </p>
-  </div>
-{/if}

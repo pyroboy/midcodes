@@ -5,9 +5,6 @@ import { floorSchema } from './formSchema';
 import type { Actions, PageServerLoad, RequestEvent } from './$types';
 import type {  FloorWithProperty, Property } from './formSchema';
 
-// Declare - Database types
-
-// Declare - Load function
 export const load: PageServerLoad = async ({ locals }) => {
   console.log('🔄 Starting server-side load function for floors');
 
