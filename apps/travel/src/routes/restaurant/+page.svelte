@@ -302,7 +302,7 @@ const barMenu: MenuCategory[] = [
       />
       <div class="absolute inset-0 bg-black/50 flex items-center justify-center">
         <div class="text-center text-white">
-          <h1 class="text-5xl font-bold mb-4">H Restaurant</h1>
+          <h1 class="text-5xl font-bold mb-4">The Cliffs Restaurant</h1>
           <p class="text-xl opacity-90">{info.description}</p>
         </div>
       </div>

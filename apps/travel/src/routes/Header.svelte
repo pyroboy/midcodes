@@ -19,7 +19,7 @@
   <div class="absolute top-0 left-0 right-0 max-w-[1400px] mx-auto flex justify-between items-center px-4 md:px-8 py-4">
     <div class="flex items-center gap-3">
       <a href="/" class="z-50">
-        <img src="https://i.ibb.co/9q9XKrt/clipart1133673.png" alt="logo" class="h-10">
+        <img src="https://res.cloudinary.com/dexcw6vg0/image/upload/v1739247373/cliffslogo_bpc611.webp" alt="logo" class="h-10">
       </a>
       <div class={`flex flex-col ${isScrolled ? 'text-gray-800' : 'text-white'}`}>
         <span class="text-lg font-semibold leading-tight">Cabilao</span>

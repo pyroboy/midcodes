@@ -2,93 +2,32 @@
  const experiences = [
   {
     id: 1,
-    title: "Cabilao Lighthouse Cliff Diving",
-    description: "Experience the thrill of cliff diving near the historic Cabilao lighthouse, with heights ranging from 5 to 12 meters above crystal clear waters.",
-    price: 1500, // PHP 1,500
-    duration: "3 Hours",
+    title: "Cabilao Island Cliff Dive Resort - Package A",
+    description: "Experience the beauty of Cabilao Island with our comprehensive Package A tour that includes both countryside and island exploration, along with exciting water activities.",
+    price: 5000,
+    duration: "Full Day",
     includes: [
-      "Safety briefing and training",
-      "Professional diving instructor",
-      "Safety gear",
-      "Basic cliff diving techniques",
-      "Fresh coconut drink"
+      "Country side tour & Island Tour",
+      "Snorkeling and Turtle watching",
+      "Free Transportation (Panglao to Island vice Versa)",
+      "Boat Ride and Guide"
     ],
-      image: "https://picsum.photos/800/600?random=120"
+    image: "https://res.cloudinary.com/ddlz560fk/image/upload/v1739248183/1491583021_okoynj.jpg"
   },
   {
     id: 2,
-    title: "Cabilao Wall Dive Adventure",
-    description: "Explore Cabilao's famous wall diving spot, home to rare critters, sea snakes, and schooling jacks.",
-    price: 3500, // PHP 3,500
-    duration: "4 Hours",
+    title: "Cabilao Island Cliff Dive Resort - Package B",
+    description: "Enjoy an extended stay at Cabilao Island with our Package B, which includes all the activities from Package A plus comfortable accommodation.",
+    price: 10000,
+    duration: "Overnight",
     includes: [
-      "PADI-certified dive master",
-      "Complete diving equipment",
-      "Underwater photography",
-      "Marine life briefing",
-      "Surface interval snacks"
+      "Country side tour & Island Tour",
+      "Snorkeling and Turtle watching",
+      "Free Transportation (Panglao to Island vice Versa)",
+      "Boat Ride and Guide",
+      "Overnight stay with free breakfast"
     ],
-     image: "https://picsum.photos/800/600?random=140"
-  },
-  {
-    id: 3,
-    title: "Lighthouse Point Night Dive",
-    description: "Discover Cabilao's nocturnal marine life including rare mandarin fish and feeding cuttlefish near the lighthouse area.",
-    price: 4000, // PHP 4,000
-    duration: "3 Hours",
-    includes: [
-      "Night diving equipment",
-      "Underwater torch",
-      "Expert night dive guide",
-      "Hot drinks post-dive",
-      "Night marine life briefing"
-    ],
-      image: "https://picsum.photos/800/600?random=150"
-  },
-  {
-    id: 4,
-    title: "Cabilao Island Snorkeling Tour",
-    description: "Perfect for non-divers, explore Cabilao's vibrant reef systems and marine sanctuaries through snorkeling.",
-    price: 1200, // PHP 1,200
-    duration: "3 Hours",
-    includes: [
-      "Snorkeling equipment",
-      "Local marine guide",
-      "Reef fish identification guide",
-      "Fresh tropical fruits",
-      "Marine sanctuary fees"
-    ],
-       image: "https://picsum.photos/800/600?random=105"
-  },
-  {
-    id: 5,
-    title: "Cambaquiz Dive Site Experience",
-    description: "Visit Cabilao's premier dive site known for hammerhead shark sightings and rich marine biodiversity.",
-    price: 3800, // PHP 3,800
-    duration: "4 Hours",
-    includes: [
-      "2 tank dive package",
-      "Professional dive guide",
-      "Full equipment rental",
-      "Surface interval with snacks",
-      "Dive site briefing"
-    ],
-      image: "https://picsum.photos/800/600?random=101"
-  },
-  {
-    id: 6,
-    title: "Sunset Beach Hopping",
-    description: "Tour around Cabilao's pristine beaches and hidden coves, ending with the famous Cabilao sunset.",
-    price: 1800, // PHP 1,800
-    duration: "4 Hours",
-    includes: [
-      "Local boat transport",
-      "Beach picnic setup",
-      "Local guide",
-      "Fresh coconut drinks",
-      "Snorkeling gear"
-    ],
-   image: "https://picsum.photos/800/600"
+    image: "https://res.cloudinary.com/ddlz560fk/image/upload/v1739248754/cabilao-drone-01_c0mz9q.jpg"
   }
 ];
 </script>
@@ -96,7 +35,7 @@
 <div class="min-h-screen bg-white">
   <div class="relative h-[60vh] overflow-hidden">
     <img 
-      src="https://picsum.photos/1920/1080?random=14" 
+      src="https://res.cloudinary.com/ddlz560fk/image/upload/v1739248182/1491581611_c7vqud.jpg" 
       alt="Experiences hero"
       class="w-full h-full object-cover"
     />

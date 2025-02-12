@@ -3,102 +3,102 @@
     {
       id: 1,
       title: "Azure Cliff Paradise",
-      image: "https://picsum.photos/800/1200?random=1"
+      image: "https://res.cloudinary.com/ddlz560fk/image/upload/v1739248184/1491584524_omcuty.jpg"
     },
     {
       id: 2,
       title: "Sunset Point Diving",
-      image: "https://picsum.photos/800/800?random=2"
+      image: "https://res.cloudinary.com/ddlz560fk/image/upload/v1739248183/1491582688_jsxxeg.jpg"
     },
     {
       id: 3,
       title: "Tropical Lagoon Jump",
-      image: "https://picsum.photos/800/600?random=3"
+      image: "https://res.cloudinary.com/ddlz560fk/image/upload/v1739248184/1491584800_vj3see.jpg"
     },
     {
       id: 4,
-      title: "Ancient Cave Diving",
-      image: "https://picsum.photos/800/1000?random=4"
+      title: "Big Room",
+      image: "https://res.cloudinary.com/ddlz560fk/image/upload/v1739248183/1489349716_u7ay9s.jpg"
     },
     {
       id: 5,
-      title: "Volcanic Rock Platform",
-      image: "https://picsum.photos/800/900?random=5"
+      title: "Twin Bed",
+      image: "https://res.cloudinary.com/ddlz560fk/image/upload/v1739248183/1491582688_jsxxeg.jpg"
     },
     {
       id: 6,
       title: "Ocean Vista Point",
-      image: "https://picsum.photos/800/700?random=6"
+      image: "https://res.cloudinary.com/ddlz560fk/image/upload/v1739248183/1489349725_epzgxe.jpg"
     },
     {
       id: 7,
       title: "Sunset Cove",
-      image: "https://picsum.photos/800/1100?random=7"
+      image: "https://res.cloudinary.com/ddlz560fk/image/upload/v1739248183/1491575830_bwgafh.jpg"
     },
     {
       id: 8,
       title: "Crystal Bay",
-      image: "https://picsum.photos/800/850?random=8"
+      image: "https://res.cloudinary.com/ddlz560fk/image/upload/v1739248183/1491579331_zngmjm.jpg"
     },
     {
       id: 9,
       title: "Hidden Beach",
-      image: "https://picsum.photos/800/950?random=9"
+      image: "https://res.cloudinary.com/ddlz560fk/image/upload/v1739248183/1491583021_okoynj.jpg"
     },
     {
       id: 10,
       title: "Paradise Point",
-      image: "https://picsum.photos/800/750?random=10"
+      image: "https://res.cloudinary.com/ddlz560fk/image/upload/v1739248182/1489322539_mfdyo1.jpg"
     },
     {
       id: 11,
       title: "Blue Lagoon",
-      image: "https://picsum.photos/800/1000?random=11"
+      image: "https://res.cloudinary.com/ddlz560fk/image/upload/v1739248182/1491581611_c7vqud.jpg"
     },
     {
       id: 12,
       title: "Secret Cove",
-      image: "https://picsum.photos/800/800?random=12"
+      image: "https://res.cloudinary.com/ddlz560fk/image/upload/v1739248182/1489322539_zqjz0x.webp"
     },
     {
       id: 13,
       title: "Mountain View Resort",
-      image: "https://picsum.photos/800/1300?random=13"
+      image: "https://res.cloudinary.com/ddlz560fk/image/upload/v1739248182/1491582580_jh9zzd.jpg"
     },
     {
       id: 14,
       title: "Beachfront Villa",
-      image: "https://picsum.photos/800/950?random=14"
+      image: "https://res.cloudinary.com/ddlz560fk/image/upload/v1739248182/1489343656_vzdbbb.jpg"
     },
     {
       id: 15,
       title: "Infinity Pool",
-      image: "https://picsum.photos/800/700?random=15"
+      image: "https://res.cloudinary.com/ddlz560fk/image/upload/v1739248182/1491581638_txz6mn.jpg"
     },
     {
       id: 16,
       title: "Garden Restaurant",
-      image: "https://picsum.photos/800/1100?random=16"
+      image: "https://res.cloudinary.com/ddlz560fk/image/upload/v1739248182/1489322992_wcsmce.jpg"
     },
     {
       id: 17,
       title: "Spa Retreat",
-      image: "https://picsum.photos/800/850?random=17"
+      image: "https://res.cloudinary.com/ddlz560fk/image/upload/v1739248182/1489348555_exjmxi.jpg"
     },
     {
       id: 18,
       title: "Sunset Bar",
-      image: "https://picsum.photos/800/1000?random=18"
+      image: "https://res.cloudinary.com/ddlz560fk/image/upload/v1739248181/476333141_1162526778992589_4885629458431212239_n_jajibh.jpg"
     },
     {
       id: 19,
       title: "Private Beach",
-      image: "https://picsum.photos/800/900?random=19"
+      image: "https://res.cloudinary.com/ddlz560fk/image/upload/v1739248181/476333141_1162526778992589_4885629458431212239_n_jajibh.jpg"
     },
     {
       id: 20,
       title: "Yoga Pavilion",
-      image: "https://picsum.photos/800/750?random=20"
+      image: "https://res.cloudinary.com/ddlz560fk/image/upload/v1739248181/1491581302_kmovd4.jpg"
     }
   ];
 
@@ -113,7 +113,7 @@
   <!-- Hero Section -->
   <div class="relative h-[60vh] overflow-hidden">
     <img 
-      src="https://picsum.photos/1920/1080?random=hero" 
+      src="https://res.cloudinary.com/ddlz560fk/image/upload/v1739248182/1491581611_c7vqud.jpg" 
       alt="Gallery hero"
       class="w-full h-full object-cover"
     />
