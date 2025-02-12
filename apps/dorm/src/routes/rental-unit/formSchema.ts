@@ -15,7 +15,12 @@ export const rentalUnitTypeEnum = z.enum(['BEDSPACER', 'PRIVATEROOM']);
 
 export const propertyBasicSchema = z.object({
   id: z.number(),
-  name: z.string().min(1, 'Property name is required').optional()
+  name: z.string().min(1, 'Property name is required'),
+  address: z.string().optional(),
+  type: z.string().optional(),
+  status: propertyStatusEnum.optional(),
+  created_at: z.string().optional(),
+  updated_at: z.string().nullable().optional()
 });
 
 
@@ -23,7 +28,7 @@ export const floorBasicSchema = z.object({
   id: z.number(),
   property_id: z.number(),
   floor_number: z.number(),
-  wing: z.string().optional()
+  wing: z.string().nullable().optional()
 });
 
 
