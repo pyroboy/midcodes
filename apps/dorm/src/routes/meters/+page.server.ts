@@ -3,7 +3,7 @@
 import { fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
-import { meterFormSchema, meterSchema } from './formSchema';
+import {  meterSchema } from './formSchema';
 import { supabase } from '$lib/supabaseClient';
 
 export const load = async ({ locals }) => {
@@ -77,19 +77,21 @@ export const load = async ({ locals }) => {
   ]);
 
   // Initialize form with empty data
-  const form = await superValidate({
-    name: '',
-    type: 'ELECTRICITY',
-    status: 'ACTIVE',
-    location_type: 'PROPERTY',
-    property_id: null,
-    floor_id: null,
-    rental_unit_id: null,
-    unit_rate: 0,
-    initial_reading: 0,
-    is_active: true,
-    notes: null
-  }, zod(meterFormSchema));
+  const form = await superValidate(
+    {
+      type: 'ELECTRICITY',
+      status: 'ACTIVE',
+      name: '',
+      location_type: 'PROPERTY',
+      property_id: null,
+      floor_id: null,
+      rental_unit_id: null,
+      initial_reading: 0,
+      unit_rate: 0,
+      notes: null
+    },
+    zod(meterSchema)
+  );
 
   return {
     form,
@@ -110,7 +112,7 @@ export const actions = {
       return fail(401, { message: 'Unauthorized' });
     }
 
-    const form = await superValidate(request, zod(meterFormSchema));
+    const form = await superValidate(request, zod(meterSchema));
     if (!form.valid) {
       return fail(400, { form });
     }
@@ -220,7 +222,7 @@ export const actions = {
       return fail(401, { message: 'Unauthorized' });
     }
 
-    const form = await superValidate(request, zod(meterFormSchema));
+    const form = await superValidate(request, zod(meterSchema));
     if (!form.valid) {
       return fail(400, { form });
     }

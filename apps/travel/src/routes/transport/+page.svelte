@@ -1,73 +1,111 @@
 <script lang="ts">
-  const services = [
+  interface TransportRate {
+    vehicle: string;
+    tubigonPort: string;
+    tagbilaranRate: string;
+    airportRate: string;
+    maxPax: string;
+  }
+
+  const rates: TransportRate[] = [
     {
-      title: "Airport Transfer",
-      description: "Direct transfer from Tagbilaran Airport to our resort",
-      price: "$50",
-      image: "https://picsum.photos/800/600?random=15",
-      features: ["Air-conditioned vehicle", "Professional driver", "Meet & greet service"]
+      vehicle: "Sedan / Car",
+      tubigonPort: "P1000 /unit / way",
+      tagbilaranRate: "P2,000net/unit/way",
+      airportRate: "P2,300net/unit/way",
+      maxPax: "2pax"
     },
     {
-      title: "Island Ferry Service",
-      description: "Regular ferry service between Cabilao and mainland Bohol",
-      price: "$25",
-      image: "https://picsum.photos/800/600?random=16",
-      features: ["Multiple daily trips", "Safe and comfortable", "Luggage assistance"]
+      vehicle: "Van",
+      tubigonPort: "P1500 / unit / way",
+      tagbilaranRate: "P2,300net/unit/way",
+      airportRate: "P2,800net/unit/way",
+      maxPax: "10pax"
     },
     {
-      title: "Private Boat Charter",
-      description: "Exclusive boat service for island hopping or custom trips",
-      price: "$199",
-      image: "https://picsum.photos/800/600?random=17",
-      features: ["Customizable itinerary", "Experienced crew", "Refreshments included"]
+      vehicle: "Coaster",
+      tubigonPort: "P10,000 / unit / wa",
+      tagbilaranRate: "P7,000net/unit/way",
+      airportRate: "P7,000net/unit/way",
+      maxPax: "22pax"
+    },
+    {
+      vehicle: "Bus",
+      tubigonPort: "P12,000 / unit / way",
+      tagbilaranRate: "P8,500net/unit/way",
+      airportRate: "P8,500net/unit/way",
+      maxPax: "45pax"
     }
+  ];
+
+  const terms = [
+    "Kids rate range from 4-8 yrs Old (50% off) / Included in the headcount.",
+    "0-3 Yrs old, Free of Charge (Max of 2Kids) / Not included in the headcount.",
+    "Transportation cancellation must be done at least one week prior to arrival or use of vehicle."
   ];
 </script>
 
 <div class="min-h-screen bg-white">
-  <div class="relative h-[60vh] overflow-hidden">
+  <div class="relative h-[40vh] overflow-hidden">
     <img 
-      src="https://picsum.photos/1920/1080?random=18" 
+      src="https://res.cloudinary.com/ddlz560fk/image/upload/v1707628800/transport-hero_kj8f9p.jpg" 
       alt="Transport hero"
       class="w-full h-full object-cover"
     />
     <div class="absolute inset-0 bg-black/50 flex items-center justify-center">
       <div class="text-center text-white">
-        <h1 class="text-5xl font-bold mb-4">Transportation Services</h1>
-        <p class="text-xl opacity-90">Seamless travel to and around Cabilao Island</p>
+        <h1 class="text-4xl font-bold mb-4">BOHOL TRANSFER RATES</h1>
       </div>
     </div>
   </div>
 
-  <div class="max-w-7xl mx-auto px-4 py-16">
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-      {#each services as service}
-        <div class="bg-white rounded-lg shadow-lg overflow-hidden">
-          <img 
-            src={service.image} 
-            alt={service.title}
-            class="w-full h-48 object-cover"
-          />
-          <div class="p-6">
-            <h3 class="text-2xl font-bold mb-2">{service.title}</h3>
-            <p class="text-gray-600 mb-4">{service.description}</p>
-            <ul class="space-y-2 mb-4">
-              {#each service.features as feature}
-                <li class="flex items-center text-gray-600">
-                  <span class="text-blue-600 mr-2">✓</span>
-                  {feature}
-                </li>
-              {/each}
-            </ul>
-            <div class="flex justify-between items-center">
-              <span class="text-2xl font-bold text-blue-600">{service.price}</span>
-              <button class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors">
-                Book Now
-              </button>
-            </div>
-          </div>
-        </div>
-      {/each}
+  <div class="max-w-7xl mx-auto px-4 py-12">
+    <!-- Rates Table -->
+    <div class="overflow-x-auto">
+      <table class="w-full border-collapse">
+        <thead>
+          <tr class="bg-gray-100">
+            <th class="border p-4 text-left">VEHICLE</th>
+            <th class="border p-4 text-left">Tubigon Sea Port</th>
+            <th class="border p-4 text-left">Tagbilaran Transfer rates</th>
+            <th class="border p-4 text-left">Airport Transfer rates</th>
+            <th class="border p-4 text-left">Maximum number of pax</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each rates as rate}
+            <tr class="hover:bg-gray-50">
+              <td class="border p-4">{rate.vehicle}</td>
+              <td class="border p-4">{rate.tubigonPort}</td>
+              <td class="border p-4">{rate.tagbilaranRate}</td>
+              <td class="border p-4">{rate.airportRate}</td>
+              <td class="border p-4">{rate.maxPax}</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Terms & Conditions -->
+    <div class="mt-12">
+      <h2 class="text-xl font-bold mb-4">Terms & Conditions:</h2>
+      <ul class="space-y-2 list-disc pl-5">
+        {#each terms as term}
+          <li class="text-gray-700">{term}</li>
+        {/each}
+      </ul>
+    </div>
+
+    <!-- Contact Information -->
+    <div class="mt-8">
+      <p class="text-gray-700">
+        Looking for partners and enjoying the agreed price, as long as you love traveling and islands, both travel agencies and backpackers can become our partners and enjoy our preferential price and special courtesy.
+      </p>
+      <p class="mt-4">
+        Please send your name, date of birth and country information to 
+        <a href="mailto:eomortal@gmail.com" class="text-orange-600 hover:underline">eomortal@gmail.com</a>
+        .Thank you!
+      </p>
     </div>
   </div>
 </div>

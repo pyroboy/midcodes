@@ -1,331 +1,342 @@
 <script lang="ts">
-  import { run } from 'svelte/legacy';
 
-  import { superForm } from 'sveltekit-superforms/client';
-  import type { SuperValidated } from 'sveltekit-superforms';
-  import { zod } from 'sveltekit-superforms/adapters';
-  import * as Alert from '$lib/components/ui/alert';
-  import * as Select from '$lib/components/ui/select';
-  import { Button } from '$lib/components/ui/button';
-  import { Input } from '$lib/components/ui/input';
-  import { Label } from '$lib/components/ui/label';
-  import { Textarea } from '$lib/components/ui/textarea';
-  import { utilityTypeEnum, meterStatusEnum, locationTypeEnum, type MeterFormData, meterFormSchema } from './formSchema';
-  import type { Database } from '$lib/database.types';
+  import { meterSchema, locationTypeEnum, utilityTypeEnum, meterStatusEnum, type FormSelectValue } from './formSchema';
+  import type { Property, Floor, RentalUnit } from './formSchema';
+  import { Button } from "$lib/components/ui/button";
+  import { Input } from "$lib/components/ui/input";
+  import { Label } from "$lib/components/ui/label";
+  import * as Select from "$lib/components/ui/select";
   import { createEventDispatcher } from 'svelte';
+  import { Textarea } from "$lib/components/ui/textarea";
 
-  type Property = Database['public']['Tables']['properties']['Row'];
-  type Floor = Database['public']['Tables']['floors']['Row'] & {
-    property: Property | null;
-  };
-  type Rental_unit = Database['public']['Tables']['rental_unit']['Row'] & {
-    floor: Floor | null;
-  };
 
-  interface Props {
-    form: SuperValidated<MeterFormData, any>;
-    properties?: Property[];
-    floors?: Floor[];
-    rental_unit?: Rental_unit[];
-    meter?: MeterFormData | undefined;
-  }
 
   let {
+    data,
+    editMode = false,
+    onMeterAdded,
     form,
-    properties = [],
-    floors = [],
-    rental_unit = [],
-    meter = undefined
-  }: Props = $props();
+    errors,
+    enhance,
+    constraints,
+    submitting,
+  } = $props();
 
-  const dispatch = createEventDispatcher<{
-    meterAdded: void;
-    meterUpdated: void;
-  }>();
+  const dispatch = createEventDispatcher();
 
-  const { enhance, errors, delayed, message, form: formData } = superForm(form, {
-    resetForm: true,
-    onResult: ({ result }) => {
-      if (result.type === 'success') {
-        dispatch(meter ? 'meterUpdated' : 'meterAdded');
-      }
+  // Single Select for Property
+  let selectedProperty = {
+    get value(): string | undefined { 
+      return $form.property_id?.toString();
+    },
+    set value(id: string | undefined) { 
+      $form.property_id = id ? parseInt(id) : null;
+      $form.floor_id = null;
+      $form.rental_unit_id = null;
     }
-  });
+  };
 
-  run(() => {
-    if (meter) {
-      $formData = {
-        ...meter
-      };
+  // Single Select for Floor
+  let selectedFloor = {
+    get value(): string | undefined { 
+      return $form.floor_id?.toString();
+    },
+    set value(id: string | undefined) { 
+      $form.floor_id = id ? parseInt(id) : null;
+      $form.rental_unit_id = null;
     }
-  });
+  };
 
-  function getLocationLabel(type: string, id: number | null): string {
-    if (!id) return '';
-    
-    switch (type) {
+  // Single Select for Rental Unit
+  let selectedRentalUnit = {
+    get value(): string | undefined { 
+      return $form.rental_unit_id?.toString();
+    },
+    set value(id: string | undefined) { 
+      $form.rental_unit_id = id ? parseInt(id) : null;
+    }
+  };
+
+  let triggerLocation = $derived.by(() => {
+    switch ($form.location_type) {
       case 'PROPERTY':
-        return properties.find(p => p.id === id)?.name || '';
+        const property = (data.properties as Property[] | undefined)?.find(p => p.id === $form.property_id);
+        return property ? property.name : "Select a property";
       case 'FLOOR':
-        const floor = floors.find(f => f.id === id);
-        return floor ? `${floor.property?.name || ''} - Floor ${floor.floor_number} ${floor.wing || ''}` : '';
+        const floor = (data.floors as Floor[] | undefined)?.find(f => f.id === $form.floor_id);
+        return floor ? `Floor ${floor.floor_number}${floor.wing ? `, Wing ${floor.wing}` : ''}` : "Select a floor";
       case 'RENTAL_UNIT':
-        const unit = rental_unit.find(r => r.id === id);
-        return unit ? `${unit.floor?.property?.name || ''} - Floor ${unit.floor?.floor_number || ''} - Rental_unit ${unit.number}` : '';
+        const unit = (data.rental_units as RentalUnit[] | undefined)?.find(r => r.id === $form.rental_unit_id);
+        return unit ? `Unit ${unit.number}` : "Select a rental unit";
       default:
-        return '';
+        return "Select location type first";
     }
+  });
+
+  function handleCancel() {
+    dispatch('cancel');
   }
 
-  let filteredProperties = $derived(properties.filter(p => p.status === 'ACTIVE'));
-  let filteredFloors = $derived(floors.filter(f => f.status === 'ACTIVE'));
-  let filteredRental_Units = $derived(rental_unit.filter(r => r.rental_unit_status === 'VACANT' || r.rental_unit_status === 'OCCUPIED'));
-
-  let locationLabel = $derived($formData.location_type ? 
-    getLocationLabel($formData.location_type, 
-      $formData.location_type === 'PROPERTY' ? Number($formData.property_id) : 
-      $formData.location_type === 'FLOOR' ? Number($formData.floor_id) : 
-      Number($formData.rental_unit_id)
-    ) : '');
-
-  function handleLocationTypeChange(type: string) {
-    if (type === 'PROPERTY' || type === 'FLOOR' || type === 'RENTAL_UNIT') {
-      $formData.location_type = type;
-      $formData.property_id = null;
-      $formData.floor_id = null;
-      $formData.rental_unit_id = null;
-    }
-  }
-
-  function handleLocationChange(id: string) {
-    const numId = Number(id);
-    switch ($formData.location_type) {
-      case 'PROPERTY':
-        $formData.property_id = numId;
-        break;
-      case 'FLOOR':
-        $formData.floor_id = numId;
-        break;
-      case 'RENTAL_UNIT':
-        $formData.rental_unit_id = numId;
-        break;
-    }
+  function handleDelete() {
+    dispatch('delete');
   }
 </script>
 
-<form method="POST" use:enhance>
-  <div class="space-y-4">
-    {#if $message}
-      <Alert.Root>
-        <Alert.Title>{$message}</Alert.Title>
-      </Alert.Root>
+<form
+  method="POST"
+  action={editMode ? "?/update" : "?/create"}
+  use:enhance
+  class="space-y-4"
+  novalidate
+>
+  {#if editMode && $form.id}
+    <input type="hidden" name="id" bind:value={$form.id} />
+  {/if}
+
+  <div class="space-y-2">
+    <Label for="name">Name</Label>
+    <Input
+      type="text"
+      id="name"
+      name="name"
+      bind:value={$form.name}
+      data-error={!!$errors.name}
+      {...$constraints.name}
+    />
+    {#if $errors.name}
+      <p class="text-sm font-medium text-destructive">{$errors.name}</p>
     {/if}
+  </div>
 
-    <div>
-      <Label for="name">Name</Label>
-      <Input type="text" id="name" bind:value={$formData.name} maxlength={255} required />
-      {#if $errors.name}<span class="text-red-500">{$errors.name}</span>{/if}
-    </div>
-
-    <div>
-      <Label for="location_type">Location Type</Label>
-      <!-- <Select.Root
-        selected={{
-          label: $formData.location_type || 'Select location type',
-          value: $formData.location_type || ''
-        }}
-        onSelectedChange={(s) => {
-          if (s?.value) {
-            handleLocationTypeChange(s.value);
-          }
-        }}
+  <div class="space-y-2">
+    <Label for="location_type">Location Type</Label>
+    <Select.Root
+      type="single"
+      name="location_type"
+      bind:value={$form.location_type}
+    >
+      <Select.Trigger 
+        class="w-full"
+        data-error={!!$errors.location_type}
+        {...$constraints.location_type}
       >
-        <Select.Trigger class="w-full">
-          <Select.Value placeholder="Select location type" />
+        {$form.location_type || "Select location type"}
+      </Select.Trigger>
+      <Select.Content>
+        {#each locationTypeEnum.options as type}
+          <Select.Item value={type}>{type.replace('_', ' ')}</Select.Item>
+        {/each}
+      </Select.Content>
+    </Select.Root>
+    {#if $errors.location_type}
+      <p class="text-sm font-medium text-destructive">{$errors.location_type}</p>
+    {/if}
+  </div>
+
+  {#if $form.location_type === 'PROPERTY'}
+    <div class="space-y-2">
+      <Label for="property_id">Property</Label>
+      <Select.Root
+        type="single"
+        name="property_id"
+        bind:value={selectedProperty.value}
+      >
+        <Select.Trigger 
+          class="w-full"
+          data-error={!!$errors.property_id}
+          {...$constraints.property_id}
+        >
+          {triggerLocation}
         </Select.Trigger>
         <Select.Content>
-          <Select.Item value="PROPERTY">Property</Select.Item>
-          <Select.Item value="FLOOR">Floor</Select.Item>
-          <Select.Item value="RENTAL_UNIT">Rental_unit</Select.Item>
+          <div class="max-h-[200px] overflow-y-auto">
+            {#each data.properties ?? [] as property (property.id)}
+            <Select.Item value={property.id.toString()}>
+              {property.name}
+            </Select.Item>
+          {/each}
+          </div>
         </Select.Content>
-      </Select.Root> -->
-      {#if $errors.location_type}<span class="text-red-500">{$errors.location_type}</span>{/if}
+      </Select.Root>
+      {#if $errors.property_id}
+        <p class="text-sm font-medium text-destructive">{$errors.property_id}</p>
+      {/if}
     </div>
+  {/if}
 
-    {#if $formData.location_type === 'PROPERTY'}
-      <div>
-        <Label for="property_id">Property</Label>
-        <!-- <Select.Root
-          selected={{
-            label: $formData.property_id ? getLocationLabel('PROPERTY', Number($formData.property_id)) : 'Select property',
-            value: $formData.property_id?.toString() || ''
-          }}
-          onSelectedChange={(s) => {
-            if (s?.value) {
-              handleLocationChange(s.value);
-            }
-          }}
+  {#if $form.location_type === 'FLOOR'}
+    <div class="space-y-2">
+      <Label for="floor_id">Floor</Label>
+      <Select.Root
+        type="single"
+        name="floor_id"
+        bind:value={selectedFloor.value}
+      >
+        <Select.Trigger 
+          class="w-full"
+          data-error={!!$errors.floor_id}
+          {...$constraints.floor_id}
         >
-          <Select.Trigger class="w-full">
-            <Select.Value placeholder="Select property" />
-          </Select.Trigger>
-          <Select.Content>
-            {#each filteredProperties as property}
-              <Select.Item value={property.id.toString()}>{property.name}</Select.Item>
-            {/each}
-          </Select.Content>
-        </Select.Root> -->
-        {#if $errors.property_id}<span class="text-red-500">{$errors.property_id}</span>{/if}
-      </div>
-    {:else if $formData.location_type === 'FLOOR'}
-      <div>
-        <Label for="floor_id">Floor</Label>
-        <!-- <Select.Root
-          selected={{
-            label: $formData.floor_id ? getLocationLabel('FLOOR', Number($formData.floor_id)) : 'Select floor',
-            value: $formData.floor_id?.toString() || ''
-          }}
-          onSelectedChange={(s) => {
-            if (s?.value) {
-              handleLocationChange(s.value);
-            }
-          }}
-        >
-          <Select.Trigger class="w-full">
-            <Select.Value placeholder="Select floor" />
-          </Select.Trigger>
-          <Select.Content>
-            {#each filteredFloors as floor}
+          {triggerLocation}
+        </Select.Trigger>
+        <Select.Content>
+          <div class="max-h-[200px] overflow-y-auto">
+            {#each data.floors?? [] as floor(floor.id)}
               <Select.Item value={floor.id.toString()}>
-                Floor {floor.floor_number}{floor.wing ? `, Wing ${floor.wing}` : ''}{floor.property ? ` - ${floor.property.name}` : ''}
+                Floor {floor.floor_number}
+                {floor.wing ? `, Wing ${floor.wing}` : ''}
+                {floor.property ? ` - ${floor.property.name}` : ''}
               </Select.Item>
             {/each}
-          </Select.Content>
-        </Select.Root> -->
-        {#if $errors.floor_id}<span class="text-red-500">{$errors.floor_id}</span>{/if}
-      </div>
-    {:else if $formData.location_type === 'RENTAL_UNIT'}
-      <div>
-        <Label for="rental_unit_id">Rental_unit</Label>
-        <!-- <Select.Root
-          selected={{
-            label: $formData.rental_unit_id ? getLocationLabel('RENTAL_UNIT', Number($formData.rental_unit_id)) : 'Select rental_unit',
-            value: $formData.rental_unit_id?.toString() || ''
-          }}
-          onSelectedChange={(s) => {
-            if (s?.value) {
-              handleLocationChange(s.value);
-            }
-          }}
+          </div>
+        </Select.Content>
+      </Select.Root>
+      {#if $errors.floor_id}
+        <p class="text-sm font-medium text-destructive">{$errors.floor_id}</p>
+      {/if}
+    </div>
+  {/if}
+
+  {#if $form.location_type === 'RENTAL_UNIT'}
+    <div class="space-y-2">
+      <Label for="rental_unit_id">Rental Unit</Label>
+      <Select.Root
+        type="single"
+        name="rental_unit_id"
+        bind:value={selectedRentalUnit.value}
+      >
+        <Select.Trigger 
+          class="w-full"
+          data-error={!!$errors.rental_unit_id}
+          {...$constraints.rental_unit_id}
         >
-          <Select.Trigger class="w-full">
-            <Select.Value placeholder="Select rental_unit" />
-          </Select.Trigger>
-          <Select.Content>
-            {#each filteredRental_Units as rental_unit}
-              <Select.Item value={rental_unit.id.toString()}>
-                Rental_unit {rental_unit.number}
-                {#if rental_unit.floor?.property}
-                  - {rental_unit.floor.property.name}
-                {/if}
+          {triggerLocation}
+        </Select.Trigger>
+        <Select.Content>
+          <div class="max-h-[200px] overflow-y-auto">
+            {#each data.rental_units ?? [] as unit (unit.id)}
+              <Select.Item value={unit.id.toString()}>
+                Unit {unit.number}
+                {unit.floor?.property && ` - ${unit.floor.property.name}`}
               </Select.Item>
             {/each}
-          </Select.Content>
-        </Select.Root> -->
-        {#if $errors.rental_unit_id}<span class="text-red-500">{$errors.rental_unit_id}</span>{/if}
-      </div>
+          </div>
+        </Select.Content>
+      </Select.Root>
+      {#if $errors.rental_unit_id}
+        <p class="text-sm font-medium text-destructive">{$errors.rental_unit_id}</p>
+      {/if}
+    </div>
+  {/if}
+
+  <div class="space-y-2">
+    <Label for="type">Utility Type</Label>
+    <Select.Root
+      type="single"
+      name="type"
+      bind:value={$form.type}
+    >
+      <Select.Trigger 
+        class="w-full"
+        data-error={!!$errors.type}
+        {...$constraints.type}
+      >
+        {$form.type || "Select utility type"}
+      </Select.Trigger>
+      <Select.Content>
+        {#each utilityTypeEnum.options as type}
+          <Select.Item value={type}>
+            {type.replace('_', ' ')}
+          </Select.Item>
+        {/each}
+      </Select.Content>
+    </Select.Root>
+    {#if $errors.type}
+      <p class="text-sm font-medium text-destructive">{$errors.type}</p>
     {/if}
+  </div>
 
-    <div>
-      <Label for="type">Utility Type</Label>
-      <!-- <Select.Root
-        selected={{
-          label: $formData.type || 'Select utility type',
-          value: $formData.type || ''
-        }}
-        onSelectedChange={(s) => {
-          if (s?.value) {
-            $formData.type = s.value;
-          }
-        }}
+  <div class="space-y-2">
+    <Label for="initial_reading">Initial Reading</Label>
+    <Input
+      type="number"
+      id="initial_reading"
+      name="initial_reading"
+      bind:value={$form.initial_reading}
+      min="0"
+      step="0.01"
+      data-error={!!$errors.initial_reading}
+      {...$constraints.initial_reading}
+    />
+    {#if $errors.initial_reading}
+      <p class="text-sm font-medium text-destructive">{$errors.initial_reading}</p>
+    {/if}
+  </div>
+
+  <div class="space-y-2">
+    <Label for="unit_rate">Unit Rate</Label>
+    <Input
+      type="number"
+      id="unit_rate"
+      name="unit_rate"
+      bind:value={$form.unit_rate}
+      min="0"
+      step="0.01"
+      data-error={!!$errors.unit_rate}
+      {...$constraints.unit_rate}
+    />
+    {#if $errors.unit_rate}
+      <p class="text-sm font-medium text-destructive">{$errors.unit_rate}</p>
+    {/if}
+  </div>
+
+  <div class="space-y-2">
+    <Label for="notes">Notes</Label>
+    <Textarea
+      id="notes"
+      name="notes"
+      bind:value={$form.notes}
+      rows={3}
+      data-error={!!$errors.notes}
+      {...$constraints.notes}
+    />
+    {#if $errors.notes}
+      <p class="text-sm font-medium text-destructive">{$errors.notes}</p>
+    {/if}
+  </div>
+
+  <!-- Action Buttons -->
+  <div class="flex justify-end space-x-2">
+    {#if editMode}
+      <Button
+        type="button"
+        variant="destructive"
+        onclick={handleDelete}
       >
-        <Select.Trigger class="w-full">
-          <Select.Value placeholder="Select utility type" />
-        </Select.Trigger>
-        <Select.Content>
-          <Select.Item value="ELECTRICITY">Electricity</Select.Item>
-          <Select.Item value="WATER">Water</Select.Item>
-          <Select.Item value="INTERNET">Internet</Select.Item>
-        </Select.Content>
-      </Select.Root> -->
-      {#if $errors.type}<span class="text-red-500">{$errors.type}</span>{/if}
-    </div>
-
-    <div>
-      <Label for="initial_reading">Initial Reading</Label>
-      <Input 
-        type="number" 
-        id="initial_reading" 
-        bind:value={$formData.initial_reading} 
-        min="0" 
-        step="0.01" 
-        required 
-      />
-      {#if $errors.initial_reading}<span class="text-red-500">{$errors.initial_reading}</span>{/if}
-    </div>
-
-    <div>
-      <Label for="unit_rate">Unit Rate</Label>
-      <Input 
-        type="number" 
-        id="unit_rate" 
-        bind:value={$formData.unit_rate} 
-        min="0" 
-        step="0.01" 
-        required 
-      />
-      {#if $errors.unit_rate}<span class="text-red-500">{$errors.unit_rate}</span>{/if}
-    </div>
-
-    <div>
-      <Label for="status">Status</Label>
-      <!-- <Select.Root
-        selected={{
-          label: $formData.status || 'Select status',
-          value: $formData.status || ''
-        }}
-        onSelectedChange={(s) => {
-          if (s?.value) {
-            $formData.status = s.value;
-          }
-        }}
-      >
-        <Select.Trigger class="w-full">
-          <Select.Value placeholder="Select status" />
-        </Select.Trigger>
-        <Select.Content>
-          <Select.Item value="ACTIVE">Active</Select.Item>
-          <Select.Item value="INACTIVE">Inactive</Select.Item>
-          <Select.Item value="MAINTENANCE">Maintenance</Select.Item>
-        </Select.Content>
-      </Select.Root> -->
-      {#if $errors.status}<span class="text-red-500">{$errors.status}</span>{/if}
-    </div>
-
-    <div>
-      <Label for="notes">Notes</Label>
-      <Textarea id="notes" bind:value={$formData.notes} />
-      {#if $errors.notes}<span class="text-red-500">{$errors.notes}</span>{/if}
-    </div>
-
-    <div class="flex justify-end gap-2">
-      <Button type="submit" disabled={$delayed}>
-        {#if $delayed}
-          Saving...
-        {:else}
-          Save
-        {/if}
+        Delete
       </Button>
-    </div>
+    {/if}
+    <Button
+      type="button"
+      variant="outline"
+      onclick={handleCancel}
+    >
+      Cancel
+    </Button>
+    <Button type="submit" disabled={$submitting}>
+      {#if $submitting}
+        Saving...
+      {:else}
+        {editMode ? 'Update' : 'Create'} Meter
+      {/if}
+    </Button>
   </div>
 </form>
+
+<style lang="postcss">
+  :global([data-error="true"]) {
+    border-color: hsl(var(--destructive)) !important;
+    --tw-ring-color: hsl(var(--destructive)) !important;
+    outline: none !important;
+  }
+</style>

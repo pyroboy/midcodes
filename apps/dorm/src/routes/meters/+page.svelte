@@ -5,21 +5,14 @@
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
-  import { page } from '$app/stores';
-  import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-  } from "$lib/components/ui/select";
-  import { utilityTypeEnum, meterStatusEnum, type MeterFormData, meterFormSchema } from './formSchema';
+
+  import { utilityTypeEnum, meterStatusEnum, type MeterFormData, meterSchema } from './formSchema';
   import { Loader2 } from 'lucide-svelte';
   import type { z } from 'zod';
   import type { Database } from '$lib/database.types';
   import type { PageData } from './$types';
   import type { SuperValidated } from 'sveltekit-superforms';
-  import { superValidate } from 'sveltekit-superforms/client';
-  import { zod } from 'sveltekit-superforms/adapters';
+
   import MeterForm from './MeterForm.svelte';
 
   type Property = Database['public']['Tables']['properties']['Row'];
@@ -30,11 +23,9 @@
     floor: Floor | null;
   };
 
-  interface Props {
-    data: PageData;
-  }
 
-  let { data }: Props = $props();
+
+  let { data } = $props();
   let showForm = $state(false);
   let selectedMeter: MeterFormData | undefined = $state();
   let loading = false;
@@ -63,7 +54,6 @@
       rental_unit_id: null,
       unit_rate: 0,
       initial_reading: 0,
-      is_active: true,
       notes: null
     }
   };
@@ -296,13 +286,10 @@
         }}>Cancel</Button>
       </div>
       <MeterForm
+        {...data}
         form={form ?? defaultForm}
-        properties={properties ?? []}
-        floors={floors ?? []}
-        rental_unit={rental_unit ?? []}
-        meter={selectedMeter}
-        on:meterAdded={handleMeterAdded}
-        on:meterUpdated={handleMeterAdded}
+        editMode={false}
+        onMeterAdded={handleMeterAdded}
       />
     </div>
   {/if}
