@@ -4,7 +4,7 @@
   import { onMount } from 'svelte';
   import { goto, preloadData } from '$app/navigation';
   import { page } from '$app/stores';
-  
+  // import { Toaster } from "$lib/components/ui/sonner";
   let { data, children }: LayoutProps = $props();
   let isLocationsOpen = $state(false);
   let isRentManagementOpen = $state(false);
@@ -206,9 +206,15 @@
       </div>
     </div>
   </nav>
-
+  <!-- <Toaster 
+    theme="system" 
+    richColors
+    expand={true}
+    closeButton
+  /> -->
   <!-- Main content -->
   <main>
+
     {@render children()}
   </main>
 </div>

@@ -6,17 +6,13 @@
   import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
   import LeaseForm from './LeaseForm.svelte';
   import LeaseList from './LeaseList.svelte';
-  import type { PageData } from './$types';
   import { leaseSchema } from './formSchema';
   import type { z } from 'zod';
 
-  interface Props {
-    data: PageData;
-  }
 
   type FormType = z.infer<typeof leaseSchema>;
   
-  let { data }: Props = $props();
+  let { data } = $props();
   let leases = $state(data.leases);
   let editMode = $state(false);
   let selectedLease: FormType | undefined = $state();

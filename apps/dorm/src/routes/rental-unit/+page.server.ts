@@ -12,7 +12,7 @@ type DBFloor = Database['public']['Tables']['floors']['Row'];
 
 export type RentalUnitResponse = DBRentalUnit & {
   property: Pick<DBProperty, 'id' | 'name'> | null;
-  floor: Pick<DBFloor, 'id' | 'floor_number' | 'wing'> | null;
+  floor: Pick<DBFloor, 'id' | 'property_id' | 'floor_number' | 'wing'> | null;
 };
 export const load: PageServerLoad = async ({ locals }) => {
   console.log('🔄 Starting server-side load function for rental units');
@@ -34,7 +34,7 @@ export const load: PageServerLoad = async ({ locals }) => {
         .select(`
           *,
           property:properties!rental_unit_property_id_fkey(id, name),
-          floor:floors!rental_unit_floor_id_fkey(id, floor_number, wing)
+          floor:floors!rental_unit_floor_id_fkey(id, property_id, floor_number, wing)
         `)
         .order('property_id, floor_id, number'),
       

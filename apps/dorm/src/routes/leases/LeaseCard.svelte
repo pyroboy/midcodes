@@ -3,7 +3,6 @@
   import * as Card from '$lib/components/ui/card';
   import { Badge } from '$lib/components/ui/badge';
   import Button from '$lib/components/ui/button/button.svelte';
-  import * as Accordion from '$lib/components/ui/accordion';
   import PaymentModal from './PaymentModal.svelte';
   import { invalidateAll } from "$app/navigation";
   import { createEventDispatcher } from 'svelte';
@@ -11,6 +10,7 @@
   import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
   import { leaseStatusEnum } from './formSchema';
   import * as AccordionPrimitive from "$lib/components/ui/accordion";
+  import { Pencil, Trash2 } from 'lucide-svelte';
   
   // Keep all interfaces and functions from before
   interface BillingBreakdown {
@@ -313,14 +313,25 @@ console.log('LeaseCard.svelte', JSON.parse(JSON.stringify({lease})));
                 autofocus
               />
             {:else}
-              <span 
-                class="text-lg font-semibold cursor-pointer hover:text-primary truncate"
-                ondblclick={handleLeaseNameDoubleClick}
-                role="button"
-                tabindex="0"
-              >
-                {lease.name || `Lease #${lease.id}`}
-              </span>
+              <div class="flex items-center gap-1 group">
+                <span 
+                  class="text-lg font-semibold cursor-pointer hover:text-primary truncate"
+                  ondblclick={handleLeaseNameDoubleClick}
+                  role="button"
+                  tabindex="0"
+                >
+                  {lease.name || `Lease #${lease.id}`}
+                </span>
+                <button 
+                  class="opacity-0 group-hover:opacity-100 transition-opacity"
+                  onclick={(e) => {
+                    e.stopPropagation();
+                    handleLeaseNameDoubleClick();
+                  }}
+                >
+                  <Pencil class="w-3.5 h-3.5 text-muted-foreground hover:text-primary" />
+                </button>
+              </div>
             {/if}
 
             <DropdownMenu.Root>
@@ -366,34 +377,36 @@ console.log('LeaseCard.svelte', JSON.parse(JSON.stringify({lease})));
           </div>
 
           <!-- Right: Balance and Actions -->
-          <div class="flex items-center gap-4 flex-1 justify-end">
-            <div class="flex items-center gap-1">
-              <span class="text-sm text-muted-foreground">Balance:</span>
-              <span class={`font-semibold ${lease.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                {formatCurrency(lease.balance)}
-              </span>
+          <div class="flex items-end gap-4 flex-1 justify-end">
+            <div class="flex flex-col items-end gap-2">
+              <div class="flex items-center gap-1">
+                <span class="text-sm text-muted-foreground">Balance:</span>
+                <span class={`font-semibold ${lease.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                  {formatCurrency(lease.balance)}
+                </span>
+              </div>
+              <Button 
+                size="sm" 
+                variant="outline"
+                onclick={(e) => {
+                  e.stopPropagation();
+                  showPaymentModal = true;
+                }}
+                class="h-8 w-full"
+              >
+                Make Payment
+              </Button>
             </div>
             <Button 
-              size="sm" 
-              variant="outline"
-              onclick={(e) => {
-                e.stopPropagation();
-                showPaymentModal = true;
-              }}
-              class="h-8"
-            >
-              Make Payment
-            </Button>
-            <Button 
-              size="sm" 
-              variant="destructive" 
+              size="icon"
+              variant="ghost"
               onclick={(e) => {
                 e.stopPropagation();
                 onDelete(e, lease);
               }}
-              class="h-8"
+              class="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
             >
-              Delete
+              <Trash2 class="w-4 h-4" />
             </Button>
           </div>
         </div>

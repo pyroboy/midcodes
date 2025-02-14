@@ -4,13 +4,12 @@
   import { Button } from '$lib/components/ui/button';
   import { superForm } from 'sveltekit-superforms/client';
   import { zodClient } from 'sveltekit-superforms/adapters';
-  import { rental_unitSchema, type Rental_unit } from './formSchema';
+  import { rental_unitSchema } from './formSchema';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { invalidate,invalidateAll } from '$app/navigation';
   import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
   import { browser } from "$app/environment";
   import type { RentalUnitResponse } from './+page.server';
-import type { RentalUnit } from './formSchema';
 
 
 
@@ -45,7 +44,7 @@ import type { RentalUnit } from './formSchema';
     }
   });
 
-  function handleRentalUnitClick(rentalUnit:RentalUnit) {
+  function handleRentalUnitClick(rentalUnit: typeof data.rentalUnits[number]) {
     editMode = true;
     $formData = {
       id: rentalUnit.id,
@@ -58,14 +57,19 @@ import type { RentalUnit } from './formSchema';
       base_rate: rentalUnit.base_rate,
       type: rentalUnit.type,
       amenities: Array.isArray(rentalUnit.amenities) ? rentalUnit.amenities : [],
-      property: rentalUnit.property ,
-      floor: rentalUnit.floor ? { ...rentalUnit.floor, wing: rentalUnit.floor.wing || undefined } : undefined,
+      property: rentalUnit.property ? { id: rentalUnit.property.id, name: rentalUnit.property.name } : undefined,
+      floor: rentalUnit.floor ? {
+        id: rentalUnit.floor.id,
+        property_id: rentalUnit.property_id,
+        floor_number: rentalUnit.floor.floor_number,
+        wing: rentalUnit.floor.wing || undefined
+      } : undefined,
       created_at: rentalUnit.created_at,
       updated_at: rentalUnit.updated_at ?? undefined
     };
   }
 
-  async function handleDeleteRentalUnit(rentalUnit: RentalUnitResponse) {
+  async function handleDeleteRentalUnit(rentalUnit: typeof data.rentalUnits[number]) {
     if (!confirm(`Are you sure you want to delete rental unit ${rentalUnit.name}?`)) {
       return;
     }

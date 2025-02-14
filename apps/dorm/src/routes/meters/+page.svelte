@@ -14,7 +14,11 @@
   import type { SuperValidated } from 'sveltekit-superforms';
 
   import MeterForm from './MeterForm.svelte';
+  import { superForm } from 'sveltekit-superforms/client';
+  import { zodClient } from 'sveltekit-superforms/adapters';
+  import { invalidate } from '$app/navigation';
 
+  // Type definitions
   type Property = Database['public']['Tables']['properties']['Row'];
   type Floor = Database['public']['Tables']['floors']['Row'] & {
     property: Property | null;
@@ -27,7 +31,7 @@
 
   let { data } = $props();
   let showForm = $state(false);
-  let selectedMeter: MeterFormData | undefined = $state();
+  let selectedMeter: ExtendedMeterFormData | undefined = $state();
   let loading = false;
   let error: string | null = null;
   let selectedType: z.infer<typeof utilityTypeEnum> | undefined = $state(undefined);
@@ -35,11 +39,37 @@
   let searchQuery = $state('');
   let sortBy: 'name' | 'type' | 'status' | 'reading' = $state('name');
   let sortOrder: 'asc' | 'desc' = $state('asc');
+  let editMode = $state(false);
 
-  let { form, meters = [], properties = [], floors = [], rental_unit = [], isAdminLevel, isUtility, isMaintenance } = $derived(data);
+  let { meters = [], properties = [], floors = [], rental_unit = [], isAdminLevel, isUtility, isMaintenance } = $derived(data);
 
-  // Create a default form value
-  const defaultForm: SuperValidated<MeterFormData, any> = {
+  // Form handling
+  const { form, enhance, errors, constraints, submitting, reset } = superForm(data.form, {
+    id: 'lease-form',
+    validators: zodClient(meterFormSchema),
+    validationMethod: 'oninput',
+    dataType: 'json',
+    taintedMessage: null,
+    resetForm: true,
+    onError: ({ result }) => {
+      console.error('Form submission error:', {
+        error: result.error,
+        status: result.status
+      });
+      if (result.error) {
+        console.error('Server error:', result.error.message);
+      }
+    },
+    onResult: async ({ result }) => {
+      if (result.type === 'success') {
+        await invalidate('app:meters');
+        reset();
+      }
+    }
+  });
+
+  // Default form value
+  const defaultForm: SuperValidated<ExtendedMeterFormData, any> = {
     id: crypto.randomUUID(),
     valid: true,
     posted: false,
@@ -58,6 +88,12 @@
     }
   };
 
+  // Event handlers
+  function handleCancel() {
+    editMode = false;
+    reset();
+  }
+
   function handleTypeSelect(value: { value: string } | undefined) {
     selectedType = value?.value as z.infer<typeof utilityTypeEnum>;
   }
@@ -66,7 +102,7 @@
     selectedStatus = value?.value as z.infer<typeof meterStatusEnum>;
   }
 
-  function handleMeterClick(meter: MeterFormData) {
+  function handleMeterClick(meter: ExtendedMeterFormData) {
     if (isAdminLevel || isUtility) {
       selectedMeter = meter;
       showForm = true;
@@ -78,18 +114,19 @@
     selectedMeter = undefined;
   }
 
-  function getLocationDetails(meter: MeterFormData): string {
+  // Utility functions
+  function getLocationDetails(meter: ExtendedMeterFormData): string {
     switch (meter.location_type) {
       case 'PROPERTY':
-        const property = properties?.find(p => p.id === meter.property_id);
+        const property = properties?.find((p: Property) => p.id === meter.property_id);
         return property ? `Property: ${property.name}` : 'Unknown Property';
       case 'FLOOR':
-        const floor = floors?.find(f => f.id === meter.floor_id);
+        const floor = floors?.find((f: Floor) => f.id === meter.floor_id);
         return floor 
           ? `Floor ${floor.floor_number}${floor.property ? ` - ${floor.property.name}` : ''}`
           : 'Unknown Floor';
       case 'RENTAL_UNIT':
-        const unit = rental_unit?.find(r => r.id === meter.rental_unit_id);
+        const unit = rental_unit?.find((r: Rental_unit) => r.id === meter.rental_unit_id);
         return unit 
           ? `Rental_unit ${unit.number}${unit.floor?.property ? ` - ${unit.floor.property.name}` : ''}`
           : 'Unknown Rental_unit';
@@ -137,7 +174,8 @@
     }
   }
 
-  let filteredMeters = $derived((meters ?? []).filter(meter => {
+  // Filtered and sorted meters
+  let filteredMeters = $derived((meters ?? []).filter((meter: ExtendedMeterFormData) => {
     if (!meter) return false;
     const matchesType = !selectedType || meter.type === selectedType;
     const matchesStatus = !selectedStatus || meter.status === selectedStatus;
@@ -145,7 +183,7 @@
       meter.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       getLocationDetails(meter).toLowerCase().includes(searchQuery.toLowerCase());
     return matchesType && matchesStatus && matchesSearch;
-  }).sort((a, b) => {
+  }).sort((a: ExtendedMeterFormData, b: ExtendedMeterFormData) => {
     const order = sortOrder === 'asc' ? 1 : -1;
     switch (sortBy) {
       case 'name':
@@ -171,53 +209,38 @@
     </Alert.Root>
   {/if}
 
-  {#if !showForm}
-    <div class="space-y-4">
-      <div class="flex justify-between items-center">
-        <h1 class="text-2xl font-bold">Meters</h1>
-        {#if isAdminLevel || isUtility}
-          <Button onclick={() => {
-            selectedMeter = undefined;
-            showForm = true;
-          }}>Add Meter</Button>
-        {/if}
-      </div>
-
-      <!-- Filters -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-        <div>
-          <Input
-            type="text"
-            placeholder="Search meters..."
-            value={searchQuery}
-            oninput={(e) => searchQuery = e.currentTarget.value}
-          />
-        </div>
-        <div>
-          <Label for="type">Type</Label>
-          <!-- <Select onValueChange={handleTypeSelect}>
-
-            <SelectContent>
-              <SelectItem value="">All Types</SelectItem>
-              {#each Object.values(utilityTypeEnum.Values) as type}
-                <SelectItem value={type}>{type}</SelectItem>
-              {/each}
-            </SelectContent>
-          </Select> -->
-        </div>
-        <div>
-          <Label for="status">Status</Label>
-          <!-- <Select onValueChange={handleStatusSelect}>
-
-            <SelectContent>
-              <SelectItem value="">All Statuses</SelectItem>
-              {#each Object.values(meterStatusEnum.Values) as status}
-                <SelectItem value={status}>{status}</SelectItem>
-              {/each}
-            </SelectContent>
-          </Select> -->
-        </div>
-      </div>
+  <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+    <div>
+      <Input
+        type="text"
+        placeholder="Search meters..."
+        value={searchQuery}
+        oninput={(e) => searchQuery = e.currentTarget.value}
+      />
+    </div>
+    <div>
+      <Label for="type">Type</Label>
+      <!-- <Select onValueChange={handleTypeSelect}>
+        <SelectContent>
+          <SelectItem value="">All Types</SelectItem>
+          {#each Object.values(utilityTypeEnum.Values) as type}
+            <SelectItem value={type}>{type}</SelectItem>
+          {/each}
+        </SelectContent>
+      </Select> -->
+    </div>
+    <div>
+      <Label for="status">Status</Label>
+      <!-- <Select onValueChange={handleStatusSelect}>
+        <SelectContent>
+          <SelectItem value="">All Statuses</SelectItem>
+          {#each Object.values(meterStatusEnum.Values) as status}
+            <SelectItem value={status}>{status}</SelectItem>
+          {/each}
+        </SelectContent>
+      </Select> -->
+    </div>
+  </div>
 
       <!-- Meters Grid -->
       <div class="grid gap-4">
@@ -295,10 +318,11 @@
   {/if}
 </div>
 
-{#if !isAdminLevel && !isUtility && !isMaintenance}
-  <div class="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-    <p class="text-yellow-800">
-      You do not have permission to manage meters. Please contact your administrator.
-    </p>
-  </div>
-{/if}
+  {#if !isAdminLevel && !isUtility && !isMaintenance}
+    <div class="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+      <p class="text-yellow-800">
+        You do not have permission to manage meters. Please contact your administrator.
+      </p>
+    </div>
+  {/if}
+</div>

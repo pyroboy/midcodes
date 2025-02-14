@@ -128,7 +128,7 @@
           invalidate('app:billings'),
           invalidateAll()
         ]);
-        onOpenChange(false);
+        onOpenChange(true); // Pass success=true back to parent
       } else {
         throw new Error(result.error || 'Payment failed');
       }
@@ -136,6 +136,7 @@
     } catch (error) {
       console.error('Payment submission error:', error);
       alert(error instanceof Error ? error.message : 'Failed to process payment');
+      onOpenChange(false);
     }
   }
 
