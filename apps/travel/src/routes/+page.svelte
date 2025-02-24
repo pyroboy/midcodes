@@ -3,6 +3,7 @@
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 	
+	// Update the Room interface
 	interface Room {
 	  id: number;
 	  name: string;
@@ -12,6 +13,7 @@
 	  features: string[];
 	  size: string;
 	  image: string;
+	  price: number;  // Add this line
 	}
 	
 	interface BookingForm {
@@ -27,7 +29,7 @@
 	  specialRequests: string;
 	}
 	
-	let videoElement: HTMLVideoElement;
+	let videoElement: HTMLVideoElement | undefined;
 	let showModal = false;
 	let selectedRoom: Room | null = null;
 	let bookingForm: BookingForm = {
@@ -43,110 +45,66 @@
 	  specialRequests: ''
 	};
 	
+	// Update the rooms array
 	const rooms: Room[] = [
 	  {
 		id: 1,
-		name: 'Hip Deluxe Room',
-		description: 'This twin room is equipped with a terrace with seating area, flat screen cable TV and superior linen. The room also includes a desk, wardrobe and safe. The private bathroom has a hairdryer and free toiletries.',
-		beds: '2 single',
-		capacity: '2 persons',
+		name: 'Family Room',
+		description: 'Spacious accommodation perfect for families, this room comfortably fits 2 adults and 2 children. Experience comfort with modern amenities and stunning views. The room features full air-conditioning and comes with complimentary breakfast for all guests.',
+		beds: 'Family bed',
+		capacity: '2 adults, 2 children',
 		features: [
-		  'Terrace with seating area',
-		  'Flat screen cable TV',
-		  'Superior linen',
-		  'Desk and wardrobe',
-		  'Safe',
-		  'Private bathroom',
-		  'Hairdryer',
-		  'Free toiletries',
+		  'Hot & Cold Water Supply',
+		  'Fully air-conditioned',
+		  'Wi-Fi access',
+		  'Free Breakfast',
+		  'Fully Secured Area',
+		  'Extra Bed Available (₱500)',
+		  'Free Swimming Pool Usage',
+		  'Free Usage of Viewing Gazebo',
 		  'UV Disinfected'
 		],
-		size: '40sqm',
-		image: 'https://res.cloudinary.com/ddlz560fk/image/upload/v1739248183/1489349716_u7ay9s.jpg'
+		size: '45sqm',
+		image: 'https://res.cloudinary.com/ddlz560fk/image/upload/v1739248183/1489349716_u7ay9s.jpg',
+		price: 4500  // Add this line
 	  },
 	  {
 		id: 2,
-		name: 'Hip Junior Suites',
-		description: 'This twin room is equipped with a terrace with seating area, flat screen cable TV and superior linen. The room also includes a desk, wardrobe, safe and a Living Area. The private bathroom has a hairdryer and free toiletries.',
-		beds: '1 queen bed + 1 single bed + living area',
-		capacity: '3 persons',
+		name: 'Twin Room',
+		description: 'Perfect for small families or groups, this twin-bedded room accommodates 2 adults and 2 children comfortably. Enjoy a relaxing stay with essential amenities and access to resort facilities including the swimming pool and viewing gazebo.',
+		beds: '2 twin beds',
+		capacity: '2 adults, 2 children',
 		features: [
-		  'Terrace with seating area',
-		  'Flat screen cable TV',
-		  'Superior linen',
-		  'Desk and wardrobe',
-		  'Safe',
-		  'Living Area',
-		  'Private bathroom',
-		  'Hairdryer',
-		  'Free toiletries',
+		  'Hot & Cold Water Supply',
+		  'Fully air-conditioned',
+		  'Wi-Fi access',
+		  'Free Breakfast',
+		  'Fully Secured Area',
+		  'Extra Bed Available (₱500)',
+		  'Free Swimming Pool Usage',
+		  'Free Usage of Viewing Gazebo',
 		  'UV Disinfected'
 		],
-		size: '82sqm',
-		image: 'https://res.cloudinary.com/ddlz560fk/image/upload/v1739248183/1491582688_jsxxeg.jpg'
-	  },
-	  {
-		id: 3,
-		name: 'Hive Villa',
-		description: 'Featuring a balcony with seating area and views of the tropical, this room is fitted with air conditioning, a flat-screen cable TV, and a desk. There is also a wardrobe and a refrigerator in the room. Included in the private bathroom is a large bathtub and free toiletries.',
-		beds: '1 queen',
-		capacity: '2 persons',
-		features: [
-		  'Balcony with tropical views',
-		  'Air conditioning',
-		  'Flat-screen cable TV',
-		  'Desk and wardrobe',
-		  'Refrigerator',
-		  'Large bathtub',
-		  'Free toiletries',
-		  'UV Disinfected'
-		],
-		size: '50sqm',
-		image: 'https://res.cloudinary.com/ddlz560fk/image/upload/v1739248184/1491584800_vj3see.jpg'
-	  },
-	  {
-		id: 4,
-		name: 'Hiatus Villa',
-		description: 'Hiatus Villa has a separate kitchen and leisure area, also has a terrace with a sunbed. The villa has a private garden on the first floor, a private bathroom with shower and toilet, a guest room and a bathroom with fumigation bed on the second floor, including free toiletries and hair dryers.',
-		beds: '1 queen',
-		capacity: '2 persons',
-		features: [
-		  'Separate kitchen',
-		  'Leisure area',
-		  'Terrace with sunbed',
-		  'Private garden',
-		  'Two-floor layout',
-		  'Guest room',
-		  'Multiple bathrooms',
-		  'Free toiletries',
-		  'Hair dryers',
-		  'UV Disinfected'
-		],
-		size: '90sqm',
-		image: 'https://res.cloudinary.com/ddlz560fk/image/upload/v1739248183/1491575830_bwgafh.jpg'
-	  },
-	  {
-		id: 5,
-		name: 'Harmony Villa',
-		description: 'The Harmony Villa has a terrace with a view of the public swimming pool and the distant island. The room has a kitchen area and a family entertainment area. Private bathrooms have free toiletries and hair dryers. The villa has direct access to the private swimming pool.',
-		beds: '3 queen',
-		capacity: '7 persons',
-		features: [
-		  'Terrace with pool view',
-		  'Kitchen area',
-		  'Family entertainment area',
-		  'Direct pool access',
-		  'Private bathrooms',
-		  'Free toiletries',
-		  'Hair dryers',
-		  'UV Disinfected'
-		],
-		size: '260sqm',
-		image: 'https://res.cloudinary.com/ddlz560fk/image/upload/v1739248182/1491581611_c7vqud.jpg'
+		size: '40sqm',
+		image: 'https://res.cloudinary.com/ddlz560fk/image/upload/v1739248183/1491582688_jsxxeg.jpg',
+		price: 3500  // Add this line
 	  }
 	];
 	
-	function openBooking(room: Room): void {
+	interface BookingForm {
+	  firstName: string;
+	  lastName: string;
+	  email: string;
+	  phone: string;
+	  checkIn: string;
+	  checkOut: string;
+	  adults: number;
+	  children: number;
+	  roomId: number | null;
+	  specialRequests: string;
+	}
+	
+		function openBooking(room: Room): void {
 	  selectedRoom = room;
 	  bookingForm.roomId = room.id;
 	  showModal = true;
@@ -195,24 +153,21 @@
 
 <main class="min-h-screen bg-white text-gray-800 font-sans m-0 p-0 overflow-x-hidden">
 	<!-- Hero Section -->
-	<section class="relative h-screen w-full overflow-hidden [margin-top:-64px]">
-		<!-- Video Background -->
-		<video
-		  bind:this={videoElement}
-		  class="absolute inset-0 w-full h-full object-cover"
-		  autoplay
-		  muted
-		  loop
-		  playsinline
-		>
-		  <source src="https://media.istockphoto.com/id/1822494596/video/woman-jumps-off-a-cliff-into-the-sea.mp4?s=mp4-640x640-is&k=20&c=nxzAh3Srg-9dfLcpVk3xjRxGl7KHHcLZ0Si-UXxebYo=" type="video/mp4">
-		</video>
-		
-		<!-- Overlay -->
-		<div class="absolute inset-0 bg-black/40"></div>
+	<section class="relative h-[600px] md:h-screen w-full overflow-hidden [margin-top:-64px]">
+		<div class="absolute inset-0 z-10 bg-gradient-radial from-transparent via-black/80 to-black/95"></div>
+		<div class="absolute inset-0 w-full h-full overflow-hidden">
+			<iframe 
+			  class="absolute w-full h-full scale-[1.5] object-cover" 
+			  src="https://www.youtube.com/embed/leb38cVmbhE?autoplay=1&mute=1&loop=1&playlist=leb38cVmbhE&controls=0" 
+			  frameborder="0" 
+			  allow="autoplay; encrypted-media" 
+			  allowfullscreen
+			  title="Cabilao Cliffs Dive Resort Video"
+			></iframe>
+		</div>
 		
 		<!-- Content -->
-		<div class="relative h-full flex items-center justify-center px-4">
+		<div class="relative h-full flex items-center justify-center px-4 z-20">
 		  <div class="max-w-4xl text-center text-white">
 			<h1 class="text-4xl sm:text-5xl md:text-6xl font-bold mb-4 md:mb-6 tracking-wider">Cabilao Cliffs Dive Resort</h1>
 			<p class="text-lg sm:text-xl md:text-2xl mb-6 md:mb-8 opacity-90">Experience luxury accommodation in paradise</p>
@@ -237,19 +192,24 @@
 							<h3 class="text-3xl font-bold">{room.name}</h3>
 							<p class="text-gray-600 text-lg">{room.description}</p>
 							
+	
 							<div class="grid grid-cols-2 gap-4 my-6">
-								<div>
-									<span class="text-gray-500">Beds</span>
-									<p class="font-semibold">{room.beds}</p>
-								</div>
-								<div>
-									<span class="text-gray-500">Capacity</span>
-									<p class="font-semibold">{room.capacity}</p>
-								</div>
-								<div>
-									<span class="text-gray-500">Room Size</span>
-									<p class="font-semibold">{room.size}</p>
-								</div>
+							  <div>
+							    <span class="text-gray-500">Beds</span>
+							    <p class="font-semibold">{room.beds}</p>
+							  </div>
+							  <div>
+							    <span class="text-gray-500">Capacity</span>
+							    <p class="font-semibold">{room.capacity}</p>
+							  </div>
+							  <div>
+							    <span class="text-gray-500">Room Size</span>
+							    <p class="font-semibold">{room.size}</p>
+							  </div>
+							  <div>
+							    <span class="text-gray-500">Price per Night</span>
+							    <p class="font-semibold">₱{room.price.toLocaleString()}</p>
+							  </div>
 							</div>
 							
 							<div class="space-y-2">
