@@ -22,7 +22,15 @@
       { href: '/readings', label: 'Readings' },
       // { href: '/overview', label: 'Overview/Monthly' },
       // { href: '/accounts', label: 'Accounts' }
+    ],
+    utilityBills: [
+{href: '/meters' , label: 'Meters' },
+    // { href: '/readings', label: 'Meter Readings' },
+
+    //   { href: '/utility-bills', label: 'Utility Bills' },
     ]
+
+
   };
   
   function toggleLocations() {
@@ -51,6 +59,7 @@
     const allLinks = [
       ...navigationLinks.locations,
       ...navigationLinks.rentManagement,
+      ...navigationLinks.utilityBills,
       // { href: '/auth', label: 'Auth' },
       // { href: '/auth/signout', label: 'Sign out' }
     ];

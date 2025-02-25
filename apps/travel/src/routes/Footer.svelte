@@ -7,10 +7,11 @@
     <!-- Logo and Address -->
     <div class="space-y-4">
       <a href="/" class="block">
-        <img src="https://i.ibb.co/9q9XKrt/clipart1133673.png" alt="Cabilao Cliffs Dive Resort" class="h-12">
+        <img src="https://res.cloudinary.com/dexcw6vg0/image/upload/v1739247373/cliffslogo_bpc611.webp" alt="Cabilao Cliffs Dive Resort" class="h-16">
       </a>
       <p class="text-gray-600">
-        Cabilao,<br>
+        Cabilao<br>
+        Cliff Dive Resort<br>
         Philippines
       </p>
     </div>

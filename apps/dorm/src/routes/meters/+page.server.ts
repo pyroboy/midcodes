@@ -1,7 +1,7 @@
 import { fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
-import { meterFormSchema, meterSchema } from './formSchema';
+import {  meterSchema } from './formSchema';
 import { supabase } from '$lib/supabaseClient';
 
 export const load = async ({ locals }) => {
@@ -96,7 +96,7 @@ export const actions = {
       return fail(401, { message: 'Unauthorized' });
     }
 
-    const form = await superValidate(request, zod(meterFormSchema));
+    const form = await superValidate(request, zod(meterSchema));
     if (!form.valid) {
       return fail(400, { form });
     }
@@ -206,7 +206,7 @@ export const actions = {
       return fail(401, { message: 'Unauthorized' });
     }
 
-    const form = await superValidate(request, zod(meterFormSchema));
+    const form = await superValidate(request, zod(meterSchema));
     if (!form.valid) {
       return fail(400, { form });
     }

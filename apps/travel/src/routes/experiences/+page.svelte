@@ -2,30 +2,100 @@
  const experiences = [
   {
     id: 1,
-    title: "Cabilao Island Cliff Dive Resort - Package A",
-    description: "Experience the beauty of Cabilao Island with our comprehensive Package A tour that includes both countryside and island exploration, along with exciting water activities.",
-    price: 5000,
-    duration: "Full Day",
+    title: "Package A: Day Tour",
+    description: "Experience a full day of adventure at Cabilao Island with our comprehensive day tour package that includes exciting water activities and guided exploration.",
+    price: 6500,
+    duration: "Day Tour (7 AM - 4 PM)",
     includes: [
-      "Country side tour & Island Tour",
-      "Snorkeling and Turtle watching",
-      "Free Transportation (Panglao to Island vice Versa)",
-      "Boat Ride and Guide"
+      "Transportation (Vice Versa)",
+      "Island Tour",
+      "Free Boat Ride",
+      "Snorkeling",
+      "Turtle Watching",
+      "Free Snorkeling Gears & Life Vest",
+      "Free Guide",
+      "Free Snacks"
     ],
     image: "https://res.cloudinary.com/ddlz560fk/image/upload/v1739248183/1491583021_okoynj.jpg"
   },
   {
     id: 2,
-    title: "Cabilao Island Cliff Dive Resort - Package B",
-    description: "Enjoy an extended stay at Cabilao Island with our Package B, which includes all the activities from Package A plus comfortable accommodation.",
+    title: "Package B: Tour with Overnight Stay",
+    description: "Make your island experience complete with our overnight package that combines exciting activities with comfortable accommodations.",
     price: 10000,
-    duration: "Overnight",
+    duration: "Overnight Stay",
     includes: [
-      "Country side tour & Island Tour",
-      "Snorkeling and Turtle watching",
-      "Free Transportation (Panglao to Island vice Versa)",
-      "Boat Ride and Guide",
-      "Overnight stay with free breakfast"
+      "Room Accommodations",
+      "Transportation (Vice Versa)",
+      "Island Tour",
+      "Boat Ride",
+      "Snorkeling",
+      "Turtle Watching",
+      "Free Snorkeling Gears & Life Vest",
+      "Free Guide",
+      "Free Breakfast"
+    ],
+    image: "https://res.cloudinary.com/ddlz560fk/image/upload/v1739248754/cabilao-drone-01_c0mz9q.jpg"
+  },
+  {
+    id: 3,
+    title: "Package C: Day Use",
+    description: "Perfect for families and groups looking to enjoy our resort facilities, this package offers access to our beautiful beachfront and recreational amenities.",
+    price: 2000,
+    duration: "Day Use (8 AM - 5 PM)",
+    maxPax: 4,
+    includes: [
+      "Swimming Pool Access",
+      "Beach Access",
+      "Gazebo for Sea Viewing"
+    ],
+    image: "https://res.cloudinary.com/ddlz560fk/image/upload/v1739248183/1489349716_u7ay9s.jpg"
+  },
+  {
+    id: 3,
+    title: "Group Island Tour - Day Package",
+    description: "Embark on an exciting day tour of Cabilao Island with your group. Explore the stunning Mundong Sandbar, enjoy snorkeling adventures, and witness the majestic sea turtles in their natural habitat.",
+    duration: "Day Tour (7 AM - 4 PM)",
+    priceTiers: [
+      { pax: "1 - 3", price: 7500 },
+      { pax: "4 - 6", price: 9500 },
+      { pax: "7 - 9", price: 11500 },
+      { pax: "10 - 12", price: 12500 }
+    ],
+    includes: [
+      "Transportation (Vice-Versa)",
+      "Island Tour to Mundong Sandbar",
+      "Boat Ride",
+      "Snorkeling",
+      "Turtle Watching",
+      "Free Snorkeling Gears & Life Vest",
+      "Free Guide",
+      "Free Snacks"
+    ],
+    image: "https://res.cloudinary.com/ddlz560fk/image/upload/v1739248183/1491583021_okoynj.jpg"
+  },
+  {
+    id: 4,
+    title: "Group Island Tour - Overnight Package",
+    description: "Make the most of your Cabilao Island experience with an overnight stay. Enjoy all the activities from our day tour package plus comfortable accommodation and more inclusions for an unforgettable island getaway.",
+    duration: "Overnight Stay",
+    priceTiers: [
+      { pax: "1 - 3", price: 10500 },
+      { pax: "4 - 6", price: 15500 },
+      { pax: "7 - 9", price: 18500 },
+      { pax: "10 - 12", price: 21500 }
+    ],
+    includes: [
+      "Transportation (Vice-Versa)",
+      "Island Tour to Mundong Sandbar",
+      "Boat Ride",
+      "Snorkeling",
+      "Turtle Watching",
+      "Free Snorkeling Gears & Life Vest",
+      "Free Guide",
+      "Free Breakfast",
+      "Free Snacks",
+      "Fully air-conditioned room"
     ],
     image: "https://res.cloudinary.com/ddlz560fk/image/upload/v1739248754/cabilao-drone-01_c0mz9q.jpg"
   }
@@ -61,8 +131,20 @@
                   <p class="text-xl font-semibold mt-1">{experience.duration}</p>
                 </div>
                 <div>
-                  <span class="text-gray-600">Price</span>
-                  <p class="text-4xl font-bold text-orange-600 mt-1">₱{experience.price }</p>
+                  {#if experience.priceTiers}
+                    <span class="text-gray-600">Price Tiers</span>
+                    <div class="space-y-2 mt-1">
+                      {#each experience.priceTiers as tier}
+                        <div class="flex justify-between items-center">
+                          <span class="text-lg">{tier.pax} pax</span>
+                          <span class="text-2xl font-bold text-orange-600">₱{tier.price.toLocaleString()}</span>
+                        </div>
+                      {/each}
+                    </div>
+                  {:else}
+                    <span class="text-gray-600">Price</span>
+                    <p class="text-4xl font-bold text-orange-600 mt-1">₱{experience.price.toLocaleString()}</p>
+                  {/if}
                 </div>
               </div>
               <ul class="space-y-2">
