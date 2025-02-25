@@ -55,53 +55,49 @@
     
     switch (type) {
       case 'PROPERTY':
-        return data.properties.find((p) => p.id === id)?.name || '';
+        return data.properties?.find((p) => p.id === id)?.name || '';
       case 'FLOOR':
-        const floor = data.floors.find((f) => f.id === id);
+        const floor = data.floors?.find((f) => f.id === id);
         return floor ? `${floor.property?.name || ''} - Floor ${floor.floor_number} ${floor.wing || ''}` : '';
       case 'RENTAL_UNIT':
-        const unit = data.rental_unit.find((r) => r.id === id);
+        const unit = data.rental_unit?.find((r) => r.id === id);
         return unit ? `${unit.floor?.property?.name || ''} - Floor ${unit.floor?.floor_number || ''} - Rental_unit ${unit.number}` : '';
       default:
         return '';
     }
   }
 
-  // Store filtered properties in state
-  let filteredProperties = $state<Property[]>([]);
-  let filteredFloors = $state<Floor[]>([]);
-  let filteredRental_Units = $state<Rental_unit[]>([]);
+  // Using $derived instead of $effect + $state
+  let filteredProperties = $derived(
+    (data.properties || []).filter((p) => p.status === 'ACTIVE')
+  );
   
-  // Use effect for filtering and logging
-  $effect(() => {
-    filteredProperties = data.properties.filter((p) => p.status === 'ACTIVE');
-    filteredFloors = data.floors.filter((f) => f.status === 'ACTIVE');
-    filteredRental_Units = data.rental_unit.filter((r) => 
+  let filteredFloors = $derived(
+    (data.floors || []).filter((f) => f.status === 'ACTIVE')
+  );
+  
+  let filteredRental_Units = $derived(
+    (data.rental_unit || []).filter((r) => 
       r.rental_unit_status === 'VACANT' || r.rental_unit_status === 'OCCUPIED'
-    );
-    
-    console.log('Form location type:', $form.location_type);
-    console.log('Available properties:', filteredProperties.length);
-    console.log('Available floors:', filteredFloors.length);
-    console.log('Available rental units:', filteredRental_Units.length);
-  });
-
-  // Compute location label
-  let locationLabel = $state('');
+    )
+  );
   
-  $effect(() => {
-    if (!$form.location_type) {
-      locationLabel = '';
-      return;
-    }
-    
-    locationLabel = getLocationLabel(
+  // Using $inspect for console logs instead of console.log
+  $inspect('Form data:', data);
+  $inspect('Form location type:', $form.location_type);
+  $inspect('Available properties:', filteredProperties.length);
+  $inspect('Available floors:', filteredFloors.length);
+  $inspect('Available rental units:', filteredRental_Units.length);
+
+  // Compute location label using $derived
+  let locationLabel = $derived(
+    !$form.location_type ? '' : getLocationLabel(
       $form.location_type, 
       $form.location_type === 'PROPERTY' ? Number($form.property_id) : 
       $form.location_type === 'FLOOR' ? Number($form.floor_id) : 
       Number($form.rental_unit_id)
-    );
-  });
+    )
+  );
 
   function handleLocationTypeChange(type: string) {
     if (type === 'PROPERTY' || type === 'FLOOR' || type === 'RENTAL_UNIT') {
@@ -143,12 +139,9 @@
   }
 </script>
 
-<form method="POST" use:enhance>
+<form method="POST" action={editMode && $form.id ? "?/update" : "?/create"} use:enhance>
   {#if editMode && $form.id}
     <input type="hidden" name="id" value={$form.id} />
-    <input type="hidden" name="action" value="update" />
-  {:else}
-    <input type="hidden" name="action" value="create" />
   {/if}
 
   <div class="space-y-4">

@@ -46,14 +46,14 @@
 
   // Component state with Svelte 5 reactive primitives
   let { data } = $props<{ data: PageData }>();
-  $inspect(data).with((type, data) => {
-    console.log(`Data ${type}:`, {
-      metersLength: data.meters?.length || 0,
-      propertiesLength: data.properties?.length || 0,
-      floorsLength: data.floors?.length || 0,
-      rentalUnitLength: data.rental_unit?.length || 0
-    });
-  });
+  
+  // Add more detailed debug logging
+  console.log("Initial data received:", data);
+  console.log("Meters data:", data.meters);
+  console.log("Properties data:", data.properties);
+  console.log("Floors data:", data.floors);
+  console.log("Rental unit data:", data.rental_unit);
+  $inspect(data);
   
   let selectedMeter = $state<ExtendedMeterFormData | undefined>(undefined);
   let loading = $state(false);
@@ -64,65 +64,148 @@
   let sortBy = $state<'name' | 'type' | 'status' | 'reading'>('name');
   let sortOrder = $state<'asc' | 'desc'>('asc');
   let editMode = $state(false);
-
-  // Store data in state variables
-  let metersData = $state<ExtendedMeterFormData[]>([]);
-  let propertiesData = $state<Property[]>([]);
-  let floorsData = $state<Floor[]>([]);
-  let rentalUnitData = $state<Rental_unit[]>([]);
-  let isAdminLevel = $state(false);
-  let isUtility = $state(false);
-  let isMaintenance = $state(false);
-
-  // Update state when data changes
-  $effect(() => {
-    $inspect.trace('data-loading');
-    metersData = data.meters || [];
-    propertiesData = data.properties || [];
-    floorsData = data.floors || [];
-    rentalUnitData = data.rental_unit || [];
-    isAdminLevel = data.isAdminLevel || false;
-    isUtility = data.isUtility || false;
-    isMaintenance = data.isMaintenance || false;
-  });
   
-  // Inspect state lengths to debug data loading
-  $inspect({
-    metersCount: metersData.length,
-    propertiesCount: propertiesData.length,
-    floorsCount: floorsData.length,
-    rentalUnitsCount: rentalUnitData.length
+  // Debug counters
+  let rawMeterCount = $state(0);
+  let processedMeterCount = $state(0);
+  let filteredMeterCount = $state(0);
+  let showDebugInfo = $state(false);
+
+  // Store data in state variables with null checks
+  let metersData = $state<ExtendedMeterFormData[]>(data.meters || []);
+  let propertiesData = $state<Property[]>(data.properties || []);
+  let floorsData = $state<Floor[]>(data.floors || []);
+  let rentalUnitData = $state<Rental_unit[]>(data.rental_unit || []);
+  
+  // Initial debug counter
+  $effect(() => {
+    rawMeterCount = metersData.length;
+    console.log(`Initial meter count: ${rawMeterCount}`);
   });
 
   // Process meters to extract latest readings
-  let processedMeters = $state<ExtendedMeterFormData[]>([]);
+// Process meters to extract latest readings
+const processMeters = () => {
+  if (!metersData || !Array.isArray(metersData)) {
+    return [];
+  }
   
-  $effect(() => {
-    $inspect.trace('process-meters');
-    processedMeters = metersData.map((meter) => {
-      // Add latest reading if readings exist
-      if (meter.readings && meter.readings.length > 0) {
-        // Sort readings by date, newest first
-        const sortedReadings = [...meter.readings].sort((a, b) => {
-          const dateA = new Date(a.reading_date);
-          const dateB = new Date(b.reading_date);
-          return dateB.getTime() - dateA.getTime();
-        });
-        
-        return {
-          ...meter,
-          latest_reading: {
-            value: sortedReadings[0].reading,
-            date: sortedReadings[0].reading_date
-          }
-        };
-      }
-      return meter;
-    });
+  return metersData.map((meter) => {
+    // Ensure readings is at least an empty array
+    const readings = meter.readings || [];
+    
+    if (readings.length > 0) {
+      // Sort readings by date, newest first
+      const sortedReadings = [...readings].sort((a, b) => {
+        const dateA = new Date(a.reading_date);
+        const dateB = new Date(b.reading_date);
+        return dateB.getTime() - dateA.getTime();
+      });
+      
+      return {
+        ...meter,
+        latest_reading: {
+          value: sortedReadings[0].reading,
+          date: sortedReadings[0].reading_date
+        }
+      };
+    }
+    return meter;
   });
+};
   
-  // Inspect processed meters count
-  $inspect(processedMeters.length);
+  let processedMeters = $derived(processMeters());
+  
+  // Update counter effects
+  $effect(() => {
+    if (processedMeters) {
+      processedMeterCount = processedMeters.length;
+      console.log(`Processed meter count effect: ${processedMeterCount}`);
+    }
+  });
+
+  // Filtered and sorted meters
+  const filterMeters = () => {
+    console.log("Filtering meters, input count:", processedMeters?.length || 0);
+    console.log("Filter criteria - type:", selectedType, "status:", selectedStatus, "search:", searchQuery);
+    
+    if (!processedMeters || !Array.isArray(processedMeters)) {
+      console.error("processedMeters is not an array:", processedMeters);
+      return [];
+    }
+    
+    try {
+      const filtered = processedMeters.filter((meter: ExtendedMeterFormData) => {
+        if (!meter) {
+          console.log("Found null/undefined meter");
+          return false;
+        }
+        
+        try {
+          // Get location details with error handling
+          let locationDetails = "";
+          try {
+            locationDetails = getLocationDetails(meter).toLowerCase();
+          } catch (locErr) {
+            console.error(`Error getting location for meter ${meter.id}:`, locErr);
+            locationDetails = "location error";
+          }
+          
+          const matchesType = !selectedType || meter.type === selectedType;
+          const matchesStatus = !selectedStatus || meter.status === selectedStatus;
+          const matchesSearch = !searchQuery || 
+            meter.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            locationDetails.includes(searchQuery.toLowerCase());
+            
+          // Log if a meter is being filtered out
+          if (!(matchesType && matchesStatus && matchesSearch)) {
+            console.log(`Meter ${meter.id} filtered out: type=${matchesType}, status=${matchesStatus}, search=${matchesSearch}`);
+          }
+          
+          return matchesType && matchesStatus && matchesSearch;
+        } catch (err) {
+          console.error(`Error filtering meter ${meter?.id}:`, err);
+          return false;
+        }
+      });
+      
+      const result = filtered.sort((a: ExtendedMeterFormData, b: ExtendedMeterFormData) => {
+        const order = sortOrder === 'asc' ? 1 : -1;
+        switch (sortBy) {
+          case 'name':
+            return order * a.name.localeCompare(b.name);
+          case 'type':
+            return order * a.type.localeCompare(b.type);
+          case 'status':
+            return order * a.status.localeCompare(b.status);
+          case 'reading':
+            const aReading = a.latest_reading?.value || 0;
+            const bReading = b.latest_reading?.value || 0;
+            return order * (aReading - bReading);
+          default:
+            return 0;
+        }
+      });
+      
+      console.log("Filtered meters count:", result.length);
+      // Don't update state here - will do in an effect later
+      return result;
+    } catch (err) {
+      console.error("Error in filterMeters:", err);
+      error = "Error filtering meter data";
+      return [];
+    }
+  };
+  
+  let filteredMeters = $derived(filterMeters());
+  
+  // Update filtered count effect
+  $effect(() => {
+    if (filteredMeters) {
+      filteredMeterCount = filteredMeters.length;
+      console.log(`Filtered meter count effect: ${filteredMeterCount}`);
+    }
+  });
 
   // Form handling
   const { form, enhance, errors, constraints, submitting, reset } = superForm(data.form, {
@@ -151,16 +234,28 @@
     }
   });
   
-  // Inspect form values to debug form state
-  $inspect($form).with((type, formValue) => {
-    console.log(`Form ${type}:`, {
-      name: formValue.name,
-      location_type: formValue.location_type,
-      property_id: formValue.property_id,
-      floor_id: formValue.floor_id,
-      rental_unit_id: formValue.rental_unit_id
-    });
-  });
+  $inspect($form);
+
+  // Debug function to reset all filters
+  function resetFilters() {
+    console.log("Resetting all filters");
+    selectedType = '';
+    selectedStatus = '';
+    searchQuery = '';
+    sortBy = 'name';
+    sortOrder = 'asc';
+  }
+  
+  // Debug function to manually refresh data
+  function refreshData() {
+    console.log("Manually refreshing data");
+    invalidate('app:meters');
+  }
+  
+  // Toggle debug info
+  function toggleDebugInfo() {
+    showDebugInfo = !showDebugInfo;
+  }
 
   // Event handlers
   function handleCancel() {
@@ -170,39 +265,47 @@
   }
 
   function handleTypeChange(value: string) {
+    console.log("Type filter changed to:", value);
     selectedType = value;
   }
 
   function handleStatusChange(value: string) {
+    console.log("Status filter changed to:", value);
     selectedStatus = value;
   }
 
   function handleEdit(meter: ExtendedMeterFormData) {
-    if (isAdminLevel || isUtility) {
+      console.log("Editing meter:", meter);
       editMode = true;
       selectedMeter = meter;
       $form = { ...meter };
-    }
   }
 
   // Utility functions
   function getLocationDetails(meter: ExtendedMeterFormData): string {
-    switch (meter.location_type) {
-      case 'PROPERTY':
-        const property = propertiesData.find((p: Property) => p.id === meter.property_id);
-        return property ? `Property: ${property.name}` : 'Unknown Property';
-      case 'FLOOR':
-        const floor = floorsData.find((f: Floor) => f.id === meter.floor_id);
-        return floor 
-          ? `Floor ${floor.floor_number}${floor.property ? ` - ${floor.property.name}` : ''}`
-          : 'Unknown Floor';
-      case 'RENTAL_UNIT':
-        const unit = rentalUnitData.find((r: Rental_unit) => r.id === meter.rental_unit_id);
-        return unit 
-          ? `Rental_unit ${unit.number}${unit.floor?.property ? ` - ${unit.floor.property.name}` : ''}`
-          : 'Unknown Rental_unit';
-      default:
-        return 'Unknown Location';
+    if (!meter || !meter.location_type) return 'Unknown Location';
+    
+    try {
+      switch (meter.location_type) {
+        case 'PROPERTY':
+          const property = propertiesData?.find((p: Property) => p.id === meter.property_id);
+          return property ? `Property: ${property.name}` : 'Unknown Property';
+        case 'FLOOR':
+          const floor = floorsData?.find((f: Floor) => f.id === meter.floor_id);
+          return floor 
+            ? `Floor ${floor.floor_number}${floor.property ? ` - ${floor.property.name}` : ''}`
+            : 'Unknown Floor';
+        case 'RENTAL_UNIT':
+          const unit = rentalUnitData?.find((r: Rental_unit) => r.id === meter.rental_unit_id);
+          return unit 
+            ? `Rental_unit ${unit.number}${unit.floor?.property ? ` - ${unit.floor.property.name}` : ''}`
+            : 'Unknown Rental_unit';
+        default:
+          return 'Unknown Location';
+      }
+    } catch (err) {
+      console.error("Error in getLocationDetails:", err);
+      return 'Location Error';
     }
   }
 
@@ -244,47 +347,43 @@
       sortOrder = 'asc';
     }
   }
-
-  // Filtered and sorted meters
-  let filteredMeters = $state<ExtendedMeterFormData[]>([]);
-  
-  $effect(() => {
-    $inspect.trace('filter-meters');
-    filteredMeters = processedMeters.filter((meter) => {
-      if (!meter) return false;
-      const matchesType = !selectedType || meter.type === selectedType;
-      const matchesStatus = !selectedStatus || meter.status === selectedStatus;
-      const matchesSearch = !searchQuery || 
-        meter.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        getLocationDetails(meter).toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesType && matchesStatus && matchesSearch;
-    }).sort((a, b) => {
-      const order = sortOrder === 'asc' ? 1 : -1;
-      switch (sortBy) {
-        case 'name':
-          return order * a.name.localeCompare(b.name);
-        case 'type':
-          return order * a.type.localeCompare(b.type);
-        case 'status':
-          return order * a.status.localeCompare(b.status);
-        case 'reading':
-          const aReading = a.latest_reading?.value || 0;
-          const bReading = b.latest_reading?.value || 0;
-          return order * (aReading - bReading);
-        default:
-          return 0;
-      }
-    });
-  });
-  
-  // Inspect filter criteria and filtered meters count
-  $inspect({
-    filterCriteria: { selectedType, selectedStatus, searchQuery },
-    filteredCount: filteredMeters.length
-  });
 </script>
 
 <div class="container mx-auto p-4 flex flex-col lg:flex-row gap-4">
+  <!-- Debug Controls -->
+  <div class="w-full mb-4 bg-gray-100 p-4 rounded-lg">
+    <div class="flex justify-between items-center">
+      <h2 class="text-lg font-bold">Debug Controls</h2>
+      <Button variant="outline" size="sm" onclick={toggleDebugInfo}>
+        {showDebugInfo ? 'Hide' : 'Show'} Debug Info
+      </Button>
+    </div>
+    
+    {#if showDebugInfo}
+      <div class="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+          <p><strong>Raw Meter Count:</strong> {rawMeterCount}</p>
+          <p><strong>Processed Meter Count:</strong> {processedMeterCount}</p>
+          <p><strong>Filtered Meter Count:</strong> {filteredMeterCount}</p>
+        </div>
+        <div>
+          <p><strong>Type Filter:</strong> "{selectedType}"</p>
+          <p><strong>Status Filter:</strong> "{selectedStatus}"</p>
+          <p><strong>Search Query:</strong> "{searchQuery}"</p>
+        </div>
+        <div>
+          <p><strong>Sort By:</strong> {sortBy}</p>
+          <p><strong>Sort Order:</strong> {sortOrder}</p>
+          <p><strong>Loading:</strong> {loading ? 'Yes' : 'No'}</p>
+        </div>
+      </div>
+      <div class="mt-2 flex space-x-2">
+        <Button variant="destructive" size="sm" onclick={resetFilters}>Reset All Filters</Button>
+        <Button variant="default" size="sm" onclick={refreshData}>Refresh Data</Button>
+      </div>
+    {/if}
+  </div>
+
   <!-- Meters List (Left side) -->
   <div class="w-full lg:w-2/3">
     <div class="flex justify-between items-center mb-4">
@@ -377,11 +476,20 @@
     </Card.Root>
 
     <div class="space-y-4">
+      <!-- Debug info for data state -->
+      {#if showDebugInfo}
+        <div class="bg-gray-100 p-3 rounded mb-4">
+          <p>metersData: {metersData ? `Array(${metersData.length})` : 'undefined'}</p>
+          <p>processedMeters: {processedMeters ? `Array(${processedMeters.length})` : 'undefined'}</p>
+          <p>filteredMeters: {filteredMeters ? `Array(${filteredMeters.length})` : 'undefined'}</p>
+        </div>
+      {/if}
+    
       {#if loading}
         <div class="flex justify-center items-center py-8">
           <Loader2 class="h-8 w-8 animate-spin" />
         </div>
-      {:else if filteredMeters.length === 0}
+      {:else if !filteredMeters || filteredMeters.length === 0}
         <div class="flex flex-col items-center justify-center py-12 px-4 bg-gray-50 rounded-lg">
           <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="text-gray-400 mb-3">
             <path d="M10.3 8.2c.7-.3 1.5-.4 2.3-.4h1.2c2.2 0 4 1.8 4 4 0 .5-.1 1-.3 1.5" />
@@ -390,6 +498,17 @@
             <path d="M21.7 16.2a2.5 2.5 0 0 0-3.2-3.4" />
           </svg>
           <p class="text-center text-gray-500">No results found</p>
+          <!-- Show debug info about why no results were found -->
+          {#if showDebugInfo}
+            <div class="mt-4 text-sm text-gray-500">
+              <p>Possible reasons:</p>
+              <ul class="list-disc list-inside mt-2">
+                <li>No meters in source data (count: {rawMeterCount})</li>
+                <li>All meters filtered out by criteria</li>
+                <li>Error during processing (check console)</li>
+              </ul>
+            </div>
+          {/if}
         </div>
       {:else}
         <div class="flex items-center justify-between mb-2 text-sm text-gray-500">
@@ -425,9 +544,8 @@
           <Card.Root class={selectedMeter?.id === meter.id ? 'border-2 border-blue-500' : ''}>
             <button 
               type="button"
-              class="w-full text-left cursor-pointer {(isAdminLevel || isUtility) ? 'hover:bg-gray-50' : ''}"
+              class="w-full text-left cursor-pointer"
               onclick={() => handleEdit(meter)}
-              disabled={!(isAdminLevel || isUtility)}
             >
               <Card.Header class="pb-2">
                 <Card.Title class="flex justify-between items-center">
@@ -461,6 +579,9 @@
                           ({new Date(meter.latest_reading.date).toLocaleDateString()})
                         </span>
                       </div>
+                    {:else}
+                      <p class="text-sm font-medium text-gray-500">Latest Reading</p>
+                      <p class="text-gray-400">No readings yet</p>
                     {/if}
                   </div>
                 </div>
@@ -482,14 +603,7 @@
     <div class="flex justify-between items-center mb-4">
       <h1 class="text-2xl font-bold">{editMode ? 'Edit' : 'Add'} Meter</h1>
     </div>
-    
-    {#if !isAdminLevel && !isUtility && !isMaintenance}
-      <div class="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <p class="text-yellow-800">
-          You do not have permission to manage meters. Please contact your administrator.
-        </p>
-      </div>
-    {:else}
+
       <MeterForm
         data={{
           properties: propertiesData,
@@ -505,7 +619,6 @@
         submitting={submitting}
         on:cancel={handleCancel}
       />
-    {/if}
   </div>
 </div>
 
