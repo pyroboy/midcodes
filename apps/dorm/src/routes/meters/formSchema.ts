@@ -27,18 +27,16 @@ const validateLocationConstraint = (data: any) => {
     case 'PROPERTY':
       return property_id != null;
     case 'FLOOR':
-      return floor_id != null && rental_unit_id == null;
       return floor_id != null;
     case 'RENTAL_UNIT':
-      return rental_unit_id != null;
       return rental_unit_id != null;
     default:
       return false;
   }
 };
 
-// Base meter schema with proper types
-export const meterSchema = z.object({
+// Base meter schema without timestamps
+const baseMeterSchema = z.object({
   id: z.number().optional(),
   name: z.string().min(1, 'Name is required').max(255, 'Name is too long'),
   location_type: locationTypeEnum,
@@ -46,18 +44,17 @@ export const meterSchema = z.object({
   floor_id: z.number().nullable(),
   rental_unit_id: z.number().nullable(),
   type: utilityTypeEnum,
+  is_active: z.boolean().default(true),
   status: meterStatusEnum.default('ACTIVE'),
-  initial_reading: z.number()
-    .min(0, 'Initial reading must be 0 or greater')
-    .default(0),
-  unit_rate: z.number()
-    .min(0, 'Unit rate must be 0 or greater')
-    .default(0),
-  notes: z.string().nullable().optional(),
-  created_at: z.string().optional(),
-  updated_at: z.string().nullable().optional()
+  initial_reading: z.number().min(0, 'Initial reading must be 0 or greater').default(0),
+  unit_rate: z.number().min(0, 'Unit rate must be 0 or greater').default(0),
+  notes: z.string().nullable().optional()
+});
+
+// Full meter schema with timestamps
+export const meterSchema = baseMeterSchema.extend({
+  created_at: z.date().optional()
 }).refine(validateLocationConstraint, {
-  message: "Location selection must match the selected location type",
   message: "Required location ID must be set based on the location type",
   path: ["location_type"]
 });
@@ -68,12 +65,27 @@ export const meterFormSchema = baseMeterSchema.refine(validateLocationConstraint
   path: ["location_type"]
 });
 
-// Type exports
-export type MeterFormData = z.infer<typeof meterSchema>;
+// Query schema for GET /meters endpoint
+export const meterQuerySchema = z.object({
+  location_type: locationTypeEnum.optional(),
+  property_id: z.number().optional(),
+  floor_id: z.number().optional(),
+  rental_unit_id: z.number().optional(),
+  status: meterStatusEnum.optional(),
+  type: utilityTypeEnum.optional(),
+  page: z.number().min(1).default(1),
+  limit: z.number().min(1).max(100).default(10)
+});
 
-// Form value types
-export type FormValue = string | number | null | undefined;
-export type FormSelectValue = string | null | undefined;
+// Schema for creating a new reading
+export const readingSchema = z.object({
+  meter_id: z.number(),
+  reading: z.number().min(0, 'Reading must be 0 or greater'),
+  reading_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format'),
+  created_at: z.date().optional()
+});
+
+// Type exports
 export type MeterSchema = typeof meterSchema;
 export type MeterFormSchema = typeof meterFormSchema;
 export type MeterFormData = z.infer<typeof meterFormSchema>;

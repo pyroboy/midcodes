@@ -75,7 +75,7 @@ export const load = async ({ locals }) => {
   ]);
 
   // Initialize form with empty data
-  const form =  await superValidate(zod(meterFormSchema));
+  const form =  await superValidate(zod(meterSchema));
 
   return {
     form,
