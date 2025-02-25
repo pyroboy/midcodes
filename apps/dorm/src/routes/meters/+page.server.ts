@@ -1,5 +1,3 @@
-// src/routes/dorm/meters/+page.server.ts
-
 import { fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';

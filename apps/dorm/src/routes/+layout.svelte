@@ -13,11 +13,13 @@
     locations: [
       { href: '/properties', label: 'Properties' },
       { href: '/rental-unit', label: 'Rental Units' },
-      { href: '/floors', label: 'Floors' }
+      { href: '/floors', label: 'Floors' },
+      { href: '/meters', label: 'Meters' },
     ],
     rentManagement: [
       { href: '/tenants', label: 'Tenants' },
       { href: '/leases', label: 'Leases' },
+      { href: '/readings', label: 'Readings' },
       // { href: '/overview', label: 'Overview/Monthly' },
       // { href: '/accounts', label: 'Accounts' }
     ]

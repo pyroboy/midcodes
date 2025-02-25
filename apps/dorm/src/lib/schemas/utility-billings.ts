@@ -16,7 +16,7 @@ export const utilityBillingSchema = z.object({
   end_date: z.coerce.date(),
   type: z.enum(Object.values(utilityBillingTypeEnum.enum) as [string, ...string[]]),
   cost_per_unit: z.coerce.number().positive(),
-  org_id: z.string().uuid(),
+  property_id: z.string().uuid(),
 });
 
 export const meterBillingSchema = z.object({

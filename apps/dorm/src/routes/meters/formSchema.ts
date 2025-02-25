@@ -19,17 +19,17 @@ export const locationTypeEnum = z.enum([
   'RENTAL_UNIT'
 ]);
 
-// Helper function to ensure only one location ID is set based on location_type
+// Helper function to ensure correct location ID is set based on location_type
 const validateLocationConstraint = (data: any) => {
   const { location_type, property_id, floor_id, rental_unit_id } = data;
   
   switch (location_type) {
     case 'PROPERTY':
-      return property_id != null && floor_id == null && rental_unit_id == null;
+      return property_id != null;
     case 'FLOOR':
-      return floor_id != null && property_id == null && rental_unit_id == null;
+      return floor_id != null;
     case 'RENTAL_UNIT':
-      return rental_unit_id != null && property_id == null && floor_id == null;
+      return rental_unit_id != null;
     default:
       return false;
   }
@@ -55,13 +55,13 @@ const baseMeterSchema = z.object({
 export const meterSchema = baseMeterSchema.extend({
   created_at: z.date().optional()
 }).refine(validateLocationConstraint, {
-  message: "Only one location ID should be set based on the location type",
+  message: "Required location ID must be set based on the location type",
   path: ["location_type"]
 });
 
 // Schema for creating/updating a meter (without timestamps)
 export const meterFormSchema = baseMeterSchema.refine(validateLocationConstraint, {
-  message: "Only one location ID should be set based on the location type",
+  message: "Required location ID must be set based on the location type",
   path: ["location_type"]
 });
 

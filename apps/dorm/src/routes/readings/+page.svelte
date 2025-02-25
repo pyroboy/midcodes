@@ -8,12 +8,7 @@
   import { readingFormSchema } from './schema';
   import type { z } from 'zod';
   import { onMount, onDestroy } from 'svelte';
-  import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-  } from "$lib/components/ui/select";
+  import * as Select from '$lib/components/ui/select';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
   import { Label } from '$lib/components/ui/label';
@@ -296,37 +291,48 @@
 
         <div class="space-y-2">
           <Label for="meter_type">Meter Type</Label>
-          <!-- <Select onSelectedChange={updateMeterType} disabled={!data.canEdit}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select meter type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ELECTRICITY">Electricity</SelectItem>
-              <SelectItem value="WATER">Water</SelectItem>
-              <SelectItem value="INTERNET">Internet</SelectItem>
-            </SelectContent>
-          </Select> -->
+          <Select.Root 
+            type="single" 
+            value={selectedMeterType} 
+            onValueChange={(value) => updateMeterType({ value })} 
+            disabled={!data.canEdit}
+          >
+            <Select.Trigger>
+              <span>{selectedMeterType || "Select meter type"}</span>
+            </Select.Trigger>
+            <Select.Content>
+              <Select.Item value="ELECTRICITY">Electricity</Select.Item>
+              <Select.Item value="WATER">Water</Select.Item>
+              <Select.Item value="INTERNET">Internet</Select.Item>
+            </Select.Content>
+          </Select.Root>
           {#if $errors.meter_type}
             <p class="text-sm text-red-500">{$errors.meter_type}</p>
           {/if}
         </div>
-
+        
         <div class="space-y-2">
           <Label for="location_type">Location Type</Label>
-          <!-- <Select onSelectedChange={updateLocationType} disabled={!data.canEdit}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select location type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="PROPERTY">Property</SelectItem>
-              <SelectItem value="FLOOR">Floor</SelectItem>
-              <SelectItem value="RENTAL_UNIT">Rental_unit</SelectItem>
-            </SelectContent>
-          </Select> -->
+          <Select.Root 
+            type="single" 
+            value={selectedLocationType} 
+            onValueChange={(value) => updateLocationType({ value })} 
+            disabled={!data.canEdit}
+          >
+            <Select.Trigger>
+              <span>{selectedLocationType || "Select location type"}</span>
+            </Select.Trigger>
+            <Select.Content>
+              <Select.Item value="PROPERTY">Property</Select.Item>
+              <Select.Item value="FLOOR">Floor</Select.Item>
+              <Select.Item value="RENTAL_UNIT">Rental Unit</Select.Item>
+            </Select.Content>
+          </Select.Root>
           {#if $errors.location_type}
             <p class="text-sm text-red-500">{$errors.location_type}</p>
           {/if}
         </div>
+        
       </div>
 
       {#if filteredMeters.length > 0}
