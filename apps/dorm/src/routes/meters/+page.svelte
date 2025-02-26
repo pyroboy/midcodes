@@ -350,40 +350,6 @@ const processMeters = () => {
 </script>
 
 <div class="container mx-auto p-4 flex flex-col lg:flex-row gap-4">
-  <!-- Debug Controls -->
-  <div class="w-full mb-4 bg-gray-100 p-4 rounded-lg">
-    <div class="flex justify-between items-center">
-      <h2 class="text-lg font-bold">Debug Controls</h2>
-      <Button variant="outline" size="sm" onclick={toggleDebugInfo}>
-        {showDebugInfo ? 'Hide' : 'Show'} Debug Info
-      </Button>
-    </div>
-    
-    {#if showDebugInfo}
-      <div class="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div>
-          <p><strong>Raw Meter Count:</strong> {rawMeterCount}</p>
-          <p><strong>Processed Meter Count:</strong> {processedMeterCount}</p>
-          <p><strong>Filtered Meter Count:</strong> {filteredMeterCount}</p>
-        </div>
-        <div>
-          <p><strong>Type Filter:</strong> "{selectedType}"</p>
-          <p><strong>Status Filter:</strong> "{selectedStatus}"</p>
-          <p><strong>Search Query:</strong> "{searchQuery}"</p>
-        </div>
-        <div>
-          <p><strong>Sort By:</strong> {sortBy}</p>
-          <p><strong>Sort Order:</strong> {sortOrder}</p>
-          <p><strong>Loading:</strong> {loading ? 'Yes' : 'No'}</p>
-        </div>
-      </div>
-      <div class="mt-2 flex space-x-2">
-        <Button variant="destructive" size="sm" onclick={resetFilters}>Reset All Filters</Button>
-        <Button variant="default" size="sm" onclick={refreshData}>Refresh Data</Button>
-      </div>
-    {/if}
-  </div>
-
   <!-- Meters List (Left side) -->
   <div class="w-full lg:w-2/3">
     <div class="flex justify-between items-center mb-4">
@@ -494,7 +460,7 @@ const processMeters = () => {
           <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="text-gray-400 mb-3">
             <path d="M10.3 8.2c.7-.3 1.5-.4 2.3-.4h1.2c2.2 0 4 1.8 4 4 0 .5-.1 1-.3 1.5" />
             <path d="M2.5 10a2.5 2.5 0 0 1 5 0c0 .5-.1 1-.3 1.5" />
-            <path d="M7.8 15.2a5 5 0 0 0-2.3.4 2.5 2.5 0 0 0-1 3.4 2.5 2.5 0 0 0 3.4 1c.7-.3 1.5-.4 2.3-.4h1.2c.8 0 1.6.1 2.3.4a2.5 2.5 0 0 0 3.4-1 2.5 2.5 0 0 0-1-3.4 5 5 0 0 0-2.3-.4h-5.6z" />
+            <path d="M7.8 15.2a5 5 0 0 0-2.3.4 2.5 2.5 0 0 0 3.4 1c.7-.3 1.5-.4 2.3-.4h1.2c.8 0 1.6.1 2.3.4a2.5 2.5 0 0 0 3.4-1 2.5 2.5 0 0 0-1-3.4 5 5 0 0 0-2.3-.4h-5.6z" />
             <path d="M21.7 16.2a2.5 2.5 0 0 0-3.2-3.4" />
           </svg>
           <p class="text-center text-gray-500">No results found</p>

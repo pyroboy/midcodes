@@ -1,14 +1,11 @@
-import { error, fail, redirect } from '@sveltejs/kit';
+import { error, fail, redirect, json } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import type { PageServerLoad } from './$types';
 import type { Actions } from './$types';
 import type { Database } from '$lib/database.types';
-import { utilityBillingCreationSchema } from '$lib/schemas/utility-billings';
-
-// Allowed roles that can access billings
-const BILLING_VIEW_ROLES = ['super_admin', 'property_admin', 'accountant', 'manager', 'frontdesk'];
-const BILLING_CREATE_ROLES = ['super_admin', 'property_admin', 'accountant'];
+import { utilityBillingCreationSchema } from './meterReadingSchema';
+import { meterReadingSchema, batchReadingsSchema } from './meterReadingSchema';
 
 export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession } }) => {
   const session = await safeGetSession();
@@ -17,25 +14,18 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
   }
 
   const form = await superValidate(zod(utilityBillingCreationSchema));
+  const readingForm = await superValidate(zod(meterReadingSchema));
 
-  // Get user's property and role access
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('property_id, role')
-    .eq('id', session.user.id)
-    .single();
+  // Get all active properties
+  const { data: properties, error: propertiesError } = await supabase
+    .from('properties')
+    .select('id, name')
+    .eq('status', 'ACTIVE')
+    .order('name');
+    
+  if (propertiesError) throw error(500, `Error fetching properties: ${propertiesError.message}`);
 
-  if (profileError || !profile?.property_id) {
-    throw error(400, 'User not associated with a property');
-  }
-
-  // Check user role
-  const canAccessBillings = BILLING_VIEW_ROLES.includes(profile.role);
-  if (!canAccessBillings) {
-    throw error(403, 'Insufficient permissions to view billings');
-  }
-
-  // Get all meters for the property
+  // Get all meters for all properties
   const { data: meters, error: metersError } = await supabase
     .from('meters')
     .select(`
@@ -51,8 +41,7 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
         name,
         number
       )
-    `)
-    .eq('property_id', profile.property_id);
+    `);
 
   if (metersError) throw error(500, `Error fetching meters: ${metersError.message}`);
 
@@ -84,12 +73,9 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
     .select(`
       rental_unit_id,
       tenants:lease_tenants (
-        tenant:profiles (
-          id
-        )
+        id
       )
     `)
-    .eq('property_id', profile.property_id)
     .eq('status', 'ACTIVE');
 
   if (tenantsError) throw error(500, `Error fetching tenant counts: ${tenantsError.message}`);
@@ -106,18 +92,18 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
 
   return {
     form,
+    readingForm,
+    properties: properties || [],
     meters: meters || [],
     readings: readings || [],
     availableReadingDates: uniqueDates,
-    rental_unitTenantCounts,
-    property_id: profile.property_id,
-    role: profile.role,
-    canCreateBillings: BILLING_CREATE_ROLES.includes(profile.role)
+    rental_unitTenantCounts
   };
 };
 
 export const actions: Actions = {
-  default: async ({ request, locals: { supabase, safeGetSession } }) => {
+  // Change the default action to a named action 'createBilling'
+  createBilling: async ({ request, locals: { supabase, safeGetSession } }) => {
     const session = await safeGetSession();
     if (!session) {
       throw error(401, 'Unauthorized');
@@ -126,23 +112,6 @@ export const actions: Actions = {
     const form = await superValidate(request, zod(utilityBillingCreationSchema));
     if (!form.valid) {
       return fail(400, { form });
-    }
-
-    // Get user's property and role
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('property_id, role')
-      .eq('id', session.user.id)
-      .single();
-
-    if (profileError || !profile?.property_id) {
-      throw error(400, 'User not associated with a property');
-    }
-
-    // Check user permissions
-    const canCreateBillings = BILLING_CREATE_ROLES.includes(profile.role);
-    if (!canCreateBillings) {
-      throw error(403, 'Insufficient permissions to create billings');
     }
 
     // Validate dates
@@ -167,13 +136,18 @@ export const actions: Actions = {
       per_tenant_cost: billing.per_tenant_cost
     }));
 
+    // Convert property_id to number if it's a string
+    const propertyId = typeof form.data.property_id === 'string' 
+      ? parseInt(form.data.property_id, 10)
+      : form.data.property_id;
+
     // Call RPC to create utility billing
     const { data, error: billingError } = await supabase.rpc('create_utility_billing', {
       p_start_date: startDate.toISOString(),
       p_end_date: endDate.toISOString(),
       p_type: form.data.type,
       p_cost_per_unit: form.data.cost_per_unit,
-      p_property_id: profile.property_id,
+      p_property_id: propertyId,
       p_meter_billings: formattedMeterBillings
     });
 
@@ -185,11 +159,100 @@ export const actions: Actions = {
       });
     }
 
-    // Redirect to billings list or show success message
+    // Return success message
     return { 
       form,
       success: true,
       message: 'Utility billing created successfully'
     };
+  },
+  
+  // Add individual reading
+  addReading: async ({ request, locals: { supabase } }) => {
+    try {
+      // Parse the request body as JSON
+      const data = await request.json();
+      
+      // Validate against schema
+      const parsedData = meterReadingSchema.safeParse(data);
+      if (!parsedData.success) {
+        return json({ 
+          error: 'Invalid data', 
+          details: parsedData.error.format() 
+        }, { status: 400 });
+      }
+      
+      // Add reading to database
+      const { data: newReading, error: readingError } = await supabase
+        .from('readings')
+        .insert({
+          meter_id: parsedData.data.meter_id,
+          reading: parsedData.data.reading,
+          reading_date: parsedData.data.reading_date
+        })
+        .select();
+      
+      if (readingError) {
+        return json({ 
+          error: `Failed to add reading: ${readingError.message}` 
+        }, { status: 500 });
+      }
+      
+      // Return success
+      return json({ success: true, reading: newReading });
+    } catch (error: any) {
+      console.error('Error adding reading:', error);
+      return json({ 
+        error: error.message || 'An unexpected error occurred' 
+      }, { status: 500 });
+    }
+  },
+  
+  // Add batch readings
+  addBatchReadings: async ({ request, locals }) => {
+    try {
+      // Extract form data from the request
+      const formData = await request.formData();
+      const readingDate = formData.get('readingDate');
+      const costPerKwh = Number(formData.get('costPerKwh'));
+      const currentReading = Number(formData.get('currentReading')); // Adjust based on your form structure
+
+      // Basic validation
+      if (!readingDate || isNaN(costPerKwh) || isNaN(currentReading)) {
+        return fail(400, { message: 'Invalid input: All fields are required and must be valid.' });
+      }
+
+      // Assuming you're using Supabase (adjust if using a different DB)
+      const { supabase } = locals; // Supabase client from locals, set up via hooks
+      const newReading = {
+        meter_name: 'dweqwe', // Replace with dynamic data from formData as needed
+        reading_date: readingDate,
+        current_reading: currentReading,
+        cost_per_kwh: costPerKwh,
+        consumption: currentReading, // Adjust logic if previous reading exists
+        cost: currentReading * costPerKwh
+      };
+
+      // Insert into Supabase and await the result
+      const { data, error } = await supabase
+        .from('readings')
+        .insert([newReading])
+        .select();
+
+      if (error) {
+        return fail(500, { message: `Database error: ${error.message}` });
+      }
+
+      // Return a plain object for success
+      return {
+        success: true,
+        message: `Successfully added ${data.length} reading(s)`,
+        readings: data
+      };
+    } catch (err) {
+      // Handle unexpected errors
+      console.error('Error in addBatchReadings:', err);
+      return fail(500, { message: 'Internal server error' });
+    }
   }
 };

@@ -17,6 +17,7 @@ export const utilityBillingSchema = z.object({
   type: z.enum(Object.values(utilityBillingTypeEnum.enum) as [string, ...string[]]),
   cost_per_unit: z.coerce.number().positive(),
   org_id: z.string().uuid(),
+  property_id: z.string(), // Add property_id to the schema
 });
 
 export const meterBillingSchema = z.object({
@@ -33,3 +34,20 @@ export const meterBillingSchema = z.object({
 export const utilityBillingCreationSchema = utilityBillingSchema.extend({
   meter_billings: z.array(meterBillingSchema),
 });
+
+// Schema for a single meter reading
+export const meterReadingSchema = z.object({
+  meter_id: z.number().positive('Meter is required'),
+  reading: z.number().positive('Reading must be a positive number'),
+  reading_date: z.string().refine(val => !isNaN(Date.parse(val)), {
+    message: 'Invalid date format'
+  })
+});
+
+// Schema for batch meter readings
+export const batchReadingsSchema = z.object({
+  readings: z.array(meterReadingSchema).min(1, 'At least one reading is required')
+});
+
+export type MeterReadingSchema = typeof meterReadingSchema;
+export type BatchReadingsSchema = typeof batchReadingsSchema;

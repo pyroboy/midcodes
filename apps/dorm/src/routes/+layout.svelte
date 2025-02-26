@@ -19,7 +19,7 @@
     rentManagement: [
       { href: '/tenants', label: 'Tenants' },
       { href: '/leases', label: 'Leases' },
-      { href: '/readings', label: 'Readings' },
+      { href: '/utility-billings', label: 'Utility Readings' },
       // { href: '/overview', label: 'Overview/Monthly' },
       // { href: '/accounts', label: 'Accounts' }
     ],
