@@ -188,11 +188,20 @@ CREATE TABLE public.properties (
 );
 
 CREATE TABLE public.readings (
-    id integer NOT NULL DEFAULT nextval('readings_id_seq'::regclass),
-    meter_id integer NOT NULL,
-    reading numeric(10,2) NOT NULL,
-    reading_date date NOT NULL,
-    created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now())
+  id serial not null,
+  meter_id integer not null,
+  reading numeric(10, 2) not null,
+  reading_date date not null,
+  created_at timestamp with time zone not null default timezone ('utc'::text, now()),
+  meter_name text null,
+  consumption numeric(10, 2) null,
+  cost numeric(10, 2) null,
+  cost_per_kwh numeric(10, 2) null,
+  previous_reading numeric(10, 2) null,
+  constraint readings_pkey primary key (id)
+) TABLESPACE pg_default;
+
+create index IF not exists idx_readings_meter on public.readings using btree (meter_id) TABLESPACE pg_default;
 );
 
 CREATE TABLE public.rental_unit (
