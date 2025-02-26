@@ -263,31 +263,7 @@
       {#if $errors.type}<span class="text-red-500">{$errors.type}</span>{/if}
     </div>
 
-    <div>
-      <Label for="initial_reading">Initial Reading</Label>
-      <Input 
-        type="number" 
-        id="initial_reading" 
-        bind:value={$form.initial_reading} 
-        min="0" 
-        step="0.01" 
-        required 
-      />
-      {#if $errors.initial_reading}<span class="text-red-500">{$errors.initial_reading}</span>{/if}
-    </div>
 
-    <div>
-      <Label for="unit_rate">Unit Rate</Label>
-      <Input 
-        type="number" 
-        id="unit_rate" 
-        bind:value={$form.unit_rate} 
-        min="0" 
-        step="0.01" 
-        required 
-      />
-      {#if $errors.unit_rate}<span class="text-red-500">{$errors.unit_rate}</span>{/if}
-    </div>
 
     <div>
       <Label for="status">Status</Label>

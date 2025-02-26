@@ -203,20 +203,17 @@ export const actions = {
         });
       }
 
-      // Prepare data for insertion - FIXED to remove created_by and created_at fields
+      // Prepare data for insertion with proper property relationships
       const insertData = {
         name: form.data.name,
         location_type: form.data.location_type,
-        property_id: form.data.location_type === 'PROPERTY' ? form.data.property_id : null,
+        property_id: form.data.property_id,
         floor_id: form.data.location_type === 'FLOOR' ? form.data.floor_id : null,
         rental_unit_id: form.data.location_type === 'RENTAL_UNIT' ? form.data.rental_unit_id : null,
         type: form.data.type,
         status: form.data.status,
         is_active: form.data.status === 'ACTIVE',
-        initial_reading: form.data.initial_reading,
-        unit_rate: form.data.unit_rate,
         notes: form.data.notes
-        // Removed created_by and created_at fields
       };
       
       console.log('📤 Inserting meter with data:', insertData);
@@ -402,20 +399,17 @@ export const actions = {
         });
       }
 
-      // Prepare clean update data - FIXED to remove updated_by and updated_at fields
+      // Prepare clean update data with proper property relationships
       const cleanUpdateData = {
         name: updateData.name,
         location_type: updateData.location_type,
-        property_id: updateData.location_type === 'PROPERTY' ? updateData.property_id : null,
+        property_id: updateData.property_id,
         floor_id: updateData.location_type === 'FLOOR' ? updateData.floor_id : null,
         rental_unit_id: updateData.location_type === 'RENTAL_UNIT' ? updateData.rental_unit_id : null,
         type: updateData.type,
         status: updateData.status,
         is_active: updateData.status === 'ACTIVE',
-        initial_reading: updateData.initial_reading,
-        unit_rate: updateData.unit_rate,
         notes: updateData.notes
-        // Removed updated_by and updated_at fields
       };
       
       console.log('📤 Updating meter with data:', cleanUpdateData);

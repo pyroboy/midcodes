@@ -1,11 +1,10 @@
-import { error, fail, redirect, json } from '@sveltejs/kit';
+import { error, fail, redirect } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import type { PageServerLoad } from './$types';
 import type { Actions } from './$types';
 import type { Database } from '$lib/database.types';
-import { utilityBillingCreationSchema } from './meterReadingSchema';
-import { meterReadingSchema, batchReadingsSchema } from './meterReadingSchema';
+import { batchReadingsSchema } from './meterReadingSchema';
 
 export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession } }) => {
   const session = await safeGetSession();
@@ -13,8 +12,8 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
     throw error(401, 'Unauthorized');
   }
 
-  const form = await superValidate(zod(utilityBillingCreationSchema));
-  const readingForm = await superValidate(zod(meterReadingSchema));
+  // Create a form for superForm to use in the client, using batchReadingsSchema
+  const form = await superValidate(zod(batchReadingsSchema));
 
   // Get all active properties
   const { data: properties, error: propertiesError } = await supabase
@@ -52,7 +51,12 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
       id,
       meter_id,
       reading_date,
-      reading
+      reading,
+      consumption,
+      cost,
+      cost_per_unit,
+      previous_reading,
+      meter_name
     `)
     .in('meter_id', meters?.map(m => m.id) || []);
 
@@ -92,7 +96,6 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
 
   return {
     form,
-    readingForm,
     properties: properties || [],
     meters: meters || [],
     readings: readings || [],
@@ -102,157 +105,126 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
 };
 
 export const actions: Actions = {
-  // Change the default action to a named action 'createBilling'
-  createBilling: async ({ request, locals: { supabase, safeGetSession } }) => {
-    const session = await safeGetSession();
-    if (!session) {
-      throw error(401, 'Unauthorized');
-    }
-
-    const form = await superValidate(request, zod(utilityBillingCreationSchema));
-    if (!form.valid) {
-      return fail(400, { form });
-    }
-
-    // Validate dates
-    const startDate = new Date(form.data.start_date);
-    const endDate = new Date(form.data.end_date);
-    
-    if (startDate >= endDate) {
-      return fail(400, {
-        form,
-        error: 'Start date must be before end date'
-      });
-    }
-
-    // Format meter billings data for the RPC call
-    const formattedMeterBillings = form.data.meter_billings.map(billing => ({
-      meter_id: billing.meter_id,
-      start_reading: billing.start_reading,
-      end_reading: billing.end_reading,
-      consumption: billing.consumption,
-      total_cost: billing.total_cost,
-      tenant_count: billing.tenant_count,
-      per_tenant_cost: billing.per_tenant_cost
-    }));
-
-    // Convert property_id to number if it's a string
-    const propertyId = typeof form.data.property_id === 'string' 
-      ? parseInt(form.data.property_id, 10)
-      : form.data.property_id;
-
-    // Call RPC to create utility billing
-    const { data, error: billingError } = await supabase.rpc('create_utility_billing', {
-      p_start_date: startDate.toISOString(),
-      p_end_date: endDate.toISOString(),
-      p_type: form.data.type,
-      p_cost_per_unit: form.data.cost_per_unit,
-      p_property_id: propertyId,
-      p_meter_billings: formattedMeterBillings
-    });
-
-    if (billingError) {
-      console.error('Error creating utility billing:', billingError);
-      return fail(500, {
-        form,
-        error: `Failed to create utility billing: ${billingError.message}`
-      });
-    }
-
-    // Return success message
-    return { 
-      form,
-      success: true,
-      message: 'Utility billing created successfully'
-    };
-  },
-  
-  // Add individual reading
-  addReading: async ({ request, locals: { supabase } }) => {
+  // Add batch readings with full data saving
+  addBatchReadings: async ({ request, locals: { supabase, safeGetSession } }) => {
     try {
-      // Parse the request body as JSON
-      const data = await request.json();
-      
-      // Validate against schema
-      const parsedData = meterReadingSchema.safeParse(data);
-      if (!parsedData.success) {
-        return json({ 
-          error: 'Invalid data', 
-          details: parsedData.error.format() 
-        }, { status: 400 });
+      // Ensure user is authenticated
+      const session = await safeGetSession();
+      if (!session) {
+        throw error(401, 'Unauthorized');
       }
-      
-      // Add reading to database
-      const { data: newReading, error: readingError } = await supabase
-        .from('readings')
-        .insert({
-          meter_id: parsedData.data.meter_id,
-          reading: parsedData.data.reading,
-          reading_date: parsedData.data.reading_date
-        })
-        .select();
-      
-      if (readingError) {
-        return json({ 
-          error: `Failed to add reading: ${readingError.message}` 
-        }, { status: 500 });
-      }
-      
-      // Return success
-      return json({ success: true, reading: newReading });
-    } catch (error: any) {
-      console.error('Error adding reading:', error);
-      return json({ 
-        error: error.message || 'An unexpected error occurred' 
-      }, { status: 500 });
-    }
-  },
-  
-  // Add batch readings
-  addBatchReadings: async ({ request, locals }) => {
-    try {
-      // Extract form data from the request
+
+      // Get form data
       const formData = await request.formData();
-      const readingDate = formData.get('readingDate');
-      const costPerKwh = Number(formData.get('costPerKwh'));
-      const currentReading = Number(formData.get('currentReading')); // Adjust based on your form structure
-
-      // Basic validation
-      if (!readingDate || isNaN(costPerKwh) || isNaN(currentReading)) {
-        return fail(400, { message: 'Invalid input: All fields are required and must be valid.' });
+      
+      // Get the base data
+      const property_id = formData.get('property_id');
+      const type = formData.get('type');
+      const cost_per_unit = parseFloat(formData.get('cost_per_unit') as string);
+      
+      // Get readings from the readings_json field
+      const readingsJson = formData.get('readings_json');
+      if (!readingsJson || typeof readingsJson !== 'string') {
+        return fail(400, { error: 'No readings provided' });
       }
-
-      // Assuming you're using Supabase (adjust if using a different DB)
-      const { supabase } = locals; // Supabase client from locals, set up via hooks
-      const newReading = {
-        meter_name: 'dweqwe', // Replace with dynamic data from formData as needed
-        reading_date: readingDate,
-        current_reading: currentReading,
-        cost_per_kwh: costPerKwh,
-        consumption: currentReading, // Adjust logic if previous reading exists
-        cost: currentReading * costPerKwh
-      };
-
-      // Insert into Supabase and await the result
-      const { data, error } = await supabase
+      
+      // Parse the readings JSON
+      let readings;
+      try {
+        readings = JSON.parse(readingsJson);
+      } catch (e) {
+        return fail(400, { error: 'Invalid readings format' });
+      }
+      
+      if (!Array.isArray(readings) || readings.length === 0) {
+        return fail(400, { error: 'No readings provided' });
+      }
+      
+      // Get meter information for all meters involved
+      const meterIds = readings.map(r => r.meter_id);
+      const { data: meterData, error: meterError } = await supabase
+        .from('meters')
+        .select('id, name')
+        .in('id', meterIds);
+      
+      if (meterError) {
+        return fail(500, { error: `Error fetching meter data: ${meterError.message}` });
+      }
+      
+      // Create a map of meter IDs to meter names
+      const meterNameMap: Record<number, string> = {};
+      meterData.forEach(meter => {
+        meterNameMap[meter.id] = meter.name;
+      });
+      
+      // Get previous readings for all meters to calculate consumption
+      const { data: previousReadings, error: prevError } = await supabase
         .from('readings')
-        .insert([newReading])
-        .select();
-
-      if (error) {
-        return fail(500, { message: `Database error: ${error.message}` });
+        .select('meter_id, reading, reading_date')
+        .in('meter_id', meterIds)
+        .order('reading_date', { ascending: false });
+        
+      if (prevError) {
+        return fail(500, { error: `Error fetching previous readings: ${prevError.message}` });
       }
-
-      // Return a plain object for success
+      
+      // Create a map of meter IDs to their most recent reading
+      const previousReadingMap: Record<number, number> = {};
+      for (const reading of previousReadings || []) {
+        // Only add the first (most recent) reading for each meter
+        if (!previousReadingMap[reading.meter_id]) {
+          previousReadingMap[reading.meter_id] = reading.reading;
+        }
+      }
+      
+      // Prepare data for insertion with all fields
+      const readingsToInsert = readings
+        .filter(reading => reading.reading !== null) // Skip null readings
+        .map(reading => {
+          const meterId = reading.meter_id;
+          const currentReading = parseFloat(reading.reading);
+          const previousReading = previousReadingMap[meterId] || null;
+          const consumption = previousReading !== null ? currentReading - previousReading : null;
+          const cost = consumption !== null && consumption > 0 ? consumption * cost_per_unit : null;
+          
+          return {
+            meter_id: meterId,
+            reading: currentReading,
+            reading_date: reading.reading_date,
+            meter_name: meterNameMap[meterId] || null,
+            consumption: consumption,
+            cost: cost,
+            cost_per_unit: cost_per_unit, // Store as cost_per_unit for any utility type
+            previous_reading: previousReading
+          };
+        });
+      
+      if (readingsToInsert.length === 0) {
+        return fail(400, { error: 'No valid readings to insert' });
+      }
+      
+      console.log('Inserting readings with data:', readingsToInsert);
+      
+      // Insert the readings into the database with all fields
+      const { data: newReadings, error: insertError } = await supabase
+        .from('readings')
+        .insert(readingsToInsert)
+        .select();
+      
+      if (insertError) {
+        console.error('Error inserting readings:', insertError);
+        return fail(500, { error: `Failed to insert readings: ${insertError.message}` });
+      }
+      
+      // Return success response
       return {
         success: true,
-        message: `Successfully added ${data.length} reading(s)`,
-        readings: data
+        message: `Successfully added ${newReadings.length} readings`,
+        readings: newReadings
       };
-    } catch (err) {
-      // Handle unexpected errors
-      console.error('Error in addBatchReadings:', err);
-      return fail(500, { message: 'Internal server error' });
+    } catch (error: any) {
+      console.error('Error in addBatchReadings:', error);
+      return fail(500, { error: error.message || 'An unexpected error occurred' });
     }
   }
 };

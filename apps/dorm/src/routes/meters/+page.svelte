@@ -532,10 +532,7 @@ const processMeters = () => {
                     <p class="text-sm font-medium text-gray-500">Location</p>
                     <p class="truncate">{getLocationDetails(meter)}</p>
                   </div>
-                  <div>
-                    <p class="text-sm font-medium text-gray-500">Unit Rate</p>
-                    <p>{formatReading(meter.unit_rate)}</p>
-                  </div>
+            
                   <div>
                     {#if meter.latest_reading}
                       <p class="text-sm font-medium text-gray-500">Latest Reading</p>

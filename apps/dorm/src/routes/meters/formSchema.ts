@@ -23,9 +23,12 @@ export const locationTypeEnum = z.enum([
 const validateLocationConstraint = (data: any) => {
   const { location_type, property_id, floor_id, rental_unit_id } = data;
   
+  // Always require property_id for any location type
+  if (!property_id) return false;
+
   switch (location_type) {
     case 'PROPERTY':
-      return property_id != null;
+      return true;
     case 'FLOOR':
       return floor_id != null;
     case 'RENTAL_UNIT':
@@ -46,8 +49,6 @@ const baseMeterSchema = z.object({
   type: utilityTypeEnum,
   is_active: z.boolean().default(true),
   status: meterStatusEnum.default('ACTIVE'),
-  initial_reading: z.number().min(0, 'Initial reading must be 0 or greater').default(0),
-  unit_rate: z.number().min(0, 'Unit rate must be 0 or greater').default(0),
   notes: z.string().nullable().optional()
 });
 
