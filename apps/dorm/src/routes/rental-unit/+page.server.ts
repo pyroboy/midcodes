@@ -15,7 +15,7 @@ export type RentalUnitResponse = DBRentalUnit & {
   floor: Pick<DBFloor, 'id' | 'property_id' | 'floor_number' | 'wing'> | null;
 };
 export const load: PageServerLoad = async ({ locals }) => {
-  console.log('🔄 Starting server-side load function for rental units');
+  // console.log('🔄 Starting server-side load function for rental units');
   
   const { user, permissions } = await locals.safeGetSession();
   const hasAccess = permissions.includes('properties.create');

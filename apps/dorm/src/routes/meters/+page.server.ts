@@ -2,6 +2,16 @@ import { fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { meterSchema } from './formSchema';
+import type { Reading } from './types';
+
+interface LatestReading {
+  value: number;
+  date: string;
+}
+
+interface MeterWithReading extends Record<string, any> {
+  latest_reading?: LatestReading;
+}
 
 export const load = async ({ locals }) => {
   const session = await locals.safeGetSession();
@@ -10,7 +20,7 @@ export const load = async ({ locals }) => {
   }
 
   // Fetch all required data in parallel
-  const [{ data: meters }, { data: properties }, { data: floors }, { data: rental_unit }] = await Promise.all([
+  const [{ data: meters }, { data: properties }, { data: floors }, { data: rental_unit }, { data: readings }] = await Promise.all([
     locals.supabase
     .from('meters')
     .select(`
@@ -49,15 +59,46 @@ export const load = async ({ locals }) => {
         )
       `)
       .in('rental_unit_status', ['VACANT', 'OCCUPIED'])
-      .order('number')
+      .order('number'),
+      
+    locals.supabase
+      .from('readings')
+      .select('*')
+      .order('reading_date', { ascending: false })
   ]);
+
+  // Group latest readings by meter_id
+  const latestReadings: Record<number, Reading> = {};
+  if (readings) {
+    readings.forEach((reading: Reading) => {
+      if (!latestReadings[reading.meter_id] || 
+          new Date(reading.reading_date) > new Date(latestReadings[reading.meter_id].reading_date)) {
+        latestReadings[reading.meter_id] = reading;
+      }
+    });
+  }
+
+  // Attach readings to meters
+  const metersWithReadings: MeterWithReading[] = meters ? meters.map((meter: Record<string, any>) => {
+    const reading = meter.id ? latestReadings[meter.id] : undefined;
+    if (reading) {
+      return {
+        ...meter,
+        latest_reading: {
+          value: reading.reading,
+          date: reading.reading_date
+        }
+      };
+    }
+    return meter;
+  }) : [];
 
   // Initialize form with empty data
   const form = await superValidate(zod(meterSchema));
 
   return {
     form,
-    meters: meters || [],
+    meters: metersWithReadings || [],
     properties: properties || [],
     floors: floors || [],
     rental_unit: rental_unit || [],
@@ -108,49 +149,155 @@ export const actions = {
       const { location_type, property_id, floor_id, rental_unit_id } = form.data;
       console.log('📍 Location data:', { location_type, property_id, floor_id, rental_unit_id });
       
+      // Prepare insertData with initial values
+      let insertData = {
+        name: form.data.name,
+        location_type: form.data.location_type,
+        property_id: form.data.property_id,
+        floor_id: null as number | null,
+        rental_unit_id: null as number | null,
+        type: form.data.type,
+        initial_reading: form.data.initial_reading,
+        status: form.data.status,
+        is_active: form.data.status === 'ACTIVE',
+        notes: form.data.notes
+      };
+      
+      // Set the correct location IDs based on location_type and handle hierarchy
+      switch (location_type) {
+        case 'PROPERTY':
+          // For PROPERTY, we only need property_id
+          if (!property_id) {
+            console.log('❌ Missing property_id for PROPERTY location type');
+            return fail(400, { form, message: 'Property ID is required for PROPERTY location type' });
+          }
+          break;
+          
+        case 'FLOOR':
+          // For FLOOR, we need floor_id and property_id
+          if (!floor_id) {
+            console.log('❌ Missing floor_id for FLOOR location type');
+            return fail(400, { form, message: 'Floor ID is required for FLOOR location type' });
+          }
+          
+          // Set floor_id
+          insertData.floor_id = floor_id;
+          
+          // If property_id is not provided, get it from the floor
+          if (!property_id) {
+            const { data: floorData, error: floorError } = await locals.supabase
+              .from('floors')
+              .select('property_id')
+              .eq('id', floor_id)
+              .single();
+              
+            if (floorError) {
+              console.log('❌ Error fetching floor:', floorError);
+              return fail(500, { form, message: 'Error fetching floor data' });
+            }
+            
+            if (floorData && floorData.property_id) {
+              insertData.property_id = floorData.property_id;
+            } else {
+              return fail(400, { form, message: 'Floor not found or has no associated property' });
+            }
+          }
+          break;
+          
+        case 'RENTAL_UNIT':
+          // For RENTAL_UNIT, we need rental_unit_id, floor_id, and property_id
+          if (!rental_unit_id) {
+            console.log('❌ Missing rental_unit_id for RENTAL_UNIT location type');
+            return fail(400, { form, message: 'Rental unit ID is required for RENTAL_UNIT location type' });
+          }
+          
+          // Set rental_unit_id
+          insertData.rental_unit_id = rental_unit_id;
+          
+          // Get floor_id from rental_unit
+          const { data: unitData, error: unitError } = await locals.supabase
+            .from('rental_unit')
+            .select('floor_id')
+            .eq('id', rental_unit_id)
+            .single();
+            
+          if (unitError) {
+            console.log('❌ Error fetching rental unit:', unitError);
+            return fail(500, { form, message: 'Error fetching rental unit data' });
+          }
+          
+          if (!unitData || !unitData.floor_id) {
+            return fail(400, { form, message: 'Rental unit not found or has no associated floor' });
+          }
+          
+          // Set floor_id
+          insertData.floor_id = unitData.floor_id;
+          
+          // If property_id is not provided, get it from the floor
+          if (!property_id) {
+            const { data: floorData, error: floorError } = await locals.supabase
+              .from('floors')
+              .select('property_id')
+              .eq('id', unitData.floor_id)
+              .single();
+              
+            if (floorError) {
+              console.log('❌ Error fetching floor:', floorError);
+              return fail(500, { form, message: 'Error fetching floor data' });
+            }
+            
+            if (floorData && floorData.property_id) {
+              insertData.property_id = floorData.property_id;
+            } else {
+              return fail(400, { form, message: 'Floor not found or has no associated property' });
+            }
+          }
+          break;
+          
+        default:
+          console.log('❌ Invalid location_type:', location_type);
+          return fail(400, { form, message: 'Invalid location type' });
+      }
+      
+      // Verify property_id is set
+      if (!insertData.property_id) {
+        console.log('❌ Missing property_id');
+        return fail(400, { form, message: 'Property ID is required' });
+      }
+      
+      // Validate the selected location exists and is active
       let locationValid = false;
       let locationQuery;
       
       switch (location_type) {
         case 'PROPERTY':
-          if (!property_id) {
-            console.log('❌ Missing property_id for PROPERTY location type');
-            return fail(400, { form, message: 'Property ID is required for PROPERTY location type' });
-          }
           locationQuery = locals.supabase
             .from('properties')
             .select('id')
-            .eq('id', property_id)
+            .eq('id', insertData.property_id)
             .eq('status', 'ACTIVE')
             .single();
           break;
         case 'FLOOR':
-          if (!floor_id) {
-            console.log('❌ Missing floor_id for FLOOR location type');
-            return fail(400, { form, message: 'Floor ID is required for FLOOR location type' });
+          if (insertData.floor_id) {
+            locationQuery = locals.supabase
+              .from('floors')
+              .select('id')
+              .eq('id', insertData.floor_id)
+              .eq('status', 'ACTIVE')
+              .single();
           }
-          locationQuery = locals.supabase
-            .from('floors')
-            .select('id')
-            .eq('id', floor_id)
-            .eq('status', 'ACTIVE')
-            .single();
           break;
         case 'RENTAL_UNIT':
-          if (!rental_unit_id) {
-            console.log('❌ Missing rental_unit_id for RENTAL_UNIT location type');
-            return fail(400, { form, message: 'Rental unit ID is required for RENTAL_UNIT location type' });
+          if (insertData.rental_unit_id) {
+            locationQuery = locals.supabase
+              .from('rental_unit')
+              .select('id')
+              .eq('id', insertData.rental_unit_id)
+              .in('rental_unit_status', ['VACANT', 'OCCUPIED'])
+              .single();
           }
-          locationQuery = locals.supabase
-            .from('rental_unit')
-            .select('id')
-            .eq('id', rental_unit_id)
-            .in('rental_unit_status', ['VACANT', 'OCCUPIED'])
-            .single();
           break;
-        default:
-          console.log('❌ Invalid location_type:', location_type);
-          return fail(400, { form, message: 'Invalid location type' });
       }
 
       if (locationQuery) {
@@ -174,17 +321,19 @@ export const actions = {
       let duplicateQuery = locals.supabase
         .from('meters')
         .select('id')
-        .eq('name', form.data.name);
+        .eq('name', form.data.name)
+        .eq('property_id', insertData.property_id);
 
       switch (location_type) {
-        case 'PROPERTY':
-          duplicateQuery = duplicateQuery.eq('property_id', property_id);
-          break;
         case 'FLOOR':
-          duplicateQuery = duplicateQuery.eq('floor_id', floor_id);
+          if (insertData.floor_id) {
+            duplicateQuery = duplicateQuery.eq('floor_id', insertData.floor_id);
+          }
           break;
         case 'RENTAL_UNIT':
-          duplicateQuery = duplicateQuery.eq('rental_unit_id', rental_unit_id);
+          if (insertData.rental_unit_id) {
+            duplicateQuery = duplicateQuery.eq('rental_unit_id', insertData.rental_unit_id);
+          }
           break;
       }
 
@@ -202,19 +351,6 @@ export const actions = {
           message: 'A meter with this name already exists in this location.' 
         });
       }
-
-      // Prepare data for insertion with proper property relationships
-      const insertData = {
-        name: form.data.name,
-        location_type: form.data.location_type,
-        property_id: form.data.property_id,
-        floor_id: form.data.location_type === 'FLOOR' ? form.data.floor_id : null,
-        rental_unit_id: form.data.location_type === 'RENTAL_UNIT' ? form.data.rental_unit_id : null,
-        type: form.data.type,
-        status: form.data.status,
-        is_active: form.data.status === 'ACTIVE',
-        notes: form.data.notes
-      };
       
       console.log('📤 Inserting meter with data:', insertData);
 
@@ -303,49 +439,155 @@ export const actions = {
       const { location_type, property_id, floor_id, rental_unit_id } = updateData;
       console.log('📍 Location data:', { location_type, property_id, floor_id, rental_unit_id });
       
+      // Prepare clean update data with initial values
+      let cleanUpdateData = {
+        name: updateData.name,
+        location_type: updateData.location_type,
+        property_id: updateData.property_id,
+        floor_id: null as number | null,
+        rental_unit_id: null as number | null,
+        initial_reading: updateData.initial_reading,
+        type: updateData.type,
+        status: updateData.status,
+        is_active: updateData.status === 'ACTIVE',
+        notes: updateData.notes
+      };
+      
+      // Set the correct location IDs based on location_type and handle hierarchy
+      switch (location_type) {
+        case 'PROPERTY':
+          // For PROPERTY, we only need property_id
+          if (!property_id) {
+            console.log('❌ Missing property_id for PROPERTY location type');
+            return fail(400, { form, message: 'Property ID is required for PROPERTY location type' });
+          }
+          break;
+          
+        case 'FLOOR':
+          // For FLOOR, we need floor_id and property_id
+          if (!floor_id) {
+            console.log('❌ Missing floor_id for FLOOR location type');
+            return fail(400, { form, message: 'Floor ID is required for FLOOR location type' });
+          }
+          
+          // Set floor_id
+          cleanUpdateData.floor_id = floor_id;
+          
+          // If property_id is not provided, get it from the floor
+          if (!property_id) {
+            const { data: floorData, error: floorError } = await locals.supabase
+              .from('floors')
+              .select('property_id')
+              .eq('id', floor_id)
+              .single();
+              
+            if (floorError) {
+              console.log('❌ Error fetching floor:', floorError);
+              return fail(500, { form, message: 'Error fetching floor data' });
+            }
+            
+            if (floorData && floorData.property_id) {
+              cleanUpdateData.property_id = floorData.property_id;
+            } else {
+              return fail(400, { form, message: 'Floor not found or has no associated property' });
+            }
+          }
+          break;
+          
+        case 'RENTAL_UNIT':
+          // For RENTAL_UNIT, we need rental_unit_id, floor_id, and property_id
+          if (!rental_unit_id) {
+            console.log('❌ Missing rental_unit_id for RENTAL_UNIT location type');
+            return fail(400, { form, message: 'Rental unit ID is required for RENTAL_UNIT location type' });
+          }
+          
+          // Set rental_unit_id
+          cleanUpdateData.rental_unit_id = rental_unit_id;
+          
+          // Get floor_id from rental_unit
+          const { data: unitData, error: unitError } = await locals.supabase
+            .from('rental_unit')
+            .select('floor_id')
+            .eq('id', rental_unit_id)
+            .single();
+            
+          if (unitError) {
+            console.log('❌ Error fetching rental unit:', unitError);
+            return fail(500, { form, message: 'Error fetching rental unit data' });
+          }
+          
+          if (!unitData || !unitData.floor_id) {
+            return fail(400, { form, message: 'Rental unit not found or has no associated floor' });
+          }
+          
+          // Set floor_id
+          cleanUpdateData.floor_id = unitData.floor_id;
+          
+          // If property_id is not provided, get it from the floor
+          if (!property_id) {
+            const { data: floorData, error: floorError } = await locals.supabase
+              .from('floors')
+              .select('property_id')
+              .eq('id', unitData.floor_id)
+              .single();
+              
+            if (floorError) {
+              console.log('❌ Error fetching floor:', floorError);
+              return fail(500, { form, message: 'Error fetching floor data' });
+            }
+            
+            if (floorData && floorData.property_id) {
+              cleanUpdateData.property_id = floorData.property_id;
+            } else {
+              return fail(400, { form, message: 'Floor not found or has no associated property' });
+            }
+          }
+          break;
+          
+        default:
+          console.log('❌ Invalid location_type:', location_type);
+          return fail(400, { form, message: 'Invalid location type' });
+      }
+      
+      // Verify property_id is set
+      if (!cleanUpdateData.property_id) {
+        console.log('❌ Missing property_id');
+        return fail(400, { form, message: 'Property ID is required' });
+      }
+      
+      // Validate the selected location exists and is active
       let locationValid = false;
       let locationQuery;
       
       switch (location_type) {
         case 'PROPERTY':
-          if (!property_id) {
-            console.log('❌ Missing property_id for PROPERTY location type');
-            return fail(400, { form, message: 'Property ID is required for PROPERTY location type' });
-          }
           locationQuery = locals.supabase
             .from('properties')
             .select('id')
-            .eq('id', property_id)
+            .eq('id', cleanUpdateData.property_id)
             .eq('status', 'ACTIVE')
             .single();
           break;
         case 'FLOOR':
-          if (!floor_id) {
-            console.log('❌ Missing floor_id for FLOOR location type');
-            return fail(400, { form, message: 'Floor ID is required for FLOOR location type' });
+          if (cleanUpdateData.floor_id) {
+            locationQuery = locals.supabase
+              .from('floors')
+              .select('id')
+              .eq('id', cleanUpdateData.floor_id)
+              .eq('status', 'ACTIVE')
+              .single();
           }
-          locationQuery = locals.supabase
-            .from('floors')
-            .select('id')
-            .eq('id', floor_id)
-            .eq('status', 'ACTIVE')
-            .single();
           break;
         case 'RENTAL_UNIT':
-          if (!rental_unit_id) {
-            console.log('❌ Missing rental_unit_id for RENTAL_UNIT location type');
-            return fail(400, { form, message: 'Rental unit ID is required for RENTAL_UNIT location type' });
+          if (cleanUpdateData.rental_unit_id) {
+            locationQuery = locals.supabase
+              .from('rental_unit')
+              .select('id')
+              .eq('id', cleanUpdateData.rental_unit_id)
+              .in('rental_unit_status', ['VACANT', 'OCCUPIED'])
+              .single();
           }
-          locationQuery = locals.supabase
-            .from('rental_unit')
-            .select('id')
-            .eq('id', rental_unit_id)
-            .in('rental_unit_status', ['VACANT', 'OCCUPIED'])
-            .single();
           break;
-        default:
-          console.log('❌ Invalid location_type:', location_type);
-          return fail(400, { form, message: 'Invalid location type' });
       }
 
       if (locationQuery) {
@@ -370,17 +612,19 @@ export const actions = {
         .from('meters')
         .select('id')
         .eq('name', updateData.name)
+        .eq('property_id', cleanUpdateData.property_id)
         .neq('id', id);
 
       switch (location_type) {
-        case 'PROPERTY':
-          duplicateQuery = duplicateQuery.eq('property_id', property_id);
-          break;
         case 'FLOOR':
-          duplicateQuery = duplicateQuery.eq('floor_id', floor_id);
+          if (cleanUpdateData.floor_id) {
+            duplicateQuery = duplicateQuery.eq('floor_id', cleanUpdateData.floor_id);
+          }
           break;
         case 'RENTAL_UNIT':
-          duplicateQuery = duplicateQuery.eq('rental_unit_id', rental_unit_id);
+          if (cleanUpdateData.rental_unit_id) {
+            duplicateQuery = duplicateQuery.eq('rental_unit_id', cleanUpdateData.rental_unit_id);
+          }
           break;
       }
 
@@ -398,19 +642,6 @@ export const actions = {
           message: 'A meter with this name already exists in this location.' 
         });
       }
-
-      // Prepare clean update data with proper property relationships
-      const cleanUpdateData = {
-        name: updateData.name,
-        location_type: updateData.location_type,
-        property_id: updateData.property_id,
-        floor_id: updateData.location_type === 'FLOOR' ? updateData.floor_id : null,
-        rental_unit_id: updateData.location_type === 'RENTAL_UNIT' ? updateData.rental_unit_id : null,
-        type: updateData.type,
-        status: updateData.status,
-        is_active: updateData.status === 'ACTIVE',
-        notes: updateData.notes
-      };
       
       console.log('📤 Updating meter with data:', cleanUpdateData);
 
@@ -434,99 +665,96 @@ export const actions = {
     }
   },
 
-  delete: async ({ request, locals }) => {
-    console.log('🔄 Starting delete action');
-    
+delete: async ({ request, locals }) => {
     try {
+      // Check if the user is authenticated
       const session = await locals.safeGetSession();
       if (!session) {
-        console.log('❌ No session found');
         return fail(401, { message: 'Unauthorized' });
       }
 
-      // Check user permissions
+      // Fetch user profile to check permissions
       const { data: profile, error: profileError } = await locals.supabase
         .from('profiles')
         .select('role')
         .eq('id', session.user.id)
         .single();
-        
+
       if (profileError) {
-        console.log('❌ Error fetching profile:', profileError);
+        console.error('Error fetching profile:', profileError);
         return fail(500, { message: 'Error fetching user profile' });
       }
 
+      // Restrict action to administrators
       const isAdminLevel = profile?.role === 'super_admin' || profile?.role === 'property_admin';
       if (!isAdminLevel) {
-        console.log('❌ Permission denied. User role:', profile?.role);
+        console.error('Permission denied. User role:', profile?.role);
         return fail(403, { message: 'Only administrators can delete meters.' });
       }
 
-      const form = await superValidate(request, zod(meterSchema));
-      if (!form.valid) {
-        console.log('❌ Form validation failed:', form.errors);
-        return fail(400, { form });
+      // Extract meter ID from the form data
+      const formData = await request.formData();
+      const id = formData.get('id');
+
+      // Validate the meter ID
+      if (!id || isNaN(Number(id))) {
+        return fail(400, { message: 'Invalid meter ID' });
       }
 
-      const { id } = form.data;
-      if (!id) {
-        console.log('❌ Missing meter ID for deletion');
-        return fail(400, { form, message: 'Meter ID is required for deletion.' });
-      }
+      const meterId = Number(id);
 
-      // Check if meter exists
+      // Verify that the meter exists
       const { data: meter, error: meterError } = await locals.supabase
         .from('meters')
         .select('id')
-        .eq('id', id)
+        .eq('id', meterId)
         .single();
 
-      if (meterError) {
-        console.log('❌ Error fetching meter:', meterError);
-        return fail(500, { form, message: 'Error fetching meter information' });
-      }
-
-      if (!meter) {
-        console.log('❌ Meter not found with ID:', id);
-        return fail(404, { form, message: 'Meter not found.' });
+      if (meterError || !meter) {
+        return fail(404, { message: 'Meter not found' });
       }
 
       // Check for existing readings
       const { data: readings, error: readingsError } = await locals.supabase
         .from('readings')
         .select('id')
-        .eq('meter_id', id)
-        .limit(1);
+        .eq('meter_id', meterId)
+        .limit(1); // We only need to know if at least one reading exists
 
       if (readingsError) {
-        console.log('❌ Error checking for readings:', readingsError);
-        return fail(500, { form, message: 'Error checking for meter readings' });
+        console.error('Error checking readings:', readingsError);
+        return fail(500, { message: 'Error checking meter readings' });
       }
 
-      if (readings && readings.length > 0) {
-        console.log('❌ Meter has existing readings, cannot delete');
-        return fail(400, { 
-          form, 
-          message: 'Cannot delete meter with existing readings. Please archive it instead.' 
-        });
+      if (readings.length > 0) {
+        // Archive the meter by setting status to 'INACTIVE'
+        const { error: updateError } = await locals.supabase
+          .from('meters')
+          .update({ status: 'INACTIVE' })
+          .eq('id', meterId);
+
+        if (updateError) {
+          console.error('Error updating meter:', updateError);
+          return fail(500, { message: 'Error archiving meter' });
+        }
+
+        return { success: true, action: 'archived' };
+      } else {
+        // Delete the meter if no readings exist
+        const { error: deleteError } = await locals.supabase
+          .from('meters')
+          .delete()
+          .eq('id', meterId);
+
+        if (deleteError) {
+          console.error('Error deleting meter:', deleteError);
+          return fail(500, { message: 'Error deleting meter' });
+        }
+
+        return { success: true, action: 'deleted' };
       }
-
-      // Delete the meter
-      const { error: deleteError } = await locals.supabase
-        .from('meters')
-        .delete()
-        .eq('id', id);
-
-      if (deleteError) {
-        console.log('❌ Error deleting meter:', deleteError);
-        return fail(500, { form, message: `Database error: ${deleteError.message}` });
-      }
-
-      console.log('✅ Meter deleted successfully');
-      return { form };
-      
     } catch (err) {
-      console.error('❌ Unexpected error in delete action:', err);
+      console.error('Unexpected error:', err);
       return fail(500, { message: 'An unexpected error occurred' });
     }
   }

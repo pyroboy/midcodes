@@ -43,18 +43,19 @@ const baseMeterSchema = z.object({
   id: z.number().optional(),
   name: z.string().min(1, 'Name is required').max(255, 'Name is too long'),
   location_type: locationTypeEnum,
-  property_id: z.number().nullable(),
+  property_id: z.number(),
   floor_id: z.number().nullable(),
   rental_unit_id: z.number().nullable(),
   type: utilityTypeEnum,
+  initial_reading: z.number().default(0),
   is_active: z.boolean().default(true),
   status: meterStatusEnum.default('ACTIVE'),
-  notes: z.string().nullable().optional()
+  notes: z.string().nullable().optional(),
+  created_at: z.date().optional() // Make created_at optional
 });
 
 // Full meter schema with timestamps
 export const meterSchema = baseMeterSchema.extend({
-  created_at: z.date().optional()
 }).refine(validateLocationConstraint, {
   message: "Required location ID must be set based on the location type",
   path: ["location_type"]

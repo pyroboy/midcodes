@@ -44,16 +44,18 @@
     readings?: Reading[];
   };
 
+  // Group interface for proper typing
+  interface MeterGroup {
+    id: number | null;
+    name: string;
+    meters: ExtendedMeterFormData[];
+  }
+
   // Component state with Svelte 5 reactive primitives
   let { data } = $props<{ data: PageData }>();
   
-  // Add more detailed debug logging
-  console.log("Initial data received:", data);
-  console.log("Meters data:", data.meters);
-  console.log("Properties data:", data.properties);
-  console.log("Floors data:", data.floors);
-  console.log("Rental unit data:", data.rental_unit);
-  $inspect(data);
+  // Debug logging
+  // console.log("Initial data received:", data);
   
   let selectedMeter = $state<ExtendedMeterFormData | undefined>(undefined);
   let loading = $state(false);
@@ -65,79 +67,53 @@
   let sortOrder = $state<'asc' | 'desc'>('asc');
   let editMode = $state(false);
   
-  // Debug counters
-  let rawMeterCount = $state(0);
-  let processedMeterCount = $state(0);
-  let filteredMeterCount = $state(0);
-  let showDebugInfo = $state(false);
-
   // Store data in state variables with null checks
   let metersData = $state<ExtendedMeterFormData[]>(data.meters || []);
   let propertiesData = $state<Property[]>(data.properties || []);
   let floorsData = $state<Floor[]>(data.floors || []);
   let rentalUnitData = $state<Rental_unit[]>(data.rental_unit || []);
   
-  // Initial debug counter
-  $effect(() => {
-    rawMeterCount = metersData.length;
-    console.log(`Initial meter count: ${rawMeterCount}`);
-  });
-
   // Process meters to extract latest readings
-// Process meters to extract latest readings
-const processMeters = () => {
-  if (!metersData || !Array.isArray(metersData)) {
-    return [];
-  }
-  
-  return metersData.map((meter) => {
-    // Ensure readings is at least an empty array
-    const readings = meter.readings || [];
-    
-    if (readings.length > 0) {
-      // Sort readings by date, newest first
-      const sortedReadings = [...readings].sort((a, b) => {
-        const dateA = new Date(a.reading_date);
-        const dateB = new Date(b.reading_date);
-        return dateB.getTime() - dateA.getTime();
-      });
-      
-      return {
-        ...meter,
-        latest_reading: {
-          value: sortedReadings[0].reading,
-          date: sortedReadings[0].reading_date
-        }
-      };
+  const processMeters = () => {
+    if (!metersData || !Array.isArray(metersData)) {
+      return [];
     }
-    return meter;
-  });
-};
+    
+    return metersData.map((meter) => {
+      // Ensure readings is at least an empty array
+      const readings = meter.readings || [];
+      
+      if (readings.length > 0) {
+        // Sort readings by date, newest first
+        const sortedReadings = [...readings].sort((a, b) => {
+          const dateA = new Date(a.reading_date);
+          const dateB = new Date(b.reading_date);
+          return dateB.getTime() - dateA.getTime();
+        });
+        
+        return {
+          ...meter,
+          latest_reading: {
+            value: sortedReadings[0].reading,
+            date: sortedReadings[0].reading_date
+          }
+        };
+      }
+      return meter;
+    });
+  };
   
   let processedMeters = $derived(processMeters());
-  
-  // Update counter effects
-  $effect(() => {
-    if (processedMeters) {
-      processedMeterCount = processedMeters.length;
-      console.log(`Processed meter count effect: ${processedMeterCount}`);
-    }
-  });
 
   // Filtered and sorted meters
   const filterMeters = () => {
-    console.log("Filtering meters, input count:", processedMeters?.length || 0);
-    console.log("Filter criteria - type:", selectedType, "status:", selectedStatus, "search:", searchQuery);
-    
     if (!processedMeters || !Array.isArray(processedMeters)) {
-      console.error("processedMeters is not an array:", processedMeters);
       return [];
     }
     
     try {
       const filtered = processedMeters.filter((meter: ExtendedMeterFormData) => {
         if (!meter) {
-          console.log("Found null/undefined meter");
           return false;
         }
         
@@ -147,7 +123,6 @@ const processMeters = () => {
           try {
             locationDetails = getLocationDetails(meter).toLowerCase();
           } catch (locErr) {
-            console.error(`Error getting location for meter ${meter.id}:`, locErr);
             locationDetails = "location error";
           }
           
@@ -157,14 +132,8 @@ const processMeters = () => {
             meter.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             locationDetails.includes(searchQuery.toLowerCase());
             
-          // Log if a meter is being filtered out
-          if (!(matchesType && matchesStatus && matchesSearch)) {
-            console.log(`Meter ${meter.id} filtered out: type=${matchesType}, status=${matchesStatus}, search=${matchesSearch}`);
-          }
-          
           return matchesType && matchesStatus && matchesSearch;
         } catch (err) {
-          console.error(`Error filtering meter ${meter?.id}:`, err);
           return false;
         }
       });
@@ -187,11 +156,8 @@ const processMeters = () => {
         }
       });
       
-      console.log("Filtered meters count:", result.length);
-      // Don't update state here - will do in an effect later
       return result;
     } catch (err) {
-      console.error("Error in filterMeters:", err);
       error = "Error filtering meter data";
       return [];
     }
@@ -199,13 +165,49 @@ const processMeters = () => {
   
   let filteredMeters = $derived(filterMeters());
   
-  // Update filtered count effect
-  $effect(() => {
-    if (filteredMeters) {
-      filteredMeterCount = filteredMeters.length;
-      console.log(`Filtered meter count effect: ${filteredMeterCount}`);
-    }
-  });
+  // Group filtered meters by property
+  const groupMeters = (): MeterGroup[] => {
+    const grouped: Record<string, MeterGroup> = {};
+    
+    filteredMeters.forEach(meter => {
+      let propertyId: number | null = null;
+      let propertyName = 'Unknown Property';
+      
+      if (meter.location_type === 'PROPERTY' && meter.property_id) {
+        propertyId = meter.property_id;
+        const property = propertiesData?.find(p => p.id === propertyId);
+        propertyName = property?.name || 'Unknown Property';
+      } else if (meter.location_type === 'FLOOR' && meter.floor_id) {
+        const floor = floorsData?.find(f => f.id === meter.floor_id);
+        if (floor?.property) {
+          propertyId = floor.property.id;
+          propertyName = floor.property.name;
+        }
+      } else if (meter.location_type === 'RENTAL_UNIT' && meter.rental_unit_id) {
+        const unit = rentalUnitData?.find(r => r.id === meter.rental_unit_id);
+        if (unit?.floor?.property) {
+          propertyId = unit.floor.property.id;
+          propertyName = unit.floor.property.name;
+        }
+      }
+      
+      const propId = propertyId ? propertyId.toString() : 'unknown';
+      
+      if (!grouped[propId]) {
+        grouped[propId] = {
+          id: propertyId,
+          name: propertyName,
+          meters: []
+        };
+      }
+      
+      grouped[propId].meters.push(meter);
+    });
+    
+    return Object.values(grouped);
+  };
+  
+  let groupedMeters = $derived(groupMeters());
 
   // Form handling
   const { form, enhance, errors, constraints, submitting, reset } = superForm(data.form, {
@@ -220,9 +222,6 @@ const processMeters = () => {
         error: result.error,
         status: result.status
       });
-      if (result.error) {
-        console.error('Server error:', result.error.message);
-      }
     },
     onResult: async ({ result }) => {
       if (result.type === 'success') {
@@ -233,29 +232,6 @@ const processMeters = () => {
       }
     }
   });
-  
-  $inspect($form);
-
-  // Debug function to reset all filters
-  function resetFilters() {
-    console.log("Resetting all filters");
-    selectedType = '';
-    selectedStatus = '';
-    searchQuery = '';
-    sortBy = 'name';
-    sortOrder = 'asc';
-  }
-  
-  // Debug function to manually refresh data
-  function refreshData() {
-    console.log("Manually refreshing data");
-    invalidate('app:meters');
-  }
-  
-  // Toggle debug info
-  function toggleDebugInfo() {
-    showDebugInfo = !showDebugInfo;
-  }
 
   // Event handlers
   function handleCancel() {
@@ -265,20 +241,33 @@ const processMeters = () => {
   }
 
   function handleTypeChange(value: string) {
-    console.log("Type filter changed to:", value);
     selectedType = value;
   }
 
   function handleStatusChange(value: string) {
-    console.log("Status filter changed to:", value);
     selectedStatus = value;
   }
 
   function handleEdit(meter: ExtendedMeterFormData) {
-      console.log("Editing meter:", meter);
-      editMode = true;
-      selectedMeter = meter;
-      $form = { ...meter };
+    console.log("Editing meter:", meter);
+    editMode = true;
+    selectedMeter = meter;
+    
+    // Make sure to copy all properties to the form
+    $form = { 
+      ...meter,
+      // Ensure ID is properly set
+      id: meter.id 
+    };
+    
+    console.log("Edit mode set to:", editMode);
+    console.log("Form after setting:", $form);
+}
+
+  function clearFilters() {
+    searchQuery = '';
+    selectedType = '';
+    selectedStatus = '';
   }
 
   // Utility functions
@@ -304,8 +293,28 @@ const processMeters = () => {
           return 'Unknown Location';
       }
     } catch (err) {
-      console.error("Error in getLocationDetails:", err);
       return 'Location Error';
+    }
+  }
+
+  function getDetailedLocationInfo(meter: ExtendedMeterFormData): string {
+    if (!meter || !meter.location_type) return '';
+    
+    try {
+      switch (meter.location_type) {
+        case 'PROPERTY':
+          return '';
+        case 'FLOOR':
+          const floor = floorsData?.find((f: Floor) => f.id === meter.floor_id);
+          return floor ? `Floor ${floor.floor_number}${floor.wing ? `, Wing ${floor.wing}` : ''}` : '';
+        case 'RENTAL_UNIT':
+          const unit = rentalUnitData?.find((r: Rental_unit) => r.id === meter.rental_unit_id);
+          return unit ? `Rental_unit ${unit.number}` : '';
+        default:
+          return '';
+      }
+    } catch (err) {
+      return '';
     }
   }
 
@@ -349,6 +358,7 @@ const processMeters = () => {
   }
 </script>
 
+
 <div class="container mx-auto p-4 flex flex-col lg:flex-row gap-4">
   <!-- Meters List (Left side) -->
   <div class="w-full lg:w-2/3">
@@ -362,9 +372,9 @@ const processMeters = () => {
       </Alert.Root>
     {/if}
 
-    <Card.Root class="mb-6">
-      <Card.Content class="pt-6">
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <Card.Root class="mb-4">
+      <Card.Content class="p-4">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div class="relative">
             <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -381,7 +391,7 @@ const processMeters = () => {
           </div>
           <div>
             <Select.Root type="single" value={selectedType} onValueChange={handleTypeChange}>
-              <Select.Trigger class="w-full">
+              <Select.Trigger>
                 <span>{selectedType || "All Types"}</span>
               </Select.Trigger>
               <Select.Content>
@@ -399,7 +409,7 @@ const processMeters = () => {
           </div>
           <div>
             <Select.Root type="single" value={selectedStatus} onValueChange={handleStatusChange}>
-              <Select.Trigger class="w-full">
+              <Select.Trigger>
                 <span>{selectedStatus || "All Statuses"}</span>
               </Select.Trigger>
               <Select.Content>
@@ -422,17 +432,13 @@ const processMeters = () => {
         </div>
       </Card.Content>
       {#if searchQuery || selectedType || selectedStatus}
-        <Card.Footer>
+        <Card.Footer class="py-2 px-4">
           <div class="flex justify-between items-center">
             <span class="text-sm text-gray-500">{filteredMeters.length} result{filteredMeters.length !== 1 ? 's' : ''}</span>
             <Button 
               variant="ghost" 
               size="sm" 
-              onclick={() => {
-                searchQuery = '';
-                selectedType = '';
-                selectedStatus = '';
-              }}
+              onclick={clearFilters}
             >
               Clear
             </Button>
@@ -441,140 +447,129 @@ const processMeters = () => {
       {/if}
     </Card.Root>
 
-    <div class="space-y-4">
-      <!-- Debug info for data state -->
-      {#if showDebugInfo}
-        <div class="bg-gray-100 p-3 rounded mb-4">
-          <p>metersData: {metersData ? `Array(${metersData.length})` : 'undefined'}</p>
-          <p>processedMeters: {processedMeters ? `Array(${processedMeters.length})` : 'undefined'}</p>
-          <p>filteredMeters: {filteredMeters ? `Array(${filteredMeters.length})` : 'undefined'}</p>
-        </div>
-      {/if}
-    
-      {#if loading}
-        <div class="flex justify-center items-center py-8">
-          <Loader2 class="h-8 w-8 animate-spin" />
-        </div>
-      {:else if !filteredMeters || filteredMeters.length === 0}
-        <div class="flex flex-col items-center justify-center py-12 px-4 bg-gray-50 rounded-lg">
-          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="text-gray-400 mb-3">
-            <path d="M10.3 8.2c.7-.3 1.5-.4 2.3-.4h1.2c2.2 0 4 1.8 4 4 0 .5-.1 1-.3 1.5" />
-            <path d="M2.5 10a2.5 2.5 0 0 1 5 0c0 .5-.1 1-.3 1.5" />
-            <path d="M7.8 15.2a5 5 0 0 0-2.3.4 2.5 2.5 0 0 0 3.4 1c.7-.3 1.5-.4 2.3-.4h1.2c.8 0 1.6.1 2.3.4a2.5 2.5 0 0 0 3.4-1 2.5 2.5 0 0 0-1-3.4 5 5 0 0 0-2.3-.4h-5.6z" />
-            <path d="M21.7 16.2a2.5 2.5 0 0 0-3.2-3.4" />
-          </svg>
-          <p class="text-center text-gray-500">No results found</p>
-          <!-- Show debug info about why no results were found -->
-          {#if showDebugInfo}
-            <div class="mt-4 text-sm text-gray-500">
-              <p>Possible reasons:</p>
-              <ul class="list-disc list-inside mt-2">
-                <li>No meters in source data (count: {rawMeterCount})</li>
-                <li>All meters filtered out by criteria</li>
-                <li>Error during processing (check console)</li>
-              </ul>
-            </div>
-          {/if}
-        </div>
-      {:else}
-        <div class="flex items-center justify-between mb-2 text-sm text-gray-500">
-          <div class="flex space-x-4">
-            <button 
-              class={`${sortBy === 'name' ? 'text-black font-medium' : ''}`}
-              onclick={() => handleSort('name')}
-            >
-              Name {sortBy === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
-            </button>
-            <button 
-              class={`${sortBy === 'type' ? 'text-black font-medium' : ''}`}
-              onclick={() => handleSort('type')}
-            >
-              Type {sortBy === 'type' && (sortOrder === 'asc' ? '↑' : '↓')}
-            </button>
-            <button 
-              class={`${sortBy === 'status' ? 'text-black font-medium' : ''}`}
-              onclick={() => handleSort('status')}
-            >
-              Status {sortBy === 'status' && (sortOrder === 'asc' ? '↑' : '↓')}
-            </button>
-            <button 
-              class={`${sortBy === 'reading' ? 'text-black font-medium' : ''}`}
-              onclick={() => handleSort('reading')}
-            >
-              Reading {sortBy === 'reading' && (sortOrder === 'asc' ? '↑' : '↓')}
-            </button>
-          </div>
-        </div>
-        
-        {#each filteredMeters as meter (meter.id)}
-          <Card.Root class={selectedMeter?.id === meter.id ? 'border-2 border-blue-500' : ''}>
-            <button 
-              type="button"
-              class="w-full text-left cursor-pointer"
-              onclick={() => handleEdit(meter)}
-            >
-              <Card.Header class="pb-2">
-                <Card.Title class="flex justify-between items-center">
-                  <div class="flex items-center space-x-2">
-                    <span>{meter.name}</span>
-                    <Badge variant={getTypeVariant(meter.type)}>
-                      {meter.type}
-                    </Badge>
-                    <Badge class={getStatusColor(meter.status)}>
-                      {meter.status}
-                    </Badge>
-                  </div>
-                </Card.Title>
-              </Card.Header>
-              <Card.Content>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <p class="text-sm font-medium text-gray-500">Location</p>
-                    <p class="truncate">{getLocationDetails(meter)}</p>
-                  </div>
-            
-                  <div>
-                    {#if meter.latest_reading}
-                      <p class="text-sm font-medium text-gray-500">Latest Reading</p>
-                      <div class="flex items-baseline space-x-2">
-                        <span>{formatReading(meter.latest_reading.value)}</span>
-                        <span class="text-xs text-gray-500">
-                          ({new Date(meter.latest_reading.date).toLocaleDateString()})
-                        </span>
-                      </div>
-                    {:else}
-                      <p class="text-sm font-medium text-gray-500">Latest Reading</p>
-                      <p class="text-gray-400">No readings yet</p>
-                    {/if}
-                  </div>
-                </div>
-                {#if meter.notes}
-                  <div class="mt-2 pt-2 border-t border-gray-100">
-                    <p class="text-sm text-gray-500">{meter.notes}</p>
-                  </div>
-                {/if}
-              </Card.Content>
-            </button>
-          </Card.Root>
-        {/each}
-      {/if}
+    <div class="flex items-center justify-between text-sm text-gray-500 mb-3 px-2">
+      <div class="flex space-x-4">
+        <button 
+          class={`${sortBy === 'name' ? 'text-black font-medium' : ''}`}
+          onclick={() => handleSort('name')}
+        >
+          Name {sortBy === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
+        </button>
+        <button 
+          class={`${sortBy === 'type' ? 'text-black font-medium' : ''}`}
+          onclick={() => handleSort('type')}
+        >
+          Type {sortBy === 'type' && (sortOrder === 'asc' ? '↑' : '↓')}
+        </button>
+        <button 
+          class={`${sortBy === 'status' ? 'text-black font-medium' : ''}`}
+          onclick={() => handleSort('status')}
+        >
+          Status {sortBy === 'status' && (sortOrder === 'asc' ? '↑' : '↓')}
+        </button>
+        <button 
+          class={`${sortBy === 'reading' ? 'text-black font-medium' : ''}`}
+          onclick={() => handleSort('reading')}
+        >
+          Reading {sortBy === 'reading' && (sortOrder === 'asc' ? '↑' : '↓')}
+        </button>
+      </div>
     </div>
+
+    {#if loading}
+      <div class="flex justify-center items-center py-6">
+        <Loader2 class="h-8 w-8 animate-spin" />
+      </div>
+    {:else if groupedMeters.length === 0}
+      <div class="flex flex-col items-center justify-center py-8 px-4 bg-gray-50 rounded-lg">
+        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="text-gray-400 mb-3">
+          <path d="M10.3 8.2c.7-.3 1.5-.4 2.3-.4h1.2c2.2 0 4 1.8 4 4 0 .5-.1 1-.3 1.5" />
+          <path d="M2.5 10a2.5 2.5 0 0 1 5 0c0 .5-.1 1-.3 1.5" />
+          <path d="M7.8 15.2a5 5 0 0 0-2.3.4 2.5 2.5 0 0 0 3.4 1c.7-.3 1.5-.4 2.3-.4h1.2c.8 0 1.6.1 2.3.4a2.5 2.5 0 0 0 3.4-1 2.5 2.5 0 0 0-1-3.4 5 5 0 0 0-2.3-.4h-5.6z" />
+          <path d="M21.7 16.2a2.5 2.5 0 0 0-3.2-3.4" />
+        </svg>
+        <p class="text-center text-gray-500">No meters found</p>
+      </div>
+    {:else}
+      <div class="space-y-6">
+        {#each groupedMeters as group}
+          <div>
+            <h2 class="text-lg font-semibold mb-2 px-1">{group.name}</h2>
+            <div class="space-y-2">
+              {#each group.meters as meter}
+                <Card.Root class={`${selectedMeter?.id === meter.id ? 'border-2 border-blue-500' : ''} hover:bg-gray-50 transition-colors`}>
+                  <button 
+                    type="button"
+                    class="w-full text-left cursor-pointer"
+                    onclick={() => handleEdit(meter)}
+                  >
+                    <Card.Content class="p-3">
+                      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-2">
+                        <div class="flex flex-col">
+                          <div class="flex items-center gap-2 mb-1">
+                            <span class="font-medium">{meter.name}</span>
+                            <Badge variant={getTypeVariant(meter.type)} class="text-xs px-2 py-0.5">
+                              {meter.type}
+                            </Badge>
+                            <Badge class={`text-xs px-2 py-0.5 ${getStatusColor(meter.status)}`}>
+                              {meter.status}
+                            </Badge>
+                          </div>
+                          {#if getDetailedLocationInfo(meter)}
+                            <span class="text-sm text-gray-500">{getDetailedLocationInfo(meter)}</span>
+                          {/if}
+                        </div>
+                        
+                        <div class="text-right">
+                          {#if meter.latest_reading}
+                            <div class="flex flex-col items-end">
+                              <span class="font-medium">{formatReading(meter.latest_reading.value)}</span>
+                              <span class="text-xs text-gray-500">
+                                {new Date(meter.latest_reading.date).toLocaleDateString()}
+                              </span>
+                            </div>
+                          {:else}
+                            <span class="text-sm text-gray-400">No readings yet</span>
+                          {/if}
+                        </div>
+                      </div>
+                      
+                      {#if meter.notes}
+                        <div class="mt-2 pt-2 border-t border-gray-100">
+                          <p class="text-sm text-gray-500">{meter.notes}</p>
+                        </div>
+                      {/if}
+                    </Card.Content>
+                  </button>
+                </Card.Root>
+              {/each}
+            </div>
+          </div>
+        {/each}
+      </div>
+    {/if}
   </div>
 
   <!-- Meter Form (Right side) -->
-  <div class="w-full lg:w-1/3">
-    <div class="flex justify-between items-center mb-4">
-      <h1 class="text-2xl font-bold">{editMode ? 'Edit' : 'Add'} Meter</h1>
-    </div>
-
+  <div class="w-full lg:w-1/3 lg:sticky lg:top-0 lg:h-screen lg:overflow-auto">
+    <div class="bg-white p-4 rounded-lg border">
+      <div class="flex justify-between items-center mb-3">
+        <h2 class="text-lg font-semibold">{editMode ? 'Edit' : 'Add'} Meter</h2>
+        <!-- Debug info for troubleshooting -->
+        <span class="text-xs text-gray-500">
+          Edit Mode: {editMode ? "YES" : "NO"} | 
+          Selected Meter ID: {selectedMeter?.id || "none"}
+        </span>
+      </div>
+  
       <MeterForm
+        {editMode}
         data={{
           properties: propertiesData,
           floors: floorsData,
           rental_unit: rentalUnitData,
           meter: selectedMeter
         }}
-        editMode={editMode}
         form={form}
         errors={errors}
         enhance={enhance}
@@ -582,6 +577,7 @@ const processMeters = () => {
         submitting={submitting}
         on:cancel={handleCancel}
       />
+    </div>
   </div>
 </div>
 

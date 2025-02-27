@@ -6,7 +6,7 @@ import type { Actions, PageServerLoad, RequestEvent } from './$types';
 import type {  FloorWithProperty, Property } from './formSchema';
 
 export const load: PageServerLoad = async ({ locals }) => {
-  console.log('🔄 Starting server-side load function for floors');
+  // console.log('🔄 Starting server-side load function for floors');
 
   const { user, permissions } = await locals.safeGetSession();
   const hasAccess = permissions.includes('properties.create');

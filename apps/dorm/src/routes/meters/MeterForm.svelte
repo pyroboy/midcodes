@@ -32,17 +32,25 @@
     submitting: SuperForm<z.infer<typeof meterFormSchema>>['submitting'];
   }
 
-  // Use props with no type argument, and assign types to destructured properties
-  let props = $props();
-  
-  // Destructure props with explicit typing
-  let form = props.form;
-  let data = props.data as Props['data'];
-  let editMode = props.editMode as Props['editMode'] || false;
-  let errors = props.errors as Props['errors'];
-  let enhance = props.enhance as Props['enhance'];
-  let constraints = props.constraints as Props['constraints'];
-  let submitting = props.submitting as Props['submitting'];
+  // Use props with no type argument
+
+  let {
+    data,
+    editMode = false,
+    form,
+    errors,
+    enhance,
+    constraints,
+    submitting,
+  }: Props = $props();
+
+
+ 
+
+  // Debug logs
+  // console.log('MeterForm Component - editMode:', editMode);
+  // console.log('MeterForm Component - form data:', $form);
+  // console.log('MeterForm Component - selected meter:', data.meter);
 
   const dispatch = createEventDispatcher<{
     meterAdded: void;
@@ -50,22 +58,8 @@
     cancel: void;
   }>();
 
-  function getLocationLabel(type: string, id: number | null): string {
-    if (!id) return '';
-    
-    switch (type) {
-      case 'PROPERTY':
-        return data.properties?.find((p) => p.id === id)?.name || '';
-      case 'FLOOR':
-        const floor = data.floors?.find((f) => f.id === id);
-        return floor ? `${floor.property?.name || ''} - Floor ${floor.floor_number} ${floor.wing || ''}` : '';
-      case 'RENTAL_UNIT':
-        const unit = data.rental_unit?.find((r) => r.id === id);
-        return unit ? `${unit.floor?.property?.name || ''} - Floor ${unit.floor?.floor_number || ''} - Rental_unit ${unit.number}` : '';
-      default:
-        return '';
-    }
-  }
+  // State for delete confirmation
+  let showDeleteConfirm = $state(false);
 
   // Using $derived instead of $effect + $state
   let filteredProperties = $derived(
@@ -81,46 +75,81 @@
       r.rental_unit_status === 'VACANT' || r.rental_unit_status === 'OCCUPIED'
     )
   );
-  
-  // Using $inspect for console logs instead of console.log
-  $inspect('Form data:', data);
-  $inspect('Form location type:', $form.location_type);
-  $inspect('Available properties:', filteredProperties.length);
-  $inspect('Available floors:', filteredFloors.length);
-  $inspect('Available rental units:', filteredRental_Units.length);
 
-  // Compute location label using $derived
-  let locationLabel = $derived(
-    !$form.location_type ? '' : getLocationLabel(
-      $form.location_type, 
-      $form.location_type === 'PROPERTY' ? Number($form.property_id) : 
-      $form.location_type === 'FLOOR' ? Number($form.floor_id) : 
-      Number($form.rental_unit_id)
-    )
-  );
+  function getLocationLabel(type: string, id: number | null): string {
+    if (!id) return '';
+    
+    switch (type) {
+      case 'PROPERTY':
+        return data.properties?.find((p) => p.id === id)?.name || '';
+      case 'FLOOR':
+        const floor = data.floors?.find((f) => f.id === id);
+        return floor ? `${floor.property?.name || ''} - Floor ${floor.floor_number} ${floor.wing || ''}` : '';
+      case 'RENTAL_UNIT':
+        const unit = data.rental_unit?.find((r) => r.id === id);
+        return unit ? `${unit.floor?.property?.name || ''}  -  ${unit.name}` : '';
+      default:
+        return '';
+    }
+  }
 
+  // Updated function to preserve property_id when location type changes
   function handleLocationTypeChange(type: string) {
     if (type === 'PROPERTY' || type === 'FLOOR' || type === 'RENTAL_UNIT') {
       $form.location_type = type;
       
-      // Reset location IDs based on the selected type
-      if (type !== 'PROPERTY') $form.property_id = null;
+      // Reset only the IDs that aren't relevant to the current type
+      // But never reset property_id (it should stay the same)
       if (type !== 'FLOOR') $form.floor_id = null;
       if (type !== 'RENTAL_UNIT') $form.rental_unit_id = null;
+      
+      // If changing to PROPERTY and we already have a property_id, keep it
+      // Otherwise if we're changing away from PROPERTY and have no property_id, try to derive it
+      if (type !== 'PROPERTY' && !$form.property_id) {
+        // Try to derive property_id from the current view context if possible
+        // This is just a fallback - normally property_id should be explicitly selected
+        if (data.properties && data.properties.length === 1) {
+          $form.property_id = data.properties[0].id;
+        }
+      }
     }
   }
 
+  // Updated function to handle location selection
   function handleLocationChange(id: string) {
     const numId = Number(id);
     switch ($form.location_type) {
       case 'PROPERTY':
         $form.property_id = numId;
+        // When property changes, clear floor and rental_unit
+        $form.floor_id = null;
+        $form.rental_unit_id = null;
         break;
+        
       case 'FLOOR':
         $form.floor_id = numId;
+        // When floor changes, clear rental_unit but set property based on floor
+        $form.rental_unit_id = null;
+        
+        // Automatically set property_id from the selected floor
+        const floor = data.floors?.find(f => f.id === numId);
+        if (floor?.property?.id) {
+          $form.property_id = floor.property.id;
+        }
         break;
+        
       case 'RENTAL_UNIT':
         $form.rental_unit_id = numId;
+        
+        // Automatically set property_id and floor_id from the selected rental unit
+        const unit = data.rental_unit?.find(r => r.id === numId);
+        if (unit?.floor?.id) {
+          $form.floor_id = unit.floor.id;
+          
+          if (unit.floor?.property?.id) {
+            $form.property_id = unit.floor.property.id;
+          }
+        }
         break;
     }
   }
@@ -137,115 +166,160 @@
   function handleCancel() {
     dispatch('cancel');
   }
+
+  function askDeleteConfirmation() {
+    console.log("Asking for delete confirmation");
+    showDeleteConfirm = true;
+  }
+
+  function cancelDelete() {
+    showDeleteConfirm = false;
+  }
 </script>
 
-<form method="POST" action={editMode && $form.id ? "?/update" : "?/create"} use:enhance>
-  {#if editMode && $form.id}
+{#if showDeleteConfirm}
+  <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 w-full max-w-md">
+      <h3 class="text-lg font-medium mb-4">Confirm Deletion</h3>
+      <p class="mb-4">Are you sure you want to delete this meter? This action cannot be undone.</p>
+      <div class="flex justify-end space-x-3">
+        <button 
+          type="button"
+          class="px-3 py-1.5 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+          onclick={cancelDelete}
+        >
+          Cancel
+        </button>
+        <form method="POST" action="?/delete">
+          <input type="hidden" name="id" value={$form.id} />
+          <button 
+            type="submit"
+            class="px-3 py-1.5 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+          >
+            Delete Meter
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<form method="POST" action={editMode ? "?/update" : "?/create"} use:enhance class="space-y-3">
+  {#if $form.id}
     <input type="hidden" name="id" value={$form.id} />
   {/if}
 
-  <div class="space-y-4">
-    <div>
-      <Label for="name">Name</Label>
-      <Input type="text" id="name" bind:value={$form.name} maxlength={255} required />
-      {#if $errors.name}<span class="text-red-500">{$errors.name}</span>{/if}
-    </div>
+  <div>
+    <Label for="name" class="text-sm font-medium">Name</Label>
+    <Input type="text" id="name" bind:value={$form.name} maxlength={255} required />
+    {#if $errors.name}<span class="text-xs text-red-500">{$errors.name}</span>{/if}
+  </div>
 
+  <div>
+    <Label for="initial_reading" class="text-sm font-medium">Initial Reading</Label>
+    <Input type="number" id="initial_reading" bind:value={$form.initial_reading} maxlength={255} required />
+    {#if $errors.name}<span class="text-xs text-red-500">{$errors.name}</span>{/if}
+  </div>
+
+
+
+  <div>
+    <Label for="location_type" class="text-sm font-medium">Location Type</Label>
+    <Select.Root type="single" value={$form.location_type} onValueChange={handleLocationTypeChange}>
+      <Select.Trigger class="w-full">
+        <span>{$form.location_type || 'Select location type'}</span>
+      </Select.Trigger>
+      <Select.Content>
+        <Select.Item value="PROPERTY">Property</Select.Item>
+        <Select.Item value="FLOOR">Floor</Select.Item>
+        <Select.Item value="RENTAL_UNIT">Rental Unit</Select.Item>
+      </Select.Content>
+    </Select.Root>
+    {#if $errors.location_type}<span class="text-xs text-red-500">{$errors.location_type}</span>{/if}
+  </div>
+
+  {#if $form.location_type === 'PROPERTY'}
     <div>
-      <Label for="location_type">Location Type</Label>
-      <Select.Root type="single" value={$form.location_type} onValueChange={handleLocationTypeChange}>
+      <Label for="property_id" class="text-sm font-medium">Property</Label>
+      <Select.Root 
+        type="single" 
+        value={$form.property_id ? $form.property_id.toString() : ''} 
+        onValueChange={handleLocationChange}
+      >
         <Select.Trigger class="w-full">
-          <span>{$form.location_type || 'Select location type'}</span>
+          <span>
+            {$form.property_id 
+              ? getLocationLabel('PROPERTY', Number($form.property_id)) 
+              : 'Select property'}
+          </span>
         </Select.Trigger>
         <Select.Content>
-          <Select.Item value="PROPERTY">Property</Select.Item>
-          <Select.Item value="FLOOR">Floor</Select.Item>
-          <Select.Item value="RENTAL_UNIT">Rental_unit</Select.Item>
+          {#each filteredProperties as property}
+            <Select.Item value={property.id.toString()}>{property.name}</Select.Item>
+          {/each}
         </Select.Content>
       </Select.Root>
-      {#if $errors.location_type}<span class="text-red-500">{$errors.location_type}</span>{/if}
+      {#if $errors.property_id}<span class="text-xs text-red-500">{$errors.property_id}</span>{/if}
     </div>
-
-    {#if $form.location_type === 'PROPERTY'}
-      <div>
-        <Label for="property_id">Property</Label>
-        <Select.Root 
-          type="single" 
-          value={$form.property_id ? $form.property_id.toString() : ''} 
-          onValueChange={handleLocationChange}
-        >
-          <Select.Trigger class="w-full">
-            <span>
-              {$form.property_id 
-                ? getLocationLabel('PROPERTY', Number($form.property_id)) 
-                : 'Select property'}
-            </span>
-          </Select.Trigger>
-          <Select.Content>
-            {#each filteredProperties as property}
-              <Select.Item value={property.id.toString()}>{property.name}</Select.Item>
-            {/each}
-          </Select.Content>
-        </Select.Root>
-        {#if $errors.property_id}<span class="text-red-500">{$errors.property_id}</span>{/if}
-      </div>
-    {:else if $form.location_type === 'FLOOR'}
-      <div>
-        <Label for="floor_id">Floor</Label>
-        <Select.Root 
-          type="single" 
-          value={$form.floor_id ? $form.floor_id.toString() : ''}
-          onValueChange={handleLocationChange}
-        >
-          <Select.Trigger class="w-full">
-            <span>
-              {$form.floor_id 
-                ? getLocationLabel('FLOOR', Number($form.floor_id)) 
-                : 'Select floor'}
-            </span>
-          </Select.Trigger>
-          <Select.Content>
-            {#each filteredFloors as floor}
-              <Select.Item value={floor.id.toString()}>
-                Floor {floor.floor_number}{floor.wing ? `, Wing ${floor.wing}` : ''}{floor.property ? ` - ${floor.property.name}` : ''}
-              </Select.Item>
-            {/each}
-          </Select.Content>
-        </Select.Root>
-        {#if $errors.floor_id}<span class="text-red-500">{$errors.floor_id}</span>{/if}
-      </div>
-    {:else if $form.location_type === 'RENTAL_UNIT'}
-      <div>
-        <Label for="rental_unit_id">Rental_unit</Label>
-        <Select.Root 
-          type="single" 
-          value={$form.rental_unit_id ? $form.rental_unit_id.toString() : ''}
-          onValueChange={handleLocationChange}
-        >
-          <Select.Trigger class="w-full">
-            <span>
-              {$form.rental_unit_id 
-                ? getLocationLabel('RENTAL_UNIT', Number($form.rental_unit_id)) 
-                : 'Select rental_unit'}
-            </span>
-          </Select.Trigger>
-          <Select.Content>
-            {#each filteredRental_Units as rental_unit}
-              <Select.Item value={rental_unit.id.toString()}>
-                Rental_unit {rental_unit.number}
-                {#if rental_unit.floor?.property}
-                  - {rental_unit.floor.property.name}
-                {/if}
-              </Select.Item>
-            {/each}
-          </Select.Content>
-        </Select.Root>
-        {#if $errors.rental_unit_id}<span class="text-red-500">{$errors.rental_unit_id}</span>{/if}
-      </div>
-    {/if}
-
+  {:else if $form.location_type === 'FLOOR'}
     <div>
-      <Label for="type">Utility Type</Label>
+      <Label for="floor_id" class="text-sm font-medium">Floor</Label>
+      <Select.Root 
+        type="single" 
+        value={$form.floor_id ? $form.floor_id.toString() : ''}
+        onValueChange={handleLocationChange}
+      >
+        <Select.Trigger class="w-full">
+          <span>
+            {$form.floor_id 
+              ? getLocationLabel('FLOOR', Number($form.floor_id)) 
+              : 'Select floor'}
+          </span>
+        </Select.Trigger>
+        <Select.Content>
+          {#each filteredFloors as floor}
+            <Select.Item value={floor.id.toString()}>
+              Floor {floor.floor_number}{floor.wing ? `, Wing ${floor.wing}` : ''}{floor.property ? ` - ${floor.property.name}` : ''}
+            </Select.Item>
+          {/each}
+        </Select.Content>
+      </Select.Root>
+      {#if $errors.floor_id}<span class="text-xs text-red-500">{$errors.floor_id}</span>{/if}
+    </div>
+  {:else if $form.location_type === 'RENTAL_UNIT'}
+    <div>
+      <Label for="rental_unit_id" class="text-sm font-medium">Rental Unit</Label>
+      <Select.Root 
+        type="single" 
+        value={$form.rental_unit_id ? $form.rental_unit_id.toString() : ''}
+        onValueChange={handleLocationChange}
+      >
+        <Select.Trigger class="w-full">
+          <span>
+            {$form.rental_unit_id 
+              ? getLocationLabel('RENTAL_UNIT', Number($form.rental_unit_id)) 
+              : 'Select rental unit'}
+          </span>
+        </Select.Trigger>
+        <Select.Content>
+          {#each filteredRental_Units as rental_unit}
+            <Select.Item value={rental_unit.id.toString()}>
+              {rental_unit.name || ''}
+              <!-- Unit {rental_unit.number}
+              {#if rental_unit.floor?.property}
+                - {rental_unit.floor.property.name}
+              {/if} -->
+            </Select.Item>
+          {/each}
+        </Select.Content>
+      </Select.Root>
+      {#if $errors.rental_unit_id}<span class="text-xs text-red-500">{$errors.rental_unit_id}</span>{/if}
+    </div>
+  {/if}
+
+  <div class="grid grid-cols-2 gap-3">
+    <div>
+      <Label for="type" class="text-sm font-medium">Utility Type</Label>
       <Select.Root 
         type="single" 
         value={$form.type} 
@@ -260,13 +334,11 @@
           <Select.Item value="INTERNET">Internet</Select.Item>
         </Select.Content>
       </Select.Root>
-      {#if $errors.type}<span class="text-red-500">{$errors.type}</span>{/if}
+      {#if $errors.type}<span class="text-xs text-red-500">{$errors.type}</span>{/if}
     </div>
 
-
-
     <div>
-      <Label for="status">Status</Label>
+      <Label for="status" class="text-sm font-medium">Status</Label>
       <Select.Root 
         type="single" 
         value={$form.status} 
@@ -281,26 +353,41 @@
           <Select.Item value="MAINTENANCE">Maintenance</Select.Item>
         </Select.Content>
       </Select.Root>
-      {#if $errors.status}<span class="text-red-500">{$errors.status}</span>{/if}
+      {#if $errors.status}<span class="text-xs text-red-500">{$errors.status}</span>{/if}
     </div>
+  </div>
 
-    <div>
-      <Label for="notes">Notes</Label>
-      <Textarea id="notes" bind:value={$form.notes} />
-      {#if $errors.notes}<span class="text-red-500">{$errors.notes}</span>{/if}
-    </div>
+  <div>
+    <Label for="notes" class="text-sm font-medium">Notes</Label>
+    <Textarea id="notes" bind:value={$form.notes} rows={3} />
+    {#if $errors.notes}<span class="text-xs text-red-500">{$errors.notes}</span>{/if}
+  </div>
 
-    <div class="flex justify-end space-x-2 pt-4">
+  <div class="flex justify-between items-center pt-3">
+    <!-- Delete button - always visible in edit mode -->
+    {#if editMode}
       <button 
         type="button" 
-        class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+        class="px-3 py-1.5 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+        onclick={askDeleteConfirmation}
+      >
+        Delete
+      </button>
+    {:else}
+      <div></div> <!-- Empty div for spacing when not in edit mode -->
+    {/if}
+
+    <div class="flex space-x-2">
+      <button 
+        type="button" 
+        class="px-3 py-1.5 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
         onclick={handleCancel}
       >
         Cancel
       </button>
       <button 
         type="submit" 
-        class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+        class="px-3 py-1.5 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
         disabled={$submitting}
       >
         {editMode ? 'Update' : 'Create'} Meter

@@ -33,12 +33,12 @@ interface PaymentDetails {
 }
 
 export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase } }) => {
-  console.log('🔄 Starting leases load');
+  // console.log('🔄 Starting leases load');
   
   const { user } = await safeGetSession();
   if (!user) throw error(401, 'Unauthorized');
 
-  console.log('📊 Fetching leases data');
+  // console.log('📊 Fetching leases data');
   const startTime = performance.now();
   
   try {
@@ -61,12 +61,12 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
     ]);
 
     const queryTime = performance.now() - startTime;
-    console.log('⏱️ Data fetch completed:', {
-      leases: mappedLeases?.length || 0,
-      units: unitsResponse.data?.length || 0,
-      tenants: tenantsResponse.data?.length || 0,
-      time: `${queryTime.toFixed(2)}ms`
-    });
+    // console.log('⏱️ Data fetch completed:', {
+    //   leases: mappedLeases?.length || 0,
+    //   units: unitsResponse.data?.length || 0,
+    //   tenants: tenantsResponse.data?.length || 0,
+    //   time: `${queryTime.toFixed(2)}ms`
+    // });
 
     if (tenantsResponse.error) {
       throw error(500, 'L-1000 - Failed to load tenants');

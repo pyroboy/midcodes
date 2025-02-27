@@ -25,7 +25,7 @@ export type TenantResponse = Omit<DBTenant, 'emergency_contact'> & {
 };
 
 export const load: PageServerLoad = async ({ locals }) => {
-  console.log('🔄 Starting server-side load function for tenants');
+  // console.log('🔄 Starting server-side load function for tenants');
   
   const { user, permissions } = await locals.safeGetSession();
   const hasAccess = permissions.includes('tenants.read');
