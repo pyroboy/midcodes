@@ -108,3 +108,33 @@ export interface Reading {
     meters: Meter[];
     selectedType: string | null;
   };
+  
+  // Grouped reading structure for the table
+  export interface GroupedReading {
+    date: string;
+    properties: PropertyGroup[];
+    totalConsumption: number;
+    totalCost: number;
+  }
+  
+  export interface PropertyGroup {
+    propertyId: number;
+    propertyName: string;
+    meters: MeterData[];
+    totalConsumption: number;
+    totalCost: number;
+  }
+  
+  export interface MeterData {
+    meterId: number;
+    meterName: string;
+    meterType: string;
+    unitName: string | null;
+    reading: number;
+    previousReading: number | null;
+    consumption: number | null;
+    costPerUnit: number | null;
+    totalCost: number | null;
+    isExpanded: boolean;
+    history: Reading[];
+  }

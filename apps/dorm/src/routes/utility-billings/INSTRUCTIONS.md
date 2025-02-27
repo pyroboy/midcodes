@@ -69,14 +69,13 @@
    - Total cost
 
 ## For the @ ConsolidatedReadingsTable
-onlly display one meter at a time and onclick show the readings history
-Chronological, expandable view of meter readings
-Key Metrics per Reading:
-Date of Reading
-Current Reading Value
-Consumption Calculation
-Cost Breakdown
-Unit Pricing
+STATUS : Okay good
+- Group by reading date, and property, so no need to show the reading date and property column
+- and make sure to show the total calculation per row,
+- as per readingdate propert table group show the grand total outside the table per reading date group,
+- only display one meter at a time and onclick show the readings history
+- Chronological, expandable view of meter readings (reading history)
+
 
 
 ## Key Calculations

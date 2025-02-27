@@ -1,139 +1,298 @@
 <script lang="ts">
-  // import { formatCurrency, formatDateTime } from '$lib/utils';
-  import { Input } from '$lib/components/ui/input';
-  import { Label } from '$lib/components/ui/label';
+  import { browser } from '$app/environment';
+  import { transactionSchema } from './schema';
   import { Button } from '$lib/components/ui/button';
+  import { toast } from 'svelte-sonner';
   import { superForm } from 'sveltekit-superforms/client';
   import type { PageData } from './$types';
-  import type { Database } from '$lib/database.types';
-  import { transactionFilterSchema, type TransactionFilterData } from './schema';
-  import { paymentMethodEnum } from './types';
-  import type { ExtendedPayment } from './types';
+  import type { Transaction } from './types';
+  import TransactionList from './TransactionList.svelte';
+  import TransactionFormModal from './TransactionFormModal.svelte';
+  import TransactionDetailsModal from './TransactionDetailsModal.svelte';
+  import { zodClient } from 'sveltekit-superforms/adapters';
+  import { invalidate, invalidateAll } from '$app/navigation';
+  import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
 
-  interface Props {
-    data: {
-    form: PageData['form'];
-    transactions: ExtendedPayment[];
-    user: {
-      role: string;
-    };
-  };
+  let { data } = $props<{data: PageData}>();
+
+  // Debug logging
+  console.log('Page data:', data);
+
+  // Form for adding/editing transactions
+  const { form, errors, enhance, constraints, submitting, reset } = superForm(
+    data.form,
+    {
+      validators: zodClient(transactionSchema),
+      resetForm: true,
+      onUpdate: ({ form }) => {
+        console.log('Form updated', form);
+      },
+      onError: ({ result }) => {
+        console.error('Form error', result.error);
+        toast.error('Error saving transaction');
+      },
+      onResult: ({ result }) => {
+        if (result.type === 'success') {
+          toast.success(selectedTransaction ? 'Transaction updated' : 'Transaction added');
+          selectedTransaction = null;
+          showFormModal = false;
+          invalidateAll();
+        }
+      }
+    }
+  );
+
+  // Modal states
+  let showFormModal = $state(false);
+  let showDetailsModal = $state(false);
+  
+  // State for managing the selected transaction
+  let selectedTransaction = $state<Transaction | null>(null);
+
+  // Handle edit transaction
+  function handleEditTransaction(event: CustomEvent<Transaction>) {
+    const transaction = event.detail;
+    selectedTransaction = transaction;
+    
+    // Reset the form with the transaction data
+    reset({
+      data: {
+        id: transaction.id,
+        amount: transaction.amount,
+        method: transaction.method,
+        reference_number: transaction.reference_number,
+        paid_by: transaction.paid_by,
+        paid_at: transaction.paid_at,
+        notes: transaction.notes,
+        receipt_url: transaction.receipt_url,
+        billing_ids: transaction.billing_ids
+      }
+    });
+    
+    showFormModal = true;
   }
 
-  let { data }: Props = $props();
+  // Handle view transaction details
+  function handleViewDetails(event: CustomEvent<Transaction>) {
+    selectedTransaction = event.detail;
+    showDetailsModal = true;
+  }
 
-  const { form } = superForm(data.form);
-
-  let searchTerm = $state('');
-  let startDate: string = $state('');
-  let endDate: string = $state('');
-  let selectedMethod: keyof typeof paymentMethodEnum.Values | null = $state(null);
-
-  let filteredTransactions = $derived(data.transactions.filter(transaction => {
-    // Search filter
-    const searchMatch = searchTerm ? (
-      transaction.billing?.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.billing?.lease?.tenant?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      transaction.reference_number?.toLowerCase().includes(searchTerm.toLowerCase())
-    ) : true;
-
-    // Date filter
-    const dateMatch = (!startDate || new Date(transaction.paid_at) >= new Date(startDate)) &&
-                     (!endDate || new Date(transaction.paid_at) <= new Date(endDate));
-
-    // Method filter
-    const methodMatch = !selectedMethod || transaction.method === selectedMethod;
-
-    return searchMatch && dateMatch && methodMatch;
-  }));
-
-  function handleMethodSelect(value: string) {
-    if (value in paymentMethodEnum.Values) {
-      selectedMethod = value as keyof typeof paymentMethodEnum.Values;
+  // Handle edit from details modal
+  function handleEditFromDetails() {
+    if (selectedTransaction) {
+      // Reset the form with the transaction data
+      reset({
+        data: {
+          id: selectedTransaction.id,
+          amount: selectedTransaction.amount,
+          method: selectedTransaction.method,
+          reference_number: selectedTransaction.reference_number,
+          paid_by: selectedTransaction.paid_by,
+          paid_at: selectedTransaction.paid_at,
+          notes: selectedTransaction.notes,
+          receipt_url: selectedTransaction.receipt_url,
+          billing_ids: selectedTransaction.billing_ids
+        }
+      });
+      
+      showDetailsModal = false;
+      showFormModal = true;
     }
+  }
+
+  // Handle delete transaction
+  async function handleDeleteTransaction(event: CustomEvent<number>) {
+    const transactionId = event.detail;
+    console.log('Delete transaction request for ID:', transactionId);
+    
+    if (!confirm('Are you sure you want to delete this transaction?')) {
+      return;
+    }
+
+    try {
+      console.log('Sending delete request for transaction ID:', transactionId);
+      
+      // Use FormData instead of JSON
+      const formData = new FormData();
+      formData.append('id', transactionId.toString());
+      
+      const response = await fetch(`?/delete`, {
+        method: 'POST',
+        body: formData
+      });
+
+      console.log('Delete response status:', response.status);
+      
+      // Carefully parse the response - it might not always be JSON
+      let responseData;
+      try {
+        const text = await response.text();
+        console.log('Delete response raw text:', text);
+        responseData = text ? JSON.parse(text) : {};
+      } catch (parseError) {
+        console.error('Error parsing response:', parseError);
+        responseData = {};
+      }
+      
+      console.log('Delete response data:', responseData);
+
+      if (response.ok) {
+        toast.success('Transaction deleted');
+        invalidateAll();
+      } else {
+        toast.error(`Error deleting transaction: ${responseData.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error deleting transaction', error);
+      toast.error('Error deleting transaction');
+    }
+  }
+  
+  // Handle add new transaction
+  function handleAddTransaction() {
+    selectedTransaction = null;
+    reset();
+    showFormModal = true;
+  }
+
+  // Handle export data
+  function handleExportData(event: CustomEvent<Transaction[]>) {
+    const transactions = event.detail;
+    
+    if (!transactions || transactions.length === 0) {
+      toast.error('No transactions to export');
+      return;
+    }
+    
+    try {
+      // Convert transactions data to CSV
+      const headers = ['ID', 'Amount', 'Method', 'Reference Number', 'Paid By', 'Paid At', 'Notes', 'Receipt URL'];
+      
+      const csvRows = [
+        headers.join(','),
+        ...transactions.map(tx => [
+          tx.id,
+          tx.amount,
+          tx.method,
+          tx.reference_number || '',
+          tx.paid_by,
+          tx.paid_at || '',
+          (tx.notes || '').replace(/,/g, ' '), // Replace commas in notes to avoid CSV issues
+          tx.receipt_url || ''
+        ].join(','))
+      ];
+      
+      const csvString = csvRows.join('\n');
+      
+      // Create a blob and download link
+      const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `transactions_export_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success('Transactions exported successfully');
+    } catch (error) {
+      console.error('Error exporting transactions', error);
+      toast.error('Error exporting transactions');
+    }
+  }
+
+  // Handle refresh event
+  async function handleRefresh(event: CustomEvent) {
+    const filters = event.detail;
+    console.log('Refreshing with filters:', filters);
+    
+    // Create query params from filters
+    const params = new URLSearchParams();
+    if (filters.method) params.set('method', filters.method);
+    if (filters.dateFrom) params.set('dateFrom', filters.dateFrom);
+    if (filters.dateTo) params.set('dateTo', filters.dateTo);
+    if (filters.searchTerm) params.set('searchTerm', filters.searchTerm);
+    
+    // Invalidate and navigate
+    await invalidate('transactions:refresh');
+    
+    // Only update URL if we have filters
+    if (params.toString()) {
+      const url = `?${params.toString()}`;
+      history.pushState(null, '', url);
+    }
+  }
+
+  // Handle close modals
+  function handleCloseFormModal() {
+    showFormModal = false;
+  }
+  
+  function handleCloseDetailsModal() {
+    showDetailsModal = false;
   }
 </script>
 
-<div class="container mx-auto p-4">
-  <div class="mb-8">
-    <h2 class="text-2xl font-bold mb-4">Transaction History</h2>
-    
-    <!-- Filters -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-      <!-- Search -->
-      <div>
-        <Label for="search">Search</Label>
-        <Input
-          id="search"
-          type="text"
-          placeholder="Search transactions..."
-          bind:value={searchTerm}
-        />
-      </div>
-
-      <!-- Start Date -->
-      <div>
-        <Label for="startDate">Start Date</Label>
-        <Input
-          id="startDate"
-          type="date"
-          bind:value={startDate}
-        />
-      </div>
-
-      <!-- End Date -->
-      <div>
-        <Label for="endDate">End Date</Label>
-        <Input
-          id="endDate"
-          type="date"
-          bind:value={endDate}
-        />
-      </div>
-
-      <!-- Payment Method -->
-      <div>
-        <Label>Payment Method</Label>
-        <select 
-          class="w-full p-2 border rounded"
-          bind:value={selectedMethod}
-        >
-          <option value="">All Methods</option>
-          {#each Object.entries(paymentMethodEnum.Values) as [key, value]}
-            <option {value}>{key}</option>
-          {/each}
-        </select>
-      </div>
-    </div>
-
-    <!-- Transaction Table -->
-    <div class="overflow-x-auto">
-      <table class="w-full">
-        <thead>
-          <tr class="border-b">
-            <th class="p-2 text-left">Date</th>
-            <th class="p-2 text-left">Type</th>
-            <th class="p-2 text-left">Paid By</th>
-            <th class="p-2 text-left">Amount</th>
-            <th class="p-2 text-left">Method</th>
-            <th class="p-2 text-left">Reference</th>
-            <th class="p-2 text-left">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each filteredTransactions as transaction}
-            <tr class="border-b">
-              <!-- <td class="p-2">{formatDateTime(transaction.paid_at)}</td> -->
-              <td class="p-2">{transaction.billing?.type ?? 'N/A'}</td>
-              <td class="p-2">{transaction.billing?.lease?.tenant?.name ?? 'N/A'}</td>
-              <!-- <td class="p-2">{formatCurrency(transaction.amount_paid)}</td> -->
-              <td class="p-2">{transaction.method}</td>
-              <td class="p-2">{transaction.reference_number ?? 'N/A'}</td>
-              <td class="p-2">{transaction.status}</td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </div>
+<div class="container mx-auto py-6">
+  <!-- Page Header -->
+  <div class="flex justify-between items-center mb-6 border-b pb-4">
+    <h1 class="text-3xl font-bold">Transaction Management</h1>
   </div>
+
+  <!-- Hidden form for POST actions -->
+  <form id="transaction-form" method="POST" action="?/upsert" use:enhance>
+    <input type="hidden" name="id" value={$form.id} />
+    <input type="hidden" name="amount" value={$form.amount} />
+    <input type="hidden" name="method" value={$form.method} />
+    <input type="hidden" name="reference_number" value={$form.reference_number} />
+    <input type="hidden" name="paid_by" value={$form.paid_by} />
+    <input type="hidden" name="paid_at" value={$form.paid_at} />
+    <input type="hidden" name="notes" value={$form.notes} />
+    <input type="hidden" name="receipt_url" value={$form.receipt_url} />
+    <input type="hidden" name="billing_ids" value={$form.billing_ids ? JSON.stringify($form.billing_ids) : '[]'} />
+  </form>
+
+  <!-- Transaction List -->
+  <TransactionList
+    transactions={data.transactions}
+    on:edit={handleEditTransaction}
+    on:delete={handleDeleteTransaction}
+    on:add={handleAddTransaction}
+    on:refresh={handleRefresh}
+    on:viewDetails={handleViewDetails}
+    on:exportData={handleExportData}
+  />
+
+  <!-- Modals -->
+  {#if showFormModal}
+    <TransactionFormModal
+      open={showFormModal}
+      data={data}
+      editMode={!!selectedTransaction}
+      {form}
+      {errors}
+      {enhance}
+      {constraints}
+      {submitting}
+      on:close={handleCloseFormModal}
+      on:cancel={handleCloseFormModal}
+    />
+  {/if}
+
+  {#if showDetailsModal && selectedTransaction}
+    <TransactionDetailsModal
+      open={showDetailsModal}
+      transaction={selectedTransaction}
+      on:close={handleCloseDetailsModal}
+      on:edit={handleEditFromDetails}
+    />
+  {/if}
 </div>
+
+{#if browser && import.meta.env.DEV}
+  <SuperDebug data={$form} />
+{/if}

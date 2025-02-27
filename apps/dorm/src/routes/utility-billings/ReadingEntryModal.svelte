@@ -7,13 +7,24 @@
     import { Badge } from '$lib/components/ui/badge';
     import type { MeterReadingEntry, ReadingSaveEvent } from './types';
     
-    // Props
-    export let open: boolean = false;
-    // export let propertyName: string = '';
-    export let utilityType: string = '';
-    export let meterReadings: MeterReadingEntry[] = [];
-    export let readingDate: string = new Date().toISOString().split('T')[0];
-    export let costPerUnit: number = 0;
+    // Props using Svelte 5 runes
+    let { 
+      open = false, 
+      utilityType = '', 
+      meterReadings = [], 
+      readingDate = new Date().toISOString().split('T')[0], 
+      costPerUnit = 0 
+    } = $props<{
+      open?: boolean;
+      utilityType?: string;
+      meterReadings?: MeterReadingEntry[];
+      readingDate?: string;
+      costPerUnit?: number;
+    }>();
+    
+    // State for input validation
+    let validationErrors = $state<Record<number, string | null>>({});
+  
     
     const dispatch = createEventDispatcher<{
       close: void;
@@ -37,23 +48,44 @@
       });
     }
     
-    // Update reading values as the user types
+    // Update reading values as the user types with validation
     function handleReadingChange(meterId: number, value: string): void {
       const readingValue = parseFloat(value);
-      if (!isNaN(readingValue)) {
-        const index = meterReadings.findIndex(m => m.meterId === meterId);
-        if (index !== -1) {
-          const previousReading = meterReadings[index].previousReading || 0;
-          // Calculate the consumption (could be negative if reading is less than previous)
-          const consumption = readingValue - previousReading;
-          // Only calculate cost if consumption is positive
-          const cost = consumption > 0 ? consumption * costPerUnit : 0;
-          
-          meterReadings[index].currentReading = readingValue;
-          meterReadings[index].consumption = consumption;
-          meterReadings[index].cost = cost;
-        }
+      const index = meterReadings.findIndex((m: MeterReadingEntry) => m.meterId === meterId);
+      
+      if (index === -1) return;
+      
+      const previousReading = meterReadings[index].previousReading || 0;
+      
+      // Validate the input
+      if (isNaN(readingValue)) {
+        validationErrors[meterId] = "Please enter a valid number";
+        meterReadings[index].currentReading = null;
+        meterReadings[index].consumption = null;
+        meterReadings[index].cost = null;
+        return;
       }
+      
+      // Check if current reading is less than previous reading
+      if (readingValue < previousReading) {
+        validationErrors[meterId] = "Current reading cannot be less than previous reading";
+        // Still update the value to show the error state
+        meterReadings[index].currentReading = readingValue;
+        meterReadings[index].consumption = readingValue - previousReading; // Will be negative
+        meterReadings[index].cost = 0;
+        return;
+      }
+      
+      // Valid input
+      validationErrors[meterId] = null;
+      
+      // Calculate consumption and cost
+      const consumption = readingValue - previousReading;
+      const cost = consumption * costPerUnit;
+      
+      meterReadings[index].currentReading = readingValue;
+      meterReadings[index].consumption = consumption;
+      meterReadings[index].cost = cost;
     }
     
     // Utility to get proper unit label
@@ -92,14 +124,31 @@
       }
     }
     
+    // Check if there are any validation errors
+    function hasValidationErrors(): boolean {
+      return Object.values(validationErrors).some((error: string | null) => error !== null);
+    }
+    
     function handleClose(): void {
+      // Clear validation errors
+      validationErrors = {};
       dispatch('close');
     }
     
     function handleSave(): void {
+      // Check for validation errors first
+      if (hasValidationErrors()) {
+        alert("Please fix validation errors before saving");
+        return;
+      }
+      
+      // Filter out readings with errors or no values
       const readingsToSubmit = meterReadings
-        .filter(r => r.currentReading !== null)
-        .map(r => ({
+        .filter((r: MeterReadingEntry) => {
+          // Must have a reading value and no validation errors
+          return r.currentReading !== null && !validationErrors[r.meterId];
+        })
+        .map((r: MeterReadingEntry) => ({
           meter_id: r.meterId,
           reading: r.currentReading,
           reading_date: readingDate,
@@ -108,11 +157,14 @@
           previous_reading: r.previousReading,
           cost: r.cost
         }));
-  
+    
       if (readingsToSubmit.length === 0) {
-        alert("Please enter at least one reading.");
+        alert("Please enter at least one valid reading.");
         return;
       }
+      
+      // Clear validation errors
+      validationErrors = {};
       
       dispatch('save', {
         readings: readingsToSubmit,
@@ -121,7 +173,7 @@
       });
     }
   </script>
-  
+    
   <Dialog.Root {open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
     <Dialog.Portal>
       <Dialog.Overlay class="fixed inset-0 bg-black/50 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
@@ -133,17 +185,12 @@
               <Badge class="{getUtilityBadgeColor(utilityType)} text-white px-3 py-1">
                 {utilityType} - 
                 {#if meterReadings.length > 0}
-                <p class="text-sm font-medium"> {meterReadings.length} meter{meterReadings.length !== 1 ? 's' : ''} found</p>
-              {/if}
+                  <p class="text-sm font-medium"> {meterReadings.length} meter{meterReadings.length !== 1 ? 's' : ''} found</p>
+                {/if}
               </Badge>
             {/if}
           </div>
-          <!-- <Dialog.Description class="text-base text-muted-foreground">
-            Enter readings for {utilityType?.toLowerCase() || 'selected'} meters at {propertyName}
-          </Dialog.Description> -->
         </Dialog.Header>
-  
-
   
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
           <div class="space-y-2">
@@ -212,16 +259,21 @@
                         <Input
                           type="number"
                           step="0.01"
-                          min="0"
+                          min={reading.previousReading || 0}
                           placeholder="Enter reading"
                           oninput={(e) => handleReadingChange(reading.meterId, (e.target as HTMLInputElement).value)}
                           value={reading.currentReading || ''}
-                          class="w-full"
+                          class={validationErrors[reading.meterId] ? "w-full border-red-500" : "w-full"}
                         />
+                        {#if validationErrors[reading.meterId]}
+                          <p class="text-xs text-red-500 mt-1">{validationErrors[reading.meterId]}</p>
+                        {/if}
                       </div>
                     </td>
                     <td class="px-4 py-3">
-                      {reading.consumption !== null ? reading.consumption.toFixed(2) : '-'}
+                      <span class={reading.consumption !== null && reading.consumption < 0 ? 'text-red-500' : ''}>
+                        {reading.consumption !== null ? reading.consumption.toFixed(2) : '-'}
+                      </span>
                     </td>
                     <td class="px-4 py-3">
                       {reading.cost !== null ? formatCurrency(reading.cost) : '-'}
@@ -237,7 +289,7 @@
           <Button variant="outline" onclick={() => handleClose()} class="mr-2">Cancel</Button>
           <Button
             onclick={() => handleSave()}
-            disabled={meterReadings.filter(r => r.currentReading !== null).length === 0}
+            disabled={hasValidationErrors() || meterReadings.filter((r: MeterReadingEntry) => r.currentReading !== null && !validationErrors[r.meterId]).length === 0}
           >
             Save Readings
           </Button>

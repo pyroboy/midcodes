@@ -1,81 +1,160 @@
 <script lang="ts">
-    import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-svelte';
+    import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight } from 'lucide-svelte';
     import { Button } from '$lib/components/ui/button';
     import * as Table from '$lib/components/ui/table';
-    import type { ConsolidatedReadingRow, Meter, Reading, Property } from './types';
-  
-    // Props using Svelte 5 runes with defaults
-    let { readings = [], meters = [], properties = [] } = $props<{
-      readings?: Reading[];
-      meters?: Meter[];
-      properties?: Property[];
-    }>();
+    import * as Accordion from '$lib/components/ui/accordion';
+    import * as Card from '$lib/components/ui/card';
+    import type { Meter, Reading, Property } from './types';
     
-    // State with Svelte 5 runes
-    let sortField = $state<keyof ConsolidatedReadingRow>('date');
-    let sortDirection = $state<'asc' | 'desc'>('desc');
-  
+    // Props using Svelte 5 runes with defaults
+    let { readings = [], meters = [], properties = [] } = $props();
+    
+    // Explicitly initialize active meter ID
+    let activeMeterId = $state(null);
+    
     // Computed values using Svelte 5 derived.by
-    const consolidatedData = $derived.by(() => {
-      // Create consolidated rows from readings and meters
-      const rows: ConsolidatedReadingRow[] = readings.map(reading => {
-        const meter = meters.find(m => m.id === reading.meter_id);
-        const property = properties.find(p => p.id === meter?.property_id);
-        
-        return {
-          id: reading.id,
-          date: reading.reading_date,
-          meterName: meter?.name || reading.meter_name || 'Unknown',
-          meterType: meter?.type || 'Unknown',
-          propertyName: property?.name || 'Unknown',
-          unitName: meter?.rental_unit?.[0]?.name || meter?.rental_unit?.[0]?.number || null,
-          reading: reading.reading,
-          previousReading: reading.previous_reading,
-          consumption: reading.consumption,
-          costPerUnit: reading.cost_per_unit,
-          totalCost: reading.cost
-        };
-      });
-  
-      // Sort the rows
-      return rows.sort((a, b) => {
-        const aValue = a[sortField];
-        const bValue = b[sortField];
-        
-        if (aValue === null || aValue === undefined) return sortDirection === 'asc' ? -1 : 1;
-        if (bValue === null || bValue === undefined) return sortDirection === 'asc' ? 1 : -1;
-        
-        // For dates, convert to timestamps for comparison
-        if (sortField === 'date') {
-          const aTime = new Date(a.date).getTime();
-          const bTime = new Date(b.date).getTime();
-          return sortDirection === 'asc' ? aTime - bTime : bTime - aTime;
+    const groupedReadings = $derived.by(() => {
+      // First group by date
+      const byDate: Record<string, Reading[]> = {};
+      
+      readings.forEach(reading => {
+        if (!byDate[reading.reading_date]) {
+          byDate[reading.reading_date] = [];
         }
-        
-        // For strings
-        if (typeof aValue === 'string' && typeof bValue === 'string') {
-          return sortDirection === 'asc' 
-            ? aValue.localeCompare(bValue) 
-            : bValue.localeCompare(aValue);
-        }
-        
-        // For numbers
-        return sortDirection === 'asc' 
-          ? (aValue as number) - (bValue as number) 
-          : (bValue as number) - (aValue as number);
+        byDate[reading.reading_date].push(reading);
       });
+      
+      // Then for each date, group by property
+      const result: {
+        date: string;
+        properties: {
+          propertyId: number;
+          propertyName: string;
+          uniqueMeters: {
+            meterId: number;
+            meterName: string;
+            meterType: string;
+            unitName: string | null;
+            reading: number;
+            previousReading: number | null;
+            consumption: number | null;
+            costPerUnit: number | null;
+            totalCost: number | null;
+            history: Reading[];
+          }[];
+          totalConsumption: number;
+          totalCost: number;
+        }[];
+        totalConsumption: number;
+        totalCost: number;
+      }[] = [];
+      
+      // Sort dates in descending order (newest first)
+      const sortedDates = Object.keys(byDate).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+      
+      sortedDates.forEach(date => {
+        const readingsForDate = byDate[date];
+        
+        // Group by property
+        const propertiesMap: Record<number, {
+          propertyId: number;
+          propertyName: string;
+          meterMap: Record<number, {
+            meterId: number;
+            meterName: string;
+            meterType: string;
+            unitName: string | null;
+            reading: number;
+            previousReading: number | null;
+            consumption: number | null;
+            costPerUnit: number | null;
+            totalCost: number | null;
+            history: Reading[];
+          }>;
+          totalConsumption: number;
+          totalCost: number;
+        }> = {};
+        
+        readingsForDate.forEach(reading => {
+          const meter = meters.find(m => m.id === reading.meter_id);
+          if (!meter || !meter.property_id) return;
+          
+          const property = properties.find(p => p.id === meter.property_id);
+          if (!property) return;
+          
+          if (!propertiesMap[property.id]) {
+            propertiesMap[property.id] = {
+              propertyId: property.id,
+              propertyName: property.name,
+              meterMap: {},
+              totalConsumption: 0,
+              totalCost: 0
+            };
+          }
+          
+          // Get reading history for this meter
+          const meterHistory = readings
+            .filter(r => r.meter_id === meter.id)
+            .sort((a, b) => new Date(b.reading_date).getTime() - new Date(a.reading_date).getTime());
+          
+          // Store in map by meter ID to ensure uniqueness
+          propertiesMap[property.id].meterMap[meter.id] = {
+            meterId: meter.id,
+            meterName: meter.name,
+            meterType: meter.type,
+            unitName: meter.rental_unit?.[0]?.name || meter.rental_unit?.[0]?.number || null,
+            reading: reading.reading,
+            previousReading: reading.previous_reading,
+            consumption: reading.consumption,
+            costPerUnit: reading.cost_per_unit,
+            totalCost: reading.cost,
+            history: meterHistory
+          };
+          
+          // Add to property totals
+          propertiesMap[property.id].totalConsumption += reading.consumption || 0;
+          propertiesMap[property.id].totalCost += reading.cost || 0;
+        });
+        
+        // Calculate date totals
+        let dateTotalConsumption = 0;
+        let dateTotalCost = 0;
+        
+        // Convert meterMap to array for each property
+        const propertiesWithUniqueMeters = Object.values(propertiesMap).map(prop => {
+          dateTotalConsumption += prop.totalConsumption;
+          dateTotalCost += prop.totalCost;
+          
+          return {
+            propertyId: prop.propertyId,
+            propertyName: prop.propertyName,
+            uniqueMeters: Object.values(prop.meterMap),
+            totalConsumption: prop.totalConsumption,
+            totalCost: prop.totalCost
+          };
+        });
+        
+        // Add to result
+        result.push({
+          date,
+          properties: propertiesWithUniqueMeters,
+          totalConsumption: dateTotalConsumption,
+          totalCost: dateTotalCost
+        });
+      });
+      
+      return result;
     });
-  
-    // Helper functions
-    function toggleSort(field: keyof ConsolidatedReadingRow) {
-      if (sortField === field) {
-        sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+    
+    // Toggle meter expansion - only one open at a time
+    function toggleMeterExpansion(meterId: number): void {
+      if (activeMeterId === meterId) {
+        activeMeterId = null;
       } else {
-        sortField = field;
-        sortDirection = 'asc';
+        activeMeterId = meterId;
       }
     }
-  
+    
     // Format date for display
     function formatDate(dateString: string): string {
       return new Date(dateString).toLocaleDateString('en-PH', {
@@ -84,7 +163,7 @@
         day: 'numeric'
       });
     }
-  
+    
     // Format number with appropriate decimal places
     function formatNumber(value: number | null | undefined): string {
       if (value === null || value === undefined) return '-';
@@ -96,7 +175,7 @@
       // Otherwise show up to 2 decimal places
       return value.toFixed(2);
     }
-  
+    
     // Format currency with peso sign
     function formatCurrency(amount: number | null | undefined): string {
       if (amount === null || amount === undefined) return '-';
@@ -108,7 +187,7 @@
         maximumFractionDigits: 2
       }).format(amount);
     }
-  
+    
     // Get utility color class
     function getUtilityColorClass(type: string): string {
       switch (type.toUpperCase()) {
@@ -120,7 +199,7 @@
         default: return "bg-gray-100 text-gray-800";
       }
     }
-  
+    
     // Get unit label based on utility type
     function getUnitLabel(type: string): string {
       switch (type.toUpperCase()) {
@@ -134,182 +213,134 @@
     }
   </script>
   
-  <div class="rounded-md border">
-    <Table.Root>
-      <Table.Header>
-        <Table.Row class="bg-gray-50 hover:bg-gray-50">
-          <Table.Head class="w-[110px]">
-            <Button variant="ghost" class="h-8 p-1" onclick={() => toggleSort('date')}>
-              <span>Date</span>
-              {#if sortField === 'date'}
-                {#if sortDirection === 'asc'}
-                  <ArrowUp class="ml-2 h-4 w-4" />
-                {:else}
-                  <ArrowDown class="ml-2 h-4 w-4" />
-                {/if}
-              {:else}
-                <ArrowUpDown class="ml-2 h-4 w-4" />
-              {/if}
-            </Button>
-          </Table.Head>
-          <Table.Head>
-            <Button variant="ghost" class="h-8 p-1" onclick={() => toggleSort('propertyName')}>
-              <span>Property</span>
-              {#if sortField === 'propertyName'}
-                {#if sortDirection === 'asc'}
-                  <ArrowUp class="ml-2 h-4 w-4" />
-                {:else}
-                  <ArrowDown class="ml-2 h-4 w-4" />
-                {/if}
-              {:else}
-                <ArrowUpDown class="ml-2 h-4 w-4" />
-              {/if}
-            </Button>
-          </Table.Head>
-          <Table.Head>
-            <Button variant="ghost" class="h-8 p-1" onclick={() => toggleSort('meterName')}>
-              <span>Meter</span>
-              {#if sortField === 'meterName'}
-                {#if sortDirection === 'asc'}
-                  <ArrowUp class="ml-2 h-4 w-4" />
-                {:else}
-                  <ArrowDown class="ml-2 h-4 w-4" />
-                {/if}
-              {:else}
-                <ArrowUpDown class="ml-2 h-4 w-4" />
-              {/if}
-            </Button>
-          </Table.Head>
-          <Table.Head>
-            <Button variant="ghost" class="h-8 p-1" onclick={() => toggleSort('meterType')}>
-              <span>Type</span>
-              {#if sortField === 'meterType'}
-                {#if sortDirection === 'asc'}
-                  <ArrowUp class="ml-2 h-4 w-4" />
-                {:else}
-                  <ArrowDown class="ml-2 h-4 w-4" />
-                {/if}
-              {:else}
-                <ArrowUpDown class="ml-2 h-4 w-4" />
-              {/if}
-            </Button>
-          </Table.Head>
-          <Table.Head class="text-right">
-            <Button variant="ghost" class="h-8 p-1" onclick={() => toggleSort('previousReading')}>
-              <span>Previous</span>
-              {#if sortField === 'previousReading'}
-                {#if sortDirection === 'asc'}
-                  <ArrowUp class="ml-2 h-4 w-4" />
-                {:else}
-                  <ArrowDown class="ml-2 h-4 w-4" />
-                {/if}
-              {:else}
-                <ArrowUpDown class="ml-2 h-4 w-4" />
-              {/if}
-            </Button>
-          </Table.Head>
-          <Table.Head class="text-right">
-            <Button variant="ghost" class="h-8 p-1" onclick={() => toggleSort('reading')}>
-              <span>Current</span>
-              {#if sortField === 'reading'}
-                {#if sortDirection === 'asc'}
-                  <ArrowUp class="ml-2 h-4 w-4" />
-                {:else}
-                  <ArrowDown class="ml-2 h-4 w-4" />
-                {/if}
-              {:else}
-                <ArrowUpDown class="ml-2 h-4 w-4" />
-              {/if}
-            </Button>
-          </Table.Head>
-          <Table.Head class="text-right">
-            <Button variant="ghost" class="h-8 p-1" onclick={() => toggleSort('consumption')}>
-              <span>Consumption</span>
-              {#if sortField === 'consumption'}
-                {#if sortDirection === 'asc'}
-                  <ArrowUp class="ml-2 h-4 w-4" />
-                {:else}
-                  <ArrowDown class="ml-2 h-4 w-4" />
-                {/if}
-              {:else}
-                <ArrowUpDown class="ml-2 h-4 w-4" />
-              {/if}
-            </Button>
-          </Table.Head>
-          <Table.Head class="text-right">
-            <Button variant="ghost" class="h-8 p-1" onclick={() => toggleSort('costPerUnit')}>
-              <span>Unit Cost</span>
-              {#if sortField === 'costPerUnit'}
-                {#if sortDirection === 'asc'}
-                  <ArrowUp class="ml-2 h-4 w-4" />
-                {:else}
-                  <ArrowDown class="ml-2 h-4 w-4" />
-                {/if}
-              {:else}
-                <ArrowUpDown class="ml-2 h-4 w-4" />
-              {/if}
-            </Button>
-          </Table.Head>
-          <Table.Head class="text-right">
-            <Button variant="ghost" class="h-8 p-1" onclick={() => toggleSort('totalCost')}>
-              <span>Total</span>
-              {#if sortField === 'totalCost'}
-                {#if sortDirection === 'asc'}
-                  <ArrowUp class="ml-2 h-4 w-4" />
-                {:else}
-                  <ArrowDown class="ml-2 h-4 w-4" />
-                {/if}
-              {:else}
-                <ArrowUpDown class="ml-2 h-4 w-4" />
-              {/if}
-            </Button>
-          </Table.Head>
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
-        {#if consolidatedData.length === 0}
-          <Table.Row>
-            <Table.Cell colspan="9" class="h-24 text-center">
-              No readings found with the current filters.
-            </Table.Cell>
-          </Table.Row>
-        {:else}
-          {#each consolidatedData as row (row.id)}
-            <Table.Row class="hover:bg-gray-50">
-              <Table.Cell class="font-medium">
-                {formatDate(row.date)}
-              </Table.Cell>
-              <Table.Cell>
-                {row.propertyName}
-                {#if row.unitName}
-                  <span class="text-xs text-gray-500">· {row.unitName}</span>
-                {/if}
-              </Table.Cell>
-              <Table.Cell>{row.meterName}</Table.Cell>
-              <Table.Cell>
-                <span class={`px-2 py-1 rounded-full text-xs font-medium ${getUtilityColorClass(row.meterType)}`}>
-                  {row.meterType}
+  {#if groupedReadings.length === 0}
+    <div class="bg-gray-50 rounded-md p-6 text-center">
+      <p class="text-gray-500">No readings found with the current filters.</p>
+    </div>
+  {:else}
+    {#each groupedReadings as dateGroup}
+      <div class="mb-8">
+        <div class="flex justify-between items-center p-3 bg-gray-100 rounded-t-md mb-2">
+          <h3 class="text-lg font-semibold">Readings for {formatDate(dateGroup.date)}</h3>
+          <div class="text-right">
+            {#if dateGroup.properties.length > 0 && dateGroup.properties[0].uniqueMeters.length > 0}
+              <div class="text-sm">
+                Unit Cost: <span class="font-bold">
+                  {formatCurrency(dateGroup.properties[0].uniqueMeters[0].costPerUnit || 0)}
+                  /{getUnitLabel(dateGroup.properties[0].uniqueMeters[0].meterType)}
                 </span>
-              </Table.Cell>
-              <Table.Cell class="text-right">
-                {row.previousReading !== null ? formatNumber(row.previousReading) : '-'}
-              </Table.Cell>
-              <Table.Cell class="text-right font-medium">
-                {formatNumber(row.reading)}
-              </Table.Cell>
-              <Table.Cell class="text-right">
-                {row.consumption !== null ? formatNumber(row.consumption) : '-'}
-                <span class="text-xs text-gray-500 ml-1">{getUnitLabel(row.meterType)}</span>
-              </Table.Cell>
-              <Table.Cell class="text-right">
-                {row.costPerUnit !== null ? formatCurrency(row.costPerUnit) : '-'}
-              </Table.Cell>
-              <Table.Cell class="text-right font-medium">
-                {row.totalCost !== null ? formatCurrency(row.totalCost) : '-'}
-              </Table.Cell>
-            </Table.Row>
-          {/each}
-        {/if}
-      </Table.Body>
-    </Table.Root>
-  </div>
+              </div>
+            {/if}
+          </div>
+        </div>
+        
+        {#each dateGroup.properties as propertyGroup}
+          <Card.Root class="mb-4">
+            <Card.Header class="py-3">
+              <div class="flex justify-between items-center">
+                <Card.Title>{propertyGroup.propertyName}</Card.Title>
+              </div>
+            </Card.Header>
+            <Card.Content>
+              <div class="rounded-md border">
+                <Table.Root>
+                  <Table.Header>
+                    <Table.Row class="bg-gray-50 hover:bg-gray-50">
+                      <Table.Head>Meter</Table.Head>
+                      <Table.Head class="text-right">Previous</Table.Head>
+                      <Table.Head class="text-right">Current</Table.Head>
+                      <Table.Head class="text-right">Consumption</Table.Head>
+                      <Table.Head class="text-right">Total</Table.Head>
+                    </Table.Row>
+                  </Table.Header>
+                  <Table.Body>
+                    {#each propertyGroup.uniqueMeters as meter}
+                      <Table.Row 
+                        class="hover:bg-gray-50 border-b cursor-pointer"
+                        onclick={() => toggleMeterExpansion(meter.meterId)}
+                      >
+                        <Table.Cell class="font-medium">
+                          {meter.meterName}
+                          {#if meter.unitName}
+                            <span class="text-xs text-gray-500">· {meter.unitName}</span>
+                          {/if}
+                          <span class="ml-2 inline-block px-2 py-0.5 rounded-full text-xs font-medium {getUtilityColorClass(meter.meterType)}">
+                            {meter.meterType}
+                          </span>
+                        </Table.Cell>
+                        <Table.Cell class="text-right">
+                          {meter.previousReading !== null ? formatNumber(meter.previousReading) : '-'}
+                        </Table.Cell>
+                        <Table.Cell class="text-right font-medium">
+                          {formatNumber(meter.reading)}
+                        </Table.Cell>
+                        <Table.Cell class="text-right">
+                          {meter.consumption !== null ? formatNumber(meter.consumption) : '-'}
+                          <span class="text-xs text-gray-500 ml-1">{getUnitLabel(meter.meterType)}</span>
+                        </Table.Cell>
+                        <Table.Cell class="text-right font-medium">
+                          {meter.totalCost !== null ? formatCurrency(meter.totalCost) : '-'}
+                        </Table.Cell>
+                      </Table.Row>
+                      
+                      {#if activeMeterId === meter.meterId && meter.history.length > 1}
+                        <Table.Row class="bg-gray-50">
+                          <Table.Cell colspan="5" class="p-0">
+                            <div class="p-4">
+                              <h4 class="text-sm font-medium mb-2">Reading History for {meter.meterName}</h4>
+                              <div class="rounded-md border bg-white">
+                                <Table.Root>
+                                  <Table.Header>
+                                    <Table.Row class="bg-gray-50 hover:bg-gray-50">
+                                      <Table.Head>Date</Table.Head>
+                                      <Table.Head class="text-right">Reading</Table.Head>
+                                      <Table.Head class="text-right">Consumption</Table.Head>
+                                      <Table.Head class="text-right">Cost</Table.Head>
+                                    </Table.Row>
+                                  </Table.Header>
+                                  <Table.Body>
+                                    {#if meter.history.length <= 1}
+                                      <Table.Row>
+                                        <Table.Cell colspan="4" class="text-center py-4 text-gray-500">
+                                          No previous reading history available for this meter.
+                                        </Table.Cell>
+                                      </Table.Row>
+                                    {:else}
+                                      {#each meter.history as historyItem}
+                                        <Table.Row class="hover:bg-gray-50">
+                                          <Table.Cell>{formatDate(historyItem.reading_date)}</Table.Cell>
+                                          <Table.Cell class="text-right">{formatNumber(historyItem.reading)}</Table.Cell>
+                                          <Table.Cell class="text-right">
+                                            {historyItem.consumption !== null ? formatNumber(historyItem.consumption) : '-'}
+                                            <span class="text-xs text-gray-500 ml-1">{getUnitLabel(meter.meterType)}</span>
+                                          </Table.Cell>
+                                          <Table.Cell class="text-right">
+                                            {historyItem.cost !== null ? formatCurrency(historyItem.cost) : '-'}
+                                          </Table.Cell>
+                                        </Table.Row>
+                                      {/each}
+                                    {/if}
+                                  </Table.Body>
+                                </Table.Root>
+                              </div>
+                            </div>
+                          </Table.Cell>
+                        </Table.Row>
+                      {/if}
+                    {/each}
+                  </Table.Body>
+                  <Table.Footer>
+                    <Table.Row class="bg-gray-50 font-medium">
+                      <Table.Cell colspan="3" class="text-right">Property Totals:</Table.Cell>
+                      <Table.Cell class="text-right">{formatNumber(propertyGroup.totalConsumption)}</Table.Cell>
+                      <Table.Cell class="text-right">{formatCurrency(propertyGroup.totalCost)}</Table.Cell>
+                    </Table.Row>
+                  </Table.Footer>
+                </Table.Root>
+              </div>
+            </Card.Content>
+          </Card.Root>
+        {/each}
+      </div>
+    {/each}
+  {/if}
