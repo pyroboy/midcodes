@@ -13,8 +13,6 @@
     import { RefreshCw } from 'lucide-svelte';
     import type { Property, FilterChangeEvent } from './types';
     
-    // We're keeping this prop for compatibility but it's not used anymore
-    // export let showFilters: boolean = true;
     export let properties: Property[] = [];
     export let availableReadingDates: string[] = [];
     export let utilityTypes: Record<string, string> = {};
@@ -31,7 +29,7 @@
     // Property name lookup helper
     function getPropertyName(propertyId: number | null): string {
       if (!propertyId) return 'N/A';
-      const property = properties.find(p => p.id === propertyId);
+      const property = properties.find((p: Property) => p.id === propertyId);
       return property ? property.name : 'Unknown';
     }
     
@@ -130,7 +128,7 @@
           <Label for="property-filter" class="text-sm font-medium">Property</Label>
           <Select 
             type="single" 
-            onValueChange={handlePropertyChange} 
+            onValueChange={(value: string) => handlePropertyChange(value)} 
             value={selectedPropertyId?.toString() || ""}
           >
             <SelectTrigger class="w-full">
@@ -154,7 +152,7 @@
           <Label for="type-filter" class="text-sm font-medium">Utility Type</Label>
           <Select 
             type="single" 
-            onValueChange={handleTypeChange} 
+            onValueChange={(value: string) => handleTypeChange(value)} 
             value={selectedType || ""}
           >
             <SelectTrigger class="w-full">
@@ -174,7 +172,7 @@
           <Label for="date-filter" class="text-sm font-medium">Reading Date</Label>
           <Select 
             type="single" 
-            onValueChange={handleDateFilterChange} 
+            onValueChange={(value: string) => handleDateFilterChange(value)} 
             value={dateFilter || ""}
           >
             <SelectTrigger class="w-full">

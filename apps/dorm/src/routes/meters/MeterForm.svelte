@@ -217,9 +217,17 @@
 
   <div>
     <Label for="initial_reading" class="text-sm font-medium">Initial Reading</Label>
-    <Input type="number" id="initial_reading" bind:value={$form.initial_reading} maxlength={255} required />
-    {#if $errors.name}<span class="text-xs text-red-500">{$errors.name}</span>{/if}
+    <Input 
+      type="number" 
+      id="initial_reading" 
+      bind:value={$form.initial_reading} 
+      step="0.01"
+      min="0"
+      required 
+    />
+    {#if $errors.initial_reading}<span class="text-xs text-red-500">{$errors.initial_reading}</span>{/if}
   </div>
+  
 
 
 

@@ -51,8 +51,11 @@ const baseMeterSchema = z.object({
   is_active: z.boolean().default(true),
   status: meterStatusEnum.default('ACTIVE'),
   notes: z.string().nullable().optional(),
-  created_at: z.date().optional() // Make created_at optional
+  // Change this line to accept either a Date or a string
+  created_at: z.union([z.string(), z.date()]).optional()
 });
+
+
 
 // Full meter schema with timestamps
 export const meterSchema = baseMeterSchema.extend({

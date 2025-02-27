@@ -12,7 +12,7 @@
   import MeterForm from './MeterForm.svelte';
   import { superForm } from 'sveltekit-superforms/client';
   import { zodClient } from 'sveltekit-superforms/adapters';
-  import { invalidate } from '$app/navigation';
+  import { invalidate,invalidateAll } from '$app/navigation';
   import { browser } from "$app/environment";
   import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
 
@@ -54,6 +54,16 @@
   // Component state with Svelte 5 reactive primitives
   let { data } = $props<{ data: PageData }>();
   
+//   $effect(() => {
+//   // When data changes, update our local state
+//   metersData = data.meters || [];
+//   propertiesData = data.properties || [];
+//   floorsData = data.floors || [];
+//   rentalUnitData = data.rental_unit || [];
+  
+//   console.log('Data updated from server:', metersData.length + ' meters');
+// });
+
   // Debug logging
   // console.log("Initial data received:", data);
   
@@ -210,28 +220,58 @@
   let groupedMeters = $derived(groupMeters());
 
   // Form handling
-  const { form, enhance, errors, constraints, submitting, reset } = superForm(data.form, {
-    id: 'meter-form',
-    validators: zodClient(meterFormSchema),
-    validationMethod: 'oninput',
-    dataType: 'json',
-    taintedMessage: null,
-    resetForm: true,
-    onError: ({ result }) => {
-      console.error('Form submission error:', {
-        error: result.error,
-        status: result.status
-      });
-    },
-    onResult: async ({ result }) => {
-      if (result.type === 'success') {
-        editMode = false;
-        selectedMeter = undefined;
-        await invalidate('app:meters');
-        reset();
-      }
+  const { form, enhance, errors, constraints, submitting, reset, message } = superForm(data.form, {
+  id: 'meter-form',
+  validators: zodClient(meterFormSchema),
+  validationMethod: 'oninput',
+  dataType: 'json',
+  taintedMessage: null,
+  resetForm: true,
+  onSubmit: () => {
+    console.log('🔄 Form submission started with data:', $form);
+    loading = true;
+  },
+  onError: ({ result }) => {
+    console.error('❌ Form submission error:', result);
+    error = result.error?.message || 'An error occurred during submission';
+    loading = false;
+  },
+  // In apps/dorm/src/routes/meters/+page.svelte
+// Update the onResult in the superForm configuration:
+
+onResult: async ({ result }) => {
+  console.log('📊 Form submission result:', result);
+  loading = false;
+  
+  if (result.type === 'success') {
+    console.log('✅ Operation successful!', result.data);
+    error = null;
+    
+    // Reset the form state immediately
+    editMode = false;
+    selectedMeter = undefined;
+    
+    // This is the important part - force a complete reload
+    try {
+      console.log('🔄 Invalidating and refreshing data...');
+      // Use both invalidateAll and a specific invalidation for app:meters
+      await invalidateAll();
+      await invalidate('app:meters');
+      
+      // Ensure the data is reflected in the UI
+      metersData = data.meters || [];
+      console.log('✅ Data refreshed:', metersData);
+    } catch (e) {
+      console.error('❌ Error refreshing data:', e);
     }
-  });
+    
+    reset();
+  } else {
+    console.error('❌ Operation failed:', result);
+    // error = result.error?.message || 'Operation failed';
+  }
+}
+});
 
   // Event handlers
   function handleCancel() {
@@ -360,6 +400,20 @@
 
 
 <div class="container mx-auto p-4 flex flex-col lg:flex-row gap-4">
+  <!-- Add this right after the <div class="container mx-auto p-4 flex flex-col lg:flex-row gap-4"> line -->
+{#if error}
+<Alert.Root variant="destructive" class="fixed top-4 right-4 z-50 max-w-md">
+  <Alert.Title>Error</Alert.Title>
+  <Alert.Description>{error}</Alert.Description>
+</Alert.Root>
+{/if}
+
+{#if $message && !error}
+<Alert.Root variant="default" class="fixed top-4 right-4 z-50 max-w-md bg-green-50 border-green-200">
+  <Alert.Title class="text-green-800">Success</Alert.Title>
+  <Alert.Description class="text-green-700">{$message}</Alert.Description>
+</Alert.Root>
+{/if}
   <!-- Meters List (Left side) -->
   <div class="w-full lg:w-2/3">
     <div class="flex justify-between items-center mb-4">
@@ -476,11 +530,8 @@
       </div>
     </div>
 
-    {#if loading}
-      <div class="flex justify-center items-center py-6">
-        <Loader2 class="h-8 w-8 animate-spin" />
-      </div>
-    {:else if groupedMeters.length === 0}
+
+    {#if groupedMeters.length === 0}
       <div class="flex flex-col items-center justify-center py-8 px-4 bg-gray-50 rounded-lg">
         <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="text-gray-400 mb-3">
           <path d="M10.3 8.2c.7-.3 1.5-.4 2.3-.4h1.2c2.2 0 4 1.8 4 4 0 .5-.1 1-.3 1.5" />

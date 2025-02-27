@@ -3,10 +3,16 @@
   import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
   import { Button } from '$lib/components/ui/button';
   import * as Alert from '$lib/components/ui/alert';
-  import { Check, RefreshCw } from 'lucide-svelte';
+  import { Check, RefreshCw, Download } from 'lucide-svelte';
   import { invalidateAll } from '$app/navigation';
   import type { PageData } from './$types';
-  import { utilityBillingTypeEnum } from './meterReadingSchema';
+  
+  // Import components
+  import ReadingFiltersPanel from './ReadingFiltersPanel.svelte';
+  import ReadingEntryModal from './ReadingEntryModal.svelte';
+  import ExportDialog from './ExportDialog.svelte';
+  import SummaryStatistics from './SummaryStatistics.svelte';
+  import ConsolidatedReadingsTable from './ConsolidatedReadingsTable.svelte';
   
   // Import types
   import type { 
@@ -16,27 +22,14 @@
     MeterReadingEntry, 
     FilterChangeEvent, 
     ReadingSaveEvent, 
-    ExportEvent 
+    ExportEvent
   } from './types';
   
-  // Import our custom components
-  import ReadingFiltersPanel from './ReadingFiltersPanel.svelte';
-  import MeterReadingCard from './MeterReadingCard.svelte';
-  import ReadingEntryModal from './ReadingEntryModal.svelte';
-  import ExportDialog from './ExportDialog.svelte';
-  import SummaryStatistics from './SummaryStatistics.svelte';
-
-  // Additional types
-  type MeterWithReadings = {
-    meter: Meter;
-    readings: Reading[];
-  };
-  
   // Props
-  let data = $props<{data: PageData}>();
+  let { data } = $props<{data: PageData}>();
   
-  // Form handling
-  const { form, errors, enhance, delayed, message } = superForm(data.data.form, {
+  // Form handling - safely access form data with optional chaining
+  const { form, errors, enhance, delayed, message } = superForm(data.form ?? {}, {
     resetForm: true,
     onResult: ({ result }) => {
       if (result.type === 'success') {
@@ -71,13 +64,13 @@
     $form.reading_date = readingDate;
   });
 
-  // Data sources
-  const allProperties = data.data.properties || [];
-  const allMeters = data.data.meters || [];
-  const allReadings = data.data.readings || [];
-  const availableDates = data.data.availableReadingDates || [];
+  // Data sources - safely access with optional chaining and defaults
+  const allProperties = data.properties || [];
+  const allMeters = data.meters || [];
+  const allReadings = data.readings || [];
+  const availableDates = data.availableReadingDates || [];
   
-  // Computed values - using functions instead of $derived (avoids TypeScript errors)
+  // Filter readings based on selected criteria
   function getFilteredReadings(): Reading[] {
     return allReadings.filter((reading: Reading) => {
       // Property filter
@@ -99,40 +92,14 @@
         meterName.toLowerCase().includes(searchQuery.toLowerCase()) : true;
       
       return propertyMatch && typeMatch && dateMatch && searchMatch;
-    }).sort((a: Reading, b: Reading) => new Date(b.reading_date).getTime() - new Date(a.reading_date).getTime());
-  }
-
-  function getReadingsByMeter(): MeterWithReadings[] {
-    const filteredReadings = getFilteredReadings();
-    const meterMap = new Map<number, MeterWithReadings>();
-    
-    filteredReadings.forEach((reading: Reading) => {
-      const meter = allMeters.find((m: Meter) => m.id === reading.meter_id);
-      if (!meter) return;
-      
-      if (!meterMap.has(meter.id)) {
-        meterMap.set(meter.id, {
-          meter,
-          readings: []
-        });
-      }
-      
-      // TypeScript knows this is safe because we just checked and potentially created the entry
-      const entry = meterMap.get(meter.id)!;
-      entry.readings.push(reading);
     });
-    
-    return Array.from(meterMap.values())
-      .sort((a, b) => a.meter.name.localeCompare(b.meter.name));
   }
 
   function getAvailableReadingDates(): string[] {
-    // Convert to an explicitly typed array to fix the unknown[] error
     const uniqueDates: string[] = Array.from(
       new Set(allReadings.map((r: Reading) => r.reading_date))
     );
     
-    // Now sort the correctly typed array
     return uniqueDates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
   }
 
@@ -146,13 +113,6 @@
     return readings.length > 0 
       ? { reading: readings[0].reading, date: readings[0].reading_date }
       : { reading: null, date: null };
-  }
-  
-  // Property name lookup helper
-  function getPropertyName(propertyId: number | null): string {
-    if (!propertyId) return 'N/A';
-    const property = allProperties.find((p: Property) => p.id === propertyId);
-    return property ? property.name : 'Unknown';
   }
 
   // Event handlers
@@ -197,10 +157,8 @@
   async function handleSaveReadings(event: CustomEvent<ReadingSaveEvent>) {
     try {
       const { readings, readingDate, costPerUnit } = event.detail;
-
-      console.log('Submitting readings:', readings); // Debug log to see what's being submitted
       
-      // Create a FormData object instead of JSON
+      // Create a FormData object
       const formData = new FormData();
       
       // Add the base data
@@ -222,7 +180,6 @@
 
       // Parse the response
       const result = await response.json();
-      console.log('Save result:', result); // Debug log to see server response
 
       showReadingModal = false;
       showSuccessMessage = true;
@@ -231,13 +188,10 @@
       }, 3000);
 
       try {
-        // Explicitly wrap invalidateAll in a try/catch to prevent silent failures
-        console.log('Refreshing data...');
+        // Refresh data
         await invalidateAll();
-        console.log('Data refreshed successfully');
       } catch (invalidateError) {
         console.error('Error during invalidateAll:', invalidateError);
-        // Still show success, but log the invalidation error
         alert('Readings saved, but page refresh failed. Please refresh manually.');
       }
     } catch (error) {
@@ -255,18 +209,17 @@
 
   function handleExport(event: CustomEvent<ExportEvent>) {
     const { format, fromDate, toDate } = event.detail;
-    
-    // TODO: Implement actual export functionality
     console.log(`Exporting in ${format} format from ${fromDate} to ${toDate}`);
-    
     showExportDialog = false;
     alert(`Export in ${format.toUpperCase()} format initiated!`);
   }
 
   // These call the functions to ensure reactivity
   let filteredReadings = $derived(getFilteredReadings());
-  let readingsByMeter = $derived(getReadingsByMeter());
   let availableReadingDates = $derived(getAvailableReadingDates());
+
+  // Get utility billing types from data
+  import { utilityBillingTypeEnum } from './meterReadingSchema';
 </script>
 
 <div class="container mx-auto py-6">
@@ -281,14 +234,15 @@
         disabled={!selectedPropertyId || !selectedType}
       >
       {#if !selectedPropertyId}
-      Select a property to continue
-    {:else if !selectedType}
-      Select a utility type to continue
-    {:else}
-      Add Meter Readings
-    {/if}
+        Select a property to continue
+      {:else if !selectedType}
+        Select a utility type to continue
+      {:else}
+        Add Meter Readings
+      {/if}
       </Button>
       <Button 
+        variant="outline"
         class="flex items-center gap-2"
         onclick={() => invalidateAll()}
       >
@@ -317,7 +271,7 @@
     on:filterChange={handleFilterChange}
   />
 
-  <!-- Main Content (merged from tabs) -->
+  <!-- Main Content -->
   <div class="space-y-6 mt-6">
     <!-- Readings Display Section -->
     <div class="space-y-4">
@@ -331,6 +285,7 @@
           class="flex items-center gap-2"
           disabled={filteredReadings.length === 0}
         >
+          <Download class="h-4 w-4 mr-1" />
           Export Data
         </Button>
       </div>
@@ -347,18 +302,12 @@
           </Button>
         </div>
       {:else}
-        <!-- Group readings by meter -->
-        <div class="space-y-6">
-          {#each readingsByMeter as { meter, readings } (meter.id)}
-            <MeterReadingCard 
-              {meter} 
-              {readings} 
-              allReadings={allReadings} 
-              {costPerUnit} 
-              properties={allProperties} 
-            />
-          {/each}
-        </div>
+        <!-- Consolidated Readings Table -->
+        <ConsolidatedReadingsTable 
+          readings={filteredReadings}
+          meters={allMeters}
+          properties={allProperties}
+        />
       {/if}
     </div>
   </div>

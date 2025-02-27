@@ -117,19 +117,23 @@ CREATE TABLE public.maintenance (
 );
 
 CREATE TABLE public.meters (
-    id integer NOT NULL DEFAULT nextval('meters_id_seq'::regclass),
-    name text NOT NULL,
-    location_type meter_location_type NOT NULL,
-    property_id integer,
-    floor_id integer,
-    rental_unit_id integer,
-    type utility_type NOT NULL,
-    is_active boolean DEFAULT true,
-    status meter_status NOT NULL DEFAULT 'ACTIVE'::meter_status,
-    initial_reading numeric(10,2) NOT NULL DEFAULT 0,
-    unit_rate numeric(10,2) NOT NULL DEFAULT 0,
-    notes text,
-    created_at timestamp with time zone NOT NULL DEFAULT timezone('utc'::text, now())
+  id integer not null default nextval('meters_id_seq'::regclass),
+  name text not null,
+  location_type public.meter_location_type not null,
+  property_id integer null,
+  floor_id integer null,
+  rental_unit_id integer null,
+  type public.utility_type not null,
+  is_active boolean null default true,
+  status public.meter_status not null default 'ACTIVE'::meter_status,
+  notes text null,
+  created_at timestamp with time zone not null default timezone ('utc'::text, now()),
+  initial_reading numeric(10, 2) null,
+  constraint meters_pkey primary key (id),
+  constraint meters_floor_id_fkey foreign KEY (floor_id) references floors (id),
+  constraint meters_property_id_fkey foreign KEY (property_id) references properties (id) on delete CASCADE,
+  constraint meters_rental_unit_id_fkey foreign KEY (rental_unit_id) references rental_unit (id)
+) TABLESPACE pg_default;
 );
 
 CREATE TABLE public.organizations (
@@ -196,7 +200,7 @@ CREATE TABLE public.readings (
   meter_name text null,
   consumption numeric(10, 2) null,
   cost numeric(10, 2) null,
-  cost_per_kwh numeric(10, 2) null,
+  cost_per_unit numeric(10, 2) null,
   previous_reading numeric(10, 2) null,
   constraint readings_pkey primary key (id)
 ) TABLESPACE pg_default;

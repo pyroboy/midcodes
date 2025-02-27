@@ -80,3 +80,31 @@ export interface Reading {
     fromDate: string;
     toDate: string;
   };
+  
+  // New types for the consumption chart
+  export type ChartData = {
+    label: string;
+    value: number;
+    color: string;
+  };
+  
+  export type ChartDataset = {
+    labels: string[];
+    values: number[];
+    colors: string[];
+  };
+  
+  export type ConsumptionByType = {
+    [key: string]: number;
+  };
+  
+  export type ConsumptionTrend = {
+    date: string;
+    consumption: number;
+  };
+  
+  export type ChartProps = {
+    readings: Reading[];
+    meters: Meter[];
+    selectedType: string | null;
+  };

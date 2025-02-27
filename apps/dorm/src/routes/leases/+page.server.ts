@@ -249,7 +249,9 @@ export const actions: Actions = {
 
       if (billingsError) throw billingsError;
 
-      return { form };
+      return { form ,
+        success: true
+      };
 
     } catch (err) {
       console.error('💥 Lease creation error:', err);

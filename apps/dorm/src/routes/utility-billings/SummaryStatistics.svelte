@@ -17,14 +17,14 @@
     
     // Helper functions to calculate stats
     function getUniquePropertyCount(): number {
-      return new Set(readings.map(r => {
-        const meter = meters.find(m => m.id === r.meter_id);
+      return new Set(readings.map((r: Reading) => {
+        const meter = meters.find((m: Meter) => m.id === r.meter_id);
         return meter?.property_id;
       }).filter(Boolean)).size;
     }
     
     function getUniqueMeterCount(): number {
-      return new Set(readings.map(r => r.meter_id)).size;
+      return new Set(readings.map((r: Reading) => r.meter_id)).size;
     }
     
     function getLatestReadingDate(): string | null {

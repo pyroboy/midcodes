@@ -12,9 +12,14 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
     throw error(401, 'Unauthorized');
   }
 
+  console.log('Session loaded, user authenticated:', session.user.id);
+
   // Create a form for superForm to use in the client, using batchReadingsSchema
   const form = await superValidate(zod(batchReadingsSchema));
 
+  // Debug: Log the query we're about to execute
+  console.log('Fetching properties with status ACTIVE...');
+  
   // Get all active properties
   const { data: properties, error: propertiesError } = await supabase
     .from('properties')
@@ -22,9 +27,28 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
     .eq('status', 'ACTIVE')
     .order('name');
     
-  if (propertiesError) throw error(500, `Error fetching properties: ${propertiesError.message}`);
+  console.log('Properties query result:', { properties, propertiesError });
+  
+  if (propertiesError) {
+    console.error('Error fetching properties:', propertiesError);
+    throw error(500, `Error fetching properties: ${propertiesError.message}`);
+  }
+
+  // Debug: Log empty results even if no error
+  if (!properties || properties.length === 0) {
+    console.log('No properties returned from query. Trying without filter...');
+    
+    // Try fetching without the status filter to see if any properties exist
+    const { data: allProperties, error: allPropertiesError } = await supabase
+      .from('properties')
+      .select('id, name')
+      .order('name');
+      
+    console.log('All properties (without filter):', { allProperties, allPropertiesError });
+  }
 
   // Get all meters for all properties
+  console.log('Fetching meters...');
   const { data: meters, error: metersError } = await supabase
     .from('meters')
     .select(`
@@ -42,9 +66,18 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
       )
     `);
 
-  if (metersError) throw error(500, `Error fetching meters: ${metersError.message}`);
+  console.log('Meters query result:', { metersCount: meters?.length || 0, metersError });
+
+  if (metersError) {
+    console.error('Error fetching meters:', metersError);
+    throw error(500, `Error fetching meters: ${metersError.message}`);
+  }
 
   // Get all readings
+  console.log('Fetching readings...');
+  let meterIds = meters?.map(m => m.id) || [];
+  console.log(`Found ${meterIds.length} meter IDs for readings query`);
+  
   const { data: readings, error: readingsError } = await supabase
     .from('readings')
     .select(`
@@ -58,20 +91,32 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
       previous_reading,
       meter_name
     `)
-    .in('meter_id', meters?.map(m => m.id) || []);
+    .in('meter_id', meterIds.length > 0 ? meterIds : [0]); // Use [0] as fallback if no meters to avoid empty array error
 
-  if (readingsError) throw error(500, `Error fetching readings: ${readingsError.message}`);
+  console.log('Readings query result:', { readingsCount: readings?.length || 0, readingsError });
+
+  if (readingsError) {
+    console.error('Error fetching readings:', readingsError);
+    throw error(500, `Error fetching readings: ${readingsError.message}`);
+  }
 
   // Get available reading dates
+  console.log('Fetching reading dates...');
   const { data: availableReadingDates, error: datesError } = await supabase
     .from('readings')
     .select('reading_date')
-    .in('meter_id', meters?.map(m => m.id) || [])
+    .in('meter_id', meterIds.length > 0 ? meterIds : [0])
     .order('reading_date');
 
-  if (datesError) throw error(500, `Error fetching reading dates: ${datesError.message}`);
+  console.log('Reading dates result:', { datesCount: availableReadingDates?.length || 0, datesError });
+
+  if (datesError) {
+    console.error('Error fetching reading dates:', datesError);
+    throw error(500, `Error fetching reading dates: ${datesError.message}`);
+  }
 
   // Get tenant counts per rental_unit
+  console.log('Fetching tenant counts...');
   const { data: tenantCounts, error: tenantsError } = await supabase
     .from('leases')
     .select(`
@@ -82,7 +127,12 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
     `)
     .eq('status', 'ACTIVE');
 
-  if (tenantsError) throw error(500, `Error fetching tenant counts: ${tenantsError.message}`);
+  console.log('Tenant counts result:', { tenantCountsCount: tenantCounts?.length || 0, tenantsError });
+
+  if (tenantsError) {
+    console.error('Error fetching tenant counts:', tenantsError);
+    throw error(500, `Error fetching tenant counts: ${tenantsError.message}`);
+  }
 
   // Process tenant counts
   const rental_unitTenantCounts = tenantCounts.reduce((acc, lease) => {
@@ -93,6 +143,14 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
 
   // Get unique reading dates (ensure they are Date objects for comparison)
   const uniqueDates = [...new Set(availableReadingDates?.map(d => d.reading_date))].sort();
+
+  console.log('Final data payload:', {
+    propertiesCount: properties?.length || 0,
+    metersCount: meters?.length || 0,
+    readingsCount: readings?.length || 0,
+    readingDatesCount: uniqueDates.length || 0,
+    sampleProperties: properties?.slice(0, 3) || []
+  });
 
   return {
     form,

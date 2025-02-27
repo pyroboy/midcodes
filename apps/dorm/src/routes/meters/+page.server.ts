@@ -365,7 +365,7 @@ export const actions = {
       }
 
       console.log('✅ Meter created successfully');
-      return { form };
+      return { form ,  success: true};
       
     } catch (err) {
       console.error('❌ Unexpected error in create action:', err);
@@ -382,7 +382,7 @@ export const actions = {
         console.log('❌ No session found');
         return fail(401, { message: 'Unauthorized' });
       }
-
+  
       // Validate form data
       const form = await superValidate(request, zod(meterSchema));
       console.log('📝 Form data:', form.data);
@@ -391,7 +391,7 @@ export const actions = {
         console.log('❌ Form validation failed:', form.errors);
         return fail(400, { form });
       }
-
+  
       // Check user permissions
       const { data: profile, error: profileError } = await locals.supabase
         .from('profiles')
@@ -403,56 +403,56 @@ export const actions = {
         console.log('❌ Error fetching profile:', profileError);
         return fail(500, { form, message: 'Error fetching user profile' });
       }
-
+  
       const isAdminLevel = profile?.role === 'super_admin' || profile?.role === 'property_admin';
       const isUtility = profile?.role === 'property_utility';
-
+  
       if (!isAdminLevel && !isUtility) {
         console.log('❌ Permission denied. User role:', profile?.role);
         return fail(403, { form, message: 'Forbidden - Insufficient permissions' });
       }
-
-      const { id, ...updateData } = form.data;
+  
+      const { id } = form.data;
       if (!id) {
         console.log('❌ Missing meter ID for update');
         return fail(400, { form, message: 'Meter ID is required for updates.' });
       }
-
+  
       // Check if meter exists
       const { data: meter, error: meterError } = await locals.supabase
         .from('meters')
         .select('id')
         .eq('id', id)
         .single();
-
+  
       if (meterError) {
         console.log('❌ Error fetching meter:', meterError);
         return fail(500, { form, message: 'Error fetching meter information' });
       }
-
+  
       if (!meter) {
         console.log('❌ Meter not found with ID:', id);
         return fail(404, { form, message: 'Meter not found.' });
       }
-
+  
       // Validate location constraints
-      const { location_type, property_id, floor_id, rental_unit_id } = updateData;
+      const { location_type, property_id, floor_id, rental_unit_id } = form.data;
       console.log('📍 Location data:', { location_type, property_id, floor_id, rental_unit_id });
       
       // Prepare clean update data with initial values
       let cleanUpdateData = {
-        name: updateData.name,
-        location_type: updateData.location_type,
-        property_id: updateData.property_id,
+        name: form.data.name,
+        location_type: form.data.location_type,
+        property_id: form.data.property_id,
         floor_id: null as number | null,
         rental_unit_id: null as number | null,
-        initial_reading: updateData.initial_reading,
-        type: updateData.type,
-        status: updateData.status,
-        is_active: updateData.status === 'ACTIVE',
-        notes: updateData.notes
+        initial_reading: form.data.initial_reading,
+        type: form.data.type,
+        status: form.data.status,
+        is_active: form.data.status === 'ACTIVE',
+        notes: form.data.notes
+        // created_at is intentionally excluded here
       };
-      
       // Set the correct location IDs based on location_type and handle hierarchy
       switch (location_type) {
         case 'PROPERTY':
@@ -589,7 +589,7 @@ export const actions = {
           }
           break;
       }
-
+  
       if (locationQuery) {
         const { data, error: locationError } = await locationQuery;
         if (locationError) {
@@ -598,7 +598,7 @@ export const actions = {
         }
         locationValid = !!data;
       }
-
+  
       if (!locationValid) {
         console.log('❌ Invalid location. Location not found or not active.');
         return fail(400, { 
@@ -606,15 +606,15 @@ export const actions = {
           message: 'Invalid location selected. Please check if the location exists and is active.' 
         });
       }
-
+  
       // Check for duplicate meter names
       let duplicateQuery = locals.supabase
         .from('meters')
         .select('id')
-        .eq('name', updateData.name)
+        .eq('name', form.data.name)
         .eq('property_id', cleanUpdateData.property_id)
         .neq('id', id);
-
+  
       switch (location_type) {
         case 'FLOOR':
           if (cleanUpdateData.floor_id) {
@@ -627,14 +627,14 @@ export const actions = {
           }
           break;
       }
-
+  
       const { data: existingMeter, error: duplicateError } = await duplicateQuery.maybeSingle();
       
       if (duplicateError) {
         console.log('❌ Error checking for duplicates:', duplicateError);
         return fail(500, { form, message: 'Error checking for duplicate meters' });
       }
-
+  
       if (existingMeter) {
         console.log('❌ Duplicate meter found:', existingMeter);
         return fail(400, { 
@@ -644,20 +644,23 @@ export const actions = {
       }
       
       console.log('📤 Updating meter with data:', cleanUpdateData);
-
+  
       // Update the meter
       const { error: updateError } = await locals.supabase
         .from('meters')
         .update(cleanUpdateData)
         .eq('id', id);
-
+  
       if (updateError) {
         console.log('❌ Error updating meter:', updateError);
         return fail(500, { form, message: `Database error: ${updateError.message}` });
       }
-
+  
       console.log('✅ Meter updated successfully');
-      return { form };
+      return { 
+        form,
+        success: true 
+      };
       
     } catch (err) {
       console.error('❌ Unexpected error in update action:', err);

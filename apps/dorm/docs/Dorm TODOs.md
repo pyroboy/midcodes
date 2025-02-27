@@ -1,0 +1,13 @@
+- [ ] #dorm add all exisitng leases data
+- [ ] #dorm learn how to backup data and restore and rollback
+- [ ] #dorm show monthly reports
+- [ ] #dorm add utility billing maker, lists all rooms
+- [ ] #dorm add penalties adder,how? 
+- [ ] #dorm design - tenant's page. show current payables, show paid
+- [x] #dorm design , monthly report
+- [ ] #dorm design the graph ( Financial Report )
+- [x] #dorm create Reporting Component
+- [x] #dorm create Meters Input
+- [x] #dorm create Budget Input
+- [x] #dorm create Maintenance R Input
+- [x] #dorm create Expenses Input
