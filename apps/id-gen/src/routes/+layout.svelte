@@ -1,5 +1,10 @@
 <script lang="ts">
-  import type { LayoutProps } from './$types';
+  // Define our own LayoutProps interface since the $types import is missing
+  interface LayoutProps {
+    data: any;
+    children: any;
+  }
+  
   import '../app.css';
   import { onMount } from 'svelte';
   import { loadGoogleFonts } from '$lib/config/fonts';

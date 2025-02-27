@@ -55,7 +55,7 @@
         property_id: expense.property_id,
         amount: expense.amount,
         description: expense.description,
-        expense_type: expense.type,
+        type: expense.type,
         expense_status: expense.expense_status,
         expense_date: expense.expense_date
       }
@@ -116,16 +116,27 @@
   // Handle add new expense
   function handleAddExpense(event: CustomEvent<Partial<Expense>>) {
     const newExpense = event.detail;
+    console.log('Page received new expense:', newExpense);
+    
     // Set form data based on the new expense
     reset({
       data: {
         property_id: newExpense.property_id,
         amount: newExpense.amount,
         description: newExpense.description,
-        expense_type: newExpense.type,
+        type: newExpense.type,
         expense_status: newExpense.expense_status,
         expense_date: newExpense.expense_date
       }
+    });
+    
+    console.log('Form reset with data:', {
+      property_id: newExpense.property_id,
+      amount: newExpense.amount,
+      description: newExpense.description,
+      type: newExpense.type,
+      expense_status: newExpense.expense_status,
+      expense_date: newExpense.expense_date
     });
     
     // Submit the form
@@ -157,7 +168,7 @@
     <input type="hidden" name="property_id" value={$form.property_id} />
     <input type="hidden" name="amount" value={$form.amount} />
     <input type="hidden" name="description" value={$form.description} />
-    <input type="hidden" name="expense_type" value={$form.expense_type} />
+    <input type="hidden" name="type" value={$form.type} />
     <input type="hidden" name="expense_status" value={$form.expense_status} />
     <input type="hidden" name="expense_date" value={$form.expense_date} />
   </form>

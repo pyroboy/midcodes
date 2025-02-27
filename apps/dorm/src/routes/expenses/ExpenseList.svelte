@@ -22,6 +22,12 @@
     return months.includes(value as Month);
   }
 
+  // Helper function to determine if an expense type is operational or capital
+  function isOperationalExpenseType(type: string): boolean {
+    const operationalTypes = ['OPERATIONAL', 'MAINTENANCE', 'UTILITIES', 'SUPPLIES', 'SALARY', 'OTHERS'];
+    return type !== 'CAPITAL' && operationalTypes.includes(type);
+  }
+
   // Props
   interface Props {
     expenses: Expense[] | null;
@@ -165,13 +171,13 @@
       }
       
       // Sort expenses into their respective categories
-      if ( expense.type === 'OPERATIONAL') {
+      console.log('Processing expense:', expense.id, 'Type:', expense.type, 'Description:', expense.description);
+      if (isOperationalExpenseType(expense.type)) {
+        console.log('-> Categorized as OPERATIONAL');
         grouped[expenseKey].operational.push(expense);
-      } else if ( expense.type === 'CAPITAL') {
+      } else if (expense.type === 'CAPITAL') {
+        console.log('-> Categorized as CAPITAL');
         grouped[expenseKey].capital.push(expense);
-      } else {
-        // For other expense types, put them in operational for now
-        grouped[expenseKey].operational.push(expense);
       }
     });
     
@@ -185,15 +191,19 @@
   function handleAddExpense(event: CustomEvent<any>) {
     const newExpense = event.detail;
     
+    console.log('Received new expense:', newExpense);
+    
     // Create new expense data based on the type
     const completeExpense = {
       property_id: selectedProperty,
       amount: newExpense.amount,
       description: newExpense.description,
-      expense_type: newExpense.expense_type,
+      type: newExpense.type,
       expense_status: 'PENDING',
       expense_date: new Date(parseInt(selectedYear), months.indexOf(selectedMonth), 15).toISOString().split('T')[0]
     };
+    
+    console.log('Complete expense to be dispatched:', completeExpense);
     
     // Dispatch to parent component
     dispatch('add', completeExpense);

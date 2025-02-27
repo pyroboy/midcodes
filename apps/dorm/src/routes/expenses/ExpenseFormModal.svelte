@@ -63,6 +63,10 @@
   let selectedYear = form.expense_date ? new Date(form.expense_date).getFullYear().toString() : currentYear.toString();
   let selectedMonth = form.expense_date ? months[new Date(form.expense_date).getMonth()] : months[new Date().getMonth()];
 
+  // State for expense types
+  let operationalExpenseType = $state<string>('OPERATIONAL');
+  const operationalExpenseTypes = ['OPERATIONAL', 'MAINTENANCE', 'UTILITIES', 'SUPPLIES', 'SALARY', 'OTHERS'];
+
   // Expense lists
   let operationalExpenses: ExpenseItem[] = $state([
     { label: form.description || 'Expense', amount: form.amount?.toString() || '' }
@@ -117,7 +121,8 @@
     let amount = '';
 
     if (operationalExpenses.length > 0 && operationalExpenses[0].label) {
-      expenseType = 'OPERATIONAL';
+      // Use the selected operational expense type
+      expenseType = operationalExpenseType;
       description = operationalExpenses[0].label;
       amount = operationalExpenses[0].amount;
     } else if (capitalExpenses.length > 0 && capitalExpenses[0].label) {
@@ -133,7 +138,7 @@
     // Update form values
     form.description = description;
     form.amount = amount ? parseFloat(amount) : 0;
-    form.expense_type = expenseType;
+    form.type = expenseType;
     form.expense_date = expenseDate.toISOString().split('T')[0];
     
     // If we support multiple expenses in the future, we could handle them differently
@@ -246,6 +251,26 @@
               </CardHeader>
               <CardContent class="p-6 pt-4">
                 <div class="space-y-6">
+                  <div class="space-y-2">
+                    <Label for="operational_expense_type">Operational Expense Type</Label>
+                    <Select.Root
+                      type="single"
+                      name="operational_expense_type"
+                      value={operationalExpenseType}
+                      onValueChange={(e: any) => operationalExpenseType = e}
+                    >
+                      <Select.Trigger class="w-full">
+                        <span>{operationalExpenseType}</span>
+                      </Select.Trigger>
+                      <Select.Content>
+                        <Select.Group>
+                          {#each operationalExpenseTypes as type}
+                            <Select.Item value={type}>{type}</Select.Item>
+                          {/each}
+                        </Select.Group>
+                      </Select.Content>
+                    </Select.Root>
+                  </div>
                   {#each operationalExpenses as expense, index}
                     <div class="flex gap-4 items-center">
                       <Input

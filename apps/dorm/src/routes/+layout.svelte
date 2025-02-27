@@ -1,9 +1,10 @@
 <script lang="ts">
+  import { getContext } from 'svelte';
   import type { LayoutProps } from './$types';
   import '../app.css';
   import * as Sidebar from "$lib/components/ui/sidebar/index.js";
-
-  // Importing Lucide icons
+  
+  // Import Lucide icons
   import Building from "lucide-svelte/icons/building";
   import Home from "lucide-svelte/icons/home";
   import Layers from "lucide-svelte/icons/layers";
@@ -12,11 +13,12 @@
   import FileText from "lucide-svelte/icons/file-text";
   import CreditCard from "lucide-svelte/icons/credit-card";
   import List from "lucide-svelte/icons/list";
-  // import FileChart from "lucide-svelte/icons/file-chart";
+  import LogOut from "lucide-svelte/icons/log-out";
+  import User from "lucide-svelte/icons/user";
 
   let { data, children }: LayoutProps = $props();
 
-  // Updated navigation links with icons
+  // Navigation links with icons
   const navigationLinks = [
     {
       category: 'Locations',
@@ -47,18 +49,31 @@
       category: 'Reports',
       links: [
         { href: '/reports', label: 'Monthly Reports', icon: CreditCard },
+        { href: '/lease-report', label: 'Lease Reports', icon: CreditCard },
       ],
     },
   ];
+
+  // Define a type for the sidebar context
+  type SidebarContext = {
+    collapsed?: boolean;
+    // Add any other properties that might be in the context
+  };
+
+  // Retrieve the sidebar context to determine if the sidebar is collapsed.
+  // (This example assumes your Sidebar component sets a context with the key 'SidebarContext'
+  // that contains a `collapsed` boolean. Adjust if your implementation differs.)
+  const sidebarContext = getContext<SidebarContext>('SidebarContext') || { collapsed: false };
+  let isCollapsed = sidebarContext.collapsed;
 </script>
 
 <Sidebar.Provider>
   <div class="flex min-h-screen">
     <!-- Sidebar -->
-    <Sidebar.Root collapsible="icon">
+    <Sidebar.Root collapsible="icon" class="shrink-0">
       <!-- Sidebar Header -->
       <Sidebar.Header>
-        <div class="p-4 font-bold text-lg">My App</div>
+        <div class="p-4 font-bold text-lg">Dorm Management</div>
       </Sidebar.Header>
       
       <!-- Sidebar Content with Navigation Groups -->
@@ -69,20 +84,24 @@
             <Sidebar.GroupContent>
               <Sidebar.Menu>
                 {#each group.links as link (link.href)}
-                  <Sidebar.MenuItem>
-                    <Sidebar.MenuButton>
-                      {#snippet child({ props })}
-                        <a
-                          href={link.href}
-                          {...props}
-                          class="flex items-center space-x-2"
-                        >
-                          <link.icon class="w-5 h-5" />
-                          <span>{link.label}</span>
-                        </a>
-                      {/snippet}
-                    </Sidebar.MenuButton>
-                  </Sidebar.MenuItem>
+                  <a href={link.href} class="block no-underline">
+                    <Sidebar.MenuItem>
+                      <Sidebar.MenuButton>
+                        {#if isCollapsed}
+                          <!-- When collapsed: show just the icon with a tooltip -->
+                          <div class="tooltip" data-tooltip={link.label}>
+                            <link.icon class="h-5 w-5" />
+                          </div>
+                        {:else}
+                          <!-- When expanded: show the icon and label -->
+                          <div class="flex items-center gap-2">
+                            <link.icon class="h-5 w-5" />
+                            <span>{link.label}</span>
+                          </div>
+                        {/if}
+                      </Sidebar.MenuButton>
+                    </Sidebar.MenuItem>
+                  </a>
                 {/each}
               </Sidebar.Menu>
             </Sidebar.GroupContent>
@@ -90,16 +109,47 @@
         {/each}
       </Sidebar.Content>
 
-      <!-- Sidebar Footer -->
+      <!-- Sidebar Footer with Auth Status -->
       <Sidebar.Footer>
-        <div class="p-4 text-sm">Footer</div>
+        <div class="p-4 border-t border-gray-200">
+          {#if data.session}
+            <div class="flex flex-col space-y-3">
+              <div class="flex items-center space-x-2 text-sm">
+                <User class="w-4 h-4 text-gray-500" />
+                <span class="text-gray-700">{data.user?.email || 'Logged in'}</span>
+              </div>
+              <a 
+                href="/auth/signout" 
+                class="flex items-center space-x-2 text-sm text-red-600 hover:text-red-800"
+              >
+                <LogOut class="w-4 h-4" />
+                <span>Sign out</span>
+              </a>
+            </div>
+          {:else}
+            <a 
+              href="/auth" 
+              class="flex items-center space-x-2 text-sm text-blue-600 hover:text-blue-800"
+            >
+              <User class="w-4 h-4" />
+              <span>Sign in</span>
+            </a>
+          {/if}
+        </div>
       </Sidebar.Footer>
+      
+      <!-- Sidebar Rail to enable proper collapsible interaction -->
+      <Sidebar.Rail />
     </Sidebar.Root>
 
     <!-- Main Content Area -->
-    <main class="flex-1 p-4 bg-gray-50">
-      <Sidebar.Trigger />
-      {@render children()}
+    <main class="flex-1 p-4 md:p-6 overflow-auto">
+      <div class="flex items-center mb-4">
+        <Sidebar.Trigger />
+      </div>
+      <div class="container mx-auto max-w-7xl">
+        {@render children()}
+      </div>
     </main>
   </div>
 </Sidebar.Provider>

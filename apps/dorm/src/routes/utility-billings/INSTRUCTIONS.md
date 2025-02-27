@@ -76,6 +76,9 @@ STATUS : Okay good
 - only display one meter at a time and onclick show the readings history
 - Chronological, expandable view of meter readings (reading history)
 
+## For the @ ReadingEntryModal
+STATUS : almost good
+- lets just fix the input validation the we cant input the current value that is less than the prvious reading
 
 
 ## Key Calculations

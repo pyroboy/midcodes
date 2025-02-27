@@ -63,7 +63,7 @@
     dispatch('add', {
       description: newDesc,
       amount: parseFloat(newAmount),
-      expense_type: 'CAPITAL'
+      type: 'CAPITAL'
     });
     
     // Reset inputs

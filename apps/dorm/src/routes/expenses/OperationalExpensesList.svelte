@@ -7,7 +7,8 @@
   import type { Expense } from './types';
   import type { Property } from './types';
   import ExpenseCard from './ExpenseCard.svelte';
-  
+  import * as Select from '$lib/components/ui/select';
+
   // Props
   interface Props {
     expenses: Expense[];
@@ -15,20 +16,20 @@
     selectedPropertyId: number | null;
     title?: string;
   }
-  
+
   let { 
     expenses = [], 
     properties = [],
     selectedPropertyId = null,
     title = "Operational Expenses"
   }: Props = $props();
-  
+
   // Create event dispatcher
   const dispatch = createEventDispatcher<{
     delete: number;
     add: any;
   }>();
-  
+
   // Calculate total expenses
   let totalExpenses = $derived.by( () => {
     let total = 0;
@@ -37,7 +38,7 @@
     }
     return total;
   });
-  
+
   // Format currency
   function formatCurrency(amount: number): string {
     return new Intl.NumberFormat('en-US', {
@@ -45,17 +46,21 @@
       currency: 'PHP'
     }).format(amount);
   }
-  
+
   // Input fields
   let newDesc = $state('');
   let newAmount = $state('');
-  
+
+  // Operational expense types
+  const operationalExpenseTypes = ['OPERATIONAL', 'MAINTENANCE', 'UTILITIES', 'SUPPLIES', 'SALARY', 'OTHERS'];
+  let selectedExpenseType = $state('OPERATIONAL');
+
   // Handle delete event from child component
   function handleDelete(event: CustomEvent<number>) {
     console.log('OperationalExpensesList received delete event for ID:', event.detail);
     dispatch('delete', event.detail);
   }
-  
+
   // Handle adding a new expense
   function handleAdd() {
     if (!newDesc || !newAmount || !selectedPropertyId) return;
@@ -63,7 +68,7 @@
     dispatch('add', {
       description: newDesc,
       amount: parseFloat(newAmount),
-      expense_type: 'OPERATIONAL'
+      type: selectedExpenseType
     });
     
     // Reset inputs
@@ -110,36 +115,60 @@
         <p class="text-amber-600 text-sm mb-2">Please select a property first</p>
       {/if}
       <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
-        <div class="md:col-span-2">
-          <Input
-            value={newDesc}
-            placeholder="Expense Description"
-            class="bg-white"
-            oninput={(e) => newDesc = (e.target as HTMLInputElement).value}
-            disabled={!selectedPropertyId}
-          />
-        </div>
-        <div class="flex gap-2">
-          <div class="relative flex-grow">
-            <span class="absolute left-3 top-2 text-gray-500">₱</span>
-            <Input
-              type="number"
-              value={newAmount}
-              placeholder="0.00"
-              class="pl-8 bg-white"
-              oninput={(e) => newAmount = (e.target as HTMLInputElement).value}
-              disabled={!selectedPropertyId}
-            />
+        <div class="space-y-4 p-2">
+          <div class="grid grid-cols-1 gap-2">
+            <div class="mb-2">
+              <label for="expense-type" class="text-sm font-medium text-gray-600 block mb-1">Expense Type</label>
+              <Select.Root
+                type="single"
+                name="expense-type"
+                value={selectedExpenseType}
+                onselect={(e: any) => selectedExpenseType = e.value}
+              >
+                <Select.Trigger class="w-full border bg-white">
+                  <span>{selectedExpenseType}</span>
+                </Select.Trigger>
+                <Select.Content>
+                  <Select.Group>
+                    {#each operationalExpenseTypes as type}
+                      <Select.Item value={type}>{type}</Select.Item>
+                    {/each}
+                  </Select.Group>
+                </Select.Content>
+              </Select.Root>
+            </div>
+            <div class="md:col-span-2">
+              <Input
+                value={newDesc}
+                placeholder="Expense Description"
+                class="bg-white"
+                oninput={(e) => newDesc = (e.target as HTMLInputElement).value}
+                disabled={!selectedPropertyId}
+              />
+            </div>
           </div>
-          <Button 
-            variant="default" 
-            class="bg-green-600 hover:bg-green-700" 
-            onclick={handleAdd}
-            disabled={!newDesc || !newAmount || !selectedPropertyId}
-          >
-            <Plus class="h-4 w-4 mr-1" />
-            Add
-          </Button>
+          <div class="flex gap-2">
+            <div class="relative flex-grow">
+              <span class="absolute left-3 top-2 text-gray-500">₱</span>
+              <Input
+                type="number"
+                value={newAmount}
+                placeholder="0.00"
+                class="pl-8 bg-white"
+                oninput={(e) => newAmount = (e.target as HTMLInputElement).value}
+                disabled={!selectedPropertyId}
+              />
+            </div>
+            <Button 
+              variant="default" 
+              class="bg-green-600 hover:bg-green-700" 
+              onclick={handleAdd}
+              disabled={!newDesc || !newAmount || !selectedPropertyId}
+            >
+              <Plus class="h-4 w-4 mr-1" />
+              Add
+            </Button>
+          </div>
         </div>
       </div>
     </div>
