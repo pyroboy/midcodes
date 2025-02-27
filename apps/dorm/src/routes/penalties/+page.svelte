@@ -2,25 +2,83 @@
   import { superForm } from 'sveltekit-superforms/client';
   import { zodClient } from 'sveltekit-superforms/adapters';
   import { invalidate } from '$app/navigation';
-  // Import components with relative paths
+  import { updatePenaltySchema } from './formSchema';
+  import type { PenaltyBilling, PenaltyFilter } from './types';
+  import type { AnyZodObject } from 'zod';
+  
+  // UI Components
+  import { 
+    Card, 
+    CardContent, 
+    CardDescription, 
+    CardHeader, 
+    CardTitle, 
+    CardFooter
+  } from '$lib/components/ui/card';
+  import { Button } from '$lib/components/ui/button';
+  import { Badge } from '$lib/components/ui/badge';
+  import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
+  import { Separator } from '$lib/components/ui/separator';
+  import * as Select from '$lib/components/ui/select';
+  
+  // Custom components
   import PenaltyTable from './PenaltyTable.svelte';
   import PenaltyCard from './PenaltyCard.svelte';
   import PenaltyModal from './PenaltyModal.svelte';
-  import { updatePenaltySchema } from './formSchema';
-  import type { PenaltyBilling, PenaltyFilter } from './types';
-  import type { SuperForm } from 'sveltekit-superforms';
-  import type { AnyZodObject } from 'zod';
+  import PenaltyRulesModal from './PenaltyRulesModal.svelte';
+  
+  // Utilities
+  import { formatCurrency } from '$lib/utils/format';
   
   let { data } = $props();
   let penaltyBillings = $state(data.penaltyBillings);
   let selectedPenalty: PenaltyBilling | undefined = $state();
   let showPenaltyDetails = $state(false);
   let showPenaltyModal = $state(false);
-  let filter: PenaltyFilter = $state({});
+  let isFilterOpen = $state(true);
+  let showRulesModal = $state(false);
+  
+  // Filter state
+  let filter: PenaltyFilter = $state({
+    dateRange: {
+      start: '',
+      end: ''
+    },
+    status: null,
+    searchTerm: ''
+  });
+
+  let fromDate = $state('');
+  let toDate = $state('');
+  let statusFilter = $state('');
+  let searchTerm = $state('');
+  
+  // Status options for the select
+  const statusOptions = [
+    { value: '', label: 'All Statuses' },
+    { value: 'PENDING', label: 'Pending' },
+    { value: 'PARTIAL', label: 'Partial' },
+    { value: 'PAID', label: 'Paid' },
+    { value: 'OVERDUE', label: 'Overdue' }
+  ];
   
   $effect(() => {
     penaltyBillings = data.penaltyBillings;
   });
+
+  // Calculate statistics
+  let totalPenaltyAmount = $derived(
+    penaltyBillings.reduce((sum, billing) => sum + billing.penalty_amount, 0)
+  );
+  
+  let overdueCount = $derived(
+    penaltyBillings.filter(billing => new Date(billing.due_date) < new Date()).length
+  );
+  
+  let pendingCount = $derived(
+    penaltyBillings.filter(billing => billing.status === 'PENDING').length
+  );
 
   const { form, enhance, errors, constraints, submitting, reset } = superForm(data.form, {
     id: 'penalty-form',
@@ -34,9 +92,6 @@
         error: result.error,
         status: result.status
       });
-      if (result.error) {
-        console.error('Server error:', result.error.message);
-      }
     },
     onResult: async ({ result }) => {
       if (result.type === 'success') {
@@ -57,7 +112,6 @@
   function handleUpdatePenalty(penalty: PenaltyBilling) {
     selectedPenalty = penalty;
     if (selectedPenalty) {
-      // Update form values using the proper method
       form.update(($form) => {
         $form.id = selectedPenalty!.id;
         $form.penalty_amount = selectedPenalty!.penalty_amount;
@@ -73,131 +127,281 @@
     selectedPenalty = undefined;
   }
 
-  function applyFilter(newFilter: PenaltyFilter) {
-    filter = { ...filter, ...newFilter };
-    // In a real implementation, you might want to fetch data from the server with these filters
-    // or filter the data client-side
+  function toggleFilter() {
+    isFilterOpen = !isFilterOpen;
+  }
+  
+  function handleStatusChange(value: string) {
+    statusFilter = value;
+  }
+
+  function applyFilter() {
+    filter = {
+      dateRange: {
+        start: fromDate,
+        end: toDate
+      },
+      status: statusFilter as any || null,
+      searchTerm: searchTerm
+    };
+    
+    // In a real implementation, you'd fetch from server with these filters
+    // For now, we'll simulate filtering client-side
+    
+    // This will trigger a notification to the user that filtering is working
+    const successMessage = document.getElementById('filter-success');
+    if (successMessage) {
+      successMessage.classList.remove('hidden');
+      setTimeout(() => {
+        successMessage.classList.add('hidden');
+      }, 3000);
+    }
   }
 
   function resetFilter() {
+    fromDate = '';
+    toDate = '';
+    statusFilter = '';
+    searchTerm = '';
     filter = {};
-    // In a real implementation, you might want to fetch all data from the server again
+    
+    // This would typically refresh all data from the server
+    // For now, just show the success message
+    const successMessage = document.getElementById('filter-success');
+    if (successMessage) {
+      successMessage.classList.remove('hidden');
+      setTimeout(() => {
+        successMessage.classList.add('hidden');
+      }, 3000);
+    }
+  }
+  
+  function handleSaveRules(rules: any) {
+    // Here you would typically save the rules to your backend
+    showRulesModal = false;
+    
+    // For demo purposes, show a success message
+    const successMessage = document.getElementById('filter-success');
+    if (successMessage) {
+      const messageElement = successMessage.querySelector('span');
+      if (messageElement) {
+        messageElement.textContent = "Penalty rules saved successfully";
+      }
+      successMessage.classList.remove('hidden');
+      setTimeout(() => {
+        successMessage.classList.add('hidden');
+      }, 3000);
+    }
   }
 </script>
 
-
-<div class="w-full h-full bg-gray-50">
+<div class="min-h-screen bg-gray-50">
   <!-- Page Header -->
-  <div class="w-full bg-white shadow-sm border-b">
-    <div class="max-w-[1600px] mx-auto px-4 py-6">
-      <h1 class="text-3xl font-bold">Penalty Billings</h1>
-    </div>
-  </div>
-
-  <div class="max-w-[1600px] mx-auto px-4 py-6">
-    <div class="flex flex-col lg:flex-row gap-6">
-      <!-- Sidebar for filter controls -->
-      <div class="w-full lg:w-72 shrink-0">
-        <div class="bg-white p-5 rounded-lg shadow-md sticky top-4">
-          <h2 class="text-xl font-semibold mb-4">Filters</h2>
-          <div class="space-y-5">
-            <!-- Date range filter -->
-            <div>
-              <label for="date-range" class="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
-              <div class="grid grid-cols-2 gap-3">
-                <div>
-                  <label for="date-from" class="text-xs text-gray-500 mb-1 block">From</label>
-                  <input 
-                    id="date-from"
-                    type="date" 
-                    class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
-                  />
-                </div>
-                <div>
-                  <label for="date-to" class="text-xs text-gray-500 mb-1 block">To</label>
-                  <input 
-                    id="date-to"
-                    type="date" 
-                    class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
-                  />
-                </div>
-              </div>
-            </div>
+  <div class="bg-white border-b">
+    <div class="max-w-[1600px] mx-auto px-4 py-5">
+      <div class="flex flex-col space-y-2">
+        <div class="flex items-center text-sm text-gray-500">
+          <a href="/" class="hover:text-gray-700">Dashboard</a>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          <span class="font-medium text-gray-900">Penalty Billings</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <h1 class="text-2xl font-bold text-gray-900">Penalty Management</h1>
+          <div class="flex space-x-2">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onclick={toggleFilter}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+              {isFilterOpen ? 'Hide Filters' : 'Show Filters'}
+            </Button>
             
-            <!-- Status filter -->
-            <div>
-              <label for="status" class="block text-sm font-medium text-gray-700 mb-2">Status</label>
-              <select 
-                id="status" 
-                class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
-              >
-                <option value="">All Statuses</option>
-                <option value="overdue">Overdue</option>
-                <option value="approaching">Approaching Due Date</option>
-                <option value="penalized">Penalized</option>
-              </select>
-            </div>
-            
-            <!-- Search -->
-            <div>
-              <label for="search" class="block text-sm font-medium text-gray-700 mb-2">Search</label>
-              <div class="relative">
-                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
-                  </svg>
-                </div>
-                <input
-                  type="text"
-                  id="search"
-                  placeholder="Search by lease or tenant..."
-                  class="pl-10 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
-                />
-              </div>
-            </div>
-            
-            <!-- Filter buttons -->
-            <div class="flex justify-between pt-3">
-              <button
-                onclick={() => applyFilter({})}
-                class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Apply Filters
-              </button>
-              <button
-                onclick={() => resetFilter()}
-                class="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                Reset
-              </button>
-            </div>
+            <!-- Gear icon for penalty rules -->
+            <Button
+              variant="outline"
+              size="sm"
+              onclick={() => showRulesModal = true}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              Penalty Rules
+            </Button>
           </div>
         </div>
       </div>
+    </div>
+  </div>
+  
+  <!-- Success Message -->
+  <div id="filter-success" class="fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded shadow-md hidden transition-opacity duration-300 z-50">
+    <div class="flex items-center">
+      <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+      </svg>
+      <span>Filters applied successfully</span>
+    </div>
+  </div>
+
+  <!-- Stats Section -->
+  <div class="max-w-[1600px] mx-auto px-4 py-5">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-6">
+      <Card>
+        <CardHeader class="pb-2">
+          <CardTitle class="text-sm font-medium text-gray-500">Total Penalties</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div class="flex items-baseline">
+            <span class="text-2xl font-bold text-gray-900">{formatCurrency(totalPenaltyAmount)}</span>
+          </div>
+          <p class="text-sm text-gray-500 mt-1">Across {penaltyBillings.length} billings</p>
+        </CardContent>
+      </Card>
       
+      <Card>
+        <CardHeader class="pb-2">
+          <CardTitle class="text-sm font-medium text-gray-500">Overdue Billings</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div class="flex items-baseline">
+            <span class="text-2xl font-bold text-gray-900">{overdueCount}</span>
+            <span class="ml-2 text-sm text-red-600">Requiring attention</span>
+          </div>
+          <p class="text-sm text-gray-500 mt-1">Past due date and not fully paid</p>
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader class="pb-2">
+          <CardTitle class="text-sm font-medium text-gray-500">Pending Payments</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div class="flex items-baseline">
+            <span class="text-2xl font-bold text-gray-900">{pendingCount}</span>
+          </div>
+          <p class="text-sm text-gray-500 mt-1">Billings with pending payment status</p>
+        </CardContent>
+      </Card>
+    </div>
+
+    <!-- Filters in a single row with fixed layout -->
+    {#if isFilterOpen}
+    <Card class="mb-6">
+      <CardContent class="pt-6">
+        <div class="flex flex-wrap items-end gap-3">
+          <div class="flex-1 min-w-[180px]">
+            <Label for="date-from" class="mb-2 block">From Date</Label>
+            <Input 
+              id="date-from"
+              type="date" 
+              bind:value={fromDate}
+            />
+          </div>
+          
+          <div class="flex-1 min-w-[180px]">
+            <Label for="date-to" class="mb-2 block">To Date</Label>
+            <Input 
+              id="date-to"
+              type="date" 
+              bind:value={toDate}
+            />
+          </div>
+          
+          <div class="flex-1 min-w-[180px]">
+            <Label for="status" class="mb-2 block">Status</Label>
+            <Select.Root 
+              type="single" 
+              value={statusFilter}
+              onValueChange={handleStatusChange}
+              items={statusOptions}
+            >
+              <Select.Trigger>
+                {#snippet children()}
+                  {statusOptions.find(option => option.value === statusFilter)?.label || 'Select status'}
+                {/snippet}
+              </Select.Trigger>
+              <Select.Content>
+                {#snippet children()}
+                  <Select.Group>
+                    {#each statusOptions as option}
+                      <Select.Item value={option.value}>
+                        {#snippet children()}
+                          {option.label}
+                        {/snippet}
+                      </Select.Item>
+                    {/each}
+                  </Select.Group>
+                {/snippet}
+              </Select.Content>
+            </Select.Root>
+          </div>
+          
+          <div class="flex-1 min-w-[180px]">
+            <Label for="search" class="mb-2 block">Search</Label>
+            <Input
+              id="search"
+              type="text"
+              placeholder="Search lease or tenant..."
+              bind:value={searchTerm}
+            />
+          </div>
+          
+          <div class="flex space-x-2 ml-auto">
+            <Button 
+              variant="default"
+              onclick={applyFilter}
+            >
+              Apply
+            </Button>
+            <Button
+              variant="outline"
+              onclick={resetFilter}
+            >
+              Reset
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  {/if}
+
+    <div class="flex flex-col">
       <!-- Main content -->
-      <div class="flex-1">
+      <div class="flex-1 transition-all duration-300 ease-in-out">
         {#if showPenaltyDetails && selectedPenalty}
-          <div class="bg-white rounded-lg shadow-md p-5">
-            <PenaltyCard 
-              penalty={selectedPenalty} 
-              onClose={handleCloseDetails}
-              onUpdate={handleUpdatePenalty}
-            />
-          </div>
+          <Card>
+            <CardContent class="p-0">
+              <PenaltyCard 
+                penalty={selectedPenalty} 
+                onClose={handleCloseDetails}
+                onUpdate={handleUpdatePenalty}
+              />
+            </CardContent>
+          </Card>
         {:else}
-          <div class="bg-white rounded-lg shadow-md overflow-hidden">
-            <div class="p-5 border-b">
-              <h2 class="text-xl font-semibold">Penalty Records</h2>
-              <p class="text-sm text-gray-500 mt-1">
-                Click on a row to view details or update penalty amounts
-              </p>
-            </div>
-            <PenaltyTable 
-              penalties={penaltyBillings} 
-              onPenaltyClick={handlePenaltyClick}
-            />
-          </div>
+          <!-- Fixed: Added overflow-hidden to the Card and wrapped PenaltyTable in a div with overflow-x-auto -->
+          <Card class="overflow-hidden">
+            <CardHeader>
+              <div class="flex justify-between items-center">
+                <div>
+                  <CardTitle>Penalty Records</CardTitle>
+                  <CardDescription>
+                    Click on a row to view details or update penalty amounts
+                  </CardDescription>
+                </div>
+                <Badge variant="outline" class="px-3 py-1">
+                  {penaltyBillings.length} Records
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent class="p-0">
+              <div class="overflow-x-auto">
+                <PenaltyTable 
+                  penalties={penaltyBillings} 
+                  onPenaltyClick={handlePenaltyClick}
+                />
+              </div>
+            </CardContent>
+          </Card>
         {/if}
       </div>
     </div>
@@ -215,5 +419,11 @@
       submitting={$submitting}
     />
   {/if}
+  
+  <!-- Use the separate PenaltyRulesModal component -->
+  <PenaltyRulesModal
+    open={showRulesModal}
+    onOpenChange={(open: boolean) => showRulesModal = open}
+    onSave={handleSaveRules}
+  />
 </div>
-

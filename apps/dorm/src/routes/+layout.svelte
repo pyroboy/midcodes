@@ -46,7 +46,7 @@
     {
       category: 'Reports',
       links: [
-        { href: '/monthly-reports', label: 'Monthly Reports', icon: CreditCard },
+        { href: '/reports', label: 'Monthly Reports', icon: CreditCard },
       ],
     },
   ];

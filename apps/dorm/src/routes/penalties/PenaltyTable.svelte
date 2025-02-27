@@ -73,7 +73,7 @@
   }
 </script>
 
-<div class="overflow-x-auto">
+<div class="w-full">
   <Table>
     <TableCaption>List of billings with penalty status</TableCaption>
     <TableHeader>

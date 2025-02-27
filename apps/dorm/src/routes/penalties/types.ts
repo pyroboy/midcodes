@@ -19,17 +19,18 @@ export interface PenaltyBilling {
     id: number;
     name: string;
     rental_unit?: {
-      rental_unit_number: string;
-      floor?: {
+      name: string;
+      number: string;
+      floors?: {
         floor_number: string;
         wing?: string;
       };
-      property?: {
+      properties?: {
         name: string;
       }
     };
     lease_tenants?: Array<{
-      tenant: {
+      tenants?: {
         id: number;
         name: string;
         email?: string;
