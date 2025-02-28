@@ -32,14 +32,22 @@ function getMonthsArray(startMonth: string, monthCount: number): string[] {
 function getMonthlyPaymentStatus(
   billings: Billing[], 
   month: string, 
-  type: 'RENT' | 'UTILITIES'
+  type: 'RENT' | 'UTILITIES' | 'PENALTY'
 ): 'PAID' | 'PENDING' | 'PARTIAL' | 'OVERDUE' {
-  const billingType = type === 'UTILITIES' ? ['UTILITIES', 'UTILITY'] : [type];
+  // For utilities, accept both 'UTILITIES' and 'UTILITY' types
+  let billingTypes: string[] = [];
+  if (type === 'UTILITIES') {
+    billingTypes = ['UTILITIES', 'UTILITY'];
+  } else if (type === 'PENALTY') {
+    billingTypes = ['PENALTY'];
+  } else {
+    billingTypes = ['RENT'];
+  }
   
   // Filter billings for the current month and type
   const relevantBillings = billings.filter(billing => {
     const billingMonth = billing.due_date.substring(0, 7); // Get YYYY-MM from date
-    return billingMonth === month && billingType.includes(billing.type);
+    return billingMonth === month && billingTypes.includes(billing.type);
   });
   
   if (relevantBillings.length === 0) {
@@ -67,14 +75,22 @@ function getMonthlyPaymentStatus(
 function getMonthlyAmount(
   billings: Billing[],
   month: string,
-  type: 'RENT' | 'UTILITIES'
+  type: 'RENT' | 'UTILITIES' | 'PENALTY'
 ): number {
-  const billingType = type === 'UTILITIES' ? ['UTILITIES', 'UTILITY'] : [type];
+  // For utilities, accept both 'UTILITIES' and 'UTILITY' types
+  let billingTypes: string[] = [];
+  if (type === 'UTILITIES') {
+    billingTypes = ['UTILITIES', 'UTILITY'];
+  } else if (type === 'PENALTY') {
+    billingTypes = ['PENALTY'];
+  } else {
+    billingTypes = ['RENT'];
+  }
   
   // Filter billings for the current month and type
   const relevantBillings = billings.filter(billing => {
     const billingMonth = billing.due_date.substring(0, 7); // Get YYYY-MM from date
-    return billingMonth === month && billingType.includes(billing.type);
+    return billingMonth === month && billingTypes.includes(billing.type);
   });
   
   // Sum all amounts
@@ -82,12 +98,29 @@ function getMonthlyAmount(
 }
 
 /**
+ * Helper function to get the correct suffix for floor numbers
+ */
+function getFloorSuffix(floorNumber: number): string {
+  if (floorNumber === 1) return 'st';
+  if (floorNumber === 2) return 'nd';
+  if (floorNumber === 3) return 'rd';
+  return 'th';
+}
+
+/**
  * Calculate payment totals for a tenant
  */
-function calculatePaymentTotals(leaseBillings: Billing[]): { totalPaid: number, totalRentPaid: number, totalUtilitiesPaid: number, totalPending: number } {
+function calculatePaymentTotals(leaseBillings: Billing[]): { 
+  totalPaid: number, 
+  totalRentPaid: number, 
+  totalUtilitiesPaid: number, 
+  totalPenaltyPaid: number, 
+  totalPending: number 
+} {
   let totalPaid = 0;
   let totalRentPaid = 0;
   let totalUtilitiesPaid = 0;
+  let totalPenaltyPaid = 0;
   let totalPending = 0;
   
   // First, let's log what we're working with
@@ -109,7 +142,7 @@ function calculatePaymentTotals(leaseBillings: Billing[]): { totalPaid: number, 
       } else if (billing.status === 'PENDING' || billing.status === 'OVERDUE') {
         totalPending += billing.amount;
       }
-    } else if (billing.type === 'UTILITIES') {
+    } else if (billing.type === 'UTILITIES' || billing.type === 'UTILITY') {
       if (billing.status === 'PAID') {
         totalUtilitiesPaid += billing.paid_amount || 0;
         totalPaid += billing.paid_amount || 0;
@@ -122,6 +155,18 @@ function calculatePaymentTotals(leaseBillings: Billing[]): { totalPaid: number, 
         // If the billing is pending/overdue, add to pending amount
         totalPending += billing.amount;
       }
+    } else if (billing.type === 'PENALTY') {
+      if (billing.status === 'PAID') {
+        totalPenaltyPaid += billing.paid_amount || 0;
+        totalPaid += billing.paid_amount || 0;
+      } else if (billing.status === 'PARTIAL') {
+        const paidAmount = billing.paid_amount || 0;
+        totalPenaltyPaid += paidAmount;
+        totalPaid += paidAmount;
+        totalPending += (billing.amount - paidAmount);
+      } else if (billing.status === 'PENDING' || billing.status === 'OVERDUE') {
+        totalPending += billing.amount;
+      }
     }
   });
   
@@ -129,11 +174,11 @@ function calculatePaymentTotals(leaseBillings: Billing[]): { totalPaid: number, 
     totalPaid,
     totalRentPaid,
     totalUtilitiesPaid,
+    totalPenaltyPaid,
     totalPending
   };
   
   console.log('Final calculated totals:', result);
-  console.log('Returning result:', result);
   return result;
 }
 
@@ -269,11 +314,11 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
             
             const leaseBillings = billings?.filter(b => b.lease_id === lease.id) || [];
             
-            console.log(`\nInspecting billings for lease ID ${lease.id} (${lease.name}), tenant ${tenant.name}:`);
-            
+         // Fix for the unterminated string literal
+console.log(`\nInspecting billings for lease ID ${lease.id} (${lease.name}), tenant ${tenant.name}:`);
             // Determine payment status for each month
             const monthlyPayments: MonthlyPaymentStatus[] = months.map(month => {
-              // Calculate rent and utility paid amounts for this month
+              // Calculate rent, utility, and penalty paid amounts for this month
               const rentPaidAmount = leaseBillings
                 .filter(b => b.type === 'RENT' && b.due_date.substring(0, 7) === month)
                 .reduce((total, billing) => total + (billing.paid_amount || 0), 0);
@@ -282,14 +327,21 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
                 .filter(b => (b.type === 'UTILITIES' || b.type === 'UTILITY') && b.due_date.substring(0, 7) === month)
                 .reduce((total, billing) => total + (billing.paid_amount || 0), 0);
                 
+              const penaltyPaidAmount = leaseBillings
+                .filter(b => b.type === 'PENALTY' && b.due_date.substring(0, 7) === month)
+                .reduce((total, billing) => total + (billing.paid_amount || 0), 0);
+                
               return {
                 month,
                 rent: getMonthlyPaymentStatus(leaseBillings, month, 'RENT'),
                 utilities: getMonthlyPaymentStatus(leaseBillings, month, 'UTILITIES'),
+                penalty: getMonthlyPaymentStatus(leaseBillings, month, 'PENALTY'),
                 rentAmount: getMonthlyAmount(leaseBillings, month, 'RENT'),
                 utilitiesAmount: getMonthlyAmount(leaseBillings, month, 'UTILITIES'),
+                penaltyAmount: getMonthlyAmount(leaseBillings, month, 'PENALTY'),
                 rentPaidAmount,
-                utilitiesPaidAmount
+                utilitiesPaidAmount,
+                penaltyPaidAmount
               };
             });
             
@@ -311,6 +363,7 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
               totalPaid: paymentTotals.totalPaid,
               totalRentPaid: paymentTotals.totalRentPaid,
               totalUtilitiesPaid: paymentTotals.totalUtilitiesPaid,
+              totalPenaltyPaid: paymentTotals.totalPenaltyPaid,
               totalPending: paymentTotals.totalPending
             };
             
@@ -348,11 +401,3 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
     throw error(500, 'LR-1005 - Internal server error');
   }
 };
-
-// Helper function to get the correct suffix for floor numbers
-function getFloorSuffix(floorNumber: number): string {
-  if (floorNumber === 1) return 'st';
-  if (floorNumber === 2) return 'nd';
-  if (floorNumber === 3) return 'rd';
-  return 'th';
-}

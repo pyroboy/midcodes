@@ -57,7 +57,7 @@ export interface Tenant {
 export interface Billing {
   id: number;
   lease_id: number;
-  type: 'RENT' | 'UTILITIES' | 'OTHER';
+  type: 'RENT' | 'UTILITIES' | 'UTILITY' | 'PENALTY' | 'OTHER';
   utility_type?: 'ELECTRICITY' | 'WATER' | 'INTERNET' | 'GAS' | 'OTHER';
   amount: number;
   paid_amount: number;

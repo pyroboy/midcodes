@@ -27,10 +27,13 @@ export interface MonthlyPaymentStatus {
   month: string; // YYYY-MM format
   rent: PaymentStatus;
   utilities: PaymentStatus;
+  penalty: PaymentStatus;
   rentAmount?: number;
   utilitiesAmount?: number;
+  penaltyAmount?: number;
   rentPaidAmount?: number;
   utilitiesPaidAmount?: number;
+  penaltyPaidAmount?: number;
 }
 
 export interface TenantPaymentRecord {
@@ -44,6 +47,7 @@ export interface TenantPaymentRecord {
   totalPaid: number;
   totalRentPaid: number;
   totalUtilitiesPaid: number;
+  totalPenaltyPaid: number;
   totalPending: number;
 }
 
