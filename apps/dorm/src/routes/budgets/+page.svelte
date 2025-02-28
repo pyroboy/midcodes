@@ -9,11 +9,12 @@
   import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
   import { Progress } from '$lib/components/ui/progress';
-  import { DollarSign, CheckCircle, Clock, Plus, PieChart, Edit, Trash2, ChevronDown, ChevronUp, RefreshCw } from 'lucide-svelte';
+  import { DollarSign, CheckCircle, Clock, Plus, Edit, Trash2, ChevronDown, ChevronUp, RefreshCw } from 'lucide-svelte';
   import type { PageData } from './$types';
   import type { Budget, BudgetWithStats, BudgetItem } from './types';
   import BudgetFormModal from './BudgetFormModal.svelte';
   import BudgetItemFormModal from './BudgetItemFormModal.svelte';
+  import BudgetDistributionCard from './BudgetDistributionCard.svelte';
 
   // Page data using Svelte 5 $props rune
   let { data } = $props<{data: PageData}>();
@@ -218,7 +219,7 @@
   </div>
 
   <!-- Statistics Summary -->
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
     <!-- Total Budget Card -->
     <Card class="bg-white shadow-sm border-gray-200">
       <CardHeader class="pb-2">
@@ -230,44 +231,11 @@
       </CardContent>
     </Card>
 
-    <!-- Allocated Budget Card -->
-    <Card class="bg-white shadow-sm border-gray-200">
-      <CardHeader class="pb-2">
-        <CardTitle class="text-sm font-medium text-gray-500">Allocated Budget</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div class="text-2xl font-bold mb-2">{formatCurrency(data.statistics.totalAllocatedBudget)}</div>
-        {#if data.statistics.totalPlannedBudget > 0}
-          {#if data.statistics.totalAllocatedBudget > 0}
-            {@const percentage = Math.min(Math.round((data.statistics.totalAllocatedBudget / data.statistics.totalPlannedBudget) * 100), 100)}
-            <div class="flex items-center gap-2">
-              <Progress value={percentage} class="h-2 flex-1" />
-              <span class="text-xs text-gray-500">{percentage}%</span>
-            </div>
-          {:else}
-            <div class="flex items-center gap-2">
-              <Progress value={0} class="h-2 flex-1" />
-              <span class="text-xs text-gray-500">0%</span>
-            </div>
-          {/if}
-        {:else}
-          <div class="text-xs text-gray-500">No planned budget</div>
-        {/if}
-      </CardContent>
-    </Card>
-
-    <!-- Remaining Budget Card -->
-    <Card class="bg-white shadow-sm border-gray-200">
-      <CardHeader class="pb-2">
-        <CardTitle class="text-sm font-medium text-gray-500">Remaining Budget</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div class="text-2xl font-bold mb-2" class:text-green-600={data.statistics.totalRemainingBudget >= 0} class:text-red-600={data.statistics.totalRemainingBudget < 0}>
-          {formatCurrency(data.statistics.totalRemainingBudget)}
-        </div>
-        <div class="text-xs text-gray-500">Available to allocate</div>
-      </CardContent>
-    </Card>
+    <!-- Combined Budget Distribution Card -->
+    <BudgetDistributionCard 
+      plannedAmount={data.statistics.totalPlannedBudget}
+      allocatedAmount={data.statistics.totalAllocatedBudget}
+    />
 
     <!-- Project Status Card -->
     <Card class="bg-white shadow-sm border-gray-200">
@@ -400,39 +368,41 @@
               </p>
             {/if}
             
-            <!-- Budget Progress Bar -->
+            <!-- Budget Progress Section -->
             <div class="mb-4">
-              <div class="flex justify-between items-center mb-1">
-                <span class="text-sm font-medium">Budget Allocation</span>
-                {#if true}
-                  {@const allocationPercentage = budget.planned_amount > 0 
-                    ? Math.min(Math.round((budget.allocatedAmount || 0) / budget.planned_amount * 100), 100)
-                    : 0}
-                  <span class="text-xs text-gray-500">{allocationPercentage}%</span>
+              <div class="flex justify-between items-center mb-2">
+                <div>
+                  <div class="text-sm text-gray-500">Planned</div>
+                  <div class="text-lg font-bold">{formatCurrency(budget.planned_amount)}</div>
+                </div>
+                <div class="text-right">
+                  <div class="text-sm text-gray-500">Remaining</div>
+                  <div class="text-lg font-bold" class:text-green-600={budget.remainingAmount >= 0} class:text-red-600={budget.remainingAmount < 0}>
+                    {formatCurrency(budget.remainingAmount || 0)}
+                  </div>
+                </div>
+              </div>
+              
+              <div class="space-y-2">
+                {#if budget.planned_amount > 0}
+                  {@const allocationPercentage = Math.min(Math.round((budget.allocatedAmount || 0) / budget.planned_amount * 100), 100)}
+                  <div class="flex flex-col gap-1">
+                    <div class="flex justify-between items-center text-xs">
+                      <span>Allocated ({formatCurrency(budget.allocatedAmount || 0)})</span>
+                      <span>{allocationPercentage}%</span>
+                    </div>
+                    <Progress value={allocationPercentage} class="h-2" />
+                  </div>
+                {:else}
+                  <div class="text-xs text-gray-500 py-1">No planned budget</div>
                 {/if}
-              </div>
-              {#if true}
-                {@const allocationPercentage = budget.planned_amount > 0 
-                  ? Math.min(Math.round((budget.allocatedAmount || 0) / budget.planned_amount * 100), 100)
-                  : 0}
-                <Progress value={allocationPercentage} class="h-2" />
-              {/if}
-            </div>
-            
-            <!-- Budget Summary -->
-            <div class="grid grid-cols-3 gap-3 mb-2">
-              <div>
-                <div class="text-sm text-gray-500">Planned</div>
-                <div class="text-lg font-bold">{formatCurrency(budget.planned_amount)}</div>
-              </div>
-              <div>
-                <div class="text-sm text-gray-500">Allocated</div>
-                <div class="text-lg font-bold">{formatCurrency(budget.allocatedAmount || 0)}</div>
-              </div>
-              <div>
-                <div class="text-sm text-gray-500">Remaining</div>
-                <div class="text-lg font-semibold" class:text-green-600={budget.remainingAmount >= 0} class:text-red-600={budget.remainingAmount < 0}>
-                  {formatCurrency(budget.remainingAmount || 0)}
+                
+                <div class="text-xs text-gray-500">
+                  {#if budget.remainingAmount >= 0}
+                    {formatCurrency(budget.remainingAmount)} available to allocate
+                  {:else}
+                    Over budget by {formatCurrency(Math.abs(budget.remainingAmount))}
+                  {/if}
                 </div>
               </div>
             </div>
