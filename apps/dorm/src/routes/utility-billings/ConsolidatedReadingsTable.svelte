@@ -10,7 +10,7 @@
     let { readings = [], meters = [], properties = [] } = $props();
     
     // Explicitly initialize active meter ID
-    let activeMeterId = $state(null);
+    let activeMeterId: number | null = $state(null);
     
     // Computed values using Svelte 5 derived.by
     const groupedReadings = $derived.by(() => {
@@ -103,11 +103,11 @@
             meterName: meter.name,
             meterType: meter.type,
             unitName: meter.rental_unit?.[0]?.name || meter.rental_unit?.[0]?.number || null,
-            reading: reading.reading,
-            previousReading: reading.previous_reading,
-            consumption: reading.consumption,
-            costPerUnit: reading.cost_per_unit,
-            totalCost: reading.cost,
+            reading: reading.reading ?? null,
+            previousReading: reading.previous_reading ?? null,
+            consumption: reading.consumption ?? null,
+            costPerUnit: reading.cost_per_unit ?? null,
+            totalCost: reading.cost ?? null,
             history: meterHistory
           };
           
@@ -146,8 +146,8 @@
       return result;
     });
     
-    // Toggle meter expansion - only one open at a time
-    function toggleMeterExpansion(meterId: number): void {
+    // Toggle the expansion of a meter's details
+    function toggleMeterExpansion(meterId: number | null): void {
       if (activeMeterId === meterId) {
         activeMeterId = null;
       } else {
@@ -285,7 +285,7 @@
                       
                       {#if activeMeterId === meter.meterId && meter.history.length > 1}
                         <Table.Row class="bg-gray-50">
-                          <Table.Cell colspan="5" class="p-0">
+                          <Table.Cell colspan={5} class="p-0">
                             <div class="p-4">
                               <h4 class="text-sm font-medium mb-2">Reading History for {meter.meterName}</h4>
                               <div class="rounded-md border bg-white">
@@ -301,7 +301,7 @@
                                   <Table.Body>
                                     {#if meter.history.length <= 1}
                                       <Table.Row>
-                                        <Table.Cell colspan="4" class="text-center py-4 text-gray-500">
+                                        <Table.Cell colspan={4} class="text-center py-4 text-gray-500">
                                           No previous reading history available for this meter.
                                         </Table.Cell>
                                       </Table.Row>
@@ -331,7 +331,7 @@
                   </Table.Body>
                   <Table.Footer>
                     <Table.Row class="bg-gray-50 font-medium">
-                      <Table.Cell colspan="3" class="text-right">Property Totals:</Table.Cell>
+                      <Table.Cell colspan={3} class="text-right">Property Totals:</Table.Cell>
                       <Table.Cell class="text-right">{formatNumber(propertyGroup.totalConsumption)}</Table.Cell>
                       <Table.Cell class="text-right">{formatCurrency(propertyGroup.totalCost)}</Table.Cell>
                     </Table.Row>

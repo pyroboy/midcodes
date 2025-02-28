@@ -1,14 +1,13 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import { Button } from '$lib/components/ui/button';
-  import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '$lib/components/ui/card';
-  import { Badge } from '$lib/components/ui/badge';
-  import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '$lib/components/ui/table';
-  import { Edit, Trash2, Plus, RefreshCw, ChevronDown, ChevronUp, DollarSign } from 'lucide-svelte';
-  import BudgetItemList from './BudgetItemList.svelte';
+  import { Plus, RefreshCw, DollarSign } from 'lucide-svelte';
   import BudgetFormModal from './BudgetFormModal.svelte';
-  import type { Budget, BudgetWithStats, Property } from './types';
+  import BudgetItemFormModal from './BudgetItemFormModal.svelte';
+  import BudgetCard from './BudgetCard.svelte';
+  import type { Budget, BudgetWithStats, Property, BudgetItem } from './types';
   import { defaultBudget } from './schema';
+  import { v4 as uuidv4 } from 'uuid';
 
   // Props using Svelte 5 $props rune
   let { 
@@ -20,9 +19,13 @@
   }>();
 
   // State
-  let showFormModal = $state(false);
+  let showBudgetFormModal = $state(false);
+  let showItemFormModal = $state(false);
   let editMode = $state(false);
   let currentBudget = $state<Budget | null>(null);
+  let currentBudgetId = $state<number | null>(null);
+  let currentBudgetItem = $state<BudgetItem | null>(null);
+  let expandedBudgetIds = $state<Set<number>>(new Set());
 
   // Event dispatcher
   const dispatch = createEventDispatcher<{
@@ -32,46 +35,63 @@
     refresh: void;
   }>();
 
-  // Format currency
-  function formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2
-    }).format(amount);
-  }
-
-  // Toggle expand/collapse for a budget
-  function toggleBudgetExpansion(budgetId: number) {
-    budgets = budgets.map((budget: BudgetWithStats) => 
-      budget.id === budgetId 
-        ? { ...budget, isExpanded: !budget.isExpanded } 
-        : budget
-    );
-  }
-
-  // Handle edit button click
-  function handleEditClick(budget: BudgetWithStats) {
-    currentBudget = budget;
-    editMode = true;
-    showFormModal = true;
-  }
-
-  // Handle delete button click
-  function handleDeleteClick(budgetId: number) {
-    dispatch('delete', budgetId);
-  }
-
   // Handle add budget button click
   function handleAddBudget() {
     currentBudget = { ...defaultBudget, property_id: properties[0]?.id } as Budget;
     editMode = false;
-    showFormModal = true;
+    showBudgetFormModal = true;
+  }
+
+  // Handle edit budget click
+  function handleEditBudget(event: CustomEvent<Budget>) {
+    currentBudget = event.detail;
+    editMode = true;
+    showBudgetFormModal = true;
+  }
+
+  // Handle delete budget click
+  function handleDeleteBudget(event: CustomEvent<number>) {
+    dispatch('delete', event.detail);
+  }
+
+  // Handle update budget
+  function handleUpdateBudget(event: CustomEvent<Budget>) {
+    dispatch('edit', event.detail);
+  }
+
+  // Handle toggle expand
+  function handleToggleExpand(event: CustomEvent<number>) {
+    const budgetId = event.detail;
+    if (expandedBudgetIds.has(budgetId)) {
+      expandedBudgetIds.delete(budgetId);
+    } else {
+      expandedBudgetIds.add(budgetId);
+    }
+    expandedBudgetIds = new Set(expandedBudgetIds); // Trigger reactivity
+  }
+
+  // Handle add budget item
+  function handleAddBudgetItem(event: CustomEvent<{ budgetId: number }>) {
+    const { budgetId } = event.detail;
+    currentBudgetId = budgetId;
+    currentBudgetItem = {
+      id: uuidv4(),
+      name: '',
+      type: 'MATERIALS',
+      cost: 0,
+      quantity: 1
+    };
+    showItemFormModal = true;
   }
 
   // Handle modal close
-  function handleModalClose() {
-    showFormModal = false;
+  function handleBudgetModalClose() {
+    showBudgetFormModal = false;
+  }
+
+  // Handle item modal close
+  function handleItemModalClose() {
+    showItemFormModal = false;
   }
 
   // Handle budget form submission
@@ -82,21 +102,42 @@
     } else {
       dispatch('add', budget);
     }
-    showFormModal = false;
+    showBudgetFormModal = false;
   }
 
-  // Get status badge color
-  function getStatusColor(status: string): string {
-    switch (status) {
-      case 'PLANNED':
-        return 'bg-blue-100 text-blue-800';
-      case 'ONGOING':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'COMPLETED':
-        return 'bg-green-100 text-green-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
+  // Handle item form submission
+  function handleItemSubmit(event: CustomEvent<BudgetItem>) {
+    const item = event.detail;
+    
+    if (!currentBudgetId) return;
+    
+    // Find the budget
+    const budget = budgets.find((b: BudgetWithStats) => b.id === currentBudgetId);
+    if (!budget) return;
+    
+    // Create a copy of the budget items array, ensuring it's always an array
+    const existingItems = Array.isArray(budget.budget_items) ? budget.budget_items : [];
+    const updatedItems = [...existingItems, item];
+    
+    // Calculate new allocated amount
+    const newAllocatedAmount = updatedItems.reduce(
+      (total: number, item: BudgetItem) => total + (item.cost * item.quantity),
+      0
+    );
+    
+    // Create an updated budget object
+    const updatedBudget = {
+      ...budget,
+      budget_items: updatedItems,
+      allocatedAmount: newAllocatedAmount,
+      remainingAmount: budget.planned_amount - newAllocatedAmount
+    };
+    
+    // Update the budget
+    dispatch('edit', updatedBudget);
+    
+    // Close the modal
+    showItemFormModal = false;
   }
 
   // Refresh data
@@ -134,112 +175,34 @@
 {:else}
   <div class="space-y-4">
     {#each budgets as budget (budget.id)}
-      <Card class="bg-white shadow-md">
-        <CardHeader class="pb-2 flex flex-row justify-between items-start">
-          <div>
-            <div class="flex items-center gap-2">
-              <CardTitle class="text-lg font-bold">{budget.project_name}</CardTitle>
-              <Badge class={getStatusColor(budget.status)}>{budget.status}</Badge>
-            </div>
-            <CardDescription>
-              {budget.project_category} | Property: {budget.property?.name || 'Unknown'} | Created: {new Date(budget.created_at).toLocaleDateString()}
-            </CardDescription>
-          </div>
-          <div class="flex items-center gap-2">
-            <Button 
-              onclick={() => handleEditClick(budget)}
-              variant="outline" 
-              size="icon" 
-              class="h-8 w-8">
-              <Edit class="h-4 w-4" />
-            </Button>
-            <Button 
-              onclick={() => handleDeleteClick(budget.id)}
-              variant="outline" 
-              size="icon" 
-              class="h-8 w-8 text-red-600 hover:text-red-800">
-              <Trash2 class="h-4 w-4" />
-            </Button>
-            <Button 
-              onclick={() => toggleBudgetExpansion(budget.id)}
-              variant="ghost" 
-              size="icon" 
-              class="h-8 w-8">
-              {#if budget.isExpanded}
-                <ChevronUp class="h-4 w-4" />
-              {:else}
-                <ChevronDown class="h-4 w-4" />
-              {/if}
-            </Button>
-          </div>
-        </CardHeader>
-        
-        <CardContent class="pb-2">
-          <div class="flex flex-wrap justify-between mb-2">
-            <div class="w-full md:w-auto mb-2 md:mb-0">
-              <div class="text-sm text-gray-500">Planned Budget</div>
-              <div class="text-lg font-semibold">{formatCurrency(budget.planned_amount)}</div>
-            </div>
-            <div class="w-full md:w-auto mb-2 md:mb-0">
-              <div class="text-sm text-gray-500">Allocated</div>
-              <div class="text-lg font-semibold">{formatCurrency(budget.allocatedAmount || 0)}</div>
-            </div>
-            <div class="w-full md:w-auto">
-              <div class="text-sm text-gray-500">Remaining</div>
-              <div class="text-lg font-semibold" class:text-green-600={budget.remainingAmount >= 0} class:text-red-600={budget.remainingAmount < 0}>
-                {formatCurrency(budget.remainingAmount || 0)}
-              </div>
-            </div>
-          </div>
-          
-          {#if budget.project_description}
-            <p class="text-sm text-gray-600 mt-2">
-              {budget.project_description}
-            </p>
-          {/if}
-          
-          {#if budget.isExpanded}
-            <div class="mt-4 border-t pt-4 bg-gray-50 p-3 rounded-md">
-              <BudgetItemList budget={budget} onUpdateBudget={(updatedBudget: Budget) => {
-                console.log('Updating budget with new items:', updatedBudget);
-                // Ensure updated budget contains all necessary fields for dispatch
-                const budgetToDispatch = {
-                  ...updatedBudget,
-                  // Make sure budget_items is properly included
-                  budget_items: Array.isArray(updatedBudget.budget_items) ? updatedBudget.budget_items : []
-                };
-                dispatch('edit', budgetToDispatch);
-              }} />
-            </div>
-          {/if}
-        </CardContent>
-        
-        {#if budget.isExpanded}
-          <CardFooter class="pt-0">
-            <div class="text-xs text-gray-500 w-full flex justify-between items-center">
-              <div>
-                <span>Start: {budget.start_date || 'Not set'}</span>
-                {#if budget.end_date}
-                  <span class="ml-4">End: {budget.end_date}</span>
-                {/if}
-              </div>
-              <div>
-                Last updated: {new Date(budget.updated_at).toLocaleDateString()}
-              </div>
-            </div>
-          </CardFooter>
-        {/if}
-      </Card>
+      <BudgetCard 
+        budget={budget}
+        isExpanded={expandedBudgetIds.has(budget.id)}
+        on:edit={handleEditBudget}
+        on:delete={handleDeleteBudget}
+        on:addItem={handleAddBudgetItem}
+        on:toggleExpand={handleToggleExpand}
+        on:updateBudget={handleUpdateBudget}
+      />
     {/each}
   </div>
 {/if}
 
-{#if showFormModal}
+{#if showBudgetFormModal}
   <BudgetFormModal
     budget={currentBudget}
     properties={properties}
     editMode={editMode}
-    on:close={handleModalClose}
-    on:submit={(event: CustomEvent<Budget>) => handleBudgetSubmit(event)}
+    on:close={handleBudgetModalClose}
+    on:submit={handleBudgetSubmit}
+  />
+{/if}
+
+{#if showItemFormModal}
+  <BudgetItemFormModal
+    item={currentBudgetItem}
+    editMode={false}
+    on:close={handleItemModalClose}
+    on:submit={handleItemSubmit}
   />
 {/if}

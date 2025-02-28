@@ -123,7 +123,9 @@
                 type="single"
                 name="expense-type"
                 value={selectedExpenseType}
-                onselect={(e: any) => selectedExpenseType = e.value}
+                onValueChange={(value) => {
+                  selectedExpenseType = value;
+                }}
               >
                 <Select.Trigger class="w-full border bg-white">
                   <span>{selectedExpenseType}</span>
