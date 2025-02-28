@@ -43,7 +43,21 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
 
     // Process budget data to include additional stats
     const budgets = budgetsData?.map(budget => {
-      const budgetItems = budget.budget_items || [];
+      // Ensure budget_items is properly parsed from JSON if needed
+      let budgetItems;
+      try {
+        // Check if budget_items is a string (JSON) and parse it
+        if (typeof budget.budget_items === 'string') {
+          budgetItems = JSON.parse(budget.budget_items);
+        } 
+        // Ensure it's an array
+        budgetItems = Array.isArray(budget.budget_items) ? budget.budget_items : 
+                     Array.isArray(budgetItems) ? budgetItems : [];
+      } catch (e) {
+        console.error('Error parsing budget_items:', e);
+        budgetItems = [];
+      }
+
       const allocatedAmount = budgetItems.reduce((total: number, item: any) => 
         total + (parseFloat(item.cost) * parseFloat(item.quantity)), 0);
       

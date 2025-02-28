@@ -24,6 +24,7 @@
     {
       validators: zodClient(budgetSchema),
       resetForm: true,
+      dataType: 'json',
       onUpdate: ({ form }) => {
         console.log('Form updated', form);
       },
@@ -177,7 +178,6 @@
     <input type="hidden" name="status" value={$form.status} />
     <input type="hidden" name="start_date" value={$form.start_date} />
     <input type="hidden" name="end_date" value={$form.end_date} />
-    <input type="hidden" name="budget_items" value={JSON.stringify($form.budget_items)} />
   </form>
 
   <BudgetList

@@ -77,24 +77,42 @@
   // Handle item form submission
   function handleItemSubmit(event: CustomEvent<BudgetItem>) {
     const item = event.detail;
+    console.log('Processing budget item submission:', item);
     
-    // Create a copy of the budget items array
-    const updatedItems = [...(budget.budget_items || [])];
+    // Create a copy of the budget items array, ensuring it's always an array
+    const existingItems = Array.isArray(budget.budget_items) ? budget.budget_items : [];
+    const updatedItems = [...existingItems];
     
     if (editMode && itemIndex !== null) {
       // Update the existing item
       updatedItems[itemIndex] = item;
+      console.log(`Updated item at index ${itemIndex}:`, item);
     } else {
       // Add the new item
       updatedItems.push(item);
+      console.log('Added new budget item:', item);
     }
 
-    // Update the budget
-    onUpdateBudget({
-      ...budget,
-      budget_items: updatedItems
-    });
+    // Calculate new allocated amount
+    const newAllocatedAmount = updatedItems.reduce(
+      (total: number, item: BudgetItem) => total + (item.cost * item.quantity),
+      0
+    );
+    console.log('New allocated amount:', newAllocatedAmount);
 
+    // Create an updated budget object
+    const updatedBudget = {
+      ...budget,
+      budget_items: updatedItems,
+      allocatedAmount: newAllocatedAmount,
+      remainingAmount: budget.planned_amount - newAllocatedAmount
+    };
+
+    // Update the budget
+    onUpdateBudget(updatedBudget);
+    console.log('Budget updated with items:', updatedItems);
+    
+    // Close the modal
     showFormModal = false;
   }
 
@@ -109,18 +127,18 @@
     <h3 class="text-lg font-semibold">Budget Items</h3>
     <Button 
       onclick={handleAddItem}
-      variant="outline" 
+      variant="default" 
       size="sm" 
-      class="flex items-center gap-1">
+      class="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white">
       <Plus class="h-4 w-4" />
       Add Item
     </Button>
   </div>
 
   {#if !budget.budget_items || budget.budget_items.length === 0}
-    <div class="text-center py-8 bg-gray-50 rounded-lg">
+    <div class="text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-300">
       <p class="text-gray-500">No budget items added yet.</p>
-      <Button onclick={handleAddItem} variant="link" class="mt-2">Add your first item</Button>
+      <Button onclick={handleAddItem} variant="link" class="mt-2 text-blue-600">Add your first item</Button>
     </div>
   {:else}
     <div class="overflow-x-auto">

@@ -199,8 +199,17 @@
           {/if}
           
           {#if budget.isExpanded}
-            <div class="mt-4 border-t pt-4">
-              <BudgetItemList budget={budget} onUpdateBudget={(updatedBudget: Budget) => dispatch('edit', updatedBudget)} />
+            <div class="mt-4 border-t pt-4 bg-gray-50 p-3 rounded-md">
+              <BudgetItemList budget={budget} onUpdateBudget={(updatedBudget: Budget) => {
+                console.log('Updating budget with new items:', updatedBudget);
+                // Ensure updated budget contains all necessary fields for dispatch
+                const budgetToDispatch = {
+                  ...updatedBudget,
+                  // Make sure budget_items is properly included
+                  budget_items: Array.isArray(updatedBudget.budget_items) ? updatedBudget.budget_items : []
+                };
+                dispatch('edit', budgetToDispatch);
+              }} />
             </div>
           {/if}
         </CardContent>
