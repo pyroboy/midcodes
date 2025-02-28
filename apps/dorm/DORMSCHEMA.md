@@ -17,6 +17,32 @@ CREATE TABLE public.attendees (
     org_id uuid NOT NULL
 );
 
+
+CREATE TABLE public.budgets (
+    id bigint primary key generated always as identity,
+    project_name text NOT NULL,
+    project_description text,
+    project_category text,
+    planned_amount numeric(10,2) NOT NULL,
+    pending_amount numeric(10,2) DEFAULT 0,
+    actual_amount numeric(10,2) DEFAULT 0,
+    budget_items jsonb DEFAULT '[]'::jsonb,
+    status text DEFAULT 'planned',
+    start_date timestamp with time zone,
+    end_date timestamp with time zone,
+    property_id integer NOT NULL,
+    created_by uuid,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+) WITH (OIDS=FALSE);
+
+ALTER TABLE public.budgets ENABLE ROW LEVEL SECURITY;
+
+-- Create a foreign key constraint for property_id referencing properties(id)
+ALTER TABLE public.budgets ADD CONSTRAINT fk_property FOREIGN KEY (property_id) REFERENCES public.properties(id);
+CREATE INDEX idx_property_id ON public.budgets(property_id);
+
+
 CREATE TABLE public.billings (
     id integer NOT NULL DEFAULT nextval('billings_id_seq'::regclass),
     lease_id integer NOT NULL,
