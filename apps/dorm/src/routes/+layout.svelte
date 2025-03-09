@@ -43,6 +43,7 @@
       links: [
         { href: '/transactions', label: 'Transactions', icon: CreditCard },
         { href: '/expenses', label: 'Expenses', icon: FileText },
+        { href: '/budgets', label: 'Budgets', icon: FileText },
       ],
     },
     {

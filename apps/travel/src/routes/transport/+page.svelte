@@ -103,7 +103,7 @@
       </p>
       <p class="mt-4">
         Please send your name, date of birth and country information to 
-        <a href="mailto:eomortal@gmail.com" class="text-orange-600 hover:underline">eomortal@gmail.com</a>
+        <a href="mailto:cabilaocliffresort@gmail.com" class="text-orange-600 hover:underline">cabilaocliffresort@gmail.com</a>
         .Thank you!
       </p>
     </div>

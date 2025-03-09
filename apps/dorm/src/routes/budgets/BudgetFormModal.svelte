@@ -8,7 +8,7 @@
   import Textarea from '$lib/components/ui/textarea/textarea.svelte';
   import { Popover, PopoverContent, PopoverTrigger } from '$lib/components/ui/popover';
   import { format } from 'date-fns';
-  import { CalendarIcon, Check } from 'lucide-svelte';
+  import { CalendarIcon, Building, DollarSign, Tag, Clock } from 'lucide-svelte';
   import { cn } from '$lib/utils';
   import type { Budget, Property } from './types';
   import { budgetCategoryEnum, budgetStatusEnum } from './schema';
@@ -76,27 +76,30 @@
   <Dialog.Portal>
     <Dialog.Overlay class="fixed inset-0 bg-black/50 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
     <Dialog.Content class="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg max-h-[90vh] overflow-y-auto">
-      <Dialog.Header>
-        <Dialog.Title class="text-xl font-semibold">
+      <Dialog.Header class="border-b pb-3">
+        <Dialog.Title class="text-xl font-semibold text-blue-700">
           {editMode ? 'Edit Budget Project' : 'Add Budget Project'}
         </Dialog.Title>
-        <Dialog.Description>
+        <Dialog.Description class="text-gray-600">
           {editMode 
             ? 'Update the details of this budget project.' 
             : 'Create a new budget project for property renovations or maintenance.'}
         </Dialog.Description>
       </Dialog.Header>
       
-      <div class="space-y-4">
+      <div class="space-y-5">
         <!-- Property Selection -->
         <div class="space-y-2">
-          <Label for="property">Property</Label>
+          <Label for="property" class="flex items-center gap-2 font-medium text-gray-700">
+            <Building class="h-4 w-4 text-gray-500" />
+            Property
+          </Label>
           <Select.Root
             type="single"
             value={formData.property_id?.toString() || ''}
             onValueChange={(value: string) => handleChange('property_id', parseInt(value, 10))}
           >
-            <Select.Trigger class="w-full">
+            <Select.Trigger class="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500">
               <span>{properties.find((p: Property) => p.id === formData.property_id)?.name || 'Select a property'}</span>
             </Select.Trigger>
             <Select.Content>
@@ -111,52 +114,86 @@
         
         <!-- Project Name -->
         <div class="space-y-2">
-          <Label for="project_name">Project Name</Label>
+          <Label for="project_name" class="font-medium text-gray-700">Project Name</Label>
           <Input 
             id="project_name" 
             value={formData.project_name}
             onchange={(e) => handleChange('project_name', e.currentTarget.value)}
             placeholder="Enter project name" 
+            class="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
             required 
           />
         </div>
         
         <!-- Project Description -->
         <div class="space-y-2">
-          <Label for="project_description">Description</Label>
+          <Label for="project_description" class="font-medium text-gray-700">Description</Label>
           <Textarea 
             id="project_description" 
             value={formData.project_description || ''}
             onchange={(e) => handleChange('project_description', e.currentTarget.value)}
             placeholder="Enter project description" 
+            class="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
             rows={3}
           />
         </div>
         
-        <!-- Project Category -->
-        <div class="space-y-2">
-          <Label for="project_category">Category</Label>
-          <Select.Root
-            type="single"
-            value={formData.project_category}
-            onValueChange={(value: string) => handleChange('project_category', value)}
-          >
-            <Select.Trigger class="w-full">
-              <span>{formData.project_category || 'Select a category'}</span>
-            </Select.Trigger>
-            <Select.Content>
-              <Select.Group>
-                {#each budgetCategories as category}
-                  <Select.Item value={category}>{category}</Select.Item>
-                {/each}
-              </Select.Group>
-            </Select.Content>
-          </Select.Root>
+        <div class="grid grid-cols-2 gap-4">
+          <!-- Project Category -->
+          <div class="space-y-2">
+            <Label for="project_category" class="flex items-center gap-2 font-medium text-gray-700">
+              <Tag class="h-4 w-4 text-gray-500" />
+              Category
+            </Label>
+            <Select.Root
+              type="single"
+              value={formData.project_category}
+              onValueChange={(value: string) => handleChange('project_category', value)}
+            >
+              <Select.Trigger class="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                <span>{formData.project_category || 'Select a category'}</span>
+              </Select.Trigger>
+              <Select.Content>
+                <Select.Group>
+                  {#each budgetCategories as category}
+                    <Select.Item value={category}>{category}</Select.Item>
+                  {/each}
+                </Select.Group>
+              </Select.Content>
+            </Select.Root>
+          </div>
+          
+          <!-- Status -->
+          <div class="space-y-2">
+            <Label for="status" class="flex items-center gap-2 font-medium text-gray-700">
+              <Clock class="h-4 w-4 text-gray-500" />
+              Status
+            </Label>
+            <Select.Root
+              type="single"
+              value={formData.status}
+              onValueChange={(value: string) => handleChange('status', value)}
+            >
+              <Select.Trigger class="w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                <span>{formData.status || 'Select a status'}</span>
+              </Select.Trigger>
+              <Select.Content>
+                <Select.Group>
+                  {#each budgetStatuses as status}
+                    <Select.Item value={status}>{status}</Select.Item>
+                  {/each}
+                </Select.Group>
+              </Select.Content>
+            </Select.Root>
+          </div>
         </div>
         
         <!-- Planned Amount -->
         <div class="space-y-2">
-          <Label for="planned_amount">Planned Budget</Label>
+          <Label for="planned_amount" class="flex items-center gap-2 font-medium text-gray-700">
+            <DollarSign class="h-4 w-4 text-gray-500" />
+            Planned Budget
+          </Label>
           <Input 
             id="planned_amount" 
             type="number"
@@ -164,42 +201,21 @@
             onchange={(e) => handleChange('planned_amount', parseFloat(e.currentTarget.value))}
             min="0"
             step="0.01"
-            placeholder="0.00" 
+            placeholder="0.00"
+            class="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
             required 
           />
         </div>
         
-        <!-- Status -->
-        <div class="space-y-2">
-          <Label for="status">Status</Label>
-          <Select.Root
-            type="single"
-            value={formData.status}
-            onValueChange={(value: string) => handleChange('status', value)}
-          >
-            <Select.Trigger class="w-full">
-              <span>{formData.status || 'Select a status'}</span>
-            </Select.Trigger>
-            <Select.Content>
-              <Select.Group>
-                {#each budgetStatuses as status}
-                  <Select.Item value={status}>{status}</Select.Item>
-                {/each}
-              </Select.Group>
-            </Select.Content>
-          </Select.Root>
-        </div>
-        
         <!-- Date Range -->
-        <div class="grid grid-cols-2 gap-4">
-          <!-- Start Date -->
+        <div class="grid grid-cols-2 gap-4 pt-1 border-t border-gray-200">
           <div class="space-y-2">
-            <Label for="start_date">Start Date</Label>
+            <Label for="start_date" class="font-medium text-gray-700">Start Date</Label>
             <Popover>
-              <PopoverTrigger>
+              <PopoverTrigger asChild>
                 <Button
                   variant="outline"
-                  class="w-full pl-3 text-left font-normal"
+                  class="w-full pl-3 text-left font-normal border-gray-300"
                 >
                   {formData.start_date ? format(new Date(formData.start_date), 'PPP') : 'Select start date'}
                   <CalendarIcon class="ml-auto h-4 w-4 opacity-50" />
@@ -222,14 +238,13 @@
             </Popover>
           </div>
           
-          <!-- End Date -->
           <div class="space-y-2">
-            <Label for="end_date">End Date</Label>
+            <Label for="end_date" class="font-medium text-gray-700">End Date</Label>
             <Popover>
-              <PopoverTrigger>
+              <PopoverTrigger asChild>
                 <Button
                   variant="outline"
-                  class="w-full pl-3 text-left font-normal"
+                  class="w-full pl-3 text-left font-normal border-gray-300"
                 >
                   {formData.end_date ? format(new Date(formData.end_date), 'PPP') : 'Select end date'}
                   <CalendarIcon class="ml-auto h-4 w-4 opacity-50" />
@@ -254,9 +269,18 @@
         </div>
       </div>
       
-      <Dialog.Footer>
-        <Button variant="outline" onclick={handleClose}>Cancel</Button>
-        <Button onclick={handleSubmit}>{editMode ? 'Update' : 'Create'}</Button>
+      <Dialog.Footer class="flex justify-end gap-2 pt-4 border-t mt-2">
+        <Button 
+          variant="outline" 
+          onclick={handleClose}
+          class="border-gray-300">
+          Cancel
+        </Button>
+        <Button 
+          onclick={handleSubmit}
+          class="bg-blue-600 hover:bg-blue-700 text-white">
+          {editMode ? 'Update Project' : 'Create Project'}
+        </Button>
       </Dialog.Footer>
     </Dialog.Content>
   </Dialog.Portal>

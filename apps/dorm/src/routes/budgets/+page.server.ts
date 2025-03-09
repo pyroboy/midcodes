@@ -41,7 +41,7 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
     // Create a mutable copy of properties data
     let properties = propertiesData || [];
 
-    // Process budget data to include additional stats
+    // Process budget data to include additional stats - with proper validation
     const budgets = budgetsData?.map(budget => {
       // Ensure budget_items is properly parsed from JSON if needed
       let budgetItems;
@@ -58,14 +58,33 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
         budgetItems = [];
       }
 
-      const allocatedAmount = budgetItems.reduce((total: number, item: any) => 
-        total + (parseFloat(item.cost) * parseFloat(item.quantity)), 0);
+      // Calculate total allocated amount with proper validation for each item
+      const allocatedAmount = budgetItems.reduce((total: number, item: any) => {
+        // Validate cost and quantity before using them
+        const cost = typeof item.cost === 'number' && !isNaN(item.cost) ? item.cost : 0;
+        const quantity = typeof item.quantity === 'number' && !isNaN(item.quantity) ? item.quantity : 0;
+        
+        return total + (cost * quantity);
+      }, 0);
+      
+      // Ensure planned_amount is a valid number
+      const plannedAmount = typeof budget.planned_amount === 'number' && !isNaN(budget.planned_amount) 
+        ? budget.planned_amount 
+        : 0;
       
       return {
         ...budget,
         allocatedAmount,
-        remainingAmount: budget.planned_amount - allocatedAmount,
+        remainingAmount: plannedAmount - allocatedAmount,
         isExpanded: false,
+        // Normalize budget_items to ensure they all have valid properties
+        budget_items: budgetItems.map((item: any) => ({
+          id: item.id || null,
+          name: item.name || '',
+          type: item.type || 'OTHER',
+          cost: typeof item.cost === 'number' && !isNaN(item.cost) ? item.cost : 0,
+          quantity: typeof item.quantity === 'number' && !isNaN(item.quantity) ? item.quantity : 0
+        })),
         start_date: budget.start_date ? new Date(budget.start_date).toLocaleDateString('en-US', {
           year: 'numeric',
           month: '2-digit',
@@ -96,13 +115,22 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
       }
     }
 
-    // Calculate overall budget statistics
+    // Calculate overall budget statistics with validation
     const statistics = budgets.reduce((stats: any, budget) => {
+      // Ensure we're using valid numbers for calculations
+      const plannedAmount = typeof budget.planned_amount === 'number' && !isNaN(budget.planned_amount) 
+        ? budget.planned_amount 
+        : 0;
+        
+      const allocatedBudget = typeof budget.allocatedAmount === 'number' && !isNaN(budget.allocatedAmount)
+        ? budget.allocatedAmount
+        : 0;
+        
       // Add planned amount to total
-      stats.totalPlannedBudget += parseFloat(budget.planned_amount) || 0;
+      stats.totalPlannedBudget += plannedAmount;
       
       // Add allocated amount
-      stats.totalAllocatedBudget += budget.allocatedAmount || 0;
+      stats.totalAllocatedBudget += allocatedBudget;
       
       // Count by status
       if (budget.status === 'COMPLETED') {
@@ -156,10 +184,31 @@ export const actions: Actions = {
     try {
       const { id, ...budgetData } = form.data;
       
+      // Validate budget items before saving to prevent NaN values
+      const validatedBudgetItems = Array.isArray(budgetData.budget_items) 
+        ? budgetData.budget_items.map(item => ({
+            ...item,
+            cost: typeof item.cost === 'number' && !isNaN(item.cost) ? item.cost : 0,
+            quantity: typeof item.quantity === 'number' && !isNaN(item.quantity) ? item.quantity : 1
+          }))
+        : [];
+      
       // Ensure budget_items is properly formatted as JSONB
       const formattedData = {
         ...budgetData,
-        budget_items: JSON.stringify(budgetData.budget_items || [])
+        // Ensure planned_amount is a valid number
+        planned_amount: typeof budgetData.planned_amount === 'number' && !isNaN(budgetData.planned_amount)
+          ? budgetData.planned_amount
+          : 0,
+        // Ensure pending_amount is a valid number
+        pending_amount: typeof budgetData.pending_amount === 'number' && !isNaN(budgetData.pending_amount)
+          ? budgetData.pending_amount
+          : 0,
+        // Ensure actual_amount is a valid number
+        actual_amount: typeof budgetData.actual_amount === 'number' && !isNaN(budgetData.actual_amount)
+          ? budgetData.actual_amount
+          : 0,
+        budget_items: JSON.stringify(validatedBudgetItems)
       };
       
       // Determine if we're creating or updating

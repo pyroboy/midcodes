@@ -48,7 +48,7 @@
         </div>
         <div>
           <p class="font-medium">Email address</p>
-          <p class="text-gray-600">eomortal@gmail.com</p>
+          <p class="text-gray-600">cabilaocliffresort@gmail.com</p>
         </div>
         <div>
             <p class="font-medium">Contact Person</p>

@@ -2,6 +2,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
+	import BookingModal from './bookings/BookingModal.svelte';
 	
 	// Update the Room interface
 	interface Room {
@@ -13,7 +14,7 @@
 	  features: string[];
 	  size: string;
 	  image: string;
-	  price: number;  // Add this line
+	  price: number;  
 	}
 	
 	interface BookingForm {
@@ -29,21 +30,23 @@
 	  specialRequests: string;
 	}
 	
-	let videoElement: HTMLVideoElement | undefined;
-	let showModal = false;
-	let selectedRoom: Room | null = null;
-	let bookingForm: BookingForm = {
-	  firstName: '',
-	  lastName: '',
-	  email: '',
-	  phone: '',
-	  checkIn: '',
-	  checkOut: '',
-	  adults: 1,
-	  children: 0,
-	  roomId: null,
-	  specialRequests: ''
-	};
+	let videoElement = $state<HTMLVideoElement | undefined>(undefined);
+	let showModal = $state(false);
+	let selectedRoom = $state<Room | null>(null);
+	let bookingForm = $state({
+		firstName: '',
+		lastName: '',
+		email: '',
+		phone: '',
+		checkIn: '',
+		checkOut: '',
+		adults: 1,
+		children: 0,
+		roomId: null as number | null,
+		specialRequests: ''
+	});
+	let successMessage = $state('');
+	let errorMessage = $state('');
 	
 	// Update the rooms array
 	const rooms: Room[] = [
@@ -66,7 +69,7 @@
 		],
 		size: '45sqm',
 		image: 'https://res.cloudinary.com/ddlz560fk/image/upload/v1739248183/1489349716_u7ay9s.jpg',
-		price: 4500  // Add this line
+		price: 4500  
 	  },
 	  {
 		id: 2,
@@ -87,24 +90,11 @@
 		],
 		size: '40sqm',
 		image: 'https://res.cloudinary.com/ddlz560fk/image/upload/v1739248183/1491582688_jsxxeg.jpg',
-		price: 3500  // Add this line
+		price: 3500  
 	  }
 	];
 	
-	interface BookingForm {
-	  firstName: string;
-	  lastName: string;
-	  email: string;
-	  phone: string;
-	  checkIn: string;
-	  checkOut: string;
-	  adults: number;
-	  children: number;
-	  roomId: number | null;
-	  specialRequests: string;
-	}
-	
-		function openBooking(room: Room): void {
+	function openBooking(room: Room): void {
 	  selectedRoom = room;
 	  bookingForm.roomId = room.id;
 	  showModal = true;
@@ -115,11 +105,41 @@
 	  selectedRoom = null;
 	}
 	
-	function handleSubmit(event: Event): void {
-	  event.preventDefault();
-	  console.log('Booking submitted:', bookingForm);
-	  alert('Thank you for your booking! We will contact you shortly.');
-	  closeModal();
+	async function handleSubmitBooking(bookingData: any): Promise<void> {
+	  try {
+	    const formData = new FormData();
+	    
+	    // Add all booking data to form
+	    Object.entries(bookingData).forEach(([key, value]) => {
+	      formData.append(key, value as string);
+	    });
+	    
+	    // Submit the form data to the server action
+	    const response = await fetch('/bookings?/createBooking', {
+	      method: 'POST',
+	      body: formData
+	    });
+	    
+	    const result = await response.json();
+	    
+	    if (result.success) {
+	      successMessage = 'Booking created successfully!';
+	      errorMessage = '';
+	      closeModal();
+	      
+	      // Clear success message after 5 seconds
+	      setTimeout(() => {
+	        successMessage = '';
+	      }, 5000);
+	    } else {
+	      errorMessage = result.message || 'Failed to create booking';
+	      successMessage = '';
+	    }
+	  } catch (error) {
+	    console.error('Error submitting booking:', error);
+	    errorMessage = 'An unexpected error occurred';
+	    successMessage = '';
+	  }
 	}
 	
 	function handleEscapeKey(event: KeyboardEvent): void {
@@ -149,7 +169,7 @@
 	<meta name="description" content="Experience luxury accommodation in paradise" />
 </svelte:head>
 
-<svelte:window on:keydown={handleEscapeKey}/>
+<svelte:window onkeydown={handleEscapeKey}/>
 
 <main class="min-h-screen bg-white text-gray-800 font-sans m-0 p-0 overflow-x-hidden">
 	<!-- Hero Section -->
@@ -173,7 +193,7 @@
 			<p class="text-lg sm:text-xl md:text-2xl mb-6 md:mb-8 opacity-90">Experience luxury accommodation in paradise</p>
 			<button 
 			  class="bg-orange-600 text-white px-6 md:px-10 py-3 md:py-4 rounded text-sm md:text-base font-medium tracking-wide transition-all hover:-translate-y-1 hover:opacity-90"
-			  on:click={scrollToRooms}
+			  onclick={scrollToRooms}
 			>
 			  View Rooms
 			</button>
@@ -185,14 +205,48 @@
 	<section id="rooms" class="py-20 bg-white">
 		<div class="max-w-7xl mx-auto px-4">
 			<h2 class="text-4xl font-bold text-center mb-16">Our Accommodations</h2>
+			
+			{#if successMessage}
+				<div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-6" role="alert">
+					<span class="block sm:inline">{successMessage}</span>
+					<button 
+						class="absolute top-0 bottom-0 right-0 px-4 py-3"
+						onclick={() => { successMessage = ''; }}
+					>
+						<span class="sr-only">Close</span>
+						<span class="text-2xl">&times;</span>
+					</button>
+				</div>
+			{/if}
+			
+			{#if errorMessage}
+				<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-6" role="alert">
+					<span class="block sm:inline">{errorMessage}</span>
+					<button 
+						class="absolute top-0 bottom-0 right-0 px-4 py-3"
+						onclick={() => { errorMessage = ''; }}
+					>
+						<span class="sr-only">Close</span>
+						<span class="text-2xl">&times;</span>
+					</button>
+				</div>
+			{/if}
+			
 			<div class="space-y-32">
 				{#each rooms as room}
 					<div class="flex flex-col md:flex-row {room.id % 2 === 0 ? 'md:flex-row-reverse' : ''} gap-12 items-center">
+						<div class="flex-1">
+							<img 
+								src={room.image} 
+								alt={room.name}
+								class="w-full h-[600px] object-cover rounded-xl shadow-xl"
+							/>
+						</div>
+						
 						<div class="flex-1 space-y-6">
 							<h3 class="text-3xl font-bold">{room.name}</h3>
 							<p class="text-gray-600 text-lg">{room.description}</p>
 							
-	
 							<div class="grid grid-cols-2 gap-4 my-6">
 							  <div>
 							    <span class="text-gray-500">Beds</span>
@@ -224,20 +278,12 @@
 								</ul>
 							</div>
 							
-							<button
-								class="mt-6 bg-orange-600 text-white px-8 py-3 rounded-lg hover:bg-orange-700 transition-all duration-300 hover:scale-[1.02] text-lg font-medium"
-								on:click={() => openBooking(room)}
+							<button 
+								class="mt-6 bg-orange-600 text-white px-6 py-3 rounded text-sm font-medium tracking-wide transition-all hover:-translate-y-1 hover:opacity-90"
+								onclick={() => openBooking(room)}
 							>
 								Book Now
 							</button>
-						</div>
-						
-						<div class="flex-1">
-							<img 
-								src={room.image} 
-								alt={room.name}
-								class="w-full h-[600px] object-cover rounded-xl shadow-xl"
-							/>
 						</div>
 					</div>
 				{/each}
@@ -245,130 +291,12 @@
 		</div>
 	</section>
 
-	<!-- Booking Modal -->
-	{#if showModal}
-		<div class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-			<div class="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto relative">
-				<button 
-					class="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl"
-					on:click={closeModal}
-				>
-					×
-				</button>
-				
-				<div class="p-6">
-					<h3 class="text-2xl font-bold mb-4">Book {selectedRoom?.name}</h3>
-					<form on:submit={handleSubmit} class="space-y-6">
-						<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-							<div class="space-y-2">
-								<label for="firstName" class="block text-gray-600">First Name *</label>
-								<input
-									type="text"
-									id="firstName"
-									bind:value={bookingForm.firstName}
-									required
-									class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500"
-								/>
-							</div>
-							
-							<div class="space-y-2">
-								<label for="lastName" class="block text-gray-600">Last Name *</label>
-								<input
-									type="text"
-									id="lastName"
-									bind:value={bookingForm.lastName}
-									required
-									class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500"
-								/>
-							</div>
-							
-							<div class="space-y-2">
-								<label for="email" class="block text-gray-600">Email *</label>
-								<input
-									type="email"
-									id="email"
-									bind:value={bookingForm.email}
-									required
-									class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500"
-								/>
-							</div>
-							
-							<div class="space-y-2">
-								<label for="phone" class="block text-gray-600">Phone *</label>
-								<input
-									type="tel"
-									id="phone"
-									bind:value={bookingForm.phone}
-									required
-									class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500"
-								/>
-							</div>
-							
-							<div class="space-y-2">
-								<label for="checkIn" class="block text-gray-600">Check-in Date *</label>
-								<input
-									type="date"
-									id="checkIn"
-									bind:value={bookingForm.checkIn}
-									required
-									class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500"
-								/>
-							</div>
-							
-							<div class="space-y-2">
-								<label for="checkOut" class="block text-gray-600">Check-out Date *</label>
-								<input
-									type="date"
-									id="checkOut"
-									bind:value={bookingForm.checkOut}
-									required
-									class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500"
-								/>
-							</div>
-							
-							<div class="space-y-2">
-								<label for="adults" class="block text-gray-600">Adults *</label>
-								<input
-									type="number"
-									id="adults"
-									bind:value={bookingForm.adults}
-									min="1"
-									required
-									class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500"
-								/>
-							</div>
-							
-							<div class="space-y-2">
-								<label for="children" class="block text-gray-600">Children</label>
-								<input
-									type="number"
-									id="children"
-									bind:value={bookingForm.children}
-									min="0"
-									class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500"
-								/>
-							</div>
-						</div>
-						
-						<div class="space-y-2">
-							<label for="specialRequests" class="block text-gray-600">Special Requests</label>
-							<textarea
-								id="specialRequests"
-								bind:value={bookingForm.specialRequests}
-								rows="4"
-								class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500"
-							></textarea>
-						</div>
-						
-						<button 
-							type="submit" 
-							class="w-full bg-orange-600 text-white py-4 rounded font-medium text-lg transition-all hover:opacity-90"
-						>
-							Confirm Booking
-						</button>
-					</form>
-				</div>
-			</div>
-		</div>
+	{#if showModal && selectedRoom}
+		<BookingModal
+			room={selectedRoom}
+			show={showModal}
+			onClose={closeModal}
+			onSubmit={handleSubmitBooking}
+		/>
 	{/if}
 </main>
