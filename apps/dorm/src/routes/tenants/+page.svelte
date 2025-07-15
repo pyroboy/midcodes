@@ -35,7 +35,7 @@
   let selectedTenant: ExtendedTenant | undefined = $state();
   let formError = $state('');
 
-  const { form, enhance, errors, constraints, submitting, reset } = superForm<TenantFormData>(data.form, {
+  const formInstance = superForm<TenantFormData>(data.form, {
     id: 'tenant-form',
     validators: zodClient(tenantFormSchema),
     validationMethod: 'oninput',
@@ -61,13 +61,17 @@
     }
   });
 
+  const { form, enhance, errors, constraints, submitting, reset } = formInstance;
+
   function handleEdit(tenant: ExtendedTenant) {
+    console.log('--- Edit Tenant Clicked ---');
+    console.log('Tenant data:', tenant);
     editMode = true;
     selectedTenant = tenant;
-    
+
     const emergencyContact = tenant.emergency_contact ?? defaultEmergencyContact;
-    
-    $form = {
+
+    reset({ data: {
       id: tenant.id,
       name: tenant.name,
       contact_number: tenant.contact_number,
@@ -80,7 +84,8 @@
         ...emergencyContact,
         email: emergencyContact.email ?? null
       }
-    };
+    }});
+    console.log('Form reset with new data for editing.');
   }
 
   async function handleDeleteTenant(tenant: ExtendedTenant) {

@@ -6,8 +6,6 @@ import type { Actions, PageServerLoad, RequestEvent } from './$types';
 import type {  FloorWithProperty, Property } from './formSchema';
 
 export const load: PageServerLoad = async ({ locals }) => {
-  // console.log('🔄 Starting server-side load function for floors');
-
   const { user, permissions } = await locals.safeGetSession();
   const hasAccess = permissions.includes('properties.create');
 
@@ -15,52 +13,34 @@ export const load: PageServerLoad = async ({ locals }) => {
     throw error(401, 'Unauthorized');
   }
 
-
   try {
-    const [floorsResult, propertiesResult] = await Promise.all([
-      locals.supabase
-        .from('floors')
-        .select(`
-          id,
-          property_id,
-          floor_number,
-          wing,
-          status,
-          created_at,
-          updated_at,
-          property:properties!floors_property_id_fkey(
-            id,
-            name
-          )
-        `)
-        .order('property_id, floor_number') ,
-      
-      locals.supabase
-        .from('properties')
-        .select('id, name')
-        .eq('status', 'ACTIVE')
-        .order('name')
-    ]);
-
-
+    const floorsResult = await locals.supabase.from('floors').select(`
+      id,
+      property_id,
+      floor_number,
+      wing,
+      status,
+      property:properties!floors_property_id_fkey(
+        id,
+        name
+      ),
+      rental_unit (
+        id,
+        number,
+        leases(id, status, lease_tenants(tenant_id))
+      )
+    `).order('floor_number');
 
     if (floorsResult.error) {
       console.error('Error loading floors:', floorsResult.error);
       throw error(500, 'Failed to load floors');
     }
 
-    if (propertiesResult.error) {
-      console.error('Error loading properties:', propertiesResult.error);
-      throw error(500, 'Failed to load properties');
-    }
-
-
     const form = await superValidate(zod(floorSchema));
 
     return {
       form,
-      floors: floorsResult.data as unknown as FloorWithProperty[],
-      properties: propertiesResult.data as Property[]
+      floors: floorsResult.data as unknown as FloorWithProperty[]
     };
   } catch (err) {
     console.error('Unexpected error in load function:', err);
@@ -68,9 +48,7 @@ export const load: PageServerLoad = async ({ locals }) => {
   }
 };
 
-
 // Declare - Actions
-
 
 export const actions: Actions = {
   create: async ({ request, locals: { supabase } }: RequestEvent) => {
@@ -177,7 +155,10 @@ export const actions: Actions = {
     const data = await request.formData();
     const id = data.get('id');
 
+    console.log('Attempting to delete floor with ID:', id);
+
     if (!id) {
+      console.error('No floor ID provided for deletion.');
       return fail(400, { message: 'No floor ID provided' });
     }
 
@@ -187,10 +168,11 @@ export const actions: Actions = {
       .eq('id', id);
 
     if (deleteError) {
-      console.error('❌ Error deleting floor:', deleteError);
+      console.error('❌ Error deleting floor:', deleteError.message);
       return fail(500, { message: 'Failed to delete floor' });
     }
 
+    console.log('Floor deleted successfully:', id);
     return { success: true };
   }
 };

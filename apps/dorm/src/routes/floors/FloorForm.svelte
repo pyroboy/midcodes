@@ -8,8 +8,8 @@
   import type { SuperForm } from 'sveltekit-superforms';
   import type { z } from 'zod';
   import type { floorSchema } from './formSchema';
-  import type {PageData} from './$types';
-
+  import type { PageData } from './$types';
+  import { propertyStore } from '$lib/stores/property';
 
   interface Props {
     data: PageData;
@@ -22,31 +22,13 @@
 
   let { data, editMode = false, form, errors, enhance, constraints }: Props = $props();
 
-
-
   const dispatch = createEventDispatcher();
 
-     // START : PATTERN FOR DATABASE BASED SELECTION ITEMS
-  let derivedProperties = $derived(data.properties.map(p => ({ value: p.id.toString(), label: p.name })));
-  let selectedProperty = {
-    get value() { 
-      return $form.property_id ? $form.property_id.toString() : '';
-    },
-    set value(id: string) { 
-      $form.property_id = id ? Number(id) : 0;
-      // Reset validation errors when property changes
-      if ($errors.property_id) {
-        $errors.property_id = undefined;
-      }
+  $effect(() => {
+    if ($propertyStore.selectedProperty) {
+      $form.property_id = $propertyStore.selectedProperty.id;
     }
-  };
-  let triggerContent = $derived(
-    selectedProperty.value 
-      ? data.properties.find(p => p.id.toString() === selectedProperty.value)?.name ?? "Select a property"
-      : "Select a property"
-  );
-    // END : PATTERN FOR DATABASE BASED SELECTION ITEMS
-
+  });
 
   // START: PATTERN FOR ENUM BASED SELECTION ITEMS
   let derivedStatuses = $derived(
@@ -56,10 +38,10 @@
     }))
   );
   let selectedStatus = {
-    get value() { 
+    get value() {
       return $form.status as keyof typeof floorStatusEnum.Values;
     },
-    set value(status: keyof typeof floorStatusEnum.Values) { 
+    set value(status: keyof typeof floorStatusEnum.Values) {
       $form.status = status || 'ACTIVE';
     }
   };
@@ -69,16 +51,6 @@
       : "Select a Status"
   );
   // END: PATTERN FOR ENUM BASED SELECTION ITEMS
-
-  // For debugging
-  $effect(() => {
-    console.log('Form State:', {
-      property_id: $form.property_id,
-      floor_number: $form.floor_number,
-      wing: $form.wing,
-      status: $form.status
-    });
-  });
 </script>
 
 <form method="POST" action={editMode ? "?/update" : "?/create"} use:enhance class="space-y-4" novalidate >
@@ -86,32 +58,7 @@
     <input type="hidden" name="id" bind:value={$form.id} />
   {/if}
 
-  <div class="space-y-2">
-    <Label for="property_id">Property</Label>
-    <Select.Root    
-      type="single"
-      name="property_id"
-      bind:value={selectedProperty.value}
-    >
-      <Select.Trigger 
-        class="w-full"
-        data-error={!!$errors.property_id}
-        {...$constraints.property_id}
-      >
-        {triggerContent}
-      </Select.Trigger>
-      <Select.Content>
-        {#each derivedProperties as property}
-          <Select.Item value={property.value}>
-            {property.label}
-          </Select.Item>
-        {/each}
-      </Select.Content>
-    </Select.Root>
-    {#if $errors.property_id}
-      <p class="text-sm font-medium text-destructive">{$errors.property_id}</p>
-    {/if}
-  </div>
+  <input type="hidden" name="property_id" bind:value={$form.property_id} />
 
   <div class="space-y-2">
     <Label for="floor_number">Floor Number</Label>

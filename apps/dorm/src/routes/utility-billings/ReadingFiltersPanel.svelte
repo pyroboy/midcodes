@@ -13,10 +13,9 @@
     import { RefreshCw } from 'lucide-svelte';
     import type { Property, FilterChangeEvent } from './types';
     
-    export let properties: Property[] = [];
     export let availableReadingDates: string[] = [];
     export let utilityTypes: Record<string, string> = {};
-    export let selectedPropertyId: number | null = null;
+    export let selectedProperty: Property | null = null;
     export let selectedType: string | null = null;
     export let dateFilter: string = '';
     export let searchQuery: string = '';
@@ -25,13 +24,6 @@
       filterChange: FilterChangeEvent;
       addReadings: void;
     }>();
-    
-    // Property name lookup helper
-    function getPropertyName(propertyId: number | null): string {
-      if (!propertyId) return 'N/A';
-      const property = properties.find((p: Property) => p.id === propertyId);
-      return property ? property.name : 'Unknown';
-    }
     
     // Format date for display
     function formatDate(dateString: string): string {
@@ -42,23 +34,9 @@
       });
     }
     
-    function handlePropertyChange(value: string): void {
-      const propertyId = parseInt(value, 10);
-      if (!isNaN(propertyId) || value === '') {
-        selectedPropertyId = value === '' ? null : propertyId;
-        dispatch('filterChange', { 
-          property: selectedPropertyId, 
-          type: selectedType, 
-          date: dateFilter, 
-          search: searchQuery 
-        });
-      }
-    }
-    
     function handleTypeChange(value: string): void {
       selectedType = value === '' ? null : value;
       dispatch('filterChange', { 
-        property: selectedPropertyId, 
         type: selectedType, 
         date: dateFilter, 
         search: searchQuery 
@@ -68,7 +46,6 @@
     function handleDateFilterChange(value: string): void {
       dateFilter = value;
       dispatch('filterChange', { 
-        property: selectedPropertyId, 
         type: selectedType, 
         date: dateFilter, 
         search: searchQuery 
@@ -77,7 +54,6 @@
     
     function handleSearchChange(): void {
       dispatch('filterChange', { 
-        property: selectedPropertyId, 
         type: selectedType, 
         date: dateFilter, 
         search: searchQuery 
@@ -85,12 +61,10 @@
     }
     
     function resetFilters(): void {
-      selectedPropertyId = null;
       selectedType = null;
       dateFilter = '';
       searchQuery = '';
       dispatch('filterChange', { 
-        property: null, 
         type: null, 
         date: '', 
         search: '' 
@@ -109,15 +83,21 @@
         </div>
         <div class="flex items-center gap-2">
           <Button 
-            variant="outline" 
-            onclick={() => resetFilters()}
             class="flex items-center gap-2"
             size="sm"
+            disabled={!selectedProperty || !selectedType}
+            on:click={() => dispatch('addReadings')}
           >
-            <RefreshCw class="h-4 w-4" />
-            Reset Filters
+            {#if !selectedProperty}
+              Select a property to continue
+            {:else if !selectedType}
+              Select a utility type
+            {:else}
+              Add Meter Readings
+            {/if}
           </Button>
-        
+
+
         </div>
       </div>
     </Card.Header>
@@ -126,25 +106,13 @@
         <!-- Property filter -->
         <div class="space-y-2">
           <Label for="property-filter" class="text-sm font-medium">Property</Label>
-          <Select 
-            type="single" 
-            onValueChange={(value: string) => handlePropertyChange(value)} 
-            value={selectedPropertyId?.toString() || ""}
-          >
-            <SelectTrigger class="w-full">
-              <span>
-                {selectedPropertyId 
-                  ? getPropertyName(selectedPropertyId)
-                  : "All Properties"}
-              </span>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">All Properties</SelectItem>
-              {#each properties as property}
-                <SelectItem value={property.id.toString()}>{property.name}</SelectItem>
-              {/each}
-            </SelectContent>
-          </Select>
+          <Input 
+            id="property-filter"
+            type="text"
+            readonly
+            value={selectedProperty ? selectedProperty.name : 'No property selected'}
+            class="w-full bg-gray-100 cursor-not-allowed"
+          />
         </div>
         
         <!-- Utility Type filter -->

@@ -1,199 +1,186 @@
 <script lang="ts">
-  import { superForm } from 'sveltekit-superforms/client';
-  import { Button } from '$lib/components/ui/button';
-  import type { PageData } from './$types';
-  import PropertyForm from './PropertyForm.svelte';
-  import * as Card from '$lib/components/ui/card';
-  import { Badge } from '$lib/components/ui/badge';
-  import { zodClient } from 'sveltekit-superforms/adapters';
-  import { propertySchema } from './formSchema';
-  import { invalidate, invalidateAll } from '$app/navigation';
-	import type { Property } from './formSchema';
-  import { browser } from "$app/environment";
-  import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
+	import { superForm } from 'sveltekit-superforms/client';
+	import { zodClient } from 'sveltekit-superforms/adapters';
+	import { browser } from '$app/environment';
+	import { invalidateAll, invalidate } from '$app/navigation';
+	import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
 
+	import PropertyForm from './PropertyForm.svelte';
+	import { Badge } from '$lib/components/ui/badge';
+	import { Button } from '$lib/components/ui/button';
+	import * as Card from '$lib/components/ui/card';
+	import { propertySchema, type Property } from './formSchema';
+	import type { PageData } from './$types';
 
-  interface Props { data: PageData; }
-  let { data }: Props = $props();
-  let { properties, form } = $derived(data);
-  let editMode = $state(false);
+	let { data } = $props<{ data: PageData }>();
+	let { properties, form } = $derived(data);
+	let editMode = $state(false);
 
+	const {
+		form: formData,
+		enhance,
+		errors,
+		constraints,
+		reset
+	} = superForm(data.form, {
+		id: 'property-form',
+		validators: zodClient(propertySchema),
+		validationMethod: 'oninput',
+		dataType: 'json',
+		taintedMessage: null,
+		resetForm: true,
+		onResult: async ({ result }) => {
+			if (result.type === 'success') {
+				editMode = false;
+				// Invalidate all data to ensure the global property list is also refreshed.
+				await invalidateAll();
+				reset();
+			}
+		}
+	});
 
-  const { form: formData, enhance, errors, constraints ,reset} = superForm(data.form, {
-    id: 'property-form',
-    validators: zodClient(propertySchema),
-    validationMethod: 'oninput',
-    dataType: 'json',
-    taintedMessage: null,
-    resetForm: true,
-    onError: ({ result }) => {
-      console.error('Form submission error:', {
-        error: result.error,
-        status: result.status
-      });
-      if (result.error) {
-        console.error('Server error:', result.error.message);
-      }
-    },
-    onResult: async ({ result }) => {
-    if (result.type === 'success') {
-      editMode = false;
-      await invalidate('app:floors');
-    }
-  }
-  });
+	// --- REMOVED: The reactive $effect block that listened to the global store. ---
+	// This page will now always display all properties fetched by its own load function.
 
+	function handlePropertyClick(property: Property) {
+		editMode = true;
+		// Use a reactive assignment to update the form data
+		$formData = {
+			id: property.id,
+			name: property.name,
+			address: property.address,
+			type: property.type ?? 'DORMITORY',
+			status: property.status ?? 'ACTIVE'
+		};
+	}
 
+	function getStatusVariant(status: string): 'default' | 'destructive' | 'outline' | 'secondary' {
+		switch (status) {
+			case 'ACTIVE':
+				return 'secondary';
+			case 'INACTIVE':
+				return 'destructive';
+			case 'MAINTENANCE':
+				return 'outline';
+			default:
+				return 'default';
+		}
+	}
 
-  function handlePropertyClick(property: Property) {
-    editMode = true;
-$formData = {
-  id: property.id,
-  name: property.name,
-  address: property.address,
-  type: property.type || 'DORMITORY',
-  status: property.status || 'ACTIVE'
-}
-  }
+	async function handleDeleteProperty(property: Property) {
+		if (!confirm(`Are you sure you want to delete property ${property.name}? This action cannot be undone.`)) {
+			return;
+		}
 
+		const deleteFormData = new FormData();
+		deleteFormData.append('id', String(property.id));
 
+		const response = await fetch('?/delete', {
+			method: 'POST',
+			body: deleteFormData
+		});
 
-  function getStatusVariant(status: string): "default" | "destructive" | "outline" | "secondary" {
-    switch (status) {
-      case 'ACTIVE':
-        return 'secondary';
-      case 'INACTIVE':
-        return 'destructive';
-      case 'MAINTENANCE':
-        return 'outline';
-      default:
-        return 'default';
-    }
-  }
+		if (response.ok) {
+			// Invalidate all data to refresh both the page list and the global selector.
+			await invalidateAll();
+		} else {
+			const result = await response.json();
+			alert(`Failed to delete property: ${result.error || 'Unknown error'}`);
+		}
+	}
 
-  async function handleDeleteProperty(property: any) {
-    if (!confirm(`Are you sure you want to delete property ${property.name}? This action cannot be undone.`)) {
-      return;
-    }
-    
-    const formData = new FormData();
-    formData.append('id', property.id.toString());
-    
-    try {
-      const result = await fetch('?/delete', {
-        method: 'POST',
-        body: formData
-      });
-
-      if (!result.ok) {
-        throw new Error(`HTTP error! status: ${result.status}`);
-      }
-      
-      const response = await result.json();
-      
-      if (response.error) {
-        throw new Error(response.error);
-      }
-
-      editMode = false;
-      // Invalidate all page data to force refresh
-      await invalidateAll();
-    } catch (error) {
-      console.error('Error deleting property:', error);
-      alert(`Failed to delete property: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
+	function handleCancel() {
+		editMode = false;
+		reset();
+	}
 </script>
 
-<div class="container mx-auto p-4 flex flex-col lg:flex-row gap-4">
-  <div class="w-full lg:w-2/3">
-    <div class="flex justify-between items-center mb-4">
-      <h1 class="text-2xl font-bold">Properties</h1>
-    </div>
-    <Card.Root>
-      <Card.Content class="p-0">
-        <div class="grid grid-cols-[2fr_2fr_1fr_1fr_2fr] gap-4 p-4 font-medium border-b bg-muted/50">
-          <div class="flex items-center">Name</div>
-          <div class="flex items-center">Address</div>
-          <div class="flex items-center">Type</div>
-          <div class="flex items-center">Status</div>
-          <div class="flex items-center">Actions</div>
-        </div>
+<div class="flex flex-col lg:flex-row gap-8">
+	<!-- Left column for the properties list -->
+	<div class="w-full lg:w-2/3">
+		<Card.Root>
+			<Card.Header class="px-7">
+				<Card.Title>Properties</Card.Title>
+				<Card.Description>Manage your properties here.</Card.Description>
+			</Card.Header>
+			<Card.Content>
+				<table class="w-full text-sm text-left">
+					<thead class="text-xs text-muted-foreground uppercase bg-muted/50">
+						<tr>
+							<th class="p-4">Name</th>
+							<th class="p-4">Address</th>
+							<th class="p-4">Type</th>
+							<th class="p-4">Status</th>
+							<th class="p-4 text-right">Actions</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#if properties?.length > 0}
+							{#each properties as property (property.id)}
+								<tr class="border-b hover:bg-muted/50">
+									<td class="p-4 font-medium">{property.name}</td>
+									<td class="p-4">{property.address}</td>
+									<td class="p-4">{property.type}</td>
+									<td class="p-4">
+										<Badge variant={getStatusVariant(property.status)}>
+											{property.status}
+										</Badge>
+									</td>
+									<td class="p-4">
+										<div class="flex items-center justify-end gap-2">
+											<Button size="sm" variant="outline" onclick={() => handlePropertyClick(property)}>
+												Edit
+											</Button>
+											<Button
+												size="sm"
+												variant="destructive"
+												onclick={() => handleDeleteProperty(property)}
+											>
+												Delete
+											</Button>
+										</div>
+									</td>
+								</tr>
+							{/each}
+						{:else}
+							<tr>
+								<td colspan="5" class="p-4 text-center text-muted-foreground">
+									No properties found
+								</td>
+							</tr>
+						{/if}
+					</tbody>
+				</table>
+			</Card.Content>
+		</Card.Root>
+	</div>
 
-        {#if properties?.length > 0}
-          {#each properties as property (property.id)}
-            <div class="grid grid-cols-[2fr_2fr_1fr_1fr_2fr] gap-4 p-4 text-left hover:bg-muted/50 w-full border-b last:border-b-0">
-              <div class="font-medium">{property.name}</div>
-              <div>{property.address}</div>
-              <div>{property.type}</div>
-              <div>
-                <Badge variant={getStatusVariant(property.status)}>
-                  {property.status}
-                </Badge>
-              </div>
-              <div class="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onclick={() => handlePropertyClick(property)}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                  </svg>
-                  Edit
-                </Button>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onclick={() => handleDeleteProperty(property)}
-                  disabled={false}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
-                    <path d="M3 6h18"/>
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                    <path d="M10 11v6"/>
-                    <path d="M14 11v6"/>
-                  </svg>
-                  Delete
-                </Button>
-              </div>
-            </div>
-          {/each}
-        {:else}
-          <div class="p-4 text-center text-muted-foreground">
-            No properties found
-          </div>
-        {/if}
-      </Card.Content>
-    </Card.Root>
+	<!-- Right column for the form -->
+	<div class="w-full lg:w-1/3">
+		<Card.Root>
+			<Card.Header>
+				<Card.Title>{editMode ? 'Edit' : 'Add'} Property</Card.Title>
+			</Card.Header>
+			<Card.Content>
+				<PropertyForm
+					{data}
+					{editMode}
+					form={formData}
+					{errors}
+					{enhance}
+					{constraints}
+					on:cancel={handleCancel}
+					on:propertyAdded={async () => {
+						editMode = false;
+						await invalidate('app:properties');
+					}}
+				/>
+			</Card.Content>
+		</Card.Root>
+	</div>
 </div>
 
-    
 
-  <div class="w-full lg:w-1/3">
-    <Card.Root>
-      <Card.Header>
-        <Card.Title>{editMode ? 'Edit' : 'Add'} Property</Card.Title>
-      </Card.Header>
-      <Card.Content>
-        <PropertyForm
-        {data}
-        {editMode}
-        form={formData}
-        {errors}
-        {enhance}
-        {constraints}
-        on:cancel={()=>{editMode = false;reset();}}
-          on:propertyAdded={async () => {
-            editMode = false;
-            await invalidate('app:properties');
-          }}
-        />
-      </Card.Content>
-    </Card.Root>
-  </div>
-</div>
 {#if browser}
-<SuperDebug data={$formData} />
+	<SuperDebug data={$formData} />
 {/if}

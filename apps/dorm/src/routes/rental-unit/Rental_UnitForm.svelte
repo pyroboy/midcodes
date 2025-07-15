@@ -4,6 +4,7 @@
   import Label from '$lib/components/ui/label/label.svelte';
   import * as Select from "$lib/components/ui/select";
   import { createEventDispatcher } from 'svelte';
+  import { propertyStore } from '$lib/stores/property';
   import type { Rental_unit } from './formSchema';
   import { locationStatusEnum, rentalUnitTypeEnum } from './formSchema';
   import type { Property ,Floor} from './formSchema';
@@ -19,34 +20,15 @@
 
   const dispatch = createEventDispatcher();
 
-  // START : PATTERN FOR DATABASE BASED SELECTION ITEMS - Property
-  let derivedProperties = $derived(data.properties.map((p: Property) => ({ value: p.id.toString(), label: p.name })));
-  let selectedProperty = {
-    get value() { 
-      return $form.property_id ? $form.property_id.toString() : '';
-    },
-    set value(id: string) { 
-      $form.property_id = id ? Number(id) : 0;
-      // Reset floor_id when property changes
-      if (!id) {
-        $form.floor_id = undefined;
-        selectedFloor.value = '';
-      }
-    }
-  };
-  let triggerPropertyContent = $derived(
-    selectedProperty.value 
-      ? data.properties.find((p: Property) => p.id.toString() === selectedProperty.value)?.name ?? "Select a property"
-      : "Select a property"
-  );
+  let selectedProperty = $derived($propertyStore.selectedProperty);
 
   // START : PATTERN FOR DATABASE BASED SELECTION ITEMS - Floor
   let derivedFloors = $derived(
-    selectedProperty.value 
+    selectedProperty
       ? data.floors
-          .filter((f: Floor) => f.property_id === Number(selectedProperty.value) && f.status === 'ACTIVE')
-          .map((f: Floor) => ({ 
-            value: f.id.toString(), 
+          .filter((f: Floor) => f.property_id === selectedProperty?.id && f.status === 'ACTIVE')
+          .map((f: Floor) => ({
+            value: f.id.toString(),
             label: `Floor ${f.floor_number}${f.wing ? ` (${f.wing})` : ''}`
           }))
       : []
@@ -62,7 +44,7 @@
   };
 
   let triggerFloorContent = $derived(
-    !selectedProperty.value 
+    !selectedProperty 
       ? "Select a property first"
       : derivedFloors.length === 0
         ? "No floors available"
@@ -151,39 +133,18 @@ function removeAmenity(idx: number): void {
   use:enhance
   class="space-y-4"
   novalidate
+  onsubmit={() => {
+    if (selectedProperty) {
+      $form.property_id = selectedProperty.id;
+    }
+  }}
 >
   {#if editMode}
     <!-- Always include hidden id in edit mode -->
     <input type="hidden" name="id" value={$form.id || ''} />
   {/if}
 
-  <!-- Property Select -->
-  <div class="space-y-2">
-    <Label for="property_id">Property</Label>
-    <Select.Root
-      type="single"
-      name="property_id"
-      bind:value={selectedProperty.value}
-    >
-      <Select.Trigger
-        class="w-full"
-        data-error={!!$errors.property_id}
-        {...$constraints.property_id}
-      >
-        {triggerPropertyContent}
-      </Select.Trigger>
-      <Select.Content>
-        {#each derivedProperties as property}
-          <Select.Item value={property.value}>
-            {property.label}
-          </Select.Item>
-        {/each}
-      </Select.Content>
-    </Select.Root>
-    {#if $errors.property_id}
-      <p class="text-sm font-medium text-destructive">{$errors.property_id}</p>
-    {/if}
-  </div>
+  
 
   <!-- Floor Select -->
   <div class="space-y-2">
@@ -192,7 +153,7 @@ function removeAmenity(idx: number): void {
       type="single"
       name="floor_id"
       bind:value={selectedFloor.value}
-      disabled={!selectedProperty.value || derivedFloors.length === 0}
+      disabled={!selectedProperty || derivedFloors.length === 0}
     >
       <Select.Trigger
         class="w-full"

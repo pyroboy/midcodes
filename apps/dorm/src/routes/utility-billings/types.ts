@@ -19,19 +19,35 @@ export interface Reading {
   export interface Meter {
     id: number;
     name: string;
-    type: string;
+    meter_type: string;
     location_type: 'PROPERTY' | 'FLOOR' | 'RENTAL_UNIT';
     property_id: number | null;
     floor_id: number | null;
     rental_unit_id: number | null;
     rental_unit: Rental_unit[] | null;
+    unit: { name: string } | null;
   }
   
   export interface Property {
     id: number;
     name: string;
   }
-  
+
+export type ShareData = {
+	tenant: Tenant;
+	lease: { id: number; name: string };
+	share: number;
+};
+
+// Defines the filters used for the utility billings page.
+export type Filters = {
+    property: Property | null;
+    type: string | null;
+    date: string;
+    search: string;
+  };
+
+
   // Structure for meter billings
   export type MeterBilling = {
     meter_id: number;
@@ -56,12 +72,23 @@ export interface Reading {
   };
   
   export type FilterChangeEvent = {
-    property: number | null;
+    property?: number | null;
     type: string | null;
     date: string;
     search: string;
   };
-  
+
+  export type Tenant = {
+    id: number;
+    full_name: string;
+  };
+
+  export type Lease = {
+    id: number;
+    name: string;
+    tenants: Tenant[] | null;
+  };
+
   export type ReadingSaveEvent = {
     readings: Array<{
       meter_id: number;
@@ -126,15 +153,16 @@ export interface Reading {
   }
   
   export interface MeterData {
-    meterId: number;
-    meterName: string;
-    meterType: string;
-    unitName: string | null;
-    reading: number;
-    previousReading: number | null;
-    consumption: number | null;
-    costPerUnit: number | null;
-    totalCost: number | null;
-    isExpanded: boolean;
-    history: Reading[];
+	meterId: number;
+	meterName: string;
+	meterType: string;
+	unit: string; 
+	currentReading: number | null;
+	currentReadingDate: string | null;
+	lastReading: number | null; 
+	lastReadingDate: string | null;
+	consumption: number | null;
+	costPerUnit: number | null;
+	totalCost: number | null;
+	history: Reading[];
   }

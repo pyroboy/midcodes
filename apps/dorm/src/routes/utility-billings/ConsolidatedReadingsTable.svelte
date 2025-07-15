@@ -1,346 +1,314 @@
 <script lang="ts">
-    import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight } from 'lucide-svelte';
-    import { Button } from '$lib/components/ui/button';
-    import * as Table from '$lib/components/ui/table';
-    import * as Accordion from '$lib/components/ui/accordion';
-    import * as Card from '$lib/components/ui/card';
-    import type { Meter, Reading, Property } from './types';
-    
-    // Props using Svelte 5 runes with defaults
-    let { readings = [], meters = [], properties = [] } = $props();
-    
-    // Explicitly initialize active meter ID
-    let activeMeterId: number | null = $state(null);
-    
-    // Computed values using Svelte 5 derived.by
-    const groupedReadings = $derived.by(() => {
-      // First group by date
-      const byDate: Record<string, Reading[]> = {};
-      
-      readings.forEach(reading => {
-        if (!byDate[reading.reading_date]) {
-          byDate[reading.reading_date] = [];
-        }
-        byDate[reading.reading_date].push(reading);
-      });
-      
-      // Then for each date, group by property
-      const result: {
-        date: string;
-        properties: {
-          propertyId: number;
-          propertyName: string;
-          uniqueMeters: {
-            meterId: number;
-            meterName: string;
-            meterType: string;
-            unitName: string | null;
-            reading: number;
-            previousReading: number | null;
-            consumption: number | null;
-            costPerUnit: number | null;
-            totalCost: number | null;
-            history: Reading[];
-          }[];
-          totalConsumption: number;
-          totalCost: number;
-        }[];
-        totalConsumption: number;
-        totalCost: number;
-      }[] = [];
-      
-      // Sort dates in descending order (newest first)
-      const sortedDates = Object.keys(byDate).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-      
-      sortedDates.forEach(date => {
-        const readingsForDate = byDate[date];
-        
-        // Group by property
-        const propertiesMap: Record<number, {
-          propertyId: number;
-          propertyName: string;
-          meterMap: Record<number, {
-            meterId: number;
-            meterName: string;
-            meterType: string;
-            unitName: string | null;
-            reading: number;
-            previousReading: number | null;
-            consumption: number | null;
-            costPerUnit: number | null;
-            totalCost: number | null;
-            history: Reading[];
-          }>;
-          totalConsumption: number;
-          totalCost: number;
-        }> = {};
-        
-        readingsForDate.forEach(reading => {
-          const meter = meters.find(m => m.id === reading.meter_id);
-          if (!meter || !meter.property_id) return;
-          
-          const property = properties.find(p => p.id === meter.property_id);
-          if (!property) return;
-          
-          if (!propertiesMap[property.id]) {
-            propertiesMap[property.id] = {
-              propertyId: property.id,
-              propertyName: property.name,
-              meterMap: {},
-              totalConsumption: 0,
-              totalCost: 0
-            };
-          }
-          
-          // Get reading history for this meter
-          const meterHistory = readings
-            .filter(r => r.meter_id === meter.id)
-            .sort((a, b) => new Date(b.reading_date).getTime() - new Date(a.reading_date).getTime());
-          
-          // Store in map by meter ID to ensure uniqueness
-          propertiesMap[property.id].meterMap[meter.id] = {
-            meterId: meter.id,
-            meterName: meter.name,
-            meterType: meter.type,
-            unitName: meter.rental_unit?.[0]?.name || meter.rental_unit?.[0]?.number || null,
-            reading: reading.reading ?? null,
-            previousReading: reading.previous_reading ?? null,
-            consumption: reading.consumption ?? null,
-            costPerUnit: reading.cost_per_unit ?? null,
-            totalCost: reading.cost ?? null,
-            history: meterHistory
-          };
-          
-          // Add to property totals
-          propertiesMap[property.id].totalConsumption += reading.consumption || 0;
-          propertiesMap[property.id].totalCost += reading.cost || 0;
-        });
-        
-        // Calculate date totals
-        let dateTotalConsumption = 0;
-        let dateTotalCost = 0;
-        
-        // Convert meterMap to array for each property
-        const propertiesWithUniqueMeters = Object.values(propertiesMap).map(prop => {
-          dateTotalConsumption += prop.totalConsumption;
-          dateTotalCost += prop.totalCost;
-          
-          return {
-            propertyId: prop.propertyId,
-            propertyName: prop.propertyName,
-            uniqueMeters: Object.values(prop.meterMap),
-            totalConsumption: prop.totalConsumption,
-            totalCost: prop.totalCost
-          };
-        });
-        
-        // Add to result
-        result.push({
-          date,
-          properties: propertiesWithUniqueMeters,
-          totalConsumption: dateTotalConsumption,
-          totalCost: dateTotalCost
-        });
-      });
-      
-      return result;
-    });
-    
-    // Toggle the expansion of a meter's details
-    function toggleMeterExpansion(meterId: number | null): void {
-      if (activeMeterId === meterId) {
-        activeMeterId = null;
-      } else {
-        activeMeterId = meterId;
-      }
-    }
-    
-    // Format date for display
-    function formatDate(dateString: string): string {
-      return new Date(dateString).toLocaleDateString('en-PH', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      });
-    }
-    
-    // Format number with appropriate decimal places
-    function formatNumber(value: number | null | undefined): string {
-      if (value === null || value === undefined) return '-';
-      
-      // If value is a whole number, show no decimals
-      if (value === Math.floor(value)) {
-        return value.toString();
-      }
-      // Otherwise show up to 2 decimal places
-      return value.toFixed(2);
-    }
-    
-    // Format currency with peso sign
-    function formatCurrency(amount: number | null | undefined): string {
-      if (amount === null || amount === undefined) return '-';
-      
-      return new Intl.NumberFormat('en-PH', {
-        style: 'currency',
-        currency: 'PHP',
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      }).format(amount);
-    }
-    
-    // Get utility color class
-    function getUtilityColorClass(type: string): string {
-      switch (type.toUpperCase()) {
-        case 'ELECTRICITY': return "bg-amber-100 text-amber-800";
-        case 'WATER': return "bg-blue-100 text-blue-800";
-        case 'GAS': return "bg-red-100 text-red-800";
-        case 'INTERNET': return "bg-purple-100 text-purple-800";
-        case 'CABLE': return "bg-green-100 text-green-800";
-        default: return "bg-gray-100 text-gray-800";
-      }
-    }
-    
-    // Get unit label based on utility type
-    function getUnitLabel(type: string): string {
-      switch (type.toUpperCase()) {
-        case 'ELECTRICITY': return "kWh";
-        case 'WATER': return "m³";
-        case 'GAS': return "m³";
-        case 'INTERNET': return "GB";
-        case 'CABLE': return "month";
-        default: return "unit";
-      }
-    }
-  </script>
-  
-  {#if groupedReadings.length === 0}
-    <div class="bg-gray-50 rounded-md p-6 text-center">
-      <p class="text-gray-500">No readings found with the current filters.</p>
-    </div>
-  {:else}
-    {#each groupedReadings as dateGroup}
-      <div class="mb-8">
-        <div class="flex justify-between items-center p-3 bg-gray-100 rounded-t-md mb-2">
-          <h3 class="text-lg font-semibold">Readings for {formatDate(dateGroup.date)}</h3>
-          <div class="text-right">
-            {#if dateGroup.properties.length > 0 && dateGroup.properties[0].uniqueMeters.length > 0}
-              <div class="text-sm">
-                Unit Cost: <span class="font-bold">
-                  {formatCurrency(dateGroup.properties[0].uniqueMeters[0].costPerUnit || 0)}
-                  /{getUnitLabel(dateGroup.properties[0].uniqueMeters[0].meterType)}
-                </span>
-              </div>
-            {/if}
-          </div>
-        </div>
-        
-        {#each dateGroup.properties as propertyGroup}
-          <Card.Root class="mb-4">
-            <Card.Header class="py-3">
-              <div class="flex justify-between items-center">
-                <Card.Title>{propertyGroup.propertyName}</Card.Title>
-              </div>
-            </Card.Header>
-            <Card.Content>
-              <div class="rounded-md border">
-                <Table.Root>
-                  <Table.Header>
-                    <Table.Row class="bg-gray-50 hover:bg-gray-50">
-                      <Table.Head>Meter</Table.Head>
-                      <Table.Head class="text-right">Previous</Table.Head>
-                      <Table.Head class="text-right">Current</Table.Head>
-                      <Table.Head class="text-right">Consumption</Table.Head>
-                      <Table.Head class="text-right">Total</Table.Head>
-                    </Table.Row>
-                  </Table.Header>
-                  <Table.Body>
-                    {#each propertyGroup.uniqueMeters as meter}
-                      <Table.Row 
-                        class="hover:bg-gray-50 border-b cursor-pointer"
-                        onclick={() => toggleMeterExpansion(meter.meterId)}
-                      >
-                        <Table.Cell class="font-medium">
-                          {meter.meterName}
-                          {#if meter.unitName}
-                            <span class="text-xs text-gray-500">· {meter.unitName}</span>
-                          {/if}
-                          <span class="ml-2 inline-block px-2 py-0.5 rounded-full text-xs font-medium {getUtilityColorClass(meter.meterType)}">
-                            {meter.meterType}
-                          </span>
-                        </Table.Cell>
-                        <Table.Cell class="text-right">
-                          {meter.previousReading !== null ? formatNumber(meter.previousReading) : '-'}
-                        </Table.Cell>
-                        <Table.Cell class="text-right font-medium">
-                          {formatNumber(meter.reading)}
-                        </Table.Cell>
-                        <Table.Cell class="text-right">
-                          {meter.consumption !== null ? formatNumber(meter.consumption) : '-'}
-                          <span class="text-xs text-gray-500 ml-1">{getUnitLabel(meter.meterType)}</span>
-                        </Table.Cell>
-                        <Table.Cell class="text-right font-medium">
-                          {meter.totalCost !== null ? formatCurrency(meter.totalCost) : '-'}
-                        </Table.Cell>
-                      </Table.Row>
-                      
-                      {#if activeMeterId === meter.meterId && meter.history.length > 1}
-                        <Table.Row class="bg-gray-50">
-                          <Table.Cell colspan={5} class="p-0">
-                            <div class="p-4">
-                              <h4 class="text-sm font-medium mb-2">Reading History for {meter.meterName}</h4>
-                              <div class="rounded-md border bg-white">
-                                <Table.Root>
-                                  <Table.Header>
-                                    <Table.Row class="bg-gray-50 hover:bg-gray-50">
-                                      <Table.Head>Date</Table.Head>
-                                      <Table.Head class="text-right">Reading</Table.Head>
-                                      <Table.Head class="text-right">Consumption</Table.Head>
-                                      <Table.Head class="text-right">Cost</Table.Head>
-                                    </Table.Row>
-                                  </Table.Header>
-                                  <Table.Body>
-                                    {#if meter.history.length <= 1}
-                                      <Table.Row>
-                                        <Table.Cell colspan={4} class="text-center py-4 text-gray-500">
-                                          No previous reading history available for this meter.
-                                        </Table.Cell>
-                                      </Table.Row>
-                                    {:else}
-                                      {#each meter.history as historyItem}
-                                        <Table.Row class="hover:bg-gray-50">
-                                          <Table.Cell>{formatDate(historyItem.reading_date)}</Table.Cell>
-                                          <Table.Cell class="text-right">{formatNumber(historyItem.reading)}</Table.Cell>
-                                          <Table.Cell class="text-right">
-                                            {historyItem.consumption !== null ? formatNumber(historyItem.consumption) : '-'}
-                                            <span class="text-xs text-gray-500 ml-1">{getUnitLabel(meter.meterType)}</span>
-                                          </Table.Cell>
-                                          <Table.Cell class="text-right">
-                                            {historyItem.cost !== null ? formatCurrency(historyItem.cost) : '-'}
-                                          </Table.Cell>
-                                        </Table.Row>
-                                      {/each}
-                                    {/if}
-                                  </Table.Body>
-                                </Table.Root>
-                              </div>
-                            </div>
-                          </Table.Cell>
-                        </Table.Row>
-                      {/if}
-                    {/each}
-                  </Table.Body>
-                  <Table.Footer>
-                    <Table.Row class="bg-gray-50 font-medium">
-                      <Table.Cell colspan={3} class="text-right">Property Totals:</Table.Cell>
-                      <Table.Cell class="text-right">{formatNumber(propertyGroup.totalConsumption)}</Table.Cell>
-                      <Table.Cell class="text-right">{formatCurrency(propertyGroup.totalCost)}</Table.Cell>
-                    </Table.Row>
-                  </Table.Footer>
-                </Table.Root>
-              </div>
-            </Card.Content>
-          </Card.Root>
-        {/each}
-      </div>
-    {/each}
-  {/if}
+	import { ChevronDown } from 'lucide-svelte';
+	import { Button } from '$lib/components/ui/button';
+	import * as Table from '$lib/components/ui/table';
+	import * as Card from '$lib/components/ui/card';
+	import type { Reading, Meter, Property, MeterData, Filters } from './types';
+	import { slide } from 'svelte/transition';
+
+	// Props using Svelte 5 runes with defaults
+	type Props = {
+		readings: Reading[];
+		meters: Meter[];
+		properties: Property[];
+		filters: Filters;
+		onShareReading: (meter: MeterData) => void;
+	};
+
+	let { readings, meters, properties, filters, onShareReading }: Props = $props();
+
+
+
+	// Computed values using Svelte 5 derived.by
+	const groupedReadings = $derived.by(() => {
+		// First group by date
+		const byDate: Record<string, Reading[]> = {};
+
+		const filteredReadings = readings.filter((reading) => {
+			const meter = meters.find((m) => m.id === reading.meter_id);
+			if (!meter) return false;
+
+			const propertyMatch = filters.property ? meter.property_id === filters.property.id : true;
+			const typeMatch = filters.type ? meter.meter_type.toUpperCase() === filters.type.toUpperCase() : true;
+			const dateMatch = filters.date ? reading.reading_date === filters.date : true;
+			const searchMatch = filters.search
+				? meter.name.toLowerCase().includes(filters.search.toLowerCase())
+				: true;
+
+			return propertyMatch && typeMatch && dateMatch && searchMatch;
+		});
+
+		filteredReadings.forEach((reading) => {
+			if (!byDate[reading.reading_date]) {
+				byDate[reading.reading_date] = [];
+			}
+			byDate[reading.reading_date].push(reading);
+		});
+
+		// Then for each date, group by property
+		const result: {
+			date: string;
+			properties: {
+				propertyId: number;
+				propertyName: string;
+				uniqueMeters: MeterData[];
+				totalConsumption: number;
+				totalCost: number;
+			}[];
+			totalConsumption: number;
+			totalCost: number;
+		}[] = [];
+
+		// Sort dates in descending order (newest first)
+		const sortedDates = Object.keys(byDate).sort(
+			(a, b) => new Date(b).getTime() - new Date(a).getTime()
+		);
+
+		sortedDates.forEach((date) => {
+			const readingsForDate = byDate[date];
+
+			// Group by property
+			const propertiesMap: Record<
+				number,
+				{
+					propertyId: number;
+					propertyName: string;
+					meterMap: Record<number, MeterData>;
+					totalConsumption: number;
+					totalCost: number;
+				}
+			> = {};
+
+			readingsForDate.forEach((reading) => {
+				const meter = meters.find((m) => m.id === reading.meter_id);
+				if (!meter || !meter.property_id) return;
+
+				const property = properties.find((p) => p.id === meter.property_id);
+				if (!property) return;
+
+				if (!propertiesMap[property.id]) {
+					propertiesMap[property.id] = {
+						propertyId: property.id,
+						propertyName: property.name,
+						meterMap: {},
+						totalConsumption: 0,
+						totalCost: 0
+					};
+				}
+
+				// Get reading history for this meter
+				const meterHistory = readings
+					.filter((r) => r.meter_id === meter.id)
+					.sort((a, b) => new Date(b.reading_date).getTime() - new Date(a.reading_date).getTime());
+
+				const latestReading = meterHistory[0];
+				const secondLatestReading = meterHistory[1];
+
+				// Store in map by meter ID to ensure uniqueness
+				propertiesMap[property.id].meterMap[meter.id] = {
+					meterId: meter.id,
+					meterName: meter.name,
+					meterType: meter.meter_type,
+					unit: meter.unit?.name || '',
+					currentReading: latestReading?.reading || 0,
+					currentReadingDate: latestReading?.reading_date || null,
+					lastReading: secondLatestReading?.reading || null,
+					lastReadingDate: secondLatestReading?.reading_date || null,
+					consumption: latestReading?.consumption || null,
+					costPerUnit: latestReading?.cost_per_unit || null,
+					totalCost: latestReading?.cost || null,
+					history: meterHistory
+				};
+
+				// Add to property totals
+				propertiesMap[property.id].totalConsumption += reading.consumption || 0;
+				propertiesMap[property.id].totalCost += reading.cost || 0;
+			});
+
+			// Calculate date totals
+			let dateTotalConsumption = 0;
+			let dateTotalCost = 0;
+
+			// Convert meterMap to array for each property
+			const propertiesWithUniqueMeters = Object.values(propertiesMap).map((prop) => {
+				dateTotalConsumption += prop.totalConsumption;
+				dateTotalCost += prop.totalCost;
+
+				return {
+					propertyId: prop.propertyId,
+					propertyName: prop.propertyName,
+					uniqueMeters: Object.values(prop.meterMap),
+					totalConsumption: prop.totalConsumption,
+					totalCost: prop.totalCost
+				};
+			});
+
+			// Add to result
+			result.push({
+				date,
+				properties: propertiesWithUniqueMeters,
+				totalConsumption: dateTotalConsumption,
+				totalCost: dateTotalCost
+			});
+		});
+
+		return result;
+	});
+
+	// Handle share button click
+	function handleShareClick(event: MouseEvent, meter: MeterData) {
+		event.stopPropagation();
+		if (onShareReading) {
+			onShareReading(meter);
+		}
+	}
+
+
+	function handleRowKeyDown(event: KeyboardEvent, meter: MeterData) {
+		if (event.key === 'Enter' || event.key === ' ') {
+			event.preventDefault();
+			onShareReading(meter);
+		}
+	}
+
+	// Format date for display
+	function formatDate(dateString: string): string {
+		return new Date(dateString).toLocaleDateString('en-PH', {
+			year: 'numeric',
+			month: 'short',
+			day: 'numeric'
+		});
+	}
+
+	// Format number with appropriate decimal places
+	function formatNumber(value: number | null | undefined): string {
+		if (value === null || value === undefined) return '-';
+
+		if (value === Math.floor(value)) {
+			return value.toString();
+		}
+		return value.toFixed(2);
+	}
+
+	// Format currency with peso sign
+	function formatCurrency(amount: number | null | undefined): string {
+		if (amount === null || amount === undefined) return '-';
+
+		return new Intl.NumberFormat('en-PH', {
+			style: 'currency',
+			currency: 'PHP',
+			minimumFractionDigits: 2,
+			maximumFractionDigits: 2
+		}).format(amount);
+	}
+
+	// Get utility color class
+	function getUtilityColorClass(type: string): string {
+		switch (type.toUpperCase()) {
+			case 'ELECTRICITY':
+				return 'bg-amber-100 text-amber-800';
+			case 'WATER':
+				return 'bg-blue-100 text-blue-800';
+			case 'GAS':
+				return 'bg-red-100 text-red-800';
+			case 'INTERNET':
+				return 'bg-purple-100 text-purple-800';
+			case 'CABLE':
+				return 'bg-green-100 text-green-800';
+			default:
+				return 'bg-gray-100 text-gray-800';
+		}
+	}
+
+	// Get unit label based on utility type
+	function getUnitLabel(type: string): string {
+		if (!type) return ''; // Guard against undefined type
+		switch (type.toUpperCase()) {
+			case 'ELECTRICITY':
+				return 'kWh';
+			case 'WATER':
+				return 'm³';
+			case 'GAS':
+				return 'm³';
+			case 'INTERNET':
+				return 'GB';
+			case 'CABLE':
+				return 'month';
+			default:
+				return 'unit';
+		}
+	}
+</script>
+{#if groupedReadings.length === 0}
+	<div class="bg-gray-50 rounded-md p-6 text-center">
+		<p class="text-gray-500">No readings found with the current filters.</p>
+	</div>
+{:else}
+	{#each groupedReadings as dateGroup}
+		<div class="mb-8">
+			<h3 class="text-lg font-semibold mb-2">Readings for {formatDate(dateGroup.date)}</h3>
+
+			{#each dateGroup.properties as propertyGroup}
+				<Card.Root class="mb-4">
+					<Card.Header>
+						<Card.Title>{propertyGroup.propertyName}</Card.Title>
+					</Card.Header>
+					<Card.Content>
+						<div class="rounded-md border">
+							<!-- Header Row -->
+							<div class="flex p-2 bg-gray-50 font-medium text-sm border-b">
+								<div class="flex-1 pl-10">Meter</div>
+								<div class="w-24 text-right">Previous</div>
+								<div class="w-24 text-right">Current</div>
+								<div class="w-32 text-right">Consumption</div>
+								<div class="w-24 text-right">Total Cost</div>
+								<div class="w-20 text-right pr-2">Share</div>
+							</div>
+
+							{#each propertyGroup.uniqueMeters as meter (meter.meterId)}
+								<div class="border-b last:border-b-0">
+									<div
+										class="flex items-center p-2 hover:bg-muted/50 transition-colors duration-200"
+										role="button"
+										tabindex="0"
+										onclick={(e) => handleShareClick(e, meter)}
+										onkeydown={(e) => handleRowKeyDown(e, meter)}
+									>
+										<div class="flex flex-1 items-center pl-6">
+											<div class="flex-1 font-medium">
+												<div>{meter.meterName}</div>
+												{#if meter.unit}
+													<div class="text-xs text-muted-foreground">{meter.unit}</div>
+												{/if}
+											</div>
+											<div class="w-24 text-right">{formatNumber(meter.lastReading)}</div>
+											<div class="w-24 text-right font-medium">{formatNumber(meter.currentReading)}</div>
+											<div class="w-32 text-right">
+												{formatNumber(meter.consumption)}
+												<span class="text-xs text-muted-foreground ml-1">{getUnitLabel(meter.meterType)}</span>
+											</div>
+											<div class="w-24 text-right font-medium">{formatCurrency(meter.totalCost)}</div>
+										</div>
+										<div class="w-20 flex items-center justify-center">
+											<Button size="sm" variant="outline" onclick={(e) => {e.stopPropagation(); onShareReading(meter);}}>
+												Share
+											</Button>
+										</div>
+									</div>
+								</div>
+							{/each}
+
+							<!-- Footer Row -->
+							<div class="flex p-2 bg-gray-50 font-medium text-sm border-t">
+								<div class="flex-1 text-right pr-4">Property Totals:</div>
+								<div class="w-32 text-right">{formatNumber(propertyGroup.totalConsumption)}</div>
+								<div class="w-24 text-right">{formatCurrency(propertyGroup.totalCost)}</div>
+								<div class="w-20"></div>
+							</div>
+						</div>
+					</Card.Content>
+				</Card.Root>
+			{/each}
+		</div>
+	{/each}
+{/if}

@@ -40,6 +40,9 @@
 
 <script lang="ts">
 	import { cn } from "$lib/utils.js";
+	import { createEventDispatcher } from 'svelte';
+
+	const dispatch = createEventDispatcher<{ click: MouseEvent }>();
 
 	let {
 		class: className,
@@ -68,6 +71,7 @@
 		class={cn(buttonVariants({ variant, size }), className)}
 		{type}
 		{...restProps}
+		onclick={(e) => dispatch('click', e)}
 	>
 		{@render children?.()}
 	</button>

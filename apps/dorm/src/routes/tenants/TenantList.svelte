@@ -40,7 +40,7 @@
   }
 </script>
 
-<div class="w-2/3">
+<div class="w-2/3 border-4 border-red-500">
   <div class="bg-white shadow rounded-lg">
       <div class="p-4 border-b">
           <div class="flex justify-between items-center mb-4">

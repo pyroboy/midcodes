@@ -47,7 +47,7 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
     console.log('All properties (without filter):', { allProperties, allPropertiesError });
   }
 
-  // Get all meters for all properties
+  // Get all meters 
   console.log('Fetching meters...');
   const { data: meters, error: metersError } = await supabase
     .from('meters')
@@ -152,13 +152,42 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
     sampleProperties: properties?.slice(0, 3) || []
   });
 
+  // Get all active leases with their tenants
+  console.log('Fetching active leases with tenants...');
+  const { data: leasesData, error: leasesError } = await supabase
+    .from('leases')
+    .select(`
+      id,
+      name,
+      rental_unit_id,
+      lease_tenants(
+        tenants(
+          id,
+          full_name:name
+        )
+      )
+    `)
+    .eq('status', 'ACTIVE');
+
+  const leases = leasesData?.map(lease => ({
+    ...lease,
+    tenants: lease.lease_tenants.map(lt => lt.tenants).filter(t => t !== null)
+  }));
+
+  if (leasesError) {
+    console.error('Error fetching leases:', leasesError);
+    throw error(500, `Error fetching leases: ${leasesError.message}`);
+  }
+
+  // Return all the data needed for the page
   return {
     form,
-    properties: properties || [],
-    meters: meters || [],
-    readings: readings || [],
+    properties,
+    meters,
+    readings,
     availableReadingDates: uniqueDates,
-    rental_unitTenantCounts
+    rental_unitTenantCounts,
+    leases
   };
 };
 

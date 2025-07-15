@@ -1,55 +1,28 @@
 // src/lib/services/permissions.ts
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { 
-  PermissionCache,
-   
-} from '$lib/types/auth';
 
-let permissionCache: PermissionCache = {};
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
+/**
+ * Fetches unique permissions for a given set of user roles from the database.
+ * @param roles - An array of user roles.
+ * @param supabase - The Supabase client instance.
+ * @returns A promise that resolves to an array of unique permission strings.
+ */
 export async function getUserPermissions(roles: string[], supabase: SupabaseClient): Promise<string[]> {
-  // Create cache key from sorted roles
-  const cacheKey = roles.sort().join(',');
-  const now = Date.now();
+	if (!roles || roles.length === 0) {
+		return [];
+	}
 
-  // Check cache
-  if (permissionCache[cacheKey] && (now - permissionCache[cacheKey].timestamp < CACHE_TTL)) {
-    return permissionCache[cacheKey].permissions;
-  }
+	const { data, error } = await supabase
+		.from('role_permissions')
+		.select('permission')
+		.in('role', roles);
 
-  // Fetch permissions for the specified roles
-  const { data, error } = await supabase
-    .from('role_permissions')
-    .select('permission')
-    .in('role', roles);
+	if (error) {
+		console.error('Error fetching permissions:', error);
+		return [];
+	}
 
-  if (error) {
-    console.error('Error fetching permissions:', error);
-    return [];
-  }
-
-  // Extract unique permissions
-  const permissions = [...new Set(data.map(rp => rp.permission))];
-
-  // Update cache
-  permissionCache[cacheKey] = {
-    permissions,
-    timestamp: now
-  };
-
-  return permissions;
-}
-
-export function cleanupPermissionCache(): void {
-  const now = Date.now();
-  Object.keys(permissionCache).forEach(key => {
-    if (now - permissionCache[key].timestamp > CACHE_TTL) {
-      delete permissionCache[key];
-    }
-  });
-}
-
-export function clearPermissionCache(): void {
-  permissionCache = {};
+	// Use a Set to get unique permission values
+	const permissions = [...new Set(data.map((rp) => rp.permission))];
+	return permissions;
 }

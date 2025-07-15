@@ -1,4 +1,5 @@
 <script lang="ts">
+  // Main page script for utility billings
   import { superForm } from 'sveltekit-superforms/client';
   import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
   import { Button } from '$lib/components/ui/button';
@@ -13,8 +14,11 @@
   import ExportDialog from './ExportDialog.svelte';
   import SummaryStatistics from './SummaryStatistics.svelte';
   import ConsolidatedReadingsTable from './ConsolidatedReadingsTable.svelte';
+  import TenantShareModal from './TenantShareModal.svelte';
+  import PrintPreviewModal from './PrintPreviewModal.svelte';
   
   // Import types
+  import { propertyStore } from '$lib/stores/property';
   import type { 
     Reading, 
     Meter, 
@@ -22,7 +26,10 @@
     MeterReadingEntry, 
     FilterChangeEvent, 
     ReadingSaveEvent, 
-    ExportEvent
+    ExportEvent,
+    MeterData,
+    Filters,
+	ShareData
   } from './types';
   
   // Props
@@ -41,9 +48,10 @@
     }
   });
 
+  // Global state
+  let selectedProperty = $derived($propertyStore.selectedProperty);
+
   // UI state
-  let selectedPropertyId: number | null = $state(null);
-  let selectedType: string | null = $state(null);
   let costPerUnit = $state(0);
   let showSuccessMessage = $state(false);
   let showReadingModal = $state(false);
@@ -55,11 +63,17 @@
   let fromDate = $state('');
   let toDate = $state('');
   let exportFormat = $state('csv');
+  let selectedType: string | null = $state(null);
+  let isTenantShareModalOpen = $state(false);
+  let selectedMeter: MeterData | null = $state(null);
+  let isPrintPreviewModalOpen = $state(false);
+  let shareDataForPreview = $state<ShareData[]>([]);
+  let selectedReadingForShare: MeterData | null = $state(null);
 
   // Initialize form data
   $effect(() => {
     $form.cost_per_unit = costPerUnit;
-    $form.property_id = selectedPropertyId?.toString();
+    $form.property_id = selectedProperty?.id.toString();
     $form.type = selectedType;
     $form.reading_date = readingDate;
   });
@@ -69,39 +83,8 @@
   const allMeters = data.meters || [];
   const allReadings = data.readings || [];
   const availableDates = data.availableReadingDates || [];
-  
-  // Filter readings based on selected criteria
-  function getFilteredReadings(): Reading[] {
-    return allReadings.filter((reading: Reading) => {
-      // Property filter
-      const meter = allMeters.find((m: Meter) => m.id === reading.meter_id);
-      const propertyMatch = selectedPropertyId ? 
-        (meter?.property_id === Number(selectedPropertyId)) : true;
-      
-      // Type filter
-      const typeMatch = selectedType ? 
-        (meter?.type.toUpperCase() === selectedType.toUpperCase()) : true;
-      
-      // Date filter
-      const dateMatch = dateFilter ? 
-        reading.reading_date === dateFilter : true;
-      
-      // Search filter (meter name)
-      const meterName = meter?.name || '';
-      const searchMatch = searchQuery ? 
-        meterName.toLowerCase().includes(searchQuery.toLowerCase()) : true;
-      
-      return propertyMatch && typeMatch && dateMatch && searchMatch;
-    });
-  }
 
-  function getAvailableReadingDates(): string[] {
-    const uniqueDates: string[] = Array.from(
-      new Set(allReadings.map((r: Reading) => r.reading_date))
-    );
-    
-    return uniqueDates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-  }
+  let leases = $derived(data.leases || []);
 
   // Returns the most recent reading for a given meter
   function getPreviousReading(meterId: number): { reading: number | null, date: string | null } {
@@ -116,9 +99,15 @@
   }
 
   // Event handlers
+  const filters: Filters = $derived({
+    property: selectedProperty,
+    type: selectedType,
+    date: dateFilter,
+    search: searchQuery
+  });
+
   function handleFilterChange(event: CustomEvent<FilterChangeEvent>) {
-    const { property, type, date, search } = event.detail;
-    selectedPropertyId = property;
+    const { type, date, search } = event.detail;
     selectedType = type;
     dateFilter = date;
     searchQuery = search;
@@ -129,14 +118,18 @@
     // Reset modal state
     meterReadings = [];
     
+    if (!selectedProperty) return;
     const metersForProperty = allMeters.filter((meter: Meter) =>
-      meter.property_id?.toString() === selectedPropertyId?.toString()
+      meter.property_id === selectedProperty.id
     );
     
     // Only include meters of the selected type if one is selected
-    const metersToUpdate = selectedType ? 
-      metersForProperty.filter((meter: Meter) => meter.type.toUpperCase() === selectedType!.toUpperCase()) : 
-      metersForProperty;
+    let metersToUpdate = metersForProperty;
+    if (selectedType) {
+      metersToUpdate = metersForProperty.filter(
+        (meter: Meter) => meter.meter_type.toUpperCase() === selectedMeter?.meterType.toUpperCase()
+      );
+    }
     
     meterReadings = metersToUpdate.map((meter: Meter) => {
       const previousData = getPreviousReading(meter.id);
@@ -154,6 +147,31 @@
     showReadingModal = true;
   }
 
+  function openTenantShareModal(meter: MeterData) {
+    console.log('Opening tenant share modal for:', meter);
+    selectedReadingForShare = meter; // Store the reading for the preview modal
+    selectedMeter = meter;
+    isTenantShareModalOpen = true;
+  }
+
+  function handleGeneratePreview(data: ShareData[]) {
+    console.log('Generating print preview with data:', data);
+    shareDataForPreview = data;
+    isTenantShareModalOpen = false;
+    isPrintPreviewModalOpen = true;
+  }
+
+  function handleBackToTenantShare() {
+    console.log('Navigating back to tenant share modal.');
+    isPrintPreviewModalOpen = false;
+    isTenantShareModalOpen = true;
+  }
+
+  function handlePrint() {
+    // TODO: Implement printing functionality
+    console.log('Printing...');
+  }
+
   async function handleSaveReadings(event: CustomEvent<ReadingSaveEvent>) {
     try {
       const { readings, readingDate, costPerUnit } = event.detail;
@@ -162,7 +180,7 @@
       const formData = new FormData();
       
       // Add the base data
-      formData.append('property_id', selectedPropertyId?.toString() || '');
+      formData.append('property_id', selectedProperty?.id.toString() || '');
       formData.append('type', selectedType || '');
       formData.append('cost_per_unit', costPerUnit.toString());
       
@@ -201,7 +219,6 @@
   }
 
   function resetFilters() {
-    selectedPropertyId = null;
     selectedType = null;
     dateFilter = '';
     searchQuery = '';
@@ -214,10 +231,6 @@
     alert(`Export in ${format.toUpperCase()} format initiated!`);
   }
 
-  // These call the functions to ensure reactivity
-  let filteredReadings = $derived(getFilteredReadings());
-  let availableReadingDates = $derived(getAvailableReadingDates());
-
   // Get utility billing types from data
   import { utilityBillingTypeEnum } from './meterReadingSchema';
 </script>
@@ -228,27 +241,7 @@
     <h1 class="text-3xl font-bold">Utility Readings Management</h1>
     
     <div class="flex items-center gap-2">
-      <Button 
-        class="flex items-center gap-2"
-        onclick={() => openReadingModal()}
-        disabled={!selectedPropertyId || !selectedType}
-      >
-      {#if !selectedPropertyId}
-        Select a property to continue
-      {:else if !selectedType}
-        Select a utility type to continue
-      {:else}
-        Add Meter Readings
-      {/if}
-      </Button>
-      <Button 
-        variant="outline"
-        class="flex items-center gap-2"
-        onclick={() => invalidateAll()}
-      >
-        <RefreshCw class="h-4 w-4" />
-        Refresh
-      </Button>
+
     </div>
   </div>
 
@@ -261,15 +254,33 @@
 
   <!-- Always show Filters Panel -->
   <ReadingFiltersPanel
-    properties={allProperties}
-    availableReadingDates={availableReadingDates}
+    availableReadingDates={availableDates}
     utilityTypes={utilityBillingTypeEnum.enum}
-    bind:selectedPropertyId
+    selectedProperty={selectedProperty}
     bind:selectedType
     bind:dateFilter
     bind:searchQuery
     on:filterChange={handleFilterChange}
+    on:addReadings={openReadingModal}
   />
+
+  <TenantShareModal
+    open={isTenantShareModalOpen}
+    reading={selectedMeter}
+    leases={data.leases || []}
+    generatePreview={handleGeneratePreview}
+    close={() => (isTenantShareModalOpen = false)} 
+  />
+
+  {#if isPrintPreviewModalOpen && selectedReadingForShare}
+    <PrintPreviewModal 
+      bind:open={isPrintPreviewModalOpen}
+      reading={selectedReadingForShare} 
+      data={shareDataForPreview}
+      onBack={handleBackToTenantShare}
+      onPrint={() => {}}
+    />
+  {/if}
 
   <!-- Main Content -->
   <div class="space-y-6 mt-6">
@@ -283,40 +294,28 @@
           variant="outline" 
           onclick={() => showExportDialog = true}
           class="flex items-center gap-2"
-          disabled={filteredReadings.length === 0}
+          disabled={allReadings.length === 0}
         >
           <Download class="h-4 w-4 mr-1" />
           Export Data
         </Button>
       </div>
 
-      {#if filteredReadings.length === 0}
-        <div class="bg-gray-50 rounded-md p-6 text-center">
-          <p class="text-gray-500">No readings found with the current filters.</p>
-          <Button 
-            variant="ghost" 
-            onclick={() => resetFilters()}
-            class="mt-2"
-          >
-            Reset Filters
-          </Button>
-        </div>
-      {:else}
-        <!-- Consolidated Readings Table -->
-        <ConsolidatedReadingsTable 
-          readings={filteredReadings}
-          meters={allMeters}
-          properties={allProperties}
-        />
-      {/if}
+      <ConsolidatedReadingsTable 
+        readings={allReadings}
+        meters={allMeters}
+        properties={allProperties}
+        {filters}
+        onShareReading={openTenantShareModal}
+      />
     </div>
   </div>
 
   <!-- Summary Statistics -->
   <SummaryStatistics
-    readings={filteredReadings}
+    readings={allReadings}
     meters={allMeters}
-    readingDates={availableReadingDates}
+    readingDates={availableDates}
   />
 
   <!-- Reading Entry Modal -->
