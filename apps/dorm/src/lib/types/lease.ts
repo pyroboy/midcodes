@@ -47,12 +47,13 @@ export interface PaymentAllocation {
     reference_number?: string;
   };
 }
+//RENT, UTILITY, PENALTY, MAINTENANCE, SERVICE, SECURITY_DEPOST
 
 export interface Billing {
 	id: number;
 	lease_id: string;
-	type: 'RENT' | 'UTILITY' | 'OTHER';
-	utility_type?: 'ELECTRICITY' | 'WATER' | 'INTERNET' | 'OTHER';
+	type: 'RENT' | 'UTILITY' | 'PENALTY' | 'MAINTENANCE' | 'SERVICE' | 'SECURITY_DEPOST';
+	utility_type?: 'ELECTRICITY' | 'WATER' | 'INTERNET' ;
 	amount: number;
 	paid_amount: number;
 	balance: number;

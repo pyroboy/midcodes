@@ -28,17 +28,15 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
 	if (!user) throw error(401, 'Unauthorized');
 
 	try {
-		const { data: leasesData, error: fetchError } = await supabase
-			.from('leases')
-			.select(
-				`
-				*,
-				rental_unit:rental_unit_id ( *, floor:floors (*), property:properties (*) ),
-				lease_tenants:lease_tenants!lease_id ( tenants ( name, email, contact_number ) ),
-				billings ( * )
-			`
-			)
-			.order('created_at', { ascending: false });
+    const { data: leasesData, error: fetchError } = await supabase
+    .from('leases')
+    .select(`
+      *,
+      rental_unit:rental_unit_id (*, floor:floors (*), property:properties (*)),
+      lease_tenants:lease_tenants!lease_id (tenant:tenants (name, email, contact_number)),
+      billings (*)
+    `)
+    .order('created_at', { ascending: false });
 
 		if (fetchError) {
 			console.error('Error fetching leases:', fetchError);
@@ -539,6 +537,102 @@ export const actions: Actions = {
         status: 500,
         message: error instanceof Error ? error.message : 'Failed to update lease status'
       };
+    }
+  },
+
+  manageSecurityDepositBillings: async ({ request, locals: { supabase, safeGetSession } }) => {
+    const { user } = await safeGetSession();
+    if (!user) throw error(401, 'Unauthorized');
+
+    try {
+      const formData = await request.formData();
+      const action = formData.get('action') as string;
+      const leaseId = formData.get('lease_id') as string;
+      const billingId = formData.get('billing_id') as string;
+      const type = formData.get('type') as string;
+      const amount = parseFloat(formData.get('amount') as string);
+      const dueDate = formData.get('due_date') as string;
+      const billingDate = formData.get('billing_date') as string;
+      const notes = formData.get('notes') as string;
+
+      if (action === 'create') {
+        const { error: insertError } = await supabase
+          .from('billings')
+          .insert({
+            lease_id: leaseId,
+            type: type as 'SECURITY_DEPOST',
+            amount: amount,
+            paid_amount: 0,
+            balance: amount,
+            status: 'PENDING',
+            due_date: dueDate,
+            billing_date: billingDate,
+            notes: notes,
+            penalty_amount: 0
+          });
+
+        if (insertError) {
+          console.error('Error creating security deposit billing:', insertError);
+          return fail(500, { message: 'Failed to create security deposit billing' });
+        }
+
+        return { success: true, message: 'Security deposit billing created successfully' };
+      } else if (action === 'update') {
+        if (!billingId) {
+          return fail(400, { message: 'Billing ID is required for update' });
+        }
+
+        const { error: updateError } = await supabase
+          .from('billings')
+          .update({
+            amount: amount,
+            balance: amount, // Reset balance when amount changes
+            due_date: dueDate,
+            billing_date: billingDate,
+            notes: notes
+          })
+          .eq('id', billingId);
+
+        if (updateError) {
+          console.error('Error updating security deposit billing:', updateError);
+          return fail(500, { message: 'Failed to update security deposit billing' });
+        }
+
+        return { success: true, message: 'Security deposit billing updated successfully' };
+      } else if (action === 'delete') {
+        if (!billingId) {
+          return fail(400, { message: 'Billing ID is required for delete' });
+        }
+
+        // First, delete any payment allocations that reference this billing
+        const { error: deleteAllocationsError } = await supabase
+          .from('payment_allocations')
+          .delete()
+          .eq('billing_id', billingId);
+
+        if (deleteAllocationsError) {
+          console.error('Error deleting payment allocations:', deleteAllocationsError);
+          return fail(500, { message: 'Failed to delete associated payment allocations' });
+        }
+
+        // Then delete the billing record
+        const { error: deleteError } = await supabase
+          .from('billings')
+          .delete()
+          .eq('id', billingId);
+
+        if (deleteError) {
+          console.error('Error deleting security deposit billing:', deleteError);
+          return fail(500, { message: 'Failed to delete security deposit billing' });
+        }
+
+        return { success: true, message: 'Security deposit billing deleted successfully' };
+      } else {
+        return fail(400, { message: 'Invalid action' });
+      }
+    } catch (error) {
+      console.error('Error managing security deposit billings:', error);
+      return fail(500, { message: 'Failed to manage security deposit billings' });
     }
   }
 };

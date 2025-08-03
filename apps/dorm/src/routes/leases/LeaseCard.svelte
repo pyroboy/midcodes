@@ -4,20 +4,29 @@
   import Button from '$lib/components/ui/button/button.svelte';
   import PaymentModal from './PaymentModal.svelte';
   import RentManagerModal from './RentManagerModal.svelte';
+  import SecurityDepositModal from './SecurityDepositModal.svelte';
   import { invalidateAll } from '$app/navigation';
   import { createEventDispatcher } from 'svelte';
   import { Input } from '$lib/components/ui/input';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+  import * as Tooltip from '$lib/components/ui/tooltip';
   import { leaseStatusEnum } from './formSchema';
   import * as AccordionPrimitive from '$lib/components/ui/accordion';
-  import { Pencil, Trash2 } from 'lucide-svelte';
+  import { 
+    Pencil, 
+    Trash2, 
+    CreditCard, 
+    Home, 
+    Shield,
+    ChevronDown,
+    Calendar,
+    MapPin,
+    Users,
+    FileText,
+    DollarSign,
+    AlertTriangle
+  } from 'lucide-svelte';
   import type { Lease, Billing } from '$lib/types/lease';
-
-  interface BillingBreakdown {
-    type: string;
-    total: number;
-    unpaidAmount: number;
-  }
 
   interface Props {
     lease: Lease;
@@ -28,71 +37,15 @@
 
   let { lease, onLeaseClick, onDelete, onStatusChange }: Props = $props();
 
-  function formatDate(dateStr: string) {
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  }
+  import {
+    formatDate,
+    formatCurrency,
+    getStatusVariant,
+    getBillingStatusColor,
+    getDisplayStatus
+  } from '$lib/utils/format';
 
-  function formatCurrency(amount: number) {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'PHP'
-    }).format(amount || 0);
-  }
-
-  function getStatusVariant(status: string): 'default' | 'destructive' | 'outline' | 'secondary' {
-    switch (status?.toUpperCase()) {
-      case 'ACTIVE':
-        return 'default';
-      case 'INACTIVE':
-        return 'secondary';
-      case 'TERMINATED':
-        return 'destructive';
-      case 'EXPIRED':
-        return 'outline';
-      default:
-        return 'secondary';
-    }
-  }
-
-  function getBillingStatusColor(status: string) {
-    const colors: { [key: string]: string } = {
-      PENDING: 'bg-yellow-100 text-yellow-800',
-      PARTIAL: 'bg-blue-100 text-blue-800',
-      PAID: 'bg-green-100 text-green-800',
-      OVERDUE: 'bg-red-100 text-red-800',
-      PENALIZED: 'bg-red-200 text-red-900',
-      'OVERDUE-PARTIAL': 'bg-orange-200 text-orange-900'
-    };
-    return colors[status] || 'bg-gray-100 text-gray-800';
-  }
-
-  function getDisplayStatus(billing: Billing): string {
-    if (billing.balance <= 0) {
-      return 'PAID';
-    }
-    if (billing.penalty_amount > 0) {
-      return 'PENALIZED';
-    }
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const isOverdue = new Date(billing.due_date) < today;
-
-    if (isOverdue) {
-      if (billing.status === 'PARTIAL') {
-        return 'OVERDUE-PARTIAL';
-      }
-      return 'OVERDUE';
-    }
-
-    return billing.status; // PENDING or PARTIAL
-  }
-
-  let selectedBillingType = $state<'RENT' | 'UTILITY' | 'PENALTY' | 'Other'>('RENT');
+  let selectedBillingType = $state<'RENT' | 'UTILITY' | 'PENALTY' | 'SECURITY_DEPOST'>('RENT');
 
   function getBillingSummary(billings: Billing[] = []): Record<string, { total: number; unpaid: number }> {
     return billings.reduce(
@@ -120,6 +73,7 @@
 
   let showPaymentModal = $state(false);
   let showRentManager = $state(false);
+  let showSecurityDepositManager = $state(false);
 
   async function handlePaymentModalClose() {
     showPaymentModal = false;
@@ -127,6 +81,10 @@
   }
   async function handleRentManagerClose() {
     showRentManager = false;
+    await invalidateAll();
+  }
+  async function handleSecurityDepositManagerClose() {
+    showSecurityDepositManager = false;
     await invalidateAll();
   }
 
@@ -162,7 +120,6 @@
       await invalidateAll();
     } catch (error) {
       console.error('Error updating lease name:', error);
-      // Optionally show a toast notification here
       isEditing = false;
     }
   }
@@ -199,30 +156,29 @@
       alert('Failed to update status: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   }
-
 </script>
 
 <AccordionPrimitive.Root type="single" class="border-none">
   <AccordionPrimitive.Item value="item-1" class="w-full border-none">
-    <Card.Root class="hover:bg-gray-50 w-full border-0">
-      <AccordionPrimitive.Trigger class="w-full py-4 px-4 border-t">
+    <Card.Root class="group hover:shadow-md transition-all duration-200 w-full border-0 bg-white/50 backdrop-blur-sm hover:bg-white/80">
+      <AccordionPrimitive.Trigger class="lease-trigger w-full py-6 px-6 border-t border-border/40">
         <!-- Main Row -->
-        <div class="flex items-center w-full">
+        <div class="flex items-center w-full gap-6">
           <!-- Left: Name and Status -->
-          <div class="flex items-center gap-2 flex-[2]">
+          <div class="w-72 flex flex-col gap-2">
             {#if isEditing}
               <Input
                 type="text"
                 bind:value={editedName}
-                class="w-48"
+                class="w-full h-9 text-lg font-semibold"
                 onblur={handleNameSubmit}
                 onkeydown={handleKeyDown}
                 autofocus
               />
             {:else}
-              <div class="flex items-center gap-1 group">
+              <div class="flex items-center gap-2 group/name min-w-0">
                 <span 
-                  class="text-lg font-semibold cursor-pointer hover:text-primary truncate"
+                  class="text-xl font-bold cursor-pointer hover:text-primary truncate text-slate-800 transition-colors"
                   ondblclick={handleLeaseNameDoubleClick}
                   role="button"
                   tabindex="0"
@@ -230,182 +186,296 @@
                   {lease.name || `Lease #${lease.id}`}
                 </span>
                 <button 
-                  class="opacity-0 group-hover:opacity-100 transition-opacity"
+                  class="opacity-0 group-hover/name:opacity-100 transition-opacity p-1 hover:bg-primary/10 rounded"
                   onclick={(e) => {
                     e.stopPropagation();
                     handleLeaseNameDoubleClick();
                   }}
                 >
-                  <Pencil class="w-3.5 h-3.5 text-muted-foreground hover:text-primary" />
+                  <Pencil class="w-4 h-4 text-muted-foreground hover:text-primary transition-colors" />
                 </button>
               </div>
             {/if}
 
-            <DropdownMenu.Root>
-              <DropdownMenu.Trigger>
-                <Badge 
-                  variant={getStatusVariant(lease.status?.toString() || 'INACTIVE')} 
-                  class="text-xs cursor-pointer hover:opacity-80"
-                >
-                  {lease.status?.toString() || 'INACTIVE'}
-                </Badge>
-              </DropdownMenu.Trigger>
-              <DropdownMenu.Content class="w-40">
-                <DropdownMenu.Group>
-                  <DropdownMenu.GroupHeading class="px-2 py-1.5 text-xs font-semibold">
-                    Change Status
-                  </DropdownMenu.GroupHeading>
-                  <DropdownMenu.Separator />
-                  <DropdownMenu.RadioGroup value={lease.status}>
-                    {#each leaseStatusEnum.options as status}
-                      <DropdownMenu.RadioItem 
-                        value={status}
-                        onSelect={() => handleStatusChange(status)}
-                      >
-                        {status}
-                      </DropdownMenu.RadioItem>
-                    {/each}
-                  </DropdownMenu.RadioGroup>
-                </DropdownMenu.Group>
-              </DropdownMenu.Content>
-            </DropdownMenu.Root>
-          </div>
-
-          <!-- Middle: Details -->
-          <div class="flex flex-col flex-1">
-            <div class="text-sm text-gray-600">
-              Unit • Floor {lease.rental_unit?.floor?.floor_number} • bedspacer
+            <div class="flex items-center">
+              <DropdownMenu.Root>
+                <DropdownMenu.Trigger>
+                  <Badge 
+                    variant={getStatusVariant(lease.status?.toString() || 'INACTIVE')} 
+                    class="text-sm px-3 py-1 cursor-pointer hover:opacity-80 transition-opacity font-medium"
+                  >
+                    {lease.status?.toString() || 'INACTIVE'}
+                    <ChevronDown class="w-3 h-3 ml-1" />
+                  </Badge>
+                </DropdownMenu.Trigger>
+                <DropdownMenu.Content class="w-44">
+                  <DropdownMenu.Group>
+                    <DropdownMenu.GroupHeading class="px-2 py-1.5 text-xs font-semibold">
+                      Change Status
+                    </DropdownMenu.GroupHeading>
+                    <DropdownMenu.Separator />
+                    <DropdownMenu.RadioGroup value={lease.status}>
+                      {#each leaseStatusEnum.options as status}
+                        <DropdownMenu.RadioItem 
+                          value={status}
+                          onSelect={() => handleStatusChange(status)}
+                        >
+                          {status}
+                        </DropdownMenu.RadioItem>
+                      {/each}
+                    </DropdownMenu.RadioGroup>
+                  </DropdownMenu.Group>
+                </DropdownMenu.Content>
+              </DropdownMenu.Root>
             </div>
-            {#if lease.lease_tenants?.length}
-              <div class="text-sm text-gray-600">
-                Tenant: {lease.lease_tenants[0]?.name || 'Unnamed Tenant'}
-              </div>
-            {/if}
           </div>
 
-          <!-- Right: Balance and Actions -->
-          <div class="flex items-end gap-4 flex-1 justify-end">
-            <div class="flex flex-col items-end gap-2">
-              <div class="w-full flex justify-between items-center py-1.5 border-b">
-                <span class="text-gray-500">
-                  Overall Balance
-     
-                </span>
-                <span class={`font-medium ${lease.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                  {formatCurrency(lease.balance)}
-                </span>
+          <!-- Middle: Balance Card -->
+          <div class="w-80">
+            <div class="bg-gradient-to-r from-slate-50 to-slate-100 rounded-lg p-4 border border-slate-200/60">
+              <div class="flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                  <DollarSign class="w-4 h-4 text-slate-500" />
+                  <span class="text-sm font-medium text-slate-600">BALANCE</span>
+                </div>
+                <div class="text-right">
+                  <span class={`text-2xl font-bold transition-colors ${
+                    lease.balance > 0 
+                      ? 'text-red-600' 
+                      : lease.balance < 0 
+                        ? 'text-green-600' 
+                        : 'text-slate-600'
+                  }`}>
+                    {formatCurrency(lease.balance)}
+                  </span>
+                  {#if totalPenalty > 0}
+                    <div class="flex items-center gap-1 text-xs text-red-500 mt-1">
+                      <AlertTriangle class="w-3 h-3" />
+                      <span>+{formatCurrency(totalPenalty)} penalty</span>
+                    </div>
+                  {/if}
+                </div>
               </div>
+            </div>
+          </div>
 
-          
-                 <div class="flex items-center gap-2">
-                <Button 
-                  variant="outline"
-                  onclick={(e) => {
-                    e.stopPropagation();
-                    showPaymentModal = true;
-                  }}
-                  class="h-8"
-                >
-                  Make Payment
-                </Button>
-                  <Button variant="outline" class="h-8" 
-                  onclick={(e) => {
-                    e.stopPropagation(); 
-                    showRentManager = true;
-                  }}>
-                    Modify Rents
+          <!-- Right: Action Icons -->
+          <div class="flex items-center gap-2">
+            <Tooltip.Provider>
+              <Tooltip.Root>
+                <Tooltip.Trigger >
+                  <Button 
+                    size="icon"
+                    variant="ghost"
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      showPaymentModal = true;
+                    }}
+                    class="h-10 w-10 hover:bg-green-50 hover:text-green-600 transition-colors group/payment"
+                  >
+                    <CreditCard class="w-5 h-5 group-hover/payment:scale-110 transition-transform" />
                   </Button>
-              </div>
-            </div>
-            <Button 
-              size="icon"
-              variant="ghost"
-              onclick={(e) => {
-                e.stopPropagation();
-                onDelete(e, lease);
-              }}
-              class="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-            >
-              <Trash2 class="w-4 h-4" />
-            </Button>
+                </Tooltip.Trigger>
+                <Tooltip.Content>
+                  <p class="text-sm font-medium">Make Payment</p>
+                </Tooltip.Content>
+              </Tooltip.Root>
+            </Tooltip.Provider>
+
+            <Tooltip.Provider>
+              <Tooltip.Root>
+                <Tooltip.Trigger >
+                  <Button 
+                    size="icon"
+                    variant="ghost"
+                    onclick={(e) => {
+                      e.stopPropagation(); 
+                      showRentManager = true;
+                    }}
+                    class="h-10 w-10 hover:bg-blue-50 hover:text-blue-600 transition-colors group/rent"
+                  >
+                    <Home class="w-5 h-5 group-hover/rent:scale-110 transition-transform" />
+                  </Button>
+                </Tooltip.Trigger>
+                <Tooltip.Content>
+                  <p class="text-sm font-medium">Modify Rents</p>
+                </Tooltip.Content>
+              </Tooltip.Root>
+            </Tooltip.Provider>
+
+            <Tooltip.Provider>
+              <Tooltip.Root>
+                <Tooltip.Trigger >
+                  <Button 
+                    size="icon"
+                    variant="ghost"
+                    onclick={(e) => {
+                      e.stopPropagation(); 
+                      showSecurityDepositManager = true;
+                    }}
+                    class="h-10 w-10 hover:bg-orange-50 hover:text-orange-600 transition-colors group/security"
+                  >
+                    <Shield class="w-5 h-5 group-hover/security:scale-110 transition-transform" />
+                  </Button>
+                </Tooltip.Trigger>
+                <Tooltip.Content>
+                  <p class="text-sm font-medium">Modify Security Deposit</p>
+                </Tooltip.Content>
+              </Tooltip.Root>
+            </Tooltip.Provider>
+
+            <Tooltip.Provider>
+              <Tooltip.Root>
+                <Tooltip.Trigger >
+                  <Button 
+                    size="icon"
+                    variant="ghost"
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      onDelete(e, lease);
+                    }}
+                    class="h-10 w-10 hover:bg-red-50 hover:text-red-600 transition-colors group/delete"
+                  >
+                    <Trash2 class="w-5 h-5 group-hover/delete:scale-110 transition-transform" />
+                  </Button>
+                </Tooltip.Trigger>
+                <Tooltip.Content>
+                  <p class="text-sm font-medium">Delete Lease</p>
+                </Tooltip.Content>
+              </Tooltip.Root>
+            </Tooltip.Provider>
           </div>
         </div>
       </AccordionPrimitive.Trigger>
 
-      <AccordionPrimitive.Content>
-        <Card.Content>
-          <div class="grid grid-cols-3 gap-4">
+      <AccordionPrimitive.Content class="accordion-content">
+        <Card.Content class="px-6 pb-6">
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <!-- Column 1: Lease Details -->
-            <div class="space-y-3">
-              <h3 class="text-sm font-semibold pb-1 border-b">Lease Details</h3>
-              <div class="space-y-2 text-sm">
-                {#if lease.rental_unit?.property?.name}
-                  <div>
-                    <p class="text-gray-500">Property</p>
-                    <p class="font-medium">{lease.rental_unit.property.name}</p>
+            <div class="space-y-4">
+              <div class="flex items-center gap-2 pb-2 border-b border-slate-200">
+                <FileText class="w-4 h-4 text-slate-500" />
+                <h3 class="text-sm font-semibold text-slate-700">Lease Details</h3>
+              </div>
+              <div class="space-y-4 text-sm">
+                <div class="bg-slate-50/50 rounded-lg p-4 space-y-3">
+                  <div class="flex items-start gap-3">
+                    <MapPin class="w-4 h-4 text-slate-500 mt-0.5 flex-shrink-0" />
+                    <div class="flex-1 min-w-0">
+                      <div class="font-medium text-slate-800">
+                        Unit • Floor {lease.rental_unit?.floor?.floor_number} • Bedspacer
+                      </div>
+                      {#if lease.rental_unit?.property?.name}
+                        <div class="text-slate-600 text-xs mt-1">
+                          {lease.rental_unit.property.name}
+                        </div>
+                      {/if}
+                    </div>
                   </div>
-                {/if}
-                <div>
-                  <p class="text-gray-500">Type</p>
-                  <p class="font-medium">{lease.type || 'STANDARD'}</p>
-                </div>
-                <div>
-                  <p class="text-gray-500">Period</p>
-                  <p class="font-medium">{formatDate(lease.start_date)} - {formatDate(lease.end_date)}</p>
-                </div>
-                {#if lease.notes}
-                  <div class="pt-2">
-                    <p class="text-gray-500">Notes</p>
-                    <p class="font-medium">{lease.notes}</p>
+
+                  {#if lease.lease_tenants?.length}
+                    <div class="flex items-start gap-3">
+                      <Users class="w-4 h-4 text-slate-500 mt-0.5 flex-shrink-0" />
+                      <div class="flex-1 min-w-0">
+                        <div class="font-medium text-slate-800">
+                          {lease.lease_tenants.length === 1 ? 'Tenant' : 'Tenants'}
+                        </div>
+                        <div class="text-slate-600 text-xs mt-1">
+                          {lease.lease_tenants.map(lt => lt.name).filter(Boolean).join(', ') || 'No tenant names available'}
+                        </div>
+                      </div>
+                    </div>
+                  {/if}
+
+                  <div class="flex items-start gap-3">
+                    <Calendar class="w-4 h-4 text-slate-500 mt-0.5 flex-shrink-0" />
+                    <div class="flex-1 min-w-0">
+                      <div class="font-medium text-slate-800">Lease Period</div>
+                      <div class="text-slate-600 text-xs mt-1">
+                        {formatDate(lease.start_date)} - {formatDate(lease.end_date)}
+                      </div>
+                    </div>
                   </div>
-                {/if}
+
+                  <div class="flex items-start gap-3">
+                    <FileText class="w-4 h-4 text-slate-500 mt-0.5 flex-shrink-0" />
+                    <div class="flex-1 min-w-0">
+                      <div class="font-medium text-slate-800">Type</div>
+                      <div class="text-slate-600 text-xs mt-1">
+                        {lease.type || 'STANDARD'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {#if lease.notes}
+                    <div class="pt-2 border-t border-slate-200">
+                      <div class="font-medium text-slate-800 text-xs mb-1">Notes</div>
+                      <div class="text-slate-600 text-xs">{lease.notes}</div>
+                    </div>
+                  {/if}
+                </div>
               </div>
             </div>
 
             <!-- Column 2: Billing Summary -->
-            <div class="space-y-3">
-              <h3 class="text-sm font-semibold pb-1 border-b">Billing Summary</h3>
-              <div class="space-y-2">
-                <div class="text-sm">
-                  <div class="flex justify-between items-center">
-                    <span class="text-gray-500">Security Deposit</span>
-                    <span class="font-medium">{formatCurrency(lease.security_deposit)}</span>
-                  </div>
-                  
-                  <!-- Overall Balance -->
-                  <div class="w-full flex justify-between items-center py-1.5 border-b">
-                    <span class="text-gray-500">
+            <div class="space-y-4">
+              <div class="flex items-center gap-2 pb-2 border-b border-slate-200">
+                <DollarSign class="w-4 h-4 text-slate-500" />
+                <h3 class="text-sm font-semibold text-slate-700">Billing Summary</h3>
+              </div>
+              <div class="space-y-3">
+                <!-- Overall Balance Card -->
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 rounded-lg p-4 border border-slate-200/60">
+                  <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm font-medium text-slate-600">
                       Overall Balance
                       {#if totalPenalty > 0}
-                        <span class="text-xs text-muted-foreground">(penalty-adjusted)</span>
+                        <span class="text-xs text-muted-foreground block">(penalty-adjusted)</span>
                       {/if}
                     </span>
-                    <span class={`font-medium ${lease.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                    <span class={`text-lg font-bold ${
+                      lease.balance > 0 
+                        ? 'text-red-600' 
+                        : lease.balance < 0 
+                          ? 'text-green-600' 
+                          : 'text-slate-600'
+                    }`}>
                       {formatCurrency(lease.balance)}
                     </span>
                   </div>
 
                   {#if totalPenalty > 0}
-                    <div class="w-full flex justify-between items-center py-1.5 border-b text-red-500">
-                      <span class="text-sm">Total Penalty</span>
-                      <span class="font-medium">{formatCurrency(totalPenalty)}</span>
+                    <div class="flex justify-between items-center pt-2 border-t border-slate-200">
+                      <div class="flex items-center gap-1">
+                        <AlertTriangle class="w-3 h-3 text-red-500" />
+                        <span class="text-sm text-red-600">Total Penalty</span>
+                      </div>
+                      <span class="font-medium text-red-600">{formatCurrency(totalPenalty)}</span>
                     </div>
                   {/if}
+                </div>
 
-                  <!-- Billing Type Summaries -->
+                <!-- Billing Type Summaries -->
+                <div class="space-y-2">
                   {#each Object.entries(getBillingSummary(lease.billings)) as [type, amounts] (type)}
                     <button
                       type="button"
-                      class="w-full flex justify-between items-center py-1 cursor-pointer hover:bg-gray-100 rounded px-2"
+                      class={`w-full flex justify-between items-center p-3 rounded-lg border transition-all duration-200 ${
+                        selectedBillingType === type 
+                          ? 'bg-primary/5 border-primary/20 shadow-sm' 
+                          : 'bg-white/50 border-slate-200/60 hover:bg-slate-50/80 hover:border-slate-300/60'
+                      }`}
                       onclick={() => (selectedBillingType = type as any)}
                       onkeydown={(e) => e.key === 'Enter' && (selectedBillingType = type as any)}
                       aria-label={`View ${type} billing details`}
                     >
-                      <span class="text-gray-500">{type}</span>
+                      <span class="font-medium text-slate-700">{type}</span>
                       <div class="text-right">
-                        <div>{formatCurrency(amounts.total)}</div>
+                        <div class="font-semibold text-slate-800">{formatCurrency(amounts.total)}</div>
                         {#if amounts.unpaid > 0}
-                          <div class="text-xs text-red-500">Unpaid: {formatCurrency(amounts.unpaid)}</div>
+                          <div class="text-xs text-red-500 font-medium">
+                            Unpaid: {formatCurrency(amounts.unpaid)}
+                          </div>
                         {/if}
                       </div>
                     </button>
@@ -415,65 +485,78 @@
             </div>
 
             <!-- Column 3: Billing Details -->
-            <div class="space-y-3">
-              <h3 class="text-sm font-semibold pb-1 border-b">{selectedBillingType} Billings</h3>
-              <div class="space-y-2 max-h-[200px] overflow-y-auto">
+            <div class="space-y-4">
+              <div class="flex items-center gap-2 pb-2 border-b border-slate-200">
+                <FileText class="w-4 h-4 text-slate-500" />
+                <h3 class="text-sm font-semibold text-slate-700">{selectedBillingType} Details</h3>
+              </div>
+              <div class="space-y-3 max-h-[300px] overflow-y-auto">
                 {#if lease.billings?.filter((b) => b.type === selectedBillingType).length}
-                  <div class="text-sm">
+                  <div class="space-y-3">
                     {#each sortedBillings.filter((b) => b.type === selectedBillingType) as billing}
                       {@const displayStatus = getDisplayStatus(billing)}
-                      <div class="flex flex-col py-1 border-b last:border-0">
-                        <div class="flex-1">
-                          <div class="flex justify-between items-center">
-                            <span class="font-medium">
-                              {#if billing.status === 'PAID'}
-                                Paid
-                              {:else}
-                                {formatCurrency((billing.amount + (billing.penalty_amount || 0)) - billing.paid_amount)}
-                              {/if}
-                            </span>
-                            <span class={`px-2 py-0.5 rounded-full text-xs ${getBillingStatusColor(displayStatus)}`}>
-                              {displayStatus}
-                            </span>
-                          </div>
-                          <div class="text-xs text-gray-500 mt-1">
-                            <span>Due: {formatDate(billing.due_date)}</span>
-                          </div>
-                          <div class="text-xs text-gray-500">
-                            Total: {formatCurrency(billing.amount)}
-                            {#if billing.penalty_amount > 0}
-                              <span class="text-red-500">(+ {formatCurrency(billing.penalty_amount)} penalty)</span>
+                      <div class="bg-white/60 rounded-lg p-4 border border-slate-200/60 hover:shadow-sm transition-shadow">
+                        <div class="flex justify-between items-start mb-3">
+                          <div class="font-semibold text-slate-800">
+                            {#if billing.status === 'PAID'}
+                              Paid in Full
+                            {:else}
+                              {formatCurrency((billing.amount + (billing.penalty_amount || 0)) - billing.paid_amount)}
                             {/if}
                           </div>
-
-                          <!-- Payment History -->
-                          {#if billing.allocations && billing.allocations.length > 0}
-                            <div class="mt-2 pt-1 border-t border-dashed">
-                              {#each billing.allocations as allocation}
-                                <div class="text-xs text-gray-600 flex justify-between">
-                                  <span>Paid: {formatCurrency(allocation.amount)}</span>
-                                  <span>{formatDate(allocation.payment.paid_at)}</span>
-                                </div>
-                              {/each}
-                            </div>
-                          {/if}
-                          {#if billing.type === 'UTILITY' && billing.notes}
-                            <div class="text-xs text-gray-500 pt-1">
-                              Notes: {billing.notes}
+                          <span class={`px-2 py-1 rounded-full text-xs font-medium ${getBillingStatusColor(displayStatus)}`}>
+                            {displayStatus}
+                          </span>
+                        </div>
+                        
+                        <div class="space-y-2 text-xs text-slate-600">
+                          <div class="flex items-center gap-2">
+                            <Calendar class="w-3 h-3" />
+                            <span>Due: {formatDate(billing.due_date)}</span>
+                          </div>
+                          
+                          <div class="flex justify-between">
+                            <span>Total Amount:</span>
+                            <span class="font-medium">{formatCurrency(billing.amount)}</span>
+                          </div>
+                          
+                          {#if billing.penalty_amount > 0}
+                            <div class="flex justify-between text-red-600">
+                              <span>Penalty:</span>
+                              <span class="font-medium">+{formatCurrency(billing.penalty_amount)}</span>
                             </div>
                           {/if}
                         </div>
+
+                        <!-- Payment History -->
+                        {#if billing.allocations && billing.allocations.length > 0}
+                          <div class="mt-3 pt-3 border-t border-slate-200">
+                            <div class="text-xs font-medium text-slate-700 mb-2">Payment History</div>
+                            {#each billing.allocations as allocation}
+                              <div class="flex justify-between items-center text-xs text-slate-600 py-1">
+                                <span>Paid: {formatCurrency(allocation.amount)}</span>
+                                <span>{formatDate(allocation.payment.paid_at)}</span>
+                              </div>
+                            {/each}
+                          </div>
+                        {/if}
+                        
+                        {#if billing.type === 'UTILITY' && billing.notes}
+                          <div class="mt-3 pt-3 border-t border-slate-200">
+                            <div class="text-xs font-medium text-slate-700 mb-1">Notes</div>
+                            <div class="text-xs text-slate-600">{billing.notes}</div>
+                          </div>
+                        {/if}
                       </div>
                     {/each}
-
-
                   </div>
                 {:else}
-                  <p class="text-sm text-gray-500">No {selectedBillingType.toLowerCase()} billings available</p>
+                  <div class="text-center py-8 text-slate-500">
+                    <FileText class="w-8 h-8 mx-auto mb-2 opacity-40" />
+                    <p class="text-sm">No {selectedBillingType.toLowerCase()} billings available</p>
+                  </div>
                 {/if}
               </div>
-
-              
             </div>
           </div>
         </Card.Content>
@@ -493,28 +576,59 @@
   open={showRentManager}
   onOpenChange={handleRentManagerClose}
 />
+
+<SecurityDepositModal
+  lease={lease}
+  open={showSecurityDepositManager}
+  onOpenChange={handleSecurityDepositManagerClose}
+/>
+
 <style>
-  :global(.accordion-trigger) {
+  :global(.lease-trigger) {
     width: 100%;
     text-align: left;
     border-bottom: none;
-    border-top: 1px solid hsl(var(--border));
+    border-top: 1px solid hsl(var(--border) / 0.4);
+    transition: all 0.2s ease;
+  }
+
+  :global(.lease-trigger:hover) {
+    background: linear-gradient(135deg, hsl(var(--muted) / 0.3), hsl(var(--muted) / 0.1));
   }
 
   :global(.accordion-content) {
     overflow: hidden;
+    background: linear-gradient(135deg, hsl(var(--background) / 0.8), hsl(var(--muted) / 0.1));
   }
 
-  :global(.accordion-trigger:focus-visible) {
-    outline: none;
-  }
-
-  :global(.accordion-trigger:hover) {
-    background-color: hsl(var(--muted));
+  :global(.lease-trigger:focus-visible) {
+    outline: 2px solid hsl(var(--primary));
+    outline-offset: -2px;
+    border-radius: 0.5rem;
   }
 
   :global(.card) {
     border: none !important;
     margin-bottom: 0 !important;
+    backdrop-filter: blur(10px);
+  }
+
+  /* Custom scrollbar for billing details */
+  :global(.max-h-\[300px\]::-webkit-scrollbar) {
+    width: 4px;
+  }
+
+  :global(.max-h-\[300px\]::-webkit-scrollbar-track) {
+    background: hsl(var(--muted) / 0.3);
+    border-radius: 2px;
+  }
+
+  :global(.max-h-\[300px\]::-webkit-scrollbar-thumb) {
+    background: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 2px;
+  }
+
+  :global(.max-h-\[300px\]::-webkit-scrollbar-thumb:hover) {
+    background: hsl(var(--muted-foreground) / 0.5);
   }
 </style>
