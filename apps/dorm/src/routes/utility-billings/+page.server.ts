@@ -4,7 +4,8 @@ import { zod } from 'sveltekit-superforms/adapters';
 import type { PageServerLoad } from './$types';
 import type { Actions } from './$types';
 import type { Database } from '$lib/database.types';
-import { batchReadingsSchema } from './meterReadingSchema';
+import { batchReadingsSchema, meterReadingSchema } from './meterReadingSchema';
+import type { z } from 'zod';
 
 export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession } }) => {
   const session = await safeGetSession();
@@ -55,11 +56,9 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
       id,
       name,
       type,
-      location_type,
       property_id,
-      floor_id,
-      rental_unit_id,
-      rental_unit:rental_unit (
+      initial_reading,
+      rental_unit(
         id,
         name,
         number
@@ -179,6 +178,67 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
     throw error(500, `Error fetching leases: ${leasesError.message}`);
   }
 
+  // Get last billed date for each lease-meter combination
+  const { data: billings, error: billingsError } = await supabase
+    .from('billings')
+    .select('meter_id, lease_id, billing_date')
+    .eq('type', 'UTILITY')
+    .not('meter_id', 'is', null);
+
+  if (billingsError) {
+    console.error('Error fetching billings:', billingsError);
+    return fail(500, { message: 'Failed to fetch billings' });
+  }
+
+  const meterLastBilledDates: Record<string, string> = {};
+  const leaseMeterBilledDates: Record<string, string> = {};
+
+  if (billings) {
+    for (const billing of billings) {
+      if (billing.meter_id) {
+        const meterId = String(billing.meter_id);
+        const newDate = billing.billing_date;
+
+        // Update meterLastBilledDates
+        if (!meterLastBilledDates[meterId] || new Date(newDate) > new Date(meterLastBilledDates[meterId])) {
+          meterLastBilledDates[meterId] = newDate;
+        }
+
+        // Update leaseMeterBilledDates
+        if (billing.lease_id) {
+          const key = `${meterId}-${billing.lease_id}`;
+          if (!leaseMeterBilledDates[key] || new Date(newDate) > new Date(leaseMeterBilledDates[key])) {
+            leaseMeterBilledDates[key] = newDate;
+          }
+        }
+      }
+    }
+  }
+
+  // Get all readings with full data
+  const { data: allReadings, error: allReadingsError } = await supabase
+    .from('readings')
+    .select('*');
+
+  if (allReadingsError) {
+    console.error('Error fetching all readings:', allReadingsError);
+    throw error(500, `Error fetching all readings: ${allReadingsError.message}`);
+  }
+
+  const readingGroups = (allReadings || []).reduce((acc, reading) => {
+    const date = reading.reading_date;
+    if (!acc[date]) {
+      acc[date] = [];
+    }
+    acc[date].push(reading);
+    return acc;
+  }, {} as Record<string, any[]>);
+
+  const previousReadingGroups = Object.entries(readingGroups).map(([date, readings]) => ({
+    date,
+    readings
+  })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
   // Return all the data needed for the page
   return {
     form,
@@ -187,224 +247,170 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
     readings,
     availableReadingDates: uniqueDates,
     rental_unitTenantCounts,
-    leases
+    leases,
+    meterLastBilledDates,
+    leaseMeterBilledDates,
+    previousReadingGroups
   };
 };
 
 export const actions: Actions = {
-  // Add batch readings with full data saving
-  addBatchReadings: async ({ request, locals: { supabase, safeGetSession } }) => {
+  createUtilityBillings: async ({ request, locals: { supabase, safeGetSession } }) => {
+    const session = await safeGetSession();
+    if (!session) {
+      return fail(401, { error: 'Unauthorized' });
+    }
+
+    const formData = await request.formData();
+    const billingDataString = formData.get('billingData') as string;
+
+    if (!billingDataString) {
+      return fail(400, { error: 'Missing billingData' });
+    }
+
     try {
-      // Ensure user is authenticated
-      const session = await safeGetSession();
-      if (!session) {
-        throw error(401, 'Unauthorized');
+      const billings: Array<{ lease_id: number; utility_type: string; billing_date: string; amount: number; notes: string; meter_id: number; lease: { name: string } }> = JSON.parse(billingDataString);
+
+      // 1. Pre-emptive Duplicate Check
+      const orFilters = billings
+        .map(
+          (b) =>
+            `and(lease_id.eq.${b.lease_id},utility_type.eq.${b.utility_type},billing_date.eq.${b.billing_date},meter_id.eq.${b.meter_id})`
+        )
+        .join(',');
+
+      const { data: existingBillings, error: checkError } = await supabase
+        .from('billings')
+        .select('lease_id')
+        .or(orFilters);
+
+      if (checkError) {
+        console.error('Error checking for duplicates:', checkError);
+        return fail(500, { error: 'Database error while checking for duplicates.' });
       }
 
-      // Get form data
-      const formData = await request.formData();
-      
-      // Get the base data
-      const property_id = formData.get('property_id');
-      const type = formData.get('type');
-      const cost_per_unit = parseFloat(formData.get('cost_per_unit') as string);
-      
-      // Get readings from the readings_json field
-      const readingsJson = formData.get('readings_json');
-      if (!readingsJson || typeof readingsJson !== 'string') {
-        return fail(400, { error: 'No readings provided' });
+      // 2. All-or-Nothing Logic
+      if (existingBillings && existingBillings.length > 0) {
+        const existingLeaseIds = new Set(existingBillings.map(eb => eb.lease_id));
+        const conflictingLeases = billings
+          .filter(b => existingLeaseIds.has(b.lease_id))
+          .map(b => b.lease.name)
+          .join(', ');
+        return fail(409, { 
+          error: `Duplicate billing detected. The following leases have already been billed for this period: ${conflictingLeases}. No new bills were created.`
+        });
       }
-      
-      // Parse the readings JSON
-      let readings;
-      try {
-        readings = JSON.parse(readingsJson);
-      } catch (e) {
-        return fail(400, { error: 'Invalid readings format' });
+
+      // 3. Transactional Data Insertion
+      const billingsToCreate = billings.map(item => {
+        const dueDate = new Date(item.billing_date);
+        dueDate.setDate(dueDate.getDate() + 15); // Due 15 days from billing date
+        return {
+          lease_id: item.lease_id,
+          type: 'UTILITY',
+          utility_type: item.utility_type,
+          amount: item.amount,
+          balance: item.amount,
+          status: 'PENDING',
+          due_date: dueDate.toISOString().split('T')[0],
+          billing_date: item.billing_date,
+          notes: item.notes,
+          meter_id: item.meter_id
+        };
+      });
+
+      const { error: insertError } = await supabase.from('billings').insert(billingsToCreate);
+
+      if (insertError) {
+        console.error('Error creating billings:', insertError);
+        // Check for unique constraint violation
+        if (insertError.code === '23505') { // Unique violation error code in PostgreSQL
+          return fail(409, { error: 'A billing for this period and lease already exists.' });
+        }
+        return fail(500, { error: 'Failed to create billings.' });
       }
-      
-      if (!Array.isArray(readings) || readings.length === 0) {
-        return fail(400, { error: 'No readings provided' });
-      }
-      
-      // Get meter information for all meters involved
-      const meterIds = readings.map(r => r.meter_id);
+
+      return { created: billingsToCreate.length, duplicates: [] };
+    } catch (e: any) {
+      return fail(400, { error: 'Invalid JSON format for billingData' });
+    }
+  },
+  // Add batch readings with full data saving
+  addBatchReadings: async ({ request, locals: { supabase, safeGetSession } }) => {
+    /* 1. Validate the form once and only once. */
+    const form = await superValidate(request, zod(batchReadingsSchema));
+    console.log("form.dataAAAAAAAAAAAAAAAAA", form.data);
+    if (!form.valid) {
+      console.error('❌ Validation failed', form.errors);
+      return fail(400, { form });
+    }
+
+    try {
+      const session = await safeGetSession();
+      if (!session) throw error(401, 'Unauthorized');
+
+      // Manually parse the JSON string after successful validation
+      const readings: z.infer<typeof meterReadingSchema>[] = JSON.parse(form.data.readings_json);
+      const { cost_per_unit } = form.data;
+
+      const meterIds = readings.map((r) => r.meter_id);
+  
       const { data: meterData, error: meterError } = await supabase
         .from('meters')
         .select('id, name, rental_unit_id, type')
         .in('id', meterIds);
-      
-      if (meterError) {
-        return fail(500, { error: `Error fetching meter data: ${meterError.message}` });
-      }
-      
-      // Create a map of meter IDs to meter names
-      const meterNameMap: Record<number, string> = {};
-      meterData.forEach(meter => {
-        meterNameMap[meter.id] = meter.name;
-      });
-      
-      // Get previous readings for all meters to calculate consumption
+      if (meterError) return fail(500, { form, error: `Error fetching meter data: ${meterError.message}` });
+  
+      const meterNameMap = Object.fromEntries((meterData ?? []).map((m) => [m.id, m.name]));
+  
       const { data: previousReadings, error: prevError } = await supabase
         .from('readings')
         .select('meter_id, reading, reading_date')
         .in('meter_id', meterIds)
         .order('reading_date', { ascending: false });
-        
-      if (prevError) {
-        return fail(500, { error: `Error fetching previous readings: ${prevError.message}` });
-      }
-      
-      // Create a map of meter IDs to their most recent reading
+      if (prevError) return fail(500, { form, error: `Error fetching previous readings: ${prevError.message}` });
+  
       const previousReadingMap: Record<number, number> = {};
-      for (const reading of previousReadings || []) {
-        // Only add the first (most recent) reading for each meter
-        if (!previousReadingMap[reading.meter_id]) {
-          previousReadingMap[reading.meter_id] = reading.reading;
-        }
+      for (const r of previousReadings || []) {
+        if (previousReadingMap[r.meter_id] === undefined) previousReadingMap[r.meter_id] = r.reading;
       }
-      
-      // Prepare data for insertion with all fields
+  
       const readingsToInsert = readings
-        .filter(reading => reading.reading !== null) // Skip null readings
-        .map(reading => {
-          const meterId = reading.meter_id;
-          const currentReading = parseFloat(reading.reading);
-          const previousReading = previousReadingMap[meterId] || null;
-          const consumption = previousReading !== null ? currentReading - previousReading : null;
+        .filter((r) => r.reading !== null)
+        .map((r) => {
+          const current = Number(r.reading);
+          const previous = previousReadingMap[r.meter_id] ?? null;
+          const consumption = previous !== null ? current - previous : null;
           const cost = consumption !== null && consumption > 0 ? consumption * cost_per_unit : null;
-          
           return {
-            meter_id: meterId,
-            reading: currentReading,
-            reading_date: reading.reading_date,
-            meter_name: meterNameMap[meterId] || null,
-            consumption: consumption,
-            cost: cost,
-            cost_per_unit: cost_per_unit, // Store as cost_per_unit for any utility type
-            previous_reading: previousReading
+            meter_id: r.meter_id,
+            reading: current,
+            reading_date: r.reading_date,
+            meter_name: meterNameMap[r.meter_id] || null,
+            consumption,
+            cost,
+            cost_per_unit,
+            previous_reading: previous
           };
         });
-      
-      if (readingsToInsert.length === 0) {
-        return fail(400, { error: 'No valid readings to insert' });
-      }
-      
-      console.log('Inserting readings with data:', readingsToInsert);
-      
-      // Insert the readings into the database with all fields
+  
+      if (readingsToInsert.length === 0) return fail(400, { form, error: 'No valid readings to insert' });
+  
       const { data: newReadings, error: insertError } = await supabase
         .from('readings')
         .insert(readingsToInsert)
         .select();
-      
-      if (insertError) {
-        console.error('Error inserting readings:', insertError);
-        return fail(500, { error: `Failed to insert readings: ${insertError.message}` });
-      }
-      
-      // Now create utility billings for each meter reading that has an associated rental unit
-      const today = new Date().toISOString().split('T')[0];
-      const utilityBillings = [];
-      
-      // Create a map of meter IDs to their details, including rental_unit_id and type
-      const meterDetailsMap: Record<number, { rental_unit_id: number | null, type: string }> = {};
-      meterData.forEach(meter => {
-        meterDetailsMap[meter.id] = {
-          rental_unit_id: meter.rental_unit_id,
-          type: meter.type
-        };
-      });
-      
-      // Group readings by meter ID to avoid duplicate billings
-      const meterReadingsMap: Record<number, any> = {};
-      for (const reading of newReadings) {
-        const meterId = reading.meter_id;
-        if (!meterReadingsMap[meterId] || new Date(reading.reading_date) > new Date(meterReadingsMap[meterId].reading_date)) {
-          meterReadingsMap[meterId] = reading;
-        }
-      }
-      
-      // Get all rental units with active leases
-      const rentalUnitIds = Object.values(meterDetailsMap)
-        .filter(detail => detail.rental_unit_id !== null)
-        .map(detail => detail.rental_unit_id);
-      
-      if (rentalUnitIds.length > 0) {
-        // Fetch active leases for these rental units
-        const { data: activeLeases, error: leaseError } = await supabase
-          .from('leases')
-          .select('id, rental_unit_id')
-          .in('rental_unit_id', rentalUnitIds)
-          .eq('status', 'ACTIVE')
-          .gte('end_date', today);
-        
-        if (leaseError) {
-          console.error('Error fetching active leases:', leaseError);
-          // Continue processing, just log the error
-        } else if (activeLeases && activeLeases.length > 0) {
-          // Group leases by rental_unit_id for easy lookup
-          const leasesByRentalUnit: Record<number, number[]> = {};
-          activeLeases.forEach(lease => {
-            if (!leasesByRentalUnit[lease.rental_unit_id]) {
-              leasesByRentalUnit[lease.rental_unit_id] = [];
-            }
-            leasesByRentalUnit[lease.rental_unit_id].push(lease.id);
-          });
-          
-          // Create utility billings for each reading with an active lease
-          for (const [meterId, reading] of Object.entries(meterReadingsMap)) {
-            const meterDetails = meterDetailsMap[parseInt(meterId)];
-            if (meterDetails && meterDetails.rental_unit_id && reading.cost) {
-              const rentalUnitId = meterDetails.rental_unit_id;
-              const leaseIds = leasesByRentalUnit[rentalUnitId];
-              
-              if (leaseIds && leaseIds.length > 0) {
-                // Create a billing for each lease
-                for (const leaseId of leaseIds) {
-                  utilityBillings.push({
-                    lease_id: leaseId,
-                    type: 'UTILITY',
-                    utility_type: meterDetails.type,
-                    amount: reading.cost,
-                    paid_amount: 0,
-                    balance: reading.cost,
-                    status: 'PENDING',
-                    due_date: new Date(new Date(today).setDate(new Date(today).getDate() + 14)).toISOString().split('T')[0], // Due in 14 days
-                    billing_date: today,
-                    penalty_amount: 0,
-                    notes: `Utility billing for ${meterNameMap[parseInt(meterId)] || 'Unknown'} - Reading: ${reading.reading} on ${reading.reading_date}`
-                  });
-                }
-              }
-            }
-          }
-          
-          // Insert utility billings if any
-          if (utilityBillings.length > 0) {
-            const { error: billingError } = await supabase
-              .from('billings')
-              .insert(utilityBillings);
-            
-            if (billingError) {
-              console.error('Error creating utility billings:', billingError);
-              // Continue processing, just log the error
-            } else {
-              console.log(`Successfully created ${utilityBillings.length} utility billings`);
-            }
-          }
-        }
-      }
-      
-      // Return success response
-      return {
+      if (insertError) return fail(500, { form, error: `Failed to insert readings: ${insertError.message}` });
+  
+            return {
+        form, // ← required by Superforms
         success: true,
-        message: `Successfully added ${newReadings.length} readings and created ${utilityBillings.length} utility billings`,
-        readings: newReadings
+        message: `Successfully added ${newReadings?.length ?? 0} readings`,
+        readings: newReadings ?? []
       };
-    } catch (error: any) {
-      console.error('Error in addBatchReadings:', error);
-      return fail(500, { error: error.message || 'An unexpected error occurred' });
+    } catch (err: any) {
+      console.error('Error in addBatchReadings:', err);
+      return fail(500, { form, error: err.message || 'An unexpected error occurred' });
     }
   }
 };

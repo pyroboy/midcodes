@@ -5,145 +5,54 @@ import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { tenantFormSchema, tenantResponseSchema, type EmergencyContact } from './formSchema';
 import type { Database } from '$lib/database.types';
-// Database types
-type DBTenant = Database['public']['Tables']['tenants']['Row'];
-type DBLease = Database['public']['Tables']['leases']['Row'];
-
-// Response type with relationships
-export type TenantResponse = Omit<DBTenant, 'emergency_contact'> & {
-  emergency_contact: EmergencyContact | null;
-  lease: DBLease & {
-    location: {
-      id: string;
-      number: string;
-      property: {
-        id: string;
-        name: string;
-      } | null;
-    } | null;
-  };
-};
+import type { TenantResponse } from '$lib/types/tenant';
 
 export const load: PageServerLoad = async ({ locals }) => {
-  // console.log('🔄 Starting server-side load function for tenants');
-  
   const { user, permissions } = await locals.safeGetSession();
-  const hasAccess = permissions.includes('tenants.read');
-  
-  if (!hasAccess) {
-    throw error(401, 'Unauthorized');
+  if (!permissions.includes('tenants.read')) throw error(401, 'Unauthorized');
+
+  const [tenantsResult, propertiesResult] = await Promise.all([
+    locals.supabase
+      .from('tenants')
+      .select(`
+        *,
+        lease_tenants:lease_tenants!left(
+          lease:leases!left(
+            *,
+            location:rental_unit!left(
+              id,
+              number,
+              property:properties!left(id,name)
+            )
+          )
+        )
+      `)
+      .order('name'),
+    locals.supabase
+      .from('properties')
+      .select('id, name')
+      .eq('status', 'ACTIVE')
+      .order('name')
+  ]);
+
+  if (tenantsResult.error) {
+    console.error('Error loading tenants:', tenantsResult.error);
+    throw error(500, 'Failed to load tenants');
   }
 
-
-
-  try {
-    const [tenantsResult, leasesResult, rentalUnitsResult, propertiesResult] = await Promise.all([
-      // Get tenants
-      locals.supabase
-        .from('tenants')
-        .select('*')
-        .order('name'),
-
-      // Get leases
-      locals.supabase
-        .from('leases')
-        .select('*')
-        .order('start_date'),
-
-      // Get rental units
-      locals.supabase
-        .from('rental_unit')
-        .select(`
-          id,
-          property_id,
-          name,
-          number
-        `),
-
-      // Get properties
-      locals.supabase
-        .from('properties')
-        .select('id, name')
-        .eq('status', 'ACTIVE')
-    ]);
-
-    // Check for errors
-    if (tenantsResult.error) {
-      console.error('Error loading tenants:', tenantsResult.error);
-      throw error(500, 'Failed to load tenants');
-    }
-
-    if (leasesResult.error) {
-      console.error('Error loading leases:', leasesResult.error);
-      throw error(500, 'Failed to load leases');
-    }
-
-    if (rentalUnitsResult.error) {
-      console.error('Error loading rental units:', rentalUnitsResult.error);
-      throw error(500, 'Failed to load rental units');
-    }
-
-    if (propertiesResult.error) {
-      console.error('Error loading properties:', propertiesResult.error);
-      throw error(500, 'Failed to load properties');
-    }
-
-    // Create lookup maps
-    const leasesMap = new Map(leasesResult.data?.map(lease => [lease.id, lease]) || []);
-    const rentalUnitsMap = new Map(rentalUnitsResult.data?.map(unit => [unit.id, unit]) || []);
-    const propertiesMap = new Map(propertiesResult.data?.map(property => [property.id, property]) || []);
-
-    // Log the raw data
-    // console.log('Raw tenants data:', tenantsResult.data);
-    // console.log('Raw leases data:', leasesResult.data);
-    // console.log('Raw rental units data:', rentalUnitsResult.data);
-    // console.log('Raw properties data:', propertiesResult.data);
-
-
-    const form = await superValidate(zod(tenantFormSchema));
-
-    // Map tenants with their relationships
-    const tenants = tenantsResult.data?.map(tenant => {
-      // Get the tenant's lease
-      const lease = leasesMap.get(tenant.lease_id);
-      
-      if (!lease) {
-        return {
-          ...tenant,
-          lease: null
-        };
-      }
-
-      // Get the rental unit for the lease
-      const rentalUnit = rentalUnitsMap.get(lease.rental_unit_id);
-      
-      // Get the property for the rental unit
-      const property = rentalUnit ? propertiesMap.get(rentalUnit.property_id) : null;
-
-      return {
-        ...tenant,
-        lease: {
-          ...lease,
-          location: rentalUnit ? {
-            id: rentalUnit.id,
-            number: rentalUnit.number,
-            property: property ? {
-              id: property.id,
-              name: property.name
-            } : null
-          } : null
-        }
-      };
-    }) || [];
-
-    return {
-      form,
-      tenants
-    };
-  } catch (err) {
-    console.error('Error in load function:', err);
-    throw error(500, 'Internal server error');
-  }
+  // The query now returns lease_tenants[], we need to flatten it to match TenantResponse
+  const tenants = tenantsResult.data.map(tenant => {
+    const lease = tenant.lease_tenants[0]?.lease ?? null;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { lease_tenants, ...rest } = tenant;
+    return { ...rest, lease };
+  }) as TenantResponse[];
+console.log(tenants);
+  return {
+    tenants,
+    properties: propertiesResult.data || [],
+    form: await superValidate(zod(tenantFormSchema))
+  };
 };
 
 

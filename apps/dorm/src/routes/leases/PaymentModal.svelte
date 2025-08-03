@@ -3,19 +3,11 @@
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import { Label } from "$lib/components/ui/label";
-  import * as Select from "$lib/components/ui/select";
-  import { Badge } from "$lib/components/ui/badge";
-  import { invalidateAll, invalidate } from "$app/navigation";
 
-  interface Billing {
-    id: number;
-    amount: number;
-    paid_amount: number;
-    status: string;
-    type: string;
-    utility_type?: string;
-    due_date: string;
-  }
+  import { Badge } from "$lib/components/ui/badge";
+  import { invalidateAll } from "$app/navigation";
+  import { toast } from 'svelte-sonner';
+  import type { Billing } from "$lib/types/lease";
 
   const { lease, isOpen = false, onOpenChange } = $props<{
     lease: {
@@ -23,6 +15,7 @@
       name?: string;
       balance: number;
       billings?: Billing[];
+      lease_tenants?: any[]; // For paid_by field
     };
     isOpen?: boolean;
     onOpenChange: (open: boolean) => void;
@@ -33,7 +26,6 @@
     label: string;
   };
 
-  // Payment types with proper typing
   const paymentTypes: PaymentMethod[] = [
     { value: 'CASH', label: 'Cash' },
     { value: 'GCASH', label: 'GCash' },
@@ -41,8 +33,8 @@
   ];
 
   let selectedPaymentType = $state<PaymentMethod['value']>('CASH');
-  let paymentAmount = $state(0); // User input amount
-  let selectedAmount = $state(0); // Total of selected billings
+  let paymentAmount = $state(0);
+  let selectedAmount = $state(0);
   let selectedBillings = $state<Set<number>>(new Set());
   let referenceNumber = $state('');
 
@@ -54,33 +46,32 @@
       newSelected.add(billingId);
     }
     selectedBillings = newSelected;
-    updateSelectedAmount(); // Update selected amount when billings change
+    updateSelectedAmount();
   }
 
   function updateSelectedAmount() {
-    selectedAmount = lease.billings
-      ?.filter((b: Billing) => selectedBillings.has(b.id) && b.status !== 'PAID')
-      .reduce((sum: number, b: Billing) => sum + (b.amount - (b.paid_amount || 0)), 0) || 0;
-      setExactAmount()
-    // Initialize payment amount to match selected amount
-    if (paymentAmount === 0) {
-      paymentAmount = selectedAmount;
+    selectedAmount =
+      lease.billings
+        ?.filter((b: Billing) => selectedBillings.has(b.id) && b.status !== 'PAID')
+        .reduce((sum: number, b: Billing) => sum + (b.amount + (b.penalty_amount || 0) - (b.paid_amount || 0)), 0) || 0;
+
+    if (selectedBillings.size === 0) {
+      paymentAmount = 0;
     }
   }
 
-  // Fix the payment type selection
-  function handlePaymentTypeChange(value: string) {
-    selectedPaymentType = value as PaymentMethod['value'];
+  function handlePaymentTypeChange(value: string | undefined) {
+    if (value) {
+      selectedPaymentType = value as PaymentMethod['value'];
+    }
   }
 
   async function handleSubmit(event: Event) {
     event.preventDefault();
-    
     try {
-      // Validate inputs
-      if (!paymentAmount) throw new Error('Payment amount is required');
-      if (!selectedPaymentType) throw new Error('Payment method is required');
-      if (!selectedBillings.size) throw new Error('No billings selected');
+      if (!paymentAmount || paymentAmount <= 0) throw new Error('Payment amount must be greater than zero.');
+      if (!selectedPaymentType) throw new Error('Payment method is required.');
+      if (!selectedBillings.size) throw new Error('No billings selected.');
 
       const paymentDetails = {
         amount: paymentAmount,
@@ -88,157 +79,122 @@
         reference_number: referenceNumber,
         paid_by: lease.lease_tenants?.[0]?.tenant?.name || 'Unknown',
         paid_at: new Date().toISOString(),
-        notes: `Payment for ${paymentAllocation.length} billing(s)`,
-        billing_ids: paymentAllocation.map(({ billing }) => billing.id),
-        billing_changes: paymentAllocation.reduce((acc, { billing, allocatedAmount }) => {
-          acc[billing.id] = {
-            previous_amount: billing.paid_amount || 0,
-            new_amount: (billing.paid_amount || 0) + allocatedAmount,
-            allocated_amount: allocatedAmount,
-            previous_status: billing.status,
-            new_status: allocatedAmount + (billing.paid_amount || 0) >= billing.amount ? 'PAID' : 'PARTIAL'
-          };
-          return acc;
-        }, {} as Record<number, any>)
+        notes: `Payment for ${selectedBillings.size} billing(s)`,
+        billing_ids: Array.from(selectedBillings)
       };
 
-      console.log('Submitting payment:', paymentDetails);
-
-      // Create FormData and append the payment details
       const formData = new FormData();
       formData.append('paymentDetails', JSON.stringify(paymentDetails));
 
       const response = await fetch('?/submitPayment', {
         method: 'POST',
-        body: formData  // Use our formData with paymentDetails
+        body: formData
       });
 
-      const result = await response.json();
-      console.log('Server response details:', {
-        status: response.status,
-        ok: response.ok,
-        result
-      });
-
-      // Check for success based on the actual response structure
-      if (response.ok && result.type === 'success') {
-        console.log('Payment processed successfully');
-        await Promise.all([
-          invalidate('app:leases'),
-          invalidate('app:billings'),
-          invalidateAll()
-        ]);
-        onOpenChange(true); // Pass success=true back to parent
+      // It's safer to check for a successful response status before parsing JSON
+      if (response.ok) {
+        toast.success('Payment submitted successfully!');
+        await invalidateAll();
+        onOpenChange(false);
       } else {
-        throw new Error(result.error || 'Payment failed');
+        // Try to parse error from JSON, but have a fallback
+        let errorMessage = 'Payment failed due to a server error.';
+        try {
+          const result = await response.json();
+          errorMessage = result.error || errorMessage;
+        } catch (e) {
+          // The response was not valid JSON, use the status text
+          errorMessage = response.statusText;
+        }
+        throw new Error(errorMessage);
       }
-
     } catch (error) {
       console.error('Payment submission error:', error);
-      alert(error instanceof Error ? error.message : 'Failed to process payment');
-      onOpenChange(false);
+      toast.error(error instanceof Error ? error.message : 'Failed to process payment');
     }
   }
 
   function formatCurrency(amount: number) {
-    return new Intl.NumberFormat('en-PH', {
-      style: 'currency',
-      currency: 'PHP'
-    }).format(amount || 0);
+    return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(amount || 0);
   }
 
   function formatDate(dateStr: string) {
-    return new Date(dateStr).toLocaleDateString('en-PH', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    if (!dateStr) return 'N/A';
+    return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   }
 
-  function getBillingStatusColor(status: string) {
-    switch (status) {
-      case 'PAID': return 'bg-green-100 text-green-800';
-      case 'PARTIAL': return 'bg-yellow-100 text-yellow-800';
-      case 'OVERDUE': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  }
-
-  // Add function to calculate payment allocation
-  function calculatePaymentAllocation(amount: number, selectedBillings: Set<number>): Array<{
-    billing: Billing;
-    allocatedAmount: number;
-    remainingBalance: number;
-    status: 'PAID' | 'PARTIAL' | 'PENDING';
-  }> {
+  function calculatePaymentAllocation(amount: number, billings: Billing[], selectedIds: Set<number>) {
     let remainingPayment = amount;
-    return lease.billings
-      ?.filter((b: Billing) => selectedBillings.has(b.id) && b.status !== 'PAID')
-      .map((billing: Billing) => {
-        const unpaidAmount = billing.amount - (billing.paid_amount || 0);
-        let allocatedAmount = Math.min(remainingPayment, unpaidAmount);
+    return billings
+      .filter((billing) => selectedIds.has(billing.id) && billing.status !== 'PAID')
+      .map((billing) => {
+        const due = (billing.amount + (billing.penalty_amount || 0)) - (billing.paid_amount || 0);
+        const allocatedAmount = Math.min(remainingPayment, due);
         remainingPayment -= allocatedAmount;
 
+        const newStatus = (billing.paid_amount || 0) + allocatedAmount >= (billing.amount + (billing.penalty_amount || 0)) ? 'PAID' : 'PARTIAL';
+        
         return {
-          billing,
-          allocatedAmount,
-          remainingBalance: unpaidAmount - allocatedAmount,
-          status: allocatedAmount >= unpaidAmount ? 'PAID' 
-                 : allocatedAmount > 0 ? 'PARTIAL' 
-                 : 'PENDING'
+          billing_id: billing.id,
+          amount: allocatedAmount,
+          new_status: newStatus
         };
-      }) || [];
+      })
+      .filter(item => item.amount > 0);
   }
 
-  // Add function to calculate total allocations needed
   function getTotalAllocationsNeeded(): number {
     return lease.billings
       ?.filter((b: Billing) => selectedBillings.has(b.id) && b.status !== 'PAID')
-      .reduce((sum: number, b: Billing) => sum + (b.amount - (b.paid_amount || 0)), 0) || 0;
+      .reduce((total: number, b: Billing) => total + (b.amount + (b.penalty_amount || 0) - (b.paid_amount || 0)), 0) || 0;
   }
 
-  // Add function to get payment status styling
   function getPaymentAmountStyle(amount: number, totalNeeded: number): string {
-    if (amount === 0) return '';
+    if (amount <= 0) return '';
     if (amount >= totalNeeded) return 'text-green-600 dark:text-green-400';
     return 'text-yellow-600 dark:text-yellow-400';
   }
 
-  // Add sorting function for billings
   function sortBillingsByDueDate(billings: Billing[]): Billing[] {
-    return [...billings].sort((a, b) => 
-      new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
-    );
+    return [...(billings || [])].sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
   }
 
-  // Use in the template where we filter billings
-  let sortedBillings = $derived(lease.billings ? sortBillingsByDueDate(lease.billings) : []);
-
-  $effect(() => {
-    // Update payment summary whenever amount or selection changes
-    paymentAllocation = calculatePaymentAllocation(paymentAmount, selectedBillings);
-  });
-
-  let paymentAllocation = $state<ReturnType<typeof calculatePaymentAllocation>>([]);
-
-  function handleAmountChange(event: Event) {
-    const value = (event.target as HTMLInputElement).value;
-    paymentAmount = Number(value) || 0;
-    // Recalculate allocation with user input amount
-    paymentAllocation = calculatePaymentAllocation(paymentAmount, selectedBillings);
-  }
+  let sortedBillings = $derived(sortBillingsByDueDate(lease.billings));
+  let paymentAllocation = $derived(calculatePaymentAllocation(paymentAmount, lease.billings || [], selectedBillings));
 
   function setExactAmount() {
     paymentAmount = selectedAmount;
-    // Recalculate allocation
-    paymentAllocation = calculatePaymentAllocation(paymentAmount, selectedBillings);
   }
 
-  function getBillingStatusText(billing: Billing): string {
-    if (billing.status === 'PARTIAL') {
-      return `${formatCurrency(billing.paid_amount)} of ${formatCurrency(billing.amount)}`;
+  const statusColors: { [key: string]: string } = {
+    PENDING: 'bg-yellow-100 text-yellow-800 border-yellow-400',
+    PENALIZED: 'bg-red-100 text-red-800 border-red-400',
+    PARTIAL: 'bg-blue-100 text-blue-800 border-blue-400',
+    PAID: 'bg-green-100 text-green-800 border-green-400',
+    OVERDUE: 'bg-orange-100 text-orange-800 border-orange-400',
+    'OVERDUE-PARTIAL': 'bg-orange-200 text-orange-900 border-orange-500'
+  };
+
+  function getDisplayStatus(billing: Billing): string {
+    if (billing.balance <= 0) {
+      return 'PAID';
     }
-    return billing.status;
+    if (billing.penalty_amount > 0) {
+      return 'PENALIZED';
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const isOverdue = new Date(billing.due_date) < today;
+
+    if (isOverdue) {
+      if (billing.status === 'PARTIAL') {
+        return 'OVERDUE-PARTIAL';
+      }
+      return 'OVERDUE';
+    }
+
+    return billing.status; // PENDING or PARTIAL
   }
 </script>
 
@@ -257,39 +213,70 @@
         <div class="border-r pr-4">
           <h3 class="font-medium mb-2">Outstanding Billings</h3>
           <div class="space-y-2 max-h-[400px] overflow-y-auto">
-            {#if sortedBillings?.length}
-              {#each sortedBillings.filter((b: Billing) => b.status !== 'PAID') as billing}
-                <div class="p-2 border rounded hover:bg-muted/50">
-                  <div class="flex items-start gap-2">
+            {#if sortedBillings.filter((b: Billing) => b.status !== 'PAID').length > 0}
+              {#each sortedBillings.filter((b: Billing) => b.status !== 'PAID') as billing (billing.id)}
+                {@const displayStatus = getDisplayStatus(billing)}
+                <div 
+                  class="p-3 rounded-lg border cursor-pointer transition-all duration-200 {selectedBillings.has(billing.id) ? 'bg-primary/10 border-primary' : 'hover:bg-muted/50'}"
+                  onclick={() => toggleBilling(billing.id)}
+                  onkeydown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      toggleBilling(billing.id);
+                    }
+                  }}
+                  role="checkbox"
+                  aria-checked={selectedBillings.has(billing.id)}
+                  tabindex="0"
+                >
+                  <div class="flex items-start gap-3">
                     <input
                       type="checkbox"
                       checked={selectedBillings.has(billing.id)}
-                      onchange={() => toggleBilling(billing.id)}
-                      class="mt-1"
+                      class="mt-1.5 h-4 w-4"
+                      tabindex="-1"
                     />
-                    <div class="flex-1">
+                    <div class="flex-grow">
                       <div class="flex justify-between items-start">
                         <div>
-                          <div class="font-medium">{billing.type}</div>
+                          <span class="font-medium">{billing.type}</span>
                           <div class="text-sm text-muted-foreground">
-                            Due: {formatDate(billing.due_date)}
+                            Due: {formatDate(billing.due_date ?? '')}
+                            {#if billing.penalty_amount > 0}
+                              <span class="text-red-500 ml-2">(+ {formatCurrency(billing.penalty_amount)} penalty)</span>
+                            {/if}
                           </div>
-                          <!-- {#if billing.status === 'PARTIAL'}
-                            <div class="text-xs text-muted-foreground">
-                              Paid Partial: {formatCurrency(billing.paid_amount)}
-                            </div>
-                          {/if} -->
                         </div>
-                        <div class="text-right">
-                          <div class="font-medium">Balance: {formatCurrency(billing.amount - (billing.paid_amount || 0))}</div>
-                          <Badge class={getBillingStatusColor(billing.status)}>
-                            {billing.status}
-                          </Badge>
+                        <Badge variant="outline" class={`capitalize ${statusColors[displayStatus]}`}>
+                          {displayStatus.toLowerCase()}
+                        </Badge>
+                      </div>
+
+                      <div class="mt-2 space-y-1 text-sm">
+                        <div class="flex justify-between">
+                          <span>Amount:</span>
+                          <span>{formatCurrency(billing.amount)}</span>
+                        </div>
+                        {#if billing.penalty_amount}
+                          <div class="flex justify-between text-red-600">
+                            <span>Penalty:</span>
+                            <span>{formatCurrency(billing.penalty_amount)}</span>
+                          </div>
+                        {/if}
+                        {#if billing.paid_amount > 0}
+                          <div class="flex justify-between text-green-600">
+                            <span>Paid:</span>
+                            <span>-{formatCurrency(billing.paid_amount)}</span>
+                          </div>
+                        {/if}
+                        <div class="flex justify-between font-semibold border-t pt-1 mt-1">
+                          <span>Balance:</span>
+                          <span>{formatCurrency(billing.amount + (billing.penalty_amount || 0) - billing.paid_amount)}</span>
                         </div>
                       </div>
-                      {#if billing.utility_type}
-                        <div class="text-sm text-muted-foreground mt-1">
-                          {billing.utility_type}
+
+                      {#if billing.notes}
+                        <div class="text-xs text-gray-500 pt-2 border-t mt-2">
+                          Notes: {billing.notes}
                         </div>
                       {/if}
                     </div>
@@ -298,7 +285,7 @@
               {/each}
             {:else}
               <div class="text-center text-muted-foreground p-4">
-                No outstanding billings
+                No outstanding billings.
               </div>
             {/if}
           </div>
@@ -311,58 +298,38 @@
             <div class="flex justify-between items-center py-2 px-3 bg-muted rounded-md">
               <span>Current Balance:</span>
               <span class="font-semibold text-lg">
-                {new Intl.NumberFormat('en-PH', {
-                  style: 'currency',
-                  currency: 'PHP'
-                }).format(lease?.balance || 0)}
+                {formatCurrency(lease.balance)}
               </span>
             </div>
-            <div class="flex justify-between items-center py-2 px-3 bg-muted rounded-md">
-                <span>Selected Amount:</span>
-                <span class="font-semibold text-lg">
-                  {formatCurrency(selectedAmount)}
-                </span>
-              </div>
-            <!-- Fixed Payment Type Select -->
-            <div class="grid gap-2">
+             <div class="flex justify-between items-center py-2 px-3 bg-muted rounded-md">
+              <span>Selected Amount:</span>
+              <span class="font-semibold text-lg">
+                {formatCurrency(selectedAmount)}
+              </span>
+            </div>
+            <!-- Payment Type Select -->
+            <div>
               <Label for="payment-type">Payment Method</Label>
-              <Select.Root 
-                type="single"
-                value={selectedPaymentType}
-                onValueChange={handlePaymentTypeChange}
+              <select
+                id="payment-type"
+                bind:value={selectedPaymentType}
+                class="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <Select.Trigger class="w-full">
-                  {paymentTypes.find(t => t.value === selectedPaymentType)?.label || "Select payment method"}
-                </Select.Trigger>
-                <Select.Content>
-                  {#each paymentTypes as type}
-                    <Select.Item value={type.value}>{type.label}</Select.Item>
-                  {/each}
-                </Select.Content>
-              </Select.Root>
+                {#each paymentTypes as type}
+                  <option value={type.value}>{type.label}</option>
+                {/each}
+              </select>
             </div>
 
-            <div class="grid gap-2">
-                <Label for="reference">Reference Number</Label>
-                <Input 
-                  id="reference"
-                  bind:value={referenceNumber}
-                  placeholder="Enter reference number"
-                />
-              </div>
-            </div>
-            
-            <!-- Make Amount Input Read-only since it's calculated -->
-            <div class="grid gap-2">
+            <!-- Amount Input -->
+            <div>
               <Label for="amount">Amount</Label>
-              <div class="flex gap-2">
+              <div class="flex items-center gap-2">
                 <Input 
                   id="amount"
                   type="number"
-                  value={paymentAmount}
-                  oninput={handleAmountChange}
-                  min="0"
-                  max={lease?.balance || 0}
+                  bind:value={paymentAmount}
+                  min="0.01"
                   step="0.01"
                 />
                 <Button 
@@ -371,16 +338,23 @@
                   onclick={setExactAmount}
                   disabled={!selectedAmount}
                 >
-                  Exact Amount
+                  Exact
                 </Button>
               </div>
             </div>
 
             <!-- Reference Number -->
-   
-
-        
-
+            {#if selectedPaymentType !== 'CASH'}
+              <div>
+                <Label for="reference">Reference Number</Label>
+                <Input 
+                  id="reference"
+                  bind:value={referenceNumber}
+                  placeholder="e.g., Transaction ID"
+                />
+              </div>
+            {/if}
+          </div>
         </div>
 
         <!-- Payment Summary -->
@@ -395,7 +369,7 @@
                   {formatCurrency(paymentAmount)}
                 </span>
               </div>
-              {#if paymentAmount > 0}
+              {#if paymentAmount > 0 && getTotalAllocationsNeeded() > 0}
                 <div class="flex justify-between items-center text-sm">
                   <span>Total Selected:</span>
                   <span class="font-medium">{formatCurrency(getTotalAllocationsNeeded())}</span>
@@ -418,27 +392,22 @@
             <div class="space-y-2">
               <h4 class="text-sm font-medium">Payment Allocation:</h4>
               {#if paymentAllocation.length > 0}
-                {#each paymentAllocation as { billing, allocatedAmount, remainingBalance, status }}
+                {#each paymentAllocation as { billing_id, amount, new_status }}
                   <div class="p-2 border rounded">
                     <div class="flex justify-between items-start">
                       <div>
-                        <div class="font-medium">{billing.type}</div>
+                        <div class="font-medium">{lease.billings?.find((b: Billing) => b.id === billing_id)?.type}</div>
                         <div class="text-sm text-muted-foreground">
-                          Due: {formatDate(billing.due_date)}
+                          Due: {formatDate(lease.billings?.find((b: Billing) => b.id === billing_id)?.due_date ?? '')}
                         </div>
                       </div>
                       <div class="text-right">
-                        <div>{formatCurrency(allocatedAmount)}</div>
-                        <Badge variant={status === 'PAID' ? 'default' : 'secondary'}>
-                          {status}
+                        <div>{formatCurrency(amount)}</div>
+                        <Badge variant={new_status === 'PAID' ? 'default' : 'secondary'}>
+                          {new_status}
                         </Badge>
                       </div>
                     </div>
-                    {#if remainingBalance > 0}
-                      <div class="text-xs text-muted-foreground mt-1">
-                        Remaining: {formatCurrency(remainingBalance)}
-                      </div>
-                    {/if}
                   </div>
                 {/each}
               {:else}
@@ -458,6 +427,5 @@
         </Button>
       </div>
     </form>
-
   </Dialog.Content>
 </Dialog.Root>

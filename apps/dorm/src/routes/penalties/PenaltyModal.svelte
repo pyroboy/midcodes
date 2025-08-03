@@ -3,6 +3,7 @@
     Dialog,
     DialogContent,
     DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle
   } from '$lib/components/ui/dialog';
@@ -17,35 +18,23 @@
     penalty, 
     open, 
     onOpenChange,
-    form, 
+    form = $bindable(), 
     enhance, 
     errors,
-    constraints,
     submitting
   } = $props<{
     penalty: PenaltyBilling;
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    form: any;
+    form: any; // This will be bound
     enhance: any;
     errors: any;
-    constraints: Record<string, any>;
     submitting: boolean;
   }>();
 
-  // Define the local state
-  let penaltyAmount = $state(penalty.penalty_amount.toString());
-  let notes = $state(penalty.notes || '');
-  
-  // Update the form data when the inputs change
-  $effect(() => {
-    form.penalty_amount = parseFloat(penaltyAmount) || 0;
-    form.notes = notes;
-  });
-  
-  // Calculate the new total with the updated penalty
-  let newTotal = $derived(penalty.amount + (parseFloat(penaltyAmount) || 0));
-  let difference = $derived((parseFloat(penaltyAmount) || 0) - penalty.penalty_amount);
+  // Calculate the new total and difference for display, reacting to changes in the bound form
+  let newTotal = $derived(penalty.amount + (form.penalty_amount || 0));
+  let difference = $derived((form.penalty_amount || 0) - penalty.penalty_amount);
   
   function formatDate(dateStr: string) {
     return new Date(dateStr).toLocaleDateString('en-US', {
@@ -93,11 +82,11 @@
               type="number" 
               step="0.01" 
               min="0"
-              bind:value={penaltyAmount}
+              bind:value={form.penalty_amount}
               class={errors?.penalty_amount ? 'border-red-500' : ''}
             />
             {#if errors?.penalty_amount}
-              <p class="text-xs text-red-500 mt-1">{errors.penalty_amount}</p>
+              <p class="text-xs text-red-500 mt-1">{errors.penalty_amount[0]}</p>
             {/if}
           </div>
         </div>
@@ -120,25 +109,25 @@
             <Textarea 
               id="notes" 
               name="notes"
-              bind:value={notes}
+              bind:value={form.notes}
               placeholder="Add any notes about this penalty"
               class={errors?.notes ? 'border-red-500' : ''}
             />
             {#if errors?.notes}
-              <p class="text-xs text-red-500 mt-1">{errors.notes}</p>
+              <p class="text-xs text-red-500 mt-1">{errors.notes[0]}</p>
             {/if}
           </div>
         </div>
       </div>
       
-      <div class="flex justify-end gap-2">
+      <DialogFooter>
         <Button type="button" variant="outline" onclick={() => onOpenChange(false)}>
           Cancel
         </Button>
         <Button type="submit" disabled={submitting}>
           {submitting ? 'Saving...' : 'Save Changes'}
         </Button>
-      </div>
+      </DialogFooter>
     </form>
   </DialogContent>
 </Dialog>

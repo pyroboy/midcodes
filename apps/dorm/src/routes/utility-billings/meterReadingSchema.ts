@@ -46,7 +46,22 @@ export const meterReadingSchema = z.object({
 
 // Schema for batch meter readings
 export const batchReadingsSchema = z.object({
-  readings: z.array(meterReadingSchema).min(1, 'At least one reading is required')
+  readings_json: z
+    .string()
+    .refine(
+    (val) => {
+      try {
+        const parsed = JSON.parse(val);
+        return Array.isArray(parsed) && parsed.length > 0;
+      } catch {
+        return false;
+      }
+    },
+    { message: 'At least one reading is required' }
+  ),
+  reading_date: z.string().nonempty('Reading date is required'),
+  cost_per_unit: z.number().positive('Cost per unit must be a positive number'),
+  type: z.string().optional() // Assuming type is optional
 });
 
 export type MeterReadingSchema = typeof meterReadingSchema;

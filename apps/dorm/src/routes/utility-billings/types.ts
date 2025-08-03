@@ -19,12 +19,13 @@ export interface Reading {
   export interface Meter {
     id: number;
     name: string;
-    meter_type: string;
+    type: string;
+    initial_reading: number;
     location_type: 'PROPERTY' | 'FLOOR' | 'RENTAL_UNIT';
     property_id: number | null;
     floor_id: number | null;
     rental_unit_id: number | null;
-    rental_unit: Rental_unit[] | null;
+    rental_unit: Rental_unit | null;
     unit: { name: string } | null;
   }
   
@@ -69,6 +70,7 @@ export type Filters = {
     currentReading: number | null;
     consumption: number | null;
     cost: number | null;
+    initialReading?: number | null;
   };
   
   export type FilterChangeEvent = {

@@ -5,7 +5,7 @@
   import { updatePenaltySchema } from './formSchema';
   import type { PenaltyBilling, PenaltyFilter } from './types';
   import type { AnyZodObject } from 'zod';
-  
+  import { toast } from 'svelte-sonner';
   // UI Components
   import { 
     Card, 
@@ -88,18 +88,22 @@
     taintedMessage: null,
     resetForm: true,
     onError: ({ result }) => {
-      console.error('Form submission error:', {
-        error: result.error,
-        status: result.status
+      toast.error('Update Failed', {
+        description: result.error.message || 'An unexpected error occurred.'
       });
     },
     onResult: async ({ result }) => {
       if (result.type === 'success') {
-        showPenaltyModal = false;
-        selectedPenalty = undefined;
-        showPenaltyDetails = false;
+        toast.success('Penalty Updated', {
+          description: `The penalty for ${selectedPenalty?.lease?.name} has been successfully updated.`
+        });
         await invalidate('app:penalties');
         reset();
+      }
+      if (result.type === 'failure') {
+        toast.error('Update Failed', {
+          description: result.data?.message || 'A validation error occurred.'
+        });
       }
     }
   });
@@ -412,10 +416,9 @@
       penalty={selectedPenalty}
       open={showPenaltyModal}
       onOpenChange={(open: boolean) => showPenaltyModal = open}
-      form={$form}
+      bind:form={$form}
       enhance={enhance}
       errors={errors}
-      constraints={constraints}
       submitting={$submitting}
     />
   {/if}

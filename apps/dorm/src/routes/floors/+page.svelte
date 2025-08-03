@@ -130,11 +130,11 @@
                     <div>{floor.rental_unit.length}</div>
                     <div><Badge>{floor.status}</Badge></div>
                     <div class="flex items-center justify-end gap-2">
-                      <Button size="icon" variant="ghost" on:click={(e) => { e.stopPropagation(); handleFloorClick(floor); }}>
+                      <Button size="icon" variant="ghost" onclick={(e) => { e.stopPropagation(); handleFloorClick(floor); }}>
                         <span class="sr-only">Edit</span>
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path><path d="m15 5 4 4"></path></svg>
                       </Button>
-                      <Button size="icon" variant="ghost" on:click={(e) => { e.stopPropagation(); confirmDelete(floor); }}>
+                      <Button size="icon" variant="ghost" onclick={(e) => { e.stopPropagation(); confirmDelete(floor); }}>
                         <span class="sr-only">Delete</span>
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
                       </Button>

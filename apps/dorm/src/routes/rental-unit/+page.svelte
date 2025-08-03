@@ -210,8 +210,8 @@
 										</AccordionPrimitive.Trigger>
 										<!-- Actions -->
 										<div class="flex items-center justify-end gap-2 px-4">
-											<Button size="icon" variant="ghost" on:click={() => handleRentalUnitClick(unit)}><Pencil class="h-4 w-4" /></Button>
-											<Button size="icon" variant="ghost" on:click={() => handleDeleteRentalUnit(unit)}><Trash2 class="h-4 w-4" /></Button>
+											<Button size="icon" variant="ghost" onclick={() => handleRentalUnitClick(unit)}><Pencil class="h-4 w-4" /></Button>
+											<Button size="icon" variant="ghost" onclick={() => handleDeleteRentalUnit(unit)}><Trash2 class="h-4 w-4" /></Button>
 										</div>
 									</div>
 									<AccordionPrimitive.Content class="overflow-hidden text-sm transition-all data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">

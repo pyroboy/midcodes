@@ -6,19 +6,11 @@ import type { Actions, PageServerLoad } from './$types';
 import type { PostgrestError } from '@supabase/postgrest-js';
 import { createPaymentSchedules } from './utils';
 import { mapLeaseData, getLeaseData } from '$lib/utils/lease';
-import type { LeaseResponse } from '$lib/types/lease';
+import type { LeaseResponse, Billing } from '$lib/types/lease';
 
 interface PaymentAllocation {
   billingId: number;
   amount: number;
-}
-
-interface BillingChange {
-  previous_amount: number;
-  new_amount: number;
-  allocated_amount: number;
-  previous_status: 'PENDING' | 'PARTIAL' | 'PAID' | 'OVERDUE';
-  new_status: 'PENDING' | 'PARTIAL' | 'PAID' | 'OVERDUE';
 }
 
 interface PaymentDetails {
@@ -29,52 +21,86 @@ interface PaymentDetails {
   paid_at: string;
   notes: string | null;
   billing_ids: number[];
-  billing_changes: Record<number, BillingChange>;
 }
 
 export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase } }) => {
-  // console.log('🔄 Starting leases load');
-  
-  const { user } = await safeGetSession();
-  if (!user) throw error(401, 'Unauthorized');
+	const { user } = await safeGetSession();
+	if (!user) throw error(401, 'Unauthorized');
 
-  // console.log('📊 Fetching leases data');
-  const startTime = performance.now();
-  
-  try {
-    const { leases, error: leasesError } = await getLeaseData(supabase);
-    if (leasesError) throw error(500, 'Failed to load leases');
+	try {
+		const { data: leasesData, error: fetchError } = await supabase
+			.from('leases')
+			.select(
+				`
+				*,
+				rental_unit:rental_unit_id ( *, floor:floors (*), property:properties (*) ),
+				lease_tenants:lease_tenants!lease_id ( tenants ( name, email, contact_number ) ),
+				billings ( * )
+			`
+			)
+			.order('created_at', { ascending: false });
 
-    const { data: floors } = await supabase.from('floors').select('*');
-    const floorsMap = new Map(floors?.map(floor => [floor.id, floor]));
+		if (fetchError) {
+			console.error('Error fetching leases:', fetchError);
+			throw error(500, 'Failed to load leases');
+		}
 
-    // Transform the data structure using utility function
-    const mappedLeases = leases?.map(lease => mapLeaseData(lease, floorsMap)) || [];
+		// Fetch payment allocations and calculate penalties for all billings
+		const allBillingIds = leasesData
+			.flatMap((lease) => lease.billings.map((b: Billing) => b.id))
+			.filter(Boolean);
 
-    // Fetch form data with proper type handling
-    const [tenantsResponse, unitsResponse] = await Promise.all([
-      supabase.from('tenants').select('id, name, email, contact_number'),
-      supabase.from('rental_unit').select(`
-        *,
-        property:properties!rental_unit_property_id_fkey(id, name)
-      `)
-    ]);
+		if (allBillingIds.length > 0) {
+			const [allocationsResponse, ...penaltyResponses] = await Promise.all([
+				supabase.from('payment_allocations').select('*, payment:payments(*)').in('billing_id', allBillingIds),
+				...allBillingIds.map((id) => supabase.rpc('calculate_penalty', { p_billing_id: id }))
+			]);
 
-    const queryTime = performance.now() - startTime;
-    // console.log('⏱️ Data fetch completed:', {
-    //   leases: mappedLeases?.length || 0,
-    //   units: unitsResponse.data?.length || 0,
-    //   tenants: tenantsResponse.data?.length || 0,
-    //   time: `${queryTime.toFixed(2)}ms`
-    // });
+			const { data: allocationsData, error: allocationsError } = allocationsResponse;
+			if (allocationsError) {
+				console.error('Error fetching payment allocations:', allocationsError);
+			}
 
-    if (tenantsResponse.error) {
-      throw error(500, 'L-1000 - Failed to load tenants');
-    }
+			const allocationsMap = new Map<number, any[]>();
+			if (allocationsData) {
+				for (const allocation of allocationsData) {
+					if (!allocationsMap.has(allocation.billing_id)) {
+						allocationsMap.set(allocation.billing_id, []);
+					}
+					allocationsMap.get(allocation.billing_id)?.push(allocation);
+				}
+			}
 
-    if (unitsResponse.error) {
-      throw error(500, 'L-1001 - Failed to load rental units');
-    }
+			const penaltiesMap = new Map<number, number>();
+			penaltyResponses.forEach((res, index) => {
+				if (res.error) {
+					console.error(`Error calculating penalty for billing ${allBillingIds[index]}:`, res.error);
+				} else if (res.data > 0) {
+					penaltiesMap.set(allBillingIds[index], res.data);
+				}
+			});
+
+			// Attach allocations and penalties to each billing
+			for (const lease of leasesData) {
+				for (const billing of lease.billings) {
+					billing.allocations = allocationsMap.get(billing.id) || [];
+					billing.penalty = penaltiesMap.get(billing.id) || 0;
+					if (billing.penalty > 0 && billing.status === 'PENDING') {
+						billing.status = 'PENALIZED';
+					}
+				}
+			}
+		}
+
+		const floors = await supabase.from('floors').select('*');
+		const floorsMap = new Map((floors.data || []).map((f) => [f.id, f]));
+
+		const leases = leasesData.map((lease) => mapLeaseData(lease, floorsMap));
+
+		const [tenantsResponse, unitsResponse] = await Promise.all([
+			supabase.from('tenants').select('id, name, email, contact_number'),
+			supabase.from('rental_unit').select(`*, property:properties!rental_unit_property_id_fkey(id, name)`)
+		]);
 
     const form = await superValidate(zod(leaseSchema));
     const deleteForm = await superValidate(zod(deleteLeaseSchema));
@@ -82,13 +108,13 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
     return {
       form,
       deleteForm,
-      leases: mappedLeases,
+      leases,
       tenants: tenantsResponse.data || [],
       rental_units: unitsResponse.data || []
     };
   } catch (err) {
-    console.error('L-1002 -Error in load function:', err);
-    throw error(500, 'L-1002 - Internal server error');
+    console.error('Error in load function:', err);
+    throw error(500, 'Internal server error');
   }
 };
 
@@ -102,6 +128,8 @@ export const actions: Actions = {
       return fail(400, { form });
     }
 
+
+    
     const { user } = await safeGetSession();
     if (!user) return fail(403, { form, message: ['Unauthorized'] });
 
@@ -227,109 +255,85 @@ export const actions: Actions = {
       } else {
         // No proration - start with full amount from first month
         let currentDate = new Date(startDate);
-        
-        while (currentDate <= endDate) {
-          billings.push({
-            lease_id: lease.id,
-            amount: form.data.rent_amount,
-            due_date: currentDate.toISOString().split('T')[0],
-            type: 'RENT',
-            status: 'PENDING',
-            billing_date: new Date().toISOString().split('T')[0],
-            balance: form.data.rent_amount,
-            paid_amount: 0
-          });
-          currentDate.setMonth(currentDate.getMonth() + 1);
-        }
       }
 
-      const { error: billingsError } = await supabase
-        .from('billings')
-        .insert(billings);
+      const { data: newLease, error: fetchError } = await supabase
+        .from('leases')
+        .select(
+          `
+				*,
+				rental_unit:rental_unit_id ( *, floor:floors (*), property:properties (*) ),
+				lease_tenants:lease_tenants!lease_id ( tenants ( name, email, contact_number ) ),
+				billings ( * )
+			`
+        )
+        .eq('id', lease.id)
+        .single();
 
-      if (billingsError) throw billingsError;
+      if (fetchError) {
+        console.error('Error fetching new lease data:', fetchError);
+        throw new Error(fetchError.message);
+      }
 
-      return { form ,
-        success: true
+      const floors = await supabase.from('floors').select('*');
+      const floorsMap = new Map((floors.data || []).map((f) => [f.id, f]));
+      const mappedLease = mapLeaseData(newLease, floorsMap);
+
+      return {
+        form,
+        lease: mappedLease
       };
 
-    } catch (err) {
-      console.error('💥 Lease creation error:', err);
-      const error = err as PostgrestError;
-      
-      if (error.message?.includes('Policy check failed')) {
-        return fail(403, { 
-          form, 
-          message: ['Permission denied'],
-          errors: [error.message] 
-        });
-      }
-      
-      return fail(500, { 
-        form, 
-        message: ['Failed to create lease and payment schedules'],
-        errors: [error.message] 
+    } catch (error) {
+      console.error('Lease creation failed:', error);
+      return fail(500, {
+        message: 'Failed to create lease'
       });
     }
   },
 
   delete: async ({ request, locals: { supabase, safeGetSession } }) => {
-    const form = await superValidate(request, zod(deleteLeaseSchema));
-    
-    if (!form.valid) {
-      console.error('❌ Delete validation failed:', form.errors);
-      return fail(400, { form });
+    const { user } = await safeGetSession();
+    if (!user) {
+      return fail(401, { error: 'Unauthorized' });
     }
 
-    const { user } = await safeGetSession();
-    if (!user) return fail(403, { form, message: ['Unauthorized'] });
+    const formData = await request.formData();
+    const leaseId = formData.get('id');
+
+    if (!leaseId) {
+      return fail(400, { error: 'Lease ID is required' });
+    }
 
     try {
-      // First delete billings
-      const { error: billingsError } = await supabase
+      // Check for associated billings with payments
+      const { data: billings, error: billingsError } = await supabase
         .from('billings')
-        .delete()
-        .eq('lease_id', form.data.id);
+        .select('id, paid_amount')
+        .eq('lease_id', leaseId);
 
       if (billingsError) {
-        console.error('Error deleting billings:', billingsError);
-        throw new Error('Failed to delete billings');
+        console.error('Error checking billings:', billingsError);
+        throw new Error('Failed to verify billings before deletion.');
       }
 
-      // Then delete payment schedules
-      const { error: schedulesError } = await supabase
-        .from('payment_schedules')
-        .delete()
-        .eq('lease_id', form.data.id);
-
-      if (schedulesError) {
-        console.error('Error deleting payment schedules:', schedulesError);
-        throw new Error('Failed to delete payment schedules');
+      const hasPaidBillings = billings.some(b => b.paid_amount > 0);
+      if (hasPaidBillings) {
+        return fail(409, { // 409 Conflict
+          error: 'Cannot delete lease with paid billings. Please remove payments first.'
+        });
       }
 
-      // Then delete lease_tenants
-      const { error: tenantsError } = await supabase
-        .from('lease_tenants')
-        .delete()
-        .eq('lease_id', form.data.id);
+      // Proceed with deletion if no paid billings are found
+      const { error: deleteError } = await supabase.rpc('delete_lease_and_dependents', { p_lease_id: leaseId });
 
-      if (tenantsError) {
-        console.error('Error deleting lease tenants:', tenantsError);
-        throw new Error('Failed to delete lease tenants');
+      if (deleteError) {
+        console.error('Error deleting lease via RPC:', deleteError);
+        throw new Error(deleteError.message);
       }
 
-      // Finally delete the lease
-      const { error: leaseError } = await supabase
-        .from('leases')
-        .delete()
-        .eq('id', form.data.id);
+      return { success: true, deletedLeaseId: leaseId };
 
-      if (leaseError) {
-        console.error('Error deleting lease:', leaseError);
-        throw new Error('Failed to delete lease');
-      }
-
-      return { success: true };
     } catch (error) {
       console.error('Delete transaction failed:', error);
       return fail(500, {
@@ -339,93 +343,46 @@ export const actions: Actions = {
   },
 
   submitPayment: async ({ request, locals: { supabase, safeGetSession } }) => {
+    const { user } = await safeGetSession();
+    if (!user) {
+      return fail(401, { error: 'Unauthorized' });
+    }
+
     try {
-      const session = await safeGetSession();
-      // if (!session?.user?.id) {
-      //   console.error('No authenticated user found');
-      //   return fail(401, { error: 'Unauthorized' });
-      // }
-
       const formData = await request.formData();
-      const paymentDetailsStr = formData.get('paymentDetails');
-      
-      if (!paymentDetailsStr) {
-        console.error('Missing payment details in request');
-        return fail(400, { error: 'Payment details are required' });
+      const paymentDetailsJSON = formData.get('paymentDetails');
+
+      if (!paymentDetailsJSON) {
+        return fail(400, { error: 'Missing payment details' });
       }
 
-      let paymentDetails: PaymentDetails;
-      try {
-        paymentDetails = JSON.parse(paymentDetailsStr.toString()) as PaymentDetails;
-      } catch (e) {
-        console.error('Failed to parse payment details:', e);
-        return fail(400, { error: 'Invalid payment details format' });
-      }
+      const paymentDetails: PaymentDetails = JSON.parse(paymentDetailsJSON as string);
 
-      // Validate payment details
-      if (!paymentDetails.amount || paymentDetails.amount <= 0) {
-        console.error('Invalid payment amount:', paymentDetails.amount);
-        return fail(400, { error: 'Invalid payment amount' });
-      }
-
-      if (!paymentDetails.billing_ids?.length) {
-        console.error('No billing IDs provided');
-        return fail(400, { error: 'No billings selected for payment' });
-      }
-
-      if (!paymentDetails.billing_changes) {
-        console.error('No billing changes provided');
-        return fail(400, { error: 'Missing billing allocation details' });
-      }
-
-      console.log('Processing payment:', {
-        amount: paymentDetails.amount,
-        method: paymentDetails.method,
-        billings: paymentDetails.billing_ids.length
+      const { data, error: rpcError } = await supabase.rpc('create_payment', {
+        p_amount: paymentDetails.amount,
+        p_method: paymentDetails.method as any,
+        p_billing_ids: paymentDetails.billing_ids,
+        p_paid_by: paymentDetails.paid_by,
+        p_paid_at: paymentDetails.paid_at,
+        p_reference_number: paymentDetails.reference_number,
+        p_notes: paymentDetails.notes,
+        p_created_by: user.id
       });
 
-      // Insert the payment record
-      const { data: payment, error: paymentError } = await supabase
-        .from('payments')
-        .insert({
-          amount: paymentDetails.amount,
-          method: paymentDetails.method,
-          reference_number: paymentDetails.reference_number,
-          paid_by: paymentDetails.paid_by,
-          paid_at: paymentDetails.paid_at,
-          notes: paymentDetails.notes,
-          billing_ids: paymentDetails.billing_ids,
-          billing_changes: paymentDetails.billing_changes,
-          created_by: session.user.id
-        })
-        .select()
-        .single();
-
-      if (paymentError) {
-        console.error('Database error creating payment:', paymentError);
-        return fail(500, { 
-          error: paymentError.message,
-          code: paymentError.code,
-          details: paymentError.details
-        });
+      if (rpcError) {
+        console.error('Error creating payment via RPC:', rpcError);
+        return fail(500, { error: `Payment processing failed: ${rpcError.message}` });
       }
 
-      console.log('Payment created successfully:', payment.id);
-      
-      // Make sure the response is properly structured
-      return {
-        type: 'success',
-        status: 200,
-        data: payment,
-        dependencies: ['app:leases', 'app:billings'] // Add dependencies for invalidation
-      };
+      return { success: true, payment: data };
 
-    } catch (error) {
-      console.error('Payment submission error:', error);
-      return fail(500, {
-        type: 'error',
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
-      });
+    } catch (e) {
+      const err = e as Error;
+      console.error('Error processing payment submission:', err);
+      if (err.message.includes('invalid input syntax for type json')) {
+        return fail(400, { error: 'Invalid payment details format.' });
+      }
+      return fail(500, { error: `An unexpected error occurred: ${err.message}` });
     }
   },
 
@@ -435,20 +392,112 @@ export const actions: Actions = {
     const name = data.get('name');
 
     if (!id || !name) {
-      return fail(400, { error: 'Missing required fields' });
+      return {
+        success: false,
+        message: 'Missing required fields'
+      };
     }
 
-    const { error } = await supabase
-      .from('leases')
-      .update({ name })
-      .eq('id', id);
+    const { error } = await supabase.from('leases').update({ name }).eq('id', id);
 
     if (error) {
-      console.error('Error updating lease name:', error);
-      return fail(500, { error: 'Failed to update lease name' });
+      return {
+        success: false,
+        message: error.message
+      };
     }
 
     return { success: true };
+  },
+
+  manageRentBillings: async ({ request, locals: { supabase, safeGetSession } }) => {
+    type MonthlyRent = {
+      month: number;
+      isActive: boolean;
+      amount: number;
+      dueDate: string;
+    };
+    const { user } = await safeGetSession();
+    if (!user) return fail(401, { message: 'Unauthorized' });
+
+    const formData = await request.formData();
+    const leaseId = formData.get('leaseId');
+    const year = formData.get('year');
+    const monthlyRentsRaw = formData.get('monthlyRents');
+
+    if (!leaseId || !year || !monthlyRentsRaw) {
+      return fail(400, { message: 'Missing required fields' });
+    }
+
+    const monthlyRents = JSON.parse(monthlyRentsRaw as string);
+
+    try {
+      // 1. Fetch existing rent billings for the year
+      const { data: existingBillings, error: fetchError } = await supabase
+        .from('billings')
+        .select('*')
+        .eq('lease_id', leaseId)
+        .eq('type', 'RENT')
+        .gte('billing_date', `${year}-01-01`)
+        .lte('billing_date', `${year}-12-31`);
+
+      if (fetchError) throw new Error(`Failed to fetch existing billings: ${fetchError.message}`);
+
+      const existingBillingsMap = new Map(existingBillings.map(b => [new Date(b.billing_date).getUTCMonth() + 1, b]));
+
+      const operations = monthlyRents.map(async (rent: MonthlyRent) => {
+        const existingBilling = existingBillingsMap.get(rent.month);
+
+        // Case 1: Create new billing
+        if (rent.isActive && !existingBilling) {
+          return supabase.from('billings').insert({
+            lease_id: leaseId,
+            type: 'RENT',
+            amount: rent.amount,
+            paid_amount: 0,
+            balance: rent.amount,
+            status: 'PENDING',
+            due_date: rent.dueDate,
+            billing_date: `${year}-${String(rent.month).padStart(2, '0')}-01`,
+            notes: 'Monthly Rent'
+          });
+        }
+
+        // Case 2: Update existing billing
+        if (rent.isActive && existingBilling) {
+          if (existingBilling.amount !== rent.amount || existingBilling.due_date !== rent.dueDate) {
+            const newBalance = existingBilling.balance - existingBilling.amount + rent.amount;
+            return supabase.from('billings').update({
+              amount: rent.amount,
+              due_date: rent.dueDate,
+              balance: newBalance
+            }).eq('id', existingBilling.id);
+          }
+        }
+
+        // Case 3: Delete existing billing
+        if (!rent.isActive && existingBilling) {
+          if (existingBilling.paid_amount > 0) {
+            throw new Error(`Cannot delete billing for month ${rent.month} as it has payments.`);
+          }
+          return supabase.from('billings').delete().eq('id', existingBilling.id);
+        }
+
+        return Promise.resolve({ error: null }); // No operation needed
+      });
+
+      const results = await Promise.all(operations);
+      const errors = results.map(r => r.error).filter(Boolean);
+
+      if (errors.length > 0) {
+        throw new Error(`Some operations failed: ${errors.map(e => e.message).join(', ')}`);
+      }
+
+      return { success: true, message: 'Rent billings updated successfully.' };
+
+    } catch (error) {
+      return fail(500, { message: error instanceof Error ? error.message : 'An unexpected error occurred.' });
+    }
   },
 
   updateStatus: async ({ request, locals: { supabase } }) => {
@@ -472,7 +521,10 @@ export const actions: Actions = {
         .update({ status })
         .eq('id', id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('Error updating lease status:', updateError);
+        return fail(500, { message: updateError.message });
+      }
 
       return {
         success: true,

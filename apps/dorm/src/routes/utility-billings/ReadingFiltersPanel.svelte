@@ -4,26 +4,36 @@
     import { Input } from '$lib/components/ui/input';
     import { Button } from '$lib/components/ui/button';
     import {
-      Select,
-      SelectContent,
-      SelectItem,
-      SelectTrigger,
-    } from "$lib/components/ui/select";
+        Select,
+        SelectContent,
+        SelectItem,
+        SelectTrigger
+    } from '$lib/components/ui/select';
     import * as Card from '$lib/components/ui/card';
-    import { RefreshCw } from 'lucide-svelte';
     import type { Property, FilterChangeEvent } from './types';
-    
-    export let availableReadingDates: string[] = [];
-    export let utilityTypes: Record<string, string> = {};
-    export let selectedProperty: Property | null = null;
-    export let selectedType: string | null = null;
-    export let dateFilter: string = '';
-    export let searchQuery: string = '';
-    
-    const dispatch = createEventDispatcher<{
-      filterChange: FilterChangeEvent;
-      addReadings: void;
-    }>();
+
+
+    type Props = {
+        availableReadingDates: string[];
+        utilityTypes: Record<string, string>;
+        selectedProperty: Property | null;
+        addReadings: () => void;
+        filters: { 
+            type: string | null; 
+            date: string; 
+            searchQuery: string; 
+        };
+    };
+
+    let {
+        availableReadingDates,
+        utilityTypes,
+        selectedProperty,
+        addReadings,
+        filters = $bindable()
+    }: Props = $props();
+
+
     
     // Format date for display
     function formatDate(dateString: string): string {
@@ -34,41 +44,10 @@
       });
     }
     
-    function handleTypeChange(value: string): void {
-      selectedType = value === '' ? null : value;
-      dispatch('filterChange', { 
-        type: selectedType, 
-        date: dateFilter, 
-        search: searchQuery 
-      });
-    }
-    
-    function handleDateFilterChange(value: string): void {
-      dateFilter = value;
-      dispatch('filterChange', { 
-        type: selectedType, 
-        date: dateFilter, 
-        search: searchQuery 
-      });
-    }
-    
-    function handleSearchChange(): void {
-      dispatch('filterChange', { 
-        type: selectedType, 
-        date: dateFilter, 
-        search: searchQuery 
-      });
-    }
-    
     function resetFilters(): void {
-      selectedType = null;
-      dateFilter = '';
-      searchQuery = '';
-      dispatch('filterChange', { 
-        type: null, 
-        date: '', 
-        search: '' 
-      });
+      filters.type = null;
+      filters.date = '';
+      filters.searchQuery = '';
     }
   </script>
   
@@ -85,19 +64,18 @@
           <Button 
             class="flex items-center gap-2"
             size="sm"
-            disabled={!selectedProperty || !selectedType}
-            on:click={() => dispatch('addReadings')}
+            disabled={!selectedProperty || !filters.type}
+            onclick={() => addReadings()}
           >
             {#if !selectedProperty}
               Select a property to continue
-            {:else if !selectedType}
+            {:else if !filters.type}
               Select a utility type
             {:else}
               Add Meter Readings
             {/if}
           </Button>
-
-
+          <Button variant="ghost" onclick={resetFilters}>Reset</Button>
         </div>
       </div>
     </Card.Header>
@@ -120,11 +98,11 @@
           <Label for="type-filter" class="text-sm font-medium">Utility Type</Label>
           <Select 
             type="single" 
-            onValueChange={(value: string) => handleTypeChange(value)} 
-            value={selectedType || ""}
+            onValueChange={(v) => filters.type = v === '' ? null : v} 
+            value={filters.type || ""}
           >
             <SelectTrigger class="w-full">
-              <span>{selectedType || "All Types"}</span>
+              <span>{filters.type || "All Types"}</span>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="">All Types</SelectItem>
@@ -140,11 +118,11 @@
           <Label for="date-filter" class="text-sm font-medium">Reading Date</Label>
           <Select 
             type="single" 
-            onValueChange={(value: string) => handleDateFilterChange(value)} 
-            value={dateFilter || ""}
+            onValueChange={(v) => filters.date = v} 
+            value={filters.date || ""}
           >
             <SelectTrigger class="w-full">
-              <span>{dateFilter ? formatDate(dateFilter) : "All Dates"}</span>
+              <span>{filters.date ? formatDate(filters.date) : "All Dates"}</span>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="">All Dates</SelectItem>
@@ -159,11 +137,10 @@
         <div class="space-y-2">
           <Label for="search" class="text-sm font-medium">Search Meters</Label>
           <Input
-            type="text"
             id="search"
-            placeholder="Search by meter name..."
-            bind:value={searchQuery}
-            oninput={() => handleSearchChange()}
+            type="search"
+            placeholder="Search by meter ID or unit..."
+            bind:value={filters.searchQuery}
           />
         </div>
       </div>

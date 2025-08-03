@@ -1,4 +1,4 @@
-import type { LeaseTenant } from '$lib/types/lease';
+import type { LeaseTenant, Billing } from '$lib/types/lease';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export function mapLeaseData(lease: any, floorsMap: Map<number, any>) {
@@ -23,9 +23,11 @@ export function mapLeaseData(lease: any, floorsMap: Map<number, any>) {
   };
 }
 
-function calculateTotalBalance(billings: any[]): number {
-  return billings.reduce((sum: number, billing: any) => {
-    return sum + Number(billing.balance || 0);
+function calculateTotalBalance(billings: Billing[]): number {
+  return billings.reduce((sum, billing) => {
+    const totalDue = (billing.amount || 0) + (billing.penalty_amount || 0);
+    const balance = totalDue - (billing.paid_amount || 0);
+    return sum + balance;
   }, 0);
 }
 

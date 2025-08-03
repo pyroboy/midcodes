@@ -13,9 +13,10 @@
 		properties: Property[];
 		filters: Filters;
 		onShareReading: (meter: MeterData) => void;
+		meterLastBilledDates?: Record<string, string>;
 	};
 
-	let { readings, meters, properties, filters, onShareReading }: Props = $props();
+	let { readings, meters, properties, filters, onShareReading, meterLastBilledDates = {} }: Props = $props();
 
 
 
@@ -29,7 +30,9 @@
 			if (!meter) return false;
 
 			const propertyMatch = filters.property ? meter.property_id === filters.property.id : true;
-			const typeMatch = filters.type ? meter.meter_type.toUpperCase() === filters.type.toUpperCase() : true;
+			const typeMatch = filters.type
+				? meter.type && meter.type.toUpperCase() === filters.type.toUpperCase()
+				: true;
 			const dateMatch = filters.date ? reading.reading_date === filters.date : true;
 			const searchMatch = filters.search
 				? meter.name.toLowerCase().includes(filters.search.toLowerCase())
@@ -108,7 +111,7 @@
 				propertiesMap[property.id].meterMap[meter.id] = {
 					meterId: meter.id,
 					meterName: meter.name,
-					meterType: meter.meter_type,
+					meterType: meter.type || 'UNKNOWN',
 					unit: meter.unit?.name || '',
 					currentReading: latestReading?.reading || 0,
 					currentReadingDate: latestReading?.reading_date || null,
@@ -244,16 +247,16 @@
 		<p class="text-gray-500">No readings found with the current filters.</p>
 	</div>
 {:else}
-	{#each groupedReadings as dateGroup}
+	{#each groupedReadings as dateGroup, i}
+		{@const previousDate = groupedReadings[i + 1]?.date}
 		<div class="mb-8">
-			<h3 class="text-lg font-semibold mb-2">Readings for {formatDate(dateGroup.date)}</h3>
+			<h3 class="text-lg font-semibold mb-2">
+				Readings for {previousDate ? `${formatDate(previousDate)} to ` : ''}{formatDate(dateGroup.date)}
+			</h3>
 
 			{#each dateGroup.properties as propertyGroup}
 				<Card.Root class="mb-4">
-					<Card.Header>
-						<Card.Title>{propertyGroup.propertyName}</Card.Title>
-					</Card.Header>
-					<Card.Content>
+				
 						<div class="rounded-md border">
 							<!-- Header Row -->
 							<div class="flex p-2 bg-gray-50 font-medium text-sm border-b">
@@ -262,7 +265,7 @@
 								<div class="w-24 text-right">Current</div>
 								<div class="w-32 text-right">Consumption</div>
 								<div class="w-24 text-right">Total Cost</div>
-								<div class="w-20 text-right pr-2">Share</div>
+								<div class="w-20 text-right pr-2"></div>
 							</div>
 
 							{#each propertyGroup.uniqueMeters as meter (meter.meterId)}
@@ -276,11 +279,21 @@
 									>
 										<div class="flex flex-1 items-center pl-6">
 											<div class="flex-1 font-medium">
-												<div>{meter.meterName}</div>
-												{#if meter.unit}
-													<div class="text-xs text-muted-foreground">{meter.unit}</div>
-												{/if}
-											</div>
+													<div class="flex items-center gap-2">
+														<span>{meter.meterName}</span>
+
+													</div>
+													<div class="text-xs text-muted-foreground">
+														{#if meter.unit}
+															<span>{meter.unit}</span>
+														{/if}
+														{#if meterLastBilledDates && meterLastBilledDates[meter.meterId]}
+															<span class="ml-2 pl-2 border-l border-border">
+																Last Billed: {formatDate(meterLastBilledDates[meter.meterId])}
+															</span>
+														{/if}
+													</div>
+												</div>
 											<div class="w-24 text-right">{formatNumber(meter.lastReading)}</div>
 											<div class="w-24 text-right font-medium">{formatNumber(meter.currentReading)}</div>
 											<div class="w-32 text-right">
@@ -291,22 +304,15 @@
 										</div>
 										<div class="w-20 flex items-center justify-center">
 											<Button size="sm" variant="outline" onclick={(e) => {e.stopPropagation(); onShareReading(meter);}}>
-												Share
+												Bill
 											</Button>
 										</div>
 									</div>
 								</div>
 							{/each}
 
-							<!-- Footer Row -->
-							<div class="flex p-2 bg-gray-50 font-medium text-sm border-t">
-								<div class="flex-1 text-right pr-4">Property Totals:</div>
-								<div class="w-32 text-right">{formatNumber(propertyGroup.totalConsumption)}</div>
-								<div class="w-24 text-right">{formatCurrency(propertyGroup.totalCost)}</div>
-								<div class="w-20"></div>
-							</div>
+		
 						</div>
-					</Card.Content>
 				</Card.Root>
 			{/each}
 		</div>

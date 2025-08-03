@@ -102,8 +102,9 @@ export const actions: Actions = {
         .from('billings')
         .update({
           penalty_amount,
+          status: 'PENALIZED',
           notes: notes || currentBilling.notes,
-          balance: (currentBilling.amount + penalty_amount) - currentBilling.paid_amount,
+          balance: currentBilling.balance - currentBilling.penalty_amount + penalty_amount,
           updated_at: new Date().toISOString()
         })
         .eq('id', id);

@@ -2,37 +2,7 @@
   import { createEventDispatcher } from 'svelte';
   import LeaseCard from './LeaseCard.svelte';
   import { Alert, AlertTitle, AlertDescription } from '$lib/components/ui/alert';
-
-  interface Lease {
-    id: string;
-    name: string;
-    status: string;
-    rental_unit?: {
-      rental_unit_number: string;
-      floor?: {
-        floor_number: string;
-        wing?: string;
-      };
-      property?: {
-        name: string;
-      }
-    };
-    type: string;
-    start_date: string;
-    end_date: string;
-    rent_amount: number;
-    security_deposit: number;
-    lease_tenants: Array<{
-        name: string;
-        contact_number?: string;
-        email?: string;
-
-    }>;
-    notes?: string;
-    balance: number;
-    billings?: any[];
-    payment_schedules?: any[];
-  }
+  import type { Lease } from '$lib/types/lease';
 
   interface Props {
     leases?: Lease[];

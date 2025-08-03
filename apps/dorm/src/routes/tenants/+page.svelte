@@ -1,153 +1,62 @@
 <script lang="ts">
   import { superForm } from 'sveltekit-superforms/client';
   import { zodClient } from 'sveltekit-superforms/adapters';
-  import { tenantFormSchema, type TenantFormData } from './formSchema';
+  import { tenantFormSchema } from './formSchema';
   import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
-  import TenantList from './TenantList.svelte';
   import TenantForm from './TenantForm.svelte';
-  import type { ExtendedTenant } from './types';
+  import type { TenantResponse } from '$lib/types/tenant';
   import type { PageData } from './$types';
-  import { browser } from "$app/environment";
+  import { browser } from '$app/environment';
   import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
-  import { invalidate,invalidateAll } from '$app/navigation';
+  import { invalidate } from '$app/navigation';
+  import { propertyStore } from '$lib/stores/property';
+  import { derived } from 'svelte/store';
+  import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '$lib/components/ui/accordion';
+  import { Button } from '$lib/components/ui/button';
+  import { Pencil, Trash2 } from 'lucide-svelte';
+  import { Input } from '$lib/components/ui/input';
+  import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
 
-  interface Props {
-    data: PageData;
-  }
+  let { data }: { data: PageData } = $props();
 
-  let { data }: Props = $props();
-  let tenants = $state(data.tenants);
-
-  $effect(() => {
-  tenants = structuredClone(data.tenants);
-});
-
-  
-  const defaultEmergencyContact = {
-    name: '',
-    relationship: '',
-    phone: '',
-    email: null,
-    address: ''
-  };
-
-  let editMode = $state(false);
-  let selectedTenant: ExtendedTenant | undefined = $state();
-  let formError = $state('');
-
-  const formInstance = superForm<TenantFormData>(data.form, {
-    id: 'tenant-form',
+  const { form, enhance, errors, constraints, submitting, reset } = superForm(data.form, {
     validators: zodClient(tenantFormSchema),
-    validationMethod: 'oninput',
     dataType: 'json',
-    delayMs: 10,
-    taintedMessage: null,
-    resetForm: true,
-    onError: ({ result }) => {
-      console.error('Form validation errors:', result.error);
-      if (result.error) {
-        console.error('Server error:', result.error.message);
-      }
-    },
     onResult: async ({ result }) => {
       if (result.type === 'success') {
         selectedTenant = undefined;
         editMode = false;
         await invalidate('app:tenants');
         reset();
-      } else if (result.type === 'failure') {
-        formError = result.data?.message || 'An unknown error occurred';
       }
-    }
+    },
+    taintedMessage: null
   });
 
-  const { form, enhance, errors, constraints, submitting, reset } = formInstance;
+  let editMode = $state(false);
+  let selectedTenant: TenantResponse | undefined = $state();
+  let searchTerm = $state('');
+  let selectedStatus = $state('');
 
-  function handleEdit(tenant: ExtendedTenant) {
-    console.log('--- Edit Tenant Clicked ---');
-    console.log('Tenant data:', tenant);
+      const filteredTenants = $derived.by(() => {
+    const selectedProperty = $propertyStore.selectedProperty;
+
+    return data.tenants.filter((tenant) => {
+      // const propertyMatch = !selectedProperty || String(tenant.lease?.location?.property?.id) === String(selectedProperty.id);
+      const searchMatch = !searchTerm || tenant.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const statusMatch = !selectedStatus || tenant.tenant_status === selectedStatus;
+
+      // return propertyMatch && searchMatch && statusMatch;
+      return searchMatch && statusMatch;
+    });
+  });
+
+  function handleEdit(tenant: TenantResponse) {
     editMode = true;
     selectedTenant = tenant;
-
-    const emergencyContact = tenant.emergency_contact ?? defaultEmergencyContact;
-
-    reset({ data: {
-      id: tenant.id,
-      name: tenant.name,
-      contact_number: tenant.contact_number,
-      email: tenant.email,
-      auth_id: tenant.auth_id,
-      tenant_status: tenant.tenant_status,
-      created_by: tenant.created_by,
-      emergency_contact: {
-        ...defaultEmergencyContact,
-        ...emergencyContact,
-        email: emergencyContact.email ?? null
-      }
-    }});
-    console.log('Form reset with new data for editing.');
+    reset({ data: tenant });
   }
 
-  async function handleDeleteTenant(tenant: ExtendedTenant) {
-    console.log('Starting delete process for tenant:', tenant);
-
-    if (!confirm(`Are you sure you want to delete tenant ${tenant.name}?`)) {
-        console.log('Delete cancelled by user');
-        return;
-    }
-
-    const formData = new FormData();
-    formData.append('id', String(tenant.id));
-    console.log('Form data prepared:', { tenantId: tenant.id });
-
-    try {
-        console.log('Sending delete request...');
-        const result = await fetch('?/delete', {
-            method: 'POST',
-            body: formData
-        });
-
-        const response = await result.json();
-        console.log('Received response:', response);
-
-        if (response.type === 'failure') {
-            // Parse the data string if it's a string
-            let errorData;
-            try {
-                errorData = typeof response.data === 'string' 
-                    ? JSON.parse(response.data) 
-                    : response.data;
-            } catch (e) {
-                errorData = response.data;
-            }
-
-            // Extract error message
-            const errorMessage = Array.isArray(errorData) 
-                ? errorData[1] 
-                : response.message || 'Unknown error';
-                
-            console.error('Delete failed:', {
-                status: response.status,
-                response,
-                error: errorMessage
-            });
-            alert(errorMessage);
-            return;
-        }
-
-        console.log('Delete successful, updating local state');
-        tenants = tenants.filter(t => t.id !== tenant.id);
-        selectedTenant = undefined;
-        editMode = false;
-
-        console.log('Invalidating caches...');
-        await invalidateAll();
-        console.log('Cache invalidation complete');
-    } catch (error) {
-        console.error('Error deleting tenant:', error);
-        alert(`Error deleting tenant: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-}
   function handleCancel() {
     selectedTenant = undefined;
     editMode = false;
@@ -155,14 +64,60 @@
   }
 </script>
 
-<div class="container mx-auto p-4 flex">
-  <TenantList
-  {tenants}
-    on:edit={event => handleEdit(event.detail)}
-    on:delete={event => handleDeleteTenant(event.detail)}
-  />
+<div class="container mx-auto p-4 flex space-x-4">
+  <div class="w-2/3">
+    <Card>
+      <CardHeader>
+        <CardTitle>Tenants</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div class="flex space-x-4 mb-4">
+          <Input placeholder="Search tenants..." bind:value={searchTerm} class="w-full" />
+          <Select type="single" name="tenant_status"  bind:value={selectedStatus}>
+            <SelectTrigger class="w-[180px]">
+              {selectedStatus ? selectedStatus.charAt(0).toUpperCase() + selectedStatus.slice(1).toLowerCase() : 'Filter by status'}
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Statuses</SelectItem>
+              <SelectItem value="ACTIVE">Active</SelectItem>
+              <SelectItem value="INACTIVE">Inactive</SelectItem>
+              <SelectItem value="PENDING">Pending</SelectItem>
+              <SelectItem value="BLACKLISTED">Blacklisted</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <Accordion type="single" class="w-full">
+          {#each filteredTenants as tenant (tenant.id)}
+            <AccordionItem value={tenant.id.toString()}>
+              <div class="flex justify-between items-center w-full">
+                <AccordionTrigger>{tenant.name}</AccordionTrigger>
+                <div class="flex space-x-2 mr-4">
+                  <Button variant="outline" size="icon" onclick={() => handleEdit(tenant)}>
+                    <Pencil class="h-4 w-4" />
+                  </Button>
+                  <form method="POST" action="?/delete" use:enhance>
+                    <input type="hidden" name="id" value={tenant.id} />
+                    <Button variant="destructive" size="icon" type="submit">
+                      <Trash2 class="h-4 w-4" />
+                    </Button>
+                  </form>
+                </div>
+              </div>
+              <AccordionContent>
+                <div>
+                  <p><strong>Email:</strong> {tenant.email || 'N/A'}</p>
+                  <p><strong>Contact:</strong> {tenant.contact_number || 'N/A'}</p>
+                  <p><strong>Status:</strong> {tenant.tenant_status}</p>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          {/each}
+        </Accordion>
+      </CardContent>
+    </Card>
+  </div>
 
-  <div class="w-1/3 pl-4">
+  <div class="w-1/3">
     <Card>
       <CardHeader>
         <CardTitle>{editMode ? 'Edit' : 'Add'} Tenant</CardTitle>
@@ -171,18 +126,12 @@
         <TenantForm
           {data}
           {editMode}
-          form={form}
+          {form}
           {errors}
           {enhance}
           {constraints}
           {submitting}
-          tenant={selectedTenant}
           on:cancel={handleCancel}
-          on:tenantSaved={async () => {
-            selectedTenant = undefined;
-            editMode = false;
-            await invalidate('app:tenants');
-          }}
         />
       </CardContent>
     </Card>
@@ -190,5 +139,5 @@
 </div>
 
 {#if browser}
-  <SuperDebug data={form} />
+  <SuperDebug data={$form} />
 {/if}
