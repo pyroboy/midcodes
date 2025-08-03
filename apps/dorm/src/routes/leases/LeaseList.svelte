@@ -6,10 +6,12 @@
 
   interface Props {
     leases?: Lease[];
+    tenants?: any[];
+    rentalUnits?: any[];
     onStatusChange: (id: string, status: string) => void;
   }
 
-  let { leases = [], onStatusChange }: Props = $props();
+  let { leases = [], tenants = [], rentalUnits = [], onStatusChange }: Props = $props();
 
   const dispatch = createEventDispatcher<{
     leaseClick: any;
@@ -38,6 +40,8 @@
     {#each leases as lease (lease.id)}
       <LeaseCard
         lease={lease}
+        {tenants}
+        {rentalUnits}
         onLeaseClick={handleLeaseClick}
         onDelete={handleDelete}
         {onStatusChange}

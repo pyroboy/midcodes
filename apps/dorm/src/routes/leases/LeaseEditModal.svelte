@@ -1,0 +1,449 @@
+<script lang="ts">
+  import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '$lib/components/ui/dialog';
+  import { Button } from '$lib/components/ui/button';
+  import { Input } from '$lib/components/ui/input';
+  import { Label } from '$lib/components/ui/label';
+  import * as Select from '$lib/components/ui/select';
+  import { toast } from 'svelte-sonner';
+  import type { Lease } from '$lib/types/lease';
+  import { Pencil, Users, Calendar, Search, AlertCircle } from 'lucide-svelte';
+  import { format } from 'date-fns';
+  import { leaseStatusEnum, unitTypeEnum } from './formSchema';
+  import { enhance } from '$app/forms';
+  import { invalidateAll } from '$app/navigation';
+
+  let { lease, open, onOpenChange, tenants = [], rentalUnits = [] } = $props();
+
+  // Format dates for input fields
+  const formatDate = (dateString: string) => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      return format(date, 'yyyy-MM-dd');
+    } catch (e) {
+      return '';
+    }
+  };
+
+  // Get tenant IDs by matching names from lease_tenants array
+  function getTenantIds(lease: any): number[] {
+    if (!lease.lease_tenants || !Array.isArray(lease.lease_tenants) || lease.lease_tenants.length === 0) {
+      return [];
+    }
+    
+    // Extract tenant names from lease_tenants
+    const leaseTenantNames = lease.lease_tenants.map((lt: any) => lt.name).filter(Boolean);
+    
+    // Find matching tenants by name
+    const matchingTenantIds = tenants
+      .filter(tenant => leaseTenantNames.includes(tenant.name))
+      .map(tenant => tenant.id);
+    
+    return matchingTenantIds;
+  }
+
+  // Form data with optional end_date
+  let formData = $state({
+    name: lease.name || '',
+    start_date: formatDate(lease.start_date),
+    end_date: formatDate(lease.end_date) || '', // Make optional
+    terms_month: lease.terms_month || 1,
+    status: lease.status || 'ACTIVE',
+    unit_type: lease.unit_type || 'BEDSPACER',
+    notes: lease.notes || '',
+    rental_unit_id: lease.rental_unit?.id || 0,
+    selectedTenants: getTenantIds(lease)
+  });
+
+  // Auto-calculate end_date when start_date or terms change
+  $effect(() => {
+    if (formData.start_date && Number(formData.terms_month) > 0) {
+      try {
+        const start = new Date(formData.start_date);
+        if (isNaN(start.getTime())) return;
+
+        const end = new Date(start);
+        end.setMonth(end.getMonth() + Number(formData.terms_month) );
+        formData.end_date = format(end, 'yyyy-MM-dd');
+      } catch (error) {
+        console.error('Error calculating end date:', error);
+      }
+    } else if (Number(formData.terms_month) === 0) {
+      formData.end_date = '';
+    }
+  });
+
+  // Search functionality
+  let searchTerm = $state('');
+  let filteredTenants = $derived.by(() => {
+    if (!searchTerm.trim()) return tenants;
+    
+    const term = searchTerm.toLowerCase();
+    return tenants.filter(tenant => 
+      tenant.name.toLowerCase().includes(term) ||
+      (tenant.email && tenant.email.toLowerCase().includes(term)) ||
+      (tenant.contact_number && tenant.contact_number.toLowerCase().includes(term))
+    );
+  });
+
+  // Validation
+  let validationErrors = $state<Record<string, string>>({});
+  let isFormValid = $state(false);
+  
+  // Updated validation
+  $effect(() => {
+    const errors: Record<string, string> = {};
+    
+    if (!formData.name.trim()) {
+      errors.name = 'Lease name is required';
+    }
+    
+    if (!formData.start_date) {
+      errors.start_date = 'Start date is required';
+    }
+    
+    // Make end_date validation optional
+    if (formData.end_date) {
+      if (formData.start_date && formData.end_date) {
+        const startDate = new Date(formData.start_date);
+        const endDate = new Date(formData.end_date);
+        
+        if (startDate >= endDate) {
+          errors.end_date = 'End date must be after start date';
+        }
+      }
+    }
+    
+    validationErrors = errors;
+    isFormValid = Object.keys(errors).length === 0;
+  });
+
+  // Get rental unit display name
+  let selectedRentalUnit = $derived.by(() => {
+    const unit = rentalUnits?.find(r => r.id === formData.rental_unit_id);
+    if (!unit) return "Select a unit";
+    const unitName = unit.name ?? "Unnamed Unit";
+    const propertyName = unit.property?.name ?? "No property";
+    return `${unitName} - ${propertyName}`;
+  });
+
+  // Handle tenant selection
+  function toggleTenant(tenantId: number) {
+    const index = formData.selectedTenants.indexOf(tenantId);
+    if (index > -1) {
+      formData.selectedTenants = formData.selectedTenants.filter((id: number) => id !== tenantId);
+    } else {
+      formData.selectedTenants = [...formData.selectedTenants, tenantId];
+    }
+  }
+
+  // Check if tenant is selected
+  function isTenantSelected(tenantId: number) {
+    return formData.selectedTenants.includes(tenantId);
+  }
+
+  // Form submission with use:enhance
+  const handleFormSubmit = () => {
+    if (!isFormValid) {
+      toast.error('Please fix the validation errors before submitting');
+      return;
+    }
+  };
+
+  // Reset form when modal opens/closes - FIXED: Use untrack to prevent infinite loop
+  $effect(() => {
+    if (open) {
+      // Use untrack to prevent the effect from re-running when we modify formData
+      const tenantIds = getTenantIds(lease);
+      
+      // Reset form data when modal opens
+      formData = {
+        name: lease.name || '',
+        start_date: formatDate(lease.start_date),
+        end_date: formatDate(lease.end_date) || '', // Make optional
+        terms_month: lease.terms_month || 1,
+        status: lease.status || 'ACTIVE',
+        unit_type: lease.unit_type || 'BEDSPACER',
+        notes: lease.notes || '',
+        rental_unit_id: lease.rental_unit?.id || 0,
+        selectedTenants: tenantIds
+      };
+      searchTerm = '';
+    }
+  });
+</script>
+
+<Dialog open={open} onOpenChange={(open) => !open && onOpenChange()}>
+  <DialogContent class="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+    <DialogHeader>
+      <div class="flex items-center gap-2">
+        <Pencil class="w-5 h-5 text-primary" />
+        <DialogTitle>Edit Lease Details</DialogTitle>
+      </div>
+      <DialogDescription>
+        Update the lease information and manage tenants. Click save when you're done.
+      </DialogDescription>
+    </DialogHeader>
+    
+    <form 
+      method="POST" 
+      action="?/updateLease"
+      use:enhance={() => {
+        return async ({ result }) => {
+          if (result.type === 'success') {
+            toast.success('Lease updated successfully');
+            onOpenChange(false);
+            await invalidateAll();
+          } else if (result.type === 'failure') {
+            toast.error('Failed to update lease');
+          }
+        };
+      }}
+      class="space-y-6"
+    >
+      <!-- Hidden form fields for server action -->
+      <input type="hidden" name="id" value={lease.id} />
+      <input type="hidden" name="name" bind:value={formData.name} />
+      <input type="hidden" name="start_date" bind:value={formData.start_date} />
+      <input type="hidden" name="end_date" bind:value={formData.end_date} />
+      <input type="hidden" name="terms_month" bind:value={formData.terms_month} />
+      <input type="hidden" name="status" bind:value={formData.status} />
+      <input type="hidden" name="unit_type" bind:value={formData.unit_type} />
+      <input type="hidden" name="notes" bind:value={formData.notes} />
+      <input type="hidden" name="rental_unit_id" bind:value={formData.rental_unit_id} />
+      <input type="hidden" name="tenantIds" value={JSON.stringify(formData.selectedTenants)} />
+      <!-- Basic Information -->
+      <div class="space-y-4">
+        <div class="flex items-center gap-2 pb-2 border-b border-slate-200">
+          <Calendar class="w-4 h-4 text-slate-500" />
+          <h3 class="text-sm font-semibold text-slate-700">Basic Information</h3>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="space-y-2">
+            <Label for="name">Lease Name</Label>
+            <Input 
+              id="name" 
+              name="name" 
+              type="text" 
+              bind:value={formData.name}
+              class={validationErrors.name ? 'border-red-500' : ''}
+              required
+            />
+            {#if validationErrors.name}
+              <p class="text-sm text-red-500 flex items-center gap-1">
+                <AlertCircle class="w-4 h-4" />
+                {validationErrors.name}
+              </p>
+            {/if}
+          </div>
+          
+          <div class="space-y-2">
+            <Label for="rental_unit">Rental Unit</Label>
+            <Select.Root
+              type="single"
+              bind:value={formData.rental_unit_id}
+            >
+              <Select.Trigger class={validationErrors.rental_unit ? 'border-red-500' : ''}>
+                {selectedRentalUnit}
+              </Select.Trigger>
+              <Select.Content>
+                {#each rentalUnits as unit}
+                  <Select.Item value={unit.id}>
+                    {unit.name} - {unit.property?.name || 'No property'}
+                  </Select.Item>
+                {/each}
+              </Select.Content>
+            </Select.Root>
+            {#if validationErrors.rental_unit}
+              <p class="text-sm text-red-500 flex items-center gap-1">
+                <AlertCircle class="w-4 h-4" />
+                {validationErrors.rental_unit}
+              </p>
+            {/if}
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="space-y-2">
+            <Label for="start_date">Start Date</Label>
+            <Input 
+              id="start_date" 
+              name="start_date" 
+              type="date" 
+              bind:value={formData.start_date}
+              class={validationErrors.start_date ? 'border-red-500' : ''}
+              required
+            />
+            {#if validationErrors.start_date}
+              <p class="text-sm text-red-500 flex items-center gap-1">
+                <AlertCircle class="w-4 h-4" />
+                {validationErrors.start_date}
+              </p>
+            {/if}
+          </div>
+          
+          <div class="space-y-2">
+            <Label for="terms_month">Terms (Months)</Label>
+            <Input 
+              id="terms_month" 
+              name="terms_month" 
+              type="number" 
+              bind:value={formData.terms_month}
+              min="1"
+              max="60"
+              class={validationErrors.terms_month ? 'border-red-500' : ''}
+            />
+            {#if validationErrors.terms_month}
+              <p class="text-sm text-red-500 flex items-center gap-1">
+                <AlertCircle class="w-4 h-4" />
+                {validationErrors.terms_month}
+              </p>
+            {/if}
+          </div>
+          
+          <div class="space-y-2">
+            <Label for="end_date">End Date (Auto-calculated)</Label>
+            <Input 
+              id="end_date" 
+              name="end_date" 
+              type="date" 
+              bind:value={formData.end_date}
+              class={`bg-gray-50 ${validationErrors.end_date ? 'border-red-500' : ''}`}
+            />
+            <p class="text-xs text-gray-500">
+              Automatically calculated from start date and terms
+            </p>
+            {#if validationErrors.end_date}
+              <p class="text-sm text-red-500 flex items-center gap-1">
+                <AlertCircle class="w-4 h-4" />
+                {validationErrors.end_date}
+              </p>
+            {/if}
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="space-y-2">
+            <Label for="status">Status</Label>
+            <Select.Root
+              type="single"
+              bind:value={formData.status}
+            >
+              <Select.Trigger>
+                {formData.status}
+              </Select.Trigger>
+              <Select.Content>
+                {#each leaseStatusEnum.options as status}
+                  <Select.Item value={status}>
+                    {status}
+                  </Select.Item>
+                {/each}
+              </Select.Content>
+            </Select.Root>
+          </div>
+          
+          <div class="space-y-2">
+            <Label for="unit_type">Unit Type</Label>
+            <Select.Root
+              type="single"
+              bind:value={formData.unit_type}
+            >
+              <Select.Trigger>
+                {formData.unit_type?.replace('_', ' ')}
+              </Select.Trigger>
+              <Select.Content>
+                {#each unitTypeEnum.options as type}
+                  <Select.Item value={type}>
+                    {type.replace('_', ' ')}
+                  </Select.Item>
+                {/each}
+              </Select.Content>
+            </Select.Root>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tenant Management -->
+      <div class="space-y-4">
+        <div class="flex items-center gap-2 pb-2 border-b border-slate-200">
+          <Users class="w-4 h-4 text-slate-500" />
+          <h3 class="text-sm font-semibold text-slate-700">Tenant Management</h3>
+        </div>
+        
+        <!-- Search Bar -->
+        <div class="space-y-2">
+          <Label for="tenant-search">Search Tenants</Label>
+          <div class="relative">
+            <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input 
+              id="tenant-search"
+              type="text"
+              placeholder="Search by name, email, or contact number..."
+              bind:value={searchTerm}
+              class="pl-10"
+            />
+          </div>
+        </div>
+        
+        <div class="space-y-2">
+          <Label>Select Tenants ({formData.selectedTenants.length} selected)</Label>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-60 overflow-y-auto border rounded-md p-3">
+            {#if filteredTenants.length === 0}
+              <div class="col-span-2 text-center py-8 text-gray-500">
+                <Users class="w-8 h-8 mx-auto mb-2 opacity-40" />
+                <p class="text-sm">
+                  {searchTerm ? 'No tenants found matching your search' : 'No tenants available'}
+                </p>
+              </div>
+            {:else}
+              {#each filteredTenants as tenant}
+                <label class="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-2 rounded border border-gray-200">
+                  <input 
+                    type="checkbox" 
+                    checked={isTenantSelected(tenant.id)}
+                    onchange={() => toggleTenant(tenant.id)}
+                    class="rounded"
+                  />
+                  <span class="text-sm flex-1">
+                    <div class="font-medium">{tenant.name}</div>
+                    <div class="text-xs text-gray-500">
+                      {tenant.email || tenant.contact_number || 'No contact info'}
+                    </div>
+                  </span>
+                </label>
+              {/each}
+            {/if}
+          </div>
+          {#if validationErrors.tenants}
+            <p class="text-sm text-red-500 flex items-center gap-1">
+              <AlertCircle class="w-4 h-4" />
+              {validationErrors.tenants}
+            </p>
+          {/if}
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div class="space-y-2">
+        <Label for="notes">Notes</Label>
+        <textarea
+          id="notes"
+          name="notes"
+          class="flex h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          bind:value={formData.notes}
+          placeholder="Additional notes about the lease..."
+        ></textarea>
+      </div>
+      
+      <div class="flex justify-end gap-2 pt-4">
+        <Button type="button" variant="outline" onclick={() => onOpenChange(false)}>
+          Cancel
+        </Button>
+        <Button type="submit" disabled={!isFormValid}>
+          Save Changes
+        </Button>
+      </div>
+    </form>
+  </DialogContent>
+</Dialog>

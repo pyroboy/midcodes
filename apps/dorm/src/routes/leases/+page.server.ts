@@ -1,7 +1,7 @@
 import { fail, error, json } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
-import { leaseSchema, deleteLeaseSchema } from './formSchema';
+import { leaseSchema, deleteLeaseSchema, leaseSchemaWithValidation } from './formSchema';
 import type { Actions, PageServerLoad } from './$types';
 import type { PostgrestError } from '@supabase/postgrest-js';
 import { createPaymentSchedules } from './utils';
@@ -119,55 +119,29 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
 export const actions: Actions = {
   create: async ({ request, locals: { supabase, safeGetSession } }) => {
     console.log('🚀 Creating lease');
-    const form = await superValidate(request, zod(leaseSchema));
+    const form = await superValidate(request, zod(leaseSchemaWithValidation));
     
     if (!form.valid) {
       console.error('L-1003 - ❌ Form validation failed:', form.errors);
       return fail(400, { form });
     }
 
-
-    
     const { user } = await safeGetSession();
     if (!user) return fail(403, { form, message: ['Unauthorized'] });
 
     try {
-      // Validate rental unit status
-      // const { data: rentalUnit } = await supabase
-      //   .from('rental_unit')
-      //   .select('capacity')
-      //   .eq('id', form.data.rental_unit_id)
-      //   .single();
-
-      // if (rentalUnit?.capacity !== 10) {
-      //   form.errors.rental_unit_id = ['Unit must be not full to create lease'];
-      //   return fail(400, { form });
-      // }
-
-      // Get unit details for lease name
-      const { data: unit } = await supabase
-        .from('rental_unit')
-        .select(`
-          name,
-          floor:floors (
-            floor_number,
-            wing
-          )
-        `)
-        .eq('id', form.data.rental_unit_id)
-        .single();
-
-      // Generate lease name with fallback
-      let leaseName: string;
-      if (!unit?.floor?.[0]) {
-        leaseName = unit?.name ?? `Unit ${form.data.rental_unit_id}`;
-      } else {
-        const floorInfo = unit.floor[0];
-        leaseName = `${floorInfo.floor_number}F${floorInfo.wing ? ` ${floorInfo.wing}` : ''} - ${unit.name}`;
+      // Calculate end_date if not provided
+      let endDate = form.data.end_date;
+      if (!endDate && form.data.start_date && form.data.terms_month > 0) {
+        const start = new Date(form.data.start_date);
+        const end = new Date(start);
+        end.setMonth(end.getMonth() + form.data.terms_month);
+        endDate = end.toISOString().split('T')[0];
       }
 
-      // Extract tenant IDs and prepare lease data matching the schema
+      // Extract tenant IDs and prepare lease data
       const { tenantIds, ...leaseData } = form.data;
+      const leaseName = leaseData.name || `Unit ${leaseData.rental_unit_id}`;
       
       // Start a transaction
       const { data: lease, error: leaseError } = await supabase
@@ -176,14 +150,15 @@ export const actions: Actions = {
           rental_unit_id: leaseData.rental_unit_id,
           name: leaseName,
           start_date: leaseData.start_date,
-          end_date: leaseData.end_date,
-          rent_amount: leaseData.rent_amount,
-          security_deposit: leaseData.security_deposit,
+          end_date: endDate,
+          // Set default values for required financial fields
+          rent_amount: 0, // Default value since you don't use this field
+          security_deposit: 0, // Default value since you don't use this field
           notes: leaseData.notes || null,
           created_by: user.id,
           terms_month: leaseData.terms_month,
           status: leaseData.status,
-          unit_type: leaseData.unit_type, // Add unit_type
+          unit_type: leaseData.unit_type,
           created_at: new Date().toISOString()
         })
         .select()
@@ -209,51 +184,9 @@ export const actions: Actions = {
 
       // Billing creation
       const startDate = new Date(form.data.start_date);
-      const endDate = new Date(form.data.end_date);
       const billings = [];
 
-      if (form.data.prorated_first_month) {
-        // Calculate prorated first month
-        const lastDayOfMonth = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0).getDate();
-        const daysInFirstMonth = lastDayOfMonth - startDate.getDate() + 1;
-        const dailyRate = form.data.rent_amount / lastDayOfMonth;
-        const proratedAmount = form.data.prorated_amount || Math.round(dailyRate * daysInFirstMonth);
 
-        // Add prorated first month
-        billings.push({
-          lease_id: lease.id,
-          amount: proratedAmount,
-          due_date: startDate.toISOString().split('T')[0],
-          type: 'RENT',
-          status: 'PENDING',
-          notes: `Prorated rent for ${daysInFirstMonth} days`,
-          billing_date: new Date().toISOString().split('T')[0],
-          balance: proratedAmount,
-          paid_amount: 0
-        });
-
-        // Start full months from next month at same date
-        const nextMonth = new Date(startDate);
-        nextMonth.setMonth(nextMonth.getMonth() + 1);
-        // Keep same day of month for subsequent billings
-        nextMonth.setDate(1);
-
-        for (let date = nextMonth; date <= endDate; date.setMonth(date.getMonth() + 1)) {
-          billings.push({
-            lease_id: lease.id,
-            amount: form.data.rent_amount,
-            due_date: new Date(date).toISOString().split('T')[0],
-            type: 'RENT',
-            status: 'PENDING',
-            billing_date: new Date().toISOString().split('T')[0],
-            balance: form.data.rent_amount,
-            paid_amount: 0
-          });
-        }
-      } else {
-        // No proration - start with full amount from first month
-        let currentDate = new Date(startDate);
-      }
 
       const { data: newLease, error: fetchError } = await supabase
         .from('leases')
@@ -290,6 +223,113 @@ export const actions: Actions = {
     }
   },
 
+  updateLease: async ({ request, locals: { supabase, safeGetSession } }) => {
+    console.log('🔄 Updating lease via form action');
+    const formData = await request.formData();
+    
+    const { user } = await safeGetSession();
+    if (!user) return fail(403, { message: ['Unauthorized'] });
+
+    try {
+      // Extract form data
+      const id = Number(formData.get('id'));
+      const name = formData.get('name') as string;
+      const start_date = formData.get('start_date') as string;
+      const end_date = formData.get('end_date') as string;
+      const terms_month = Number(formData.get('terms_month'));
+      const status = formData.get('status') as any;
+      const unit_type = formData.get('unit_type') as any;
+      const notes = formData.get('notes') as string;
+      const rental_unit_id = Number(formData.get('rental_unit_id'));
+      const tenantIds = formData.get('tenantIds') as string;
+
+      if (!id || id <= 0) {
+        return fail(400, { message: ['Valid lease ID is required'] });
+      }
+
+      // Get existing lease to preserve required fields
+      const { data: existingLease, error: fetchError } = await supabase
+        .from('leases')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (fetchError || !existingLease) {
+        return fail(404, { message: ['Lease not found'] });
+      }
+
+      // Calculate end_date if not provided
+      let calculatedEndDate = end_date;
+      if (!calculatedEndDate && start_date && terms_month > 0) {
+        const start = new Date(start_date);
+        const end = new Date(start);
+        end.setMonth(end.getMonth() + terms_month);
+        calculatedEndDate = end.toISOString().split('T')[0];
+      }
+
+      // Update the lease
+      const { data: updatedLease, error: leaseError } = await supabase
+        .from('leases')
+        .update({
+          name: name.trim(),
+          start_date,
+          end_date: calculatedEndDate,
+          terms_month,
+          status,
+          unit_type,
+          notes: notes?.trim() || null,
+          rental_unit_id,
+          // Preserve existing financial fields
+          rent_amount: existingLease.rent_amount,
+          security_deposit: existingLease.security_deposit,
+          balance: existingLease.balance,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .select('*')
+        .single();
+
+      if (leaseError) {
+        console.error('Supabase error updating lease:', leaseError);
+        return fail(500, { message: ['Database error'] });
+      }
+
+      // Update tenant relationships
+      if (tenantIds) {
+        const tenantIdsArray = JSON.parse(tenantIds);
+        
+        if (tenantIdsArray && tenantIdsArray.length > 0) {
+          // Delete existing relationships
+          await supabase
+            .from('lease_tenants')
+            .delete()
+            .eq('lease_id', id);
+
+          // Create new relationships
+          const leaseTenants = tenantIdsArray.map((tenant_id: number) => ({
+            lease_id: id,
+            tenant_id
+          }));
+
+          const { error: relationError } = await supabase
+            .from('lease_tenants')
+            .insert(leaseTenants);
+
+          if (relationError) {
+            console.error('Error creating tenant relationships:', relationError);
+            return fail(500, { message: ['Failed to update tenant relationships'] });
+          }
+        }
+      }
+
+      return { success: true, lease: updatedLease };
+
+    } catch (error) {
+      console.error('Lease update failed:', error);
+      return fail(500, { message: ['Failed to update lease'] });
+    }
+  },
+
   delete: async ({ request, locals: { supabase, safeGetSession } }) => {
     const { user } = await safeGetSession();
     if (!user) {
@@ -317,6 +357,7 @@ export const actions: Actions = {
 
       const hasPaidBillings = billings.some(b => b.paid_amount > 0);
       if (hasPaidBillings) {
+        console.error('Cannot delete lease with paid billings. Please remove payments first.');
         return fail(409, { // 409 Conflict
           error: 'Cannot delete lease with paid billings. Please remove payments first.'
         });

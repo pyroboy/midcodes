@@ -5,6 +5,7 @@
   import PaymentModal from './PaymentModal.svelte';
   import RentManagerModal from './RentManagerModal.svelte';
   import SecurityDepositModal from './SecurityDepositModal.svelte';
+  import LeaseEditModal from './LeaseEditModal.svelte';
   import { invalidateAll } from '$app/navigation';
   import { createEventDispatcher } from 'svelte';
   import { Input } from '$lib/components/ui/input';
@@ -30,12 +31,14 @@
 
   interface Props {
     lease: Lease;
+    tenants?: any[];
+    rentalUnits?: any[];
     onLeaseClick: (lease: Lease) => void;
     onDelete: (event: Event, lease: Lease) => void;
     onStatusChange: (id: string, status: string) => void;
   }
 
-  let { lease, onLeaseClick, onDelete, onStatusChange }: Props = $props();
+  let { lease, tenants = [], rentalUnits = [], onLeaseClick, onDelete, onStatusChange }: Props = $props();
 
   import {
     formatDate,
@@ -74,6 +77,7 @@
   let showPaymentModal = $state(false);
   let showRentManager = $state(false);
   let showSecurityDepositManager = $state(false);
+  let showEditModal = $state(false);
 
   async function handlePaymentModalClose() {
     showPaymentModal = false;
@@ -85,6 +89,11 @@
   }
   async function handleSecurityDepositManagerClose() {
     showSecurityDepositManager = false;
+    await invalidateAll();
+  }
+
+  async function handleEditModalClose() {
+    showEditModal = false;
     await invalidateAll();
   }
 
@@ -290,9 +299,30 @@
                     variant="ghost"
                     onclick={(e) => {
                       e.stopPropagation(); 
+                      showEditModal = true;
+                    }}
+                    class="h-10 w-10 hover:bg-blue-50 hover:text-blue-600 transition-colors group/edit"
+                  >
+                    <Pencil class="w-5 h-5 group-hover/edit:scale-110 transition-transform" />
+                  </Button>
+                </Tooltip.Trigger>
+                <Tooltip.Content>
+                  <p class="text-sm font-medium">Edit Lease</p>
+                </Tooltip.Content>
+              </Tooltip.Root>
+            </Tooltip.Provider>
+
+            <Tooltip.Provider>
+              <Tooltip.Root>
+                <Tooltip.Trigger >
+                  <Button 
+                    size="icon"
+                    variant="ghost"
+                    onclick={(e) => {
+                      e.stopPropagation(); 
                       showRentManager = true;
                     }}
-                    class="h-10 w-10 hover:bg-blue-50 hover:text-blue-600 transition-colors group/rent"
+                    class="h-10 w-10 hover:bg-purple-50 hover:text-purple-600 transition-colors group/rent"
                   >
                     <Home class="w-5 h-5 group-hover/rent:scale-110 transition-transform" />
                   </Button>
@@ -578,9 +608,17 @@
 />
 
 <SecurityDepositModal
-  lease={lease}
+  lease={{...lease, id: lease.id.toString()}}
   open={showSecurityDepositManager}
   onOpenChange={handleSecurityDepositManagerClose}
+/>
+
+<LeaseEditModal
+  lease={lease}
+  tenants={tenants}
+  rentalUnits={rentalUnits}
+  open={showEditModal}
+  onOpenChange={handleEditModalClose}
 />
 
 <style>

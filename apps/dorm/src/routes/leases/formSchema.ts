@@ -6,15 +6,15 @@ export const leaseStatusEnum = z.enum([
   'TERMINATED',
   'EXPIRED'
 ]);
+
 export const deleteLeaseSchema = z.object({
   id: z.number({
-    required_error: 'Floor ID is required',
-    invalid_type_error: 'Invalid floor ID'
-  }).positive('Invalid floor ID')
+    required_error: 'Lease ID is required',
+    invalid_type_error: 'Invalid lease ID'
+  }).positive('Invalid lease ID')
 });
 
 export type DeleteLeaseSchema = typeof deleteLeaseSchema
-
 
 export type LeaseStatus = z.infer<typeof leaseStatusEnum>;
 
@@ -35,10 +35,9 @@ export const leaseSchema = z.object({
   start_date: z.string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, { message: 'Invalid date format' }),
   end_date: z.string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, { message: 'Invalid date format' }),
-  terms_month: z.coerce.number().int().min(1).max(60),
-  security_deposit: z.coerce.number().min(0),
-  rent_amount: z.coerce.number().min(0),
+    .regex(/^\d{4}-\d{2}-\d{2}$/, { message: 'Invalid date format' })
+    .optional(),
+  terms_month: z.coerce.number().int().min(0).max(60), // Allow 0 for no end date
   prorated_first_month: z.boolean().default(false),
   prorated_amount: z.number().nullable().optional(),
   notes: z.string().max(1000).optional().nullable(),
@@ -46,4 +45,26 @@ export const leaseSchema = z.object({
   unit_type: z.enum(['BEDSPACER', 'PRIVATE_ROOM'])
 });
 
+// Updated validation to match frontend logic
+export const leaseSchemaWithValidation = leaseSchema.refine(
+  (data) => {
+    if (data.end_date && data.start_date && data.terms_month > 0) {
+      const start = new Date(data.start_date);
+      const end = new Date(data.end_date);
+      const calculatedEnd = new Date(start);
+      calculatedEnd.setMonth(calculatedEnd.getMonth() + data.terms_month);
+      
+      // Allow end_date to be within 1 day of calculated date (for month boundary issues)
+      const diffDays = Math.abs((end.getTime() - calculatedEnd.getTime()) / (1000 * 60 * 60 * 24));
+      return diffDays <= 1;
+    }
+    return true;
+  },
+  {
+    message: "End date should match the calculated date based on terms",
+    path: ["end_date"]
+  }
+);
+
 export type FormSchema = typeof leaseSchema;
+

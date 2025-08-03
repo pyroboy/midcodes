@@ -105,6 +105,8 @@
     </div>
     <LeaseList
       {leases}
+      tenants={data.tenants}
+      rentalUnits={data.rental_units}
       on:edit={event => handleEdit(event.detail)}
       on:delete={event => handleDeleteLease(event.detail)}
       onStatusChange={handleStatusChange}

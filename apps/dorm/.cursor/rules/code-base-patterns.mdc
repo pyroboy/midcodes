@@ -1,0 +1,893 @@
+---
+alwaysApply: true
+---
+## Architecture Patterns
+
+### Component-Driven Architecture
+The application follows a **modular, component-first approach** with clear separation of concerns:
+
+- **Route-level logic** in `+page.svelte` and `+page.server.ts`
+- **Reusable UI components** for specific features
+- **Schema-driven validation** with Zod
+- **Type-safe data flow** throughout the application
+
+### Reactive State Management
+Svelte 5's runes provide **fine-grained reactivity** without boilerplate:
+- `$state` for component-local state
+- `$derived` for computed values
+- `$props` for type-safe component props
+- Minimal external state management needed
+
+---
+
+## File Structure & Route Patterns
+
+### Standard Route Organization
+Each feature follows a consistent file structure pattern:
+
+```
+src/routes/[feature]/
+├── +page.svelte          # Main page component
+├── +page.server.ts       # Server-side logic & actions
+├── +page.types.ts        # Generated TypeScript types
+├── formSchema.ts         # Zod validation schemas
+├── types.ts              # Domain type definitions
+├── [Feature]Card.svelte  # Feature-specific UI components
+├── [Feature]Table.svelte # Feature-specific UI components
+└── [Feature]Modal.svelte # Feature-specific UI components
+```
+
+### Component Colocation Benefits
+- **Improved maintainability** - Related functionality stays together
+- **Better discoverability** - Easy to find relevant components
+- **Reduced coupling** - Clear boundaries between features
+- **Scalable architecture** - Patterns replicate consistently
+
+---
+
+## Svelte 5 Runes Implementation
+
+### The Runes Revolution
+Svelte 5 introduces a **paradigm shift** from reactive declarations to explicit runes:
+
+#### Props Declaration Pattern
+```svelte
+<script lang="ts">
+// ✅ Svelte 5 - Explicit and type-safe
+let { data, editMode = false, onSubmit } = $props<{
+  data: PageData;
+  editMode?: boolean;
+  onSubmit: (data: FormData) => void;
+}>();
+</script>
+```
+
+#### State Management Pattern
+```svelte
+<script lang="ts">
+// ✅ Local component state
+let showModal = $state(false);
+let selectedItem = $state<Item | null>(null);
+let formData = $state({
+  name: '',
+  amount: 0
+});
+
+// ✅ Computed/derived values
+let isValid = $derived(formData.name.length > 0 && formData.amount > 0);
+let displayAmount = $derived(`$${formData.amount.toFixed(2)}`);
+</script>
+```
+
+#### Why Runes Are Superior
+- **Explicit reactivity** - No magic, clear data flow
+- **Better TypeScript integration** - Full type inference
+- **Improved performance** - Fine-grained updates
+- **Reduced mental overhead** - Predictable behavior
+
+---
+
+## SvelteKit Superforms Integration
+
+### The Complete Form Solution
+Superforms provides **unified form handling** across client and server:
+
+#### Server-Side Pattern (`+page.server.ts`)
+```typescript
+import { superValidate } from 'sveltekit-superforms/server';
+import { zod } from 'sveltekit-superforms/adapters';
+import { fail } from '@sveltejs/kit';
+
+export const load: PageServerLoad = async ({ locals }) => {
+  // Initialize form with schema validation
+  const form = await superValidate(zod(expenseSchema));
+  
+  // Fetch additional data
+  const { data: expenses } = await locals.supabase
+    .from('expenses')
+    .select('*');
+    
+  return { form, expenses };
+};
+
+export const actions: Actions = {
+  create: async ({ request, locals }) => {
+    // Validate incoming form data
+    const form = await superValidate(request, zod(expenseSchema));
+    
+    if (!form.valid) {
+      return fail(400, { form });
+    }
+    
+    // Process validated data
+    const { error } = await locals.supabase
+      .from('expenses')
+      .insert(form.data);
+    
+    if (error) {
+      return fail(500, { form, message: 'Database error' });
+    }
+    
+    return { form };
+  }
+};
+```
+
+#### Client-Side Pattern (`+page.svelte`)
+```svelte
+<script lang="ts">
+import { superForm } from 'sveltekit-superforms/client';
+import { zodClient } from 'sveltekit-superforms/adapters';
+import { invalidateAll } from '$app/navigation';
+import { toast } from 'svelte-sonner';
+
+let { data } = $props<{ data: PageData }>();
+
+// Initialize reactive form
+const { 
+  form, 
+  errors, 
+  enhance, 
+  constraints, 
+  submitting, 
+  reset 
+} = superForm(data.form, {
+  validators: zodClient(expenseSchema),
+  validationMethod: 'oninput',
+  dataType: 'json',
+  resetForm: true,
+  onSubmit: () => {
+    console.log('🔄 Form submission started');
+  },
+  onResult: async ({ result }) => {
+    if (result.type === 'success') {
+      await invalidateAll();
+      reset();
+      toast.success('Expense created successfully');
+    }
+  },
+  onError: ({ result }) => {
+    toast.error(result.error?.message || 'An error occurred');
+  }
+});
+</script>
+
+<form use:enhance>
+  <Input 
+    bind:value={$form.description}
+    placeholder="Expense description"
+    class={$errors.description ? 'border-red-500' : ''}
+    {...$constraints.description}
+  />
+  {#if $errors.description}
+    <p class="text-red-500 text-sm">{$errors.description}</p>
+  {/if}
+  
+  <Button type="submit" disabled={$submitting}>
+    {$submitting ? 'Creating...' : 'Create Expense'}
+  </Button>
+</form>
+```
+
+### Superforms Benefits
+- **Unified validation** - Same schema on client and server
+- **Progressive enhancement** - Works without JavaScript
+- **Real-time feedback** - Immediate validation responses
+- **Type safety** - Full TypeScript integration
+- **Optimistic updates** - Smooth user experience
+
+---
+
+## Component Architecture Patterns
+
+### Modal Component Pattern
+Consistent modal implementation across the application:
+
+```svelte
+<script lang="ts">
+import * as Dialog from '$lib/components/ui/dialog';
+import { createEventDispatcher } from 'svelte';
+
+// Type-safe props with defaults
+let { 
+  open = false, 
+  data, 
+  editMode = false,
+  form,
+  errors,
+  enhance,
+  constraints,
+  submitting 
+} = $props<{
+  open?: boolean;
+  data: PageData;
+  editMode?: boolean;
+  form: any;
+  errors: any;
+  enhance: any;
+  constraints: any;
+  submitting: any;
+}>();
+
+// Event communication
+const dispatch = createEventDispatcher<{
+  submit: void;
+  close: void;
+}>();
+
+// Handle form submission
+function handleSubmit() {
+  // Form logic here
+  dispatch('submit');
+}
+</script>
+
+<Dialog.Root {open} onOpenChange={(newOpen) => {
+  if (!newOpen) dispatch('close');
+}}>
+  <Dialog.Content>
+    <Dialog.Header>
+      <Dialog.Title>
+        {editMode ? 'Edit' : 'Create'} Item
+      </Dialog.Title>
+    </Dialog.Header>
+    
+    <form use:enhance on:submit|preventDefault={handleSubmit}>
+      <!-- Form fields -->
+      <Dialog.Footer>
+        <Dialog.Close asChild>
+          <Button variant="outline">Cancel</Button>
+        </Dialog.Close>
+        <Button type="submit" disabled={$submitting}>
+          {$submitting ? 'Saving...' : 'Save'}
+        </Button>
+      </Dialog.Footer>
+    </form>
+  </Dialog.Content>
+</Dialog.Root>
+```
+
+### Table Component Pattern
+Consistent data display with interaction handling:
+
+```svelte
+<script lang="ts">
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '$lib/components/ui/table';
+import { Badge } from '$lib/components/ui/badge';
+import { createEventDispatcher } from 'svelte';
+
+// Type-safe props
+let { items, onItemClick } = $props<{
+  items: Item[];
+  onItemClick: (item: Item) => void;
+}>();
+
+// Event dispatcher
+const dispatch = createEventDispatcher<{
+  itemclick: Item;
+  edit: Item;
+  delete: Item;
+}>();
+
+// Helper functions
+function getStatusColor(status: string) {
+  const colors = {
+    'ACTIVE': 'bg-green-100 text-green-800',
+    'PENDING': 'bg-yellow-100 text-yellow-800',
+    'INACTIVE': 'bg-gray-100 text-gray-800'
+  };
+  return colors[status] || colors['INACTIVE'];
+}
+</script>
+
+<Table>
+  <TableHeader>
+    <TableRow>
+      <TableHead>Name</TableHead>
+      <TableHead>Status</TableHead>
+      <TableHead>Amount</TableHead>
+      <TableHead>Actions</TableHead>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    {#each items as item}
+      <TableRow 
+        class="cursor-pointer hover:bg-gray-50"
+        on:click={() => dispatch('itemclick', item)}
+      >
+        <TableCell class="font-medium">{item.name}</TableCell>
+        <TableCell>
+          <Badge class={getStatusColor(item.status)}>
+            {item.status}
+          </Badge>
+        </TableCell>
+        <TableCell>${item.amount.toFixed(2)}</TableCell>
+        <TableCell>
+          <Button 
+            variant="ghost" 
+            size="sm"
+            on:click|stopPropagation={() => dispatch('edit', item)}
+          >
+            Edit
+          </Button>
+        </TableCell>
+      </TableRow>
+    {/each}
+  </TableBody>
+</Table>
+```
+
+---
+
+## Data Management Patterns
+
+### Type-Safe Database Queries
+Leveraging Supabase with generated types:
+
+```typescript
+import type { Database } from '$lib/database.types';
+
+// Type-safe query with relationships
+const { data: expenses, error } = await supabase
+  .from('expenses')
+  .select(`
+    *,
+    property:properties(name, address),
+    category:expense_categories(name, color)
+  `)
+  .eq('property_id', propertyId)
+  .order('created_at', { ascending: false });
+
+if (error) {
+  console.error('Database query failed:', error);
+  throw error(500, 'Failed to fetch expenses');
+}
+```
+
+### Schema-Driven Validation
+Single source of truth for data validation:
+
+```typescript
+// formSchema.ts
+import { z } from 'zod';
+
+export const expenseSchema = z.object({
+  description: z.string().min(1, 'Description is required'),
+  amount: z.number().positive('Amount must be positive'),
+  category_id: z.number().int().positive(),
+  property_id: z.number().int().positive(),
+  date: z.string().min(10, 'Date is required'),
+  receipt_url: z.string().url().optional(),
+  notes: z.string().optional()
+});
+
+// Automatic type generation
+export type Expense = z.infer<typeof expenseSchema>;
+
+// Enhanced type with database relations
+export type ExpenseWithRelations = Expense & {
+  property?: { name: string; address: string };
+  category?: { name: string; color: string };
+  created_at: string;
+  updated_at: string;
+};
+```
+
+---
+
+## Best Practices & Code Styling
+
+### Import Organization
+Consistent import structure across all files:
+
+```svelte
+<script lang="ts">
+// SvelteKit core imports
+import { superForm } from 'sveltekit-superforms/client';
+import { zodClient } from 'sveltekit-superforms/adapters';
+import { invalidateAll } from '$app/navigation';
+
+// External library imports
+import { toast } from 'svelte-sonner';
+
+// UI component imports
+import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+import { Button } from '$lib/components/ui/button';
+import { Input } from '$lib/components/ui/input';
+
+// Local component imports
+import ExpenseCard from './ExpenseCard.svelte';
+import ExpenseModal from './ExpenseModal.svelte';
+
+// Type and schema imports
+import type { PageData } from './$types';
+import { expenseSchema } from './formSchema';
+import type { ExpenseWithRelations } from './types';
+</script>
+```
+
+### Naming Conventions
+- **Components**: PascalCase (`ExpenseCard.svelte`)
+- **Files**: camelCase (`formSchema.ts`, `types.ts`)
+- **Variables**: camelCase (`selectedExpense`, `showModal`)
+- **Constants**: UPPER_SNAKE_CASE (`MAX_AMOUNT`, `DEFAULT_STATUS`)
+- **Types**: PascalCase (`ExpenseWithRelations`, `PageData`)
+
+### Error Handling Pattern
+Consistent error handling across the application:
+
+```typescript
+// Server-side error handling
+export const actions: Actions = {
+  create: async ({ request, locals }) => {
+    try {
+      const form = await superValidate(request, zod(schema));
+      
+      if (!form.valid) {
+        return fail(400, { form });
+      }
+      
+      const { data, error } = await locals.supabase
+        .from('expenses')
+        .insert(form.data)
+        .select()
+        .single();
+        
+      if (error) {
+        console.error('Database error:', error);
+        return fail(500, { 
+          form, 
+          message: 'Failed to create expense' 
+        });
+      }
+      
+      return { form, success: true };
+      
+    } catch (err) {
+      console.error('Unexpected error:', err);
+      return fail(500, { 
+        form, 
+        message: 'An unexpected error occurred' 
+      });
+    }
+  }
+};
+```
+
+---
+
+## Recommended Commenting Standards
+
+### File Header Documentation
+```typescript
+/**
+ * Expense Management Route - Server Logic
+ * 
+ * Handles expense CRUD operations including:
+ * - Loading expense records with property/category relations
+ * - Creating new expenses with file upload support
+ * - Updating existing expense details
+ * - Soft-deleting expenses with audit trail
+ * 
+ * @route /expenses
+ * @permissions property_manager, admin
+ * @database expenses, properties, expense_categories
+ * 
+ * @author Development Team
+ * @since 2024-01
+ */
+```
+
+### Function Documentation (JSDoc)
+```typescript
+/**
+ * Creates payment schedules for a lease period
+ * 
+ * Generates monthly payment records between lease start and end dates,
+ * calculates prorated amounts for partial months, and updates the 
+ * lease balance accordingly.
+ * 
+ * @param supabase - Authenticated Supabase client
+ * @param leaseId - Unique identifier for the lease
+ * @param startDate - Lease start date (ISO 8601 format)
+ * @param endDate - Lease end date (ISO 8601 format)
+ * @param monthlyRent - Monthly rent amount in cents
+ * 
+ * @returns Promise resolving to created payment schedules
+ * 
+ * @throws {DatabaseError} When schedule creation fails
+ * @throws {ValidationError} When date range is invalid
+ * 
+ * @example
+ * ```typescript
+ * const schedules = await createPaymentSchedules(
+ *   supabase, 
+ *   123, 
+ *   '2024-01-01', 
+ *   '2024-12-31', 
+ *   150000
+ * );
+ * ```
+ */
+async function createPaymentSchedules(
+  supabase: SupabaseClient,
+  leaseId: number,
+  startDate: string,
+  endDate: string,
+  monthlyRent: number
+): Promise<PaymentSchedule[]> {
+  // Implementation here...
+}
+```
+
+### Section Organization Comments
+```svelte
+<script lang="ts">
+/* =====================================================
+   IMPORTS & DEPENDENCIES
+   ===================================================== */
+import { superForm } from 'sveltekit-superforms/client';
+// ... other imports
+
+/* =====================================================
+   PROPS & DATA INITIALIZATION
+   ===================================================== */
+let { data } = $props<{ data: PageData }>();
+
+/* =====================================================
+   FORM MANAGEMENT
+   ===================================================== */
+const { form, errors, enhance, submitting } = superForm(data.form, {
+  // Configuration...
+});
+
+/* =====================================================
+   STATE MANAGEMENT
+   ===================================================== */
+let selectedExpense = $state<Expense | null>(null);
+let showCreateModal = $state(false);
+
+/* =====================================================
+   COMPUTED VALUES
+   ===================================================== */
+let totalExpenses = $derived(expenses.reduce((sum, exp) => sum + exp.amount, 0));
+let filteredExpenses = $derived(expenses.filter(exp => exp.status === selectedStatus));
+
+/* =====================================================
+   EVENT HANDLERS
+   ===================================================== */
+function handleExpenseSelect(expense: Expense) {
+  selectedExpense = expense;
+  showEditModal = true;
+}
+</script>
+```
+
+### Complex Logic Documentation
+```typescript
+// Calculate prorated rent for partial months
+// 
+// Business Rule: When a lease starts or ends mid-month, 
+// the rent is prorated based on the number of days in that month.
+// 
+// Formula: (days_in_partial_month / total_days_in_month) * monthly_rent
+//
+// Example: 
+// - Monthly rent: $1,000
+// - Move-in: January 15th (17 days remaining)
+// - January has 31 days
+// - Prorated amount: (17/31) * $1,000 = $548.39
+const proratedAmount = Math.round(
+  (daysInPartialMonth / totalDaysInMonth) * monthlyRent
+);
+
+// TODO: Consider implementing business rules for weekend move-ins
+// Priority: Medium
+// Expected completion: Q2 2024
+// Reference: Ticket #RENT-456
+```
+
+### Component Prop Documentation
+```svelte
+<!--
+  Expense Form Modal Component
+  
+  A reusable modal for creating and editing expense records.
+  Integrates with Superforms for validation and submission.
+  
+  @prop {boolean} [open=false] - Controls modal visibility
+  @prop {PageData} data - Server-provided page data
+  @prop {boolean} [editMode=false] - Whether editing existing expense
+  @prop {Expense|null} [selectedExpense=null] - Expense being edited
+  @prop {SuperFormData} form - Superforms form object
+  @prop {FormErrors} errors - Form validation errors
+  @prop {EnhanceAction} enhance - Form enhancement function
+  @prop {ConstraintsStore} constraints - Field constraints
+  @prop {Readable<boolean>} submitting - Form submission state
+  
+  @event {CustomEvent<void>} submit - Fired on successful form submission
+  @event {CustomEvent<void>} close - Fired when modal is closed
+  @event {CustomEvent<Expense>} delete - Fired when expense is deleted
+  
+  @example
+  ```svelte
+  <ExpenseModal
+    bind:open={showModal}
+    {data}
+    editMode={!!selectedExpense}
+    {selectedExpense}
+    {form}
+    {errors}
+    {enhance}
+    {constraints}
+    {submitting}
+    on:submit={handleSubmit}
+    on:close={() => showModal = false}
+  />
+  ```
+-->
+```
+
+---
+
+## Performance & Optimization Patterns
+
+### Efficient Data Loading
+```typescript
+export const load: PageServerLoad = async ({ locals, url }) => {
+  const { supabase } = locals;
+  
+  // Parallel data fetching for better performance
+  const [expensesResult, categoriesResult, propertiesResult] = await Promise.all([
+    supabase
+      .from('expenses')
+      .select('*, property:properties(name), category:expense_categories(name)')
+      .order('created_at', { ascending: false })
+      .limit(50), // Pagination for large datasets
+    
+    supabase
+      .from('expense_categories')
+      .select('id, name, color')
+      .eq('active', true),
+    
+    supabase
+      .from('properties')
+      .select('id, name, address')
+      .eq('active', true)
+  ]);
+  
+  // Handle errors appropriately
+  if (expensesResult.error) {
+    throw error(500, 'Failed to load expenses');
+  }
+  
+  return {
+    expenses: expensesResult.data,
+    categories: categoriesResult.data || [],
+    properties: propertiesResult.data || []
+  };
+};
+```
+
+### Optimized Component Updates
+```svelte
+<script lang="ts">
+// Use derived state to minimize recalculation
+let filteredExpenses = $derived(() => {
+  if (!searchTerm && !selectedCategory) return expenses;
+  
+  return expenses.filter(expense => {
+    const matchesSearch = !searchTerm || 
+      expense.description.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = !selectedCategory || 
+      expense.category_id === selectedCategory;
+    
+    return matchesSearch && matchesCategory;
+  });
+});
+
+// Efficient event handling with debouncing
+import { debounce } from 'lodash-es';
+
+const debouncedSearch = debounce((term: string) => {
+  searchTerm = term;
+}, 300);
+</script>
+```
+
+---
+
+## Testing Patterns
+
+### Component Testing Structure
+```typescript
+// ExpenseCard.test.ts
+import { render, screen, fireEvent } from '@testing-library/svelte';
+import { expect, test, vi } from 'vitest';
+import ExpenseCard from './ExpenseCard.svelte';
+
+const mockExpense = {
+  id: 1,
+  description: 'Office supplies',
+  amount: 125.50,
+  category: { name: 'Office', color: 'blue' },
+  property: { name: 'Main Office' },
+  created_at: '2024-01-15T10:00:00Z'
+};
+
+test('displays expense information correctly', () => {
+  render(ExpenseCard, { props: { expense: mockExpense } });
+  
+  expect(screen.getByText('Office supplies')).toBeInTheDocument();
+  expect(screen.getByText('$125.50')).toBeInTheDocument();
+  expect(screen.getByText('Office')).toBeInTheDocument();
+});
+
+test('calls onClick callback when card is clicked', async () => {
+  const onClickMock = vi.fn();
+  
+  render(ExpenseCard, { 
+    props: { 
+      expense: mockExpense,
+      onClick: onClickMock
+    } 
+  });
+  
+  await fireEvent.click(screen.getByRole('button'));
+  
+  expect(onClickMock).toHaveBeenCalledWith(mockExpense);
+});
+```
+
+---
+
+## Security Considerations
+
+### Authentication Pattern
+```typescript
+// Authentication check in +page.server.ts
+export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession } }) => {
+  const session = await safeGetSession();
+  
+  if (!session) {
+    throw error(401, 'Authentication required');
+  }
+  
+  // Additional role-based checks
+  const userRole = session.user.user_metadata?.role;
+  if (!['admin', 'property_manager'].includes(userRole)) {
+    throw error(403, 'Insufficient permissions');
+  }
+  
+  // Proceed with data loading...
+};
+```
+
+### Data Sanitization
+```typescript
+// Sanitize user input before database operations
+import { z } from 'zod';
+
+const sanitizedSchema = expenseSchema.extend({
+  description: z.string()
+    .trim()
+    .min(1, 'Description required')
+    .max(255, 'Description too long')
+    .regex(/^[a-zA-Z0-9\s\-.,!?()]+$/, 'Invalid characters'),
+  
+  notes: z.string()
+    .trim()
+    .max(1000, 'Notes too long')
+    .optional()
+    .transform(val => val || null)
+});
+```
+
+---
+
+## Deployment & Environment Patterns
+
+### Environment Configuration
+```typescript
+// lib/config.ts
+import { env } from '$env/dynamic/private';
+import { env as publicEnv } from '$env/static/public';
+
+export const config = {
+  // Server-side only
+  supabase: {
+    url: env.SUPABASE_URL!,
+    anonKey: env.SUPABASE_ANON_KEY!,
+    serviceKey: env.SUPABASE_SERVICE_ROLE_KEY!
+  },
+  
+  // Public configuration
+  app: {
+    name: publicEnv.PUBLIC_APP_NAME || 'Property Manager',
+    version: publicEnv.PUBLIC_APP_VERSION || '1.0.0',
+    environment: publicEnv.PUBLIC_ENVIRONMENT || 'development'
+  }
+};
+```
+
+### Database Migration Pattern
+```sql
+-- migrations/001_create_expenses_table.sql
+CREATE TABLE expenses (
+  id SERIAL PRIMARY KEY,
+  description TEXT NOT NULL,
+  amount DECIMAL(10,2) NOT NULL CHECK (amount > 0),
+  property_id INTEGER REFERENCES properties(id),
+  category_id INTEGER REFERENCES expense_categories(id),
+  receipt_url TEXT,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  deleted_at TIMESTAMPTZ NULL
+);
+
+-- Enable RLS
+ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
+
+-- Create policies
+CREATE POLICY "Users can view expenses for their properties"
+  ON expenses FOR SELECT
+  USING (property_id IN (
+    SELECT property_id 
+    FROM user_properties 
+    WHERE user_id = auth.uid()
+  ));
+```
+
+---
+
+## Conclusion
+
+This codebase represents a **mature, well-architected Svelte 5 application** that demonstrates:
+
+### Strengths
+- **Modern Framework Adoption** - Full utilization of Svelte 5 runes
+- **Type Safety** - End-to-end TypeScript integration
+- **Consistent Patterns** - Repeatable architecture across features
+- **Developer Experience** - Excellent tooling and development workflow
+- **Performance** - Optimized for speed and user experience
+- **Maintainability** - Clear separation of concerns and documentation
+
+### Areas for Enhancement
+- **Comprehensive Testing** - Expand test coverage across components
+- **Enhanced Documentation** - Implement consistent commenting standards
+- **Error Boundaries** - Add robust error handling components
+- **Performance Monitoring** - Implement metrics and monitoring
+- **Accessibility** - Ensure WCAG compliance across all components
+
+### Key Takeaways
+1. **Svelte 5 runes** provide superior developer experience and performance
+2. **Superforms** enables seamless full-stack form handling
+3. **Component colocation** improves maintainability significantly
+4. **Type-driven development** reduces runtime errors dramatically
+5. **Consistent patterns** make onboarding and scaling much easier
+
+This architecture serves as an excellent foundation for building scalable, maintainable web applications with modern tools and best practices.
+globs:
+alwaysApply: false
+---

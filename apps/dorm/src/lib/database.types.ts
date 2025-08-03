@@ -241,6 +241,7 @@ export type Database = {
           created_by: string | null
           terms_month: number | null
           status: Database['public']['Enums']['lease_status']
+          unit_type: 'BEDSPACER' | 'PRIVATE_ROOM' | null
         }
         Insert: {
           id?: number
@@ -257,6 +258,7 @@ export type Database = {
           created_by?: string | null
           terms_month?: number | null
           status?: Database['public']['Enums']['lease_status']
+          unit_type?: 'BEDSPACER' | 'PRIVATE_ROOM' | null
         }
         Update: {
           id?: number
@@ -273,6 +275,7 @@ export type Database = {
           created_by?: string | null
           terms_month?: number | null
           status?: Database['public']['Enums']['lease_status']
+          unit_type?: 'BEDSPACER' | 'PRIVATE_ROOM' | null
         }
       }
       lease_tenants: {
