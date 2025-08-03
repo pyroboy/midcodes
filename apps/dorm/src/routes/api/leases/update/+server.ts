@@ -102,7 +102,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
       end_date: calculatedEndDate,
       terms_month: leaseUpdates.terms_month,
       status: leaseUpdates.status,
-      unit_type: leaseUpdates.unit_type,
       notes: leaseUpdates.notes?.trim() || null,
       rental_unit_id: leaseUpdates.rental_unit_id,
       // Preserve existing financial fields since they're required

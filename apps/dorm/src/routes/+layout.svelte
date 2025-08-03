@@ -86,7 +86,7 @@
 	{#if properties && properties.length > 0}
 	{#if ready}
 		<Sidebar.Provider>
-		<div class="flex min-h-screen">
+		<div class="flex min-h-screen w-full">
 			<!-- Sidebar -->
 			<Sidebar.Root collapsible="icon" class="shrink-0">
 				<Sidebar.Header>
@@ -145,9 +145,9 @@
 				<Sidebar.Rail />
 			</Sidebar.Root>
 
-			<!-- Main Content Area - Restored to original working structure -->
-			<main class="flex-1 p-4 md:p-6 overflow-auto">
-				<div class="flex items-center justify-between mb-4">
+			<!-- Main Content Area - Full Width -->
+			<main class="flex-1 overflow-auto w-full">
+				<div class="flex items-center justify-between p-4 md:p-6 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
 					<div class="flex items-center gap-4">
 						<Sidebar.Trigger />
 						{#if data.user}
@@ -155,7 +155,7 @@
 						{/if}
 					</div>
 				</div>
-				<div class="container mx-auto max-w-7xl">
+				<div class="w-full">
 					{@render children()}
 				</div>
 			</main>

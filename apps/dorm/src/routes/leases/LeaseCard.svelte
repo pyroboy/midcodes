@@ -5,7 +5,7 @@
   import PaymentModal from './PaymentModal.svelte';
   import RentManagerModal from './RentManagerModal.svelte';
   import SecurityDepositModal from './SecurityDepositModal.svelte';
-  import LeaseEditModal from './LeaseEditModal.svelte';
+  import LeaseFormModal from './LeaseFormModal.svelte';
   import { invalidateAll } from '$app/navigation';
   import { createEventDispatcher } from 'svelte';
   import { Input } from '$lib/components/ui/input';
@@ -613,7 +613,8 @@
   onOpenChange={handleSecurityDepositManagerClose}
 />
 
-<LeaseEditModal
+<LeaseFormModal
+editMode
   lease={lease}
   tenants={tenants}
   rentalUnits={rentalUnits}

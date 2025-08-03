@@ -141,6 +141,10 @@ export const actions: Actions = {
 
       // Extract tenant IDs and prepare lease data
       const { tenantIds, ...leaseData } = form.data;
+      
+      // tenantIds is already transformed to an array by the schema
+      const tenantIdsArray = tenantIds;
+      
       const leaseName = leaseData.name || `Unit ${leaseData.rental_unit_id}`;
       
       // Start a transaction
@@ -158,7 +162,6 @@ export const actions: Actions = {
           created_by: user.id,
           terms_month: leaseData.terms_month,
           status: leaseData.status,
-          unit_type: leaseData.unit_type,
           created_at: new Date().toISOString()
         })
         .select()
@@ -167,7 +170,7 @@ export const actions: Actions = {
       if (leaseError) throw leaseError;
 
       // Create lease-tenant relationships
-      const leaseTenants = tenantIds.map(tenant_id => ({
+      const leaseTenants = tenantIdsArray.map((tenant_id: number) => ({
         lease_id: lease.id,
         tenant_id
       }));
@@ -182,12 +185,7 @@ export const actions: Actions = {
         throw relationError;
       }
 
-      // Billing creation
-      const startDate = new Date(form.data.start_date);
-      const billings = [];
-
-
-
+      // Fetch the newly created lease with all relationships
       const { data: newLease, error: fetchError } = await supabase
         .from('leases')
         .select(
@@ -238,7 +236,6 @@ export const actions: Actions = {
       const end_date = formData.get('end_date') as string;
       const terms_month = Number(formData.get('terms_month'));
       const status = formData.get('status') as any;
-      const unit_type = formData.get('unit_type') as any;
       const notes = formData.get('notes') as string;
       const rental_unit_id = Number(formData.get('rental_unit_id'));
       const tenantIds = formData.get('tenantIds') as string;
@@ -276,7 +273,6 @@ export const actions: Actions = {
           end_date: calculatedEndDate,
           terms_month,
           status,
-          unit_type,
           notes: notes?.trim() || null,
           rental_unit_id,
           // Preserve existing financial fields

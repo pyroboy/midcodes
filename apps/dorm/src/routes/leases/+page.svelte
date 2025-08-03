@@ -1,56 +1,34 @@
 <script lang="ts">
-  import { superForm } from 'sveltekit-superforms/client';
-  import { zodClient } from 'sveltekit-superforms/adapters';
-  import { browser } from "$app/environment";
-  import { invalidate,invalidateAll } from '$app/navigation';
-  import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
-  import LeaseForm from './LeaseForm.svelte';
+  import { invalidateAll } from '$app/navigation';
+  import LeaseFormModal from './LeaseFormModal.svelte';
   import LeaseList from './LeaseList.svelte';
-  import { leaseSchema } from './formSchema';
+  import { Button } from '$lib/components/ui/button';
+  import { Plus } from 'lucide-svelte';
   import type { z } from 'zod';
-
+  import { leaseSchema } from './formSchema';
 
   type FormType = z.infer<typeof leaseSchema>;
   
   let { data } = $props();
   let leases = $state(data.leases);
-  let editMode = $state(false);
+  let showModal = $state(false);
   let selectedLease: FormType | undefined = $state();
+  let editMode = $state(false);
 
   $effect(() => {
     leases = data.leases;
   });
 
-  const { form, enhance, errors, constraints, submitting, reset } = superForm(data.form, {
-    id: 'lease-form',
-    validators: zodClient(leaseSchema),
-    validationMethod: 'oninput',
-    dataType: 'json',
-    taintedMessage: null,
-    resetForm: true,
-    onError: ({ result }) => {
-      console.error('Form submission error:', {
-        error: result.error,
-        status: result.status
-      });
-      if (result.error) {
-        console.error('Server error:', result.error.message);
-      }
-    },
-    onResult: async ({ result }) => {
-      if (result.type === 'success') {
-        editMode = false;
-        selectedLease = undefined;
-        await invalidate('app:leases');
-        reset();
-      }
-    }
-  });
+  function handleAddLease() {
+    selectedLease = undefined;
+    editMode = false;
+    showModal = true;
+  }
 
   function handleEdit(lease: FormType) {
-    editMode = true;
     selectedLease = lease;
-    $form = { ...lease };
+    editMode = true;
+    showModal = true;
   }
 
   async function handleDeleteLease(lease: FormType) {
@@ -68,10 +46,6 @@
 
       if (result.ok) {
         leases = leases.filter(l => l.id !== lease.id);
-        // Reset form state properly
-        editMode = false;
-        selectedLease = undefined;
-        reset(); // Reset form before invalidating
         await invalidateAll();
       } else {
         console.error('Delete failed:', response);
@@ -83,10 +57,10 @@
     }
   }
 
-  function handleCancel() {
+  function handleModalClose() {
+    showModal = false;
     selectedLease = undefined;
     editMode = false;
-    reset();
   }
 
   function handleStatusChange(id: string, status: string) {
@@ -98,38 +72,31 @@
   }
 </script>
 
-<div class="container mx-auto p-4 flex flex-col lg:flex-row gap-4">
-  <div class="w-full lg:w-2/3">
-    <div class="flex justify-between items-center mb-4">
-      <h1 class="text-2xl font-bold">Leases</h1>
-    </div>
-    <LeaseList
-      {leases}
-      tenants={data.tenants}
-      rentalUnits={data.rental_units}
-      on:edit={event => handleEdit(event.detail)}
-      on:delete={event => handleDeleteLease(event.detail)}
-      onStatusChange={handleStatusChange}
-    />
+<div class="w-full p-4">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-3xl font-bold">Leases</h1>
+    <Button onclick={handleAddLease} class="flex items-center gap-2">
+      <Plus class="w-4 h-4" />
+      Add Lease
+    </Button>
   </div>
-
-  <div class="w-full lg:w-1/3">
-    <div class="flex justify-between items-center mb-4">
-      <h1 class="text-2xl font-bold">{editMode ? 'Edit' : 'Add'} Lease</h1>
-    </div>
-    <LeaseForm
-      {data}
-      {editMode}
-      {form}
-      {errors}
-      {enhance}
-      {constraints}
-      {submitting}
-      on:cancel={handleCancel}
-    />
-  </div>
+  
+  <LeaseList
+    {leases}
+    tenants={data.tenants}
+    rentalUnits={data.rental_units}
+    on:edit={event => handleEdit(event.detail)}
+    on:delete={event => handleDeleteLease(event.detail)}
+    onStatusChange={handleStatusChange}
+  />
 </div>
 
-{#if browser}
-  <SuperDebug data={form} />
-{/if}
+<!-- Modal for Create/Edit -->
+<LeaseFormModal
+  open={showModal}
+  lease={selectedLease}
+  {editMode}
+  tenants={data.tenants}
+  rentalUnits={data.rental_units}
+  onOpenChange={handleModalClose}
+/>

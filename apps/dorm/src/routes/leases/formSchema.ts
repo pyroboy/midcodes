@@ -18,17 +18,20 @@ export type DeleteLeaseSchema = typeof deleteLeaseSchema
 
 export type LeaseStatus = z.infer<typeof leaseStatusEnum>;
 
-export const unitTypeEnum = {
-  Values: {
-    BEDSPACER: 'BEDSPACER',
-    PRIVATE_ROOM: 'PRIVATE_ROOM'
-  },
-  options: ['BEDSPACER', 'PRIVATE_ROOM'] as const
-} as const;
-
 export const leaseSchema = z.object({
   id: z.coerce.number().optional(),
-  tenantIds: z.array(z.number()).min(1, 'At least one tenant must be selected'),
+  tenantIds: z.string()
+    .transform((val) => {
+      try {
+        const parsed = JSON.parse(val);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    })
+    .refine((val) => Array.isArray(val) && val.length > 0, {
+      message: 'At least one tenant must be selected'
+    }),
   rental_unit_id: z.coerce.number().min(1, 'A rental unit must be selected'),
   name: z.string().optional(),
   status: leaseStatusEnum,
@@ -41,8 +44,7 @@ export const leaseSchema = z.object({
   prorated_first_month: z.boolean().default(false),
   prorated_amount: z.number().nullable().optional(),
   notes: z.string().max(1000).optional().nullable(),
-  balance: z.coerce.number().optional(),
-  unit_type: z.enum(['BEDSPACER', 'PRIVATE_ROOM'])
+  balance: z.coerce.number().optional()
 });
 
 // Updated validation to match frontend logic

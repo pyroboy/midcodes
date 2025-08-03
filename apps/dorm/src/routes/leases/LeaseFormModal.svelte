@@ -6,13 +6,27 @@
   import * as Select from '$lib/components/ui/select';
   import { toast } from 'svelte-sonner';
   import type { Lease } from '$lib/types/lease';
-  import { Pencil, Users, Calendar, Search, AlertCircle } from 'lucide-svelte';
+  import { Pencil, Users, Calendar, Search, AlertCircle, Plus } from 'lucide-svelte';
   import { format } from 'date-fns';
-  import { leaseStatusEnum, unitTypeEnum } from './formSchema';
+  import { leaseStatusEnum } from './formSchema';
   import { enhance } from '$app/forms';
   import { invalidateAll } from '$app/navigation';
 
-  let { lease, open, onOpenChange, tenants = [], rentalUnits = [] } = $props();
+  let { 
+    lease = null, 
+    open, 
+    onOpenChange, 
+    tenants = [], 
+    rentalUnits = [],
+    editMode = false 
+  } = $props<{
+    lease?: any;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    tenants: any[];
+    rentalUnits: any[];
+    editMode: boolean;
+  }>();
 
   // Format dates for input fields
   const formatDate = (dateString: string) => {
@@ -27,7 +41,7 @@
 
   // Get tenant IDs by matching names from lease_tenants array
   function getTenantIds(lease: any): number[] {
-    if (!lease.lease_tenants || !Array.isArray(lease.lease_tenants) || lease.lease_tenants.length === 0) {
+    if (!lease?.lease_tenants || !Array.isArray(lease.lease_tenants) || lease.lease_tenants.length === 0) {
       return [];
     }
     
@@ -36,22 +50,21 @@
     
     // Find matching tenants by name
     const matchingTenantIds = tenants
-      .filter(tenant => leaseTenantNames.includes(tenant.name))
-      .map(tenant => tenant.id);
+      .filter((tenant: any) => leaseTenantNames.includes(tenant.name))
+      .map((tenant: any) => tenant.id);
     
     return matchingTenantIds;
   }
 
   // Form data with optional end_date
   let formData = $state({
-    name: lease.name || '',
-    start_date: formatDate(lease.start_date),
-    end_date: formatDate(lease.end_date) || '', // Make optional
-    terms_month: lease.terms_month || 1,
-    status: lease.status || 'ACTIVE',
-    unit_type: lease.unit_type || 'BEDSPACER',
-    notes: lease.notes || '',
-    rental_unit_id: lease.rental_unit?.id || 0,
+    name: lease?.name || '',
+    start_date: formatDate(lease?.start_date || ''),
+    end_date: formatDate(lease?.end_date || '') || '', // Make optional
+    terms_month: lease?.terms_month || 1,
+    status: lease?.status || 'ACTIVE',
+    notes: lease?.notes || '',
+    rental_unit_id: lease?.rental_unit?.id || 0,
     selectedTenants: getTenantIds(lease)
   });
 
@@ -79,7 +92,7 @@
     if (!searchTerm.trim()) return tenants;
     
     const term = searchTerm.toLowerCase();
-    return tenants.filter(tenant => 
+    return tenants.filter((tenant: any) => 
       tenant.name.toLowerCase().includes(term) ||
       (tenant.email && tenant.email.toLowerCase().includes(term)) ||
       (tenant.contact_number && tenant.contact_number.toLowerCase().includes(term))
@@ -102,6 +115,14 @@
       errors.start_date = 'Start date is required';
     }
     
+    if (!formData.rental_unit_id || formData.rental_unit_id === 0) {
+      errors.rental_unit = 'A rental unit must be selected';
+    }
+    
+    if (formData.selectedTenants.length === 0) {
+      errors.tenants = 'At least one tenant must be selected';
+    }
+    
     // Make end_date validation optional
     if (formData.end_date) {
       if (formData.start_date && formData.end_date) {
@@ -120,7 +141,7 @@
 
   // Get rental unit display name
   let selectedRentalUnit = $derived.by(() => {
-    const unit = rentalUnits?.find(r => r.id === formData.rental_unit_id);
+    const unit = rentalUnits?.find((r: any) => r.id === formData.rental_unit_id);
     if (!unit) return "Select a unit";
     const unitName = unit.name ?? "Unnamed Unit";
     const propertyName = unit.property?.name ?? "No property";
@@ -158,14 +179,13 @@
       
       // Reset form data when modal opens
       formData = {
-        name: lease.name || '',
-        start_date: formatDate(lease.start_date),
-        end_date: formatDate(lease.end_date) || '', // Make optional
-        terms_month: lease.terms_month || 1,
-        status: lease.status || 'ACTIVE',
-        unit_type: lease.unit_type || 'BEDSPACER',
-        notes: lease.notes || '',
-        rental_unit_id: lease.rental_unit?.id || 0,
+        name: lease?.name || '',
+        start_date: formatDate(lease?.start_date || ''),
+        end_date: formatDate(lease?.end_date || '') || '', // Make optional
+        terms_month: lease?.terms_month || 1,
+        status: lease?.status || 'ACTIVE',
+        notes: lease?.notes || '',
+        rental_unit_id: lease?.rental_unit?.id || 0,
         selectedTenants: tenantIds
       };
       searchTerm = '';
@@ -177,41 +197,47 @@
   <DialogContent class="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
     <DialogHeader>
       <div class="flex items-center gap-2">
-        <Pencil class="w-5 h-5 text-primary" />
-        <DialogTitle>Edit Lease Details</DialogTitle>
+        {#if editMode}
+          <Pencil class="w-5 h-5 text-primary" />
+        {:else}
+          <Plus class="w-5 h-5 text-primary" />
+        {/if}
+        <DialogTitle>{editMode ? 'Edit' : 'Create'} Lease</DialogTitle>
       </div>
       <DialogDescription>
-        Update the lease information and manage tenants. Click save when you're done.
+        {editMode ? 'Update the lease information and manage tenants.' : 'Create a new lease and assign tenants.'} Click save when you're done.
       </DialogDescription>
     </DialogHeader>
     
     <form 
       method="POST" 
-      action="?/updateLease"
+      action={editMode ? "?/updateLease" : "?/create"}
       use:enhance={() => {
         return async ({ result }) => {
           if (result.type === 'success') {
-            toast.success('Lease updated successfully');
+            toast.success(editMode ? 'Lease updated successfully' : 'Lease created successfully');
             onOpenChange(false);
             await invalidateAll();
           } else if (result.type === 'failure') {
-            toast.error('Failed to update lease');
+            toast.error(editMode ? 'Failed to update lease' : 'Failed to create lease');
           }
         };
       }}
       class="space-y-6"
     >
       <!-- Hidden form fields for server action -->
-      <input type="hidden" name="id" value={lease.id} />
+      {#if editMode}
+        <input type="hidden" name="id" value={lease?.id} />
+      {/if}
       <input type="hidden" name="name" bind:value={formData.name} />
       <input type="hidden" name="start_date" bind:value={formData.start_date} />
       <input type="hidden" name="end_date" bind:value={formData.end_date} />
       <input type="hidden" name="terms_month" bind:value={formData.terms_month} />
       <input type="hidden" name="status" bind:value={formData.status} />
-      <input type="hidden" name="unit_type" bind:value={formData.unit_type} />
       <input type="hidden" name="notes" bind:value={formData.notes} />
       <input type="hidden" name="rental_unit_id" bind:value={formData.rental_unit_id} />
       <input type="hidden" name="tenantIds" value={JSON.stringify(formData.selectedTenants)} />
+      
       <!-- Basic Information -->
       <div class="space-y-4">
         <div class="flex items-center gap-2 pb-2 border-b border-slate-200">
@@ -323,7 +349,7 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-1 gap-4">
           <div class="space-y-2">
             <Label for="status">Status</Label>
             <Select.Root
@@ -337,25 +363,6 @@
                 {#each leaseStatusEnum.options as status}
                   <Select.Item value={status}>
                     {status}
-                  </Select.Item>
-                {/each}
-              </Select.Content>
-            </Select.Root>
-          </div>
-          
-          <div class="space-y-2">
-            <Label for="unit_type">Unit Type</Label>
-            <Select.Root
-              type="single"
-              bind:value={formData.unit_type}
-            >
-              <Select.Trigger>
-                {formData.unit_type?.replace('_', ' ')}
-              </Select.Trigger>
-              <Select.Content>
-                {#each unitTypeEnum.options as type}
-                  <Select.Item value={type}>
-                    {type.replace('_', ' ')}
                   </Select.Item>
                 {/each}
               </Select.Content>
@@ -441,7 +448,7 @@
           Cancel
         </Button>
         <Button type="submit" disabled={!isFormValid}>
-          Save Changes
+          {editMode ? 'Save Changes' : 'Create Lease'}
         </Button>
       </div>
     </form>
