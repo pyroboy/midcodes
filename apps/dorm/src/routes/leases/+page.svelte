@@ -3,7 +3,7 @@
   import LeaseFormModal from './LeaseFormModal.svelte';
   import LeaseList from './LeaseList.svelte';
   import { Button } from '$lib/components/ui/button';
-  import { Plus } from 'lucide-svelte';
+  import { Plus, FileText, Home, DollarSign, AlertTriangle } from 'lucide-svelte';
   import type { z } from 'zod';
   import { leaseSchema } from './formSchema';
 
@@ -31,11 +31,32 @@
     showModal = true;
   }
 
-  async function handleDeleteLease(lease: FormType) {
-    if (!confirm(`Are you sure you want to delete lease ${lease.name}?`)) return;
+  async function handleDeleteLease(lease: FormType & { billings?: { paid_amount: number }[]; balance?: number; name?: string; id?: number }) {
+    // Enhanced confirmation dialog with detailed warning
+    const hasPayments = lease.billings?.some((b: { paid_amount: number }) => b.paid_amount > 0);
+    const totalBalance = lease.balance || 0;
+    
+    let confirmMessage = `Are you sure you want to archive lease "${lease.name}"?\n\n`;
+    if (hasPayments) {
+      confirmMessage += `⚠️  WARNING: This lease has payment history that will be preserved for audit purposes.\n\n`;
+    }
+    
+    if (totalBalance > 0) {
+      confirmMessage += `💰 Outstanding Balance: ₱${totalBalance.toLocaleString()}\n`;
+    }
+    
+    confirmMessage += `\nThis action will:\n`;
+    confirmMessage += `• Archive the lease (soft delete)\n`;
+    confirmMessage += `• Preserve all payment and billing history\n`;
+    confirmMessage += `• Maintain audit compliance\n`;
+    confirmMessage += `• Remove from active lease list\n\n`;
+    confirmMessage += `This action cannot be undone. Continue?`;
+
+    if (!confirm(confirmMessage)) return;
 
     const formData = new FormData();
     formData.append('id', String(lease.id));
+    formData.append('reason', 'User initiated deletion');
     
     try {
       const result = await fetch('?/delete', {
@@ -47,9 +68,11 @@
       if (result.ok) {
         leases = leases.filter(l => l.id !== lease.id);
         await invalidateAll();
+        // Show success message
+        alert(`Lease "${lease.name}" has been successfully archived. Payment history has been preserved.`);
       } else {
         console.error('Delete failed:', response);
-        alert(response.message || 'Failed to delete lease');
+        alert(response.error || response.message || 'Failed to delete lease');
       }
     } catch (error) {
       console.error('Error deleting lease:', error);
@@ -72,23 +95,72 @@
   }
 </script>
 
-<div class="w-full p-4">
-  <div class="flex justify-between items-center mb-6">
-    <h1 class="text-3xl font-bold">Leases</h1>
-    <Button onclick={handleAddLease} class="flex items-center gap-2">
-      <Plus class="w-4 h-4" />
-      Add Lease
-    </Button>
+<div class="w-full min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+ <!-- Header Section with Integrated Stats -->
+<div class="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-slate-200/60">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+      <div class="flex items-center gap-4">
+        <div>
+          <h1 class="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+            Leases Dashboard
+          </h1>
+          <p class="text-slate-600 text-sm mt-1">
+            Manage rental agreements and track payments
+          </p>
+        </div>
+      </div>
+      
+      <!-- Minimized Stats Overview -->
+      <div class="flex items-center gap-3 text-xs sm:text-sm">
+        <div class="flex items-center gap-1 px-2 py-1 bg-blue-50 rounded-lg">
+          <span class="text-blue-600 font-medium">{leases.length}</span>
+          <span class="text-slate-600">Total</span>
+        </div>
+        <div class="flex items-center gap-1 px-2 py-1 bg-green-50 rounded-lg">
+          <span class="text-green-600 font-medium">{leases.filter(l => l.status === 'ACTIVE').length}</span>
+          <span class="text-slate-600">Active</span>
+        </div>
+        <div class="flex items-center gap-1 px-2 py-1 bg-orange-50 rounded-lg">
+          <span class="text-orange-600 font-medium">₱{leases.reduce((sum, lease) => sum + (lease.balance || 0), 0).toLocaleString()}</span>
+          <span class="text-slate-600">Balance</span>
+        </div>
+        <div class="flex items-center gap-1 px-2 py-1 bg-red-50 rounded-lg">
+          <span class="text-red-600 font-medium">{leases.filter(l => l.balance > 0).length}</span>
+          <span class="text-slate-600">Overdue</span>
+        </div>
+      </div>
+      
+      <Button 
+        onclick={handleAddLease} 
+        class="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+      >
+        <Plus class="w-4 h-4" />
+        Add Lease
+      </Button>
+    </div>
   </div>
-  
-  <LeaseList
-    {leases}
-    tenants={data.tenants}
-    rentalUnits={data.rental_units}
-    on:edit={event => handleEdit(event.detail)}
-    on:delete={event => handleDeleteLease(event.detail)}
-    onStatusChange={handleStatusChange}
-  />
+</div>
+
+  <!-- Main Content Area -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+    <!-- Stats Overview -->
+   
+
+    <!-- Lease List Section -->
+    <div class="bg-white/40 backdrop-blur-sm rounded-2xl border border-slate-200/60 shadow-sm">
+
+      
+        <LeaseList
+          {leases}
+          tenants={data.tenants}
+          rentalUnits={data.rental_units}
+          on:edit={event => handleEdit(event.detail)}
+          on:delete={event => handleDeleteLease(event.detail)}
+          onStatusChange={handleStatusChange}
+        />
+    </div>
+  </div>
 </div>
 
 <!-- Modal for Create/Edit -->

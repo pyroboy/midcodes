@@ -10,22 +10,22 @@ export const TenantStatusEnum = z.enum([
 
 
 export interface EmergencyContact {
-  name: string;
-  relationship: string;
-  phone: string;
+  name?: string;
+  relationship?: string;
+  phone?: string;
   email: string | null;
-  address: string;
+  address?: string;
 }
 
 
 
 
 export const defaultEmergencyContact: {
-  name: string;
-  relationship: string;
-  phone: string;
+  name?: string;
+  relationship?: string;
+  phone?: string;
   email: string | null;
-  address: string;
+  address?: string;
 } = {
   name: '',
   relationship: '',
@@ -37,12 +37,12 @@ export const defaultEmergencyContact: {
 
 // Emergency contact schema
 export const emergencyContactSchema = z.object({
-    name: z.string().min(1, 'Emergency contact name is required'),
-    relationship: z.string().min(1, 'Relationship is required'),
-    phone: z.string().min(1, 'Phone number is required'),
-    email: z.string().email('Invalid email').nullable(),
-    address: z.string().min(1, 'Address is required')
-});
+    name: z.string().optional(),
+    relationship: z.string().optional(),
+    phone: z.string().optional(),
+    email: z.string().email('Invalid email').nullable().optional(),
+    address: z.string().optional()
+}).nullable().optional();
 
 // Base tenant type definition
 export interface BaseTenant {
@@ -100,8 +100,10 @@ export const tenantSchema = z.object({
     .nullable()
     .optional(),
   email: z.string()
-    .email('Invalid email address')
     .max(255, 'Email must be less than 255 characters')
+    .refine((val) => !val || val.trim() === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), {
+      message: 'Invalid email address'
+    })
     .nullable()
     .optional(),
   tenant_status: TenantStatusEnum
@@ -115,32 +117,25 @@ export const tenantSchema = z.object({
     .nullable()
     .optional(),
   emergency_contact: emergencyContactSchema
-    .optional()
-    .nullable()
 });
 
 // Schema for updating an existing tenant
 export const updateTenantSchema = tenantSchema.partial();
 
-// Schema for tenant response (including system-generated fields)
-export const tenantResponseSchema = tenantSchema.extend({
-    id: z.number(),
-    updated_at: z.string().datetime().nullable().optional()
-});
-
 // Schema specifically for the form
 export const tenantFormSchema = z.object({
-  id: z.number(),
+  id: z.number().optional(),
   name: z.string()
     .min(1, 'Name is required')
     .max(255, 'Name must be less than 255 characters'),
   contact_number: z.string()
-    .min(1, 'Contact number is required')
     .nullable()
     .optional(),
   email: z.string()
-    .email('Invalid email address')
     .max(255, 'Email must be less than 255 characters')
+    .refine((val) => !val || val.trim() === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), {
+      message: 'Invalid email address'
+    })
     .nullable()
     .optional(),
   tenant_status: TenantStatusEnum
@@ -153,8 +148,7 @@ export const tenantFormSchema = z.object({
     .uuid('Invalid UUID format')
     .nullable()
     .optional(),
-  emergency_contact: emergencyContactSchema
-    .nullable(),
+  emergency_contact: emergencyContactSchema,
   lease_status: z.string().optional(),
   lease_type: z.string().optional(),
   lease_id: z.number().nullable().optional(),
@@ -175,6 +169,12 @@ export const tenantFormSchema = z.object({
     .optional()
 });
 
+// Schema for tenant response (including system-generated fields)
+export const tenantResponseSchema = tenantFormSchema.extend({
+    id: z.number(),
+    updated_at: z.string().datetime().nullable().optional()
+}).required();
+
 // Export type definitions
 export type CreateTenantInput = z.infer<typeof tenantSchema>;
 export type UpdateTenantInput = z.infer<typeof updateTenantSchema>;
@@ -187,9 +187,8 @@ export const validateTenantForm = (data: unknown) => {
 };
 
 // Transform form data to database input
-export const transformFormToDbInput = (formData: TenantFormData): CreateTenantInput => {
+export const transformFormToDbInput = (formData: TenantFormData): Omit<CreateTenantInput, 'id'> => {
     return {
-      id: formData.id,
       name: formData.name,
       contact_number: formData.contact_number,
       email: formData.email,

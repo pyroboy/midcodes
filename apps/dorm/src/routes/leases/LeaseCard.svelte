@@ -25,9 +25,11 @@
     Users,
     FileText,
     DollarSign,
-    AlertTriangle
+    AlertTriangle,
+    Printer
   } from 'lucide-svelte';
   import type { Lease, Billing } from '$lib/types/lease';
+  import { printLeaseInvoice } from '$lib/utils/print';
 
   interface Props {
     lease: Lease;
@@ -78,7 +80,6 @@
   let showRentManager = $state(false);
   let showSecurityDepositManager = $state(false);
   let showEditModal = $state(false);
-
   async function handlePaymentModalClose() {
     showPaymentModal = false;
     await invalidateAll();
@@ -169,12 +170,12 @@
 
 <AccordionPrimitive.Root type="single" class="border-none">
   <AccordionPrimitive.Item value="item-1" class="w-full border-none">
-    <Card.Root class="group hover:shadow-md transition-all duration-200 w-full border-0 bg-white/50 backdrop-blur-sm hover:bg-white/80">
-      <AccordionPrimitive.Trigger class="lease-trigger w-full py-6 px-6 border-t border-border/40">
+    <Card.Root class="group hover:shadow-lg transition-all duration-300 w-full border-0 bg-white/70 backdrop-blur-sm hover:bg-white/90 rounded-xl overflow-hidden">
+      <AccordionPrimitive.Trigger class="lease-trigger w-full py-6 px-6 border-t border-slate-200/40 hover:bg-slate-50/50 transition-colors duration-200">
         <!-- Main Row -->
-        <div class="flex items-center w-full gap-6">
-          <!-- Left: Name and Status -->
-          <div class="w-72 flex flex-col gap-2">
+        <div class="flex flex-col lg:flex-row lg:items-center w-full gap-4 lg:gap-6">
+          <!-- Left: Name and Status - 1/3 width on desktop, full on mobile -->
+          <div class="w-full lg:w-1/3 flex flex-col gap-2">
             {#if isEditing}
               <Input
                 type="text"
@@ -239,9 +240,9 @@
             </div>
           </div>
 
-          <!-- Middle: Balance Card -->
-          <div class="w-80">
-            <div class="bg-gradient-to-r from-slate-50 to-slate-100 rounded-lg p-4 border border-slate-200/60">
+          <!-- Middle: Balance Card - 1/3 width on desktop, full on mobile -->
+          <div class="w-full lg:w-1/3 flex items-center justify-center">
+            <div class="bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl p-4 border border-slate-200/60 shadow-sm w-full max-w-sm">
               <div class="flex justify-between items-center">
                 <div class="flex items-center gap-2">
                   <DollarSign class="w-4 h-4 text-slate-500" />
@@ -268,11 +269,11 @@
             </div>
           </div>
 
-          <!-- Right: Action Icons -->
-          <div class="flex items-center gap-2">
+          <!-- Right: Action Icons - 1/3 width on desktop, compressed on mobile -->
+          <div class="flex items-center justify-center lg:justify-end gap-1 sm:gap-2 flex-wrap w-full lg:w-1/3">
             <Tooltip.Provider>
               <Tooltip.Root>
-                <Tooltip.Trigger >
+                <Tooltip.Trigger>
                   <Button 
                     size="icon"
                     variant="ghost"
@@ -280,9 +281,9 @@
                       e.stopPropagation();
                       showPaymentModal = true;
                     }}
-                    class="h-10 w-10 hover:bg-green-50 hover:text-green-600 transition-colors group/payment"
+                    class="h-8 w-8 sm:h-10 sm:w-10 hover:bg-green-50 hover:text-green-600 transition-colors group/payment"
                   >
-                    <CreditCard class="w-5 h-5 group-hover/payment:scale-110 transition-transform" />
+                    <CreditCard class="w-4 h-4 sm:w-5 sm:h-5 group-hover/payment:scale-110 transition-transform" />
                   </Button>
                 </Tooltip.Trigger>
                 <Tooltip.Content>
@@ -293,7 +294,7 @@
 
             <Tooltip.Provider>
               <Tooltip.Root>
-                <Tooltip.Trigger >
+                <Tooltip.Trigger>
                   <Button 
                     size="icon"
                     variant="ghost"
@@ -301,9 +302,9 @@
                       e.stopPropagation(); 
                       showEditModal = true;
                     }}
-                    class="h-10 w-10 hover:bg-blue-50 hover:text-blue-600 transition-colors group/edit"
+                    class="h-8 w-8 sm:h-10 sm:w-10 hover:bg-blue-50 hover:text-blue-600 transition-colors group/edit"
                   >
-                    <Pencil class="w-5 h-5 group-hover/edit:scale-110 transition-transform" />
+                    <Pencil class="w-4 h-4 sm:w-5 sm:h-5 group-hover/edit:scale-110 transition-transform" />
                   </Button>
                 </Tooltip.Trigger>
                 <Tooltip.Content>
@@ -314,7 +315,7 @@
 
             <Tooltip.Provider>
               <Tooltip.Root>
-                <Tooltip.Trigger >
+                <Tooltip.Trigger>
                   <Button 
                     size="icon"
                     variant="ghost"
@@ -322,9 +323,9 @@
                       e.stopPropagation(); 
                       showRentManager = true;
                     }}
-                    class="h-10 w-10 hover:bg-purple-50 hover:text-purple-600 transition-colors group/rent"
+                    class="h-8 w-8 sm:h-10 sm:w-10 hover:bg-purple-50 hover:text-purple-600 transition-colors group/rent"
                   >
-                    <Home class="w-5 h-5 group-hover/rent:scale-110 transition-transform" />
+                    <Home class="w-4 h-4 sm:w-5 sm:h-5 group-hover/rent:scale-110 transition-transform" />
                   </Button>
                 </Tooltip.Trigger>
                 <Tooltip.Content>
@@ -335,7 +336,7 @@
 
             <Tooltip.Provider>
               <Tooltip.Root>
-                <Tooltip.Trigger >
+                <Tooltip.Trigger>
                   <Button 
                     size="icon"
                     variant="ghost"
@@ -343,9 +344,9 @@
                       e.stopPropagation(); 
                       showSecurityDepositManager = true;
                     }}
-                    class="h-10 w-10 hover:bg-orange-50 hover:text-orange-600 transition-colors group/security"
+                    class="h-8 w-8 sm:h-10 sm:w-10 hover:bg-orange-50 hover:text-orange-600 transition-colors group/security"
                   >
-                    <Shield class="w-5 h-5 group-hover/security:scale-110 transition-transform" />
+                    <Shield class="w-4 h-4 sm:w-5 sm:h-5 group-hover/security:scale-110 transition-transform" />
                   </Button>
                 </Tooltip.Trigger>
                 <Tooltip.Content>
@@ -356,7 +357,28 @@
 
             <Tooltip.Provider>
               <Tooltip.Root>
-                <Tooltip.Trigger >
+                <Tooltip.Trigger>
+                  <Button 
+                    size="icon"
+                    variant="ghost"
+                    onclick={(e) => {
+                      e.stopPropagation(); 
+                      printLeaseInvoice(lease);
+                    }}
+                    class="h-8 w-8 sm:h-10 sm:w-10 hover:bg-gray-50 hover:text-gray-600 transition-colors group/print"
+                  >
+                    <Printer class="w-4 h-4 sm:w-5 sm:h-5 group-hover/print:scale-110 transition-transform" />
+                  </Button>
+                </Tooltip.Trigger>
+                <Tooltip.Content>
+                  <p class="text-sm font-medium">Print Statement</p>
+                </Tooltip.Content>
+              </Tooltip.Root>
+            </Tooltip.Provider>
+
+            <Tooltip.Provider>
+              <Tooltip.Root>
+                <Tooltip.Trigger>
                   <Button 
                     size="icon"
                     variant="ghost"
@@ -364,9 +386,9 @@
                       e.stopPropagation();
                       onDelete(e, lease);
                     }}
-                    class="h-10 w-10 hover:bg-red-50 hover:text-red-600 transition-colors group/delete"
+                    class="h-8 w-8 sm:h-10 sm:w-10 hover:bg-red-50 hover:text-red-600 transition-colors group/delete"
                   >
-                    <Trash2 class="w-5 h-5 group-hover/delete:scale-110 transition-transform" />
+                    <Trash2 class="w-4 h-4 sm:w-5 sm:h-5 group-hover/delete:scale-110 transition-transform" />
                   </Button>
                 </Tooltip.Trigger>
                 <Tooltip.Content>
@@ -379,8 +401,8 @@
       </AccordionPrimitive.Trigger>
 
       <AccordionPrimitive.Content class="accordion-content">
-        <Card.Content class="px-6 pb-6">
-          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card.Content class="px-4 sm:px-6 pb-6 bg-gradient-to-b from-slate-50/30 to-white/50">
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
             <!-- Column 1: Lease Details -->
             <div class="space-y-4">
               <div class="flex items-center gap-2 pb-2 border-b border-slate-200">
@@ -455,7 +477,7 @@
               </div>
               <div class="space-y-3">
                 <!-- Overall Balance Card -->
-                <div class="bg-gradient-to-r from-slate-50 to-slate-100 rounded-lg p-4 border border-slate-200/60">
+                <div class="bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl p-4 border border-slate-200/60 shadow-sm">
                   <div class="flex justify-between items-center mb-2">
                     <span class="text-sm font-medium text-slate-600">
                       Overall Balance
@@ -490,7 +512,7 @@
                   {#each Object.entries(getBillingSummary(lease.billings)) as [type, amounts] (type)}
                     <button
                       type="button"
-                      class={`w-full flex justify-between items-center p-3 rounded-lg border transition-all duration-200 ${
+                      class={`w-full flex justify-between items-center p-3 rounded-xl border transition-all duration-200 ${
                         selectedBillingType === type 
                           ? 'bg-primary/5 border-primary/20 shadow-sm' 
                           : 'bg-white/50 border-slate-200/60 hover:bg-slate-50/80 hover:border-slate-300/60'
@@ -525,7 +547,7 @@
                   <div class="space-y-3">
                     {#each sortedBillings.filter((b) => b.type === selectedBillingType) as billing}
                       {@const displayStatus = getDisplayStatus(billing)}
-                      <div class="bg-white/60 rounded-lg p-4 border border-slate-200/60 hover:shadow-sm transition-shadow">
+                      <div class="bg-white/60 rounded-xl p-4 border border-slate-200/60 hover:shadow-sm transition-shadow">
                         <div class="flex justify-between items-start mb-3">
                           <div class="font-semibold text-slate-800">
                             {#if billing.status === 'PAID'}
@@ -622,28 +644,30 @@ editMode
   onOpenChange={handleEditModalClose}
 />
 
+
+
 <style>
   :global(.lease-trigger) {
     width: 100%;
     text-align: left;
     border-bottom: none;
     border-top: 1px solid hsl(var(--border) / 0.4);
-    transition: all 0.2s ease;
+    transition: all 0.3s ease;
   }
 
   :global(.lease-trigger:hover) {
-    background: linear-gradient(135deg, hsl(var(--muted) / 0.3), hsl(var(--muted) / 0.1));
+    background: linear-gradient(135deg, hsl(var(--muted) / 0.2), hsl(var(--muted) / 0.05));
   }
 
   :global(.accordion-content) {
     overflow: hidden;
-    background: linear-gradient(135deg, hsl(var(--background) / 0.8), hsl(var(--muted) / 0.1));
+    background: linear-gradient(135deg, hsl(var(--background) / 0.9), hsl(var(--muted) / 0.05));
   }
 
   :global(.lease-trigger:focus-visible) {
     outline: 2px solid hsl(var(--primary));
     outline-offset: -2px;
-    border-radius: 0.5rem;
+    border-radius: 0.75rem;
   }
 
   :global(.card) {

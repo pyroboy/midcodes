@@ -27,6 +27,7 @@ export const load: PageServerLoad = async ({ locals }) => {
           )
         )
       `)
+      .is('deleted_at', null) // Only load non-deleted tenants
       .order('name'),
     locals.supabase
       .from('properties')
@@ -47,14 +48,13 @@ export const load: PageServerLoad = async ({ locals }) => {
     const { lease_tenants, ...rest } = tenant;
     return { ...rest, lease };
   }) as TenantResponse[];
-console.log(tenants);
+
   return {
     tenants,
     properties: propertiesResult.data || [],
     form: await superValidate(zod(tenantFormSchema))
   };
 };
-
 
 // Base tenant insert type from database
 type TenantInsertBase = {
@@ -78,26 +78,34 @@ export const actions: Actions = {
       return fail(400, { form });
     }
 
-    // Check for duplicate email if provided
-    if (form.data.email) {
+    // Check for duplicate email if provided (excluding soft-deleted tenants)
+    if (form.data.email && form.data.email.trim() !== '') {
       const existingTenant = await supabase
         .from('tenants')
         .select('id')
         .eq('email', form.data.email)
+        .is('deleted_at', null)
         .single();
 
       if (existingTenant.data) {
         form.errors.email = ['A tenant with this email already exists'];
-        return fail(400, { form });
+        return fail(400, { form, message: 'Duplicate email found: A tenant with this email already exists' });
       }
     }
 
     const insertData: TenantInsert = {
       name: form.data.name,
       contact_number: form.data.contact_number || null,
-      email: form.data.email || null,
-      tenant_status: 'PENDING',
-      emergency_contact: form.data.emergency_contact || null
+      email: form.data.email && form.data.email.trim() !== '' ? form.data.email : null,
+      tenant_status: form.data.tenant_status || 'PENDING',
+      emergency_contact: form.data.emergency_contact && 
+        (form.data.emergency_contact.name || form.data.emergency_contact.phone || form.data.emergency_contact.email || form.data.emergency_contact.address) ? {
+          name: form.data.emergency_contact.name || '',
+          relationship: form.data.emergency_contact.relationship || '',
+          phone: form.data.emergency_contact.phone || '',
+          email: form.data.emergency_contact.email || null,
+          address: form.data.emergency_contact.address || ''
+        } : null
     };
 
     const { error: insertError } = await supabase
@@ -118,36 +126,47 @@ export const actions: Actions = {
   },
 
   update: async ({ request, locals: { supabase } }: RequestEvent) => {
-    const form = await superValidate(request, zod(tenantResponseSchema));
+    const form = await superValidate(request, zod(tenantFormSchema));
     if (!form.valid) {
       console.error('Form validation failed:', form.errors);
       return fail(400, { form });
     }
 
-    // Check for duplicate email, excluding current tenant
-    if (form.data.email) {
+    console.log('🔄 Update action - Received form data:', form.data);
+
+    // Check for duplicate email, excluding current tenant and soft-deleted tenants
+    if (form.data.email && form.data.email.trim() !== '') {
       const existingTenant = await supabase
         .from('tenants')
         .select('id')
         .eq('email', form.data.email)
         .neq('id', form.data.id)
+        .is('deleted_at', null)
         .single();
 
       if (existingTenant.data) {
         console.error('Duplicate email found:', form.data.email);
         form.errors.email = ['A tenant with this email already exists'];
-        return fail(400, { form });
+        return fail(400, { form, message: 'Duplicate email found: A tenant with this email already exists' });
       }
     }
 
     const updateData: TenantUpdate = {
       name: form.data.name,
       contact_number: form.data.contact_number || null,
-      email: form.data.email || null,
+      email: form.data.email && form.data.email.trim() !== '' ? form.data.email : null,
       tenant_status: form.data.tenant_status,
-      emergency_contact: form.data.emergency_contact || null,
+      emergency_contact: form.data.emergency_contact ? {
+        name: form.data.emergency_contact.name,
+        relationship: form.data.emergency_contact.relationship,
+        phone: form.data.emergency_contact.phone,
+        email: form.data.emergency_contact.email || null,
+        address: form.data.emergency_contact.address
+      } : null,
       updated_at: new Date().toISOString()
     };
+
+    console.log('🔄 Update action - Sending to database:', updateData);
 
     const { error: updateError } = await supabase
       .from('tenants')
@@ -163,12 +182,14 @@ export const actions: Actions = {
       return fail(500, { form, message: 'Failed to update tenant' });
     }
 
+    console.log('✅ Update action - Successfully updated tenant');
     return { form };
   },
 
   delete: async ({ request, locals: { supabase } }: RequestEvent) => {
     const formData = await request.formData();
     const id = formData.get('id');
+    const reason = formData.get('reason') || 'User initiated deletion';
 
     if (!id || typeof id !== 'string') {
       return fail(400, { message: 'Invalid tenant ID' });
@@ -179,22 +200,38 @@ export const actions: Actions = {
       return fail(400, { message: 'Invalid tenant ID format' });
     }
 
+    // Get tenant details for confirmation message
+    const { data: tenant, error: fetchError } = await supabase
+      .from('tenants')
+      .select('name, email, contact_number')
+      .eq('id', tenantId)
+      .is('deleted_at', null)
+      .single();
+
+    if (fetchError || !tenant) {
+      return fail(404, { message: 'Tenant not found or already deleted' });
+    }
+
+    // Soft delete by setting deleted_at timestamp
     const { error: deleteError } = await supabase
       .from('tenants')
-      .delete()
+      .update({ 
+        deleted_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
       .eq('id', tenantId);
 
     if (deleteError) {
-      console.error('Error deleting tenant:', deleteError);
+      console.error('Error soft deleting tenant:', deleteError);
       if (deleteError.message?.includes('Policy check failed')) {
         return fail(403, { message: 'You do not have permission to delete tenants' });
-      }
-      if (deleteError.code === '23503') {
-        return fail(400, { message: 'Cannot delete tenant because they have active leases or other records' });
       }
       return fail(500, { message: 'Failed to delete tenant' });
     }
 
-    return { success: true };
+    return { 
+      success: true, 
+      message: `Tenant "${tenant.name}" has been successfully archived. All data has been preserved for audit purposes.`
+    };
   }
 };

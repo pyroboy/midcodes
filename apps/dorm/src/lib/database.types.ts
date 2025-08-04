@@ -205,6 +205,10 @@ export type Database = {
           created_at: string
           updated_at: string | null
           auth_id: string | null
+          emergency_contact: Record<string, any> | null
+          tenant_status: Database['public']['Enums']['tenant_status']
+          created_by: string | null
+          deleted_at: string | null
         }
         Insert: {
           id?: number
@@ -214,6 +218,10 @@ export type Database = {
           created_at?: string
           updated_at?: string | null
           auth_id?: string | null
+          emergency_contact?: Record<string, any> | null
+          tenant_status?: Database['public']['Enums']['tenant_status']
+          created_by?: string | null
+          deleted_at?: string | null
         }
         Update: {
           id?: number
@@ -223,6 +231,10 @@ export type Database = {
           created_at?: string
           updated_at?: string | null
           auth_id?: string | null
+          emergency_contact?: Record<string, any> | null
+          tenant_status?: Database['public']['Enums']['tenant_status']
+          created_by?: string | null
+          deleted_at?: string | null
         }
       }
       leases: {

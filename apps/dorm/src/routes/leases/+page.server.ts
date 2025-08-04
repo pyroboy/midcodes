@@ -36,6 +36,7 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
       lease_tenants:lease_tenants!lease_id (tenant:tenants (name, email, contact_number)),
       billings (*)
     `)
+    .is('deleted_at', null) // Only show non-archived leases
     .order('created_at', { ascending: false });
 
 		if (fetchError) {
@@ -334,45 +335,31 @@ export const actions: Actions = {
 
     const formData = await request.formData();
     const leaseId = formData.get('id');
+    const reason = formData.get('reason') as string || 'User initiated deletion';
 
     if (!leaseId) {
       return fail(400, { error: 'Lease ID is required' });
     }
 
     try {
-      // Check for associated billings with payments
-      const { data: billings, error: billingsError } = await supabase
-        .from('billings')
-        .select('id, paid_amount')
-        .eq('lease_id', leaseId);
-
-      if (billingsError) {
-        console.error('Error checking billings:', billingsError);
-        throw new Error('Failed to verify billings before deletion.');
-      }
-
-      const hasPaidBillings = billings.some(b => b.paid_amount > 0);
-      if (hasPaidBillings) {
-        console.error('Cannot delete lease with paid billings. Please remove payments first.');
-        return fail(409, { // 409 Conflict
-          error: 'Cannot delete lease with paid billings. Please remove payments first.'
-        });
-      }
-
-      // Proceed with deletion if no paid billings are found
-      const { error: deleteError } = await supabase.rpc('delete_lease_and_dependents', { p_lease_id: leaseId });
+      // Soft delete the lease (preserves all payment data)
+      const { error: deleteError } = await supabase.rpc('soft_delete_lease', { 
+        p_lease_id: leaseId,
+        p_deleted_by: user.id,
+        p_reason: reason
+      });
 
       if (deleteError) {
-        console.error('Error deleting lease via RPC:', deleteError);
+        console.error('Error soft deleting lease:', deleteError);
         throw new Error(deleteError.message);
       }
 
       return { success: true, deletedLeaseId: leaseId };
 
     } catch (error) {
-      console.error('Delete transaction failed:', error);
+      console.error('Soft delete failed:', error);
       return fail(500, {
-        message: 'Failed to delete lease and associated records'
+        error: 'Failed to archive lease'
       });
     }
   },
