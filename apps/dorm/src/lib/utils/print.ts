@@ -118,11 +118,13 @@ function generateLeasePrintHTML(lease: Lease): string {
        <p><strong>Lease Period:</strong> ${formatDate(lease.start_date)} - ${formatDate(lease.end_date)}</p>
      </div>
      <div class="account-info">
-       <h3>Account Summary</h3>
-       <p><strong>Monthly Rent:</strong> ${formatCurrency(lease.rent_amount)}</p>
-       <p><strong>Security Deposit:</strong> ${formatCurrency(lease.security_deposit)}</p>
-       <p><strong>Current Balance:</strong> ${formatCurrency(lease.balance)}</p>
-       <p><strong>Status:</strong> ${lease.status}</p>
+       <h3>Tenants</h3>
+       ${lease.lease_tenants && lease.lease_tenants.length > 0 
+         ? lease.lease_tenants.map(tenant => `
+           <p><strong>${tenant.name}</strong>${tenant.contact_number ? ` • ${tenant.contact_number}` : ''}${tenant.email ? ` • ${tenant.email}` : ''}</p>
+         `).join('')
+         : '<p><em>No tenants assigned</em></p>'
+       }
      </div>
    </div>
 
@@ -153,7 +155,7 @@ function generateLeasePrintHTML(lease: Lease): string {
         const paymentDetailsHtml = billing.allocations && billing.allocations.length > 0
           ? billing.allocations.map((alloc: any) => {
               const methodDisplay = alloc.payment.method === 'SECURITY_DEPOSIT' 
-                ? `Security Deposit (${formatCurrency(alloc.payment.amount)})`
+                ? `SECURITY DEPOSIT`
                 : alloc.payment.method;
               return `<div>${formatDate(alloc.payment.paid_at)}: ${methodDisplay} (${formatCurrency(alloc.amount)})</div>`;
             }).join('')

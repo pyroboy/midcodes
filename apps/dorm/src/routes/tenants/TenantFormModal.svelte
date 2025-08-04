@@ -102,19 +102,29 @@
     if (open) {
       if (editMode && tenant) {
         // Edit mode - populate with existing tenant data
+        console.log('🔄 Edit mode - Tenant data:', tenant);
+        console.log('🔄 Edit mode - Emergency contact:', tenant.emergency_contact);
+        
         $form = {
           id: tenant.id,
           name: tenant.name || '',
-          email: tenant.email || '', // Ensure email is empty string if null
+          email: tenant.email || '', // Use empty string for input binding
           contact_number: tenant.contact_number || '',
           tenant_status: tenant.tenant_status || 'PENDING',
+          // Set both nested object and flat fields for emergency contact
           emergency_contact: tenant.emergency_contact ? {
             name: tenant.emergency_contact.name || '',
             relationship: tenant.emergency_contact.relationship || '',
             phone: tenant.emergency_contact.phone || '',
-            email: tenant.emergency_contact.email || null,
+            email: tenant.emergency_contact.email || '', // Use empty string for input binding
             address: tenant.emergency_contact.address || ''
           } : { ...defaultEmergencyContact },
+          // Flat emergency contact fields
+          'emergency_contact.name': tenant.emergency_contact?.name || '',
+          'emergency_contact.relationship': tenant.emergency_contact?.relationship || '',
+          'emergency_contact.phone': tenant.emergency_contact?.phone || '',
+          'emergency_contact.email': tenant.emergency_contact?.email || '',
+          'emergency_contact.address': tenant.emergency_contact?.address || '',
           // Add other fields as needed
           auth_id: tenant.auth_id || null,
           created_by: tenant.created_by || null,
@@ -139,10 +149,16 @@
         $form = {
           id: undefined,
           name: '',
-          email: '', // Ensure email is empty string, not null
+          email: '', // Use empty string for input binding
           contact_number: '',
           tenant_status: 'PENDING',
           emergency_contact: { ...defaultEmergencyContact },
+          // Flat emergency contact fields
+          'emergency_contact.name': '',
+          'emergency_contact.relationship': '',
+          'emergency_contact.phone': '',
+          'emergency_contact.email': '',
+          'emergency_contact.address': '',
           auth_id: null,
           created_by: null,
           lease_status: '',
@@ -302,103 +318,102 @@
         
         <Card>
           <CardContent class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-6">
-            <!-- Hidden inputs for emergency contact fields -->
-            <input type="hidden" name="emergency_contact.name" bind:value={$form.emergency_contact.name} />
-            <input type="hidden" name="emergency_contact.relationship" bind:value={$form.emergency_contact.relationship} />
-            <input type="hidden" name="emergency_contact.phone" bind:value={$form.emergency_contact.phone} />
-            <input type="hidden" name="emergency_contact.email" bind:value={$form.emergency_contact.email} />
-            <input type="hidden" name="emergency_contact.address" bind:value={$form.emergency_contact.address} />
-            
+            <!-- Emergency Contact Fields -->
             <div class="space-y-2">
-              <Label for="emergency_contact.name">Contact Name (Optional)</Label>
+              <Label for="emergency_contact_name">Contact Name (Optional)</Label>
               <Input
-                id="emergency_contact.name"
+                id="emergency_contact_name"
+                name="emergency_contact.name"
                 type="text"
-                bind:value={$form.emergency_contact.name}
-                class={$errors.emergency_contact && typeof $errors.emergency_contact === 'object' && 'name' in $errors.emergency_contact ? 'border-red-500' : ''}
+                bind:value={$form['emergency_contact.name']}
+                class={$errors['emergency_contact.name'] ? 'border-red-500' : ''}
                 placeholder="Emergency contact name (optional)"
               />
-              {#if $errors.emergency_contact && typeof $errors.emergency_contact === 'object' && 'name' in $errors.emergency_contact}
+              {#if $errors['emergency_contact.name']}
                 <p class="text-sm text-red-500 flex items-center gap-1">
                   <AlertCircle class="w-4 h-4" />
-                  {$errors.emergency_contact.name}
+                  {$errors['emergency_contact.name']}
                 </p>
               {/if}
             </div>
 
             <div class="space-y-2">
-              <Label for="emergency_contact.relationship">Relationship (Optional)</Label>
+              <Label for="emergency_contact_relationship">Relationship (Optional)</Label>
               <Input
-                id="emergency_contact.relationship"
+                id="emergency_contact_relationship"
+                name="emergency_contact.relationship"
                 type="text"
-                bind:value={$form.emergency_contact.relationship}
-                class={$errors.emergency_contact && typeof $errors.emergency_contact === 'object' && 'relationship' in $errors.emergency_contact ? 'border-red-500' : ''}
+                bind:value={$form['emergency_contact.relationship']}
+                class={$errors['emergency_contact.relationship'] ? 'border-red-500' : ''}
                 placeholder="e.g., Spouse, Parent, Friend (optional)"
               />
-              {#if $errors.emergency_contact && typeof $errors.emergency_contact === 'object' && 'relationship' in $errors.emergency_contact}
+              {#if $errors['emergency_contact.relationship']}
                 <p class="text-sm text-red-500 flex items-center gap-1">
                   <AlertCircle class="w-4 h-4" />
-                  {$errors.emergency_contact.relationship}
+                  {$errors['emergency_contact.relationship']}
                 </p>
               {/if}
             </div>
 
             <div class="space-y-2">
-              <Label for="emergency_contact.phone">Phone Number (Optional)</Label>
+              <Label for="emergency_contact_phone">Phone Number (Optional)</Label>
               <div class="relative">
                 <Phone class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <Input
-                  id="emergency_contact.phone"
+                  id="emergency_contact_phone"
+                  name="emergency_contact.phone"
                   type="tel"
-                  bind:value={$form.emergency_contact.phone}
-                  class={`pl-10 ${$errors.emergency_contact && typeof $errors.emergency_contact === 'object' && 'phone' in $errors.emergency_contact ? 'border-red-500' : ''}`}
+                  bind:value={$form['emergency_contact.phone']}
+                  class={`pl-10 ${$errors['emergency_contact.phone'] ? 'border-red-500' : ''}`}
                   placeholder="+1 (555) 123-4567 (optional)"
                 />
               </div>
-              {#if $errors.emergency_contact && typeof $errors.emergency_contact === 'object' && 'phone' in $errors.emergency_contact}
+              {#if $errors['emergency_contact.phone']}
                 <p class="text-sm text-red-500 flex items-center gap-1">
                   <AlertCircle class="w-4 h-4" />
-                  {$errors.emergency_contact.phone}
+                  {$errors['emergency_contact.phone']}
                 </p>
               {/if}
             </div>
 
             <div class="space-y-2">
-              <Label for="emergency_contact.email">Email Address (Optional)</Label>
+              <Label for="emergency_contact_email">Email Address (Optional)</Label>
               <div class="relative">
                 <Mail class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <Input
-                  id="emergency_contact.email"
+                  id="emergency_contact_email"
+                  name="emergency_contact.email"
                   type="email"
-                  bind:value={$form.emergency_contact.email}
-                  class={`pl-10 ${$errors.emergency_contact && typeof $errors.emergency_contact === 'object' && 'email' in $errors.emergency_contact ? 'border-red-500' : ''}`}
+                  bind:value={$form['emergency_contact.email']}
+                  class={`pl-10 ${$errors['emergency_contact.email'] ? 'border-red-500' : ''}`}
                   placeholder="emergency@example.com (optional)"
                 />
               </div>
-              {#if $errors.emergency_contact && typeof $errors.emergency_contact === 'object' && 'email' in $errors.emergency_contact}
+              {#if $errors['emergency_contact.email']}
                 <p class="text-sm text-red-500 flex items-center gap-1">
                   <AlertCircle class="w-4 h-4" />
-                  {$errors.emergency_contact.email}
+                  {$errors['emergency_contact.email']}
                 </p>
               {/if}
             </div>
 
             <div class="col-span-2 space-y-2">
-              <Label for="emergency_contact.address">Address (Optional)</Label>
+              <Label for="emergency_contact_address">Address (Optional)</Label>
               <div class="relative">
                 <MapPin class="absolute left-3 top-3 w-4 h-4 text-gray-400" />
                 <Textarea
-                  id="emergency_contact.address"
-                  bind:value={$form.emergency_contact.address}
-                  class={`pl-10 ${$errors.emergency_contact && typeof $errors.emergency_contact === 'object' && 'address' in $errors.emergency_contact ? 'border-red-500' : ''}`}
+                  id="emergency_contact_address"
+                  name="emergency_contact.address"
+                  bind:value={$form['emergency_contact.address']}
+                  class={`pl-10 ${$errors['emergency_contact.address'] ? 'border-red-500' : ''}`}
                   placeholder="Enter emergency contact's full address (optional)"
                   rows={3}
                 />
               </div>
-              {#if $errors.emergency_contact && typeof $errors.emergency_contact === 'object' && 'address' in $errors.emergency_contact}
+              {#if $errors['emergency_contact.address']}
                 <p class="text-sm text-red-500 flex items-center gap-1">
                   <AlertCircle class="w-4 h-4" />
-                  {$errors.emergency_contact.address}
+                  {$errors['emergency_contact.address']}
                 </p>
               {/if}
             </div>

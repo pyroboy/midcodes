@@ -74,7 +74,21 @@
   }
 
   let sortedBillings = $derived(sortBillingsByDueDate(lease.billings || []));
-  let totalPenalty = $derived(lease.billings?.reduce((acc, b) => acc + (b.penalty_amount || 0), 0) || 0);
+  // Calculate total penalty only for unpaid billings
+  let totalPenalty = $derived.by(() => {
+    return lease.billings?.reduce((acc, b) => {
+      const totalDue = b.amount + (b.penalty_amount || 0);
+      const isFullyPaid = b.paid_amount >= totalDue;
+      // Only include penalty if billing is not fully paid
+      return acc + (isFullyPaid ? 0 : (b.penalty_amount || 0));
+    }, 0) || 0;
+  });
+
+  // Helper function to check if a billing is fully paid
+  function isBillingFullyPaid(billing: Billing): boolean {
+    const totalDue = billing.amount + (billing.penalty_amount || 0);
+    return billing.paid_amount >= totalDue;
+  }
 
   let showPaymentModal = $state(false);
   let showRentManager = $state(false);
@@ -566,18 +580,23 @@
                             <Calendar class="w-3 h-3" />
                             <span>Due: {formatDate(billing.due_date)}</span>
                           </div>
-                          
+                          {#if billing.penalty_amount > 0}
                           <div class="flex justify-between">
-                            <span>Total Amount:</span>
+                            <span>Base Amount:</span>
                             <span class="font-medium">{formatCurrency(billing.amount)}</span>
                           </div>
                           
-                          {#if billing.penalty_amount > 0}
+                       
                             <div class="flex justify-between text-red-600">
                               <span>Penalty:</span>
                               <span class="font-medium">+{formatCurrency(billing.penalty_amount)}</span>
                             </div>
                           {/if}
+                          
+                          <div class="flex justify-between font-semibold border-t pt-1 mt-1">
+                            <span>Total Amount:</span>
+                            <span class="font-medium">{formatCurrency(billing.amount + (billing.penalty_amount || 0))}</span>
+                          </div>
                         </div>
 
                         <!-- Payment History -->

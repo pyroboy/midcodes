@@ -8,7 +8,6 @@ export const TenantStatusEnum = z.enum([
     'BLACKLISTED'
 ]);
 
-
 export interface EmergencyContact {
   name?: string;
   relationship?: string;
@@ -17,30 +16,26 @@ export interface EmergencyContact {
   address?: string;
 }
 
-
-
-
-export const defaultEmergencyContact: {
-  name?: string;
-  relationship?: string;
-  phone?: string;
-  email: string | null;
-  address?: string;
-} = {
+export const defaultEmergencyContact: EmergencyContact = {
   name: '',
   relationship: '',
   phone: '',
-  email: null, // Now explicitly string | null
+  email: '',
   address: ''
 };
 
-
-// Emergency contact schema
+// Emergency contact schema - Fixed validation
 export const emergencyContactSchema = z.object({
     name: z.string().optional(),
     relationship: z.string().optional(),
     phone: z.string().optional(),
-    email: z.string().email('Invalid email').nullable().optional(),
+    email: z.string()
+      .optional()
+      .nullable()
+      .refine((val) => !val || val.trim() === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), {
+        message: 'Invalid email format'
+      })
+      .transform(val => val === '' ? null : val), // Transform empty string to null
     address: z.string().optional()
 }).nullable().optional();
 
@@ -122,7 +117,7 @@ export const tenantSchema = z.object({
 // Schema for updating an existing tenant
 export const updateTenantSchema = tenantSchema.partial();
 
-// Schema specifically for the form
+// Schema specifically for the form - includes flat emergency contact fields
 export const tenantFormSchema = z.object({
   id: z.number().optional(),
   name: z.string()
@@ -133,11 +128,12 @@ export const tenantFormSchema = z.object({
     .optional(),
   email: z.string()
     .max(255, 'Email must be less than 255 characters')
-    .refine((val) => !val || val.trim() === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), {
-      message: 'Invalid email address'
-    })
+    .optional()
     .nullable()
-    .optional(),
+    .refine((val) => !val || val.trim() === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), {
+      message: 'Invalid email format'
+    })
+    .transform(val => val === '' ? null : val), // Transform empty string to null
   tenant_status: TenantStatusEnum
     .default('PENDING'),
   auth_id: z.string()
@@ -148,6 +144,19 @@ export const tenantFormSchema = z.object({
     .uuid('Invalid UUID format')
     .nullable()
     .optional(),
+  // Flat emergency contact fields for form handling
+  'emergency_contact.name': z.string().optional(),
+  'emergency_contact.relationship': z.string().optional(),
+  'emergency_contact.phone': z.string().optional(),
+  'emergency_contact.email': z.string()
+    .optional()
+    .nullable()
+    .refine((val) => !val || val.trim() === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), {
+      message: 'Invalid email format'
+    })
+    .transform(val => val === '' ? null : val),
+  'emergency_contact.address': z.string().optional(),
+  // Keep the nested object for backward compatibility
   emergency_contact: emergencyContactSchema,
   lease_status: z.string().optional(),
   lease_type: z.string().optional(),
@@ -188,13 +197,38 @@ export const validateTenantForm = (data: unknown) => {
 
 // Transform form data to database input
 export const transformFormToDbInput = (formData: TenantFormData): Omit<CreateTenantInput, 'id'> => {
+    // Parse emergency contact from flat fields
+    const emergencyContact = parseEmergencyContactFromForm(formData);
+    
     return {
       name: formData.name,
       contact_number: formData.contact_number,
       email: formData.email,
-      emergency_contact: formData.emergency_contact || null,
+      emergency_contact: emergencyContact,
       tenant_status: 'PENDING',
     };
+};
+
+// Helper function to parse emergency contact from form data
+export const parseEmergencyContactFromForm = (formData: TenantFormData): EmergencyContact | null => {
+  const name = (formData as any)['emergency_contact.name'] || formData.emergency_contact?.name || '';
+  const relationship = (formData as any)['emergency_contact.relationship'] || formData.emergency_contact?.relationship || '';
+  const phone = (formData as any)['emergency_contact.phone'] || formData.emergency_contact?.phone || '';
+  const email = (formData as any)['emergency_contact.email'] || formData.emergency_contact?.email || '';
+  const address = (formData as any)['emergency_contact.address'] || formData.emergency_contact?.address || '';
+
+  // Only create emergency contact object if at least one field has data
+  if (name?.trim() || relationship?.trim() || phone?.trim() || email?.trim() || address?.trim()) {
+    return {
+      name: name?.trim() || '',
+      relationship: relationship?.trim() || '',
+      phone: phone?.trim() || '',
+      email: email?.trim() || null,
+      address: address?.trim() || ''
+    };
+  }
+
+  return null;
 };
 
 // Re-export everything in a single object
@@ -206,5 +240,6 @@ export const TenantSchemas = {
     emergencyContactSchema,
     TenantStatusEnum,
     validateTenantForm,
-    transformFormToDbInput
+    transformFormToDbInput,
+    parseEmergencyContactFromForm
 } as const;

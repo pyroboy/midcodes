@@ -3,7 +3,7 @@ import type { Actions, PageServerLoad } from './$types';
 import type { RequestEvent } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
-import { tenantFormSchema, tenantResponseSchema, type EmergencyContact } from './formSchema';
+import { tenantFormSchema, tenantResponseSchema, type EmergencyContact, parseEmergencyContactFromForm } from './formSchema';
 import type { Database } from '$lib/database.types';
 import type { TenantResponse } from '$lib/types/tenant';
 
@@ -78,19 +78,37 @@ export const actions: Actions = {
       return fail(400, { form });
     }
 
+    console.log('🔄 Create action - Received form data:', form.data);
+
+    // Use the helper function to parse emergency contact
+    const parsedEmergencyContact = parseEmergencyContactFromForm(form.data);
+    console.log('🔍 Create - Parsed emergency contact:', parsedEmergencyContact);
+
     // Check for duplicate email if provided (excluding soft-deleted tenants)
+    console.log('🔍 Email check - form.data.email:', form.data.email);
+    console.log('🔍 Email check - typeof:', typeof form.data.email);
+    console.log('🔍 Email check - length:', form.data.email?.length);
+    console.log('🔍 Email check - trimmed:', form.data.email?.trim());
+    
     if (form.data.email && form.data.email.trim() !== '') {
+      console.log('🔍 Email check - Checking for duplicates with email:', form.data.email);
+      
       const existingTenant = await supabase
         .from('tenants')
         .select('id')
-        .eq('email', form.data.email)
+        .eq('email', form.data.email.trim())
         .is('deleted_at', null)
         .single();
 
+      console.log('🔍 Email check - Query result:', existingTenant);
+      
       if (existingTenant.data) {
+        console.log('🔍 Email check - Duplicate found!');
         form.errors.email = ['A tenant with this email already exists'];
         return fail(400, { form, message: 'Duplicate email found: A tenant with this email already exists' });
       }
+    } else {
+      console.log('🔍 Email check - Skipping duplicate check (empty or null email)');
     }
 
     const insertData: TenantInsert = {
@@ -98,15 +116,10 @@ export const actions: Actions = {
       contact_number: form.data.contact_number || null,
       email: form.data.email && form.data.email.trim() !== '' ? form.data.email : null,
       tenant_status: form.data.tenant_status || 'PENDING',
-      emergency_contact: form.data.emergency_contact && 
-        (form.data.emergency_contact.name || form.data.emergency_contact.phone || form.data.emergency_contact.email || form.data.emergency_contact.address) ? {
-          name: form.data.emergency_contact.name || '',
-          relationship: form.data.emergency_contact.relationship || '',
-          phone: form.data.emergency_contact.phone || '',
-          email: form.data.emergency_contact.email || null,
-          address: form.data.emergency_contact.address || ''
-        } : null
+      emergency_contact: parsedEmergencyContact
     };
+
+    console.log('🔄 Create action - Sending to database:', insertData);
 
     const { error: insertError } = await supabase
       .from('tenants')
@@ -122,6 +135,7 @@ export const actions: Actions = {
       return fail(500, { form });
     }
 
+    console.log('✅ Create action - Successfully created tenant');
     return { form };
   },
 
@@ -134,21 +148,34 @@ export const actions: Actions = {
 
     console.log('🔄 Update action - Received form data:', form.data);
 
+    // Use the helper function to parse emergency contact
+    const parsedEmergencyContact = parseEmergencyContactFromForm(form.data);
+    console.log('🔍 Update - Parsed emergency contact:', parsedEmergencyContact);
+
     // Check for duplicate email, excluding current tenant and soft-deleted tenants
+    console.log('🔍 Update Email check - form.data.email:', form.data.email);
+    console.log('🔍 Update Email check - form.data.id:', form.data.id);
+    
     if (form.data.email && form.data.email.trim() !== '') {
+      console.log('🔍 Update Email check - Checking for duplicates with email:', form.data.email);
+      
       const existingTenant = await supabase
         .from('tenants')
         .select('id')
-        .eq('email', form.data.email)
+        .eq('email', form.data.email.trim())
         .neq('id', form.data.id)
         .is('deleted_at', null)
         .single();
 
+      console.log('🔍 Update Email check - Query result:', existingTenant);
+      
       if (existingTenant.data) {
         console.error('Duplicate email found:', form.data.email);
         form.errors.email = ['A tenant with this email already exists'];
         return fail(400, { form, message: 'Duplicate email found: A tenant with this email already exists' });
       }
+    } else {
+      console.log('🔍 Update Email check - Skipping duplicate check (empty or null email)');
     }
 
     const updateData: TenantUpdate = {
@@ -156,13 +183,7 @@ export const actions: Actions = {
       contact_number: form.data.contact_number || null,
       email: form.data.email && form.data.email.trim() !== '' ? form.data.email : null,
       tenant_status: form.data.tenant_status,
-      emergency_contact: form.data.emergency_contact ? {
-        name: form.data.emergency_contact.name,
-        relationship: form.data.emergency_contact.relationship,
-        phone: form.data.emergency_contact.phone,
-        email: form.data.emergency_contact.email || null,
-        address: form.data.emergency_contact.address
-      } : null,
+      emergency_contact: parsedEmergencyContact,
       updated_at: new Date().toISOString()
     };
 

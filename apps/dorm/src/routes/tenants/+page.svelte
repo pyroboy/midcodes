@@ -11,6 +11,7 @@
   import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
   import { Badge } from '$lib/components/ui/badge';
   import { toast } from 'svelte-sonner';
+  import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
 
   let { data } = $props<{ data: PageData }>();
   let tenants = $state(data.tenants);
@@ -122,7 +123,7 @@
 </script>
 
 <div class="w-full min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
-  <!-- Header Section -->
+  <!-- Header Section with Integrated Stats -->
   <div class="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-slate-200/60">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4">
       <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
@@ -136,6 +137,27 @@
             </p>
           </div>
         </div>
+        
+        <!-- Minimized Stats Overview -->
+        <div class="flex items-center gap-3 text-xs sm:text-sm">
+          <div class="flex items-center gap-1 px-2 py-1 bg-blue-50 rounded-lg">
+            <span class="text-blue-600 font-medium">{stats.total}</span>
+            <span class="text-slate-600">Total</span>
+          </div>
+          <div class="flex items-center gap-1 px-2 py-1 bg-green-50 rounded-lg">
+            <span class="text-green-600 font-medium">{stats.active}</span>
+            <span class="text-slate-600">Active</span>
+          </div>
+          <div class="flex items-center gap-1 px-2 py-1 bg-yellow-50 rounded-lg">
+            <span class="text-yellow-600 font-medium">{stats.pending}</span>
+            <span class="text-slate-600">Pending</span>
+          </div>
+          <div class="flex items-center gap-1 px-2 py-1 bg-red-50 rounded-lg">
+            <span class="text-red-600 font-medium">{stats.blacklisted}</span>
+            <span class="text-slate-600">Blacklisted</span>
+          </div>
+        </div>
+        
         <Button 
           onclick={handleAddTenant} 
           class="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all duration-200"
@@ -149,57 +171,6 @@
 
   <!-- Main Content Area -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-    <!-- Stats Overview -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
-      <div class="bg-white/60 backdrop-blur-sm rounded-xl p-4 sm:p-6 border border-slate-200/60 shadow-sm hover:shadow-md transition-all duration-200">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-slate-600 text-xs sm:text-sm font-medium">Total Tenants</p>
-            <p class="text-xl sm:text-2xl font-bold text-slate-800">{stats.total}</p>
-          </div>
-          <div class="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-            <Users class="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
-          </div>
-        </div>
-      </div>
-
-      <div class="bg-white/60 backdrop-blur-sm rounded-xl p-4 sm:p-6 border border-slate-200/60 shadow-sm hover:shadow-md transition-all duration-200">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-slate-600 text-xs sm:text-sm font-medium">Active Tenants</p>
-            <p class="text-xl sm:text-2xl font-bold text-green-600">{stats.active}</p>
-          </div>
-          <div class="w-10 h-10 sm:w-12 sm:h-12 bg-green-100 rounded-lg flex items-center justify-center">
-            <UserCheck class="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
-          </div>
-        </div>
-      </div>
-
-      <div class="bg-white/60 backdrop-blur-sm rounded-xl p-4 sm:p-6 border border-slate-200/60 shadow-sm hover:shadow-md transition-all duration-200">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-slate-600 text-xs sm:text-sm font-medium">Pending</p>
-            <p class="text-xl sm:text-2xl font-bold text-yellow-600">{stats.pending}</p>
-          </div>
-          <div class="w-10 h-10 sm:w-12 sm:h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-            <AlertTriangle class="w-5 h-5 sm:w-6 sm:h-6 text-yellow-600" />
-          </div>
-        </div>
-      </div>
-
-      <div class="bg-white/60 backdrop-blur-sm rounded-xl p-4 sm:p-6 border border-slate-200/60 shadow-sm hover:shadow-md transition-all duration-200">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-slate-600 text-xs sm:text-sm font-medium">Blacklisted</p>
-            <p class="text-xl sm:text-2xl font-bold text-red-600">{stats.blacklisted}</p>
-          </div>
-          <div class="w-10 h-10 sm:w-12 sm:h-12 bg-red-100 rounded-lg flex items-center justify-center">
-            <UserX class="w-5 h-5 sm:w-6 sm:h-6 text-red-600" />
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- Search and Filter Section -->
     <div class="bg-white/40 backdrop-blur-sm rounded-2xl border border-slate-200/60 shadow-sm p-6 mb-6">
       <div class="flex flex-col sm:flex-row gap-4">
@@ -329,3 +300,5 @@
   form={data.form}
   onOpenChange={handleModalClose}
 />
+
+<SuperDebug data={data} />
