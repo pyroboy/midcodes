@@ -37,7 +37,7 @@
   let availablePaymentTypes = $derived.by(() => {
     const hasSecurityDepositBilling = Array.from(selectedBillings).some(billingId => {
       const billing = lease.billings?.find((b: Billing) => b.id === billingId);
-      return billing?.type === 'SECURITY_DEPOST';
+      return billing?.type === 'SECURITY_DEPOSIT';
     });
     
     if (hasSecurityDepositBilling) {
@@ -55,7 +55,7 @@
 
   // Calculate available security deposit amount (based on paid_amount, not balance)
   let availableSecurityDeposit = $derived(() => {
-    const securityBillings = lease.billings?.filter((b: Billing) => b.type === 'SECURITY_DEPOST') || [];
+    const securityBillings = lease.billings?.filter((b: Billing) => b.type === 'SECURITY_DEPOSIT') || [];
     const totalPaid = securityBillings.reduce((sum: number, b: Billing) => sum + b.paid_amount, 0);
     
     // Calculate amount already used from security deposit
@@ -63,7 +63,7 @@
     let amountUsed = 0;
     
     allBillings.forEach((billing: any) => {
-      if (billing.type !== 'SECURITY_DEPOST' && billing.allocations) {
+      if (billing.type !== 'SECURITY_DEPOSIT' && billing.allocations) {
         billing.allocations.forEach((allocation: any) => {
           if (allocation.payment.method === 'SECURITY_DEPOSIT') {
             amountUsed += allocation.amount;
@@ -118,7 +118,7 @@
   function resetInvalidPaymentType() {
     const hasSecurityDepositBilling = Array.from(selectedBillings).some(billingId => {
       const billing = lease.billings?.find((b: Billing) => b.id === billingId);
-      return billing?.type === 'SECURITY_DEPOST';
+      return billing?.type === 'SECURITY_DEPOSIT';
     });
     
     if (hasSecurityDepositBilling && selectedPaymentType === 'SECURITY_DEPOSIT') {
@@ -174,7 +174,19 @@
       }
     } catch (error) {
       console.error('Payment submission error:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to process payment');
+      
+      let errorMessage = 'Failed to process payment';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error && typeof error === 'object' && 'message' in error) {
+        errorMessage = String(error.message);
+      }
+      
+      toast.error('Payment Failed', {
+        description: errorMessage
+      });
     }
   }
 
@@ -409,7 +421,7 @@
             <!-- Security Deposit Billing Warning -->
             {#if Array.from(selectedBillings).some(billingId => {
               const billing = lease.billings?.find((b: Billing) => b.id === billingId);
-              return billing?.type === 'SECURITY_DEPOST';
+              return billing?.type === 'SECURITY_DEPOSIT';
             })}
               <div class="p-3 bg-red-50 border border-red-200 rounded-md">
                 <div class="text-sm text-red-800">

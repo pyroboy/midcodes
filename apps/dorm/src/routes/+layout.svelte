@@ -35,6 +35,8 @@
 				if (properties) {
 					propertyStore.init(properties);
 				}
+			}).catch((error) => {
+				console.error('Failed to load properties:', error);
 			});
 		}
 	});

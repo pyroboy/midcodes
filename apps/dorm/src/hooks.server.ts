@@ -153,8 +153,8 @@ const authGuard: Handle = async ({ event, resolve }) => {
 			if (returnTo) {
 				throw redirect(303, returnTo);
 			}
-			// If no returnTo is specified, redirect to a default page (e.g., dashboard)
-			throw redirect(303, '/dashboard');
+			// If no returnTo is specified, redirect to the overview page (which should exist)
+			throw redirect(303, '/overview');
 		}
 		return resolve(event);
 	}

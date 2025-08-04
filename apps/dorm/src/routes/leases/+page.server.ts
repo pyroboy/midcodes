@@ -528,7 +528,7 @@ export const actions: Actions = {
       });
 
       const results = await Promise.all(operations);
-      const errors = results.map(r => r.error).filter(Boolean);
+      const errors = results.filter(r => r.error).map(r => r.error);
 
       if (errors.length > 0) {
         throw new Error(`Some operations failed: ${errors.map(e => e.message).join(', ')}`);
@@ -603,7 +603,7 @@ export const actions: Actions = {
           .from('billings')
           .insert({
             lease_id: leaseId,
-            type: type as 'SECURITY_DEPOST',
+            type: type as 'SECURITY_DEPOSIT',
             amount: amount,
             paid_amount: 0,
             balance: amount,

@@ -41,8 +41,8 @@
 
   const loadSecurityDeposits = () => {
     // Filter existing billings for security deposits (type 'OTHER' with security deposit context)
-    securityDeposits = lease.billings?.filter((b: Billing) => 
-      b.type === 'SECURITY_DEPOST' && (b.notes?.toLowerCase().includes('security') || b.notes?.toLowerCase().includes('deposit'))
+      securityDeposits = lease.billings?.filter((b: Billing) =>
+    b.type === 'SECURITY_DEPOSIT' && (b.notes?.toLowerCase().includes('security') || b.notes?.toLowerCase().includes('deposit'))
     ) || [];
   };
 
@@ -87,7 +87,7 @@
       if (editingDeposit) {
         formDataToSubmit.append('billing_id', editingDeposit?.id?.toString() || '');
       }
-      formDataToSubmit.append('type', 'SECURITY_DEPOST');
+      formDataToSubmit.append('type', 'SECURITY_DEPOSIT');
       formDataToSubmit.append('amount', formData.amount.toString());
       formDataToSubmit.append('due_date', formData.due_date);
       formDataToSubmit.append('billing_date', formData.billing_date);
@@ -189,7 +189,7 @@
     const allBillings = lease.billings || [];
     
     allBillings.forEach((billing: any) => {
-      if (billing.type !== 'SECURITY_DEPOST' && billing.allocations) {
+      if (billing.type !== 'SECURITY_DEPOSIT' && billing.allocations) {
         billing.allocations.forEach((allocation: any) => {
           if (allocation.payment.method === 'SECURITY_DEPOSIT') {
             usage.push({
@@ -227,7 +227,7 @@
     let totalUsed = 0;
     
     allBillings.forEach((billing: any) => {
-      if (billing.type !== 'SECURITY_DEPOST' && billing.allocations) {
+      if (billing.type !== 'SECURITY_DEPOSIT' && billing.allocations) {
         billing.allocations.forEach((allocation: any) => {
           if (allocation.payment.method === 'SECURITY_DEPOSIT') {
             totalUsed += allocation.amount;
