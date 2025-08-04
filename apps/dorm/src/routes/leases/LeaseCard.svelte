@@ -50,7 +50,7 @@
     getDisplayStatus
   } from '$lib/utils/format';
 
-  let selectedBillingType = $state<'RENT' | 'UTILITY' | 'PENALTY' | 'SECURITY_DEPOST'>('RENT');
+  let selectedBillingType = $state<'RENT' | 'UTILITY' | 'PENALTY' | 'SECURITY_DEPOSIT'>('RENT');
 
   function getBillingSummary(billings: Billing[] = []): Record<string, { total: number; unpaid: number }> {
     return billings.reduce(
@@ -447,7 +447,7 @@
                           {lease.lease_tenants.length === 1 ? 'Tenant' : 'Tenants'}
                         </div>
                         <div class="text-slate-600 text-xs mt-1">
-                          {lease.lease_tenants.map(lt => lt.name).filter(Boolean).join(', ') || 'No tenant names available'}
+                          {lease.lease_tenants.filter(lt => lt.name).map(lt => lt.name).join(', ') || 'No tenant names available'}
                         </div>
                       </div>
                     </div>

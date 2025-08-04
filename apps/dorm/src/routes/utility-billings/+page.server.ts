@@ -170,7 +170,7 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
 
   const leases = leasesData?.map(lease => ({
     ...lease,
-    tenants: lease.lease_tenants.map(lt => lt.tenants).filter(t => t !== null)
+              tenants: lease.lease_tenants.filter(lt => lt.tenants !== null).map(lt => lt.tenants)
   }));
 
   if (leasesError) {

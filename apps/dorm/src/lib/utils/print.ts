@@ -202,7 +202,7 @@ function generateLeasePrintHTML(lease: Lease): string {
 
                ${(() => {
           // Get all security deposit billings
-          const securityDepositBillings = sortedBillings.filter(b => b.type === 'SECURITY_DEPOST');
+          const securityDepositBillings = sortedBillings.filter(b => b.type === 'SECURITY_DEPOSIT');
           
           if (securityDepositBillings.length > 0) {
                          // Calculate security deposit totals
@@ -213,7 +213,7 @@ function generateLeasePrintHTML(lease: Lease): string {
                          // Calculate amount used from security deposit for other billings
              let amountUsed = 0;
              sortedBillings.forEach(billing => {
-               if (billing.type !== 'SECURITY_DEPOST' && billing.allocations) {
+               if (billing.type !== 'SECURITY_DEPOSIT' && billing.allocations) {
                  billing.allocations.forEach((allocation: any) => {
                    if (allocation.payment.method === 'SECURITY_DEPOSIT') {
                      amountUsed += allocation.amount;

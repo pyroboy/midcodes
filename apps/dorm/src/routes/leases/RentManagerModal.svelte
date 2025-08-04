@@ -69,6 +69,32 @@
   });
 
   const handleSaveChanges = async () => {
+    // Validate data before submission
+    const validationErrors: string[] = [];
+    
+    monthlyRents.forEach((rent, index) => {
+      if (rent.isActive) {
+        if (!rent.amount || rent.amount <= 0) {
+          validationErrors.push(`Month ${rent.month}: Amount must be greater than 0`);
+        }
+        if (!rent.dueDate) {
+          validationErrors.push(`Month ${rent.month}: Due date is required`);
+        }
+        // Validate due date format
+        const dueDate = new Date(rent.dueDate);
+        if (isNaN(dueDate.getTime())) {
+          validationErrors.push(`Month ${rent.month}: Invalid due date format`);
+        }
+      }
+    });
+    
+    if (validationErrors.length > 0) {
+      toast.error('Validation Error', {
+        description: validationErrors.join(', ')
+      });
+      return;
+    }
+    
     isLoading = true;
     try {
       const formData = new FormData();

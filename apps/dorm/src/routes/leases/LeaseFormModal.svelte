@@ -46,7 +46,7 @@
     }
     
     // Extract tenant names from lease_tenants
-    const leaseTenantNames = lease.lease_tenants.map((lt: any) => lt.name).filter(Boolean);
+    const leaseTenantNames = lease.lease_tenants.filter((lt: any) => lt.name).map((lt: any) => lt.name);
     
     // Find matching tenants by name
     const matchingTenantIds = tenants
