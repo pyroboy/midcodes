@@ -15,7 +15,7 @@ interface PaymentAllocation {
 
 interface PaymentDetails {
   amount: number;
-  method: 'CASH' | 'GCASH' | 'BANK_TRANSFER';
+  method: 'CASH' | 'GCASH' | 'BANK_TRANSFER' | 'SECURITY_DEPOSIT';
   reference_number: string | null;
   paid_by: string;
   paid_at: string;
@@ -380,16 +380,35 @@ export const actions: Actions = {
 
       const paymentDetails: PaymentDetails = JSON.parse(paymentDetailsJSON as string);
 
-      const { data, error: rpcError } = await supabase.rpc('create_payment', {
-        p_amount: paymentDetails.amount,
-        p_method: paymentDetails.method as any,
-        p_billing_ids: paymentDetails.billing_ids,
-        p_paid_by: paymentDetails.paid_by,
-        p_paid_at: paymentDetails.paid_at,
-        p_reference_number: paymentDetails.reference_number,
-        p_notes: paymentDetails.notes,
-        p_created_by: user.id
-      });
+      let data, rpcError;
+
+      // Use different RPC function based on payment method
+      if (paymentDetails.method === 'SECURITY_DEPOSIT') {
+        const result = await supabase.rpc('create_security_deposit_payment', {
+          p_amount: paymentDetails.amount,
+          p_billing_ids: paymentDetails.billing_ids,
+          p_paid_by: paymentDetails.paid_by,
+          p_paid_at: paymentDetails.paid_at,
+          p_reference_number: paymentDetails.reference_number,
+          p_notes: paymentDetails.notes,
+          p_created_by: user.id
+        });
+        data = result.data;
+        rpcError = result.error;
+      } else {
+        const result = await supabase.rpc('create_payment', {
+          p_amount: paymentDetails.amount,
+          p_method: paymentDetails.method as any,
+          p_billing_ids: paymentDetails.billing_ids,
+          p_paid_by: paymentDetails.paid_by,
+          p_paid_at: paymentDetails.paid_at,
+          p_reference_number: paymentDetails.reference_number,
+          p_notes: paymentDetails.notes,
+          p_created_by: user.id
+        });
+        data = result.data;
+        rpcError = result.error;
+      }
 
       if (rpcError) {
         console.error('Error creating payment via RPC:', rpcError);

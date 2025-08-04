@@ -151,9 +151,12 @@ function generateLeasePrintHTML(lease: Lease): string {
         const itemBalance = totalDue - paymentsMade;
 
         const paymentDetailsHtml = billing.allocations && billing.allocations.length > 0
-          ? billing.allocations.map((alloc: any) =>
-              `<div>${formatDate(alloc.payment.paid_at)}: ${alloc.payment.method} (${formatCurrency(alloc.amount)})</div>`
-            ).join('')
+          ? billing.allocations.map((alloc: any) => {
+              const methodDisplay = alloc.payment.method === 'SECURITY_DEPOSIT' 
+                ? `Security Deposit (${formatCurrency(alloc.payment.amount)})`
+                : alloc.payment.method;
+              return `<div>${formatDate(alloc.payment.paid_at)}: ${methodDisplay} (${formatCurrency(alloc.amount)})</div>`;
+            }).join('')
           : '-';
 
         return `
@@ -195,28 +198,54 @@ function generateLeasePrintHTML(lease: Lease): string {
          <td class="amount">${formatCurrency(lease.balance)}</td>
        </tr>
 
-       ${(() => {
-         // Get all security deposit billings and sum all allocations (partial payments) for all of them
-         const securityDepositBillings = sortedBillings.filter(b => b.type === 'SECURITY_DEPOST');
-         // Sum all allocations for all security deposit billings
-         const totalSecurityPaid = securityDepositBillings.reduce((sum, b) => {
-           if (b.allocations && Array.isArray(b.allocations)) {
-             // Sum all allocations for this billing and add to sum
-             return sum + b.allocations.reduce((aSum: number, alloc: { amount?: number }) => aSum + (alloc.amount || 0), 0);
-           }
-           // Fallback to paid_amount if allocations are missing
-           return sum + (b.paid_amount || 0);
-         }, 0);
-         if (securityDepositBillings.length > 0) {
-           return `
-             <tr>
-               <td class="label">Security Deposit:</td>
-               <td class="amount">${formatCurrency(totalSecurityPaid)}</td>
-             </tr>
-           `;
-         }
-         return '';
-       })()}
+               ${(() => {
+          // Get all security deposit billings
+          const securityDepositBillings = sortedBillings.filter(b => b.type === 'SECURITY_DEPOST');
+          
+          if (securityDepositBillings.length > 0) {
+                         // Calculate security deposit totals
+             const totalBilledSecurityDeposit = securityDepositBillings.reduce((sum, b) => sum + b.amount, 0);
+             const totalPaidToSecurityDeposit = securityDepositBillings.reduce((sum, b) => sum + b.paid_amount, 0);
+             const unpaidSecurityDeposit = securityDepositBillings.reduce((sum, b) => sum + b.balance, 0);
+            
+                         // Calculate amount used from security deposit for other billings
+             let amountUsed = 0;
+             sortedBillings.forEach(billing => {
+               if (billing.type !== 'SECURITY_DEPOST' && billing.allocations) {
+                 billing.allocations.forEach((allocation: any) => {
+                   if (allocation.payment.method === 'SECURITY_DEPOSIT') {
+                     amountUsed += allocation.amount;
+                   }
+                 });
+               }
+             });
+            
+            return `
+              <tr>
+                <td class="label" colspan="2" style="text-align: center; font-weight: bold; padding-top: 10px; border-top: 1px solid #ccc;">
+                  Security Deposit Info
+                </td>
+              </tr>
+              <tr>
+                <td class="label">Total Billed Security Deposit:</td>
+                <td class="amount">${formatCurrency(totalBilledSecurityDeposit)}</td>
+              </tr>
+                             <tr>
+                 <td class="label">Available Deposit:</td>
+                 <td class="amount">${formatCurrency(totalPaidToSecurityDeposit - amountUsed)}</td>
+               </tr>
+              <tr>
+                <td class="label">Unpaid Security Deposit:</td>
+                <td class="amount">${formatCurrency(unpaidSecurityDeposit)}</td>
+              </tr>
+              <tr>
+                <td class="label">Amount Used:</td>
+                <td class="amount">${formatCurrency(amountUsed)}</td>
+              </tr>
+            `;
+          }
+          return '';
+        })()}
      </table>
    </div>
 

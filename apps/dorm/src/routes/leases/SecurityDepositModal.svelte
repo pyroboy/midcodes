@@ -183,6 +183,62 @@
     }
   };
 
+  // Calculate security deposit usage (when security deposit money is used for other billings)
+  let securityDepositUsage = $derived(() => {
+    const usage: any[] = [];
+    const allBillings = lease.billings || [];
+    
+    allBillings.forEach((billing: any) => {
+      if (billing.type !== 'SECURITY_DEPOST' && billing.allocations) {
+        billing.allocations.forEach((allocation: any) => {
+          if (allocation.payment.method === 'SECURITY_DEPOSIT') {
+            usage.push({
+              billing: billing,
+              amount: allocation.amount,
+              date: allocation.payment.paid_at,
+              method: allocation.payment.method,
+              billingType: billing.type
+            });
+          }
+        });
+      }
+    });
+    
+    return usage;
+  });
+
+  // Calculate security deposit totals
+  let totalBilledSecurityDeposit = $derived(() => {
+    return securityDeposits.reduce((sum, deposit) => sum + deposit.amount, 0);
+  });
+
+  let availableDeposit = $derived(() => {
+    return securityDeposits.reduce((sum, deposit) => sum + deposit.paid_amount, 0);
+  });
+
+  let unpaidSecurityDeposit = $derived(() => {
+    return securityDeposits.reduce((sum, deposit) => sum + deposit.balance, 0);
+  });
+
+  // Calculate amount used from security deposit for other billings
+  let amountUsed = $derived(() => {
+    // Calculate from all billings that have security deposit payments
+    const allBillings = lease.billings || [];
+    let totalUsed = 0;
+    
+    allBillings.forEach((billing: any) => {
+      if (billing.type !== 'SECURITY_DEPOST' && billing.allocations) {
+        billing.allocations.forEach((allocation: any) => {
+          if (allocation.payment.method === 'SECURITY_DEPOSIT') {
+            totalUsed += allocation.amount;
+          }
+        });
+      }
+    });
+    
+    return totalUsed;
+  });
+
   // Load deposits when modal opens
   $effect(() => {
     if (open) {
@@ -216,6 +272,54 @@
         </Button>
       </div>
 
+      <!-- Security Deposit Summary -->
+      {#if securityDeposits.length > 0}
+        <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+          <h4 class="font-medium text-blue-900 mb-2">Security Deposit Summary</h4>
+          <div class="grid grid-cols-4 gap-4 text-sm">
+            <div>
+              <span class="text-blue-700">Total Billed Security Deposit:</span>
+              <div class="font-medium">{formatCurrency(totalBilledSecurityDeposit())}</div>
+            </div>
+            <div>
+              <span class="text-blue-700">Available Deposit:</span>
+              <div class="font-medium">{formatCurrency(availableDeposit() - amountUsed())}</div>
+            </div>
+            <div>
+              <span class="text-blue-700">Unpaid Security Deposit:</span>
+              <div class="font-medium">{formatCurrency(unpaidSecurityDeposit())}</div>
+            </div>
+            <div>
+              <span class="text-blue-700">Amount Used:</span>
+              <div class="font-medium">{formatCurrency(amountUsed())}</div>
+            </div>
+          </div>
+        </div>
+      {/if}
+
+      <!-- Security Deposit Usage History -->
+      {#if securityDepositUsage().length > 0}
+        <div class="mb-4">
+          <h4 class="font-medium mb-2">Usage History</h4>
+          <div class="space-y-2 max-h-40 overflow-y-auto">
+            {#each securityDepositUsage() as usage}
+              <div class="p-2 border rounded bg-white">
+                <div class="flex items-center justify-between text-sm">
+                  <div>
+                    <span class="font-medium">{formatCurrency(usage.amount)}</span>
+                    <span class="text-gray-600">for {usage.billingType}</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">Security Deposit</span>
+                    <span class="text-gray-500">{formatDate(usage.date)}</span>
+                  </div>
+                </div>
+              </div>
+            {/each}
+          </div>
+        </div>
+      {/if}
+
       <!-- Existing Security Deposits List -->
       <div class="space-y-2 max-h-60 overflow-y-auto">
         {#if securityDeposits.length === 0}
@@ -241,6 +345,12 @@
                       <div>Notes: {deposit.notes}</div>
                     {/if}
                     <div>Balance: {formatCurrency(deposit.balance)}</div>
+                    {#if deposit.paid_amount > 0}
+                      <div class="text-green-600">Paid: {formatCurrency(deposit.paid_amount)}</div>
+                    {/if}
+                    {#if deposit.balance > 0}
+                      <div class="text-red-600">Unpaid: {formatCurrency(deposit.balance)}</div>
+                    {/if}
                   </div>
                 </div>
                 <div class="flex gap-2">

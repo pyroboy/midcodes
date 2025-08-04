@@ -5,6 +5,7 @@ export const transactionTypeEnum = {
     CASH: 'CASH',
     BANK: 'BANK',
     GCASH: 'GCASH',
+    SECURITY_DEPOSIT: 'SECURITY_DEPOSIT',
     OTHER: 'OTHER'
   }
 } as const;

@@ -43,7 +43,7 @@ export interface PaymentAllocation {
   payment: {
     id: number;
     paid_at: string;
-    method: string;
+    method: 'CASH' | 'GCASH' | 'BANK_TRANSFER' | 'SECURITY_DEPOSIT' | string;
     reference_number?: string;
   };
 }

@@ -586,7 +586,12 @@
                             <div class="text-xs font-medium text-slate-700 mb-2">Payment History</div>
                             {#each billing.allocations as allocation}
                               <div class="flex justify-between items-center text-xs text-slate-600 py-1">
-                                <span>Paid: {formatCurrency(allocation.amount)}</span>
+                                <div class="flex items-center gap-2">
+                                  <span>Paid: {formatCurrency(allocation.amount)}</span>
+                                  {#if allocation.payment.method === 'SECURITY_DEPOSIT'}
+                                    <span class="px-1 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">Security Deposit</span>
+                                  {/if}
+                                </div>
                                 <span>{formatDate(allocation.payment.paid_at)}</span>
                               </div>
                             {/each}

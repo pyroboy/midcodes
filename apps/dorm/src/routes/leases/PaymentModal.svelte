@@ -22,21 +22,58 @@
   }>();
 
   type PaymentMethod = {
-    value: 'CASH' | 'GCASH' | 'BANK_TRANSFER';
+    value: 'CASH' | 'GCASH' | 'BANK_TRANSFER' | 'SECURITY_DEPOSIT';
     label: string;
   };
 
   const paymentTypes: PaymentMethod[] = [
     { value: 'CASH', label: 'Cash' },
     { value: 'GCASH', label: 'GCash' },
-    { value: 'BANK_TRANSFER', label: 'Bank Transfer' }
+    { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
+    { value: 'SECURITY_DEPOSIT', label: 'Security Deposit' }
   ];
+
+  // Filter out security deposit payment method if any selected billing is a security deposit
+  let availablePaymentTypes = $derived.by(() => {
+    const hasSecurityDepositBilling = Array.from(selectedBillings).some(billingId => {
+      const billing = lease.billings?.find((b: Billing) => b.id === billingId);
+      return billing?.type === 'SECURITY_DEPOST';
+    });
+    
+    if (hasSecurityDepositBilling) {
+      return paymentTypes.filter(type => type.value !== 'SECURITY_DEPOSIT');
+    }
+    
+    return paymentTypes;
+  });
 
   let selectedPaymentType = $state<PaymentMethod['value']>('CASH');
   let paymentAmount = $state(0);
   let selectedAmount = $state(0);
   let selectedBillings = $state<Set<number>>(new Set());
   let referenceNumber = $state('');
+
+  // Calculate available security deposit amount (based on paid_amount, not balance)
+  let availableSecurityDeposit = $derived(() => {
+    const securityBillings = lease.billings?.filter((b: Billing) => b.type === 'SECURITY_DEPOST') || [];
+    const totalPaid = securityBillings.reduce((sum: number, b: Billing) => sum + b.paid_amount, 0);
+    
+    // Calculate amount already used from security deposit
+    const allBillings = lease.billings || [];
+    let amountUsed = 0;
+    
+    allBillings.forEach((billing: any) => {
+      if (billing.type !== 'SECURITY_DEPOST' && billing.allocations) {
+        billing.allocations.forEach((allocation: any) => {
+          if (allocation.payment.method === 'SECURITY_DEPOSIT') {
+            amountUsed += allocation.amount;
+          }
+        });
+      }
+    });
+    
+    return totalPaid - amountUsed;
+  });
 
   function toggleBilling(billingId: number) {
     const newSelected = new Set(selectedBillings);
@@ -47,6 +84,7 @@
     }
     selectedBillings = newSelected;
     updateSelectedAmount();
+    resetInvalidPaymentType();
   }
 
   function updateSelectedAmount() {
@@ -66,12 +104,38 @@
     }
   }
 
+  // Add validation for security deposit payments
+  function validateSecurityDepositPayment() {
+    if (selectedPaymentType === 'SECURITY_DEPOSIT') {
+      const availableAmount = availableSecurityDeposit();
+      if (paymentAmount > availableAmount) {
+        throw new Error(`Payment amount exceeds available security deposit (${formatCurrency(availableAmount)})`);
+      }
+    }
+  }
+
+  // Reset payment type if it becomes invalid due to billing selection
+  function resetInvalidPaymentType() {
+    const hasSecurityDepositBilling = Array.from(selectedBillings).some(billingId => {
+      const billing = lease.billings?.find((b: Billing) => b.id === billingId);
+      return billing?.type === 'SECURITY_DEPOST';
+    });
+    
+    if (hasSecurityDepositBilling && selectedPaymentType === 'SECURITY_DEPOSIT') {
+      selectedPaymentType = 'CASH';
+      toast.error('Security deposit cannot be used to pay security deposit billings. Payment method reset to Cash.');
+    }
+  }
+
   async function handleSubmit(event: Event) {
     event.preventDefault();
     try {
       if (!paymentAmount || paymentAmount <= 0) throw new Error('Payment amount must be greater than zero.');
       if (!selectedPaymentType) throw new Error('Payment method is required.');
       if (!selectedBillings.size) throw new Error('No billings selected.');
+
+      // Validate security deposit payment
+      validateSecurityDepositPayment();
 
       const paymentDetails = {
         amount: paymentAmount,
@@ -315,11 +379,47 @@
                 bind:value={selectedPaymentType}
                 class="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {#each paymentTypes as type}
-                  <option value={type.value}>{type.label}</option>
+                {#each availablePaymentTypes as type}
+                  <option value={type.value}>
+                    {type.value === 'SECURITY_DEPOSIT' 
+                      ? 'Security Deposit'
+                      : type.label}
+                  </option>
                 {/each}
               </select>
             </div>
+
+            <!-- Security Deposit Info -->
+            {#if selectedPaymentType === 'SECURITY_DEPOSIT'}
+              <div class="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                <div class="text-sm text-blue-800">
+                  <div class="font-medium">Available Security Deposit: {formatCurrency(availableSecurityDeposit())}</div>
+                  <div class="text-xs text-blue-600 mt-1">
+                    This is the amount you can use to pay other billings
+                  </div>
+                  {#if paymentAmount > availableSecurityDeposit()}
+                    <div class="text-red-600 mt-1">
+                      ⚠️ Payment amount exceeds available security deposit
+                    </div>
+                  {/if}
+                </div>
+              </div>
+            {/if}
+
+            <!-- Security Deposit Billing Warning -->
+            {#if Array.from(selectedBillings).some(billingId => {
+              const billing = lease.billings?.find((b: Billing) => b.id === billingId);
+              return billing?.type === 'SECURITY_DEPOST';
+            })}
+              <div class="p-3 bg-red-50 border border-red-200 rounded-md">
+                <div class="text-sm text-red-800">
+                  <div class="font-medium">⚠️ Security Deposit Billing Selected</div>
+                  <div class="text-xs text-red-600 mt-1">
+                    Security deposit billings cannot be paid using security deposit funds. Please use cash, GCash, or bank transfer.
+                  </div>
+                </div>
+              </div>
+            {/if}
 
             <!-- Amount Input -->
             <div>
@@ -422,7 +522,14 @@
 
       <!-- Submit Button Row -->
       <div class="border-t pt-4 flex justify-end gap-2">
-        <Button type="submit" disabled={!paymentAmount || !selectedBillings.size}>
+        <Button 
+          type="submit" 
+          disabled={
+            !paymentAmount || 
+            !selectedBillings.size ||
+            (selectedPaymentType === 'SECURITY_DEPOSIT' && paymentAmount > availableSecurityDeposit())
+          }
+        >
           Submit Payment
         </Button>
       </div>

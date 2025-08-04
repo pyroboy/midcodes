@@ -4,6 +4,7 @@ export const paymentMethodEnum = z.enum([
   'CASH',
   'BANK',
   'GCASH',
+  'SECURITY_DEPOSIT',
   'OTHER'
 ] as const);
 
