@@ -6,9 +6,16 @@
   import { Textarea } from '$lib/components/ui/textarea';
   import { toast } from 'svelte-sonner';
   import type { Lease, Billing } from '$lib/types/lease';
-  import { invalidate } from '$app/navigation';
+  import { invalidateAll } from '$app/navigation';
   import { Trash2, Plus } from 'lucide-svelte';
   import DatePicker from '$lib/components/ui/date-picker.svelte';
+  import { superForm } from 'sveltekit-superforms/client';
+  import { zodClient } from 'sveltekit-superforms/adapters';
+    import { z } from 'zod';
+  import type { SuperForm } from 'sveltekit-superforms';
+  import { securityDepositSchema } from './securityDepositSchema';
+
+  type SecurityDepositForm = z.infer<typeof securityDepositSchema>;
 
   let { lease, open, onOpenChange } = $props<{
     lease: Lease;
@@ -21,75 +28,74 @@
   let editingDeposit = $state<Partial<Billing> | null>(null);
   let showAddForm = $state(false);
 
-  // Form state for new/edit deposit
-  let formData = $state({
+  // Initialize Superform with default form data
+  const initialFormData: SecurityDepositForm = {
+    action: 'create',
+    lease_id: lease.id || 0, // Fallback to 0 if lease.id is not available yet
+    type: 'SECURITY_DEPOSIT',
     amount: 0,
     due_date: '',
     billing_date: '',
-    notes: ''
-  });
-
-  // Form validation state
-  let formErrors = $state({
-    amount: '',
-    due_date: '',
-    billing_date: '',
-    notes: ''
-  });
-
-  const resetForm = () => {
-    formData = {
-      amount: 0,
-      due_date: '',
-      billing_date: '',
-      notes: ''
-    };
-    formErrors = {
-      amount: '',
-      due_date: '',
-      billing_date: '',
-      notes: ''
-    };
-    editingDeposit = null;
-    showAddForm = false;
+    notes: 'Security Deposit'
   };
 
-  const validateForm = () => {
-    let isValid = true;
-    formErrors = {
-      amount: '',
-      due_date: '',
-      billing_date: '',
-      notes: ''
-    };
-
-    if (!formData.amount || formData.amount <= 0) {
-      formErrors.amount = 'Please enter a valid amount greater than 0';
-      isValid = false;
-    }
-
-    if (!formData.billing_date) {
-      formErrors.billing_date = 'Billing date is required';
-      isValid = false;
-    }
-
-    if (!formData.due_date) {
-      formErrors.due_date = 'Due date is required';
-      isValid = false;
-    }
-
-    // Validate that due date is not before billing date
-    if (formData.billing_date && formData.due_date) {
-      const billingDate = new Date(formData.billing_date);
-      const dueDate = new Date(formData.due_date);
-      if (dueDate < billingDate) {
-        formErrors.due_date = 'Due date cannot be before billing date';
-        isValid = false;
+  const { form, errors, enhance, reset, submitting } = superForm(initialFormData, {
+    validators: zodClient(securityDepositSchema),
+    validationMethod: 'onblur', // Change to onblur to avoid premature validation
+    dataType: 'json',
+    resetForm: true,
+    onSubmit: () => {
+      console.log('🔄 Security deposit form submission started');
+      
+      // Ensure lease_id is set before submission
+      if (!$form.lease_id || $form.lease_id !== lease.id) {
+        console.log('⚠️ Setting lease_id before submission');
+        $form.lease_id = lease.id;
       }
+    },
+    onResult: async ({ result }: { result: any }) => {
+      if (result.type === 'success') {
+        await invalidateAll();
+        reset();
+        toast.success(result.data?.message || 'Security deposit operation completed successfully');
+        showAddForm = false;
+        editingDeposit = null;
+        // Reload deposits after successful operation
+        setTimeout(() => {
+          loadSecurityDeposits();
+        }, 100);
+      } else if (result.type === 'failure') {
+        toast.error(result.data?.message || 'Failed to process security deposit operation');
+      }
+    },
+    onError: ({ result }: { result: any }) => {
+      toast.error(result.error?.message || 'An error occurred');
     }
+  });
 
-    return isValid;
-  };
+  // Track if form has been initialized for current lease
+  let initializedForLease = $state<number | null>(null);
+
+  // Initialize form when modal opens/closes
+  $effect(() => {
+    if (open && lease.id) {
+      // Only initialize if we haven't initialized for this lease yet
+      if (initializedForLease !== lease.id) {
+        reset();
+        $form.lease_id = lease.id;
+        $form.type = 'SECURITY_DEPOSIT';
+        initializedForLease = lease.id;
+      }
+      loadSecurityDeposits();
+    } else if (!open) {
+      // Reset state when modal closes
+      securityDeposits = [];
+      editingDeposit = null;
+      showAddForm = false;
+      initializedForLease = null;
+      reset();
+    }
+  });
 
   const loadSecurityDeposits = () => {
     // Filter existing billings for security deposits (type 'SECURITY_DEPOSIT')
@@ -99,91 +105,30 @@
     ) || [];
   };
 
-  // Load security deposits when modal opens
-  $effect(() => {
-    if (open) {
-      loadSecurityDeposits();
-    } else {
-      // Reset state when modal closes
-      securityDeposits = [];
-      editingDeposit = null;
-      showAddForm = false;
-      resetForm();
-    }
-  });
-
   const startEdit = (deposit: Billing) => {
     editingDeposit = deposit;
-    formData = {
-      amount: deposit.amount,
-      due_date: deposit.due_date.split('T')[0],
-      billing_date: deposit.billing_date.split('T')[0],
-      notes: deposit.notes || ''
-    };
+    $form.action = 'update';
+    $form.lease_id = lease.id;
+    $form.billing_id = deposit.id;
+    $form.type = 'SECURITY_DEPOSIT';
+    $form.amount = deposit.amount;
+    $form.due_date = deposit.due_date.split('T')[0];
+    $form.billing_date = deposit.billing_date.split('T')[0];
+    $form.notes = deposit.notes || 'Security Deposit';
     showAddForm = true;
   };
 
   const startAdd = () => {
     editingDeposit = null;
-    resetForm();
-    // Set default dates
-    const today = new Date().toISOString().split('T')[0];
-    formData.billing_date = today;
-    formData.due_date = today;
-    formData.notes = 'Security Deposit';
+    reset();
+    // Ensure lease_id and type are set
+    $form.lease_id = lease.id;
+    $form.type = 'SECURITY_DEPOSIT';
+    $form.action = 'create';
+    // Set current date values
+    $form.due_date = new Date().toISOString().split('T')[0];
+    $form.billing_date = new Date().toISOString().split('T')[0];
     showAddForm = true;
-  };
-
-  const saveBilling = async () => {
-    if (!validateForm()) {
-      toast.error('Please fix the form errors before submitting');
-      return;
-    }
-
-    isLoading = true;
-    try {
-      const formDataToSubmit = new FormData();
-      formDataToSubmit.append('lease_id', lease.id);
-      formDataToSubmit.append('action', editingDeposit ? 'update' : 'create');
-      if (editingDeposit) {
-        formDataToSubmit.append('billing_id', editingDeposit?.id?.toString() || '');
-      }
-      formDataToSubmit.append('type', 'SECURITY_DEPOSIT');
-      formDataToSubmit.append('amount', formData.amount.toString());
-      formDataToSubmit.append('due_date', formData.due_date);
-      formDataToSubmit.append('billing_date', formData.billing_date);
-      formDataToSubmit.append('notes', formData.notes || 'Security Deposit');
-
-      const response = await fetch('?/manageSecurityDepositBillings', {
-        method: 'POST',
-        body: formDataToSubmit
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to save security deposit billing');
-      }
-
-      const result = await response.json();
-      
-      if (result.type === 'failure') {
-        throw new Error(result.data?.message || 'Failed to save security deposit billing');
-      }
-
-      toast.success(editingDeposit ? 'Security deposit updated successfully' : 'Security deposit added successfully');
-      await invalidate('leases:all');
-      resetForm();
-      
-      // Reload deposits after save
-      setTimeout(() => {
-        loadSecurityDeposits();
-      }, 100);
-    } catch (error) {
-      console.error('Error saving security deposit:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to save security deposit');
-    } finally {
-      isLoading = false;
-    }
   };
 
   const deleteBilling = async (billingId: number) => {
@@ -191,40 +136,20 @@
       return;
     }
 
-    isLoading = true;
-    try {
-      const formDataToSubmit = new FormData();
-      formDataToSubmit.append('action', 'delete');
-      formDataToSubmit.append('billing_id', billingId.toString());
+    // Set form data for deletion
+    $form.action = 'delete';
+    $form.billing_id = billingId;
+    $form.lease_id = lease.id;
+    $form.type = 'SECURITY_DEPOSIT';
+    $form.amount = 0;
+    $form.due_date = '';
+    $form.billing_date = '';
+    $form.notes = '';
 
-      const response = await fetch('?/manageSecurityDepositBillings', {
-        method: 'POST',
-        body: formDataToSubmit
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to delete security deposit billing');
-      }
-
-      const result = await response.json();
-      
-      if (result.type === 'failure') {
-        throw new Error(result.data?.message || 'Failed to delete security deposit billing');
-      }
-
-      toast.success('Security deposit deleted successfully');
-      await invalidate('leases:all');
-      
-      // Reload deposits after delete
-      setTimeout(() => {
-        loadSecurityDeposits();
-      }, 100);
-    } catch (error) {
-      console.error('Error deleting security deposit:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to delete security deposit');
-    } finally {
-      isLoading = false;
+    // Submit the form
+    const formElement = document.getElementById('security-deposit-delete-form') as HTMLFormElement;
+    if (formElement) {
+      formElement.requestSubmit();
     }
   };
 
@@ -313,15 +238,19 @@
     
     return totalUsed;
   });
-
-  // Load deposits when modal opens
-  $effect(() => {
-    if (open) {
-      loadSecurityDeposits();
-      resetForm();
-    }
-  });
 </script>
+
+<!-- Hidden form for delete operations -->
+<form id="security-deposit-delete-form" method="POST" action="?/manageSecurityDepositBillings" use:enhance style="display: none;">
+  <input type="hidden" name="action" value={$form.action} />
+  <input type="hidden" name="lease_id" value={lease.id} />
+  <input type="hidden" name="billing_id" value={$form.billing_id} />
+  <input type="hidden" name="type" value={$form.type} />
+  <input type="hidden" name="amount" value={$form.amount} />
+  <input type="hidden" name="due_date" value={$form.due_date} />
+  <input type="hidden" name="billing_date" value={$form.billing_date} />
+  <input type="hidden" name="notes" value={$form.notes} />
+</form>
 
 <Dialog {open} onOpenChange={onOpenChange}>
   <DialogContent class="max-w-3xl max-h-[80vh] overflow-y-auto">
@@ -340,7 +269,7 @@
           variant="outline" 
           size="sm" 
           onclick={startAdd}
-          disabled={isLoading}
+          disabled={$submitting}
         >
           <Plus class="w-4 h-4 mr-2" />
           Add Security Deposit
@@ -433,7 +362,7 @@
                     variant="outline" 
                     size="sm" 
                     onclick={() => startEdit(deposit)}
-                    disabled={isLoading}
+                    disabled={$submitting}
                   >
                     Edit
                   </Button>
@@ -441,7 +370,7 @@
                     variant="outline" 
                     size="sm" 
                     onclick={() => deleteBilling(deposit.id)}
-                    disabled={isLoading}
+                    disabled={$submitting}
                     class="text-red-600 hover:text-red-700"
                   >
                     <Trash2 class="w-4 h-4" />
@@ -460,83 +389,100 @@
             {editingDeposit ? 'Edit Security Deposit' : 'Add New Security Deposit'}
           </h4>
           
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <Label for="amount">Amount</Label>
-              <Input 
-                id="amount"
-                type="number" 
-                step="0.01"
-                bind:value={formData.amount}
-                placeholder="Enter amount"
-                disabled={isLoading}
-                class={formErrors.amount ? 'border-red-500' : ''}
-              />
-              {#if formErrors.amount}
-                <p class="text-red-500 text-xs mt-1">{formErrors.amount}</p>
-              {/if}
+          <form method="POST" action="?/manageSecurityDepositBillings" use:enhance>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <Label for="amount">Amount</Label>
+                <Input 
+                  id="amount"
+                  name="amount"
+                  type="number" 
+                  step="0.01"
+                  bind:value={$form.amount}
+                  placeholder="Enter amount"
+                  disabled={$submitting}
+                  class={$errors.amount ? 'border-red-500' : ''}
+                />
+                {#if $errors.amount}
+                  <p class="text-red-500 text-xs mt-1">{$errors.amount}</p>
+                {/if}
+              </div>
+              
+              <div>
+                <DatePicker
+                  bind:value={$form.billing_date}
+                  label="Billing Date"
+                  placeholder="Select billing date"
+                  required={true}
+                  id="billing_date"
+                  name="billing_date"
+                  disabled={$submitting}
+                />
+                {#if $errors.billing_date}
+                  <p class="text-red-500 text-xs mt-1">{$errors.billing_date}</p>
+                {/if}
+              </div>
+              
+              <div>
+                <DatePicker
+                  bind:value={$form.due_date}
+                  label="Due Date"
+                  placeholder="Select due date"
+                  required={true}
+                  id="due_date"
+                  name="due_date"
+                  disabled={$submitting}
+                />
+                {#if $errors.due_date}
+                  <p class="text-red-500 text-xs mt-1">{$errors.due_date}</p>
+                {/if}
+              </div>
+              
+              <div>
+                <Label for="notes">Notes</Label>
+                <Input 
+                  id="notes"
+                  name="notes"
+                  bind:value={$form.notes}
+                  placeholder="Security Deposit"
+                  disabled={$submitting}
+                  class={$errors.notes ? 'border-red-500' : ''}
+                />
+                {#if $errors.notes}
+                  <p class="text-red-500 text-xs mt-1">{$errors.notes}</p>
+                {/if}
+              </div>
             </div>
             
-            <div>
-              <DatePicker
-                bind:value={formData.billing_date}
-                label="Billing Date"
-                placeholder="Select billing date"
-                required={true}
-                id="billing_date"
-                name="billing_date"
-                disabled={isLoading}
-              />
-              {#if formErrors.billing_date}
-                <p class="text-red-500 text-xs mt-1">{formErrors.billing_date}</p>
-              {/if}
-            </div>
+            <!-- Hidden fields -->
+            <input type="hidden" name="action" value={$form.action} />
+            <input type="hidden" name="lease_id" value={lease.id} />
+            {#if $form.billing_id}
+              <input type="hidden" name="billing_id" value={$form.billing_id} />
+            {/if}
+            <input type="hidden" name="type" value={$form.type} />
             
-            <div>
-              <DatePicker
-                bind:value={formData.due_date}
-                label="Due Date"
-                placeholder="Select due date"
-                required={true}
-                id="due_date"
-                name="due_date"
-                disabled={isLoading}
-              />
-              {#if formErrors.due_date}
-                <p class="text-red-500 text-xs mt-1">{formErrors.due_date}</p>
-              {/if}
+            <div class="flex justify-end gap-2 mt-4">
+              <Button 
+                type="button"
+                variant="outline" 
+                onclick={() => {
+                  showAddForm = false;
+                  editingDeposit = null;
+                  reset();
+                }}
+                disabled={$submitting}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="submit"
+                disabled={$submitting}
+              >
+                {$submitting ? 'Saving...' : (editingDeposit ? 'Update' : 'Add')}
+              </Button>
             </div>
-            
-            <div>
-              <Label for="notes">Notes</Label>
-              <Input 
-                id="notes"
-                bind:value={formData.notes}
-                placeholder="Security Deposit"
-                disabled={isLoading}
-                class={formErrors.notes ? 'border-red-500' : ''}
-              />
-              {#if formErrors.notes}
-                <p class="text-red-500 text-xs mt-1">{formErrors.notes}</p>
-              {/if}
-            </div>
-          </div>
-          
-          <div class="flex justify-end gap-2 mt-4">
-            <Button 
-              variant="outline" 
-              onclick={resetForm}
-              disabled={isLoading}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onclick={saveBilling}
-              disabled={isLoading}
-            >
-              {isLoading ? 'Saving...' : (editingDeposit ? 'Update' : 'Add')}
-            </Button>
-          </div>
+          </form>
         </div>
       {/if}
     </div>

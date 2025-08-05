@@ -2,6 +2,7 @@ import { fail, error, json } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { leaseSchema, deleteLeaseSchema, leaseSchemaWithValidation } from './formSchema';
+import { securityDepositSchema } from './securityDepositSchema';
 import type { Actions, PageServerLoad } from './$types';
 import type { PostgrestError } from '@supabase/postgrest-js';
 import { createPaymentSchedules } from './utils';
@@ -593,16 +594,16 @@ export const actions: Actions = {
     const { user } = await safeGetSession();
     if (!user) throw error(401, 'Unauthorized');
 
+    // Validate form data using Superforms
+    const form = await superValidate(request, zod(securityDepositSchema));
+    
+    if (!form.valid) {
+      console.error('❌ Form validation failed:', form.errors);
+      return fail(400, { form });
+    }
+
     try {
-      const formData = await request.formData();
-      const action = formData.get('action') as string;
-      const leaseId = formData.get('lease_id') as string;
-      const billingId = formData.get('billing_id') as string;
-      const type = formData.get('type') as string;
-      const amount = parseFloat(formData.get('amount') as string);
-      const dueDate = formData.get('due_date') as string;
-      const billingDate = formData.get('billing_date') as string;
-      const notes = formData.get('notes') as string;
+      const { action, lease_id: leaseId, billing_id: billingId, type, amount, due_date: dueDate, billing_date: billingDate, notes } = form.data;
 
       if (action === 'create') {
         const { error: insertError } = await supabase
@@ -621,14 +622,14 @@ export const actions: Actions = {
           });
 
         if (insertError) {
-          console.error('Error creating security deposit billing:', insertError);
-          return fail(500, { message: 'Failed to create security deposit billing' });
+          console.error('❌ Error creating security deposit billing:', insertError);
+          return fail(500, { form, message: 'Failed to create security deposit billing' });
         }
 
-        return { success: true, message: 'Security deposit billing created successfully' };
+        return { form, success: true, message: 'Security deposit billing created successfully' };
       } else if (action === 'update') {
         if (!billingId) {
-          return fail(400, { message: 'Billing ID is required for update' });
+          return fail(400, { form, message: 'Billing ID is required for update' });
         }
 
         const { error: updateError } = await supabase
@@ -644,13 +645,13 @@ export const actions: Actions = {
 
         if (updateError) {
           console.error('Error updating security deposit billing:', updateError);
-          return fail(500, { message: 'Failed to update security deposit billing' });
+          return fail(500, { form, message: 'Failed to update security deposit billing' });
         }
 
-        return { success: true, message: 'Security deposit billing updated successfully' };
+        return { form, success: true, message: 'Security deposit billing updated successfully' };
       } else if (action === 'delete') {
         if (!billingId) {
-          return fail(400, { message: 'Billing ID is required for delete' });
+          return fail(400, { form, message: 'Billing ID is required for delete' });
         }
 
         // First, delete any payment allocations that reference this billing
@@ -661,7 +662,7 @@ export const actions: Actions = {
 
         if (deleteAllocationsError) {
           console.error('Error deleting payment allocations:', deleteAllocationsError);
-          return fail(500, { message: 'Failed to delete associated payment allocations' });
+          return fail(500, { form, message: 'Failed to delete associated payment allocations' });
         }
 
         // Then delete the billing record
@@ -672,16 +673,16 @@ export const actions: Actions = {
 
         if (deleteError) {
           console.error('Error deleting security deposit billing:', deleteError);
-          return fail(500, { message: 'Failed to delete security deposit billing' });
+          return fail(500, { form, message: 'Failed to delete security deposit billing' });
         }
 
-        return { success: true, message: 'Security deposit billing deleted successfully' };
+        return { form, success: true, message: 'Security deposit billing deleted successfully' };
       } else {
-        return fail(400, { message: 'Invalid action' });
+        return fail(400, { form, message: 'Invalid action' });
       }
     } catch (error) {
       console.error('Error managing security deposit billings:', error);
-      return fail(500, { message: 'Failed to manage security deposit billings' });
+      return fail(500, { form, message: 'Failed to manage security deposit billings' });
     }
   }
 };

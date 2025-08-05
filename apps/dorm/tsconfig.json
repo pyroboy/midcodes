@@ -9,11 +9,7 @@
 	  "resolveJsonModule": true,
 	  "skipLibCheck": true,
 	  "sourceMap": true,
-	  "typeRoots": ["./node_modules/@types", "./src/types"],
-	  "baseUrl": ".",
-	  "paths": {
-		"$lib/*": ["src/lib/*"]
-	  }
+	  "typeRoots": ["./node_modules/@types", "./src/types"]
 	}
   }
   

@@ -458,7 +458,7 @@ export type Database = {
       lease_type: 'BEDSPACER' | 'PRIVATEROOM'
       maintenance_status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED'
       utility_type: 'ELECTRICITY' | 'WATER' | 'INTERNET'
-      billing_type: 'RENT' | 'UTILITY' | 'PENALTY' | 'MAINTENANCE' | 'SERVICE'
+      billing_type: 'RENT' | 'UTILITY' | 'PENALTY' | 'MAINTENANCE' | 'SERVICE' | 'SECURITY_DEPOSIT'
       payment_status: 'PENDING' | 'PARTIAL' | 'PAID' | 'OVERDUE' | 'PENALIZED'
       payment_method: 'CASH' | 'BANK' | 'GCASH' | 'OTHER'
       payment_frequency: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'CUSTOM'

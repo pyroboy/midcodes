@@ -43,6 +43,15 @@
             <CircleDollarSign class="h-4 w-4 text-green-600" />
             <span class="text-xs font-medium text-green-800">Allocated</span>
           </div>
+          <div class="text-lg font-bold text-green-700">{formatCurrency(allocatedAmount)}</div>
+        </div>
+        <div class="flex-1 p-3 rounded-lg bg-blue-50 border border-blue-100">
+          <div class="flex items-center gap-1.5 mb-1">
+            <ArrowDownCircle class="h-4 w-4 text-blue-600" />
+            <span class="text-xs font-medium text-blue-800">Remaining</span>
+          </div>
+          <div class="text-lg font-bold text-blue-700">{formatCurrency(remainingAmount)}</div>
+        </div>
       </div>
       
       <div class="space-y-4 mt-2">

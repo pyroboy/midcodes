@@ -9,7 +9,7 @@
   },
   {
     "name": "ENUM: billing_type",
-    "definition": "CREATE TYPE billing_type AS ENUM ('RENT', 'UTILITY', 'PENALTY', 'MAINTENANCE', 'SERVICE', 'SECURITY_DEPOST');"
+    "definition": "CREATE TYPE billing_type AS ENUM ('RENT', 'UTILITY', 'PENALTY', 'MAINTENANCE', 'SERVICE', 'SECURITY_DEPOSIT');"
   },
   {
     "name": "ENUM: expense_status",
