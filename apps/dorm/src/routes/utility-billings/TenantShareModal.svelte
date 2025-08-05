@@ -18,6 +18,7 @@ type Props = {
   reading: MeterData | null;
   leases: Lease[];
   leaseMeterBilledDates?: Record<string, string>;
+  actualBilledDates?: Record<string, string[]>;
 };
 
 type View = 'tenants' | 'history';
@@ -28,7 +29,8 @@ let {
   generatePreview, 
   reading, 
   leases = [], 
-  leaseMeterBilledDates = {} 
+  leaseMeterBilledDates = {},
+  actualBilledDates = {}
 }: Props = $props();
 
 let view: View = $state('tenants');
@@ -41,12 +43,16 @@ const flatTenantList = $derived(leases
     (lease.tenants || []).map(tenant => ({
       leaseId: lease.id,
       leaseName: lease.name,
-      tenant: tenant
+      roomName: lease.roomName || 'Unknown Room',
+      leaseStatus: lease.status,
+      tenant: tenant,
+      tenantStatus: tenant.tenant_status || 'UNKNOWN'
     }))
-));
+  )
+);
 
 const fuse = $derived(new Fuse(flatTenantList, {
-  keys: ['leaseName', 'tenant.full_name'],
+  keys: ['leaseName', 'roomName', 'tenant.full_name'],
   threshold: 0.6,
 }));
 
@@ -200,6 +206,7 @@ function getUnitLabel(type: string): string {
               <div class="grid gap-2">
                 {#each filteredList as item (item.tenant.id)}
                   {@const billedDate = reading && leaseMeterBilledDates ? leaseMeterBilledDates[`${reading.meterId}-${item.leaseId}`] : undefined}
+                  {@const isBilledForPeriod = reading && actualBilledDates && actualBilledDates[String(reading.meterId)] ? actualBilledDates[String(reading.meterId)].includes(reading.currentReadingDate || '') : false}
                   <label class="flex items-center p-3 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors">
                     <Checkbox.Root
                       class="mr-3"
@@ -208,10 +215,16 @@ function getUnitLabel(type: string): string {
                     />
                     <div class="flex-1">
                       <p class="font-medium">
-                        {item.leaseName} - <span class="text-muted-foreground">{item.tenant.full_name}</span>
-                        {#if billedDate && reading && billedDate === reading.currentReadingDate}
-                          <span class="ml-2 text-xs font-normal text-green-600">(Billed {formatDate(billedDate)} {reading.meterName})</span>
+                        {item.roomName} - <span class="text-muted-foreground">{item.tenant.full_name}</span>
+                        <span class="ml-2 text-xs text-muted-foreground">
+                          ({item.leaseStatus} • {item.tenantStatus})
+                        </span>
+                        {#if isBilledForPeriod}
+                          <span class="ml-2 text-xs font-normal text-green-600">✓ Billed for this period</span>
                         {/if}
+                      </p>
+                      <p class="text-xs text-muted-foreground mt-1">
+                        Lease: {item.leaseName}
                       </p>
                     </div>
                   </label>

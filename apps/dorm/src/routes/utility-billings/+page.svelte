@@ -264,6 +264,7 @@ console.log('handleSaveReadings', readings);
     reading={tenantShare.selectedMeter}
     leases={data.leases || []}
     leaseMeterBilledDates={data.leaseMeterBilledDates}
+    actualBilledDates={data.actualBilledDates}
     generatePreview={handleGeneratePreview}
     close={() => {
       modals.tenantShare = false;
@@ -335,6 +336,7 @@ console.log('handleSaveReadings', readings);
         filters={activeFilters}
         onShareReading={openTenantShareModal}
         meterLastBilledDates={data.meterLastBilledDates}
+        actualBilledDates={data.actualBilledDates}
       />
     </div>
   </div>

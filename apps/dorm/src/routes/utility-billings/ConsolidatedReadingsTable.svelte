@@ -6,171 +6,69 @@
 	import type { Reading, Meter, Property, MeterData, Filters } from './types';
 	import { slide } from 'svelte/transition';
 
-	// Props using Svelte 5 runes with defaults
-	type Props = {
+	// Props (Svelte 5 style)
+	let props = $props<{
 		readings: Reading[];
 		meters: Meter[];
 		properties: Property[];
 		filters: Filters;
 		onShareReading: (meter: MeterData) => void;
 		meterLastBilledDates?: Record<string, string>;
-	};
+		actualBilledDates?: Record<string, string[]>;
+	}>();
 
-	let { readings, meters, properties, filters, onShareReading, meterLastBilledDates = {} }: Props = $props();
+	// State
+	let filters = $state({
+		period: new Date().toISOString().slice(0, 7),
+		search: '',
+	});
 
-
-
-	// Computed values using Svelte 5 derived.by
-	const groupedReadings = $derived.by(() => {
-		// First group by date
-		const byDate: Record<string, Reading[]> = {};
-
-		const filteredReadings = readings.filter((reading) => {
-			const meter = meters.find((m) => m.id === reading.meter_id);
-			if (!meter) return false;
-
-			const propertyMatch = filters.property ? meter.property_id === filters.property.id : true;
-			const typeMatch = filters.type
-				? meter.type && meter.type.toUpperCase() === filters.type.toUpperCase()
-				: true;
-			const dateMatch = filters.date ? reading.reading_date === filters.date : true;
-			const searchMatch = filters.search
-				? meter.name.toLowerCase().includes(filters.search.toLowerCase())
-				: true;
-
-			return propertyMatch && typeMatch && dateMatch && searchMatch;
+	// Derived: filtered and grouped readings
+	const filteredReadings = $derived.by(() => {
+		return props.readings.filter((r: Reading) => {
+			const matchesPeriod = !filters.period || r.period === filters.period;
+			const matchesSearch =
+				!filters.search ||
+				r.meters?.name.toLowerCase().includes(filters.search.toLowerCase()) ||
+				r.meters?.type.toLowerCase().includes(filters.search.toLowerCase());
+			return matchesPeriod && matchesSearch;
 		});
-
-		filteredReadings.forEach((reading) => {
-			if (!byDate[reading.reading_date]) {
-				byDate[reading.reading_date] = [];
-			}
-			byDate[reading.reading_date].push(reading);
-		});
-
-		// Then for each date, group by property
-		const result: {
-			date: string;
-			properties: {
-				propertyId: number;
-				propertyName: string;
-				uniqueMeters: MeterData[];
-				totalConsumption: number;
-				totalCost: number;
-			}[];
-			totalConsumption: number;
-			totalCost: number;
-		}[] = [];
-
-		// Sort dates in descending order (newest first)
-		const sortedDates = Object.keys(byDate).sort(
-			(a, b) => new Date(b).getTime() - new Date(a).getTime()
-		);
-
-		sortedDates.forEach((date) => {
-			const readingsForDate = byDate[date];
-
-			// Group by property
-			const propertiesMap: Record<
-				number,
-				{
-					propertyId: number;
-					propertyName: string;
-					meterMap: Record<number, MeterData>;
-					totalConsumption: number;
-					totalCost: number;
-				}
-			> = {};
-
-			readingsForDate.forEach((reading) => {
-				const meter = meters.find((m) => m.id === reading.meter_id);
-				if (!meter || !meter.property_id) return;
-
-				const property = properties.find((p) => p.id === meter.property_id);
-				if (!property) return;
-
-				if (!propertiesMap[property.id]) {
-					propertiesMap[property.id] = {
-						propertyId: property.id,
-						propertyName: property.name,
-						meterMap: {},
-						totalConsumption: 0,
-						totalCost: 0
-					};
-				}
-
-				// Get reading history for this meter
-				const meterHistory = readings
-					.filter((r) => r.meter_id === meter.id)
-					.sort((a, b) => new Date(b.reading_date).getTime() - new Date(a.reading_date).getTime());
-
-				const latestReading = meterHistory[0];
-				const secondLatestReading = meterHistory[1];
-
-				// Store in map by meter ID to ensure uniqueness
-				propertiesMap[property.id].meterMap[meter.id] = {
-					meterId: meter.id,
-					meterName: meter.name,
-					meterType: meter.type || 'UNKNOWN',
-					unit: meter.unit?.name || '',
-					currentReading: latestReading?.reading || 0,
-					currentReadingDate: latestReading?.reading_date || null,
-					lastReading: secondLatestReading?.reading || null,
-					lastReadingDate: secondLatestReading?.reading_date || null,
-					consumption: latestReading?.consumption || null,
-					costPerUnit: latestReading?.cost_per_unit || null,
-					totalCost: latestReading?.cost || null,
-					history: meterHistory
-				};
-
-				// Add to property totals
-				propertiesMap[property.id].totalConsumption += reading.consumption || 0;
-				propertiesMap[property.id].totalCost += reading.cost || 0;
-			});
-
-			// Calculate date totals
-			let dateTotalConsumption = 0;
-			let dateTotalCost = 0;
-
-			// Convert meterMap to array for each property
-			const propertiesWithUniqueMeters = Object.values(propertiesMap).map((prop) => {
-				dateTotalConsumption += prop.totalConsumption;
-				dateTotalCost += prop.totalCost;
-
-				return {
-					propertyId: prop.propertyId,
-					propertyName: prop.propertyName,
-					uniqueMeters: Object.values(prop.meterMap),
-					totalConsumption: prop.totalConsumption,
-					totalCost: prop.totalCost
-				};
-			});
-
-			// Add to result
-			result.push({
-				date,
-				properties: propertiesWithUniqueMeters,
-				totalConsumption: dateTotalConsumption,
-				totalCost: dateTotalCost
-			});
-		});
-
-		return result;
 	});
 
 	// Handle share button click
-	function handleShareClick(event: MouseEvent, meter: MeterData) {
+	function handleShareClick(event: MouseEvent, reading: Reading) {
 		event.stopPropagation();
-		if (onShareReading) {
-			onShareReading(meter);
+		if (props.onShareReading && reading.meters) {
+			const meterData: MeterData = {
+				meterId: reading.meter_id,
+				meterName: reading.meters.name,
+				meterType: reading.meters.type,
+				unit: '', // No unit field in database
+				currentReading: reading.reading,
+				currentReadingDate: reading.reading_date,
+				lastReading: reading.previous_reading || null,
+				lastReadingDate: reading.previous_reading_date || null, // Add previous reading date
+				consumption: reading.consumption || null,
+				costPerUnit: reading.rate_at_reading || null,
+				totalCost: reading.cost || null,
+				history: [reading]
+			};
+			props.onShareReading(meterData);
 		}
 	}
 
+	// Check if this reading period has been billed
+	function isBilledForPeriod(reading: Reading): boolean {
+		if (!props.actualBilledDates) return false;
+		const meterKey = String(reading.meter_id);
+		const billedDates = props.actualBilledDates[meterKey];
+		return billedDates ? billedDates.includes(reading.reading_date) : false;
+	}
 
-	function handleRowKeyDown(event: KeyboardEvent, meter: MeterData) {
+	function handleRowKeyDown(event: KeyboardEvent, reading: Reading) {
 		if (event.key === 'Enter' || event.key === ' ') {
 			event.preventDefault();
-			onShareReading(meter);
+			handleShareClick(event as any, reading);
 		}
 	}
 
@@ -242,79 +140,117 @@
 		}
 	}
 </script>
-{#if groupedReadings.length === 0}
-	<div class="bg-gray-50 rounded-md p-6 text-center">
-		<p class="text-gray-500">No readings found with the current filters.</p>
-	</div>
-{:else}
-	{#each groupedReadings as dateGroup, i}
-		{@const previousDate = groupedReadings[i + 1]?.date}
-		<div class="mb-8">
-			<h3 class="text-lg font-semibold mb-2">
-				Readings for {previousDate ? `${formatDate(previousDate)} to ` : ''}{formatDate(dateGroup.date)}
-			</h3>
 
-			{#each dateGroup.properties as propertyGroup}
-				<Card.Root class="mb-4">
-				
-						<div class="rounded-md border">
-							<!-- Header Row -->
-							<div class="flex p-2 bg-gray-50 font-medium text-sm border-b">
-								<div class="flex-1 pl-10">Meter</div>
-								<div class="w-24 text-right">Previous</div>
-								<div class="w-24 text-right">Current</div>
-								<div class="w-32 text-right">Consumption</div>
-								<div class="w-24 text-right">Total Cost</div>
-								<div class="w-20 text-right pr-2"></div>
-							</div>
-
-							{#each propertyGroup.uniqueMeters as meter (meter.meterId)}
-								<div class="border-b last:border-b-0">
-									<div
-										class="flex items-center p-2 hover:bg-muted/50 transition-colors duration-200"
-										role="button"
-										tabindex="0"
-										onclick={(e) => handleShareClick(e, meter)}
-										onkeydown={(e) => handleRowKeyDown(e, meter)}
-									>
-										<div class="flex flex-1 items-center pl-6">
-											<div class="flex-1 font-medium">
-													<div class="flex items-center gap-2">
-														<span>{meter.meterName}</span>
-
-													</div>
-													<div class="text-xs text-muted-foreground">
-														{#if meter.unit}
-															<span>{meter.unit}</span>
-														{/if}
-														{#if meterLastBilledDates && meterLastBilledDates[meter.meterId]}
-															<span class="ml-2 pl-2 border-l border-border">
-																Last Billed: {formatDate(meterLastBilledDates[meter.meterId])}
-															</span>
-														{/if}
-													</div>
-												</div>
-											<div class="w-24 text-right">{formatNumber(meter.lastReading)}</div>
-											<div class="w-24 text-right font-medium">{formatNumber(meter.currentReading)}</div>
-											<div class="w-32 text-right">
-												{formatNumber(meter.consumption)}
-												<span class="text-xs text-muted-foreground ml-1">{getUnitLabel(meter.meterType)}</span>
-											</div>
-											<div class="w-24 text-right font-medium">{formatCurrency(meter.totalCost)}</div>
-										</div>
-										<div class="w-20 flex items-center justify-center">
-											<Button size="sm" variant="outline" onclick={(e) => {e.stopPropagation(); onShareReading(meter);}}>
-												Bill
-											</Button>
-										</div>
-									</div>
-								</div>
-							{/each}
-
-		
-						</div>
-				</Card.Root>
-			{/each}
+<div class="space-y-4">
+	<!-- Filters -->
+	<div class="flex flex-wrap gap-4 items-end">
+		<div>
+			<label for="period-filter" class="block text-sm font-medium mb-1">Period</label>
+			<input
+				id="period-filter"
+				type="month"
+				class="border rounded px-3 py-2"
+				bind:value={filters.period}
+			/>
 		</div>
-	{/each}
-{/if}
+		<div class="flex-1">
+			<label for="search-filter" class="block text-sm font-medium mb-1">Search</label>
+			<input
+				id="search-filter"
+				type="text"
+				placeholder="Search meters..."
+				class="w-full border rounded px-3 py-2"
+				bind:value={filters.search}
+			/>
+		</div>
+	</div>
+
+	<!-- Table -->
+	{#if filteredReadings.length === 0}
+		<div class="bg-gray-50 rounded-md p-6 text-center">
+			<p class="text-gray-500">No readings found with the current filters.</p>
+		</div>
+	{:else}
+		<Table.Root>
+			<Table.Header>
+				<Table.Row>
+					<Table.Head>Meter</Table.Head>
+					<Table.Head>Type</Table.Head>
+					<Table.Head>Last Billed</Table.Head>
+					<Table.Head>Previous</Table.Head>
+					<Table.Head>Current</Table.Head>
+					<Table.Head>Consumption</Table.Head>
+					<Table.Head>Rate</Table.Head>
+					<Table.Head>Cost</Table.Head>
+					<Table.Head>Actions</Table.Head>
+				</Table.Row>
+			</Table.Header>
+			<Table.Body>
+				{#each filteredReadings as reading (reading.id)}
+					<Table.Row 
+						class="cursor-pointer hover:bg-gray-50"
+						role="button"
+						tabindex={0}
+					>
+						<Table.Cell class="font-medium">
+							<div class="flex items-center gap-2">
+								<span>{reading.meters?.name || 'Unknown Meter'}</span>
+								{#if reading.meters?.type}
+									<span class="px-2 py-1 text-xs rounded-full {getUtilityColorClass(reading.meters.type)}">
+										{reading.meters.type}
+									</span>
+								{/if}
+							</div>
+						</Table.Cell>
+						<Table.Cell>
+							{reading.meters?.type || '-'}
+						</Table.Cell>
+						<Table.Cell>
+							{#if props.meterLastBilledDates && props.meterLastBilledDates[String(reading.meter_id)]}
+								{formatDate(props.meterLastBilledDates[String(reading.meter_id)])}
+								{#if isBilledForPeriod(reading)}
+									<span class="ml-2 text-xs text-green-600">✓ Billed</span>
+								{/if}
+							{:else}
+								-
+							{/if}
+						</Table.Cell>
+						<Table.Cell>
+							<div class="text-right">
+								<div>{formatNumber(reading.previous_reading)}</div>
+								{#if reading.previous_reading_date}
+									<div class="text-xs text-muted-foreground">{formatDate(reading.previous_reading_date)}</div>
+								{/if}
+							</div>
+						</Table.Cell>
+						<Table.Cell class="font-medium">
+							<div class="text-right">
+								<div>{formatNumber(reading.reading)}</div>
+								<div class="text-xs text-muted-foreground">{formatDate(reading.reading_date)}</div>
+							</div>
+						</Table.Cell>
+						<Table.Cell>
+							{formatNumber(reading.consumption)}
+							{#if reading.meters?.type}
+								<span class="text-xs text-muted-foreground ml-1">
+									{getUnitLabel(reading.meters.type)}
+								</span>
+							{/if}
+						</Table.Cell>
+						<Table.Cell>{formatCurrency(reading.rate_at_reading)}</Table.Cell>
+						<Table.Cell class="font-medium">{formatCurrency(reading.cost)}</Table.Cell>
+						<Table.Cell>
+							<Button 
+								variant="ghost" 
+								size="sm"
+								onclick={() => handleShareClick(event as any, reading)}
+							>
+								Bill
+							</Button>
+						</Table.Cell>
+					</Table.Row>
+				{/each}
+			</Table.Body>
+		</Table.Root>
+	{/if}
+</div>

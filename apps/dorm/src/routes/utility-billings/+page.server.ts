@@ -72,39 +72,125 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
     throw error(500, `Error fetching meters: ${metersError.message}`);
   }
 
-  // Get all readings
-  console.log('Fetching readings...');
-  let meterIds = meters?.map(m => m.id) || [];
-  console.log(`Found ${meterIds.length} meter IDs for readings query`);
-  
+  // Fetch readings with meter info for billing period grouping
+  console.log('Fetching readings for billing period grouping...');
   const { data: readings, error: readingsError } = await supabase
     .from('readings')
     .select(`
       id,
       meter_id,
-      reading_date,
       reading,
-      consumption,
-      cost,
-      cost_per_unit,
-      previous_reading,
-      meter_name
+      reading_date,
+      rate_at_reading
     `)
-    .in('meter_id', meterIds.length > 0 ? meterIds : [0]); // Use [0] as fallback if no meters to avoid empty array error
-
-  console.log('Readings query result:', { readingsCount: readings?.length || 0, readingsError });
+    .order('reading_date', { ascending: true });
 
   if (readingsError) {
     console.error('Error fetching readings:', readingsError);
     throw error(500, `Error fetching readings: ${readingsError.message}`);
   }
 
-  // Get available reading dates
+  // Get meter data separately since there's no foreign key relationship
+  const meterIds = [...new Set(readings?.map(r => r.meter_id) || [])];
+  const { data: meterData, error: meterError } = await supabase
+    .from('meters')
+    .select(`
+      id,
+      name,
+      type,
+      property_id
+    `)
+    .in('id', meterIds.length > 0 ? meterIds : [0]);
+
+  if (meterError) {
+    console.error('Error fetching meter data:', meterError);
+    throw error(500, `Error fetching meter data: ${meterError.message}`);
+  }
+
+  // Create a map of meter data for easy lookup
+  const meterMap = new Map(meterData?.map(m => [m.id, m]) || []);
+
+  // Join readings with meter data
+  const readingsWithMeters = readings?.map(reading => ({
+    ...reading,
+    meters: meterMap.get(reading.meter_id) || null
+  })) || [];
+
+  // Group by meter_id and create billing periods
+  const grouped = readingsWithMeters.reduce((acc, r) => {
+    acc[r.meter_id] = [...(acc[r.meter_id] || []), r];
+    return acc;
+  }, {} as Record<number, typeof readingsWithMeters>);
+
+  const displayedReadings = [];
+  const meterLastBilledDates: Record<string, string> = {};
+
+  for (const [meterId, meterReadings] of Object.entries(grouped)) {
+    const sorted = meterReadings.sort(
+      (a, b) => new Date(a.reading_date).getTime() - new Date(b.reading_date).getTime()
+    );
+
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = sorted[i - 1];
+      const curr = sorted[i];
+
+      const daysDiff = (new Date(curr.reading_date).getTime() - new Date(prev.reading_date).getTime()) / (1000 * 60 * 60 * 24);
+
+      // Only consider valid billing cycles (25–35 days)
+      if (daysDiff >= 25 && daysDiff <= 35) {
+        const consumption = curr.reading - prev.reading;
+        const cost = consumption * (curr.rate_at_reading || 0);
+
+        displayedReadings.push({
+          ...curr,
+          previous_reading: prev.reading,
+          previous_reading_date: prev.reading_date, // Add the date of the previous reading
+          consumption,
+          cost,
+          days_diff: Math.round(daysDiff),
+          period: curr.reading_date.slice(0, 7), // "2025-04"
+        });
+
+        // Track last billed date
+        if (!meterLastBilledDates[meterId] || curr.reading_date > meterLastBilledDates[meterId]) {
+          meterLastBilledDates[meterId] = curr.reading_date;
+        }
+      }
+    }
+
+    // Fallback: if only one reading, show it (no consumption)
+    if (sorted.length === 1) {
+      const r = sorted[0];
+      displayedReadings.push({
+        ...r,
+        previous_reading: null,
+        consumption: null,
+        cost: null,
+        days_diff: null,
+        period: r.reading_date.slice(0, 7),
+      });
+    }
+  }
+
+  // Merge with billings to ensure accurate last billed dates
+  const { data: billings } = await supabase
+    .from('billings')
+    .select('meter_id, billing_date')
+    .not('meter_id', 'is', null)
+    .eq('type', 'UTILITY');
+
+  billings?.forEach(b => {
+    const key = String(b.meter_id);
+    if (!meterLastBilledDates[key] || b.billing_date > meterLastBilledDates[key]) {
+      meterLastBilledDates[key] = b.billing_date;
+    }
+  });
+
+  // Get available reading dates (for backward compatibility)
   console.log('Fetching reading dates...');
   const { data: availableReadingDates, error: datesError } = await supabase
     .from('readings')
     .select('reading_date')
-    .in('meter_id', meterIds.length > 0 ? meterIds : [0])
     .order('reading_date');
 
   console.log('Reading dates result:', { datesCount: availableReadingDates?.length || 0, datesError });
@@ -146,31 +232,41 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
   console.log('Final data payload:', {
     propertiesCount: properties?.length || 0,
     metersCount: meters?.length || 0,
-    readingsCount: readings?.length || 0,
+    readingsCount: displayedReadings.length || 0,
     readingDatesCount: uniqueDates.length || 0,
     sampleProperties: properties?.slice(0, 3) || []
   });
 
-  // Get all active leases with their tenants
-  console.log('Fetching active leases with tenants...');
+  // Get all leases with their tenants (regardless of status) and room information
+  console.log('Fetching all leases with tenants and room info...');
   const { data: leasesData, error: leasesError } = await supabase
     .from('leases')
     .select(`
       id,
       name,
       rental_unit_id,
+      status,
+      rental_unit:rental_unit_id(
+        id,
+        name,
+        number,
+        type
+      ),
       lease_tenants(
         tenants(
           id,
-          full_name:name
+          full_name:name,
+          tenant_status
         )
       )
-    `)
-    .eq('status', 'ACTIVE');
+    `);
 
   const leases = leasesData?.map(lease => ({
     ...lease,
-              tenants: lease.lease_tenants.filter(lt => lt.tenants !== null).map(lt => lt.tenants)
+    tenants: lease.lease_tenants.filter(lt => lt.tenants !== null).map(lt => lt.tenants),
+    roomName: lease.rental_unit 
+      ? `${(lease.rental_unit as any).name} (${(lease.rental_unit as any).type})` 
+      : 'Unknown Room'
   }));
 
   if (leasesError) {
@@ -178,10 +274,10 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
     throw error(500, `Error fetching leases: ${leasesError.message}`);
   }
 
-  // Get last billed date for each lease-meter combination
-  const { data: billings, error: billingsError } = await supabase
+  // Get last billed date for each lease-meter combination with more accurate tracking
+  const { data: leaseBillings, error: billingsError } = await supabase
     .from('billings')
-    .select('meter_id, lease_id, billing_date')
+    .select('meter_id, lease_id, billing_date, amount')
     .eq('type', 'UTILITY')
     .not('meter_id', 'is', null);
 
@@ -190,32 +286,37 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
     return fail(500, { message: 'Failed to fetch billings' });
   }
 
-  const meterLastBilledDates: Record<string, string> = {};
   const leaseMeterBilledDates: Record<string, string> = {};
+  const meterBilledDates: Record<string, string[]> = {}; // Track all billing dates per meter
 
-  if (billings) {
-    for (const billing of billings) {
-      if (billing.meter_id) {
-        const meterId = String(billing.meter_id);
+  if (leaseBillings) {
+    for (const billing of leaseBillings) {
+      if (billing.meter_id && billing.lease_id) {
+        const key = `${billing.meter_id}-${billing.lease_id}`;
         const newDate = billing.billing_date;
 
-        // Update meterLastBilledDates
-        if (!meterLastBilledDates[meterId] || new Date(newDate) > new Date(meterLastBilledDates[meterId])) {
-          meterLastBilledDates[meterId] = newDate;
+        if (!leaseMeterBilledDates[key] || new Date(newDate) > new Date(leaseMeterBilledDates[key])) {
+          leaseMeterBilledDates[key] = newDate;
         }
 
-        // Update leaseMeterBilledDates
-        if (billing.lease_id) {
-          const key = `${meterId}-${billing.lease_id}`;
-          if (!leaseMeterBilledDates[key] || new Date(newDate) > new Date(leaseMeterBilledDates[key])) {
-            leaseMeterBilledDates[key] = newDate;
-          }
+        // Track all billing dates for each meter
+        const meterKey = String(billing.meter_id);
+        if (!meterBilledDates[meterKey]) {
+          meterBilledDates[meterKey] = [];
         }
+        meterBilledDates[meterKey].push(newDate);
       }
     }
   }
 
-  // Get all readings with full data
+  // Update meterLastBilledDates to only show dates where bills were actually created
+  // This will be used to show "✓ Billed" indicator in the UI
+  const actualBilledDates: Record<string, string[]> = {};
+  for (const [meterKey, dates] of Object.entries(meterBilledDates)) {
+    actualBilledDates[meterKey] = [...new Set(dates)].sort();
+  }
+
+  // Get all readings with full data (for backward compatibility)
   const { data: allReadings, error: allReadingsError } = await supabase
     .from('readings')
     .select('*');
@@ -244,12 +345,13 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
     form,
     properties,
     meters,
-    readings,
+    readings: displayedReadings, // Use the new grouped readings
     availableReadingDates: uniqueDates,
     rental_unitTenantCounts,
     leases,
     meterLastBilledDates,
     leaseMeterBilledDates,
+    actualBilledDates, // Add actual billed dates for accurate tracking
     previousReadingGroups
   };
 };
@@ -389,7 +491,7 @@ export const actions: Actions = {
             meter_name: meterNameMap[r.meter_id] || null,
             consumption,
             cost,
-            cost_per_unit,
+            rate_at_reading: cost_per_unit, // Updated to use new column name
             previous_reading: previous
           };
         });

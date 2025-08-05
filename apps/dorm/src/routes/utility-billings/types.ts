@@ -5,9 +5,18 @@ export interface Reading {
     reading: number;
     consumption?: number | null;
     cost?: number | null;
-    cost_per_unit?: number | null;
+    rate_at_reading?: number | null; // Renamed from cost_per_unit
     previous_reading?: number | null;
+    previous_reading_date?: string | null; // Date of the previous reading
     meter_name?: string | null;
+    days_diff?: number | null; // Days between readings for billing period
+    period?: string | null; // Billing period (e.g., "2025-04")
+    meters?: {
+      id: number;
+      name: string;
+      type: string;
+      property_id: number;
+    } | null;
   }
   
   export interface Rental_unit {
@@ -83,11 +92,21 @@ export type Filters = {
   export type Tenant = {
     id: number;
     full_name: string;
+    tenant_status?: string;
   };
 
   export type Lease = {
     id: number;
     name: string;
+    rental_unit_id: number;
+    status: string;
+    rental_unit?: {
+      id: number;
+      name: string;
+      number: number;
+      type: string;
+    } | null;
+    roomName?: string;
     tenants: Tenant[] | null;
   };
 
