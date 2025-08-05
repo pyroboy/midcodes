@@ -18,15 +18,13 @@
     status: string;
     year: string;
     sortBy: string;
-    balanceStatus: 'all' | 'overdue' | 'pending' | 'partial' | 'paid';
   }
 
   let filters = $state<FilterState>({
     search: '',
     status: '',
     year: '',
-    sortBy: 'name-az',
-    balanceStatus: 'all'
+    sortBy: 'name-az'
   });
 
   // Get unique years from lease start dates
@@ -53,11 +51,7 @@
   });
 
   function handleFilterChange(key: keyof FilterState, value: string) {
-    if (key === 'balanceStatus') {
-      filters[key] = value as 'all' | 'overdue' | 'pending' | 'partial' | 'paid';
-    } else {
-      filters[key] = value;
-    }
+    filters[key] = value;
     onFiltersChange(filters);
   }
 
@@ -66,14 +60,13 @@
       search: '',
       status: '',
       year: '',
-      sortBy: 'name-az',
-      balanceStatus: 'all'
+      sortBy: 'name-az'
     };
     onFiltersChange(filters);
   }
 
   let hasActiveFilters = $derived(
-    filters.search || filters.status || filters.year || filters.sortBy !== 'name-az' || filters.balanceStatus !== 'all'
+    filters.search || filters.status || filters.year || filters.sortBy !== 'name-az'
   );
 
   // Reactive statement to handle filter changes
@@ -112,27 +105,6 @@
           {#each availableStatuses as status}
             <Select.Item value={status}>{status}</Select.Item>
           {/each}
-        </Select.Content>
-      </Select.Root>
-
-      <!-- Balance Status Filter -->
-      <Select.Root
-        type="single"
-        bind:value={filters.balanceStatus}
-      >
-        <Select.Trigger class="w-40 h-10">
-          {filters.balanceStatus === 'all' ? 'All Balances' :
-           filters.balanceStatus === 'overdue' ? 'Overdue' :
-           filters.balanceStatus === 'pending' ? 'Pending' :
-           filters.balanceStatus === 'partial' ? 'Partial' :
-           filters.balanceStatus === 'paid' ? 'Paid' : 'All Balances'}
-        </Select.Trigger>
-        <Select.Content>
-          <Select.Item value="all">All Balances</Select.Item>
-          <Select.Item value="overdue">Overdue</Select.Item>
-          <Select.Item value="pending">Pending</Select.Item>
-          <Select.Item value="partial">Partial</Select.Item>
-          <Select.Item value="paid">Paid</Select.Item>
         </Select.Content>
       </Select.Root>
 
@@ -219,17 +191,6 @@
           <button
             onclick={() => handleFilterChange('status', '')}
             class="hover:bg-green-200 rounded-full p-0.5"
-          >
-            <X class="w-3 h-3" />
-          </button>
-        </span>
-      {/if}
-      {#if filters.balanceStatus !== 'all'}
-        <span class="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs">
-          Balance: {filters.balanceStatus.charAt(0).toUpperCase() + filters.balanceStatus.slice(1)}
-          <button
-            onclick={() => handleFilterChange('balanceStatus', 'all')}
-            class="hover:bg-red-200 rounded-full p-0.5"
           >
             <X class="w-3 h-3" />
           </button>

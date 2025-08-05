@@ -1,6 +1,5 @@
 <script lang="ts">
   import * as Card from '$lib/components/ui/card';
-  import { Badge } from '$lib/components/ui/badge';
   import Button from '$lib/components/ui/button/button.svelte';
   import PaymentModal from './PaymentModal.svelte';
   import RentManagerModal from './RentManagerModal.svelte';
@@ -136,13 +135,10 @@
         <div class="flex items-center">
           <DropdownMenu.Root>
             <DropdownMenu.Trigger>
-              <Badge 
-                variant={getStatusVariant(lease.status?.toString() || 'INACTIVE')} 
-                class="text-sm px-3 py-1 cursor-pointer hover:opacity-80 transition-opacity font-medium"
-              >
+              <div class="flex items-center gap-2 px-3 py-1 rounded-md bg-slate-100 text-slate-700 text-sm cursor-pointer hover:bg-slate-200 transition-colors font-medium">
                 {lease.status?.toString() || 'INACTIVE'}
-                <ChevronDown class="w-3 h-3 ml-1" />
-              </Badge>
+                <ChevronDown class="w-3 h-3" />
+              </div>
             </DropdownMenu.Trigger>
             <DropdownMenu.Content class="w-44">
               <DropdownMenu.Group>
@@ -166,117 +162,47 @@
         </div>
       </div>
 
-      <!-- Middle: Enhanced Balance Card - 1/3 width on desktop, full on mobile -->
+      <!-- Middle: Simplified Balance Display - 1/3 width on desktop, full on mobile -->
       <div class="w-full lg:w-1/3 flex items-center justify-center">
-        <div class="bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl p-4 border border-slate-200/60 shadow-sm w-full max-w-sm">
-          <div class="flex flex-col gap-2">
-            <!-- Status Badge -->
-            {#if lease.balanceStatus}
-              {@const displayStatus = getLeaseDisplayStatus(lease.balanceStatus)}
-              <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                  {#if displayStatus.icon === 'AlertCircle'}
-                    <AlertCircle class="w-4 h-4 text-red-500" />
-                  {:else if displayStatus.icon === 'AlertTriangle'}
-                    <AlertTriangle class="w-4 h-4 text-amber-500" />
-                  {:else if displayStatus.icon === 'Clock'}
-                    <Clock class="w-4 h-4 text-orange-500" />
-                  {:else}
-                    <CheckCircle class="w-4 h-4 text-green-500" />
-                  {/if}
-                  <span class="text-sm font-medium text-slate-600">{displayStatus.label.toUpperCase()}</span>
-                </div>
-                <Badge variant={displayStatus.variant} class="text-xs">
-                  {#if lease.balanceStatus.hasOverdue}
-                    {formatCurrency(lease.balanceStatus.overdueBalance)}
-                  {:else if lease.balanceStatus.hasPartial}
-                    {formatCurrency(lease.balanceStatus.partialBalance)}
-                  {:else if lease.balanceStatus.hasPending}
-                    {formatCurrency(lease.balanceStatus.pendingBalance)}
-                  {:else}
-                    Paid
-                  {/if}
-                </Badge>
-              </div>
-            {/if}
-            
-            <!-- Total Balance -->
-            <div class="flex justify-between items-center">
-              <div class="flex items-center gap-2">
-                <DollarSign class="w-4 h-4 text-slate-500" />
-                <span class="text-sm font-medium text-slate-600">TOTAL BALANCE</span>
-              </div>
-              <div class="text-right">
-                <span class={`text-2xl font-bold transition-colors ${
-                  lease.balance > 0 
-                    ? 'text-red-600' 
-                    : lease.balance < 0 
-                      ? 'text-green-600' 
-                      : 'text-slate-600'
-                }`}>
-                  {formatCurrency(lease.balance)}
-                </span>
-                {#if totalPenalty > 0}
-                  <div class="flex items-center gap-1 text-xs text-red-500 mt-1">
-                    <AlertTriangle class="w-3 h-3" />
-                    <span>+{formatCurrency(totalPenalty)} penalty</span>
-                  </div>
-                {/if}
-              </div>
-            </div>
+        <div class="text-right">
+          <!-- Main Balance , if 0 dont show anything -->
+          <div class="text-2xl font-bold text-slate-800">
 
-            <!-- Due Date Context -->
-            {#if lease.balanceStatus}
-              {#if lease.balanceStatus.hasOverdue}
-                <p class="text-sm text-red-600">
-                  {lease.balanceStatus.daysOverdue} days overdue
-                </p>
-              {:else if lease.balanceStatus.hasPending && lease.balanceStatus.nextDueDate}
-                <p class="text-sm text-orange-600">
-                  Due: {formatDate(lease.balanceStatus.nextDueDate)}
-                </p>
+       
+          
+          <!-- Balance Breakdown -->
+          {#if lease.balanceStatus}
+            <div class="text-2xl text-slate-600 mt-1">
+              {#if lease.balanceStatus.overdueBalance > 0}
+                <span class="text-red-600">₱{lease.balanceStatus.overdueBalance.toLocaleString()} overdue</span>
               {/if}
-            {/if}
-
-            <!-- Balance Breakdown Tooltip -->
-            {#if lease.balanceStatus && (lease.balanceStatus.overdueBalance > 0 || lease.balanceStatus.partialBalance > 0 || lease.balanceStatus.pendingBalance > 0)}
-              <div class="mt-2 group relative">
-                <button 
-                  class="text-xs text-slate-500 hover:text-slate-700 underline"
-                  type="button"
-                  onclick={(e) => e.stopPropagation()}
-                >
-                  View Balance Details
-                </button>
-                <div class="absolute hidden group-hover:block bg-white border rounded-lg shadow-lg p-3 z-10 w-64 bottom-full mb-2 left-0">
-                  <div class="space-y-2">
-                    {#if lease.balanceStatus.overdueBalance > 0}
-                      <div class="flex justify-between text-red-600">
-                        <span>Overdue:</span>
-                        <span>{formatCurrency(lease.balanceStatus.overdueBalance)}</span>
-                      </div>
-                    {/if}
-                    {#if lease.balanceStatus.partialBalance > 0}
-                      <div class="flex justify-between text-amber-600">
-                        <span>Partial:</span>
-                        <span>{formatCurrency(lease.balanceStatus.partialBalance)}</span>
-                      </div>
-                    {/if}
-                    {#if lease.balanceStatus.pendingBalance > 0}
-                      <div class="flex justify-between text-orange-600">
-                        <span>Pending:</span>
-                        <span>{formatCurrency(lease.balanceStatus.pendingBalance)}</span>
-                      </div>
-                    {/if}
-                    <div class="border-t pt-2 flex justify-between font-medium">
-                      <span>Total:</span>
-                      <span>{formatCurrency(lease.balance || 0)}</span>
-                    </div>
-                  </div>
-                </div>
+              {#if lease.balanceStatus.partialBalance > 0}
+                {#if lease.balanceStatus.overdueBalance > 0} • {/if}
+                <span class="text-amber-600">₱{lease.balanceStatus.partialBalance.toLocaleString()} partial</span>
+              {/if}
+              {#if lease.balanceStatus.pendingBalance > 0}
+                {#if lease.balanceStatus.overdueBalance > 0 || lease.balanceStatus.partialBalance > 0} • {/if}
+                <span class="text-orange-600">₱{lease.balanceStatus.pendingBalance.toLocaleString()} pending</span>
+              {/if}
+            </div>
+            
+            <!-- Status Context -->
+            {#if lease.balanceStatus.hasOverdue}
+              <div class="text-xs text-red-600 mt-1">
+                {lease.balanceStatus.daysOverdue} days overdue
+              </div>
+            {:else if lease.balanceStatus.hasPending && lease.balanceStatus.nextDueDate}
+              <div class="text-xs text-orange-600 mt-1">
+                Due: {formatDate(lease.balanceStatus.nextDueDate)}
               </div>
             {/if}
+          {/if}
           </div>
+          {#if totalPenalty > 0}
+            <div class="text-xs text-red-500 mt-1">
+              +{formatCurrency(totalPenalty)} penalty
+            </div>
+          {/if}
         </div>
       </div>
 
@@ -452,8 +378,6 @@
   onOpenChange={handleDetailsModalClose}
 />
 {/if}
-
-
 
 <style>
   :global(.card) {

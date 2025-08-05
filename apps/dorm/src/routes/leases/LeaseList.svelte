@@ -19,15 +19,13 @@
     status: string;
     year: string;
     sortBy: string;
-    balanceStatus: 'all' | 'overdue' | 'pending' | 'partial' | 'paid';
   }
 
   let filters = $state<FilterState>({
     search: '',
     status: '',
     year: '',
-    sortBy: 'name-az',
-    balanceStatus: 'all'
+    sortBy: 'name-az'
   });
 
   let filteredLeases = $derived.by(() => {
@@ -52,28 +50,6 @@
     // Status filter
     if (filters.status) {
       filtered = filtered.filter(lease => lease.status === filters.status);
-    }
-
-    // Balance status filter
-    if (filters.balanceStatus && filters.balanceStatus !== 'all') {
-      filtered = filtered.filter(lease => {
-        if (!lease.balanceStatus) return false;
-        
-        switch (filters.balanceStatus) {
-          case 'overdue':
-            return lease.balanceStatus.hasOverdue;
-          case 'pending':
-            return lease.balanceStatus.hasPending;
-          case 'partial':
-            return lease.balanceStatus.hasPartial;
-          case 'paid':
-            return !lease.balanceStatus.hasOverdue && 
-                   !lease.balanceStatus.hasPending && 
-                   !lease.balanceStatus.hasPartial;
-          default:
-            return true;
-        }
-      });
     }
 
     // Year filter

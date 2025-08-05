@@ -17,6 +17,9 @@
   let selectedLease: FormType | undefined = $state();
   let editMode = $state(false);
 
+  // Add activeFilter state for summary card filtering
+  let activeFilter = $state<'all' | 'paid' | 'pending' | 'partial' | 'overdue'>('all');
+
   $effect(() => {
     leases = data.leases;
   });
@@ -46,6 +49,32 @@
     totalBalance: leasesWithStatus.reduce((sum, l) => sum + (l.balance || 0), 0)
   }));
 
+  // Filter leases based on activeFilter
+  let filteredLeases = $derived.by(() => {
+    if (activeFilter === 'all') {
+      return leasesWithStatus;
+    }
+    
+    return leasesWithStatus.filter(lease => {
+      if (!lease.balanceStatus) return false;
+      
+      switch (activeFilter) {
+        case 'paid':
+          return !lease.balanceStatus.hasOverdue && 
+                 !lease.balanceStatus.hasPending && 
+                 !lease.balanceStatus.hasPartial;
+        case 'pending':
+          return lease.balanceStatus.hasPending;
+        case 'partial':
+          return lease.balanceStatus.hasPartial;
+        case 'overdue':
+          return lease.balanceStatus.hasOverdue;
+        default:
+          return true;
+      }
+    });
+  });
+
   function handleAddLease() {
     selectedLease = undefined;
     editMode = false;
@@ -56,6 +85,10 @@
     selectedLease = lease;
     editMode = true;
     showModal = true;
+  }
+
+  function handleFilterClick(filter: 'all' | 'paid' | 'pending' | 'partial' | 'overdue') {
+    activeFilter = filter;
   }
 
   async function handleDeleteLease(lease: FormType & { billings?: { paid_amount: number }[]; balance?: number; name?: string; id?: number }) {
@@ -139,37 +172,56 @@
         </div>
       </div>
       
-      <!-- Enhanced Stats Overview -->
+      <!-- Enhanced Stats Overview - Now Clickable -->
       <div class="flex items-center gap-3 text-xs sm:text-sm">
-        <div class="flex items-center gap-1 px-2 py-1 bg-blue-50 rounded-lg">
+        <button 
+          onclick={() => handleFilterClick('all')}
+          class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 {activeFilter === 'all' ? 'bg-blue-100 ring-2 ring-blue-500' : 'bg-blue-50 hover:bg-blue-100'}"
+        >
           <span class="text-blue-600 font-medium">{summaryMetrics.totalLeases}</span>
           <span class="text-slate-600">Total</span>
-        </div>
-        <div class="flex items-center gap-1 px-2 py-1 bg-green-50 rounded-lg">
+        </button>
+        
+        <button 
+          onclick={() => handleFilterClick('paid')}
+          class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 {activeFilter === 'paid' ? 'bg-green-100 ring-2 ring-green-500' : 'bg-green-50 hover:bg-green-100'}"
+        >
           <span class="text-green-600 font-medium">{summaryMetrics.paidInFull}</span>
           <span class="text-slate-600">Paid</span>
-        </div>
-        <div class="flex items-center gap-1 px-2 py-1 bg-orange-50 rounded-lg">
+        </button>
+        
+        <button 
+          onclick={() => handleFilterClick('pending')}
+          class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 {activeFilter === 'pending' ? 'bg-orange-100 ring-2 ring-orange-500' : 'bg-orange-50 hover:bg-orange-100'}"
+        >
           <div class="flex flex-col">
             <span class="text-orange-600 font-medium">{summaryMetrics.pendingCount}</span>
             <span class="text-orange-600 text-xs">{formatCurrency(summaryMetrics.totalPending)}</span>
           </div>
           <span class="text-slate-600">Pending</span>
-        </div>
-        <div class="flex items-center gap-1 px-2 py-1 bg-amber-50 rounded-lg">
+        </button>
+        
+        <button 
+          onclick={() => handleFilterClick('partial')}
+          class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 {activeFilter === 'partial' ? 'bg-amber-100 ring-2 ring-amber-500' : 'bg-amber-50 hover:bg-amber-100'}"
+        >
           <div class="flex flex-col">
             <span class="text-amber-600 font-medium">{summaryMetrics.partialCount}</span>
             <span class="text-amber-600 text-xs">{formatCurrency(summaryMetrics.totalPartial)}</span>
           </div>
           <span class="text-slate-600">Partial</span>
-        </div>
-        <div class="flex items-center gap-1 px-2 py-1 bg-red-50 rounded-lg">
+        </button>
+        
+        <button 
+          onclick={() => handleFilterClick('overdue')}
+          class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 {activeFilter === 'overdue' ? 'bg-red-100 ring-2 ring-red-500' : 'bg-red-50 hover:bg-red-100'}"
+        >
           <div class="flex flex-col">
             <span class="text-red-600 font-medium">{summaryMetrics.overdueCount}</span>
             <span class="text-red-600 text-xs">{formatCurrency(summaryMetrics.totalOverdue)}</span>
           </div>
           <span class="text-slate-600">Overdue</span>
-        </div>
+        </button>
       </div>
       
       <Button 
@@ -185,15 +237,37 @@
 
   <!-- Main Content Area -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-    <!-- Stats Overview -->
-   
+    <!-- Active Filter Display -->
+    {#if activeFilter !== 'all'}
+      <div class="mb-6 p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-slate-200/60">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-medium text-slate-600">Showing:</span>
+            <span class="px-2 py-1 rounded-md text-sm font-medium {
+              activeFilter === 'paid' ? 'bg-green-100 text-green-700' :
+              activeFilter === 'pending' ? 'bg-orange-100 text-orange-700' :
+              activeFilter === 'partial' ? 'bg-amber-100 text-amber-700' :
+              activeFilter === 'overdue' ? 'bg-red-100 text-red-700' :
+              'bg-blue-100 text-blue-700'
+            }">
+              {activeFilter.charAt(0).toUpperCase() + activeFilter.slice(1)} Leases
+            </span>
+            <span class="text-sm text-slate-500">({filteredLeases.length} of {leasesWithStatus.length})</span>
+          </div>
+          <button 
+            onclick={() => handleFilterClick('all')}
+            class="text-sm text-slate-600 hover:text-slate-800 underline"
+          >
+            Show All
+          </button>
+        </div>
+      </div>
+    {/if}
 
     <!-- Lease List Section -->
     <div class="bg-white/40 backdrop-blur-sm rounded-2xl border border-slate-200/60 shadow-sm">
-
-      
         <LeaseList
-          leases={leasesWithStatus}
+          leases={filteredLeases}
           tenants={data.tenants}
           rentalUnits={data.rental_units}
           on:edit={event => handleEdit(event.detail)}
