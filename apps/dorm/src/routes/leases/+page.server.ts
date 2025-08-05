@@ -474,6 +474,13 @@ export const actions: Actions = {
 
     const monthlyRents = JSON.parse(monthlyRentsRaw as string);
 
+    console.log('📥 Received monthly rents data:', monthlyRents.map((r: any) => ({
+      month: r.month,
+      isActive: r.isActive,
+      amount: r.amount,
+      dueDate: r.dueDate
+    })));
+
     try {
       // 1. Fetch existing rent billings for the year
       const { data: existingBillings, error: fetchError } = await supabase
@@ -491,10 +498,10 @@ export const actions: Actions = {
       const operations = monthlyRents.map(async (rent: MonthlyRent) => {
         const existingBilling = existingBillingsMap.get(rent.month);
 
-        // Ensure due date is always first day of the month (timezone-safe)
-        const dueDate = new Date(rent.dueDate + 'T00:00:00');
-        const firstDayOfMonth = new Date(dueDate.getFullYear(), dueDate.getMonth(), 1);
-        const normalizedDueDate = firstDayOfMonth.toISOString().split('T')[0];
+        // Use the actual due date provided by the user (no timezone conversion)
+        const normalizedDueDate = rent.dueDate; // Use the date string directly
+        
+        console.log(`📅 Month ${rent.month}: Due date: ${rent.dueDate}`);
 
         // Case 1: Create new billing
         if (rent.isActive && !existingBilling) {

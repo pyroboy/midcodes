@@ -22,7 +22,8 @@
     disabled = false,
     required = false,
     name = 'date',
-    id = 'date'
+    id = 'date',
+    onChange = undefined
   } = $props<{
     value?: string;
     placeholder?: string;
@@ -33,6 +34,7 @@
     required?: boolean;
     name?: string;
     id?: string;
+    onChange?: (value: string) => void;
   }>();
 
   const df = new DateFormatter("en-US", {
@@ -45,8 +47,10 @@
   function handleValueChange(v: DateValue | undefined) {
     if (v) {
       value = v.toString();
+      onChange?.(value);
     } else {
       value = '';
+      onChange?.('');
     }
   }
 </script>
