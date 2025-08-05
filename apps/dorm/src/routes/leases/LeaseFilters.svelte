@@ -18,13 +18,15 @@
     status: string;
     year: string;
     sortBy: string;
+    balanceStatus: 'all' | 'overdue' | 'pending' | 'partial' | 'paid';
   }
 
   let filters = $state<FilterState>({
     search: '',
     status: '',
     year: '',
-    sortBy: 'name-az'
+    sortBy: 'name-az',
+    balanceStatus: 'all'
   });
 
   // Get unique years from lease start dates
@@ -51,7 +53,11 @@
   });
 
   function handleFilterChange(key: keyof FilterState, value: string) {
-    filters[key] = value;
+    if (key === 'balanceStatus') {
+      filters[key] = value as 'all' | 'overdue' | 'pending' | 'partial' | 'paid';
+    } else {
+      filters[key] = value;
+    }
     onFiltersChange(filters);
   }
 
@@ -60,13 +66,14 @@
       search: '',
       status: '',
       year: '',
-      sortBy: 'name-az'
+      sortBy: 'name-az',
+      balanceStatus: 'all'
     };
     onFiltersChange(filters);
   }
 
   let hasActiveFilters = $derived(
-    filters.search || filters.status || filters.year || filters.sortBy !== 'name-az'
+    filters.search || filters.status || filters.year || filters.sortBy !== 'name-az' || filters.balanceStatus !== 'all'
   );
 
   // Reactive statement to handle filter changes
@@ -108,6 +115,27 @@
         </Select.Content>
       </Select.Root>
 
+      <!-- Balance Status Filter -->
+      <Select.Root
+        type="single"
+        bind:value={filters.balanceStatus}
+      >
+        <Select.Trigger class="w-40 h-10">
+          {filters.balanceStatus === 'all' ? 'All Balances' :
+           filters.balanceStatus === 'overdue' ? 'Overdue' :
+           filters.balanceStatus === 'pending' ? 'Pending' :
+           filters.balanceStatus === 'partial' ? 'Partial' :
+           filters.balanceStatus === 'paid' ? 'Paid' : 'All Balances'}
+        </Select.Trigger>
+        <Select.Content>
+          <Select.Item value="all">All Balances</Select.Item>
+          <Select.Item value="overdue">Overdue</Select.Item>
+          <Select.Item value="pending">Pending</Select.Item>
+          <Select.Item value="partial">Partial</Select.Item>
+          <Select.Item value="paid">Paid</Select.Item>
+        </Select.Content>
+      </Select.Root>
+
       <!-- Year Filter -->
       <Select.Root
         type="single"
@@ -135,7 +163,11 @@
            filters.sortBy === 'recent-edited' ? 'Recently Edited' :
            filters.sortBy === 'oldest-edited' ? 'Oldest Edited' :
            filters.sortBy === 'floor-unit' ? 'Floor/Unit Number' :
-           filters.sortBy === 'unit-floor' ? 'Unit/Floor Number' : 'Name A-Z'}
+           filters.sortBy === 'unit-floor' ? 'Unit/Floor Number' :
+           filters.sortBy === 'balance-desc' ? 'Balance (High to Low)' :
+           filters.sortBy === 'balance-asc' ? 'Balance (Low to High)' :
+           filters.sortBy === 'due-date' ? 'Next Due Date' :
+           filters.sortBy === 'days-overdue' ? 'Days Overdue' : 'Name A-Z'}
         </Select.Trigger>
         <Select.Content>
           <Select.Item value="name-az">Name A-Z</Select.Item>
@@ -144,6 +176,10 @@
           <Select.Item value="oldest-edited">Oldest Edited</Select.Item>
           <Select.Item value="floor-unit">Floor/Unit Number</Select.Item>
           <Select.Item value="unit-floor">Unit/Floor Number</Select.Item>
+          <Select.Item value="balance-desc">Balance (High to Low)</Select.Item>
+          <Select.Item value="balance-asc">Balance (Low to High)</Select.Item>
+          <Select.Item value="due-date">Next Due Date</Select.Item>
+          <Select.Item value="days-overdue">Days Overdue</Select.Item>
         </Select.Content>
       </Select.Root>
 
@@ -183,6 +219,17 @@
           <button
             onclick={() => handleFilterChange('status', '')}
             class="hover:bg-green-200 rounded-full p-0.5"
+          >
+            <X class="w-3 h-3" />
+          </button>
+        </span>
+      {/if}
+      {#if filters.balanceStatus !== 'all'}
+        <span class="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs">
+          Balance: {filters.balanceStatus.charAt(0).toUpperCase() + filters.balanceStatus.slice(1)}
+          <button
+            onclick={() => handleFilterChange('balanceStatus', 'all')}
+            class="hover:bg-red-200 rounded-full p-0.5"
           >
             <X class="w-3 h-3" />
           </button>

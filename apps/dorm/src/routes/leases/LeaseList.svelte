@@ -6,7 +6,7 @@
   import type { Lease } from '$lib/types/lease';
 
   interface Props {
-    leases?: Lease[];
+    leases?: (Lease & { balanceStatus?: any })[];
     tenants?: any[];
     rentalUnits?: any[];
     onStatusChange: (id: string, status: string) => void;
@@ -19,13 +19,15 @@
     status: string;
     year: string;
     sortBy: string;
+    balanceStatus: 'all' | 'overdue' | 'pending' | 'partial' | 'paid';
   }
 
   let filters = $state<FilterState>({
     search: '',
     status: '',
     year: '',
-    sortBy: 'name-az'
+    sortBy: 'name-az',
+    balanceStatus: 'all'
   });
 
   let filteredLeases = $derived.by(() => {
@@ -50,6 +52,28 @@
     // Status filter
     if (filters.status) {
       filtered = filtered.filter(lease => lease.status === filters.status);
+    }
+
+    // Balance status filter
+    if (filters.balanceStatus && filters.balanceStatus !== 'all') {
+      filtered = filtered.filter(lease => {
+        if (!lease.balanceStatus) return false;
+        
+        switch (filters.balanceStatus) {
+          case 'overdue':
+            return lease.balanceStatus.hasOverdue;
+          case 'pending':
+            return lease.balanceStatus.hasPending;
+          case 'partial':
+            return lease.balanceStatus.hasPartial;
+          case 'paid':
+            return !lease.balanceStatus.hasOverdue && 
+                   !lease.balanceStatus.hasPending && 
+                   !lease.balanceStatus.hasPartial;
+          default:
+            return true;
+        }
+      });
     }
 
     // Year filter
@@ -89,6 +113,22 @@
           if (aUnit !== bUnit) return aUnit.localeCompare(bUnit);
           return parseInt(a.rental_unit?.floor?.floor_number || '0') - parseInt(b.rental_unit?.floor?.floor_number || '0');
         });
+        break;
+      case 'balance-desc':
+        filtered.sort((a, b) => (b.balance || 0) - (a.balance || 0));
+        break;
+      case 'balance-asc':
+        filtered.sort((a, b) => (a.balance || 0) - (b.balance || 0));
+        break;
+      case 'due-date':
+        filtered.sort((a, b) => {
+          const aDate = a.balanceStatus?.nextDueDate ? new Date(a.balanceStatus.nextDueDate) : new Date('9999-12-31');
+          const bDate = b.balanceStatus?.nextDueDate ? new Date(b.balanceStatus.nextDueDate) : new Date('9999-12-31');
+          return aDate.getTime() - bDate.getTime();
+        });
+        break;
+      case 'days-overdue':
+        filtered.sort((a, b) => (b.balanceStatus?.daysOverdue || 0) - (a.balanceStatus?.daysOverdue || 0));
         break;
     }
 

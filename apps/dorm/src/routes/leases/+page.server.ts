@@ -35,7 +35,18 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
       *,
       rental_unit:rental_unit_id (*, floor:floors (*), property:properties (*)),
       lease_tenants:lease_tenants!lease_id (tenant:tenants (name, email, contact_number)),
-      billings!billings_lease_id_fkey (*)
+      billings!billings_lease_id_fkey (
+        id,
+        type,
+        amount,
+        paid_amount,
+        balance,
+        status,
+        due_date,
+        billing_date,
+        penalty_amount,
+        notes
+      )
     `)
     .is('deleted_at', null) // Only show non-archived leases
     .order('created_at', { ascending: false });

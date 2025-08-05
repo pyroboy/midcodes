@@ -6,6 +6,8 @@
   import { Plus } from 'lucide-svelte';
   import type { z } from 'zod';
   import { leaseSchema } from './formSchema';
+  import { calculateLeaseBalanceStatus } from '$lib/utils/lease-status';
+  import { formatCurrency } from '$lib/utils/format';
 
   type FormType = z.infer<typeof leaseSchema>;
   
@@ -18,6 +20,31 @@
   $effect(() => {
     leases = data.leases;
   });
+
+  // Svelte 5 runes for reactive calculations
+  let leasesWithStatus = $derived.by(() => 
+    leases.map(lease => ({
+      ...lease,
+      balanceStatus: calculateLeaseBalanceStatus(lease)
+    }))
+  );
+
+  // Calculate summary metrics using $derived
+  let summaryMetrics = $derived.by(() => ({
+    totalLeases: leasesWithStatus.length,
+    paidInFull: leasesWithStatus.filter(l => 
+      !l.balanceStatus.hasOverdue && 
+      !l.balanceStatus.hasPending && 
+      !l.balanceStatus.hasPartial
+    ).length,
+    pendingCount: leasesWithStatus.filter(l => l.balanceStatus.hasPending).length,
+    partialCount: leasesWithStatus.filter(l => l.balanceStatus.hasPartial).length,
+    overdueCount: leasesWithStatus.filter(l => l.balanceStatus.hasOverdue).length,
+    totalPending: leasesWithStatus.reduce((sum, l) => sum + l.balanceStatus.pendingBalance, 0),
+    totalPartial: leasesWithStatus.reduce((sum, l) => sum + l.balanceStatus.partialBalance, 0),
+    totalOverdue: leasesWithStatus.reduce((sum, l) => sum + l.balanceStatus.overdueBalance, 0),
+    totalBalance: leasesWithStatus.reduce((sum, l) => sum + (l.balance || 0), 0)
+  }));
 
   function handleAddLease() {
     selectedLease = undefined;
@@ -112,22 +139,35 @@
         </div>
       </div>
       
-      <!-- Minimized Stats Overview -->
+      <!-- Enhanced Stats Overview -->
       <div class="flex items-center gap-3 text-xs sm:text-sm">
         <div class="flex items-center gap-1 px-2 py-1 bg-blue-50 rounded-lg">
-          <span class="text-blue-600 font-medium">{leases.length}</span>
+          <span class="text-blue-600 font-medium">{summaryMetrics.totalLeases}</span>
           <span class="text-slate-600">Total</span>
         </div>
         <div class="flex items-center gap-1 px-2 py-1 bg-green-50 rounded-lg">
-          <span class="text-green-600 font-medium">{leases.filter(l => l.status === 'ACTIVE').length}</span>
-          <span class="text-slate-600">Active</span>
+          <span class="text-green-600 font-medium">{summaryMetrics.paidInFull}</span>
+          <span class="text-slate-600">Paid</span>
         </div>
         <div class="flex items-center gap-1 px-2 py-1 bg-orange-50 rounded-lg">
-          <span class="text-orange-600 font-medium">₱{leases.reduce((sum, lease) => sum + (lease.balance || 0), 0).toLocaleString()}</span>
-          <span class="text-slate-600">Balance</span>
+          <div class="flex flex-col">
+            <span class="text-orange-600 font-medium">{summaryMetrics.pendingCount}</span>
+            <span class="text-orange-600 text-xs">{formatCurrency(summaryMetrics.totalPending)}</span>
+          </div>
+          <span class="text-slate-600">Pending</span>
+        </div>
+        <div class="flex items-center gap-1 px-2 py-1 bg-amber-50 rounded-lg">
+          <div class="flex flex-col">
+            <span class="text-amber-600 font-medium">{summaryMetrics.partialCount}</span>
+            <span class="text-amber-600 text-xs">{formatCurrency(summaryMetrics.totalPartial)}</span>
+          </div>
+          <span class="text-slate-600">Partial</span>
         </div>
         <div class="flex items-center gap-1 px-2 py-1 bg-red-50 rounded-lg">
-          <span class="text-red-600 font-medium">{leases.filter(l => l.balance > 0).length}</span>
+          <div class="flex flex-col">
+            <span class="text-red-600 font-medium">{summaryMetrics.overdueCount}</span>
+            <span class="text-red-600 text-xs">{formatCurrency(summaryMetrics.totalOverdue)}</span>
+          </div>
           <span class="text-slate-600">Overdue</span>
         </div>
       </div>
@@ -153,7 +193,7 @@
 
       
         <LeaseList
-          {leases}
+          leases={leasesWithStatus}
           tenants={data.tenants}
           rentalUnits={data.rental_units}
           on:edit={event => handleEdit(event.detail)}
