@@ -11,6 +11,7 @@
   import { leaseStatusEnum } from './formSchema';
   import { enhance } from '$app/forms';
   import { invalidateAll } from '$app/navigation';
+  import DatePicker from '$lib/components/ui/date-picker.svelte';
 
   let { 
     lease = null, 
@@ -65,6 +66,7 @@
     status: lease?.status || 'ACTIVE',
     notes: lease?.notes || '',
     rental_unit_id: lease?.rental_unit?.id || 0,
+    rent_amount: lease?.rent_amount || 0,
     selectedTenants: getTenantIds(lease)
   });
 
@@ -89,14 +91,30 @@
   // Search functionality
   let searchTerm = $state('');
   let filteredTenants = $derived.by(() => {
-    if (!searchTerm.trim()) return tenants;
+    let filtered = tenants;
     
-    const term = searchTerm.toLowerCase();
-    return tenants.filter((tenant: any) => 
-      tenant.name.toLowerCase().includes(term) ||
-      (tenant.email && tenant.email.toLowerCase().includes(term)) ||
-      (tenant.contact_number && tenant.contact_number.toLowerCase().includes(term))
-    );
+    // Apply search filter if search term exists
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      filtered = tenants.filter((tenant: any) => 
+        tenant.name.toLowerCase().includes(term) ||
+        (tenant.email && tenant.email.toLowerCase().includes(term)) ||
+        (tenant.contact_number && tenant.contact_number.toLowerCase().includes(term))
+      );
+    }
+    
+    // Sort: selected tenants first, then unselected tenants
+    return filtered.sort((a: any, b: any) => {
+      const aSelected = formData.selectedTenants.includes(a.id);
+      const bSelected = formData.selectedTenants.includes(b.id);
+      
+      // Selected tenants go to the top
+      if (aSelected && !bSelected) return -1;
+      if (!aSelected && bSelected) return 1;
+      
+      // If both have same selection status, sort alphabetically by name
+      return a.name.localeCompare(b.name);
+    });
   });
 
   // Validation
@@ -186,6 +204,7 @@
         status: lease?.status || 'ACTIVE',
         notes: lease?.notes || '',
         rental_unit_id: lease?.rental_unit?.id || 0,
+        rent_amount: lease?.rent_amount || 0,
         selectedTenants: tenantIds
       };
       searchTerm = '';
@@ -236,6 +255,7 @@
       <input type="hidden" name="status" bind:value={formData.status} />
       <input type="hidden" name="notes" bind:value={formData.notes} />
       <input type="hidden" name="rental_unit_id" bind:value={formData.rental_unit_id} />
+      <input type="hidden" name="rent_amount" bind:value={formData.rent_amount} />
       <input type="hidden" name="tenantIds" value={JSON.stringify(formData.selectedTenants)} />
       
       <!-- Basic Information -->
@@ -245,7 +265,7 @@
           <h3 class="text-sm font-semibold text-slate-700">Basic Information</h3>
         </div>
         
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div class="space-y-2">
             <Label for="name">Lease Name</Label>
             <Input 
@@ -288,18 +308,37 @@
               </p>
             {/if}
           </div>
+
+          <div class="space-y-2">
+            <Label for="rent_amount">Monthly Rent Amount</Label>
+            <Input 
+              id="rent_amount" 
+              name="rent_amount" 
+              type="number" 
+              bind:value={formData.rent_amount}
+              min="0"
+              step="0.01"
+              placeholder="0.00"
+              class={validationErrors.rent_amount ? 'border-red-500' : ''}
+            />
+            {#if validationErrors.rent_amount}
+              <p class="text-sm text-red-500 flex items-center gap-1">
+                <AlertCircle class="w-4 h-4" />
+                {validationErrors.rent_amount}
+              </p>
+            {/if}
+          </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div class="space-y-2">
-            <Label for="start_date">Start Date</Label>
-            <Input 
-              id="start_date" 
-              name="start_date" 
-              type="date" 
+            <DatePicker
               bind:value={formData.start_date}
-              class={validationErrors.start_date ? 'border-red-500' : ''}
-              required
+              label="Start Date"
+              placeholder="Select start date"
+              required={true}
+              id="start_date"
+              name="start_date"
             />
             {#if validationErrors.start_date}
               <p class="text-sm text-red-500 flex items-center gap-1">
@@ -329,13 +368,12 @@
           </div>
           
           <div class="space-y-2">
-            <Label for="end_date">End Date (Auto-calculated)</Label>
-            <Input 
-              id="end_date" 
-              name="end_date" 
-              type="date" 
+            <DatePicker
               bind:value={formData.end_date}
-              class={`bg-gray-50 ${validationErrors.end_date ? 'border-red-500' : ''}`}
+              label="End Date (Auto-calculated)"
+              placeholder="Select end date"
+              id="end_date"
+              name="end_date"
             />
             <p class="text-xs text-gray-500">
               Automatically calculated from start date and terms
@@ -347,9 +385,7 @@
               </p>
             {/if}
           </div>
-        </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-1 gap-4">
           <div class="space-y-2">
             <Label for="status">Status</Label>
             <Select.Root
@@ -369,18 +405,18 @@
             </Select.Root>
           </div>
         </div>
+
+
       </div>
 
       <!-- Tenant Management -->
-      <div class="space-y-4">
+      <div class="space-y-2">
         <div class="flex items-center gap-2 pb-2 border-b border-slate-200">
           <Users class="w-4 h-4 text-slate-500" />
-          <h3 class="text-sm font-semibold text-slate-700">Tenant Management</h3>
+          <h3 class="text-sm font-semibold text-slate-700">Tenant Management - selected ({formData.selectedTenants.length})</h3>
         </div>
         
         <!-- Search Bar -->
-        <div class="space-y-2">
-          <Label for="tenant-search">Search Tenants</Label>
           <div class="relative">
             <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             <Input 
@@ -391,10 +427,6 @@
               class="pl-10"
             />
           </div>
-        </div>
-        
-        <div class="space-y-2">
-          <Label>Select Tenants ({formData.selectedTenants.length} selected)</Label>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-60 overflow-y-auto border rounded-md p-3">
             {#if filteredTenants.length === 0}
               <div class="col-span-2 text-center py-8 text-gray-500">
@@ -404,22 +436,30 @@
                 </p>
               </div>
             {:else}
-              {#each filteredTenants as tenant}
-                <label class="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-2 rounded border border-gray-200">
-                  <input 
-                    type="checkbox" 
-                    checked={isTenantSelected(tenant.id)}
-                    onchange={() => toggleTenant(tenant.id)}
-                    class="rounded"
-                  />
-                  <span class="text-sm flex-1">
-                    <div class="font-medium">{tenant.name}</div>
-                    <div class="text-xs text-gray-500">
-                      {tenant.email || tenant.contact_number || 'No contact info'}
-                    </div>
-                  </span>
-                </label>
-              {/each}
+                             {#each filteredTenants as tenant}
+                 {@const isSelected = isTenantSelected(tenant.id)}
+                 <label class="flex items-center space-x-2 cursor-pointer p-2 rounded border transition-all duration-200"
+                   class:bg-blue-50={isSelected}
+                   class:border-blue-300={isSelected}
+                   class:hover:bg-gray-50={!isSelected}
+                   class:border-gray-200={!isSelected}
+                 >
+                   <input 
+                     type="checkbox" 
+                     checked={isSelected}
+                     onchange={() => toggleTenant(tenant.id)}
+                     class="rounded"
+                   />
+                   <span class="text-sm flex-1">
+                     <div class="font-medium" class:text-blue-700={isSelected}>
+                       {tenant.name}
+                     </div>
+                     <div class="text-xs" class:text-blue-500={isSelected} class:text-gray-500={!isSelected}>
+                       {tenant.email || tenant.contact_number || 'No contact info'}
+                     </div>
+                   </span>
+                 </label>
+               {/each}
             {/if}
           </div>
           {#if validationErrors.tenants}
@@ -428,8 +468,11 @@
               {validationErrors.tenants}
             </p>
           {/if}
+ 
         </div>
-      </div>
+        
+
+
 
       <!-- Notes -->
       <div class="space-y-2">

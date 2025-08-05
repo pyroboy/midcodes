@@ -8,6 +8,7 @@
   import { invalidateAll } from "$app/navigation";
   import { toast } from 'svelte-sonner';
   import type { Billing } from "$lib/types/lease";
+  import DatePicker from "$lib/components/ui/date-picker.svelte";
 
   const { lease, isOpen = false, onOpenChange } = $props<{
     lease: {
@@ -52,6 +53,8 @@
   let selectedAmount = $state(0);
   let selectedBillings = $state<Set<number>>(new Set());
   let referenceNumber = $state('');
+  let paidBy = $state(lease.lease_tenants?.[0]?.tenant?.name || '');
+  let paidAt = $state(new Date().toISOString().split('T')[0]);
 
   // Calculate available security deposit amount (based on paid_amount, not balance)
   let availableSecurityDeposit = $derived(() => {
@@ -133,6 +136,7 @@
       if (!paymentAmount || paymentAmount <= 0) throw new Error('Payment amount must be greater than zero.');
       if (!selectedPaymentType) throw new Error('Payment method is required.');
       if (!selectedBillings.size) throw new Error('No billings selected.');
+      if (!paidAt) throw new Error('Payment date is required.');
 
       // Validate security deposit payment
       validateSecurityDepositPayment();
@@ -141,8 +145,8 @@
         amount: paymentAmount,
         method: selectedPaymentType,
         reference_number: referenceNumber,
-        paid_by: lease.lease_tenants?.[0]?.tenant?.name || 'Unknown',
-        paid_at: new Date().toISOString(),
+        paid_by: paidBy.trim() || lease.lease_tenants?.[0]?.tenant?.name || 'Unknown',
+        paid_at: new Date(paidAt + 'T00:00:00').toISOString(),
         notes: `Payment for ${selectedBillings.size} billing(s)`,
         billing_ids: Array.from(selectedBillings)
       };
@@ -235,8 +239,14 @@
     return [...(billings || [])].sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
   }
 
-  let sortedBillings = $derived(sortBillingsByDueDate(lease.billings));
-  let paymentAllocation = $derived(calculatePaymentAllocation(paymentAmount, lease.billings || [], selectedBillings));
+  let sortedBillings = $derived.by(() => {
+    if (!isOpen) return [];
+    return sortBillingsByDueDate(lease.billings);
+  });
+  let paymentAllocation = $derived.by(() => {
+    if (!isOpen) return [];
+    return calculatePaymentAllocation(paymentAmount, lease.billings || [], selectedBillings);
+  });
 
   function setExactAmount() {
     paymentAmount = selectedAmount;
@@ -433,6 +443,26 @@
               </div>
             {/if}
 
+            <!-- Paid By Input -->
+            <div>
+              <Label for="paid-by">Paid By</Label>
+              <Input 
+                id="paid-by"
+                bind:value={paidBy}
+                placeholder="Enter payer name"
+              />
+            </div>
+
+            <!-- Paid At Input -->
+            <DatePicker
+              bind:value={paidAt}
+              label="Payment Date"
+              placeholder="Select payment date"
+              required={true}
+              id="paid-at"
+              name="paid-at"
+            />
+
             <!-- Amount Input -->
             <div>
               <Label for="amount">Amount</Label>
@@ -539,6 +569,7 @@
           disabled={
             !paymentAmount || 
             !selectedBillings.size ||
+            !paidAt ||
             (selectedPaymentType === 'SECURITY_DEPOSIT' && paymentAmount > availableSecurityDeposit())
           }
         >

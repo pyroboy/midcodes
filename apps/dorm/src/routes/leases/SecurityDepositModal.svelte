@@ -8,6 +8,7 @@
   import type { Lease, Billing } from '$lib/types/lease';
   import { invalidate } from '$app/navigation';
   import { Trash2, Plus } from 'lucide-svelte';
+  import DatePicker from '$lib/components/ui/date-picker.svelte';
 
   let { lease, open, onOpenChange } = $props<{
     lease: Lease;
@@ -41,10 +42,24 @@
 
   const loadSecurityDeposits = () => {
     // Filter existing billings for security deposits (type 'OTHER' with security deposit context)
-      securityDeposits = lease.billings?.filter((b: Billing) =>
-    b.type === 'SECURITY_DEPOSIT' && (b.notes?.toLowerCase().includes('security') || b.notes?.toLowerCase().includes('deposit'))
+    if (!open) return;
+    securityDeposits = lease.billings?.filter((b: Billing) =>
+      b.type === 'SECURITY_DEPOSIT' && (b.notes?.toLowerCase().includes('security') || b.notes?.toLowerCase().includes('deposit'))
     ) || [];
   };
+
+  // Load security deposits when modal opens
+  $effect(() => {
+    if (open) {
+      loadSecurityDeposits();
+    } else {
+      // Reset state when modal closes
+      securityDeposits = [];
+      editingDeposit = null;
+      showAddForm = false;
+      resetForm();
+    }
+  });
 
   const startEdit = (deposit: Billing) => {
     editingDeposit = deposit;
@@ -399,21 +414,25 @@
             </div>
             
             <div>
-              <Label for="billing_date">Billing Date</Label>
-              <Input 
-                id="billing_date"
-                type="date" 
+              <DatePicker
                 bind:value={formData.billing_date}
+                label="Billing Date"
+                placeholder="Select billing date"
+                required={true}
+                id="billing_date"
+                name="billing_date"
                 disabled={isLoading}
               />
             </div>
             
             <div>
-              <Label for="due_date">Due Date</Label>
-              <Input 
-                id="due_date"
-                type="date" 
+              <DatePicker
                 bind:value={formData.due_date}
+                label="Due Date"
+                placeholder="Select due date"
+                required={true}
+                id="due_date"
+                name="due_date"
                 disabled={isLoading}
               />
             </div>

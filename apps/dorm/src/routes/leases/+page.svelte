@@ -67,7 +67,8 @@
 
       if (result.ok) {
         leases = leases.filter(l => l.id !== lease.id);
-        await invalidateAll();
+        // No need to invalidateAll since we're already updating the local state
+        // await invalidateAll();
         // Show success message
         alert(`Lease "${lease.name}" has been successfully archived. Payment history has been preserved.`);
       } else {

@@ -2,12 +2,14 @@
   import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '$lib/components/ui/dialog';
   import { Button } from '$lib/components/ui/button';
   import { Input } from '$lib/components/ui/input';
+
   import { Label } from '$lib/components/ui/label';
   import { Checkbox } from '$lib/components/ui/checkbox';
   import { toast } from 'svelte-sonner';
   import type { Lease } from '$lib/types/lease';
   import { getMonthName, getDaysInMonth } from '$lib/utils/date';
   import { invalidate } from '$app/navigation';
+  import DatePicker from '$lib/components/ui/date-picker.svelte';
 
   let { lease, open, onOpenChange } = $props<{
     lease: Lease;
@@ -28,19 +30,26 @@
   let isLoading = $state(false);
   let error = $state<string | null>(null);
 
+  // Fixed timezone-safe function
+  const getFirstDayOfMonth = (year: number, month: number) => {
+    const monthStr = month.toString().padStart(2, '0');
+    return `${year}-${monthStr}-01`;
+  };
+
   const initializeRents = (year: number, existingBillings: any[]) => {
     const billingsMap = new Map(existingBillings.map(b => [new Date(b.billing_date).getUTCMonth() + 1, b]));
     
     return Array.from({ length: 12 }, (_, i) => {
-      const month = i + 1;
+      const month = i + 1; // Fixed: months 1-12
       const existing = billingsMap.get(month);
-      const dueDate = new Date(year, i, lease.rent_due_day || 1);
+      // Use the timezone-safe helper function
+      const defaultDueDate = getFirstDayOfMonth(year, month);
 
       return {
         month,
         isActive: !!existing,
         amount: existing ? existing.amount : lease.rent_amount,
-        dueDate: existing ? existing.due_date.split('T')[0] : dueDate.toISOString().split('T')[0],
+        dueDate: existing ? existing.due_date.split('T')[0] : defaultDueDate,
         billingId: existing ? existing.id : null
       };
     });
@@ -65,6 +74,11 @@
   $effect(() => {
     if (open) {
       fetchBillingsForYear(selectedYear);
+    } else {
+      // Reset state when modal closes to free memory
+      monthlyRents = [];
+      isLoading = false;
+      error = null;
     }
   });
 
@@ -80,10 +94,15 @@
         if (!rent.dueDate) {
           validationErrors.push(`Month ${rent.month}: Due date is required`);
         }
-        // Validate due date format
-        const dueDate = new Date(rent.dueDate);
+        // Validate due date format and ensure it's first day of month
+        const dueDate = new Date(rent.dueDate + 'T00:00:00');
         if (isNaN(dueDate.getTime())) {
           validationErrors.push(`Month ${rent.month}: Invalid due date format`);
+        } else {
+          // Check if it's the first day of the month
+          if (dueDate.getDate() !== 1) {
+            validationErrors.push(`Month ${rent.month}: Due date must be the first day of the month`);
+          }
         }
       }
     });
@@ -128,6 +147,30 @@
     fetchBillingsForYear(selectedYear);
   };
 
+  // Fixed timezone-safe due date change handler
+  const handleDueDateChange = (rent: MonthlyRent, newDate: string) => {
+    if (newDate) {
+      const date = new Date(newDate + 'T00:00:00'); // Add time to avoid timezone issues
+      const year = date.getFullYear();
+      const month = date.getMonth() + 1;
+      rent.dueDate = getFirstDayOfMonth(year, month);
+    }
+  };
+
+  // Handle checkbox changes to set default due date when activating
+  const handleActiveChange = (rent: MonthlyRent, isActive: boolean) => {
+    if (isActive) {
+      // Set to first day of the month when activating
+      if (!rent.dueDate) {
+        rent.dueDate = getFirstDayOfMonth(selectedYear, rent.month);
+      }
+      // Set default rent amount if not already set
+      if (!rent.amount || rent.amount === 0) {
+        rent.amount = lease.rent_amount || 0;
+      }
+    }
+  };
+
 </script>
 
 <Dialog {open} onOpenChange={onOpenChange}>
@@ -153,7 +196,15 @@
       <div class="max-h-[50vh] overflow-y-auto px-1">
         {#each monthlyRents as rent, i (rent.month)}
           <div class="border-b last:border-b-0 p-2 flex items-center gap-3" class:opacity-50={!rent.isActive}>
-            <Checkbox bind:checked={rent.isActive} />
+            <Checkbox 
+              bind:checked={rent.isActive} 
+              onchange={(e) => {
+                const target = e.target as HTMLInputElement;
+                if (target) {
+                  handleActiveChange(rent, target.checked);
+                }
+              }}
+            />
             <div class="min-w-[80px]">
               <Label class="font-medium text-sm">{getMonthName(rent.month)}</Label>
             </div>
@@ -170,13 +221,13 @@
             </div>
             <div class="flex items-center gap-1">
               <Label for={`due-date-${i}`} class="text-xs text-muted-foreground">Due:</Label>
-              <Input 
-                type="date"
-                id={`due-date-${i}`} 
+              <DatePicker
+                bind:value={rent.dueDate}
+                placeholder={getFirstDayOfMonth(selectedYear, rent.month)}
+                id={`due-date-${i}`}
                 name={`due-date-${i}`}
-                bind:value={rent.dueDate} 
                 disabled={!rent.isActive}
-                class="h-7 w-32 text-sm {!rent.isActive ? 'cursor-default' : ''}"
+                label=""
               />
             </div>
           </div>

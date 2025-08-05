@@ -113,7 +113,7 @@ function generateLeasePrintHTML(lease: Lease): string {
      <div class="lease-info">
        <h3>Lease Information</h3>
        <p><strong>Lease:</strong> ${lease.name || `#${lease.id}`}</p>
-       <p><strong>Unit:</strong> Unit • Floor ${lease.rental_unit?.floor?.floor_number || 'N/A'} • Bedspacer</p>
+       <p><strong>Unit:</strong> ${(lease.rental_unit as any)?.name || lease.rental_unit?.rental_unit_number || `Unit ${(lease.rental_unit as any)?.number || 'N/A'}`}</p>
        <p><strong>Property:</strong> ${lease.rental_unit?.property?.name || 'N/A'}</p>
        <p><strong>Lease Period:</strong> ${formatDate(lease.start_date)} - ${formatDate(lease.end_date)}</p>
      </div>

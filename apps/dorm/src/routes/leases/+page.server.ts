@@ -34,7 +34,7 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
       *,
       rental_unit:rental_unit_id (*, floor:floors (*), property:properties (*)),
       lease_tenants:lease_tenants!lease_id (tenant:tenants (name, email, contact_number)),
-      billings (*)
+      billings!billings_lease_id_fkey (*)
     `)
     .is('deleted_at', null) // Only show non-archived leases
     .order('created_at', { ascending: false });
@@ -156,8 +156,8 @@ export const actions: Actions = {
           name: leaseName,
           start_date: leaseData.start_date,
           end_date: endDate,
-          // Set default values for required financial fields
-          rent_amount: 0, // Default value since you don't use this field
+          // Set rent amount from form data
+          rent_amount: leaseData.rent_amount || 0,
           security_deposit: 0, // Default value since you don't use this field
           notes: leaseData.notes || null,
           created_by: user.id,
@@ -194,7 +194,7 @@ export const actions: Actions = {
 				*,
 				rental_unit:rental_unit_id ( *, floor:floors (*), property:properties (*) ),
 				lease_tenants:lease_tenants!lease_id ( tenants ( name, email, contact_number ) ),
-				billings ( * )
+				billings!billings_lease_id_fkey ( * )
 			`
         )
         .eq('id', lease.id)
@@ -239,6 +239,7 @@ export const actions: Actions = {
       const status = formData.get('status') as any;
       const notes = formData.get('notes') as string;
       const rental_unit_id = Number(formData.get('rental_unit_id'));
+      const rent_amount = Number(formData.get('rent_amount')) || 0;
       const tenantIds = formData.get('tenantIds') as string;
 
       if (!id || id <= 0) {
@@ -276,8 +277,8 @@ export const actions: Actions = {
           status,
           notes: notes?.trim() || null,
           rental_unit_id,
-          // Preserve existing financial fields
-          rent_amount: existingLease.rent_amount,
+          // Update rent amount from form data
+          rent_amount: rent_amount,
           security_deposit: existingLease.security_deposit,
           balance: existingLease.balance,
           updated_at: new Date().toISOString()
@@ -489,6 +490,11 @@ export const actions: Actions = {
       const operations = monthlyRents.map(async (rent: MonthlyRent) => {
         const existingBilling = existingBillingsMap.get(rent.month);
 
+        // Ensure due date is always first day of the month (timezone-safe)
+        const dueDate = new Date(rent.dueDate + 'T00:00:00');
+        const firstDayOfMonth = new Date(dueDate.getFullYear(), dueDate.getMonth(), 1);
+        const normalizedDueDate = firstDayOfMonth.toISOString().split('T')[0];
+
         // Case 1: Create new billing
         if (rent.isActive && !existingBilling) {
           return supabase.from('billings').insert({
@@ -498,7 +504,7 @@ export const actions: Actions = {
             paid_amount: 0,
             balance: rent.amount,
             status: 'PENDING',
-            due_date: rent.dueDate,
+            due_date: normalizedDueDate,
             billing_date: `${year}-${String(rent.month).padStart(2, '0')}-01`,
             notes: 'Monthly Rent'
           });
@@ -506,11 +512,11 @@ export const actions: Actions = {
 
         // Case 2: Update existing billing
         if (rent.isActive && existingBilling) {
-          if (existingBilling.amount !== rent.amount || existingBilling.due_date !== rent.dueDate) {
+          if (existingBilling.amount !== rent.amount || existingBilling.due_date !== normalizedDueDate) {
             const newBalance = existingBilling.balance - existingBilling.amount + rent.amount;
             return supabase.from('billings').update({
               amount: rent.amount,
-              due_date: rent.dueDate,
+              due_date: normalizedDueDate,
               balance: newBalance
             }).eq('id', existingBilling.id);
           }

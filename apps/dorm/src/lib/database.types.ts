@@ -307,6 +307,132 @@ export type Database = {
           created_at?: string
         }
       }
+      billings: {
+        Row: {
+          id: number
+          lease_id: number
+          type: Database['public']['Enums']['billing_type']
+          utility_type: Database['public']['Enums']['utility_type'] | null
+          amount: number
+          paid_amount: number
+          balance: number
+          status: Database['public']['Enums']['payment_status']
+          due_date: string
+          billing_date: string
+          penalty_amount: number
+          notes: string | null
+          created_at: string
+          updated_at: string | null
+          meter_id: number | null
+        }
+        Insert: {
+          id?: number
+          lease_id: number
+          type: Database['public']['Enums']['billing_type']
+          utility_type?: Database['public']['Enums']['utility_type'] | null
+          amount: number
+          paid_amount?: number
+          balance: number
+          status?: Database['public']['Enums']['payment_status']
+          due_date: string
+          billing_date: string
+          penalty_amount?: number
+          notes?: string | null
+          created_at?: string
+          updated_at?: string | null
+          meter_id?: number | null
+        }
+        Update: {
+          id?: number
+          lease_id?: number
+          type?: Database['public']['Enums']['billing_type']
+          utility_type?: Database['public']['Enums']['utility_type'] | null
+          amount?: number
+          paid_amount?: number
+          balance?: number
+          status?: Database['public']['Enums']['payment_status']
+          due_date?: string
+          billing_date?: string
+          penalty_amount?: number
+          notes?: string | null
+          created_at?: string
+          updated_at?: string | null
+          meter_id?: number | null
+        }
+      }
+      payments: {
+        Row: {
+          id: number
+          amount: number
+          method: Database['public']['Enums']['payment_method']
+          reference_number: string | null
+          paid_by: string
+          paid_at: string
+          notes: string | null
+          created_at: string
+          receipt_url: string | null
+          created_by: string | null
+          updated_by: string | null
+          updated_at: string | null
+          billing_ids: number[]
+          billing_id: number | null
+        }
+        Insert: {
+          id?: number
+          amount: number
+          method: Database['public']['Enums']['payment_method']
+          reference_number?: string | null
+          paid_by: string
+          paid_at: string
+          notes?: string | null
+          created_at?: string
+          receipt_url?: string | null
+          created_by?: string | null
+          updated_by?: string | null
+          updated_at?: string | null
+          billing_ids: number[]
+          billing_id?: number | null
+        }
+        Update: {
+          id?: number
+          amount?: number
+          method?: Database['public']['Enums']['payment_method']
+          reference_number?: string | null
+          paid_by?: string
+          paid_at?: string
+          notes?: string | null
+          created_at?: string
+          receipt_url?: string | null
+          created_by?: string | null
+          updated_by?: string | null
+          updated_at?: string | null
+          billing_ids?: number[]
+          billing_id?: number | null
+        }
+      }
+      payment_allocations: {
+        Row: {
+          id: number
+          payment_id: number | null
+          billing_id: number | null
+          amount: number
+          created_at: string
+        }
+        Insert: {
+          id?: number
+          payment_id?: number | null
+          billing_id?: number | null
+          amount: number
+          created_at?: string
+        }
+        Update: {
+          id?: number
+          payment_id?: number | null
+          billing_id?: number | null
+          amount?: number
+          created_at?: string
+        }
+      }
     }
     Enums: {
       user_role: 

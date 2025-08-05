@@ -35,6 +35,7 @@ export const leaseSchema = z.object({
   rental_unit_id: z.coerce.number().min(1, 'A rental unit must be selected'),
   name: z.string().optional(),
   status: leaseStatusEnum,
+  rent_amount: z.coerce.number().min(0, 'Rent amount must be non-negative'),
   start_date: z.string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, { message: 'Invalid date format' }),
   end_date: z.string()

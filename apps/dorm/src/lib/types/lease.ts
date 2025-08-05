@@ -51,7 +51,7 @@ export interface PaymentAllocation {
 
 export interface Billing {
 	id: number;
-	lease_id: string;
+	lease_id: number;
 	type: 'RENT' | 'UTILITY' | 'PENALTY' | 'MAINTENANCE' | 'SERVICE' | 'SECURITY_DEPOSIT';
 	utility_type?: 'ELECTRICITY' | 'WATER' | 'INTERNET' ;
 	amount: number;
@@ -67,7 +67,7 @@ export interface Billing {
 }
 
 export interface LeaseResponse {
-  id: string;
+  id: number;
   name: string;
   start_date: string;
   end_date: string;
@@ -78,7 +78,7 @@ export interface LeaseResponse {
 }
 
 export interface Lease {
-  id: string;
+  id: number;
   name: string;
   type: 'STANDARD' | 'GROUP';
   balance: number;
