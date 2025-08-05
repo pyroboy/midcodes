@@ -339,7 +339,7 @@
 
 {#if showSecurityDepositManager}
 <SecurityDepositModal
-  lease={{...lease, id: lease.id.toString()}}
+  lease={lease}
   open={showSecurityDepositManager}
   onOpenChange={handleSecurityDepositManagerClose}
 />

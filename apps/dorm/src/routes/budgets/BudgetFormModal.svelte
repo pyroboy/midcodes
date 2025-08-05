@@ -212,7 +212,7 @@
           <div class="space-y-2">
             <Label for="start_date" class="font-medium text-gray-700">Start Date</Label>
             <Popover>
-              <PopoverTrigger asChild>
+              <PopoverTrigger>
                 <Button
                   variant="outline"
                   class="w-full pl-3 text-left font-normal border-gray-300"
@@ -241,7 +241,7 @@
           <div class="space-y-2">
             <Label for="end_date" class="font-medium text-gray-700">End Date</Label>
             <Popover>
-              <PopoverTrigger asChild>
+              <PopoverTrigger>
                 <Button
                   variant="outline"
                   class="w-full pl-3 text-left font-normal border-gray-300"

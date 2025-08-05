@@ -29,9 +29,23 @@
     notes: ''
   });
 
+  // Form validation state
+  let formErrors = $state({
+    amount: '',
+    due_date: '',
+    billing_date: '',
+    notes: ''
+  });
+
   const resetForm = () => {
     formData = {
       amount: 0,
+      due_date: '',
+      billing_date: '',
+      notes: ''
+    };
+    formErrors = {
+      amount: '',
       due_date: '',
       billing_date: '',
       notes: ''
@@ -40,11 +54,48 @@
     showAddForm = false;
   };
 
+  const validateForm = () => {
+    let isValid = true;
+    formErrors = {
+      amount: '',
+      due_date: '',
+      billing_date: '',
+      notes: ''
+    };
+
+    if (!formData.amount || formData.amount <= 0) {
+      formErrors.amount = 'Please enter a valid amount greater than 0';
+      isValid = false;
+    }
+
+    if (!formData.billing_date) {
+      formErrors.billing_date = 'Billing date is required';
+      isValid = false;
+    }
+
+    if (!formData.due_date) {
+      formErrors.due_date = 'Due date is required';
+      isValid = false;
+    }
+
+    // Validate that due date is not before billing date
+    if (formData.billing_date && formData.due_date) {
+      const billingDate = new Date(formData.billing_date);
+      const dueDate = new Date(formData.due_date);
+      if (dueDate < billingDate) {
+        formErrors.due_date = 'Due date cannot be before billing date';
+        isValid = false;
+      }
+    }
+
+    return isValid;
+  };
+
   const loadSecurityDeposits = () => {
-    // Filter existing billings for security deposits (type 'OTHER' with security deposit context)
+    // Filter existing billings for security deposits (type 'SECURITY_DEPOSIT')
     if (!open) return;
     securityDeposits = lease.billings?.filter((b: Billing) =>
-      b.type === 'SECURITY_DEPOSIT' && (b.notes?.toLowerCase().includes('security') || b.notes?.toLowerCase().includes('deposit'))
+      b.type === 'SECURITY_DEPOSIT'
     ) || [];
   };
 
@@ -84,13 +135,8 @@
   };
 
   const saveBilling = async () => {
-    if (!formData.amount || formData.amount <= 0) {
-      toast.error('Please enter a valid amount');
-      return;
-    }
-
-    if (!formData.due_date || !formData.billing_date) {
-      toast.error('Please enter both billing date and due date');
+    if (!validateForm()) {
+      toast.error('Please fix the form errors before submitting');
       return;
     }
 
@@ -114,7 +160,14 @@
       });
 
       if (!response.ok) {
-        throw new Error('Failed to save security deposit billing');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to save security deposit billing');
+      }
+
+      const result = await response.json();
+      
+      if (result.type === 'failure') {
+        throw new Error(result.data?.message || 'Failed to save security deposit billing');
       }
 
       toast.success(editingDeposit ? 'Security deposit updated successfully' : 'Security deposit added successfully');
@@ -127,7 +180,7 @@
       }, 100);
     } catch (error) {
       console.error('Error saving security deposit:', error);
-      toast.error('Failed to save security deposit');
+      toast.error(error instanceof Error ? error.message : 'Failed to save security deposit');
     } finally {
       isLoading = false;
     }
@@ -150,7 +203,14 @@
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete security deposit billing');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to delete security deposit billing');
+      }
+
+      const result = await response.json();
+      
+      if (result.type === 'failure') {
+        throw new Error(result.data?.message || 'Failed to delete security deposit billing');
       }
 
       toast.success('Security deposit deleted successfully');
@@ -162,7 +222,7 @@
       }, 100);
     } catch (error) {
       console.error('Error deleting security deposit:', error);
-      toast.error('Failed to delete security deposit');
+      toast.error(error instanceof Error ? error.message : 'Failed to delete security deposit');
     } finally {
       isLoading = false;
     }
@@ -410,7 +470,11 @@
                 bind:value={formData.amount}
                 placeholder="Enter amount"
                 disabled={isLoading}
+                class={formErrors.amount ? 'border-red-500' : ''}
               />
+              {#if formErrors.amount}
+                <p class="text-red-500 text-xs mt-1">{formErrors.amount}</p>
+              {/if}
             </div>
             
             <div>
@@ -423,6 +487,9 @@
                 name="billing_date"
                 disabled={isLoading}
               />
+              {#if formErrors.billing_date}
+                <p class="text-red-500 text-xs mt-1">{formErrors.billing_date}</p>
+              {/if}
             </div>
             
             <div>
@@ -435,6 +502,9 @@
                 name="due_date"
                 disabled={isLoading}
               />
+              {#if formErrors.due_date}
+                <p class="text-red-500 text-xs mt-1">{formErrors.due_date}</p>
+              {/if}
             </div>
             
             <div>
@@ -444,7 +514,11 @@
                 bind:value={formData.notes}
                 placeholder="Security Deposit"
                 disabled={isLoading}
+                class={formErrors.notes ? 'border-red-500' : ''}
               />
+              {#if formErrors.notes}
+                <p class="text-red-500 text-xs mt-1">{formErrors.notes}</p>
+              {/if}
             </div>
           </div>
           

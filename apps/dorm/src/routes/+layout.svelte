@@ -9,16 +9,18 @@
 
 
 	// Import Lucide icons
-	import Building from 'lucide-svelte/icons/building';
-	import Home from 'lucide-svelte/icons/home';
-	import Layers from 'lucide-svelte/icons/layers';
-	import Gauge from 'lucide-svelte/icons/gauge';
-	import Users from 'lucide-svelte/icons/users';
-	import FileText from 'lucide-svelte/icons/file-text';
-	import CreditCard from 'lucide-svelte/icons/credit-card';
-	import List from 'lucide-svelte/icons/list';
-	import LogOut from 'lucide-svelte/icons/log-out';
-	import User from 'lucide-svelte/icons/user';
+	import { 
+		Building, 
+		Home, 
+		Layers, 
+		Gauge, 
+		Users, 
+		FileText, 
+		CreditCard, 
+		List, 
+		LogOut, 
+		User 
+	} from 'lucide-svelte';
 
 	let { data, children }: { data: PageData; children: any } = $props();
 

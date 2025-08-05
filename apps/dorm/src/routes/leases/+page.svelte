@@ -3,7 +3,7 @@
   import LeaseFormModal from './LeaseFormModal.svelte';
   import LeaseList from './LeaseList.svelte';
   import { Button } from '$lib/components/ui/button';
-  import { Plus, FileText, Home, DollarSign, AlertTriangle } from 'lucide-svelte';
+  import { Plus } from 'lucide-svelte';
   import type { z } from 'zod';
   import { leaseSchema } from './formSchema';
 
