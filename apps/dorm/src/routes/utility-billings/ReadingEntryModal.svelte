@@ -5,7 +5,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Badge } from '$lib/components/ui/badge';
   import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
-	import type { MeterReadingEntry, ReadingSaveEvent, Property } from './types';
+	import type { MeterReadingEntry, ReadingSaveEvent, Property, ReadingGroup } from './types';
 
 	interface Props {
     open: boolean;
@@ -17,7 +17,7 @@
     costPerUnit: number;
     onSave: (event: ReadingSaveEvent) => void;
     close: () => void;
-    previousReadingGroups: { date: string, readings: any[] }[];
+    previousReadingGroups: ReadingGroup[];
   };
 
 	  let { open = $bindable(), property, utilityType, meters, meterReadings: initialMeterReadings, readingDate, costPerUnit, onSave, close, previousReadingGroups = [] }: Props = $props();
@@ -199,14 +199,17 @@
             <SelectTrigger class="w-full">
               <span>
                 {selectedPreviousDate 
-                  ? new Date(selectedPreviousDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-                  : 'Select a previous reading date...'}
+                  ? (() => {
+                      const selectedGroup = previousReadingGroups.find(g => g.date === selectedPreviousDate);
+                      return selectedGroup?.monthName || new Date(selectedPreviousDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+                    })()
+                  : 'Select a previous reading month...'}
               </span>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="">None</SelectItem>
               {#each previousReadingGroups as group}
-                <SelectItem value={group.date}>{new Date(group.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</SelectItem>
+                <SelectItem value={group.date}>{group.monthName || new Date(group.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}</SelectItem>
               {/each}
             </SelectContent>
           </Select>

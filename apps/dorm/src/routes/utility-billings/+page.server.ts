@@ -18,21 +18,154 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
   // Create a form for superForm to use in the client, using batchReadingsSchema
   const form = await superValidate(zod(batchReadingsSchema));
 
-  // Debug: Log the query we're about to execute
-  console.log('Fetching properties with status ACTIVE...');
+  // Use Promise.all for parallel data fetching to improve performance
+  console.log('Fetching all data in parallel...');
   
-  // Get all active properties
-  const { data: properties, error: propertiesError } = await supabase
-    .from('properties')
-    .select('id, name')
-    .eq('status', 'ACTIVE')
-    .order('name');
+  const [
+    propertiesResult,
+    metersResult,
+    readingsResult,
+    billingsResult,
+    availableReadingDatesResult,
+    tenantCountsResult,
+    leasesResult,
+    allReadingsResult
+  ] = await Promise.all([
+    // Properties
+    supabase
+      .from('properties')
+      .select('id, name')
+      .eq('status', 'ACTIVE')
+      .order('name'),
     
-  console.log('Properties query result:', { properties, propertiesError });
-  
+    // Meters with rental unit info
+    supabase
+      .from('meters')
+      .select(`
+        id,
+        name,
+        type,
+        property_id,
+        initial_reading,
+        rental_unit(
+          id,
+          name,
+          number
+        )
+      `),
+    
+    // All readings with meter info for billing period grouping
+    supabase
+      .from('readings')
+      .select(`
+        id,
+        meter_id,
+        reading,
+        reading_date,
+        rate_at_reading
+      `)
+      .order('reading_date', { ascending: true }),
+    
+    // Billings for last billed date tracking
+    supabase
+      .from('billings')
+      .select('meter_id, lease_id, billing_date, amount')
+      .eq('type', 'UTILITY')
+      .not('meter_id', 'is', null),
+    
+    // Available reading dates
+    supabase
+      .from('readings')
+      .select('reading_date')
+      .order('reading_date'),
+    
+    // Tenant counts per rental unit
+    supabase
+      .from('leases')
+      .select(`
+        rental_unit_id,
+        tenants:lease_tenants (
+          id
+        )
+      `)
+      .eq('status', 'ACTIVE'),
+    
+    // All leases with tenants and room info
+    supabase
+      .from('leases')
+      .select(`
+        id,
+        name,
+        rental_unit_id,
+        status,
+        rental_unit:rental_unit_id(
+          id,
+          name,
+          number,
+          type
+        ),
+        lease_tenants(
+          tenants(
+            id,
+            full_name:name,
+            tenant_status
+          )
+        )
+      `),
+    
+    // All readings for backward compatibility
+    supabase
+      .from('readings')
+      .select('*')
+  ]);
+
+  // Handle errors for each result
+  const { data: properties, error: propertiesError } = propertiesResult;
   if (propertiesError) {
     console.error('Error fetching properties:', propertiesError);
     throw error(500, `Error fetching properties: ${propertiesError.message}`);
+  }
+
+  const { data: meters, error: metersError } = metersResult;
+  if (metersError) {
+    console.error('Error fetching meters:', metersError);
+    throw error(500, `Error fetching meters: ${metersError.message}`);
+  }
+
+  const { data: readings, error: readingsError } = readingsResult;
+  if (readingsError) {
+    console.error('Error fetching readings:', readingsError);
+    throw error(500, `Error fetching readings: ${readingsError.message}`);
+  }
+
+  const { data: billings, error: billingsError } = billingsResult;
+  if (billingsError) {
+    console.error('Error fetching billings:', billingsError);
+    throw error(500, `Error fetching billings: ${billingsError.message}`);
+  }
+
+  const { data: availableReadingDates, error: datesError } = availableReadingDatesResult;
+  if (datesError) {
+    console.error('Error fetching reading dates:', datesError);
+    throw error(500, `Error fetching reading dates: ${datesError.message}`);
+  }
+
+  const { data: tenantCounts, error: tenantsError } = tenantCountsResult;
+  if (tenantsError) {
+    console.error('Error fetching tenant counts:', tenantsError);
+    throw error(500, `Error fetching tenant counts: ${tenantsError.message}`);
+  }
+
+  const { data: leasesData, error: leasesError } = leasesResult;
+  if (leasesError) {
+    console.error('Error fetching leases:', leasesError);
+    throw error(500, `Error fetching leases: ${leasesError.message}`);
+  }
+
+  const { data: allReadings, error: allReadingsError } = allReadingsResult;
+  if (allReadingsError) {
+    console.error('Error fetching all readings:', allReadingsError);
+    throw error(500, `Error fetching all readings: ${allReadingsError.message}`);
   }
 
   // Debug: Log empty results even if no error
@@ -46,48 +179,6 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
       .order('name');
       
     console.log('All properties (without filter):', { allProperties, allPropertiesError });
-  }
-
-  // Get all meters 
-  console.log('Fetching meters...');
-  const { data: meters, error: metersError } = await supabase
-    .from('meters')
-    .select(`
-      id,
-      name,
-      type,
-      property_id,
-      initial_reading,
-      rental_unit(
-        id,
-        name,
-        number
-      )
-    `);
-
-  console.log('Meters query result:', { metersCount: meters?.length || 0, metersError });
-
-  if (metersError) {
-    console.error('Error fetching meters:', metersError);
-    throw error(500, `Error fetching meters: ${metersError.message}`);
-  }
-
-  // Fetch readings with meter info for billing period grouping
-  console.log('Fetching readings for billing period grouping...');
-  const { data: readings, error: readingsError } = await supabase
-    .from('readings')
-    .select(`
-      id,
-      meter_id,
-      reading,
-      reading_date,
-      rate_at_reading
-    `)
-    .order('reading_date', { ascending: true });
-
-  if (readingsError) {
-    console.error('Error fetching readings:', readingsError);
-    throw error(500, `Error fetching readings: ${readingsError.message}`);
   }
 
   // Get meter data separately since there's no foreign key relationship
@@ -116,44 +207,117 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
     meters: meterMap.get(reading.meter_id) || null
   })) || [];
 
-  // Group by meter_id and create billing periods
+  // Group by meter_id
   const grouped = readingsWithMeters.reduce((acc, r) => {
     acc[r.meter_id] = [...(acc[r.meter_id] || []), r];
     return acc;
   }, {} as Record<number, typeof readingsWithMeters>);
 
-  const displayedReadings = [];
+  // Create a map of the LAST billing date for each meter
   const meterLastBilledDates: Record<string, string> = {};
+  billings?.forEach(b => {
+    const key = String(b.meter_id);
+    // Ensure we are always storing the most recent billing date
+    if (!meterLastBilledDates[key] || b.billing_date > meterLastBilledDates[key]) {
+      meterLastBilledDates[key] = b.billing_date;
+    }
+  });
 
+  // IMPLEMENT THE FIXED BILLING PERIOD LOGIC
+  const displayedReadings = [];
+
+  console.log('Processing billing periods for meters:', Object.keys(grouped));
+  console.log('Meter last billed dates:', meterLastBilledDates);
+
+  // Process each meter's readings
   for (const [meterId, meterReadings] of Object.entries(grouped)) {
     const sorted = meterReadings.sort(
       (a, b) => new Date(a.reading_date).getTime() - new Date(b.reading_date).getTime()
     );
 
-    for (let i = 1; i < sorted.length; i++) {
-      const prev = sorted[i - 1];
-      const curr = sorted[i];
+    console.log(`Processing meter ${meterId}:`, {
+      totalReadings: sorted.length,
+      readingDates: sorted.map(r => r.reading_date),
+      lastBilledDate: meterLastBilledDates[meterId]
+    });
 
-      const daysDiff = (new Date(curr.reading_date).getTime() - new Date(prev.reading_date).getTime()) / (1000 * 60 * 60 * 24);
+    // Find the last billed reading for this meter, or the very first reading if never billed
+    const lastBilledDate = meterLastBilledDates[meterId];
+    let lastBilledReading = sorted.find(r => r.reading_date === lastBilledDate);
 
-      // Only consider valid billing cycles (25–35 days)
-      if (daysDiff >= 25 && daysDiff <= 35) {
-        const consumption = curr.reading - prev.reading;
-        const cost = consumption * (curr.rate_at_reading || 0);
+    // If no last billed reading is found, we need to handle this differently
+    if (!lastBilledReading) {
+      // For meters that have never been billed, we should look for billing periods
+      // between consecutive readings, starting from the first reading
+      console.log(`Meter ${meterId} has no billing history, checking consecutive readings`);
+      
+      // Check consecutive readings for valid billing periods
+      for (let i = 1; i < sorted.length; i++) {
+        const prev = sorted[i - 1];
+        const curr = sorted[i];
 
-        displayedReadings.push({
-          ...curr,
-          previous_reading: prev.reading,
-          previous_reading_date: prev.reading_date, // Add the date of the previous reading
-          consumption,
-          cost,
-          days_diff: Math.round(daysDiff),
-          period: curr.reading_date.slice(0, 7), // "2025-04"
-        });
+        const daysDiff = (new Date(curr.reading_date).getTime() - new Date(prev.reading_date).getTime()) / (1000 * 60 * 60 * 24);
 
-        // Track last billed date
-        if (!meterLastBilledDates[meterId] || curr.reading_date > meterLastBilledDates[meterId]) {
-          meterLastBilledDates[meterId] = curr.reading_date;
+        console.log(`Checking period: ${prev.reading_date} to ${curr.reading_date} (${daysDiff} days)`);
+
+        // Only consider valid billing cycles (25–35 days)
+        if (daysDiff >= 25 && daysDiff <= 35) {
+          const consumption = curr.reading - prev.reading;
+          const cost = consumption * (curr.rate_at_reading || 0);
+
+          displayedReadings.push({
+            ...curr,
+            previous_reading: prev.reading,
+            previous_reading_date: prev.reading_date,
+            consumption,
+            cost,
+            days_diff: Math.round(daysDiff),
+            period: curr.reading_date.slice(0, 7), // "2025-04"
+          });
+          
+          console.log(`✅ Valid billing period found for meter ${meterId}: ${prev.reading_date} to ${curr.reading_date}`);
+        }
+      }
+    } else {
+      // For meters with billing history, use the improved logic
+      console.log(`Meter ${meterId} has billing history, last billed: ${lastBilledReading.reading_date}`);
+      
+      // Find all readings that occurred AFTER the last billed reading
+      const potentialNewReadings = sorted.filter(
+        r => new Date(r.reading_date) > new Date(lastBilledReading!.reading_date)
+      );
+
+      console.log(`Found ${potentialNewReadings.length} potential new readings after last billed date`);
+
+      // Now, check each of these potential readings against the last billed one
+      for (const currentReading of potentialNewReadings) {
+        const prev = lastBilledReading;
+        const curr = currentReading;
+
+        const daysDiff = (new Date(curr.reading_date).getTime() - new Date(prev.reading_date).getTime()) / (1000 * 60 * 60 * 24);
+
+        console.log(`Checking period: ${prev.reading_date} to ${curr.reading_date} (${daysDiff} days)`);
+
+        // This condition is now more reliable - only consider valid billing cycles (25–35 days)
+        if (daysDiff >= 25 && daysDiff <= 35) {
+          const consumption = curr.reading - prev.reading;
+          const cost = consumption * (curr.rate_at_reading || 0);
+
+          displayedReadings.push({
+            ...curr,
+            previous_reading: prev.reading,
+            previous_reading_date: prev.reading_date,
+            consumption,
+            cost,
+            days_diff: Math.round(daysDiff),
+            period: curr.reading_date.slice(0, 7), // "2025-04"
+          });
+          
+          console.log(`✅ Valid billing period found for meter ${meterId}: ${prev.reading_date} to ${curr.reading_date}`);
+          
+          // IMPORTANT: Once a valid period is found, update the 'lastBilledReading' 
+          // so the next iteration looks for a period from this new point
+          lastBilledReading = currentReading;
         }
       }
     }
@@ -169,55 +333,11 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
         days_diff: null,
         period: r.reading_date.slice(0, 7),
       });
+      console.log(`📝 Single reading fallback for meter ${meterId}`);
     }
   }
 
-  // Merge with billings to ensure accurate last billed dates
-  const { data: billings } = await supabase
-    .from('billings')
-    .select('meter_id, billing_date')
-    .not('meter_id', 'is', null)
-    .eq('type', 'UTILITY');
-
-  billings?.forEach(b => {
-    const key = String(b.meter_id);
-    if (!meterLastBilledDates[key] || b.billing_date > meterLastBilledDates[key]) {
-      meterLastBilledDates[key] = b.billing_date;
-    }
-  });
-
-  // Get available reading dates (for backward compatibility)
-  console.log('Fetching reading dates...');
-  const { data: availableReadingDates, error: datesError } = await supabase
-    .from('readings')
-    .select('reading_date')
-    .order('reading_date');
-
-  console.log('Reading dates result:', { datesCount: availableReadingDates?.length || 0, datesError });
-
-  if (datesError) {
-    console.error('Error fetching reading dates:', datesError);
-    throw error(500, `Error fetching reading dates: ${datesError.message}`);
-  }
-
-  // Get tenant counts per rental_unit
-  console.log('Fetching tenant counts...');
-  const { data: tenantCounts, error: tenantsError } = await supabase
-    .from('leases')
-    .select(`
-      rental_unit_id,
-      tenants:lease_tenants (
-        id
-      )
-    `)
-    .eq('status', 'ACTIVE');
-
-  console.log('Tenant counts result:', { tenantCountsCount: tenantCounts?.length || 0, tenantsError });
-
-  if (tenantsError) {
-    console.error('Error fetching tenant counts:', tenantsError);
-    throw error(500, `Error fetching tenant counts: ${tenantsError.message}`);
-  }
+  console.log(`Total billing periods found: ${displayedReadings.length}`);
 
   // Process tenant counts
   const rental_unitTenantCounts = tenantCounts.reduce((acc, lease) => {
@@ -237,30 +357,7 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
     sampleProperties: properties?.slice(0, 3) || []
   });
 
-  // Get all leases with their tenants (regardless of status) and room information
-  console.log('Fetching all leases with tenants and room info...');
-  const { data: leasesData, error: leasesError } = await supabase
-    .from('leases')
-    .select(`
-      id,
-      name,
-      rental_unit_id,
-      status,
-      rental_unit:rental_unit_id(
-        id,
-        name,
-        number,
-        type
-      ),
-      lease_tenants(
-        tenants(
-          id,
-          full_name:name,
-          tenant_status
-        )
-      )
-    `);
-
+  // Process leases data
   const leases = leasesData?.map(lease => ({
     ...lease,
     tenants: lease.lease_tenants.filter(lt => lt.tenants !== null).map(lt => lt.tenants),
@@ -269,28 +366,12 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
       : 'Unknown Room'
   }));
 
-  if (leasesError) {
-    console.error('Error fetching leases:', leasesError);
-    throw error(500, `Error fetching leases: ${leasesError.message}`);
-  }
-
   // Get last billed date for each lease-meter combination with more accurate tracking
-  const { data: leaseBillings, error: billingsError } = await supabase
-    .from('billings')
-    .select('meter_id, lease_id, billing_date, amount')
-    .eq('type', 'UTILITY')
-    .not('meter_id', 'is', null);
-
-  if (billingsError) {
-    console.error('Error fetching billings:', billingsError);
-    return fail(500, { message: 'Failed to fetch billings' });
-  }
-
   const leaseMeterBilledDates: Record<string, string> = {};
   const meterBilledDates: Record<string, string[]> = {}; // Track all billing dates per meter
 
-  if (leaseBillings) {
-    for (const billing of leaseBillings) {
+  if (billings) {
+    for (const billing of billings) {
       if (billing.meter_id && billing.lease_id) {
         const key = `${billing.meter_id}-${billing.lease_id}`;
         const newDate = billing.billing_date;
@@ -316,29 +397,23 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
     actualBilledDates[meterKey] = [...new Set(dates)].sort();
   }
 
-  // Get all readings with full data (for backward compatibility)
-  const { data: allReadings, error: allReadingsError } = await supabase
-    .from('readings')
-    .select('*');
-
-  if (allReadingsError) {
-    console.error('Error fetching all readings:', allReadingsError);
-    throw error(500, `Error fetching all readings: ${allReadingsError.message}`);
-  }
-
+  // Group readings by month instead of individual dates
   const readingGroups = (allReadings || []).reduce((acc, reading) => {
-    const date = reading.reading_date;
-    if (!acc[date]) {
-      acc[date] = [];
+    const date = new Date(reading.reading_date);
+    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`; // "2025-06"
+    
+    if (!acc[monthKey]) {
+      acc[monthKey] = [];
     }
-    acc[date].push(reading);
+    acc[monthKey].push(reading);
     return acc;
   }, {} as Record<string, any[]>);
 
-  const previousReadingGroups = Object.entries(readingGroups).map(([date, readings]) => ({
-    date,
-    readings
-  })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const previousReadingGroups = Object.entries(readingGroups).map(([monthKey, readings]) => ({
+    date: monthKey, // Use month key as date
+    readings,
+    monthName: new Date(monthKey + '-01').toLocaleDateString('en-US', { year: 'numeric', month: 'long' }) // "June 2025"
+  })).sort((a, b) => new Date(b.date + '-01').getTime() - new Date(a.date + '-01').getTime());
 
   // Return all the data needed for the page
   return {
@@ -373,37 +448,10 @@ export const actions: Actions = {
     try {
       const billings: Array<{ lease_id: number; utility_type: string; billing_date: string; amount: number; notes: string; meter_id: number; lease: { name: string } }> = JSON.parse(billingDataString);
 
-      // 1. Pre-emptive Duplicate Check
-      const orFilters = billings
-        .map(
-          (b) =>
-            `and(lease_id.eq.${b.lease_id},utility_type.eq.${b.utility_type},billing_date.eq.${b.billing_date},meter_id.eq.${b.meter_id})`
-        )
-        .join(',');
+      // REMOVED: Pre-emptive duplicate check to eliminate race condition
+      // The database unique constraint will handle this more reliably
 
-      const { data: existingBillings, error: checkError } = await supabase
-        .from('billings')
-        .select('lease_id')
-        .or(orFilters);
-
-      if (checkError) {
-        console.error('Error checking for duplicates:', checkError);
-        return fail(500, { error: 'Database error while checking for duplicates.' });
-      }
-
-      // 2. All-or-Nothing Logic
-      if (existingBillings && existingBillings.length > 0) {
-        const existingLeaseIds = new Set(existingBillings.map(eb => eb.lease_id));
-        const conflictingLeases = billings
-          .filter(b => existingLeaseIds.has(b.lease_id))
-          .map(b => b.lease.name)
-          .join(', ');
-        return fail(409, { 
-          error: `Duplicate billing detected. The following leases have already been billed for this period: ${conflictingLeases}. No new bills were created.`
-        });
-      }
-
-      // 3. Transactional Data Insertion
+      // Transactional Data Insertion
       const billingsToCreate = billings.map(item => {
         const dueDate = new Date(item.billing_date);
         dueDate.setDate(dueDate.getDate() + 15); // Due 15 days from billing date

@@ -34,7 +34,7 @@ let {
 }: Props = $props();
 
 let view: View = $state('tenants');
-let selectedTenants = $state(new Set<number>());
+let selectedTenants = $state(new Set<string>()); // Change to string to store lease-tenant combination
 let searchQuery = $state(reading?.meterName ?? '');
 
 const flatTenantList = $derived(leases
@@ -60,11 +60,12 @@ const filteredList = $derived(
   searchQuery ? fuse.search(searchQuery).map(result => result.item) : flatTenantList
 );
 
-function toggleTenantSelection(tenantId: number, isChecked: boolean | 'indeterminate') {
+function toggleTenantSelection(leaseId: number, tenantId: number, isChecked: boolean | 'indeterminate') {
+  const uniqueKey = `${leaseId}-${tenantId}`;
   if (isChecked === true) {
-    selectedTenants.add(tenantId);
+    selectedTenants.add(uniqueKey);
   } else {
-    selectedTenants.delete(tenantId);
+    selectedTenants.delete(uniqueKey);
   }
   selectedTenants = new Set(selectedTenants);
 }
@@ -76,7 +77,7 @@ function handleGenerate() {
   const sharePerTenant = totalCost / selectedTenants.size;
 
   const shareData = flatTenantList
-    .filter(item => selectedTenants.has(item.tenant.id))
+    .filter(item => selectedTenants.has(`${item.leaseId}-${item.tenant.id}`))
     .map(item => ({
       tenant: item.tenant,
       lease: { id: item.leaseId, name: item.leaseName },
@@ -204,14 +205,14 @@ function getUnitLabel(type: string): string {
           <div class="mt-4 pr-2 -mr-4 max-h-60 overflow-y-auto">
             {#if filteredList.length > 0}
               <div class="grid gap-2">
-                {#each filteredList as item (item.tenant.id)}
+                {#each filteredList as item (`${item.leaseId}-${item.tenant.id}`)}
                   {@const billedDate = reading && leaseMeterBilledDates ? leaseMeterBilledDates[`${reading.meterId}-${item.leaseId}`] : undefined}
                   {@const isBilledForPeriod = reading && actualBilledDates && actualBilledDates[String(reading.meterId)] ? actualBilledDates[String(reading.meterId)].includes(reading.currentReadingDate || '') : false}
                   <label class="flex items-center p-3 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors">
                     <Checkbox.Root
                       class="mr-3"
-                      checked={selectedTenants.has(item.tenant.id)}
-                      onCheckedChange={(isChecked) => toggleTenantSelection(item.tenant.id, isChecked)}
+                      checked={selectedTenants.has(`${item.leaseId}-${item.tenant.id}`)}
+                      onCheckedChange={(isChecked) => toggleTenantSelection(item.leaseId, item.tenant.id, isChecked)}
                     />
                     <div class="flex-1">
                       <p class="font-medium">
@@ -282,7 +283,7 @@ function getUnitLabel(type: string): string {
             const sharePerTenant = totalCost / selectedTenants.size;
 
             const shareData = flatTenantList
-              .filter(item => selectedTenants.has(item.tenant.id))
+              .filter(item => selectedTenants.has(`${item.leaseId}-${item.tenant.id}`))
               .map(item => ({
                 tenant: item.tenant,
                 lease: { id: item.leaseId, name: item.leaseName },

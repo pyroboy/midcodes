@@ -187,3 +187,10 @@ export type Filters = {
 	totalCost: number | null;
 	history: Reading[];
   }
+
+  // Reading group structure for previous readings
+  export interface ReadingGroup {
+    date: string;
+    readings: any[];
+    monthName?: string;
+  }
