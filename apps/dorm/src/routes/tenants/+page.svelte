@@ -1,28 +1,67 @@
 <script lang="ts">
   import { invalidateAll } from '$app/navigation';
   import TenantFormModal from './TenantFormModal.svelte';
+  import TenantCard from './TenantCard.svelte';
+  import TenantTable from './TenantTable.svelte';
   import { Button } from '$lib/components/ui/button';
-  import { Plus, Users, UserCheck, UserX, AlertTriangle, Search } from 'lucide-svelte';
+  import { Plus, Users, UserCheck, UserX, AlertTriangle, Search, LayoutGrid, List } from 'lucide-svelte';
   import type { TenantResponse } from '$lib/types/tenant';
   import type { PageData } from './$types';
-  import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '$lib/components/ui/accordion';
-  import { Pencil, Trash2 } from 'lucide-svelte';
+
   import { Input } from '$lib/components/ui/input';
   import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
-  import { Badge } from '$lib/components/ui/badge';
+  import { Skeleton } from '$lib/components/ui/skeleton';
   import { toast } from 'svelte-sonner';
   import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
+  import { onMount } from 'svelte';
 
   let { data } = $props<{ data: PageData }>();
-  let tenants = $state(data.tenants);
+  let tenants = $state<TenantResponse[]>(data.tenants);
+  let properties = $state(data.properties);
+
+  // Update local state when data changes (after invalidateAll())
+  $effect(() => {
+    // Always update when data changes, unless we're currently lazy loading
+    if (!isLoading && !data.lazy) {
+      tenants = data.tenants;
+      properties = data.properties;
+    }
+  });
   let showModal = $state(false);
   let selectedTenant: TenantResponse | undefined = $state();
   let editMode = $state(false);
   let searchTerm = $state('');
   let selectedStatus = $state('');
+  let isLoading = $state(data.lazy === true); // Loading state for skeletons
+  let viewMode = $state<'card' | 'list'>('card'); // Toggle between card and list view
+
+  // Load data lazily if needed
+  onMount(async () => {
+    if (data.lazy && data.tenantsPromise && data.propertiesPromise) {
+      try {
+        // Load data in background
+        const [loadedTenants, loadedProperties] = await Promise.all([
+          data.tenantsPromise,
+          data.propertiesPromise
+        ]);
+        
+        // Update state
+        tenants = loadedTenants;
+        properties = loadedProperties;
+        isLoading = false;
+      } catch (error) {
+        console.error('Error loading tenant data:', error);
+        toast.error('Failed to load tenant data');
+        isLoading = false;
+      }
+    }
+  });
 
   $effect(() => {
-    tenants = data.tenants;
+    if (!data.lazy) {
+      tenants = data.tenants;
+      properties = data.properties;
+    }
   });
 
   // Filtered tenants
@@ -54,6 +93,15 @@
     selectedTenant = tenant;
     editMode = true;
     showModal = true;
+  }
+
+  // Function to update tenant in local state immediately
+  function updateTenantInState(updatedTenant: TenantResponse) {
+    const index = tenants.findIndex(t => t.id === updatedTenant.id);
+    if (index !== -1) {
+      tenants[index] = updatedTenant;
+      tenants = [...tenants]; // Trigger reactivity
+    }
   }
 
   async function handleDeleteTenant(tenant: TenantResponse) {
@@ -106,20 +154,7 @@
     }
   }
 
-  function getStatusColor(status: string) {
-    switch (status) {
-      case 'ACTIVE':
-        return 'bg-green-100 text-green-800';
-      case 'PENDING':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'INACTIVE':
-        return 'bg-gray-100 text-gray-800';
-      case 'BLACKLISTED':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  }
+
 </script>
 
 <div class="w-full min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
@@ -140,22 +175,42 @@
         
         <!-- Minimized Stats Overview -->
         <div class="flex items-center gap-3 text-xs sm:text-sm">
-          <div class="flex items-center gap-1 px-2 py-1 bg-blue-50 rounded-lg">
-            <span class="text-blue-600 font-medium">{stats.total}</span>
-            <span class="text-slate-600">Total</span>
-          </div>
-          <div class="flex items-center gap-1 px-2 py-1 bg-green-50 rounded-lg">
-            <span class="text-green-600 font-medium">{stats.active}</span>
-            <span class="text-slate-600">Active</span>
-          </div>
-          <div class="flex items-center gap-1 px-2 py-1 bg-yellow-50 rounded-lg">
-            <span class="text-yellow-600 font-medium">{stats.pending}</span>
-            <span class="text-slate-600">Pending</span>
-          </div>
-          <div class="flex items-center gap-1 px-2 py-1 bg-red-50 rounded-lg">
-            <span class="text-red-600 font-medium">{stats.blacklisted}</span>
-            <span class="text-slate-600">Blacklisted</span>
-          </div>
+          {#if isLoading}
+            <!-- Skeleton stats -->
+            <div class="flex items-center gap-1 px-2 py-1 bg-blue-50 rounded-lg">
+              <Skeleton class="h-4 w-6" />
+              <span class="text-slate-600">Total</span>
+            </div>
+            <div class="flex items-center gap-1 px-2 py-1 bg-green-50 rounded-lg">
+              <Skeleton class="h-4 w-6" />
+              <span class="text-slate-600">Active</span>
+            </div>
+            <div class="flex items-center gap-1 px-2 py-1 bg-yellow-50 rounded-lg">
+              <Skeleton class="h-4 w-6" />
+              <span class="text-slate-600">Pending</span>
+            </div>
+            <div class="flex items-center gap-1 px-2 py-1 bg-red-50 rounded-lg">
+              <Skeleton class="h-4 w-6" />
+              <span class="text-slate-600">Blacklisted</span>
+            </div>
+          {:else}
+            <div class="flex items-center gap-1 px-2 py-1 bg-blue-50 rounded-lg">
+              <span class="text-blue-600 font-medium">{stats.total}</span>
+              <span class="text-slate-600">Total</span>
+            </div>
+            <div class="flex items-center gap-1 px-2 py-1 bg-green-50 rounded-lg">
+              <span class="text-green-600 font-medium">{stats.active}</span>
+              <span class="text-slate-600">Active</span>
+            </div>
+            <div class="flex items-center gap-1 px-2 py-1 bg-yellow-50 rounded-lg">
+              <span class="text-yellow-600 font-medium">{stats.pending}</span>
+              <span class="text-slate-600">Pending</span>
+            </div>
+            <div class="flex items-center gap-1 px-2 py-1 bg-red-50 rounded-lg">
+              <span class="text-red-600 font-medium">{stats.blacklisted}</span>
+              <span class="text-slate-600">Blacklisted</span>
+            </div>
+          {/if}
         </div>
         
         <Button 
@@ -182,27 +237,79 @@
             class="pl-10 w-full" 
           />
         </div>
-        <Select type="single" bind:value={selectedStatus}>
-          <SelectTrigger class="w-[180px]">
-            {selectedStatus ? selectedStatus.charAt(0).toUpperCase() + selectedStatus.slice(1).toLowerCase() : 'Filter by status'}
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="">All Statuses</SelectItem>
-            <SelectItem value="ACTIVE">Active</SelectItem>
-            <SelectItem value="INACTIVE">Inactive</SelectItem>
-            <SelectItem value="PENDING">Pending</SelectItem>
-            <SelectItem value="BLACKLISTED">Blacklisted</SelectItem>
-          </SelectContent>
-        </Select>
+        <div class="flex gap-2">
+          <Select type="single" bind:value={selectedStatus}>
+            <SelectTrigger class="w-[180px]">
+              {selectedStatus ? selectedStatus.charAt(0).toUpperCase() + selectedStatus.slice(1).toLowerCase() : 'Filter by status'}
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Statuses</SelectItem>
+              <SelectItem value="ACTIVE">Active</SelectItem>
+              <SelectItem value="INACTIVE">Inactive</SelectItem>
+              <SelectItem value="PENDING">Pending</SelectItem>
+              <SelectItem value="BLACKLISTED">Blacklisted</SelectItem>
+            </SelectContent>
+          </Select>
+          
+          <!-- View Toggle Buttons -->
+          <div class="flex border border-slate-200 rounded-md bg-white">
+            <Button
+              variant={viewMode === 'card' ? 'default' : 'ghost'}
+              size="sm"
+              onclick={() => viewMode = 'card'}
+              class="rounded-r-none px-3"
+            >
+              <LayoutGrid class="w-4 h-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'list' ? 'default' : 'ghost'}
+              size="sm"
+              onclick={() => viewMode = 'list'}
+              class="rounded-l-none px-3 border-l border-slate-200"
+            >
+              <List class="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- Tenants List Section -->
     <div class="bg-white/40 backdrop-blur-sm rounded-2xl border border-slate-200/60 shadow-sm">
       <div class="p-6">
-        <h2 class="text-lg font-semibold text-slate-800 mb-4">Tenant List ({filteredTenants.length})</h2>
+        <h2 class="text-lg font-semibold text-slate-800 mb-4">
+          Tenant List {isLoading ? '' : `(${filteredTenants.length})`}
+        </h2>
         
-        {#if filteredTenants.length === 0}
+        {#if isLoading}
+          <!-- Skeleton tenant cards -->
+          <div class="space-y-2">
+            {#each Array(5) as _, i (i)}
+              <div class="border border-slate-200 rounded-lg p-4">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-3 flex-1">
+                    <!-- Avatar skeleton -->
+                    <Skeleton class="w-10 h-10 rounded-full" />
+                    <div class="space-y-2">
+                      <!-- Name skeleton -->
+                      <Skeleton class="h-4 w-32" />
+                      <!-- Contact info skeleton -->
+                      <Skeleton class="h-3 w-48" />
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <!-- Status badge skeleton -->
+                    <Skeleton class="h-6 w-16 rounded-full" />
+                    <!-- Edit button skeleton -->
+                    <Skeleton class="h-9 w-9 rounded-md" />
+                    <!-- Delete button skeleton -->
+                    <Skeleton class="h-9 w-9 rounded-md" />
+                  </div>
+                </div>
+              </div>
+            {/each}
+          </div>
+        {:else if filteredTenants.length === 0}
           <div class="text-center py-12">
             <Users class="w-12 h-12 mx-auto mb-4 text-gray-400" />
             <p class="text-gray-500 text-lg font-medium">
@@ -218,74 +325,24 @@
               </Button>
             {/if}
           </div>
-        {:else}
-          <Accordion type="single" class="w-full space-y-2">
+        {:else if viewMode === 'card'}
+          <!-- Card View (Grid) -->
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {#each filteredTenants as tenant (tenant.id)}
-              <AccordionItem value={tenant.id.toString()} class="border border-slate-200 rounded-lg">
-                <div class="flex justify-between items-center w-full p-4">
-                  <AccordionTrigger class="flex-1 text-left">
-                    <div class="flex items-center gap-3">
-                      <div class="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center">
-                        <span class="text-slate-600 font-medium text-sm">
-                          {tenant.name.split(' ').map((n: string) => n[0]).join('').toUpperCase()}
-                        </span>
-                      </div>
-                      <div>
-                        <div class="font-medium text-slate-900">{tenant.name}</div>
-                        <div class="text-sm text-slate-500">
-                          {tenant.email || tenant.contact_number || 'No contact info'}
-                        </div>
-                      </div>
-                    </div>
-                  </AccordionTrigger>
-                  <div class="flex items-center gap-2">
-                    <Badge class={getStatusColor(tenant.tenant_status)}>
-                      {tenant.tenant_status}
-                    </Badge>
-                    <Button variant="outline" size="icon" onclick={() => handleEdit(tenant)}>
-                      <Pencil class="h-4 w-4" />
-                    </Button>
-                    <Button variant="destructive" size="icon" onclick={() => handleDeleteTenant(tenant)}>
-                      <Trash2 class="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <AccordionContent class="px-4 pb-4">
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p class="text-slate-600"><strong>Email:</strong> {tenant.email || 'N/A'}</p>
-                      <p class="text-slate-600"><strong>Contact:</strong> {tenant.contact_number || 'N/A'}</p>
-                      <p class="text-slate-600"><strong>Status:</strong> 
-                        <Badge class={`ml-2 ${getStatusColor(tenant.tenant_status)}`}>
-                          {tenant.tenant_status}
-                        </Badge>
-                      </p>
-                    </div>
-                    <div>
-                      {#if tenant.lease}
-                        <p class="text-slate-600"><strong>Current Lease:</strong> {tenant.lease.name || 'N/A'}</p>
-                        <p class="text-slate-600"><strong>Property:</strong> {tenant.lease.location?.property?.name || 'N/A'}</p>
-                        <p class="text-slate-600"><strong>Unit:</strong> {tenant.lease.location?.number || 'N/A'}</p>
-                      {:else}
-                        <p class="text-slate-600"><strong>Current Lease:</strong> <span class="text-orange-600">No active lease</span></p>
-                      {/if}
-                    </div>
-                    {#if tenant.emergency_contact?.name}
-                      <div class="md:col-span-2">
-                        <p class="text-slate-600 font-medium mb-2">Emergency Contact:</p>
-                        <div class="bg-slate-50 rounded-lg p-3">
-                          <p class="text-slate-600"><strong>Name:</strong> {tenant.emergency_contact.name}</p>
-                          <p class="text-slate-600"><strong>Relationship:</strong> {tenant.emergency_contact.relationship || 'N/A'}</p>
-                          <p class="text-slate-600"><strong>Phone:</strong> {tenant.emergency_contact.phone || 'N/A'}</p>
-                          <p class="text-slate-600"><strong>Email:</strong> {tenant.emergency_contact.email || 'N/A'}</p>
-                        </div>
-                      </div>
-                    {/if}
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
+              <TenantCard 
+                {tenant} 
+                onEdit={handleEdit} 
+                onDelete={handleDeleteTenant} 
+              />
             {/each}
-          </Accordion>
+          </div>
+        {:else}
+          <!-- List View (Table) -->
+          <TenantTable 
+            tenants={filteredTenants}
+            on:edit={(e) => handleEdit(e.detail)}
+            on:delete={(e) => handleDeleteTenant(e.detail)}
+          />
         {/if}
       </div>
     </div>
@@ -299,6 +356,7 @@
   {editMode}
   form={data.form}
   onOpenChange={handleModalClose}
+  onTenantUpdate={updateTenantInState}
 />
 
 <SuperDebug data={data} />

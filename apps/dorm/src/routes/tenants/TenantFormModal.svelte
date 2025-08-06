@@ -10,10 +10,11 @@
   import { Pencil, Plus, AlertCircle, User, Phone, Mail, MapPin } from 'lucide-svelte';
   import { superForm } from 'sveltekit-superforms/client';
   import { zodClient } from 'sveltekit-superforms/adapters';
-  import { invalidateAll } from '$app/navigation';
+  import { invalidateAll, invalidate } from '$app/navigation';
   import { tenantFormSchema, TenantStatusEnum, defaultEmergencyContact } from './formSchema';
   import type { z } from 'zod';
   import Textarea from '$lib/components/ui/textarea/textarea.svelte';
+  import ImageUpload from '$lib/components/ui/ImageUpload.svelte';
 
   type FormType = z.infer<typeof tenantFormSchema>;
 
@@ -22,19 +23,25 @@
     open, 
     onOpenChange, 
     editMode = false,
-    form: initialForm
+    form: initialForm,
+    onTenantUpdate
   } = $props<{
     tenant?: any;
     open: boolean;
     onOpenChange: (open: boolean) => void;
     editMode: boolean;
     form: any;
+    onTenantUpdate?: (tenant: any) => void;
   }>();
 
   // Debug logging
   $effect(() => {
     // Modal props changed - no longer needed for debugging
   });
+
+  // Profile picture state
+  let profilePictureFile: File | null = $state(null);
+  let uploadingImage = $state(false);
 
   // Initialize Superforms
   const { 
@@ -54,6 +61,22 @@
     },
     onResult: async ({ result }) => {
       if (result.type === 'success') {
+        // If we're in edit mode and have a callback, immediately update the tenant with new profile picture
+        if (editMode && onTenantUpdate && tenant) {
+          const updatedTenant = {
+            ...tenant,
+            name: $form.name,
+            email: $form.email,
+            contact_number: $form.contact_number,
+            tenant_status: $form.tenant_status,
+            profile_picture_url: $form.profile_picture_url,
+            // Keep other existing data
+          };
+          onTenantUpdate(updatedTenant);
+        }
+        
+        // Still invalidate for data consistency
+        await invalidate('app:tenants');
         await invalidateAll();
         reset();
         toast.success(editMode ? 'Tenant updated successfully' : 'Tenant created successfully');
@@ -78,6 +101,60 @@
       $form.emergency_contact = { ...defaultEmergencyContact };
     }
   });
+
+  // Profile picture handlers
+  async function handleProfilePictureUpload(file: File) {
+    // Validate file size (2MB limit for profile pictures)
+    const maxSize = 2 * 1024 * 1024; // 2MB in bytes
+    if (file.size > maxSize) {
+      toast.error('Profile picture must be smaller than 2MB');
+      return;
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select a valid image file');
+      return;
+    }
+
+    uploadingImage = true;
+    profilePictureFile = file;
+    
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch('/api/upload-image', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Upload failed');
+      }
+
+      const result = await response.json();
+      $form.profile_picture_url = result.secure_url;
+      toast.success(`Profile picture uploaded successfully (${(file.size / 1024 / 1024).toFixed(1)}MB)`);
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast.error(`Failed to upload profile picture: ${error?.message || 'Unknown error'}`);
+      profilePictureFile = null;
+      $form.profile_picture_url = null;
+    } finally {
+      uploadingImage = false;
+    }
+  }
+
+  function handleProfilePictureRemove() {
+    $form.profile_picture_url = null;
+    profilePictureFile = null;
+  }
+
+  function handleProfilePictureError(error: string) {
+    toast.error(error);
+  }
 
   // Convert ZodEnum to array of status options
   let tenantStatusOptions = $derived(Object.values(TenantStatusEnum.Values));
@@ -142,7 +219,8 @@
           next_payment_due: null,
           payment_schedules: [],
           status_history: [],
-          status_change_reason: null
+          status_change_reason: null,
+          profile_picture_url: tenant?.profile_picture_url || null
         };
       } else {
         // Create mode - reset to defaults with proper emergency_contact initialization
@@ -175,7 +253,8 @@
           next_payment_due: null,
           payment_schedules: [],
           status_history: [],
-          status_change_reason: null
+          status_change_reason: null,
+          profile_picture_url: null
         };
       }
     }
@@ -309,6 +388,44 @@
         </div>
       </div>
 
+      <!-- Profile Picture -->
+      <div class="space-y-4">
+        <div class="flex items-center gap-2 pb-2 border-b border-slate-200">
+          <User class="w-4 h-4 text-slate-500" />
+          <h3 class="text-sm font-semibold text-slate-700">Profile Picture (Optional)</h3>
+        </div>
+        
+        <div class="flex flex-col items-center space-y-2">
+          <ImageUpload
+            value={$form.profile_picture_url}
+            disabled={uploadingImage || $submitting}
+            onupload={handleProfilePictureUpload}
+            onremove={handleProfilePictureRemove}
+            onerror={handleProfilePictureError}
+            class="w-40 h-40"
+            placeholder="Upload profile picture"
+            maxSize={2}
+          />
+          
+          {#if uploadingImage}
+            <div class="flex items-center gap-2 text-sm text-slate-600">
+              <div class="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+              <span>Optimizing and uploading image...</span>
+            </div>
+          {/if}
+        </div>
+        
+        <!-- Hidden input for form submission -->
+        <input type="hidden" name="profile_picture_url" bind:value={$form.profile_picture_url} />
+        
+        {#if $errors.profile_picture_url}
+          <p class="text-sm text-red-500 flex items-center gap-1 justify-center">
+            <AlertCircle class="w-4 h-4" />
+            {$errors.profile_picture_url}
+          </p>
+        {/if}
+      </div>
+
       <!-- Emergency Contact -->
       <div class="space-y-4">
         <div class="flex items-center gap-2 pb-2 border-b border-slate-200">
@@ -425,8 +542,8 @@
         <Button type="button" variant="outline" onclick={() => onOpenChange(false)}>
           Cancel
         </Button>
-        <Button type="submit" disabled={$submitting}>
-          {$submitting ? (editMode ? 'Saving...' : 'Creating...') : (editMode ? 'Save Changes' : 'Create Tenant')}
+        <Button type="submit" disabled={$submitting || uploadingImage}>
+          {uploadingImage ? 'Uploading Image...' : $submitting ? (editMode ? 'Saving...' : 'Creating...') : (editMode ? 'Save Changes' : 'Create Tenant')}
         </Button>
       </div>
     </form>

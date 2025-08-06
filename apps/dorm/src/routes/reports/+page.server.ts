@@ -2,6 +2,14 @@ import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import type { Database } from '$lib/database.types';
 
+// Configure ISR for report caching
+export const config = {
+	isr: {
+		expiration: 300, // Cache for 5 minutes (300 seconds)
+		allowQuery: ['year', 'month', 'propertyId']
+	}
+};
+
 export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession }, url }) => {
   const session = await safeGetSession();
   if (!session) {

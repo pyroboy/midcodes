@@ -94,6 +94,27 @@
     }, 0) || 0;
   });
 
+  // Get the most recent payment date when all billings are paid
+  let lastPaidDate = $derived.by(() => {
+    if (!lease.billings || lease.billings.length === 0) return null;
+    
+    // Check if all billings are fully paid
+    const allPaid = lease.billings.every(b => {
+      const totalDue = b.amount + (b.penalty_amount || 0);
+      return b.paid_amount >= totalDue;
+    });
+    
+    if (!allPaid) return null;
+    
+    // Find the most recent paid_at date from all billings
+    const paidDates = lease.billings
+      .filter(b => b.paid_at)
+      .map(b => new Date(b.paid_at))
+      .sort((a, b) => b.getTime() - a.getTime());
+    
+    return paidDates.length > 0 ? paidDates[0] : null;
+  });
+
   async function handleStatusChange(newStatus: string) {
     try {
       const formData = new FormData();
@@ -162,46 +183,100 @@
         </div>
       </div>
 
-      <!-- Middle: Simplified Balance Display - 1/3 width on desktop, full on mobile -->
-      <div class="w-full lg:w-1/3 flex items-center justify-center">
-        <div class="text-right">
-          <!-- Main Balance , if 0 dont show anything -->
-          <div class="text-2xl font-bold text-slate-800">
-
-       
-          
-          <!-- Balance Breakdown -->
-          {#if lease.balanceStatus}
-            <div class="text-2xl text-slate-600 mt-1">
-              {#if lease.balanceStatus.overdueBalance > 0}
-                <span class="text-red-600">₱{lease.balanceStatus.overdueBalance.toLocaleString()} overdue</span>
-              {/if}
-              {#if lease.balanceStatus.partialBalance > 0}
-                {#if lease.balanceStatus.overdueBalance > 0} • {/if}
-                <span class="text-amber-600">₱{lease.balanceStatus.partialBalance.toLocaleString()} partial</span>
-              {/if}
-              {#if lease.balanceStatus.pendingBalance > 0}
-                {#if lease.balanceStatus.overdueBalance > 0 || lease.balanceStatus.partialBalance > 0} • {/if}
-                <span class="text-orange-600">₱{lease.balanceStatus.pendingBalance.toLocaleString()} pending</span>
-              {/if}
-            </div>
-            
-            <!-- Status Context -->
-            {#if lease.balanceStatus.hasOverdue}
-              <div class="text-xs text-red-600 mt-1">
-                {lease.balanceStatus.daysOverdue} days overdue
+      <!-- Middle Left: Tenant Profile Pictures -->
+      <div class="w-full lg:w-auto flex items-center justify-start">
+        {#if lease.lease_tenants && lease.lease_tenants.length > 0}
+          <div class="flex items-center">
+            {#each lease.lease_tenants.slice(0, 3) as leaseTenant, index}
+              {@const tenantData = leaseTenant.tenant || leaseTenant}
+              {@const matchedTenant = tenants.find(t => t.name === tenantData.name)}
+              {@const profileUrl = tenantData.profile_picture_url || matchedTenant?.profile_picture_url}
+              <div 
+                class="w-12 h-12 sm:w-14 sm:h-14 rounded-full border-3 border-white shadow-lg flex-shrink-0"
+                class:-ml-4={index > 0}
+                style="z-index: {lease.lease_tenants.length - index}"
+              >
+                {#if profileUrl}
+                  <img 
+                    src={profileUrl} 
+                    alt="{tenantData.name}'s profile picture"
+                    class="w-full h-full rounded-full object-cover"
+                  />
+                {:else}
+                  <div class="w-full h-full bg-slate-100 rounded-full flex items-center justify-center">
+                    <span class="text-slate-600 font-medium text-sm sm:text-base">
+                      {tenantData.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                    </span>
+                  </div>
+                {/if}
               </div>
-            {:else if lease.balanceStatus.hasPending && lease.balanceStatus.nextDueDate}
-              <div class="text-xs text-orange-600 mt-1">
-                Due: {formatDate(lease.balanceStatus.nextDueDate)}
+            {/each}
+            {#if lease.lease_tenants.length > 3}
+              <div 
+                class="w-12 h-12 sm:w-14 sm:h-14 rounded-full border-3 border-white shadow-lg flex-shrink-0 bg-slate-200 flex items-center justify-center -ml-4"
+                style="z-index: 0"
+              >
+                <span class="text-slate-600 font-medium text-sm sm:text-base">
+                  +{lease.lease_tenants.length - 3}
+                </span>
               </div>
             {/if}
-          {/if}
           </div>
-          {#if totalPenalty > 0}
-            <div class="text-xs text-red-500 mt-1">
-              +{formatCurrency(totalPenalty)} penalty
+        {/if}
+      </div>
+
+      <!-- Middle Right: Simplified Balance Display - 1/3 width on desktop, full on mobile -->
+      <div class="w-full lg:w-1/3 flex items-center justify-center">
+        <div class="text-center">
+          {#if !lease.billings || lease.billings.length === 0}
+            <!-- No Billings Yet Message -->
+            <div class="text-lg italic text-slate-400 font-light">
+              No Billings Yet
             </div>
+          {:else}
+            <!-- Balance Breakdown -->
+            {#if lease.balanceStatus}
+              <div class="text-2xl text-slate-600">
+                {#if lease.balanceStatus.overdueBalance > 0}
+                  <span class="text-red-600">₱{lease.balanceStatus.overdueBalance.toLocaleString()} overdue</span>
+                {/if}
+                {#if lease.balanceStatus.partialBalance > 0}
+                  {#if lease.balanceStatus.overdueBalance > 0} • {/if}
+                  <span class="text-amber-600">₱{lease.balanceStatus.partialBalance.toLocaleString()} partial</span>
+                {/if}
+                {#if lease.balanceStatus.pendingBalance > 0}
+                  {#if lease.balanceStatus.overdueBalance > 0 || lease.balanceStatus.partialBalance > 0} • {/if}
+                  <span class="text-orange-600">₱{lease.balanceStatus.pendingBalance.toLocaleString()} pending</span>
+                {/if}
+                
+                <!-- Show "Paid" if all balances are zero -->
+                {#if lease.balanceStatus.overdueBalance === 0 && lease.balanceStatus.partialBalance === 0 && lease.balanceStatus.pendingBalance === 0}
+                  <span class="text-green-600">Paid</span>
+                  {#if lastPaidDate}
+                    <div class="text-xs text-slate-500 mt-1">
+                      Was Paid on: {formatDate(lastPaidDate.toISOString())}
+                    </div>
+                  {/if}
+                {/if}
+              </div>
+              
+              <!-- Status Context -->
+              {#if lease.balanceStatus.hasOverdue}
+                <div class="text-xs text-red-600 mt-1">
+                  {lease.balanceStatus.daysOverdue} days overdue
+                </div>
+              {:else if lease.balanceStatus.hasPending && lease.balanceStatus.nextDueDate}
+                <div class="text-xs text-orange-600 mt-1">
+                  Due: {formatDate(lease.balanceStatus.nextDueDate)}
+                </div>
+              {/if}
+            {/if}
+            
+            {#if totalPenalty > 0}
+              <div class="text-xs text-red-500 mt-1">
+                +{formatCurrency(totalPenalty)} penalty
+              </div>
+            {/if}
           {/if}
         </div>
       </div>

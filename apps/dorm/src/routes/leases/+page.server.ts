@@ -24,109 +24,147 @@ interface PaymentDetails {
   billing_ids: number[];
 }
 
-export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase } }) => {
+async function loadLeasesData(locals: any) {
+	const { supabase } = locals;
+	
+	const { data: leasesData, error: fetchError } = await supabase
+		.from('leases')
+		.select(`
+			*,
+			rental_unit:rental_unit_id (*, floor:floors (*), property:properties (*)),
+			lease_tenants:lease_tenants!lease_id (tenant:tenants (name, email, contact_number, profile_picture_url)),
+			billings!billings_lease_id_fkey (
+				id,
+				type,
+				amount,
+				paid_amount,
+				balance,
+				status,
+				due_date,
+				billing_date,
+				penalty_amount,
+				notes
+			)
+		`)
+		.is('deleted_at', null)
+		.order('created_at', { ascending: false });
+
+	if (fetchError) {
+		console.error('Error fetching leases:', fetchError);
+		throw new Error('Failed to load leases');
+	}
+
+	// Fetch payment allocations and calculate penalties for all billings
+	const allBillingIds = leasesData
+		.flatMap((lease: any) => lease.billings.map((b: Billing) => b.id))
+		.filter(Boolean);
+
+	if (allBillingIds.length > 0) {
+		const [allocationsResponse, ...penaltyResponses] = await Promise.all([
+			supabase.from('payment_allocations').select('*, payment:payments(*)').in('billing_id', allBillingIds),
+			...allBillingIds.map((id: any) => supabase.rpc('calculate_penalty', { p_billing_id: id }))
+		]);
+
+		const { data: allocationsData, error: allocationsError } = allocationsResponse;
+		if (allocationsError) {
+			console.error('Error fetching payment allocations:', allocationsError);
+		}
+
+		const allocationsMap = new Map<number, any[]>();
+		if (allocationsData) {
+			for (const allocation of allocationsData) {
+				if (!allocationsMap.has(allocation.billing_id)) {
+					allocationsMap.set(allocation.billing_id, []);
+				}
+				allocationsMap.get(allocation.billing_id)?.push(allocation);
+			}
+		}
+
+		const penaltiesMap = new Map<number, number>();
+		penaltyResponses.forEach((res, index) => {
+			if (res.error) {
+				console.error(`Error calculating penalty for billing ${allBillingIds[index]}:`, res.error);
+			} else if (res.data > 0) {
+				penaltiesMap.set(allBillingIds[index], res.data);
+			}
+		});
+
+		// Attach allocations and penalties to each billing
+		for (const lease of leasesData) {
+			for (const billing of lease.billings) {
+				billing.allocations = allocationsMap.get(billing.id) || [];
+				billing.penalty = penaltiesMap.get(billing.id) || 0;
+				if (billing.penalty > 0 && billing.status === 'PENDING') {
+					billing.status = 'PENALIZED';
+				}
+			}
+		}
+	}
+
+	const floors = await supabase.from('floors').select('*');
+	const floorsMap = new Map<number, any>((floors.data || []).map((f: any) => [f.id, f]));
+
+	return leasesData.map((lease: any) => mapLeaseData(lease, floorsMap));
+}
+
+async function loadTenantsData(locals: any) {
+	const { supabase } = locals;
+	const { data, error } = await supabase
+		.from('tenants')
+		.select('id, name, email, contact_number, profile_picture_url');
+	
+	if (error) {
+		console.error('Error fetching tenants:', error);
+		return [];
+	}
+	
+	return data || [];
+}
+
+async function loadRentalUnitsData(locals: any) {
+	const { supabase } = locals;
+	const { data, error } = await supabase
+		.from('rental_unit')
+		.select(`*, property:properties!rental_unit_property_id_fkey(id, name)`);
+	
+	if (error) {
+		console.error('Error fetching rental units:', error);
+		return [];
+	}
+	
+	return data || [];
+}
+
+export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase }, depends }) => {
 	const { user } = await safeGetSession();
 	if (!user) throw error(401, 'Unauthorized');
 
+	// Set up dependencies for invalidation
+	depends('app:leases');
+
 	try {
-    const { data: leasesData, error: fetchError } = await supabase
-    .from('leases')
-    .select(`
-      *,
-      rental_unit:rental_unit_id (*, floor:floors (*), property:properties (*)),
-      lease_tenants:lease_tenants!lease_id (tenant:tenants (name, email, contact_number)),
-      billings!billings_lease_id_fkey (
-        id,
-        type,
-        amount,
-        paid_amount,
-        balance,
-        status,
-        due_date,
-        billing_date,
-        penalty_amount,
-        notes
-      )
-    `)
-    .is('deleted_at', null) // Only show non-archived leases
-    .order('created_at', { ascending: false });
+		const form = await superValidate(zod(leaseSchema));
+		const deleteForm = await superValidate(zod(deleteLeaseSchema));
 
-		if (fetchError) {
-			console.error('Error fetching leases:', fetchError);
-			throw error(500, 'Failed to load leases');
-		}
-
-		// Fetch payment allocations and calculate penalties for all billings
-		const allBillingIds = leasesData
-			.flatMap((lease) => lease.billings.map((b: Billing) => b.id))
-			.filter(Boolean);
-
-		if (allBillingIds.length > 0) {
-			const [allocationsResponse, ...penaltyResponses] = await Promise.all([
-				supabase.from('payment_allocations').select('*, payment:payments(*)').in('billing_id', allBillingIds),
-				...allBillingIds.map((id) => supabase.rpc('calculate_penalty', { p_billing_id: id }))
-			]);
-
-			const { data: allocationsData, error: allocationsError } = allocationsResponse;
-			if (allocationsError) {
-				console.error('Error fetching payment allocations:', allocationsError);
-			}
-
-			const allocationsMap = new Map<number, any[]>();
-			if (allocationsData) {
-				for (const allocation of allocationsData) {
-					if (!allocationsMap.has(allocation.billing_id)) {
-						allocationsMap.set(allocation.billing_id, []);
-					}
-					allocationsMap.get(allocation.billing_id)?.push(allocation);
-				}
-			}
-
-			const penaltiesMap = new Map<number, number>();
-			penaltyResponses.forEach((res, index) => {
-				if (res.error) {
-					console.error(`Error calculating penalty for billing ${allBillingIds[index]}:`, res.error);
-				} else if (res.data > 0) {
-					penaltiesMap.set(allBillingIds[index], res.data);
-				}
-			});
-
-			// Attach allocations and penalties to each billing
-			for (const lease of leasesData) {
-				for (const billing of lease.billings) {
-					billing.allocations = allocationsMap.get(billing.id) || [];
-					billing.penalty = penaltiesMap.get(billing.id) || 0;
-					if (billing.penalty > 0 && billing.status === 'PENDING') {
-						billing.status = 'PENALIZED';
-					}
-				}
-			}
-		}
-
-		const floors = await supabase.from('floors').select('*');
-		const floorsMap = new Map((floors.data || []).map((f) => [f.id, f]));
-
-		const leases = leasesData.map((lease) => mapLeaseData(lease, floorsMap));
-
-		const [tenantsResponse, unitsResponse] = await Promise.all([
-			supabase.from('tenants').select('id, name, email, contact_number'),
-			supabase.from('rental_unit').select(`*, property:properties!rental_unit_property_id_fkey(id, name)`)
-		]);
-
-    const form = await superValidate(zod(leaseSchema));
-    const deleteForm = await superValidate(zod(deleteLeaseSchema));
-
-    return {
-      form,
-      deleteForm,
-      leases,
-      tenants: tenantsResponse.data || [],
-      rental_units: unitsResponse.data || []
-    };
-  } catch (err) {
-    console.error('Error in load function:', err);
-    throw error(500, 'Internal server error');
-  }
+		// Return minimal data for instant navigation
+		return {
+			form,
+			deleteForm,
+			// Start with empty arrays for instant rendering
+			leases: [],
+			tenants: [],
+			rental_units: [],
+			// Flag to indicate lazy loading
+			lazy: true,
+			// Return promises that resolve with the actual data
+			leasesPromise: loadLeasesData({ supabase }),
+			tenantsPromise: loadTenantsData({ supabase }),
+			rentalUnitsPromise: loadRentalUnitsData({ supabase })
+		};
+	} catch (err) {
+		console.error('Error in load function:', err);
+		throw error(500, 'Internal server error');
+	}
 };
 
 export const actions: Actions = {

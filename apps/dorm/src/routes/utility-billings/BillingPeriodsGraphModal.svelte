@@ -310,13 +310,13 @@
 					<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
 						<!-- Property Filter -->
 						<div class="space-y-2">
-							<label class="text-sm font-medium">Property</label>
+							<label for="property-select" class="text-sm font-medium">Property</label>
 							<Select type="single" value={selectedProperty?.toString() || undefined} onValueChange={(value) => {
 								selectedProperty = value ? Number(value) : null;
 								selectedMeter = null; // Reset meter when property changes
 								selectedMeters = []; // Reset selected meters when property changes
 							}}>
-								<SelectTrigger>
+								<SelectTrigger id="property-select">
 									<span>{selectedProperty ? properties.find(p => p.id === selectedProperty)?.name : 'All Properties'}</span>
 								</SelectTrigger>
 								<SelectContent>
@@ -330,7 +330,7 @@
 
 						<!-- Meter Filter -->
 						<div class="space-y-2">
-							<label class="text-sm font-medium">
+							<label for="meter-select" class="text-sm font-medium">
 								{viewMode === 'mixed' ? 'Meters (Multi-select)' : 'Meter'}
 							</label>
 							{#if viewMode === 'mixed'}
@@ -338,7 +338,7 @@
 								<Select type="multiple" value={selectedMeters.map(id => id.toString())} onValueChange={(values) => {
 									selectedMeters = values.map(v => Number(v));
 								}}>
-									<SelectTrigger>
+									<SelectTrigger id="meter-select">
 										<span>
 											{selectedMeters.length === 0 
 												? 'Select meters...' 
@@ -358,7 +358,7 @@
 								<Select type="single" value={selectedMeter?.toString() || undefined} onValueChange={(value) => {
 									selectedMeter = value ? Number(value) : null;
 								}}>
-									<SelectTrigger>
+									<SelectTrigger id="meter-select">
 										<span>{selectedMeter ? propertyMeters.find(m => m.id === selectedMeter)?.name : 'All Meters'}</span>
 									</SelectTrigger>
 									<SelectContent>
@@ -373,11 +373,11 @@
 
 						<!-- Utility Type Filter -->
 						<div class="space-y-2">
-							<label class="text-sm font-medium">Utility Type</label>
+							<label for="utility-type-select" class="text-sm font-medium">Utility Type</label>
 							<Select type="single" value={selectedUtilityType || undefined} onValueChange={(value) => {
 								selectedUtilityType = value;
 							}}>
-								<SelectTrigger>
+								<SelectTrigger id="utility-type-select">
 									<span>{selectedUtilityType || 'All Types'}</span>
 								</SelectTrigger>
 								<SelectContent>
@@ -391,11 +391,11 @@
 
 						<!-- Graph Type Filter -->
 						<div class="space-y-2">
-							<label class="text-sm font-medium">Graph Type</label>
+							<label for="graph-type-select" class="text-sm font-medium">Graph Type</label>
 							<Select type="single" value={graphType} onValueChange={(value) => {
 								graphType = value as 'consumption' | 'days' | 'cost';
 							}}>
-								<SelectTrigger>
+								<SelectTrigger id="graph-type-select">
 									<span>{graphType === 'consumption' ? 'Consumption' : graphType === 'days' ? 'Days Gap' : 'Cost'}</span>
 								</SelectTrigger>
 								<SelectContent>
@@ -408,11 +408,11 @@
 
 						<!-- View Mode Filter -->
 						<div class="space-y-2">
-							<label class="text-sm font-medium">View Mode</label>
+							<label for="view-mode-select" class="text-sm font-medium">View Mode</label>
 							<Select type="single" value={viewMode} onValueChange={(value) => {
 								viewMode = value as 'single' | 'mixed';
 							}}>
-								<SelectTrigger>
+								<SelectTrigger id="view-mode-select">
 									<span>{viewMode === 'single' ? 'Single Meter' : 'Mixed Meters'}</span>
 								</SelectTrigger>
 								<SelectContent>

@@ -9,10 +9,13 @@ import type { EmergencyContact } from '../../routes/tenants/formSchema';
 export type TenantResponse = Omit<DBTenant, 'emergency_contact'> & {
   tenant_status: 'ACTIVE' | 'INACTIVE' | 'PENDING' | 'BLACKLISTED';
 	emergency_contact: EmergencyContact | null;
+	profile_picture_url?: string | null;
 	lease: (DBLease & {
 			location: {
 				id: string;
+				name: string;
 				number: string;
+				base_rate?: number;
 				property: {
 					id: string;
 					name: string;

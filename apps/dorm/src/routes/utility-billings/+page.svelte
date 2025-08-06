@@ -6,7 +6,7 @@
   import * as Alert from '$lib/components/ui/alert';
   import { Check, RefreshCw, Download, BarChart } from 'lucide-svelte';
   import { invalidateAll } from '$app/navigation';
-  import { tick } from 'svelte';
+  import { tick, onMount } from 'svelte';
   import type { PageData } from './$types';
   
   // Import components
@@ -18,6 +18,7 @@
   import TenantShareModal from './TenantShareModal.svelte';
   import PrintPreviewModal from './PrintPreviewModal.svelte';
   import BillingPeriodsGraphModal from './BillingPeriodsGraphModal.svelte';
+  import UtilityBillingSkeleton from './UtilityBillingSkeleton.svelte';
   
   // Import types
   import { propertyStore } from '$lib/stores/property';
@@ -34,8 +35,28 @@
 	ShareData
   } from './types';
   
+  // Import processing function
+  import { processUtilityBillingsData } from './dataProcessor';
+  
   // Props
   let { data } = $props<{data: PageData}>();
+  
+  // Loading state
+  let isLoading = $state(data.lazy === true);
+  
+  // Initialize with empty data that will be populated lazily
+  let processedData = $state({
+    properties: data.properties || [],
+    meters: data.meters || [],
+    readings: data.readings || [],
+    availableReadingDates: data.availableReadingDates || [],
+    rental_unitTenantCounts: data.rental_unitTenantCounts || {},
+    leases: data.leases || [],
+    meterLastBilledDates: data.meterLastBilledDates || {},
+    leaseMeterBilledDates: data.leaseMeterBilledDates || {},
+    actualBilledDates: data.actualBilledDates || {},
+    previousReadingGroups: data.previousReadingGroups || []
+  });
   
   // Form handling - safely access form data with optional chaining
   const { form, errors, enhance, delayed, message } = superForm(data.form ?? {}, {
@@ -101,13 +122,63 @@
     $form.reading_date = readingEntry.readingDate;
   });
 
-  // Data sources - safely access with optional chaining and defaults
-  const allProperties = data.properties || [];
-  const allMeters = data.meters || [];
-  const allReadings = data.readings || [];
-  const availableDates = data.availableReadingDates || [];
+  // Load data lazily on mount
+  onMount(async () => {
+    if (data.lazy && data.propertiesPromise) {
+      try {
+        console.log('Loading utility billings data lazily...');
+        
+        const [
+          loadedProperties,
+          loadedMeters,
+          loadedReadings,
+          loadedBillings,
+          loadedAvailableReadingDates,
+          loadedTenantCounts,
+          loadedLeases,
+          loadedAllReadings
+        ] = await Promise.all([
+          data.propertiesPromise,
+          data.metersPromise,
+          data.readingsPromise,
+          data.billingsPromise,
+          data.availableReadingDatesPromise,
+          data.tenantCountsPromise,
+          data.leasesPromise,
+          data.allReadingsPromise
+        ]);
 
-  let leases = $derived(data.leases || []);
+        // Process the loaded data
+        const processed = processUtilityBillingsData(
+          loadedProperties,
+          loadedMeters,
+          loadedReadings,
+          loadedBillings,
+          loadedAvailableReadingDates,
+          loadedTenantCounts,
+          loadedLeases,
+          loadedAllReadings
+        );
+
+        // Update the processed data
+        processedData = processed;
+        isLoading = false;
+
+        console.log('Utility billings data loaded successfully');
+      } catch (error) {
+        console.error('Error loading utility billings data:', error);
+        isLoading = false;
+      }
+    }
+  });
+
+  // Data sources - use processed data
+  const allProperties = $derived(processedData.properties);
+  const allMeters = $derived(processedData.meters);
+  const allReadings = $derived(processedData.readings);
+  const availableDates = $derived(processedData.availableReadingDates);
+
+  let leases = $derived(processedData.leases);
 
   // Returns the most recent reading for a given meter
   function getPreviousReading(meterId: number): { reading: number | null, date: string | null } {
@@ -264,9 +335,9 @@ console.log('handleSaveReadings', readings);
   <TenantShareModal
     bind:open={modals.tenantShare}
     reading={tenantShare.selectedMeter}
-    leases={data.leases || []}
-    leaseMeterBilledDates={data.leaseMeterBilledDates}
-    actualBilledDates={data.actualBilledDates}
+    leases={processedData.leases}
+    leaseMeterBilledDates={processedData.leaseMeterBilledDates}
+    actualBilledDates={processedData.actualBilledDates}
     generatePreview={handleGeneratePreview}
     close={() => {
       modals.tenantShare = false;
@@ -290,7 +361,7 @@ console.log('handleSaveReadings', readings);
   {#if modals.reading && selectedProperty}
     <ReadingEntryModal
       bind:open={modals.reading}
-      previousReadingGroups={data.previousReadingGroups}
+      previousReadingGroups={processedData.previousReadingGroups}
       property={selectedProperty}
       utilityType={readingEntry.utilityType}
       meters={allMeters}
@@ -352,24 +423,30 @@ console.log('handleSaveReadings', readings);
         </div>
       </div>
 
-      <ConsolidatedReadingsTable 
-        readings={allReadings}
-        meters={allMeters}
-        properties={allProperties}
-        filters={activeFilters}
-        onShareReading={openTenantShareModal}
-        meterLastBilledDates={data.meterLastBilledDates}
-        actualBilledDates={data.actualBilledDates}
-      />
+      {#if isLoading}
+        <UtilityBillingSkeleton />
+      {:else}
+        <ConsolidatedReadingsTable 
+          readings={allReadings}
+          meters={allMeters}
+          properties={allProperties}
+          filters={activeFilters}
+          onShareReading={openTenantShareModal}
+          meterLastBilledDates={processedData.meterLastBilledDates}
+          actualBilledDates={processedData.actualBilledDates}
+        />
+      {/if}
     </div>
   </div>
 
   <!-- Summary Statistics -->
-  <SummaryStatistics
-    readings={allReadings}
-    meters={allMeters}
-    readingDates={availableDates}
-  />
+  {#if !isLoading}
+    <SummaryStatistics
+      readings={allReadings}
+      meters={allMeters}
+      readingDates={availableDates}
+    />
+  {/if}
 
   {#if import.meta.env.DEV}
     <SuperDebug data={$form} />

@@ -10,6 +10,14 @@ import type {
   FloorGroup, RentalUnitGroup, TenantPaymentRecord, MonthlyPaymentStatus, LeaseReportData 
 } from './reportSchema';
 
+// Configure ISR for lease report caching
+export const config = {
+	isr: {
+		expiration: 180, // Cache for 3 minutes (180 seconds)
+		allowQuery: ['propertyId', 'startMonth', 'monthCount']
+	}
+};
+
 /**
  * Get array of month strings in YYYY-MM format from startMonth for specified number of months
  */

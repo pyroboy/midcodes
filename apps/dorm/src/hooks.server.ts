@@ -125,6 +125,33 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
 	return resolve(event);
 };
 
+const cacheControl: Handle = async ({ event, resolve }) => {
+	const response = await resolve(event);
+
+	// Skip cache headers in development to avoid conflicts with Vite dev server
+	if (process.env.NODE_ENV === 'development') {
+		return response;
+	}
+
+	// Add cache headers only in production
+	if (event.url.pathname.startsWith('/_app/') || event.url.pathname.startsWith('/favicon')) {
+		response.headers.set('cache-control', 'public, max-age=31536000, immutable');
+	} else if (response.status === 200 && (
+		event.url.pathname.startsWith('/reports') || 
+		event.url.pathname.startsWith('/lease-report')
+	)) {
+		response.headers.set('cache-control', 'public, max-age=300, stale-while-revalidate=600');
+		response.headers.set('vary', 'Accept-Encoding');
+	}
+
+	// Security headers for production
+	response.headers.set('x-frame-options', 'DENY');
+	response.headers.set('x-content-type-options', 'nosniff');
+	response.headers.set('referrer-policy', 'strict-origin-when-cross-origin');
+
+	return response;
+};
+
 const authGuard: Handle = async ({ event, resolve }) => {
 	const sessionInfo = await event.locals.safeGetSession();
 
@@ -167,4 +194,4 @@ const authGuard: Handle = async ({ event, resolve }) => {
 	return resolve(event);
 };
 
-export const handle = sequence(initializeSupabase, authGuard);
+export const handle = sequence(initializeSupabase, authGuard, cacheControl);

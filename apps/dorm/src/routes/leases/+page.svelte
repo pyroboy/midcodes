@@ -8,20 +8,50 @@
   import { leaseSchema } from './formSchema';
   import { calculateLeaseBalanceStatus } from '$lib/utils/lease-status';
   import { formatCurrency } from '$lib/utils/format';
+  import { Skeleton } from '$lib/components/ui/skeleton';
+  import { onMount } from 'svelte';
 
   type FormType = z.infer<typeof leaseSchema>;
   
   let { data } = $props();
-  let leases = $state(data.leases);
+  let leases = $state<any[]>(data.leases);
+  let tenants = $state(data.tenants);
+  let rentalUnits = $state(data.rental_units);
   let showModal = $state(false);
   let selectedLease: FormType | undefined = $state();
   let editMode = $state(false);
+  let isLoading = $state(data.lazy === true);
 
   // Add activeFilter state for summary card filtering
   let activeFilter = $state<'all' | 'paid' | 'pending' | 'partial' | 'overdue'>('all');
 
+  // Load data lazily on mount
+  onMount(async () => {
+    if (data.lazy && data.leasesPromise && data.tenantsPromise && data.rentalUnitsPromise) {
+      try {
+        const [loadedLeases, loadedTenants, loadedRentalUnits] = await Promise.all([
+          data.leasesPromise,
+          data.tenantsPromise,
+          data.rentalUnitsPromise
+        ]);
+        
+        leases = loadedLeases;
+        tenants = loadedTenants;
+        rentalUnits = loadedRentalUnits;
+        isLoading = false;
+      } catch (error) {
+        console.error('Error loading lease data:', error);
+        isLoading = false;
+      }
+    }
+  });
+
   $effect(() => {
-    leases = data.leases;
+    if (!data.lazy) {
+      leases = data.leases;
+      tenants = data.tenants;
+      rentalUnits = data.rental_units;
+    }
   });
 
   // Svelte 5 runes for reactive calculations
@@ -178,7 +208,11 @@
           onclick={() => handleFilterClick('all')}
           class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 {activeFilter === 'all' ? 'bg-blue-100 ring-2 ring-blue-500' : 'bg-blue-50 hover:bg-blue-100'}"
         >
-          <span class="text-blue-600 font-medium">{summaryMetrics.totalLeases}</span>
+          {#if isLoading}
+            <Skeleton class="h-4 w-6" />
+          {:else}
+            <span class="text-blue-600 font-medium">{summaryMetrics.totalLeases}</span>
+          {/if}
           <span class="text-slate-600">Total</span>
         </button>
         
@@ -186,7 +220,11 @@
           onclick={() => handleFilterClick('paid')}
           class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 {activeFilter === 'paid' ? 'bg-green-100 ring-2 ring-green-500' : 'bg-green-50 hover:bg-green-100'}"
         >
-          <span class="text-green-600 font-medium">{summaryMetrics.paidInFull}</span>
+          {#if isLoading}
+            <Skeleton class="h-4 w-6" />
+          {:else}
+            <span class="text-green-600 font-medium">{summaryMetrics.paidInFull}</span>
+          {/if}
           <span class="text-slate-600">Paid</span>
         </button>
         
@@ -194,10 +232,17 @@
           onclick={() => handleFilterClick('pending')}
           class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 {activeFilter === 'pending' ? 'bg-orange-100 ring-2 ring-orange-500' : 'bg-orange-50 hover:bg-orange-100'}"
         >
-          <div class="flex flex-col">
-            <span class="text-orange-600 font-medium">{summaryMetrics.pendingCount}</span>
-            <span class="text-orange-600 text-xs">{formatCurrency(summaryMetrics.totalPending)}</span>
-          </div>
+          {#if isLoading}
+            <div class="flex flex-col space-y-1">
+              <Skeleton class="h-4 w-6" />
+              <Skeleton class="h-3 w-12" />
+            </div>
+          {:else}
+            <div class="flex flex-col">
+              <span class="text-orange-600 font-medium">{summaryMetrics.pendingCount}</span>
+              <span class="text-orange-600 text-xs">{formatCurrency(summaryMetrics.totalPending)}</span>
+            </div>
+          {/if}
           <span class="text-slate-600">Pending</span>
         </button>
         
@@ -205,10 +250,17 @@
           onclick={() => handleFilterClick('partial')}
           class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 {activeFilter === 'partial' ? 'bg-amber-100 ring-2 ring-amber-500' : 'bg-amber-50 hover:bg-amber-100'}"
         >
-          <div class="flex flex-col">
-            <span class="text-amber-600 font-medium">{summaryMetrics.partialCount}</span>
-            <span class="text-amber-600 text-xs">{formatCurrency(summaryMetrics.totalPartial)}</span>
-          </div>
+          {#if isLoading}
+            <div class="flex flex-col space-y-1">
+              <Skeleton class="h-4 w-6" />
+              <Skeleton class="h-3 w-12" />
+            </div>
+          {:else}
+            <div class="flex flex-col">
+              <span class="text-amber-600 font-medium">{summaryMetrics.partialCount}</span>
+              <span class="text-amber-600 text-xs">{formatCurrency(summaryMetrics.totalPartial)}</span>
+            </div>
+          {/if}
           <span class="text-slate-600">Partial</span>
         </button>
         
@@ -216,10 +268,17 @@
           onclick={() => handleFilterClick('overdue')}
           class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 {activeFilter === 'overdue' ? 'bg-red-100 ring-2 ring-red-500' : 'bg-red-50 hover:bg-red-100'}"
         >
-          <div class="flex flex-col">
-            <span class="text-red-600 font-medium">{summaryMetrics.overdueCount}</span>
-            <span class="text-red-600 text-xs">{formatCurrency(summaryMetrics.totalOverdue)}</span>
-          </div>
+          {#if isLoading}
+            <div class="flex flex-col space-y-1">
+              <Skeleton class="h-4 w-6" />
+              <Skeleton class="h-3 w-12" />
+            </div>
+          {:else}
+            <div class="flex flex-col">
+              <span class="text-red-600 font-medium">{summaryMetrics.overdueCount}</span>
+              <span class="text-red-600 text-xs">{formatCurrency(summaryMetrics.totalOverdue)}</span>
+            </div>
+          {/if}
           <span class="text-slate-600">Overdue</span>
         </button>
       </div>
@@ -266,14 +325,60 @@
 
     <!-- Lease List Section -->
     <div class="bg-white/40 backdrop-blur-sm rounded-2xl border border-slate-200/60 shadow-sm">
+      {#if isLoading}
+        <!-- Skeleton Loading State -->
+        <div class="p-6">
+          <div class="space-y-6">
+            <!-- Skeleton cards that match lease structure -->
+            {#each Array(5) as _, i (i)}
+              <div class="border border-slate-200 rounded-lg p-6">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-4 flex-1">
+                    <div class="space-y-2">
+                      <Skeleton class="h-5 w-48" />
+                      <Skeleton class="h-4 w-32" />
+                    </div>
+                    <div class="flex-1 ml-8">
+                      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="space-y-1">
+                          <Skeleton class="h-3 w-16" />
+                          <Skeleton class="h-4 w-24" />
+                        </div>
+                        <div class="space-y-1">
+                          <Skeleton class="h-3 w-16" />
+                          <Skeleton class="h-4 w-20" />
+                        </div>
+                        <div class="space-y-1">
+                          <Skeleton class="h-3 w-16" />
+                          <Skeleton class="h-4 w-28" />
+                        </div>
+                        <div class="space-y-1">
+                          <Skeleton class="h-3 w-16" />
+                          <Skeleton class="h-4 w-16" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <Skeleton class="h-6 w-16" />
+                    <Skeleton class="h-8 w-8" />
+                    <Skeleton class="h-8 w-8" />
+                  </div>
+                </div>
+              </div>
+            {/each}
+          </div>
+        </div>
+      {:else}
         <LeaseList
           leases={filteredLeases}
-          tenants={data.tenants}
-          rentalUnits={data.rental_units}
+          tenants={tenants}
+          rentalUnits={rentalUnits}
           on:edit={event => handleEdit(event.detail)}
           on:delete={event => handleDeleteLease(event.detail)}
           onStatusChange={handleStatusChange}
         />
+      {/if}
     </div>
   </div>
 </div>
@@ -283,7 +388,7 @@
   open={showModal}
   lease={selectedLease}
   {editMode}
-  tenants={data.tenants}
-  rentalUnits={data.rental_units}
+  tenants={tenants}
+  rentalUnits={rentalUnits}
   onOpenChange={handleModalClose}
 />

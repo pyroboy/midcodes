@@ -6,7 +6,9 @@
 	import { propertyStore } from '$lib/stores/property';
 	import type { PageData } from './$types';
 	import { onMount } from 'svelte';
-
+	import { page } from '$app/stores';
+	import { contextualPreload, safePreloadData } from '$lib/utils/prefetch';
+	import { preloadHeavyComponents } from '$lib/utils/lazyLoad';
 
 	// Import Lucide icons
 	import { 
@@ -27,7 +29,24 @@
 	let ready = $state(false);
 	onMount(() => {
 		ready = true;
+		
+		// Preload related pages based on current route
+		if (data.user) {
+			const userRoles = data.user.user_metadata?.roles || [];
+			contextualPreload($page.url.pathname, userRoles);
+		}
+		
+		// Preload heavy components for better performance
+		preloadHeavyComponents();
 	});
+
+	// Enhanced hover preloading for navigation sections
+	function onSectionHover(sectionLinks: { href: string; label: string }[]) {
+		// Preload all pages in this section when user hovers over section
+		sectionLinks.forEach(link => {
+			safePreloadData(link.href);
+		});
+	}
 
 	// Use an effect to safely initialize the store after data is loaded
 	$effect(() => {
@@ -100,11 +119,15 @@
 				<Sidebar.Content>
 					{#each navigationLinks as group (group.category)}
 						<Sidebar.Group>
-							<Sidebar.GroupLabel>{group.category}</Sidebar.GroupLabel>
+							<Sidebar.GroupLabel
+								onmouseover={() => onSectionHover(group.links)}
+							>
+								{group.category}
+							</Sidebar.GroupLabel>
 							<Sidebar.GroupContent>
 								<Sidebar.Menu>
 									{#each group.links as link (link.href)}
-										<a href={link.href} class="block no-underline">
+										<a href={link.href} class="block no-underline" data-sveltekit-preload-data="hover">
 											<Sidebar.MenuItem>
 												<Sidebar.MenuButton>
 													<link.icon class="h-5 w-5" />
@@ -130,6 +153,7 @@
 								<a
 									href="/auth/signout"
 									class="flex items-center space-x-2 text-sm text-red-600 hover:text-red-800"
+									data-sveltekit-preload-data="hover"
 								>
 									<LogOut class="w-4 h-4" />
 									<span>Sign out</span>
@@ -139,6 +163,7 @@
 							<a
 								href="/auth"
 								class="flex items-center space-x-2 text-sm text-blue-600 hover:text-blue-800"
+								data-sveltekit-preload-data="hover"
 							>
 								<User class="w-4 h-4" />
 								<span>Sign in</span>

@@ -50,6 +50,7 @@ export interface BaseTenant {
   updated_at: string | null;
   created_by: string | null;
   emergency_contact: EmergencyContact | null;
+  profile_picture_url?: string | null;
 }
 
 // Lease relationship types
@@ -111,7 +112,13 @@ export const tenantSchema = z.object({
     .uuid('Invalid UUID format')
     .nullable()
     .optional(),
-  emergency_contact: emergencyContactSchema
+  emergency_contact: emergencyContactSchema,
+  profile_picture_url: z.string()
+    .nullable()
+    .optional()
+    .refine((val) => !val || val.trim() === '' || /^https?:\/\/.+/.test(val), {
+      message: 'Invalid URL format'
+    })
 });
 
 // Schema for updating an existing tenant
@@ -175,7 +182,13 @@ export const tenantFormSchema = z.object({
   status_change_reason: z.string()
     .max(500, 'Reason must be less than 500 characters')
     .nullable()
+    .optional(),
+  profile_picture_url: z.string()
+    .nullable()
     .optional()
+    .refine((val) => !val || val.trim() === '' || /^https?:\/\/.+/.test(val), {
+      message: 'Invalid URL format'
+    })
 });
 
 // Schema for tenant response (including system-generated fields)

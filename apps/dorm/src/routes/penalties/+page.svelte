@@ -205,7 +205,7 @@
     <div class="max-w-[1600px] mx-auto px-4 py-5">
       <div class="flex flex-col space-y-2">
         <div class="flex items-center text-sm text-gray-500">
-          <a href="/" class="hover:text-gray-700">Dashboard</a>
+          <a href="/" class="hover:text-gray-700" data-sveltekit-preload-data="hover">Dashboard</a>
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-2"><polyline points="9 18 15 12 9 6"></polyline></svg>
           <span class="font-medium text-gray-900">Penalty Billings</span>
         </div>

@@ -19,7 +19,7 @@ export function formatDate(dateStr: string): string {
  * @returns Formatted currency string
  */
 export const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat('en-PH', {
     style: 'currency',
     currency: 'PHP'
   }).format(amount || 0);

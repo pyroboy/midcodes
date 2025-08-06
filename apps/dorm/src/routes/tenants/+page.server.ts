@@ -7,34 +7,48 @@ import { tenantFormSchema, tenantResponseSchema, type EmergencyContact, parseEme
 import type { Database } from '$lib/database.types';
 import type { TenantResponse } from '$lib/types/tenant';
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, depends }) => {
   const { user, permissions } = await locals.safeGetSession();
   if (!permissions.includes('tenants.read')) throw error(401, 'Unauthorized');
 
-  const [tenantsResult, propertiesResult] = await Promise.all([
-    locals.supabase
-      .from('tenants')
-      .select(`
-        *,
-        lease_tenants:lease_tenants!left(
-          lease:leases!left(
-            *,
-            location:rental_unit!left(
-              id,
-              number,
-              property:properties!left(id,name)
-            )
+  // Set up dependencies for invalidation
+  depends('app:tenants');
+
+  // Return minimal data for instant navigation
+  return {
+    // Start with empty arrays for instant rendering
+    tenants: [],
+    properties: [],
+    form: await superValidate(zod(tenantFormSchema)),
+    // Flag to indicate lazy loading
+    lazy: true,
+    // Return a promise that resolves with the actual data
+    tenantsPromise: loadTenantsData(locals),
+    propertiesPromise: loadPropertiesData(locals)
+  };
+};
+
+// Separate function to load tenants data
+async function loadTenantsData(locals: any) {
+  const tenantsResult = await locals.supabase
+    .from('tenants')
+    .select(`
+      *,
+      lease_tenants:lease_tenants!left(
+        lease:leases!left(
+          *,
+          location:rental_unit!left(
+            id,
+            name,
+            number,
+            base_rate,
+            property:properties!left(id,name)
           )
         )
-      `)
-      .is('deleted_at', null) // Only load non-deleted tenants
-      .order('name'),
-    locals.supabase
-      .from('properties')
-      .select('id, name')
-      .eq('status', 'ACTIVE')
-      .order('name')
-  ]);
+      )
+    `)
+    .is('deleted_at', null) // Only load non-deleted tenants
+    .order('name');
 
   if (tenantsResult.error) {
     console.error('Error loading tenants:', tenantsResult.error);
@@ -42,19 +56,26 @@ export const load: PageServerLoad = async ({ locals }) => {
   }
 
   // The query now returns lease_tenants[], we need to flatten it to match TenantResponse
-  const tenants = tenantsResult.data.map(tenant => {
+  const tenants = tenantsResult.data.map((tenant: any) => {
     const lease = tenant.lease_tenants[0]?.lease ?? null;
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { lease_tenants, ...rest } = tenant;
     return { ...rest, lease };
   }) as TenantResponse[];
 
-  return {
-    tenants,
-    properties: propertiesResult.data || [],
-    form: await superValidate(zod(tenantFormSchema))
-  };
-};
+  return tenants;
+}
+
+// Separate function to load properties data
+async function loadPropertiesData(locals: any) {
+  const propertiesResult = await locals.supabase
+    .from('properties')
+    .select('id, name')
+    .eq('status', 'ACTIVE')
+    .order('name');
+
+  return propertiesResult.data || [];
+}
 
 // Base tenant insert type from database
 type TenantInsertBase = {
@@ -63,6 +84,7 @@ type TenantInsertBase = {
   email: string | null;
   tenant_status: 'ACTIVE' | 'INACTIVE' | 'PENDING' | 'BLACKLISTED';
   emergency_contact: EmergencyContact | null;
+  profile_picture_url?: string | null;
 };
 
 // Types for database operations
@@ -116,7 +138,8 @@ export const actions: Actions = {
       contact_number: form.data.contact_number || null,
       email: form.data.email && form.data.email.trim() !== '' ? form.data.email : null,
       tenant_status: form.data.tenant_status || 'PENDING',
-      emergency_contact: parsedEmergencyContact
+      emergency_contact: parsedEmergencyContact,
+      profile_picture_url: form.data.profile_picture_url || null
     };
 
     console.log('🔄 Create action - Sending to database:', insertData);
@@ -184,7 +207,8 @@ export const actions: Actions = {
       email: form.data.email && form.data.email.trim() !== '' ? form.data.email : null,
       tenant_status: form.data.tenant_status,
       emergency_contact: parsedEmergencyContact,
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
+      profile_picture_url: form.data.profile_picture_url || null
     };
 
     console.log('🔄 Update action - Sending to database:', updateData);

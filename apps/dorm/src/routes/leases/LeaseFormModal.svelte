@@ -104,7 +104,7 @@
     }
     
     // Sort: selected tenants first, then unselected tenants
-    return filtered.sort((a: any, b: any) => {
+    return [...filtered].sort((a: any, b: any) => {
       const aSelected = formData.selectedTenants.includes(a.id);
       const bSelected = formData.selectedTenants.includes(b.id);
       
