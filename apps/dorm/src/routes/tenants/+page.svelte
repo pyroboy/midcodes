@@ -358,5 +358,3 @@
   onOpenChange={handleModalClose}
   onTenantUpdate={updateTenantInState}
 />
-
-<SuperDebug data={data} />

@@ -99,148 +99,144 @@
   }
 </script>
 
-<div class="p-6 space-y-6">
+<div class="space-y-8">
   <!-- Balance Overview -->
-  <div class="bg-gradient-to-r from-slate-50 via-white to-slate-50 rounded-2xl p-6 border-2 border-slate-200 shadow-sm">
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      <div class="text-center">
-        <div class={`text-3xl font-bold mb-2 ${
+  <div class="space-y-4">
+    <h2 class="text-2xl font-bold text-gray-900 tracking-tight">Financial Summary</h2>
+    
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="space-y-1">
+        <dt class="text-sm font-medium text-gray-500 uppercase tracking-wide">Balance</dt>
+        <dd class={`text-2xl font-bold ${
           lease.balance > 0 
-            ? 'text-red-600' 
+            ? 'text-gray-900' 
             : lease.balance < 0 
-              ? 'text-green-600' 
-              : 'text-slate-600'
+              ? 'text-gray-700' 
+              : 'text-gray-600'
         }`}>
           {formatCurrency(lease.balance)}
-        </div>
-        <div class="text-sm text-slate-600">Current Balance</div>
+        </dd>
       </div>
       
-      <div class="text-center">
-        <div class="text-3xl font-bold text-red-600 mb-2">
+      <div class="space-y-1">
+        <dt class="text-sm font-medium text-gray-500 uppercase tracking-wide">Penalties</dt>
+        <dd class="text-2xl font-bold text-gray-900">
           {formatCurrency(totalPenalty)}
-        </div>
-        <div class="text-sm text-slate-600 flex items-center justify-center gap-1">
-          <AlertTriangle class="w-4 h-4 text-red-500" />
-          Total Penalties
-        </div>
+        </dd>
       </div>
   
-      <div class="text-center">
-        <div class="text-3xl font-bold text-blue-600 mb-2">
+      <div class="space-y-1">
+        <dt class="text-sm font-medium text-gray-500 uppercase tracking-wide">Payment Rate</dt>
+        <dd class="text-2xl font-bold text-gray-900">
           {paymentStats.paymentRate.toFixed(0)}%
-        </div>
-        <div class="text-sm text-slate-600 flex items-center justify-center gap-1">
-          <TrendingUp class="w-4 h-4 text-blue-500" />
-          Payment Rate
-        </div>
+        </dd>
       </div>
   
-      <div class="text-center">
-        <div class="text-3xl font-bold text-red-600 mb-2">
+      <div class="space-y-1">
+        <dt class="text-sm font-medium text-gray-500 uppercase tracking-wide">Overdue</dt>
+        <dd class="text-2xl font-bold text-gray-900">
           {overdueBillings.length}
-        </div>
-        <div class="text-sm text-slate-600 flex items-center justify-center gap-1">
-          <AlertTriangle class="w-4 h-4 text-red-500" />
-          Overdue Payments
-        </div>
-        <div class="text-xs text-red-700 mt-1">
-          Total: {formatCurrency(overdueBillings.reduce((sum, b) => sum + (b.amount + (b.penalty_amount || 0) - b.paid_amount), 0))}
+        </dd>
+        <div class="text-sm text-gray-600">
+          {formatCurrency(overdueBillings.reduce((sum, b) => sum + (b.amount + (b.penalty_amount || 0) - b.paid_amount), 0))}
         </div>
       </div>
     </div>
   </div>
 
   <!-- Billing Type Summary -->
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-    {#each Object.entries(getBillingSummary(lease.billings)) as [type, amounts] (type)}
-    <button
-      type="button"
-      class="p-4 rounded-xl border-2 text-left transition-all duration-300 hover:shadow-lg"
-      class:bg-blue-50={selectedBillingType === type}
-      class:border-blue-300={selectedBillingType === type}
-      class:shadow-md={selectedBillingType === type}
-      class:bg-white={selectedBillingType !== type}
-      class:border-slate-200={selectedBillingType !== type}
-      class:hover:border-slate-300={selectedBillingType !== type}
-      onclick={() => (selectedBillingType = type as 'RENT' | 'UTILITY' | 'PENALTY' | 'SECURITY_DEPOSIT')}
-    >
-      <div class="mb-1 font-semibold text-slate-800">{type}</div>
-      <div class="mb-1 text-2xl font-bold text-slate-900">
-        {formatCurrency(amounts.total)}
-      </div>
-      <div class="mb-2 text-xs text-slate-600">
-        {amounts.count} billing{amounts.count !== 1 ? 's' : ''}
-      </div>
+  <div class="space-y-4">
+    <h2 class="text-2xl font-bold text-gray-900 tracking-tight">Billing Categories</h2>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {#each Object.entries(getBillingSummary(lease.billings)) as [type, amounts] (type)}
+      <button
+        type="button"
+        class="p-4 border text-left transition-all duration-200"
+        class:bg-gray-100={selectedBillingType === type}
+        class:border-gray-900={selectedBillingType === type}
+        class:bg-white={selectedBillingType !== type}
+        class:border-gray-200={selectedBillingType !== type}
+        class:hover:border-gray-400={selectedBillingType !== type}
+        onclick={() => (selectedBillingType = type as 'RENT' | 'UTILITY' | 'PENALTY' | 'SECURITY_DEPOSIT')}
+      >
+        <div class="space-y-2">
+          <dt class="text-sm font-medium text-gray-500 uppercase tracking-wide">{type}</dt>
+          <dd class="text-xl font-bold text-gray-900">
+            {formatCurrency(amounts.total)}
+          </dd>
+          <div class="text-sm text-gray-600">
+            {amounts.count} billing{amounts.count !== 1 ? 's' : ''}
+          </div>
 
-      {#if amounts.unpaid > 0}
-        <div class="text-sm font-medium text-red-600">
-          Outstanding: {formatCurrency(amounts.unpaid)}
+          {#if amounts.unpaid > 0}
+            <div class="text-sm font-semibold text-gray-900">
+              Outstanding: {formatCurrency(amounts.unpaid)}
+            </div>
+          {:else}
+            <div class="text-sm font-medium text-gray-600">All paid</div>
+          {/if}
         </div>
-      {:else}
-        <div class="text-sm font-medium text-green-600">All paid</div>
-      {/if}
-    </button>
-  {/each}
-</div>
+      </button>
+      {/each}
+    </div>
+  </div>
 
   <!-- Billing Details -->
-  <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-    <div class="bg-slate-50 px-6 py-4 border-b border-slate-200">
-      <h3 class="text-lg font-semibold text-slate-800">{selectedBillingType} Details</h3>
-    </div>
+  <div class="space-y-4">
+    <h2 class="text-2xl font-bold text-gray-900 tracking-tight">{selectedBillingType} Details</h2>
     
-    <div class="p-6">
+    <div>
       {#if lease.billings?.filter((b) => b.type === selectedBillingType).length}
         <div class="space-y-4 max-h-[400px] overflow-y-auto">
           {#each sortedBillings.filter((b) => b.type === selectedBillingType) as billing}
             {@const displayStatus = getDisplayStatus(billing)}
             {@const StatusIcon = getBillingStatusIcon(billing)}
             
-            <div class="bg-slate-50/50 rounded-xl p-4 border border-slate-100 hover:shadow-sm transition-all">
-              <div class="flex items-start justify-between mb-3">
-                <div class="flex items-center gap-3">
-                  <StatusIcon class={`w-5 h-5 ${
+            <div class="border border-gray-200 p-4">
+              <div class="flex items-start justify-between mb-4">
+                <div class="flex items-start gap-3">
+                  <StatusIcon class={`w-5 h-5 mt-0.5 ${
                     isBillingFullyPaid(billing) 
-                      ? 'text-green-500' 
+                      ? 'text-gray-600' 
                       : new Date(billing.due_date) < new Date() 
-                        ? 'text-red-500' 
-                        : 'text-amber-500'
+                        ? 'text-gray-900' 
+                        : 'text-gray-600'
                   }`} />
                   <div>
-                    <div class="font-semibold text-slate-800">
+                    <div class="text-xl font-bold text-gray-900">
                       {formatCurrency((billing.amount + (billing.penalty_amount || 0)) - billing.paid_amount)}
                     </div>
-                    <div class="text-sm text-slate-600">
+                    <div class="text-sm text-gray-500">
                       Due: {formatDate(billing.due_date)}
                     </div>
                   </div>
                 </div>
-                <span class={`px-3 py-1 rounded-full text-xs font-medium ${getBillingStatusColor(displayStatus)}`}>
+                <div class="px-3 py-1 bg-gray-100 text-gray-700 text-sm font-medium">
                   {displayStatus}
-                </span>
+                </div>
               </div>
               
               <!-- Amount Breakdown -->
-              <div class="bg-white rounded-lg p-3 mb-3">
-                <div class="grid grid-cols-2 gap-4 text-sm">
-                  <div class="flex justify-between">
-                    <span class="text-slate-600">Base Amount:</span>
-                    <span class="font-medium">{formatCurrency(billing.amount)}</span>
+              <div class="bg-gray-50 p-3 space-y-3">
+                <div class="grid grid-cols-1 gap-3 text-sm">
+                  <div class="flex justify-between py-2 border-b border-gray-200">
+                    <span class="text-gray-500">Base Amount</span>
+                    <span class="font-semibold text-gray-900">{formatCurrency(billing.amount)}</span>
                   </div>
                   {#if billing.penalty_amount > 0}
-                    <div class="flex justify-between text-red-600">
-                      <span>Penalty:</span>
-                      <span class="font-medium">+{formatCurrency(billing.penalty_amount)}</span>
+                    <div class="flex justify-between py-2 border-b border-gray-200">
+                      <span class="text-gray-500">Penalty</span>
+                      <span class="font-semibold text-gray-900">+{formatCurrency(billing.penalty_amount)}</span>
                     </div>
                   {/if}
-                  <div class="flex justify-between">
-                    <span class="text-slate-600">Paid:</span>
-                    <span class="font-medium text-green-600">{formatCurrency(billing.paid_amount)}</span>
+                  <div class="flex justify-between py-2 border-b border-gray-200">
+                    <span class="text-gray-500">Paid</span>
+                    <span class="font-semibold text-gray-900">{formatCurrency(billing.paid_amount)}</span>
                   </div>
-                  <div class="flex justify-between font-semibold border-t pt-2">
-                    <span>Balance:</span>
-                    <span class={billing.paid_amount >= (billing.amount + (billing.penalty_amount || 0)) ? 'text-green-600' : 'text-red-600'}>
+                  <div class="flex justify-between pt-2">
+                    <span class="font-medium text-gray-700">Balance</span>
+                    <span class="font-bold text-gray-900">
                       {formatCurrency((billing.amount + (billing.penalty_amount || 0)) - billing.paid_amount)}
                     </span>
                   </div>
@@ -249,21 +245,21 @@
 
               <!-- Payment History -->
               {#if billing.allocations && billing.allocations.length > 0}
-                <div class="border-t border-slate-200 pt-3">
-                  <div class="text-sm font-medium text-slate-700 mb-2">Payment History</div>
-                  <div class="space-y-1">
+                <div class="border-t border-gray-200 pt-4">
+                  <div class="text-sm font-semibold text-gray-700 mb-3">Payment History</div>
+                  <div class="space-y-2">
                     {#each billing.allocations as allocation}
-                      <div class="flex justify-between items-center text-sm bg-green-50 p-2 rounded">
+                      <div class="flex justify-between items-center text-sm bg-gray-50 p-3">
                         <div class="flex items-center gap-2">
-                          <Receipt class="w-3 h-3 text-green-600" />
-                          <span>{formatCurrency(allocation.amount)}</span>
+                          <Receipt class="w-4 h-4 text-gray-600" />
+                          <span class="font-medium text-gray-900">{formatCurrency(allocation.amount)}</span>
                           {#if allocation.payment?.method === 'SECURITY_DEPOSIT'}
-                            <span class="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs">
+                            <span class="px-2 py-1 bg-gray-200 text-gray-700 text-xs font-medium">
                               Security Deposit
                             </span>
                           {/if}
                         </div>
-                        <span class="text-slate-600">{formatDate(allocation.payment?.paid_at || '')}</span>
+                        <span class="text-gray-500">{formatDate(allocation.payment?.paid_at || '')}</span>
                       </div>
                     {/each}
                   </div>
@@ -271,19 +267,19 @@
               {/if}
               
               {#if billing.notes}
-                <div class="border-t border-slate-200 pt-3 mt-3">
-                  <div class="text-sm font-medium text-slate-700 mb-1">Notes</div>
-                  <div class="text-sm text-slate-600 bg-amber-50 p-2 rounded">{billing.notes}</div>
+                <div class="border-t border-gray-200 pt-4">
+                  <div class="text-sm font-semibold text-gray-700 mb-2">Notes</div>
+                  <div class="text-sm text-gray-600 bg-gray-50 p-3">{billing.notes}</div>
                 </div>
               {/if}
             </div>
           {/each}
         </div>
       {:else}
-        <div class="text-center py-12 text-slate-500">
-          <FileText class="w-12 h-12 mx-auto mb-4 opacity-40" />
-          <p class="text-lg font-medium mb-2">No {selectedBillingType.toLowerCase()} billings</p>
-          <p class="text-sm">No billing records found for this category</p>
+        <div class="text-center py-12 text-gray-500">
+          <FileText class="w-12 h-12 mx-auto mb-4 text-gray-300" />
+          <p class="text-lg font-semibold text-gray-600 mb-2">No {selectedBillingType.toLowerCase()} billings</p>
+          <p class="text-sm text-gray-500">No billing records found for this category</p>
         </div>
       {/if}
     </div>

@@ -21,13 +21,13 @@
     lease: Lease;
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    tenants?: any[];
   }
 
-  let { lease, open, onOpenChange }: Props = $props();
+  let { lease, open, onOpenChange, tenants = [] }: Props = $props();
 
   let isEditingName = $state(false);
   let editedName = $state('');
-  let activeTab = $state<'overview' | 'billing' | 'history'>('overview');
 
   // Computed values for header stats - only calculate when modal is open
   let overdueBillings = $derived.by(() => {
@@ -104,16 +104,16 @@
 </script>
 
 <Dialog.Root {open} onOpenChange={onOpenChange}>
-  <Dialog.Content class="max-w-5xl max-h-[95vh] overflow-hidden p-0">
+  <Dialog.Content class="max-w-5xl max-h-[95vh] overflow-hidden p-0 bg-white">
     <!-- Header -->
-    <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white p-6">
+    <div class="bg-white border-b border-gray-200 p-6">
       <div class="flex items-start justify-between">
         <div class="flex-1">
           {#if isEditingName}
             <Input
               type="text"
               bind:value={editedName}
-              class="text-2xl font-bold bg-white/10 border-white/20 text-white placeholder:text-white/60"
+              class="text-2xl font-bold bg-gray-50 border-gray-300 text-gray-900 placeholder:text-gray-500"
               onblur={handleNameSubmit}
               onkeydown={handleKeyDown}
               autofocus
@@ -121,19 +121,19 @@
           {:else}
             <div class="group flex items-center gap-3">
               <button 
-                class="text-2xl font-bold cursor-pointer hover:text-blue-200 transition-colors bg-transparent border-none p-0 text-left"
+                class="text-2xl font-bold cursor-pointer hover:text-gray-600 transition-colors bg-transparent border-none p-0 text-left text-gray-900"
                 ondblclick={handleLeaseNameDoubleClick}
               >
                 {lease.name || `Lease #${lease.id}`}
               </button>
               <button 
-                class="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-white/10 rounded-lg"
+                class="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-gray-100 rounded-lg"
                 onclick={(e) => {
                   e.stopPropagation();
                   handleLeaseNameDoubleClick();
                 }}
               >
-                <Pencil class="w-4 h-4" />
+                <Pencil class="w-4 h-4 text-gray-500" />
               </button>
             </div>
           {/if}
@@ -141,73 +141,50 @@
           <div class="flex items-center gap-4 mt-3">
             <button 
               onclick={copyLeaseId}
-              class="flex items-center gap-2 text-sm text-white/70 hover:text-white transition-colors"
+              class="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
             >
               <span>ID: {lease.id}</span>
               <Copy class="w-3 h-3" />
             </button>
-            <Badge variant={getStatusVariant(lease.status?.toString() || 'INACTIVE')} class="text-sm">
+            <div class="px-2 py-1 bg-gray-100 text-gray-700 text-sm rounded-md">
               {lease.status?.toString() || 'INACTIVE'}
-            </Badge>
+            </div>
           </div>
         </div>
-
-        
       </div>
 
-      <!-- Navigation Tabs -->
-      <div class="flex gap-1 mt-6 bg-white/10 p-1 rounded-lg">
-        <button
-          class={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-            activeTab === 'overview' 
-              ? 'bg-white text-slate-900 shadow-sm' 
-              : 'text-white/70 hover:text-white hover:bg-white/5'
-          }`}
-          onclick={() => activeTab = 'overview'}
-        >
-          <Home class="w-4 h-4" />
-          Overview
-        </button>
-        <button
-          class={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-            activeTab === 'billing' 
-              ? 'bg-white text-slate-900 shadow-sm' 
-              : 'text-white/70 hover:text-white hover:bg-white/5'
-          }`}
-          onclick={() => activeTab = 'billing'}
-        >
-          <DollarSign class="w-4 h-4" />
-          Billing
-          {#if overdueBillings.length > 0}
-            <span class="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
-              {overdueBillings.length}
-            </span>
-          {/if}
-        </button>
-        <button
-          class={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-            activeTab === 'history' 
-              ? 'bg-white text-slate-900 shadow-sm' 
-              : 'text-white/70 hover:text-white hover:bg-white/5'
-          }`}
-          onclick={() => activeTab = 'history'}
-        >
-          <Clock class="w-4 h-4" />
-          History
-        </button>
-      </div>
     </div>
 
     <!-- Content -->
-    <div class="overflow-y-auto h-[calc(95vh-280px)]">
+    <div class="overflow-y-auto h-[calc(95vh-200px)] p-6">
       {#if open}
-        {#if activeTab === 'overview'}
-          <LeaseOverviewTab {lease} />
-        {:else if activeTab === 'billing'}
-          <LeaseBillingTab {lease} />
-        {:else if activeTab === 'history'}
-          <LeaseHistoryTab {lease} />
-        {/if}
+        <!-- Top Row: Overview (Left) and Billing (Right) -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <!-- Overview Column -->
+          
+            <div class="bg-gray-50 rounded-lg p-4">
+              <LeaseOverviewTab {lease} {tenants} />
+            </div>
+
+          <!-- Billing Column -->
+          <div class="space-y-4">
+
+              {#if overdueBillings.length > 0}
+                <span class="bg-gray-900 text-white text-xs px-1.5 py-0.5 rounded-full">
+                  {overdueBillings.length}
+                </span>
+              {/if}
+            <div class="bg-gray-50 rounded-lg p-4">
+              <LeaseBillingTab {lease} />
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom Row: History (Full Width) -->
+
+          <div class="bg-gray-50 rounded-lg p-4">
+            <LeaseHistoryTab {lease} />
+          </div>
       {/if}
     </div>
   </Dialog.Content>

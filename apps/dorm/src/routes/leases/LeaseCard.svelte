@@ -94,7 +94,7 @@
     }, 0) || 0;
   });
 
-  // Get the most recent payment date when all billings are paid
+  // Get the most recent billing date when all billings are paid
   let lastPaidDate = $derived.by(() => {
     if (!lease.billings || lease.billings.length === 0) return null;
     
@@ -106,13 +106,16 @@
     
     if (!allPaid) return null;
     
-    // Find the most recent paid_at date from all billings
-    const paidDates = lease.billings
-      .filter(b => b.paid_at)
-      .map(b => new Date(b.paid_at))
+    // Find the most recent billing date from fully paid billings
+    const paidBillings = lease.billings
+      .filter(b => {
+        const totalDue = b.amount + (b.penalty_amount || 0);
+        return b.paid_amount >= totalDue;
+      })
+      .map(b => new Date(b.billing_date))
       .sort((a, b) => b.getTime() - a.getTime());
     
-    return paidDates.length > 0 ? paidDates[0] : null;
+    return paidBillings.length > 0 ? paidBillings[0] : null;
   });
 
   async function handleStatusChange(newStatus: string) {
@@ -254,7 +257,7 @@
                   <span class="text-green-600">Paid</span>
                   {#if lastPaidDate}
                     <div class="text-xs text-slate-500 mt-1">
-                      Was Paid on: {formatDate(lastPaidDate.toISOString())}
+                      Last billing: {formatDate(lastPaidDate.toISOString())}
                     </div>
                   {/if}
                 {/if}
@@ -449,6 +452,7 @@
 {#if showDetailsModal}
 <LeaseDetailsModal
   {lease}
+  {tenants}
   open={showDetailsModal}
   onOpenChange={handleDetailsModalClose}
 />
