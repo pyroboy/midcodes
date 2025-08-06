@@ -6,6 +6,11 @@
 	import { Badge } from '$lib/components/ui/badge';
   import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
 	import type { MeterReadingEntry, ReadingSaveEvent, Property, ReadingGroup } from './types';
+	import { superForm } from 'sveltekit-superforms/client';
+	import { zodClient } from 'sveltekit-superforms/adapters';
+	import { batchReadingsSchema } from './meterReadingSchema';
+	import { formatCurrency } from '$lib/utils/format';
+	import { toast } from 'svelte-sonner';
 
 	interface Props {
     open: boolean;
@@ -18,9 +23,10 @@
     onSave: (event: ReadingSaveEvent) => void;
     close: () => void;
     previousReadingGroups: ReadingGroup[];
+    form: any; // SuperForm form data
   };
 
-	  let { open = $bindable(), property, utilityType, meters, meterReadings: initialMeterReadings, readingDate, costPerUnit, onSave, close, previousReadingGroups = [] }: Props = $props();
+	  let { open = $bindable(), property, utilityType, meters, meterReadings: initialMeterReadings, readingDate, costPerUnit, onSave, close, previousReadingGroups = [], form: formData }: Props = $props();
 
   let meterReadings = $state([...initialMeterReadings]);
 
@@ -29,17 +35,74 @@
   });
 
   let selectedPreviousDate = $state<string | null>(null);
+  let isSubmitting = $state(false);
+
+  // Derive readings JSON from current state with validation
+  let readingsJson = $derived.by(() => {
+    const readingsToSubmit = meterReadings
+      .filter((r) => {
+        const hasReading = r.currentReading !== null && r.currentReading !== undefined && !isNaN(Number(r.currentReading));
+        console.log(`Meter ${r.meterId} (${r.meterName}):`, {
+          currentReading: r.currentReading,
+          hasReading,
+          type: typeof r.currentReading
+        });
+        return hasReading;
+      })
+      .map((r) => {
+        const readingData = {
+          meter_id: Number(r.meterId),
+          reading: Number(r.currentReading),
+          reading_date: readingDate,
+          previous_reading: r.previousReading !== null ? Number(r.previousReading) : null
+        };
+        console.log(`Mapped reading for meter ${r.meterId}:`, readingData);
+        return readingData;
+      });
+    
+    const jsonString = JSON.stringify(readingsToSubmit);
+    console.log('Generated readings JSON:', jsonString);
+    console.log('Total readings to submit:', readingsToSubmit.length);
+    return jsonString;
+  });
+
+  // Initialize superForm with comprehensive error handling
+  const { form, errors, enhance, submitting, message } = superForm(formData, {
+    validators: zodClient(batchReadingsSchema),
+    resetForm: false,
+    taintedMessage: null,
+    id: `meter-reading-${property.id}-${utilityType}`,
+    onUpdated: ({ form: f }) => {
+      if (f.valid) {
+        if (f.message) {
+          toast.success(f.message);
+        } else {
+          toast.success('Meter readings saved successfully');
+        }
+        isSubmitting = false;
+        close();
+      } else if (f.errors) {
+        // Handle validation errors
+        const errorMessages = Object.values(f.errors).flat().join(', ');
+        toast.error(`Validation failed: ${errorMessages}`);
+        isSubmitting = false;
+      }
+    },
+    onError: ({ result }) => {
+      console.error('Form submission error:', result);
+      const errorMessage = result.error?.message || result.error || 'Failed to save readings';
+      toast.error(errorMessage);
+      isSubmitting = false;
+    },
+    onSubmit: () => {
+      isSubmitting = true;
+    }
+  });
 
 	let sortedReadings = $derived.by(() => {
 		return meterReadings.slice().sort((a, b) => a.meterName.localeCompare(b.meterName));
 	});
-	// Helper: Format currency with peso sign
-	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('en-PH', {
-			style: 'currency',
-			currency: 'PHP'
-		}).format(amount);
-	}
+	// Remove local formatCurrency function - using imported one
 
 	// Format date for display
 	function formatDate(dateString: string): string {
@@ -50,21 +113,58 @@
 		});
 	}
 
-	// Update reading values as the user types
+	// Update reading values with client-side validation
 	function handleReadingChange(meterId: number, value: string): void {
 		const readingToUpdate = meterReadings.find((r) => r.meterId === meterId);
 		if (!readingToUpdate) return;
 
 		const readingValue = value === '' ? null : parseFloat(value);
-		readingToUpdate.currentReading = readingValue;
+		
+		// Clear any previous validation errors
+		readingToUpdate.validationError = null;
 
 		if (readingValue !== null && !isNaN(readingValue)) {
+			// Client-side validation
+			if (readingValue < 0) {
+				readingToUpdate.validationError = 'Reading must be positive';
+				readingToUpdate.currentReading = readingValue;
+				readingToUpdate.consumption = null;
+				readingToUpdate.cost = null;
+				return;
+			}
+
+			if (readingValue > 999999999) {
+				readingToUpdate.validationError = 'Reading value is too high';
+				readingToUpdate.currentReading = readingValue;
+				readingToUpdate.consumption = null;
+				readingToUpdate.cost = null;
+				return;
+			}
+
 			// Use previous reading if available, otherwise fall back to initial reading, then to 0
 			const baselineReading = readingToUpdate.previousReading ?? readingToUpdate.initialReading ?? 0;
+			
+			// Validate against previous reading
+			if (readingValue < baselineReading) {
+				readingToUpdate.validationError = `Reading must be ≥ ${baselineReading} (previous reading)`;
+				readingToUpdate.currentReading = readingValue;
+				readingToUpdate.consumption = null;
+				readingToUpdate.cost = null;
+				return;
+			}
+
 			const consumption = readingValue - baselineReading;
+			
+			// Flag unusually high consumption
+			if (consumption > 50000) {
+				readingToUpdate.validationError = `Very high consumption (${consumption} units). Please verify.`;
+			}
+
+			readingToUpdate.currentReading = readingValue;
 			readingToUpdate.consumption = consumption;
 			readingToUpdate.cost = consumption > 0 ? consumption * costPerUnit : 0;
 		} else {
+			readingToUpdate.currentReading = readingValue;
 			readingToUpdate.consumption = null;
 			readingToUpdate.cost = null;
 		}
@@ -107,21 +207,60 @@
 		}
 	}
 
-	function handleSave() {
+	async function handleSave() {
+		if (isSubmitting) return;
+		
+		console.log('=== Starting form save ===');
+		console.log('Current meter readings:', meterReadings);
+		console.log('Reading date:', readingDate, 'Cost per unit:', costPerUnit, typeof costPerUnit);
+		
 		const readingsToSubmit = meterReadings
-			.filter((r) => r.currentReading !== null && r.currentReading !== undefined)
-			.map((r) => {
-				return {
-					meter_id: r.meterId,
-					reading: r.currentReading,
-					reading_date: readingDate,
-					consumption: r.consumption,
-					previous_reading: r.previousReading,
-					cost: r.cost
-				};
-			});
+			.filter((r) => r.currentReading !== null && r.currentReading !== undefined && !isNaN(Number(r.currentReading)));
 
-		onSave({ readings: readingsToSubmit, readingDate, costPerUnit });
+		console.log('Filtered readings to submit:', readingsToSubmit);
+
+		if (readingsToSubmit.length === 0) {
+			toast.error('Please enter at least one valid reading');
+			return;
+		}
+		
+		// Validate required fields
+		if (!readingDate) {
+			toast.error('Reading date is required');
+			return;
+		}
+		
+		if (!costPerUnit || isNaN(Number(costPerUnit)) || Number(costPerUnit) <= 0) {
+			toast.error('Valid cost per unit is required');
+			return;
+		}
+
+		isSubmitting = true;
+		
+		try {
+			console.log('Submitting form with data:', {
+				readingsJson,
+				readingDate,
+				costPerUnit: Number(costPerUnit),
+				utilityType
+			});
+			
+			// Update form data before submission
+			$form.readings_json = readingsJson;
+			$form.reading_date = readingDate;
+			$form.cost_per_unit = Number(costPerUnit);
+			$form.type = utilityType;
+			
+			// Submit using the form action
+			const formElement = document.getElementById('reading-form') as HTMLFormElement;
+			if (formElement) {
+				formElement.requestSubmit();
+			}
+		} catch (error) {
+			console.error('Form submission error:', error);
+			toast.error('Failed to submit readings');
+			isSubmitting = false;
+		}
 	}
 
 	function getUtilityBadgeColor(type: string): string {
@@ -177,6 +316,7 @@
 	<Dialog.Portal>
 		<Dialog.Overlay class="fixed inset-0 bg-black/50 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
 		<Dialog.Content class="fixed left-1/2 top-1/2 w-full max-w-4xl -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg">
+			<form id="reading-form" method="POST" action="?/addBatchReadings" use:enhance>
 			<Dialog.Header class="flex flex-col gap-2">
 				<div class="flex items-center justify-between">
 					<Dialog.Title class="text-2xl font-bold">Add Meter Readings</Dialog.Title>
@@ -259,7 +399,7 @@
 						<tbody>
 							{#each sortedReadings as reading}
 								<tr class="bg-white border-b hover:bg-gray-50">
-									<td class="px-4  font-medium text-gray-900">{reading.meterName}</td>
+									<td class="px-4 font-medium text-gray-900">{reading.meterName}</td>
 									<td class="px-4">
 										{#if reading.previousReading != null}
 											{reading.previousReading.toFixed(2)}
@@ -282,8 +422,13 @@
 												placeholder="Enter reading"
 												oninput={(e) => handleReadingChange(reading.meterId, (e.target as HTMLInputElement).value)}
 												value={reading.currentReading || ''}
-												class="w-full"
+												class="w-full {reading.validationError ? 'border-red-500 focus:border-red-500' : ''}"
 											/>
+											{#if reading.validationError}
+												<div class="absolute top-full left-0 mt-1 text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1 z-10">
+													{reading.validationError}
+												</div>
+											{/if}
 										</div>
 									</td>
 									<td class="px-4">
@@ -299,14 +444,56 @@
 				{/if}
 			</div>
 
+				
+				<!-- Hidden form fields for superform -->
+				<input type="hidden" name="readings_json" value={readingsJson} />
+				<input type="hidden" name="reading_date" value={readingDate} />
+				<input type="hidden" name="cost_per_unit" value={costPerUnit} />
+				<input type="hidden" name="type" value={utilityType} />
+				
+				<!-- Debug info in development -->
+				{#if typeof window !== 'undefined' && window.location.hostname === 'localhost'}
+					<div class="mt-2 p-2 bg-gray-50 border rounded text-xs text-gray-600">
+						<strong>Debug Info:</strong><br/>
+						Readings JSON: {readingsJson?.substring(0, 100)}...<br/>
+						Reading Date: {readingDate}<br/>
+						Cost Per Unit: {costPerUnit} (type: {typeof costPerUnit})<br/>
+						Utility Type: {utilityType}
+					</div>
+				{/if}
+				
+			</form>
+
+			<!-- Display validation errors -->
+			{#if $errors.readings_json}
+				<div class="mt-2 p-2 bg-red-50 border border-red-200 rounded text-red-600 text-sm">
+					{$errors.readings_json}
+				</div>
+			{/if}
+			{#if $errors.reading_date}
+				<div class="mt-2 p-2 bg-red-50 border border-red-200 rounded text-red-600 text-sm">
+					{$errors.reading_date}
+				</div>
+			{/if}
+			{#if $errors.cost_per_unit}
+				<div class="mt-2 p-2 bg-red-50 border border-red-200 rounded text-red-600 text-sm">
+					{$errors.cost_per_unit}
+				</div>
+			{/if}
+
 			<Dialog.Footer class="mt-4">
-								<Button variant="outline" onclick={close} class="mr-2">Cancel</Button>
-								<Button
+				<Button variant="outline" onclick={close} class="mr-2">Cancel</Button>
+				<Button
 					type="button"
 					onclick={handleSave}
-					disabled={meterReadings.filter((r) => r.currentReading !== null).length === 0}
+					disabled={meterReadings.filter((r) => r.currentReading !== null).length === 0 || isSubmitting || $submitting}
 				>
-					Save Readings
+					{#if isSubmitting || $submitting}
+						<span class="mr-2">⏳</span>
+						Saving...
+					{:else}
+						Save Readings
+					{/if}
 				</Button>
 			</Dialog.Footer>
 		</Dialog.Content>

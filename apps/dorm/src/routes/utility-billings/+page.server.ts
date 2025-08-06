@@ -6,6 +6,7 @@ import type { Actions } from './$types';
 import type { Database } from '$lib/database.types';
 import { batchReadingsSchema, meterReadingSchema } from './meterReadingSchema';
 import type { z } from 'zod';
+import { getUserPermissions } from '$lib/services/permissions';
 
 // Optimize preloading by caching frequently accessed data
 export const config = {
@@ -275,10 +276,49 @@ export const actions: Actions = {
   // Add batch readings with full data saving
   addBatchReadings: async ({ request, locals: { supabase, safeGetSession } }) => {
     /* 1. Validate the form once and only once. */
-    const form = await superValidate(request, zod(batchReadingsSchema));
-    console.log("form.dataAAAAAAAAAAAAAAAAA", form.data);
+    console.log('=== Starting addBatchReadings ===');
+    
+    // Log raw form data for debugging
+    const formData = await request.formData();
+    const rawReadingsJson = formData.get('readings_json') as string;
+    const rawReadingDate = formData.get('reading_date') as string;
+    const rawCostPerUnit = formData.get('cost_per_unit') as string;
+    const rawType = formData.get('type') as string;
+    
+    console.log('Raw form data:', {
+      readings_json: rawReadingsJson,
+      reading_date: rawReadingDate,
+      cost_per_unit: rawCostPerUnit,
+      type: rawType
+    });
+    
+    // Reconstruct request for superValidate
+    const reconstructedFormData = new FormData();
+    reconstructedFormData.append('readings_json', rawReadingsJson || '');
+    reconstructedFormData.append('reading_date', rawReadingDate || '');
+    reconstructedFormData.append('cost_per_unit', rawCostPerUnit || '');
+    if (rawType) reconstructedFormData.append('type', rawType);
+    
+    const mockRequest = new Request(request.url, {
+      method: 'POST',
+      body: reconstructedFormData
+    });
+    
+    const form = await superValidate(mockRequest, zod(batchReadingsSchema));
+    console.log("form.data received:", form.data);
+    console.log("form.errors:", form.errors);
+    console.log("form.valid:", form.valid);
+    
     if (!form.valid) {
-      console.error('❌ Validation failed', form.errors);
+      console.error('❌ Validation failed', {
+        errors: form.errors,
+        data: form.data,
+        rawData: {
+          readings_json: rawReadingsJson?.substring(0, 200),
+          reading_date: rawReadingDate,
+          cost_per_unit: rawCostPerUnit
+        }
+      });
       return fail(400, { form });
     }
 
@@ -286,9 +326,19 @@ export const actions: Actions = {
       const session = await safeGetSession();
       if (!session) throw error(401, 'Unauthorized');
 
+      // Check user permissions for utility management
+      const userPermissions = await getUserPermissions(session.user.user_metadata?.user_roles || [], supabase);
+      if (!userPermissions.includes('property_utility') && !userPermissions.includes('property_manager') && !userPermissions.includes('property_admin')) {
+        return fail(403, { form, error: 'Insufficient permissions to add meter readings' });
+      }
+
       // Manually parse the JSON string after successful validation
+      console.log('Parsing validated readings JSON:', form.data.readings_json);
       const readings: z.infer<typeof meterReadingSchema>[] = JSON.parse(form.data.readings_json);
       const { cost_per_unit } = form.data;
+      
+      console.log('Parsed readings:', readings);
+      console.log('Cost per unit:', cost_per_unit, typeof cost_per_unit);
 
       const meterIds = readings.map((r) => r.meter_id);
   
@@ -317,8 +367,26 @@ export const actions: Actions = {
         .map((r) => {
           const current = Number(r.reading);
           const previous = previousReadingMap[r.meter_id] ?? null;
+          
+          // VALIDATE: Current reading must be >= previous reading
+          if (previous !== null && current < previous) {
+            throw new Error(`Invalid reading for meter ${meterNameMap[r.meter_id] || `ID ${r.meter_id}`}: ${current} is less than previous reading ${previous}`);
+          }
+          
           const consumption = previous !== null ? current - previous : null;
+          
+          // VALIDATE: Reasonable consumption limits (flag unusually high usage)
+          if (consumption !== null && consumption > 50000) {
+            throw new Error(`Unusually high consumption detected for meter ${meterNameMap[r.meter_id] || `ID ${r.meter_id}`}: ${consumption} units. Please verify the reading.`);
+          }
+          
+          // VALIDATE: Negative consumption (reading error)
+          if (consumption !== null && consumption < 0) {
+            throw new Error(`Negative consumption detected for meter ${meterNameMap[r.meter_id] || `ID ${r.meter_id}`}. Current reading must be greater than previous reading.`);
+          }
+          
           const cost = consumption !== null && consumption > 0 ? consumption * cost_per_unit : null;
+          
           return {
             meter_id: r.meter_id,
             reading: current,
@@ -326,7 +394,7 @@ export const actions: Actions = {
             meter_name: meterNameMap[r.meter_id] || null,
             consumption,
             cost,
-            rate_at_reading: cost_per_unit, // Updated to use new column name
+            rate_at_reading: cost_per_unit,
             previous_reading: previous
           };
         });
@@ -337,17 +405,44 @@ export const actions: Actions = {
         .from('readings')
         .insert(readingsToInsert)
         .select();
-      if (insertError) return fail(500, { form, error: `Failed to insert readings: ${insertError.message}` });
+      if (insertError) {
+        console.error('Database insertion error:', insertError);
+        return fail(500, { 
+          form, 
+          error: `Failed to insert readings: ${insertError.message}`,
+          details: insertError
+        });
+      }
   
-            return {
+      return {
         form, // ← required by Superforms
         success: true,
-        message: `Successfully added ${newReadings?.length ?? 0} readings`,
+        message: `Successfully added ${newReadings?.length ?? 0} meter readings`,
         readings: newReadings ?? []
       };
     } catch (err: any) {
       console.error('Error in addBatchReadings:', err);
-      return fail(500, { form, error: err.message || 'An unexpected error occurred' });
+      
+      // Provide more specific error messages based on error type
+      let userMessage = 'An unexpected error occurred while saving readings';
+      
+      if (err.message.includes('Invalid reading for meter')) {
+        userMessage = err.message; // Use the specific validation message
+      } else if (err.message.includes('Unusually high consumption')) {
+        userMessage = err.message; // Use the specific consumption warning
+      } else if (err.message.includes('Insufficient permissions')) {
+        userMessage = 'You do not have permission to add meter readings';
+      } else if (err.code === '23505') {
+        userMessage = 'A reading for this date already exists for one or more meters';
+      } else if (err.message.includes('database')) {
+        userMessage = 'Database error occurred. Please try again.';
+      }
+      
+      return fail(500, { 
+        form, 
+        error: userMessage,
+        details: process.env.NODE_ENV === 'development' ? err.message : undefined
+      });
     }
   }
 };
