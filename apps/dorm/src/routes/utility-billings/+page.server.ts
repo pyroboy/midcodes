@@ -223,7 +223,7 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
     }
   });
 
-  // IMPLEMENT THE FIXED BILLING PERIOD LOGIC
+  // IMPLEMENT THE NEW MONTHLY BILLING PERIOD LOGIC
   const displayedReadings = [];
 
   console.log('Processing billing periods for meters:', Object.keys(grouped));
@@ -235,94 +235,62 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
       (a, b) => new Date(a.reading_date).getTime() - new Date(b.reading_date).getTime()
     );
 
-    console.log(`Processing meter ${meterId}:`, {
+    console.log(`Processing meter ${meterId} with new monthly logic:`, {
       totalReadings: sorted.length,
       readingDates: sorted.map(r => r.reading_date),
       lastBilledDate: meterLastBilledDates[meterId]
     });
 
-    // Find the last billed reading for this meter, or the very first reading if never billed
-    const lastBilledDate = meterLastBilledDates[meterId];
-    let lastBilledReading = sorted.find(r => r.reading_date === lastBilledDate);
-
-    // If no last billed reading is found, we need to handle this differently
-    if (!lastBilledReading) {
-      // For meters that have never been billed, we should look for billing periods
-      // between consecutive readings, starting from the first reading
-      console.log(`Meter ${meterId} has no billing history, checking consecutive readings`);
-      
-      // Check consecutive readings for valid billing periods
-      for (let i = 1; i < sorted.length; i++) {
-        const prev = sorted[i - 1];
-        const curr = sorted[i];
-
-        const daysDiff = (new Date(curr.reading_date).getTime() - new Date(prev.reading_date).getTime()) / (1000 * 60 * 60 * 24);
-
-        console.log(`Checking period: ${prev.reading_date} to ${curr.reading_date} (${daysDiff} days)`);
-
-        // Only consider valid billing cycles (25–35 days)
-        if (daysDiff >= 25 && daysDiff <= 35) {
-          const consumption = curr.reading - prev.reading;
-          const cost = consumption * (curr.rate_at_reading || 0);
-
-          displayedReadings.push({
-            ...curr,
-            previous_reading: prev.reading,
-            previous_reading_date: prev.reading_date,
-            consumption,
-            cost,
-            days_diff: Math.round(daysDiff),
-            period: curr.reading_date.slice(0, 7), // "2025-04"
-          });
-          
-          console.log(`✅ Valid billing period found for meter ${meterId}: ${prev.reading_date} to ${curr.reading_date}`);
-        }
+    // 1. Group all readings by month (e.g., "2024-08", "2024-09")
+    const readingsByMonth = sorted.reduce((acc, reading) => {
+      const monthKey = reading.reading_date.slice(0, 7); // "YYYY-MM"
+      if (!acc[monthKey]) {
+        acc[monthKey] = [];
       }
-    } else {
-      // For meters with billing history, use the improved logic
-      console.log(`Meter ${meterId} has billing history, last billed: ${lastBilledReading.reading_date}`);
-      
-      // Find all readings that occurred AFTER the last billed reading
-      const potentialNewReadings = sorted.filter(
-        r => new Date(r.reading_date) > new Date(lastBilledReading!.reading_date)
-      );
+      acc[monthKey].push(reading);
+      return acc;
+    }, {} as Record<string, typeof sorted>);
 
-      console.log(`Found ${potentialNewReadings.length} potential new readings after last billed date`);
+    console.log(`Meter ${meterId} readings by month:`, Object.keys(readingsByMonth));
 
-      // Now, check each of these potential readings against the last billed one
-      for (const currentReading of potentialNewReadings) {
-        const prev = lastBilledReading;
-        const curr = currentReading;
+    // 2. Get a sorted list of the months that have readings
+    const sortedMonths = Object.keys(readingsByMonth).sort();
 
+    // 3. Iterate through the months to create billing periods
+    for (let i = 1; i < sortedMonths.length; i++) {
+      const currentMonthKey = sortedMonths[i];
+      const previousMonthKey = sortedMonths[i - 1];
+
+      // Get the last reading from the previous month
+      const prevMonthReadings = readingsByMonth[previousMonthKey];
+      const prev = prevMonthReadings[prevMonthReadings.length - 1];
+
+      // Get the last reading from the current month
+      const currentMonthReadings = readingsByMonth[currentMonthKey];
+      const curr = currentMonthReadings[currentMonthReadings.length - 1];
+
+      // This check is to ensure we have both readings to compare
+      if (prev && curr) {
         const daysDiff = (new Date(curr.reading_date).getTime() - new Date(prev.reading_date).getTime()) / (1000 * 60 * 60 * 24);
+        const consumption = curr.reading - prev.reading;
+        const cost = consumption * (curr.rate_at_reading || 0);
 
-        console.log(`Checking period: ${prev.reading_date} to ${curr.reading_date} (${daysDiff} days)`);
+        displayedReadings.push({
+          ...curr,
+          previous_reading: prev.reading,
+          previous_reading_date: prev.reading_date,
+          consumption,
+          cost,
+          days_diff: Math.round(daysDiff),
+          // The period is now the current month's key
+          period: currentMonthKey, 
+        });
 
-        // This condition is now more reliable - only consider valid billing cycles (25–35 days)
-        if (daysDiff >= 25 && daysDiff <= 35) {
-          const consumption = curr.reading - prev.reading;
-          const cost = consumption * (curr.rate_at_reading || 0);
-
-          displayedReadings.push({
-            ...curr,
-            previous_reading: prev.reading,
-            previous_reading_date: prev.reading_date,
-            consumption,
-            cost,
-            days_diff: Math.round(daysDiff),
-            period: curr.reading_date.slice(0, 7), // "2025-04"
-          });
-          
-          console.log(`✅ Valid billing period found for meter ${meterId}: ${prev.reading_date} to ${curr.reading_date}`);
-          
-          // IMPORTANT: Once a valid period is found, update the 'lastBilledReading' 
-          // so the next iteration looks for a period from this new point
-          lastBilledReading = currentReading;
-        }
+        console.log(`✅ Generated period for ${currentMonthKey}. From ${prev.reading_date} to ${curr.reading_date} (${Math.round(daysDiff)} days).`);
       }
     }
 
-    // Fallback: if only one reading, show it (no consumption)
+    // Fallback: if only one reading exists, show it without consumption
     if (sorted.length === 1) {
       const r = sorted[0];
       displayedReadings.push({

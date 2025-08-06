@@ -16,7 +16,7 @@
 		"format": "prettier --write .",
 		"test:integration": "playwright test",
 		"test:unit": "vitest",
-		"clean": "rm -rf .svelte-kit build node_modules/.cache/turbo"
+		"clean": "rimraf .svelte-kit build node_modules/.cache/turbo node_modules/.vite"
 	},
 	"devDependencies": {
 		"@playwright/test": "^1.49.1",

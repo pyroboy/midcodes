@@ -46,7 +46,6 @@ import { Button } from '$lib/components/ui/button';
       tbody td { padding: 0.5rem 0.75rem; border-bottom: 1px solid #e2e8f0; }
       tbody tr:last-child td { border-bottom: none; }
 
-      .footer { margin-top: 1rem; text-align: right; font-size: 1.1rem; font-weight: 700; color: #059669; }
     </style>
   </head>
   <body>
@@ -56,6 +55,7 @@ import { Button } from '$lib/components/ui/button';
         <div class="meta">
           <dt>Meter</dt><dd>${meter.meterName}</dd>
           <dt>Period</dt><dd>${formatDate(meter.lastReadingDate)} – ${formatDate(meter.currentReadingDate)}</dd>
+          ${meter.daysDiff ? `<dt>Days Gap</dt><dd>${meter.daysDiff} days</dd>` : ''}
           <dt>Consumption</dt><dd>${meter.consumption?.toFixed(2)}</dd>
         </div>
       </div>
@@ -82,9 +82,7 @@ import { Button } from '$lib/components/ui/button';
         </tbody>
       </table>
 
-      <div class="footer">
-        Total Cost: ₱${data.reduce((s, d) => s + d.share, 0).toFixed(2)}
-      </div>
+    
     </div>
   </body>
 </html>`;
@@ -150,6 +148,9 @@ import { Button } from '$lib/components/ui/button';
 				<div>
 					<p><strong>Meter:</strong> {reading.meterName}</p>
 					<p><strong>Period:</strong> {formatDate(reading.lastReadingDate)} – {formatDate(reading.currentReadingDate)}</p>
+					{#if reading.daysDiff}
+						<p><strong>Days Gap:</strong> {reading.daysDiff} days</p>
+					{/if}
 					<p><strong>Consumption:</strong> {reading.consumption?.toFixed(2)}</p>
 					<p><strong>Total Cost:</strong> ₱{data.reduce((s, d) => s + d.share, 0).toFixed(2)}</p>
 				</div>

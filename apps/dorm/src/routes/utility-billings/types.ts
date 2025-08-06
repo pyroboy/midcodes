@@ -185,6 +185,7 @@ export type Filters = {
 	consumption: number | null;
 	costPerUnit: number | null;
 	totalCost: number | null;
+	daysDiff?: number | null; // Days between readings for billing period
 	history: Reading[];
   }
 

@@ -4,7 +4,7 @@
   import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
   import { Button } from '$lib/components/ui/button';
   import * as Alert from '$lib/components/ui/alert';
-  import { Check, RefreshCw, Download } from 'lucide-svelte';
+  import { Check, RefreshCw, Download, BarChart } from 'lucide-svelte';
   import { invalidateAll } from '$app/navigation';
   import { tick } from 'svelte';
   import type { PageData } from './$types';
@@ -17,6 +17,7 @@
   import ConsolidatedReadingsTable from './ConsolidatedReadingsTable.svelte';
   import TenantShareModal from './TenantShareModal.svelte';
   import PrintPreviewModal from './PrintPreviewModal.svelte';
+  import BillingPeriodsGraphModal from './BillingPeriodsGraphModal.svelte';
   
   // Import types
   import { propertyStore } from '$lib/stores/property';
@@ -76,7 +77,8 @@
     reading: false,
     export: false,
     tenantShare: false,
-    printPreview: false
+    printPreview: false,
+    billingGraph: false
   });
 
   // Grouped state for tenant sharing
@@ -310,6 +312,14 @@ console.log('handleSaveReadings', readings);
     on:close={() => (modals.export = false)}
   />
 
+  <BillingPeriodsGraphModal
+    bind:open={modals.billingGraph}
+    readings={allReadings}
+    meters={allMeters}
+    properties={allProperties}
+    close={() => (modals.billingGraph = false)}
+  />
+
   <!-- Main Content -->
   <div class="space-y-6 mt-6">
     <!-- Readings Display Section -->
@@ -317,16 +327,29 @@ console.log('handleSaveReadings', readings);
       <div class="flex items-center justify-between">
         <h2 class="text-xl font-semibold">Meter Readings</h2>
         
-        <!-- Export button -->
-        <Button 
-          variant="outline" 
-          onclick={() => modals.export = true}
-          class="flex items-center gap-2"
-          disabled={allReadings.length === 0}
-        >
-          <Download class="h-4 w-4 mr-1" />
-          Export Data
-        </Button>
+        <div class="flex items-center gap-2">
+          <!-- Graph Analysis button -->
+          <Button 
+            variant="outline" 
+            onclick={() => modals.billingGraph = true}
+            class="flex items-center gap-2"
+            disabled={allReadings.length === 0}
+          >
+            <BarChart class="h-4 w-4 mr-1" />
+            Graph Analysis
+          </Button>
+          
+          <!-- Export button -->
+          <Button 
+            variant="outline" 
+            onclick={() => modals.export = true}
+            class="flex items-center gap-2"
+            disabled={allReadings.length === 0}
+          >
+            <Download class="h-4 w-4 mr-1" />
+            Export Data
+          </Button>
+        </div>
       </div>
 
       <ConsolidatedReadingsTable 

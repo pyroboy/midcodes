@@ -51,6 +51,7 @@
 				consumption: reading.consumption || null,
 				costPerUnit: reading.rate_at_reading || null,
 				totalCost: reading.cost || null,
+				daysDiff: reading.days_diff || null, // Add days gap
 				history: [reading]
 			};
 			props.onShareReading(meterData);
@@ -139,6 +140,21 @@
 				return 'unit';
 		}
 	}
+
+	// Get color class based on days difference
+	function getDaysDiffColorClass(daysDiff: number): string {
+		if (daysDiff <= 15) {
+			return 'text-red-600'; // Very short period (red)
+		} else if (daysDiff <= 25) {
+			return 'text-orange-600'; // Short period (orange)
+		} else if (daysDiff <= 35) {
+			return 'text-green-600'; // Normal period (green)
+		} else if (daysDiff <= 45) {
+			return 'text-yellow-600'; // Long period (yellow)
+		} else {
+			return 'text-red-600'; // Very long period (red)
+		}
+	}
 </script>
 
 <div class="space-y-4">
@@ -179,6 +195,7 @@
 					<Table.Head>Last Billed</Table.Head>
 					<Table.Head>Previous</Table.Head>
 					<Table.Head>Current</Table.Head>
+					<Table.Head>Days Gap</Table.Head>
 					<Table.Head>Consumption</Table.Head>
 					<Table.Head>Rate</Table.Head>
 					<Table.Head>Cost</Table.Head>
@@ -228,6 +245,16 @@
 								<div>{formatNumber(reading.reading)}</div>
 								<div class="text-xs text-muted-foreground">{formatDate(reading.reading_date)}</div>
 							</div>
+						</Table.Cell>
+						<Table.Cell>
+							{#if reading.days_diff !== null && reading.days_diff !== undefined}
+								<div class="text-center">
+									<span class="font-medium {getDaysDiffColorClass(reading.days_diff)}">{reading.days_diff}</span>
+									<div class="text-xs text-muted-foreground">days</div>
+								</div>
+							{:else}
+								<span class="text-muted-foreground">-</span>
+							{/if}
 						</Table.Cell>
 						<Table.Cell>
 							{formatNumber(reading.consumption)}
