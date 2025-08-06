@@ -34,6 +34,7 @@
   let selectedStatus = $state('');
   let isLoading = $state(data.lazy === true); // Loading state for skeletons
   let viewMode = $state<'card' | 'list'>('card'); // Toggle between card and list view
+  let activeFilter = $state<'all' | 'active' | 'inactive' | 'pending' | 'blacklisted'>('all'); // Filter for stats
 
   // Load data lazily if needed
   onMount(async () => {
@@ -69,7 +70,14 @@
     return tenants.filter((tenant: TenantResponse) => {
       const searchMatch = !searchTerm || tenant.name.toLowerCase().includes(searchTerm.toLowerCase());
       const statusMatch = !selectedStatus || tenant.tenant_status === selectedStatus;
-      return searchMatch && statusMatch;
+      
+      // Apply activeFilter
+      let filterMatch = true;
+      if (activeFilter !== 'all') {
+        filterMatch = tenant.tenant_status === activeFilter.toUpperCase();
+      }
+      
+      return searchMatch && statusMatch && filterMatch;
     });
   });
 
@@ -77,10 +85,11 @@
   let stats = $derived.by(() => {
     const total = tenants.length;
     const active = tenants.filter((t: TenantResponse) => t.tenant_status === 'ACTIVE').length;
+    const inactive = tenants.filter((t: TenantResponse) => t.tenant_status === 'INACTIVE').length;
     const pending = tenants.filter((t: TenantResponse) => t.tenant_status === 'PENDING').length;
     const blacklisted = tenants.filter((t: TenantResponse) => t.tenant_status === 'BLACKLISTED').length;
     
-    return { total, active, pending, blacklisted };
+    return { total, active, inactive, pending, blacklisted };
   });
 
   function handleAddTenant() {
@@ -93,6 +102,14 @@
     selectedTenant = tenant;
     editMode = true;
     showModal = true;
+  }
+
+  function handleFilterClick(filter: 'all' | 'active' | 'inactive' | 'pending' | 'blacklisted') {
+    activeFilter = filter;
+    // Clear the select dropdown when using the mini stats filters
+    if (filter !== 'all') {
+      selectedStatus = '';
+    }
   }
 
   // Function to update tenant in local state immediately
@@ -173,44 +190,67 @@
           </div>
         </div>
         
-        <!-- Minimized Stats Overview -->
+        <!-- Enhanced Stats Overview - Now Clickable -->
         <div class="flex items-center gap-3 text-xs sm:text-sm">
-          {#if isLoading}
-            <!-- Skeleton stats -->
-            <div class="flex items-center gap-1 px-2 py-1 bg-blue-50 rounded-lg">
+          <button 
+            onclick={() => handleFilterClick('all')}
+            class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 {activeFilter === 'all' ? 'bg-blue-100 ring-2 ring-blue-500' : 'bg-blue-50 hover:bg-blue-100'}"
+          >
+            {#if isLoading}
               <Skeleton class="h-4 w-6" />
-              <span class="text-slate-600">Total</span>
-            </div>
-            <div class="flex items-center gap-1 px-2 py-1 bg-green-50 rounded-lg">
-              <Skeleton class="h-4 w-6" />
-              <span class="text-slate-600">Active</span>
-            </div>
-            <div class="flex items-center gap-1 px-2 py-1 bg-yellow-50 rounded-lg">
-              <Skeleton class="h-4 w-6" />
-              <span class="text-slate-600">Pending</span>
-            </div>
-            <div class="flex items-center gap-1 px-2 py-1 bg-red-50 rounded-lg">
-              <Skeleton class="h-4 w-6" />
-              <span class="text-slate-600">Blacklisted</span>
-            </div>
-          {:else}
-            <div class="flex items-center gap-1 px-2 py-1 bg-blue-50 rounded-lg">
+            {:else}
               <span class="text-blue-600 font-medium">{stats.total}</span>
-              <span class="text-slate-600">Total</span>
-            </div>
-            <div class="flex items-center gap-1 px-2 py-1 bg-green-50 rounded-lg">
+            {/if}
+            <span class="text-slate-600">Total</span>
+          </button>
+          
+          <button 
+            onclick={() => handleFilterClick('active')}
+            class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 {activeFilter === 'active' ? 'bg-green-100 ring-2 ring-green-500' : 'bg-green-50 hover:bg-green-100'}"
+          >
+            {#if isLoading}
+              <Skeleton class="h-4 w-6" />
+            {:else}
               <span class="text-green-600 font-medium">{stats.active}</span>
-              <span class="text-slate-600">Active</span>
-            </div>
-            <div class="flex items-center gap-1 px-2 py-1 bg-yellow-50 rounded-lg">
+            {/if}
+            <span class="text-slate-600">Active</span>
+          </button>
+          
+          <button 
+            onclick={() => handleFilterClick('inactive')}
+            class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 {activeFilter === 'inactive' ? 'bg-gray-100 ring-2 ring-gray-500' : 'bg-gray-50 hover:bg-gray-100'}"
+          >
+            {#if isLoading}
+              <Skeleton class="h-4 w-6" />
+            {:else}
+              <span class="text-gray-600 font-medium">{stats.inactive}</span>
+            {/if}
+            <span class="text-slate-600">Inactive</span>
+          </button>
+          
+          <button 
+            onclick={() => handleFilterClick('pending')}
+            class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 {activeFilter === 'pending' ? 'bg-yellow-100 ring-2 ring-yellow-500' : 'bg-yellow-50 hover:bg-yellow-100'}"
+          >
+            {#if isLoading}
+              <Skeleton class="h-4 w-6" />
+            {:else}
               <span class="text-yellow-600 font-medium">{stats.pending}</span>
-              <span class="text-slate-600">Pending</span>
-            </div>
-            <div class="flex items-center gap-1 px-2 py-1 bg-red-50 rounded-lg">
+            {/if}
+            <span class="text-slate-600">Pending</span>
+          </button>
+          
+          <button 
+            onclick={() => handleFilterClick('blacklisted')}
+            class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 {activeFilter === 'blacklisted' ? 'bg-red-100 ring-2 ring-red-500' : 'bg-red-50 hover:bg-red-100'}"
+          >
+            {#if isLoading}
+              <Skeleton class="h-4 w-6" />
+            {:else}
               <span class="text-red-600 font-medium">{stats.blacklisted}</span>
-              <span class="text-slate-600">Blacklisted</span>
-            </div>
-          {/if}
+            {/if}
+            <span class="text-slate-600">Blacklisted</span>
+          </button>
         </div>
         
         <Button 
@@ -226,6 +266,33 @@
 
   <!-- Main Content Area -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+    <!-- Active Filter Display -->
+    {#if activeFilter !== 'all'}
+      <div class="mb-6 p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-slate-200/60">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-medium text-slate-600">Showing:</span>
+            <span class="px-2 py-1 rounded-md text-sm font-medium {
+              activeFilter === 'active' ? 'bg-green-100 text-green-700' :
+              activeFilter === 'inactive' ? 'bg-gray-100 text-gray-700' :
+              activeFilter === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+              activeFilter === 'blacklisted' ? 'bg-red-100 text-red-700' :
+              'bg-blue-100 text-blue-700'
+            }">
+              {activeFilter.charAt(0).toUpperCase() + activeFilter.slice(1)} Tenants
+            </span>
+            <span class="text-sm text-slate-500">({filteredTenants.length} of {tenants.length})</span>
+          </div>
+          <button 
+            onclick={() => handleFilterClick('all')}
+            class="text-sm text-slate-600 hover:text-slate-800 underline"
+          >
+            Show All
+          </button>
+        </div>
+      </div>
+    {/if}
+
     <!-- Search and Filter Section -->
     <div class="bg-white/40 backdrop-blur-sm rounded-2xl border border-slate-200/60 shadow-sm p-6 mb-6">
       <div class="flex flex-col sm:flex-row gap-4">

@@ -6,10 +6,27 @@ import type { Actions, PageServerLoad } from './$types';
 import type { PostgrestError } from '@supabase/postgrest-js';
 import type { PenaltyBilling } from './types';
 
-export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession } }) => {
+export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession }, depends }) => {
   const session = await safeGetSession();
   if (!session.user) throw error(401, 'Unauthorized');
 
+  // Set up dependencies for invalidation
+  depends('app:penalties');
+
+  // Return minimal data for instant navigation
+  return {
+    // Start with empty arrays for instant rendering
+    penaltyBillings: [],
+    form: await superValidate(zod(updatePenaltySchema)),
+    // Flag to indicate lazy loading
+    lazy: true,
+    // Return promise that resolves with the actual data
+    penaltyBillingsPromise: loadPenaltyBillingsData(supabase)
+  };
+};
+
+// Separate async function for heavy data loading
+async function loadPenaltyBillingsData(supabase: any) {
   try {
     // Get current date
     const currentDate = new Date();
@@ -51,21 +68,15 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
 
     if (penaltyError) {
       console.error('Error fetching penalty billings:', penaltyError);
-      throw error(500, 'Failed to load penalty billings');
+      throw new Error('Failed to load penalty billings');
     }
 
-    // Initialize the form for penalty updates
-    const form = await superValidate(zod(updatePenaltySchema));
-
-    return {
-      penaltyBillings: penaltyBillings as PenaltyBilling[],
-      form
-    };
+    return penaltyBillings as PenaltyBilling[];
   } catch (err) {
-    console.error('Error in penalties load function:', err);
-    throw error(500, 'An unexpected error occurred');
+    console.error('Error in loadPenaltyBillingsData:', err);
+    throw err;
   }
-};
+}
 
 export const actions: Actions = {
   // Update a penalty amount

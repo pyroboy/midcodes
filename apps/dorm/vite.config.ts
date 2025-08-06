@@ -4,19 +4,16 @@ import type { UserConfig } from 'vite';
 
 export default defineConfig({
     plugins: [sveltekit()],
-    optimizeDeps: {
-        exclude: [
-            '@threlte/core',
-            '@threlte/extras', 
-            'three',
-            'three-inspect',
-            'html5-qrcode',
-            'jszip'
-        ]
-    },
-    server: {
-        fs: {
-            allow: ['..']
-        }
-    }
+    // optimizeDeps: {
+    //     exclude: [
+    //         'bits-ui',
+    //         'lucide-svelte',
+    //         'sveltekit-superforms',
+    //     ]
+    // },
+    // server: {
+    //     fs: {
+    //         allow: ['..']
+    //     }
+    // }
 } as UserConfig);
