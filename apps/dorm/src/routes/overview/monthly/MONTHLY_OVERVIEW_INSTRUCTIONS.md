@@ -1,9 +1,11 @@
 # Monthly Overview Route Instructions
 
 ## Overview
+
 The Monthly Overview route serves as a comprehensive financial and occupancy dashboard for property managers. Its primary purpose is to provide a clear month-by-month view of:
 
 1. **Financial Health**
+
    - Tenant payment histories and current balances
    - Rent collection status
    - Utility payment tracking
@@ -14,6 +16,7 @@ The Monthly Overview route serves as a comprehensive financial and occupancy das
    - Security deposit management
 
 2. **Occupancy Management**
+
    - Rental_unit status (Vacant/Occupied/Reserved)
    - Tenant assignments and capacity utilization
    - Lease status and expiration tracking
@@ -22,6 +25,7 @@ The Monthly Overview route serves as a comprehensive financial and occupancy das
    - Wing assignments
 
 3. **Utility Monitoring**
+
    - Meter readings and consumption patterns
    - Utility billing status
    - Rate adjustments and charges
@@ -38,6 +42,7 @@ The Monthly Overview route serves as a comprehensive financial and occupancy das
 ## Key Goals
 
 1. **Financial Oversight**
+
    - Track monthly revenue streams (rent, utilities, other charges)
    - Monitor payment compliance and identify delayed payments
    - Analyze payment patterns for better forecasting
@@ -47,6 +52,7 @@ The Monthly Overview route serves as a comprehensive financial and occupancy das
    - Manage security deposits effectively
 
 2. **Operational Efficiency**
+
    - Quick identification of vacant rental_unit for marketing
    - Early warning for lease expirations
    - Streamlined utility billing process
@@ -56,6 +62,7 @@ The Monthly Overview route serves as a comprehensive financial and occupancy das
    - Batch operations for common tasks
 
 3. **Decision Support**
+
    - Identify problematic payment patterns
    - Guide rental_unit rate adjustments based on occupancy
    - Support maintenance scheduling decisions
@@ -65,6 +72,7 @@ The Monthly Overview route serves as a comprehensive financial and occupancy das
    - Occupancy optimization
 
 4. **Compliance & Reporting**
+
    - Generate monthly financial summaries
    - Track security deposit status
    - Monitor lease agreement compliance
@@ -74,6 +82,7 @@ The Monthly Overview route serves as a comprehensive financial and occupancy das
    - Payment schedule tracking
 
 5. **Maintenance Management**
+
    - Track maintenance requests and status
    - Monitor completion rates
    - Document maintenance history
@@ -90,6 +99,7 @@ The Monthly Overview route serves as a comprehensive financial and occupancy das
    - Vendor payment management
 
 ## Target Users
+
 1. **Property Managers**: Daily operations and tenant management
 2. **Financial Staff**: Revenue tracking and payment processing
 3. **Maintenance Staff**: Rental_unit status and utility monitoring
@@ -100,7 +110,8 @@ The Monthly Overview route serves as a comprehensive financial and occupancy das
 ## Database Schema Dependencies
 
 ### Primary Tables
-```sql
+
+````sql
 -- Properties Table
 CREATE TABLE public.properties (
     id integer NOT NULL DEFAULT nextval('properties_id_seq'::regclass),
@@ -408,7 +419,7 @@ CREATE OR REPLACE FUNCTION get_tenant_monthly_balances(
 BEGIN
     RETURN QUERY
     WITH monthly_balances AS (
-        SELECT 
+        SELECT
             lt.tenant_id,
             date_trunc('month', b.billing_date) as month,
             SUM(b.balance) as balance
@@ -486,114 +497,118 @@ const { data: balances } = await supabase
     p_property_id: profile.property,
     p_months_back: 12
   });
-```
+````
 
 ### 2. User Interface (+page.svelte)
 
 1. Data Organization
+
 ```typescript
 interface Rental_unit {
-  id: number;
-  name: string;
-  number: number;
-  capacity: number;
-  rental_unit_status: 'VACANT' | 'OCCUPIED' | 'MAINTENANCE';
-  base_rate: number;
-  property_id: number;
-  floor_id: number;
-  type: string;
-  amenities: Record<string, any>;
-  leases: Array<{
-    id: number;
-    name: string;
-    status: string;
-    type: string;
-    start_date: string;
-    end_date: string;
-    rent_amount: number;
-    balance: number;
-    lease_tenants: Array<{
-      tenant: {
-        id: number;
-        name: string;
-        email: string | null;
-        contact_number: string | null;
-      };
-    }>;
-  }>;
+	id: number;
+	name: string;
+	number: number;
+	capacity: number;
+	rental_unit_status: 'VACANT' | 'OCCUPIED' | 'MAINTENANCE';
+	base_rate: number;
+	property_id: number;
+	floor_id: number;
+	type: string;
+	amenities: Record<string, any>;
+	leases: Array<{
+		id: number;
+		name: string;
+		status: string;
+		type: string;
+		start_date: string;
+		end_date: string;
+		rent_amount: number;
+		balance: number;
+		lease_tenants: Array<{
+			tenant: {
+				id: number;
+				name: string;
+				email: string | null;
+				contact_number: string | null;
+			};
+		}>;
+	}>;
 }
 ```
 
 2. UI Components
+
 ```svelte
 <!-- Floor Section -->
 <Card.Root>
-  <Card.Header>
-    <Card.Title>Floor {floor}</Card.Title>
-  </Card.Header>
-  <Card.Content>
-    <Table.Root>
-      <!-- Table Headers -->
-      <Table.Header>
-        <Table.Row>
-          <Table.Head>Rental_unit</Table.Head>
-          <Table.Head>Type</Table.Head>
-          <Table.Head>Status</Table.Head>
-          <Table.Head>Tenant</Table.Head>
-          <Table.Head>Base Rate</Table.Head>
-          {#each months as month}
-            <Table.Head>{month}</Table.Head>
-          {/each}
-        </Table.Row>
-      </Table.Header>
-      
-      <!-- Table Body -->
-      <Table.Body>
-        {#each rental_unit as rental_unit}
-          {#each rental_unit.leases as lease}
-            {#each lease.lease_tenants as tenant}
-              <Table.Row>
-                <Table.Cell>{rental_unit.number}</Table.Cell>
-                <Table.Cell>{rental_unit.type}</Table.Cell>
-                <Table.Cell>
-                  <Badge variant={getStatusVariant(rental_unit.rental_unit_status)}>
-                    {rental_unit.rental_unit_status}
-                  </Badge>
-                </Table.Cell>
-                <Table.Cell>
-                  {tenant.tenant.name}
-                  {#if tenant.tenant.contact_number}
-                    <br />
-                    <span class="text-sm text-muted-foreground">
-                      {tenant.tenant.contact_number}
-                    </span>
-                  {/if}
-                </Table.Cell>
-                <Table.Cell>{formatCurrency(rental_unit.base_rate)}</Table.Cell>
-                {#each months as month}
-                  <Table.Cell>
-                    {formatCurrency(balancesByTenant[tenant.tenant.id]?.[month] ?? 0)}
-                  </Table.Cell>
-                {/each}
-              </Table.Row>
-            {/each}
-          {/each}
-        {/each}
-      </Table.Body>
-    </Table.Root>
-  </Card.Content>
+	<Card.Header>
+		<Card.Title>Floor {floor}</Card.Title>
+	</Card.Header>
+	<Card.Content>
+		<Table.Root>
+			<!-- Table Headers -->
+			<Table.Header>
+				<Table.Row>
+					<Table.Head>Rental_unit</Table.Head>
+					<Table.Head>Type</Table.Head>
+					<Table.Head>Status</Table.Head>
+					<Table.Head>Tenant</Table.Head>
+					<Table.Head>Base Rate</Table.Head>
+					{#each months as month}
+						<Table.Head>{month}</Table.Head>
+					{/each}
+				</Table.Row>
+			</Table.Header>
+
+			<!-- Table Body -->
+			<Table.Body>
+				{#each rental_unit as rental_unit}
+					{#each rental_unit.leases as lease}
+						{#each lease.lease_tenants as tenant}
+							<Table.Row>
+								<Table.Cell>{rental_unit.number}</Table.Cell>
+								<Table.Cell>{rental_unit.type}</Table.Cell>
+								<Table.Cell>
+									<Badge variant={getStatusVariant(rental_unit.rental_unit_status)}>
+										{rental_unit.rental_unit_status}
+									</Badge>
+								</Table.Cell>
+								<Table.Cell>
+									{tenant.tenant.name}
+									{#if tenant.tenant.contact_number}
+										<br />
+										<span class="text-sm text-muted-foreground">
+											{tenant.tenant.contact_number}
+										</span>
+									{/if}
+								</Table.Cell>
+								<Table.Cell>{formatCurrency(rental_unit.base_rate)}</Table.Cell>
+								{#each months as month}
+									<Table.Cell>
+										{formatCurrency(balancesByTenant[tenant.tenant.id]?.[month] ?? 0)}
+									</Table.Cell>
+								{/each}
+							</Table.Row>
+						{/each}
+					{/each}
+				{/each}
+			</Table.Body>
+		</Table.Root>
+	</Card.Content>
 </Card.Root>
 ```
 
 ## Error Handling
 
 ### Server-Side Errors
+
 1. Authentication Errors (401)
 2. Authorization Errors (403)
 3. Database Query Errors (500)
 4. Data Validation Errors (400)
 
 ### Client-Side Error Boundaries
+
 1. Loading States
 2. Error States
 3. Empty States
@@ -602,7 +617,9 @@ interface Rental_unit {
 ## Performance Considerations
 
 ### Database Optimization
+
 1. Create indexes for commonly queried fields:
+
 ```sql
 -- Indexes for rental_unit table
 CREATE INDEX idx_rental_unit_property_id ON rental_unit(property_id);
@@ -623,9 +640,10 @@ CREATE INDEX idx_billings_billing_date ON billings(billing_date);
 ```
 
 2. Create materialized view for monthly balances:
+
 ```sql
 CREATE MATERIALIZED VIEW monthly_tenant_balances AS
-SELECT 
+SELECT
     lt.tenant_id,
     date_trunc('month', b.billing_date) as month,
     SUM(b.balance) as balance
@@ -635,11 +653,12 @@ JOIN lease_tenants lt ON lt.lease_id = l.id
 JOIN rental_unit r ON r.id = l.location_id
 GROUP BY lt.tenant_id, date_trunc('month', b.billing_date);
 
-CREATE INDEX idx_mtb_tenant_month 
+CREATE INDEX idx_mtb_tenant_month
 ON monthly_tenant_balances(tenant_id, month);
 ```
 
 ### UI Performance
+
 1. Implement virtual scrolling for large datasets
 2. Optimize re-renders using proper Svelte reactivity
 3. Lazy load components when possible
@@ -647,16 +666,19 @@ ON monthly_tenant_balances(tenant_id, month);
 ## Testing Requirements
 
 ### Unit Tests
+
 1. Data transformation functions
 2. Component logic
 3. Error handling
 
 ### Integration Tests
+
 1. Data loading flow
 2. Role-based access
 3. Filter functionality
 
 ### End-to-End Tests
+
 1. Complete user flows
 2. Error scenarios
 3. Performance benchmarks
@@ -664,6 +686,7 @@ ON monthly_tenant_balances(tenant_id, month);
 ## Future Enhancements
 
 ### Planned Features
+
 1. Advanced filtering options:
    - By rental_unit type
    - By tenant status
@@ -675,7 +698,9 @@ ON monthly_tenant_balances(tenant_id, month);
 5. Occupancy rate tracking
 
 ### Budget Management
+
 1. **Budget Configuration Table**
+
    - Currently, the budget allocation is hardcoded (100,000)
    - Need to create a proper configuration table with:
      ```sql
@@ -706,6 +731,7 @@ ON monthly_tenant_balances(tenant_id, month);
    - Implement budget vs actual comparison reports
 
 ### Technical Improvements
+
 1. Implement Redis caching for frequently accessed data
 2. Add real-time updates using Supabase realtime
 3. Improve error reporting
@@ -714,12 +740,14 @@ ON monthly_tenant_balances(tenant_id, month);
 ## Maintenance
 
 ### Regular Tasks
+
 1. Refresh materialized views
 2. Monitor query performance
 3. Update cached data
 4. Review error logs
 
 ### Documentation
+
 1. Keep API documentation updated
 2. Document new features
 3. Update testing procedures

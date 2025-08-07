@@ -20,7 +20,7 @@
 	// State
 	let filters = $state({
 		period: new Date().toISOString().slice(0, 7),
-		search: '',
+		search: ''
 	});
 
 	// Derived: filtered and grouped readings
@@ -204,16 +204,16 @@
 			</Table.Header>
 			<Table.Body>
 				{#each filteredReadings as reading (reading.id)}
-					<Table.Row 
-						class="cursor-pointer hover:bg-gray-50"
-						role="button"
-						tabindex={0}
-					>
+					<Table.Row class="cursor-pointer hover:bg-gray-50" role="button" tabindex={0}>
 						<Table.Cell class="font-medium">
 							<div class="flex items-center gap-2">
 								<span>{reading.meters?.name || 'Unknown Meter'}</span>
 								{#if reading.meters?.type}
-									<span class="px-2 py-1 text-xs rounded-full {getUtilityColorClass(reading.meters.type)}">
+									<span
+										class="px-2 py-1 text-xs rounded-full {getUtilityColorClass(
+											reading.meters.type
+										)}"
+									>
 										{reading.meters.type}
 									</span>
 								{/if}
@@ -236,7 +236,9 @@
 							<div class="text-right">
 								<div>{formatNumber(reading.previous_reading)}</div>
 								{#if reading.previous_reading_date}
-									<div class="text-xs text-muted-foreground">{formatDate(reading.previous_reading_date)}</div>
+									<div class="text-xs text-muted-foreground">
+										{formatDate(reading.previous_reading_date)}
+									</div>
 								{/if}
 							</div>
 						</Table.Cell>
@@ -249,7 +251,9 @@
 						<Table.Cell>
 							{#if reading.days_diff !== null && reading.days_diff !== undefined}
 								<div class="text-center">
-									<span class="font-medium {getDaysDiffColorClass(reading.days_diff)}">{reading.days_diff}</span>
+									<span class="font-medium {getDaysDiffColorClass(reading.days_diff)}"
+										>{reading.days_diff}</span
+									>
 									<div class="text-xs text-muted-foreground">days</div>
 								</div>
 							{:else}
@@ -267,8 +271,8 @@
 						<Table.Cell>{formatCurrency(reading.rate_at_reading)}</Table.Cell>
 						<Table.Cell class="font-medium">{formatCurrency(reading.cost)}</Table.Cell>
 						<Table.Cell>
-							<Button 
-								variant="ghost" 
+							<Button
+								variant="ghost"
 								size="sm"
 								onclick={() => handleShareClick(event as any, reading)}
 							>

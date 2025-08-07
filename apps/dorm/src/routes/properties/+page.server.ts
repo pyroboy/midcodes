@@ -72,10 +72,7 @@ export const actions: Actions = {
 
 		const propertyData = preparePropertyData(form.data);
 
-		const { error } = await supabase
-			.from('properties')
-			.update(propertyData)
-			.eq('id', form.data.id);
+		const { error } = await supabase.from('properties').update(propertyData).eq('id', form.data.id);
 
 		if (error) {
 			console.error('Error updating property:', error);

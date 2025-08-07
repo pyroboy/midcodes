@@ -63,6 +63,7 @@ All monetary values in the application use **Philippine Peso (PHP)** formatting:
 - **Example Output**: `₱1,234.56`
 
 **Usage:**
+
 ```typescript
 import { formatCurrency } from '$lib/utils/format';
 
@@ -81,6 +82,7 @@ const displayAmount = formatCurrency(1234.56); // "₱1,234.56"
 ### Important Patterns
 
 1. **Route Structure**: Each feature route contains:
+
    - `+page.server.ts` - Server-side data loading and form actions
    - `+page.svelte` - Main page component
    - Component files for modals/forms/tables
@@ -134,76 +136,76 @@ The application implements a high-performance lazy loading pattern for instant n
 ### Implementation Pattern
 
 **Server-Side (`+page.server.ts`):**
+
 ```typescript
 export const load: PageServerLoad = async ({ locals, depends }) => {
-  // Set up dependencies for invalidation
-  depends('app:tenants');
+	// Set up dependencies for invalidation
+	depends('app:tenants');
 
-  // Return minimal data for instant navigation
-  return {
-    // Start with empty arrays for instant rendering
-    tenants: [],
-    properties: [],
-    form: await superValidate(zod(tenantFormSchema)),
-    // Flag to indicate lazy loading
-    lazy: true,
-    // Return promises that resolve with the actual data
-    tenantsPromise: loadTenantsData(locals),
-    propertiesPromise: loadPropertiesData(locals)
-  };
+	// Return minimal data for instant navigation
+	return {
+		// Start with empty arrays for instant rendering
+		tenants: [],
+		properties: [],
+		form: await superValidate(zod(tenantFormSchema)),
+		// Flag to indicate lazy loading
+		lazy: true,
+		// Return promises that resolve with the actual data
+		tenantsPromise: loadTenantsData(locals),
+		propertiesPromise: loadPropertiesData(locals)
+	};
 };
 
 // Separate async functions for heavy data loading
 async function loadTenantsData(locals: any) {
-  const result = await locals.supabase
-    .from('tenants')
-    .select('*')
-    .order('name');
-  return result.data || [];
+	const result = await locals.supabase.from('tenants').select('*').order('name');
+	return result.data || [];
 }
 ```
 
 **Client-Side (`+page.svelte`):**
+
 ```typescript
 let isLoading = $state(data.lazy === true);
 let tenants = $state<TenantResponse[]>(data.tenants);
 
 // Load data lazily on mount
 onMount(async () => {
-  if (data.lazy && data.tenantsPromise) {
-    try {
-      const loadedTenants = await data.tenantsPromise;
-      tenants = loadedTenants;
-      isLoading = false;
-    } catch (error) {
-      console.error('Error loading data:', error);
-      isLoading = false;
-    }
-  }
+	if (data.lazy && data.tenantsPromise) {
+		try {
+			const loadedTenants = await data.tenantsPromise;
+			tenants = loadedTenants;
+			isLoading = false;
+		} catch (error) {
+			console.error('Error loading data:', error);
+			isLoading = false;
+		}
+	}
 });
 ```
 
 **Skeleton Loading:**
+
 ```svelte
 {#if isLoading}
-  <!-- Skeleton cards that match real content structure -->
-  <div class="space-y-2">
-    {#each Array(5) as _, i (i)}
-      <div class="border border-slate-200 rounded-lg p-4">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3 flex-1">
-            <Skeleton class="w-10 h-10 rounded-full" />
-            <div class="space-y-2">
-              <Skeleton class="h-4 w-32" />
-              <Skeleton class="h-3 w-48" />
-            </div>
-          </div>
-        </div>
-      </div>
-    {/each}
-  </div>
+	<!-- Skeleton cards that match real content structure -->
+	<div class="space-y-2">
+		{#each Array(5) as _, i (i)}
+			<div class="border border-slate-200 rounded-lg p-4">
+				<div class="flex items-center justify-between">
+					<div class="flex items-center gap-3 flex-1">
+						<Skeleton class="w-10 h-10 rounded-full" />
+						<div class="space-y-2">
+							<Skeleton class="h-4 w-32" />
+							<Skeleton class="h-3 w-48" />
+						</div>
+					</div>
+				</div>
+			</div>
+		{/each}
+	</div>
 {:else}
-  <!-- Real content -->
+	<!-- Real content -->
 {/if}
 ```
 
@@ -218,6 +220,7 @@ onMount(async () => {
 ### When to Use This Pattern
 
 Apply this pattern to routes with:
+
 - Heavy database queries (multiple joins, large datasets)
 - Complex data processing
 - Non-critical initial load data
@@ -226,6 +229,7 @@ Apply this pattern to routes with:
 ### Integration with Existing Systems
 
 This pattern works seamlessly with:
+
 - **Hover Preloading**: Links still preload on hover for even faster subsequent visits
 - **Caching System**: Cached routes load instantly without skeletons
 - **Service Worker**: Static assets remain cached while data loads
@@ -233,6 +237,7 @@ This pattern works seamlessly with:
 ## Documentation
 
 Feature-specific documentation is available in:
+
 - Route-level `INSTRUCTIONS.md` files
 - `docs/` directory with detailed specifications
 - `DORMSCHEMA.md` for database schema information

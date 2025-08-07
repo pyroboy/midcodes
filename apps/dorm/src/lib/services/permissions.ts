@@ -7,7 +7,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
  * @param supabase - The Supabase client instance.
  * @returns A promise that resolves to an array of unique permission strings.
  */
-export async function getUserPermissions(roles: string[], supabase: SupabaseClient): Promise<string[]> {
+export async function getUserPermissions(
+	roles: string[],
+	supabase: SupabaseClient
+): Promise<string[]> {
 	if (!roles || roles.length === 0) {
 		return [];
 	}

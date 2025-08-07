@@ -1,12 +1,15 @@
 # Payments Module Instructions
 
 ## Overview
+
 The Payments module manages all financial transactions within the dormitory management system. It handles payment processing, tracking, and management for various types of payments including rent, utilities, security deposits, penalties, and maintenance fees.
 
 ## Core Functionality
 
 ### 1. Payment Processing
+
 - **Create Payments**
+
   - Process payments against pending billings
   - Support multiple payment methods:
     - CASH
@@ -19,6 +22,7 @@ The Payments module manages all financial transactions within the dormitory mana
   - Track payment dates and paid_by information
 
 - **Update Payments**
+
   - Modify payment details (method, reference, receipt URL, notes)
   - Update payment status (Pending, Partial, Paid, Overdue)
   - Restricted to admin and accountant roles
@@ -31,7 +35,9 @@ The Payments module manages all financial transactions within the dormitory mana
   - Support read-only mode for non-administrative users
 
 ### 2. Role-Based Access Control
+
 - **Administrative Roles**
+
   - super_admin: Full access to all payment functions
   - property_admin: Full access to property-specific payments
   - property_accountant: Can process and manage payments
@@ -44,7 +50,9 @@ The Payments module manages all financial transactions within the dormitory mana
   - property_guest: View access to own payments only
 
 ### 3. Payment Workflow
+
 1. **Payment Initiation**
+
    - Select pending billing with valid lease_id
    - Enter payment amount (cannot exceed balance)
    - Choose payment method (CASH, BANK, GCASH, OTHER)
@@ -55,6 +63,7 @@ The Payments module manages all financial transactions within the dormitory mana
      - Notes (optional)
 
 2. **Payment Processing**
+
    - Validate payment details
    - Create payment record
    - Update billing:
@@ -76,6 +85,7 @@ The Payments module manages all financial transactions within the dormitory mana
 ## Database Schema Dependencies
 
 ### Primary Tables
+
 ```sql
 -- Payments Table
 CREATE TABLE public.payments (
@@ -140,6 +150,7 @@ CREATE TABLE public.penalty_configs (
 ```
 
 ### Enums
+
 ```sql
 CREATE TYPE payment_method AS ENUM (
     'CASH',
@@ -180,6 +191,7 @@ CREATE TYPE utility_type AS ENUM (
 ## UI Components
 
 ### 1. Payment List View
+
 - Display all payments in card format
 - Show key payment information:
   - Amount and status
@@ -191,6 +203,7 @@ CREATE TYPE utility_type AS ENUM (
   - Created by information
 
 ### 2. Payment Form
+
 - Input fields for:
   - Billing selection (with balance check)
   - Payment amount
@@ -205,6 +218,7 @@ CREATE TYPE utility_type AS ENUM (
 ## Security Considerations
 
 1. **Access Control**
+
    - Enforce role-based permissions
    - Validate user session
    - Check property access rights
@@ -219,6 +233,7 @@ CREATE TYPE utility_type AS ENUM (
      - property_guest: View own payments
 
 2. **Data Validation**
+
    - Validate payment amounts against billing balance
    - Check billing status (must be PENDING or PARTIAL)
    - Verify lease_id exists and is active
@@ -236,6 +251,7 @@ CREATE TYPE utility_type AS ENUM (
 ## Error Handling
 
 1. **Common Errors**
+
    - Insufficient permissions
    - Invalid payment amount
    - Non-pending billing
@@ -253,6 +269,7 @@ CREATE TYPE utility_type AS ENUM (
 ## Future Enhancements
 
 1. **Payment Features**
+
    - Batch payment processing
    - Payment scheduling
    - Recurring payment setup
@@ -261,6 +278,7 @@ CREATE TYPE utility_type AS ENUM (
    - Digital payment integration
 
 2. **Integration Options**
+
    - Payment gateway integration
    - Mobile payment support
    - Bank API integration
@@ -277,6 +295,7 @@ CREATE TYPE utility_type AS ENUM (
 ## Technical Notes
 
 1. **Form Handling**
+
    - Uses sveltekit-superforms for form management
    - Implements Zod schema validation for:
      - Required fields: billing_id, amount, method, paid_by, paid_at
@@ -286,6 +305,7 @@ CREATE TYPE utility_type AS ENUM (
    - Manages file uploads for receipts
 
 2. **State Management**
+
    - Manages form state locally using SvelteKit stores
    - Updates UI reactively based on payment status
    - Handles loading states during async operations

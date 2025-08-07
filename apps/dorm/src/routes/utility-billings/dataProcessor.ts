@@ -1,215 +1,242 @@
 // Data processing function for utility billings
 export function processUtilityBillingsData(
-  properties: any[],
-  meters: any[],
-  readings: any[],
-  billings: any[],
-  availableReadingDates: any[],
-  tenantCounts: any[],
-  leasesData: any[],
-  allReadings: any[]
+	properties: any[],
+	meters: any[],
+	readings: any[],
+	billings: any[],
+	availableReadingDates: any[],
+	tenantCounts: any[],
+	leasesData: any[],
+	allReadings: any[]
 ) {
-  console.log('Processing utility billings data...');
+	console.log('Processing utility billings data...');
 
-  // Get meter data separately since there's no foreign key relationship
-  const meterIds = [...new Set(readings?.map(r => r.meter_id) || [])];
-  
-  // Create a map of meter data for easy lookup
-  const meterMap = new Map(meters?.map(m => [m.id, m]) || []);
+	// Get meter data separately since there's no foreign key relationship
+	const meterIds = [...new Set(readings?.map((r) => r.meter_id) || [])];
 
-  // Join readings with meter data
-  const readingsWithMeters = readings?.map(reading => ({
-    ...reading,
-    meters: meterMap.get(reading.meter_id) || null
-  })) || [];
+	// Create a map of meter data for easy lookup
+	const meterMap = new Map(meters?.map((m) => [m.id, m]) || []);
 
-  // Group by meter_id
-  const grouped = readingsWithMeters.reduce((acc, r) => {
-    acc[r.meter_id] = [...(acc[r.meter_id] || []), r];
-    return acc;
-  }, {} as Record<number, typeof readingsWithMeters>);
+	// Join readings with meter data
+	const readingsWithMeters =
+		readings?.map((reading) => ({
+			...reading,
+			meters: meterMap.get(reading.meter_id) || null
+		})) || [];
 
-  // Create a map of the LAST billing date for each meter
-  const meterLastBilledDates: Record<string, string> = {};
-  billings?.forEach(b => {
-    const key = String(b.meter_id);
-    // Ensure we are always storing the most recent billing date
-    if (!meterLastBilledDates[key] || b.billing_date > meterLastBilledDates[key]) {
-      meterLastBilledDates[key] = b.billing_date;
-    }
-  });
+	// Group by meter_id
+	const grouped = readingsWithMeters.reduce(
+		(acc, r) => {
+			acc[r.meter_id] = [...(acc[r.meter_id] || []), r];
+			return acc;
+		},
+		{} as Record<number, typeof readingsWithMeters>
+	);
 
-  // IMPLEMENT THE NEW MONTHLY BILLING PERIOD LOGIC
-  const displayedReadings = [];
+	// Create a map of the LAST billing date for each meter
+	const meterLastBilledDates: Record<string, string> = {};
+	billings?.forEach((b) => {
+		const key = String(b.meter_id);
+		// Ensure we are always storing the most recent billing date
+		if (!meterLastBilledDates[key] || b.billing_date > meterLastBilledDates[key]) {
+			meterLastBilledDates[key] = b.billing_date;
+		}
+	});
 
-  console.log('Processing billing periods for meters:', Object.keys(grouped));
-  console.log('Meter last billed dates:', meterLastBilledDates);
+	// IMPLEMENT THE NEW MONTHLY BILLING PERIOD LOGIC
+	const displayedReadings = [];
 
-  // Process each meter's readings
-  for (const [meterId, meterReadings] of Object.entries(grouped)) {
-    const sorted = (meterReadings as any[]).sort(
-      (a: any, b: any) => new Date(a.reading_date).getTime() - new Date(b.reading_date).getTime()
-    );
+	console.log('Processing billing periods for meters:', Object.keys(grouped));
+	console.log('Meter last billed dates:', meterLastBilledDates);
 
-    console.log(`Processing meter ${meterId} with new monthly logic:`, {
-      totalReadings: sorted.length,
-      readingDates: sorted.map((r: any) => r.reading_date),
-      lastBilledDate: meterLastBilledDates[meterId]
-    });
+	// Process each meter's readings
+	for (const [meterId, meterReadings] of Object.entries(grouped)) {
+		const sorted = (meterReadings as any[]).sort(
+			(a: any, b: any) => new Date(a.reading_date).getTime() - new Date(b.reading_date).getTime()
+		);
 
-    // 1. Group all readings by month (e.g., "2024-08", "2024-09")
-    const readingsByMonth = sorted.reduce((acc: any, reading: any) => {
-      const monthKey = reading.reading_date.slice(0, 7); // "YYYY-MM"
-      if (!acc[monthKey]) {
-        acc[monthKey] = [];
-      }
-      acc[monthKey].push(reading);
-      return acc;
-    }, {} as Record<string, typeof sorted>);
+		console.log(`Processing meter ${meterId} with new monthly logic:`, {
+			totalReadings: sorted.length,
+			readingDates: sorted.map((r: any) => r.reading_date),
+			lastBilledDate: meterLastBilledDates[meterId]
+		});
 
-    console.log(`Meter ${meterId} readings by month:`, Object.keys(readingsByMonth));
+		// 1. Group all readings by month (e.g., "2024-08", "2024-09")
+		const readingsByMonth = sorted.reduce(
+			(acc: any, reading: any) => {
+				const monthKey = reading.reading_date.slice(0, 7); // "YYYY-MM"
+				if (!acc[monthKey]) {
+					acc[monthKey] = [];
+				}
+				acc[monthKey].push(reading);
+				return acc;
+			},
+			{} as Record<string, typeof sorted>
+		);
 
-    // 2. Get a sorted list of the months that have readings
-    const sortedMonths = Object.keys(readingsByMonth).sort();
+		console.log(`Meter ${meterId} readings by month:`, Object.keys(readingsByMonth));
 
-    // 3. Iterate through the months to create billing periods
-    for (let i = 1; i < sortedMonths.length; i++) {
-      const currentMonthKey = sortedMonths[i];
-      const previousMonthKey = sortedMonths[i - 1];
+		// 2. Get a sorted list of the months that have readings
+		const sortedMonths = Object.keys(readingsByMonth).sort();
 
-      // Get the last reading from the previous month
-      const prevMonthReadings = readingsByMonth[previousMonthKey];
-      const prev = prevMonthReadings[prevMonthReadings.length - 1];
+		// 3. Iterate through the months to create billing periods
+		for (let i = 1; i < sortedMonths.length; i++) {
+			const currentMonthKey = sortedMonths[i];
+			const previousMonthKey = sortedMonths[i - 1];
 
-      // Get the last reading from the current month
-      const currentMonthReadings = readingsByMonth[currentMonthKey];
-      const curr = currentMonthReadings[currentMonthReadings.length - 1];
+			// Get the last reading from the previous month
+			const prevMonthReadings = readingsByMonth[previousMonthKey];
+			const prev = prevMonthReadings[prevMonthReadings.length - 1];
 
-      // This check is to ensure we have both readings to compare
-      if (prev && curr) {
-        const daysDiff = (new Date(curr.reading_date).getTime() - new Date(prev.reading_date).getTime()) / (1000 * 60 * 60 * 24);
-        const consumption = curr.reading - prev.reading;
-        const cost = consumption * (curr.rate_at_reading || 0);
+			// Get the last reading from the current month
+			const currentMonthReadings = readingsByMonth[currentMonthKey];
+			const curr = currentMonthReadings[currentMonthReadings.length - 1];
 
-        displayedReadings.push({
-          ...curr,
-          previous_reading: prev.reading,
-          previous_reading_date: prev.reading_date,
-          consumption,
-          cost,
-          days_diff: Math.round(daysDiff),
-          // The period is now the current month's key
-          period: currentMonthKey, 
-        });
+			// This check is to ensure we have both readings to compare
+			if (prev && curr) {
+				const daysDiff =
+					(new Date(curr.reading_date).getTime() - new Date(prev.reading_date).getTime()) /
+					(1000 * 60 * 60 * 24);
+				const consumption = curr.reading - prev.reading;
+				const cost = consumption * (curr.rate_at_reading || 0);
 
-        console.log(`✅ Generated period for ${currentMonthKey}. From ${prev.reading_date} to ${curr.reading_date} (${Math.round(daysDiff)} days).`);
-      }
-    }
+				displayedReadings.push({
+					...curr,
+					previous_reading: prev.reading,
+					previous_reading_date: prev.reading_date,
+					consumption,
+					cost,
+					days_diff: Math.round(daysDiff),
+					// The period is now the current month's key
+					period: currentMonthKey
+				});
 
-    // Fallback: if only one reading exists, show it without consumption
-    if (sorted.length === 1) {
-      const r = sorted[0];
-      displayedReadings.push({
-        ...r,
-        previous_reading: null,
-        consumption: null,
-        cost: null,
-        days_diff: null,
-        period: r.reading_date.slice(0, 7),
-      });
-      console.log(`📝 Single reading fallback for meter ${meterId}`);
-    }
-  }
+				console.log(
+					`✅ Generated period for ${currentMonthKey}. From ${prev.reading_date} to ${curr.reading_date} (${Math.round(daysDiff)} days).`
+				);
+			}
+		}
 
-  console.log(`Total billing periods found: ${displayedReadings.length}`);
+		// Fallback: if only one reading exists, show it without consumption
+		if (sorted.length === 1) {
+			const r = sorted[0];
+			displayedReadings.push({
+				...r,
+				previous_reading: null,
+				consumption: null,
+				cost: null,
+				days_diff: null,
+				period: r.reading_date.slice(0, 7)
+			});
+			console.log(`📝 Single reading fallback for meter ${meterId}`);
+		}
+	}
 
-  // Process tenant counts
-  const rental_unitTenantCounts = tenantCounts.reduce((acc, lease) => {
-    if (!lease.rental_unit_id) return acc;
-    acc[lease.rental_unit_id] = (lease.tenants?.length || 0);
-    return acc;
-  }, {} as Record<number, number>);
+	console.log(`Total billing periods found: ${displayedReadings.length}`);
 
-  // Get unique reading dates (ensure they are Date objects for comparison)
-  const uniqueDates = [...new Set(availableReadingDates?.map(d => d.reading_date))].sort();
+	// Process tenant counts
+	const rental_unitTenantCounts = tenantCounts.reduce(
+		(acc, lease) => {
+			if (!lease.rental_unit_id) return acc;
+			acc[lease.rental_unit_id] = lease.tenants?.length || 0;
+			return acc;
+		},
+		{} as Record<number, number>
+	);
 
-  console.log('Final data payload:', {
-    propertiesCount: properties?.length || 0,
-    metersCount: meters?.length || 0,
-    readingsCount: displayedReadings.length || 0,
-    readingDatesCount: uniqueDates.length || 0,
-    sampleProperties: properties?.slice(0, 3) || []
-  });
+	// Get unique reading dates (ensure they are Date objects for comparison)
+	const uniqueDates = [...new Set(availableReadingDates?.map((d) => d.reading_date))].sort();
 
-  // Process leases data
-  const leases = leasesData?.map(lease => ({
-    ...lease,
-    tenants: lease.lease_tenants.filter((lt: any) => lt.tenants !== null).map((lt: any) => lt.tenants),
-    roomName: lease.rental_unit 
-      ? `${(lease.rental_unit as any).name} (${(lease.rental_unit as any).type})` 
-      : 'Unknown Room'
-  }));
+	console.log('Final data payload:', {
+		propertiesCount: properties?.length || 0,
+		metersCount: meters?.length || 0,
+		readingsCount: displayedReadings.length || 0,
+		readingDatesCount: uniqueDates.length || 0,
+		sampleProperties: properties?.slice(0, 3) || []
+	});
 
-  // Get last billed date for each lease-meter combination with more accurate tracking
-  const leaseMeterBilledDates: Record<string, string> = {};
-  const meterBilledDates: Record<string, string[]> = {}; // Track all billing dates per meter
+	// Process leases data
+	const leases = leasesData?.map((lease) => ({
+		...lease,
+		tenants: lease.lease_tenants
+			.filter((lt: any) => lt.tenants !== null)
+			.map((lt: any) => lt.tenants),
+		roomName: lease.rental_unit
+			? `${(lease.rental_unit as any).name} (${(lease.rental_unit as any).type})`
+			: 'Unknown Room'
+	}));
 
-  if (billings) {
-    for (const billing of billings) {
-      if (billing.meter_id && billing.lease_id) {
-        const key = `${billing.meter_id}-${billing.lease_id}`;
-        const newDate = billing.billing_date;
+	// Get last billed date for each lease-meter combination with more accurate tracking
+	const leaseMeterBilledDates: Record<string, string> = {};
+	const meterBilledDates: Record<string, string[]> = {}; // Track all billing dates per meter
 
-        if (!leaseMeterBilledDates[key] || new Date(newDate) > new Date(leaseMeterBilledDates[key])) {
-          leaseMeterBilledDates[key] = newDate;
-        }
+	if (billings) {
+		for (const billing of billings) {
+			if (billing.meter_id && billing.lease_id) {
+				const key = `${billing.meter_id}-${billing.lease_id}`;
+				const newDate = billing.billing_date;
 
-        // Track all billing dates for each meter
-        const meterKey = String(billing.meter_id);
-        if (!meterBilledDates[meterKey]) {
-          meterBilledDates[meterKey] = [];
-        }
-        meterBilledDates[meterKey].push(newDate);
-      }
-    }
-  }
+				if (
+					!leaseMeterBilledDates[key] ||
+					new Date(newDate) > new Date(leaseMeterBilledDates[key])
+				) {
+					leaseMeterBilledDates[key] = newDate;
+				}
 
-  // Update meterLastBilledDates to only show dates where bills were actually created
-  // This will be used to show "✓ Billed" indicator in the UI
-  const actualBilledDates: Record<string, string[]> = {};
-  for (const [meterKey, dates] of Object.entries(meterBilledDates)) {
-    actualBilledDates[meterKey] = [...new Set(dates)].sort();
-  }
+				// Track all billing dates for each meter
+				const meterKey = String(billing.meter_id);
+				if (!meterBilledDates[meterKey]) {
+					meterBilledDates[meterKey] = [];
+				}
+				meterBilledDates[meterKey].push(newDate);
+			}
+		}
+	}
 
-  // Group readings by month instead of individual dates
-  const readingGroups = (allReadings || []).reduce((acc, reading) => {
-    const date = new Date(reading.reading_date);
-    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`; // "2025-06"
-    
-    if (!acc[monthKey]) {
-      acc[monthKey] = [];
-    }
-    acc[monthKey].push(reading);
-    return acc;
-  }, {} as Record<string, any[]>);
+	// Update meterLastBilledDates to only show dates where bills were actually created
+	// This will be used to show "✓ Billed" indicator in the UI
+	const actualBilledDates: Record<string, string[]> = {};
+	for (const [meterKey, dates] of Object.entries(meterBilledDates)) {
+		actualBilledDates[meterKey] = [...new Set(dates)].sort();
+	}
 
-  const previousReadingGroups = Object.entries(readingGroups).map(([monthKey, readings]) => ({
-    date: monthKey, // Use month key as date
-    readings,
-    monthName: new Date(monthKey + '-01').toLocaleDateString('en-US', { year: 'numeric', month: 'long' }) // "June 2025"
-  })).sort((a, b) => new Date(b.date + '-01').getTime() - new Date(a.date + '-01').getTime());
+	// Group readings by month instead of individual dates
+	const readingGroups = (allReadings || []).reduce(
+		(acc, reading) => {
+			const date = new Date(reading.reading_date);
+			const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`; // "2025-06"
 
-  // Return all the data needed for the page
-  return {
-    properties,
-    meters,
-    readings: displayedReadings, // Use the new grouped readings
-    availableReadingDates: uniqueDates,
-    rental_unitTenantCounts,
-    leases,
-    meterLastBilledDates,
-    leaseMeterBilledDates,
-    actualBilledDates, // Add actual billed dates for accurate tracking
-    previousReadingGroups
-  };
+			if (!acc[monthKey]) {
+				acc[monthKey] = [];
+			}
+			acc[monthKey].push(reading);
+			return acc;
+		},
+		{} as Record<string, any[]>
+	);
+
+	const previousReadingGroups = Object.entries(readingGroups)
+		.map(([monthKey, readings]) => ({
+			date: monthKey, // Use month key as date
+			readings,
+			monthName: new Date(monthKey + '-01').toLocaleDateString('en-US', {
+				year: 'numeric',
+				month: 'long'
+			}) // "June 2025"
+		}))
+		.sort((a, b) => new Date(b.date + '-01').getTime() - new Date(a.date + '-01').getTime());
+
+	// Return all the data needed for the page
+	return {
+		properties,
+		meters,
+		readings: displayedReadings, // Use the new grouped readings
+		availableReadingDates: uniqueDates,
+		rental_unitTenantCounts,
+		leases,
+		meterLastBilledDates,
+		leaseMeterBilledDates,
+		actualBilledDates, // Add actual billed dates for accurate tracking
+		previousReadingGroups
+	};
 }

@@ -3,30 +3,37 @@
 ## Tables
 
 ### properties
+
 - Columns: id, name, address, type, status, created_at, updated_at
 - Primary purpose: Store information about properties
 
 ### floors
+
 - Columns: id, property_id, floor_number, wing, status, created_at, updated_at
 - Primary purpose: Store information about floors within properties
 
 ### rental_unit
+
 - Columns: id, name, capacity, rental_unit_status, base_rate, created_at, updated_at, property_id, floor_id, type, amenities, number
 - Primary purpose: Store information about rental units within floors
 
 ### billings
+
 - Columns: id, lease_id, type, utility_type, amount, paid_amount, balance, status, due_date, billing_date, penalty_amount, notes, created_at, updated_at
 - Primary purpose: Store billing information for leases
 
 ### leases
+
 - Columns: id, rental_unit_id, name, start_date, end_date, rent_amount, security_deposit, balance, notes, created_at, updated_at, created_by, terms_month, status, unit_type
 - Primary purpose: Store lease information for rental units
 
 ### expenses
+
 - Columns: id, property_id, amount, description, type, status, created_by, created_at
 - Primary purpose: Store expense information for properties
 
 ### payments
+
 - Columns: id, amount, method, reference_number, paid_by, paid_at, notes, created_at, receipt_url, created_by, updated_by, updated_at, billing_ids, billing_changes
 - Primary purpose: Store payment information for billings
 
@@ -56,13 +63,14 @@
 3. **Capital Expenses**: Sum of all expenses with type = 'CAPITAL' for the period.
 4. **Net Income Before Capital**: Gross Income - Operational Expenses.
 5. **Profit Sharing**:
-   - 40% Share: (Gross Income - Operational Expenses) * 0.4
-   - 60% Share: (Gross Income - Operational Expenses) * 0.6 - Capital Expenses
+   - 40% Share: (Gross Income - Operational Expenses) \* 0.4
+   - 60% Share: (Gross Income - Operational Expenses) \* 0.6 - Capital Expenses
 6. **Final Net Income**: Gross Income - (Operational Expenses + Capital Expenses).
 
 ## Business Rules
 
 1. **Income Allocation**:
+
    - Operational expenses reduce both the 40% and 60% shares proportionally.
    - Capital expenses are deducted only from the 60% share.
 
@@ -80,6 +88,7 @@
 ## Per Component Instructions
 
 ### ReportsDashboard.svelte
+
 - **Description**: Main dashboard component that displays financial data for a selected period.
 - **Props**:
   - `reportData`: Financial data for the selected period (MonthData)
@@ -97,6 +106,7 @@
   - Calculates and displays profit sharing according to the business rules
 
 ### +page.server.ts
+
 - **Description**: Server-side load function that fetches financial data from the database.
 - **Functionality**:
   - Validates user session
@@ -112,12 +122,14 @@
   - Calculates profit sharing according to the business rules
 
 ### +page.svelte
+
 - **Description**: Simple wrapper component that passes data to the ReportsDashboard.
 - **Functionality**:
   - Receives data from the server via the `data` prop
   - Passes data to the ReportsDashboard component
 
 ### ReportsSchema.ts
+
 - **Description**: Zod schema definitions for validating data structures.
 - **Schemas**:
   - `ExpenseSchema`: Validates expense data
@@ -131,6 +143,7 @@
   - `FilterParamsSchema`: Validates filter parameters
 
 ### types.ts
+
 - **Description**: TypeScript type definitions for use across components.
 - **Types**:
   - `FloorData`, `FloorName`, `FloorDataMap`: Types for floor-related data

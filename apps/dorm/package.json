@@ -16,7 +16,13 @@
 		"format": "prettier --write .",
 		"test:integration": "playwright test",
 		"test:unit": "vitest",
-		"clean": "rimraf .svelte-kit build node_modules/.cache/turbo node_modules/.vite"
+		"clean": "rimraf .svelte-kit build node_modules/.cache/turbo node_modules/.vite",
+		"schema:dump": "node scripts/schema-dump.js",
+		"schema:dump:simple": "node scripts/schema-dump-simple.js",
+		"schema:dump:complete": "node scripts/schema-dump-complete.js",
+		"schema:dump:file": "node scripts/schema-dump.js schema_$(date +%Y%m%d_%H%M%S).sql",
+		"schema:dump:simple:file": "node scripts/schema-dump-simple.js schema_simple_$(date +%Y%m%d_%H%M%S).sql",
+		"schema:dump:complete:file": "node scripts/schema-dump-complete.js schema_complete_$(date +%Y%m%d_%H%M%S).sql"
 	},
 	"devDependencies": {
 		"@playwright/test": "^1.49.1",

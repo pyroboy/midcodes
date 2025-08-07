@@ -10,7 +10,7 @@ export async function lazyLoadComponent<T>(
 	if (!browser) {
 		return fallback as T;
 	}
-	
+
 	try {
 		const module = await loader();
 		return module.default;
@@ -32,12 +32,12 @@ export async function lazyLoadComponents<T extends Record<string, any>>(
 	if (!browser) {
 		return {} as T;
 	}
-	
+
 	const keys = Object.keys(loaders) as Array<keyof T>;
-	const promises = keys.map(key => lazyLoadComponent(loaders[key]));
-	
+	const promises = keys.map((key) => lazyLoadComponent(loaders[key]));
+
 	const components = await Promise.all(promises);
-	
+
 	return keys.reduce((acc, key, index) => {
 		acc[key] = components[index];
 		return acc;
@@ -49,9 +49,9 @@ export async function lazyLoadComponents<T extends Record<string, any>>(
  */
 export function preloadComponent(loader: () => Promise<{ default: any }>): void {
 	if (!browser) return;
-	
+
 	// Trigger the import to cache it, but don't wait for it
-	loader().catch(error => {
+	loader().catch((error) => {
 		console.warn('Failed to preload component:', error);
 	});
 }
@@ -66,9 +66,9 @@ export function lazyLoadOnVisible<T>(
 	if (!browser) {
 		return { destroy: () => {} };
 	}
-	
+
 	let hasLoaded = false;
-	
+
 	const observer = new IntersectionObserver(
 		async (entries) => {
 			if (entries[0].isIntersecting && !hasLoaded) {
@@ -85,9 +85,9 @@ export function lazyLoadOnVisible<T>(
 			rootMargin: '50px'
 		}
 	);
-	
+
 	observer.observe(node);
-	
+
 	return {
 		destroy() {
 			observer.disconnect();
@@ -103,19 +103,19 @@ export const lazyLoaders = {
 	async utilityBillingModal() {
 		return await import('../../routes/utility-billings/ReadingEntryModal.svelte');
 	},
-	
+
 	async printPreviewModal() {
 		return await import('../../routes/utility-billings/PrintPreviewModal.svelte');
 	},
-	
+
 	async billingPeriodsGraphModal() {
 		return await import('../../routes/utility-billings/BillingPeriodsGraphModal.svelte');
 	},
-	
+
 	async leaseFormModal() {
 		return await import('../../routes/leases/LeaseFormModal.svelte');
 	},
-	
+
 	async expenseFormModal() {
 		return await import('../../routes/expenses/ExpenseFormModal.svelte');
 	}
@@ -126,13 +126,13 @@ export const lazyLoaders = {
  */
 export function preloadHeavyComponents(): void {
 	if (!browser) return;
-	
+
 	// Preload heavy modals after a short delay to not block initial render
 	setTimeout(() => {
 		preloadComponent(lazyLoaders.utilityBillingModal);
 		preloadComponent(lazyLoaders.printPreviewModal);
 	}, 2000);
-	
+
 	// Preload form modals after a longer delay
 	setTimeout(() => {
 		preloadComponent(lazyLoaders.leaseFormModal);

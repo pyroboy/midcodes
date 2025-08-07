@@ -1,4 +1,3 @@
-
 ```
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -155,7 +154,7 @@ const RentCollectionDashboard = () => {
                 {Object.entries(currentData.operationalExpenses).map(([key, amount]) => (
                   <div key={key} className="flex justify-between items-center">
                     <span className="text-gray-600">
-                      {key.replace(/([A-Z])/g, ' $1').split(' ').map(word => 
+                      {key.replace(/([A-Z])/g, ' $1').split(' ').map(word =>
                         word.charAt(0).toUpperCase() + word.slice(1)
                       ).join(' ')}
                     </span>
@@ -187,7 +186,7 @@ const RentCollectionDashboard = () => {
                 {Object.entries(currentData.capitalExpenses).map(([key, amount]) => (
                   <div key={key} className="flex justify-between items-center">
                     <span className="text-gray-600">
-                      {key.replace(/([A-Z])/g, ' $1').split(' ').map(word => 
+                      {key.replace(/([A-Z])/g, ' $1').split(' ').map(word =>
                         word.charAt(0).toUpperCase() + word.slice(1)
                       ).join(' ')}
                     </span>

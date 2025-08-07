@@ -136,10 +136,10 @@ const cacheControl: Handle = async ({ event, resolve }) => {
 	// Add cache headers only in production
 	if (event.url.pathname.startsWith('/_app/') || event.url.pathname.startsWith('/favicon')) {
 		response.headers.set('cache-control', 'public, max-age=31536000, immutable');
-	} else if (response.status === 200 && (
-		event.url.pathname.startsWith('/reports') || 
-		event.url.pathname.startsWith('/lease-report')
-	)) {
+	} else if (
+		response.status === 200 &&
+		(event.url.pathname.startsWith('/reports') || event.url.pathname.startsWith('/lease-report'))
+	) {
 		response.headers.set('cache-control', 'public, max-age=300, stale-while-revalidate=600');
 		response.headers.set('vary', 'Accept-Encoding');
 	}
@@ -160,8 +160,6 @@ const authGuard: Handle = async ({ event, resolve }) => {
 	event.locals.user = sessionInfo.user;
 	event.locals.decodedToken = sessionInfo.decodedToken ?? undefined;
 	event.locals.permissions = sessionInfo.permissions;
-
-
 
 	// Handle API routes
 	if (event.url.pathname.startsWith('/api')) {

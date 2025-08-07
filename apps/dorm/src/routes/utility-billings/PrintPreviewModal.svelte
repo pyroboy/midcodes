@@ -1,7 +1,7 @@
 <script lang="ts">
 	import * as Dialog from '$lib/components/ui/dialog';
 	import type { MeterData, ShareData } from './types';
-import { Button } from '$lib/components/ui/button';
+	import { Button } from '$lib/components/ui/button';
 	type Props = {
 		open: boolean;
 		reading: MeterData | null;
@@ -9,7 +9,13 @@ import { Button } from '$lib/components/ui/button';
 		onBack: () => void;
 	};
 
-	let { open = $bindable(), reading, data, onBack, close }: Props & { close: () => void } = $props();
+	let {
+		open = $bindable(),
+		reading,
+		data,
+		onBack,
+		close
+	}: Props & { close: () => void } = $props();
 
 	let loading = $state(true);
 
@@ -69,12 +75,16 @@ import { Button } from '$lib/components/ui/button';
           </tr>
         </thead>
         <tbody>
-          ${data.map(r => `
+          ${data
+						.map(
+							(r) => `
             <tr>
               <td>${r.tenant.full_name}</td>
               <td>${r.lease.name}</td>
               <td style="text-align:right">₱${r.share.toFixed(2)}</td>
-            </tr>`).join('')}
+            </tr>`
+						)
+						.join('')}
           <tr class="total-row">
             <td colspan="2"><strong>Total</strong></td>
             <td style="text-align:right"><strong>₱${data.reduce((s, d) => s + d.share, 0).toFixed(2)}</strong></td>
@@ -147,7 +157,10 @@ import { Button } from '$lib/components/ui/button';
 			<div class="space-y-4">
 				<div>
 					<p><strong>Meter:</strong> {reading.meterName}</p>
-					<p><strong>Period:</strong> {formatDate(reading.lastReadingDate)} – {formatDate(reading.currentReadingDate)}</p>
+					<p>
+						<strong>Period:</strong>
+						{formatDate(reading.lastReadingDate)} – {formatDate(reading.currentReadingDate)}
+					</p>
 					{#if reading.daysDiff}
 						<p><strong>Days Gap:</strong> {reading.daysDiff} days</p>
 					{/if}

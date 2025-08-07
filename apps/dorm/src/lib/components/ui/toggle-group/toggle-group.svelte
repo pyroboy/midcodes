@@ -28,7 +28,8 @@
 		onValueChange?: (value: any) => void;
 		type?: 'single' | 'multiple';
 		children: any;
-	} & VariantProps<typeof toggleVariants> & Omit<HTMLAttributes<HTMLDivElement>, 'value'>;
+	} & VariantProps<typeof toggleVariants> &
+		Omit<HTMLAttributes<HTMLDivElement>, 'value'>;
 
 	let {
 		value = undefined,
@@ -59,7 +60,10 @@
 
 <div
 	role={type === 'single' ? 'radiogroup' : 'group'}
-	class={cn('inline-flex items-center justify-center gap-1 rounded-md bg-muted p-1 text-muted-foreground', className)}
+	class={cn(
+		'inline-flex items-center justify-center gap-1 rounded-md bg-muted p-1 text-muted-foreground',
+		className
+	)}
 >
 	{@render children()}
 </div>

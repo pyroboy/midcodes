@@ -6,11 +6,11 @@ import type { Billing } from '$lib/types/lease';
  * @returns Formatted date string
  */
 export function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  });
+	return new Date(dateStr).toLocaleDateString('en-US', {
+		year: 'numeric',
+		month: 'short',
+		day: 'numeric'
+	});
 }
 
 /**
@@ -19,10 +19,10 @@ export function formatDate(dateStr: string): string {
  * @returns Formatted currency string
  */
 export const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('en-PH', {
-    style: 'currency',
-    currency: 'PHP'
-  }).format(amount || 0);
+	return new Intl.NumberFormat('en-PH', {
+		style: 'currency',
+		currency: 'PHP'
+	}).format(amount || 0);
 };
 
 /**
@@ -30,19 +30,21 @@ export const formatCurrency = (amount: number): string => {
  * @param status - The status string
  * @returns The variant name for the badge component
  */
-export function getStatusVariant(status: string): 'default' | 'destructive' | 'outline' | 'secondary' {
-  switch (status?.toUpperCase()) {
-    case 'ACTIVE':
-      return 'default';
-    case 'INACTIVE':
-      return 'secondary';
-    case 'TERMINATED':
-      return 'destructive';
-    case 'EXPIRED':
-      return 'outline';
-    default:
-      return 'secondary';
-  }
+export function getStatusVariant(
+	status: string
+): 'default' | 'destructive' | 'outline' | 'secondary' {
+	switch (status?.toUpperCase()) {
+		case 'ACTIVE':
+			return 'default';
+		case 'INACTIVE':
+			return 'secondary';
+		case 'TERMINATED':
+			return 'destructive';
+		case 'EXPIRED':
+			return 'outline';
+		default:
+			return 'secondary';
+	}
 }
 
 /**
@@ -51,15 +53,15 @@ export function getStatusVariant(status: string): 'default' | 'destructive' | 'o
  * @returns Tailwind classes for the status badge
  */
 export function getBillingStatusColor(status: string): string {
-  const colors: { [key: string]: string } = {
-    PENDING: 'bg-yellow-100 text-yellow-800',
-    PARTIAL: 'bg-blue-100 text-blue-800',
-    PAID: 'bg-green-100 text-green-800',
-    OVERDUE: 'bg-red-100 text-red-800',
-    PENALIZED: 'bg-red-200 text-red-900',
-    'OVERDUE-PARTIAL': 'bg-orange-200 text-orange-900'
-  };
-  return colors[status] || 'bg-gray-100 text-gray-800';
+	const colors: { [key: string]: string } = {
+		PENDING: 'bg-yellow-100 text-yellow-800',
+		PARTIAL: 'bg-blue-100 text-blue-800',
+		PAID: 'bg-green-100 text-green-800',
+		OVERDUE: 'bg-red-100 text-red-800',
+		PENALIZED: 'bg-red-200 text-red-900',
+		'OVERDUE-PARTIAL': 'bg-orange-200 text-orange-900'
+	};
+	return colors[status] || 'bg-gray-100 text-gray-800';
 }
 
 /**
@@ -68,23 +70,23 @@ export function getBillingStatusColor(status: string): string {
  * @returns The display status string
  */
 export function getDisplayStatus(billing: Billing): string {
-  if (billing.balance <= 0) {
-    return 'PAID';
-  }
-  if (billing.penalty_amount > 0) {
-    return 'PENALIZED';
-  }
+	if (billing.balance <= 0) {
+		return 'PAID';
+	}
+	if (billing.penalty_amount > 0) {
+		return 'PENALIZED';
+	}
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const isOverdue = new Date(billing.due_date) < today;
+	const today = new Date();
+	today.setHours(0, 0, 0, 0);
+	const isOverdue = new Date(billing.due_date) < today;
 
-  if (isOverdue) {
-    if (billing.status === 'PARTIAL') {
-      return 'OVERDUE-PARTIAL';
-    }
-    return 'OVERDUE';
-  }
+	if (isOverdue) {
+		if (billing.status === 'PARTIAL') {
+			return 'OVERDUE-PARTIAL';
+		}
+		return 'OVERDUE';
+	}
 
-  return billing.status; // PENDING or PARTIAL
+	return billing.status; // PENDING or PARTIAL
 }

@@ -48,7 +48,7 @@ const BudgetPlanner = () => {
   ];
 
   const calculateProjectTotal = (items) => {
-    return items.reduce((sum, item) => 
+    return items.reduce((sum, item) =>
       sum + ((parseFloat(item.cost) || 0) * (parseFloat(item.quantity) || 1)), 0
     );
   };
@@ -68,7 +68,7 @@ const BudgetPlanner = () => {
 
       newStats.totalBudget += projectBudget;
       newStats.allocatedBudget += itemsTotal;
-      
+
       if (project.status === 'completed') {
         newStats.completedProjects += 1;
       } else if (project.status === 'ongoing') {
@@ -102,14 +102,14 @@ const BudgetPlanner = () => {
   };
 
   const updateProject = (id, field, value) => {
-    setProjects(prev => prev.map(project => 
+    setProjects(prev => prev.map(project =>
       project.id === id ? { ...project, [field]: value } : project
     ));
   };
 
   const addItem = (projectId) => {
-    setProjects(prev => prev.map(project => 
-      project.id === projectId 
+    setProjects(prev => prev.map(project =>
+      project.id === projectId
         ? {
             ...project,
             items: [...project.items, {
@@ -125,7 +125,7 @@ const BudgetPlanner = () => {
   };
 
   const updateItem = (projectId, itemId, field, value) => {
-    setProjects(prev => prev.map(project => 
+    setProjects(prev => prev.map(project =>
       project.id === projectId
         ? {
             ...project,
@@ -138,7 +138,7 @@ const BudgetPlanner = () => {
   };
 
   const removeItem = (projectId, itemId) => {
-    setProjects(prev => prev.map(project => 
+    setProjects(prev => prev.map(project =>
       project.id === projectId
         ? {
             ...project,
@@ -149,7 +149,7 @@ const BudgetPlanner = () => {
   };
 
   const toggleProjectExpansion = (projectId) => {
-    setProjects(prev => prev.map(project => 
+    setProjects(prev => prev.map(project =>
       project.id === projectId
         ? { ...project, isExpanded: !project.isExpanded }
         : project
@@ -172,7 +172,7 @@ const BudgetPlanner = () => {
             </div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-500">Allocated / Remaining</CardTitle>
@@ -221,7 +221,7 @@ const BudgetPlanner = () => {
           {projects.map((project) => {
             const projectTotal = calculateProjectTotal(project.items);
             const budgetDifference = (parseFloat(project.budget) || 0) - projectTotal;
-            
+
             return (
               <Card key={project.id} className="border border-gray-200">
                 <CardContent className="pt-6">
@@ -346,7 +346,7 @@ const BudgetPlanner = () => {
                                   onChange={(e) => updateItem(project.id, item.id, 'name', e.target.value)}
                                   className="w-1/3"
                                 />
-                                <Select 
+                                <Select
                                   value={item.type}
                                   onValueChange={(value) => updateItem(project.id, item.id, 'type', value)}
                                 >
@@ -403,7 +403,7 @@ const BudgetPlanner = () => {
               </Card>
             );
           })}
-          
+
           <Button
             variant="outline"
             onClick={addProject}

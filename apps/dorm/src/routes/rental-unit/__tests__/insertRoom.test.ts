@@ -64,10 +64,10 @@
 // // Mock superValidate with error handling
 // vi.mock('sveltekit-superforms/server', () => ({
 //   superValidate: vi.fn().mockImplementation(async (request, schema) => {
-//     const data = request instanceof Request 
-//       ? await request.json() 
+//     const data = request instanceof Request
+//       ? await request.json()
 //       : request;
-    
+
 //     return {
 //       data,
 //       valid: true,
@@ -137,14 +137,14 @@
 //     if (floorId === '1' && number === '101') {
 //       const response = [{ id: 1, floor_id: 1, number: 101 }];
 //       debugLog('Returning existing rental_unit', response);
-//       return HttpResponse.json(response, { 
+//       return HttpResponse.json(response, {
 //         status: 200,
 //         headers: { 'Content-Type': 'application/json' }
 //       });
 //     }
 
 //     debugLog('No existing rental_unit found');
-//     return HttpResponse.json([], { 
+//     return HttpResponse.json([], {
 //       status: 200,
 //       headers: { 'Content-Type': 'application/json' }
 //     });

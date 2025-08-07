@@ -4,56 +4,56 @@ import type { Database } from '../database.types';
 export type TypedSupabaseClient = SupabaseClient<Database>;
 
 export interface Floor {
-  id: number;
-  name: string;
-  property_id: number;
+	id: number;
+	name: string;
+	property_id: number;
 }
 
 export interface Property {
-  id: number;
-  name: string;
+	id: number;
+	name: string;
 }
 
 export interface RentalUnit {
-  id: number;
-  name: string;
-  floor_id: number;
-  property_id: number;
-  floor: Floor;
-  property: Property;
+	id: number;
+	name: string;
+	floor_id: number;
+	property_id: number;
+	floor: Floor;
+	property: Property;
 }
 
 export interface Tenant {
-  id: number;
-  name: string;
-  email: string;
-  contact_number: string;
+	id: number;
+	name: string;
+	email: string;
+	contact_number: string;
 }
 
 export interface LeaseTenant {
-  tenant: Tenant;
+	tenant: Tenant;
 }
 
 export interface PaymentAllocation {
-  id: number;
-  payment_id: number;
-  billing_id: number;
-  amount: number;
-  created_at: string;
-  payment: {
-    id: number;
-    paid_at: string;
-    method: 'CASH' | 'GCASH' | 'BANK_TRANSFER' | 'SECURITY_DEPOSIT' | string;
-    reference_number?: string;
-  };
+	id: number;
+	payment_id: number;
+	billing_id: number;
+	amount: number;
+	created_at: string;
+	payment: {
+		id: number;
+		paid_at: string;
+		method: 'CASH' | 'GCASH' | 'BANK_TRANSFER' | 'SECURITY_DEPOSIT' | string;
+		reference_number?: string;
+	};
 }
-  //RENT, UTILITY, PENALTY, MAINTENANCE, SERVICE, SECURITY_DEPOSIT
+//RENT, UTILITY, PENALTY, MAINTENANCE, SERVICE, SECURITY_DEPOSIT
 
 export interface Billing {
 	id: number;
 	lease_id: number;
 	type: 'RENT' | 'UTILITY' | 'PENALTY' | 'MAINTENANCE' | 'SERVICE' | 'SECURITY_DEPOSIT';
-	utility_type?: 'ELECTRICITY' | 'WATER' | 'INTERNET' ;
+	utility_type?: 'ELECTRICITY' | 'WATER' | 'INTERNET';
 	amount: number;
 	paid_amount: number;
 	balance: number;
@@ -67,46 +67,46 @@ export interface Billing {
 }
 
 export interface LeaseResponse {
-  id: number;
-  name: string;
-  start_date: string;
-  end_date: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'EXPIRED' | 'PENDING';
-  rental_unit: RentalUnit;
-  lease_tenants: LeaseTenant[];
-  billings: Billing[];
+	id: number;
+	name: string;
+	start_date: string;
+	end_date: string;
+	status: 'ACTIVE' | 'INACTIVE' | 'EXPIRED' | 'PENDING';
+	rental_unit: RentalUnit;
+	lease_tenants: LeaseTenant[];
+	billings: Billing[];
 }
 
 export interface Lease {
-  id: number;
-  name: string;
-  type: 'STANDARD' | 'GROUP';
-  balance: number;
-  start_date: string;
-  end_date: string;
-  notes: string;
-  security_deposit: number;
-  rent_amount: number;
-  terms_month: number;
-  status: 'ACTIVE' | 'INACTIVE' | 'EXPIRED' | 'PENDING';
-  unitName: string;
-  floorName: string;
-  propertyName: string;
-  tenants: Tenant[];
-  billings: Billing[];
-  lease_tenants: {
-    name: string;
-    contact_number?: string;
-    email?: string;
-  }[];
-  rental_unit: {
-    rental_unit_number: string;
-    floor?: {
-      floor_number: string;
-      wing?: string;
-    };
-    property?: {
-      name: string;
-    };
-  };
+	id: number;
+	name: string;
+	type: 'STANDARD' | 'GROUP';
+	balance: number;
+	start_date: string;
+	end_date: string;
+	notes: string;
+	security_deposit: number;
+	rent_amount: number;
+	terms_month: number;
+	status: 'ACTIVE' | 'INACTIVE' | 'EXPIRED' | 'PENDING';
+	unitName: string;
+	floorName: string;
+	propertyName: string;
+	tenants: Tenant[];
+	billings: Billing[];
+	lease_tenants: {
+		name: string;
+		contact_number?: string;
+		email?: string;
+	}[];
+	rental_unit: {
+		rental_unit_number: string;
+		floor?: {
+			floor_number: string;
+			wing?: string;
+		};
+		property?: {
+			name: string;
+		};
+	};
 }

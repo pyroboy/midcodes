@@ -4,7 +4,17 @@
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
-	import { BarChart, LineChart, TrendingUp, Calendar, Zap, Droplets, Flame, Wifi, Tv } from 'lucide-svelte';
+	import {
+		BarChart,
+		LineChart,
+		TrendingUp,
+		Calendar,
+		Zap,
+		Droplets,
+		Flame,
+		Wifi,
+		Tv
+	} from 'lucide-svelte';
 	import type { Reading, Meter, Property } from './types';
 
 	type Props = {
@@ -27,13 +37,13 @@
 
 	// Get unique utility types from meters
 	const utilityTypes = $derived.by(() => {
-		return [...new Set(meters.map(m => m.type))].sort();
+		return [...new Set(meters.map((m) => m.type))].sort();
 	});
 
 	// Get meters for selected property
 	const propertyMeters = $derived.by(() => {
 		if (!selectedProperty) return meters;
-		return meters.filter(m => m.property_id === selectedProperty);
+		return meters.filter((m) => m.property_id === selectedProperty);
 	});
 
 	// Filter readings based on selections
@@ -41,19 +51,19 @@
 		let filtered = readings;
 
 		if (selectedProperty) {
-			const propertyMeterIds = propertyMeters.map(m => m.id);
-			filtered = filtered.filter(r => propertyMeterIds.includes(r.meter_id));
+			const propertyMeterIds = propertyMeters.map((m) => m.id);
+			filtered = filtered.filter((r) => propertyMeterIds.includes(r.meter_id));
 		}
 
 		if (viewMode === 'single' && selectedMeter) {
-			filtered = filtered.filter(r => r.meter_id === selectedMeter);
+			filtered = filtered.filter((r) => r.meter_id === selectedMeter);
 		} else if (viewMode === 'mixed' && selectedMeters.length > 0) {
-			filtered = filtered.filter(r => selectedMeters.includes(r.meter_id));
+			filtered = filtered.filter((r) => selectedMeters.includes(r.meter_id));
 		}
 
 		if (selectedUtilityType) {
-			const meterIds = meters.filter(m => m.type === selectedUtilityType).map(m => m.id);
-			filtered = filtered.filter(r => meterIds.includes(r.meter_id));
+			const meterIds = meters.filter((m) => m.type === selectedUtilityType).map((m) => m.id);
+			filtered = filtered.filter((r) => meterIds.includes(r.meter_id));
 		}
 
 		return filtered;
@@ -61,35 +71,44 @@
 
 	// Group readings by month for the graph
 	const monthlyData = $derived.by(() => {
-		const grouped = filteredReadings.reduce((acc, reading) => {
-			const monthKey = reading.reading_date.slice(0, 7); // "2025-06"
-			if (!acc[monthKey]) {
-				acc[monthKey] = {
-					month: monthKey,
-					monthName: new Date(reading.reading_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }),
-					readings: [],
-					totalConsumption: 0,
-					totalCost: 0,
-					averageDays: 0,
-					readingCount: 0
-				};
-			}
-			acc[monthKey].readings.push(reading);
-			acc[monthKey].totalConsumption += reading.consumption || 0;
-			acc[monthKey].totalCost += reading.cost || 0;
-			acc[monthKey].readingCount += 1;
-			return acc;
-		}, {} as Record<string, any>);
+		const grouped = filteredReadings.reduce(
+			(acc, reading) => {
+				const monthKey = reading.reading_date.slice(0, 7); // "2025-06"
+				if (!acc[monthKey]) {
+					acc[monthKey] = {
+						month: monthKey,
+						monthName: new Date(reading.reading_date).toLocaleDateString('en-US', {
+							year: 'numeric',
+							month: 'short'
+						}),
+						readings: [],
+						totalConsumption: 0,
+						totalCost: 0,
+						averageDays: 0,
+						readingCount: 0
+					};
+				}
+				acc[monthKey].readings.push(reading);
+				acc[monthKey].totalConsumption += reading.consumption || 0;
+				acc[monthKey].totalCost += reading.cost || 0;
+				acc[monthKey].readingCount += 1;
+				return acc;
+			},
+			{} as Record<string, any>
+		);
 
 		// Calculate average days for each month
 		Object.values(grouped).forEach((monthData: any) => {
 			const validDays = monthData.readings
 				.filter((r: Reading) => r.days_diff !== null && r.days_diff !== undefined)
 				.map((r: Reading) => r.days_diff);
-			
-			monthData.averageDays = validDays.length > 0 
-				? Math.round(validDays.reduce((sum: number, days: number) => sum + days, 0) / validDays.length)
-				: 0;
+
+			monthData.averageDays =
+				validDays.length > 0
+					? Math.round(
+							validDays.reduce((sum: number, days: number) => sum + days, 0) / validDays.length
+						)
+					: 0;
 		});
 
 		return Object.values(grouped).sort((a, b) => a.month.localeCompare(b.month));
@@ -98,49 +117,58 @@
 	// Get mixed meter data for line graph
 	const mixedMeterData = $derived.by(() => {
 		if (viewMode !== 'mixed' || !selectedProperty || selectedMeters.length === 0) return [];
-		
-		const meterReadings = filteredReadings.filter(r => selectedMeters.includes(r.meter_id));
-		
+
+		const meterReadings = filteredReadings.filter((r) => selectedMeters.includes(r.meter_id));
+
 		console.log('Mixed meter data calculation:', {
 			viewMode,
 			selectedProperty,
 			selectedMeters,
 			meterReadingsCount: meterReadings.length
 		});
-		
+
 		// Group by meter and month
-		const meterGroups = meterReadings.reduce((acc, reading) => {
-			const meterId = reading.meter_id;
-			const monthKey = reading.reading_date.slice(0, 7);
-			
-			if (!acc[meterId]) {
-				acc[meterId] = {};
-			}
-			if (!acc[meterId][monthKey]) {
-				acc[meterId][monthKey] = {
-					month: monthKey,
-					monthName: new Date(reading.reading_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' }),
-					value: 0
-				};
-			}
-			
-			acc[meterId][monthKey].value += graphType === 'consumption' ? (reading.consumption || 0) :
-										   graphType === 'days' ? (reading.days_diff || 0) :
-										   (reading.cost || 0);
-			return acc;
-		}, {} as Record<number, Record<string, any>>);
-		
+		const meterGroups = meterReadings.reduce(
+			(acc, reading) => {
+				const meterId = reading.meter_id;
+				const monthKey = reading.reading_date.slice(0, 7);
+
+				if (!acc[meterId]) {
+					acc[meterId] = {};
+				}
+				if (!acc[meterId][monthKey]) {
+					acc[meterId][monthKey] = {
+						month: monthKey,
+						monthName: new Date(reading.reading_date).toLocaleDateString('en-US', {
+							year: 'numeric',
+							month: 'short'
+						}),
+						value: 0
+					};
+				}
+
+				acc[meterId][monthKey].value +=
+					graphType === 'consumption'
+						? reading.consumption || 0
+						: graphType === 'days'
+							? reading.days_diff || 0
+							: reading.cost || 0;
+				return acc;
+			},
+			{} as Record<number, Record<string, any>>
+		);
+
 		// Convert to array format for line graph
 		const result = Object.entries(meterGroups).map(([meterId, months]) => {
-			const meter = meters.find(m => m.id === Number(meterId));
+			const meter = meters.find((m) => m.id === Number(meterId));
 			const sortedData = Object.values(months).sort((a, b) => a.month.localeCompare(b.month));
-			
+
 			console.log(`Meter ${meterId} data:`, {
 				meterName: meter?.name,
 				dataPoints: sortedData.length,
-				values: sortedData.map(d => d.value)
+				values: sortedData.map((d) => d.value)
 			});
-			
+
 			return {
 				meterId: Number(meterId),
 				meterName: meter?.name || `Meter ${meterId}`,
@@ -148,45 +176,50 @@
 				data: sortedData
 			};
 		});
-		
+
 		console.log('Final mixed meter data:', result.length, 'meters');
 		return result;
 	});
 
 	// Get graph data based on selected type
 	const graphData = $derived.by(() => {
-		return monthlyData.map(month => ({
-           
+		return monthlyData.map((month) => ({
 			month: month.monthName,
-			value: graphType === 'consumption' ? month.totalConsumption :
-				   graphType === 'days' ? month.averageDays :
-				   month.totalCost,
-			label: graphType === 'consumption' ? 'Total Consumption' :
-				   graphType === 'days' ? 'Avg Days Gap' :
-				   'Total Cost'
+			value:
+				graphType === 'consumption'
+					? month.totalConsumption
+					: graphType === 'days'
+						? month.averageDays
+						: month.totalCost,
+			label:
+				graphType === 'consumption'
+					? 'Total Consumption'
+					: graphType === 'days'
+						? 'Avg Days Gap'
+						: 'Total Cost'
 		}));
 	});
 
 	// Get dynamic title based on selections
 	const graphTitle = $derived.by(() => {
 		let title = '';
-		
+
 		if (selectedProperty) {
-			const property = properties.find(p => p.id === selectedProperty);
+			const property = properties.find((p) => p.id === selectedProperty);
 			title += property?.name || 'Unknown Property';
 		} else {
 			title += 'All Properties';
 		}
-		
+
 		if (selectedMeter) {
-			const meter = meters.find(m => m.id === selectedMeter);
+			const meter = meters.find((m) => m.id === selectedMeter);
 			title += ` - ${meter?.name || 'Unknown Meter'}`;
 		} else if (viewMode === 'mixed' && selectedProperty) {
 			title += ' - All Meters';
 		}
-		
+
 		title += ` - ${graphType === 'consumption' ? 'Consumption' : graphType === 'days' ? 'Days Gap' : 'Cost'}`;
-		
+
 		return title;
 	});
 
@@ -230,7 +263,7 @@
 	function getBarColor(index: number): string {
 		const colors = [
 			'bg-blue-500',
-			'bg-green-500', 
+			'bg-green-500',
 			'bg-yellow-500',
 			'bg-red-500',
 			'bg-purple-500',
@@ -259,7 +292,7 @@
 			'#14b8a6', // teal
 			'#06b6d4', // cyan
 			'#84cc16', // lime
-			'#059669'  // emerald
+			'#059669' // emerald
 		];
 		return colors[meterId % colors.length];
 	}
@@ -268,12 +301,12 @@
 	const maxValue = $derived.by(() => {
 		if (viewMode === 'mixed' && mixedMeterData.length > 0) {
 			// For mixed meters, get max value from all meter data
-			const allValues = mixedMeterData.flatMap(meter => meter.data.map(point => point.value));
+			const allValues = mixedMeterData.flatMap((meter) => meter.data.map((point) => point.value));
 			return allValues.length > 0 ? Math.max(...allValues) : 1;
 		} else if (graphData.length === 0) {
 			return 1;
 		} else {
-			return Math.max(...graphData.map(d => d.value));
+			return Math.max(...graphData.map((d) => d.value));
 		}
 	});
 
@@ -311,13 +344,21 @@
 						<!-- Property Filter -->
 						<div class="space-y-2">
 							<label for="property-select" class="text-sm font-medium">Property</label>
-							<Select type="single" value={selectedProperty?.toString() || undefined} onValueChange={(value) => {
-								selectedProperty = value ? Number(value) : null;
-								selectedMeter = null; // Reset meter when property changes
-								selectedMeters = []; // Reset selected meters when property changes
-							}}>
+							<Select
+								type="single"
+								value={selectedProperty?.toString() || undefined}
+								onValueChange={(value) => {
+									selectedProperty = value ? Number(value) : null;
+									selectedMeter = null; // Reset meter when property changes
+									selectedMeters = []; // Reset selected meters when property changes
+								}}
+							>
 								<SelectTrigger id="property-select">
-									<span>{selectedProperty ? properties.find(p => p.id === selectedProperty)?.name : 'All Properties'}</span>
+									<span
+										>{selectedProperty
+											? properties.find((p) => p.id === selectedProperty)?.name
+											: 'All Properties'}</span
+									>
 								</SelectTrigger>
 								<SelectContent>
 									<SelectItem value="">All Properties</SelectItem>
@@ -335,16 +376,20 @@
 							</label>
 							{#if viewMode === 'mixed'}
 								<!-- Multi-select for mixed mode -->
-								<Select type="multiple" value={selectedMeters.map(id => id.toString())} onValueChange={(values) => {
-									selectedMeters = values.map(v => Number(v));
-								}}>
+								<Select
+									type="multiple"
+									value={selectedMeters.map((id) => id.toString())}
+									onValueChange={(values) => {
+										selectedMeters = values.map((v) => Number(v));
+									}}
+								>
 									<SelectTrigger id="meter-select">
 										<span>
-											{selectedMeters.length === 0 
-												? 'Select meters...' 
+											{selectedMeters.length === 0
+												? 'Select meters...'
 												: selectedMeters.length === 1
-												? propertyMeters.find(m => m.id === selectedMeters[0])?.name
-												: `${selectedMeters.length} meters selected`}
+													? propertyMeters.find((m) => m.id === selectedMeters[0])?.name
+													: `${selectedMeters.length} meters selected`}
 										</span>
 									</SelectTrigger>
 									<SelectContent>
@@ -355,11 +400,19 @@
 								</Select>
 							{:else}
 								<!-- Single select for single mode -->
-								<Select type="single" value={selectedMeter?.toString() || undefined} onValueChange={(value) => {
-									selectedMeter = value ? Number(value) : null;
-								}}>
+								<Select
+									type="single"
+									value={selectedMeter?.toString() || undefined}
+									onValueChange={(value) => {
+										selectedMeter = value ? Number(value) : null;
+									}}
+								>
 									<SelectTrigger id="meter-select">
-										<span>{selectedMeter ? propertyMeters.find(m => m.id === selectedMeter)?.name : 'All Meters'}</span>
+										<span
+											>{selectedMeter
+												? propertyMeters.find((m) => m.id === selectedMeter)?.name
+												: 'All Meters'}</span
+										>
 									</SelectTrigger>
 									<SelectContent>
 										<SelectItem value="">All Meters</SelectItem>
@@ -374,9 +427,13 @@
 						<!-- Utility Type Filter -->
 						<div class="space-y-2">
 							<label for="utility-type-select" class="text-sm font-medium">Utility Type</label>
-							<Select type="single" value={selectedUtilityType || undefined} onValueChange={(value) => {
-								selectedUtilityType = value;
-							}}>
+							<Select
+								type="single"
+								value={selectedUtilityType || undefined}
+								onValueChange={(value) => {
+									selectedUtilityType = value;
+								}}
+							>
 								<SelectTrigger id="utility-type-select">
 									<span>{selectedUtilityType || 'All Types'}</span>
 								</SelectTrigger>
@@ -392,11 +449,21 @@
 						<!-- Graph Type Filter -->
 						<div class="space-y-2">
 							<label for="graph-type-select" class="text-sm font-medium">Graph Type</label>
-							<Select type="single" value={graphType} onValueChange={(value) => {
-								graphType = value as 'consumption' | 'days' | 'cost';
-							}}>
+							<Select
+								type="single"
+								value={graphType}
+								onValueChange={(value) => {
+									graphType = value as 'consumption' | 'days' | 'cost';
+								}}
+							>
 								<SelectTrigger id="graph-type-select">
-									<span>{graphType === 'consumption' ? 'Consumption' : graphType === 'days' ? 'Days Gap' : 'Cost'}</span>
+									<span
+										>{graphType === 'consumption'
+											? 'Consumption'
+											: graphType === 'days'
+												? 'Days Gap'
+												: 'Cost'}</span
+									>
 								</SelectTrigger>
 								<SelectContent>
 									<SelectItem value="consumption">Consumption</SelectItem>
@@ -409,9 +476,13 @@
 						<!-- View Mode Filter -->
 						<div class="space-y-2">
 							<label for="view-mode-select" class="text-sm font-medium">View Mode</label>
-							<Select type="single" value={viewMode} onValueChange={(value) => {
-								viewMode = value as 'single' | 'mixed';
-							}}>
+							<Select
+								type="single"
+								value={viewMode}
+								onValueChange={(value) => {
+									viewMode = value as 'single' | 'mixed';
+								}}
+							>
 								<SelectTrigger id="view-mode-select">
 									<span>{viewMode === 'single' ? 'Single Meter' : 'Mixed Meters'}</span>
 								</SelectTrigger>
@@ -424,9 +495,7 @@
 					</div>
 
 					<div class="flex justify-end mt-4">
-						<Button variant="outline" size="sm" onclick={resetFilters}>
-							Reset Filters
-						</Button>
+						<Button variant="outline" size="sm" onclick={resetFilters}>Reset Filters</Button>
 					</div>
 				</CardContent>
 			</Card>
@@ -439,7 +508,13 @@
 					</CardTitle>
 				</CardHeader>
 				<CardContent>
-					{@const debugInfo = { viewMode, mixedMeterDataLength: mixedMeterData.length, selectedProperty, selectedMeters, propertyMetersLength: propertyMeters.length }}
+					{@const debugInfo = {
+						viewMode,
+						mixedMeterDataLength: mixedMeterData.length,
+						selectedProperty,
+						selectedMeters,
+						propertyMetersLength: propertyMeters.length
+					}}
 					{@const showMixedGraph = viewMode === 'mixed' && mixedMeterData.length > 0}
 					{console.log('Graph rendering debug:', debugInfo, 'showMixedGraph:', showMixedGraph)}
 					{console.log('Mixed meter data for rendering:', mixedMeterData)}
@@ -449,46 +524,50 @@
 						<div class="space-y-4">
 							<div class="h-64 relative">
 								<!-- Y-axis labels -->
-								<div class="absolute left-0 top-0 bottom-0 w-16 flex flex-col justify-between text-xs text-muted-foreground">
-									{#each Array.from({length: 5}, (_, i) => i) as i}
+								<div
+									class="absolute left-0 top-0 bottom-0 w-16 flex flex-col justify-between text-xs text-muted-foreground"
+								>
+									{#each Array.from({ length: 5 }, (_, i) => i) as i}
 										<div class="text-right pr-2">
-											{graphType === 'cost' ? formatCurrency(maxValue * (4 - i) / 4) : formatNumber(maxValue * (4 - i) / 4)}
+											{graphType === 'cost'
+												? formatCurrency((maxValue * (4 - i)) / 4)
+												: formatNumber((maxValue * (4 - i)) / 4)}
 										</div>
 									{/each}
 								</div>
-								
+
 								<!-- Chart area -->
 								<div class="ml-16 h-full relative">
 									<!-- Grid lines -->
-									{#each Array.from({length: 5}, (_, i) => i) as i}
-										<div 
+									{#each Array.from({ length: 5 }, (_, i) => i) as i}
+										<div
 											class="absolute w-full border-t border-gray-200"
 											style="top: {i * 25}%;"
 										></div>
 									{/each}
-									
+
 									<!-- Single SVG for all chart elements -->
-									<svg 
-										class="absolute inset-0 w-full h-full" 
+									<svg
+										class="absolute inset-0 w-full h-full"
 										style="pointer-events: none;"
-										viewBox="0 0 3 1" 
+										viewBox="0 0 3 1"
 										preserveAspectRatio="none"
 									>
 										<!-- Line charts for each meter -->
 										{#each mixedMeterData as meter}
-											{@const pathData = meter.data.length > 1 ? meter.data.map((point, index) => {
-												const x = (index / (meter.data.length - 1)) * 2.4 + 0.3; // 10% margin on each side (0.3 to 2.7)
-												const y = 0.1 + (point.value / maxValue) * 0.8; // 10% margin top/bottom
-												return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
-											}).join(' ') : ''}
-											
+											{@const pathData =
+												meter.data.length > 1
+													? meter.data
+															.map((point, index) => {
+																const x = (index / (meter.data.length - 1)) * 2.4 + 0.3; // 10% margin on each side (0.3 to 2.7)
+																const y = 0.1 + (point.value / maxValue) * 0.8; // 10% margin top/bottom
+																return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
+															})
+															.join(' ')
+													: ''}
+
 											{#if meter.data.length > 1}
-												<path
-													d={pathData}
-													stroke={meter.color}
-													stroke-width="0.015"
-													fill="none"
-												/>
+												<path d={pathData} stroke={meter.color} stroke-width="0.015" fill="none" />
 											{/if}
 											<!-- {#each meter.data as point, index}
 												<circle
@@ -502,13 +581,15 @@
 											{/each} -->
 										{/each}
 									</svg>
-									
+
 									<!-- X-axis labels -->
 									{#if mixedMeterData.length > 0 && mixedMeterData[0].data.length > 0}
 										{#each mixedMeterData[0].data as point, index}
-											<div 
+											<div
 												class="absolute bottom-0 text-xs text-muted-foreground text-center transform -translate-x-1/2"
-												style="left: {((index / (mixedMeterData[0].data.length - 1)) * 2.4 + 0.3) / 3 * 100}%;"
+												style="left: {(((index / (mixedMeterData[0].data.length - 1)) * 2.4 + 0.3) /
+													3) *
+													100}%;"
 											>
 												{point.monthName.split(' ')[0]}
 											</div>
@@ -516,7 +597,7 @@
 									{/if}
 								</div>
 							</div>
-							
+
 							<!-- Legend -->
 							<div class="flex flex-wrap gap-4 justify-center">
 								{#each mixedMeterData as meter}
@@ -530,7 +611,10 @@
 					{:else if viewMode === 'mixed' && mixedMeterData.length === 0}
 						<div class="text-center py-8 text-muted-foreground">
 							<LineChart class="h-12 w-12 mx-auto mb-4 opacity-50" />
-							<p>No meter data available for mixed view. Please select a property and choose meters to compare.</p>
+							<p>
+								No meter data available for mixed view. Please select a property and choose meters
+								to compare.
+							</p>
 						</div>
 					{:else if graphData.length === 0}
 						<div class="text-center py-8 text-muted-foreground">
@@ -544,20 +628,27 @@
 								{#each graphData as monthData, index}
 									<div class="flex-1 flex flex-col items-center">
 										<!-- Bar -->
-										<div 
+										<div
 											class="w-full min-w-[40px] rounded-t transition-all duration-300 hover:opacity-80 cursor-pointer"
 											class:bg-blue-500={graphType === 'consumption'}
 											class:bg-green-500={graphType === 'days'}
 											class:bg-purple-500={graphType === 'cost'}
 											style="height: {maxValue > 0 ? (monthData.value / maxValue) * 200 : 0}px;"
-											title="{monthData.month}: {formatNumber(monthData.value)} {graphType === 'consumption' ? 'units' : graphType === 'days' ? 'days' : 'PHP'}"
+											title="{monthData.month}: {formatNumber(monthData.value)} {graphType ===
+											'consumption'
+												? 'units'
+												: graphType === 'days'
+													? 'days'
+													: 'PHP'}"
 										></div>
-										
+
 										<!-- Value Label -->
 										<div class="text-xs text-center mt-2 font-medium">
-											{graphType === 'cost' ? formatCurrency(monthData.value) : formatNumber(monthData.value)}
+											{graphType === 'cost'
+												? formatCurrency(monthData.value)
+												: formatNumber(monthData.value)}
 										</div>
-										
+
 										<!-- Month Label -->
 										<div class="text-xs text-center mt-1 text-muted-foreground">
 											{monthData.month.split(' ')[0]}
@@ -582,18 +673,22 @@
 								<p class="text-sm text-blue-600 font-medium">Total Periods</p>
 								<p class="text-2xl font-bold text-blue-700">{monthlyData.length}</p>
 							</div>
-							
+
 							<div class="text-center p-4 bg-green-50 rounded-lg">
 								<p class="text-sm text-green-600 font-medium">Avg Consumption</p>
 								<p class="text-2xl font-bold text-green-700">
-									{formatNumber(monthlyData.reduce((sum, m) => sum + m.totalConsumption, 0) / monthlyData.length)}
+									{formatNumber(
+										monthlyData.reduce((sum, m) => sum + m.totalConsumption, 0) / monthlyData.length
+									)}
 								</p>
 							</div>
-							
+
 							<div class="text-center p-4 bg-purple-50 rounded-lg">
 								<p class="text-sm text-purple-600 font-medium">Avg Days Gap</p>
 								<p class="text-2xl font-bold text-purple-700">
-									{formatNumber(monthlyData.reduce((sum, m) => sum + m.averageDays, 0) / monthlyData.length)}
+									{formatNumber(
+										monthlyData.reduce((sum, m) => sum + m.averageDays, 0) / monthlyData.length
+									)}
 								</p>
 							</div>
 						</div>
@@ -639,4 +734,4 @@
 			<Button variant="outline" onclick={close}>Close</Button>
 		</Dialog.Footer>
 	</Dialog.Content>
-</Dialog.Root> 
+</Dialog.Root>

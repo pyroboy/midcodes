@@ -68,7 +68,11 @@
 	}
 
 	async function handleDeleteProperty(property: Property) {
-		if (!confirm(`Are you sure you want to delete property ${property.name}? This action cannot be undone.`)) {
+		if (
+			!confirm(
+				`Are you sure you want to delete property ${property.name}? This action cannot be undone.`
+			)
+		) {
 			return;
 		}
 
@@ -128,7 +132,11 @@
 									</td>
 									<td class="p-4">
 										<div class="flex items-center justify-end gap-2">
-											<Button size="sm" variant="outline" onclick={() => handlePropertyClick(property)}>
+											<Button
+												size="sm"
+												variant="outline"
+												onclick={() => handlePropertyClick(property)}
+											>
 												Edit
 											</Button>
 											<Button
@@ -179,7 +187,6 @@
 		</Card.Root>
 	</div>
 </div>
-
 
 {#if browser}
 	<SuperDebug data={$formData} />

@@ -1,8 +1,10 @@
-```markdown
+````markdown
 # Transaction Management Module Instructions
 
 ## Overview
+
 The `/dorm/transactions` route provides a comprehensive view of all financial transactions in the dormitory system. Its primary functions include:
+
 - **Transaction History:** Display a comprehensive list of all payments with their status, method, and receipt details.
 - **Transaction Details:** View detailed information for each transaction.
 - **Receipt Management:** Manage and access payment receipts.
@@ -15,6 +17,7 @@ This module works closely with the payments module to provide clear and accurate
 ## Database Schema
 
 ### Payments Table
+
 ```sql
 create table public.payments (
   id serial not null,
@@ -107,19 +110,21 @@ create trigger update_leases_updated_at BEFORE
 update on leases for EACH row
 execute FUNCTION update_updated_at_column ();
 ```
+````
 
 ---
 
 ## Core Features
 
 ### 1. Transaction History
+
 - **Data Retrieval:**  
   The system queries the `public.payments` table to display all transactions, focusing on:
   - **`id`**: Unique identifier.
   - **`amount`**: Payment value.
   - **`method`**: Payment method, which supports filtering.
   - **`paid_by` & `paid_at`**: Identifies who made the payment and when.
-- **Filtering & Sorting:**  
+- **Filtering & Sorting:**
   - **Date Range:** Filter transactions using the `paid_at` timestamp.
   - **Payment Method:** Filter by the `method` field.
   - **Search by Tenant/Rental Unit:** Although the table does not directly include rental unit data, joins with related tables enable these searches.
@@ -130,19 +135,21 @@ execute FUNCTION update_updated_at_column ();
 ---
 
 ### 2. Transaction Details
+
 - **Detailed View Composition:**  
   When a transaction is selected, display:
   - **Payment Information:** Fields like `amount`, `method`, `reference_number`, and `notes`.
   - **Timestamps:** Information from `paid_at`, `created_at`, and `updated_at` for audit trails.
-  - **Billing Linkage:**  
+  - **Billing Linkage:**
     - **`billing_ids` & `billing_changes`:** Connect the payment to its corresponding billing records and track any modifications.
-  - **User Metadata:**  
+  - **User Metadata:**
     - **`created_by` & `updated_by`:** Links to the profiles table, ensuring accountability.
 
 ---
 
 ### 3. Receipt Management
-- **Receipt Handling:**  
+
+- **Receipt Handling:**
   - **`receipt_url`:** Provides a digital link to the payment receipt.
   - **Features:**
     - **Viewing & Downloading:** Users can click to view or download receipts.
@@ -151,14 +158,15 @@ execute FUNCTION update_updated_at_column ();
 ---
 
 ### 4. Transaction Analysis
-- **Analytical Reporting:**  
-  - **Trend Analysis:**  
+
+- **Analytical Reporting:**
+  - **Trend Analysis:**
     - Use the `amount` and `paid_at` fields to analyze payment trends over time.
-  - **Method-Based Tracking:**  
+  - **Method-Based Tracking:**
     - Aggregate data based on the `method` field to monitor the popularity and frequency of payment methods.
-  - **Status Monitoring:**  
+  - **Status Monitoring:**
     - Leverage the `billing_changes` JSONB field to track any changes in billing or transaction status.
-  - **Report Generation:**  
+  - **Report Generation:**
     - Generate comprehensive reports that provide actionable insights for management and accounting.
 
 ---
@@ -166,30 +174,35 @@ execute FUNCTION update_updated_at_column ();
 ## Role-Based Access Control (RBAC)
 
 ### Admin (super_admin, property_admin)
+
 - **Access Rights:**
   - Full access to all transactions, including detailed metadata.
   - Can view, export, and download all transaction data and receipts.
   - Access to all reports and analytical tools.
 
 ### Accountant
+
 - **Access Rights:**
   - Full access to all transaction records.
   - Ability to generate detailed financial reports.
   - Access to complete receipt histories.
 
 ### Manager
+
 - **Access Rights:**
   - View transaction history with basic details.
   - Access to essential reports and download options.
   - Ability to view receipts.
 
 ### Frontdesk
+
 - **Access Rights:**
   - Basic access to recent transactions.
   - Can view transaction details and receipts.
   - Limited report generation capabilities.
 
 ### Tenant
+
 - **Access Rights:**
   - Restricted view limited to their own transactions.
   - Can view personal transaction history, receipts, and payment statuses.
@@ -197,7 +210,9 @@ execute FUNCTION update_updated_at_column ();
 ---
 
 ## Summary
+
 The Transaction Management Module is designed to integrate seamlessly with the `payments` table schema. By leveraging structured data fields, robust indexing, and foreign key relationships, the module provides:
+
 - A comprehensive transaction history.
 - Detailed transaction insights.
 - Efficient receipt management.

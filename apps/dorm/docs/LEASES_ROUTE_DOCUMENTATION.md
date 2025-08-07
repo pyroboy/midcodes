@@ -29,6 +29,7 @@ src/routes/leases/
 The route handles the complete lifecycle of lease agreements:
 
 #### **Lease Creation** (`create` action)
+
 - **Location**: `+page.server.ts:121-223`
 - **Purpose**: Creates new lease agreements with tenant relationships
 - **Key Features**:
@@ -43,21 +44,20 @@ const { tenantIds, ...leaseData } = form.data;
 const tenantIdsArray = tenantIds; // Already transformed to array by schema
 
 // Create lease with calculated end date
-const { data: lease, error: leaseError } = await supabase
-  .from('leases')
-  .insert({
-    rental_unit_id: leaseData.rental_unit_id,
-    name: leaseName,
-    start_date: leaseData.start_date,
-    end_date: endDate,
-    // Financial defaults
-    rent_amount: 0,
-    security_deposit: 0,
-    // ... other fields
-  })
+const { data: lease, error: leaseError } = await supabase.from('leases').insert({
+	rental_unit_id: leaseData.rental_unit_id,
+	name: leaseName,
+	start_date: leaseData.start_date,
+	end_date: endDate,
+	// Financial defaults
+	rent_amount: 0,
+	security_deposit: 0
+	// ... other fields
+});
 ```
 
 #### **Lease Updates** (`updateLease` action)
+
 - **Location**: `+page.server.ts:225-328`
 - **Purpose**: Modifies existing lease terms and tenant relationships
 - **Key Features**:
@@ -66,6 +66,7 @@ const { data: lease, error: leaseError } = await supabase
   - Recalculates end dates when terms change
 
 #### **Lease Archival** (`delete` action)
+
 - **Location**: `+page.server.ts:330-365`
 - **Purpose**: Soft-deletes leases while preserving audit trail
 - **Key Features**:
@@ -78,12 +79,14 @@ const { data: lease, error: leaseError } = await supabase
 The leases route is the **primary financial control center** of the application:
 
 #### **Billing System Integration**
+
 - **Rent Billing Management**: Automated monthly rent billing generation
 - **Security Deposit Tracking**: Dedicated security deposit billing workflows
 - **Utility Billing**: Integration with utility meters and consumption tracking
 - **Penalty Calculation**: Automated penalty assessment via database functions
 
 #### **Payment Processing** (`submitPayment` action)
+
 - **Location**: `+page.server.ts:367-428`
 - **Payment Methods Supported**:
   - `CASH` - Physical cash payments
@@ -94,24 +97,25 @@ The leases route is the **primary financial control center** of the application:
 ```typescript
 // Different RPC functions based on payment method
 if (paymentDetails.method === 'SECURITY_DEPOSIT') {
-  const result = await supabase.rpc('create_security_deposit_payment', {
-    p_amount: paymentDetails.amount,
-    p_billing_ids: paymentDetails.billing_ids,
-    p_paid_by: paymentDetails.paid_by,
-    // ... other parameters
-  });
+	const result = await supabase.rpc('create_security_deposit_payment', {
+		p_amount: paymentDetails.amount,
+		p_billing_ids: paymentDetails.billing_ids,
+		p_paid_by: paymentDetails.paid_by
+		// ... other parameters
+	});
 } else {
-  const result = await supabase.rpc('create_payment', {
-    p_amount: paymentDetails.amount,
-    p_method: paymentDetails.method,
-    // ... other parameters
-  });
+	const result = await supabase.rpc('create_payment', {
+		p_amount: paymentDetails.amount,
+		p_method: paymentDetails.method
+		// ... other parameters
+	});
 }
 ```
 
 ### 3. Rent Management Operations
 
 #### **Monthly Rent Billing** (`manageRentBillings` action)
+
 - **Location**: `+page.server.ts:454-542`
 - **Purpose**: Comprehensive yearly rent billing management
 - **Features**:
@@ -122,19 +126,20 @@ if (paymentDetails.method === 'SECURITY_DEPOSIT') {
 
 ```typescript
 type MonthlyRent = {
-  month: number;
-  isActive: boolean;
-  amount: number;
-  dueDate: string;
+	month: number;
+	isActive: boolean;
+	amount: number;
+	dueDate: string;
 };
 
 // Three billing operations:
 // 1. Create new billing
-// 2. Update existing billing  
+// 2. Update existing billing
 // 3. Delete billing (with payment validation)
 ```
 
 #### **Security Deposit Management** (`manageSecurityDepositBillings` action)
+
 - **Location**: `+page.server.ts:586-680`
 - **Purpose**: Full CRUD operations for security deposit billings
 - **Operations**:
@@ -145,11 +150,12 @@ type MonthlyRent = {
 ## 📊 Data Flow & Integration Points
 
 ### Database Relationships
+
 The leases route integrates with multiple database entities:
 
 ```sql
 -- Core lease query with all relationships
-SELECT 
+SELECT
   leases.*,
   rental_unit:rental_unit_id (*, floor:floors (*), property:properties (*)),
   lease_tenants:lease_tenants!lease_id (tenant:tenants (name, email, contact_number)),
@@ -162,11 +168,13 @@ ORDER BY created_at DESC
 ### External System Integration
 
 #### **Penalty Calculation System**
+
 - **Integration**: Database function `calculate_penalty(p_billing_id)`
 - **Purpose**: Real-time penalty assessment based on configurable rules
 - **Implementation**: Automatically called for all billings during data load
 
 #### **Payment Allocation System**
+
 - **Integration**: `payment_allocations` table with payment relationships
 - **Purpose**: Track partial payments across multiple billings
 - **Features**: Complex allocation logic for multi-billing payments
@@ -174,6 +182,7 @@ ORDER BY created_at DESC
 ## 🎨 User Interface Components
 
 ### LeaseCard.svelte - Individual Lease Management
+
 - **Size**: 721 lines (largest component)
 - **Purpose**: Complete lease interaction interface
 - **Features**:
@@ -184,6 +193,7 @@ ORDER BY created_at DESC
   - Print functionality for invoices
 
 ### Modal System Architecture
+
 The route employs a sophisticated modal system:
 
 1. **LeaseFormModal**: Lease creation/editing
@@ -194,6 +204,7 @@ The route employs a sophisticated modal system:
 ## 🔐 Security & Authorization
 
 ### Row Level Security (RLS) Integration
+
 - **Admin Levels**: Full access to all lease operations
 - **Property Managers**: Access to assigned property leases
 - **Accountants**: Financial operation permissions
@@ -202,19 +213,22 @@ The route employs a sophisticated modal system:
 ### Validation & Data Integrity
 
 #### **Zod Schema Validation** (`formSchema.ts`)
+
 ```typescript
 export const leaseSchema = z.object({
-  tenantIds: z.string()
-    .transform((val) => JSON.parse(val))
-    .refine((val) => Array.isArray(val) && val.length > 0),
-  rental_unit_id: z.coerce.number().min(1),
-  start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  terms_month: z.coerce.number().int().min(0).max(60),
-  // ... additional validations
+	tenantIds: z
+		.string()
+		.transform((val) => JSON.parse(val))
+		.refine((val) => Array.isArray(val) && val.length > 0),
+	rental_unit_id: z.coerce.number().min(1),
+	start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+	terms_month: z.coerce.number().int().min(0).max(60)
+	// ... additional validations
 });
 ```
 
 #### **Business Rule Validation**
+
 - **Date Consistency**: End date matches calculated terms
 - **Tenant Requirements**: At least one tenant required
 - **Financial Integrity**: Balance calculations with payment validations
@@ -222,6 +236,7 @@ export const leaseSchema = z.object({
 ## 🔄 Business Process Workflows
 
 ### Standard Lease Creation Process
+
 1. **User Input**: Property manager selects unit and tenants
 2. **Validation**: Form validation with business rules
 3. **Lease Creation**: Database transaction with rollback capability
@@ -229,6 +244,7 @@ export const leaseSchema = z.object({
 5. **Initial Setup**: Default financial configurations
 
 ### Payment Processing Workflow
+
 1. **Billing Selection**: User selects billings to pay
 2. **Amount Allocation**: System calculates optimal allocation
 3. **Payment Creation**: Database RPC with integrity checks
@@ -236,6 +252,7 @@ export const leaseSchema = z.object({
 5. **Status Updates**: Billing status progression
 
 ### Billing Management Lifecycle
+
 1. **Schedule Generation**: Automated based on lease terms
 2. **Monthly Activation**: Property manager controls active months
 3. **Penalty Assessment**: Automatic calculation for overdue bills
@@ -245,15 +262,17 @@ export const leaseSchema = z.object({
 ## 📈 Performance Considerations
 
 ### Optimized Data Loading
+
 ```typescript
 // Parallel data fetching for better performance
 const [allocationsResponse, ...penaltyResponses] = await Promise.all([
-  supabase.from('payment_allocations').select('*, payment:payments(*)'),
-  ...allBillingIds.map((id) => supabase.rpc('calculate_penalty', { p_billing_id: id }))
+	supabase.from('payment_allocations').select('*, payment:payments(*)'),
+	...allBillingIds.map((id) => supabase.rpc('calculate_penalty', { p_billing_id: id }))
 ]);
 ```
 
 ### Efficient State Management
+
 - **Derived State**: Calculated values using Svelte 5 runes
 - **Batched Operations**: Bulk billing operations
 - **Optimistic Updates**: UI responsiveness with data invalidation
@@ -261,18 +280,20 @@ const [allocationsResponse, ...penaltyResponses] = await Promise.all([
 ## 🐛 Error Handling & Resilience
 
 ### Comprehensive Error Management
+
 ```typescript
 try {
-  // Business logic operations
+	// Business logic operations
 } catch (error) {
-  console.error('Lease creation failed:', error);
-  return fail(500, {
-    message: 'Failed to create lease'
-  });
+	console.error('Lease creation failed:', error);
+	return fail(500, {
+		message: 'Failed to create lease'
+	});
 }
 ```
 
 ### Transaction Safety
+
 - **Rollback Mechanisms**: Failed operations cleanup
 - **Validation Layers**: Client and server-side validation
 - **Audit Trails**: Comprehensive logging for debugging
@@ -280,11 +301,13 @@ try {
 ## 🔧 Configuration & Customization
 
 ### Business Rule Configuration
+
 - **Penalty Rules**: Database-driven penalty configurations
 - **Payment Methods**: Configurable payment method options
 - **Billing Types**: Extensible billing type system
 
 ### UI Customization
+
 - **Status Colors**: Configurable status badge colors
 - **Date Formats**: Consistent date formatting utilities
 - **Currency Display**: Localized currency formatting
@@ -292,6 +315,7 @@ try {
 ## 📚 Related Documentation
 
 ### Connected Systems
+
 - **Properties Route**: Rental unit management
 - **Tenants Route**: Tenant information system
 - **Payments Route**: Payment history and reporting
@@ -299,6 +323,7 @@ try {
 - **Reports Route**: Financial and operational reporting
 
 ### Database Schema References
+
 - **Primary Tables**: `leases`, `billings`, `payment_allocations`
 - **Junction Tables**: `lease_tenants`
 - **Related Tables**: `rental_unit`, `tenants`, `properties`, `floors`
@@ -306,12 +331,14 @@ try {
 ## 🚀 Future Enhancements
 
 ### Planned Features
+
 - **Automated Rent Increases**: Scheduled rent adjustments
 - **Contract Generation**: PDF lease agreement generation
 - **Tenant Communication**: Integrated messaging system
 - **Financial Forecasting**: Predictive revenue analytics
 
 ### Technical Improvements
+
 - **Real-time Updates**: WebSocket integration for live updates
 - **Mobile Optimization**: Enhanced mobile interface
 - **API Integration**: External payment gateway connections

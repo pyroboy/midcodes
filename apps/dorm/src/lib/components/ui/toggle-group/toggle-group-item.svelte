@@ -9,11 +9,7 @@
 		children: any;
 	} & Omit<HTMLAttributes<HTMLButtonElement>, 'value'>;
 
-	let {
-		value,
-		class: className = '',
-		children
-	} = $props();
+	let { value, class: className = '', children } = $props();
 
 	const context = getContext<any>('toggle-group');
 

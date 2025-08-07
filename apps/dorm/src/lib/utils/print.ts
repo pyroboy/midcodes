@@ -2,74 +2,76 @@ import type { Lease } from '$lib/types/lease';
 import { formatDate, formatCurrency } from './format';
 
 export function printLeaseInvoice(lease: Lease): void {
-  // This function remains unchanged.
-  const iframe = document.createElement('iframe');
-  iframe.style.position = 'absolute';
-  iframe.style.width = '0';
-  iframe.style.height = '0';
-  iframe.style.border = 'none';
-  document.body.appendChild(iframe);
+	// This function remains unchanged.
+	const iframe = document.createElement('iframe');
+	iframe.style.position = 'absolute';
+	iframe.style.width = '0';
+	iframe.style.height = '0';
+	iframe.style.border = 'none';
+	document.body.appendChild(iframe);
 
-  const html = generateLeasePrintHTML(lease);
+	const html = generateLeasePrintHTML(lease);
 
-  iframe.contentDocument?.open();
-  iframe.contentDocument?.write(html);
-  iframe.contentDocument?.close();
+	iframe.contentDocument?.open();
+	iframe.contentDocument?.write(html);
+	iframe.contentDocument?.close();
 
-  iframe.onload = () => {
-    iframe?.contentWindow?.focus();
-    setTimeout(() => {
-      if (iframe) {
-        iframe.contentWindow?.print();
-        // Clean up iframe after print
-        setTimeout(() => {
-          iframe.remove();
-        }, 1000);
-      }
-    }, 100);
-  };
+	iframe.onload = () => {
+		iframe?.contentWindow?.focus();
+		setTimeout(() => {
+			if (iframe) {
+				iframe.contentWindow?.print();
+				// Clean up iframe after print
+				setTimeout(() => {
+					iframe.remove();
+				}, 1000);
+			}
+		}, 100);
+	};
 }
 
 function sortBillingsByDate(billings: any[]): any[] {
-  // This function remains unchanged.
-  if (!billings) return [];
-  return [...billings].sort((a, b) => new Date(a.billing_date).getTime() - new Date(b.billing_date).getTime());
+	// This function remains unchanged.
+	if (!billings) return [];
+	return [...billings].sort(
+		(a, b) => new Date(a.billing_date).getTime() - new Date(b.billing_date).getTime()
+	);
 }
 
 function getCustomDisplayStatus(billing: any): string {
-  // This function remains unchanged.
-  if ((billing.amount + (billing.penalty_amount || 0) - billing.paid_amount) <= 0) {
-    return 'PAID';
-  }
-  if (billing.penalty_amount > 0) {
-    return 'PENALIZED';
-  }
+	// This function remains unchanged.
+	if (billing.amount + (billing.penalty_amount || 0) - billing.paid_amount <= 0) {
+		return 'PAID';
+	}
+	if (billing.penalty_amount > 0) {
+		return 'PENALIZED';
+	}
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const isOverdue = new Date(billing.due_date) < today;
+	const today = new Date();
+	today.setHours(0, 0, 0, 0);
+	const isOverdue = new Date(billing.due_date) < today;
 
-  if (isOverdue) {
-    if (billing.status === 'PARTIAL' || billing.paid_amount > 0) {
-      return 'OVERDUE-PARTIAL';
-    }
-    return 'OVERDUE';
-  }
+	if (isOverdue) {
+		if (billing.status === 'PARTIAL' || billing.paid_amount > 0) {
+			return 'OVERDUE-PARTIAL';
+		}
+		return 'OVERDUE';
+	}
 
-  return billing.status; // PENDING or PARTIAL
+	return billing.status; // PENDING or PARTIAL
 }
 
 // --- UPDATED FUNCTION ---
 function generateLeasePrintHTML(lease: Lease): string {
-  const currentDate = new Date();
-  const sortedBillings = sortBillingsByDate(lease.billings || []);
+	const currentDate = new Date();
+	const sortedBillings = sortBillingsByDate(lease.billings || []);
 
-  // Overall totals for the summary section
-  const totalAmount = sortedBillings.reduce((sum, b) => sum + b.amount, 0);
-  const totalPenalties = sortedBillings.reduce((sum, b) => sum + (b.penalty_amount || 0), 0);
-  const totalPaid = sortedBillings.reduce((sum, b) => sum + b.paid_amount, 0);
+	// Overall totals for the summary section
+	const totalAmount = sortedBillings.reduce((sum, b) => sum + b.amount, 0);
+	const totalPenalties = sortedBillings.reduce((sum, b) => sum + (b.penalty_amount || 0), 0);
+	const totalPaid = sortedBillings.reduce((sum, b) => sum + b.paid_amount, 0);
 
-  return `
+	return `
 <html>
 <head>
   <title>Invoice - ${lease.name}</title>
@@ -119,12 +121,17 @@ function generateLeasePrintHTML(lease: Lease): string {
      </div>
      <div class="account-info">
        <h3>Tenants</h3>
-       ${lease.lease_tenants && lease.lease_tenants.length > 0 
-         ? lease.lease_tenants.map(tenant => `
+       ${
+					lease.lease_tenants && lease.lease_tenants.length > 0
+						? lease.lease_tenants
+								.map(
+									(tenant) => `
            <p><strong>${tenant.name}</strong>${tenant.contact_number ? ` • ${tenant.contact_number}` : ''}${tenant.email ? ` • ${tenant.email}` : ''}</p>
-         `).join('')
-         : '<p><em>No tenants assigned</em></p>'
-       }
+         `
+								)
+								.join('')
+						: '<p><em>No tenants assigned</em></p>'
+				}
      </div>
    </div>
 
@@ -144,24 +151,31 @@ function generateLeasePrintHTML(lease: Lease): string {
       </tr>
     </thead>
     <tbody>
-      ${sortedBillings.length > 0 ? sortedBillings.map(billing => {
-        const displayStatus = getCustomDisplayStatus(billing);
-        const billAmount = billing.amount;
-        const penaltyAmount = billing.penalty_amount || 0;
-        const totalDue = billAmount + penaltyAmount;
-        const paymentsMade = billing.paid_amount || 0;
-        const itemBalance = totalDue - paymentsMade;
+      ${
+				sortedBillings.length > 0
+					? sortedBillings
+							.map((billing) => {
+								const displayStatus = getCustomDisplayStatus(billing);
+								const billAmount = billing.amount;
+								const penaltyAmount = billing.penalty_amount || 0;
+								const totalDue = billAmount + penaltyAmount;
+								const paymentsMade = billing.paid_amount || 0;
+								const itemBalance = totalDue - paymentsMade;
 
-        const paymentDetailsHtml = billing.allocations && billing.allocations.length > 0
-          ? billing.allocations.map((alloc: any) => {
-              const methodDisplay = alloc.payment.method === 'SECURITY_DEPOSIT' 
-                ? `SECURITY DEPOSIT`
-                : alloc.payment.method;
-              return `<div>${formatDate(alloc.payment.paid_at)}: ${methodDisplay} (${formatCurrency(alloc.amount)})</div>`;
-            }).join('')
-          : '-';
+								const paymentDetailsHtml =
+									billing.allocations && billing.allocations.length > 0
+										? billing.allocations
+												.map((alloc: any) => {
+													const methodDisplay =
+														alloc.payment.method === 'SECURITY_DEPOSIT'
+															? `SECURITY DEPOSIT`
+															: alloc.payment.method;
+													return `<div>${formatDate(alloc.payment.paid_at)}: ${methodDisplay} (${formatCurrency(alloc.amount)})</div>`;
+												})
+												.join('')
+										: '-';
 
-        return `
+								return `
           <tr>
             <td class="center">${formatDate(billing.billing_date)}</td>
             <td>${billing.type}${billing.utility_type ? ` - ${billing.utility_type}` : ''}${billing.notes ? ` (${billing.notes})` : ''}</td>
@@ -175,13 +189,16 @@ function generateLeasePrintHTML(lease: Lease): string {
             <td class="amount ${itemBalance > 0 ? 'balance-positive' : ''}"><strong>${formatCurrency(itemBalance)}</strong></td>
           </tr>
         `;
-      }).join('') : `
+							})
+							.join('')
+					: `
         <tr>
           <td colspan="10" style="text-align: center; padding: 20px; color: #666;">
             No billing statements available
           </td>
         </tr>
-      `}
+      `
+			}
     </tbody>
   </table>
 
@@ -201,28 +218,39 @@ function generateLeasePrintHTML(lease: Lease): string {
        </tr>
 
                ${(() => {
-          // Get all security deposit billings
-          const securityDepositBillings = sortedBillings.filter(b => b.type === 'SECURITY_DEPOSIT');
-          
-          if (securityDepositBillings.length > 0) {
-                         // Calculate security deposit totals
-             const totalBilledSecurityDeposit = securityDepositBillings.reduce((sum, b) => sum + b.amount, 0);
-             const totalPaidToSecurityDeposit = securityDepositBillings.reduce((sum, b) => sum + b.paid_amount, 0);
-             const unpaidSecurityDeposit = securityDepositBillings.reduce((sum, b) => sum + b.balance, 0);
-            
-                         // Calculate amount used from security deposit for other billings
-             let amountUsed = 0;
-             sortedBillings.forEach(billing => {
-               if (billing.type !== 'SECURITY_DEPOSIT' && billing.allocations) {
-                 billing.allocations.forEach((allocation: any) => {
-                   if (allocation.payment.method === 'SECURITY_DEPOSIT') {
-                     amountUsed += allocation.amount;
-                   }
-                 });
-               }
-             });
-            
-            return `
+									// Get all security deposit billings
+									const securityDepositBillings = sortedBillings.filter(
+										(b) => b.type === 'SECURITY_DEPOSIT'
+									);
+
+									if (securityDepositBillings.length > 0) {
+										// Calculate security deposit totals
+										const totalBilledSecurityDeposit = securityDepositBillings.reduce(
+											(sum, b) => sum + b.amount,
+											0
+										);
+										const totalPaidToSecurityDeposit = securityDepositBillings.reduce(
+											(sum, b) => sum + b.paid_amount,
+											0
+										);
+										const unpaidSecurityDeposit = securityDepositBillings.reduce(
+											(sum, b) => sum + b.balance,
+											0
+										);
+
+										// Calculate amount used from security deposit for other billings
+										let amountUsed = 0;
+										sortedBillings.forEach((billing) => {
+											if (billing.type !== 'SECURITY_DEPOSIT' && billing.allocations) {
+												billing.allocations.forEach((allocation: any) => {
+													if (allocation.payment.method === 'SECURITY_DEPOSIT') {
+														amountUsed += allocation.amount;
+													}
+												});
+											}
+										});
+
+										return `
               <tr>
                 <td class="label" colspan="2" style="text-align: center; font-weight: bold; padding-top: 10px; border-top: 1px solid #ccc;">
                   Security Deposit Info
@@ -245,9 +273,9 @@ function generateLeasePrintHTML(lease: Lease): string {
                 <td class="amount">${formatCurrency(amountUsed)}</td>
               </tr>
             `;
-          }
-          return '';
-        })()}
+									}
+									return '';
+								})()}
      </table>
    </div>
 

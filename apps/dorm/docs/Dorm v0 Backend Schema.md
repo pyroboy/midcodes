@@ -5,6 +5,7 @@
 ### Tables
 
 #### utility_rates
+
 ```sql
 CREATE TABLE utility_rates (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -16,6 +17,7 @@ CREATE TABLE utility_rates (
 ```
 
 #### utility_readings
+
 ```sql
 CREATE TABLE utility_readings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -32,6 +34,7 @@ CREATE TABLE utility_readings (
 ```
 
 #### monthly_summaries
+
 ```sql
 CREATE TABLE monthly_summaries (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -50,21 +53,25 @@ CREATE TABLE monthly_summaries (
 ### Utility Management
 
 #### POST /api/utility-readings/batch
+
 - Accepts batch readings for multiple rooms
 - Calculates consumption
 - Flags unusual patterns
 - Returns generated bills
 
 #### GET /api/monthly-report/:year/:month
+
 - Returns floor-wise summary
 - Includes occupancy rates
 - Shows utility consumption
 - Provides overall balance
 
 #### GET /api/utility-rates/current
+
 - Returns current rates for all utility types
 
 #### POST /api/utility-rates
+
 - Sets new utility rates
 - Validates rate values
 - Records effective date

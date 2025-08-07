@@ -1,12 +1,12 @@
 export interface NavigationPath {
-  path: string;
-  showInNav?: boolean;
-  label?: string;
+	path: string;
+	showInNav?: boolean;
+	label?: string;
 }
 
 export interface NavigationState {
-  homeUrl: string;
-  showHeader: boolean;
-  allowedPaths: NavigationPath[];
-  showRoleEmulation: boolean;
+	homeUrl: string;
+	showHeader: boolean;
+	allowedPaths: NavigationPath[];
+	showRoleEmulation: boolean;
 }

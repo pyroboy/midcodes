@@ -1,11 +1,13 @@
 np# Rental_unit Management Module Instructions
 
 ## Overview
+
 The Rental_unit Management module is a core component of the dormitory management system that handles rental_unit operations and tracking. It enables staff to create, update, and manage rental_unit across different properties and floors, including their status, capacity, and rates.
 
 ## Database Schema
 
 ### Rental_Units Table
+
 ```sql
 CREATE TABLE public.rental_unit (
     id integer NOT NULL DEFAULT nextval('locations_id_seq'::regclass),
@@ -26,6 +28,7 @@ CREATE TABLE public.rental_unit (
 ### Related Tables
 
 #### Properties Table (Reference)
+
 ```sql
 CREATE TABLE public.properties (
     id integer NOT NULL DEFAULT nextval('properties_id_seq'::regclass),
@@ -39,6 +42,7 @@ CREATE TABLE public.properties (
 ```
 
 #### Floors Table (Reference)
+
 ```sql
 CREATE TABLE public.floors (
     id integer NOT NULL DEFAULT nextval('floors_id_seq'::regclass),
@@ -54,16 +58,19 @@ CREATE TABLE public.floors (
 ## Enums Used
 
 ### location_status (rental_unit_status)
+
 - VACANT
 - OCCUPIED
 - RESERVED
 
 ### property_status
+
 - ACTIVE
 - INACTIVE
 - MAINTENANCE
 
 ### floor_status
+
 - ACTIVE
 - INACTIVE
 - MAINTENANCE
@@ -71,13 +78,16 @@ CREATE TABLE public.floors (
 ## Access Control
 
 ### User Roles
+
 1. **Admin Access** (Full access)
+
    - super_admin
    - property_admin
    - property_manager
    - property_accountant
 
 2. **Staff Access** (Create/Edit access)
+
    - property_maintenance
    - property_utility
    - property_frontdesk
@@ -87,6 +97,7 @@ CREATE TABLE public.floors (
    - property_guest
 
 ### Access Level Permissions
+
 - **Admin**: Full CRUD operations on rental_unit
 - **Staff**: Create and update rental_unit information
 - **View**: Read-only access to rental_unit information
@@ -94,12 +105,14 @@ CREATE TABLE public.floors (
 ## Core Features
 
 ### 1. Rental_unit Management
+
 - Create new rental_unit with required details
 - Update existing rental_unit information
 - Delete rental_unit (with proper validation)
 - Track rental_unit status changes
 
 ### 2. Rental_unit Properties
+
 - Rental_unit number assignment
 - Capacity configuration
 - Base rate setting
@@ -107,11 +120,13 @@ CREATE TABLE public.floors (
 - Status management
 
 ### 3. Location Hierarchy
+
 - Property association
 - Floor assignment
 - Wing specification (optional)
 
 ### 4. Data Validation
+
 - **Rental_unit Number**
   - Must be unique within a floor
   - Required field
@@ -127,12 +142,15 @@ CREATE TABLE public.floors (
 ## Data Input Flow
 
 ### User Input Sequence
+
 1. **Select Rental_unit Action**
+
    - Create new rental_unit
    - Edit existing rental_unit
    - View rental_unit details
 
 2. **Enter Rental_unit Details**
+
    - Property selection
    - Floor selection
    - Rental_unit information:
@@ -150,6 +168,7 @@ CREATE TABLE public.floors (
    - Database update
 
 ### Data Flow
+
 ```mermaid
 graph TD
     A[User Action] --> B[Form Input]
@@ -167,7 +186,9 @@ graph TD
 ## Implementation Details
 
 ### Required Files
+
 1. **+page.server.ts**
+
    - Load rental_unit data with relations
    - Handle form actions:
      - Create rental_unit
@@ -177,12 +198,14 @@ graph TD
    - Manage database operations
 
 2. **+page.svelte**
+
    - Display rental_unit list
    - Handle rental_unit selection
    - Manage edit/create modes
    - Status indicators
 
 3. **Rental_UnitForm.svelte**
+
    - Form input fields
    - Validation feedback
    - Property/Floor selection
@@ -194,22 +217,24 @@ graph TD
    - Status enums
 
 ### Form Implementation
+
 ```typescript
 const rental_unitSchema = z.object({
-  id: z.number().optional(),
-  property_id: z.number(),
-  floor_id: z.number(),
-  name: z.string().min(1, 'Rental_unit name is required'),
-  number: z.number().min(1, 'Rental_unit number is required'),
-  rental_unit_status: z.enum(['VACANT', 'OCCUPIED', 'RESERVED']),
-  capacity: z.number().min(1, 'Capacity must be at least 1'),
-  base_rate: z.number().min(0, 'Rate must be 0 or greater'),
-  type: z.string().min(1, 'Rental_unit type is required'),
-  amenities: z.array(z.string()).default([])
+	id: z.number().optional(),
+	property_id: z.number(),
+	floor_id: z.number(),
+	name: z.string().min(1, 'Rental_unit name is required'),
+	number: z.number().min(1, 'Rental_unit number is required'),
+	rental_unit_status: z.enum(['VACANT', 'OCCUPIED', 'RESERVED']),
+	capacity: z.number().min(1, 'Capacity must be at least 1'),
+	base_rate: z.number().min(0, 'Rate must be 0 or greater'),
+	type: z.string().min(1, 'Rental_unit type is required'),
+	amenities: z.array(z.string()).default([])
 });
 ```
 
 ## Performance Considerations
+
 1. Use proper indexing on:
    - property_id
    - floor_id
@@ -218,6 +243,7 @@ const rental_unitSchema = z.object({
 3. Cache frequently accessed rental_unit data
 
 ## Security Considerations
+
 1. Validate all user inputs
 2. Implement proper access control
 3. Sanitize data before display

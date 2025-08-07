@@ -24,9 +24,9 @@ This document provides instructions for integrating the new database schema migr
 2. Update `+page.server.ts`:
    ```typescript
    // Change queries from
-   const { data: locations } = await supabase.from('locations').select('*')
+   const { data: locations } = await supabase.from('locations').select('*');
    // to
-   const { data: rental_unit } = await supabase.from('rental_unit').select('*')
+   const { data: rental_unit } = await supabase.from('rental_unit').select('*');
    ```
 3. Update `+page.svelte`:
    - Rename all variables and references from `location` to `rental_unit`
@@ -51,13 +51,9 @@ This document provides instructions for integrating the new database schema migr
 1. Update `+page.server.ts`:
    ```typescript
    // Update join queries from
-   const { data: leases } = await supabase
-     .from('leases')
-     .select('*, location:locations(*)')
+   const { data: leases } = await supabase.from('leases').select('*, location:locations(*)');
    // to
-   const { data: leases } = await supabase
-     .from('leases')
-     .select('*, rental_unit:rental_unit(*)')
+   const { data: leases } = await supabase.from('leases').select('*, rental_unit:rental_unit(*)');
    ```
 2. Update `+page.svelte`:
    - Update form references from `location_id` to `rental_unit_id`
@@ -79,13 +75,9 @@ This document provides instructions for integrating the new database schema migr
 1. Update `+page.server.ts`:
    ```typescript
    // Update queries from
-   const { data: meters } = await supabase
-     .from('meters')
-     .select('*, location:locations(*)')
+   const { data: meters } = await supabase.from('meters').select('*, location:locations(*)');
    // to
-   const { data: meters } = await supabase
-     .from('meters')
-     .select('*, rental_unit:rental_unit(*)')
+   const { data: meters } = await supabase.from('meters').select('*, rental_unit:rental_unit(*)');
    ```
 2. Update `+page.svelte`:
    - Change location selection to rental_unit selection
@@ -106,8 +98,8 @@ This document provides instructions for integrating the new database schema migr
    ```typescript
    // Update queries to use new rental_unit references and respect RLS
    const { data: readings } = await supabase
-     .from('readings')
-     .select('*, meter:meters(*, rental_unit:rental_unit(*))')
+   	.from('readings')
+   	.select('*, meter:meters(*, rental_unit:rental_unit(*))');
    ```
 3. Update `+page.svelte`:
    - Update display of rental_unit information
@@ -124,8 +116,8 @@ This document provides instructions for integrating the new database schema migr
    ```typescript
    // Update queries to use new rental_unit references and respect RLS
    const { data: billings } = await supabase
-     .from('billings')
-     .select('*, lease:leases(*, rental_unit:rental_unit(*))')
+   	.from('billings')
+   	.select('*, lease:leases(*, rental_unit:rental_unit(*))');
    ```
 2. Update `+page.svelte`:
    - Update rental_unit information display
@@ -143,8 +135,8 @@ This document provides instructions for integrating the new database schema migr
    ```typescript
    // Update queries to include rental_unit information and respect RLS
    const { data: tenants } = await supabase
-     .from('lease_tenants')
-     .select('*, tenant:tenants(*), lease:leases(*, rental_unit:rental_unit(*))')
+   	.from('lease_tenants')
+   	.select('*, tenant:tenants(*), lease:leases(*, rental_unit:rental_unit(*))');
    ```
 2. Update `+page.svelte` and `TenantList.svelte`:
    - Update rental_unit information display
@@ -161,8 +153,8 @@ This document provides instructions for integrating the new database schema migr
    ```typescript
    // Update payment queries to include rental_unit information and respect RLS
    const { data: payments } = await supabase
-     .from('payments')
-     .select('*, billing:billings(*, lease:leases(*, rental_unit:rental_unit(*)))')
+   	.from('payments')
+   	.select('*, billing:billings(*, lease:leases(*, rental_unit:rental_unit(*)))');
    ```
 2. Update `+page.svelte` and `TransactionList.svelte`:
    - Update rental_unit information display
@@ -178,9 +170,7 @@ This document provides instructions for integrating the new database schema migr
 1. Update `+page.server.ts`:
    ```typescript
    // Update queries to use rental_unit instead of locations and respect RLS
-   const { data: rental_unitStats } = await supabase
-     .from('rental_unit')
-     .select('*')
+   const { data: rental_unitStats } = await supabase.from('rental_unit').select('*');
    ```
 2. Update `+page.svelte`:
    - Update statistics and charts to use rental_unit terminology
@@ -192,6 +182,7 @@ This document provides instructions for integrating the new database schema migr
 ### `/dorm/properties`
 
 1. Create the route directory structure:
+
    ```
    /dorm/properties/
    ├── +page.server.ts
@@ -201,6 +192,7 @@ This document provides instructions for integrating the new database schema migr
    ```
 
 2. In `formSchema.ts`:
+
    - Define `propertyStatusEnum` with values: 'ACTIVE', 'INACTIVE', 'MAINTENANCE'
    - Create `propertySchema` with fields:
      - id (optional number)
@@ -211,6 +203,7 @@ This document provides instructions for integrating the new database schema migr
    - Export PropertySchema type
 
 3. In `+page.server.ts`:
+
    - Implement load function to fetch properties with RLS
    - Add create and update actions with form validation
    - Include error handling for database operations
@@ -218,6 +211,7 @@ This document provides instructions for integrating the new database schema migr
    - Order properties by name
 
 4. In `Form.svelte`:
+
    - Create form with superForm integration
    - Add input fields for all property fields
    - Include status dropdown with enum values
@@ -234,6 +228,7 @@ This document provides instructions for integrating the new database schema migr
 ### `/dorm/floors`
 
 1. Create the route directory structure:
+
    ```
    /dorm/floors/
    ├── +page.server.ts
@@ -243,6 +238,7 @@ This document provides instructions for integrating the new database schema migr
    ```
 
 2. In `formSchema.ts`:
+
    - Define `floorStatusEnum` with values: 'ACTIVE', 'INACTIVE', 'MAINTENANCE'
    - Create `floorSchema` with fields:
      - id (optional number)
@@ -253,6 +249,7 @@ This document provides instructions for integrating the new database schema migr
    - Export FloorSchema type
 
 3. In `+page.server.ts`:
+
    - Implement load function to fetch:
      - Floors with property information
      - Properties list for dropdown
@@ -262,6 +259,7 @@ This document provides instructions for integrating the new database schema migr
    - Order by property and floor number
 
 4. In `Form.svelte`:
+
    - Create form with superForm integration
    - Add property selection dropdown
    - Include fields for floor details
@@ -269,6 +267,7 @@ This document provides instructions for integrating the new database schema migr
    - Style consistently with other forms
 
 5. In `+page.svelte`:
+
    - Display floors in organized list/grid
    - Show floor details with property name
    - Include form component
@@ -284,31 +283,34 @@ This document provides instructions for integrating the new database schema migr
 ### `/dorm/accounts`
 
 1. Update `formSchema.ts`:
+
    ```typescript
    // Update schema to use new billing structure
    const billingSchema = z.object({
-     leaseId: z.string(),
-     type: z.enum(['RENT', 'UTILITY', 'PENALTY']),
-     utilityType: z.enum(['WATER', 'ELECTRICITY']).optional(),
-     amount: z.number(),
-     paidAmount: z.number(),
-     status: z.enum(['UNPAID', 'PARTIAL', 'PAID']),
-     dueDate: z.date(),
-     billingDate: z.date(),
-     penaltyAmount: z.number(),
-     notes: z.string().optional()
-   })
+   	leaseId: z.string(),
+   	type: z.enum(['RENT', 'UTILITY', 'PENALTY']),
+   	utilityType: z.enum(['WATER', 'ELECTRICITY']).optional(),
+   	amount: z.number(),
+   	paidAmount: z.number(),
+   	status: z.enum(['UNPAID', 'PARTIAL', 'PAID']),
+   	dueDate: z.date(),
+   	billingDate: z.date(),
+   	penaltyAmount: z.number(),
+   	notes: z.string().optional()
+   });
    ```
 
 2. Update `+page.server.ts`:
+
    ```typescript
    // Update queries to use billings table instead of accounts
    const { data: billings } = await supabase
-     .from('billings')
-     .select('*, lease:leases(*, rental_unit:rental_unit(*), tenant:tenants(*))')
+   	.from('billings')
+   	.select('*, lease:leases(*, rental_unit:rental_unit(*), tenant:tenants(*))');
    ```
 
 3. Update `+page.svelte`:
+
    - Update form to use new billing schema
    - Add support for utility types when billing type is UTILITY
    - Add proper date handling for billing and due dates
@@ -317,6 +319,7 @@ This document provides instructions for integrating the new database schema migr
    - Add role-based UI controls
 
 4. Implement RLS policies:
+
    - Admin and Accountant: Full access
    - Manager: View and update
    - Frontdesk: Create and view
@@ -335,6 +338,7 @@ This document provides instructions for integrating the new database schema migr
 ### Testing Instructions
 
 1. Test Property Management:
+
    - Create property with all required fields
    - Update existing property details
    - Verify status changes are reflected
@@ -344,6 +348,7 @@ This document provides instructions for integrating the new database schema migr
      - Tenants can only view
 
 2. Test Floor Management:
+
    - Create floor for existing property
    - Update floor details
    - Test wing field (optional)
@@ -354,6 +359,7 @@ This document provides instructions for integrating the new database schema migr
      - Tenants can only view
 
 3. Verify Data Relationships:
+
    - Properties appear in floor creation form
    - Floor updates reflect in rental_unit management
    - Status changes propagate correctly
@@ -367,7 +373,9 @@ This document provides instructions for integrating the new database schema migr
 ### Security Considerations
 
 1. Ensure RLS Policies:
+
    - Properties table:
+
      - Full access for admin levels
      - View access for staff
      - View only for tenants/guests
@@ -378,6 +386,7 @@ This document provides instructions for integrating the new database schema migr
      - View only for tenants/guests
 
 2. Validate User Roles:
+
    - Check session in load functions
    - Verify permissions before operations
    - Handle unauthorized access gracefully
@@ -393,29 +402,29 @@ Update your database types file (if exists) to reflect the new schema:
 
 ```typescript
 interface Rental_unit {
-  id: number
-  name: string
-  floor_level: number
-  capacity: number
-  rental_unit_status: 'VACANT' | 'OCCUPIED' | 'RESERVED'
-  base_rate: number
-  created_at: string
-  updated_at: string | null
+	id: number;
+	name: string;
+	floor_level: number;
+	capacity: number;
+	rental_unit_status: 'VACANT' | 'OCCUPIED' | 'RESERVED';
+	base_rate: number;
+	created_at: string;
+	updated_at: string | null;
 }
 
 // Update all references to Location with Rental_unit
 type Database = {
-  public: {
-    Tables: {
-      rental_unit: {
-        Row: Rental_unit
-        Insert: Omit<Rental_unit, 'id' | 'created_at' | 'updated_at'>
-        Update: Partial<Omit<Rental_unit, 'id' | 'created_at' | 'updated_at'>>
-      }
-      // ... other tables
-    }
-  }
-}
+	public: {
+		Tables: {
+			rental_unit: {
+				Row: Rental_unit;
+				Insert: Omit<Rental_unit, 'id' | 'created_at' | 'updated_at'>;
+				Update: Partial<Omit<Rental_unit, 'id' | 'created_at' | 'updated_at'>>;
+			};
+			// ... other tables
+		};
+	};
+};
 ```
 
 ## Testing Instructions

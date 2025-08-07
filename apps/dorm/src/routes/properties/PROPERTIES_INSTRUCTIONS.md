@@ -1,12 +1,15 @@
 # Properties Module Instructions
 
 ## Overview
+
 The Properties module is the foundation of the dormitory management system. It manages property creation, updates, and management, serving as the top-level organizational unit for floors, rental_unit, and all related entities.
 
 ## Core Functionality
 
 ### 1. Property Management
+
 - **Create Properties**
+
   - Basic property information:
     - Name (required, text)
     - Address (required, text)
@@ -17,6 +20,7 @@ The Properties module is the foundation of the dormitory management system. It m
   - Record creation timestamp (UTC)
 
 - **Update Properties**
+
   - Modify property details
   - Update status
   - Track modification timestamp
@@ -29,6 +33,7 @@ The Properties module is the foundation of the dormitory management system. It m
   - Support filtering and sorting
 
 ### 2. Property-Floor Relationship
+
 - One property has many floors
 - Track per floor:
   - Floor number (required, integer)
@@ -38,6 +43,7 @@ The Properties module is the foundation of the dormitory management system. It m
   - Creation/update timestamps (UTC)
 
 ### 3. Property-Rental_unit Relationship
+
 - Rental_Units linked to property via floors
 - Track per rental_unit:
   - Name (required, text)
@@ -54,6 +60,7 @@ The Properties module is the foundation of the dormitory management system. It m
 ## Database Schema
 
 ### Primary Tables
+
 ```sql
 -- Properties Table (Matches CURRENT_SCHEMA.md exactly)
 CREATE TABLE public.properties (
@@ -95,6 +102,7 @@ CREATE TABLE public.rental_unit (
 ```
 
 ### Status Types (Matches CURRENT_SCHEMA.md exactly)
+
 ```sql
 -- Property Status Type
 CREATE TYPE property_status AS ENUM (
@@ -118,10 +126,12 @@ CREATE TYPE location_status AS ENUM (
 );
 ```
 
-okay 
+okay
+
 ## UI Components
 
 ### 1. Property List View
+
 - Display properties in card/table format
 - Show key information:
   - Name and status
@@ -130,6 +140,7 @@ okay
   - Rental_unit count
 
 ### 2. Property Form
+
 - Input fields for:
   - Property name (required, text)
   - Address (required, text)
@@ -137,6 +148,7 @@ okay
   - Status (property_status)
 
 ### 3. Property Details
+
 - Property information
 - Floor list with status
 - Rental_unit summary by status
@@ -144,17 +156,20 @@ okay
 ## Core Features
 
 ### 1. Basic Analytics
+
 - Count of properties by status
 - Count of floors per property
 - Count of rental_unit by status
 - Basic occupancy tracking
 
 ### 2. Status Management
+
 - Update property status (ACTIVE/INACTIVE only)
 - Track status changes via timestamps
 - Validate status changes
 
 ### 3. Search and Filter
+
 - Search by property name
 - Filter by status
 - Sort by available fields

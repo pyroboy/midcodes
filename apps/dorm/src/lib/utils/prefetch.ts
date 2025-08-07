@@ -26,10 +26,7 @@ export async function safePreloadCode(path: string): Promise<void> {
  * Preloads both data and code for a given path
  */
 export async function preloadAll(path: string): Promise<void> {
-	await Promise.all([
-		safePreloadData(path),
-		safePreloadCode(path)
-	]);
+	await Promise.all([safePreloadData(path), safePreloadCode(path)]);
 }
 
 /**
@@ -47,9 +44,9 @@ export function prefetchWhenVisible(node: HTMLAnchorElement) {
 			rootMargin: '50px'
 		}
 	);
-	
+
 	observer.observe(node);
-	
+
 	return {
 		destroy() {
 			observer.disconnect();
@@ -68,7 +65,7 @@ export const preloadRelatedPages = {
 			safePreloadData('/budgets')
 		]);
 	},
-	
+
 	async locations(): Promise<void> {
 		await Promise.all([
 			safePreloadData('/properties'),
@@ -77,7 +74,7 @@ export const preloadRelatedPages = {
 			safePreloadData('/meters')
 		]);
 	},
-	
+
 	async rentManagement(): Promise<void> {
 		await Promise.all([
 			safePreloadData('/tenants'),
@@ -86,19 +83,19 @@ export const preloadRelatedPages = {
 			safePreloadData('/penalties')
 		]);
 	},
-	
+
 	async reports(): Promise<void> {
-		await Promise.all([
-			safePreloadData('/reports'),
-			safePreloadData('/lease-report')
-		]);
+		await Promise.all([safePreloadData('/reports'), safePreloadData('/lease-report')]);
 	}
 };
 
 /**
  * Preloads routes based on user role and current context
  */
-export async function contextualPreload(currentPath: string, userRoles: string[] = []): Promise<void> {
+export async function contextualPreload(
+	currentPath: string,
+	userRoles: string[] = []
+): Promise<void> {
 	// Preload related pages based on current location
 	if (currentPath.startsWith('/expenses') || currentPath.startsWith('/transactions')) {
 		await preloadRelatedPages.finances();
@@ -109,7 +106,7 @@ export async function contextualPreload(currentPath: string, userRoles: string[]
 	} else if (currentPath.startsWith('/reports')) {
 		await preloadRelatedPages.reports();
 	}
-	
+
 	// Always preload dashboard/overview for quick navigation
 	safePreloadData('/');
 }
@@ -124,10 +121,10 @@ export async function preloadLeaseRoutes(leaseId: string): Promise<void> {
 		`/leases/${leaseId}/billings?year=${currentYear}&type=RENT`,
 		`/leases/${leaseId}/billings?year=${currentYear}&type=UTILITY`
 	];
-	
+
 	// Preload billing data for the current year
-	endpoints.forEach(endpoint => {
-		fetch(endpoint).catch(error => {
+	endpoints.forEach((endpoint) => {
+		fetch(endpoint).catch((error) => {
 			console.warn(`Failed to preload ${endpoint}:`, error);
 		});
 	});
@@ -143,7 +140,7 @@ export const smartPreload = {
 	onLeaseHover(leaseId: string) {
 		preloadLeaseRoutes(leaseId);
 	},
-	
+
 	/**
 	 * Preload when user is in a property context
 	 */
@@ -152,7 +149,7 @@ export const smartPreload = {
 		safePreloadData('/rental-unit');
 		safePreloadData('/floors');
 	},
-	
+
 	/**
 	 * Preload financial routes when in billing context
 	 */

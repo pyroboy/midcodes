@@ -1,6 +1,7 @@
 # Tenant Management Module Instructions
 
 ## Overview
+
 The Tenant Management module is a core component of the dormitory management system that handles tenant operations, including tenant registration, contract management, and rental_unit assignments. It enables staff to create, update, and manage tenant information while maintaining proper relationships with rental_unit and properties.
 
 ## Database Schema
@@ -8,6 +9,7 @@ The Tenant Management module is a core component of the dormitory management sys
 ### Main Tables
 
 #### Tenants Table
+
 ```sql
 CREATE TABLE public.tenants (
     id integer NOT NULL DEFAULT nextval('tenants_id_seq'::regclass),
@@ -23,6 +25,7 @@ CREATE TABLE public.tenants (
 ```
 
 #### Leases Table
+
 ```sql
 CREATE TABLE public.leases (
     id integer NOT NULL DEFAULT nextval('leases_id_seq'::regclass),
@@ -43,6 +46,7 @@ CREATE TABLE public.leases (
 ```
 
 #### Lease Tenants Table
+
 ```sql
 CREATE TABLE public.lease_tenants (
     id integer NOT NULL DEFAULT nextval('lease_tenants_id_seq'::regclass),
@@ -53,6 +57,7 @@ CREATE TABLE public.lease_tenants (
 ```
 
 #### Payment Schedules Table
+
 ```sql
 CREATE TABLE public.payment_schedules (
     id integer NOT NULL DEFAULT nextval('payment_schedules_id_seq'::regclass),
@@ -69,6 +74,7 @@ CREATE TABLE public.payment_schedules (
 ```
 
 #### Billings Table
+
 ```sql
 CREATE TABLE public.billings (
     id integer NOT NULL DEFAULT nextval('billings_id_seq'::regclass),
@@ -89,6 +95,7 @@ CREATE TABLE public.billings (
 ```
 
 #### Payments Table
+
 ```sql
 CREATE TABLE public.payments (
     id integer NOT NULL DEFAULT nextval('payments_id_seq'::regclass),
@@ -110,6 +117,7 @@ CREATE TABLE public.payments (
 ### Related Tables
 
 #### Rental_Units Table
+
 ```sql
 CREATE TABLE public.rental_unit (
     id integer NOT NULL DEFAULT nextval('locations_id_seq'::regclass),
@@ -128,6 +136,7 @@ CREATE TABLE public.rental_unit (
 ```
 
 #### Properties Table
+
 ```sql
 CREATE TABLE public.properties (
     id integer NOT NULL DEFAULT nextval('properties_id_seq'::regclass),
@@ -141,6 +150,7 @@ CREATE TABLE public.properties (
 ```
 
 #### Profiles Table
+
 ```sql
 CREATE TABLE public.profiles (
     id uuid NOT NULL,
@@ -156,6 +166,7 @@ CREATE TABLE public.profiles (
 ## Enums and Types
 
 ### Status Enums
+
 ```sql
 -- Payment Status
 CREATE TYPE payment_status AS ENUM (
@@ -197,6 +208,7 @@ CREATE TYPE tenant_status AS ENUM (
 ```
 
 ### Type Enums
+
 ```sql
 -- Billing Type
 CREATE TYPE billing_type AS ENUM (
@@ -255,12 +267,14 @@ CREATE TYPE user_role AS ENUM (
 ### Role-Based Permissions
 
 1. **Admin Level** (super_admin, property_admin)
+
    - Full CRUD operations
    - Can change tenant status
    - Can delete tenants
    - Can edit all fields
 
 2. **Staff Level** (property_manager, property_frontdesk)
+
    - Create new tenants
    - View tenant details
    - Limited edit capabilities
@@ -273,6 +287,7 @@ CREATE TYPE user_role AS ENUM (
 ## Core Features
 
 ### 1. Tenant Management
+
 - Create new tenants with user association
 - Update tenant information
 - View tenant details and history
@@ -280,18 +295,21 @@ CREATE TYPE user_role AS ENUM (
 - Handle emergency contact information
 
 ### 2. Rental_unit Assignment
+
 - Property selection with filtered rental_unit
 - Rental_unit status management
 - Automatic status updates
 - Property-based rental_unit filtering
 
 ### 3. Contract Management
+
 - Contract date validation
 - Rate and deposit handling
 - Status tracking
 - Notes and additional information
 
 ### 4. Financial Tracking
+
 - Monthly rate management
 - Security deposit tracking
 - Payment schedule integration
@@ -300,19 +318,24 @@ CREATE TYPE user_role AS ENUM (
 ## Data Flow
 
 ### Create/Update Flow
+
 1. Property Selection
+
    - Triggers rental_unit list filtering
    - Updates available rental_unit
 
 2. Rental_unit Assignment
+
    - Validates rental_unit availability
    - Updates rental_unit status
 
 3. User Association
+
    - Links to profile
    - Manages contact details
 
 4. Contract Details
+
    - Validates dates
    - Sets rates and deposits
 
@@ -321,6 +344,7 @@ CREATE TYPE user_role AS ENUM (
    - Handles rental_unit status changes
 
 ### Rental_unit Status Flow
+
 1. Rental_unit Selection
 2. Status Validation
 3. Status Update
@@ -330,17 +354,21 @@ CREATE TYPE user_role AS ENUM (
 ## Data Validation
 
 ### Required Validations
+
 1. Contract Dates
+
    - Start date before end date
    - Valid date formats
    - Future dates for new contracts
 
 2. Financial Information
+
    - Non-negative amounts
    - Valid currency formats
    - Minimum amounts
 
 3. Contact Information
+
    - Valid email formats
    - Required phone numbers
    - Complete addresses
@@ -353,12 +381,14 @@ CREATE TYPE user_role AS ENUM (
 ## Financial Integration
 
 ### Payment Schedule Display
+
 - Next payment due date
 - Payment amount
 - Payment status
 - Payment frequency
 
 ### Outstanding Balances
+
 - Current balance
 - Overdue amounts
 - Upcoming payments
@@ -367,12 +397,14 @@ CREATE TYPE user_role AS ENUM (
 ## Error Handling
 
 ### Validation Errors
+
 - Field-level validation
 - Form-level validation
 - Custom error messages
 - User-friendly notifications
 
 ### Transaction Errors
+
 - Rollback mechanisms
 - Error logging
 - User notifications
@@ -381,6 +413,7 @@ CREATE TYPE user_role AS ENUM (
 ## UI/UX Guidelines
 
 ### List View
+
 - Tenant name and rental_unit
 - Contract dates
 - Tenant status
@@ -393,6 +426,7 @@ CREATE TYPE user_role AS ENUM (
 - Responsive layout
 
 ### Form View
+
 - Logical field grouping
 - Dynamic rental_unit selection
 - Clear validation feedback
@@ -403,6 +437,7 @@ CREATE TYPE user_role AS ENUM (
 - Mobile-friendly inputs
 
 ### Status Indicators
+
 - Color-coded status badges
 - Clear status labels
 - Status change history
@@ -411,32 +446,38 @@ CREATE TYPE user_role AS ENUM (
 ## Recommended Improvements
 
 1. **Search and Filtering**
+
    - Text search for tenants
    - Filter by property/status
    - Date range filtering
    - Advanced search options
 
 2. **Pagination**
+
    - Server-side pagination
    - Configurable page size
    - Page navigation controls
 
 3. **Real-time Updates**
+
    - Supabase subscriptions
    - Live status updates
    - Payment notifications
 
 4. **Export Features**
+
    - CSV/Excel export
    - Tenant reports
    - Financial summaries
 
 5. **Batch Operations**
+
    - Bulk status updates
    - Mass notifications
    - Batch contract renewals
 
 6. **Enhanced Financial Integration**
+
    - Payment reminders
    - Late payment tracking
    - Automated billing

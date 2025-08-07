@@ -8,9 +8,9 @@
 // import type { Rental_unit, Property, Floor } from '../formSchema';
 // import type { SuperValidated } from 'sveltekit-superforms';
 // import type { UserRole } from '$lib/auth/roleConfig';
-// import type { 
-//   SessionWithAuth, 
-//   ServerProfile 
+// import type {
+//   SessionWithAuth,
+//   ServerProfile
 // } from '$lib/types/auth';
 // import type { NavigationState } from '$lib/types/navigation';
 // import type { Emulation } from '$lib/types/roles';
@@ -18,11 +18,9 @@
 // // Define types needed for load function
 // type RouteParams = Record<string, string>;
 
-
-
 // // next we have to test the auth server side, because we can insert no problem
 // // so what if they are under a policy.
-// // so that falls onto integration testing, 
+// // so that falls onto integration testing,
 
 // // this test checks to see auth works with this page, so far so good we can test who is logged in
 
@@ -40,7 +38,7 @@
 // // 10. create a mock floors
 // // 11. create a mock rental_unit
 // // 12. render the page
-// // 13. check that the page is rendered  
+// // 13. check that the page is rendered
 
 // // Create a specific type for the ServerLoadEvent with proper generic parameters
 // type TypedServerLoadEvent = ServerLoadEvent<RouteParams, PageParentData, "/dorm/rental_unit">;
@@ -395,7 +393,7 @@
 
 //   it('should redirect unauthorized users', async () => {
 //     const mockEvent = createMockEvent(mockStaffUser, 'property_maintenance');
-    
+
 //     try {
 //       await load(mockEvent);
 //       assert.fail('Expected redirect to be thrown');
@@ -407,10 +405,10 @@
 
 //   it('should not redirect authorized users', async () => {
 //     const mockEvent = createMockEvent(mockAdminUser, 'super_admin');
-    
+
 //     try {
 //       const result = await load(mockEvent);
-      
+
 //       expect(result).toBeDefined();
 //       if (result) {
 //         expect('rental_unit' in result).toBeTruthy();
@@ -418,7 +416,7 @@
 //         expect('floors' in result).toBeTruthy();
 //         expect('form' in result).toBeTruthy();
 //         expect('user' in result).toBeTruthy();
-        
+
 //         const typedResult = result as {
 //           rental_unit: Rental_unit[];
 //           properties: Property[];
@@ -426,7 +424,7 @@
 //           form: SuperValidated<any>;
 //           user: User;
 //         };
-        
+
 //         expect(typedResult.rental_unit).toEqual(mockRental_Units);
 //         expect(typedResult.properties).toEqual(mockProperties);
 //         expect(typedResult.floors).toEqual(mockFloors);

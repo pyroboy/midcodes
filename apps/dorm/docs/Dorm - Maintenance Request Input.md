@@ -33,7 +33,7 @@ const MaintenanceRequestForm = () => {
   return (
     <div className="max-w-md mx-auto p-6 bg-white rounded-lg shadow">
       <h2 className="text-xl font-bold mb-4">Maintenance Request</h2>
-      
+
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block mb-1">

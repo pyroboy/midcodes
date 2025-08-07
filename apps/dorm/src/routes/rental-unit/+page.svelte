@@ -103,7 +103,7 @@
 							property_id: rentalUnit.property_id,
 							floor_number: rentalUnit.floor.floor_number,
 							wing: rentalUnit.floor.wing || undefined
-					  }
+						}
 					: undefined,
 				created_at: rentalUnit.created_at,
 				updated_at: rentalUnit.updated_at ?? undefined
@@ -146,7 +146,9 @@
 			}
 		} catch (error) {
 			console.error('Error deleting rental unit:', error);
-			alert(`Error deleting rental unit: ${error instanceof Error ? error.message : 'Unknown error'}`);
+			alert(
+				`Error deleting rental unit: ${error instanceof Error ? error.message : 'Unknown error'}`
+			);
 		}
 	}
 
@@ -174,7 +176,9 @@
 
 		<Card>
 			<CardContent class="p-0">
-				<div class="hidden md:grid md:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-4 py-2 font-medium border-b bg-muted/50">
+				<div
+					class="hidden md:grid md:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-4 py-2 font-medium border-b bg-muted/50"
+				>
 					<div>Unit</div>
 					<div>Floor</div>
 					<div>Type</div>
@@ -194,27 +198,49 @@
 									<div class="flex items-center w-full">
 										<AccordionPrimitive.Trigger class="flex-grow p-0 hover:no-underline">
 											<!-- Main Row (Desktop) -->
-											<div class="hidden md:grid md:grid-cols-[2fr_1fr_1fr_1fr] gap-4 px-4 py-2 items-center w-full">
+											<div
+												class="hidden md:grid md:grid-cols-[2fr_1fr_1fr_1fr] gap-4 px-4 py-2 items-center w-full"
+											>
 												<div class="font-medium text-left">{unit.name}</div>
 												<div class="text-left">Floor {unit.floor?.floor_number}</div>
 												<div class="text-left">{unit.type}</div>
-												<div><Badge variant={getStatusVariant(unit.rental_unit_status)}>{unit.rental_unit_status}</Badge></div>
+												<div>
+													<Badge variant={getStatusVariant(unit.rental_unit_status)}
+														>{unit.rental_unit_status}</Badge
+													>
+												</div>
 											</div>
 
 											<!-- Card (Mobile) -->
 											<div class="md:hidden p-4 w-full text-left">
 												<div class="font-medium">{unit.name}</div>
-												<div class="text-sm text-muted-foreground">Floor {unit.floor?.floor_number}</div>
-												<Badge variant={getStatusVariant(unit.rental_unit_status)}>{unit.rental_unit_status}</Badge>
+												<div class="text-sm text-muted-foreground">
+													Floor {unit.floor?.floor_number}
+												</div>
+												<Badge variant={getStatusVariant(unit.rental_unit_status)}
+													>{unit.rental_unit_status}</Badge
+												>
 											</div>
 										</AccordionPrimitive.Trigger>
 										<!-- Actions -->
 										<div class="flex items-center justify-end gap-2 px-4">
-											<Button size="icon" variant="ghost" onclick={() => handleRentalUnitClick(unit)}><Pencil class="h-4 w-4" /></Button>
-											<Button size="icon" variant="ghost" onclick={() => handleDeleteRentalUnit(unit)}><Trash2 class="h-4 w-4" /></Button>
+											<Button
+												size="icon"
+												variant="ghost"
+												onclick={() => handleRentalUnitClick(unit)}
+												><Pencil class="h-4 w-4" /></Button
+											>
+											<Button
+												size="icon"
+												variant="ghost"
+												onclick={() => handleDeleteRentalUnit(unit)}
+												><Trash2 class="h-4 w-4" /></Button
+											>
 										</div>
 									</div>
-									<AccordionPrimitive.Content class="overflow-hidden text-sm transition-all data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
+									<AccordionPrimitive.Content
+										class="overflow-hidden text-sm transition-all data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down"
+									>
 										<div class="p-4 bg-muted/50">
 											<div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
 												<div class="flex items-start gap-3">

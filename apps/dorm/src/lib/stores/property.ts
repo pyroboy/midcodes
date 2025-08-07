@@ -49,7 +49,8 @@ function createPropertyStore() {
 
 				// Find the selected property object from the full list.
 				if (currentSelectedId) {
-					selectedProperty = allProperties.find((p) => p.id.toString() === currentSelectedId) ?? null;
+					selectedProperty =
+						allProperties.find((p) => p.id.toString() === currentSelectedId) ?? null;
 				}
 
 				// If no valid property is selected, default to the first one in the list.
@@ -78,7 +79,8 @@ function createPropertyStore() {
 			update((state) => {
 				if (!state.properties) return state; // Don't update if properties aren't loaded
 
-				const newSelectedProperty = state.properties.find((p) => p.id.toString() === propertyId) ?? null;
+				const newSelectedProperty =
+					state.properties.find((p) => p.id.toString() === propertyId) ?? null;
 
 				if (browser && newSelectedProperty) {
 					localStorage.setItem('selectedPropertyId', newSelectedProperty.id.toString());
