@@ -4,11 +4,10 @@ export interface Reading {
 	reading_date: string;
 	reading: number;
 	rate_at_reading?: number | null; // Actual database field
-	previous_reading?: number | null;
 	meter_name?: string | null;
 	created_at?: string; // Added from actual database schema
 	// Calculated fields (not stored in database, computed for UI)
-	consumption?: number | null; // Calculated: reading - previous_reading
+	consumption?: number | null; // Calculated: reading - previous_reading (from window function)
 	cost?: number | null; // Calculated: consumption * rate_at_reading
 	previous_reading_date?: string | null; // Date of the previous reading (for UI)
 	days_diff?: number | null; // Days between readings for billing period (for UI)
@@ -118,7 +117,6 @@ export type ReadingSaveEvent = {
 		reading: number | null;
 		reading_date: string;
 		consumption?: number | null;
-		previous_reading?: number | null;
 		cost?: number | null;
 	}>;
 	readingDate: string;

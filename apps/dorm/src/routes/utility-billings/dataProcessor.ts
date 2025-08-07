@@ -102,7 +102,7 @@ export function processUtilityBillingsData(
 
 				displayedReadings.push({
 					...curr,
-					previous_reading: prev.reading,
+					previous_reading: prev.reading, // Calculated from window function, not stored in DB
 					previous_reading_date: prev.reading_date,
 					consumption,
 					cost,

@@ -108,6 +108,19 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
 			? jwtDecode<UserJWTPayload>(currentSession.access_token)
 			: null;
 
+		// Debug JWT decoding
+		if (decodedToken) {
+			console.log('🔍 JWT Decoded:', {
+				userId: user.id,
+				userRoles: decodedToken.user_roles,
+				hasUserRoles: !!decodedToken.user_roles,
+				userRolesLength: decodedToken.user_roles?.length || 0,
+				userMetadata: user.user_metadata
+			});
+		} else {
+			console.log('⚠️ No JWT token found or failed to decode');
+		}
+
 		// Get permissions directly without caching
 		const permissions = decodedToken
 			? await getUserPermissions(decodedToken.user_roles, event.locals.supabase)

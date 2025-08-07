@@ -4,10 +4,10 @@
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Badge } from '$lib/components/ui/badge';
-	import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
+
 	import DatePicker from '$lib/components/ui/date-picker.svelte';
 	import { Switch } from '$lib/components/ui/switch';
-	import type { MeterReadingEntry, ReadingSaveEvent, Property, ReadingGroup } from './types';
+	import type { MeterReadingEntry, ReadingSaveEvent, Property } from './types';
 	import { superForm } from 'sveltekit-superforms/client';
 	import { zodClient } from 'sveltekit-superforms/adapters';
 	import { batchReadingsSchema } from './meterReadingSchema';
@@ -26,7 +26,7 @@
 		costPerUnit: number;
 		onSave: (event: ReadingSaveEvent) => void;
 		close: () => void;
-		previousReadingGroups: ReadingGroup[];
+
 		form: any; // SuperForm form data
 	}
 
@@ -40,7 +40,7 @@
 		costPerUnit,
 		onSave,
 		close,
-		previousReadingGroups = [],
+
 		form: formData
 	}: Props = $props();
 
@@ -50,101 +50,92 @@
 		meterReadings = [...initialMeterReadings];
 	});
 
-	let selectedPreviousDate = $state<string | null>(null);
 	let isSubmitting = $state(false);
 	let allowBackdating = $state(false);
 
-	// Debug effect to monitor state changes
+		// Debug effect to monitor state changes
 	$effect(() => {
 		console.log('🔍 Modal state changed:', {
 			open,
 			propertyId: property?.id,
 			propertyName: property?.name,
-			utilityType,
-			effectiveReadingsCount: effectivePreviousReadings.length
+			utilityType
 		});
 	});
 
-	// Use previousReadingGroups directly as effectivePreviousReadings
-	let effectivePreviousReadings = $derived.by(() => {
-		return previousReadingGroups;
-	});
 
-	// Calculate recommended date ranges based on previous readings and backdating toggle
+
+	// Calculate recommended date ranges based on backdating toggle with enhanced constraints
 	let dateConstraints = $derived.by(() => {
-		// Set maximum date to 1 month from now (more flexible than before)
+		// Set maximum date to 1 month from now
 		const maxDate = new Date();
 		maxDate.setMonth(maxDate.getMonth() + 1);
 
-		if (!effectivePreviousReadings || effectivePreviousReadings.length === 0) {
-			// No previous readings - flexible range based on backdating setting
-			const minDateRange = new Date();
-			minDateRange.setFullYear(minDateRange.getFullYear() - (allowBackdating ? 1 : 0));
+		// Get all existing reading dates from meter readings
+		const existingReadingDates = new Set<string>();
+		const latestReadingDates = new Map<number, string>();
+
+		// Collect existing reading dates and latest reading dates for each meter
+		meterReadings.forEach((reading) => {
+			if (reading.previousDate) {
+				existingReadingDates.add(reading.previousDate);
+			}
 			
-			return {
-				minDate: new CalendarDate(
-					minDateRange.getFullYear(),
-					minDateRange.getMonth() + 1,
-					minDateRange.getDate()
-				),
-				maxDate: new CalendarDate(maxDate.getFullYear(), maxDate.getMonth() + 1, maxDate.getDate()),
-				recommendedDate: today(getLocalTimeZone()),
-				suggestion: allowBackdating 
-					? 'First reading - backdating enabled, choose any date within the last year'
-					: 'First reading - select today or a recent date'
-			};
-		}
+			// Track the latest reading date for each meter
+			if (reading.previousDate) {
+				const currentLatest = latestReadingDates.get(reading.meterId);
+				if (!currentLatest || new Date(reading.previousDate) > new Date(currentLatest)) {
+					latestReadingDates.set(reading.meterId, reading.previousDate);
+				}
+			}
+		});
 
-		// Find the most recent reading date across all meters
-		const sortedDates = effectivePreviousReadings
-			.map((group) => new Date(group.date))
-			.sort((a, b) => b.getTime() - a.getTime());
+		// Find the overall latest reading date across all meters
+		const overallLatestReadingDate = latestReadingDates.size > 0 
+			? new Date(Math.max(...Array.from(latestReadingDates.values()).map(date => new Date(date).getTime())))
+			: null;
 
-		const lastReadingDate = sortedDates[0];
-		const daysSinceLastReading = Math.floor(
-			(Date.now() - lastReadingDate.getTime()) / (1000 * 60 * 60 * 24)
-		);
-
-		// Dynamic minimum date based on backdating toggle
 		let minDate: Date;
-		let suggestion = '';
+		let maxDateConstraint: Date;
+		let suggestion: string;
 
 		if (allowBackdating) {
-			// When backdating is enabled, allow up to 1 year ago
+			// When backdating is enabled:
+			// - Min date: 1 year ago
+			// - Max date: Latest reading date (to prevent future readings beyond existing data)
 			minDate = new Date();
 			minDate.setFullYear(minDate.getFullYear() - 1);
-			suggestion = `Backdating enabled - can select dates from ${minDate.toLocaleDateString()} onwards`;
-		} else {
-			// When backdating is disabled, require date after last reading
-			minDate = new Date(lastReadingDate);
-			minDate.setDate(minDate.getDate() + 1);
 			
-			if (daysSinceLastReading >= 30) {
-				suggestion = `Monthly reading due (${daysSinceLastReading} days since last reading)`;
-			} else if (daysSinceLastReading >= 7) {
-				suggestion = `Reading acceptable (${daysSinceLastReading} days since last reading)`;
-			} else {
-				const suggestedDate = new Date(lastReadingDate);
-				suggestedDate.setDate(suggestedDate.getDate() + 7);
-				suggestion = `Consider waiting until ${suggestedDate.toLocaleDateString()} (7+ days from last reading)`;
-			}
+			maxDateConstraint = overallLatestReadingDate || maxDate;
+			
+			suggestion = overallLatestReadingDate 
+				? `Backdating enabled - choose any date within the last year, but not after ${overallLatestReadingDate.toLocaleDateString()} (latest reading)`
+				: 'Backdating enabled - choose any date within the last year';
+		} else {
+			// When backdating is disabled:
+			// - Min date: Today (no backdating)
+			// - Max date: 1 month from now
+			minDate = new Date();
+			maxDateConstraint = maxDate;
+			suggestion = 'Select today or a recent date';
 		}
 
-		// Calculate recommended date
-		const recommendedDate = allowBackdating ? today(getLocalTimeZone()) : (daysSinceLastReading >= 7 ? today(getLocalTimeZone()) : (() => {
-			const suggested = new Date(lastReadingDate);
-			suggested.setDate(suggested.getDate() + 7);
-			return new CalendarDate(suggested.getFullYear(), suggested.getMonth() + 1, suggested.getDate());
-		})());
-
 		return {
-			minDate: new CalendarDate(minDate.getFullYear(), minDate.getMonth() + 1, minDate.getDate()),
-			maxDate: new CalendarDate(maxDate.getFullYear(), maxDate.getMonth() + 1, maxDate.getDate()),
-			recommendedDate: typeof recommendedDate === 'object' ? recommendedDate : today(getLocalTimeZone()),
+			minDate: new CalendarDate(
+				minDate.getFullYear(),
+				minDate.getMonth() + 1,
+				minDate.getDate()
+			),
+			maxDate: new CalendarDate(
+				maxDateConstraint.getFullYear(), 
+				maxDateConstraint.getMonth() + 1, 
+				maxDateConstraint.getDate()
+			),
+			recommendedDate: today(getLocalTimeZone()),
 			suggestion,
-			daysSinceLastReading,
-			lastReadingDate: lastReadingDate.toLocaleDateString(),
-			allowBackdating
+			existingReadingDates: Array.from(existingReadingDates),
+			latestReadingDates: Object.fromEntries(latestReadingDates),
+			overallLatestReadingDate: overallLatestReadingDate?.toISOString().split('T')[0] || null
 		};
 	});
 
@@ -168,7 +159,6 @@
 					meter_id: Number(r.meterId),
 					reading: Number(r.currentReading),
 					reading_date: readingDate,
-					previous_reading: r.previousReading !== null ? Number(r.previousReading) : null,
 					backdating_enabled: allowBackdating
 				};
 				console.log(`Mapped reading for meter ${r.meterId}:`, readingData);
@@ -182,41 +172,60 @@
 	});
 
 	// Initialize superForm with comprehensive error handling
-	const { form, errors, enhance, submitting, message } = superForm(formData, {
-		validators: zodClient(batchReadingsSchema),
-		resetForm: false,
-		taintedMessage: null,
-		id: `meter-reading-${property.id}-${utilityType}`,
-		onUpdated: ({ form: f }) => {
-			if (f.valid) {
-				if (f.message) {
-					toast.success(f.message);
-				} else {
-					toast.success('Meter readings saved successfully');
-				}
-				isSubmitting = false;
-				close();
-				// Invalidate to refresh data
-				invalidate('app:utility-billings');
-			} else if (f.errors) {
-				// Handle validation errors
-				const errorMessages = Object.values(f.errors).flat().join(', ');
-				toast.error(`Validation failed: ${errorMessages}`);
-				isSubmitting = false;
-			}
-		},
-		onError: ({ result }) => {
-			console.error('Form submission error:', result);
-			const errorMessage =
-				result.error?.message ||
-				(typeof result.error === 'string' ? result.error : 'Failed to save readings');
-			toast.error(errorMessage);
-			isSubmitting = false;
-		},
-		onSubmit: () => {
-			isSubmitting = true;
-		}
-	});
+// Initialize superForm with comprehensive error handling
+const { form, errors, enhance, submitting, message } = superForm(formData, {
+    validators: zodClient(batchReadingsSchema),
+    resetForm: false,
+    taintedMessage: null,
+    id: `meter-reading-${property.id}-${utilityType}`,
+    onUpdated: ({ form: f }) => {
+        if (f.valid) {
+            if (f.message) {
+                toast.success(f.message);
+            } else {
+                toast.success('Meter readings saved successfully');
+            }
+            isSubmitting = false;
+            close();
+            // Invalidate to refresh data
+            invalidate('app:utility-billings');
+        } else if (f.errors) {
+            // Handle validation errors
+            const errorMessages = Object.values(f.errors).flat().join(', ');
+            toast.error(`Validation failed: ${errorMessages}`);
+            isSubmitting = false;
+        }
+    },
+    onResult: async ({ result }) => {
+        console.log('Form submission result:', result);
+        isSubmitting = false;
+        
+        if (result.type === 'success') {
+            if (result.data?.message) {
+                toast.success(result.data.message);
+            } else {
+                toast.success('Meter readings saved successfully');
+            }
+            close();
+            // Invalidate to refresh data
+            await invalidate('app:utility-billings');
+        } else if (result.type === 'failure') {
+            const errorMessage = result.data?.error || 'Failed to save readings';
+            toast.error(errorMessage);
+        }
+    },
+    onError: ({ result }) => {
+        console.error('Form submission error:', result);
+        const errorMessage =
+            result.error?.message ||
+            (typeof result.error === 'string' ? result.error : 'Failed to save readings');
+        toast.error(errorMessage);
+        isSubmitting = false;
+    },
+    onSubmit: () => {
+        isSubmitting = true;
+    }
+});
 
 	let sortedReadings = $derived.by(() => {
 		return meterReadings.slice().sort((a, b) => a.meterName.localeCompare(b.meterName));
@@ -326,7 +335,7 @@
 		}
 	}
 
-	// Enhanced flexible date validation function with comprehensive warnings
+	// Enhanced date validation function with backdating constraints
 	function validateReadingDate(selectedDate: string): {
 		isValid: boolean;
 		warning?: string;
@@ -354,51 +363,30 @@
 			};
 		}
 
-		// Check against previous reading dates - behavior depends on backdating toggle
-		if (effectivePreviousReadings && effectivePreviousReadings.length > 0) {
-			const sortedDates = effectivePreviousReadings
-				.map((group) => new Date(group.date))
-				.sort((a, b) => b.getTime() - a.getTime());
-
-			const lastReadingDate = sortedDates[0];
-			const daysSinceLastReading = Math.floor(
-				(currentDate.getTime() - lastReadingDate.getTime()) / (1000 * 60 * 60 * 24)
-			);
-
-			// Handle backdated readings
-			if (currentDate <= lastReadingDate) {
-				if (!allowBackdating) {
-					return {
-						isValid: false,
-						error: `Reading date cannot be on or before the last reading date (${lastReadingDate.toLocaleDateString()}). Enable backdating to allow historical dates.`,
-						level: 'error',
-						icon: '❌'
-					};
-				} else {
-					// Backdating is enabled - show info warning
-					const daysBefore = Math.abs(daysSinceLastReading);
-					return {
-						isValid: true,
-						warning: `Backdated entry: ${daysBefore} days before last reading (${lastReadingDate.toLocaleDateString()}). Please verify accuracy.`,
-						level: 'info',
-						icon: '🟡'
-					};
-				}
-			}
-
-			// Warning for readings too close together (but allow)
-			if (daysSinceLastReading < 7 && !allowBackdating) {
+		// Enhanced validation for backdating
+		if (allowBackdating) {
+			// Check if date already has readings
+			const dateString = selectedDate;
+			if (dateConstraints.existingReadingDates.includes(dateString)) {
 				return {
-					isValid: true,
-					warning: `Only ${daysSinceLastReading} days since last reading. Consider waiting for a more typical reading interval.`,
-					level: 'warning',
-					icon: '🟠'
+					isValid: false,
+					error: `Reading already exists for ${new Date(selectedDate).toLocaleDateString()}. Please choose a different date.`,
+					level: 'error',
+					icon: '❌'
 				};
 			}
-		}
 
-		// Check if date is very far in the past (when backdating is enabled)
-		if (allowBackdating) {
+			// Check if date is beyond the latest reading date
+			if (dateConstraints.overallLatestReadingDate && dateString > dateConstraints.overallLatestReadingDate) {
+				return {
+					isValid: false,
+					error: `Date cannot be after ${new Date(dateConstraints.overallLatestReadingDate).toLocaleDateString()} (latest reading date)`,
+					level: 'error',
+					icon: '❌'
+				};
+			}
+
+			// Check if date is very far in the past
 			const oneYearAgo = new Date();
 			oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 			
@@ -421,6 +409,19 @@
 					warning: 'Very old date selected. Please confirm this is accurate historical data.',
 					level: 'warning',
 					icon: '🔴'
+				};
+			}
+		} else {
+			// When backdating is disabled, ensure date is not in the past
+			const today = new Date();
+			today.setHours(0, 0, 0, 0);
+			
+			if (currentDate < today) {
+				return {
+					isValid: false,
+					error: 'Backdating is disabled. Please select today or a future date.',
+					level: 'error',
+					icon: '❌'
 				};
 			}
 		}
@@ -450,6 +451,26 @@
 		}
 
 		return { isValid: true };
+	}
+
+	// Helper function to get disabled dates information
+	function getDisabledDatesInfo(): string {
+		if (!allowBackdating) {
+			return 'Past dates are disabled when backdating is off';
+		}
+
+		const existingCount = dateConstraints.existingReadingDates.length;
+		const latestDate = dateConstraints.overallLatestReadingDate;
+		
+		let info = '';
+		if (existingCount > 0) {
+			info += `${existingCount} existing reading date${existingCount > 1 ? 's' : ''} will be disabled. `;
+		}
+		if (latestDate) {
+			info += `Dates after ${new Date(latestDate).toLocaleDateString()} will be disabled.`;
+		}
+		
+		return info || 'No date restrictions apply';
 	}
 
 	// Reactive validation of the current reading date
@@ -546,35 +567,7 @@
 		}
 	}
 
-	function handlePreviousReadingSelection(selectedDate: string | null): void {
-		if (!effectivePreviousReadings) return;
-		selectedPreviousDate = selectedDate;
-		if (!selectedDate) {
-			// Reset previous readings if 'None' is selected
-			meterReadings.forEach((reading) => {
-				reading.previousReading = null;
-				reading.previousDate = null;
-				handleReadingChange(reading.meterId, String(reading.currentReading || ''));
-			});
-			return;
-		}
 
-		const selectedGroup = effectivePreviousReadings.find((g) => g.date === selectedDate);
-		if (!selectedGroup) return;
-
-		meterReadings.forEach((currentReading) => {
-			const previous = selectedGroup.readings.find((pr) => pr.meter_id === currentReading.meterId);
-			if (previous) {
-				currentReading.previousReading = previous.reading;
-				currentReading.previousDate = previous.reading_date;
-			} else {
-				currentReading.previousReading = null;
-				currentReading.previousDate = null;
-			}
-			// Recalculate consumption and cost
-			handleReadingChange(currentReading.meterId, String(currentReading.currentReading || ''));
-		});
-	}
 </script>
 
 <Dialog.Root {open} onOpenChange={(isOpen) => !isOpen && close()}>
@@ -619,61 +612,6 @@
 				</Dialog.Header>
 
 				<div class="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
-					<div class="space-y-2 md:col-span-2">
-						<Label>Load Previous Readings ({utilityType} - {property.name})</Label>
-						<Select
-							type="single"
-							name="previous_reading_date"
-							onValueChange={(value) => handlePreviousReadingSelection(value)}
-							disabled={false}
-						>
-							<SelectTrigger class="w-full">
-								<span>
-									{#if selectedPreviousDate}
-										{(() => {
-											const selectedGroup = effectivePreviousReadings.find(
-												(g) => g.date === selectedPreviousDate
-											);
-											return (
-												selectedGroup?.displayName ||
-												selectedGroup?.monthName ||
-												new Date(selectedPreviousDate).toLocaleDateString('en-US', {
-													year: 'numeric',
-													month: 'long'
-												})
-											);
-										})()}
-									{:else}
-										Select a previous reading month...
-									{/if}
-								</span>
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value="">None</SelectItem>
-								{#each effectivePreviousReadings as group}
-									<SelectItem value={group.date}>
-										{group.displayName || group.monthName || 
-											new Date(group.date).toLocaleDateString('en-US', {
-												year: 'numeric',
-												month: 'long'
-											})
-										}
-									</SelectItem>
-								{/each}
-							</SelectContent>
-						</Select>
-						{#if effectivePreviousReadings.length > 0}
-							<p class="text-xs text-green-600 bg-green-50 border border-green-200 rounded p-2">
-								<span class="font-medium">✅ Previous Readings Available:</span>
-								Showing {effectivePreviousReadings.length} reading periods for {property.name} ({utilityType})
-							</p>
-						{:else}
-							<p class="text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded p-2">
-								<span class="font-medium">💡 No Previous Readings:</span>
-								This appears to be the first reading for {property.name} ({utilityType})
-							</p>
-						{/if}
-					</div>
 					<div class="space-y-2">
 						<DatePicker
 							bind:value={readingDate}
@@ -686,14 +624,9 @@
 							maxValue={dateConstraints.maxDate}
 							onChange={(newDate) => {
 								readingDate = newDate;
-								// Recalculate consumption for all readings when date changes
-								meterReadings.forEach((reading) => {
-									if (reading.currentReading !== null) {
-										handleReadingChange(reading.meterId, String(reading.currentReading));
-									}
-								});
 							}}
 						/>
+						<!-- Enhanced date validation and information -->
 						{#if dateValidation.error}
 							<p class="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2">
 								<span class="font-medium">{dateValidation.icon || '❌'} Error:</span>
@@ -705,16 +638,17 @@
 								{dateValidation.warning}
 							</p>
 						{:else if dateConstraints.suggestion}
-							<p
-								class="text-xs text-muted-foreground bg-blue-50 border border-blue-200 rounded p-2"
-							>
+							<p class="text-xs text-muted-foreground bg-blue-50 border border-blue-200 rounded p-2">
 								<span class="font-medium text-blue-700">💡 Suggestion:</span>
 								{dateConstraints.suggestion}
-								{#if dateConstraints.lastReadingDate}
-									<br /><span class="text-blue-600"
-										>Last reading: {dateConstraints.lastReadingDate}</span
-									>
-								{/if}
+							</p>
+						{/if}
+						
+						<!-- Show disabled dates information when backdating is enabled -->
+						{#if allowBackdating}
+							<p class="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded p-2">
+								<span class="font-medium text-gray-700">📅 Date Restrictions:</span>
+								{getDisabledDatesInfo()}
 							</p>
 						{/if}
 					</div>
@@ -746,7 +680,7 @@
 							<thead class="text-xs text-gray-700 uppercase bg-gray-50">
 								<tr>
 									<th scope="col" class="px-4">Meter Name</th>
-									<th scope="col" class="px-4">Previous Reading</th>
+									<th scope="col" class="px-4">Latest Reading</th>
 									<th scope="col" class="px-4"
 										>Current Reading <span class="text-red-500">*</span></th
 									>
@@ -834,7 +768,7 @@
 						Rate At Reading: {costPerUnit} (type: {typeof costPerUnit})<br />
 						Utility Type: {utilityType}<br />
 						Backdating Enabled: {allowBackdating}<br />
-						Previous Readings: {effectivePreviousReadings.length} groups
+		
 					</div>
 				{/if}
 			</form>

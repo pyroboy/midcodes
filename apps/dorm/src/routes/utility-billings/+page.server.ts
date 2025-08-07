@@ -400,17 +400,70 @@ export const actions: Actions = {
 			if (!session) throw error(401, 'Unauthorized');
 
 			// Check user permissions for utility management
-			const userPermissions = await getUserPermissions(
-				session.user.user_metadata?.user_roles || [],
-				supabase
-			);
-			if (
-				!userPermissions.includes('property_utility') &&
-				!userPermissions.includes('property_manager') &&
-				!userPermissions.includes('property_admin')
-			) {
-				return fail(403, { form, error: 'Insufficient permissions to add meter readings' });
+			const userRoles = session.user.user_metadata?.user_roles || [];
+			const userPermissions = await getUserPermissions(userRoles, supabase);
+			
+			console.log('🔐 Permission check for meter readings:', {
+				userId: session.user.id,
+				userRoles,
+				userPermissions,
+				hasReadingsPermission: userPermissions.includes('readings.create')
+			});
+			
+			// Fallback: If JWT doesn't have roles, check directly from profiles table
+			let hasReadingsPermission = userPermissions.includes('readings.create');
+			let isSuperAdmin = userRoles.includes('super_admin');
+			let isPropertyAdmin = userRoles.includes('property_admin');
+			let isPropertyUser = userRoles.includes('property_user');
+			
+			// If no roles found in JWT, check the profiles table directly
+			if (userRoles.length === 0) {
+				console.log('⚠️ No roles found in JWT, checking profiles table...');
+				const { data: profile, error: profileError } = await supabase
+					.from('profiles')
+					.select('role')
+					.eq('id', session.user.id)
+					.single();
+				
+				if (!profileError && profile) {
+					console.log('📋 Found role in profiles table:', profile.role);
+					isSuperAdmin = profile.role === 'super_admin';
+					isPropertyAdmin = profile.role === 'property_admin';
+					isPropertyUser = profile.role === 'property_user';
+					
+					// Get permissions for this role
+					const fallbackPermissions = await getUserPermissions([profile.role], supabase);
+					hasReadingsPermission = fallbackPermissions.includes('readings.create');
+					
+					console.log('🔐 Fallback permissions:', {
+						role: profile.role,
+						permissions: fallbackPermissions,
+						hasReadingsPermission
+					});
+				}
 			}
+			
+			if (!hasReadingsPermission && !isSuperAdmin && !isPropertyAdmin && !isPropertyUser) {
+				console.log('❌ Permission denied for user:', {
+					userId: session.user.id,
+					userRoles,
+					userPermissions,
+					hasReadingsPermission,
+					isSuperAdmin,
+					isPropertyAdmin,
+					isPropertyUser
+				});
+				return fail(403, { form, error: 'Insufficient permissions to add meter readings. You need readings.create permission or appropriate role.' });
+			}
+			
+			console.log('✅ Permission granted for user:', {
+				userId: session.user.id,
+				userRoles,
+				hasReadingsPermission,
+				isSuperAdmin,
+				isPropertyAdmin,
+				isPropertyUser
+			});
 
 			// Manually parse the JSON string after successful validation
 			console.log('Parsing validated readings JSON:', form.data.readings_json);
@@ -482,7 +535,6 @@ export const actions: Actions = {
 						reading_date: r.reading_date,
 						meter_name: meterNameMap[r.meter_id] || null,
 						rate_at_reading: rate_at_reading,
-						previous_reading: previous,
 						backdating_enabled: backdating_enabled || false
 					};
 				});

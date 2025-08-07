@@ -66,23 +66,9 @@ export const meterReadingSchema = z
 						'Reading date must be within the last year and not more than 1 month in the future'
 				}
 			),
-		previous_reading: z.number().optional().nullable(),
 		// New field to track if backdating was enabled for audit purposes
 		backdating_enabled: z.boolean().optional().default(false)
-	})
-	.refine(
-		(data) => {
-			// Business rule: Current reading must be >= previous reading
-			if (data.previous_reading !== undefined && data.previous_reading !== null) {
-				return data.reading >= data.previous_reading;
-			}
-			return true;
-		},
-		{
-			message: 'Current reading must be greater than or equal to previous reading',
-			path: ['reading']
-		}
-	);
+	});
 
 // Enhanced schema for batch meter readings with flexible validation
 export const batchReadingsSchema = z
@@ -185,41 +171,38 @@ export const batchReadingsSchema = z
 	})
 	.refine(
 		(data) => {
-			// Enhanced business rule: Check for reasonable consumption limits across all readings
+			// Enhanced business rule: Check for reasonable reading values
 			try {
 				const readings = JSON.parse(data.readings_json);
 				const invalidReadings: string[] = [];
 
 				const allValid = readings.every((reading: any) => {
-					if (reading.previous_reading !== undefined && reading.previous_reading !== null) {
-						const consumption = reading.reading - reading.previous_reading;
-						// Flag unusually high consumption (adjust threshold as needed)
-						if (consumption > 50000) {
-							invalidReadings.push(`Meter ID ${reading.meter_id}: ${consumption} units`);
-							return false;
-						}
-						if (consumption < 0) {
-							invalidReadings.push(
-								`Meter ID ${reading.meter_id}: negative consumption (${consumption})`
-							);
-							return false;
-						}
+					// Flag unusually high readings (adjust threshold as needed)
+					if (reading.reading > 999999999) {
+						invalidReadings.push(`Meter ID ${reading.meter_id}: reading too high (${reading.reading})`);
+						return false;
+					}
+					if (reading.reading < 0) {
+						invalidReadings.push(
+							`Meter ID ${reading.meter_id}: negative reading (${reading.reading})`
+						);
+						return false;
 					}
 					return true;
 				});
 
 				if (!allValid) {
-					console.error('Consumption validation failed for readings:', invalidReadings);
+					console.error('Reading validation failed for readings:', invalidReadings);
 				}
 
 				return allValid;
 			} catch (error) {
-				console.error('Error validating consumption:', error);
+				console.error('Error validating readings:', error);
 				return false;
 			}
 		},
 		{
-			message: 'One or more readings show invalid consumption. Please verify the readings.',
+			message: 'One or more readings show invalid values. Please verify the readings.',
 			path: ['readings_json']
 		}
 	)
