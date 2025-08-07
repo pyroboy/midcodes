@@ -49,9 +49,9 @@
 		{#if lease.lease_tenants?.length}
 			<div class="space-y-3">
 				{#each lease.lease_tenants.filter((lt) => lt.name) as leaseTenant, index}
-					{@const tenantData = leaseTenant.tenant || leaseTenant}
+					{@const tenantData = (leaseTenant as any).tenant || leaseTenant}
 					{@const matchedTenant = tenants.find((t) => t.name === tenantData.name)}
-					{@const profileUrl = tenantData.profile_picture_url || matchedTenant?.profile_picture_url}
+					{@const profileUrl = (tenantData as any).profile_picture_url || matchedTenant?.profile_picture_url}
 					<div class="flex items-center gap-3">
 						{#if profileUrl}
 							<img

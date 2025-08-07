@@ -14,6 +14,7 @@
 	import { formatCurrency } from '$lib/utils/format';
 	import { toast } from 'svelte-sonner';
 	import { CalendarDate, getLocalTimeZone, today, parseDate } from '@internationalized/date';
+	import { invalidate } from '$app/navigation';
 
 	interface Props {
 		open: boolean;
@@ -53,13 +54,29 @@
 	let isSubmitting = $state(false);
 	let allowBackdating = $state(false);
 
+	// Debug effect to monitor state changes
+	$effect(() => {
+		console.log('🔍 Modal state changed:', {
+			open,
+			propertyId: property?.id,
+			propertyName: property?.name,
+			utilityType,
+			effectiveReadingsCount: effectivePreviousReadings.length
+		});
+	});
+
+	// Use previousReadingGroups directly as effectivePreviousReadings
+	let effectivePreviousReadings = $derived.by(() => {
+		return previousReadingGroups;
+	});
+
 	// Calculate recommended date ranges based on previous readings and backdating toggle
 	let dateConstraints = $derived.by(() => {
 		// Set maximum date to 1 month from now (more flexible than before)
 		const maxDate = new Date();
 		maxDate.setMonth(maxDate.getMonth() + 1);
 
-		if (!previousReadingGroups || previousReadingGroups.length === 0) {
+		if (!effectivePreviousReadings || effectivePreviousReadings.length === 0) {
 			// No previous readings - flexible range based on backdating setting
 			const minDateRange = new Date();
 			minDateRange.setFullYear(minDateRange.getFullYear() - (allowBackdating ? 1 : 0));
@@ -79,7 +96,7 @@
 		}
 
 		// Find the most recent reading date across all meters
-		const sortedDates = previousReadingGroups
+		const sortedDates = effectivePreviousReadings
 			.map((group) => new Date(group.date))
 			.sort((a, b) => b.getTime() - a.getTime());
 
@@ -151,7 +168,8 @@
 					meter_id: Number(r.meterId),
 					reading: Number(r.currentReading),
 					reading_date: readingDate,
-					previous_reading: r.previousReading !== null ? Number(r.previousReading) : null
+					previous_reading: r.previousReading !== null ? Number(r.previousReading) : null,
+					backdating_enabled: allowBackdating
 				};
 				console.log(`Mapped reading for meter ${r.meterId}:`, readingData);
 				return readingData;
@@ -178,6 +196,8 @@
 				}
 				isSubmitting = false;
 				close();
+				// Invalidate to refresh data
+				invalidate('app:utility-billings');
 			} else if (f.errors) {
 				// Handle validation errors
 				const errorMessages = Object.values(f.errors).flat().join(', ');
@@ -201,7 +221,6 @@
 	let sortedReadings = $derived.by(() => {
 		return meterReadings.slice().sort((a, b) => a.meterName.localeCompare(b.meterName));
 	});
-	// Remove local formatCurrency function - using imported one
 
 	// Format date for display
 	function formatDate(dateString: string): string {
@@ -307,15 +326,16 @@
 		}
 	}
 
-	// Flexible date validation function with warnings instead of strict errors
+	// Enhanced flexible date validation function with comprehensive warnings
 	function validateReadingDate(selectedDate: string): {
 		isValid: boolean;
 		warning?: string;
 		error?: string;
 		level?: 'info' | 'warning' | 'error';
+		icon?: string;
 	} {
 		if (!selectedDate) {
-			return { isValid: false, error: 'Reading date is required', level: 'error' };
+			return { isValid: false, error: 'Reading date is required', level: 'error', icon: '❌' };
 		}
 
 		const currentDate = new Date(selectedDate);
@@ -329,13 +349,14 @@
 			return {
 				isValid: false,
 				error: 'Reading date cannot be more than 1 month in the future',
-				level: 'error'
+				level: 'error',
+				icon: '❌'
 			};
 		}
 
 		// Check against previous reading dates - behavior depends on backdating toggle
-		if (previousReadingGroups && previousReadingGroups.length > 0) {
-			const sortedDates = previousReadingGroups
+		if (effectivePreviousReadings && effectivePreviousReadings.length > 0) {
+			const sortedDates = effectivePreviousReadings
 				.map((group) => new Date(group.date))
 				.sort((a, b) => b.getTime() - a.getTime());
 
@@ -350,7 +371,8 @@
 					return {
 						isValid: false,
 						error: `Reading date cannot be on or before the last reading date (${lastReadingDate.toLocaleDateString()}). Enable backdating to allow historical dates.`,
-						level: 'error'
+						level: 'error',
+						icon: '❌'
 					};
 				} else {
 					// Backdating is enabled - show info warning
@@ -358,7 +380,8 @@
 					return {
 						isValid: true,
 						warning: `Backdated entry: ${daysBefore} days before last reading (${lastReadingDate.toLocaleDateString()}). Please verify accuracy.`,
-						level: 'info'
+						level: 'info',
+						icon: '🟡'
 					};
 				}
 			}
@@ -368,7 +391,8 @@
 				return {
 					isValid: true,
 					warning: `Only ${daysSinceLastReading} days since last reading. Consider waiting for a more typical reading interval.`,
-					level: 'warning'
+					level: 'warning',
+					icon: '🟠'
 				};
 			}
 		}
@@ -382,7 +406,8 @@
 				return {
 					isValid: false,
 					error: `Date cannot be more than 1 year in the past (${oneYearAgo.toLocaleDateString()})`,
-					level: 'error'
+					level: 'error',
+					icon: '❌'
 				};
 			}
 
@@ -394,7 +419,8 @@
 				return {
 					isValid: true,
 					warning: 'Very old date selected. Please confirm this is accurate historical data.',
-					level: 'warning'
+					level: 'warning',
+					icon: '🔴'
 				};
 			}
 		}
@@ -407,7 +433,8 @@
 			return {
 				isValid: true,
 				warning: 'Reading scheduled for weekend. Ensure meter access is available.',
-				level: 'info'
+				level: 'info',
+				icon: '🟡'
 			};
 		}
 
@@ -417,7 +444,8 @@
 			return {
 				isValid: true,
 				warning: `Future date selected (${daysInFuture} days ahead). Ensure this is intentional.`,
-				level: 'info'
+				level: 'info',
+				icon: '🟡'
 			};
 		}
 
@@ -478,7 +506,8 @@
 				readingsJson,
 				readingDate,
 				costPerUnit: Number(costPerUnit),
-				utilityType
+				utilityType,
+				backdating_enabled: allowBackdating
 			});
 
 			// Update form data before submission
@@ -486,6 +515,7 @@
 			$form.reading_date = readingDate;
 			$form.rate_at_reading = Number(costPerUnit);
 			$form.type = utilityType;
+			$form.backdating_enabled = allowBackdating;
 
 			// Submit using the form action
 			const formElement = document.getElementById('reading-form') as HTMLFormElement;
@@ -517,7 +547,7 @@
 	}
 
 	function handlePreviousReadingSelection(selectedDate: string | null): void {
-		if (!previousReadingGroups) return;
+		if (!effectivePreviousReadings) return;
 		selectedPreviousDate = selectedDate;
 		if (!selectedDate) {
 			// Reset previous readings if 'None' is selected
@@ -529,7 +559,7 @@
 			return;
 		}
 
-		const selectedGroup = previousReadingGroups.find((g) => g.date === selectedDate);
+		const selectedGroup = effectivePreviousReadings.find((g) => g.date === selectedDate);
 		if (!selectedGroup) return;
 
 		meterReadings.forEach((currentReading) => {
@@ -567,8 +597,8 @@
 						{/if}
 					</div>
 					
-					<!-- Backdating Toggle -->
-					<div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg border">
+					<!-- Enhanced Backdating Toggle with Context -->
+					<div class="flex items-center justify-between p-4 bg-slate-50 rounded-lg border">
 						<div class="flex flex-col">
 							<Label class="text-sm font-medium text-slate-700">Enable Backdating</Label>
 							<span class="text-xs text-slate-500">
@@ -579,58 +609,70 @@
 					</div>
 					
 					{#if allowBackdating}
-						<div class="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded">
+						<div class="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded">
 							<span class="text-amber-600">⚠️</span>
-							<span class="text-xs text-amber-700">
-								Backdating is enabled. Please ensure date accuracy for data integrity.
+							<span class="text-sm text-amber-700">
+								<strong>Backdating Enabled:</strong> You can now select dates up to 1 year in the past. Please ensure date accuracy for data integrity.
 							</span>
 						</div>
 					{/if}
-					
-					<!-- <Dialog.Description class="text-base text-muted-foreground">
-            Enter readings for {utilityType?.toLowerCase() || 'selected'} meters at {propertyName}
-          </Dialog.Description> -->
 				</Dialog.Header>
 
 				<div class="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
 					<div class="space-y-2 md:col-span-2">
-						<Label>Load Previous Readings</Label>
+						<Label>Load Previous Readings ({utilityType} - {property.name})</Label>
 						<Select
 							type="single"
 							name="previous_reading_date"
 							onValueChange={(value) => handlePreviousReadingSelection(value)}
+							disabled={false}
 						>
 							<SelectTrigger class="w-full">
 								<span>
-									{selectedPreviousDate
-										? (() => {
-												const selectedGroup = previousReadingGroups.find(
-													(g) => g.date === selectedPreviousDate
-												);
-												return (
-													selectedGroup?.monthName ||
-													new Date(selectedPreviousDate).toLocaleDateString('en-US', {
-														year: 'numeric',
-														month: 'long'
-													})
-												);
-											})()
-										: 'Select a previous reading month...'}
+									{#if selectedPreviousDate}
+										{(() => {
+											const selectedGroup = effectivePreviousReadings.find(
+												(g) => g.date === selectedPreviousDate
+											);
+											return (
+												selectedGroup?.displayName ||
+												selectedGroup?.monthName ||
+												new Date(selectedPreviousDate).toLocaleDateString('en-US', {
+													year: 'numeric',
+													month: 'long'
+												})
+											);
+										})()}
+									{:else}
+										Select a previous reading month...
+									{/if}
 								</span>
 							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value="">None</SelectItem>
-								{#each previousReadingGroups as group}
-									<SelectItem value={group.date}
-										>{group.monthName ||
+								{#each effectivePreviousReadings as group}
+									<SelectItem value={group.date}>
+										{group.displayName || group.monthName || 
 											new Date(group.date).toLocaleDateString('en-US', {
 												year: 'numeric',
 												month: 'long'
-											})}</SelectItem
-									>
+											})
+										}
+									</SelectItem>
 								{/each}
 							</SelectContent>
 						</Select>
+						{#if effectivePreviousReadings.length > 0}
+							<p class="text-xs text-green-600 bg-green-50 border border-green-200 rounded p-2">
+								<span class="font-medium">✅ Previous Readings Available:</span>
+								Showing {effectivePreviousReadings.length} reading periods for {property.name} ({utilityType})
+							</p>
+						{:else}
+							<p class="text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded p-2">
+								<span class="font-medium">💡 No Previous Readings:</span>
+								This appears to be the first reading for {property.name} ({utilityType})
+							</p>
+						{/if}
 					</div>
 					<div class="space-y-2">
 						<DatePicker
@@ -654,12 +696,12 @@
 						/>
 						{#if dateValidation.error}
 							<p class="text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2">
-								<span class="font-medium">❌ Error:</span>
+								<span class="font-medium">{dateValidation.icon || '❌'} Error:</span>
 								{dateValidation.error}
 							</p>
 						{:else if dateValidation.warning}
-							<p class="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded p-2">
-								<span class="font-medium">⚠️ Warning:</span>
+							<p class="text-xs {dateValidation.level === 'warning' ? 'text-amber-600 bg-amber-50 border-amber-200' : 'text-blue-600 bg-blue-50 border-blue-200'} border rounded p-2">
+								<span class="font-medium">{dateValidation.icon || '⚠️'} {dateValidation.level === 'warning' ? 'Warning' : 'Info'}:</span>
 								{dateValidation.warning}
 							</p>
 						{:else if dateConstraints.suggestion}
@@ -781,6 +823,7 @@
 				<input type="hidden" name="reading_date" value={readingDate} />
 				<input type="hidden" name="rate_at_reading" value={costPerUnit} />
 				<input type="hidden" name="type" value={utilityType} />
+				<input type="hidden" name="backdating_enabled" value={allowBackdating} />
 
 				<!-- Debug info in development -->
 				{#if typeof window !== 'undefined' && window.location.hostname === 'localhost'}
@@ -789,7 +832,9 @@
 						Readings JSON: {readingsJson?.substring(0, 100)}...<br />
 						Reading Date: {readingDate}<br />
 						Rate At Reading: {costPerUnit} (type: {typeof costPerUnit})<br />
-						Utility Type: {utilityType}
+						Utility Type: {utilityType}<br />
+						Backdating Enabled: {allowBackdating}<br />
+						Previous Readings: {effectivePreviousReadings.length} groups
 					</div>
 				{/if}
 			</form>

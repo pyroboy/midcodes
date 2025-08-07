@@ -235,46 +235,7 @@ async function loadAllReadingsData(supabase: any) {
 	return result.data || [];
 }
 
-// New function for efficient context-aware previous readings loading
-async function loadContextualPreviousReadings(
-	supabase: any, 
-	propertyId: number, 
-	utilityType: string
-) {
-	console.log(`Loading contextual previous readings for property ${propertyId}, type ${utilityType}...`);
-	
-	// Optimized query with property and utility type filtering
-	const twoYearsAgo = new Date();
-	twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
-	
-	const result = await supabase
-		.from('readings')
-		.select(`
-			id,
-			meter_id,
-			reading,
-			reading_date,
-			rate_at_reading,
-			meters!inner(
-				id,
-				name,
-				type,
-				property_id
-			)
-		`)
-		.eq('meters.property_id', propertyId)
-		.eq('meters.type', utilityType)
-		.gte('reading_date', twoYearsAgo.toISOString().split('T')[0])
-		.order('reading_date', { ascending: false })
-		.limit(1000); // Reasonable limit for performance
 
-	if (result.error) {
-		console.error('Error fetching contextual previous readings:', result.error);
-		throw error(500, `Error fetching previous readings: ${result.error.message}`);
-	}
-
-	return result.data || [];
-}
 
 // Helper function to group readings by month with enhanced metadata
 function groupReadingsByMonth(readings: any[]) {
@@ -312,38 +273,7 @@ function groupReadingsByMonth(readings: any[]) {
 }
 
 export const actions: Actions = {
-	// New action for loading contextual previous readings
-	loadContextualPreviousReadings: async ({ request, locals: { supabase, safeGetSession } }) => {
-		const session = await safeGetSession();
-		if (!session) {
-			return fail(401, { error: 'Unauthorized' });
-		}
 
-		const formData = await request.formData();
-		const propertyId = formData.get('propertyId') as string;
-		const utilityType = formData.get('utilityType') as string;
-
-		if (!propertyId || !utilityType) {
-			return fail(400, { error: 'Property ID and utility type are required' });
-		}
-
-		try {
-			const readings = await loadContextualPreviousReadings(supabase, parseInt(propertyId), utilityType);
-			
-			// Group readings by month for efficient display
-			const groupedReadings = groupReadingsByMonth(readings);
-			
-			return { 
-				success: true, 
-				readings: groupedReadings,
-				propertyId: parseInt(propertyId),
-				utilityType 
-			};
-		} catch (error) {
-			console.error('Error loading contextual previous readings:', error);
-			return fail(500, { error: 'Failed to load previous readings' });
-		}
-	},
 
 	createUtilityBillings: async ({ request, locals: { supabase, safeGetSession } }) => {
 		const session = await safeGetSession();
@@ -431,14 +361,23 @@ export const actions: Actions = {
 		reconstructedFormData.append('readings_json', rawReadingsJson || '');
 		reconstructedFormData.append('reading_date', rawReadingDate || '');
 		reconstructedFormData.append('rate_at_reading', rawRateAtReading || '');
-		if (rawType) reconstructedFormData.append('type', rawType);
+		reconstructedFormData.append('type', rawType || '');
+		
+		// Add backdating field if present
+		const rawBackdatingEnabled = formData.get('backdating_enabled') as string;
+		if (rawBackdatingEnabled !== null) {
+			reconstructedFormData.append('backdating_enabled', rawBackdatingEnabled);
+		}
 
-		const mockRequest = new Request(request.url, {
-			method: 'POST',
-			body: reconstructedFormData
+		console.log('Reconstructed form data for validation:', {
+			readings_json: rawReadingsJson,
+			reading_date: rawReadingDate,
+			rate_at_reading: rawRateAtReading,
+			type: rawType,
+			backdating_enabled: rawBackdatingEnabled
 		});
 
-		const form = await superValidate(mockRequest, zod(batchReadingsSchema));
+		const form = await superValidate(reconstructedFormData, zod(batchReadingsSchema));
 		console.log('form.data received:', form.data);
 		console.log('form.errors:', form.errors);
 		console.log('form.valid:', form.valid);
@@ -476,10 +415,11 @@ export const actions: Actions = {
 			// Manually parse the JSON string after successful validation
 			console.log('Parsing validated readings JSON:', form.data.readings_json);
 			const readings: z.infer<typeof meterReadingSchema>[] = JSON.parse(form.data.readings_json);
-			const { rate_at_reading } = form.data;
+			const { rate_at_reading, backdating_enabled } = form.data;
 
 			console.log('Parsed readings:', readings);
 			console.log('Rate at reading:', rate_at_reading, typeof rate_at_reading);
+			console.log('Backdating enabled:', backdating_enabled);
 
 			const meterIds = readings.map((r) => r.meter_id);
 
@@ -542,7 +482,8 @@ export const actions: Actions = {
 						reading_date: r.reading_date,
 						meter_name: meterNameMap[r.meter_id] || null,
 						rate_at_reading: rate_at_reading,
-						previous_reading: previous
+						previous_reading: previous,
+						backdating_enabled: backdating_enabled || false
 					};
 				});
 

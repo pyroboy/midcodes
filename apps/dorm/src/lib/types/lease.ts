@@ -95,6 +95,9 @@ export interface Lease {
 	tenants: Tenant[];
 	billings: Billing[];
 	lease_tenants: {
+		tenant: {
+			profile_picture_url: any; name: string; contact_number?: string; email?: string; 
+};
 		name: string;
 		contact_number?: string;
 		email?: string;

@@ -207,10 +207,10 @@
 				{#if lease.lease_tenants && lease.lease_tenants.length > 0}
 					<div class="flex items-center">
 						{#each lease.lease_tenants.slice(0, 3) as leaseTenant, index}
-							{@const tenantData = leaseTenant.tenant || leaseTenant}
+							{@const tenantData = leaseTenant}
 							{@const matchedTenant = tenants.find((t) => t.name === tenantData.name)}
 							{@const profileUrl =
-								tenantData.profile_picture_url || matchedTenant?.profile_picture_url}
+								(tenantData as any).profile_picture_url || matchedTenant?.profile_picture_url}
 							<div
 								class="w-12 h-12 sm:w-14 sm:h-14 rounded-full border-3 border-white shadow-lg flex-shrink-0"
 								class:-ml-4={index > 0}
