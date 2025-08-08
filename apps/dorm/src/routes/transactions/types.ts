@@ -10,7 +10,8 @@ import type { SuperValidated, SuperForm } from 'sveltekit-superforms';
 
 // Export types from schema
 export type Transaction = z.infer<typeof transactionSchema> & {
-	lease_name?: string | null;
+    lease_name?: string | null;
+    allocations?: { billing_id: number; amount: number }[];
 };
 export type PaymentMethod = z.infer<typeof paymentMethodEnum>;
 export type TransactionStatus = z.infer<typeof transactionStatusEnum>;

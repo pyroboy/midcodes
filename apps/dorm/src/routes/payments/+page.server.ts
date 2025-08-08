@@ -2,6 +2,7 @@ import { fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { paymentSchema, type UserRole } from './formSchema';
+import { transactionSchema } from '../transactions/schema';
 import { supabase } from '$lib/supabaseClient';
 import {
 	calculatePenalty,
@@ -19,43 +20,15 @@ export const load = async ({ locals }) => {
 		return fail(401, { message: 'Unauthorized' });
 	}
 
-	const [{ data: userRole }, { data: payments }, { data: billings }] = await Promise.all([
+	const [{ data: userRole }, { data: payments }, { data: unpaidBillings }, { data: allBillings }] = await Promise.all([
 		supabase.from('profiles').select('role').eq('id', session.user.id).single(),
 
 		supabase
 			.from('payments')
-			.select(
-				`
-        *,
-        created_by:profiles!created_by(name),
-        billing:billings(
-          id,
-          type,
-          utility_type,
-          amount,
-          paid_amount,
-          balance,
-          status,
-          due_date,
-          lease:leases(
-            id,
-            name,
-            rental_unit:rental_unit(
-              rental_unit_number,
-              floor:floors(
-                floor_number,
-                wing,
-                property:properties(
-                  name
-                )
-              )
-            )
-          )
-        )
-      `
-			)
+			.select('*')
 			.order('paid_at', { ascending: false }),
 
+		// Billings for payment creation (only unpaid ones)
 		supabase
 			.from('billings')
 			.select(
@@ -86,10 +59,68 @@ export const load = async ({ locals }) => {
       `
 			)
 			.in('status', ['PENDING', 'PARTIAL', 'OVERDUE'])
+			.order('due_date'),
+
+		// All billings for payment display (including paid ones)
+		supabase
+			.from('billings')
+			.select(
+				`
+        id,
+        type,
+        utility_type,
+        amount,
+        paid_amount,
+        balance,
+        status,
+        due_date,
+        lease:leases(
+          id,
+          name,
+          rental_unit:rental_unit(
+            id,
+            rental_unit_number,
+            floor:floors(
+              floor_number,
+              wing,
+              property:properties(
+                name
+              )
+            )
+          )
+        )
+      `
+			)
 			.order('due_date')
 	]);
 
+	console.log('📊 DATA LOADING: Raw payments data:', payments);
+	console.log('📊 DATA LOADING: All billings data count:', allBillings?.length);
+
+	// Manually join payment data with billing/lease information
+	const enrichedPayments = payments?.map((payment, index) => {
+		console.log(`📊 DATA LOADING: Processing payment ${index + 1}:`, payment);
+		
+		// Find the first billing for this payment to get lease info
+		const primaryBilling = payment.billing_ids && payment.billing_ids.length > 0 
+			? allBillings?.find(b => b.id === payment.billing_ids[0])
+			: null;
+			
+		console.log(`📊 DATA LOADING: Found primary billing for payment ${payment.id}:`, primaryBilling);
+			
+		const enriched = {
+			...payment,
+			billing: primaryBilling
+		};
+		
+		console.log(`📊 DATA LOADING: Enriched payment ${payment.id}:`, enriched);
+		return enriched;
+	}) || [];
+	
+	console.log('📊 DATA LOADING: Final enriched payments:', enrichedPayments);
+
 	const form = await superValidate(zod(paymentSchema));
+	const transactionForm = await superValidate(zod(transactionSchema));
 	const isAdminLevel = ['super_admin', 'property_admin'].includes(userRole?.role || '');
 	const isAccountant = userRole?.role === 'property_accountant';
 	const isUtility = userRole?.role === 'property_utility';
@@ -98,8 +129,9 @@ export const load = async ({ locals }) => {
 
 	return {
 		form,
-		payments,
-		billings,
+		transactionForm,
+		payments: enrichedPayments,
+		billings: unpaidBillings, // For payment creation
 		userRole: userRole?.role || 'user',
 		isAdminLevel,
 		isAccountant,
@@ -378,5 +410,163 @@ export const actions = {
 		}
 
 		return { form };
+		},
+
+		revert: async ({ request, locals }) => {
+			const session = await locals.safeGetSession();
+			if (!session) {
+				return fail(401, {
+					form: null,
+					error: 'You must be logged in to revert payments'
+				});
+			}
+
+			const formData = await request.formData();
+			const paymentIdRaw = formData.get('payment_id');
+			const reason = (formData.get('reason') as string) || null;
+
+			if (!paymentIdRaw) {
+				return fail(400, { error: 'payment_id is required' });
+			}
+
+			const paymentId = Number(paymentIdRaw);
+			if (!Number.isFinite(paymentId) || paymentId <= 0) {
+				return fail(400, { error: 'Invalid payment_id' });
+			}
+
+			// Authorization: mirror update permissions
+			const { data: userRole } = await supabase
+				.from('profiles')
+				.select('role')
+				.eq('id', session.user.id)
+				.single();
+
+			const canRevert = ['super_admin', 'property_admin', 'property_accountant'] as UserRole[];
+			if (!canRevert.includes(userRole?.role as UserRole)) {
+				return fail(403, { error: 'You do not have permission to revert payments' });
+			}
+
+			// Ensure payment exists and not already reverted
+			const { data: payment, error: fetchError } = await supabase
+				.from('payments')
+				.select('id, reverted_at')
+				.eq('id', paymentId)
+				.single();
+
+			if (fetchError || !payment) {
+				return fail(404, { error: 'Payment not found' });
+			}
+
+			if (payment.reverted_at) {
+				return fail(400, { error: 'Payment is already reverted' });
+			}
+
+			// Call DB function to revert
+			const { data: revertResult, error: revertError } = await supabase.rpc('revert_payment', {
+				p_payment_id: paymentId,
+				p_reason: reason,
+				p_performed_by: session.user.id
+			});
+
+			if (revertError) {
+				console.error('Failed to revert payment:', revertError);
+				return fail(500, { error: 'Failed to revert payment' });
+			}
+
+			return { success: true, result: revertResult };
+		},
+
+	// Action to handle payment updates via TransactionFormModal
+	upsert: async ({ request, locals }) => {
+		console.log('🔄 SERVER ACTION: Upsert action called');
+		
+		const session = await locals.safeGetSession();
+		if (!session) {
+			console.error('❌ SERVER ACTION: No session found');
+			return fail(401, {
+				form: null,
+				error: 'You must be logged in to update payments'
+			});
+		}
+
+		console.log('📋 SERVER ACTION: Validating form data...');
+		const form = await superValidate(request, zod(transactionSchema));
+		console.log('📋 SERVER ACTION: Form validation result:', { valid: form.valid, data: form.data, errors: form.errors });
+		
+		if (!form.valid) {
+			console.error('❌ SERVER ACTION: Form validation failed:', form.errors);
+			return fail(400, {
+				form,
+				error: 'Invalid form data. Please check your input.'
+			});
+		}
+
+		const { data: userRole } = await supabase
+			.from('profiles')
+			.select('role')
+			.eq('id', session.user.id)
+			.single();
+
+		const canUpdate = ['super_admin', 'property_admin', 'property_accountant'] as UserRole[];
+		if (!canUpdate.includes(userRole?.role as UserRole)) {
+			return fail(403, {
+				form,
+				error: 'You do not have permission to update payments'
+			});
+		}
+
+		// Convert transaction data back to payment format
+		const paymentData = {
+			id: form.data.id,
+			billing_ids: form.data.billing_ids || [], // Preserve all billing IDs
+			amount: form.data.amount,
+			method: mapTransactionMethodToPayment(form.data.method),
+			reference_number: form.data.reference_number,
+			paid_by: form.data.paid_by,
+			paid_at: form.data.paid_at,
+			notes: form.data.notes,
+			receipt_url: form.data.receipt_url
+		};
+		
+		console.log('🔄 SERVER ACTION: Converted payment data for update:', paymentData);
+
+		// Update payment with tracking fields
+		const updatePayload = {
+			...paymentData,
+			updated_by: session.user.id,
+			updated_at: getUTCTimestamp()
+		};
+		
+		console.log('📤 DATABASE UPDATE: Updating payment with payload:', updatePayload);
+		
+		const { data: updateResult, error: updateError } = await supabase
+			.from('payments')
+			.update(updatePayload)
+			.eq('id', form.data.id)
+			.select('*'); // Return the updated record
+
+		if (updateError) {
+			console.error('❌ DATABASE UPDATE: Failed to update payment:', updateError);
+			return fail(500, {
+				form,
+				error: 'Failed to update payment record'
+			});
+		}
+		
+		console.log('✅ DATABASE UPDATE: Payment updated successfully:', updateResult);
+
+		return { form };
 	}
 };
+
+// Helper function to map transaction methods back to payment methods
+function mapTransactionMethodToPayment(transactionMethod: string): string {
+	const methodMap: Record<string, string> = {
+		'BANK': 'BANK',
+		'GCASH': 'GCASH',
+		'CASH': 'CASH',
+		'SECURITY_DEPOSIT': 'SECURITY_DEPOSIT',
+		'OTHER': 'OTHER'
+	};
+	return methodMap[transactionMethod] || 'OTHER';
+}

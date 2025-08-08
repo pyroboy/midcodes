@@ -1,11 +1,13 @@
 <script lang="ts">
 	import PaymentForm from './PaymentForm.svelte';
+	import TransactionFormModal from '../transactions/TransactionFormModal.svelte';
 	import * as Card from '$lib/components/ui/card';
 	import { Badge } from '$lib/components/ui/badge';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import type { PageData } from './$types';
 	import type { z } from 'zod';
 	import { paymentSchema } from './formSchema';
+	import { invalidateAll } from '$app/navigation';
 
 	type Payment = z.infer<typeof paymentSchema> & {
 		billing?: {
@@ -38,17 +40,70 @@
 
 	let showForm = $state(false);
 	let selectedPayment: Payment | undefined = $state(undefined);
+	let showTransactionModal = $state(false);
+
+	// Debug effect
+	$effect(() => {
+		console.log('Modal state changed:', { 
+			showTransactionModal, 
+			selectedPayment: selectedPayment?.id, 
+			shouldShow: showTransactionModal && selectedPayment 
+		});
+	});
 
 	function handlePaymentClick(payment: Payment) {
+		console.log('🖱️ PAYMENT CLICK: handlePaymentClick called with:', payment);
+		console.log('🔐 PAYMENT CLICK: User permissions:', { 
+			isAdminLevel: data.isAdminLevel, 
+			isAccountant: data.isAccountant, 
+			isFrontdesk: data.isFrontdesk 
+		});
+		
 		if (data.isAdminLevel || data.isAccountant || data.isFrontdesk) {
 			selectedPayment = payment;
-			showForm = true;
+			showTransactionModal = true;
+			console.log('✅ PAYMENT CLICK: Modal should open:', { selectedPayment, showTransactionModal });
+		} else {
+			console.log('❌ PAYMENT CLICK: User does not have permission to edit payments');
 		}
 	}
 
 	function handlePaymentAdded() {
 		showForm = false;
 		selectedPayment = undefined;
+	}
+
+	async function handleTransactionModalClose() {
+		console.log('🔒 MODAL CLOSE: Transaction modal closing, invalidating data...');
+		showTransactionModal = false;
+		selectedPayment = undefined;
+		
+		// Invalidate data to refresh the payments list
+		console.log('🔄 MODAL CLOSE: Calling invalidateAll to refresh data...');
+		await invalidateAll();
+		console.log('✅ MODAL CLOSE: Data invalidation complete');
+	}
+
+	async function revertPayment(paymentId: number) {
+		const reason = prompt('Enter a reason for reverting this payment (optional):') ?? '';
+		const confirmRevert = confirm('Are you sure you want to revert this payment? This will adjust affected billings.');
+		if (!confirmRevert) return;
+
+		const form = new FormData();
+		form.append('payment_id', String(paymentId));
+		form.append('reason', reason);
+
+		const res = await fetch('?/revert', {
+			method: 'POST',
+			body: form
+		});
+		if (res.ok) {
+			// Simple reload to reflect new states
+			location.reload();
+		} else {
+			const data = await res.json().catch(() => ({}));
+			alert(data?.error || 'Failed to revert payment');
+		}
 	}
 
 	function getStatusVariant(status: string): 'default' | 'destructive' | 'outline' | 'secondary' {
@@ -133,6 +188,12 @@
 								{/if}
 							</div>
 						</Card.Content>
+						{#if data.isAdminLevel || data.isAccountant}
+							<div class="flex gap-2 p-4 pt-0">
+								<Button variant="outline" onclick={(e) => { e.stopPropagation(); handlePaymentClick(payment); }}>Edit</Button>
+								<Button variant="destructive" onclick={(e) => { e.stopPropagation(); revertPayment(payment.id as unknown as number); }}>Revert</Button>
+							</div>
+						{/if}
 					</Card.Root>
 				{/each}
 			</div>
@@ -170,4 +231,16 @@
 			changes.
 		</p>
 	</div>
+{/if}
+
+<!-- Transaction Modal for Editing Payments -->
+{#if showTransactionModal && selectedPayment}
+	<TransactionFormModal
+		open={showTransactionModal}
+		data={data}
+		editMode={true}
+		transaction={selectedPayment}
+		on:close={handleTransactionModalClose}
+		on:cancel={handleTransactionModalClose}
+	/>
 {/if}

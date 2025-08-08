@@ -103,7 +103,7 @@
 		const transactionId = event.detail;
 		console.log('Delete transaction request for ID:', transactionId);
 
-		if (!confirm('Are you sure you want to delete this transaction?')) {
+		if (!confirm('Are you sure you want to delete (revert) this transaction? This will adjust related billings.')) {
 			return;
 		}
 
@@ -113,6 +113,8 @@
 			// Use FormData instead of JSON
 			const formData = new FormData();
 			formData.append('id', transactionId.toString());
+			const reason = prompt('Enter a reason for reverting this transaction (optional):') ?? '';
+			formData.append('reason', reason);
 
 			const response = await fetch(`?/delete`, {
 				method: 'POST',
@@ -293,6 +295,7 @@
 			{enhance}
 			{constraints}
 			{submitting}
+			transaction={selectedTransaction}
 			on:close={handleCloseFormModal}
 			on:cancel={handleCloseFormModal}
 		/>

@@ -97,7 +97,7 @@
 			{#if transaction}
 				<div class="space-y-6">
 					<!-- Basic transaction info -->
-					<Card class="shadow-sm border-gray-100">
+    <Card class="shadow-sm border-gray-100">
 						<CardHeader class="pb-2">
 							<CardTitle class="text-lg font-medium">Payment Information</CardTitle>
 						</CardHeader>
@@ -251,18 +251,25 @@
 						</CardContent>
 					</Card>
 
-					<!-- Billing info -->
-					{#if transaction.billing_ids && transaction.billing_ids.length > 0}
+                    <!-- Billing info and allocations -->
+                    {#if transaction.billing_ids && transaction.billing_ids.length > 0}
 						<Card class="shadow-sm border-gray-100">
 							<CardHeader class="pb-2">
-								<CardTitle class="text-lg font-medium">Linked Billings</CardTitle>
+                                <CardTitle class="text-lg font-medium">Linked Billings</CardTitle>
 							</CardHeader>
 							<CardContent class="pt-0">
-								<ul class="list-disc pl-5 space-y-1">
-									{#each transaction.billing_ids as billingId}
-										<li class="text-sm">Billing #{billingId}</li>
-									{/each}
-								</ul>
+                                <ul class="list-disc pl-5 space-y-1">
+                                    {#each transaction.billing_ids as billingId}
+                                        <li class="text-sm flex items-center justify-between gap-2">
+                                            <span>Billing #{billingId}</span>
+                                            {#if transaction.allocations}
+                                                {#each transaction.allocations.filter(a => a.billing_id === billingId) as alloc}
+                                                    <span class="text-xs text-gray-600">Allocated: ₱{alloc.amount?.toFixed(2)}</span>
+                                                {/each}
+                                            {/if}
+                                        </li>
+                                    {/each}
+                                </ul>
 							</CardContent>
 						</Card>
 					{/if}

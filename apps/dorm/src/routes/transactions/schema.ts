@@ -1,16 +1,12 @@
 import { z } from 'zod';
 
-// Define payment method enum (from the instruction document)
+// Define payment method enum (matching DORMSCHEMA.md database enum)
 export const paymentMethodEnum = z.enum([
 	'CASH',
-	'BANK_TRANSFER',
-	'CREDIT_CARD',
-	'DEBIT_CARD',
-	'CHEQUE',
-	'MOBILE_PAYMENT',
-	'ONLINE_PAYMENT',
-	'SECURITY_DEPOSIT',
-	'OTHER'
+	'BANK',
+	'GCASH',
+	'OTHER',
+	'SECURITY_DEPOSIT'
 ]);
 
 export type PaymentMethod = z.infer<typeof paymentMethodEnum>;
