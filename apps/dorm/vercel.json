@@ -1,8 +1,5 @@
 {
-	"framework": "sveltekit",
-	"outputDirectory": ".svelte-kit/output",
-	"regions": ["sin1"],
-	"version": 2,
-	"buildCommand": "cd ../.. && turbo run build --filter=./apps/dorm...",
-	"ignoreCommand": "git diff HEAD^ HEAD --quiet ."
+  "framework": "sveltekit",
+  "version": 2,
+  "regions": ["sin1"]
 }
