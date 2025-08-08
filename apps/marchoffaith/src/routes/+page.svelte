@@ -2,13 +2,13 @@
 </script>
 
 <svelte:head>
-	<meta name="description" content="Welcome to Grace Community Church" />
+	<meta name="description" content="Welcome to March of Faith Incorporated, Tagbilaran, Bohol" />
 </svelte:head>
 
 <section class="hero">
 	<div class="hero-content">
-		<h1>Welcome to Grace Community Church</h1>
-		<p class="subtitle">Where Faith Meets Community</p>
+		<h1>Welcome to March of Faith Incorporated</h1>
+		<p class="subtitle">Situated in Tagbilaran, Bohol</p>
 		<div class="cta-buttons">
 			<a href="/contact" class="button primary">Join Us Sunday</a>
 			<a href="/about" class="button secondary">Learn More</a>
@@ -20,8 +20,7 @@
 	<div class="text-column">
 		<h2>Join Us in Worship</h2>
 		<p>
-			We are a welcoming community dedicated to spreading God's love and message. Join us for
-			worship services, community outreach, and spiritual growth.
+			We are March of Faith Incorporated, a welcoming church community in Tagbilaran, Bohol, dedicated to spreading God's love and message. Join us for worship services, community outreach, and spiritual growth.
 		</p>
 		<div class="service-times">
 			<h3>Service Times</h3>
