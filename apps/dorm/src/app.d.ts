@@ -42,7 +42,6 @@ declare global {
 			PUBLIC_RECAPTCHA_SITE_KEY: string;
 			PRIVATE_SERVICE_ROLE: string;
 			RECAPTCHA_SECRET_KEY: string;
-			PRIVATE_ADMIN_URL: string;
 		}
 	}
 }

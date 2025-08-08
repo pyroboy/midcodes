@@ -1,20 +1,27 @@
 import { createBrowserClient, createServerClient, type CookieOptions } from '@supabase/ssr';
 import type { Database } from '$lib/database.types';
-import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
+import { env as publicEnv } from '$env/dynamic/public';
 import type { Cookies } from '@sveltejs/kit';
 
 export const createSupabaseBrowserClient = () => {
-	return createBrowserClient<Database>(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, {
+    return createBrowserClient<Database>(
+        publicEnv.PUBLIC_SUPABASE_URL!,
+        publicEnv.PUBLIC_SUPABASE_ANON_KEY!,
+        {
 		auth: {
 			autoRefreshToken: true,
 			persistSession: true,
 			detectSessionInUrl: true
 		}
-	});
+        }
+    );
 };
 
 export const createSupabaseServerClient = ({ cookies }: { cookies: Cookies }) => {
-	return createServerClient<Database>(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, {
+    return createServerClient<Database>(
+        publicEnv.PUBLIC_SUPABASE_URL!,
+        publicEnv.PUBLIC_SUPABASE_ANON_KEY!,
+        {
 		cookies: {
 			get: (key: string) => {
 				const cookie = cookies.get(key);
@@ -27,5 +34,6 @@ export const createSupabaseServerClient = ({ cookies }: { cookies: Cookies }) =>
 				cookies.delete(key, { ...options, path: '/' });
 			}
 		}
-	});
+        }
+    );
 };

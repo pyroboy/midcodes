@@ -4,13 +4,8 @@ import { zod } from 'sveltekit-superforms/adapters';
 import { budgetSchema } from './schema';
 import type { Actions, PageServerLoad } from './$types';
 
-// Configure ISR for budget dashboard - moderate caching since budgets don't change frequently
-export const config = {
-	isr: {
-		expiration: 300, // Cache for 5 minutes
-		allowQuery: ['propertyId', 'year']
-	}
-};
+// Use Node runtime; avoid ISR on authed routes to prevent cache/redirect issues
+export const config = { runtime: 'nodejs20.x' };
 
 export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession } }) => {
 	const session = await safeGetSession();

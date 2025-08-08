@@ -2,7 +2,6 @@
   "$schema": "https://turbo.build/schema.json",
   "globalDependencies": ["**/.env", "**/.env.*local"],
   "globalEnv": [
-    "ADMIN_URL",
     "PRIVATE_SERVICE_ROLE",
     "RECAPTCHA_SECRET_KEY",
     "PUBLIC_SUPABASE_URL",

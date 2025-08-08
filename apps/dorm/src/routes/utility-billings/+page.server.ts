@@ -8,13 +8,8 @@ import { batchReadingsSchema, meterReadingSchema } from './meterReadingSchema';
 import type { z } from 'zod';
 import { getUserPermissions } from '$lib/services/permissions';
 
-// Optimize preloading by caching frequently accessed data
-export const config = {
-	isr: {
-		expiration: 60, // Cache for 1 minute due to real-time meter readings
-		allowQuery: ['propertyId', 'dateFilter']
-	}
-};
+// Use Node runtime; avoid ISR on authed routes to prevent cache/redirect issues
+export const config = { runtime: 'nodejs20.x' };
 
 export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession }, depends }) => {
 	const session = await safeGetSession();
