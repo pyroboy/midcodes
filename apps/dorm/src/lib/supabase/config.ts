@@ -1,9 +1,6 @@
-import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
-
-if (!PUBLIC_SUPABASE_URL) throw new Error('Missing PUBLIC_SUPABASE_URL');
-if (!PUBLIC_SUPABASE_ANON_KEY) throw new Error('Missing PUBLIC_SUPABASE_ANON_KEY');
+import { env as publicEnv } from '$env/dynamic/public';
 
 export const supabaseConfig = {
-	supabaseUrl: PUBLIC_SUPABASE_URL,
-	supabaseKey: PUBLIC_SUPABASE_ANON_KEY
+    supabaseUrl: publicEnv.PUBLIC_SUPABASE_URL,
+    supabaseKey: publicEnv.PUBLIC_SUPABASE_ANON_KEY
 };

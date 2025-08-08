@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import type { User, Session } from '@supabase/supabase-js';
 import { sequence } from '@sveltejs/kit/hooks';
 import { redirect, error as throwError } from '@sveltejs/kit';
-import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
+import { env as publicEnv } from '$env/dynamic/public';
 import type { Handle } from '@sveltejs/kit';
 import { jwtDecode } from 'jwt-decode';
 import { getUserPermissions } from '$lib/services/permissions';
@@ -17,7 +17,15 @@ export interface GetSessionResult {
 }
 
 const initializeSupabase: Handle = async ({ event, resolve }) => {
-	event.locals.supabase = createServerClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, {
+    const supabaseUrl = publicEnv.PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = publicEnv.PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+        console.error('Supabase environment variables are missing. Please set PUBLIC_SUPABASE_URL and PUBLIC_SUPABASE_ANON_KEY.');
+        throw throwError(500, 'Server configuration error');
+    }
+
+    event.locals.supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
 		cookies: {
 			get: (key) => event.cookies.get(key),
 			set: (key, value, options) => {
