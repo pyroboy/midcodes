@@ -22,8 +22,8 @@ export const transactionStatusEnum = z.enum([
 
 export type TransactionStatus = z.infer<typeof transactionStatusEnum>;
 
-// Define the main transaction schema based on the payments table structure
-export const transactionSchema = z.object({
+// Simplified payment schema for form submission
+export const paymentSchema = z.object({
 	id: z.number().optional(),
 	amount: z.number().positive('Amount must be positive'),
 	method: paymentMethodEnum,
@@ -31,15 +31,14 @@ export const transactionSchema = z.object({
 	paid_by: z.string().min(1, 'Paid by is required'),
 	paid_at: z.string().nullable().optional(),
 	notes: z.string().nullable().optional(),
-	receipt_url: z.string().nullable().optional(),
-	billing_ids: z.array(z.number()).optional(),
-	billing_changes: z.any().optional(), // Using any for JSONB type
-	created_by: z.string().uuid().nullable().optional(),
-	created_at: z.string().optional(),
-	updated_by: z.string().uuid().nullable().optional(),
-	updated_at: z.string().nullable().optional()
+	receipt_url: z.string().url('Must be a valid URL').or(z.literal('')).nullable().optional(),
+	billing_ids: z.array(z.number()).default([])
 });
 
+// Alias for backward compatibility
+export const transactionSchema = paymentSchema;
+
+export type Payment = z.infer<typeof paymentSchema>;
 export type Transaction = z.infer<typeof transactionSchema>;
 
 // Delete schema

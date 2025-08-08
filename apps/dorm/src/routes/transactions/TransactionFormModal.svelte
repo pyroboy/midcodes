@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { createEventDispatcher } from 'svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import * as Select from '$lib/components/ui/select';
@@ -17,23 +16,21 @@
 	import { zodClient } from 'sveltekit-superforms/adapters';
 	import { formatCurrency } from '$lib/utils/format';
 
-	// Props using Svelte 5 runes
+	// Props using Svelte 5 runes with callback props
     let {
         open = false,
         data,
         editMode = false,
-        transaction = null
+        transaction = null,
+        onClose,
+        onCancel
     } = $props<{
 		open?: boolean;
 		data: PageData;
 		editMode?: boolean;
         transaction?: Transaction | null;
-	}>();
-
-	// Event dispatcher
-	const dispatch = createEventDispatcher<{
-		close: void;
-		cancel: void;
+        onClose?: () => void;
+        onCancel?: () => void;
 	}>();
 
 	// Setup superForm within modal with proper defaults
@@ -48,7 +45,7 @@
 		billing_ids: []
 	};
 	
-	const { form, errors, enhance, constraints, submitting } = superForm(data.transactionForm || defaultFormData, {
+	const { form, errors, enhance, constraints, submitting } = superForm(data.form, {
 		validators: zodClient(transactionSchema),
 		resetForm: true,
 		onSubmit: ({ formData, cancel }) => {
@@ -59,7 +56,7 @@
 			console.log('📥 FORM RESULT: Received result:', result);
 			if (result.type === 'success') {
 				console.log('✅ FORM RESULT: Success - closing modal and invalidating data');
-				dispatch('close');
+				onClose?.();
 				// The payments page should handle invalidateAll
 			} else if (result.type === 'failure') {
 				console.error('❌ FORM RESULT: Failure:', result);
@@ -75,12 +72,12 @@
 
 	// Handle close
 	function handleClose() {
-		dispatch('close');
+		onClose?.();
 	}
 
 	// Handle cancel
 	function handleCancel() {
-		dispatch('cancel');
+		onCancel?.();
 	}
 
 	// Format date for input fields
@@ -99,21 +96,17 @@
 	let amountValue = $state<string | number>($form.amount ?? '');
 	let isPopulated = $state(false);
 	
-	// Advanced allocation management states
+	// Simplified allocation management states
 	let originalAmount = $state(0);
 	let relatedBillings = $state<any[]>([]);
-	let allocationPreview = $state<any[]>([]);
-	let billingStatuses = $state<any[]>([]);
+	let sortedAllocations = $state<any[]>([]);
+	let allocationOrder = $state<number[]>([]);
 	let validationErrors = $state<string[]>([]);
 	let amountChanged = $state(false);
-	
-	// Interactive allocation states
-	let allocationStrategy = $state<'priority' | 'proportional' | 'manual'>('priority');
-	let sortedAllocations = $state<any[]>([]);
-	let totalAllocated = $state(0);
-	let remainingToAllocate = $state(0);
-	let allocationOrder = $state<number[]>([]);
-	let showInteractiveMode = $state(false);
+
+	// Computed allocation summary values
+	let totalAllocated = $derived(sortedAllocations.reduce((sum, a) => sum + (a.allocatedAmount || 0), 0));
+	let remainingAmount = $derived(Number(amountValue) - totalAllocated);
 
 	// Initialize form fields when transaction prop changes (only once)
 	$effect(() => {
@@ -167,7 +160,7 @@
 		}
 	});
 	
-	// Handle amount changes separately to prevent infinite loops
+	// Handle amount changes - automatically recalculate priority allocations
 	$effect(() => {
 		if (isPopulated) {
 			const newAmount = Number(amountValue) || 0;
@@ -178,21 +171,15 @@
 				
 				if (newAmount !== originalAmount) {
 					amountChanged = true;
-					calculateAllocationPreview(newAmount);
-					
-					// Update interactive allocations without triggering infinite loop
-					if (sortedAllocations.length > 0 && showInteractiveMode) {
-						// Use a timeout to break the effect chain
+					// Automatically calculate priority-based allocations
+					if (sortedAllocations.length > 0) {
 						setTimeout(() => {
-							recalculateAllocations();
+							calculatePriorityAllocations(newAmount);
 						}, 0);
 					}
 				} else {
 					amountChanged = false;
-					allocationPreview = [];
-					if (!showInteractiveMode) {
-						validationErrors = [];
-					}
+					validationErrors = [];
 				}
 			}
 		}
@@ -212,20 +199,6 @@
 		}
 	});
 
-	// Debug: Track interactive mode visibility conditions (throttled)
-	let debugTimer: number | null = null;
-	$effect(() => {
-		if (debugTimer) clearTimeout(debugTimer);
-		debugTimer = setTimeout(() => {
-			console.log('🎯 INTERACTIVE MODE DEBUG:', {
-				editMode,
-				amountChanged,
-				showInteractiveMode,
-				sortedAllocationsLength: sortedAllocations.length,
-				shouldShowInteractive: editMode && (amountChanged || showInteractiveMode) && sortedAllocations.length > 0
-			});
-		}, 100);
-	});
 
 	// Convert payment data to transaction data format
 	function convertPaymentToTransaction(paymentData: any) {
@@ -233,7 +206,7 @@
 		console.log('🔄 DATA CONVERSION: Converting payment data:', snapshot);
 		
 		// Ensure we preserve existing billing allocations
-		let billingIds = [];
+		let billingIds: number[] = [];
 		
 		// Handle different possible billing ID formats
 		if (snapshot.billing_ids && Array.isArray(snapshot.billing_ids)) {
@@ -294,7 +267,7 @@
 			// Try to find billing data from available sources
 			if (data?.billings && data.billings.length > 0) {
 				// First try to find in unpaid billings (for new payments)
-				foundBillings = data.billings.filter(b => billingIds.includes(b.id));
+				foundBillings = data.billings.filter((b: any) => billingIds.includes(b.id));
 				console.log('🔍 BILLING LOAD: Found in data.billings:', foundBillings.length);
 			}
 			
@@ -344,126 +317,6 @@
 		}
 	}
 
-	// Calculate allocation preview when amount changes
-	function calculateAllocationPreview(newAmount: number) {
-		validationErrors = [];
-		
-		if (!relatedBillings || relatedBillings.length === 0) {
-			allocationPreview = [];
-			return;
-		}
-
-		console.log('🧮 ALLOCATION CALC: Calculating preview for amount:', newAmount, 'from original:', originalAmount);
-
-		try {
-			// Calculate the difference
-			const difference = newAmount - originalAmount;
-			
-			// Validation checks
-			if (newAmount < 0) {
-				validationErrors.push('Negative amounts will be processed as refunds');
-			}
-			
-			if (newAmount === 0) {
-				validationErrors.push('Zero amount will suggest payment deletion');
-			}
-
-			// Calculate new allocations (proportional distribution for now)
-			const totalOriginalBalance = relatedBillings.reduce((sum, billing) => sum + (billing.balance || 0), 0);
-			
-			if (newAmount > totalOriginalBalance) {
-				validationErrors.push(`Payment amount (${newAmount}) exceeds total outstanding balance (${totalOriginalBalance})`);
-			}
-
-			// Create allocation preview
-			allocationPreview = relatedBillings.map(billing => {
-				const originalAllocation = billing.balance || 0;
-				const proportion = totalOriginalBalance > 0 ? originalAllocation / totalOriginalBalance : 0;
-				const newAllocation = Math.min(newAmount * proportion, billing.balance || 0);
-				
-				// Calculate new status
-				let newStatus = billing.status;
-				const newBillingBalance = (billing.balance || 0) - newAllocation;
-				
-				if (newBillingBalance <= 0) {
-					newStatus = 'PAID';
-				} else if (newAllocation > 0) {
-					newStatus = 'PARTIAL';
-				} else {
-					newStatus = 'PENDING';
-				}
-
-				return {
-					...billing,
-					originalAllocation,
-					newAllocation: Math.round(newAllocation * 100) / 100, // Round to 2 decimal places
-					newStatus,
-					statusChanged: newStatus !== billing.status
-				};
-			});
-
-			console.log('✅ ALLOCATION CALC: Preview calculated:', allocationPreview);
-			
-		} catch (error) {
-			console.error('❌ ALLOCATION CALC: Error calculating preview:', error);
-			validationErrors.push('Error calculating allocation preview');
-		}
-	}
-
-	// Handle soft delete for zero amount payments
-	async function handleSoftDelete() {
-		const confirmed = confirm(
-			'This will delete the payment and restore the original billing balances. This action cannot be undone. Continue?'
-		);
-		
-		if (!confirmed) return;
-		
-		try {
-			console.log('🗑️ SOFT DELETE: Initiating soft delete for payment:', $form.id);
-			
-			// Create form data for soft delete action
-			const formData = new FormData();
-			formData.append('payment_id', String($form.id));
-			formData.append('reason', 'Payment amount changed to zero - soft deleted via edit');
-			
-			const response = await fetch('?/revert', {
-				method: 'POST',
-				body: formData
-			});
-			
-			if (response.ok) {
-				console.log('✅ SOFT DELETE: Payment soft deleted successfully');
-				dispatch('close');
-			} else {
-				console.error('❌ SOFT DELETE: Failed to soft delete payment');
-				alert('Failed to delete payment. Please try again.');
-			}
-		} catch (error) {
-			console.error('❌ SOFT DELETE: Error:', error);
-			alert('Error deleting payment. Please try again.');
-		}
-	}
-	
-	// Handle refund workflow for negative amounts
-	async function handleRefund() {
-		const confirmed = confirm(
-			`This will process a refund of $${Math.abs(Number(amountValue))} and adjust billing allocations accordingly. Continue?`
-		);
-		
-		if (!confirmed) return;
-		
-		try {
-			console.log('💰 REFUND: Processing refund for amount:', amountValue);
-			
-			// For now, we'll treat this as a regular update but with special handling
-			// In a full implementation, you might want a separate refund action
-			alert('Refund functionality will be implemented in the next phase. For now, please use the revert payment option.');
-			
-		} catch (error) {
-			console.error('❌ REFUND: Error:', error);
-			alert('Error processing refund. Please try again.');
-		}
-	}
 
 	// Initialize sorted allocations from billing data
 	function initializeSortedAllocations(billings: any[]) {
@@ -491,9 +344,8 @@
 			const allocation = {
 				...billing,
 				priority: index + 1,
-				allocatedAmount: 0, // Will be calculated based on strategy
-				maxAmount: billing.balance || 0,
-				isEditing: false
+				allocatedAmount: billing.balance || 0, // Show current balance as potential allocation
+				maxAmount: billing.balance || 0
 			};
 			
 			console.log('🎯 ALLOCATION INIT: Created allocation for billing', billingId, ':', allocation);
@@ -502,36 +354,25 @@
 		
 		console.log('🎯 ALLOCATION INIT: Created sorted allocations:', sortedAllocations.length);
 		
-		// Calculate initial allocations based on current strategy
-		recalculateAllocations();
-		
-		console.log('🎯 ALLOCATION INIT: Final sorted allocations after recalculation:', sortedAllocations.length);
-	}
-
-	// Recalculate allocations based on strategy and payment amount
-	function recalculateAllocations() {
-		const paymentAmount = Number(amountValue) || 0;
-		
-		switch (allocationStrategy) {
-			case 'priority':
-				calculatePriorityFillAllocations(paymentAmount);
-				break;
-			case 'proportional':
-				calculateProportionalAllocations(paymentAmount);
-				break;
-			case 'manual':
-				// In manual mode, don't auto-calculate - just validate
-				validateManualAllocations();
-				break;
+		// Calculate initial priority-based allocations
+		if (originalAmount > 0) {
+			calculatePriorityAllocations(originalAmount);
 		}
 		
-		updateTotalsAndValidation();
+		console.log('🎯 ALLOCATION INIT: Final sorted allocations after calculation:', sortedAllocations.length);
 	}
 
-	// Priority fill: Fill higher priority billings completely before moving to next
-	function calculatePriorityFillAllocations(paymentAmount: number) {
+	// Calculate priority-based allocations (simplified)
+	function calculatePriorityAllocations(paymentAmount: number) {
 		let remainingAmount = paymentAmount;
 		
+		// Update validation
+		const newValidationErrors = [];
+		if (paymentAmount <= 0) {
+			newValidationErrors.push(paymentAmount === 0 ? 'Zero amount payments are not allowed' : 'Negative amounts are not supported');
+		}
+		
+		// Calculate allocations based on priority order
 		sortedAllocations = sortedAllocations.map(allocation => {
 			if (remainingAmount <= 0) {
 				return { ...allocation, allocatedAmount: 0 };
@@ -545,103 +386,14 @@
 				allocatedAmount: Math.round(maxPossible * 100) / 100
 			};
 		});
+		
+		// Update validation errors
+		validationErrors = newValidationErrors;
+		
+		console.log('✅ PRIORITY ALLOCATION: Calculated for amount:', paymentAmount);
 	}
 
-	// Proportional: Distribute based on billing balance ratios
-	function calculateProportionalAllocations(paymentAmount: number) {
-		const totalBalance = sortedAllocations.reduce((sum, allocation) => sum + allocation.maxAmount, 0);
-		
-		if (totalBalance === 0) {
-			sortedAllocations = sortedAllocations.map(allocation => ({
-				...allocation,
-				allocatedAmount: 0
-			}));
-			return;
-		}
-		
-		sortedAllocations = sortedAllocations.map(allocation => {
-			const proportion = allocation.maxAmount / totalBalance;
-			const proportionalAmount = Math.min(paymentAmount * proportion, allocation.maxAmount);
-			
-			return {
-				...allocation,
-				allocatedAmount: Math.round(proportionalAmount * 100) / 100
-			};
-		});
-	}
-
-	// Manual: Just validate current manual allocations
-	function validateManualAllocations() {
-		// Keep existing allocated amounts, just validate them
-		sortedAllocations = sortedAllocations.map(allocation => ({
-			...allocation,
-			allocatedAmount: Math.min(allocation.allocatedAmount || 0, allocation.maxAmount)
-		}));
-	}
-
-	// Update totals and validation messages
-	function updateTotalsAndValidation() {
-		const newTotalAllocated = sortedAllocations.reduce((sum, allocation) => sum + (allocation.allocatedAmount || 0), 0);
-		const newRemainingToAllocate = Number(amountValue) - newTotalAllocated;
-		
-		// Only update if values actually changed
-		if (newTotalAllocated !== totalAllocated || newRemainingToAllocate !== remainingToAllocate) {
-			totalAllocated = newTotalAllocated;
-			remainingToAllocate = newRemainingToAllocate;
-			
-			// Update validation errors
-			const newValidationErrors = [];
-			
-			if (totalAllocated > Number(amountValue)) {
-				newValidationErrors.push(`Total allocated (${formatCurrency(totalAllocated)}) exceeds payment amount (${formatCurrency(Number(amountValue))})`);
-			}
-			
-			if (Number(amountValue) === 0) {
-				newValidationErrors.push('Zero amount will suggest payment deletion');
-			}
-			
-			if (Number(amountValue) < 0) {
-				newValidationErrors.push('Negative amounts will be processed as refunds');
-			}
-			
-			// Only update validation errors if they changed
-			if (JSON.stringify(newValidationErrors) !== JSON.stringify(validationErrors)) {
-				validationErrors = newValidationErrors;
-			}
-		}
-	}
-
-	// Handle individual allocation amount changes
-	function updateAllocationAmount(allocationIndex: number, newAmount: string) {
-		const amount = Math.max(0, Number(newAmount) || 0);
-		const allocation = sortedAllocations[allocationIndex];
-		
-		// Clamp to maximum available
-		const clampedAmount = Math.min(amount, allocation.maxAmount);
-		
-		sortedAllocations[allocationIndex] = {
-			...allocation,
-			allocatedAmount: Math.round(clampedAmount * 100) / 100
-		};
-		
-		// If we're in manual mode, just update totals
-		// In other modes, this would switch to manual mode
-		if (allocationStrategy !== 'manual') {
-			allocationStrategy = 'manual';
-		}
-		
-		updateTotalsAndValidation();
-	}
-
-	// Toggle interactive allocation mode
-	function toggleInteractiveMode() {
-		showInteractiveMode = !showInteractiveMode;
-		if (showInteractiveMode) {
-			recalculateAllocations();
-		}
-	}
-
-	// Drag and Drop functionality
+	// Drag and Drop functionality for priority reordering
 	let draggedIndex = $state<number | null>(null);
 
 	function handleDragStart(event: DragEvent, index: number) {
@@ -650,6 +402,7 @@
 			event.dataTransfer.effectAllowed = 'move';
 			event.dataTransfer.setData('text/html', '');
 		}
+		console.log('🚀 DRAG START: Started dragging allocation at index:', index);
 	}
 
 	function handleDragOver(event: DragEvent, index: number) {
@@ -667,6 +420,8 @@
 			return;
 		}
 
+		console.log('🎯 DRAG DROP: Moving from index', draggedIndex, 'to index', dropIndex);
+
 		// Reorder the allocations array
 		const newAllocations = [...sortedAllocations];
 		const [draggedItem] = newAllocations.splice(draggedIndex, 1);
@@ -678,21 +433,27 @@
 			priority: index + 1
 		}));
 		
-		// Update allocation order
+		// Update allocation order array
 		allocationOrder = sortedAllocations.map(a => a.id);
 		
-		// Recalculate allocations based on new priority order
-		if (allocationStrategy === 'priority') {
-			recalculateAllocations();
+		// Update form billing_ids to match new priority order
+		$form.billing_ids = [...allocationOrder];
+		
+		// Automatically recalculate allocations based on new priority order
+		const currentAmount = Number(amountValue) || originalAmount;
+		if (currentAmount > 0) {
+			calculatePriorityAllocations(currentAmount);
 		}
 		
-		console.log('🔄 DRAG DROP: Reordered allocations, new order:', allocationOrder);
+		console.log('✅ DRAG DROP: Reordered allocations, new order:', allocationOrder);
+		console.log('✅ DRAG DROP: Updated form billing_ids:', $form.billing_ids);
 		
 		draggedIndex = null;
 	}
 
 	function handleDragEnd() {
 		draggedIndex = null;
+		console.log('🏁 DRAG END: Drag operation completed');
 	}
 </script>
 
@@ -746,259 +507,126 @@
 							</div>
 						{/if}
 
-						<!-- Manual Interactive Mode Toggle (when no amount change) -->
-						{#if editMode && !amountChanged && !showInteractiveMode && sortedAllocations.length > 0}
-							<div class="p-3 bg-gray-50 rounded-md border text-center">
-								<Label class="text-sm text-gray-600">Want to adjust payment allocation?</Label>
-								<Button
-									type="button"
-									size="sm"
-									variant="outline"
-									onclick={toggleInteractiveMode}
-									class="mt-2 text-xs"
-								>
-									Enable Interactive Mode
-								</Button>
-							</div>
-						{/if}
-
-						<!-- Enhanced Interactive Allocation Management -->
-						{#if editMode && (amountChanged || showInteractiveMode) && sortedAllocations.length > 0}
-							<div class="space-y-4 p-4 bg-blue-50 rounded-md border border-blue-200">
-								
-								<!-- Header with Strategy Selector -->
+						<!-- Simplified Drag-and-Drop Allocation Manager -->
+						{#if editMode && sortedAllocations.length > 0}
+							<div class="space-y-4 p-4 bg-slate-50 rounded-md border">
 								<div class="flex items-center justify-between">
-									<Label class="text-blue-900">Interactive Allocation Management</Label>
-									<div class="flex items-center gap-2">
-										<Button
-											type="button"
-											size="sm"
-											variant="outline"
-											onclick={toggleInteractiveMode}
-											class="text-xs"
-										>
-											{showInteractiveMode ? 'Simple View' : 'Advanced Mode'}
-										</Button>
-										<div class="text-sm font-medium text-blue-700">
-											{formatCurrency(originalAmount)} → {formatCurrency(Number(amountValue))}
-										</div>
+									<Label class="text-slate-900">Billing Allocation Priority</Label>
+									<div class="text-sm text-slate-600">
+										Drag to reorder • Payment: {formatCurrency(Number(amountValue))}
 									</div>
 								</div>
-
-								{#if showInteractiveMode}
-									<!-- Allocation Strategy Selector -->
-									<div class="flex items-center gap-4 p-3 bg-white rounded border">
-										<Label class="text-sm font-medium">Strategy:</Label>
-										<div class="flex gap-2">
-											<button
-												type="button"
-												class="px-3 py-1 text-xs rounded {allocationStrategy === 'priority' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}"
-												onclick={() => {
-													allocationStrategy = 'priority';
-													recalculateAllocations();
-												}}
-											>
-												Priority Fill
-											</button>
-											<button
-												type="button"
-												class="px-3 py-1 text-xs rounded {allocationStrategy === 'proportional' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}"
-												onclick={() => {
-													allocationStrategy = 'proportional';
-													recalculateAllocations();
-												}}
-											>
-												Proportional
-											</button>
-											<button
-												type="button"
-												class="px-3 py-1 text-xs rounded {allocationStrategy === 'manual' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}"
-												onclick={() => {
-													allocationStrategy = 'manual';
-													updateTotalsAndValidation();
-												}}
-											>
-												Manual
-											</button>
-										</div>
-									</div>
-
-									<!-- Allocation Summary Panel -->
-									<div class="grid grid-cols-3 gap-4 p-3 bg-white rounded border text-center">
-										<div>
-											<div class="text-xs text-gray-500">Payment Amount</div>
-											<div class="font-medium text-lg">{formatCurrency(Number(amountValue))}</div>
-										</div>
-										<div>
-											<div class="text-xs text-gray-500">Total Allocated</div>
-											<div class="font-medium text-lg {totalAllocated > Number(amountValue) ? 'text-red-600' : 'text-green-600'}">
-												{formatCurrency(totalAllocated)}
-											</div>
-										</div>
-										<div>
-											<div class="text-xs text-gray-500">Remaining</div>
-											<div class="font-medium text-lg {remainingToAllocate < 0 ? 'text-red-600' : remainingToAllocate > 0 ? 'text-blue-600' : 'text-green-600'}">
-												{formatCurrency(remainingToAllocate)}
-											</div>
-										</div>
-									</div>
-								{/if}
 								
-								<!-- Interactive Allocation List -->
+								<!-- Simple Drag-and-Drop List with Real-time Allocation Display -->
 								<div class="space-y-2">
 									{#each sortedAllocations as allocation, index}
-										{@const currentStatus = allocation.status}
-										{@const newStatus = allocation.allocatedAmount >= allocation.maxAmount ? 'PAID' : allocation.allocatedAmount > 0 ? 'PARTIAL' : 'PENDING'}
 										<div 
-											class="bg-white rounded p-3 border {showInteractiveMode ? 'border-l-4 border-l-blue-500' : ''} {draggedIndex === index ? 'opacity-50' : ''} transition-opacity"
-											draggable={showInteractiveMode}
+											class="bg-white rounded-lg p-4 border-2 {draggedIndex === index ? 'opacity-50 border-blue-300 shadow-lg' : 'border-slate-200'} hover:border-slate-300 transition-all cursor-move"
+											draggable="true"
+											role="listitem"
 											ondragstart={(e) => handleDragStart(e, index)}
 											ondragover={(e) => handleDragOver(e, index)}
 											ondrop={(e) => handleDrop(e, index)}
 											ondragend={handleDragEnd}
 										>
-											<div class="flex items-center gap-3">
-												
-												{#if showInteractiveMode}
-													<!-- Drag Handle & Priority -->
-													<div class="flex flex-col items-center">
-														<div class="cursor-move text-gray-400 hover:text-gray-600 select-none" title="Drag to reorder priority">
-															⋮⋮
-														</div>
-														<div class="text-xs bg-blue-600 text-white rounded-full w-5 h-5 flex items-center justify-center">
-															{allocation.priority}
-														</div>
+											<div class="flex items-start gap-4">
+												<!-- Priority Badge & Drag Handle -->
+												<div class="flex flex-col items-center">
+													<div class="text-gray-400 text-lg select-none mb-1" title="Drag to reorder priority">
+														⋮⋮
 													</div>
-												{/if}
+													<div class="text-sm bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold">
+														{allocation.priority}
+													</div>
+												</div>
 												
 												<!-- Billing Info -->
 												<div class="flex-1">
-													<div class="font-medium text-sm">
-														Billing #{allocation.id} - {allocation.type}
-														{#if allocation.utility_type}({allocation.utility_type}){/if}
-													</div>
-													<div class="text-xs text-gray-600">
-														{#if allocation.lease?.name}
-															{allocation.lease.name} 
-														{/if}
-														{#if allocation.lease?.rental_unit?.rental_unit_number}
-															- Unit {allocation.lease.rental_unit.rental_unit_number}
-														{/if}
-													</div>
-												</div>
-												
-												<!-- Allocation Controls -->
-												<div class="text-right space-y-1">
-													{#if showInteractiveMode}
-														<div class="flex items-center gap-2">
-															<Input
-																type="number"
-																value={allocation.allocatedAmount || 0}
-																max={allocation.maxAmount}
-																min="0"
-																step="0.01"
-																class="w-24 text-right text-sm"
-																oninput={(e) => updateAllocationAmount(index, e.target.value)}
-															/>
-															<span class="text-xs text-gray-500">
-																/ {formatCurrency(allocation.maxAmount)}
-															</span>
+													<div class="flex items-start justify-between">
+														<div>
+															<div class="font-semibold text-base text-slate-900">
+																Billing #{allocation.id} - {allocation.type}
+																{#if allocation.utility_type}({allocation.utility_type}){/if}
+															</div>
+															<div class="text-sm text-slate-600">
+																{#if allocation.lease?.name}
+																	{allocation.lease.name}
+																{/if}
+																{#if allocation.lease?.rental_unit?.rental_unit_number}
+																	- Unit {allocation.lease.rental_unit.rental_unit_number}
+																{/if}
+															</div>
 														</div>
-													{:else}
-														<div class="text-sm">
-															<span class="font-medium">{formatCurrency(allocation.allocatedAmount || 0)}</span>
-															<span class="text-xs text-gray-500">/ {formatCurrency(allocation.maxAmount)}</span>
+														
+														<!-- Real-time Allocation Display -->
+														<div class="text-right">
+															<div class="text-lg font-bold {allocation.allocatedAmount > 0 ? 'text-green-700' : 'text-slate-400'}">
+																{formatCurrency(allocation.allocatedAmount || 0)}
+															</div>
+															<div class="text-xs text-slate-500 mb-2">
+																of {formatCurrency(allocation.maxAmount)} due
+															</div>
+															<!-- Enhanced Visual allocation bar -->
+															<div class="w-20 bg-slate-200 rounded-full h-2">
+																<div 
+																	class="h-2 rounded-full transition-all duration-500 ease-out {allocation.allocatedAmount >= allocation.maxAmount ? 'bg-green-500' : allocation.allocatedAmount > 0 ? 'bg-blue-500' : 'bg-slate-300'}"
+																	style="width: {Math.min(100, ((allocation.allocatedAmount || 0) / allocation.maxAmount) * 100)}%"
+																></div>
+															</div>
+															<div class="text-xs {allocation.allocatedAmount >= allocation.maxAmount ? 'text-green-600 font-medium' : allocation.allocatedAmount > 0 ? 'text-blue-600' : 'text-slate-500'} mt-1">
+																{Math.round(((allocation.allocatedAmount || 0) / allocation.maxAmount) * 100)}%
+																{#if allocation.allocatedAmount >= allocation.maxAmount}
+																	✓ Fully Paid
+																{:else if allocation.allocatedAmount > 0}
+																	Paid
+																{:else}
+																	Unpaid
+																{/if}
+															</div>
 														</div>
-													{/if}
-													
-													<!-- Status Indicators -->
-													<div class="flex items-center gap-2 justify-end">
-														<span class="px-2 py-1 text-xs rounded {currentStatus === 'PAID' ? 'bg-green-100 text-green-800' : currentStatus === 'PARTIAL' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'}">
-															{currentStatus}
-														</span>
-														{#if newStatus !== currentStatus}
-															<span class="text-xs">→</span>
-															<span class="px-2 py-1 text-xs rounded {newStatus === 'PAID' ? 'bg-green-100 text-green-800' : newStatus === 'PARTIAL' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'}">
-																{newStatus}
-															</span>
-														{/if}
 													</div>
 												</div>
 											</div>
-											
-											{#if showInteractiveMode}
-												<!-- Progress Bar -->
-												<div class="mt-2">
-													<div class="w-full bg-gray-200 rounded-full h-2">
-														<div 
-															class="h-2 rounded-full {(allocation.allocatedAmount || 0) >= allocation.maxAmount ? 'bg-green-500' : 'bg-blue-500'}"
-															style="width: {Math.min(100, ((allocation.allocatedAmount || 0) / allocation.maxAmount) * 100)}%"
-														></div>
-													</div>
-													<div class="text-xs text-gray-500 mt-1">
-														{Math.round(((allocation.allocatedAmount || 0) / allocation.maxAmount) * 100)}% allocated
-													</div>
-												</div>
-											{/if}
 										</div>
 									{/each}
 								</div>
 								
-								{#if showInteractiveMode}
-									<!-- Smart Action Buttons -->
-									<div class="flex flex-wrap gap-2 pt-2 border-t">
-										<Button
-											type="button"
-											size="sm"
-											variant="outline"
-											onclick={() => {
-												allocationStrategy = 'priority';
-												recalculateAllocations();
-											}}
-											class="text-xs"
-										>
-											Auto-Fill Priority
-										</Button>
-										<Button
-											type="button"
-											size="sm"
-											variant="outline"
-											onclick={() => {
-												allocationStrategy = 'proportional';
-												recalculateAllocations();
-											}}
-											class="text-xs"
-										>
-											Distribute Proportionally
-										</Button>
-										<Button
-											type="button"
-											size="sm"
-											variant="outline"
-											onclick={() => {
-												sortedAllocations = sortedAllocations.map(a => ({ ...a, allocatedAmount: 0 }));
-												allocationStrategy = 'manual';
-												updateTotalsAndValidation();
-											}}
-											class="text-xs"
-										>
-											Clear All
-										</Button>
+								<!-- Real-time Allocation Summary -->
+								<div class="border-t pt-4 mt-4 bg-white rounded-lg p-4">
+									<div class="flex items-center justify-between text-base mb-2">
+										<span class="font-semibold text-slate-700">Payment Total:</span>
+										<span class="font-bold text-blue-700 text-lg">{formatCurrency(Number(amountValue))}</span>
 									</div>
-								{/if}
-								
-								<!-- Summary (always visible) -->
-								<div class="text-sm text-blue-700 bg-blue-100 rounded p-2">
-									<strong>Summary:</strong> 
-									{#if showInteractiveMode}
-										{formatCurrency(totalAllocated)} of {formatCurrency(Number(amountValue))} allocated
-										{#if remainingToAllocate !== 0}
-											({remainingToAllocate > 0 ? `${formatCurrency(remainingToAllocate)} remaining` : `${formatCurrency(Math.abs(remainingToAllocate))} over-allocated`})
-										{/if}
-									{:else if Number(amountValue) > originalAmount}
-										Increasing payment by {formatCurrency(Number(amountValue) - originalAmount)}
-									{:else if Number(amountValue) < originalAmount}
-										Reducing payment by {formatCurrency(originalAmount - Number(amountValue))}
+									<div class="flex items-center justify-between text-sm">
+										<span class="text-slate-600">Amount Allocated:</span>
+										<span class="font-semibold {totalAllocated > 0 ? 'text-green-600' : 'text-slate-500'}">{formatCurrency(totalAllocated)}</span>
+									</div>
+									{#if remainingAmount !== 0}
+										<div class="flex items-center justify-between text-sm mt-1">
+											<span class="text-slate-600">
+												{#if remainingAmount > 0}
+													Remaining:
+												{:else}
+													Over-allocated:
+												{/if}
+											</span>
+											<span class="font-semibold {remainingAmount > 0 ? 'text-orange-600' : 'text-red-600'}">{formatCurrency(Math.abs(remainingAmount))}</span>
+										</div>
+									{/if}
+									{#if amountChanged}
+										<div class="text-sm text-blue-600 mt-3 p-3 bg-blue-50 rounded-lg">
+											<div class="font-semibold flex items-center gap-2">
+												💡 Live Allocation Preview:
+												{#if Number(amountValue) > originalAmount}
+													<span class="text-green-600">+{formatCurrency(Number(amountValue) - originalAmount)}</span>
+												{:else if Number(amountValue) < originalAmount}
+													<span class="text-red-600">-{formatCurrency(originalAmount - Number(amountValue))}</span>
+												{/if}
+											</div>
+											<div class="text-xs mt-1">
+												Payment allocated by priority order (higher priority first). Drag items to change priority.
+											</div>
+										</div>
 									{/if}
 								</div>
 							</div>
@@ -1149,31 +777,9 @@
 
 						<div class="mt-6 flex justify-end gap-2">
 							<Button type="button" variant="outline" onclick={handleCancel}>Cancel</Button>
-							
-							<!-- Smart Action Buttons -->
-							{#if editMode && Number(amountValue) === 0}
-								<Button 
-									type="button" 
-									variant="destructive" 
-									onclick={() => handleSoftDelete()}
-									disabled={$submitting}
-								>
-									{$submitting ? 'Deleting...' : 'Delete Payment'}
-								</Button>
-							{:else if editMode && Number(amountValue) < 0}
-								<Button 
-									type="button" 
-									variant="secondary" 
-									onclick={() => handleRefund()}
-									disabled={$submitting}
-								>
-									{$submitting ? 'Processing...' : 'Process Refund'}
-								</Button>
-							{:else}
-								<Button type="submit" disabled={$submitting || validationErrors.some(e => e.includes('exceeds'))}>
-									{$submitting ? 'Saving...' : editMode ? 'Update Payment' : 'Save Payment'}
-								</Button>
-							{/if}
+							<Button type="submit" disabled={$submitting || validationErrors.length > 0}>
+								{$submitting ? 'Saving...' : editMode ? 'Update Payment' : 'Save Payment'}
+							</Button>
 						</div>
 					</div>
 				</form>

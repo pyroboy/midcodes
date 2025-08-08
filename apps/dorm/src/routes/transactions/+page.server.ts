@@ -4,6 +4,106 @@ import { zod } from 'sveltekit-superforms/adapters';
 import { transactionSchema } from './schema';
 import type { Actions, PageServerLoad } from './$types';
 
+// Manual payment creation function
+async function createPaymentManually(supabase: any, transactionData: any, userId: string, form: any) {
+	// Start a transaction
+	const { data: payment, error: paymentError } = await supabase
+		.from('payments')
+		.insert({
+			amount: transactionData.amount,
+			method: transactionData.method,
+			reference_number: transactionData.reference_number,
+			paid_by: transactionData.paid_by,
+			paid_at: transactionData.paid_at || new Date().toISOString(),
+			notes: transactionData.notes,
+			receipt_url: transactionData.receipt_url,
+			created_by: userId,
+			billing_ids: transactionData.billing_ids || []
+		})
+		.select()
+		.single();
+
+	if (paymentError) {
+		console.error('Error creating payment:', paymentError);
+		return fail(500, { form, message: 'Failed to create payment' });
+	}
+
+	// If no billing IDs, just return the standalone payment
+	if (!transactionData.billing_ids || transactionData.billing_ids.length === 0) {
+		return { form, success: true, operation: 'create', transaction: payment };
+	}
+
+	// Process billing allocations manually
+	let remainingAmount = transactionData.amount;
+	const paymentAllocations = [];
+
+	for (const billingId of transactionData.billing_ids) {
+		if (remainingAmount <= 0) break;
+
+		// Get current billing details
+		const { data: billing, error: billingError } = await supabase
+			.from('billings')
+			.select('*')
+			.eq('id', billingId)
+			.single();
+
+		if (billingError || !billing) {
+			console.error('Error fetching billing:', billingError);
+			continue;
+		}
+
+		// Calculate amount to apply to this billing
+		const currentBalance = billing.balance || 0;
+		const amountToApply = Math.min(remainingAmount, currentBalance);
+
+		if (amountToApply > 0) {
+			// Create payment allocation record
+			const { error: allocationError } = await supabase
+				.from('payment_allocations')
+				.insert({
+					payment_id: payment.id,
+					billing_id: billingId,
+					amount: amountToApply
+				});
+
+			if (allocationError) {
+				console.error('Error creating payment allocation:', allocationError);
+				continue;
+			}
+
+			// Update billing record
+			const newPaidAmount = (billing.paid_amount || 0) + amountToApply;
+			const newBalance = billing.amount + (billing.penalty_amount || 0) - newPaidAmount;
+			const newStatus = newBalance <= 0 ? 'PAID' : 'PARTIAL';
+
+			const { error: updateError } = await supabase
+				.from('billings')
+				.update({
+					paid_amount: newPaidAmount,
+					balance: newBalance,
+					status: newStatus,
+					updated_at: new Date().toISOString()
+				})
+				.eq('id', billingId);
+
+			if (updateError) {
+				console.error('Error updating billing:', updateError);
+				continue;
+			}
+
+			paymentAllocations.push({ billing_id: billingId, amount: amountToApply });
+			remainingAmount -= amountToApply;
+		}
+	}
+
+	return { 
+		form,
+		success: true, 
+		operation: 'create', 
+		transaction: { ...payment, allocations: paymentAllocations } 
+	};
+}
+
 export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession }, url }) => {
 	const session = await safeGetSession();
 	if (!session) {
@@ -103,16 +203,52 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
       })
     );
 
+    // Fetch detailed billing records for all referenced billing_ids
+    const allBillingIds = Array.from(
+      new Set(
+        transactions.flatMap((t: any) => (Array.isArray(t.billing_ids) ? t.billing_ids : [])).filter(Boolean)
+      )
+    );
+
+    let billingsById: Record<number, any> = {};
+    if (allBillingIds.length > 0) {
+      const { data: billingsData, error: billingsError } = await supabase
+        .from('billings')
+        .select(`
+          id,
+          type,
+          utility_type,
+          amount,
+          paid_amount,
+          balance,
+          status,
+          due_date,
+          lease:leases(id, name,
+            rental_unit:rental_unit(
+              rental_unit_number,
+              floor:floors(floor_number, wing)
+            )
+          )
+        `)
+        .in('id', allBillingIds);
+      if (!billingsError && billingsData) {
+        for (const b of billingsData) {
+          billingsById[b.id] = b;
+        }
+      }
+    }
+
 		console.log('Transactions loaded:', transactions.length);
 
 		// Create form for superForm
 		const form = await superValidate(zod(transactionSchema));
 
-		return {
-			transactions,
-			form,
-			user: session.user
-		};
+    return {
+      transactions,
+      form,
+      user: session.user,
+      billingsById
+    };
 	} catch (err) {
 		console.error('Error in load function:', err);
 		throw error(500, 'An error occurred while loading transactions');
@@ -169,58 +305,8 @@ export const actions: Actions = {
               return fail(500, { form, message: 'Failed to replace transaction' });
             }
 
-            // Create replacement via RPC or standalone
-            const hasBillings = Array.isArray(transactionData.billing_ids) && transactionData.billing_ids.length > 0;
-            if (!hasBillings) {
-              const { data, error: insertError } = await supabase
-                .from('payments')
-                .insert({
-                  amount: transactionData.amount,
-                  method: transactionData.method,
-                  reference_number: transactionData.reference_number,
-                  paid_by: transactionData.paid_by,
-                  paid_at: transactionData.paid_at || new Date().toISOString(),
-                  notes: transactionData.notes,
-                  receipt_url: transactionData.receipt_url,
-                  created_by: session.user.id,
-                  billing_ids: []
-                })
-                .select();
-              if (insertError) {
-                console.error('Failed to create replacement transaction:', insertError);
-                return fail(500, { form, message: 'Failed to create replacement transaction' });
-              }
-              return { form, success: true, operation: 'replace', transaction: data?.[0] };
-            } else {
-              const isSecurityDeposit = transactionData.method === 'SECURITY_DEPOSIT';
-              const rpcName = isSecurityDeposit ? 'create_security_deposit_payment' : 'create_payment';
-              const payload: any = isSecurityDeposit
-                ? {
-                    p_amount: transactionData.amount,
-                    p_billing_ids: transactionData.billing_ids,
-                    p_paid_by: transactionData.paid_by,
-                    p_paid_at: transactionData.paid_at || new Date().toISOString(),
-                    p_reference_number: transactionData.reference_number,
-                    p_notes: transactionData.notes,
-                    p_created_by: session.user.id
-                  }
-                : {
-                    p_amount: transactionData.amount,
-                    p_method: transactionData.method,
-                    p_billing_ids: transactionData.billing_ids,
-                    p_paid_by: transactionData.paid_by,
-                    p_paid_at: transactionData.paid_at || new Date().toISOString(),
-                    p_reference_number: transactionData.reference_number,
-                    p_notes: transactionData.notes,
-                    p_created_by: session.user.id
-                  };
-              const { data, error: rpcError } = await supabase.rpc(rpcName, payload);
-              if (rpcError) {
-                console.error('Failed to create replacement via RPC:', rpcError);
-                return fail(500, { form, message: `Failed to create replacement: ${rpcError.message}` });
-              }
-              return { form, success: true, operation: 'replace', transaction: data };
-            }
+            // Create replacement manually
+            return await createPaymentManually(supabase, transactionData, session.user.id, form);
           }
 
           const { data, error: updateError } = await supabase
@@ -244,62 +330,8 @@ export const actions: Actions = {
 
           return { form, success: true, operation: 'update', transaction: data?.[0] };
         } else {
-          // Creation via robust RPC to ensure correct billing updates
-          if (!transactionData.billing_ids || transactionData.billing_ids.length === 0) {
-            // Fallback: create a standalone payment record (no billing linkage)
-            const { data, error: insertError } = await supabase
-              .from('payments')
-              .insert({
-                amount: transactionData.amount,
-                method: transactionData.method,
-                reference_number: transactionData.reference_number,
-                paid_by: transactionData.paid_by,
-                paid_at: transactionData.paid_at || new Date().toISOString(),
-                notes: transactionData.notes,
-                receipt_url: transactionData.receipt_url,
-                created_by: session.user.id,
-                billing_ids: []
-              })
-              .select();
-
-            if (insertError) {
-              console.error('Error creating standalone transaction:', insertError);
-              return fail(500, { form, message: 'Failed to create transaction' });
-            }
-
-            return { form, success: true, operation: 'create', transaction: data?.[0] };
-          }
-
-          const isSecurityDeposit = transactionData.method === 'SECURITY_DEPOSIT';
-          const rpcName = isSecurityDeposit ? 'create_security_deposit_payment' : 'create_payment';
-          const payload: any = isSecurityDeposit
-            ? {
-                p_amount: transactionData.amount,
-                p_billing_ids: transactionData.billing_ids,
-                p_paid_by: transactionData.paid_by,
-                p_paid_at: transactionData.paid_at || new Date().toISOString(),
-                p_reference_number: transactionData.reference_number,
-                p_notes: transactionData.notes,
-                p_created_by: session.user.id
-              }
-            : {
-                p_amount: transactionData.amount,
-                p_method: transactionData.method,
-                p_billing_ids: transactionData.billing_ids,
-                p_paid_by: transactionData.paid_by,
-                p_paid_at: transactionData.paid_at || new Date().toISOString(),
-                p_reference_number: transactionData.reference_number,
-                p_notes: transactionData.notes,
-                p_created_by: session.user.id
-              };
-
-          const { data, error: rpcError } = await supabase.rpc(rpcName, payload);
-          if (rpcError) {
-            console.error('Error creating transaction via RPC:', rpcError);
-            return fail(500, { form, message: `Failed to create transaction: ${rpcError.message}` });
-          }
-
-          return { form, success: true, operation: 'create', transaction: data };
+          // Manual payment creation without RPC functions
+          return await createPaymentManually(supabase, transactionData, session.user.id, form);
         }
       } catch (err) {
 			console.error('Error in upsert operation:', err);

@@ -8,15 +8,45 @@ import type {
 } from './schema';
 import type { SuperValidated, SuperForm } from 'sveltekit-superforms';
 
-// Export types from schema
-export type Transaction = z.infer<typeof transactionSchema> & {
+// Primary Payment types aligned with database schema
+export type Payment = z.infer<typeof transactionSchema> & {
     lease_name?: string | null;
-    allocations?: { billing_id: number; amount: number }[];
+    allocations?: PaymentAllocation[];
 };
+
+// Alias for backward compatibility (since component still uses "Transaction")
+export type Transaction = Payment;
+
 export type PaymentMethod = z.infer<typeof paymentMethodEnum>;
 export type TransactionStatus = z.infer<typeof transactionStatusEnum>;
 export type DateRange = z.infer<typeof dateRangeSchema>;
 export type TransactionFilter = z.infer<typeof transactionFilterSchema>;
+
+// Payment allocation structure matching payment_allocations table
+export interface PaymentAllocation {
+	id?: number;
+	payment_id?: number;
+	billing_id: number;
+	amount: number;
+	created_at?: string;
+}
+
+// Simplified billing interface for selection in payment form
+export interface BillingForPayment {
+	id: number;
+	lease_id: number;
+	type: 'RENT' | 'UTILITY' | 'SECURITY_DEPOST' | 'OTHER';
+	utility_type: 'WATER' | 'ELECTRICITY' | 'INTERNET' | null;
+	amount: number;
+	balance: number;
+	due_date: string;
+	lease?: {
+		name: string;
+		rental_unit?: {
+			rental_unit_number: string;
+		};
+	};
+}
 
 // Additional types for the UI
 export interface TransactionTableRow {
@@ -34,8 +64,8 @@ export interface TransactionTableRow {
 	updated_by_name?: string;
 }
 
-// Extended Transaction interface with profile data
-export interface TransactionWithProfiles extends Transaction {
+// Extended Payment interface with profile data
+export interface PaymentWithProfiles extends Payment {
 	created_by_profile?: {
 		id: string;
 		full_name: string;
@@ -49,6 +79,9 @@ export interface TransactionWithProfiles extends Transaction {
 	billing_lease?: any;
 	lease_name?: string | null;
 }
+
+// Alias for backward compatibility
+export interface TransactionWithProfiles extends PaymentWithProfiles {}
 
 export interface TransactionFilterOptions {
 	method?: PaymentMethod;
@@ -71,53 +104,28 @@ export interface User {
 	[key: string]: any;
 }
 
-// Database table structure based on the SQL definition
+// Database table structure exactly matching the payments table from DORMSCHEMA.md
 export interface PaymentDB {
 	id: number;
-	amount: number;
+	amount: number; // numeric(10,2)
 	method: PaymentMethod;
 	reference_number: string | null;
 	paid_by: string;
-	paid_at: string; // timestamp
+	paid_at: string; // timestamp with time zone
 	notes: string | null;
-	created_at: string; // timestamp
+	created_at: string; // timestamp with time zone
 	receipt_url: string | null;
 	created_by: string | null; // UUID
 	updated_by: string | null; // UUID
-	updated_at: string | null; // timestamp
-	billing_ids: number[];
-	billing_changes: any; // JSONB
+	updated_at: string | null; // timestamp with time zone
+	billing_ids: number[]; // integer array
+	billing_id: number | null; // legacy field, nullable
 }
 
-// Generic form props helper type
-export type FormProps<T extends z.ZodTypeAny> = {
-	form: z.infer<T>;
-	errors: Record<string, string | string[] | undefined>;
-	enhance: SuperForm<SuperValidated<z.infer<T>, unknown, z.infer<T>>>['enhance'];
-	constraints?: Record<string, unknown>;
-	submitting?: boolean;
-	editMode?: boolean;
-};
-
-// Specific form props type
-export type TransactionFormProps = FormProps<typeof transactionSchema>;
-
-// Receipt details interface
-export interface ReceiptDetails {
-	id: number;
-	url: string;
-	filename: string;
-	uploadedAt: string;
-	fileSize?: number;
-}
-
-// Billing details interface
-export interface BillingDetails {
-	id: number;
-	amount: number;
-	description: string;
-	status: string;
-	dueDate: string;
-	tenantName?: string;
-	unitName?: string;
+// Simplified form state interface for the component
+export interface PaymentFormState {
+	form: any;
+	errors: any;
+	enhance: any;
+	submitting: boolean;
 }

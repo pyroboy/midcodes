@@ -40,10 +40,7 @@
 		onTenantUpdate?: (tenant: any) => void;
 	}>();
 
-	// Debug logging
-	$effect(() => {
-		// Modal props changed - no longer needed for debugging
-	});
+
 
 	// Profile picture state
 	let profilePictureFile: File | null = $state(null);

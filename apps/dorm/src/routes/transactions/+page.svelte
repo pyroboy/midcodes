@@ -290,15 +290,10 @@
 			open={showFormModal}
 			{data}
 			editMode={!!selectedTransaction}
-			{form}
-			{errors}
-			{enhance}
-			{constraints}
-			{submitting}
 			transaction={selectedTransaction}
-			on:close={handleCloseFormModal}
-			on:cancel={handleCloseFormModal}
-		/>
+			onClose={handleCloseFormModal}
+			onCancel={handleCloseFormModal}
+		/> 
 	{/if}
 
 	{#if showDetailsModal && selectedTransaction}
