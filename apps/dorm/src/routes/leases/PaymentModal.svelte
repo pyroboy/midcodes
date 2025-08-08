@@ -13,7 +13,8 @@
 	const {
 		lease,
 		isOpen = false,
-		onOpenChange
+		onOpenChange,
+		onDataChange
 	} = $props<{
 		lease: {
 			id: string;
@@ -24,6 +25,7 @@
 		};
 		isOpen?: boolean;
 		onOpenChange: (open: boolean) => void;
+		onDataChange?: () => Promise<void>;
 	}>();
 
 	type PaymentMethod = {
@@ -176,7 +178,11 @@
 			// It's safer to check for a successful response status before parsing JSON
 			if (response.ok) {
 				toast.success('Payment submitted successfully!');
-				await invalidateAll();
+				if (onDataChange) {
+					await onDataChange();
+				} else {
+					await invalidateAll();
+				}
 				onOpenChange(false);
 			} else {
 				// Try to parse error from JSON, but have a fallback

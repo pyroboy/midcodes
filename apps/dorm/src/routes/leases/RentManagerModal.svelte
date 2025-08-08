@@ -18,10 +18,11 @@
 	import { invalidateAll } from '$app/navigation';
 	import DatePicker from '$lib/components/ui/date-picker.svelte';
 
-	let { lease, open, onOpenChange } = $props<{
+	let { lease, open, onOpenChange, onDataChange } = $props<{
 		lease: Lease;
 		open: boolean;
 		onOpenChange: (open: boolean) => void;
+		onDataChange?: () => Promise<void>;
 	}>();
 
 	type MonthlyRent = {
@@ -218,7 +219,11 @@
 			});
 
 			// Force refresh of all lease data
-			await invalidateAll();
+			if (onDataChange) {
+				await onDataChange();
+			} else {
+				await invalidateAll();
+			}
 
 			// Reset original data to current state after successful save
 			originalMonthlyRents = JSON.parse(JSON.stringify(monthlyRents));

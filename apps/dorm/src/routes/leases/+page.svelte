@@ -1,15 +1,16 @@
 <script lang="ts">
-	import { invalidateAll } from '$app/navigation';
+	import { invalidateAll, invalidate } from '$app/navigation';
 	import LeaseFormModal from './LeaseFormModal.svelte';
 	import LeaseList from './LeaseList.svelte';
 	import { Button } from '$lib/components/ui/button';
-	import { Plus } from 'lucide-svelte';
+	import { Plus, Printer } from 'lucide-svelte';
 	import type { z } from 'zod';
 	import { leaseSchema } from './formSchema';
 	import { calculateLeaseBalanceStatus } from '$lib/utils/lease-status';
 	import { formatCurrency } from '$lib/utils/format';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { onMount } from 'svelte';
+	import { printAllLeases } from '$lib/utils/print';
 
 	type FormType = z.infer<typeof leaseSchema>;
 
@@ -25,9 +26,9 @@
 	// Add activeFilter state for summary card filtering
 	let activeFilter = $state<'all' | 'paid' | 'pending' | 'partial' | 'overdue'>('all');
 
-	// Load data lazily on mount
-	onMount(async () => {
-		if (data.lazy && data.leasesPromise && data.tenantsPromise && data.rentalUnitsPromise) {
+	// Function to load data from promises
+	async function loadDataFromPromises() {
+		if (data.leasesPromise && data.tenantsPromise && data.rentalUnitsPromise) {
 			try {
 				const [loadedLeases, loadedTenants, loadedRentalUnits] = await Promise.all([
 					data.leasesPromise,
@@ -43,6 +44,32 @@
 				console.error('Error loading lease data:', error);
 				isLoading = false;
 			}
+		}
+	}
+
+	// Function to refresh data after server actions
+	async function refreshData() {
+		isLoading = true;
+		try {
+			// Invalidate all dependencies to get fresh data
+			await invalidateAll();
+			
+			// After invalidation, the data object should have new promises
+			// We need to wait for the next tick to ensure data is updated
+			await new Promise(resolve => setTimeout(resolve, 0));
+			
+			// Reload data from new promises
+			await loadDataFromPromises();
+		} catch (error) {
+			console.error('Error refreshing data:', error);
+			isLoading = false;
+		}
+	}
+
+	// Load data lazily on mount
+	onMount(async () => {
+		if (data.lazy) {
+			await loadDataFromPromises();
 		}
 	});
 
@@ -122,6 +149,11 @@
 		activeFilter = filter;
 	}
 
+	function handlePrintAllLeases() {
+		// Use the filtered leases that are currently displayed
+		printAllLeases(filteredLeases);
+	}
+
 	async function handleDeleteLease(
 		lease: FormType & {
 			billings?: { paid_amount: number }[];
@@ -164,9 +196,8 @@
 			const response = await result.json();
 
 			if (result.ok) {
-				leases = leases.filter((l) => l.id !== lease.id);
-				// No need to invalidateAll since we're already updating the local state
-				// await invalidateAll();
+				// Refresh data to get latest state from server
+				await refreshData();
 				// Show success message
 				alert(
 					`Lease "${lease.name}" has been successfully archived. Payment history has been preserved.`
@@ -310,13 +341,24 @@
 					</button>
 				</div>
 
-				<Button
-					onclick={handleAddLease}
-					class="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all duration-200"
-				>
-					<Plus class="w-4 h-4" />
-					Add Lease
-				</Button>
+				<div class="flex items-center gap-2">
+					<Button
+						onclick={handlePrintAllLeases}
+						variant="outline"
+						class="flex items-center gap-2 border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-300 shadow-sm hover:shadow-md transition-all duration-200"
+						disabled={isLoading || filteredLeases.length === 0}
+					>
+						<Printer class="w-4 h-4" />
+						Print All
+					</Button>
+					<Button
+						onclick={handleAddLease}
+						class="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+					>
+						<Plus class="w-4 h-4" />
+						Add Lease
+					</Button>
+				</div>
 			</div>
 		</div>
 	</div>
@@ -410,6 +452,7 @@
 					on:edit={(event) => handleEdit(event.detail)}
 					on:delete={(event) => handleDeleteLease(event.detail)}
 					onStatusChange={handleStatusChange}
+					onDataChange={refreshData}
 				/>
 			{/if}
 		</div>
@@ -424,4 +467,5 @@
 	{tenants}
 	{rentalUnits}
 	onOpenChange={handleModalClose}
+	onDataChange={refreshData}
 />

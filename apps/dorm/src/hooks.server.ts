@@ -108,8 +108,8 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
 			? jwtDecode<UserJWTPayload>(currentSession.access_token)
 			: null;
 
-		// Debug JWT decoding
-		if (decodedToken) {
+		// Debug JWT decoding - only in development
+		if (process.env.NODE_ENV === 'development' && decodedToken) {
 			console.log('🔍 JWT Decoded:', {
 				userId: user.id,
 				userRoles: decodedToken.user_roles,
@@ -117,8 +117,6 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
 				userRolesLength: decodedToken.user_roles?.length || 0,
 				userMetadata: user.user_metadata
 			});
-		} else {
-			console.log('⚠️ No JWT token found or failed to decode');
 		}
 
 		// Get permissions directly without caching
@@ -191,8 +189,8 @@ const authGuard: Handle = async ({ event, resolve }) => {
 			if (returnTo) {
 				throw redirect(303, returnTo);
 			}
-			// If no returnTo is specified, redirect to the overview page (which should exist)
-			throw redirect(303, '/overview');
+			// If no returnTo is specified, redirect to the home page
+			throw redirect(303, '/');
 		}
 		return resolve(event);
 	}

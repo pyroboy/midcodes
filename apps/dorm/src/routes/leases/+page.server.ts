@@ -146,6 +146,8 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
 
 	// Set up dependencies for invalidation
 	depends('app:leases');
+	depends('app:tenants');
+	depends('app:rental-units');
 
 	try {
 		const form = await superValidate(zod(leaseSchema));

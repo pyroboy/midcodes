@@ -37,6 +37,7 @@
 		onLeaseClick: (lease: Lease) => void;
 		onDelete: (event: Event, lease: Lease) => void;
 		onStatusChange: (id: string, status: string) => void;
+		onDataChange?: () => Promise<void>;
 	}
 
 	let {
@@ -45,7 +46,8 @@
 		rentalUnits = [],
 		onLeaseClick,
 		onDelete,
-		onStatusChange
+		onStatusChange,
+		onDataChange
 	}: Props = $props();
 
 	import { getStatusVariant } from '$lib/utils/format';
@@ -140,7 +142,11 @@
 
 			if (result.status === 200) {
 				onStatusChange(lease.id.toString(), newStatus);
-				await invalidateAll();
+				if (onDataChange) {
+					await onDataChange();
+				} else {
+					await invalidateAll();
+				}
 			} else {
 				throw new Error(result.message || 'Failed to update status');
 			}
@@ -465,10 +471,11 @@
 	lease={{ ...lease, id: lease.id.toString() }}
 	isOpen={showPaymentModal}
 	onOpenChange={handlePaymentModalClose}
+	{onDataChange}
 />
 
 {#if showRentManager}
-	<RentManagerModal {lease} open={showRentManager} onOpenChange={handleRentManagerClose} />
+	<RentManagerModal {lease} open={showRentManager} onOpenChange={handleRentManagerClose} {onDataChange} />
 {/if}
 
 {#if showSecurityDepositManager}
@@ -476,6 +483,7 @@
 		{lease}
 		open={showSecurityDepositManager}
 		onOpenChange={handleSecurityDepositManagerClose}
+		{onDataChange}
 	/>
 {/if}
 
@@ -487,6 +495,7 @@
 		{rentalUnits}
 		open={showEditModal}
 		onOpenChange={handleEditModalClose}
+		{onDataChange}
 	/>
 {/if}
 

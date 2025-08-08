@@ -10,9 +10,10 @@
 		tenants?: any[];
 		rentalUnits?: any[];
 		onStatusChange: (id: string, status: string) => void;
+		onDataChange?: () => Promise<void>;
 	}
 
-	let { leases = [], tenants = [], rentalUnits = [], onStatusChange }: Props = $props();
+	let { leases = [], tenants = [], rentalUnits = [], onStatusChange, onDataChange }: Props = $props();
 
 	interface FilterState {
 		search: string;
@@ -180,6 +181,7 @@
 					onLeaseClick={handleLeaseClick}
 					onDelete={handleDelete}
 					{onStatusChange}
+					{onDataChange}
 				/>
 			{/each}
 		</div>

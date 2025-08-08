@@ -24,10 +24,11 @@
 
 	type SecurityDepositForm = z.infer<typeof securityDepositSchema>;
 
-	let { lease, open, onOpenChange } = $props<{
+	let { lease, open, onOpenChange, onDataChange } = $props<{
 		lease: Lease;
 		open: boolean;
 		onOpenChange: (open: boolean) => void;
+		onDataChange?: () => Promise<void>;
 	}>();
 
 	let securityDeposits = $state<Billing[]>([]);
@@ -62,7 +63,11 @@
 		},
 		onResult: async ({ result }: { result: any }) => {
 			if (result.type === 'success') {
-				await invalidateAll();
+				if (onDataChange) {
+					await onDataChange();
+				} else {
+					await invalidateAll();
+				}
 				reset();
 				toast.success(result.data?.message || 'Security deposit operation completed successfully');
 				showAddForm = false;

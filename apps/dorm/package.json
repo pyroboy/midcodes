@@ -5,6 +5,8 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
+		"dev:clean": "powershell -ExecutionPolicy Bypass -File scripts/restart-dev.ps1",
+		"dev:fix-hmr": "powershell -ExecutionPolicy Bypass -File scripts/fix-hmr.ps1",
 		"serve:edge": "supabase functions serve role-emulation --env-file .env.local",
 		"deploy:edge": "supabase functions deploy role-emulation",
 		"build": "vite build",

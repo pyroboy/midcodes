@@ -39,26 +39,42 @@ function sortBillingsByDate(billings: any[]): any[] {
 }
 
 function getCustomDisplayStatus(billing: any): string {
-	// This function remains unchanged.
-	if (billing.amount + (billing.penalty_amount || 0) - billing.paid_amount <= 0) {
+	// Enhanced status calculation with better data handling
+	if (!billing) return 'UNKNOWN';
+	
+	const totalAmount = billing.amount || 0;
+	const penaltyAmount = billing.penalty_amount || 0;
+	const paidAmount = billing.paid_amount || 0;
+	const totalDue = totalAmount + penaltyAmount;
+	
+	// Check if fully paid
+	if (totalDue - paidAmount <= 0) {
 		return 'PAID';
 	}
-	if (billing.penalty_amount > 0) {
+	
+	// Check if has penalties
+	if (penaltyAmount > 0) {
 		return 'PENALIZED';
 	}
 
+	// Check if overdue
 	const today = new Date();
 	today.setHours(0, 0, 0, 0);
-	const isOverdue = new Date(billing.due_date) < today;
-
-	if (isOverdue) {
-		if (billing.status === 'PARTIAL' || billing.paid_amount > 0) {
-			return 'OVERDUE-PARTIAL';
+	const dueDate = billing.due_date ? new Date(billing.due_date) : null;
+	
+	if (dueDate && dueDate < today) {
+		if (paidAmount > 0) {
+			return 'OVERDUE_PARTIAL';
 		}
 		return 'OVERDUE';
 	}
 
-	return billing.status; // PENDING or PARTIAL
+	// Default status based on payment amount
+	if (paidAmount > 0 && paidAmount < totalDue) {
+		return 'PARTIAL';
+	}
+	
+	return billing.status || 'PENDING';
 }
 
 // --- UPDATED FUNCTION ---
@@ -67,9 +83,9 @@ function generateLeasePrintHTML(lease: Lease): string {
 	const sortedBillings = sortBillingsByDate(lease.billings || []);
 
 	// Overall totals for the summary section
-	const totalAmount = sortedBillings.reduce((sum, b) => sum + b.amount, 0);
+	const totalAmount = sortedBillings.reduce((sum, b) => sum + (b.amount || 0), 0);
 	const totalPenalties = sortedBillings.reduce((sum, b) => sum + (b.penalty_amount || 0), 0);
-	const totalPaid = sortedBillings.reduce((sum, b) => sum + b.paid_amount, 0);
+	const totalPaid = sortedBillings.reduce((sum, b) => sum + (b.paid_amount || 0), 0);
 
 	return `
 <html>
@@ -96,9 +112,11 @@ function generateLeasePrintHTML(lease: Lease): string {
     .payment-details { text-align: left; line-height: 1.4; }
     .status-paid { color: #28a745; font-weight: bold; }
     .status-pending { color: #ffc107; font-weight: bold; }
+    .status-partial { color: #ffc107; font-weight: bold; }
     .status-overdue { color: #dc3545; font-weight: bold; }
     .status-penalized { color: #dc3545; font-weight: bold; }
     .status-overdue-partial { color: #dc3545; font-weight: bold; }
+    .status-unknown { color: #6c757d; font-weight: bold; }
     .totals-section { margin-top: 20px; }
     .totals-table { width: 100%; border-collapse: collapse; }
     .totals-table td { padding: 4px 8px; font-size: 9px; border: none; }
@@ -126,7 +144,7 @@ function generateLeasePrintHTML(lease: Lease): string {
 						? lease.lease_tenants
 								.map(
 									(tenant) => `
-           <p><strong>${tenant.name}</strong>${tenant.contact_number ? ` • ${tenant.contact_number}` : ''}${tenant.email ? ` • ${tenant.email}` : ''}</p>
+           <p><strong>${tenant.name || 'Unknown Tenant'}</strong>${tenant.contact_number ? ` • ${tenant.contact_number}` : ''}${tenant.email ? ` • ${tenant.email}` : ''}</p>
          `
 								)
 								.join('')
@@ -156,31 +174,39 @@ function generateLeasePrintHTML(lease: Lease): string {
 					? sortedBillings
 							.map((billing) => {
 								const displayStatus = getCustomDisplayStatus(billing);
-								const billAmount = billing.amount;
+								const billAmount = billing.amount || 0;
 								const penaltyAmount = billing.penalty_amount || 0;
 								const totalDue = billAmount + penaltyAmount;
 								const paymentsMade = billing.paid_amount || 0;
 								const itemBalance = totalDue - paymentsMade;
 
+								// Enhanced payment details with better error handling
 								const paymentDetailsHtml =
 									billing.allocations && billing.allocations.length > 0
 										? billing.allocations
 												.map((alloc: any) => {
+													if (!alloc.payment) return '';
 													const methodDisplay =
 														alloc.payment.method === 'SECURITY_DEPOSIT'
 															? `SECURITY DEPOSIT`
-															: alloc.payment.method;
-													return `<div>${formatDate(alloc.payment.paid_at)}: ${methodDisplay} (${formatCurrency(alloc.amount)})</div>`;
+															: alloc.payment.method || 'UNKNOWN';
+													const paymentDate = alloc.payment.paid_at ? formatDate(alloc.payment.paid_at) : 'Unknown Date';
+													const paymentAmount = formatCurrency(alloc.amount || 0);
+													return `<div>${paymentDate}: ${methodDisplay} (${paymentAmount})</div>`;
 												})
+												.filter((detail: string) => detail !== '')
 												.join('')
 										: '-';
 
+								// Enhanced status class mapping
+								const statusClass = displayStatus.toLowerCase().replace('_', '-');
+
 								return `
           <tr>
-            <td class="center">${formatDate(billing.billing_date)}</td>
-            <td>${billing.type}${billing.utility_type ? ` - ${billing.utility_type}` : ''}${billing.notes ? ` (${billing.notes})` : ''}</td>
-            <td class="center">${formatDate(billing.due_date)}</td>
-            <td class="center status-${displayStatus.toLowerCase().replace('_', '-')}">${displayStatus}</td>
+            <td class="center">${billing.billing_date ? formatDate(billing.billing_date) : 'N/A'}</td>
+            <td>${billing.type || 'Unknown'}${billing.utility_type ? ` - ${billing.utility_type}` : ''}${billing.notes ? ` (${billing.notes})` : ''}</td>
+            <td class="center">${billing.due_date ? formatDate(billing.due_date) : 'N/A'}</td>
+            <td class="center status-${statusClass}">${displayStatus}</td>
             <td class="amount">${formatCurrency(billAmount)}</td>
             <td class="amount">${penaltyAmount > 0 ? formatCurrency(penaltyAmount) : '-'}</td>
             <td class="amount"><strong>${formatCurrency(totalDue)}</strong></td>
@@ -204,17 +230,17 @@ function generateLeasePrintHTML(lease: Lease): string {
 
      <div class="totals-section">
      <table class="totals-table">
-
+       <tr>
          <td class="label">Total Amount Due:</td>
          <td class="amount">${formatCurrency(totalAmount)} + ${formatCurrency(totalPenalties)}</td>
        </tr>
-             <tr>
+       <tr>
          <td class="label">Total Payments Made:</td>
          <td class="amount" style="color: #28a745;">-${formatCurrency(totalPaid)}</td>
        </tr>
        <tr class="total-row">
          <td class="label">Current Balance Due:</td>
-         <td class="amount">${formatCurrency(lease.balance)}</td>
+         <td class="amount">${formatCurrency(lease.balance || 0)}</td>
        </tr>
 
                ${(() => {
@@ -226,15 +252,15 @@ function generateLeasePrintHTML(lease: Lease): string {
 									if (securityDepositBillings.length > 0) {
 										// Calculate security deposit totals
 										const totalBilledSecurityDeposit = securityDepositBillings.reduce(
-											(sum, b) => sum + b.amount,
+											(sum, b) => sum + (b.amount || 0),
 											0
 										);
 										const totalPaidToSecurityDeposit = securityDepositBillings.reduce(
-											(sum, b) => sum + b.paid_amount,
+											(sum, b) => sum + (b.paid_amount || 0),
 											0
 										);
 										const unpaidSecurityDeposit = securityDepositBillings.reduce(
-											(sum, b) => sum + b.balance,
+											(sum, b) => sum + ((b.amount || 0) - (b.paid_amount || 0)),
 											0
 										);
 
@@ -243,8 +269,8 @@ function generateLeasePrintHTML(lease: Lease): string {
 										sortedBillings.forEach((billing) => {
 											if (billing.type !== 'SECURITY_DEPOSIT' && billing.allocations) {
 												billing.allocations.forEach((allocation: any) => {
-													if (allocation.payment.method === 'SECURITY_DEPOSIT') {
-														amountUsed += allocation.amount;
+													if (allocation.payment && allocation.payment.method === 'SECURITY_DEPOSIT') {
+														amountUsed += allocation.amount || 0;
 													}
 												});
 											}
@@ -282,6 +308,318 @@ function generateLeasePrintHTML(lease: Lease): string {
   <div class="footer">
     <p><strong>Generated:</strong> ${currentDate.toLocaleDateString()} at ${currentDate.toLocaleTimeString()}</p>
     <p>For questions about this statement, please contact the property management office.</p>
+  </div>
+</body>
+</html>`;
+}
+
+export function printAllLeases(leases: any[]): void {
+	const iframe = document.createElement('iframe');
+	iframe.style.position = 'absolute';
+	iframe.style.width = '0';
+	iframe.style.height = '0';
+	iframe.style.border = 'none';
+	document.body.appendChild(iframe);
+
+	const html = generateAllLeasesPrintHTML(leases);
+
+	iframe.contentDocument?.open();
+	iframe.contentDocument?.write(html);
+	iframe.contentDocument?.close();
+
+	iframe.onload = () => {
+		iframe?.contentWindow?.focus();
+		setTimeout(() => {
+			if (iframe) {
+				iframe.contentWindow?.print();
+				// Clean up iframe after print
+				setTimeout(() => {
+					iframe.remove();
+				}, 1000);
+			}
+		}, 100);
+	};
+}
+
+function generateAllLeasesPrintHTML(leases: any[]): string {
+	const currentDate = new Date();
+	
+	// Calculate totals with better data handling
+	const totalLeases = leases.length;
+	const totalBalance = leases.reduce((sum, lease) => sum + (lease.balance || 0), 0);
+	const paidLeases = leases.filter(lease => !lease.balance || lease.balance <= 0).length;
+	const unpaidLeases = totalLeases - paidLeases;
+
+	return `
+<html>
+<head>
+  <title>All Leases Summary Report</title>
+  <style>
+    @page { margin: 0.5cm; size: portrait; }
+    body { 
+      font-family: Arial, sans-serif; 
+      font-size: 9px; 
+      color: #333; 
+      margin: 0; 
+      padding: 8px; 
+      line-height: 1.3; 
+    }
+    .report-header { 
+      text-align: center; 
+      margin-bottom: 20px; 
+      padding-bottom: 10px; 
+      border-bottom: 2px solid #000; 
+    }
+    .report-title { 
+      font-size: 24px; 
+      font-weight: bold; 
+      margin: 0 0 5px 0; 
+    }
+    .report-subtitle { 
+      font-size: 12px; 
+      color: #666; 
+      margin: 0; 
+    }
+    .summary-stats { 
+      display: flex; 
+      justify-content: space-around; 
+      margin-bottom: 20px; 
+      padding: 10px; 
+      background: #f8f9fa; 
+      border-radius: 5px; 
+    }
+    .stat-item { 
+      text-align: center; 
+    }
+    .stat-value { 
+      font-size: 16px; 
+      font-weight: bold; 
+      color: #007bff; 
+    }
+    .stat-label { 
+      font-size: 10px; 
+      color: #666; 
+    }
+    .leases-table { 
+      width: 100%; 
+      border-collapse: collapse; 
+      margin-bottom: 20px; 
+    }
+    .leases-table th { 
+      background: #f5f5f5; 
+      border: 1px solid #ddd; 
+      padding: 4px 6px; 
+      text-align: left; 
+      font-size: 8px; 
+      font-weight: bold; 
+    }
+    .leases-table td { 
+      border: 1px solid #ddd; 
+      padding: 3px 4px; 
+      font-size: 8px; 
+    }
+    .status-paid { 
+      color: #28a745; 
+      font-weight: bold; 
+    }
+    .status-pending { 
+      color: #ffc107; 
+      font-weight: bold; 
+    }
+    .status-partial { 
+      color: #ffc107; 
+      font-weight: bold; 
+    }
+    .status-overdue { 
+      color: #dc3545; 
+      font-weight: bold; 
+    }
+    .status-overdue-partial { 
+      color: #dc3545; 
+      font-weight: bold; 
+    }
+    .status-penalized { 
+      color: #dc3545; 
+      font-weight: bold; 
+    }
+    .status-unknown { 
+      color: #6c757d; 
+      font-weight: bold; 
+    }
+    .balance-positive { 
+      color: #dc3545; 
+      font-weight: bold; 
+    }
+    .balance-zero { 
+      color: #28a745; 
+    }
+    .balance-pending { 
+      color: #ffc107; 
+      font-weight: bold; 
+    }
+    .due-date-pending { 
+      color: #ffc107; 
+      font-weight: bold; 
+    }
+    .due-date-overdue { 
+      color: #dc3545; 
+      font-weight: bold; 
+    }
+    .footer { 
+      margin-top: 20px; 
+      text-align: center; 
+      font-size: 9px; 
+      color: #666; 
+      border-top: 1px solid #ccc; 
+      padding-top: 10px; 
+    }
+  </style>
+</head>
+<body>
+  <div class="report-header">
+    <h1 class="report-title">Leases Summary Report</h1>
+    <p class="report-subtitle">Property Management System</p>
+  </div>
+
+  <div class="summary-stats">
+    <div class="stat-item">
+      <div class="stat-value">${totalLeases}</div>
+      <div class="stat-label">Total Leases</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value" style="color: #28a745;">${paidLeases}</div>
+      <div class="stat-label">Paid Up</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value" style="color: #dc3545;">${unpaidLeases}</div>
+      <div class="stat-label">With Balance</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-value" style="color: #dc3545;">${formatCurrency(totalBalance)}</div>
+      <div class="stat-label">Total Outstanding</div>
+    </div>
+  </div>
+
+  <table class="leases-table">
+    <thead>
+      <tr>
+        <th style="width: 30%;">Lease Name</th>
+        <th style="width: 35%;">Tenants</th>
+        <th style="width: 15%;">Status</th>
+        <th style="width: 10%;">Balance</th>
+        <th style="width: 10%;">Due Date</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${leases.map((lease) => {
+        const balance = lease.balance || 0;
+        const hasBalance = balance > 0;
+        
+        // Enhanced tenant name extraction
+        const tenantNames = lease.lease_tenants && lease.lease_tenants.length > 0
+          ? lease.lease_tenants.map((lt: any) => {
+              // Handle different tenant data structures
+              if (lt.tenants) {
+                return lt.tenants.full_name || lt.tenants.name || 'Unknown Tenant';
+              }
+              return lt.name || lt.full_name || 'Unknown Tenant';
+            }).join(', ')
+          : 'No tenants assigned';
+
+        // Enhanced billing status calculation
+        const hasBillings = lease.billings && lease.billings.length > 0;
+        let hasPayments = false;
+        let nextDueDate = null;
+        let daysOverdue = 0;
+        
+        if (hasBillings) {
+          // Check for payments
+          lease.billings.forEach((billing: any) => {
+            if (billing.allocations && billing.allocations.length > 0) {
+              hasPayments = true;
+            }
+          });
+          
+          // Find next due date and calculate overdue days
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
+          const unpaidBillings = lease.billings.filter((billing: any) => {
+            const totalDue = (billing.amount || 0) + (billing.penalty_amount || 0);
+            const paidAmount = billing.paid_amount || 0;
+            return totalDue > paidAmount;
+          });
+          
+          if (unpaidBillings.length > 0) {
+            // Find the earliest due date among unpaid billings
+            const dueDates = unpaidBillings
+              .map((billing: any) => billing.due_date ? new Date(billing.due_date) : null)
+              .filter(date => date !== null)
+              .sort((a, b) => a!.getTime() - b!.getTime());
+            
+            if (dueDates.length > 0) {
+              nextDueDate = dueDates[0];
+              if (nextDueDate < today) {
+                daysOverdue = Math.floor((today.getTime() - nextDueDate.getTime()) / (1000 * 60 * 60 * 24));
+              }
+            }
+          }
+        }
+        
+        // Enhanced status determination
+        let status = '';
+        let statusClass = '';
+        let balanceClass = '';
+        let dueDateDisplay = '-';
+        let dueDateClass = '';
+        
+        if (!hasBillings) {
+          status = 'NO BILLINGS';
+          statusClass = 'status-unknown';
+          balanceClass = '';
+          dueDateDisplay = '-';
+        } else if (!hasPayments && !hasBalance) {
+          status = 'NO PAYMENTS';
+          statusClass = 'status-unknown';
+          balanceClass = '';
+          dueDateDisplay = '-';
+        } else if (!hasBalance) {
+          status = 'PAID';
+          statusClass = 'status-paid';
+          balanceClass = 'balance-zero';
+          dueDateDisplay = '-';
+        } else {
+          if (daysOverdue > 0) {
+            status = 'OVERDUE';
+            statusClass = 'status-overdue';
+            balanceClass = 'balance-positive';
+            dueDateDisplay = nextDueDate ? `${formatDate(nextDueDate)} (${daysOverdue} days)` : '-';
+            dueDateClass = 'due-date-overdue';
+          } else {
+            status = 'PENDING';
+            statusClass = 'status-pending';
+            balanceClass = 'balance-pending';
+            dueDateDisplay = nextDueDate ? formatDate(nextDueDate) : '-';
+            dueDateClass = 'due-date-pending';
+          }
+        }
+
+        return `
+          <tr>
+            <td><strong>${lease.name || `Lease #${lease.id}`}</strong></td>
+            <td>${tenantNames}</td>
+            <td class="${statusClass}">${status}</td>
+            <td class="${balanceClass}">${formatCurrency(balance)}</td>
+            <td class="${dueDateClass}">${dueDateDisplay}</td>
+          </tr>
+        `;
+      }).join('')}
+    </tbody>
+  </table>
+
+  <div class="footer">
+    <p><strong>Generated:</strong> ${currentDate.toLocaleDateString()} at ${currentDate.toLocaleTimeString()}</p>
+    <p>Dormitory Management System - Leases Summary Report</p>
   </div>
 </body>
 </html>`;

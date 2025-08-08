@@ -25,7 +25,8 @@
 		onOpenChange,
 		tenants = [],
 		rentalUnits = [],
-		editMode = false
+		editMode = false,
+		onDataChange
 	} = $props<{
 		lease?: any;
 		open: boolean;
@@ -33,6 +34,7 @@
 		tenants: any[];
 		rentalUnits: any[];
 		editMode: boolean;
+		onDataChange?: () => Promise<void>;
 	}>();
 
 	// Format dates for input fields
@@ -251,7 +253,12 @@
 					if (result.type === 'success') {
 						toast.success(editMode ? 'Lease updated successfully' : 'Lease created successfully');
 						onOpenChange(false);
-						await invalidateAll();
+						// Use the onDataChange callback to refresh data
+						if (onDataChange) {
+							await onDataChange();
+						} else {
+							await invalidateAll();
+						}
 					} else if (result.type === 'failure') {
 						toast.error(editMode ? 'Failed to update lease' : 'Failed to create lease');
 					}

@@ -5,6 +5,7 @@
 	import PropertySelector from '$lib/components/ui/PropertySelector.svelte';
 	import { propertyStore } from '$lib/stores/property';
 	import type { PageData } from './$types';
+	import type { Property } from '$lib/types/database';
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { contextualPreload, safePreloadData } from '$lib/utils/prefetch';
@@ -27,6 +28,8 @@
 	let { data, children }: { data: PageData; children: any } = $props();
 
 	let ready = $state(false);
+	let isAuthRoute = $derived($page.url.pathname.startsWith('/auth'));
+	
 	onMount(() => {
 		ready = true;
 
@@ -48,19 +51,42 @@
 		});
 	}
 
-	// Use an effect to safely initialize the store after data is loaded
+	// Initialize properties store - simplified approach
+	let propertiesInitialized = $state(false);
+	let resolvedProperties = $state<Property[]>([]);
+	
 	$effect(() => {
+		// Reset initialization state when data changes
 		if (data.properties) {
-			// The promise itself is a dependency. When it resolves, the effect re-runs.
-			data.properties
-				.then((properties) => {
-					if (properties) {
-						propertyStore.init(properties);
-					}
-				})
-				.catch((error) => {
-					console.error('Failed to load properties:', error);
-				});
+			// Handle the properties promise
+			if (data.properties instanceof Promise) {
+				propertiesInitialized = false;
+				data.properties
+					.then((properties) => {
+						resolvedProperties = properties || [];
+						propertiesInitialized = true;
+						if (properties && properties.length > 0) {
+							propertyStore.init(properties);
+						}
+					})
+					.catch((error) => {
+						console.error('Failed to load properties:', error);
+						resolvedProperties = [];
+						propertiesInitialized = true; // Still mark as initialized even on error
+					});
+			} else {
+				// Properties already resolved
+				const props = data.properties as Property[] || [];
+				resolvedProperties = props;
+				propertiesInitialized = true;
+				if (props.length > 0) {
+					propertyStore.init(props);
+				}
+			}
+		} else {
+			// No properties data
+			resolvedProperties = [];
+			propertiesInitialized = true;
 		}
 	});
 
@@ -101,108 +127,126 @@
 	];
 </script>
 
-{#await data.properties}
-	<div class="flex h-screen w-full items-center justify-center">
-		<p>Loading application data...</p>
-	</div>
-{:then properties}
+{#if isAuthRoute}
+	<!-- Auth routes - minimal layout, just render the auth page -->
 	<Toaster />
-	{#if properties && properties.length > 0}
-		{#if ready}
-			<Sidebar.Provider>
-				<div class="flex min-h-screen w-full">
-					<!-- Sidebar -->
-					<Sidebar.Root collapsible="icon" class="shrink-0">
-						<Sidebar.Header>
-							<div class="p-4 font-bold text-lg">Dorm Management</div>
-						</Sidebar.Header>
+	{@render children()}
+{:else}
+	<!-- Regular app routes - full layout with sidebar -->
+	<Toaster />
+	{#if ready}
+		<Sidebar.Provider>
+			<div class="flex min-h-screen w-full">
+				<!-- Sidebar -->
+				<Sidebar.Root collapsible="icon" class="shrink-0">
+					<Sidebar.Header>
+						<div class="p-4 font-bold text-lg">Dorm Management</div>
+					</Sidebar.Header>
 
-						<Sidebar.Content>
-							{#each navigationLinks as group (group.category)}
-								<Sidebar.Group>
-									<Sidebar.GroupLabel onmouseover={() => onSectionHover(group.links)}>
-										{group.category}
-									</Sidebar.GroupLabel>
-									<Sidebar.GroupContent>
-										<Sidebar.Menu>
-											{#each group.links as link (link.href)}
-												<a
-													href={link.href}
-													class="block no-underline"
-													data-sveltekit-preload-data="hover"
-												>
-													<Sidebar.MenuItem>
-														<Sidebar.MenuButton>
-															<link.icon class="h-5 w-5" />
-															<span>{link.label}</span>
-														</Sidebar.MenuButton>
-													</Sidebar.MenuItem>
-												</a>
-											{/each}
-										</Sidebar.Menu>
-									</Sidebar.GroupContent>
-								</Sidebar.Group>
-							{/each}
-						</Sidebar.Content>
+					<Sidebar.Content>
+						{#each navigationLinks as group (group.category)}
+							<Sidebar.Group>
+								<Sidebar.GroupLabel onmouseover={() => onSectionHover(group.links)}>
+									{group.category}
+								</Sidebar.GroupLabel>
+								<Sidebar.GroupContent>
+									<Sidebar.Menu>
+										{#each group.links as link (link.href)}
+											<a
+												href={link.href}
+												class="block no-underline"
+												data-sveltekit-preload-data="hover"
+											>
+												<Sidebar.MenuItem>
+													<Sidebar.MenuButton>
+														<link.icon class="h-5 w-5" />
+														<span>{link.label}</span>
+													</Sidebar.MenuButton>
+												</Sidebar.MenuItem>
+											</a>
+										{/each}
+									</Sidebar.Menu>
+								</Sidebar.GroupContent>
+							</Sidebar.Group>
+						{/each}
+					</Sidebar.Content>
 
-						<Sidebar.Footer>
-							<div class="p-4 border-t">
-								{#if data.session}
-									<div class="flex flex-col space-y-3">
-										<div class="flex items-center space-x-2 text-sm">
-											<User class="w-4 h-4 text-muted-foreground" />
-											<span class="truncate">{data.user?.email || 'Logged in'}</span>
-										</div>
-										<a
-											href="/auth/signout"
-											class="flex items-center space-x-2 text-sm text-red-600 hover:text-red-800"
-											data-sveltekit-preload-data="hover"
-										>
-											<LogOut class="w-4 h-4" />
-											<span>Sign out</span>
-										</a>
+					<Sidebar.Footer>
+						<div class="p-4 border-t">
+							{#if data.session}
+								<div class="flex flex-col space-y-3">
+									<div class="flex items-center space-x-2 text-sm">
+										<User class="w-4 h-4 text-muted-foreground" />
+										<span class="truncate">{data.user?.email || 'Logged in'}</span>
 									</div>
-								{:else}
 									<a
-										href="/auth"
-										class="flex items-center space-x-2 text-sm text-blue-600 hover:text-blue-800"
+										href="/auth/signout"
+										class="flex items-center space-x-2 text-sm text-red-600 hover:text-red-800"
 										data-sveltekit-preload-data="hover"
 									>
-										<User class="w-4 h-4" />
-										<span>Sign in</span>
+										<LogOut class="w-4 h-4" />
+										<span>Sign out</span>
 									</a>
-								{/if}
-							</div>
-						</Sidebar.Footer>
-						<Sidebar.Rail />
-					</Sidebar.Root>
+								</div>
+							{:else}
+								<a
+									href="/auth"
+									class="flex items-center space-x-2 text-sm text-blue-600 hover:text-blue-800"
+									data-sveltekit-preload-data="hover"
+								>
+									<User class="w-4 h-4" />
+									<span>Sign in</span>
+								</a>
+							{/if}
+						</div>
+					</Sidebar.Footer>
+					<Sidebar.Rail />
+				</Sidebar.Root>
 
-					<!-- Main Content Area - Full Width -->
-					<main class="flex-1 overflow-auto w-full">
-						<div
-							class="flex items-center justify-between p-4 md:p-6 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
-						>
-							<div class="flex items-center gap-4">
-								<Sidebar.Trigger />
-								{#if data.user}
-									<PropertySelector />
-								{/if}
+				<!-- Main Content Area - Full Width -->
+				<main class="flex-1 overflow-auto w-full">
+					<div
+						class="flex items-center justify-between p-4 md:p-6 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+					>
+						<div class="flex items-center gap-4">
+							<Sidebar.Trigger />
+							{#if data.user}
+								<PropertySelector />
+							{/if}
+						</div>
+					</div>
+					<div class="w-full">
+						{#if !propertiesInitialized}
+							<!-- Loading state -->
+							<div class="flex items-center justify-center h-[calc(100vh-120px)]">
+								<div class="flex flex-col items-center space-y-4">
+									<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+									<p class="text-sm text-muted-foreground">Loading...</p>
+								</div>
 							</div>
-						</div>
-						<div class="w-full">
+						{:else if resolvedProperties.length === 0 && $page.url.pathname !== '/'}
+							<!-- No properties state - but only show for non-root routes -->
+							<div class="flex flex-col items-center justify-center h-[calc(100vh-120px)] text-center p-8">
+								<Building class="h-16 w-16 text-muted-foreground mb-4" />
+								<h2 class="text-2xl font-semibold mb-2">Welcome to Dorm Management</h2>
+								<p class="text-muted-foreground mb-6 max-w-md">
+									To get started, you'll need to add your first property. This will serve as the foundation for managing your dorm operations.
+								</p>
+								<a
+									href="/properties"
+									class="inline-flex items-center justify-center rounded-md bg-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90"
+								>
+									<Building class="mr-2 h-4 w-4" />
+									Add Your First Property
+								</a>
+							</div>
+						{:else}
+							<!-- App content - always render for root route or when properties exist -->
 							{@render children()}
-						</div>
-					</main>
-				</div>
-			</Sidebar.Provider>
-		{/if}
-	{:else}
-		<div class="flex h-screen w-full items-center justify-center">
-			<p>No properties found. Please add a property to continue.</p>
-		</div>
+						{/if}
+					</div>
+				</main>
+			</div>
+		</Sidebar.Provider>
 	{/if}
-{:catch error}
-	<div class="flex h-screen w-full items-center justify-center">
-		<p class="text-red-500">Error: Could not load essential property data. {error.message}</p>
-	</div>
-{/await}
+{/if}
