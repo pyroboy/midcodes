@@ -78,6 +78,10 @@ async function loadLeasesData(locals: any) {
 		const allocationsMap = new Map<number, any[]>();
 		if (allocationsData) {
 			for (const allocation of allocationsData) {
+				// Skip allocations from reverted payments
+				if (allocation.payment && allocation.payment.reverted_at) {
+					continue;
+				}
 				if (!allocationsMap.has(allocation.billing_id)) {
 					allocationsMap.set(allocation.billing_id, []);
 				}
