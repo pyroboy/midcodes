@@ -5,23 +5,30 @@ type DBLease = Database['public']['Tables']['leases']['Row'];
 
 import type { EmergencyContact } from '../../routes/tenants/formSchema';
 
-// Response type with relationships
+// Simplified lease type for tenant relationships (basic info only)
+export type TenantLease = {
+	id: number;
+	name: string;
+	start_date: string;
+	end_date: string;
+	status: string;
+	rental_unit: {
+		id: string;
+		name: string;
+		number: string;
+		property: {
+			id: string;
+			name: string;
+		} | null;
+	} | null;
+};
+
+// Response type with relationships - supports multiple leases (simplified)
 export type TenantResponse = Omit<DBTenant, 'emergency_contact'> & {
 	tenant_status: 'ACTIVE' | 'INACTIVE' | 'PENDING' | 'BLACKLISTED';
 	emergency_contact: EmergencyContact | null;
 	profile_picture_url?: string | null;
-	lease:
-		| (DBLease & {
-				location: {
-					id: string;
-					name: string;
-					number: string;
-					base_rate?: number;
-					property: {
-						id: string;
-						name: string;
-					} | null;
-				} | null;
-		  })
-		| null;
+	leases: TenantLease[];
+	// Backward compatibility - primary lease (first active lease)
+	lease?: TenantLease | null;
 };

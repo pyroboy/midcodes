@@ -125,24 +125,50 @@
 	</div>
 
 	<div class="p-6 pt-0 mt-auto">
-		<div class="grid grid-cols-2 gap-4">
-			<div class="text-center">
-				<div class="text-sm font-medium text-slate-800">
-					{tenant.lease?.location?.name || 'N/A'}
+		{#if tenant.leases && tenant.leases.length > 0}
+			<div class="space-y-2">
+				<div class="text-xs font-medium text-slate-600 mb-2 text-center">
+					{tenant.leases.length} Lease{tenant.leases.length > 1 ? 's' : ''}
 				</div>
-			</div>
-			<div class="text-center">
-				<div class="text-sm font-medium text-slate-800">
-					{formatCurrency(tenant.lease?.balance || 0)}
-				</div>
-				{#if tenant.lease?.balance && tenant.lease.balance > 0}
-					<Badge
-						class={`${getBalanceStatus(tenant.lease.balance)} text-xs px-2 py-0.5 rounded-full border`}
-					>
-						Overdue
-					</Badge>
+				{#each tenant.leases.slice(0, 2) as lease}
+					<div class="flex items-center justify-between text-sm bg-slate-50 rounded-lg p-2">
+						<div class="flex-1">
+							<div class="font-medium text-slate-800 truncate">
+								{lease.name}
+							</div>
+                            <div class="text-xs text-slate-500">
+                                {#if lease.rental_unit?.name}
+                                    {lease.rental_unit.name}
+                                {:else if lease.rental_unit?.number}
+                                    Unit {lease.rental_unit.number}
+                                {:else}
+                                    N/A
+                                {/if}
+                            </div>
+						</div>
+						<div class="text-right">
+							<Badge 
+								class={`text-xs px-2 py-0.5 rounded-full border ${
+									lease.status === 'ACTIVE' ? 'bg-green-100 text-green-800 border-green-200' :
+									lease.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
+									'bg-gray-100 text-gray-800 border-gray-200'
+								}`}
+							>
+								{lease.status}
+							</Badge>
+						</div>
+					</div>
+				{/each}
+				{#if tenant.leases.length > 2}
+					<div class="text-center text-xs text-slate-500">
+						+{tenant.leases.length - 2} more lease{tenant.leases.length - 2 > 1 ? 's' : ''}
+					</div>
 				{/if}
 			</div>
-		</div>
+		{:else}
+			<div class="text-center text-sm text-slate-500 py-4">
+				No active leases
+			</div>
+		{/if}
 	</div>
 </div>

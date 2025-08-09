@@ -137,8 +137,13 @@
 		// Enhanced confirmation dialog with detailed warning
 		let confirmMessage = `Are you sure you want to archive tenant "${tenant.name}"?\n\n`;
 
-		if (tenant.lease) {
-			confirmMessage += `⚠️  WARNING: This tenant has an active lease that will be preserved.\n\n`;
+		if (tenant.leases && tenant.leases.length > 0) {
+			const activeLeases = tenant.leases.filter(l => l.status === 'ACTIVE');
+			if (activeLeases.length > 0) {
+				confirmMessage += `⚠️  WARNING: This tenant has ${activeLeases.length} active lease${activeLeases.length > 1 ? 's' : ''} that will be preserved.\n\n`;
+			} else {
+				confirmMessage += `⚠️  WARNING: This tenant has ${tenant.leases.length} lease${tenant.leases.length > 1 ? 's' : ''} that will be preserved.\n\n`;
+			}
 		}
 
 		confirmMessage += `This action will:\n`;

@@ -124,8 +124,8 @@
 					<td class="p-4">
 						<div class="text-sm text-slate-600">
 							{#if tenant.lease}
-								<div class="font-medium">{tenant.lease.location?.property?.name || 'N/A'}</div>
-								<div class="text-slate-500">Unit {tenant.lease.location?.number || 'N/A'}</div>
+								<div class="font-medium">{tenant.lease.rental_unit?.property?.name || 'N/A'}</div>
+								<div class="text-slate-500">Unit {tenant.lease.rental_unit?.number || 'N/A'}</div>
 							{:else}
 								<span class="text-orange-600">No active lease</span>
 							{/if}

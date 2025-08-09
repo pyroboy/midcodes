@@ -33,7 +33,7 @@ async function loadLeasesData(locals: any) {
 			`
 			*,
 			rental_unit:rental_unit_id (*, floor:floors (*), property:properties (*)),
-			lease_tenants:lease_tenants!lease_id (tenant:tenants (name, email, contact_number, profile_picture_url)),
+			lease_tenants:lease_tenants!lease_id (tenant:tenants (name, email, contact_number, profile_picture_url, deleted_at)),
 			billings!billings_lease_id_fkey (
 				id,
 				type,
@@ -113,6 +113,13 @@ async function loadLeasesData(locals: any) {
 	const floors = await supabase.from('floors').select('*');
 	const floorsMap = new Map<number, any>((floors.data || []).map((f: any) => [f.id, f]));
 
+	// Filter out soft-deleted tenants from embedded lease_tenants before mapping
+	for (const lease of leasesData) {
+		if (Array.isArray(lease.lease_tenants)) {
+			lease.lease_tenants = lease.lease_tenants.filter((lt: any) => !lt?.tenant?.deleted_at);
+		}
+	}
+
 	return leasesData.map((lease: any) => mapLeaseData(lease, floorsMap));
 }
 
@@ -120,7 +127,9 @@ async function loadTenantsData(locals: any) {
 	const { supabase } = locals;
 	const { data, error } = await supabase
 		.from('tenants')
-		.select('id, name, email, contact_number, profile_picture_url');
+    .select('id, name, email, contact_number, profile_picture_url')
+    .is('deleted_at', null)
+    .order('name');
 
 	if (error) {
 		console.error('Error fetching tenants:', error);

@@ -42,13 +42,17 @@ async function loadTenantsData(locals: any) {
       *,
       lease_tenants:lease_tenants!left(
         lease:leases!left(
-          *,
-          location:rental_unit!left(
+          id,
+          name,
+          start_date,
+          end_date,
+          status,
+          rental_unit:rental_unit_id(
             id,
             name,
             number,
             base_rate,
-            property:properties!left(id,name)
+            property:properties!rental_unit_property_id_fkey(id, name)
           )
         )
       )
@@ -62,12 +66,36 @@ async function loadTenantsData(locals: any) {
 		throw error(500, 'Failed to load tenants');
 	}
 
-	// The query now returns lease_tenants[], we need to flatten it to match TenantResponse
+	// Process all leases for each tenant (not just the first one)
 	const tenants = tenantsResult.data.map((tenant: any) => {
-		const lease = tenant.lease_tenants[0]?.lease ?? null;
+		// Extract all leases for this tenant
+		const leases = tenant.lease_tenants
+			?.map((lt: any) => lt.lease)
+			.filter((lease: any) => lease !== null)
+			.map((lease: any) => ({
+				id: lease.id,
+				name: lease.name,
+				start_date: lease.start_date,
+				end_date: lease.end_date,
+				status: lease.status,
+				rental_unit: lease.rental_unit ? {
+					id: lease.rental_unit.id,
+					name: lease.rental_unit.name,
+					number: lease.rental_unit.number,
+					property: lease.rental_unit.property
+				} : null
+			})) || [];
+		
+		// For backward compatibility, set the primary lease (first active lease or first lease)
+		const primaryLease = leases.find((l: any) => l.status === 'ACTIVE') || leases[0] || null;
+		
 		// eslint-disable-next-line @typescript-eslint/no-unused-vars
 		const { lease_tenants, ...rest } = tenant;
-		return { ...rest, lease };
+		return { 
+			...rest, 
+			leases,
+			lease: primaryLease // backward compatibility
+		};
 	}) as TenantResponse[];
 
 	return tenants;
@@ -143,6 +171,33 @@ export const actions: Actions = {
 			console.log('🔍 Email check - Skipping duplicate check (empty or null email)');
 		}
 
+		// Safeguard: prevent exact-name duplicates without distinct contact details (case-insensitive)
+		const normalizedName = form.data.name.trim();
+		const normalizedEmail = form.data.email?.trim().toLowerCase() || null;
+		const normalizedContact = form.data.contact_number?.trim() || null;
+
+		const possibleDuplicates = await supabase
+			.from('tenants')
+			.select('id, name, email, contact_number')
+			.ilike('name', normalizedName)
+			.is('deleted_at', null);
+
+		if (possibleDuplicates.data && possibleDuplicates.data.length > 0) {
+			const conflict = possibleDuplicates.data.find((t) => {
+				const tEmail = (t.email || '').trim().toLowerCase() || null;
+				const tContact = (t.contact_number || '').trim() || null;
+				const sameEmail = normalizedEmail && tEmail ? normalizedEmail === tEmail : !normalizedEmail && !tEmail;
+				const sameContact = normalizedContact && tContact ? normalizedContact === tContact : !normalizedContact && !tContact;
+				// Duplicate if name matches and there is no distinguishing contact detail
+				return sameEmail || sameContact;
+			});
+
+			if (conflict) {
+				form.errors.name = ['A tenant with this name already exists without distinct contact details'];
+				return fail(400, { form, message: 'Duplicate tenant: provide distinct email or contact number' });
+			}
+		}
+
 		const insertData: TenantInsert = {
 			name: form.data.name,
 			contact_number: form.data.contact_number || null,
@@ -210,6 +265,33 @@ export const actions: Actions = {
 			}
 		} else {
 			console.log('🔍 Update Email check - Skipping duplicate check (empty or null email)');
+		}
+
+		// Safeguard: prevent exact-name duplicates without distinct contact details (exclude self, case-insensitive)
+		const normalizedNameU = form.data.name.trim();
+		const normalizedEmailU = form.data.email?.trim().toLowerCase() || null;
+		const normalizedContactU = form.data.contact_number?.trim() || null;
+
+		const possibleDuplicatesU = await supabase
+			.from('tenants')
+			.select('id, name, email, contact_number')
+			.ilike('name', normalizedNameU)
+			.neq('id', form.data.id)
+			.is('deleted_at', null);
+
+		if (possibleDuplicatesU.data && possibleDuplicatesU.data.length > 0) {
+			const conflict = possibleDuplicatesU.data.find((t) => {
+				const tEmail = (t.email || '').trim().toLowerCase() || null;
+				const tContact = (t.contact_number || '').trim() || null;
+				const sameEmail = normalizedEmailU && tEmail ? normalizedEmailU === tEmail : !normalizedEmailU && !tEmail;
+				const sameContact = normalizedContactU && tContact ? normalizedContactU === tContact : !normalizedContactU && !tContact;
+				return sameEmail || sameContact;
+			});
+
+			if (conflict) {
+				form.errors.name = ['A tenant with this name already exists without distinct contact details'];
+				return fail(400, { form, message: 'Duplicate tenant: provide distinct email or contact number' });
+			}
 		}
 
 		const updateData: TenantUpdate = {
