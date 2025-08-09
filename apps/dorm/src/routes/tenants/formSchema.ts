@@ -140,14 +140,10 @@ export const tenantSchema = z.object({
     .optional()
     .nullable()
     .refine(
-      (val) => !val || val.trim() === '' || /^(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])\/\d{4}$/.test(val),
-      { message: 'Use MM/DD/YYYY' }
+      (val) => !val || val.trim() === '' || /^\d{4}-\d{2}-\d{2}$/.test(val),
+      { message: 'Invalid date format' }
     )
-    .transform((val) => {
-      if (!val || val.trim() === '') return null;
-      const [mm, dd, yyyy] = val.split('/');
-      return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
-    })
+    .transform((val) => (val === '' ? null : val))
 });
 
 // Schema for updating an existing tenant
@@ -194,14 +190,10 @@ export const tenantFormSchema = z.object({
     .optional()
     .nullable()
     .refine(
-      (val) => !val || val.trim() === '' || /^(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])\/\d{4}$/.test(val),
-      { message: 'Use MM/DD/YYYY' }
+      (val) => !val || val.trim() === '' || /^\d{4}-\d{2}-\d{2}$/.test(val),
+      { message: 'Invalid date format' }
     )
-    .transform((val) => {
-      if (!val || val.trim() === '') return null;
-      const [mm, dd, yyyy] = val.split('/');
-      return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
-    }),
+    .transform((val) => (val === '' ? null : val)),
 	// Flat emergency contact fields for form handling
 	'emergency_contact.name': z.string().optional(),
 	'emergency_contact.relationship': z.string().optional(),
