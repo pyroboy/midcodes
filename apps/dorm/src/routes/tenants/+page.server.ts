@@ -117,9 +117,13 @@ type TenantInsertBase = {
 	name: string;
 	contact_number: string | null;
 	email: string | null;
+    address: string | null;
 	tenant_status: 'ACTIVE' | 'INACTIVE' | 'PENDING' | 'BLACKLISTED';
 	emergency_contact: EmergencyContact | null;
-	profile_picture_url?: string | null;
+    profile_picture_url?: string | null;
+    school_or_workplace: string | null;
+    facebook_name: string | null;
+    birthday: string | null;
 };
 
 // Types for database operations
@@ -202,9 +206,13 @@ export const actions: Actions = {
 			name: form.data.name,
 			contact_number: form.data.contact_number || null,
 			email: form.data.email && form.data.email.trim() !== '' ? form.data.email : null,
+            address: (form.data as any).address ?? null,
 			tenant_status: form.data.tenant_status || 'PENDING',
 			emergency_contact: parsedEmergencyContact,
-			profile_picture_url: form.data.profile_picture_url || null
+            profile_picture_url: form.data.profile_picture_url || null,
+            school_or_workplace: (form.data as any).school_or_workplace ?? null,
+            facebook_name: (form.data as any).facebook_name ?? null,
+            birthday: (form.data as any).birthday ?? null
 		};
 
 		console.log('🔄 Create action - Sending to database:', insertData);
@@ -298,10 +306,14 @@ export const actions: Actions = {
 			name: form.data.name,
 			contact_number: form.data.contact_number || null,
 			email: form.data.email && form.data.email.trim() !== '' ? form.data.email : null,
+            address: (form.data as any).address ?? null,
 			tenant_status: form.data.tenant_status,
 			emergency_contact: parsedEmergencyContact,
 			updated_at: new Date().toISOString(),
-			profile_picture_url: form.data.profile_picture_url || null
+            profile_picture_url: form.data.profile_picture_url || null,
+            school_or_workplace: (form.data as any).school_or_workplace ?? null,
+            facebook_name: (form.data as any).facebook_name ?? null,
+            birthday: (form.data as any).birthday ?? null
 		};
 
 		console.log('🔄 Update action - Sending to database:', updateData);

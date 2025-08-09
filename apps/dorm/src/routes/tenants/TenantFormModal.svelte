@@ -223,7 +223,11 @@
 					payment_schedules: [],
 					status_history: [],
 					status_change_reason: null,
-					profile_picture_url: tenant?.profile_picture_url || null
+					profile_picture_url: tenant?.profile_picture_url || null,
+					address: tenant.address || '',
+					school_or_workplace: tenant.school_or_workplace || '',
+					facebook_name: tenant.facebook_name || '',
+					birthday: tenant.birthday ? new Date(tenant.birthday).toLocaleDateString('en-US') : ''
 				};
 			} else {
 				// Create mode - reset to defaults with proper emergency_contact initialization
@@ -257,7 +261,11 @@
 					payment_schedules: [],
 					status_history: [],
 					status_change_reason: null,
-					profile_picture_url: null
+					profile_picture_url: null,
+					address: '',
+					school_or_workplace: '',
+					facebook_name: '',
+					birthday: ''
 				};
 			}
 		}
@@ -295,8 +303,11 @@
 					<h3 class="text-sm font-semibold text-slate-700">Basic Information</h3>
 				</div>
 
+	
+
+   
 				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-					<div class="space-y-2">
+                    <div class="space-y-2">
 						<Label for="name">Full Name *</Label>
 						<Input
 							id="name"
@@ -314,7 +325,7 @@
 								{$errors.name}
 							</p>
 						{/if}
-					</div>
+                    </div>
 
 					<div class="space-y-2">
 						<Label for="tenant_status">Status</Label>
@@ -335,8 +346,8 @@
 								{/each}
 							</Select.Content>
 						</Select.Root>
-					</div>
-				</div>
+                    </div>
+                </div>
 
 				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 					<div class="space-y-2">
@@ -385,6 +396,84 @@
 								{$errors.contact_number}
 							</p>
 						{/if}
+					</div>
+				</div>
+
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<div class="space-y-2">
+						<Label for="address">Address (Optional)</Label>
+						<Textarea
+							id="address"
+							name="address"
+							bind:value={$form.address}
+							class={$errors.address ? 'border-red-500' : ''}
+							placeholder="Street, City, Province/State, ZIP"
+							rows={2}
+							{...$constraints.address}
+						/>
+						{#if $errors.address}
+							<p class="text-sm text-red-500 flex items-center gap-1">
+								<AlertCircle class="w-4 h-4" />
+								{$errors.address}
+							</p>
+						{/if}
+					</div>
+				<div class="space-y-2">
+						<Label for="school_or_workplace">School/Workplace (Optional)</Label>
+						<Input
+							id="school_or_workplace"
+							name="school_or_workplace"
+							type="text"
+							bind:value={$form.school_or_workplace}
+							class={$errors.school_or_workplace ? 'border-red-500' : ''}
+							placeholder="e.g., State University / ACME Corp"
+							{...$constraints.school_or_workplace}
+						/>
+						{#if $errors.school_or_workplace}
+							<p class="text-sm text-red-500 flex items-center gap-1">
+								<AlertCircle class="w-4 h-4" />
+								{$errors.school_or_workplace}
+							</p>
+						{/if}
+					</div>
+	
+					<div class="space-y-2">
+						<Label for="facebook_name">Facebook Name (Optional)</Label>
+						<Input
+							id="facebook_name"
+							name="facebook_name"
+							type="text"
+							bind:value={$form.facebook_name}
+							class={$errors.facebook_name ? 'border-red-500' : ''}
+							placeholder="Exact Facebook profile name"
+							{...$constraints.facebook_name}
+						/>
+						{#if $errors.facebook_name}
+							<p class="text-sm text-red-500 flex items-center gap-1">
+								<AlertCircle class="w-4 h-4" />
+								{$errors.facebook_name}
+							</p>
+						{/if}
+					</div>
+					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+						<div class="space-y-2">
+							<Label for="birthday">Birthday (MM/DD/YYYY) (Optional)</Label>
+							<Input
+								id="birthday"
+								name="birthday"
+								type="text"
+								bind:value={$form.birthday}
+								class={$errors.birthday ? 'border-red-500' : ''}
+								placeholder="MM/DD/YYYY"
+								{...$constraints.birthday}
+							/>
+							{#if $errors.birthday}
+								<p class="text-sm text-red-500 flex items-center gap-1">
+									<AlertCircle class="w-4 h-4" />
+									{$errors.birthday}
+								</p>
+							{/if}
+						</div>
 					</div>
 				</div>
 			</div>

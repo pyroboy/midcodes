@@ -44,12 +44,18 @@ export interface BaseTenant {
 	name: string;
 	contact_number: string | null;
 	email: string | null;
+  address?: string | null;
 	tenant_status: 'ACTIVE' | 'INACTIVE' | 'PENDING' | 'BLACKLISTED';
 	auth_id: string | null;
 	updated_at: string | null;
 	created_by: string | null;
 	emergency_contact: EmergencyContact | null;
 	profile_picture_url?: string | null;
+  // Additional optional fields
+  school_or_workplace?: string | null;
+  facebook_name?: string | null;
+  /** Stored as ISO date string (YYYY-MM-DD) */
+  birthday?: string | null;
 }
 
 // Lease relationship types
@@ -109,6 +115,39 @@ export const tenantSchema = z.object({
 		.refine((val) => !val || val.trim() === '' || /^https?:\/\/.+/.test(val), {
 			message: 'Invalid URL format'
 		})
+})
+.extend({
+  address: z
+    .string()
+    .max(500, 'Must be less than 500 characters')
+    .optional()
+    .nullable()
+    .transform((v) => (v === '' ? null : v?.trim() ?? null)),
+  school_or_workplace: z
+    .string()
+    .max(255, 'Must be less than 255 characters')
+    .optional()
+    .nullable()
+    .transform((v) => (v === '' ? null : v?.trim() ?? null)),
+  facebook_name: z
+    .string()
+    .max(255, 'Must be less than 255 characters')
+    .optional()
+    .nullable()
+    .transform((v) => (v === '' ? null : v?.trim() ?? null)),
+  birthday: z
+    .string()
+    .optional()
+    .nullable()
+    .refine(
+      (val) => !val || val.trim() === '' || /^(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])\/\d{4}$/.test(val),
+      { message: 'Use MM/DD/YYYY' }
+    )
+    .transform((val) => {
+      if (!val || val.trim() === '') return null;
+      const [mm, dd, yyyy] = val.split('/');
+      return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+    })
 });
 
 // Schema for updating an existing tenant
@@ -131,6 +170,38 @@ export const tenantFormSchema = z.object({
 	tenant_status: TenantStatusEnum.default('PENDING'),
 	auth_id: z.string().uuid('Invalid UUID format').nullable().optional(),
 	created_by: z.string().uuid('Invalid UUID format').nullable().optional(),
+  address: z
+    .string()
+    .max(500, 'Must be less than 500 characters')
+    .optional()
+    .nullable()
+    .transform((v) => (v === '' ? null : v?.trim() ?? null)),
+  // New flat fields
+  school_or_workplace: z
+    .string()
+    .max(255, 'Must be less than 255 characters')
+    .optional()
+    .nullable()
+    .transform((v) => (v === '' ? null : v?.trim() ?? null)),
+  facebook_name: z
+    .string()
+    .max(255, 'Must be less than 255 characters')
+    .optional()
+    .nullable()
+    .transform((v) => (v === '' ? null : v?.trim() ?? null)),
+  birthday: z
+    .string()
+    .optional()
+    .nullable()
+    .refine(
+      (val) => !val || val.trim() === '' || /^(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])\/\d{4}$/.test(val),
+      { message: 'Use MM/DD/YYYY' }
+    )
+    .transform((val) => {
+      if (!val || val.trim() === '') return null;
+      const [mm, dd, yyyy] = val.split('/');
+      return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+    }),
 	// Flat emergency contact fields for form handling
 	'emergency_contact.name': z.string().optional(),
 	'emergency_contact.relationship': z.string().optional(),
@@ -202,8 +273,12 @@ export const transformFormToDbInput = (formData: TenantFormData): Omit<CreateTen
 		name: formData.name,
 		contact_number: formData.contact_number,
 		email: formData.email,
+    address: (formData as any).address ?? null,
 		emergency_contact: emergencyContact,
-		tenant_status: 'PENDING'
+    tenant_status: 'PENDING',
+    school_or_workplace: (formData as any).school_or_workplace ?? null,
+    facebook_name: (formData as any).facebook_name ?? null,
+    birthday: (formData as any).birthday ?? null
 	};
 };
 

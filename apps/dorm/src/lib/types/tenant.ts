@@ -28,6 +28,10 @@ export type TenantResponse = Omit<DBTenant, 'emergency_contact'> & {
 	tenant_status: 'ACTIVE' | 'INACTIVE' | 'PENDING' | 'BLACKLISTED';
 	emergency_contact: EmergencyContact | null;
 	profile_picture_url?: string | null;
+  address?: string | null;
+  school_or_workplace?: string | null;
+  facebook_name?: string | null;
+  birthday?: string | null;
 	leases: TenantLease[];
 	// Backward compatibility - primary lease (first active lease)
 	lease?: TenantLease | null;
