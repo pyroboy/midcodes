@@ -2,6 +2,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Button } from '$lib/components/ui/button';
 	import * as Select from '$lib/components/ui/select';
+	import * as Popover from '$lib/components/ui/popover';
 	import { Search, X, Filter } from 'lucide-svelte';
 	import { leaseStatusEnum } from './formSchema';
 	import type { Lease } from '$lib/types/lease';
@@ -69,116 +70,149 @@
 		filters.search || filters.status || filters.year || filters.sortBy !== 'name-az'
 	);
 
+	let showFiltersPopover = $state(false);
+
 	// Reactive statement to handle filter changes
 	$effect(() => {
 		onFiltersChange(filters);
 	});
 </script>
 
-<div class="bg-white/60 backdrop-blur-sm rounded-xl border border-slate-200/60 p-4 mb-6">
-	<div class="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
+<div class="bg-white/60 backdrop-blur-sm  p-2">
+	<div class="flex items-center gap-3">
 		<!-- Search Bar -->
-		<div class="flex-1 min-w-0">
+		<div class="flex-1">
 			<div class="relative">
 				<Search class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
 				<Input
 					type="text"
-					placeholder="Search lease, tenant, unit, floor..."
+					placeholder="Search leases..."
 					bind:value={filters.search}
-					class="pl-10 pr-4 h-10"
+					oninput={() => onFiltersChange(filters)}
+					class="w-full pl-10 pr-4 py-2.5 sm:py-2 text-sm sm:text-base border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
 				/>
 			</div>
 		</div>
 
-		<!-- Filters Row -->
-		<div class="flex flex-wrap gap-3 items-center">
-			<!-- Status Filter -->
-			<Select.Root type="single" bind:value={filters.status}>
-				<Select.Trigger class="w-40 h-10">
-					{filters.status || 'All Status'}
-				</Select.Trigger>
-				<Select.Content>
-					<Select.Item value="">All Status</Select.Item>
-					{#each availableStatuses as status}
-						<Select.Item value={status}>{status}</Select.Item>
-					{/each}
-				</Select.Content>
-			</Select.Root>
-
-			<!-- Year Filter -->
-			<Select.Root type="single" bind:value={filters.year}>
-				<Select.Trigger class="w-32 h-10">
-					{filters.year || 'All Years'}
-				</Select.Trigger>
-				<Select.Content>
-					<Select.Item value="">All Years</Select.Item>
-					{#each availableYears as year}
-						<Select.Item value={year}>{year}</Select.Item>
-					{/each}
-				</Select.Content>
-			</Select.Root>
-
-			<!-- Sort Filter -->
-			<Select.Root type="single" bind:value={filters.sortBy}>
-				<Select.Trigger class="w-48 h-10">
-					{filters.sortBy === 'name-az'
-						? 'Name A-Z'
-						: filters.sortBy === 'name-za'
-							? 'Name Z-A'
-							: filters.sortBy === 'recent-edited'
-								? 'Recently Edited'
-								: filters.sortBy === 'oldest-edited'
-									? 'Oldest Edited'
-									: filters.sortBy === 'floor-unit'
-										? 'Floor/Unit Number'
-										: filters.sortBy === 'unit-floor'
-											? 'Unit/Floor Number'
-											: filters.sortBy === 'balance-desc'
-												? 'Balance (High to Low)'
-												: filters.sortBy === 'balance-asc'
-													? 'Balance (Low to High)'
-													: filters.sortBy === 'due-date'
-														? 'Next Due Date'
-														: filters.sortBy === 'days-overdue'
-															? 'Days Overdue'
-															: 'Name A-Z'}
-				</Select.Trigger>
-				<Select.Content>
-					<Select.Item value="name-az">Name A-Z</Select.Item>
-					<Select.Item value="name-za">Name Z-A</Select.Item>
-					<Select.Item value="recent-edited">Recently Edited</Select.Item>
-					<Select.Item value="oldest-edited">Oldest Edited</Select.Item>
-					<Select.Item value="floor-unit">Floor/Unit Number</Select.Item>
-					<Select.Item value="unit-floor">Unit/Floor Number</Select.Item>
-					<Select.Item value="balance-desc">Balance (High to Low)</Select.Item>
-					<Select.Item value="balance-asc">Balance (Low to High)</Select.Item>
-					<Select.Item value="due-date">Next Due Date</Select.Item>
-					<Select.Item value="days-overdue">Days Overdue</Select.Item>
-				</Select.Content>
-			</Select.Root>
-
-			<!-- Clear Filters Button -->
-			{#if hasActiveFilters}
+		<!-- Filters Button -->
+		<Popover.Root bind:open={showFiltersPopover}>
+			<Popover.Trigger>
 				<Button
 					variant="outline"
-					size="sm"
-					onclick={clearAllFilters}
-					class="h-10 px-3 text-slate-600 hover:text-slate-800"
+					class="h-10 px-4 border border-slate-200 hover:border-slate-300 text-slate-600 hover:text-slate-800 bg-white hover:bg-slate-50 transition-colors {hasActiveFilters ? 'border-blue-300 text-blue-700 bg-blue-50' : ''}"
 				>
-					<X class="w-4 h-4 mr-1" />
-					Clear All
+					<Filter class="w-4 h-4 mr-2" />
+					Filters
+					{#if hasActiveFilters}
+						<span class="ml-1 bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
+							{[filters.status, filters.year, filters.sortBy !== 'name-az' ? 'sort' : ''].filter(Boolean).length}
+						</span>
+					{/if}
 				</Button>
-			{/if}
-		</div>
+			</Popover.Trigger>
+			<Popover.Content class="w-80 p-4" align="end">
+				<div class="space-y-4">
+					<div class="flex items-center justify-between">
+						<h3 class="font-semibold text-slate-900">Filter Options</h3>
+						{#if hasActiveFilters}
+							<Button
+								variant="ghost"
+								size="sm"
+								onclick={clearAllFilters}
+								class="text-slate-500 hover:text-slate-700 p-1 h-auto"
+							>
+								<X class="w-4 h-4 mr-1" />
+								Clear All
+							</Button>
+						{/if}
+					</div>
+
+					<!-- Status Filter -->
+					<div class="space-y-2">
+						<label class="text-sm font-medium text-slate-700">Status</label>
+						<Select.Root type="single" bind:value={filters.status}>
+							<Select.Trigger class="w-full h-9">
+								{filters.status || 'All Status'}
+							</Select.Trigger>
+							<Select.Content>
+								<Select.Item value="">All Status</Select.Item>
+								{#each availableStatuses as status}
+									<Select.Item value={status}>{status}</Select.Item>
+								{/each}
+							</Select.Content>
+						</Select.Root>
+					</div>
+
+					<!-- Year Filter -->
+					<div class="space-y-2">
+						<label class="text-sm font-medium text-slate-700">Year</label>
+						<Select.Root type="single" bind:value={filters.year}>
+							<Select.Trigger class="w-full h-9">
+								{filters.year || 'All Years'}
+							</Select.Trigger>
+							<Select.Content>
+								<Select.Item value="">All Years</Select.Item>
+								{#each availableYears as year}
+									<Select.Item value={year}>{year}</Select.Item>
+								{/each}
+							</Select.Content>
+						</Select.Root>
+					</div>
+
+					<!-- Sort Filter -->
+					<div class="space-y-2">
+						<label class="text-sm font-medium text-slate-700">Sort By</label>
+						<Select.Root type="single" bind:value={filters.sortBy}>
+							<Select.Trigger class="w-full h-9">
+								{filters.sortBy === 'name-az'
+									? 'Name A-Z'
+									: filters.sortBy === 'name-za'
+										? 'Name Z-A'
+										: filters.sortBy === 'recent-edited'
+											? 'Recently Edited'
+											: filters.sortBy === 'oldest-edited'
+												? 'Oldest Edited'
+												: filters.sortBy === 'floor-unit'
+													? 'Floor/Unit Number'
+													: filters.sortBy === 'unit-floor'
+														? 'Unit/Floor Number'
+														: filters.sortBy === 'balance-desc'
+															? 'Balance (High to Low)'
+															: filters.sortBy === 'balance-asc'
+																? 'Balance (Low to High)'
+																: filters.sortBy === 'due-date'
+																	? 'Next Due Date'
+																	: filters.sortBy === 'days-overdue'
+																		? 'Days Overdue'
+																		: 'Name A-Z'}
+							</Select.Trigger>
+							<Select.Content>
+								<Select.Item value="name-az">Name A-Z</Select.Item>
+								<Select.Item value="name-za">Name Z-A</Select.Item>
+								<Select.Item value="recent-edited">Recently Edited</Select.Item>
+								<Select.Item value="oldest-edited">Oldest Edited</Select.Item>
+								<Select.Item value="floor-unit">Floor/Unit Number</Select.Item>
+								<Select.Item value="unit-floor">Unit/Floor Number</Select.Item>
+								<Select.Item value="balance-desc">Balance (High to Low)</Select.Item>
+								<Select.Item value="balance-asc">Balance (Low to High)</Select.Item>
+								<Select.Item value="due-date">Next Due Date</Select.Item>
+								<Select.Item value="days-overdue">Days Overdue</Select.Item>
+							</Select.Content>
+						</Select.Root>
+					</div>
+				</div>
+			</Popover.Content>
+		</Popover.Root>
 	</div>
 
 	<!-- Active Filters Display -->
 	{#if hasActiveFilters}
 		<div class="flex flex-wrap gap-2 mt-3 pt-3 border-t border-slate-200">
-			<span class="text-xs text-slate-500 font-medium">Active Filters:</span>
+			<span class="sr-only">Active Filters:</span>
+			<span class="text-xs text-slate-500 font-medium hidden sm:inline">Active Filters:</span>
 			{#if filters.search}
 				<span
-					class="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs"
+					class="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs whitespace-nowrap"
 				>
 					Search: "{filters.search}"
 					<button

@@ -11,8 +11,9 @@
 	} from '$lib/components/ui/card';
 	import { Separator } from '$lib/components/ui/separator';
 	import { Button } from '$lib/components/ui/button';
-	import { Receipt, Calendar, DollarSign, CreditCard, FileText, User, Home } from 'lucide-svelte';
+	import { Receipt, Calendar, DollarSign, CreditCard, FileText, User, Home, Users, MapPin, ChevronDown, ChevronUp, Building2, Clock } from 'lucide-svelte';
 	import type { TransactionWithProfiles } from './types';
+	import { formatCurrency } from '$lib/utils/format';
 
 	// Props
 	interface Props {
@@ -21,6 +22,10 @@
 	}
 
 	let { open = false, transaction = null }: Props = $props();
+
+	// State for collapsible sections
+	let showBillingBreakdown = $state(false);
+	let showAuditInfo = $state(false);
 
 	// Event dispatcher
 	const dispatch = createEventDispatcher<{
@@ -40,13 +45,6 @@
 		}
 	}
 
-	// Format currency
-	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('en-PH', {
-			style: 'currency',
-			currency: 'PHP'
-		}).format(amount);
-	}
 
 	// Format date
 	function formatDate(dateString: string | null | undefined): string {
@@ -95,185 +93,234 @@
 			</Dialog.Header>
 
 			{#if transaction}
-				<div class="space-y-6">
-					<!-- Basic transaction info -->
-    <Card class="shadow-sm border-gray-100">
-						<CardHeader class="pb-2">
-							<CardTitle class="text-lg font-medium">Payment Information</CardTitle>
-						</CardHeader>
-						<CardContent class="space-y-4 pt-0">
-							<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-								<div class="flex items-start gap-2">
-									<div class="p-2 bg-gray-100 rounded-md">
-										<DollarSign class="h-4 w-4 text-gray-700" />
-									</div>
-									<div>
-										<p class="text-sm text-gray-500">Amount</p>
-										<p class="font-medium">{formatCurrency(transaction.amount || 0)}</p>
-									</div>
+				<!-- Single Consolidated Card -->
+				<Card class="shadow-sm border-gray-100">
+					<CardContent class="p-6">
+						<!-- Transaction Header with Prominent Amount -->
+						<div class="flex items-center justify-between mb-6">
+							<div class="flex items-center gap-4">
+								<div class="p-3 bg-green-100 rounded-lg">
+									<DollarSign class="h-6 w-6 text-green-600" />
 								</div>
-
-								<div class="flex items-start gap-2">
-									<div class="p-2 bg-gray-100 rounded-md">
-										<CreditCard class="h-4 w-4 text-gray-700" />
-									</div>
-									<div>
-										<p class="text-sm text-gray-500">Payment Method</p>
-										<p class="font-medium">{transaction.method?.replace('_', ' ') || 'N/A'}</p>
-									</div>
-								</div>
-
-								<div class="flex items-start gap-2">
-									<div class="p-2 bg-gray-100 rounded-md">
-										<User class="h-4 w-4 text-gray-700" />
-									</div>
-									<div>
-										<p class="text-sm text-gray-500">Paid By</p>
-										<p class="font-medium">{transaction.paid_by || 'N/A'}</p>
-									</div>
-								</div>
-
-								<div class="flex items-start gap-2">
-									<div class="p-2 bg-gray-100 rounded-md">
-										<Calendar class="h-4 w-4 text-gray-700" />
-									</div>
-									<div>
-										<p class="text-sm text-gray-500">Paid At</p>
-										<p class="font-medium">{formatDate(transaction.paid_at)}</p>
-									</div>
-								</div>
-
-								<div class="flex items-start gap-2">
-									<div class="p-2 bg-gray-100 rounded-md">
-										<Home class="h-4 w-4 text-gray-700" />
-									</div>
-									<div>
-										<p class="text-sm text-gray-500">Lease</p>
-										<p class="font-medium">{transaction?.lease_name || 'N/A'}</p>
-									</div>
+								<div>
+									<p class="text-sm text-gray-500">Payment Amount</p>
+									<p class="text-2xl font-bold text-gray-900">{formatCurrency(transaction.amount || 0)}</p>
 								</div>
 							</div>
-
-							<div class="grid grid-cols-2 gap-4">
-								<div class="space-y-1">
-									<p class="text-xs text-gray-500 flex items-center gap-1">
-										<User class="h-3 w-3" />
-										Paid By
-									</p>
-									<p class="font-medium">{transaction.paid_by}</p>
+							<div class="text-right">
+								<div class="px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+									Completed
 								</div>
-								<div class="space-y-1">
-									<p class="text-xs text-gray-500 flex items-center gap-1">
-										<CreditCard class="h-3 w-3" />
-										Payment Method
-									</p>
-									<p class="font-medium">{transaction.method.replace('_', ' ')}</p>
-								</div>
+								<p class="text-sm text-gray-500 mt-1">{formatDate(transaction.paid_at)}</p>
 							</div>
+						</div>
 
-							{#if transaction.reference_number}
-								<div class="space-y-1">
-									<p class="text-xs text-gray-500 flex items-center gap-1">
-										<FileText class="h-3 w-3" />
-										Reference Number
-									</p>
-									<p class="font-medium">{transaction.reference_number}</p>
+						<Separator class="my-6" />
+
+						<!-- Payment & Lease Information -->
+						<div class="space-y-4">
+							<!-- Payment Details Grid -->
+							<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+								<div class="flex items-center gap-2">
+									<CreditCard class="h-4 w-4 text-gray-400" />
+									<div>
+										<p class="text-xs text-gray-500">Method</p>
+										<p class="text-sm font-medium">{transaction.method?.replace('_', ' ') || 'N/A'}</p>
+									</div>
 								</div>
-							{/if}
 
-							{#if transaction.notes}
-								<div class="space-y-1">
-									<p class="text-xs text-gray-500">Notes</p>
-									<p class="text-sm text-gray-700 bg-gray-50 p-2 rounded">{transaction.notes}</p>
+								<div class="flex items-center gap-2">
+									<User class="h-4 w-4 text-gray-400" />
+									<div>
+										<p class="text-xs text-gray-500">Paid By</p>
+										<p class="text-sm font-medium">{transaction.paid_by || 'N/A'}</p>
+									</div>
 								</div>
-							{/if}
-						</CardContent>
-					</Card>
 
-					<!-- Receipt info -->
-					{#if transaction.receipt_url}
-						<Card class="shadow-sm border-gray-100">
-							<CardHeader class="pb-2">
-								<CardTitle class="text-lg font-medium">Receipt</CardTitle>
-							</CardHeader>
-							<CardContent class="pt-0">
-								<div class="flex items-center justify-between">
+								{#if transaction.reference_number}
+									<div class="flex items-center gap-2">
+										<FileText class="h-4 w-4 text-gray-400" />
+										<div>
+											<p class="text-xs text-gray-500">Reference</p>
+											<p class="text-sm font-medium">{transaction.reference_number}</p>
+										</div>
+									</div>
+								{/if}
+
+								{#if transaction.receipt_url}
 									<div class="flex items-center gap-2">
 										<Receipt class="h-4 w-4 text-blue-500" />
-										<span class="text-sm">Receipt available</span>
+										<div>
+											<p class="text-xs text-gray-500">Receipt</p>
+											<a
+												href={transaction.receipt_url}
+												target="_blank"
+												rel="noopener noreferrer"
+												class="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+											>
+												View
+											</a>
+										</div>
 									</div>
-									<a
-										href={transaction.receipt_url}
-										target="_blank"
-										rel="noopener noreferrer"
-										class="text-blue-600 hover:text-blue-800 text-sm font-medium hover:underline"
-									>
-										View Receipt
-									</a>
-								</div>
-							</CardContent>
-						</Card>
-					{/if}
-
-					<!-- Audit info -->
-					<Card class="shadow-sm border-gray-100">
-						<CardHeader class="pb-2">
-							<CardTitle class="text-lg font-medium">Audit Information</CardTitle>
-						</CardHeader>
-						<CardContent class="space-y-4 pt-0">
-							<div class="grid grid-cols-2 gap-4">
-								<div class="space-y-1">
-									<p class="text-xs text-gray-500">Created At</p>
-									<p class="text-sm">{formatDateTime(transaction.created_at)}</p>
-								</div>
-								<div class="space-y-1">
-									<p class="text-xs text-gray-500">Created By</p>
-									<p class="text-sm">
-										{transaction.created_by_profile?.full_name || 'Unknown'}
-									</p>
-								</div>
+								{/if}
 							</div>
 
-							{#if transaction.updated_at}
-								<div class="grid grid-cols-2 gap-4">
-									<div class="space-y-1">
-										<p class="text-xs text-gray-500">Last Updated</p>
-										<p class="text-sm">{formatDateTime(transaction.updated_at)}</p>
-									</div>
-									<div class="space-y-1">
-										<p class="text-xs text-gray-500">Updated By</p>
-										<p class="text-sm">
-											{transaction.updated_by_profile?.full_name || 'Unknown'}
-										</p>
-									</div>
+								</div>
+
+							{#if transaction.notes}
+								<div class="bg-gray-50 p-3 rounded-md">
+									<p class="text-xs text-gray-500 mb-1">Notes</p>
+									<p class="text-sm text-gray-700">{transaction.notes}</p>
 								</div>
 							{/if}
+
+							<!-- Lease Information -->
+							{#if transaction?.unique_leases && transaction.unique_leases.length > 0}
+								<div class="space-y-3">
+									<h3 class="text-sm font-medium text-gray-700 flex items-center gap-2">
+										<Building2 class="h-4 w-4" />
+										Property & Lease Information
+									</h3>
+									{#each transaction.unique_leases as lease}
+										<div class="border-l-3 border-blue-200 pl-4 py-2">
+											<div class="flex items-center justify-between mb-2">
+												<h4 class="font-medium text-gray-900">{lease.name}</h4>
+												<span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+													{lease.status?.toLowerCase() || 'active'}
+												</span>
+											</div>
+											{#if lease.rental_unit}
+												<div class="flex items-center gap-1 text-sm text-gray-600 mb-1">
+													<MapPin class="h-3 w-3" />
+													Unit {lease.rental_unit.rental_unit_number}
+													{#if lease.rental_unit.floor}
+														• Floor {lease.rental_unit.floor.floor_number}
+														{#if lease.rental_unit.floor.wing}
+															({lease.rental_unit.floor.wing})
+														{/if}
+													{/if}
+												</div>
+											{/if}
+											{#if lease.tenants && lease.tenants.length > 0}
+												<div class="flex items-center gap-1 text-sm text-gray-600">
+													<Users class="h-3 w-3" />
+													{lease.tenants.map(t => t.name).join(', ')}
+												</div>
+											{/if}
+										</div>
+									{/each}
+								</div>
+							{:else if transaction?.lease_name}
+								<div class="space-y-2">
+									<h3 class="text-sm font-medium text-gray-700 flex items-center gap-2">
+										<Building2 class="h-4 w-4" />
+										Lease Information
+									</h3>
+									<p class="text-sm text-gray-600">{transaction.lease_name}</p>
+								</div>
+							{/if}
+
+
+							<!-- Collapsible Billing Breakdown -->
+							{#if transaction?.lease_details && transaction.lease_details.length > 0}
+								<Separator class="my-4" />
+								<div class="space-y-3">
+									<button
+										class="flex items-center justify-between w-full text-left hover:bg-gray-50 p-2 rounded-md transition-colors"
+										onclick={() => showBillingBreakdown = !showBillingBreakdown}
+									>
+										<h3 class="text-sm font-medium text-gray-700 flex items-center gap-2">
+											<Receipt class="h-4 w-4" />
+											Payment Allocation Details
+										</h3>
+										{#if showBillingBreakdown}
+											<ChevronUp class="h-4 w-4 text-gray-400" />
+										{:else}
+											<ChevronDown class="h-4 w-4 text-gray-400" />
+										{/if}
+									</button>
+
+									{#if showBillingBreakdown}
+										<div class="space-y-3 pl-4">
+											{#each (transaction.unique_leases || []) as lease}
+												{@const leaseAllocations = (transaction.lease_details || []).filter(detail => detail.lease.id === lease.id)}
+												{#if leaseAllocations.length > 0}
+													<div class="border-l-2 border-gray-200 pl-4">
+														<h4 class="font-medium text-sm text-gray-900 mb-2">{lease.name}</h4>
+														<div class="space-y-2">
+															{#each leaseAllocations as allocation}
+																<div class="flex items-center justify-between py-2 px-3 bg-gray-50 rounded text-sm">
+																	<div>
+																		<span class="font-medium">
+																			{allocation.billing_type}
+																			{#if allocation.utility_type}
+																				({allocation.utility_type})
+																			{/if}
+																		</span>
+																		<div class="text-xs text-gray-500">Due: {formatDate(allocation.due_date)}</div>
+																	</div>
+																	<div class="text-right">
+																		<div class="font-semibold text-green-600">
+																			{formatCurrency(allocation.allocated_amount)}
+																		</div>
+																		<div class="text-xs text-gray-500">
+																			of {formatCurrency(allocation.billing_amount)}
+																		</div>
+																	</div>
+																</div>
+															{/each}
+															{#if leaseAllocations.length > 0}
+																{@const leaseTotal = leaseAllocations.reduce((sum, alloc) => sum + alloc.allocated_amount, 0)}
+																<div class="border-t border-gray-200 pt-2 mt-2 flex justify-between font-semibold text-sm">
+																	<span>Lease Total</span>
+																	<span class="text-green-700">{formatCurrency(leaseTotal)}</span>
+																</div>
+															{/if}
+														</div>
+													</div>
+												{/if}
+											{/each}
+										</div>
+									{/if}
+								</div>
+							{/if}
+
+							<!-- Collapsible Audit Information -->
+							<Separator class="my-4" />
+							<div class="space-y-3">
+								<button
+									class="flex items-center justify-between w-full text-left hover:bg-gray-50 p-2 rounded-md transition-colors"
+									onclick={() => showAuditInfo = !showAuditInfo}
+								>
+									<h3 class="text-sm font-medium text-gray-700 flex items-center gap-2">
+										<Clock class="h-4 w-4" />
+										Audit Information
+									</h3>
+									{#if showAuditInfo}
+										<ChevronUp class="h-4 w-4 text-gray-400" />
+									{:else}
+										<ChevronDown class="h-4 w-4 text-gray-400" />
+									{/if}
+								</button>
+
+								{#if showAuditInfo}
+									<div class="pl-6 space-y-2 text-sm">
+										<div class="flex justify-between">
+											<span class="text-gray-500">Created:</span>
+											<span class="text-gray-700">{formatDateTime(transaction.created_at || '')} by {transaction.created_by_profile?.full_name || 'Unknown'}</span>
+										</div>
+										{#if transaction.updated_at}
+											<div class="flex justify-between">
+												<span class="text-gray-500">Updated:</span>
+												<span class="text-gray-700">{formatDateTime(transaction.updated_at)} by {transaction.updated_by_profile?.full_name || 'Unknown'}</span>
+											</div>
+										{/if}
+									</div>
+								{/if}
+							</div>
 						</CardContent>
 					</Card>
 
-                    <!-- Billing info and allocations -->
-                    {#if transaction.billing_ids && transaction.billing_ids.length > 0}
-						<Card class="shadow-sm border-gray-100">
-							<CardHeader class="pb-2">
-                                <CardTitle class="text-lg font-medium">Linked Billings</CardTitle>
-							</CardHeader>
-							<CardContent class="pt-0">
-                                <ul class="list-disc pl-5 space-y-1">
-                                    {#each transaction.billing_ids as billingId}
-                                        <li class="text-sm flex items-center justify-between gap-2">
-                                            <span>Billing #{billingId}</span>
-                                            {#if transaction.allocations}
-                                                {#each transaction.allocations.filter(a => a.billing_id === billingId) as alloc}
-                                                    <span class="text-xs text-gray-600">Allocated: ₱{alloc.amount?.toFixed(2)}</span>
-                                                {/each}
-                                            {/if}
-                                        </li>
-                                    {/each}
-                                </ul>
-							</CardContent>
-						</Card>
-					{/if}
-				</div>
 			{/if}
 
 			<Dialog.Footer class="flex justify-end">

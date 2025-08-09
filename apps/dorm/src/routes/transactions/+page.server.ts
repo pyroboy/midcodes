@@ -183,22 +183,113 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
     const transactions = await Promise.all(
       formattedTransactions.map(async (transaction) => {
         let leaseName: string | null = null;
+        let leaseDetails: any[] = [];
+        let uniqueLeases: any[] = [];
+        
         if (transaction.billing_ids && transaction.billing_ids.length > 0) {
-          const firstBillingId = transaction.billing_ids[0];
-          const { data: billingData } = await supabase
+          // Get comprehensive lease information for all billings
+          const { data: billingLeaseData, error: billingLeaseError } = await supabase
             .from('billings')
-            .select('lease:leases(id, name)')
-            .eq('id', firstBillingId)
-            .single();
-          if (billingData && billingData.lease) {
-            const leaseData = Array.isArray(billingData.lease) ? billingData.lease[0] : billingData.lease;
-            leaseName = leaseData?.name || null;
+            .select(`
+              id,
+              type,
+              utility_type,
+              amount,
+              due_date,
+              lease:leases(
+                id,
+                name,
+                start_date,
+                end_date,
+                rent_amount,
+                security_deposit,
+                status,
+                rental_unit(
+                  id,
+                  number,
+                  floors(
+                    floor_number,
+                    wing
+                  )
+                ),
+                lease_tenants(
+                  tenant:tenants(
+                    id,
+                    name,
+                    email,
+                    contact_number
+                  )
+                )
+              )
+            `)
+            .in('id', transaction.billing_ids);
+
+          if (billingLeaseData && billingLeaseData.length > 0) {
+            // Set lease name from first lease for backward compatibility
+            const firstLease = billingLeaseData[0]?.lease;
+            if (firstLease) {
+              leaseName = Array.isArray(firstLease) ? firstLease[0]?.name : firstLease.name;
+            }
+
+            // Build comprehensive lease details with allocation information
+            const allocations = allocationsByPayment.get(transaction.id) || [];
+            
+            leaseDetails = billingLeaseData.map((billing: any) => {
+              const lease = Array.isArray(billing.lease) ? billing.lease[0] : billing.lease;
+              const allocation = allocations.find(a => a.billing_id === billing.id);
+              
+              const processedLease = {
+                id: lease?.id,
+                name: lease?.name,
+                start_date: lease?.start_date,
+                end_date: lease?.end_date,
+                rent_amount: lease?.rent_amount,
+                security_deposit: lease?.security_deposit,
+                status: lease?.status,
+                rental_unit: lease?.rental_unit ? {
+                  id: lease.rental_unit.id,
+                  rental_unit_number: lease.rental_unit.number,
+                  floor: lease.rental_unit.floors ? {
+                    floor_number: lease.rental_unit.floors.floor_number,
+                    wing: lease.rental_unit.floors.wing
+                  } : undefined
+                } : undefined,
+                tenants: lease?.lease_tenants?.map((lt: any) => ({
+                  id: lt.tenant?.id,
+                  name: lt.tenant?.name,
+                  email: lt.tenant?.email,
+                  phone: lt.tenant?.contact_number
+                })).filter((t: any) => t.id) || []
+              };
+
+              return {
+                billing_id: billing.id,
+                billing_type: billing.type,
+                utility_type: billing.utility_type,
+                billing_amount: billing.amount,
+                allocated_amount: allocation?.amount || 0,
+                due_date: billing.due_date,
+                lease: processedLease
+              };
+            });
+
+            // Extract unique leases for summary display
+            const leaseMap = new Map();
+            leaseDetails.forEach(detail => {
+              if (detail.lease?.id && !leaseMap.has(detail.lease.id)) {
+                leaseMap.set(detail.lease.id, detail.lease);
+              }
+            });
+            uniqueLeases = Array.from(leaseMap.values());
           }
         }
+        
         return {
           ...transaction,
           lease_name: leaseName,
-          allocations: allocationsByPayment.get(transaction.id) || []
+          allocations: allocationsByPayment.get(transaction.id) || [],
+          lease_details: leaseDetails,
+          unique_leases: uniqueLeases
         } as any;
       })
     );
@@ -288,25 +379,14 @@ export const actions: Actions = {
             return fail(400, { form, message: 'Cannot update a reverted transaction' });
           }
 
+          // Prevent any financial field changes during edit - amount and allocations are now immutable
           const financialFieldsChanged =
             (transactionData.amount != null && Number(transactionData.amount) !== Number(existing.amount)) ||
-            (transactionData.method && transactionData.method !== existing.method) ||
             (transactionData.billing_ids && JSON.stringify(transactionData.billing_ids) !== JSON.stringify(existing.billing_ids));
 
           if (financialFieldsChanged) {
-            // Soft-delete the old payment
-            const { error: revertError } = await supabase.rpc('revert_payment', {
-              p_payment_id: id,
-              p_reason: 'Replaced via edit',
-              p_performed_by: session.user.id
-            });
-            if (revertError) {
-              console.error('Failed to revert payment on edit:', revertError);
-              return fail(500, { form, message: 'Failed to replace transaction' });
-            }
-
-            // Create replacement manually
-            return await createPaymentManually(supabase, transactionData, session.user.id, form);
+            console.error('Attempted to modify financial fields during edit - this is not allowed');
+            return fail(400, { form, message: 'Amount and billing allocations cannot be modified during edit. Only administrative fields like payment method, reference number, and notes can be updated.' });
           }
 
           const { data, error: updateError } = await supabase

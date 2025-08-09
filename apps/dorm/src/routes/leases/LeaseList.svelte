@@ -156,9 +156,9 @@
 
 <LeaseFilters {leases} onFiltersChange={handleFiltersChange} />
 
-<div class="space-y-4">
+<div class="">
 	{#if filteredLeases.length === 0}
-		<div class="flex flex-col items-center justify-center py-16 px-6">
+		<div class="flex flex-col items-center justify-center">
 			<div class="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-6">
 				<FileText class="w-12 h-12 text-slate-400" />
 			</div>
@@ -172,7 +172,7 @@
 			</p>
 		</div>
 	{:else}
-		<div class="space-y-4">
+		<div class="">
 			{#each filteredLeases as lease (lease.id)}
 				<LeaseCard
 					{lease}

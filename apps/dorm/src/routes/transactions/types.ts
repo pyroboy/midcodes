@@ -64,7 +64,44 @@ export interface TransactionTableRow {
 	updated_by_name?: string;
 }
 
-// Extended Payment interface with profile data
+// Interfaces for comprehensive lease information
+export interface LeaseDetails {
+	id: number;
+	name: string;
+	start_date: string;
+	end_date: string;
+	rent_amount: number;
+	security_deposit: number;
+	status: string;
+	rental_unit?: {
+		id: number;
+		rental_unit_number: string;
+		floor?: {
+			floor_number: number;
+			wing?: string;
+		};
+	};
+	tenants?: TenantInfo[];
+}
+
+export interface TenantInfo {
+	id: number;
+	name: string;
+	email?: string;
+	phone?: string;
+}
+
+export interface BillingLeaseInfo {
+	billing_id: number;
+	billing_type: string;
+	utility_type?: string;
+	billing_amount: number;
+	allocated_amount: number;
+	due_date: string;
+	lease: LeaseDetails;
+}
+
+// Extended Payment interface with profile data and comprehensive lease information
 export interface PaymentWithProfiles extends Payment {
 	created_by_profile?: {
 		id: string;
@@ -78,6 +115,12 @@ export interface PaymentWithProfiles extends Payment {
 	};
 	billing_lease?: any;
 	lease_name?: string | null;
+	// New comprehensive lease information
+	lease_details?: BillingLeaseInfo[];
+	unique_leases?: LeaseDetails[];
+	// Timestamp fields for audit information
+	created_at?: string;
+	updated_at?: string | null;
 }
 
 // Alias for backward compatibility

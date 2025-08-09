@@ -184,6 +184,7 @@ function generateLeasePrintHTML(lease: Lease): string {
 								const paymentDetailsHtml =
 									billing.allocations && billing.allocations.length > 0
 										? billing.allocations
+												.filter((alloc: any) => alloc.payment && !alloc.payment.reverted_at)
 												.map((alloc: any) => {
 													if (!alloc.payment) return '';
 													const methodDisplay =
@@ -264,12 +265,12 @@ function generateLeasePrintHTML(lease: Lease): string {
 											0
 										);
 
-										// Calculate amount used from security deposit for other billings
+										// Calculate amount used from security deposit for other billings - exclude reverted payments
 										let amountUsed = 0;
 										sortedBillings.forEach((billing) => {
 											if (billing.type !== 'SECURITY_DEPOSIT' && billing.allocations) {
 												billing.allocations.forEach((allocation: any) => {
-													if (allocation.payment && allocation.payment.method === 'SECURITY_DEPOSIT') {
+													if (allocation.payment && allocation.payment.method === 'SECURITY_DEPOSIT' && !allocation.payment.reverted_at) {
 														amountUsed += allocation.amount || 0;
 													}
 												});

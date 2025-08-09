@@ -3,7 +3,7 @@
 	import LeaseFormModal from './LeaseFormModal.svelte';
 	import LeaseList from './LeaseList.svelte';
 	import { Button } from '$lib/components/ui/button';
-	import { Plus, Printer } from 'lucide-svelte';
+	import { Plus, Printer, Check, Clock, AlertTriangle, CircleDollarSign } from 'lucide-svelte';
 	import type { z } from 'zod';
 	import { leaseSchema } from './formSchema';
 	import { calculateLeaseBalanceStatus } from '$lib/utils/lease-status';
@@ -226,151 +226,137 @@
 <div class="w-full min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
 	<!-- Header Section with Integrated Stats -->
 	<div class="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-slate-200/60">
-		<div class="max-w-7xl mx-auto px-4 sm:px-6 py-4">
-			<div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-				<div class="flex items-center gap-4">
-					<div>
-						<h1
-							class="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent"
-						>
-							Leases Dashboard
-						</h1>
-						<p class="text-slate-600 text-sm mt-1">Manage rental agreements and track payments</p>
-					</div>
-				</div>
-
-				<!-- Enhanced Stats Overview - Now Clickable -->
-				<div class="flex items-center gap-3 text-xs sm:text-sm">
-					<button
-						onclick={() => handleFilterClick('all')}
-						class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 {activeFilter ===
-						'all'
-							? 'bg-blue-100 ring-2 ring-blue-500'
-							: 'bg-blue-50 hover:bg-blue-100'}"
-					>
-						{#if isLoading}
-							<Skeleton class="h-4 w-6" />
-						{:else}
-							<span class="text-blue-600 font-medium">{summaryMetrics.totalLeases}</span>
-						{/if}
-						<span class="text-slate-600">Total</span>
-					</button>
-
-					<button
-						onclick={() => handleFilterClick('paid')}
-						class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 {activeFilter ===
-						'paid'
-							? 'bg-green-100 ring-2 ring-green-500'
-							: 'bg-green-50 hover:bg-green-100'}"
-					>
-						{#if isLoading}
-							<Skeleton class="h-4 w-6" />
-						{:else}
-							<span class="text-green-600 font-medium">{summaryMetrics.paidInFull}</span>
-						{/if}
-						<span class="text-slate-600">Paid</span>
-					</button>
-
-					<button
-						onclick={() => handleFilterClick('pending')}
-						class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 {activeFilter ===
-						'pending'
-							? 'bg-orange-100 ring-2 ring-orange-500'
-							: 'bg-orange-50 hover:bg-orange-100'}"
-					>
-						{#if isLoading}
-							<div class="flex flex-col space-y-1">
-								<Skeleton class="h-4 w-6" />
-								<Skeleton class="h-3 w-12" />
-							</div>
-						{:else}
-							<div class="flex flex-col">
-								<span class="text-orange-600 font-medium">{summaryMetrics.pendingCount}</span>
-								<span class="text-orange-600 text-xs"
-									>{formatCurrency(summaryMetrics.totalPending)}</span
-								>
-							</div>
-						{/if}
-						<span class="text-slate-600">Pending</span>
-					</button>
-
-					<button
-						onclick={() => handleFilterClick('partial')}
-						class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 {activeFilter ===
-						'partial'
-							? 'bg-amber-100 ring-2 ring-amber-500'
-							: 'bg-amber-50 hover:bg-amber-100'}"
-					>
-						{#if isLoading}
-							<div class="flex flex-col space-y-1">
-								<Skeleton class="h-4 w-6" />
-								<Skeleton class="h-3 w-12" />
-							</div>
-						{:else}
-							<div class="flex flex-col">
-								<span class="text-amber-600 font-medium">{summaryMetrics.partialCount}</span>
-								<span class="text-amber-600 text-xs"
-									>{formatCurrency(summaryMetrics.totalPartial)}</span
-								>
-							</div>
-						{/if}
-						<span class="text-slate-600">Partial</span>
-					</button>
-
-					<button
-						onclick={() => handleFilterClick('overdue')}
-						class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 {activeFilter ===
-						'overdue'
-							? 'bg-red-100 ring-2 ring-red-500'
-							: 'bg-red-50 hover:bg-red-100'}"
-					>
-						{#if isLoading}
-							<div class="flex flex-col space-y-1">
-								<Skeleton class="h-4 w-6" />
-								<Skeleton class="h-3 w-12" />
-							</div>
-						{:else}
-							<div class="flex flex-col">
-								<span class="text-red-600 font-medium">{summaryMetrics.overdueCount}</span>
-								<span class="text-red-600 text-xs"
-									>{formatCurrency(summaryMetrics.totalOverdue)}</span
-								>
-							</div>
-						{/if}
-						<span class="text-slate-600">Overdue</span>
-					</button>
-				</div>
-
-				<div class="flex items-center gap-2">
+		<div class="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-3">
+			<!-- Title and Action Buttons -->
+			<div class="flex items-center justify-between mb-2">
+				<h1 class="text-lg sm:text-xl lg:text-2xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+					Leases Dashboard
+				</h1>
+				<div class="flex items-center gap-1 sm:gap-2">
 					<Button
 						onclick={handlePrintAllLeases}
 						variant="outline"
-						class="flex items-center gap-2 border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-300 shadow-sm hover:shadow-md transition-all duration-200"
+						class="flex items-center justify-center gap-1 sm:gap-2 h-8 sm:h-9 px-2 sm:px-3 py-1 text-xs sm:text-sm border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-300 shadow-sm"
 						disabled={isLoading || filteredLeases.length === 0}
 					>
-						<Printer class="w-4 h-4" />
-						Print All
+						<Printer class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+						<span class="hidden sm:inline">Print All</span>
 					</Button>
 					<Button
 						onclick={handleAddLease}
-						class="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+						class="flex items-center justify-center gap-1 sm:gap-2 h-8 sm:h-9 px-2 sm:px-3 py-1 text-xs sm:text-sm bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
 					>
-						<Plus class="w-4 h-4" />
-						Add Lease
+						<Plus class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+						<span class="hidden sm:inline">Add Lease</span>
 					</Button>
 				</div>
 			</div>
+			<!-- Responsive Summary Cards -->
+			<div class="flex flex-nowrap gap-1.5 sm:gap-2 overflow-x-auto pb-2 -mx-1 sm:mx-0 scrollbar-hide">
+				<!-- All Leases Card -->
+				<button
+				onclick={() => (activeFilter = 'all')}
+				class="flex-shrink-0 w-20 sm:w-28 bg-white/80 backdrop-blur-sm rounded-lg border border-slate-200/60 p-2 text-left transition-all duration-200 hover:shadow hover:border-blue-200 cursor-pointer {activeFilter === 'all' ? 'ring-2 ring-blue-500' : ''}"
+				>
+					{#if isLoading}
+						<Skeleton class="h-5 w-8 mb-1" />
+						<Skeleton class="h-3 w-10" />
+					{:else}
+						<div class="text-base sm:text-xl font-bold text-slate-800">{summaryMetrics.totalLeases}</div>
+						<div class="flex items-center gap-1 text-slate-600 text-[10px] sm:text-xs font-medium truncate">
+							<CircleDollarSign class="w-3 h-3 flex-shrink-0" />
+							<span class="truncate">Total</span>
+						</div>
+					{/if}
+				</button>
+
+				<!-- Paid in Full Card -->
+				<button
+					onclick={() => (activeFilter = 'paid')}
+					class="flex-shrink-0 w-20 sm:w-28 bg-white/80 backdrop-blur-sm rounded-lg border border-slate-200/60 p-2 text-left transition-all duration-200 hover:shadow hover:border-green-200 cursor-pointer {activeFilter === 'paid' ? 'ring-2 ring-green-500' : ''}"
+				>
+					{#if isLoading}
+						<Skeleton class="h-5 w-8 mb-1" />
+						<Skeleton class="h-3 w-10" />
+					{:else}
+						<div class="text-base sm:text-xl font-bold text-green-600">{summaryMetrics.paidInFull}</div>
+						<div class="flex items-center gap-1 text-[10px] sm:text-xs font-medium text-green-600 truncate">
+							<Check class="w-3 h-3 flex-shrink-0" />
+							<span class="truncate">Paid</span>
+						</div>
+					{/if}
+				</button>
+
+				<!-- Pending Card -->
+				<button
+					onclick={() => (activeFilter = 'pending')}
+					class="flex-shrink-0 w-20 sm:w-28 bg-white/80 backdrop-blur-sm rounded-lg border border-slate-200/60 p-2 text-left transition-all duration-200 hover:shadow hover:border-yellow-200 cursor-pointer {activeFilter === 'pending' ? 'ring-2 ring-yellow-500' : ''}"
+				>
+					{#if isLoading}
+						<Skeleton class="h-5 w-8 mb-1" />
+						<Skeleton class="h-3 w-12 mb-1" />
+						<Skeleton class="h-3 w-10" />
+					{:else}
+						<div class="text-base sm:text-xl font-bold text-yellow-600">{summaryMetrics.pendingCount}</div>
+						<div class="flex items-center gap-1 text-[10px] sm:text-xs font-medium text-yellow-600 truncate">
+							<Clock class="w-3 h-3 flex-shrink-0" />
+							<span class="truncate">Pending</span>
+						</div>
+						<span class="text-yellow-600 text-[9px] sm:text-xs leading-tight font-medium truncate block">{formatCurrency(summaryMetrics.totalPending)}</span>
+					{/if}
+				</button>
+
+				<!-- Partial Card -->
+				<button
+					onclick={() => (activeFilter = 'partial')}
+					class="flex-shrink-0 w-20 sm:w-28 bg-white/80 backdrop-blur-sm rounded-lg border border-slate-200/60 p-2 text-left transition-all duration-200 hover:shadow hover:border-amber-200 cursor-pointer {activeFilter === 'partial' ? 'ring-2 ring-amber-500' : ''}"
+				>
+					{#if isLoading}
+						<Skeleton class="h-5 w-8 mb-1" />
+						<Skeleton class="h-3 w-12 mb-1" />
+						<Skeleton class="h-3 w-10" />
+					{:else}
+						<div class="text-base sm:text-xl font-bold text-amber-600">{summaryMetrics.partialCount}</div>
+						<div class="flex items-center gap-1 text-[10px] sm:text-xs font-medium text-amber-600 truncate">
+							<AlertTriangle class="w-3 h-3 flex-shrink-0" />
+							<span class="truncate">Partial</span>
+						</div>
+						<span class="text-amber-600 text-[9px] sm:text-xs leading-tight font-medium truncate block">{formatCurrency(summaryMetrics.totalPartial)}</span>
+					{/if}
+				</button>
+
+				<!-- Overdue Card -->
+				<button
+					onclick={() => (activeFilter = 'overdue')}
+					class="flex-shrink-0 w-20 sm:w-28 bg-white/80 backdrop-blur-sm rounded-lg border border-slate-200/60 p-2 text-left transition-all duration-200 hover:shadow hover:border-red-200 cursor-pointer {activeFilter === 'overdue' ? 'ring-2 ring-red-500' : ''}"
+				>
+					{#if isLoading}
+						<Skeleton class="h-5 w-8 mb-1" />
+						<Skeleton class="h-3 w-12 mb-1" />
+						<Skeleton class="h-3 w-10" />
+					{:else}
+						<div class="text-base sm:text-xl font-bold text-red-600">{summaryMetrics.overdueCount}</div>
+						<div class="flex items-center gap-1 text-[10px] sm:text-xs font-medium text-red-600 truncate">
+							<AlertTriangle class="w-3 h-3 flex-shrink-0" />
+							<span class="truncate">Overdue</span>
+						</div>
+						<span class="text-red-600 text-[9px] sm:text-xs leading-tight font-medium truncate block">{formatCurrency(summaryMetrics.totalOverdue)}</span>
+					{/if}
+				</button>
+			</div>
+
+	
 		</div>
 	</div>
 
 	<!-- Main Content Area -->
-	<div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+	<div class="max-w-7xl mx-auto  sm:px-2  ">
 		<!-- Active Filter Display -->
 		{#if activeFilter !== 'all'}
 			<div class="mb-6 p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-slate-200/60">
 				<div class="flex items-center justify-between">
 					<div class="flex items-center gap-2">
-						<span class="text-sm font-medium text-slate-600">Showing:</span>
+						<div class="text-xs sm:text-sm font-medium text-slate-500 truncate">All</div>
 						<span
 							class="px-2 py-1 rounded-md text-sm font-medium {activeFilter === 'paid'
 								? 'bg-green-100 text-green-700'
