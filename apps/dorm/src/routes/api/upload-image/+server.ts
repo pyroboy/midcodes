@@ -1,6 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { uploadImage, type UploadResult } from '$lib/utils/cloudinary';
+import { env } from '$env/dynamic/private';
 
 export const POST: RequestHandler = async ({ request }) => {
 	try {
@@ -25,26 +26,51 @@ export const POST: RequestHandler = async ({ request }) => {
 		const arrayBuffer = await file.arrayBuffer();
 		const buffer = Buffer.from(arrayBuffer);
 
-		// Upload to Cloudinary
-		const result: UploadResult = await uploadImage(buffer, {
-			folder: 'dorm/tenants',
-			quality: 'auto',
-			format: 'webp',
-			transformation: [
-				{ width: 400, height: 400, crop: 'fill', gravity: 'face' },
-				{ quality: 'auto' }
-			]
-		});
+		// Check if Cloudinary is configured
+		const hasCloudinaryConfig = 
+			env.PRIVATE_CLOUDINARY_CLOUD_NAME && 
+			env.PRIVATE_CLOUDINARY_API_KEY && 
+			env.PRIVATE_CLOUDINARY_API_SECRET;
 
-		return json({
-			success: true,
-			public_id: result.public_id,
-			secure_url: result.secure_url,
-			width: result.width,
-			height: result.height,
-			format: result.format,
-			bytes: result.bytes
-		});
+		if (hasCloudinaryConfig) {
+			// Upload to Cloudinary when properly configured
+			const result: UploadResult = await uploadImage(buffer, {
+				folder: 'dorm/tenants',
+				quality: 'auto',
+				format: 'webp',
+				transformation: [
+					{ width: 400, height: 400, crop: 'fill', gravity: 'face' },
+					{ quality: 'auto' }
+				]
+			});
+
+			return json({
+				success: true,
+				public_id: result.public_id,
+				secure_url: result.secure_url,
+				width: result.width,
+				height: result.height,
+				format: result.format,
+				bytes: result.bytes
+			});
+		} else {
+			// Fallback: return data URL for development
+			console.warn('⚠️ Cloudinary not configured, using data URL fallback');
+			
+			const base64Data = buffer.toString('base64');
+			const mimeType = file.type;
+			const dataUrl = `data:${mimeType};base64,${base64Data}`;
+
+			return json({
+				success: true,
+				public_id: `dev_upload_${Date.now()}`,
+				secure_url: dataUrl,
+				width: 400,
+				height: 400,
+				format: file.type.split('/')[1] || 'jpeg',
+				bytes: file.size
+			});
+		}
 	} catch (err: any) {
 		console.error('Image upload error:', err);
 

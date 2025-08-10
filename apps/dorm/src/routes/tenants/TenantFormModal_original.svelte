@@ -13,15 +13,15 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Card, CardContent } from '$lib/components/ui/card';
 	import { toast } from 'svelte-sonner';
-	import { Pencil, Plus, AlertCircle, User, Phone, Mail, MapPin, Calendar, Building, Camera } from 'lucide-svelte';
+	import { Pencil, Plus, AlertCircle, User, Phone, Mail, MapPin } from 'lucide-svelte';
+	import DatePicker from '$lib/components/ui/date-picker.svelte';
 	import { superForm } from 'sveltekit-superforms/client';
 	import { zodClient } from 'sveltekit-superforms/adapters';
 	import { invalidateAll, invalidate } from '$app/navigation';
 	import { tenantFormSchema, TenantStatusEnum, defaultEmergencyContact } from './formSchema';
 	import type { z } from 'zod';
 	import Textarea from '$lib/components/ui/textarea/textarea.svelte';
-	import ImageUploadWithCrop from '$lib/components/ui/ImageUploadWithCrop.svelte';
-	import BirthdayInput from '$lib/components/ui/birthday-input.svelte';
+	import ImageUpload from '$lib/components/ui/ImageUpload.svelte';
 
 	type FormType = z.infer<typeof tenantFormSchema>;
 
@@ -41,31 +41,25 @@
 		onTenantUpdate?: (tenant: any) => void;
 	}>();
 
-	// Profile picture state  
-	let profilePictureFile: File | null = $state(null);
-	let profilePicturePreviewUrl: string | null = $state(null);
-	let uploadingImage = $state(false);
 
-	// Track form changes to prevent accidental exits
-	let initialFormData = $state<string>('');
-	let hasUnsavedChanges = $derived.by(() => {
-		if (!open) return false;
-		const currentData = JSON.stringify($form);
-		return initialFormData !== '' && currentData !== initialFormData;
-	});
+
+	// Profile picture state
+	let profilePictureFile: File | null = $state(null);
+	let uploadingImage = $state(false);
 
 	// Initialize Superforms
 	const { form, errors, enhance, constraints, submitting, reset } = superForm(initialForm, {
 		validators: zodClient(tenantFormSchema),
 		validationMethod: 'onsubmit',
 		resetForm: true,
-		invalidateAll: false,
+		invalidateAll: false, // Prevent automatic route invalidation
 		onSubmit: () => {
 			console.log('🔄 Form submission started');
 			console.log('📤 Form data being sent:', $form);
 		},
 		onResult: async ({ result }) => {
 			if (result.type === 'success') {
+				// If we're in edit mode and have a callback, immediately update the tenant with new profile picture
 				if (editMode && onTenantUpdate && tenant) {
 					const updatedTenant = {
 						...tenant,
@@ -74,14 +68,17 @@
 						contact_number: $form.contact_number,
 						tenant_status: $form.tenant_status,
 						profile_picture_url: $form.profile_picture_url
+						// Keep other existing data
 					};
 					onTenantUpdate(updatedTenant);
 				}
 
+				// No need to invalidate - optimistic update handles UI consistency
 				reset();
 				toast.success(editMode ? 'Tenant updated successfully' : 'Tenant created successfully');
 				onOpenChange(false);
 			} else if (result.type === 'failure') {
+				// Check for duplicate email error specifically
 				if (
 					result.data?.form?.errors?.email ||
 					result.data?.message?.includes('Duplicate email found')
@@ -106,12 +103,14 @@
 
 	// Profile picture handlers
 	async function handleProfilePictureUpload(file: File) {
+		// Validate file size (2MB limit for profile pictures)
 		const maxSize = 2 * 1024 * 1024; // 2MB in bytes
 		if (file.size > maxSize) {
 			toast.error('Profile picture must be smaller than 2MB');
 			return;
 		}
 
+		// Validate file type
 		if (!file.type.startsWith('image/')) {
 			toast.error('Please select a valid image file');
 			return;
@@ -176,16 +175,6 @@
 		}
 	}
 
-	// Handle modal close with unsaved changes check
-	function handleModalClose(shouldClose: boolean) {
-		if (shouldClose && hasUnsavedChanges) {
-			if (!confirm('You have unsaved changes. Are you sure you want to close without saving?')) {
-				return;
-			}
-		}
-		onOpenChange(shouldClose);
-	}
-
 	// Reset form when modal opens/closes or tenant changes
 	$effect(() => {
 		if (open) {
@@ -197,23 +186,26 @@
 				$form = {
 					id: tenant.id,
 					name: tenant.name || '',
-					email: tenant.email || '',
+					email: tenant.email || '', // Use empty string for input binding
 					contact_number: tenant.contact_number || '',
 					tenant_status: tenant.tenant_status || 'PENDING',
+					// Set both nested object and flat fields for emergency contact
 					emergency_contact: tenant.emergency_contact
 						? {
 								name: tenant.emergency_contact.name || '',
 								relationship: tenant.emergency_contact.relationship || '',
 								phone: tenant.emergency_contact.phone || '',
-								email: tenant.emergency_contact.email || '',
+								email: tenant.emergency_contact.email || '', // Use empty string for input binding
 								address: tenant.emergency_contact.address || ''
 							}
 						: { ...defaultEmergencyContact },
+					// Flat emergency contact fields
 					'emergency_contact.name': tenant.emergency_contact?.name || '',
 					'emergency_contact.relationship': tenant.emergency_contact?.relationship || '',
 					'emergency_contact.phone': tenant.emergency_contact?.phone || '',
 					'emergency_contact.email': tenant.emergency_contact?.email || '',
 					'emergency_contact.address': tenant.emergency_contact?.address || '',
+					// Add other fields as needed
 					auth_id: tenant.auth_id || null,
 					created_by: tenant.created_by || null,
 					lease_status: tenant.lease?.status || '',
@@ -238,14 +230,15 @@
 					birthday: tenant.birthday || ''
 				};
 			} else {
-				// Create mode - reset to defaults
+				// Create mode - reset to defaults with proper emergency_contact initialization
 				$form = {
 					id: undefined,
 					name: '',
-					email: '',
+					email: '', // Use empty string for input binding
 					contact_number: '',
 					tenant_status: 'PENDING',
 					emergency_contact: { ...defaultEmergencyContact },
+					// Flat emergency contact fields
 					'emergency_contact.name': '',
 					'emergency_contact.relationship': '',
 					'emergency_contact.phone': '',
@@ -275,16 +268,11 @@
 					birthday: ''
 				};
 			}
-
-			// Set initial form data after form is populated
-			setTimeout(() => {
-				initialFormData = JSON.stringify($form);
-			}, 100);
 		}
 	});
 </script>
 
-<Dialog {open} onOpenChange={handleModalClose}>
+<Dialog {open} {onOpenChange}>
 	<DialogContent class="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
 		<DialogHeader>
 			<div class="flex items-center gap-2">
@@ -308,23 +296,200 @@
 				<input type="hidden" name="id" value={$form.id} />
 			{/if}
 
+			<!-- Basic Information -->
+			<div class="space-y-4">
+				<div class="flex items-center gap-2 pb-2 border-b border-slate-200">
+					<User class="w-4 h-4 text-slate-500" />
+					<h3 class="text-sm font-semibold text-slate-700">Basic Information</h3>
+				</div>
+
+	
+
+   
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="space-y-2">
+						<Label for="name">Full Name *</Label>
+						<Input
+							id="name"
+							name="name"
+							type="text"
+							bind:value={$form.name}
+							class={$errors.name ? 'border-red-500' : ''}
+							placeholder="Enter tenant's full name"
+							{...$constraints.name}
+							required
+						/>
+						{#if $errors.name}
+							<p class="text-sm text-red-500 flex items-center gap-1">
+								<AlertCircle class="w-4 h-4" />
+								{$errors.name}
+							</p>
+						{/if}
+                    </div>
+
+					<div class="space-y-2">
+						<Label for="tenant_status">Status</Label>
+						<input type="hidden" name="tenant_status" bind:value={$form.tenant_status} />
+						<Select.Root type="single" bind:value={$form.tenant_status}>
+							<Select.Trigger>
+								<Badge variant="outline" class={getStatusColor($form.tenant_status)}>
+									{$form.tenant_status}
+								</Badge>
+							</Select.Trigger>
+							<Select.Content>
+								{#each tenantStatusOptions as status}
+									<Select.Item value={status}>
+										<Badge variant="outline" class={getStatusColor(status)}>
+											{status}
+										</Badge>
+									</Select.Item>
+								{/each}
+							</Select.Content>
+						</Select.Root>
+                    </div>
+                </div>
+
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<div class="space-y-2">
+						<Label for="email">Email Address (Optional)</Label>
+						<div class="relative">
+							<Mail
+								class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"
+							/>
+							<Input
+								id="email"
+								name="email"
+								type="email"
+								bind:value={$form.email}
+								class={`pl-10 ${$errors.email ? 'border-red-500' : ''}`}
+								placeholder="tenant@example.com (optional)"
+								{...$constraints.email}
+							/>
+						</div>
+						{#if $errors.email}
+							<p class="text-sm text-red-500 flex items-center gap-1">
+								<AlertCircle class="w-4 h-4" />
+								{$errors.email}
+							</p>
+						{/if}
+					</div>
+
+					<div class="space-y-2">
+						<Label for="contact_number">Contact Number (Optional)</Label>
+						<div class="relative">
+							<Phone
+								class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"
+							/>
+							<Input
+								id="contact_number"
+								name="contact_number"
+								type="tel"
+								bind:value={$form.contact_number}
+								class={`pl-10 ${$errors.contact_number ? 'border-red-500' : ''}`}
+								placeholder="+1 (555) 123-4567 (optional)"
+								{...$constraints.contact_number}
+							/>
+						</div>
+						{#if $errors.contact_number}
+							<p class="text-sm text-red-500 flex items-center gap-1">
+								<AlertCircle class="w-4 h-4" />
+								{$errors.contact_number}
+							</p>
+						{/if}
+					</div>
+				</div>
+
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<div class="space-y-2">
+						<Label for="address">Address (Optional)</Label>
+						<Textarea
+							id="address"
+							name="address"
+							bind:value={$form.address}
+							class={$errors.address ? 'border-red-500' : ''}
+							placeholder="Street, City, Province/State, ZIP"
+							rows={2}
+							{...$constraints.address}
+						/>
+						{#if $errors.address}
+							<p class="text-sm text-red-500 flex items-center gap-1">
+								<AlertCircle class="w-4 h-4" />
+								{$errors.address}
+							</p>
+						{/if}
+					</div>
+				<div class="space-y-2">
+						<Label for="school_or_workplace">School/Workplace (Optional)</Label>
+						<Input
+							id="school_or_workplace"
+							name="school_or_workplace"
+							type="text"
+							bind:value={$form.school_or_workplace}
+							class={$errors.school_or_workplace ? 'border-red-500' : ''}
+							placeholder="e.g., State University / ACME Corp"
+							{...$constraints.school_or_workplace}
+						/>
+						{#if $errors.school_or_workplace}
+							<p class="text-sm text-red-500 flex items-center gap-1">
+								<AlertCircle class="w-4 h-4" />
+								{$errors.school_or_workplace}
+							</p>
+						{/if}
+					</div>
+	
+					<div class="space-y-2">
+						<Label for="facebook_name">Facebook Name (Optional)</Label>
+						<Input
+							id="facebook_name"
+							name="facebook_name"
+							type="text"
+							bind:value={$form.facebook_name}
+							class={$errors.facebook_name ? 'border-red-500' : ''}
+							placeholder="Exact Facebook profile name"
+							{...$constraints.facebook_name}
+						/>
+						{#if $errors.facebook_name}
+							<p class="text-sm text-red-500 flex items-center gap-1">
+								<AlertCircle class="w-4 h-4" />
+								{$errors.facebook_name}
+							</p>
+						{/if}
+					</div>
+					<div class="space-y-2">
+						<DatePicker
+							bind:value={$form.birthday}
+							label="Birthday (Optional)"
+							placeholder="Select birthday"
+							name="birthday"
+							id="birthday"
+						/>
+						{#if $errors.birthday}
+							<p class="text-sm text-red-500 flex items-center gap-1">
+								<AlertCircle class="w-4 h-4" />
+								{$errors.birthday}
+							</p>
+						{/if}
+					</div>
+				</div>
+			</div>
+
 			<!-- Profile Picture -->
 			<div class="space-y-4">
 				<div class="flex items-center gap-2 pb-2 border-b border-slate-200">
-					<Camera class="w-4 h-4 text-slate-500" />
+					<User class="w-4 h-4 text-slate-500" />
 					<h3 class="text-sm font-semibold text-slate-700">Profile Picture (Optional)</h3>
 				</div>
 
 				<div class="flex flex-col items-center space-y-2">
-					<ImageUploadWithCrop
+					<ImageUpload
 						value={$form.profile_picture_url}
 						disabled={uploadingImage || $submitting}
 						onupload={handleProfilePictureUpload}
 						onremove={handleProfilePictureRemove}
 						onerror={handleProfilePictureError}
+						class="w-40 h-40"
 						placeholder="Upload profile picture"
-						maxSize={10}
-						cropSize={{ width: 400, height: 400 }}
+						maxSize={2}
 					/>
 
 					{#if uploadingImage}
@@ -348,211 +513,10 @@
 				{/if}
 			</div>
 
-			<!-- Personal Information -->
-			<div class="space-y-4">
-				<div class="flex items-center gap-2 pb-2 border-b border-slate-200">
-					<User class="w-4 h-4 text-slate-500" />
-					<h3 class="text-sm font-semibold text-slate-700">Personal Information</h3>
-				</div>
-
-				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-					<div class="space-y-2">
-						<Label for="name">Full Name *</Label>
-						<div class="relative">
-							<User class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-							<Input
-								id="name"
-								name="name"
-								type="text"
-								bind:value={$form.name}
-								class={`pl-10 ${$errors.name ? 'border-red-500' : ''}`}
-								placeholder="Enter tenant's full name"
-								{...$constraints.name}
-								required
-							/>
-						</div>
-						{#if $errors.name}
-							<p class="text-sm text-red-500 flex items-center gap-1">
-								<AlertCircle class="w-4 h-4" />
-								{$errors.name}
-							</p>
-						{/if}
-					</div>
-
-					<div class="space-y-2">
-						<Label for="tenant_status">Status</Label>
-						<input type="hidden" name="tenant_status" bind:value={$form.tenant_status} />
-						<Select.Root type="single" bind:value={$form.tenant_status}>
-							<Select.Trigger>
-								<Badge variant="outline" class={getStatusColor($form.tenant_status)}>
-									{$form.tenant_status}
-								</Badge>
-							</Select.Trigger>
-							<Select.Content>
-								{#each tenantStatusOptions as status}
-									<Select.Item value={status}>
-										<Badge variant="outline" class={getStatusColor(status)}>
-											{status}
-										</Badge>
-									</Select.Item>
-								{/each}
-							</Select.Content>
-						</Select.Root>
-					</div>
-
-					<div class="space-y-2">
-						<BirthdayInput
-							bind:value={$form.birthday}
-							label="Birthday (Optional)"
-							name="birthday"
-							id="birthday"
-							error={$errors.birthday}
-						/>
-						{#if $errors.birthday}
-							<p class="text-sm text-red-500 flex items-center gap-1">
-								<AlertCircle class="w-4 h-4" />
-								{$errors.birthday}
-							</p>
-						{/if}
-					</div>
-
-					<div class="space-y-2">
-						<Label for="address">Home Address (Optional)</Label>
-						<div class="relative">
-							<MapPin class="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-							<Textarea
-								id="address"
-								name="address"
-								bind:value={$form.address}
-								class={`pl-10 ${$errors.address ? 'border-red-500' : ''}`}
-								placeholder="Street, City, Province/State, ZIP"
-								rows={2}
-								{...$constraints.address}
-							/>
-						</div>
-						{#if $errors.address}
-							<p class="text-sm text-red-500 flex items-center gap-1">
-								<AlertCircle class="w-4 h-4" />
-								{$errors.address}
-							</p>
-						{/if}
-					</div>
-				</div>
-			</div>
-
-			<!-- Contact Information -->
-			<div class="space-y-4">
-				<div class="flex items-center gap-2 pb-2 border-b border-slate-200">
-					<Phone class="w-4 h-4 text-slate-500" />
-					<h3 class="text-sm font-semibold text-slate-700">Contact Information</h3>
-				</div>
-
-				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-					<div class="space-y-2">
-						<Label for="email">Email Address (Optional)</Label>
-						<div class="relative">
-							<Mail class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-							<Input
-								id="email"
-								name="email"
-								type="email"
-								bind:value={$form.email}
-								class={`pl-10 ${$errors.email ? 'border-red-500' : ''}`}
-								placeholder="tenant@example.com (optional)"
-								{...$constraints.email}
-							/>
-						</div>
-						{#if $errors.email}
-							<p class="text-sm text-red-500 flex items-center gap-1">
-								<AlertCircle class="w-4 h-4" />
-								{$errors.email}
-							</p>
-						{/if}
-					</div>
-
-					<div class="space-y-2">
-						<Label for="contact_number">Phone Number (Optional)</Label>
-						<div class="relative">
-							<Phone class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-							<Input
-								id="contact_number"
-								name="contact_number"
-								type="tel"
-								bind:value={$form.contact_number}
-								class={`pl-10 ${$errors.contact_number ? 'border-red-500' : ''}`}
-								placeholder="+63 912 345 6789 (optional)"
-								{...$constraints.contact_number}
-							/>
-						</div>
-						{#if $errors.contact_number}
-							<p class="text-sm text-red-500 flex items-center gap-1">
-								<AlertCircle class="w-4 h-4" />
-								{$errors.contact_number}
-							</p>
-						{/if}
-					</div>
-
-					<div class="space-y-2">
-						<Label for="facebook_name">Facebook Profile Name (Optional)</Label>
-						<div class="relative">
-							<User class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-							<Input
-								id="facebook_name"
-								name="facebook_name"
-								type="text"
-								bind:value={$form.facebook_name}
-								class={`pl-10 ${$errors.facebook_name ? 'border-red-500' : ''}`}
-								placeholder="Exact Facebook profile name"
-								{...$constraints.facebook_name}
-							/>
-						</div>
-						{#if $errors.facebook_name}
-							<p class="text-sm text-red-500 flex items-center gap-1">
-								<AlertCircle class="w-4 h-4" />
-								{$errors.facebook_name}
-							</p>
-						{/if}
-					</div>
-				</div>
-			</div>
-
-			<!-- Additional Information -->
-			<div class="space-y-4">
-				<div class="flex items-center gap-2 pb-2 border-b border-slate-200">
-					<Building class="w-4 h-4 text-slate-500" />
-					<h3 class="text-sm font-semibold text-slate-700">Additional Information</h3>
-				</div>
-
-				<div class="grid grid-cols-1 gap-4">
-					<div class="space-y-2">
-						<Label for="school_or_workplace">School/Workplace (Optional)</Label>
-						<div class="relative">
-							<Building class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-							<Input
-								id="school_or_workplace"
-								name="school_or_workplace"
-								type="text"
-								bind:value={$form.school_or_workplace}
-								class={`pl-10 ${$errors.school_or_workplace ? 'border-red-500' : ''}`}
-								placeholder="e.g., University of the Philippines / ACME Corporation"
-								{...$constraints.school_or_workplace}
-							/>
-						</div>
-						{#if $errors.school_or_workplace}
-							<p class="text-sm text-red-500 flex items-center gap-1">
-								<AlertCircle class="w-4 h-4" />
-								{$errors.school_or_workplace}
-							</p>
-						{/if}
-					</div>
-				</div>
-			</div>
-
-
 			<!-- Emergency Contact -->
 			<div class="space-y-4">
 				<div class="flex items-center gap-2 pb-2 border-b border-slate-200">
-					<AlertCircle class="w-4 h-4 text-slate-500" />
+					<User class="w-4 h-4 text-slate-500" />
 					<h3 class="text-sm font-semibold text-slate-700">
 						Emergency Contact (All fields optional)
 					</h3>
@@ -609,7 +573,7 @@
 									type="tel"
 									bind:value={$form['emergency_contact.phone']}
 									class={`pl-10 ${$errors['emergency_contact.phone'] ? 'border-red-500' : ''}`}
-									placeholder="+63 912 345 6789 (optional)"
+									placeholder="+1 (555) 123-4567 (optional)"
 								/>
 							</div>
 							{#if $errors['emergency_contact.phone']}
@@ -668,7 +632,7 @@
 			</div>
 
 			<div class="flex justify-end gap-2 pt-4">
-				<Button type="button" variant="outline" onclick={() => handleModalClose(false)}>Cancel</Button>
+				<Button type="button" variant="outline" onclick={() => onOpenChange(false)}>Cancel</Button>
 				<Button type="submit" disabled={$submitting || uploadingImage}>
 					{uploadingImage
 						? 'Uploading Image...'
