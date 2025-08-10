@@ -119,7 +119,7 @@
 					<div class="memorial-card">
 						<div class="memorial-photo">
 							<img 
-								src="https://res.cloudinary.com/dexcw6vg0/image/upload/c_fill,w_150,h_200,g_face/v1/sample"
+								src="https://res.cloudinary.com/dexcw6vg0/image/upload/v1754821750/rcpqj7mzayco2ndwioqp.png"
 								alt="Rev. Rudy Salomon Trigo, D.D." 
 								class="founder-photo"
 							/>

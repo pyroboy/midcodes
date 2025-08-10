@@ -636,5 +636,20 @@
 		.container {
 			padding: 0 1rem;
 		}
+
+		.leadership-content {
+			flex-direction: column;
+			text-align: center;
+			gap: 1.5rem;
+		}
+
+		.founder-legacy {
+			padding: 1rem;
+		}
+
+		.founder-legacy-photo {
+			width: 100px;
+			height: 130px;
+		}
 	}
 </style>
