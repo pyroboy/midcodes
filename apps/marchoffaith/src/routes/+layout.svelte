@@ -3,6 +3,7 @@
     import { config } from '$lib/config';
     import UnderConstruction from '$lib/components/UnderConstruction.svelte';
     import Header from '$lib/components/Header.svelte';
+    import Footer from '$lib/components/Footer.svelte';
 </script>
 
 {#if config.underConstruction}
@@ -13,6 +14,7 @@
         <main>
             <slot />
         </main>
+        <Footer />
     </div>
 {/if}
 

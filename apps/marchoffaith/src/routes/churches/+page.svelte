@@ -28,12 +28,12 @@
 </script>
 
 <svelte:head>
-  <title>Our Churches - Grace Community Church</title>
-  <meta name="description" content="Explore our church locations and communities" />
+  <title>Our Churches - March of Faith Incorporated</title>
+  <meta name="description" content="Explore our church locations and communities across the Philippines" />
 </svelte:head>
 
 {#snippet church(c: Church)}
-  <Card class="w-full max-w-6xl bg-white shadow-lg rounded-lg overflow-hidden">
+  <Card class="w-full max-w-6xl bg-white shadow-xl rounded-xl overflow-hidden border border-gray-100 hover:shadow-2xl transition-all duration-300">
     <!-- Mobile Layout -->
     <div class="md:hidden">
       <div class="relative h-48 bg-gray-200">
@@ -42,9 +42,9 @@
           alt="Church building"
           class="w-full h-full object-cover"
         />
-        <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4">
+        <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
           <h2 class="text-xl font-bold text-white mb-1">{c.name}</h2>
-          <p class="text-sm text-gray-200">{c.address.street}, {c.address.city}</p>
+          <p class="text-sm text-gray-100">{c.address.street}, {c.address.city}</p>
         </div>
       </div>
 
@@ -53,26 +53,26 @@
         <div class="space-y-2.5">
           <div class="flex items-center text-sm text-gray-600">
             <div class="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center shrink-0">
-              <Phone class="w-4 h-4 text-red-600" />
+              <Phone class="w-4 h-4 text-[#C1272D]" />
             </div>
-            <a href="tel:{c.contact.phone}" class="ml-2 hover:text-red-600 transition-colors">{c.contact.phone}</a>
+            <a href="tel:{c.contact.phone}" class="ml-2 hover:text-[#981B1E] transition-colors">{c.contact.phone}</a>
           </div>
           <div class="flex items-center text-sm text-gray-600">
             <div class="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center shrink-0">
-              <Mail class="w-4 h-4 text-red-600" />
+              <Mail class="w-4 h-4 text-[#C1272D]" />
             </div>
-            <a href="mailto:{c.contact.email}" class="ml-2 hover:text-red-600 transition-colors truncate">{c.contact.email}</a>
+            <a href="mailto:{c.contact.email}" class="ml-2 hover:text-[#981B1E] transition-colors truncate">{c.contact.email}</a>
           </div>
         </div>
         <!-- Social Icons -->
         <div class="flex gap-4">
-          <a href="https://facebook.com/{c.contact.social.facebook}" class="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center text-gray-500 hover:text-red-600 hover:bg-red-100 transition-colors">
+          <a href="https://facebook.com/{c.contact.social.facebook}" class="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center text-gray-500 hover:text-[#981B1E] hover:bg-red-100 transition-colors">
             <Facebook class="w-4 h-4" />
           </a>
-          <a href="https://instagram.com/{c.contact.social.instagram}" class="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center text-gray-500 hover:text-red-600 hover:bg-red-100 transition-colors">
+          <a href="https://instagram.com/{c.contact.social.instagram}" class="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center text-gray-500 hover:text-[#981B1E] hover:bg-red-100 transition-colors">
             <Instagram class="w-4 h-4" />
           </a>
-          <a href="https://youtube.com/{c.contact.social.youtube}" class="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center text-gray-500 hover:text-red-600 hover:bg-red-100 transition-colors">
+          <a href="https://youtube.com/{c.contact.social.youtube}" class="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center text-gray-500 hover:text-[#981B1E] hover:bg-red-100 transition-colors">
             <Youtube class="w-4 h-4" />
           </a>
         </div>
@@ -96,7 +96,7 @@
                   ] as { day, letter }}
                     {@const hasSchedule = groupServicesByDay(c.services)[day] !== undefined}
                     <div class="flex flex-col items-center gap-2">
-                      <span class="text font-black {hasSchedule ? 'text-black font-black' : 'text-gray-400'}">{letter}</span>
+                      <span class="text font-black {hasSchedule ? 'text-[#981B1E] font-black' : 'text-gray-400'}">{letter}</span>
                     </div>
                   {/each}
                 </div>
@@ -108,16 +108,16 @@
                 <div class="overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                   <div class="flex gap-3 min-w-max">
                     {#each Object.entries(groupServicesByDay(c.services)) as [day, services]}
-                      <div class="bg-red-50 rounded-lg p-3 w-36">
-                        <div class="text-sm font-semibold text-red-800 mb-2">
+                      <div class="bg-red-50 rounded-lg p-3 w-36 border-l-4 border-[#C1272D]">
+                        <div class="text-sm font-semibold text-[#981B1E] mb-2">
                           {day}
                         </div>
                         {#each services as service}
                           <div class="mb-2 last:mb-0">
-                            <div class="text-sm font-medium text-red-700">
+                            <div class="text-sm font-medium text-[#981B1E]">
                               {formatTime(service.time)}
                             </div>
-                            <div class="text-xs text-red-600 capitalize">
+                            <div class="text-xs text-[#666] capitalize">
                               {service.type.replace('-', ' ')}
                             </div>
                           </div>
@@ -133,7 +133,7 @@
 
         <!-- Leadership -->
         <div class="space-y-2">
-          <h3 class="text-sm font-medium">Leadership</h3>
+          <h3 class="text-sm font-semibold text-[#981B1E] border-b border-gray-200 pb-2">Leadership</h3>
           <div class="space-y-2">
             {#each c.pastors as pastor}
               <div class="text-sm">
@@ -147,18 +147,18 @@
         </div>
 
         <!-- Stats -->
-        <div class="grid grid-cols-2 gap-2">
-          <div class="bg-red-50 rounded-md p-2 text-center">
-            <div class="text-sm font-bold text-red-700">
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-red-50 rounded-md p-3 text-center border-t-4 border-[#C1272D]">
+            <div class="text-lg font-bold text-[#981B1E]">
               {formatNumber(c.stats.totalMembers)}
             </div>
-            <div class="text-xs text-red-600">Members</div>
+            <div class="text-xs text-[#666] font-medium">Members</div>
           </div>
-          <div class="bg-red-50 rounded-md p-2 text-center">
-            <div class="text-sm font-bold text-red-700">
+          <div class="bg-red-50 rounded-md p-3 text-center border-t-4 border-[#C1272D]">
+            <div class="text-lg font-bold text-[#981B1E]">
               {c.stats.yearFounded}
             </div>
-            <div class="text-xs text-red-600">Est. Year</div>
+            <div class="text-xs text-[#666] font-medium">Est. Year</div>
           </div>
         </div>
       </div>
@@ -178,16 +178,16 @@
       <!-- Middle section - Weekly Schedule -->
       <div class="w-2/4 p-6 border-r border-gray-200">
         <div class="mb-4">
-          <h2 class="text-2xl font-bold text-black mb-1">{c.name}</h2>
+          <h2 class="text-2xl font-bold text-[#981B1E] mb-1">{c.name}</h2>
           <p class="text-sm text-gray-600">{c.address.street}, {c.address.city}</p>
           <div class="flex items-center gap-4 mt-2">
             <div class="flex items-center text-sm text-gray-600">
-              <Phone class="w-4 h-4 mr-1 text-black" />
-              <a href="tel:{c.contact.phone}" class="hover:text-red-600">{c.contact.phone}</a>
+              <Phone class="w-4 h-4 mr-1 text-[#C1272D]" />
+              <a href="tel:{c.contact.phone}" class="hover:text-[#981B1E] transition-colors">{c.contact.phone}</a>
             </div>
             <div class="flex items-center text-sm text-gray-600">
-              <Mail class="w-4 h-4 mr-1 text-black" />
-              <a href="mailto:{c.contact.email}" class="hover:text-red-600">{c.contact.email}</a>
+              <Mail class="w-4 h-4 mr-1 text-[#C1272D]" />
+              <a href="mailto:{c.contact.email}" class="hover:text-[#981B1E] transition-colors">{c.contact.email}</a>
             </div>
           </div>
         </div>
@@ -206,7 +206,7 @@
             ] as { day, letter }}
               {@const hasSchedule = groupServicesByDay(c.services)[day] !== undefined}
               <div class="flex flex-col items-center gap-2">
-                <span class="text font-black {hasSchedule ? 'text-black font-black' : 'text-gray-400'}">{letter}</span>
+                <span class="text font-black {hasSchedule ? 'text-[#981B1E] font-black' : 'text-gray-400'}">{letter}</span>
               </div>
             {/each}
           </div>
@@ -215,16 +215,16 @@
           <div class="overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             <div class="flex gap-3 min-w-max">
               {#each Object.entries(groupServicesByDay(c.services)) as [day, services]}
-                <div class="bg-red-50 rounded-lg p-3 w-40">
-                  <div class="text-sm font-semibold text-red-800 mb-2">
+                <div class="bg-red-50 rounded-lg p-3 w-40 border-l-4 border-[#C1272D]">
+                  <div class="text-sm font-semibold text-[#981B1E] mb-2">
                     {day}
                   </div>
                   {#each services as service}
                     <div class="mb-2 last:mb-0">
-                      <div class="text-sm font-medium text-red-700">
+                      <div class="text-sm font-medium text-[#981B1E]">
                         {formatTime(service.time)}
                       </div>
-                      <div class="text-xs text-red-600 capitalize">
+                      <div class="text-xs text-[#666] capitalize">
                         {service.type.replace('-', ' ')}
                       </div>
                     </div>
@@ -240,19 +240,20 @@
       <div class="w-1/4 p-6">
         <!-- Social Icons -->
         <div class="flex justify-end gap-3 mb-6">
-          <a href="https://facebook.com/{c.contact.social.facebook}" class="text-gray-500 hover:text-red-600">
+          <a href="https://facebook.com/{c.contact.social.facebook}" class="text-gray-500 hover:text-[#981B1E] transition-colors">
             <Facebook class="w-5 h-5" />
           </a>
-          <a href="https://instagram.com/{c.contact.social.instagram}" class="text-gray-500 hover:text-red-600">
+          <a href="https://instagram.com/{c.contact.social.instagram}" class="text-gray-500 hover:text-[#981B1E] transition-colors">
             <Instagram class="w-5 h-5" />
           </a>
-          <a href="https://youtube.com/{c.contact.social.youtube}" class="text-gray-500 hover:text-red-600">
+          <a href="https://youtube.com/{c.contact.social.youtube}" class="text-gray-500 hover:text-[#981B1E] transition-colors">
             <Youtube class="w-5 h-5" />
           </a>
         </div>
 
         <!-- Leadership -->
         <div class="mb-6">
+          <h3 class="text-sm font-semibold text-[#981B1E] mb-3 border-b border-gray-200 pb-2">Leadership</h3>
           <div class="space-y-3">
             {#each c.pastors as pastor}
               <div class="text-sm">
@@ -266,18 +267,18 @@
         </div>
 
         <!-- Stats -->
-        <div class="grid grid-cols-2 gap-2">
-          <div class="bg-red-50 rounded-md p-2 text-center">
-            <div class="text-sm font-bold text-red-700">
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-red-50 rounded-md p-3 text-center border-t-4 border-[#C1272D]">
+            <div class="text-lg font-bold text-[#981B1E]">
               {formatNumber(c.stats.totalMembers)}
             </div>
-            <div class="text-xs text-red-600">Members</div>
+            <div class="text-xs text-[#666] font-medium">Members</div>
           </div>
-          <div class="bg-red-50 rounded-md p-2 text-center">
-            <div class="text-sm font-bold text-red-700">
+          <div class="bg-red-50 rounded-md p-3 text-center border-t-4 border-[#C1272D]">
+            <div class="text-lg font-bold text-[#981B1E]">
               {c.stats.yearFounded}
             </div>
-            <div class="text-xs text-red-600">Est. Year</div>
+            <div class="text-xs text-[#666] font-medium">Est. Year</div>
           </div>
         </div>
       </div>
@@ -285,12 +286,38 @@
   </Card>
 {/snippet}
 
-<div class="p-6">
-  <h1 class="text-2xl font-bold text-center text-red-600 mb-8">Our Church Locations</h1>
-
-  <div class="space-y-6">
-    {#each churches as c}
-      {@render church(c)}
-    {/each}
+<!-- Hero Section -->
+<section class="bg-[#981B1E] text-white py-12">
+  <div class="container mx-auto px-6">
+    <div class="text-center">
+      <h1 class="text-4xl font-bold mb-4">Our Church Network</h1>
+      <p class="text-xl opacity-90">Discover March of Faith communities across the Philippines</p>
+    </div>
   </div>
-</div>
+</section>
+
+<!-- Churches Section -->
+<section class="py-12 bg-gray-50">
+  <div class="container mx-auto px-6">
+    <div class="space-y-8">
+      {#each churches as c}
+        {@render church(c)}
+      {/each}
+    </div>
+  </div>
+</section>
+
+<style>
+  .container {
+    max-width: 1200px;
+  }
+  
+  /* Override any conflicting Tailwind styles */
+  :global(.bg-red-50) {
+    background-color: #fef2f2;
+  }
+  
+  :global([class*="text-red-"]) {
+    /* Let the inline styles take precedence */
+  }
+</style>
