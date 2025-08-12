@@ -1,29 +1,28 @@
 <svelte:head>
 	<title>Resources & Documents - March of Faith Incorporated</title>
-	<meta name="description" content="Important documents and resources for our church community across the Philippines" />
+	<meta name="description" content="Access official church documents, ministry resources, and important information for March of Faith Incorporated in Tagbilaran, Bohol." />
 </svelte:head>
 
 <!-- Hero Section -->
-<section class="resources-hero">
+<section class="hero-section" role="banner" aria-labelledby="hero-title">
 	<div class="container">
 		<div class="hero-content">
-			<h1>Resources & Documents</h1>
-			<p class="hero-subtitle">Access important church documents and ministry resources</p>
+			<h1 id="hero-title">RESOURCES & DOCUMENTS</h1>
+			<p class="hero-subtitle">Official church documents, ministry resources, and important information for our community</p>
 		</div>
 	</div>
 </section>
 
 <!-- Resources Content -->
-<section class="resources-content">
+<section class="resources-content" role="main">
 	<div class="container">
 		<div class="content-layout">
 			<div class="main-content">
 				<!-- Church Documents Section -->
 				<div class="documents-section">
-					<h2>Official Church Documents</h2>
-					<div class="documents-grid">
-						<a href="/" class="doc-card">
-							<div class="doc-icon">📋</div>
+					<h2 id="church-docs-title">Official Church Documents</h2>
+					<div class="card-container">
+						<a href="/" class="card doc-card">
 							<div class="doc-info">
 								<h3>Church Constitution</h3>
 								<p>Governing documents and foundational principles of March of Faith Incorporated</p>
@@ -31,8 +30,7 @@
 							</div>
 						</a>
 
-						<a href="/" class="doc-card">
-							<div class="doc-icon">✝️</div>
+						<a href="/" class="card doc-card">
 							<div class="doc-info">
 								<h3>Statement of Faith</h3>
 								<p>Our core beliefs and doctrinal positions based on biblical principles</p>
@@ -40,8 +38,7 @@
 							</div>
 						</a>
 
-						<a href="/" class="doc-card">
-							<div class="doc-icon">📖</div>
+						<a href="/" class="card doc-card">
 							<div class="doc-info">
 								<h3>Bylaws & Policies</h3>
 								<p>Church governance, membership, and operational guidelines</p>
@@ -49,8 +46,7 @@
 							</div>
 						</a>
 
-						<a href="/" class="doc-card">
-							<div class="doc-icon">🏛️</div>
+						<a href="/" class="card doc-card">
 							<div class="doc-info">
 								<h3>SEC Registration</h3>
 								<p>Official incorporation documents (Registration No. 0000058834)</p>
@@ -62,10 +58,9 @@
 
 				<!-- Ministry Resources Section -->
 				<div class="ministry-section">
-					<h2>Ministry Resources</h2>
-					<div class="documents-grid">
-						<a href="/" class="doc-card">
-							<div class="doc-icon">📰</div>
+					<h2 id="ministry-resources-title">Ministry Resources</h2>
+					<div class="card-container">
+						<a href="/" class="card doc-card">
 							<div class="doc-info">
 								<h3>Weekly Bulletin</h3>
 								<p>Current week's announcements, events, and prayer requests</p>
@@ -73,8 +68,7 @@
 							</div>
 						</a>
 
-						<a href="/" class="doc-card">
-							<div class="doc-icon">🤝</div>
+						<a href="/" class="card doc-card">
 							<div class="doc-info">
 								<h3>Ministry Guidelines</h3>
 								<p>Resources and information for ministry volunteers and leaders</p>
@@ -82,8 +76,7 @@
 							</div>
 						</a>
 
-						<a href="/" class="doc-card">
-							<div class="doc-icon">👥</div>
+						<a href="/" class="card doc-card">
 							<div class="doc-info">
 								<h3>Leadership Manual</h3>
 								<p>Training materials and guidelines for church leadership</p>
@@ -91,8 +84,7 @@
 							</div>
 						</a>
 
-						<a href="/" class="doc-card">
-							<div class="doc-icon">📅</div>
+						<a href="/" class="card doc-card">
 							<div class="doc-info">
 								<h3>Event Guidelines</h3>
 								<p>Planning guides and policies for church events and activities</p>
@@ -109,19 +101,15 @@
 					<h3>Quick Access</h3>
 					<div class="quick-links">
 						<a href="/contact" class="quick-link">
-							<span class="link-icon">📞</span>
 							<span>Contact Church Office</span>
 						</a>
 						<a href="/about" class="quick-link">
-							<span class="link-icon">ℹ️</span>
 							<span>About Our Church</span>
 						</a>
 						<a href="/churches" class="quick-link">
-							<span class="link-icon">🏛️</span>
 							<span>Find a Location</span>
 						</a>
 						<a href="/pastors" class="quick-link">
-							<span class="link-icon">👨‍💼</span>
 							<span>Our Leadership</span>
 						</a>
 					</div>
@@ -134,14 +122,14 @@
 					<div class="help-info">
 						<div class="help-item">
 							<strong>Phone:</strong>
-							<span>+63 99 9953 6700</span>
+							<span><a href="tel:+639999536700">+63 99 9953 6700</a></span>
 						</div>
 						<div class="help-item">
 							<strong>Email:</strong>
-							<span>marchoffaithincorporated@gmail.com</span>
+							<span><a href="mailto:marchoffaithincorporated@gmail.com">marchoffaithincorporated@gmail.com</a></span>
 						</div>
 					</div>
-					<a href="/contact" class="help-button">Get Help</a>
+					<a href="/contact" class="btn btn-primary help-button">Get Help</a>
 				</div>
 			</div>
 		</div>
@@ -149,122 +137,131 @@
 </section>
 
 <style>
+	/* CSS Custom Properties - Brand Colors */
+	:root {
+		--deep-red: #981B1E;
+		--bright-red: #C1272D;
+		--white: #FFFFFF;
+		--dark-gray: #333333;
+		--light-gray: #F8F9FA;
+	}
+
 	/* Global Styles */
 	.container {
 		max-width: 1200px;
 		margin: 0 auto;
-		padding: 0 2rem;
+		padding: 0 1.5rem;
 	}
 
 	/* Hero Section */
-	.resources-hero {
-		background: #981B1E;
-		color: white;
-		padding: 4rem 0;
+	.hero-section {
+		background: var(--deep-red);
+		color: var(--white);
+		padding: 3rem 0;
 		text-align: center;
 	}
 
 	.hero-content h1 {
-		font-size: 3rem;
-		font-weight: 700;
+		font-family: 'Montserrat', sans-serif;
+		font-size: 2.5rem;
+		font-weight: 800;
 		margin-bottom: 1rem;
-		color: white;
+		color: var(--white);
+		text-transform: uppercase;
+		letter-spacing: 1px;
 	}
 
 	.hero-subtitle {
-		font-size: 1.3rem;
-		font-weight: 300;
-		opacity: 0.9;
-		max-width: 600px;
+		font-family: 'Montserrat', sans-serif;
+		font-size: 1.2rem;
+		font-weight: 400;
+		opacity: 0.95;
+		max-width: 700px;
 		margin: 0 auto;
+		line-height: 1.5;
 	}
 
 	/* Main Content */
 	.resources-content {
-		padding: 4rem 0;
-		background: #f8f9fa;
+		padding: 2.5rem 0;
+		background: var(--light-gray);
 	}
 
 	.content-layout {
 		display: grid;
 		grid-template-columns: 2fr 1fr;
-		gap: 4rem;
+		gap: 2rem;
 		align-items: start;
 	}
 
 	.documents-section,
 	.ministry-section {
-		margin-bottom: 3rem;
+		margin-bottom: 2rem;
 	}
 
 	.documents-section h2,
 	.ministry-section h2 {
-		font-size: 2rem;
-		color: #981B1E;
-		margin-bottom: 2rem;
-		font-weight: 600;
-		border-bottom: 3px solid #C1272D;
+		font-family: 'Montserrat', sans-serif;
+		font-size: 1.5rem;
+		color: var(--deep-red);
+		margin-bottom: 1rem;
+		font-weight: 700;
+		border-bottom: 1px solid var(--bright-red);
 		padding-bottom: 0.5rem;
 	}
 
-	/* Document Grid */
-	.documents-grid {
+	/* Card Container with Zero Gaps */
+	.card-container {
 		display: grid;
+		gap: 0;
 		grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-		gap: 1.5rem;
+	}
+
+	.card {
+		background: var(--white);
+		border: 1px solid #e2e8f0;
+		margin: 0;
+		padding: 1.75rem;
+		transition: all 0.2s ease;
+	}
+
+	.card:hover {
+		border-color: var(--bright-red);
+		box-shadow: 0 2px 8px rgba(193, 39, 45, 0.1);
 	}
 
 	.doc-card {
-		display: flex;
-		align-items: flex-start;
-		gap: 1.5rem;
-		padding: 2rem;
-		background: white;
-		border-radius: 10px;
-		box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 		text-decoration: none;
 		color: inherit;
-		transition: all 0.3s ease;
-		border-left: 4px solid transparent;
+		display: block;
 	}
 
 	.doc-card:hover {
-		transform: translateY(-5px);
-		box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-		border-left-color: #C1272D;
 		text-decoration: none;
-	}
-
-	.doc-icon {
-		font-size: 2.5rem;
-		flex-shrink: 0;
-		width: 60px;
-		height: 60px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		background: #f8f9fa;
-		border-radius: 8px;
+		color: inherit;
 	}
 
 	.doc-info h3 {
-		font-size: 1.3rem;
-		color: #981B1E;
-		margin-bottom: 0.5rem;
+		font-family: 'Montserrat', sans-serif;
+		font-size: 1.2rem;
+		color: var(--deep-red);
+		margin-bottom: 0.75rem;
 		font-weight: 600;
 	}
 
 	.doc-info p {
-		color: #666;
-		line-height: 1.6;
-		margin-bottom: 1rem;
+		font-family: 'Montserrat', sans-serif;
+		color: #555555;
+		line-height: 1.5;
+		margin-bottom: 0.75rem;
 		font-size: 0.95rem;
 	}
 
 	.doc-meta {
+		font-family: 'Montserrat', sans-serif;
 		font-size: 0.8rem;
-		color: #999;
-		font-weight: 500;
+		color: var(--bright-red);
+		font-weight: 600;
 		text-transform: uppercase;
 		letter-spacing: 0.5px;
 	}
@@ -272,72 +269,68 @@
 	/* Sidebar */
 	.quick-access-card,
 	.help-card {
-		background: white;
-		padding: 2rem;
-		border-radius: 10px;
-		box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-		margin-bottom: 2rem;
+		background: var(--white);
+		padding: 1.75rem;
+		border-radius: 8px;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+		margin-bottom: 1rem;
 	}
 
 	.quick-access-card h3,
 	.help-card h3 {
-		color: #981B1E;
-		font-size: 1.3rem;
-		margin-bottom: 1.5rem;
-		font-weight: 600;
-		border-bottom: 2px solid #C1272D;
+		font-family: 'Montserrat', sans-serif;
+		color: var(--deep-red);
+		font-size: 1.1rem;
+		margin-bottom: 0.75rem;
+		font-weight: 700;
+		border-bottom: 1px solid var(--bright-red);
 		padding-bottom: 0.5rem;
 	}
 
 	.quick-links {
 		display: flex;
 		flex-direction: column;
-		gap: 0.75rem;
+		gap: 0.5rem;
 	}
 
 	.quick-link {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-		padding: 1rem;
-		background: #f8f9fa;
-		border-radius: 8px;
+		display: block;
+		padding: 0.75rem;
+		background: var(--light-gray);
+		border-radius: 6px;
 		text-decoration: none;
-		color: #333;
-		transition: all 0.3s ease;
-		border-left: 3px solid transparent;
+		color: var(--dark-gray);
+		transition: all 0.2s ease;
+		font-family: 'Montserrat', sans-serif;
+		font-size: 0.9rem;
 	}
 
 	.quick-link:hover {
-		background: white;
-		border-left-color: #C1272D;
-		transform: translateX(5px);
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+		background: var(--white);
+		color: var(--bright-red);
+		box-shadow: 0 2px 8px rgba(193, 39, 45, 0.1);
 		text-decoration: none;
-		color: #981B1E;
-	}
-
-	.link-icon {
-		font-size: 1.2rem;
-		flex-shrink: 0;
 	}
 
 	.help-card p {
-		color: #666;
-		line-height: 1.6;
-		margin-bottom: 1.5rem;
+		font-family: 'Montserrat', sans-serif;
+		color: #555555;
+		line-height: 1.5;
+		margin-bottom: 1rem;
+		font-size: 0.95rem;
 	}
 
 	.help-info {
-		margin-bottom: 1.5rem;
+		margin-bottom: 1rem;
 	}
 
 	.help-item {
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		padding: 0.75rem 0;
+		padding: 0.5rem 0;
 		border-bottom: 1px solid #f0f0f0;
+		font-family: 'Montserrat', sans-serif;
 	}
 
 	.help-item:last-child {
@@ -345,58 +338,95 @@
 	}
 
 	.help-item strong {
-		color: #333;
-		font-weight: 600;
-		min-width: 60px;
+		color: var(--dark-gray);
+		font-weight: 700;
+		font-size: 0.9rem;
 	}
 
 	.help-item span {
-		color: #666;
+		color: #555555;
 		text-align: right;
+		font-size: 0.85rem;
+	}
+
+	.help-item a {
+		color: var(--bright-red);
+		text-decoration: none;
+	}
+
+	.help-item a:hover {
+		color: var(--deep-red);
+	}
+
+	/* Brand Button Styles */
+	.btn {
+		padding: 0.5rem 1rem;
+		border-radius: 25px;
+		font-weight: 600;
+		text-decoration: none;
+		transition: all 0.2s ease;
+		display: inline-block;
+		font-family: 'Montserrat', sans-serif;
+		cursor: pointer;
+		border: none;
 		font-size: 0.9rem;
+	}
+
+	.btn-primary {
+		background: linear-gradient(45deg, var(--bright-red), var(--deep-red));
+		color: var(--white);
+		box-shadow: 0 4px 15px rgba(193, 39, 45, 0.3);
+	}
+
+	.btn-primary:hover {
+		transform: translateY(-2px);
+		box-shadow: 0 8px 25px rgba(193, 39, 45, 0.4);
+		text-decoration: none;
+		color: var(--white);
 	}
 
 	.help-button {
 		display: block;
 		width: 100%;
-		padding: 1rem;
-		background: #C1272D;
-		color: white;
 		text-align: center;
-		text-decoration: none;
-		border-radius: 5px;
-		font-weight: 600;
-		transition: background 0.3s ease;
-	}
-
-	.help-button:hover {
-		background: #981B1E;
-		text-decoration: none;
-		color: white;
+		padding: 0.75rem;
 	}
 
 	/* Responsive Design */
 	@media (max-width: 768px) {
+		.hero-section {
+			padding: 2rem 0;
+		}
+
 		.hero-content h1 {
 			font-size: 2rem;
+			margin-bottom: 0.75rem;
 		}
 
 		.hero-subtitle {
 			font-size: 1.1rem;
 		}
 
+		.resources-content {
+			padding: 2rem 0;
+		}
+
 		.content-layout {
 			grid-template-columns: 1fr;
-			gap: 2rem;
+			gap: 1.5rem;
 		}
 
-		.documents-grid {
+		.card-container {
 			grid-template-columns: 1fr;
 		}
 
-		.doc-card {
-			flex-direction: column;
-			text-align: center;
+		.card {
+			padding: 1.5rem;
+		}
+
+		.quick-access-card,
+		.help-card {
+			padding: 1.5rem;
 		}
 
 		.container {

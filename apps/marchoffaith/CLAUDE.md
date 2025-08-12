@@ -123,6 +123,116 @@ March of Faith Incorporated is the headquarters church website located in Tagbil
 }
 ```
 
+### Card Components (Professional & Minimal Design)
+
+**Design Philosophy:**
+- Remove decorative elements (emojis, icons) for professional appearance
+- Focus on clear typography and content hierarchy
+- Minimal spacing with zero gaps between cards
+- Professional contact information presentation
+
+```css
+.card-container {
+  display: grid;
+  gap: 0; /* Zero gap between cards */
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+
+.card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  margin: 0; /* Remove default margins */
+  padding: 1.75rem; /* Generous internal padding for readability */
+  transition: all 0.2s ease;
+}
+
+.card:hover {
+  border-color: var(--bright-red);
+  box-shadow: 0 2px 8px rgba(193, 39, 45, 0.1);
+}
+
+/* Professional contact card styling */
+.method-card h3 {
+  font-family: 'Montserrat', sans-serif;
+  color: var(--deep-red);
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.method-info {
+  font-family: 'Montserrat', sans-serif;
+  color: var(--dark-gray);
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.method-desc {
+  font-family: 'Montserrat', sans-serif;
+  color: #555555;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: 0 0 0.5rem 0;
+}
+
+.method-hours {
+  font-family: 'Montserrat', sans-serif;
+  color: var(--bright-red);
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* For flexbox layouts */
+.card-grid-flex {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0; /* Zero gap */
+  margin: 0;
+}
+
+.card-grid-flex .card {
+  flex: 1 1 250px;
+  margin: 0;
+}
+```
+
+**Professional Card Content Guidelines:**
+- Use clear, descriptive titles (Phone, Email, Visit Us)
+- NO emojis or decorative icons
+- Include operational details (hours, response times)
+- Maintain professional language while being welcoming
+- Focus on actionable information
+
+### Contact Page Implementation Notes
+
+**Recent Improvements (Contact Page Redesign):**
+
+1. **Removed Unprofessional Elements:**
+   - Eliminated emoji icons (📞, ✉️, 📍, ⏰) from contact method cards
+   - Removed decorative "method-icon" styling
+   - Streamlined to typography-only design
+
+2. **Enhanced Professional Structure:**
+   - Removed redundant "Welcome Home" introductory section
+   - Removed "Ways to Connect" card grid to eliminate visual clutter
+   - Focused layout on essential contact form and sidebar information
+
+3. **Improved Content Hierarchy:**
+   - Added `.method-hours` styling for operational information
+   - Professional red accent color for business hours/response times
+   - Clear information architecture with primary and secondary text
+
+4. **Modern Business Aesthetic:**
+   - Clean, corporate-style contact cards
+   - Consistent with professional organization standards
+   - Generous internal padding (1.75rem) for readability
+   - Maintains church warmth through content, not design elements
+
 ## Content Guidelines
 
 ### Voice & Tone
