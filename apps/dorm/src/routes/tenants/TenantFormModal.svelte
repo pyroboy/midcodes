@@ -16,7 +16,6 @@
 	import { Pencil, Plus, AlertCircle, User, Phone, Mail, MapPin, Calendar, Building, Camera } from 'lucide-svelte';
 	import { superForm } from 'sveltekit-superforms/client';
 	import { zodClient } from 'sveltekit-superforms/adapters';
-	import { invalidateAll, invalidate } from '$app/navigation';
 	import { tenantFormSchema, TenantStatusEnum, defaultEmergencyContact } from './formSchema';
 	import type { z } from 'zod';
 	import Textarea from '$lib/components/ui/textarea/textarea.svelte';
@@ -583,7 +582,7 @@
 							label="Birthday (Optional)"
 							name="birthday"
 							id="birthday"
-							error={$errors.birthday}
+							error={Array.isArray($errors.birthday) ? $errors.birthday[0] : (typeof $errors.birthday === 'string' ? $errors.birthday : undefined)}
 						/>
 						{#if $errors.birthday}
 							<p class="text-sm text-red-500 flex items-center gap-1">

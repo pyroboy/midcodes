@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { invalidateAll, invalidate } from '$app/navigation';
+	import { invalidateAll } from '$app/navigation';
 	import LeaseFormModal from './LeaseFormModal.svelte';
 	import LeaseList from './LeaseList.svelte';
 	import { Button } from '$lib/components/ui/button';
