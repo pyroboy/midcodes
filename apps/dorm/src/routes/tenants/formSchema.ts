@@ -265,12 +265,13 @@ export const transformFormToDbInput = (formData: TenantFormData): Omit<CreateTen
 		name: formData.name,
 		contact_number: formData.contact_number,
 		email: formData.email,
-    address: (formData as any).address ?? null,
+		address: formData.address ?? null,
 		emergency_contact: emergencyContact,
-    tenant_status: 'PENDING',
-    school_or_workplace: (formData as any).school_or_workplace ?? null,
-    facebook_name: (formData as any).facebook_name ?? null,
-    birthday: (formData as any).birthday ?? null
+		tenant_status: formData.tenant_status || 'PENDING',
+		school_or_workplace: formData.school_or_workplace ?? null,
+		facebook_name: formData.facebook_name ?? null,
+		birthday: formData.birthday ?? null,
+		profile_picture_url: formData.profile_picture_url ?? null
 	};
 };
 

@@ -43,7 +43,7 @@
 	let selectedStatus = $state('');
 	let isLoading = $state(data.lazy === true); // Loading state for skeletons
 	let viewMode = $state<'card' | 'list'>('card'); // Toggle between card and list view
-	let activeFilter = $state<'all' | 'active' | 'inactive' | 'pending' | 'blacklisted'>('all'); // Filter for stats
+	let activeFilter = $state<'all' | 'active' | 'inactive' | 'pending' | 'blacklisted'>('active'); // Filter for stats
 
 	// Load data lazily if needed
 	onMount(async () => {
@@ -210,21 +210,6 @@
 				<!-- Enhanced Stats Overview - Now Clickable -->
 				<div class="flex items-center gap-3 text-xs sm:text-sm">
 					<button
-						onclick={() => handleFilterClick('all')}
-						class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 {activeFilter ===
-						'all'
-							? 'bg-blue-100 ring-2 ring-blue-500'
-							: 'bg-blue-50 hover:bg-blue-100'}"
-					>
-						{#if isLoading}
-							<Skeleton class="h-4 w-6" />
-						{:else}
-							<span class="text-blue-600 font-medium">{stats.total}</span>
-						{/if}
-						<span class="text-slate-600">Total</span>
-					</button>
-
-					<button
 						onclick={() => handleFilterClick('active')}
 						class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 {activeFilter ===
 						'active'
@@ -237,6 +222,21 @@
 							<span class="text-green-600 font-medium">{stats.active}</span>
 						{/if}
 						<span class="text-slate-600">Active</span>
+					</button>
+
+					<button
+						onclick={() => handleFilterClick('all')}
+						class="flex items-center gap-1 px-3 py-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 {activeFilter ===
+						'all'
+							? 'bg-blue-100 ring-2 ring-blue-500'
+							: 'bg-blue-50 hover:bg-blue-100'}"
+					>
+						{#if isLoading}
+							<Skeleton class="h-4 w-6" />
+						{:else}
+							<span class="text-blue-600 font-medium">{stats.total}</span>
+						{/if}
+						<span class="text-slate-600">Total</span>
 					</button>
 
 					<button

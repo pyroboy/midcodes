@@ -52,6 +52,109 @@ function mapRentalUnit(unit: any, floor: any) {
 	};
 }
 
+/**
+ * Calculate security deposit status with usage information
+ * @param lease - The lease object with billings
+ * @returns object with status information
+ */
+export function getSecurityDepositStatus(lease: any): {
+	hasSecurityDeposit: boolean;
+	isFullyPaid: boolean;
+	availableAmount: number;
+	totalPaid: number;
+	amountUsed: number;
+	status: 'none' | 'unpaid' | 'fully-paid' | 'partially-used' | 'fully-used';
+} {
+	if (!lease?.billings) {
+		return {
+			hasSecurityDeposit: false,
+			isFullyPaid: false,
+			availableAmount: 0,
+			totalPaid: 0,
+			amountUsed: 0,
+			status: 'none'
+		};
+	}
+
+	// Get all security deposit billings
+	const securityDepositBillings = lease.billings.filter(
+		(billing: Billing) => billing.type === 'SECURITY_DEPOSIT'
+	);
+
+	// If no security deposit billings exist
+	if (securityDepositBillings.length === 0) {
+		return {
+			hasSecurityDeposit: false,
+			isFullyPaid: false,
+			availableAmount: 0,
+			totalPaid: 0,
+			amountUsed: 0,
+			status: 'none'
+		};
+	}
+
+	// Calculate total paid to security deposits
+	const totalPaid = securityDepositBillings.reduce((sum: number, billing: Billing) => {
+		return sum + (billing.paid_amount || 0);
+	}, 0);
+
+	// Check if all security deposit billings are fully paid
+	const isFullyPaid = securityDepositBillings.every((billing: Billing) => {
+		const totalDue = (billing.amount || 0) + (billing.penalty_amount || 0);
+		const paidAmount = billing.paid_amount || 0;
+		const balance = totalDue - paidAmount;
+		return balance <= 0; // Fully paid or overpaid
+	});
+
+	// Calculate amount used from security deposit for other billings
+	const allBillings = lease.billings || [];
+	let amountUsed = 0;
+
+	allBillings.forEach((billing: any) => {
+		if (billing.type !== 'SECURITY_DEPOSIT' && billing.allocations) {
+			billing.allocations.forEach((allocation: any) => {
+				if (allocation.payment && allocation.payment.method === 'SECURITY_DEPOSIT') {
+					amountUsed += allocation.amount || 0;
+				}
+			});
+		}
+	});
+
+	const availableAmount = totalPaid - amountUsed;
+
+	// Determine status
+	let status: 'none' | 'unpaid' | 'fully-paid' | 'partially-used' | 'fully-used' = 'none';
+	
+	if (!isFullyPaid) {
+		status = 'unpaid';
+	} else if (availableAmount <= 0) {
+		status = 'fully-used';
+	} else if (amountUsed > 0) {
+		status = 'partially-used';
+	} else {
+		status = 'fully-paid';
+	}
+
+	return {
+		hasSecurityDeposit: true,
+		isFullyPaid,
+		availableAmount,
+		totalPaid,
+		amountUsed,
+		status
+	};
+}
+
+/**
+ * Legacy function for backward compatibility
+ * @param lease - The lease object with billings
+ * @returns true if all security deposit billings are fully paid, false otherwise
+ */
+export function isSecurityDepositFullyPaid(lease: any): boolean {
+	const status = getSecurityDepositStatus(lease);
+	return status.isFullyPaid;
+}
+
 export async function getLeaseData(supabase: SupabaseClient) {
 	const { data: leases, error: leasesError } = await supabase
 		.from('leases')
