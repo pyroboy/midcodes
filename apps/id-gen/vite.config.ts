@@ -10,18 +10,14 @@ export default defineConfig({
         tailwind()
     ],
     server: {
-        host: true, // Allows access on the local network
-      },
-    // optimizeDeps: {
-    //     include: ['three']
-    // },
-    // resolve: {
-    //     alias: {
-    //         'three/examples/jsm/objects/GroundProjectedSkybox': resolve('node_modules/three/examples/jsm/objects/GroundProjectedSkybox.js'),
-    //         'three/examples/jsm': resolve('node_modules/three/examples/jsm')
-    //     }
-    // },
-    ssr: {
-        noExternal: ['three', '@threlte/core', '@threlte/extras']
+        host: '127.0.0.1', // Bind to localhost specifically for Windows
+        port: 5173
+    },
+    optimizeDeps: {
+        exclude: ['ws', 'events'],
+        include: ['jszip', 'three', '@threlte/core', '@threlte/extras', 'bits-ui', 'lucide-svelte']
+    },
+    define: {
+        global: 'globalThis'
     }
 } as UserConfig);
