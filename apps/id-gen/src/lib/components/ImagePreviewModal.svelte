@@ -29,6 +29,7 @@
     let animationId: number | null = null;
     let debugLogs = $state<Array<{ timestamp: number; message: string; type: 'info' | 'error' | 'success' }>>([]);
 
+
     function addDebugLog(message: string, type: 'info' | 'error' | 'success' = 'info') {
         console.log(`[ImagePreviewModal] ${message}`);
         debugLogs.push({
@@ -125,20 +126,68 @@
                                 <T.DirectionalLight position={[-6, -3, 3]} intensity={0.2} color="#ffecd1" />
                             </T.PerspectiveCamera>
                             <T.Group rotation.y={rotationY}>
+
+                                {#if frontGeometry}
+                                    {#await frontImageUrl ? useTexture(frontImageUrl) : Promise.resolve(null)}
+                                        <T.Mesh geometry={frontGeometry}>
+                                            <T.MeshStandardMaterial envMap={null} color="#374151" metalness={0.1} roughness={0.8} />
+                                        </T.Mesh>
+                                    {:then frontTexture}
+                                        <T.Mesh geometry={frontGeometry}>
+                                            <T.MeshStandardMaterial
+                                                envMap={null}
+                                                color="#ffffff"
+                                                map={frontTexture as THREE.Texture}
+                                                metalness={0.1}
+                                                roughness={0.1}
+                                            />
+                                        </T.Mesh>
+                                    {:catch error}
+                                        <T.Mesh geometry={frontGeometry}>
+                                            <T.MeshStandardMaterial envMap={null} color="#374151" metalness={0.1} roughness={0.8} />
+                                        </T.Mesh>
+                                        {(() => {
+                                            if (!canvasError) {
+                                                canvasError = `Failed to load front texture: ${error.message}`;
+                                                addDebugLog(`Front texture loading error: ${error.message}`, 'error');
+                                            }
+                                            return null;
+                                        })()}
+                                    {/await}
+                                {/if}
+                                
+                                {#if backGeometry}
+                                    {#await backImageUrl ? useTexture(backImageUrl) : Promise.resolve(null)}
+                                        <T.Mesh position={[0, 0, -0.001]} geometry={backGeometry}>
+                                            <T.MeshStandardMaterial envMap={null} color="#374151" metalness={0.1} roughness={0.8} />
+                                        </T.Mesh>
+                                    {:then backTexture}
+                                        <T.Mesh position={[0, 0, -0.001]} geometry={backGeometry}>
+                                            <T.MeshStandardMaterial
+                                                map={backTexture as THREE.Texture}
+                                                envMap={null}
+                                                metalness={0.1}
+                                                roughness={0.1}
+                                            />
+                                        </T.Mesh>
+                                    {:catch error}
+                                        <T.Mesh position={[0, 0, -0.001]} geometry={backGeometry}>
+                                            <T.MeshStandardMaterial envMap={null} color="#374151" metalness={0.1} roughness={0.8} />
+                                        </T.Mesh>
+                                        {(() => {
+                                            if (!canvasError) {
+                                                canvasError = `Failed to load back texture: ${error.message}`;
+                                                addDebugLog(`Back texture loading error: ${error.message}`, 'error');
+                                            }
+                                            return null;
+                                        })()}
+                                    {/await}
+                                {/if}
+
                                 {#await Promise.all([
                                     frontImageUrl ? useTexture(frontImageUrl) : Promise.resolve(null),
                                     backImageUrl ? useTexture(backImageUrl) : Promise.resolve(null)
                                 ])}
-                                    {#if frontGeometry}
-                                        <T.Mesh geometry={frontGeometry}>
-                                            <T.MeshStandardMaterial envMap={null} color="#374151" metalness={0.1} roughness={0.8} />
-                                        </T.Mesh>
-                                    {/if}
-                                    {#if backGeometry}
-                                        <T.Mesh position={[0, 0, -0.001]} geometry={backGeometry}>
-                                            <T.MeshStandardMaterial envMap={null} color="#374151" metalness={0.1} roughness={0.8} />
-                                        </T.Mesh>
-                                    {/if}
                                     <T.Group
                                         position={[0, 0, 0.01]}
                                         rotation={[0, 0, -rotationY * 4]}
@@ -159,50 +208,9 @@
                                             <T.MeshBasicMaterial color="#ffffff" transparent opacity={0.8} />
                                         </T.Mesh>
                                     </T.Group>
-                                {:then [frontTexture, backTexture]}
-                                    {#if frontGeometry && frontTexture}
-                                        <T.Mesh geometry={frontGeometry}>
-                                            <T.MeshStandardMaterial
-                                                envMap={null}
-                                                color="#ffffff"
-                                                map={frontTexture as THREE.Texture}
-                                                metalness={0.1}
-                                                roughness={0.1}
-                                            />
-                                        </T.Mesh>
-                                    {:else if frontGeometry}
-                                        <T.Mesh geometry={frontGeometry}>
-                                            <T.MeshStandardMaterial envMap={null} color="#374151" metalness={0.1} roughness={0.8} />
-                                        </T.Mesh>
-                                    {/if}
-                                    {#if backGeometry && backTexture}
-                                        <T.Mesh position={[0, 0, -0.001]} geometry={backGeometry}>
-                                            <T.MeshStandardMaterial
-                                                map={backTexture as THREE.Texture}
-                                                envMap={null}
-                                                metalness={0.1}
-                                                roughness={0.1}
-                                            />
-                                        </T.Mesh>
-                                    {:else if backGeometry}
-                                        <T.Mesh position={[0, 0, -0.001]} geometry={backGeometry}>
-                                            <T.MeshStandardMaterial envMap={null} color="#374151" metalness={0.1} roughness={0.8} />
-                                        </T.Mesh>
-                                    {/if}
-                                {:catch error}
-                                    <T.Mesh geometry={frontGeometry}>
-                                        <T.MeshStandardMaterial envMap={null} color="#374151" metalness={0.1} roughness={0.8} />
-                                    </T.Mesh>
-                                    <T.Mesh position={[0, 0, -0.001]} geometry={backGeometry}>
-                                        <T.MeshStandardMaterial envMap={null} color="#374151" metalness={0.1} roughness={0.8} />
-                                    </T.Mesh>
-                                    {(() => {
-                                        canvasError = `Failed to load textures: ${error.message}`;
-                                        addDebugLog(`Texture loading error: ${error.message}`, 'error');
-                                        return null;
-                                    })()}
-                                {/await}
-                                
+                                {:then}
+                                    {/await}
+
                                 {#if edgeGeometry}
                                     <T.Mesh geometry={edgeGeometry}>
                                         <T.MeshStandardMaterial color="#ffffff" metalness={0} roughness={0.2} />
