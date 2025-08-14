@@ -44,25 +44,128 @@
 	let profilePictureFile: File | null = $state(null);
 	let profilePicturePreviewUrl: string | null = $state(null);
 	let uploadingImage = $state(false);
+	let hasSelectedNewImage = $state(false);
+	
+	// Current display value for the image component - bindable
+	let imageDisplayValue = $state<string | null>(null);
+	
+	// Sync imageDisplayValue with form and preview state
+	$effect(() => {
+		imageDisplayValue = profilePicturePreviewUrl || $form.profile_picture_url || null;
+		console.log('📸 Image display value updated:', imageDisplayValue?.substring(0, 50) + '...');
+	});
 
 	// Track form changes to prevent accidental exits
 	let initialFormData = $state<string>('');
 	let hasUnsavedChanges = $derived.by(() => {
 		if (!open) return false;
 		const currentData = JSON.stringify($form);
-		return initialFormData !== '' && currentData !== initialFormData;
+		const dataChanged = initialFormData !== '' && currentData !== initialFormData;
+		// Include image selection in unsaved changes
+		return dataChanged || hasSelectedNewImage;
 	});
 
 	// Initialize Superforms
+	// Custom submission handler to ensure proper timing
+	let isSubmitting = $state(false);
+
+	// Custom submit handler that ensures upload happens BEFORE form submission
+	async function handleCustomSubmit(event: Event) {
+		event.preventDefault();
+		
+		if (isSubmitting) return; // Prevent double submission
+		isSubmitting = true;
+
+		console.log('🔄 Custom form submission started');
+		console.log('📤 Form data before upload:', {
+			profile_picture_url: $form.profile_picture_url,
+			hasSelectedNewImage,
+			profilePictureFile: profilePictureFile?.name
+		});
+		
+		try {
+			// STEP 1: Upload image first if there's a selected file
+			if (profilePictureFile && hasSelectedNewImage) {
+				uploadingImage = true;
+				console.log('📤 Starting image upload before form submission...');
+				
+				await uploadProfilePicture();
+				
+				console.log('✅ Image upload complete, form data after upload:', {
+					profile_picture_url: $form.profile_picture_url,
+					imageDisplayValue: imageDisplayValue?.substring(0, 50) + '...'
+				});
+				toast.success('Image uploaded successfully');
+				uploadingImage = false;
+			}
+
+			// STEP 2: Wait a bit to ensure DOM updates
+			await new Promise(resolve => setTimeout(resolve, 100));
+
+			console.log('🚀 Now submitting form to server with final data:', {
+				id: $form.id,
+				name: $form.name,
+				profile_picture_url: $form.profile_picture_url
+			});
+
+			// STEP 3: Now submit the form with updated data
+			const formElement = event.target as HTMLFormElement;
+			const formData = new FormData(formElement);
+			
+			// Log what's actually being sent
+			console.log('📋 FormData being sent:', {
+				profile_picture_url: formData.get('profile_picture_url'),
+				name: formData.get('name'),
+				id: formData.get('id')
+			});
+
+			const response = await fetch(formElement.action, {
+				method: 'POST',
+				body: formData
+			});
+
+			const result = await response.text();
+			
+			if (response.ok) {
+				// Handle success
+				if (editMode && onTenantUpdate && tenant) {
+					const updatedTenant = {
+						...tenant,
+						name: $form.name,
+						email: $form.email,
+						contact_number: $form.contact_number,
+						tenant_status: $form.tenant_status,
+						profile_picture_url: $form.profile_picture_url
+					};
+					onTenantUpdate(updatedTenant);
+				}
+
+				// Reset states
+				reset();
+				profilePictureFile = null;
+				profilePicturePreviewUrl = null;
+				hasSelectedNewImage = false;
+				
+				toast.success(editMode ? 'Tenant updated successfully' : 'Tenant created successfully');
+				onOpenChange(false);
+			} else {
+				throw new Error('Form submission failed');
+			}
+
+		} catch (error: any) {
+			console.error('❌ Form submission failed:', error);
+			toast.error(`Failed to ${editMode ? 'update' : 'create'} tenant: ${error.message}`);
+		} finally {
+			isSubmitting = false;
+			uploadingImage = false;
+		}
+	}
+
 	const { form, errors, enhance, constraints, submitting, reset } = superForm(initialForm, {
 		validators: zodClient(tenantFormSchema),
 		validationMethod: 'onsubmit',
 		resetForm: true,
 		invalidateAll: false,
-		onSubmit: () => {
-			console.log('🔄 Form submission started');
-			console.log('📤 Form data being sent:', $form);
-		},
 		onResult: async ({ result }) => {
 			if (result.type === 'success') {
 				if (editMode && onTenantUpdate && tenant) {
@@ -77,7 +180,12 @@
 					onTenantUpdate(updatedTenant);
 				}
 
+				// Reset states
 				reset();
+				profilePictureFile = null;
+				profilePicturePreviewUrl = null;
+				hasSelectedNewImage = false;
+				
 				toast.success(editMode ? 'Tenant updated successfully' : 'Tenant created successfully');
 				onOpenChange(false);
 			} else if (result.type === 'failure') {
@@ -103,54 +211,95 @@
 		}
 	});
 
-	// Profile picture handlers
-	async function handleProfilePictureUpload(file: File) {
-		const maxSize = 2 * 1024 * 1024; // 2MB in bytes
-		if (file.size > maxSize) {
-			toast.error('Profile picture must be smaller than 2MB');
-			return;
+	// Handle cropped image from ImageUploadWithCrop - DEFERRED MODE
+	function handleCropReady(file: File, previewUrl: string) {
+		console.log('🎯 Crop ready received:', { 
+			file: file.name, 
+			size: file.size, 
+			previewUrl: previewUrl.substring(0, 50) + '...'
+		});
+
+		// Clean up previous preview URL
+		if (profilePicturePreviewUrl && profilePicturePreviewUrl !== previewUrl) {
+			URL.revokeObjectURL(profilePicturePreviewUrl);
 		}
 
-		if (!file.type.startsWith('image/')) {
-			toast.error('Please select a valid image file');
-			return;
-		}
-
-		uploadingImage = true;
+		// Store the cropped file and preview URL
 		profilePictureFile = file;
+		profilePicturePreviewUrl = previewUrl;
+		hasSelectedNewImage = true;
+		
+		// Manually update the bound value to ensure immediate display
+		imageDisplayValue = previewUrl;
+		
+		console.log('✅ Image ready for upload on form save, imageDisplayValue updated to:', imageDisplayValue?.substring(0, 50) + '...');
+	}
 
-		try {
-			const formData = new FormData();
-			formData.append('file', file);
+	// Legacy handler - not used with onCropReady
+	function handleProfilePictureUpload(file: File) {
+		// This won't be called when using onCropReady
+		console.log('Legacy upload handler called - this should not happen with deferred mode');
+	}
 
-			const response = await fetch('/api/upload-image', {
-				method: 'POST',
-				body: formData
-			});
-
-			if (!response.ok) {
-				const error = await response.json();
-				throw new Error(error.message || 'Upload failed');
-			}
-
-			const result = await response.json();
-			$form.profile_picture_url = result.secure_url;
-			toast.success(
-				`Profile picture uploaded successfully (${(file.size / 1024 / 1024).toFixed(1)}MB)`
-			);
-		} catch (error: any) {
-			console.error('Upload error:', error);
-			toast.error(`Failed to upload profile picture: ${error?.message || 'Unknown error'}`);
-			profilePictureFile = null;
-			$form.profile_picture_url = null;
-		} finally {
-			uploadingImage = false;
+	// Actual upload function called during form submission
+	async function uploadProfilePicture(): Promise<void> {
+		if (!profilePictureFile) {
+			console.log('⚠️ No profile picture file to upload');
+			return;
 		}
+
+		console.log('📤 Starting image upload:', {
+			fileName: profilePictureFile.name,
+			fileSize: profilePictureFile.size,
+			fileType: profilePictureFile.type
+		});
+
+		const formData = new FormData();
+		formData.append('file', profilePictureFile);
+
+		const response = await fetch('/api/upload-image', {
+			method: 'POST',
+			body: formData
+		});
+
+		if (!response.ok) {
+			const error = await response.json();
+			console.error('❌ Upload failed:', error);
+			throw new Error(error.message || 'Upload failed');
+		}
+
+		const result = await response.json();
+		console.log('✅ Upload successful:', {
+			secure_url: result.secure_url,
+			previousUrl: $form.profile_picture_url
+		});
+		
+		$form.profile_picture_url = result.secure_url;
+		
+		// Force update of the hidden input field
+		const hiddenInput = document.querySelector('input[name="profile_picture_url"]') as HTMLInputElement;
+		if (hiddenInput) {
+			hiddenInput.value = result.secure_url;
+			console.log('🎯 Hidden input forcibly updated to:', hiddenInput.value);
+		}
+		
+		console.log('✅ Form profile_picture_url updated to:', $form.profile_picture_url);
 	}
 
 	function handleProfilePictureRemove() {
+		console.log('🗑️ Removing profile picture');
+		
+		// Clean up preview URL if exists
+		if (profilePicturePreviewUrl) {
+			URL.revokeObjectURL(profilePicturePreviewUrl);
+			profilePicturePreviewUrl = null;
+		}
+		
 		$form.profile_picture_url = null;
 		profilePictureFile = null;
+		hasSelectedNewImage = true; // Mark as changed for unsaved changes detection
+		
+		console.log('✅ Profile picture removed');
 	}
 
 	function handleProfilePictureError(error: string) {
@@ -275,10 +424,37 @@
 				};
 			}
 
+			// Reset image states when opening modal (but don't reset if we have a fresh crop)
+			console.log('🔄 Modal opened - resetting image states', { 
+				editMode, 
+				tenantImage: tenant?.profile_picture_url,
+				hasNewCrop: hasSelectedNewImage && profilePicturePreviewUrl
+			});
+			
+			// Only reset if we don't have a fresh cropped image
+			if (!hasSelectedNewImage || !profilePicturePreviewUrl) {
+				profilePictureFile = null;
+				hasSelectedNewImage = false;
+				if (profilePicturePreviewUrl) {
+					URL.revokeObjectURL(profilePicturePreviewUrl);
+					profilePicturePreviewUrl = null;
+				}
+			} else {
+				console.log('🎯 Preserving cropped image - not resetting image states');
+			}
+
 			// Set initial form data after form is populated
 			setTimeout(() => {
 				initialFormData = JSON.stringify($form);
 			}, 100);
+		} else {
+			// Clean up when closing modal
+			if (profilePicturePreviewUrl) {
+				URL.revokeObjectURL(profilePicturePreviewUrl);
+				profilePicturePreviewUrl = null;
+			}
+			profilePictureFile = null;
+			hasSelectedNewImage = false;
 		}
 	});
 </script>
@@ -301,7 +477,7 @@
 			</DialogDescription>
 		</DialogHeader>
 
-		<form method="POST" action={editMode ? '?/update' : '?/create'} use:enhance class="space-y-6">
+		<form method="POST" action={editMode ? '?/update' : '?/create'} onsubmit={handleCustomSubmit} class="space-y-6">
 			<!-- Hidden input for tenant ID in edit mode -->
 			{#if editMode && $form.id}
 				<input type="hidden" name="id" value={$form.id} />
@@ -316,9 +492,9 @@
 
 				<div class="flex flex-col items-center space-y-2">
 					<ImageUploadWithCrop
-						value={$form.profile_picture_url}
+						bind:value={imageDisplayValue}
 						disabled={uploadingImage || $submitting}
-						onupload={handleProfilePictureUpload}
+						onCropReady={handleCropReady}
 						onremove={handleProfilePictureRemove}
 						onerror={handleProfilePictureError}
 						placeholder="Upload profile picture"
@@ -326,12 +502,13 @@
 						cropSize={{ width: 400, height: 400 }}
 					/>
 
+
 					{#if uploadingImage}
 						<div class="flex items-center gap-2 text-sm text-slate-600">
 							<div
 								class="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"
 							></div>
-							<span>Optimizing and uploading image...</span>
+							<span>Uploading image...</span>
 						</div>
 					{/if}
 				</div>
@@ -558,91 +735,94 @@
 				</div>
 
 				<Card>
-					<CardContent class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-6">
-						<!-- Emergency Contact Fields -->
-						<div class="space-y-2">
-							<Label for="emergency_contact_name">Contact Name (Optional)</Label>
-							<Input
-								id="emergency_contact_name"
-								name="emergency_contact.name"
-								type="text"
-								bind:value={$form['emergency_contact.name']}
-								class={$errors['emergency_contact.name'] ? 'border-red-500' : ''}
-								placeholder="Emergency contact name (optional)"
-							/>
-							{#if $errors['emergency_contact.name']}
-								<p class="text-sm text-red-500 flex items-center gap-1">
-									<AlertCircle class="w-4 h-4" />
-									{$errors['emergency_contact.name']}
-								</p>
-							{/if}
-						</div>
-
-						<div class="space-y-2">
-							<Label for="emergency_contact_relationship">Relationship (Optional)</Label>
-							<Input
-								id="emergency_contact_relationship"
-								name="emergency_contact.relationship"
-								type="text"
-								bind:value={$form['emergency_contact.relationship']}
-								class={$errors['emergency_contact.relationship'] ? 'border-red-500' : ''}
-								placeholder="e.g., Spouse, Parent, Friend (optional)"
-							/>
-							{#if $errors['emergency_contact.relationship']}
-								<p class="text-sm text-red-500 flex items-center gap-1">
-									<AlertCircle class="w-4 h-4" />
-									{$errors['emergency_contact.relationship']}
-								</p>
-							{/if}
-						</div>
-
-						<div class="space-y-2">
-							<Label for="emergency_contact_phone">Phone Number (Optional)</Label>
-							<div class="relative">
-								<Phone
-									class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"
-								/>
+					<CardContent class="pt-6">
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+							<!-- Emergency Contact Fields -->
+							<div class="space-y-2">
+								<Label for="emergency_contact_name">Contact Name (Optional)</Label>
 								<Input
-									id="emergency_contact_phone"
-									name="emergency_contact.phone"
-									type="tel"
-									bind:value={$form['emergency_contact.phone']}
-									class={`pl-10 ${$errors['emergency_contact.phone'] ? 'border-red-500' : ''}`}
-									placeholder="+63 912 345 6789 (optional)"
+									id="emergency_contact_name"
+									name="emergency_contact.name"
+									type="text"
+									bind:value={$form['emergency_contact.name']}
+									class={$errors['emergency_contact.name'] ? 'border-red-500' : ''}
+									placeholder="Emergency contact name (optional)"
 								/>
+								{#if $errors['emergency_contact.name']}
+									<p class="text-sm text-red-500 flex items-center gap-1">
+										<AlertCircle class="w-4 h-4" />
+										{$errors['emergency_contact.name']}
+									</p>
+								{/if}
 							</div>
-							{#if $errors['emergency_contact.phone']}
-								<p class="text-sm text-red-500 flex items-center gap-1">
-									<AlertCircle class="w-4 h-4" />
-									{$errors['emergency_contact.phone']}
-								</p>
-							{/if}
-						</div>
 
-						<div class="space-y-2">
-							<Label for="emergency_contact_email">Email Address (Optional)</Label>
-							<div class="relative">
-								<Mail
-									class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"
-								/>
+							<div class="space-y-2">
+								<Label for="emergency_contact_relationship">Relationship (Optional)</Label>
 								<Input
-									id="emergency_contact_email"
-									name="emergency_contact.email"
-									type="email"
-									bind:value={$form['emergency_contact.email']}
-									class={`pl-10 ${$errors['emergency_contact.email'] ? 'border-red-500' : ''}`}
-									placeholder="emergency@example.com (optional)"
+									id="emergency_contact_relationship"
+									name="emergency_contact.relationship"
+									type="text"
+									bind:value={$form['emergency_contact.relationship']}
+									class={$errors['emergency_contact.relationship'] ? 'border-red-500' : ''}
+									placeholder="e.g., Spouse, Parent, Friend (optional)"
 								/>
+								{#if $errors['emergency_contact.relationship']}
+									<p class="text-sm text-red-500 flex items-center gap-1">
+										<AlertCircle class="w-4 h-4" />
+										{$errors['emergency_contact.relationship']}
+									</p>
+								{/if}
 							</div>
-							{#if $errors['emergency_contact.email']}
-								<p class="text-sm text-red-500 flex items-center gap-1">
-									<AlertCircle class="w-4 h-4" />
-									{$errors['emergency_contact.email']}
-								</p>
-							{/if}
+
+							<div class="space-y-2">
+								<Label for="emergency_contact_phone">Phone Number (Optional)</Label>
+								<div class="relative">
+									<Phone
+										class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"
+									/>
+									<Input
+										id="emergency_contact_phone"
+										name="emergency_contact.phone"
+										type="tel"
+										bind:value={$form['emergency_contact.phone']}
+										class={`pl-10 ${$errors['emergency_contact.phone'] ? 'border-red-500' : ''}`}
+										placeholder="+63 912 345 6789 (optional)"
+									/>
+								</div>
+								{#if $errors['emergency_contact.phone']}
+									<p class="text-sm text-red-500 flex items-center gap-1">
+										<AlertCircle class="w-4 h-4" />
+										{$errors['emergency_contact.phone']}
+									</p>
+								{/if}
+							</div>
+
+							<div class="space-y-2">
+								<Label for="emergency_contact_email">Email Address (Optional)</Label>
+								<div class="relative">
+									<Mail
+										class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400"
+									/>
+									<Input
+										id="emergency_contact_email"
+										name="emergency_contact.email"
+										type="email"
+										bind:value={$form['emergency_contact.email']}
+										class={`pl-10 ${$errors['emergency_contact.email'] ? 'border-red-500' : ''}`}
+										placeholder="emergency@example.com (optional)"
+									/>
+								</div>
+								{#if $errors['emergency_contact.email']}
+									<p class="text-sm text-red-500 flex items-center gap-1">
+										<AlertCircle class="w-4 h-4" />
+										{$errors['emergency_contact.email']}
+									</p>
+								{/if}
+							</div>
 						</div>
 
-						<div class="col-span-2 space-y-2">
+						<!-- Address field - separate row for better mobile layout -->
+						<div class="space-y-2 mt-4">
 							<Label for="emergency_contact_address">Address (Optional)</Label>
 							<div class="relative">
 								<MapPin class="absolute left-3 top-3 w-4 h-4 text-gray-400" />
@@ -668,16 +848,24 @@
 
 			<div class="flex justify-end gap-2 pt-4">
 				<Button type="button" variant="outline" onclick={() => handleModalClose(false)}>Cancel</Button>
-				<Button type="submit" disabled={$submitting || uploadingImage}>
+				<Button type="submit" disabled={isSubmitting || uploadingImage}>
 					{uploadingImage
 						? 'Uploading Image...'
-						: $submitting
+						: isSubmitting
 							? editMode
-								? 'Saving...'
-								: 'Creating...'
+								? hasSelectedNewImage 
+									? 'Saving & Uploading...'
+									: 'Saving...'
+								: hasSelectedNewImage
+									? 'Creating & Uploading...'
+									: 'Creating...'
 							: editMode
-								? 'Save Changes'
-								: 'Create Tenant'}
+								? hasSelectedNewImage
+									? 'Save & Upload Image'
+									: 'Save Changes'
+								: hasSelectedNewImage
+									? 'Create & Upload Image'
+									: 'Create Tenant'}
 				</Button>
 			</div>
 		</form>

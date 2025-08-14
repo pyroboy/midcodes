@@ -31,6 +31,8 @@
 	import { printLeaseInvoice } from '$lib/utils/print';
 	import { getLeaseDisplayStatus } from '$lib/utils/lease-status';
 	import { formatCurrency, formatDate } from '$lib/utils/format';
+	import { getSecurityDepositStatus } from '$lib/utils/lease';
+	import { featureFlags } from '$lib/stores/featureFlags';
 
 	interface Props {
 		lease: Lease & { balanceStatus?: any };
@@ -158,6 +160,48 @@
 		return paidBillings.length > 0 ? paidBillings[0] : null;
 	});
 
+	// Security deposit status with enhanced logic
+	let securityDepositStatus = $derived.by(() => {
+		if (!$featureFlags.showSecurityDepositIndicator) {
+			return { show: false };
+		}
+		
+		const status = getSecurityDepositStatus(lease);
+		
+		// Only show indicator if there are security deposits and they're paid
+		if (!status.hasSecurityDeposit || !status.isFullyPaid) {
+			return { show: false };
+		}
+		
+		// Determine color based on usage
+		let bgColor: string;
+		let tooltip: string;
+		
+		switch (status.status) {
+			case 'fully-paid':
+				bgColor = 'bg-green-500';
+				tooltip = `Security Deposit Fully Paid (₱${status.totalPaid.toLocaleString()} available)`;
+				break;
+			case 'partially-used':
+				bgColor = 'bg-orange-500';
+				tooltip = `Security Deposit Partially Used (₱${status.availableAmount.toLocaleString()} of ₱${status.totalPaid.toLocaleString()} available)`;
+				break;
+			case 'fully-used':
+				bgColor = 'bg-red-500';
+				tooltip = `Security Deposit Fully Used (₱${status.totalPaid.toLocaleString()} used)`;
+				break;
+			default:
+				return { show: false };
+		}
+		
+		return {
+			show: true,
+			bgColor,
+			tooltip,
+			status: status.status
+		};
+	});
+
 	async function handleStatusChange(newStatus: string) {
 		try {
 			const formData = new FormData();
@@ -202,9 +246,19 @@
 			<div class="flex items-center justify-between">
 				<!-- Lease Name -->
 				<div class="flex-1 min-w-0">
-					<span class="text-sm sm:text-base font-bold truncate text-slate-800 transition-colors leading-tight block">
-						{lease.name || `Lease #${lease.id}`}
-					</span>
+					<div class="flex items-center">
+						<span class="text-sm sm:text-base font-bold truncate text-slate-800 transition-colors leading-tight block">
+							{lease.name || `Lease #${lease.id}`}
+						</span>
+						{#if securityDepositStatus.show}
+							<div 
+								class="inline-flex items-center justify-center w-3 h-3 {securityDepositStatus.bgColor} rounded-full ml-2 flex-shrink-0" 
+								title={securityDepositStatus.tooltip}
+							>
+								<Shield class="w-2 h-2 text-white" />
+							</div>
+						{/if}
+					</div>
 				</div>
 				
 				<!-- Balance Amount -->
@@ -239,7 +293,7 @@
 								{@const profileUrl =
 									(tenantData as any).profile_picture_url || matchedTenant?.profile_picture_url}
 								<div
-									class="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-white shadow-sm flex-shrink-0 {index > 0 ? '-ml-2 sm:-ml-2.5' : ''}"
+									class="w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 border-white shadow-sm flex-shrink-0 {index > 0 ? '-ml-3 sm:-ml-3.5' : ''}"
 									style="z-index: {lease.lease_tenants.length - index}"
 								>
 									{#if profileUrl}
@@ -265,7 +319,7 @@
 							{/each}
 							{#if lease.lease_tenants.length > 3}
 								<div
-									class="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-white shadow-sm flex-shrink-0 bg-slate-200 flex items-center justify-center -ml-2 sm:-ml-2.5"
+									class="w-12 h-12 sm:w-14 sm:h-14 rounded-full border-2 border-white shadow-sm flex-shrink-0 bg-slate-200 flex items-center justify-center -ml-3 sm:-ml-3.5"
 									style="z-index: 0"
 								>
 									<span class="text-slate-600 font-medium text-xs">
@@ -309,9 +363,19 @@
 		<div class="hidden lg:flex lg:items-center w-full gap-4">
 			<!-- Name -->
 			<div class="flex-shrink-0 min-w-0 w-48">
-				<span class="text-base font-bold truncate text-slate-800 transition-colors leading-tight block">
-					{lease.name || `Lease #${lease.id}`}
-				</span>
+				<div class="flex items-center">
+					<span class="text-base font-bold truncate text-slate-800 transition-colors leading-tight block">
+						{lease.name || `Lease #${lease.id}`}
+					</span>
+					{#if securityDepositStatus.show}
+						<div 
+							class="inline-flex items-center justify-center w-4 h-4 {securityDepositStatus.bgColor} rounded-full ml-2 flex-shrink-0" 
+							title={securityDepositStatus.tooltip}
+						>
+							<Shield class="w-2.5 h-2.5 text-white" />
+						</div>
+					{/if}
+				</div>
 			</div>
 
 			<!-- Profile Pictures -->
@@ -324,7 +388,7 @@
 							{@const profileUrl =
 								(tenantData as any).profile_picture_url || matchedTenant?.profile_picture_url}
 							<div
-								class="w-10 h-10 rounded-full border-2 border-white shadow-sm flex-shrink-0 {index > 0 ? '-ml-2.5' : ''}"
+								class="w-14 h-14 rounded-full border-2 border-white shadow-sm flex-shrink-0 {index > 0 ? '-ml-3.5' : ''}"
 								style="z-index: {lease.lease_tenants.length - index}"
 							>
 								{#if profileUrl}

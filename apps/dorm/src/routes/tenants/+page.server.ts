@@ -206,13 +206,13 @@ export const actions: Actions = {
 			name: form.data.name,
 			contact_number: form.data.contact_number || null,
 			email: form.data.email && form.data.email.trim() !== '' ? form.data.email : null,
-            address: (form.data as any).address ?? null,
+			address: form.data.address ?? null,
 			tenant_status: form.data.tenant_status || 'PENDING',
 			emergency_contact: parsedEmergencyContact,
-            profile_picture_url: form.data.profile_picture_url || null,
-            school_or_workplace: (form.data as any).school_or_workplace ?? null,
-            facebook_name: (form.data as any).facebook_name ?? null,
-            birthday: (form.data as any).birthday ?? null
+			profile_picture_url: form.data.profile_picture_url || null,
+			school_or_workplace: form.data.school_or_workplace ?? null,
+			facebook_name: form.data.facebook_name ?? null,
+			birthday: form.data.birthday ?? null
 		};
 
 		console.log('🔄 Create action - Sending to database:', insertData);
@@ -240,7 +240,12 @@ export const actions: Actions = {
 			return fail(400, { form });
 		}
 
-		console.log('🔄 Update action - Received form data:', form.data);
+		console.log('🔄 Update action - Received form data:', {
+			id: form.data.id,
+			name: form.data.name,
+			profile_picture_url: form.data.profile_picture_url,
+			formDataKeys: Object.keys(form.data)
+		});
 
 		// Use the helper function to parse emergency contact
 		const parsedEmergencyContact = parseEmergencyContactFromForm(form.data);
@@ -306,14 +311,14 @@ export const actions: Actions = {
 			name: form.data.name,
 			contact_number: form.data.contact_number || null,
 			email: form.data.email && form.data.email.trim() !== '' ? form.data.email : null,
-            address: (form.data as any).address ?? null,
+			address: form.data.address ?? null,
 			tenant_status: form.data.tenant_status,
 			emergency_contact: parsedEmergencyContact,
 			updated_at: new Date().toISOString(),
-            profile_picture_url: form.data.profile_picture_url || null,
-            school_or_workplace: (form.data as any).school_or_workplace ?? null,
-            facebook_name: (form.data as any).facebook_name ?? null,
-            birthday: (form.data as any).birthday ?? null
+			profile_picture_url: form.data.profile_picture_url || null,
+			school_or_workplace: form.data.school_or_workplace ?? null,
+			facebook_name: form.data.facebook_name ?? null,
+			birthday: form.data.birthday ?? null
 		};
 
 		console.log('🔄 Update action - Sending to database:', updateData);

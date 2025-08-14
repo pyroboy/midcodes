@@ -46,6 +46,107 @@ The application follows SvelteKit's file-based routing with feature-based organi
 - **Reports**: `/reports`, `/lease-report` - various reporting features
 - **Room Management**: `/rental-unit`, `/floors`, `/meters` - physical space management
 
+### Input Components & Form Functionality
+
+The application features sophisticated input handling across different routes:
+
+#### Image Upload with Cropping (`ImageUploadWithCrop.svelte`)
+**Location**: `src/lib/components/ui/ImageUploadWithCrop.svelte`
+**Used in**: Tenant profiles
+
+**Features**:
+- **Deferred Upload Pattern**: Images are cropped and prepared locally, but only uploaded when the parent form is saved
+- **Canvas-Based Cropping**: Circular crop area with real-time preview using HTML5 Canvas
+- **Touch & Mouse Support**: Full mobile/desktop interaction with pan, zoom, and rotation
+- **Performance Optimized**: Large images are automatically scaled during preview for smooth performance
+- **Sequential Processing**: Custom form submission ensures image upload completes before form data submission
+- **State Management**: Tracks unsaved changes to prevent accidental modal closure
+- **Blob URL Management**: Proper cleanup and memory management for image previews
+
+**Usage Pattern**:
+```typescript
+// Deferred upload - image processes on form save
+<ImageUploadWithCrop
+  bind:value={imageDisplayValue}
+  onCropReady={handleCropReady}  // Called when crop is ready
+  onremove={handleRemove}
+  cropSize={{ width: 400, height: 400 }}
+/>
+```
+
+#### Birthday Input (`birthday-input.svelte`)
+**Location**: `src/lib/components/ui/birthday-input.svelte`
+**Used in**: Tenant registration
+
+**Features**:
+- **Three-Field Format**: Separate MM/DD/YYYY inputs for better UX
+- **Smart Navigation**: Auto-advance between fields on completion
+- **Validation**: Real-time date validation with error display
+- **Mobile Optimized**: Numeric input modes and proper keyboard layouts
+
+#### Form Patterns by Route
+
+**Tenant Management (`/tenants`)**:
+- **Profile Pictures**: Advanced image cropping with deferred upload
+- **Emergency Contacts**: Nested object handling with flat form fields
+- **Status Management**: Enum-based status selection with color coding
+- **Contact Information**: Optional email/phone with validation
+- **Address Fields**: Multi-line address inputs with proper formatting
+
+**Lease Management (`/leases`)**:
+- **Tenant Association**: Multi-select tenant assignment with search
+- **Rental Unit Selection**: Hierarchical property → unit selection
+- **Date Management**: Start/end dates with automatic calculation
+- **Billing Integration**: Automatic rent scheduling and security deposit handling
+
+**Property Management (`/properties`)**:
+- **Hierarchical Structure**: Property → Floor → Unit relationships
+- **Configuration Settings**: Property-specific billing and utility settings
+- **Status Management**: Active/inactive property status with cascading effects
+
+**Utility Billing (`/utility-billings`)**:
+- **Meter Readings**: Numeric inputs with automatic consumption calculation
+- **Bulk Operations**: Multi-unit reading entry with validation
+- **Historical Data**: Previous reading display and validation against historical patterns
+
+**Financial Routes (`/payments`, `/transactions`)**:
+- **Amount Inputs**: Currency formatting with PHP locale
+- **Payment Methods**: Method-specific form fields (reference numbers, etc.)
+- **Allocation System**: Payment distribution across multiple billings
+- **Receipt Management**: File upload integration for payment receipts
+
+#### Form Validation & Error Handling
+
+**Validation Strategy**:
+- **Zod Schemas**: Comprehensive validation with TypeScript integration
+- **SuperForms Integration**: Client and server-side validation with `sveltekit-superforms`
+- **Real-time Feedback**: Instant validation feedback during user input
+- **Error Display**: Contextual error messages with red styling and icons
+
+**Common Patterns**:
+```typescript
+// Form initialization with validation
+const { form, errors, enhance } = superForm(initialForm, {
+  validators: zodClient(formSchema),
+  validationMethod: 'onsubmit',
+  resetForm: true
+});
+
+// Error display in components
+{#if $errors.fieldName}
+  <p class="text-sm text-red-500 flex items-center gap-1">
+    <AlertCircle class="w-4 h-4" />
+    {$errors.fieldName}
+  </p>
+{/if}
+```
+
+**Custom Validation Rules**:
+- **Email Uniqueness**: Server-side duplicate checking for tenant emails
+- **Date Relationships**: End dates after start dates, billing periods
+- **Business Logic**: Security deposit amounts, payment allocations
+- **File Constraints**: Image size limits, file type validation
+
 ### Key Components & Libraries
 
 - **UI Components**: Located in `src/lib/components/ui/` using shadcn-svelte
@@ -75,9 +176,10 @@ const displayAmount = formatCurrency(1234.56); // "₱1,234.56"
 
 ### State Management
 
-- **Global Stores**: Configuration, organization, property, and settings stores in `src/lib/stores/`
+- **Global Stores**: Configuration, organization, property, settings, and feature flags stores in `src/lib/stores/`
 - **Form Handling**: sveltekit-superforms for form validation and submission
 - **Data Fetching**: SvelteKit load functions with Supabase queries
+- **Feature Flags**: Configurable feature toggles managed in `src/lib/stores/featureFlags.ts`
 
 ### Important Patterns
 
@@ -94,6 +196,62 @@ const displayAmount = formatCurrency(1234.56); // "₱1,234.56"
 3. **Database Operations**: Use the Supabase client with proper error handling and type safety
 
 4. **Form Validation**: Use Zod schemas with sveltekit-superforms for consistent validation
+
+## Feature Flags
+
+The application includes a feature flag system for controlling the visibility of features without code changes.
+
+### Implementation
+
+**Store Location**: `src/lib/stores/featureFlags.ts`
+
+The feature flag store provides:
+- Persistent storage via localStorage
+- TypeScript type safety
+- Helper methods for common operations
+- Environment variable support (future)
+
+### Current Features
+
+- **Security Deposit Indicator**: Shows a green shield icon on lease cards when all security deposit billings are fully paid
+  - **Default**: Enabled
+  - **Location**: Lease cards in desktop and mobile layouts
+  - **Helper Function**: `isSecurityDepositFullyPaid()` in `src/lib/utils/lease.ts`
+
+### Usage Pattern
+
+```typescript
+import { featureFlags } from '$lib/stores/featureFlags';
+
+// In component
+let showFeature = $derived($featureFlags.showSecurityDepositIndicator);
+
+// Conditional rendering
+{#if showFeature}
+  <!-- Feature content -->
+{/if}
+```
+
+### Management
+
+Feature flags can be toggled programmatically:
+
+```typescript
+import { featureFlags } from '$lib/stores/featureFlags';
+
+// Toggle specific feature
+featureFlags.toggleSecurityDepositIndicator();
+
+// Set specific value
+featureFlags.setSecurityDepositIndicator(true);
+```
+
+### Adding New Features
+
+1. Update `FeatureFlags` interface in `featureFlags.ts`
+2. Add default value in `getInitialFeatureFlags()`
+3. Add helper methods if needed
+4. Use the flag in components with conditional rendering
 
 ## Test Structure
 
