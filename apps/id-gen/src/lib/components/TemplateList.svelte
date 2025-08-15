@@ -1,19 +1,23 @@
 <script lang="ts">
     import { fade } from 'svelte/transition';
     import { Button } from "$lib/components/ui/button";
-    import { Copy, Trash2, Edit } from 'lucide-svelte';
+    import { Copy, Trash2, Edit, Plus } from 'lucide-svelte';
     import type { TemplateData } from '../stores/templateStore';
     import { goto } from '$app/navigation';
     import { invalidate } from '$app/navigation';
+    import SizeSelectionDialog from './SizeSelectionDialog.svelte';
+    import type { CardSize } from '$lib/utils/sizeConversion';
     
 
     let { 
         templates = $bindable([]),
-        onSelect
+        onSelect,
+        onCreateNew
      } = $props();
     let selectedTemplate: TemplateData | null = null;
     let notification: string | null = $state(null);
     let hoveredTemplate: string | null = $state(null);
+    let showSizeDialog: boolean = $state(false);
     
 
 
@@ -133,11 +137,29 @@
                 break;
         }
     }
+
+    function handleCreateNew() {
+        showSizeDialog = true;
+    }
+
+    function handleSizeSelected(event: CustomEvent<{ cardSize: CardSize; templateName: string }>) {
+        const { cardSize, templateName } = event.detail;
+        showSizeDialog = false;
+        onCreateNew?.(cardSize, templateName);
+    }
+
+    function handleSizeSelectionCancel() {
+        showSizeDialog = false;
+    }
 </script>
 
 <div class="h-full w-full overflow-y-auto bg-background p-6">
-    <div class="mb-8">
+    <div class="mb-8 flex items-center justify-between">
         <h2 class="text-2xl font-bold tracking-tight">Templates</h2>
+        <Button onclick={handleCreateNew} class="flex items-center gap-2">
+            <Plus class="h-4 w-4" />
+            Create New Template
+        </Button>
     </div>
     
     <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
@@ -205,6 +227,13 @@
         {/each}
     </div>
 </div>
+
+<!-- Size Selection Dialog -->
+<SizeSelectionDialog 
+    bind:open={showSizeDialog}
+    on:sizeSelected={handleSizeSelected}
+    on:cancel={handleSizeSelectionCancel}
+/>
 
 {#if notification}
     <div 

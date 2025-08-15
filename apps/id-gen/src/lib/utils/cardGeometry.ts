@@ -9,11 +9,15 @@ export interface CardGeometry {
 let cachedGeometry: CardGeometry | null = null;
 
 export function createRoundedRectCard(width = 2, height = 1.25, depth = 0.007, radius = 0.08): CardGeometry {
-    // Return cached geometry if it exists
-    if (cachedGeometry) {
-        console.log('[CardGeometry] Using cached geometry');
-        return cachedGeometry;
-    }
+    // Create a unique cache key based on dimensions
+    const cacheKey = `${width}-${height}-${depth}-${radius}`;
+    
+    // For now, disable caching to support dynamic sizing
+    // TODO: Implement proper cache with dimension-based keys
+    // if (cachedGeometry) {
+    //     console.log('[CardGeometry] Using cached geometry');
+    //     return cachedGeometry;
+    // }
 
     console.log('[CardGeometry] Creating new card geometry');
     const roundedRectShape = new THREE.Shape();
@@ -66,14 +70,14 @@ export function createRoundedRectCard(width = 2, height = 1.25, depth = 0.007, r
         curveSegments: 32
     };
 
-    const geometry = new THREE.ExtrudeGeometry(roundedRectShape, extrudeSettings);
+    const extrudeGeometry = new THREE.ExtrudeGeometry(roundedRectShape, extrudeSettings);
 
     const frontGeometry = new THREE.BufferGeometry();
     const backGeometry = new THREE.BufferGeometry();
     const edgeGeometry = new THREE.BufferGeometry();
 
-    const position = geometry.getAttribute('position');
-    const normal = geometry.getAttribute('normal');
+    const position = extrudeGeometry.getAttribute('position');
+    const normal = extrudeGeometry.getAttribute('normal');
 
     const frontPositions = [];
     const frontNormals = [];
@@ -118,15 +122,15 @@ export function createRoundedRectCard(width = 2, height = 1.25, depth = 0.007, r
     edgeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(edgePositions, 3));
     edgeGeometry.setAttribute('normal', new THREE.Float32BufferAttribute(edgeNormals, 3));
 
-    // Cache the geometry for future use
-    cachedGeometry = {
+    // Create the geometry object (caching disabled for dynamic sizing)
+    const cardGeometry = {
         frontGeometry,
         backGeometry,
         edgeGeometry
     };
 
-    console.log('[CardGeometry] Card geometry created and cached successfully');
-    return cachedGeometry;
+    console.log('[CardGeometry] Card geometry created successfully', { width, height, depth, radius });
+    return cardGeometry;
 }
 
 export function getCardGeometry(): CardGeometry | null {
@@ -135,4 +139,33 @@ export function getCardGeometry(): CardGeometry | null {
 
 export function preloadCardGeometry(): CardGeometry {
     return createRoundedRectCard();
+}
+
+/**
+ * Convert card size in inches to 3D world units
+ * Uses a scale factor to convert real-world dimensions to Three.js units
+ */
+export function cardSizeTo3D(widthInches: number, heightInches: number, scaleInchesToUnits: number = 0.5): { width: number; height: number } {
+    return {
+        width: widthInches * scaleInchesToUnits,
+        height: heightInches * scaleInchesToUnits
+    };
+}
+
+/**
+ * Create card geometry from real-world dimensions
+ */
+export function createCardFromInches(
+    widthInches: number, 
+    heightInches: number, 
+    depth = 0.007, 
+    scaleInchesToUnits: number = 0.5
+): CardGeometry {
+    const { width, height } = cardSizeTo3D(widthInches, heightInches, scaleInchesToUnits);
+    
+    // Calculate radius proportional to the smaller dimension
+    const minDimension = Math.min(width, height);
+    const radius = minDimension * 0.04; // 4% of smaller dimension for corner radius
+    
+    return createRoundedRectCard(width, height, depth, radius);
 }

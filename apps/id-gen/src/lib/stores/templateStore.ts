@@ -41,6 +41,10 @@ export interface TemplateData {
     template_elements: TemplateElement[];
     created_at: string;
     updated_at?: string;
+    // New fields for flexible sizing
+    width_inches?: number;
+    height_inches?: number;
+    dpi?: number;
 }
 
 function createTemplateStore() {
@@ -53,7 +57,11 @@ function createTemplateStore() {
         orientation: 'landscape',
         template_elements: [],
         created_at: new Date().toISOString(),
-        org_id: ''
+        org_id: '',
+        // Default values for new size fields
+        width_inches: 3.375, // Credit card width
+        height_inches: 2.125, // Credit card height
+        dpi: 300
     });
 
     return {
@@ -72,7 +80,11 @@ function createTemplateStore() {
             orientation: 'landscape',
             template_elements: [],
             created_at: new Date().toISOString(),
-            org_id: ''
+            org_id: '',
+            // Default values for new size fields
+            width_inches: 3.375, // Credit card width
+            height_inches: 2.125, // Credit card height
+            dpi: 300
         })
     };
 }

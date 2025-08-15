@@ -6,6 +6,8 @@
     import { uploadImage } from '$lib/database';
     import { pushState } from '$app/navigation';
     import type { TemplateData, TemplateElement } from '$lib/stores/templateStore';
+    import type { CardSize } from '$lib/utils/sizeConversion';
+    import { cardSizeToPixels, DEFAULT_DPI } from '$lib/utils/sizeConversion';
 
     // data means get data from server
     let { data } = $props();
@@ -25,6 +27,9 @@
     let frontElements: TemplateElement[] = $state([]);
     let backElements: TemplateElement[] = $state([]);
 
+    // Current template size info
+    let currentCardSize: CardSize | null = $state(null);
+    let requiredPixelDimensions: { width: number; height: number } | null = $state(null);
 
     // Add view mode state
     let isLoading = $state(false);
@@ -59,8 +64,15 @@
                 img.src = url;
             });
 
-            if (img.width !== 1013 || img.height !== 638) {
-                errorMessage = `${side.charAt(0).toUpperCase() + side.slice(1)} background must be exactly 1013x638 pixels.`;
+            // Use dynamic dimensions if available, otherwise fall back to legacy size
+            const expectedWidth = requiredPixelDimensions?.width || 1013;
+            const expectedHeight = requiredPixelDimensions?.height || 638;
+
+            if (img.width !== expectedWidth || img.height !== expectedHeight) {
+                const sizeInfo = currentCardSize 
+                    ? `${currentCardSize.widthInches}" × ${currentCardSize.heightInches}" (${expectedWidth}px × ${expectedHeight}px)`
+                    : `${expectedWidth}px × ${expectedHeight}px`;
+                errorMessage = `${side.charAt(0).toUpperCase() + side.slice(1)} background must be exactly ${sizeInfo}.`;
                 return false;
             }
 
@@ -199,6 +211,33 @@
                 backPreview = data.selectedTemplate.back_background;
                 frontElements = (data.selectedTemplate.template_elements as TemplateElement[]).filter(el => el.side === 'front');
                 backElements = (data.selectedTemplate.template_elements as TemplateElement[]).filter(el => el.side === 'back');
+                
+                // Set size data for existing template
+                if (data.selectedTemplate.width_pixels && data.selectedTemplate.height_pixels) {
+                    // Template has new size fields
+                    currentCardSize = {
+                        name: data.selectedTemplate.name,
+                        width: data.selectedTemplate.unit_width || data.selectedTemplate.width_pixels,
+                        height: data.selectedTemplate.unit_height || data.selectedTemplate.height_pixels,
+                        unit: (data.selectedTemplate.unit_type as any) || 'pixels'
+                    };
+                    requiredPixelDimensions = {
+                        width: data.selectedTemplate.width_pixels,
+                        height: data.selectedTemplate.height_pixels
+                    };
+                } else {
+                    // Legacy template - use hardcoded dimensions
+                    currentCardSize = {
+                        name: 'Legacy Template',
+                        width: 1013,
+                        height: 638,
+                        unit: 'pixels' as const
+                    };
+                    requiredPixelDimensions = {
+                        width: 1013,
+                        height: 638
+                    };
+                }
             }
 
 
@@ -249,6 +288,47 @@
         console.log('✅ EditTemplate: Form cleared');
     }
 
+    function handleCreateNewTemplate(cardSize: CardSize, templateName: string) {
+        // Set up new template creation
+        currentCardSize = cardSize;
+        requiredPixelDimensions = cardSizeToPixels(cardSize, DEFAULT_DPI);
+        
+        // Create new template with card size information
+        currentTemplate = {
+            id: crypto.randomUUID(),
+            user_id: user?.id ?? '',
+            name: templateName,
+            front_background: '',
+            back_background: '',
+            orientation: cardSize.widthInches >= cardSize.heightInches ? 'landscape' : 'portrait',
+            template_elements: [],
+            created_at: new Date().toISOString(),
+            org_id: org_id ?? '',
+            // Add size information for new templates
+            width_inches: cardSize.widthInches,
+            height_inches: cardSize.heightInches,
+            dpi: DEFAULT_DPI
+        };
+
+        // Clear existing data
+        frontBackground = null;
+        backBackground = null;
+        frontPreview = null;
+        backPreview = null;
+        frontElements = [];
+        backElements = [];
+        errorMessage = '';
+
+        // Enter edit mode
+        isEditMode = true;
+        
+        console.log('✅ New template created:', {
+            name: templateName,
+            cardSize: cardSize,
+            pixelDimensions: requiredPixelDimensions
+        });
+    }
+
     onMount(() => {
         const handlePopState = (event: PopStateEvent) => {
             if (isEditMode) {
@@ -272,74 +352,26 @@
         {#if !isEditMode}
             <TemplateList 
                 templates={templates??[]} 
-                onSelect={(id: string) => handleTemplateSelect(id)} 
+                onSelect={(id: string) => handleTemplateSelect(id)}
+                onCreateNew={handleCreateNewTemplate}
             />
         {:else}
-            <div class="template-form-container active">
-                <div class="back-button-container">
-                    <button 
-                        onclick={handleBack}
-                        class="back-button inline-flex items-center text-lg dark:text-gray-300 text-gray-700 hover:text-primary dark:hover:text-primary-400"
-                    >
-                        <svg 
-                            xmlns="http://www.w3.org/2000/svg" 
-                            viewBox="0 0 24 24" 
-                            fill="none" 
-                            stroke="currentColor" 
-                            class="w-6 h-6 mr-2"
-                            stroke-width="2.5" 
-                            stroke-linecap="round" 
-                            stroke-linejoin="round"
-                        >
-                            <path d="M19 12H5M12 19l-7-7 7-7"/>
-                        </svg>
-                        Back
-                    </button>
-                </div>
-
-                <div class="template-content">
-                    <h1 class="text-2xl font-bold mb-6">Edit Template</h1>
-
-                    {#if isLoading}
-                        <div class="animate-pulse space-y-8">
-                            <!-- Skeleton for front template form -->
-                            <div class="space-y-4">
-                                <div class="h-8 bg-gray-200 rounded w-1/4"></div>
-                                <div class="h-64 bg-gray-200 rounded"></div>
-                                <div class="space-y-2">
-                                    <div class="h-4 bg-gray-200 rounded w-1/3"></div>
-                                    <div class="h-4 bg-gray-200 rounded w-1/4"></div>
-                                </div>
-                            </div>
-
-                            <!-- Skeleton for back template form -->
-                            <div class="space-y-4">
-                                <div class="h-8 bg-gray-200 rounded w-1/4"></div>
-                                <div class="h-64 bg-gray-200 rounded"></div>
-                                <div class="space-y-2">
-                                    <div class="h-4 bg-gray-200 rounded w-1/3"></div>
-                                    <div class="h-4 bg-gray-200 rounded w-1/4"></div>
-                                </div>
-                            </div>
-                        </div>
-                    {:else}
-                        <TemplateEdit 
-                            {isLoading}
-                            {frontElements}
-                            {backElements}
-                            {frontPreview}
-                            {backPreview}
-                            {errorMessage}
-                            onBack={handleBack}
-                            onSave={saveTemplate}
-                            onClear={clearForm}
-                            onUpdateElements={(elements, side) => updateElements(elements, side)}
-                            onImageUpload={(files, side) => handleImageUpload(files, side)}
-                            onRemoveImage={(side) => handleRemoveImage(side)}
-                        />
-                    {/if}
-                </div>
-            </div>
+            <TemplateEdit 
+                {isLoading}
+                {frontElements}
+                {backElements}
+                {frontPreview}
+                {backPreview}
+                {errorMessage}
+                cardSize={currentCardSize}
+                pixelDimensions={requiredPixelDimensions}
+                onBack={handleBack}
+                onSave={saveTemplate}
+                onClear={clearForm}
+                onUpdateElements={(elements, side) => updateElements(elements, side)}
+                onImageUpload={(files, side) => handleImageUpload(files, side)}
+                onRemoveImage={(side) => handleRemoveImage(side)}
+            />
         {/if}
     </div>
 </main>

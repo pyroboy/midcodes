@@ -14,13 +14,41 @@
         elements,
         onUpdateElements, // (elements:TemplateElement[], side: 'front' | 'back')
         onImageUpload, // (files: File[], side: 'front' | 'back')
-        onRemoveImage  // (side: 'front' | 'back')
+        onRemoveImage,  // (side: 'front' | 'back')
+        // New props for dynamic sizing
+        cardSize = null,
+        pixelDimensions = null
     }= $props();
 
 
     // let currentElements = $state(elements);
-    const BASE_WIDTH = 506.5;
-    const BASE_HEIGHT = 319;
+    // Legacy dimensions for fallback
+    const LEGACY_WIDTH = 506.5;
+    const LEGACY_HEIGHT = 319;
+    const BASE_WIDTH = 1013;
+    const BASE_HEIGHT = 638;
+    
+    // Calculate dynamic base dimensions
+    let baseDimensions = $derived(() => {
+        if (pixelDimensions) {
+            // Use actual pixel dimensions, scaled down for UI
+            const maxWidth = 600; // Max width for preview
+            const scale = Math.min(maxWidth / pixelDimensions.width, maxWidth / pixelDimensions.height);
+            return {
+                width: pixelDimensions.width * scale,
+                height: pixelDimensions.height * scale,
+                actualWidth: pixelDimensions.width,
+                actualHeight: pixelDimensions.height
+            };
+        }
+        // Fallback to legacy dimensions
+        return {
+            width: LEGACY_WIDTH,
+            height: LEGACY_HEIGHT,
+            actualWidth: 1013,
+            actualHeight: 638
+        };
+    });
 
 
 
@@ -34,18 +62,19 @@
     let fontOptions: string[] = $state([]);
     let fontsLoaded = false;
     let previewDimensions = $state({
-        width: BASE_WIDTH,
-        height: BASE_HEIGHT,
+        width: LEGACY_WIDTH,
+        height: LEGACY_HEIGHT,
         scale: 1
     });
 
     function updatePreviewDimensions() {
         if (!templateContainer?.parentElement) return;
 
+        const currentBase = baseDimensions();
         const parentWidth = templateContainer.parentElement.offsetWidth;
-        const containerWidth = Math.min(parentWidth, BASE_WIDTH);
-        const containerHeight = (containerWidth / BASE_WIDTH) * BASE_HEIGHT;
-        const scale = containerWidth / BASE_WIDTH;
+        const containerWidth = Math.min(parentWidth, currentBase.width);
+        const containerHeight = (containerWidth / currentBase.width) * currentBase.height;
+        const scale = containerWidth / currentBase.width;
 
         previewDimensions = {
             width: containerWidth,
@@ -415,7 +444,8 @@ const defaultBackElements: TemplateElement[] = [
 <div class="template-section">
     <h2 class="text-2xl font-semibold mb-4 text-foreground">{side.charAt(0).toUpperCase() + side.slice(1)} Template</h2>
     <div class="template-layout">
-        <div class="preview-container">
+        <div class="preview-container" 
+             style="max-width: {baseDimensions().width}px; aspect-ratio: {baseDimensions().width}/{baseDimensions().height};">
             <div 
                 class="template-container {side} group" 
                 class:has-preview={preview}
@@ -430,7 +460,15 @@ const defaultBackElements: TemplateElement[] = [
                                 <Plus class="w-4 h-4 text-primary absolute -right-1 -bottom-1" />
                             </div>
                             <h3 class="text-lg font-medium text-foreground/80 mb-1">Add Template Background</h3>
-                            <p class="text-sm text-muted-foreground mb-4">Recommended size: 1013x638 pixels</p>
+                            <p class="text-sm text-muted-foreground mb-4">
+                                Required size: {baseDimensions().actualWidth}×{baseDimensions().actualHeight} pixels
+                                {#if cardSize}
+                                    <br>
+                                    <span class="text-xs">
+                                        ({cardSize.width}{cardSize.unit === 'inches' ? '"' : cardSize.unit === 'mm' ? 'mm' : cardSize.unit === 'cm' ? 'cm' : 'px'} × {cardSize.height}{cardSize.unit === 'inches' ? '"' : cardSize.unit === 'mm' ? 'mm' : cardSize.unit === 'cm' ? 'cm' : 'px'} at 300 DPI)
+                                    </span>
+                                {/if}
+                            </p>
                             <label class="upload-button">
                                 <input type="file" accept="image/*" onchange={(e) => onImageUpload(e,side)} />
                                 <span class="upload-text">
@@ -514,15 +552,15 @@ const defaultBackElements: TemplateElement[] = [
     }
 
     .preview-container {
-        flex: 0 0 506.5px;
-        max-width: 506.5px;
+        flex: 0 0 600px;
+        max-width: 600px;
     }
 }
 
 .preview-container {
     width: 100%;
-    max-width: 506.5px;
-    aspect-ratio: 506.5/319;
+    max-width: 600px;
+    /* aspect-ratio is now set dynamically via style attribute */
     position: relative;
     background: var(--background);
 }

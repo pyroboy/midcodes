@@ -15,6 +15,9 @@
     export let onUpdateElements: (elements: TemplateElement[], side: 'front' | 'back') => void;
     export let onImageUpload: (files: File[], side: 'front' | 'back') => void;
     export let onRemoveImage: (side: 'front' | 'back') => void;
+    // New props for size information
+    export let cardSize: any = null;
+    export let pixelDimensions: { width: number; height: number } | null = null;
 </script>
 
 <div class="template-form-container active">
@@ -40,7 +43,23 @@
     </div>
 
     <div class="template-content">
-        <h1 class="text-2xl font-bold mb-6">Edit Template</h1>
+        <h1 class="text-2xl font-bold mb-2">Edit Template</h1>
+        
+        {#if cardSize && pixelDimensions}
+            <div class="mb-6 p-3 bg-muted/50 rounded-lg border">
+                <div class="text-sm text-muted-foreground">
+                    <strong class="text-foreground">Card Size:</strong> 
+                    {#if cardSize.unit}
+                        {cardSize.width}{cardSize.unit === 'inches' ? '"' : cardSize.unit === 'mm' ? 'mm' : cardSize.unit === 'cm' ? 'cm' : 'px'} × {cardSize.height}{cardSize.unit === 'inches' ? '"' : cardSize.unit === 'mm' ? 'mm' : cardSize.unit === 'cm' ? 'cm' : 'px'}
+                    {:else}
+                        {cardSize.widthInches || cardSize.width}" × {cardSize.heightInches || cardSize.height}"
+                    {/if}
+                    <span class="ml-2 text-xs">
+                        ({pixelDimensions.width}px × {pixelDimensions.height}px at 300 DPI)
+                    </span>
+                </div>
+            </div>
+        {/if}
 
         {#if isLoading}
             <div class="animate-pulse space-y-8">
@@ -70,6 +89,8 @@
                     side="front"
                     elements={frontElements}
                     preview={frontPreview}
+                    cardSize={cardSize}
+                    pixelDimensions={pixelDimensions}
                     onUpdateElements={(elements:TemplateElement[], side: 'front' | 'back') => onUpdateElements(elements, side)}
                     onImageUpload={(files:File[],side: 'front' | 'back') => onImageUpload(files, side)}
                     onRemoveImage={(side: 'front' | 'back') => onRemoveImage(side)}
@@ -80,6 +101,8 @@
                     side="back"
                     elements={backElements}
                     preview={backPreview}
+                    cardSize={cardSize}
+                    pixelDimensions={pixelDimensions}
                     onUpdateElements={(elements:TemplateElement[], side: 'front' | 'back') => onUpdateElements(elements, side)}
                     onImageUpload={(files:File[],side: 'front' | 'back') => onImageUpload(files, side)}
                     onRemoveImage={(side: 'front' | 'back') => onRemoveImage(side)}
