@@ -199,10 +199,7 @@
         try {
             isEditMode = true;
             
-            // Push state when entering edit mode
-            pushState( `/templates?id=${id}`,{ editing: true });
-            
-            // Navigate to new URL
+            // Navigate to new URL (this will handle state properly)
             await goto(`/templates?id=${id}`, { replaceState: true });
             
             if (data.selectedTemplate) {

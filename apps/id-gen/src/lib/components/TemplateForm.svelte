@@ -5,6 +5,8 @@
     import { Button } from '$lib/components/ui/button';
     import { Upload, Image, Plus, X } from 'lucide-svelte';
     import { loadGoogleFonts, getAllFontFamilies, isFontLoaded, fonts } from '../config/fonts';
+    import { CoordinateSystem } from '$lib/utils/coordinateSystem';
+    import { createAdaptiveElements } from '$lib/utils/adaptiveElements';
 
 
 
@@ -21,16 +23,13 @@
     }= $props();
 
 
-    // let currentElements = $state(elements);
     // Legacy dimensions for fallback
     const LEGACY_WIDTH = 506.5;
     const LEGACY_HEIGHT = 319;
-    const BASE_WIDTH = 1013;
-    const BASE_HEIGHT = 638;
     
     // Calculate dynamic base dimensions
     let baseDimensions = $derived(() => {
-        if (pixelDimensions) {
+        if (pixelDimensions && pixelDimensions.width > 0 && pixelDimensions.height > 0) {
             // Use actual pixel dimensions, scaled down for UI
             const maxWidth = 600; // Max width for preview
             const scale = Math.min(maxWidth / pixelDimensions.width, maxWidth / pixelDimensions.height);
@@ -41,7 +40,7 @@
                 actualHeight: pixelDimensions.height
             };
         }
-        // Fallback to legacy dimensions
+        // Fallback to legacy dimensions for existing templates
         return {
             width: LEGACY_WIDTH,
             height: LEGACY_HEIGHT,
@@ -66,6 +65,57 @@
         height: LEGACY_HEIGHT,
         scale: 1
     });
+    
+    // Calculate background positioning to align with elements
+    let backgroundInfo = $derived(() => {
+        const currentBase = baseDimensions();
+        const container = previewDimensions;
+        
+        // Calculate how background-size: cover affects the image
+        const backgroundAspect = currentBase.actualWidth / currentBase.actualHeight;
+        const containerAspect = container.width / container.height;
+        
+        let bgScale, bgOffsetX = 0, bgOffsetY = 0;
+        
+        if (backgroundAspect > containerAspect) {
+            // Background is wider - height fits, width is cropped
+            bgScale = container.height / currentBase.actualHeight;
+            const scaledBgWidth = currentBase.actualWidth * bgScale;
+            bgOffsetX = (container.width - scaledBgWidth) / 2; // Negative if cropped
+        } else {
+            // Background is taller - width fits, height is cropped  
+            bgScale = container.width / currentBase.actualWidth;
+            const scaledBgHeight = currentBase.actualHeight * bgScale;
+            bgOffsetY = (container.height - scaledBgHeight) / 2; // Negative if cropped
+        }
+        
+        // Debug background positioning (remove in production)
+        // console.log('📱 Background positioning:', {
+        //     currentBase, container, backgroundAspect, containerAspect,
+        //     bgScale, bgOffsetX, bgOffsetY
+        // });
+        
+        return { bgScale, bgOffsetX, bgOffsetY };
+    });
+
+    // Unified coordinate system
+    let coordSystem = $derived(() => {
+        const currentBase = baseDimensions();
+        const scale = previewDimensions.scale || 1; // Use original scale, not background scale
+        
+        if (!currentBase || !currentBase.actualWidth || !currentBase.actualHeight) {
+            // Fallback to legacy dimensions
+            // console.log('Using legacy dimensions:', 1013, 638, scale);
+            return new CoordinateSystem(1013, 638, scale);
+        }
+        
+        // console.log('Using pixel dimensions:', currentBase.actualWidth, currentBase.actualHeight, scale);
+        return new CoordinateSystem(
+            currentBase.actualWidth,
+            currentBase.actualHeight, 
+            scale
+        );
+    });
 
     function updatePreviewDimensions() {
         if (!templateContainer?.parentElement) return;
@@ -75,6 +125,14 @@
         const containerWidth = Math.min(parentWidth, currentBase.width);
         const containerHeight = (containerWidth / currentBase.width) * currentBase.height;
         const scale = containerWidth / currentBase.width;
+
+        // Debug dimensions (remove in production)
+        // console.log('🔍 Dimensions Debug:', {
+        //     parentWidth, currentBase, containerWidth, containerHeight, scale,
+        //     templateContainerSize: templateContainer ? {
+        //         width: templateContainer.offsetWidth, height: templateContainer.offsetHeight
+        //     } : 'not available'
+        // });
 
         previewDimensions = {
             width: containerWidth,
@@ -87,7 +145,13 @@
 
     onMount(() => {
         if (elements.length === 0) {
-            elements = side === 'front' ? [...defaultFrontElements] : [...defaultBackElements];
+            const currentBase = baseDimensions();
+            elements = createAdaptiveElements(
+                currentBase.actualWidth,
+                currentBase.actualHeight,
+                side,
+                'aspect-ratio'
+            );
         }
         
         loadGoogleFonts().then(() => {
@@ -121,8 +185,9 @@
             if (i === index) {
                 let newEl = { ...el, side };
                 if (templateContainer) {
-                    const maxX = BASE_WIDTH - (newEl.width || 0);
-                    const maxY = BASE_HEIGHT - (newEl.height || 0);
+                    const bounds = coordSystem().getStorageBounds();
+                    const maxX = bounds.width - (newEl.width || 0);
+                    const maxY = bounds.height - (newEl.height || 0);
 
                     newEl.x = Math.min(Math.max(x, 0), maxX);
                     newEl.y = Math.min(Math.max(y, 0), maxY);
@@ -160,14 +225,15 @@
         const dx = event.clientX - startX;
         const dy = event.clientY - startY;
 
-        const scaledDx = dx / previewDimensions.scale;
-        const scaledDy = dy / previewDimensions.scale;
+        // Use coordinate system for mouse movement conversion
+        const storageDelta = coordSystem().scaleMouseDelta(dx, dy);
 
         const element = elements[currentElementIndex];
         if (!element) return;
 
         const updatedElements = [...elements];
         const updatedElement = { ...element };
+        const bounds = coordSystem().getStorageBounds();
 
         if (isResizing && element.width !== undefined && element.height !== undefined) {
             let newWidth = element.width;
@@ -177,41 +243,51 @@
 
             switch (resizeHandle) {
                 case 'top-left':
-                    newWidth -= scaledDx;
-                    newHeight -= scaledDy;
-                    newX += scaledDx;
-                    newY += scaledDy;
+                    newWidth -= storageDelta.x;
+                    newHeight -= storageDelta.y;
+                    newX += storageDelta.x;
+                    newY += storageDelta.y;
                     break;
                 case 'top-right':
-                    newWidth += scaledDx;
-                    newHeight -= scaledDy;
-                    newY += scaledDy;
+                    newWidth += storageDelta.x;
+                    newHeight -= storageDelta.y;
+                    newY += storageDelta.y;
                     break;
                 case 'bottom-left':
-                    newWidth -= scaledDx;
-                    newHeight += scaledDy;
-                    newX += scaledDx;
+                    newWidth -= storageDelta.x;
+                    newHeight += storageDelta.y;
+                    newX += storageDelta.x;
                     break;
                 case 'bottom-right':
-                    newWidth += scaledDx;
-                    newHeight += scaledDy;
+                    newWidth += storageDelta.x;
+                    newHeight += storageDelta.y;
                     break;
             }
 
-            newX = Math.max(0, Math.min(newX, BASE_WIDTH - newWidth));
-            newY = Math.max(0, Math.min(newY, BASE_HEIGHT - newHeight));
+            // Constrain to bounds using coordinate system
+            const constrainedPos = coordSystem().constrainToStorage(
+                { x: newX, y: newY },
+                { width: Math.max(20, newWidth), height: Math.max(20, newHeight) }
+            );
 
-            updatedElement.x = newX;
-            updatedElement.y = newY;
+            updatedElement.x = constrainedPos.x;
+            updatedElement.y = constrainedPos.y;
             updatedElement.width = Math.max(20, newWidth);
             updatedElement.height = Math.max(20, newHeight);
         } else {
             // Just update position during dragging, maintain original size
-            const newX = Math.max(0, Math.min((element.x || 0) + scaledDx, BASE_WIDTH - (element.width || 0)));
-            const newY = Math.max(0, Math.min((element.y || 0) + scaledDy, BASE_HEIGHT - (element.height || 0)));
+            const newPos = {
+                x: (element.x || 0) + storageDelta.x,
+                y: (element.y || 0) + storageDelta.y
+            };
             
-            updatedElement.x = newX;
-            updatedElement.y = newY;
+            const constrainedPos = coordSystem().constrainToStorage(
+                newPos,
+                { width: element.width || 0, height: element.height || 0 }
+            );
+            
+            updatedElement.x = constrainedPos.x;
+            updatedElement.y = constrainedPos.y;
         }
 
         updatedElements[currentElementIndex] = updatedElement;
@@ -229,206 +305,61 @@
     }
 
 
-    const defaultFrontElements: TemplateElement[] = [
-    { 
-        id: 'licenseNo',
-        variableName: 'licenseNo', 
-        type: 'text', 
-        content: '75-005-24', 
-        x: 293, 
-        y: 159, 
-        width: 100,
-        height: 20,
-        font: 'Arial', 
-        size: 16, 
-        color: '#000000', 
-        alignment: 'left',
-        side: 'front'
-    },
-    { 
-        id: 'valid',
-        variableName: 'valid', 
-        type: 'text', 
-        content: '01/01/2026', 
-        x: 295, 
-        y: 179, 
-        width: 100,
-        height: 20,
-        font: 'Arial', 
-        size: 16, 
-        color: '#000000', 
-        alignment: 'left',
-        side: 'front'
-    },
-    { 
-        id: 'name',
-        variableName: 'name', 
-        type: 'text', 
-        content: 'Junifer D. Oban', 
-        x: 256, 
-        y: 246, 
-        width: 100,
-        height: 20,
-        font: 'Arial', 
-        size: 21, 
-        color: '#000000', 
-        alignment: 'left',
-        side: 'front'
-    },
-    { 
-        id: 'photo',
-        variableName: 'photo', 
-        type: 'photo', 
-        x: 50, 
-        y: 131, 
-        width: 119,
-        height: 158,
-        side: 'front'
-    },
-    { 
-        id: 'signature',
-        variableName: 'signature', 
-        type: 'signature', 
-        x: 263, 
-        y: 196, 
-        width: 152,
-        height: 65,
-        side: 'front'
-    },
-    { 
-        id: 'idType',
-        variableName: 'idType', 
-        type: 'selection', 
-        options: ['Ministerial License', 'Ordination License', 'Local License'], 
-        x: 198, 
-        y: 131, 
-        width: 100,
-        height: 20,
-        font: 'Arial', 
-        size: 16, 
-        color: '#000000', 
-        alignment: 'left',
-        side: 'front'
-    },
-    { 
-        id: 'position',
-        variableName: 'position', 
-        type: 'selection', 
-        options: ['General Treasurer', 'General Secretary', 'District Superintendent', 'Pastor'], 
-        x: 276, 
-        y: 270, 
-        width: 100,
-        height: 20,
-        font: 'Arial', 
-        size: 16, 
-        color: '#000000', 
-        alignment: 'left',
-        side: 'front'
-    }
-];
 
-const defaultBackElements: TemplateElement[] = [
-    { 
-        id: 'contactName',
-        variableName: 'contactName', 
-        type: 'text', 
-        content: 'Ralph Steven D. Trigo', 
-        x: 113, 
-        y: 36, 
-        width: 100,
-        height: 20,
-        font: 'Arial', 
-        size: 13, 
-        color: '#000000', 
-        alignment: 'left',
-        side: 'back'
-    },
-    { 
-        id: 'addresss',
-        variableName: 'addresss', 
-        type: 'text', 
-        content: 'San Isidro District', 
-        x: 112, 
-        y: 55, 
-        width: 100,
-        height: 20,
-        font: 'Arial', 
-        size: 13, 
-        color: '#000000', 
-        alignment: 'left',
-        side: 'back'
-    },
-    { 
-        id: 'contactNo',
-        variableName: 'contactNo', 
-        type: 'text', 
-        content: '9478920644', 
-        x: 112, 
-        y: 74, 
-        width: 100,
-        height: 20,
-        font: 'Arial', 
-        size: 13, 
-        color: '#000000', 
-        alignment: 'left',
-        side: 'back'
-    },
-    { 
-        id: 'tin',
-        variableName: 'tin', 
-        type: 'text', 
-        content: '943-403-393', 
-        x: 133, 
-        y: 115, 
-        width: 100,
-        height: 20,
-        font: 'Arial', 
-        size: 13, 
-        color: '#000000', 
-        alignment: 'left',
-        side: 'back'
-    },
-    { 
-        id: 'sss',
-        variableName: 'sss', 
-        type: 'text', 
-        content: '943-403-393', 
-        x: 133, 
-        y: 138, 
-        width: 100,
-        height: 20,
-        font: 'Arial', 
-        size: 13, 
-        color: '#000000', 
-        alignment: 'left',
-        side: 'back'
-    }
-];
+    let elementStyle = $derived((element: TemplateElement) => {
+        const currentCoordSystem = coordSystem();
+        const bgInfo = backgroundInfo();
+        
+        // Get base position from coordinate system
+        const baseStyle = currentCoordSystem.createPositionStyle(
+            element.x || 0,
+            element.y || 0,
+            element.width || 0,
+            element.height || 0
+        );
+        
+        // Apply background offset to align with actual background position
+        const adjustedStyle = {
+            ...baseStyle,
+            left: `${parseFloat(baseStyle.left) + bgInfo.bgOffsetX}px`,
+            top: `${parseFloat(baseStyle.top) + bgInfo.bgOffsetY}px`
+        };
+        
+        // Debug element positioning (remove in production)
+        // if ((element.x || 0) < 300 && (element.y || 0) < 200) {
+        //     console.log(`📍 Element "${element.id}" positioning:`, {
+        //         storageCoords: { x: element.x, y: element.y, width: element.width, height: element.height },
+        //         baseStyle, backgroundOffset: { x: bgInfo.bgOffsetX, y: bgInfo.bgOffsetY },
+        //         adjustedStyle, scale: currentCoordSystem.scale
+        //     });
+        // }
+        
+        return adjustedStyle;
+    });
 
-    let elementStyle = $derived((element: TemplateElement) => ({
-        left: `${(element.x || 0) * previewDimensions.scale}px`,
-        top: `${(element.y || 0) * previewDimensions.scale}px`,
-        width: `${((element.width || 0) * previewDimensions.scale)}px`,
-        height: `${((element.height || 0) * previewDimensions.scale)}px`
-    }));
-
-    let textStyle = $derived((element: TemplateElement) => ({
-        'font-family': `"${element.font || 'Arial'}", sans-serif`,
-        'font-weight': element.fontWeight || '400',
-        'font-style': element.fontStyle || 'normal',
-        'font-size': `${((element.size || 16) * previewDimensions.scale)}px`,
-        'color': element.color || '#000000',
-        'text-align': element.alignment || 'left',
-        'text-transform': element.textTransform || 'none',
-        'text-decoration-line': element.textDecoration || 'none',
-        'letter-spacing': element.letterSpacing ? `${element.letterSpacing * previewDimensions.scale}px` : 'normal',
-        'line-height': element.lineHeight || '1.2',
-        'opacity': typeof element.opacity === 'number' ? element.opacity : 1,
-        'display': 'block',
-        'width': '100%',
-        'white-space': 'pre-wrap',
-        'word-break': 'break-word'
-    }));
+    let textStyle = $derived((element: TemplateElement) => {
+        const currentCoordSystem = coordSystem();
+        // Debug coordinate system (remove in production)
+        // console.log('CoordSystem instance:', currentCoordSystem, 'has scale?', typeof currentCoordSystem.scale);
+        const scale = currentCoordSystem.scale;
+        return {
+            'font-family': `"${element.font || 'Arial'}", sans-serif`,
+            'font-weight': element.fontWeight || '400',
+            'font-style': element.fontStyle || 'normal',
+            'font-size': `${((element.size || 16) * scale)}px`,
+            'color': element.color || '#000000',
+            'text-align': element.alignment || 'left',
+            'text-transform': element.textTransform || 'none',
+            'text-decoration-line': element.textDecoration || 'none',
+            'letter-spacing': element.letterSpacing ? `${element.letterSpacing * scale}px` : 'normal',
+            'line-height': element.lineHeight || '1.2',
+            'opacity': typeof element.opacity === 'number' ? element.opacity : 1,
+            'display': 'block',
+            'width': '100%',
+            'white-space': 'pre-wrap',
+            'word-break': 'break-word'
+        };
+    });
 
 
 
