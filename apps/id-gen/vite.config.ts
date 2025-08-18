@@ -11,13 +11,23 @@ export default defineConfig({
 		port: 5173
 	},
 	optimizeDeps: {
-		exclude: ['ws', 'events'],
-		include: ['jszip', 'three', '@threlte/core', '@threlte/extras', 'bits-ui']
+		exclude: ['ws', 'events', '@sveltejs/kit'],
+		include: [
+			'jszip', 
+			'three', 
+			'@threlte/core', 
+			'@threlte/extras',
+			'bits-ui'
+		]
 	},
 	define: {
 		global: 'globalThis'
 	},
 	ssr: {
-		noExternal: ['webfontloader']
+		noExternal: ['webfontloader', '@threlte/core', '@threlte/extras', 'three'],
+		external: ['@sveltejs/kit']
+	},
+	resolve: {
+		dedupe: ['@sveltejs/kit', 'svelte']
 	}
 } as UserConfig);

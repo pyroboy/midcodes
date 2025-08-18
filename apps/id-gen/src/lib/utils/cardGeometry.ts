@@ -1,19 +1,18 @@
-import * as THREE from 'three';
-
 export interface CardGeometry {
-	frontGeometry: THREE.BufferGeometry;
-	backGeometry: THREE.BufferGeometry;
-	edgeGeometry: THREE.BufferGeometry;
+	frontGeometry: any;
+	backGeometry: any;
+	edgeGeometry: any;
 }
 
 let cachedGeometry: CardGeometry | null = null;
 
-export function createRoundedRectCard(
+export async function createRoundedRectCard(
 	width = 2,
 	height = 1.25,
 	depth = 0.007,
 	radius = 0.08
-): CardGeometry {
+): Promise<CardGeometry> {
+	const THREE = await import('three');
 	// Create a unique cache key based on dimensions
 	const cacheKey = `${width}-${height}-${depth}-${radius}`;
 
@@ -126,7 +125,7 @@ export function getCardGeometry(): CardGeometry | null {
 	return cachedGeometry;
 }
 
-export function preloadCardGeometry(): CardGeometry {
+export async function preloadCardGeometry(): Promise<CardGeometry> {
 	return createRoundedRectCard();
 }
 
@@ -148,12 +147,12 @@ export function cardSizeTo3D(
 /**
  * Create card geometry from real-world dimensions
  */
-export function createCardFromInches(
+export async function createCardFromInches(
 	widthInches: number,
 	heightInches: number,
 	depth = 0.007,
 	scaleInchesToUnits: number = 0.5
-): CardGeometry {
+): Promise<CardGeometry> {
 	const { width, height } = cardSizeTo3D(widthInches, heightInches, scaleInchesToUnits);
 
 	// Calculate radius proportional to the smaller dimension
