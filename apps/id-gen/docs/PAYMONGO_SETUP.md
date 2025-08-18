@@ -13,18 +13,21 @@ PayMongo integration requires several environment variables that must be configu
 ## Environment Variables Required
 
 ### Server-Only Variables (Secret)
+
 ```bash
 PAYMONGO_SECRET_KEY=sk_test_...           # Test: sk_test_xxx, Live: sk_live_xxx
 PAYMONGO_WEBHOOK_SECRET=whsec_...         # Webhook signing secret
 ```
 
 ### Public Variables (Safe for Client)
+
 ```bash
-PUBLIC_PAYMONGO_PUBLIC_KEY=pk_test_...    # Test: pk_test_xxx, Live: pk_live_xxx  
+PUBLIC_PAYMONGO_PUBLIC_KEY=pk_test_...    # Test: pk_test_xxx, Live: pk_live_xxx
 PUBLIC_APP_URL=https://yourdomain.com    # Your application's base URL
 ```
 
 ### Configuration Paths
+
 ```bash
 PAYMONGO_CHECKOUT_SUCCESS_PATH=/account/billing/success
 PAYMONGO_CHECKOUT_CANCEL_PATH=/pricing?canceled=1
@@ -69,6 +72,7 @@ PAYMONGO_CHECKOUT_CANCEL_PATH=/pricing?canceled=1
 ### Step 4: Test Configuration
 
 Run your development server:
+
 ```bash
 npm run dev
 ```
@@ -130,14 +134,14 @@ git push origin main
 
 ## Environment Variable Reference
 
-| Variable | Type | Required | Description |
-|----------|------|----------|-------------|
-| `PAYMONGO_SECRET_KEY` | Server-only | ✅ | PayMongo secret API key (sk_test_/sk_live_) |
-| `PAYMONGO_WEBHOOK_SECRET` | Server-only | ✅ | Webhook signature verification secret |
-| `PUBLIC_PAYMONGO_PUBLIC_KEY` | Public | ✅ | PayMongo public key (pk_test_/pk_live_) |
-| `PUBLIC_APP_URL` | Public | ✅ | Base URL of your application |
-| `PAYMONGO_CHECKOUT_SUCCESS_PATH` | Server-only | ✅ | Relative path for successful payments |
-| `PAYMONGO_CHECKOUT_CANCEL_PATH` | Server-only | ✅ | Relative path for cancelled payments |
+| Variable                         | Type        | Required | Description                                 |
+| -------------------------------- | ----------- | -------- | ------------------------------------------- |
+| `PAYMONGO_SECRET_KEY`            | Server-only | ✅       | PayMongo secret API key (sk*test*/sk*live*) |
+| `PAYMONGO_WEBHOOK_SECRET`        | Server-only | ✅       | Webhook signature verification secret       |
+| `PUBLIC_PAYMONGO_PUBLIC_KEY`     | Public      | ✅       | PayMongo public key (pk*test*/pk*live*)     |
+| `PUBLIC_APP_URL`                 | Public      | ✅       | Base URL of your application                |
+| `PAYMONGO_CHECKOUT_SUCCESS_PATH` | Server-only | ✅       | Relative path for successful payments       |
+| `PAYMONGO_CHECKOUT_CANCEL_PATH`  | Server-only | ✅       | Relative path for cancelled payments        |
 
 ## Security Best Practices
 
@@ -150,20 +154,21 @@ git push origin main
 ### 🛡️ Validate Environment on Startup
 
 The application automatically validates:
+
 - Required variables are present
-- Correct key formats (sk_*, pk_*, whsec_*)
+- Correct key formats (sk*\*, pk*_, whsec\__)
 - Proper URL formats
 
 ### 🔄 Use Different Keys for Different Environments
 
-- **Development**: `sk_test_*` and `pk_test_*`  
+- **Development**: `sk_test_*` and `pk_test_*`
 - **Production**: `sk_live_*` and `pk_live_*`
 - **Webhooks**: Separate webhook endpoints and secrets per environment
 
 ### 🌐 Environment-Specific URLs
 
 - **Local**: `http://localhost:5173`
-- **Preview**: `https://your-app-git-branch.vercel.app`  
+- **Preview**: `https://your-app-git-branch.vercel.app`
 - **Production**: `https://yourdomain.com`
 
 ## Troubleshooting
@@ -174,7 +179,7 @@ The application automatically validates:
    - Check that all required environment variables are set
    - Verify variable names match exactly (case-sensitive)
 
-2. **"Environment validation failed"**  
+2. **"Environment validation failed"**
    - Check that secret key starts with `sk_test_` or `sk_live_`
    - Check that public key starts with `pk_test_` or `pk_live_`
    - Check that webhook secret starts with `whsec_`
@@ -204,7 +209,7 @@ Any configuration issues will be displayed with clear error messages during star
 After setting up environment variables:
 
 1. ✅ Configure payment methods in your PayMongo dashboard
-2. ✅ Set up webhook endpoints for your application  
+2. ✅ Set up webhook endpoints for your application
 3. ✅ Test payment flows in development environment
 4. ✅ Deploy and test in production environment
 5. ✅ Monitor webhook deliveries and payment transactions

@@ -6,7 +6,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	// Check if user is authenticated
 	if (!session || !user) {
-		throw redirect(303, '/auth?redirectTo=/profile');
+		throw redirect(303, '/auth?returnTo=/profile');
 	}
 
 	try {
@@ -78,7 +78,6 @@ export const load: PageServerLoad = async ({ locals }) => {
 				cardsCreated: cardsCreated || 0
 			}
 		};
-
 	} catch (err) {
 		console.error('Error loading profile data:', err);
 		throw error(500, 'Failed to load profile data');
@@ -95,14 +94,14 @@ export const actions: Actions = {
 
 		try {
 			const formData = await request.formData();
-			
+
 			// For now, we don't allow email changes via this form
 			// Email updates should go through proper email verification flow
-			
+
 			// Update timestamp
 			const { error: updateError } = await supabase
 				.from('profiles')
-				.update({ 
+				.update({
 					updated_at: new Date().toISOString()
 				})
 				.eq('id', user.id);
@@ -112,14 +111,13 @@ export const actions: Actions = {
 				return fail(500, { error: 'Failed to update profile' });
 			}
 
-			return { 
-				success: true, 
+			return {
+				success: true,
 				message: 'Profile updated successfully',
 				updatedProfile: {
 					updated_at: new Date().toISOString()
 				}
 			};
-
 		} catch (err) {
 			console.error('Error in updateProfile action:', err);
 			return fail(500, { error: 'An unexpected error occurred' });
@@ -165,7 +163,7 @@ export const actions: Actions = {
 
 			const { error: updateError } = await supabase
 				.from('profiles')
-				.update({ 
+				.update({
 					context: updatedContext,
 					updated_at: new Date().toISOString()
 				})
@@ -176,12 +174,11 @@ export const actions: Actions = {
 				return fail(500, { error: 'Failed to update preferences' });
 			}
 
-			return { 
-				success: true, 
+			return {
+				success: true,
 				message: 'Preferences updated successfully',
 				updatedPreferences: updatedContext.preferences
 			};
-
 		} catch (err) {
 			console.error('Error in updatePreferences action:', err);
 			return fail(500, { error: 'An unexpected error occurred' });
@@ -233,11 +230,10 @@ export const actions: Actions = {
 				return fail(500, { error: 'Failed to update password' });
 			}
 
-			return { 
-				success: true, 
-				message: 'Password updated successfully' 
+			return {
+				success: true,
+				message: 'Password updated successfully'
 			};
-
 		} catch (err) {
 			console.error('Error in changePassword action:', err);
 			return fail(500, { error: 'An unexpected error occurred' });
@@ -287,12 +283,13 @@ export const actions: Actions = {
 					updated_at: profile.updated_at,
 					preferences: profile.context?.preferences || {}
 				},
-				idCards: idCards?.map(card => ({
-					id: card.id,
-					template_id: card.template_id,
-					created_at: card.created_at,
-					data: card.data
-				})) || [],
+				idCards:
+					idCards?.map((card) => ({
+						id: card.id,
+						template_id: card.template_id,
+						created_at: card.created_at,
+						data: card.data
+					})) || [],
 				templates: templates || [],
 				statistics: {
 					totalIdCards: idCards?.length || 0,
@@ -306,7 +303,6 @@ export const actions: Actions = {
 				exportData,
 				message: 'Data exported successfully'
 			};
-
 		} catch (err) {
 			console.error('Error in exportData action:', err);
 			return fail(500, { error: 'An unexpected error occurred' });
@@ -348,17 +344,14 @@ export const actions: Actions = {
 					.neq('id', user.id);
 
 				if ((adminCount || 0) === 0) {
-					return fail(400, { 
-						error: 'Cannot delete account: You are the last administrator in your organization' 
+					return fail(400, {
+						error: 'Cannot delete account: You are the last administrator in your organization'
 					});
 				}
 			}
 
 			// Delete profile (this should cascade to related data based on foreign key constraints)
-			const { error: deleteError } = await supabase
-				.from('profiles')
-				.delete()
-				.eq('id', user.id);
+			const { error: deleteError } = await supabase.from('profiles').delete().eq('id', user.id);
 
 			if (deleteError) {
 				console.error('Error deleting profile:', deleteError);
@@ -370,7 +363,6 @@ export const actions: Actions = {
 
 			// Redirect to auth page with message
 			throw redirect(303, '/auth?message=Account deleted successfully');
-
 		} catch (err) {
 			if (err instanceof Error && err.message.includes('redirect')) {
 				throw err; // Re-throw redirects

@@ -26,7 +26,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		// Get usage statistics for the current month
 		const currentMonth = new Date();
 		const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
-		
+
 		const { data: monthlyUsage } = await locals.supabase
 			.from('id_cards')
 			.select('created_at')
@@ -56,7 +56,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			transactions: transactions || [],
 			monthlyUsage: monthlyUsage?.length || 0,
 			totalGenerations: totalGenerations?.length || 0,
-			purchases: purchases || [],
+			purchases: purchases || []
 		};
 	} catch (error) {
 		console.error('Error loading credits data:', error);

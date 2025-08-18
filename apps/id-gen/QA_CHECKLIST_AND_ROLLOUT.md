@@ -1,17 +1,20 @@
 # QA Checklist and Rollout Plan - Payment System with Admin Controls
 
 ## Overview
+
 This document outlines the manual QA testing procedures and deployment strategy for the payment system with admin controls, including payment toggles and bypass functionality.
 
 ## Pre-Rollout Status ✅
 
 ### Database Setup
+
 - ✅ `org_settings` table exists with required columns
 - ✅ `credit_transactions` table for audit trails
 - ✅ User profiles with role-based access control
 - ✅ Super admin user: `arjomagno@gmail.com`
 
 ### Implementation Status
+
 - ✅ Admin dashboard with payment controls (`/admin`)
 - ✅ Credit management page (`/admin/credits`)
 - ✅ Payment remote functions with bypass logic
@@ -26,6 +29,7 @@ This document outlines the manual QA testing procedures and deployment strategy 
 ### 🔐 Super Admin Testing (`role: super_admin`)
 
 #### Access /admin Dashboard
+
 - [ ] **Verify Payment Card Display**
   - Navigate to `/admin`
   - Confirm "Payments" card shows current state (Enabled/Disabled)
@@ -33,6 +37,7 @@ This document outlines the manual QA testing procedures and deployment strategy 
   - Check that toggle controls are visible
 
 #### Test Payment Toggle Security
+
 - [ ] **Invalid Keyword Protection**
   - Type incorrect keyword (e.g., "test", "toggle", "wrong")
   - Confirm toggle button remains disabled
@@ -47,6 +52,7 @@ This document outlines the manual QA testing procedures and deployment strategy 
   - Check browser console for successful API log
 
 #### Test Bypass Functionality
+
 - [ ] **Enable Bypass Mode**
   - With payments disabled, click "Enable Bypass"
   - Confirm button changes to "Disable Bypass"
@@ -62,6 +68,7 @@ This document outlines the manual QA testing procedures and deployment strategy 
   - **Verify**: New record in `credit_transactions` with `metadata.bypass = true`
 
 #### Test Re-enabling Payments
+
 - [ ] **Disable Bypass and Re-enable Payments**
   - Return to `/admin`
   - Click "Disable Bypass"
@@ -70,6 +77,7 @@ This document outlines the manual QA testing procedures and deployment strategy 
   - Verify status shows "Enabled" and bypass shows "Off"
 
 #### Test Credit Management
+
 - [ ] **Manual Credit Adjustment**
   - Navigate to `/admin/credits`
   - Find a test user in the list
@@ -83,6 +91,7 @@ This document outlines the manual QA testing procedures and deployment strategy 
 ### 🏢 Org Admin Testing (`role: org_admin`)
 
 #### Access Control Verification
+
 - [ ] **Limited Admin Access**
   - Login as org_admin user
   - Navigate to `/admin`
@@ -97,6 +106,7 @@ This document outlines the manual QA testing procedures and deployment strategy 
 ### 👤 Regular User Testing (`role: id_gen_user`)
 
 #### Payment Disabled Experience
+
 - [ ] **Pricing Page with Payments Disabled**
   - Ensure payments are disabled via admin panel
   - Login as regular user
@@ -111,6 +121,7 @@ This document outlines the manual QA testing procedures and deployment strategy 
   - **Verify**: No bypass of disabled payment state
 
 #### Normal Payment Experience
+
 - [ ] **Pricing Page with Payments Enabled**
   - Ensure payments are enabled via admin panel
   - Refresh `/pricing` page
@@ -119,6 +130,7 @@ This document outlines the manual QA testing procedures and deployment strategy 
   - **Verify**: Can initiate normal payment flow
 
 #### Credit Usage Verification
+
 - [ ] **Card Generation Still Works**
   - Navigate to card generator
   - Create and generate an ID card
@@ -130,11 +142,13 @@ This document outlines the manual QA testing procedures and deployment strategy 
 ## Rollout Strategy
 
 ### Phase 1: Database Migration ✅
+
 - **Status**: Already deployed
 - **Verification**: `org_settings` table exists with required columns
 - **Rollback**: No action needed (table already exists)
 
 ### Phase 2: Deploy Server Remote Functions
+
 - **Files to deploy**:
   - `src/routes/admin/billing.remote.ts`
   - `src/lib/server/remotes/payments.remote.ts`
@@ -154,6 +168,7 @@ This document outlines the manual QA testing procedures and deployment strategy 
   ```
 
 ### Phase 3: Deploy UI Updates
+
 - **Files to deploy**:
   - `src/routes/admin/+page.svelte`
   - `src/routes/admin/credits/+page.svelte`
@@ -164,6 +179,7 @@ This document outlines the manual QA testing procedures and deployment strategy 
 - **Default behavior**: Payments remain enabled (no downtime)
 
 ### Phase 4: Verification and Monitoring
+
 - [ ] Run full QA checklist
 - [ ] Monitor application logs for errors
 - [ ] Verify no impact on existing user workflows
@@ -173,19 +189,21 @@ This document outlines the manual QA testing procedures and deployment strategy 
 ## Observability and Monitoring
 
 ### Logging Standards ✅
+
 All toggle and manual adjustment operations already emit structured logs:
 
 ```typescript
 console.info('[Payment Command]', {
-  action: 'payment_toggle_changed',
-  userId: user.id,
-  enabled: boolean,
-  updated_by: user.id,
-  timestamp: new Date().toISOString()
+	action: 'payment_toggle_changed',
+	userId: user.id,
+	enabled: boolean,
+	updated_by: user.id,
+	timestamp: new Date().toISOString()
 });
 ```
 
 ### Optional: Admin Audit Table
+
 For enhanced audit trails, consider adding:
 
 ```sql
@@ -202,7 +220,9 @@ CREATE TABLE admin_audit (
 ```
 
 ### Monitoring Alerts
+
 Set up alerts for:
+
 - [ ] Payment toggle changes (especially disabling)
 - [ ] Large manual credit adjustments (>100 credits)
 - [ ] Failed payment processing attempts
@@ -228,7 +248,7 @@ Set up alerts for:
    - No database rollback needed (table already exists)
    - Clear problematic org_settings records if needed:
      ```sql
-     UPDATE org_settings 
+     UPDATE org_settings
      SET payments_enabled = true, payments_bypass = false
      WHERE org_id = '<problematic_org>';
      ```
@@ -238,6 +258,7 @@ Set up alerts for:
 ## Success Criteria
 
 ### ✅ Core Functionality
+
 - [ ] Super admins can toggle payments with keyword protection
 - [ ] Payment bypass works for testing/development
 - [ ] Manual credit management available to super admins only
@@ -245,18 +266,21 @@ Set up alerts for:
 - [ ] No impact on existing card generation functionality
 
 ### ✅ Security
+
 - [ ] Role-based access control enforced
 - [ ] Keyword protection prevents accidental toggles
 - [ ] Audit trails maintained for all admin actions
 - [ ] No privilege escalation vulnerabilities
 
 ### ✅ User Experience
+
 - [ ] Clear feedback when payments are disabled
 - [ ] Graceful degradation of payment UI
 - [ ] No confusion about payment availability
 - [ ] Consistent behavior across all payment touchpoints
 
 ### ✅ Operations
+
 - [ ] Comprehensive logging for troubleshooting
 - [ ] Easy rollback procedures
 - [ ] No downtime during deployment
@@ -267,8 +291,9 @@ Set up alerts for:
 ## Contact Information
 
 For questions or issues during QA/rollout:
+
 - **Technical Lead**: Review implementation details
-- **DevOps Team**: Coordinate deployment sequence  
+- **DevOps Team**: Coordinate deployment sequence
 - **QA Team**: Execute manual testing procedures
 - **Support Team**: Handle user inquiries during rollout
 
@@ -277,17 +302,20 @@ For questions or issues during QA/rollout:
 ## Appendix: Test Data
 
 ### Sample Test Users
+
 - **Super Admin**: `arjomagno@gmail.com` (role: super_admin)
-- **Org Admin**: Create test user with role: org_admin  
+- **Org Admin**: Create test user with role: org_admin
 - **Regular User**: Create test user with role: id_gen_user
 
 ### Test Credit Packages
+
 - Starter: 25 credits, ₱125
-- Popular: 100 credits, ₱450 
+- Popular: 100 credits, ₱450
 - Business: 500 credits, ₱2000
 - Enterprise: 1000 credits, ₱3500
 
 ### Test Scenarios
+
 1. **Bypass Flow**: Disable payments → Enable bypass → Purchase credits
 2. **Toggle Flow**: Enable → Disable → Re-enable payments
 3. **Access Control**: Test each role's permissions

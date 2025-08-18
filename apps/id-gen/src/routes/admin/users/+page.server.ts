@@ -3,7 +3,7 @@ import { error, fail } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ locals, parent }) => {
 	const { supabase, user, org_id } = locals;
-	
+
 	// Ensure we have parent data (user auth and permissions)
 	const parentData = await parent();
 
@@ -30,7 +30,6 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 			currentUserRole: user?.role,
 			organization: parentData.organization
 		};
-
 	} catch (err) {
 		console.error('Error loading user management data:', err);
 		throw error(500, 'Failed to load user management data');
@@ -40,7 +39,7 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 export const actions: Actions = {
 	addUser: async ({ request, locals }) => {
 		const { supabase, user, org_id } = locals;
-		
+
 		if (!user?.role || !['super_admin', 'org_admin'].includes(user.role)) {
 			return fail(403, { error: 'Insufficient permissions to add users' });
 		}
@@ -74,7 +73,8 @@ export const actions: Actions = {
 				.eq('org_id', org_id)
 				.single();
 
-			if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows found
+			if (checkError && checkError.code !== 'PGRST116') {
+				// PGRST116 = no rows found
 				console.error('Error checking existing user:', checkError);
 				return fail(500, { error: 'Failed to check existing user' });
 			}
@@ -100,16 +100,14 @@ export const actions: Actions = {
 			}
 
 			// Create profile
-			const { error: profileError } = await supabase
-				.from('profiles')
-				.insert({
-					id: authUser.user.id,
-					email,
-					role,
-					org_id,
-					created_at: new Date().toISOString(),
-					updated_at: new Date().toISOString()
-				});
+			const { error: profileError } = await supabase.from('profiles').insert({
+				id: authUser.user.id,
+				email,
+				role,
+				org_id,
+				created_at: new Date().toISOString(),
+				updated_at: new Date().toISOString()
+			});
 
 			if (profileError) {
 				console.error('Error creating profile:', profileError);
@@ -120,7 +118,7 @@ export const actions: Actions = {
 
 			// Send invitation email (this would typically be handled by your email service)
 			const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email);
-			
+
 			if (inviteError) {
 				console.warn('Failed to send invitation email:', inviteError);
 				// Don't fail the request if email fails, user was created successfully
@@ -137,12 +135,11 @@ export const actions: Actions = {
 				console.error('Error fetching updated users:', fetchError);
 			}
 
-			return { 
-				success: true, 
+			return {
+				success: true,
 				message: `User ${email} added successfully. They will receive an invitation email.`,
 				updatedUsers: updatedUsers || []
 			};
-
 		} catch (err) {
 			console.error('Error in addUser action:', err);
 			return fail(500, { error: 'An unexpected error occurred' });
@@ -151,7 +148,7 @@ export const actions: Actions = {
 
 	updateUserRole: async ({ request, locals }) => {
 		const { supabase, user, org_id } = locals;
-		
+
 		if (!user?.role || !['super_admin', 'org_admin'].includes(user.role)) {
 			return fail(403, { error: 'Insufficient permissions to update user roles' });
 		}
@@ -202,9 +199,9 @@ export const actions: Actions = {
 			// Update user role
 			const { error: updateError } = await supabase
 				.from('profiles')
-				.update({ 
-					role: newRole, 
-					updated_at: new Date().toISOString() 
+				.update({
+					role: newRole,
+					updated_at: new Date().toISOString()
 				})
 				.eq('id', userId)
 				.eq('org_id', org_id);
@@ -225,12 +222,11 @@ export const actions: Actions = {
 				console.error('Error fetching updated users:', fetchUsersError);
 			}
 
-			return { 
-				success: true, 
+			return {
+				success: true,
 				message: 'User role updated successfully',
 				updatedUsers: updatedUsers || []
 			};
-
 		} catch (err) {
 			console.error('Error in updateUserRole action:', err);
 			return fail(500, { error: 'An unexpected error occurred' });
@@ -239,7 +235,7 @@ export const actions: Actions = {
 
 	deleteUser: async ({ request, locals }) => {
 		const { supabase, user, org_id } = locals;
-		
+
 		if (!user?.role || !['super_admin', 'org_admin'].includes(user.role)) {
 			return fail(403, { error: 'Insufficient permissions to delete users' });
 		}
@@ -280,8 +276,8 @@ export const actions: Actions = {
 					.neq('id', userId);
 
 				if ((adminCount || 0) === 0) {
-					return fail(400, { 
-						error: 'Cannot delete the last administrator in the organization' 
+					return fail(400, {
+						error: 'Cannot delete the last administrator in the organization'
 					});
 				}
 			}
@@ -316,12 +312,11 @@ export const actions: Actions = {
 				console.error('Error fetching updated users:', fetchUsersError);
 			}
 
-			return { 
-				success: true, 
+			return {
+				success: true,
 				message: `User ${targetUser.email} deleted successfully`,
 				updatedUsers: updatedUsers || []
 			};
-
 		} catch (err) {
 			console.error('Error in deleteUser action:', err);
 			return fail(500, { error: 'An unexpected error occurred' });

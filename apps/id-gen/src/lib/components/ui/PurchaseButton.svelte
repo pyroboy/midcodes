@@ -2,10 +2,10 @@
 	import { Button } from '$lib/components/ui/button';
 	import { CreditCard } from '@lucide/svelte';
 
-	let { 
-		packageId, 
-		featureId, 
-		amount, 
+	let {
+		packageId,
+		featureId,
+		amount,
 		currency = 'PHP',
 		disabled = false,
 		variant = 'default',
@@ -28,13 +28,7 @@
 	}
 </script>
 
-<Button 
-	onclick={handlePurchase}
-	{disabled}
-	{variant}
-	{size}
-	class="flex items-center gap-2"
->
+<Button onclick={handlePurchase} {disabled} {variant} {size} class="flex items-center gap-2">
 	<CreditCard class="w-4 h-4" />
 	{#if children}
 		{@render children()}

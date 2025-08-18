@@ -1,5 +1,11 @@
 <script lang="ts">
-	import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '$lib/components/ui/card';
+	import {
+		Card,
+		CardHeader,
+		CardTitle,
+		CardDescription,
+		CardContent
+	} from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import { getUsersWithCredits, adjustUserCredits, getBillingSettings } from '../billing.remote';
 
@@ -12,7 +18,7 @@
 	async function apply(userId: string) {
 		const delta = Number(deltas[userId] || 0);
 		if (!delta) return;
-		
+
 		try {
 			await adjustUserCredits({ userId, delta, reason: reasons[userId] });
 			deltas[userId] = 0;

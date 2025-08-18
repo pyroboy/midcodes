@@ -73,13 +73,9 @@ export const FEATURE_SKUS: readonly FeatureSKU[] = [
 ] as const;
 
 // Maps for quick lookups by ID
-export const CREDIT_PACKAGE_MAP = new Map(
-	CREDIT_PACKAGES.map(pkg => [pkg.id, pkg])
-);
+export const CREDIT_PACKAGE_MAP = new Map(CREDIT_PACKAGES.map((pkg) => [pkg.id, pkg]));
 
-export const FEATURE_SKU_MAP = new Map(
-	FEATURE_SKUS.map(sku => [sku.id, sku])
-);
+export const FEATURE_SKU_MAP = new Map(FEATURE_SKUS.map((sku) => [sku.id, sku]));
 
 // Server-only functions to get pricing information
 // These ensure that clients can only pass SKU IDs, never amounts
@@ -94,16 +90,16 @@ export function getFeatureSkuById(id: string): FeatureSKU | undefined {
 }
 
 export function getActiveCreditPackages(): readonly CreditPackage[] {
-	return CREDIT_PACKAGES.filter(pkg => pkg.isActive);
+	return CREDIT_PACKAGES.filter((pkg) => pkg.isActive);
 }
 
 export function getActiveFeatureSkus(): readonly FeatureSKU[] {
-	return FEATURE_SKUS.filter(sku => sku.isActive);
+	return FEATURE_SKUS.filter((sku) => sku.isActive);
 }
 
 // Client-safe exports (only metadata, no pricing)
 export function getCreditPackageMetadata() {
-	return CREDIT_PACKAGES.map(pkg => ({
+	return CREDIT_PACKAGES.map((pkg) => ({
 		id: pkg.id,
 		name: pkg.name,
 		credits: pkg.credits,
@@ -114,7 +110,7 @@ export function getCreditPackageMetadata() {
 }
 
 export function getFeatureSkuMetadata() {
-	return FEATURE_SKUS.map(sku => ({
+	return FEATURE_SKUS.map((sku) => ({
 		id: sku.id,
 		name: sku.name,
 		featureFlag: sku.featureFlag,

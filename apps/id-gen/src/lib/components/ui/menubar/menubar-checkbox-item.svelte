@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { Menubar as MenubarPrimitive } from "bits-ui";
-	import { Check } from "@lucide/svelte";
-	import { Minus } from "@lucide/svelte";
-	import { cn, type WithoutChildrenOrChild } from "$lib/utils.js";
-	import type { Snippet } from "svelte";
+	import { Menubar as MenubarPrimitive } from 'bits-ui';
+	import { Check } from '@lucide/svelte';
+	import { Minus } from '@lucide/svelte';
+	import { cn, type WithoutChildrenOrChild } from '$lib/utils.js';
+	import type { Snippet } from 'svelte';
 
 	let {
 		ref = $bindable(null),
@@ -33,7 +33,7 @@
 			{#if indeterminate}
 				<Minus class="size-4" />
 			{:else}
-				<Check class={cn("size-4", !checked && "text-transparent")} />
+				<Check class={cn('size-4', !checked && 'text-transparent')} />
 			{/if}
 		</span>
 		{@render childrenProp?.()}

@@ -8,7 +8,9 @@ import { z } from 'zod';
  * Payment methods supported by the system
  * Optional since Checkout can handle multiple methods
  */
-export const paymentMethodSchema = z.enum(['gcash', 'paymaya', 'card', 'online_banking']).optional();
+export const paymentMethodSchema = z
+	.enum(['gcash', 'paymaya', 'card', 'online_banking'])
+	.optional();
 
 /**
  * Type of purchase being made
@@ -23,18 +25,18 @@ export const purchaseKindSchema = z.enum(['credit', 'feature']);
  * Schema for creating a credit payment
  */
 export const createCreditPaymentInputSchema = z.object({
-  packageId: z.string().min(1, 'Package ID is required'),
-  method: paymentMethodSchema,
-  returnTo: z.string().url('Must be a valid URL').optional()
+	packageId: z.string().min(1, 'Package ID is required'),
+	method: paymentMethodSchema,
+	returnTo: z.string().url('Must be a valid URL').optional()
 });
 
 /**
  * Schema for creating a feature payment
  */
 export const createFeaturePaymentInputSchema = z.object({
-  featureId: z.string().min(1, 'Feature ID is required'),
-  method: paymentMethodSchema,
-  returnTo: z.string().url('Must be a valid URL').optional()
+	featureId: z.string().min(1, 'Feature ID is required'),
+	method: paymentMethodSchema,
+	returnTo: z.string().url('Must be a valid URL').optional()
 });
 
 // =============================================================================
@@ -45,8 +47,8 @@ export const createFeaturePaymentInputSchema = z.object({
  * Schema for payment history query parameters
  */
 export const paymentHistoryQuerySchema = z.object({
-  cursor: z.string().optional(),
-  limit: z.number().int().min(1).max(100).default(20)
+	cursor: z.string().optional(),
+	limit: z.number().int().min(1).max(100).default(20)
 });
 
 // =============================================================================
@@ -58,10 +60,10 @@ export const paymentHistoryQuerySchema = z.object({
  * Full validation should happen after signature verification
  */
 export const payMongoEventSchema = z.object({
-  id: z.string(),
-  type: z.string(),
-  data: z.any(), // Will be refined based on event type after signature verification
-  created_at: z.number()
+	id: z.string(),
+	type: z.string(),
+	data: z.any(), // Will be refined based on event type after signature verification
+	created_at: z.number()
 });
 
 // =============================================================================
@@ -73,11 +75,11 @@ export const payMongoEventSchema = z.object({
  * Supports both standard PayMongo flow and bypass mode
  */
 export const checkoutInitResultSchema = z.object({
-  checkoutUrl: z.string().url(),
-  sessionId: z.string(),
-  provider: z.enum(['paymongo', 'bypass']),
-  bypass: z.boolean().optional(),
-  success: z.boolean().optional()
+	checkoutUrl: z.string().url(),
+	sessionId: z.string(),
+	provider: z.enum(['paymongo', 'bypass']),
+	bypass: z.boolean().optional(),
+	success: z.boolean().optional()
 });
 
 /**
@@ -85,32 +87,32 @@ export const checkoutInitResultSchema = z.object({
  * Note: Using more permissive types to match actual database schema
  */
 export const paymentRecordSchema = z.object({
-  id: z.string(),
-  user_id: z.string(),
-  session_id: z.string(),
-  provider_payment_id: z.string().nullable(),
-  kind: z.string(), // Database stores as string, not enum
-  sku_id: z.string(),
-  amount_php: z.number(),
-  currency: z.string(),
-  status: z.string(), // Database stores as string, not enum
-  method: z.string().nullable(),
-  method_allowed: z.array(z.string()),
-  metadata: z.any(), // Database stores as Json type
-  reason: z.string().nullable(),
-  paid_at: z.string().nullable(),
-  raw_event: z.any(), // Database stores as Json type
-  idempotency_key: z.string(),
-  created_at: z.string(),
-  updated_at: z.string()
+	id: z.string(),
+	user_id: z.string(),
+	session_id: z.string(),
+	provider_payment_id: z.string().nullable(),
+	kind: z.string(), // Database stores as string, not enum
+	sku_id: z.string(),
+	amount_php: z.number(),
+	currency: z.string(),
+	status: z.string(), // Database stores as string, not enum
+	method: z.string().nullable(),
+	method_allowed: z.array(z.string()),
+	metadata: z.any(), // Database stores as Json type
+	reason: z.string().nullable(),
+	paid_at: z.string().nullable(),
+	raw_event: z.any(), // Database stores as Json type
+	idempotency_key: z.string(),
+	created_at: z.string(),
+	updated_at: z.string()
 });
 
 /**
  * Payment history response structure
  */
 export const paymentHistorySchema = z.object({
-  items: z.array(paymentRecordSchema),
-  nextCursor: z.string().nullable()
+	items: z.array(paymentRecordSchema),
+	nextCursor: z.string().nullable()
 });
 
 // =============================================================================

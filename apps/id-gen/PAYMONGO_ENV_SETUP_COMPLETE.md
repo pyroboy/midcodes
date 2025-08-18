@@ -7,13 +7,15 @@ This document confirms that all PayMongo environment variables and security conf
 ### Environment Variables Structure
 
 #### Server-Only Variables (🔒 Never exposed to client)
-- `PAYMONGO_SECRET_KEY` - PayMongo secret API key (sk_test_/sk_live_)
-- `PAYMONGO_WEBHOOK_SECRET` - Webhook signature verification secret (whsec_)
+
+- `PAYMONGO_SECRET_KEY` - PayMongo secret API key (sk*test*/sk*live*)
+- `PAYMONGO_WEBHOOK_SECRET` - Webhook signature verification secret (whsec\_)
 - `PAYMONGO_CHECKOUT_SUCCESS_PATH` - Success redirect path
 - `PAYMONGO_CHECKOUT_CANCEL_PATH` - Cancel redirect path
 
 #### Public Variables (✅ Safe for client-side)
-- `PUBLIC_PAYMONGO_PUBLIC_KEY` - PayMongo public key (pk_test_/pk_live_)
+
+- `PUBLIC_PAYMONGO_PUBLIC_KEY` - PayMongo public key (pk*test*/pk*live*)
 - `PUBLIC_APP_URL` - Application base URL
 
 ## 📁 Files Created/Updated
@@ -36,6 +38,7 @@ This document confirms that all PayMongo environment variables and security conf
 ## 🛠️ Quick Start Commands
 
 ### Local Development Setup
+
 ```bash
 # 1. Create local environment file
 npm run env:setup
@@ -51,6 +54,7 @@ npm run dev
 ```
 
 ### Vercel Deployment
+
 ```bash
 # 1. Install Vercel CLI (if not already installed)
 npm install -g vercel
@@ -68,44 +72,50 @@ vercel --prod
 ## 🔐 Security Features
 
 ### ✅ Server-Only Variable Protection
+
 - Environment validation prevents accidental client exposure
 - `assertServerContext()` throws errors if server variables are accessed client-side
 - Proper separation between `$env/dynamic/private` and `$env/dynamic/public`
 
 ### ✅ Automatic Validation
+
 - Environment variables are validated on application startup
-- Key format validation (sk_*, pk_*, whsec_*)
+- Key format validation (sk*\*, pk*_, whsec\__)
 - Required variables check with clear error messages
 
 ### ✅ Type Safety
+
 - Full TypeScript support with proper typing
 - Compile-time checks for environment variable usage
 - Runtime validation for additional safety
 
 ## 📋 Environment Variables Reference
 
-| Variable | Type | Format | Required | Description |
-|----------|------|--------|----------|-------------|
-| `PAYMONGO_SECRET_KEY` | Server-only | `sk_test_*` / `sk_live_*` | ✅ | PayMongo secret API key |
-| `PAYMONGO_WEBHOOK_SECRET` | Server-only | `whsec_*` | ✅ | Webhook signature secret |
-| `PUBLIC_PAYMONGO_PUBLIC_KEY` | Public | `pk_test_*` / `pk_live_*` | ✅ | PayMongo public key |
-| `PUBLIC_APP_URL` | Public | Valid URL | ✅ | Application base URL |
-| `PAYMONGO_CHECKOUT_SUCCESS_PATH` | Server-only | Path string | ✅ | Success redirect path |
-| `PAYMONGO_CHECKOUT_CANCEL_PATH` | Server-only | Path string | ✅ | Cancel redirect path |
+| Variable                         | Type        | Format                    | Required | Description              |
+| -------------------------------- | ----------- | ------------------------- | -------- | ------------------------ |
+| `PAYMONGO_SECRET_KEY`            | Server-only | `sk_test_*` / `sk_live_*` | ✅       | PayMongo secret API key  |
+| `PAYMONGO_WEBHOOK_SECRET`        | Server-only | `whsec_*`                 | ✅       | Webhook signature secret |
+| `PUBLIC_PAYMONGO_PUBLIC_KEY`     | Public      | `pk_test_*` / `pk_live_*` | ✅       | PayMongo public key      |
+| `PUBLIC_APP_URL`                 | Public      | Valid URL                 | ✅       | Application base URL     |
+| `PAYMONGO_CHECKOUT_SUCCESS_PATH` | Server-only | Path string               | ✅       | Success redirect path    |
+| `PAYMONGO_CHECKOUT_CANCEL_PATH`  | Server-only | Path string               | ✅       | Cancel redirect path     |
 
 ## 🌍 Environment-Specific Configuration
 
 ### Development
+
 - Use `sk_test_*` and `pk_test_*` keys
 - `PUBLIC_APP_URL=http://localhost:5173`
 - File: `.env.local`
 
 ### Production
-- Use `sk_live_*` and `pk_live_*` keys  
+
+- Use `sk_live_*` and `pk_live_*` keys
 - `PUBLIC_APP_URL=https://yourdomain.com`
 - Configure in Vercel dashboard
 
 ### Preview/Staging
+
 - Use `sk_test_*` and `pk_test_*` keys
 - `PUBLIC_APP_URL=https://your-app-git-branch.vercel.app`
 - Configure in Vercel dashboard
@@ -143,12 +153,14 @@ vercel --prod
 ## 🆘 Troubleshooting
 
 ### Common Issues
+
 - **"Environment validation failed"** → Check variable names and formats
 - **"PayMongo credentials not configured"** → Ensure all required variables are set
 - **Client-side access error** → Use `publicConfig` instead of `serverEnv`
 - **Webhook verification fails** → Check webhook secret matches dashboard
 
 ### Getting Help
+
 1. Check `docs/PAYMONGO_SETUP.md` for detailed guide
 2. Validate configuration with `npm run env:validate`
 3. Review PayMongo documentation
@@ -159,8 +171,9 @@ vercel --prod
 ✅ **PayMongo environment variables are now properly configured with enterprise-grade security!**
 
 Your application now has:
+
 - Secure server-only variable handling
 - Client-safe public configuration
-- Automatic validation and error reporting  
+- Automatic validation and error reporting
 - Easy deployment tools for Vercel
 - Comprehensive documentation and troubleshooting guides

@@ -1,61 +1,60 @@
 import type { PageServerLoad } from './$types';
 import { error, redirect } from '@sveltejs/kit';
 
-export const load: PageServerLoad = async ({ locals}) => {
+export const load: PageServerLoad = async ({ locals }) => {
+	const { supabase, session, user, org_id, permissions } = locals;
 
-    const { supabase, session, user, org_id, permissions } = locals;
-    
-    // Check if user has admin role and redirect to admin dashboard
-    if (user && user.app_metadata && user.app_metadata.role) {
-        const userRole = user.app_metadata.role;
-        console.log('User role detected:', userRole);
-        
-        // Redirect super admins to admin dashboard
-        if (['super_admin', 'org_admin', 'id_gen_admin'].includes(userRole)) {
-            console.log('Redirecting admin user to /admin dashboard');
-            throw redirect(302, '/admin');
-        }
-    }
-    
-console.log('session:', session);
-console.log('user:', user);
-console.log('org_id:', org_id);
+	// Check if user has admin role and redirect to admin dashboard
+	if (user && user.app_metadata && user.app_metadata.role) {
+		const userRole = user.app_metadata.role;
+		console.log('User role detected:', userRole);
 
-    const effectiveOrgId = org_id;
+		// Redirect super admins to admin dashboard
+		// TEMPORARILY DISABLED FOR DEBUGGING
+		// if (['super_admin', 'org_admin', 'id_gen_admin'].includes(userRole)) {
+		//     console.log('Redirecting admin user to /admin dashboard');
+		//     throw redirect(302, '/admin');
+		// }
+	}
 
+	console.log('session:', session);
+	console.log('user:', user);
+	console.log('org_id:', org_id);
 
-    // Get the effective organization ID (either emulated or actual)
+	const effectiveOrgId = org_id;
 
-    // console.log('effectiveOrgId:', effectiveOrgId);
+	// Get the effective organization ID (either emulated or actual)
 
-    // if (!effectiveOrgId) {
-    //     throw error(500, 'Organization ID not found - User is not associated with any organization');
-    // }
+	// console.log('effectiveOrgId:', effectiveOrgId);
 
-    // Get statistics for the dashboard
-    const { data: recentCards, error: cardsError } = await supabase
-        .from('idcards')
-        .select('id, template_id, front_image, back_image, created_at, data')
-        .eq('org_id', effectiveOrgId)
-        .order('created_at', { ascending: false })
-        .limit(5);
+	// if (!effectiveOrgId) {
+	//     throw error(500, 'Organization ID not found - User is not associated with any organization');
+	// }
 
-    const { count: totalCards, error: countError } = await supabase
-        .from('idcards')
-        .select('*', { count: 'exact', head: true })
-        .eq('org_id', effectiveOrgId);
+	// Get statistics for the dashboard
+	const { data: recentCards, error: cardsError } = await supabase
+		.from('idcards')
+		.select('id, template_id, front_image, back_image, created_at, data')
+		.eq('org_id', effectiveOrgId)
+		.order('created_at', { ascending: false })
+		.limit(5);
 
-    if (cardsError) {
-        console.error('Error fetching recent cards:', cardsError);
-    }
+	const { count: totalCards, error: countError } = await supabase
+		.from('idcards')
+		.select('*', { count: 'exact', head: true })
+		.eq('org_id', effectiveOrgId);
 
-    if (countError) {
-        console.error('Error fetching total cards:', countError);
-    }
+	if (cardsError) {
+		console.error('Error fetching recent cards:', cardsError);
+	}
 
-    return {
-        recentCards: recentCards || [],
-        totalCards: totalCards || 0,
-        error: cardsError || countError
-    };
+	if (countError) {
+		console.error('Error fetching total cards:', countError);
+	}
+
+	return {
+		recentCards: recentCards || [],
+		totalCards: totalCards || 0,
+		error: cardsError || countError
+	};
 };

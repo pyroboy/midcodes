@@ -5,6 +5,7 @@ This document outlines the plan to migrate the ID Generator routes from `apps/we
 ## Current Structure
 
 Source Directory (`apps/web/src/routes/id-gen/`):
+
 - `+page.server.ts` - Server-side logic
 - `+page.svelte` - Frontend component
 - `ID_GEN_ROLE_INSTRUCTIONS.md` - Documentation
@@ -13,11 +14,13 @@ Source Directory (`apps/web/src/routes/id-gen/`):
 - `use-template/` - Directory containing template usage functionality
 
 Target Directory (`apps/id-gen/src/routes/`):
+
 - Currently contains only a basic `+page.svelte`
 
 ## Dependencies Analysis
 
 ### Main Route Dependencies (+page.svelte)
+
 - **Svelte Types**:
   - `./$types` for PageData type
 - **Auth Components**:
@@ -27,6 +30,7 @@ Target Directory (`apps/id-gen/src/routes/`):
   - Custom styling for layout and components
 
 ### Templates Route Dependencies (+page.svelte)
+
 - **Svelte Core**:
   - `svelte/legacy` for run
   - `svelte` for onMount

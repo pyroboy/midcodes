@@ -3,7 +3,7 @@ import { error, fail } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ locals, parent }) => {
 	const { supabase, user, org_id } = locals;
-	
+
 	// Ensure we have parent data (user auth and permissions)
 	await parent();
 
@@ -20,10 +20,7 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 			{ data: recentCards, error: recentCardsError }
 		] = await Promise.all([
 			// Total cards count
-			supabase
-				.from('idcards')
-				.select('*', { count: 'exact', head: true })
-				.eq('org_id', org_id),
+			supabase.from('idcards').select('*', { count: 'exact', head: true }).eq('org_id', org_id),
 
 			// All users in organization
 			supabase
@@ -64,30 +61,35 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 		thisMonth.setDate(1);
 		thisMonth.setHours(0, 0, 0, 0);
 
-		const newCardsThisMonth = recentCards?.filter(card => 
-			new Date(card.created_at) >= thisMonth
-		).length || 0;
+		const newCardsThisMonth =
+			recentCards?.filter((card) => new Date(card.created_at) >= thisMonth).length || 0;
 
 		// Create recent activity from recent cards
-		const recentActivity = recentCards?.map(card => ({
-			id: card.id,
-			type: 'card_generated',
-			description: `ID card generated for ${card.data?.name || card.data?.full_name || 'Unknown'}`,
-			created_at: card.created_at
-		})).slice(0, 5) || [];
+		const recentActivity =
+			recentCards
+				?.map((card) => ({
+					id: card.id,
+					type: 'card_generated',
+					description: `ID card generated for ${card.data?.name || card.data?.full_name || 'Unknown'}`,
+					created_at: card.created_at
+				}))
+				.slice(0, 5) || [];
 
 		// Add user registration activities
-		const recentUsers = users?.filter(user => {
-			const userDate = new Date(user.created_at);
-			const sevenDaysAgo = new Date();
-			sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-			return userDate >= sevenDaysAgo;
-		}).map(user => ({
-			id: `user_${user.id}`,
-			type: 'user_added',
-			description: `New user registered: ${user.email}`,
-			created_at: user.created_at
-		})) || [];
+		const recentUsers =
+			users
+				?.filter((user) => {
+					const userDate = new Date(user.created_at);
+					const sevenDaysAgo = new Date();
+					sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+					return userDate >= sevenDaysAgo;
+				})
+				.map((user) => ({
+					id: `user_${user.id}`,
+					type: 'user_added',
+					description: `New user registered: ${user.email}`,
+					created_at: user.created_at
+				})) || [];
 
 		// Combine and sort activities
 		const allActivities = [...recentActivity, ...recentUsers]
@@ -108,7 +110,6 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 				recentCards: recentCardsError?.message || null
 			}
 		};
-
 	} catch (err) {
 		console.error('Error loading admin dashboard data:', err);
 		throw error(500, 'Failed to load dashboard data');
@@ -119,14 +120,15 @@ export const actions: Actions = {
 	// Action for quick user role updates or other admin actions
 	updateUserRole: async ({ request, locals }) => {
 		const { supabase, user, org_id } = locals;
-		
+
 		// Check user roles from app_metadata
-		const userRoles = user?.app_metadata?.role ? [user.app_metadata.role] : 
-			(user?.app_metadata?.roles || []);
-		const hasAdminPermission = userRoles.some((role: string) => 
+		const userRoles = user?.app_metadata?.role
+			? [user.app_metadata.role]
+			: user?.app_metadata?.roles || [];
+		const hasAdminPermission = userRoles.some((role: string) =>
 			['super_admin', 'org_admin', 'property_admin'].includes(role)
 		);
-		
+
 		if (!hasAdminPermission) {
 			return fail(403, { error: 'Insufficient permissions' });
 		}
@@ -159,7 +161,6 @@ export const actions: Actions = {
 			}
 
 			return { success: true, message: 'User role updated successfully' };
-
 		} catch (err) {
 			console.error('Error in updateUserRole action:', err);
 			return fail(500, { error: 'An unexpected error occurred' });
@@ -168,14 +169,15 @@ export const actions: Actions = {
 
 	deleteUser: async ({ request, locals }) => {
 		const { supabase, user, org_id } = locals;
-		
+
 		// Check user roles from app_metadata
-		const userRoles = user?.app_metadata?.role ? [user.app_metadata.role] : 
-			(user?.app_metadata?.roles || []);
-		const hasDeletePermission = userRoles.some((role: string) => 
+		const userRoles = user?.app_metadata?.role
+			? [user.app_metadata.role]
+			: user?.app_metadata?.roles || [];
+		const hasDeletePermission = userRoles.some((role: string) =>
 			['super_admin', 'org_admin', 'property_admin'].includes(role)
 		);
-		
+
 		if (!hasDeletePermission) {
 			return fail(403, { error: 'Insufficient permissions' });
 		}
@@ -206,7 +208,6 @@ export const actions: Actions = {
 			}
 
 			return { success: true, message: 'User deleted successfully' };
-
 		} catch (err) {
 			console.error('Error in deleteUser action:', err);
 			return fail(500, { error: 'An unexpected error occurred' });

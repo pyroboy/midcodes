@@ -4,24 +4,24 @@ import { z } from 'zod';
 
 // Import schemas following AZPOS pattern
 import {
-  updateProfileSchema,
-  changePasswordSchema,
-  profileDataSchema,
-  profileActionResultSchema,
-  passwordChangeResultSchema,
-  type UpdateProfile,
-  type ChangePassword,
-  type ProfileData,
-  type ProfileActionResult,
-  type PasswordChangeResult
+	updateProfileSchema,
+	changePasswordSchema,
+	profileDataSchema,
+	profileActionResultSchema,
+	passwordChangeResultSchema,
+	type UpdateProfile,
+	type ChangePassword,
+	type ProfileData,
+	type ProfileActionResult,
+	type PasswordChangeResult
 } from '$lib/types/profile.schema';
 
 // Local schemas for functions not covered by profile.schema.ts
 const updatePreferencesSchema = z.object({
-  darkMode: z.boolean(),
-  emailNotifications: z.boolean(),
-  adminNotifications: z.boolean(),
-  defaultTemplate: z.string().nullable()
+	darkMode: z.boolean(),
+	emailNotifications: z.boolean(),
+	adminNotifications: z.boolean(),
+	defaultTemplate: z.string().nullable()
 });
 
 // Helper function to check authentication
@@ -30,7 +30,7 @@ async function requireAuth() {
 	const { user, session, supabase, org_id } = locals;
 
 	if (!session || !user) {
-		throw redirect(303, '/auth?redirectTo=/profile');
+		throw redirect(303, '/auth?returnTo=/profile');
 	}
 
 	return { user, session, supabase, org_id };
@@ -109,7 +109,6 @@ export const getProfileData = query(async (): Promise<any> => {
 				cardsCreated: cardsCreated || 0
 			}
 		};
-
 	} catch (err) {
 		console.error('Error loading profile data:', err);
 		throw error(500, 'Failed to load profile data');
@@ -123,11 +122,11 @@ export const updateProfile = command('unchecked', async () => {
 	try {
 		// For now, we don't allow email changes via this form
 		// Email updates should go through proper email verification flow
-		
+
 		// Update timestamp
 		const { error: updateError } = await supabase
 			.from('profiles')
-			.update({ 
+			.update({
 				updated_at: new Date().toISOString()
 			})
 			.eq('id', user.id);
@@ -140,11 +139,10 @@ export const updateProfile = command('unchecked', async () => {
 		// Refresh the profile data
 		await getProfileData().refresh();
 
-		return { 
-			success: true, 
+		return {
+			success: true,
 			message: 'Profile updated successfully'
 		};
-
 	} catch (err) {
 		console.error('Error in updateProfile command:', err);
 		if (err instanceof Error && err.message.includes('error')) {
@@ -154,104 +152,108 @@ export const updateProfile = command('unchecked', async () => {
 	}
 });
 
-export const updatePreferences = command('unchecked', async ({ darkMode, emailNotifications, adminNotifications, defaultTemplate }: any) => {
-	const { user, supabase } = await requireAuth();
+export const updatePreferences = command(
+	'unchecked',
+	async ({ darkMode, emailNotifications, adminNotifications, defaultTemplate }: any) => {
+		const { user, supabase } = await requireAuth();
 
-	try {
-		// Get current profile to preserve other context data
-		const { data: currentProfile, error: fetchError } = await supabase
-			.from('profiles')
-			.select('context')
-			.eq('id', user.id)
-			.single();
+		try {
+			// Get current profile to preserve other context data
+			const { data: currentProfile, error: fetchError } = await supabase
+				.from('profiles')
+				.select('context')
+				.eq('id', user.id)
+				.single();
 
-		if (fetchError) {
-			console.error('Error fetching current profile:', fetchError);
-			throw error(500, 'Failed to fetch current profile');
-		}
-
-		// Update preferences in context
-		const updatedContext = {
-			...currentProfile.context,
-			preferences: {
-				darkMode,
-				emailNotifications,
-				adminNotifications,
-				defaultTemplate: defaultTemplate || null
+			if (fetchError) {
+				console.error('Error fetching current profile:', fetchError);
+				throw error(500, 'Failed to fetch current profile');
 			}
-		};
 
-		const { error: updateError } = await supabase
-			.from('profiles')
-			.update({ 
-				context: updatedContext,
-				updated_at: new Date().toISOString()
-			})
-			.eq('id', user.id);
+			// Update preferences in context
+			const updatedContext = {
+				...currentProfile.context,
+				preferences: {
+					darkMode,
+					emailNotifications,
+					adminNotifications,
+					defaultTemplate: defaultTemplate || null
+				}
+			};
 
-		if (updateError) {
-			console.error('Error updating preferences:', updateError);
-			throw error(500, 'Failed to update preferences');
+			const { error: updateError } = await supabase
+				.from('profiles')
+				.update({
+					context: updatedContext,
+					updated_at: new Date().toISOString()
+				})
+				.eq('id', user.id);
+
+			if (updateError) {
+				console.error('Error updating preferences:', updateError);
+				throw error(500, 'Failed to update preferences');
+			}
+
+			// Refresh the profile data
+			await getProfileData().refresh();
+
+			return {
+				success: true,
+				message: 'Preferences updated successfully'
+			};
+		} catch (err) {
+			console.error('Error in updatePreferences command:', err);
+			if (err instanceof Error && err.message.includes('error')) {
+				throw err; // Re-throw SvelteKit errors
+			}
+			throw error(500, 'An unexpected error occurred');
 		}
-
-		// Refresh the profile data
-		await getProfileData().refresh();
-
-		return { 
-			success: true, 
-			message: 'Preferences updated successfully'
-		};
-
-	} catch (err) {
-		console.error('Error in updatePreferences command:', err);
-		if (err instanceof Error && err.message.includes('error')) {
-			throw err; // Re-throw SvelteKit errors
-		}
-		throw error(500, 'An unexpected error occurred');
 	}
-});
+);
 
-export const changePassword = command('unchecked', async ({ currentPassword, newPassword, confirmPassword }: any) => {
-	const { user, supabase } = await requireAuth();
+export const changePassword = command(
+	'unchecked',
+	async ({ currentPassword, newPassword, confirmPassword }: any) => {
+		const { user, supabase } = await requireAuth();
 
-	try {
-		if (newPassword !== confirmPassword) {
-			throw error(400, 'New passwords do not match');
+		try {
+			if (newPassword !== confirmPassword) {
+				throw error(400, 'New passwords do not match');
+			}
+
+			// Verify current password by attempting to sign in
+			const { error: signInError } = await supabase.auth.signInWithPassword({
+				email: user.email || '',
+				password: currentPassword
+			});
+
+			if (signInError) {
+				throw error(400, 'Current password is incorrect');
+			}
+
+			// Update password
+			const { error: updateError } = await supabase.auth.updateUser({
+				password: newPassword
+			});
+
+			if (updateError) {
+				console.error('Error updating password:', updateError);
+				throw error(500, 'Failed to update password');
+			}
+
+			return {
+				success: true,
+				message: 'Password updated successfully'
+			};
+		} catch (err) {
+			console.error('Error in changePassword command:', err);
+			if (err instanceof Error && err.message.includes('error')) {
+				throw err; // Re-throw SvelteKit errors
+			}
+			throw error(500, 'An unexpected error occurred');
 		}
-
-		// Verify current password by attempting to sign in
-		const { error: signInError } = await supabase.auth.signInWithPassword({
-			email: user.email || '',
-			password: currentPassword
-		});
-
-		if (signInError) {
-			throw error(400, 'Current password is incorrect');
-		}
-
-		// Update password
-		const { error: updateError } = await supabase.auth.updateUser({
-			password: newPassword
-		});
-
-		if (updateError) {
-			console.error('Error updating password:', updateError);
-			throw error(500, 'Failed to update password');
-		}
-
-		return { 
-			success: true, 
-			message: 'Password updated successfully' 
-		};
-
-	} catch (err) {
-		console.error('Error in changePassword command:', err);
-		if (err instanceof Error && err.message.includes('error')) {
-			throw err; // Re-throw SvelteKit errors
-		}
-		throw error(500, 'An unexpected error occurred');
 	}
-});
+);
 
 export const exportData = command('unchecked', async () => {
 	const { user, supabase, org_id } = await requireAuth();
@@ -292,12 +294,13 @@ export const exportData = command('unchecked', async () => {
 				updated_at: profile.updated_at,
 				preferences: profile.context?.preferences || {}
 			},
-			idCards: idCards?.map(card => ({
-				id: card.id,
-				template_id: card.template_id,
-				created_at: card.created_at,
-				data: card.data
-			})) || [],
+			idCards:
+				idCards?.map((card) => ({
+					id: card.id,
+					template_id: card.template_id,
+					created_at: card.created_at,
+					data: card.data
+				})) || [],
 			templates: templates || [],
 			statistics: {
 				totalIdCards: idCards?.length || 0,
@@ -311,7 +314,6 @@ export const exportData = command('unchecked', async () => {
 			exportData,
 			message: 'Data exported successfully'
 		};
-
 	} catch (err) {
 		console.error('Error in exportData command:', err);
 		if (err instanceof Error && err.message.includes('error')) {
@@ -352,15 +354,15 @@ export const deleteAccount = command('unchecked', async () => {
 				.neq('id', user.id);
 
 			if ((adminCount || 0) === 0) {
-				throw error(400, 'Cannot delete account: You are the last administrator in your organization');
+				throw error(
+					400,
+					'Cannot delete account: You are the last administrator in your organization'
+				);
 			}
 		}
 
 		// Delete profile (this should cascade to related data based on foreign key constraints)
-		const { error: deleteError } = await supabase
-			.from('profiles')
-			.delete()
-			.eq('id', user.id);
+		const { error: deleteError } = await supabase.from('profiles').delete().eq('id', user.id);
 
 		if (deleteError) {
 			console.error('Error deleting profile:', deleteError);
@@ -372,7 +374,6 @@ export const deleteAccount = command('unchecked', async () => {
 
 		// Redirect to auth page with message
 		throw redirect(303, '/auth?message=Account deleted successfully');
-
 	} catch (err) {
 		if (err instanceof Error && err.message.includes('redirect')) {
 			throw err; // Re-throw redirects

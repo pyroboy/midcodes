@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { HTMLAttributes } from 'svelte/elements';
 	import type { WithElementRef } from '$lib/utils.js';
-import { Dot } from '@lucide/svelte';
+	import { Dot } from '@lucide/svelte';
 
 	let {
 		ref = $bindable(null),

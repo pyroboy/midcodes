@@ -19,7 +19,7 @@
 	let frontGeom: THREE.BufferGeometry;
 	let backGeom: THREE.BufferGeometry;
 	let edgeGeom: THREE.BufferGeometry;
-	
+
 	// Initialize geometry in onMount or use a simpler approach
 	$effect(() => {
 		const result = createRoundedRectCard();
@@ -68,13 +68,16 @@
 			back: new THREE.BufferGeometry(),
 			edge: new THREE.BufferGeometry()
 		};
-		
+
 		mainGeometry.toNonIndexed(); // Important for splitting geometry
 		const pos = mainGeometry.getAttribute('position');
 		const norm = mainGeometry.getAttribute('normal');
 		const uv = mainGeometry.getAttribute('uv');
 
-		const groupData: Record<keyof typeof geometries, { pos: number[]; norm: number[]; uv: number[] }> = {
+		const groupData: Record<
+			keyof typeof geometries,
+			{ pos: number[]; norm: number[]; uv: number[] }
+		> = {
 			front: { pos: [], norm: [], uv: [] },
 			back: { pos: [], norm: [], uv: [] },
 			edge: { pos: [], norm: [], uv: [] }
@@ -83,11 +86,11 @@
 		for (let i = 0; i < pos.count; i += 3) {
 			// Get the normal of the face (since it's non-indexed, all 3 vertices have the same normal)
 			const nz = norm.getZ(i);
-			
+
 			let targetGroup: keyof typeof geometries = 'edge';
 			if (nz > 0.5) targetGroup = 'front';
 			else if (nz < -0.5) targetGroup = 'back';
-			
+
 			// Add all 3 vertices of the face to the target group
 			for (let j = 0; j < 3; j++) {
 				const index = i + j;
@@ -98,11 +101,17 @@
 		}
 
 		for (const key of Object.keys(geometries) as (keyof typeof geometries)[]) {
-			geometries[key].setAttribute('position', new THREE.Float32BufferAttribute(groupData[key].pos, 3));
-			geometries[key].setAttribute('normal', new THREE.Float32BufferAttribute(groupData[key].norm, 3));
+			geometries[key].setAttribute(
+				'position',
+				new THREE.Float32BufferAttribute(groupData[key].pos, 3)
+			);
+			geometries[key].setAttribute(
+				'normal',
+				new THREE.Float32BufferAttribute(groupData[key].norm, 3)
+			);
 			geometries[key].setAttribute('uv', new THREE.Float32BufferAttribute(groupData[key].uv, 2));
 		}
-		
+
 		return { frontGeom: geometries.front, backGeom: geometries.back, edgeGeom: geometries.edge };
 	}
 
@@ -110,7 +119,7 @@
 	// For now, let's use a simpler approach without useFrame
 	// We'll implement this with requestAnimationFrame or find the correct import
 	let animationId: number | null = null;
-	
+
 	function animate() {
 		// Auto-rotate logic
 		if (autoRotate) {
@@ -118,10 +127,10 @@
 		}
 		// Smoothly interpolate the actual rotation towards the target rotation
 		rotationY = THREE.MathUtils.lerp(rotationY, targetRotationY, 0.05);
-		
+
 		animationId = requestAnimationFrame(animate);
 	}
-	
+
 	// Start animation
 	$effect(() => {
 		animate();

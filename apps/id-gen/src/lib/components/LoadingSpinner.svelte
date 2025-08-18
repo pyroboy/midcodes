@@ -1,16 +1,16 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { onMount } from 'svelte';
-	
+
 	// Dynamically import Threlte components only on client
 	let T: any = $state(null);
 	let THREE: any = $state(null);
-	
+
 	onMount(async () => {
 		if (browser) {
 			const threlteCore = await import('@threlte/core');
 			const threeJs = await import('three');
-			
+
 			T = threlteCore.T;
 			THREE = threeJs;
 		}
@@ -24,12 +24,12 @@
 
 	// Simple animation loop for the spinner
 	let animationId: number | null = null;
-	
+
 	function animate() {
 		uniforms.time.value += 0.016 * 2; // Assuming 60fps
 		animationId = requestAnimationFrame(animate);
 	}
-	
+
 	// Start animation
 	$effect(() => {
 		if (browser) {

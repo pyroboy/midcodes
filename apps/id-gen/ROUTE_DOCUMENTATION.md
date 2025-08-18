@@ -1,7 +1,9 @@
 # ID Generator App - Route Documentation
 
 ## App Purpose & Ultimate Goal
+
 The ID Generator app is designed to make **ID card printing super easy** for organizations. It allows users to:
+
 - Create custom ID card templates with dynamic dimensions and elements
 - Generate personalized ID cards by filling in forms
 - Preview cards in 3D with high-quality rendering
@@ -11,8 +13,10 @@ The ID Generator app is designed to make **ID card printing super easy** for org
 ## Current Route Analysis
 
 ### 1. `/` - Home/Dashboard Page
+
 **Purpose**: Landing page and dashboard for authenticated users
 **Design Elements & Hierarchy**:
+
 ```
 Header Navigation (if authenticated)
 ├── Logo: "ID Generator"
@@ -38,8 +42,10 @@ Main Content
 ---
 
 ### 2. `/auth` - Authentication Page
+
 **Purpose**: User login and registration
 **Design Elements & Hierarchy**:
+
 ```
 Centered Card Layout
 ├── Header
@@ -64,8 +70,10 @@ Centered Card Layout
 ---
 
 ### 3. `/templates` - Template Management Page
+
 **Purpose**: Admin interface for creating and managing ID card templates
 **Design Elements & Hierarchy**:
+
 ```
 Two-Mode Interface:
 ├── List Mode (Default)
@@ -87,8 +95,10 @@ Two-Mode Interface:
 ---
 
 ### 4. `/use-template/[id]` - ID Card Generation Page
+
 **Purpose**: Generate personalized ID cards from templates
 **Design Elements & Hierarchy**:
+
 ```
 Split Layout (Desktop)
 ├── Left Panel: Live Preview
@@ -108,8 +118,10 @@ Split Layout (Desktop)
 ---
 
 ### 5. `/all-ids` - ID Card Management Page
+
 **Purpose**: View, download, and manage generated ID cards
 **Design Elements & Hierarchy**:
+
 ```
 Header Controls
 ├── Search Input
@@ -128,7 +140,8 @@ Card Groups (by Template)
         └── Individual Actions: Download | Delete
 ```
 
-**Features**: 
+**Features**:
+
 - Bulk selection and operations
 - 3D card preview with template-specific geometry
 - Zip download functionality
@@ -137,12 +150,14 @@ Card Groups (by Template)
 ---
 
 ### 6. `/auth/forgot-password` - Password Reset
+
 **Purpose**: Password recovery interface
 **Current Status**: Basic form implementation
 
 ---
 
 ### 7. `/auth/reset-password` - Password Reset Confirmation
+
 **Purpose**: Complete password reset process
 **Current Status**: Basic form implementation
 
@@ -151,6 +166,7 @@ Card Groups (by Template)
 ## Application Architecture Strengths
 
 ### ✅ Well-Designed Features
+
 1. **Role-Based Access Control**: Proper organization-scoped permissions
 2. **Dynamic Template System**: Supports custom dimensions and elements
 3. **3D Preview System**: High-quality card visualization
@@ -159,6 +175,7 @@ Card Groups (by Template)
 6. **Bulk Operations**: Efficient card management
 
 ### ⚠️ Areas Needing Improvement
+
 1. **Landing Page**: Needs engaging introduction for new users
 2. **Mobile Responsiveness**: Current design is desktop-focused
 3. **User Onboarding**: No guided tour or help system
@@ -166,6 +183,7 @@ Card Groups (by Template)
 5. **Navigation**: Basic header navigation could be enhanced
 
 ## Missing Administrative Features
+
 - Organization management
 - User role assignment
 - System settings

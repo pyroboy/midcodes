@@ -66,8 +66,8 @@ class AuthStore {
 		this._loginWithPinStatus = 'pending';
 		try {
 			// Simulate pin verification - replace with actual API call
-			await new Promise(resolve => setTimeout(resolve, 1000));
-			
+			await new Promise((resolve) => setTimeout(resolve, 1000));
+
 			// Mock verification - replace with real logic
 			if (pin === '1234') {
 				this._isStaffMode = true;

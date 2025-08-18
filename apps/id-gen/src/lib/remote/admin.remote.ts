@@ -3,19 +3,19 @@ import { query, command, getRequestEvent } from '$app/server';
 
 // Import schemas following AZPOS pattern
 import {
-  addUserSchema,
-  updateUserRoleSchema,
-  deleteUserSchema,
-  userRoleSchema,
-  adminDashboardDataSchema,
-  usersDataSchema,
-  adminActionResultSchema,
-  type AddUser,
-  type UpdateUserRole,
-  type DeleteUser,
-  type AdminDashboardData,
-  type UsersData,
-  type AdminActionResult
+	addUserSchema,
+	updateUserRoleSchema,
+	deleteUserSchema,
+	userRoleSchema,
+	adminDashboardDataSchema,
+	usersDataSchema,
+	adminActionResultSchema,
+	type AddUser,
+	type UpdateUserRole,
+	type DeleteUser,
+	type AdminDashboardData,
+	type UsersData,
+	type AdminActionResult
 } from '$lib/types/admin.schema';
 
 // Helper function to check admin permissions
@@ -71,10 +71,7 @@ export const getAdminDashboardData = query(async (): Promise<AdminDashboardData>
 			{ data: recentCards, error: recentCardsError }
 		] = await Promise.all([
 			// Total cards count
-			supabase
-				.from('idcards')
-				.select('*', { count: 'exact', head: true })
-				.eq('org_id', org_id),
+			supabase.from('idcards').select('*', { count: 'exact', head: true }).eq('org_id', org_id),
 
 			// All users in organization
 			supabase
@@ -115,30 +112,35 @@ export const getAdminDashboardData = query(async (): Promise<AdminDashboardData>
 		thisMonth.setDate(1);
 		thisMonth.setHours(0, 0, 0, 0);
 
-		const newCardsThisMonth = recentCards?.filter(card => 
-			new Date(card.created_at) >= thisMonth
-		).length || 0;
+		const newCardsThisMonth =
+			recentCards?.filter((card) => new Date(card.created_at) >= thisMonth).length || 0;
 
 		// Create recent activity from recent cards
-		const recentActivity = recentCards?.map(card => ({
-			id: card.id,
-			type: 'card_generated',
-			description: `ID card generated for ${card.data?.name || card.data?.full_name || 'Unknown'}`,
-			created_at: card.created_at
-		})).slice(0, 5) || [];
+		const recentActivity =
+			recentCards
+				?.map((card) => ({
+					id: card.id,
+					type: 'card_generated',
+					description: `ID card generated for ${card.data?.name || card.data?.full_name || 'Unknown'}`,
+					created_at: card.created_at
+				}))
+				.slice(0, 5) || [];
 
 		// Add user registration activities
-		const recentUsers = users?.filter(user => {
-			const userDate = new Date(user.created_at);
-			const sevenDaysAgo = new Date();
-			sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-			return userDate >= sevenDaysAgo;
-		}).map(user => ({
-			id: `user_${user.id}`,
-			type: 'user_added',
-			description: `New user registered: ${user.email}`,
-			created_at: user.created_at
-		})) || [];
+		const recentUsers =
+			users
+				?.filter((user) => {
+					const userDate = new Date(user.created_at);
+					const sevenDaysAgo = new Date();
+					sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+					return userDate >= sevenDaysAgo;
+				})
+				.map((user) => ({
+					id: `user_${user.id}`,
+					type: 'user_added',
+					description: `New user registered: ${user.email}`,
+					created_at: user.created_at
+				})) || [];
 
 		// Combine and sort activities
 		const allActivities = [...recentActivity, ...recentUsers]
@@ -159,7 +161,6 @@ export const getAdminDashboardData = query(async (): Promise<AdminDashboardData>
 				recentCards: recentCardsError?.message || null
 			}
 		};
-
 	} catch (err) {
 		console.error('Error loading admin dashboard data:', err);
 		throw error(500, 'Failed to load dashboard data');
@@ -191,7 +192,6 @@ export const getUsersData = query(async (): Promise<UsersData> => {
 			currentUserId: user?.id,
 			currentUserRole: user?.role
 		};
-
 	} catch (err) {
 		console.error('Error loading user management data:', err);
 		throw error(500, 'Failed to load user management data');
@@ -217,7 +217,8 @@ export const addUser = command('unchecked', async ({ email, role }: any) => {
 			.eq('org_id', org_id)
 			.single();
 
-		if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows found
+		if (checkError && checkError.code !== 'PGRST116') {
+			// PGRST116 = no rows found
 			console.error('Error checking existing user:', checkError);
 			throw error(500, 'Failed to check existing user');
 		}
@@ -243,16 +244,14 @@ export const addUser = command('unchecked', async ({ email, role }: any) => {
 		}
 
 		// Create profile
-		const { error: profileError } = await supabase
-			.from('profiles')
-			.insert({
-				id: authUser.user.id,
-				email,
-				role,
-				org_id,
-				created_at: new Date().toISOString(),
-				updated_at: new Date().toISOString()
-			});
+		const { error: profileError } = await supabase.from('profiles').insert({
+			id: authUser.user.id,
+			email,
+			role,
+			org_id,
+			created_at: new Date().toISOString(),
+			updated_at: new Date().toISOString()
+		});
 
 		if (profileError) {
 			console.error('Error creating profile:', profileError);
@@ -263,7 +262,7 @@ export const addUser = command('unchecked', async ({ email, role }: any) => {
 
 		// Send invitation email (this would typically be handled by your email service)
 		const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email);
-		
+
 		if (inviteError) {
 			console.warn('Failed to send invitation email:', inviteError);
 			// Don't fail the request if email fails, user was created successfully
@@ -272,11 +271,10 @@ export const addUser = command('unchecked', async ({ email, role }: any) => {
 		// Refresh the users query
 		await getUsersData().refresh();
 
-		return { 
-			success: true, 
+		return {
+			success: true,
 			message: `User ${email} added successfully. They will receive an invitation email.`
 		};
-
 	} catch (err) {
 		console.error('Error in addUser command:', err);
 		if (err instanceof Error && err.message.includes('error')) {
@@ -327,9 +325,9 @@ export const updateUserRole = command('unchecked', async ({ userId, role }: any)
 		// Update user role
 		const { error: updateError } = await supabase
 			.from('profiles')
-			.update({ 
-				role: role, 
-				updated_at: new Date().toISOString() 
+			.update({
+				role: role,
+				updated_at: new Date().toISOString()
 			})
 			.eq('id', userId)
 			.eq('org_id', org_id);
@@ -342,11 +340,10 @@ export const updateUserRole = command('unchecked', async ({ userId, role }: any)
 		// Refresh the users query
 		await getUsersData().refresh();
 
-		return { 
-			success: true, 
+		return {
+			success: true,
 			message: 'User role updated successfully'
 		};
-
 	} catch (err) {
 		console.error('Error in updateUserRole command:', err);
 		if (err instanceof Error && err.message.includes('error')) {
@@ -414,11 +411,10 @@ export const deleteUser = command('unchecked', async ({ userId }: any) => {
 		// Refresh the users query
 		await getUsersData().refresh();
 
-		return { 
-			success: true, 
+		return {
+			success: true,
 			message: `User ${targetUser.email} deleted successfully`
 		};
-
 	} catch (err) {
 		console.error('Error in deleteUser command:', err);
 		if (err instanceof Error && err.message.includes('error')) {

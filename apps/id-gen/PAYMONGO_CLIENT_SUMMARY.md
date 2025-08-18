@@ -50,6 +50,7 @@
 ### 🔧 Technical Implementation Details
 
 #### Authentication
+
 ```typescript
 private get authHeaders() {
   return {
@@ -61,22 +62,24 @@ private get authHeaders() {
 ```
 
 #### Error Handling
+
 - Custom error classes: `PayMongoAPIError`, `PayMongoConfigurationError`
 - Safe error message mapping to prevent information disclosure
 - Proper HTTP status code handling
 
 #### Type Safety
+
 ```typescript
 export type PayMongoPaymentMethodType = 'gcash' | 'paymaya' | 'card' | 'online_banking';
 
 export interface PayMongoCheckoutSessionRequest {
-  line_items: PayMongoLineItem[];
-  payment_method_types: PayMongoPaymentMethodType[];
-  success_url: string;
-  cancel_url: string;
-  metadata?: Record<string, any>;
-  description?: string;
-  send_email_receipt?: boolean;
+	line_items: PayMongoLineItem[];
+	payment_method_types: PayMongoPaymentMethodType[];
+	success_url: string;
+	cancel_url: string;
+	metadata?: Record<string, any>;
+	description?: string;
+	send_email_receipt?: boolean;
 }
 ```
 
@@ -88,18 +91,20 @@ import { PayMongoClient } from '$lib/server/paymongo/client';
 const client = new PayMongoClient();
 
 const session = await client.createCheckoutSession({
-  line_items: [{
-    currency: 'PHP',
-    amount: 500, // ₱500.00 (auto-converted to centavos)
-    name: 'Premium License',
-    quantity: 1
-  }],
-  payment_method_types: ['gcash', 'paymaya', 'card', 'online_banking'],
-  success_url: 'https://yourapp.com/success',
-  cancel_url: 'https://yourapp.com/cancel',
-  description: 'Premium License Purchase',
-  send_email_receipt: true,
-  metadata: { user_id: '123' }
+	line_items: [
+		{
+			currency: 'PHP',
+			amount: 500, // ₱500.00 (auto-converted to centavos)
+			name: 'Premium License',
+			quantity: 1
+		}
+	],
+	payment_method_types: ['gcash', 'paymaya', 'card', 'online_banking'],
+	success_url: 'https://yourapp.com/success',
+	cancel_url: 'https://yourapp.com/cancel',
+	description: 'Premium License Purchase',
+	send_email_receipt: true,
+	metadata: { user_id: '123' }
 });
 
 // Redirect user to: session.checkout_url
@@ -135,7 +140,7 @@ const session = await client.createCheckoutSession({
 - [x] `retrieveCheckoutSession(sessionId)` implementation
 - [x] Optional PaymentIntent/Source flows behind interface
 - [x] Idempotency-Key header on create calls
-- [x] Handle non-2xx responses with typed errors and safe messages  
+- [x] Handle non-2xx responses with typed errors and safe messages
 - [x] Payment method types: 'gcash', 'paymaya', 'card', 'online_banking'
 - [x] Currency: PHP, amounts in centavos with automatic conversion
 

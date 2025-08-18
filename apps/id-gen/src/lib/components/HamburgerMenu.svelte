@@ -3,15 +3,15 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Separator } from '$lib/components/ui/separator';
 	import { paymentFlags } from '$lib/stores/featureFlags';
-	
+
 	interface Props {
 		isOpen: boolean;
 		user?: any;
 		onClose?: () => void;
 	}
-	
+
 	let { isOpen, user, onClose }: Props = $props();
-	
+
 	// Secondary navigation items
 	const secondaryNavItems = [
 		{
@@ -39,7 +39,7 @@
 			roles: ['all']
 		}
 	];
-	
+
 	// Admin-only navigation items
 	const adminNavItems = [
 		{
@@ -67,29 +67,30 @@
 			roles: ['super_admin']
 		}
 	];
-	
+
 	function hasPermission(itemRoles: string[], userRole?: string): boolean {
 		if (itemRoles.includes('all')) return true;
 		if (!userRole) return false;
 		return itemRoles.includes(userRole);
 	}
-	
+
 	function getUserDisplayName(user: any): string {
 		return user?.email?.split('@')[0] || 'User';
 	}
-	
+
 	function getUserRole(user: any): string {
 		if (!user?.role) return 'User';
-		return user.role.split('_').map((word: string) => 
-			word.charAt(0).toUpperCase() + word.slice(1)
-		).join(' ');
+		return user.role
+			.split('_')
+			.map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
+			.join(' ');
 	}
-	
+
 	// Close menu when clicking outside or on links
 	function handleBackdropClick() {
 		onClose?.();
 	}
-	
+
 	function handleLinkClick() {
 		onClose?.();
 	}
@@ -97,8 +98,8 @@
 
 <!-- Backdrop -->
 {#if isOpen}
-	<div 
-		class="lg:hidden fixed inset-0 bg-black/50 z-50" 
+	<div
+		class="lg:hidden fixed inset-0 bg-black/50 z-50"
 		transition:fade={{ duration: 200 }}
 		onclick={handleBackdropClick}
 		onkeydown={(e) => e.key === 'Escape' && handleBackdropClick()}
@@ -110,40 +111,61 @@
 
 <!-- Menu Drawer -->
 {#if isOpen}
-	<div 
+	<div
 		class="lg:hidden fixed top-0 left-0 h-full w-80 max-w-[85vw] bg-white dark:bg-gray-900 shadow-xl z-50 overflow-y-auto"
 		transition:fly={{ x: -300, duration: 300 }}
 	>
 		<!-- Header -->
-		<div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+		<div
+			class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700"
+		>
 			<div class="flex items-center gap-3">
 				<div class="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-					<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V4a2 2 0 114 0v2m-4 0a2 2 0 104 0m-4 0V4a2 2 0 014 0v2" />
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="h-6 w-6 text-white"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+					>
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V4a2 2 0 114 0v2m-4 0a2 2 0 104 0m-4 0V4a2 2 0 014 0v2"
+						/>
 					</svg>
 				</div>
 				<div>
 					<h2 class="text-lg font-semibold text-gray-900 dark:text-white">Menu</h2>
 				</div>
 			</div>
-			
-			<Button 
-				variant="ghost" 
-				size="icon"
-				onclick={onClose}
-				aria-label="Close menu"
-			>
-				<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+
+			<Button variant="ghost" size="icon" onclick={onClose} aria-label="Close menu">
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="h-6 w-6"
+					fill="none"
+					viewBox="0 0 24 24"
+					stroke="currentColor"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M6 18L18 6M6 6l12 12"
+					/>
 				</svg>
 			</Button>
 		</div>
-		
+
 		<!-- User Info -->
 		{#if user}
 			<div class="p-4 border-b border-gray-200 dark:border-gray-700">
 				<div class="flex items-center gap-3">
-					<div class="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-white font-medium">
+					<div
+						class="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-white font-medium"
+					>
 						{user.email?.substring(0, 2).toUpperCase() || 'U'}
 					</div>
 					<div>
@@ -157,7 +179,7 @@
 				</div>
 			</div>
 		{/if}
-		
+
 		<!-- Navigation Items -->
 		<div class="p-4 space-y-2">
 			<!-- Secondary Navigation -->
@@ -167,12 +189,18 @@
 						{#if item.href === '/pricing' && !$paymentFlags.paymentsEnabled}
 							<!-- Hide pricing link when payments are disabled -->
 						{:else}
-							<a 
+							<a
 								href={item.href}
 								class="flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
 								onclick={handleLinkClick}
 							>
-								<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									class="h-5 w-5"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke="currentColor"
+								>
 									{@html item.icon}
 								</svg>
 								{item.label}
@@ -181,24 +209,32 @@
 					{/if}
 				{/each}
 			</div>
-			
+
 			<!-- Admin Section -->
 			{#if user?.role && ['super_admin', 'org_admin', 'id_gen_admin'].includes(user.role)}
 				<Separator class="my-4" />
-				
+
 				<div class="space-y-1">
-					<h3 class="px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+					<h3
+						class="px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+					>
 						Administration
 					</h3>
-					
+
 					{#each adminNavItems as item}
 						{#if hasPermission(item.roles, user?.role)}
-							<a 
+							<a
 								href={item.href}
 								class="flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
 								onclick={handleLinkClick}
 							>
-								<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									class="h-5 w-5"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke="currentColor"
+								>
 									{@html item.icon}
 								</svg>
 								{item.label}
@@ -207,18 +243,29 @@
 					{/each}
 				</div>
 			{/if}
-			
+
 			<!-- Sign Out -->
 			{#if user}
 				<Separator class="my-4" />
-				
+
 				<form method="POST" action="/auth/signout" class="w-full">
-					<button 
-						type="submit" 
+					<button
+						type="submit"
 						class="flex w-full items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
 					>
-						<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-5 w-5"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+							/>
 						</svg>
 						Sign Out
 					</button>

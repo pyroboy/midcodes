@@ -1,108 +1,91 @@
 <script lang="ts">
+	let { x, y, width, height, onUpdate } = $props();
 
-    let { x, y, width, height, onUpdate } = $props();
+	function handleXChange(event: Event) {
+		const value = Number((event.target as HTMLInputElement).value);
+		onUpdate({ x: value });
+	}
 
-    function handleXChange(event: Event) {
-        const value = Number((event.target as HTMLInputElement).value);
-        onUpdate({ x: value });
-    }
+	function handleYChange(event: Event) {
+		const value = Number((event.target as HTMLInputElement).value);
+		onUpdate({ y: value });
+	}
 
-    function handleYChange(event: Event) {
-        const value = Number((event.target as HTMLInputElement).value);
-        onUpdate({ y: value });
-    }
+	function handleWidthChange(event: Event) {
+		const value = Number((event.target as HTMLInputElement).value);
+		onUpdate({ width: value });
+	}
 
-    function handleWidthChange(event: Event) {
-        const value = Number((event.target as HTMLInputElement).value);
-        onUpdate({ width: value });
-    }
-
-    function handleHeightChange(event: Event) {
-        const value = Number((event.target as HTMLInputElement).value);
-        onUpdate({ height: value });
-    }
+	function handleHeightChange(event: Event) {
+		const value = Number((event.target as HTMLInputElement).value);
+		onUpdate({ height: value });
+	}
 </script>
 
 <div class="position-container">
-    <div class="input-group position-group">
-        <label>
-            <span>X</span>
-            <input 
-                type="number" 
-                value={x}
-                oninput={handleXChange}
-            >
-        </label>
-        <label>
-            <span>Y</span>
-            <input 
-                type="number" 
-                value={y}
-                oninput={handleYChange}
-            >
-        </label>
-    </div>
-    <div class="input-group position-group">
-        <label>
-            <span>W</span>
-            <input 
-                type="number" 
-                value={width}
-                oninput={handleWidthChange}
-            >
-        </label>
-        <label>
-            <span>H</span>
-            <input 
-                type="number" 
-                value={height}
-                oninput={handleHeightChange}
-            >
-        </label>
-    </div>
+	<div class="input-group position-group">
+		<label>
+			<span>X</span>
+			<input type="number" value={x} oninput={handleXChange} />
+		</label>
+		<label>
+			<span>Y</span>
+			<input type="number" value={y} oninput={handleYChange} />
+		</label>
+	</div>
+	<div class="input-group position-group">
+		<label>
+			<span>W</span>
+			<input type="number" value={width} oninput={handleWidthChange} />
+		</label>
+		<label>
+			<span>H</span>
+			<input type="number" value={height} oninput={handleHeightChange} />
+		</label>
+	</div>
 </div>
 
 <style>
-    .position-container {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-    }
-    .position-group {
-        display: flex;
-        background-color: #1e1e1e;
-        border-radius: 4px;
-        overflow: hidden;
-    }
-    .position-group label {
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-        padding: 4px 8px;
-        background-color: #2d2d2d;
-        flex: 1;
-    }
-    .position-group label:last-of-type {
-        border-right: none;
-    }
-    .position-group span {
-        font-size: 12px;
-        color: #888;
-        margin-right: 4px;
-        width: 30px;
-    }
-    .position-group input {
-        width: 100%;
-        background-color: transparent;
-        border: none;
-        color: #fff;
-        font-size: 12px;
-        padding: 2px;
-        text-align: left;
-    }
-    .position-group input[type="number"]::-webkit-inner-spin-button,
-    .position-group input[type="number"]::-webkit-outer-spin-button {
-        -webkit-appearance: none;
-        margin: 0;
-    }
+	.position-container {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+	.position-group {
+		display: flex;
+		background-color: #1e1e1e;
+		border-radius: 4px;
+		overflow: hidden;
+	}
+	.position-group label {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		padding: 4px 8px;
+		background-color: #2d2d2d;
+		flex: 1;
+	}
+	.position-group label:last-of-type {
+		border-right: none;
+	}
+	.position-group span {
+		font-size: 12px;
+		color: #888;
+		margin-right: 4px;
+		width: 30px;
+	}
+	.position-group input {
+		width: 100%;
+		background-color: transparent;
+		border: none;
+		color: #fff;
+		font-size: 12px;
+		padding: 2px;
+		text-align: left;
+	}
+	.position-group input[type='number']::-webkit-inner-spin-button,
+	.position-group input[type='number']::-webkit-outer-spin-button {
+		-webkit-appearance: none;
+		margin: 0;
+	}
 </style>
