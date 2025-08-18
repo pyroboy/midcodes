@@ -9,56 +9,72 @@
 	// --- LOCAL IMPORTS ---
 	import type { CardGeometry } from '$lib/utils/cardGeometry';
 	import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeometry';
-	import LoadingSpinner from './LoadingSpinner.svelte';
 
 	// --- TYPES ---
 	type GeometryDimensions = { width: number; height: number } | null;
 
 	/**
-	 * ✅ THE CORE FIX: Transforms a texture to "cover" a geometry.
-	 * This function compares the aspect ratio of the image and the 3D model
-	 * and adjusts the texture's scale (.repeat) and position (.offset)
-	 * to ensure it fills the entire surface, cropping any excess.
+	 * 🔧 DEBUG VERSION: Simple texture transform for testing
 	 */
-	function transformTextureToCover(
+	function transformTextureToFit(
 		texture: THREE.Texture,
 		templateDims: TemplateDimensions,
 		geoDims: GeometryDimensions | null
 	): THREE.Texture {
-		// If we don't have the necessary dimensions, return the texture as is.
-		if (!templateDims || !geoDims) {
-			return texture;
-		}
+		console.log('🔍 DEBUG - Input parameters:', {
+			templateDims,
+			geoDims,
+			textureSize: { width: texture.image?.width, height: texture.image?.height }
+		});
 
-		// Keep flipY=true for proper orientation in most cases
+		// Basic texture setup
 		texture.flipY = true;
 		texture.wrapS = THREE.ClampToEdgeWrapping;
 		texture.wrapT = THREE.ClampToEdgeWrapping;
-		
+
+		// DEBUG: Try different approaches
+		if (!templateDims || !geoDims) {
+			console.log('🚨 Missing dimensions - using 1:1 mapping');
+			texture.repeat.set(1, 1);
+			texture.offset.set(0, 0);
+			return texture;
+		}
+
 		const templateAspect = templateDims.width / templateDims.height;
 		const geometryAspect = geoDims.width / geoDims.height;
+		const imageAspect = texture.image ? texture.image.width / texture.image.height : templateAspect;
 
-		if (templateAspect > geometryAspect) {
-			// Image is WIDER than the card geometry.
-			// We fit the texture to the card's height and let the sides get cropped.
-			const scale = geometryAspect / templateAspect;
-			texture.repeat.set(scale, 1);
-			texture.offset.set((1 - scale) / 2, 0);
-		} else {
-			// Image is TALLER than (or same aspect as) the card geometry.
-			// We fit the texture to the card's width and let the top/bottom get cropped.
-			const scale = templateAspect / geometryAspect;
-			texture.repeat.set(1, scale);
-			texture.offset.set(0, (1 - scale) / 2);
-		}
-		
-		console.log('🎯 Texture Transform Applied:', {
-			templateAspect,
-			geometryAspect,
-			repeat: { x: texture.repeat.x, y: texture.repeat.y },
-			offset: { x: texture.offset.x, y: texture.offset.y }
+		console.log('📊 Aspect Ratios:', {
+			template: templateAspect.toFixed(3),
+			geometry: geometryAspect.toFixed(3),
+			image: imageAspect.toFixed(3)
 		});
-		
+
+		// For debugging, try using image aspect ratio directly
+		const actualAspect = imageAspect;
+		let scaleX = 1;
+		let scaleY = 1;
+
+		if (actualAspect > geometryAspect) {
+			// Image is wider than geometry - fit by height
+			scaleX = geometryAspect / actualAspect;
+			scaleY = 1;
+		} else {
+			// Image is taller than geometry - fit by width
+			scaleX = 1;
+			scaleY = actualAspect / geometryAspect;
+		}
+
+		// Apply scaling and centering
+		texture.repeat.set(scaleX, scaleY);
+		texture.offset.set((1 - scaleX) / 2, (1 - scaleY) / 2);
+
+		console.log('✅ Final Transform:', {
+			scale: { x: scaleX.toFixed(3), y: scaleY.toFixed(3) },
+			repeat: { x: texture.repeat.x.toFixed(3), y: texture.repeat.y.toFixed(3) },
+			offset: { x: texture.offset.x.toFixed(3), y: texture.offset.y.toFixed(3) }
+		});
+
 		texture.needsUpdate = true;
 		return texture;
 	}
@@ -123,11 +139,45 @@
 			canvasError = null;
 			try {
 			let geometry: CardGeometry | null = null;
+			console.log('🔄 Geometry Path Debug:', {
+				resolvedCardGeometry: !!resolvedCardGeometry,
+				resolvedTemplateDimensions: resolvedTemplateDimensions
+			});
+			
 			if (resolvedCardGeometry) {
+				console.log('📍 Taking Custom Geometry Path');
 				geometry = resolvedCardGeometry;
-				// Use default geometry dimensions if not specified
-				geometryDimensions = { width: 2, height: 1.25 };
+				
+				// FIXED: Use template dimensions to calculate correct geometry dimensions
+				// even when we have custom geometry
+				if (resolvedTemplateDimensions) {
+					console.log('🔧 Using template dimensions for custom geometry scaling');
+					const { width, height, unit } = resolvedTemplateDimensions;
+					const isInches = ['in', 'inch', 'inches'].includes(unit?.toLowerCase() ?? '');
+					
+					// Convert pixels to a sensible inch-like scale, assuming 300 DPI
+					const widthInches = isInches ? width : width / 300;
+					const heightInches = isInches ? height : height / 300;
+					
+					// Convert to 3D world units using the same scale factor as createCardFromInches
+					const scaleInchesToUnits = 0.5;
+					const worldWidth = widthInches * scaleInchesToUnits;
+					const worldHeight = heightInches * scaleInchesToUnits;
+					
+					// Store the actual 3D world dimensions for texture transform
+					geometryDimensions = { width: worldWidth, height: worldHeight };
+					
+					console.log('📐 Custom Geometry Dimensions:', {
+						template: { width, height, unit },
+						inches: { width: widthInches, height: heightInches },
+						worldUnits: { width: worldWidth, height: worldHeight }
+					});
+				} else {
+					console.log('⚠️ No template dimensions available, using default geometry dimensions');
+					geometryDimensions = { width: 2, height: 1.25 };
+				}
 			} else if (resolvedTemplateDimensions) {
+				console.log('📍 Taking Template Dimensions Path');
 				const { width, height, unit } = resolvedTemplateDimensions;
 				const isInches = ['in', 'inch', 'inches'].includes(unit?.toLowerCase() ?? '');
 				
@@ -135,12 +185,32 @@
 				const widthInches = isInches ? width : width / 300;
 				const heightInches = isInches ? height : height / 300;
 				
-				// Store geometry dimensions for texture transform
-				geometryDimensions = { width: widthInches, height: heightInches };
+				// Convert to 3D world units using the same scale factor as createCardFromInches
+				const scaleInchesToUnits = 0.5;
+				const worldWidth = widthInches * scaleInchesToUnits;
+				const worldHeight = heightInches * scaleInchesToUnits;
 				
-				// Create standard geometry - texture transform will handle the rest
+				// Store the actual 3D world dimensions for texture transform
+				geometryDimensions = { width: worldWidth, height: worldHeight };
+				
+				// Also update resolved template dimensions to use the actual card size in inches
+				// This ensures texture transformation uses the correct aspect ratio
+				resolvedTemplateDimensions = {
+					width: widthInches,
+					height: heightInches,
+					unit: 'inches'
+				};
+				
+				// Create geometry with the calculated dimensions
 				geometry = await createCardFromInches(widthInches, heightInches);
+				
+				console.log('📐 Geometry Dimensions:', {
+					template: { width, height, unit },
+					inches: { width: widthInches, height: heightInches },
+					worldUnits: { width: worldWidth, height: worldHeight }
+				});
 			} else {
+				console.log('📍 Taking Default Geometry Path (no template dimensions)');
 				geometry = await createRoundedRectCard();
 				geometryDimensions = { width: 2, height: 1.25 };
 			}
@@ -223,7 +293,7 @@
 
 <svelte:window on:keydown={handleKeydown} />
 
-{#if resolvedFrontUrl || resolvedBackUrl}
+{#if frontImageUrlProp || backImageUrlProp}
 	<div class="fixed inset-0 z-50">
 		<div class="fixed inset-0 bg-black/80 backdrop-blur-sm modal-backdrop" role="presentation" onclick={handleModalClose}></div>
 
@@ -252,7 +322,7 @@
 								<T.Group rotation.y={rotationY}>
 									{#if currentGeometry.frontGeometry && resolvedFrontUrl}
 										{@const frontTexture = useTexture(resolvedFrontUrl, { 
-											transform: (texture) => transformTextureToCover(texture, resolvedTemplateDimensions, geometryDimensions)
+											transform: (texture) => transformTextureToFit(texture, resolvedTemplateDimensions, geometryDimensions)
 										})}
 										
 										{#await frontTexture}
@@ -326,7 +396,7 @@
 									
 									{#if currentGeometry.backGeometry && resolvedBackUrl}
 										{@const backTexture = useTexture(resolvedBackUrl, { 
-											transform: (texture) => transformTextureToCover(texture, resolvedTemplateDimensions, geometryDimensions)
+											transform: (texture) => transformTextureToFit(texture, resolvedTemplateDimensions, geometryDimensions)
 										})}
 										
 										{#await backTexture}
@@ -408,7 +478,7 @@
 						</Canvas>
 					{:else}
 						<div class="absolute inset-0 flex items-center justify-center">
-							<LoadingSpinner />
+							<div class="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
 						</div>
 					{/if}
 				</div>

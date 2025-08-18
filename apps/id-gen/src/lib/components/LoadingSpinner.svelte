@@ -5,14 +5,20 @@
 	// Dynamically import Threlte components only on client
 	let T: any = $state(null);
 	let THREE: any = $state(null);
+	let isLoaded = $state(false);
 
 	onMount(async () => {
 		if (browser) {
-			const threlteCore = await import('@threlte/core');
-			const threeJs = await import('three');
+			try {
+				const threlteCore = await import('@threlte/core');
+				const threeJs = await import('three');
 
-			T = threlteCore.T;
-			THREE = threeJs;
+				T = threlteCore.T;
+				THREE = threeJs;
+				isLoaded = true;
+			} catch (error) {
+				console.error('Failed to load Threlte components:', error);
+			}
 		}
 	});
 
@@ -32,14 +38,14 @@
 
 	// Start animation
 	$effect(() => {
-		if (browser) {
+		if (browser && isLoaded) {
 			animate();
 		}
-		return () => {
-			if (animationId) {
-				cancelAnimationFrame(animationId);
-			}
-		};
+	return () => {
+		if (animationId) {
+			cancelAnimationFrame(animationId);
+		}
+	};
 	});
 
 	// GLSL for the spinner shader
@@ -77,7 +83,7 @@
   `;
 </script>
 
-{#if T && THREE}
+{#if isLoaded && T && THREE}
 	<T.Mesh>
 		<T.PlaneGeometry />
 		<T.ShaderMaterial
