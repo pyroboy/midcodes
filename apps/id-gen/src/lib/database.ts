@@ -1,12 +1,13 @@
 import { supabase } from './supabaseClient';
 import type { TemplateData } from './stores/templateStore';
-import { uploadFile, deleteFile } from './utils/supabase';
+import { uploadFile, deleteFile, getSupabaseStorageUrl } from './utils/supabase';
 
 export async function uploadImage(file: File, path: string, userId?: string): Promise<string> {
 	try {
 		const finalPath = userId ? `${userId}/${path}` : path;
 		const result = await uploadFile('templates', finalPath, file);
-		return result.path;
+		// Return the full URL instead of just the path
+		return getSupabaseStorageUrl(result.path, 'templates');
 	} catch (error) {
 		console.error('Error uploading image:', error);
 		throw error;

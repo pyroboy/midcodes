@@ -106,19 +106,24 @@ function calculateCropArea(
 	const finalHeight = originalImageSize.height * finalScale;
 
 	// Convert UI background positioning to actual pixel offsets
-	// In CSS, background-position uses percentages where 50% means centered
-	// backgroundPosition.x/y are offset values from center position (0 = center)
+	// The UI positioning works like CSS background-position where:
+	// - 0,0 is centered
+	// - positive values move the background right/down
+	// - negative values move the background left/up
+	
+	// Calculate where the scaled image would be positioned
 	const centerOffsetX = (templateSize.width - finalWidth) / 2;
 	const centerOffsetY = (templateSize.height - finalHeight) / 2;
 
-	// Apply user positioning offsets
-	// backgroundPosition.x/y are direct pixel offsets from the UI
-	const userOffsetX = backgroundPosition.x;
-	const userOffsetY = backgroundPosition.y;
+	// The backgroundPosition.x/y values are already in template coordinate space
+	// because they're calculated using the coordinate system scale in TemplateForm
+	// No additional scaling is needed here
+	const scaledUserOffsetX = backgroundPosition.x;
+	const scaledUserOffsetY = backgroundPosition.y;
 
 	// Calculate final positioned area in template space
-	const imageLeft = coverOffsetX + centerOffsetX + userOffsetX;
-	const imageTop = coverOffsetY + centerOffsetY + userOffsetY;
+	const imageLeft = coverOffsetX + centerOffsetX + scaledUserOffsetX;
+	const imageTop = coverOffsetY + centerOffsetY + scaledUserOffsetY;
 
 	// Calculate what portion of the original image corresponds to the template bounds
 	// Convert template coordinates back to original image coordinates
@@ -136,10 +141,11 @@ function calculateCropArea(
 		sourceTop + templateSize.height * templateToImageScale
 	);
 
-	const sourceX = sourceLeft;
-	const sourceY = sourceTop;
-	const sourceWidth = sourceRight - sourceLeft;
-	const sourceHeight = sourceBottom - sourceTop;
+	// Apply strict bounds checking
+	const sourceX = Math.max(0, Math.min(sourceLeft, originalImageSize.width));
+	const sourceY = Math.max(0, Math.min(sourceTop, originalImageSize.height));
+	const sourceWidth = Math.max(0, Math.min(sourceRight - sourceX, originalImageSize.width - sourceX));
+	const sourceHeight = Math.max(0, Math.min(sourceBottom - sourceY, originalImageSize.height - sourceY));
 
 	// Destination coordinates (where to place in the template)
 	const destX = Math.max(0, imageLeft);

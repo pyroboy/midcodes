@@ -5,10 +5,28 @@
 	import TemplateEdit from '$lib/components/TemplateEdit.svelte';
 	import CroppingConfirmationDialog from '$lib/components/CroppingConfirmationDialog.svelte';
 	import { uploadImage } from '$lib/database';
+	import { getSupabaseStorageUrl } from '$lib/utils/supabase';
 	import { pushState } from '$app/navigation';
-	import type { TemplateData, TemplateElement } from '$lib/stores/templateStore';
+	import type { TemplateElement, TemplateData } from '$lib/stores/templateStore';
 	import type { CardSize } from '$lib/utils/sizeConversion';
-	import { cardSizeToPixels, DEFAULT_DPI } from '$lib/utils/sizeConversion';
+	import { cardSizeToPixels } from '$lib/utils/sizeConversion';
+
+	// Type that matches the actual database schema
+	type DatabaseTemplate = {
+		id: string;
+		user_id: string;
+		name: string;
+		description?: string | null;
+		org_id: string;
+		front_background: string;
+		back_background: string;
+		front_background_url?: string | null;
+		back_background_url?: string | null;
+		orientation: 'landscape' | 'portrait';
+		template_elements: TemplateElement[];
+		created_at: string;
+		updated_at?: string | null;
+	};
 import {
 	needsCropping,
 	cropBackgroundImage,
@@ -21,7 +39,7 @@ import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeom
 	// data means get data from server
 	let { data } = $props();
 
-	let templates = $state(data.templates);
+	let templates = $state<DatabaseTemplate[]>(data.templates);
 
 	let user = $state(data.user);
 	let org_id = $state(data.org_id);
@@ -31,7 +49,7 @@ import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeom
 	let frontPreview: string | null = $state(null);
 	let backPreview: string | null = $state(null);
 	let errorMessage = $state('');
-	let currentTemplate: TemplateData | null = $state(null);
+	let currentTemplate: DatabaseTemplate | null = $state(null);
 	let frontElements: TemplateElement[] = $state([]);
 	let backElements: TemplateElement[] = $state([]);
 
@@ -137,7 +155,7 @@ import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeom
 
 				// Use the cropped file for upload
 				frontBackground = frontResult.croppedFile;
-				frontUrl = await uploadImage(frontResult.croppedFile, 'front', user?.id, org_id);
+				frontUrl = await uploadImage(frontResult.croppedFile, 'front', user?.id);
 				console.log('✅ Front background processed and uploaded:', {
 					wasCropped: frontResult.wasCropped,
 					originalSize: frontResult.originalSize,
@@ -157,7 +175,7 @@ import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeom
 
 				// Use the cropped file for upload
 				backBackground = backResult.croppedFile;
-				backUrl = await uploadImage(backResult.croppedFile, 'back', user?.id, org_id);
+				backUrl = await uploadImage(backResult.croppedFile, 'back', user?.id);
 				console.log('✅ Back background processed and uploaded:', {
 					wasCropped: backResult.wasCropped,
 					originalSize: backResult.originalSize,
@@ -193,7 +211,7 @@ import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeom
 				backUrlType: typeof backUrl
 			});
 
-			const templateDataToSave: TemplateData = {
+			const templateDataToSave = {
 				id: currentTemplate?.id || crypto.randomUUID(),
 				user_id: user?.id ?? '',
 				name: currentTemplate?.name || 'Untitled Template',
@@ -202,14 +220,7 @@ import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeom
 				orientation: currentTemplate?.orientation ?? 'landscape',
 				template_elements: allElements,
 				created_at: currentTemplate?.created_at || new Date().toISOString(),
-				org_id: org_id ?? '',
-				// Add the database schema fields
-				width_pixels: requiredPixelDimensions?.width || currentTemplate?.width_pixels,
-				height_pixels: requiredPixelDimensions?.height || currentTemplate?.height_pixels,
-				dpi: currentTemplate?.dpi || DEFAULT_DPI,
-				unit_type: currentCardSize?.unit || currentTemplate?.unit_type || 'pixels',
-				unit_width: currentCardSize?.width || currentTemplate?.unit_width,
-				unit_height: currentCardSize?.height || currentTemplate?.unit_height
+				org_id: org_id ?? ''
 			};
 
 			if (!templateDataToSave.user_id) {
@@ -409,11 +420,9 @@ import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeom
 		if (side === 'front') {
 			frontBackground = null;
 			frontPreview = null;
-			frontElements = [];
 		} else {
 			backBackground = null;
 			backPreview = null;
-			backElements = [];
 		}
 	}
 
@@ -426,8 +435,17 @@ import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeom
 
 			if (data.selectedTemplate) {
 				currentTemplate = data.selectedTemplate;
-				frontPreview = data.selectedTemplate.front_background;
-				backPreview = data.selectedTemplate.back_background;
+				// Convert storage paths to full URLs if they're not already URLs
+				frontPreview = data.selectedTemplate.front_background?.startsWith('http') 
+					? data.selectedTemplate.front_background
+					: data.selectedTemplate.front_background 
+						? getSupabaseStorageUrl(data.selectedTemplate.front_background, 'templates')
+						: null;
+				backPreview = data.selectedTemplate.back_background?.startsWith('http')
+					? data.selectedTemplate.back_background
+					: data.selectedTemplate.back_background
+						? getSupabaseStorageUrl(data.selectedTemplate.back_background, 'templates')
+						: null;
 				frontElements = (data.selectedTemplate.template_elements as TemplateElement[]).filter(
 					(el) => el.side === 'front'
 				);
@@ -509,9 +527,9 @@ import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeom
 	function handleCreateNewTemplate(cardSize: CardSize, templateName: string) {
 		// Set up new template creation
 		currentCardSize = cardSize;
-		requiredPixelDimensions = cardSizeToPixels(cardSize, DEFAULT_DPI);
+		requiredPixelDimensions = cardSizeToPixels(cardSize, 300); // Use hardcoded DPI
 
-		// Create new template with card size information
+		// Create new template with only database-compatible properties
 		currentTemplate = {
 			id: crypto.randomUUID(),
 			user_id: user?.id ?? '',
@@ -521,14 +539,7 @@ import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeom
 			orientation: cardSize.width >= cardSize.height ? 'landscape' : 'portrait',
 			template_elements: [],
 			created_at: new Date().toISOString(),
-			org_id: org_id ?? '',
-			// Add size information for new templates
-			width_pixels: requiredPixelDimensions?.width,
-			height_pixels: requiredPixelDimensions?.height,
-			dpi: DEFAULT_DPI,
-			unit_type: cardSize.unit,
-			unit_width: cardSize.width,
-			unit_height: cardSize.height
+			org_id: org_id ?? ''
 		};
 
 		// Clear existing data
@@ -564,25 +575,8 @@ import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeom
 				try {
 					console.log(`🔄 Creating 3D model for template "${templateName}"...`);
 					
-					let geometry;
-					if (template.width_pixels && template.height_pixels) {
-						// Use template dimensions if available
-						const unit = template.unit_type?.toLowerCase() || 'pixels';
-						if (unit === 'inches' || unit === 'inch' || unit === 'in') {
-							geometry = await createCardFromInches(
-								template.unit_width || template.width_pixels,
-								template.unit_height || template.height_pixels
-							);
-						} else {
-							// Convert pixels to inches (assuming 300 DPI)
-							const widthInches = template.width_pixels / 300;
-							const heightInches = template.height_pixels / 300;
-							geometry = await createCardFromInches(widthInches, heightInches);
-						}
-					} else {
-						// Fallback to default card dimensions for legacy templates
-						geometry = await createCardFromInches(3.375, 2.125); // Standard credit card size
-					}
+					// Use default card dimensions for all templates since size fields don't exist in DB
+					const geometry = await createCardFromInches(3.375, 2.125); // Standard credit card size
 					
 					templateGeometries[templateName] = geometry;
 					readyModelsCount++;
@@ -647,7 +641,8 @@ import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeom
 				onImageUpload={(files, side) => handleImageUpload(files, side)}
 				onRemoveImage={(side) => handleRemoveImage(side)}
 				onUpdateBackgroundPosition={(position, side) => {
-					console.log(`Background position updated for ${side}:`, position);
+			$state.snapshot(`Background side updated for ${side}:`);
+			$state.snapshot(`Background position updated for ${position}`);
 					if (side === 'front') {
 						frontBackgroundPosition = { ...position };
 					} else {
@@ -681,37 +676,7 @@ import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeom
 		justify-content: center;
 	}
 
-	.template-form-container {
-		flex: 1;
-		padding: 2rem;
-		overflow-y: auto;
-		max-width: 100%;
-		transition: all 0.3s ease;
-		position: relative;
-	}
 
-	.template-form-container.active {
-		max-width: 1200px;
-		margin: 0 auto;
-	}
-
-	.back-button-container {
-		position: sticky;
-		top: 0;
-		left: 0;
-		padding: 1rem 0;
-		z-index: 10;
-	}
-
-	.back-button {
-		font-size: 1.125rem;
-		font-weight: 500;
-		transition: all 0.2s ease;
-	}
-
-	.template-content {
-		padding-top: 1rem;
-	}
 
 	:global(.animate-pulse) {
 		animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;

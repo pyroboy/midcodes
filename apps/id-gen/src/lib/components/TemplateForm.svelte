@@ -6,7 +6,11 @@
 	import { Upload, Image, Plus, X, Move, Scaling } from '@lucide/svelte';
 	import { loadGoogleFonts, getAllFontFamilies, isFontLoaded, fonts } from '../config/fonts';
 	import { CoordinateSystem } from '$lib/utils/coordinateSystem';
-	import { createAdaptiveElements } from '$lib/utils/adaptiveElements';
+import { createAdaptiveElements } from '$lib/utils/adaptiveElements';
+import { cssForBackground, clampBackgroundPosition } from '$lib/utils/backgroundGeometry';
+import type { Dims } from '$lib/utils/backgroundGeometry';
+import { browser } from '$app/environment';
+import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 
 	let {
 		side,
@@ -69,62 +73,57 @@
 		scale: 1
 	});
 
-	// Calculate background positioning to align with elements
-	let backgroundInfo = $derived(() => {
+	// Debug state for visual feedback verification
+	let debugState = $state({
+		lastUpdate: Date.now(),
+		position: backgroundPosition,
+		previewBounds: null as DOMRect | null,
+		cssValues: { size: '', position: '' },
+		enabled: true // Enable debug by default
+	});
+
+	// Calculate background CSS using shared geometry utility
+	let backgroundCSS = $derived(() => {
 		const currentBase = baseDimensions();
 		const container = previewDimensions;
 
 		// Return early if dimensions are not yet available
 		if (currentBase.actualWidth === 0 || currentBase.actualHeight === 0) {
-			return { bgScale: 1, bgOffsetX: 0, bgOffsetY: 0 };
+			return {
+				size: 'cover',
+				position: 'center'
+			};
 		}
 
-		// Calculate how background-size: cover affects the image
-		const backgroundAspect = currentBase.actualWidth / currentBase.actualHeight;
-		const containerAspect = container.width / container.height;
+		const image: Dims = {
+			width: currentBase.actualWidth,
+			height: currentBase.actualHeight
+		};
+		const containerDims: Dims = {
+			width: container.width,
+			height: container.height
+		};
 
-		let bgScale,
-			bgOffsetX = 0,
-			bgOffsetY = 0;
+		// Get accurate CSS values using shared math
+		const css = cssForBackground(image, containerDims, backgroundPosition, 1);
 
-		if (backgroundAspect > containerAspect) {
-			// Background is wider - height fits, width is cropped
-			bgScale = container.height / currentBase.actualHeight;
-			const scaledBgWidth = currentBase.actualWidth * bgScale * 2;
-			bgOffsetX = (container.width - scaledBgWidth) / 2; // Negative if cropped
-		} else {
-			// Background is taller - width fits, height is cropped
-			bgScale = container.width / currentBase.actualWidth;
-			const scaledBgHeight = currentBase.actualHeight * bgScale;
-			bgOffsetY = (container.height - scaledBgHeight) / 2; // Negative if cropped
-		}
-
-		// Debug background positioning
-		console.log('📱 Background positioning:', {
-			currentBase,
-			container,
-			backgroundAspect,
-			containerAspect,
-			bgScale,
-			bgOffsetX,
-			bgOffsetY
-		});
-
-		return { bgScale, bgOffsetX, bgOffsetY };
+		return {
+			size: `${css.sizePx.w}px ${css.sizePx.h}px`,
+			position: `calc(50% + ${css.posPx.x}px) calc(50% + ${css.posPx.y}px)`
+		};
 	});
 
-	// Unified coordinate system - use background scale for proper alignment
+	// Simplified coordinate system - use preview scale directly
 	let coordSystem = $derived(() => {
 		const currentBase = baseDimensions();
-		const bgInfo = backgroundInfo();
 
 		// Return early if dimensions are not yet available
 		if (currentBase.actualWidth === 0 || currentBase.actualHeight === 0) {
 			return new CoordinateSystem(100, 100, 1); // Default fallback
 		}
 
-		// Use the actual background scale from CSS background-size: cover
-		const scale = bgInfo.bgScale;
+		// Use the preview dimensions scale
+		const scale = previewDimensions.scale;
 
 		return new CoordinateSystem(currentBase.actualWidth, currentBase.actualHeight, scale);
 	});
@@ -397,39 +396,51 @@
 		if (onUpdateBackgroundPosition) {
 			onUpdateBackgroundPosition(backgroundPosition, side);
 		}
+
+		// Only log debug info on actual position changes, not continuous updates
+		if (debugState.enabled && browser) {
+			const newCssValues = { 
+				size: backgroundCSS().size, 
+				position: backgroundCSS().position 
+			};
+
+			// Update debug state
+			debugState = {
+				...debugState,
+				lastUpdate: Date.now(),
+				position: { ...backgroundPosition },
+				previewBounds: templateContainer?.getBoundingClientRect() || null,
+				cssValues: newCssValues
+			};
+
+			// Only log when this is called from a user interaction (not reactive updates)
+			const debugInfo: DebugInfo = {
+				component: 'TemplateForm',
+				position: backgroundPosition,
+				cssValues: newCssValues,
+				timestamp: Date.now()
+			};
+
+			logDebugInfo(debugInfo);
+
+			window.dispatchEvent(new CustomEvent('background-position-update', {
+				detail: debugInfo
+			}));
+		}
 	}
 
 	let elementStyle = $derived((element: TemplateElement) => {
 		const currentCoordSystem = coordSystem();
-		const bgInfo = backgroundInfo();
 
-		// Get base position from coordinate system
-		const baseStyle = currentCoordSystem.createPositionStyle(
+		// Get position from coordinate system - no offset needed with accurate background positioning
+		const positionStyle = currentCoordSystem.createPositionStyle(
 			element.x || 0,
 			element.y || 0,
 			element.width || 0,
 			element.height || 0
 		);
 
-		// Apply background offset to align with actual background position
-		const adjustedStyle = {
-			...baseStyle,
-			left: `${Math.round(parseFloat(baseStyle.left) + bgInfo.bgOffsetX)}px`,
-			top: `${Math.round(parseFloat(baseStyle.top) + bgInfo.bgOffsetY)}px`
-		};
-
-		// Debug element positioning for key elements
-		if (element.variableName === 'name' || element.variableName === 'photo') {
-			console.log(`📍 Element "${element.variableName}" positioning:`, {
-				storageCoords: { x: element.x, y: element.y, width: element.width, height: element.height },
-				baseStyle,
-				backgroundOffset: { x: bgInfo.bgOffsetX, y: bgInfo.bgOffsetY },
-				adjustedStyle,
-				coordSystemScale: currentCoordSystem.scale
-			});
-		}
-
-		return adjustedStyle;
+		return positionStyle;
 	});
 
 	let textStyle = $derived((element: TemplateElement) => {
@@ -480,14 +491,30 @@
 				class="template-container {side} group"
 				class:has-preview={preview}
 				bind:this={templateContainer}
-				style="background-image: {preview ? `url('${preview}')` : 'none'}; 
-                       background-size: {preview ? `${100 * backgroundPosition.scale}%` : 'cover'};
-                       background-position: {preview
-					? `${50 + backgroundPosition.x}% ${50 + backgroundPosition.y}%`
-					: 'center'};
+			style="background-image: {preview ? `url('${preview}')` : 'none'}; 
+                       background-size: {preview ? backgroundCSS.size : 'cover'};
+                       background-position: {preview ? backgroundCSS.position : 'center'};
                        background-repeat: no-repeat;
                        background-color: white;"
 			>
+				{#if debugState.enabled && preview}
+					<div class="debug-overlay">
+						<div 
+							class="position-indicator" 
+							style="left: calc(50% + {backgroundPosition.x}px); 
+							       top: calc(50% + {backgroundPosition.y}px);">
+							📍
+						</div>
+						<div class="debug-controls">
+							<button 
+								class="debug-button" 
+								title="Toggle debug overlay"
+								onclick={() => debugState.enabled = false}>
+								❌ Debug
+							</button>
+						</div>
+					</div>
+				{/if}
 				{#if !preview}
 					<label class="placeholder-design clickable-container">
 						<input
@@ -608,22 +635,32 @@
 					>
 						<X class="w-4 h-4" />
 					</Button>
+					
+					{#if !debugState.enabled}
+						<Button
+							variant="outline"
+							size="icon"
+							class="debug-toggle"
+							onclick={() => debugState.enabled = true}
+							title="Enable debug mode"
+						>
+							🐛
+						</Button>
+					{/if}
 				{/if}
 			</div>
 		</div>
-		{#if preview}
-			<ElementList
-				{elements}
-				{onUpdateElements}
-				{fontOptions}
-				{side}
-				{preview}
-				bind:backgroundPosition
-				{onUpdateBackgroundPosition}
-				{cardSize}
-				{pixelDimensions}
-			/>
-		{/if}
+		<ElementList
+			{elements}
+			{onUpdateElements}
+			{fontOptions}
+			{side}
+			{preview}
+			bind:backgroundPosition
+			{onUpdateBackgroundPosition}
+			{cardSize}
+			{pixelDimensions}
+		/>
 	</div>
 </div>
 
@@ -812,6 +849,52 @@
 		top: 10px;
 		right: 10px;
 		z-index: 10;
+	}
+
+	.debug-toggle {
+		position: absolute;
+		top: 10px;
+		right: 50px;
+		z-index: 10;
+		font-size: 12px;
+	}
+	
+	.debug-overlay {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		z-index: 100;
+	}
+	
+	.position-indicator {
+		position: absolute;
+		font-size: 20px;
+		transition: all 0.2s ease;
+		margin-left: -10px;
+		margin-top: -20px;
+		filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+	}
+	
+	.debug-controls {
+		position: absolute;
+		top: 50px;
+		right: 10px;
+		z-index: 101;
+		pointer-events: auto;
+	}
+	
+	.debug-button {
+		background: rgba(0, 0, 0, 0.7);
+		color: white;
+		border: none;
+		padding: 4px 8px;
+		border-radius: 4px;
+		font-size: 12px;
+		cursor: pointer;
+	}
+	
+	.debug-button:hover {
+		background: rgba(0, 0, 0, 0.9);
 	}
 
 	.resize-handle.top-left {
