@@ -9,6 +9,13 @@
 	import type { CardSize } from '$lib/utils/sizeConversion';
 
 	let { templates = $bindable([]), onSelect, onCreateNew } = $props();
+	
+	// Track template loading and 3D model readiness
+	$effect(() => {
+		if (templates.length > 0) {
+			console.log(`📋 TemplateList: ${templates.length} templates loaded, 3D models will be generated...`);
+		}
+	});
 	let selectedTemplate: TemplateData | null = null;
 	let notification: string | null = $state(null);
 	let hoveredTemplate: string | null = $state(null);

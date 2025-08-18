@@ -9,12 +9,14 @@
 	import type { TemplateData, TemplateElement } from '$lib/stores/templateStore';
 	import type { CardSize } from '$lib/utils/sizeConversion';
 	import { cardSizeToPixels, DEFAULT_DPI } from '$lib/utils/sizeConversion';
-	import {
-		needsCropping,
-		cropBackgroundImage,
-		getImageDimensions,
-		type BackgroundPosition
-	} from '$lib/utils/imageCropper';
+import {
+	needsCropping,
+	cropBackgroundImage,
+	getImageDimensions,
+	type BackgroundPosition
+} from '$lib/utils/imageCropper';
+import { browser } from '$app/environment';
+import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeometry';
 
 	// data means get data from server
 	let { data } = $props();
@@ -40,6 +42,11 @@
 	// Add view mode state
 	let isLoading = $state(false);
 	let isEditMode = $state(false);
+	
+	// Preload 3D card geometries for templates
+	const templateGeometries = $state<Record<string, any>>({});
+	let readyModelsCount = $state(0);
+	let totalTemplatesCount = $state(0);
 
 	// Background position tracking for cropping
 	let frontBackgroundPosition: BackgroundPosition = $state({ x: 0, y: 0, scale: 1 });
@@ -542,6 +549,61 @@
 			pixelDimensions: requiredPixelDimensions
 		});
 	}
+
+	// Load 3D geometries for all templates asynchronously
+	$effect(() => {
+		if (browser && templates && templates.length > 0) {
+			totalTemplatesCount = templates.length;
+			readyModelsCount = 0;
+			
+			console.log(`🚀 Templates: Starting 3D model generation for ${totalTemplatesCount} templates...`);
+			
+			// Process each template
+			templates.forEach(async (template) => {
+				const templateName = template.name;
+				try {
+					console.log(`🔄 Creating 3D model for template "${templateName}"...`);
+					
+					let geometry;
+					if (template.width_pixels && template.height_pixels) {
+						// Use template dimensions if available
+						const unit = template.unit_type?.toLowerCase() || 'pixels';
+						if (unit === 'inches' || unit === 'inch' || unit === 'in') {
+							geometry = await createCardFromInches(
+								template.unit_width || template.width_pixels,
+								template.unit_height || template.height_pixels
+							);
+						} else {
+							// Convert pixels to inches (assuming 300 DPI)
+							const widthInches = template.width_pixels / 300;
+							const heightInches = template.height_pixels / 300;
+							geometry = await createCardFromInches(widthInches, heightInches);
+						}
+					} else {
+						// Fallback to default card dimensions for legacy templates
+						geometry = await createCardFromInches(3.375, 2.125); // Standard credit card size
+					}
+					
+					templateGeometries[templateName] = geometry;
+					readyModelsCount++;
+					
+					console.log(`✅ 3D model ready for template "${templateName}" (${readyModelsCount}/${totalTemplatesCount})`);
+					
+					// Log when all models are ready
+					if (readyModelsCount === totalTemplatesCount) {
+						console.log(`🎉 All ${totalTemplatesCount} template 3D models are ready!`);
+					}
+				} catch (error) {
+					console.error(`❌ Failed to create 3D model for template "${templateName}":`, error);
+					// Still increment count to avoid hanging
+					readyModelsCount++;
+					if (readyModelsCount === totalTemplatesCount) {
+						console.log(`⚠️ Template 3D model generation completed with ${Object.keys(templateGeometries).length} successful models out of ${totalTemplatesCount}`);
+					}
+				}
+			});
+		}
+	});
 
 	onMount(() => {
 		const handlePopState = (event: PopStateEvent) => {
