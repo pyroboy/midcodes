@@ -36,6 +36,14 @@
                     <a href="/" class="px-3 py-2 rounded hover:bg-gray-700">Home</a>
                     <a href="/all-ids" class="px-3 py-2 rounded hover:bg-gray-700">All IDs</a>
                     <a href="/templates" class="px-3 py-2 rounded hover:bg-gray-700">Templates</a>
+                    {#if data.user && data.user.app_metadata && data.user.app_metadata.role && ['super_admin', 'org_admin', 'id_gen_admin'].includes(data.user.app_metadata.role)}
+                        <a href="/admin" class="px-3 py-2 rounded hover:bg-gray-700 bg-gray-700 text-yellow-300">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                            </svg>
+                            Admin
+                        </a>
+                    {/if}
                     <form method="POST" action="/auth/signout" class="inline">
                         <button type="submit" class="px-3 py-2 rounded hover:bg-gray-700">Sign Out</button>
                     </form>

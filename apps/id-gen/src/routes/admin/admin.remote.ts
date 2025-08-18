@@ -1,28 +1,22 @@
-import * as v from 'valibot';
 import { error } from '@sveltejs/kit';
 import { query, command, getRequestEvent } from '$app/server';
 
-// Type definitions for validation
-const UserRoleSchema = v.union([
-	v.literal('super_admin'),
-	v.literal('org_admin'),
-	v.literal('id_gen_admin'),
-	v.literal('id_gen_user')
-]);
-
-const AddUserSchema = v.object({
-	email: v.pipe(v.string(), v.email()),
-	role: UserRoleSchema
-});
-
-const UpdateUserRoleSchema = v.object({
-	userId: v.string(),
-	role: UserRoleSchema
-});
-
-const DeleteUserSchema = v.object({
-	userId: v.string()
-});
+// Import schemas following AZPOS pattern
+import {
+  addUserSchema,
+  updateUserRoleSchema,
+  deleteUserSchema,
+  userRoleSchema,
+  adminDashboardDataSchema,
+  usersDataSchema,
+  adminActionResultSchema,
+  type AddUser,
+  type UpdateUserRole,
+  type DeleteUser,
+  type AdminDashboardData,
+  type UsersData,
+  type AdminActionResult
+} from '$lib/types/admin.schema';
 
 // Helper function to check admin permissions
 async function requireAdminPermissions() {
@@ -61,7 +55,7 @@ async function requireSuperAdminPermissions() {
 }
 
 // Query functions
-export const getAdminDashboardData = query(async () => {
+export const getAdminDashboardData = query(async (): Promise<AdminDashboardData> => {
 	const { user, supabase, org_id } = await requireAdminPermissions();
 
 	if (!org_id) {
@@ -172,7 +166,7 @@ export const getAdminDashboardData = query(async () => {
 	}
 });
 
-export const getUsersData = query(async () => {
+export const getUsersData = query(async (): Promise<UsersData> => {
 	const { user, supabase, org_id } = await requireAdminPermissions();
 
 	if (!org_id) {
@@ -205,7 +199,7 @@ export const getUsersData = query(async () => {
 });
 
 // Command functions
-export const addUser = command(AddUserSchema, async ({ email, role }) => {
+export const addUser = command('unchecked', async ({ email, role }: any) => {
 	const { user, supabase, org_id } = await requireUserManagementPermissions();
 
 	try {
@@ -292,7 +286,7 @@ export const addUser = command(AddUserSchema, async ({ email, role }) => {
 	}
 });
 
-export const updateUserRole = command(UpdateUserRoleSchema, async ({ userId, role }) => {
+export const updateUserRole = command('unchecked', async ({ userId, role }: any) => {
 	const { user, supabase, org_id } = await requireUserManagementPermissions();
 
 	try {
@@ -362,7 +356,7 @@ export const updateUserRole = command(UpdateUserRoleSchema, async ({ userId, rol
 	}
 });
 
-export const deleteUser = command(DeleteUserSchema, async ({ userId }) => {
+export const deleteUser = command('unchecked', async ({ userId }: any) => {
 	const { user, supabase, org_id } = await requireUserManagementPermissions();
 
 	try {

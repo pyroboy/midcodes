@@ -1,10 +1,22 @@
 import type { PageServerLoad } from './$types';
-import { error } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ locals}) => {
 
     const { supabase, session, user, org_id, permissions } = locals;
-    // const { user, profile } = session;
+    
+    // Check if user has admin role and redirect to admin dashboard
+    if (user && user.app_metadata && user.app_metadata.role) {
+        const userRole = user.app_metadata.role;
+        console.log('User role detected:', userRole);
+        
+        // Redirect super admins to admin dashboard
+        if (['super_admin', 'org_admin', 'id_gen_admin'].includes(userRole)) {
+            console.log('Redirecting admin user to /admin dashboard');
+            throw redirect(302, '/admin');
+        }
+    }
+    
 console.log('session:', session);
 console.log('user:', user);
 console.log('org_id:', org_id);

@@ -3,7 +3,7 @@
     import { Button } from '$lib/components/ui/button';
     import { Badge } from '$lib/components/ui/badge';
     import { CREDIT_PACKAGES, PREMIUM_FEATURES } from '$lib/utils/credits';
-    import { createCreditPayment, createFeaturePayment } from '$lib/server/remotes/payments.remote';
+    import { createCreditPayment, createFeaturePayment } from '$lib/remote/payments.remote';
     import { paymentFlags } from '$lib/stores/featureFlags';
     
     interface Props {

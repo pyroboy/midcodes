@@ -8,43 +8,43 @@ import { z } from 'zod';
  * Payment methods supported by the system
  * Optional since Checkout can handle multiple methods
  */
-export const zPaymentMethod = z.enum(['gcash', 'paymaya', 'card', 'online_banking']).optional();
+export const paymentMethodSchema = z.enum(['gcash', 'paymaya', 'card', 'online_banking']).optional();
 
 /**
  * Type of purchase being made
  */
-export const zPurchaseKind = z.enum(['credit', 'feature']);
+export const purchaseKindSchema = z.enum(['credit', 'feature']);
 
 // =============================================================================
-// COMMAND SCHEMAS (Input validation for operations)
+// INPUT SCHEMAS (for commands)
 // =============================================================================
 
 /**
  * Schema for creating a credit payment
  */
-export const zCreateCreditPaymentInput = z.object({
+export const createCreditPaymentInputSchema = z.object({
   packageId: z.string().min(1, 'Package ID is required'),
-  method: zPaymentMethod,
+  method: paymentMethodSchema,
   returnTo: z.string().url('Must be a valid URL').optional()
 });
 
 /**
  * Schema for creating a feature payment
  */
-export const zCreateFeaturePaymentInput = z.object({
+export const createFeaturePaymentInputSchema = z.object({
   featureId: z.string().min(1, 'Feature ID is required'),
-  method: zPaymentMethod,
+  method: paymentMethodSchema,
   returnTo: z.string().url('Must be a valid URL').optional()
 });
 
 // =============================================================================
-// QUERY SCHEMAS (Input validation for queries)
+// QUERY SCHEMAS (for queries)
 // =============================================================================
 
 /**
  * Schema for payment history query parameters
  */
-export const zPaymentHistoryQuery = z.object({
+export const paymentHistoryQuerySchema = z.object({
   cursor: z.string().optional(),
   limit: z.number().int().min(1).max(100).default(20)
 });
@@ -57,7 +57,7 @@ export const zPaymentHistoryQuery = z.object({
  * Minimal PayMongo webhook event parsing
  * Full validation should happen after signature verification
  */
-export const zPayMongoEvent = z.object({
+export const payMongoEventSchema = z.object({
   id: z.string(),
   type: z.string(),
   data: z.any(), // Will be refined based on event type after signature verification
@@ -65,14 +65,14 @@ export const zPayMongoEvent = z.object({
 });
 
 // =============================================================================
-// OUTPUT SCHEMAS (Response validation)
+// OUTPUT SCHEMAS (for responses)
 // =============================================================================
 
 /**
  * Result from initializing a checkout session
  * Supports both standard PayMongo flow and bypass mode
  */
-export const zCheckoutInitResult = z.object({
+export const checkoutInitResultSchema = z.object({
   checkoutUrl: z.string().url(),
   sessionId: z.string(),
   provider: z.enum(['paymongo', 'bypass']),
@@ -84,7 +84,7 @@ export const zCheckoutInitResult = z.object({
  * Payment record schema matching the database table structure
  * Note: Using more permissive types to match actual database schema
  */
-export const zPaymentRecord = z.object({
+export const paymentRecordSchema = z.object({
   id: z.string(),
   user_id: z.string(),
   session_id: z.string(),
@@ -108,8 +108,8 @@ export const zPaymentRecord = z.object({
 /**
  * Payment history response structure
  */
-export const zPaymentHistory = z.object({
-  items: z.array(zPaymentRecord),
+export const paymentHistorySchema = z.object({
+  items: z.array(paymentRecordSchema),
   nextCursor: z.string().nullable()
 });
 
@@ -117,12 +117,27 @@ export const zPaymentHistory = z.object({
 // TYPE EXPORTS (TypeScript types derived from schemas)
 // =============================================================================
 
-export type PaymentMethod = z.infer<typeof zPaymentMethod>;
-export type PurchaseKind = z.infer<typeof zPurchaseKind>;
-export type CreateCreditPaymentInput = z.infer<typeof zCreateCreditPaymentInput>;
-export type CreateFeaturePaymentInput = z.infer<typeof zCreateFeaturePaymentInput>;
-export type PaymentHistoryQuery = z.infer<typeof zPaymentHistoryQuery>;
-export type PayMongoEvent = z.infer<typeof zPayMongoEvent>;
-export type CheckoutInitResult = z.infer<typeof zCheckoutInitResult>;
-export type PaymentRecord = z.infer<typeof zPaymentRecord>;
-export type PaymentHistory = z.infer<typeof zPaymentHistory>;
+export type PaymentMethod = z.infer<typeof paymentMethodSchema>;
+export type PurchaseKind = z.infer<typeof purchaseKindSchema>;
+export type CreateCreditPaymentInput = z.infer<typeof createCreditPaymentInputSchema>;
+export type CreateFeaturePaymentInput = z.infer<typeof createFeaturePaymentInputSchema>;
+export type PaymentHistoryQuery = z.infer<typeof paymentHistoryQuerySchema>;
+export type PayMongoEvent = z.infer<typeof payMongoEventSchema>;
+export type CheckoutInitResult = z.infer<typeof checkoutInitResultSchema>;
+export type PaymentRecord = z.infer<typeof paymentRecordSchema>;
+export type PaymentHistory = z.infer<typeof paymentHistorySchema>;
+
+// =============================================================================
+// LEGACY EXPORTS (for backward compatibility)
+// =============================================================================
+
+// Keep old z-prefixed exports for existing code compatibility
+export const zPaymentMethod = paymentMethodSchema;
+export const zPurchaseKind = purchaseKindSchema;
+export const zCreateCreditPaymentInput = createCreditPaymentInputSchema;
+export const zCreateFeaturePaymentInput = createFeaturePaymentInputSchema;
+export const zPaymentHistoryQuery = paymentHistoryQuerySchema;
+export const zPayMongoEvent = payMongoEventSchema;
+export const zCheckoutInitResult = checkoutInitResultSchema;
+export const zPaymentRecord = paymentRecordSchema;
+export const zPaymentHistory = paymentHistorySchema;

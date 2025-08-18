@@ -4,24 +4,49 @@
     "apps/*",
     "packages/*"
   ],
-  "scripts": {
-    "build": "turbo run build",
-    "dev": "turbo run dev",
-    "lint": "turbo run lint",
-    "test": "turbo run test",
-    "clean": "turbo run clean && rm -rf node_modules"
+  "packageManager": "pnpm@9.12.1",
+  "engines": {
+    "node": ">=20.0.0"
   },
-  "devDependencies": {
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "clean": "turbo run clean && rimraf node_modules",
+    "dep:align": "manypkg fix && syncpack fix-mismatches && syncpack format",
+    "dep:check": "manypkg check && syncpack list-mismatches",
+    "dep:dedupe": "pnpm -r dedupe",
+    "dep:audit": "pnpm audit --prod --json || true"
+  },
+  "overrides": {
+    "svelte": "^5.2.0",
+    "@sveltejs/kit": "^2.27.3",
+    "@sveltejs/vite-plugin-svelte": "^4.0.0",
+    "vite": "^5.4.11",
+    "typescript": "^5.5.0",
+    "tailwindcss": "^3.4.17",
+    "autoprefixer": "^10.4.20"
+  },
+  "dependencies": {
+    "@manypkg/cli": "^0.21.4",
     "autoprefixer": "^10.4.20",
     "clsx": "^2.1.1",
     "esbuild": "^0.24.2",
+    "eslint": "^8.56.0",
+    "knip": "^5.37.1",
+    "only-allow": "^1.2.1",
+    "prettier": "^3.1.1",
+    "prettier-plugin-svelte": "^3.2.6",
+    "prettier-plugin-tailwindcss": "^0.6.5",
+    "rimraf": "^6.0.1",
+    "sv": "^0.6.11",
+    "svelte-check": "^4.0.0",
+    "syncpack": "^13.0.0",
     "tslib": "^2.6.2",
     "turbo": "latest",
     "turbo-ignore": "latest",
-    "typescript": "^5.3.3"
-  },
-  "packageManager": "npm@10.2.4",
-  "dependencies": {
-    "sv": "^0.6.11"
+    "typescript": "^5.5.0"
   }
 }

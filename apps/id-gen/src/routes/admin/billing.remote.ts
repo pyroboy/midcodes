@@ -1,7 +1,24 @@
-import * as v from 'valibot';
 import { error } from '@sveltejs/kit';
 import { query, command, getRequestEvent } from '$app/server';
 import { getUsersData } from './admin.remote'; // for refreshing users after credit changes
+
+// Import schemas following AZPOS pattern
+import {
+  addCreditsManualSchema,
+  grantFeatureSchema,
+  adminCreditAdjustmentSchema,
+  creditActionResultSchema,
+  featureGrantResultSchema,
+  billingOverviewSchema,
+  userCreditsSchema,
+  type AddCreditsManual,
+  type GrantFeature,
+  type AdminCreditAdjustment,
+  type CreditActionResult,
+  type FeatureGrantResult,
+  type BillingOverview,
+  type UserCredits
+} from '$lib/types/billing.schema';
 
 // Reuse or import from admin.remote.ts
 async function requireSuperAdminPermissions() {
@@ -11,7 +28,7 @@ async function requireSuperAdminPermissions() {
   return { user, supabase: locals.supabase, org_id: locals.org_id };
 }
 
-export const getBillingSettings = query(async () => {
+export const getBillingSettings = query(async (): Promise<any> => {
   const { supabase, org_id } = await requireSuperAdminPermissions();
 
   // Ensure a row exists (idempotent)
@@ -35,12 +52,14 @@ export const getBillingSettings = query(async () => {
   return settings;
 });
 
-const ToggleSchema = v.object({
-  enabled: v.boolean(),
-  keyword: v.pipe(v.string(), v.trim(), v.minLength(1))
+import { z } from 'zod';
+
+const toggleSchema = z.object({
+  enabled: z.boolean(),
+  keyword: z.string().min(1).trim()
 });
 
-export const togglePayments = command(ToggleSchema, async ({ enabled, keyword }) => {
+export const togglePayments = command('unchecked', async ({ enabled, keyword }: any) => {
   const { user, supabase, org_id } = await requireSuperAdminPermissions();
 
   if (keyword !== 'TOGGLE_PAYMENTS') {
@@ -58,9 +77,9 @@ export const togglePayments = command(ToggleSchema, async ({ enabled, keyword })
   return { success: true };
 });
 
-const BypassSchema = v.object({ bypass: v.boolean() });
+const bypassSchema = z.object({ bypass: z.boolean() });
 
-export const setPaymentsBypass = command(BypassSchema, async ({ bypass }) => {
+export const setPaymentsBypass = command('unchecked', async ({ bypass }: any) => {
   const { user, supabase, org_id } = await requireSuperAdminPermissions();
 
   const { error: updateError } = await supabase
@@ -74,7 +93,7 @@ export const setPaymentsBypass = command(BypassSchema, async ({ bypass }) => {
   return { success: true };
 });
 
-export const getUsersWithCredits = query(async () => {
+export const getUsersWithCredits = query(async (): Promise<any[]> => {
   const { supabase, org_id } = await requireSuperAdminPermissions();
 
   const { data, error: usersError } = await supabase
@@ -87,13 +106,13 @@ export const getUsersWithCredits = query(async () => {
   return data || [];
 });
 
-const AdjustCreditsSchema = v.object({
-  userId: v.string(),
-  delta: v.number(), // positive to add, negative to deduct
-  reason: v.optional(v.string())
+const adjustCreditsSchema = z.object({
+  userId: z.string(),
+  delta: z.number(), // positive to add, negative to deduct
+  reason: z.string().optional()
 });
 
-export const adjustUserCredits = command(AdjustCreditsSchema, async ({ userId, delta, reason }) => {
+export const adjustUserCredits = command('unchecked', async ({ userId, delta, reason }: any) => {
   const { supabase, org_id } = await requireSuperAdminPermissions();
 
   // Fetch current

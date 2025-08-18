@@ -9,6 +9,9 @@ const config = {
       runtime: 'nodejs20.x',
       split: false
     }),
+    experimental: {
+      remoteFunctions: true
+    },
     alias: {
       // $lib is built-in, but included for completeness
       // '$app/*': './tests/mocks/$app/*',

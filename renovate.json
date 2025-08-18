@@ -1,0 +1,39 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":semanticCommits", ":pinVersions"],
+  "enabledManagers": ["pnpm", "github-actions"],
+  "rangeStrategy": "bump",
+  "timezone": "Asia/Manila",
+  "packageRules": [
+    {
+      "groupName": "SvelteKit core",
+      "matchPackagePrefixes": ["@sveltejs/"],
+      "matchPackageNames": ["svelte", "vite", "@sveltejs/vite-plugin-svelte"],
+      "separateMinorPatch": false,
+      "stabilityDays": 3
+    },
+    {
+      "groupName": "Tailwind ecosystem",
+      "matchPackageNames": [
+        "tailwindcss",
+        "@tailwindcss/forms",
+        "@tailwindcss/typography",
+        "@tailwindcss/aspect-ratio",
+        "tailwindcss-animate"
+      ],
+      "stabilityDays": 3
+    },
+    {
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true,
+      "automergeType": "pr"
+    }
+  ],
+  "ignoreDeps": [
+    "vite@6",
+    "@sveltejs/vite-plugin-svelte@5",
+    "svelte@6",
+    "@sveltejs/kit@3"
+  ]
+}
