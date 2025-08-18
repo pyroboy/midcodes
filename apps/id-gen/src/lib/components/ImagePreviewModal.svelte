@@ -250,37 +250,151 @@
 								<T.DirectionalLight position={[5, 5, 5]} intensity={1.5} />
 								
 								<T.Group rotation.y={rotationY}>
-									{#if currentGeometry.frontGeometry}
+									{#if currentGeometry.frontGeometry && resolvedFrontUrl}
+										{@const frontTexture = useTexture(resolvedFrontUrl, { 
+											transform: (texture) => transformTextureToCover(texture, resolvedTemplateDimensions, geometryDimensions)
+										})}
+										
+										{#await frontTexture}
+											<!-- Front texture loading -->
+											<T.Mesh geometry={currentGeometry.frontGeometry}>
+												<T.MeshBasicMaterial color="#1a1a1a" transparent opacity={0.9} />
+											</T.Mesh>
+											<!-- Front loading spinner overlay -->
+											<T.Group position={[0, 0, 0.01]} rotation.z={rotationY * 4}>
+												<T.Mesh scale={[0.4, 0.4, 0.01]}>
+													<T.PlaneGeometry args={[1, 1]} />
+													<T.ShaderMaterial 
+														vertexShader={`
+															varying vec2 vUv;
+															void main() {
+																vUv = uv;
+																gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+															}
+														`}
+														fragmentShader={`
+															uniform float time;
+															varying vec2 vUv;
+															
+															void main() {
+																vec2 center = vec2(0.5, 0.5);
+																vec2 pos = vUv - center;
+																float dist = length(pos);
+																float angle = atan(pos.y, pos.x);
+																
+																// Create spinner arc
+																float innerRadius = 0.15;
+																float outerRadius = 0.25;
+																float arcStart = -1.57; // -90 degrees
+																float arcEnd = arcStart + 4.71; // 270 degrees
+																
+																// Check if we're in the ring and arc
+																float ring = step(innerRadius, dist) * (1.0 - step(outerRadius, dist));
+																float inArc = step(arcStart, angle) * (1.0 - step(arcEnd, angle));
+																
+																// Create fade effect
+																float fade = smoothstep(arcStart, arcEnd, angle);
+																
+																float alpha = ring * inArc * fade;
+																gl_FragColor = vec4(1.0, 1.0, 1.0, alpha);
+															}
+														`}
+														uniforms={{ time: { value: rotationY } }}
+														transparent
+														depthWrite={false}
+													/>
+												</T.Mesh>
+											</T.Group>
+										{:then map}
+											<!-- Front texture loaded -->
+											<T.Mesh geometry={currentGeometry.frontGeometry}>
+												<T.MeshStandardMaterial {map} roughness={0.4} />
+											</T.Mesh>
+										{:catch error}
+											<!-- Front texture error -->
+											<T.Mesh geometry={currentGeometry.frontGeometry}>
+												<T.MeshStandardMaterial color="#ff6b6b" />
+											</T.Mesh>
+											{console.error('Front texture failed to load:', error)}
+										{/await}
+									{:else if currentGeometry.frontGeometry}
+										<!-- Front geometry without texture -->
 										<T.Mesh geometry={currentGeometry.frontGeometry}>
-											{#if resolvedFrontUrl}
-												{#await useTexture(resolvedFrontUrl, { 
-													transform: (texture) => transformTextureToCover(texture, resolvedTemplateDimensions, geometryDimensions)
-												}) then map}
-													<T.MeshStandardMaterial {map} roughness={0.4} />
-												{:catch error}
-													<T.MeshStandardMaterial color="#ff6b6b" />
-													{console.error('Front texture failed to load:', error)}
-												{/await}
-											{:else}
-												<T.MeshStandardMaterial color="#e0e0e0" roughness={0.8} />
-											{/if}
+											<T.MeshStandardMaterial color="#e0e0e0" roughness={0.8} />
 										</T.Mesh>
 									{/if}
 									
-									{#if currentGeometry.backGeometry}
+									{#if currentGeometry.backGeometry && resolvedBackUrl}
+										{@const backTexture = useTexture(resolvedBackUrl, { 
+											transform: (texture) => transformTextureToCover(texture, resolvedTemplateDimensions, geometryDimensions)
+										})}
+										
+										{#await backTexture}
+											<!-- Back texture loading -->
+											<T.Mesh geometry={currentGeometry.backGeometry}>
+												<T.MeshBasicMaterial color="#1a1a1a" transparent opacity={0.9} />
+											</T.Mesh>
+											<!-- Back loading spinner overlay -->
+											<T.Group position={[0, 0, -0.01]} rotation={[0, Math.PI, -rotationY * 4]}>
+												<T.Mesh scale={[0.4, 0.4, 0.01]}>
+													<T.PlaneGeometry args={[1, 1]} />
+													<T.ShaderMaterial 
+														vertexShader={`
+															varying vec2 vUv;
+															void main() {
+																vUv = uv;
+																gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+															}
+														`}
+														fragmentShader={`
+															uniform float time;
+															varying vec2 vUv;
+															
+															void main() {
+																vec2 center = vec2(0.5, 0.5);
+																vec2 pos = vUv - center;
+																float dist = length(pos);
+																float angle = atan(pos.y, pos.x);
+																
+																// Create spinner arc
+																float innerRadius = 0.15;
+																float outerRadius = 0.25;
+																float arcStart = -1.57; // -90 degrees
+																float arcEnd = arcStart + 4.71; // 270 degrees
+																
+																// Check if we're in the ring and arc
+																float ring = step(innerRadius, dist) * (1.0 - step(outerRadius, dist));
+																float inArc = step(arcStart, angle) * (1.0 - step(arcEnd, angle));
+																
+																// Create fade effect
+																float fade = smoothstep(arcStart, arcEnd, angle);
+																
+																float alpha = ring * inArc * fade;
+																gl_FragColor = vec4(1.0, 1.0, 1.0, alpha);
+															}
+														`}
+														uniforms={{ time: { value: rotationY } }}
+														transparent
+														depthWrite={false}
+													/>
+												</T.Mesh>
+											</T.Group>
+										{:then map}
+											<!-- Back texture loaded -->
+											<T.Mesh geometry={currentGeometry.backGeometry}>
+												<T.MeshStandardMaterial {map} roughness={0.4} />
+											</T.Mesh>
+										{:catch error}
+											<!-- Back texture error -->
+											<T.Mesh geometry={currentGeometry.backGeometry}>
+												<T.MeshStandardMaterial color="#ff6b6b" />
+											</T.Mesh>
+											{console.error('Back texture failed to load:', error)}
+										{/await}
+									{:else if currentGeometry.backGeometry}
+										<!-- Back geometry without texture -->
 										<T.Mesh geometry={currentGeometry.backGeometry}>
-											{#if resolvedBackUrl}
-												{#await useTexture(resolvedBackUrl, { 
-													transform: (texture) => transformTextureToCover(texture, resolvedTemplateDimensions, geometryDimensions)
-												}) then map}
-													<T.MeshStandardMaterial {map} roughness={0.4} />
-												{:catch error}
-													<T.MeshStandardMaterial color="#ff6b6b" />
-													{console.error('Back texture failed to load:', error)}
-												{/await}
-											{:else}
-												<T.MeshStandardMaterial color="#e0e0e0" roughness={0.8} />
-											{/if}
+											<T.MeshStandardMaterial color="#e0e0e0" roughness={0.8} />
 										</T.Mesh>
 									{/if}
 
