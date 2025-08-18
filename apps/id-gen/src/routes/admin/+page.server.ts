@@ -120,7 +120,14 @@ export const actions: Actions = {
 	updateUserRole: async ({ request, locals }) => {
 		const { supabase, user, org_id } = locals;
 		
-		if (!user?.role || !['super_admin', 'org_admin'].includes(user.role)) {
+		// Check user roles from app_metadata
+		const userRoles = user?.app_metadata?.role ? [user.app_metadata.role] : 
+			(user?.app_metadata?.roles || []);
+		const hasAdminPermission = userRoles.some((role: string) => 
+			['super_admin', 'org_admin', 'property_admin'].includes(role)
+		);
+		
+		if (!hasAdminPermission) {
 			return fail(403, { error: 'Insufficient permissions' });
 		}
 
@@ -162,7 +169,14 @@ export const actions: Actions = {
 	deleteUser: async ({ request, locals }) => {
 		const { supabase, user, org_id } = locals;
 		
-		if (!user?.role || !['super_admin', 'org_admin'].includes(user.role)) {
+		// Check user roles from app_metadata
+		const userRoles = user?.app_metadata?.role ? [user.app_metadata.role] : 
+			(user?.app_metadata?.roles || []);
+		const hasDeletePermission = userRoles.some((role: string) => 
+			['super_admin', 'org_admin', 'property_admin'].includes(role)
+		);
+		
+		if (!hasDeletePermission) {
 			return fail(403, { error: 'Insufficient permissions' });
 		}
 

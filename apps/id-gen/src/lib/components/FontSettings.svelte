@@ -4,7 +4,7 @@
         Type, Bold, Italic, Underline, AlignLeft, AlignRight, AlignCenter, 
         AlignJustifyIcon, AlignJustify, ChevronsUpDown, MoveHorizontal,
         ArrowUpNarrowWide
-    } from 'lucide-svelte';
+    } from '@lucide/svelte';
     import ColorInput from './ColorInput.svelte';
 
     let { 

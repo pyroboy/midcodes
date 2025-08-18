@@ -67,9 +67,51 @@ export const load = (async ({ locals }) => {
         throw error(500, 'Invalid API response format');
     }
 
+    // Fetch template dimensions for 3D geometry preparation
+    const templateNames = Array.from(new Set(response.idcards.map(card => card.template_name)));
+    
+    const { data: templates, error: templatesError } = await supabase
+        .from('templates')
+        .select('name, width_pixels, height_pixels, unit_width, unit_height, unit_type')
+        .eq('org_id', org_id)
+        .in('name', templateNames);
+
+    if (templatesError) {
+        console.warn('Could not fetch template dimensions:', templatesError);
+    }
+
+    // Create template dimensions map
+    const templateDimensions: Record<string, { width: number; height: number; unit: string }> = {};
+    
+    if (templates) {
+        templates.forEach(template => {
+            if (template.width_pixels && template.height_pixels) {
+                templateDimensions[template.name] = {
+                    width: template.width_pixels,
+                    height: template.height_pixels,
+                    unit: 'pixels'
+                };
+            } else if (template.unit_width && template.unit_height && template.unit_type) {
+                templateDimensions[template.name] = {
+                    width: template.unit_width,
+                    height: template.unit_height,
+                    unit: template.unit_type
+                };
+            } else {
+                // Fallback to legacy dimensions
+                templateDimensions[template.name] = {
+                    width: 1013,
+                    height: 638,
+                    unit: 'pixels'
+                };
+            }
+        });
+    }
+
     return {
         idCards: response.idcards,
         metadata: response.metadata,
+        templateDimensions,
     };
 }) satisfies PageServerLoad;
 

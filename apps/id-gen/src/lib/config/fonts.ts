@@ -68,7 +68,7 @@ let fontsLoaded = false;
 
 export async function loadGoogleFonts(): Promise<void> {
   // Check if we're in a browser environment
-  if (typeof window === 'undefined' || fontsLoaded) {
+  if (typeof window === 'undefined' || typeof document === 'undefined' || fontsLoaded) {
     return Promise.resolve();
   }
 
@@ -86,27 +86,37 @@ export async function loadGoogleFonts(): Promise<void> {
     const fontFamilies = fonts.map(font => `${font.family}:${font.variants.join(',')}`);
     console.log('Loading fonts:', fontFamilies);
     
-    WebFontLoader?.load({
-      google: {
-        families: fontFamilies
-      },
-      active: () => {
-        fontsLoaded = true;
-        console.log('✅ All fonts loaded successfully:', fontFamilies);
-        resolve();
-      },
-      inactive: () => {
-        console.warn('⚠️ Some fonts failed to load');
-        // Log which fonts failed to load
-        const failedFonts = fonts
-          .map(font => font.family)
-          .filter(family => !isFontLoaded(family));
-        if (failedFonts.length > 0) {
-          console.warn('Failed fonts:', failedFonts);
-        }
-        resolve(); // Resolve anyway to prevent blocking
-      },
-      timeout: 5000 // 5 seconds timeout
-    });
+    // Add error handling wrapper
+    try {
+      WebFontLoader?.load({
+        google: {
+          families: fontFamilies
+        },
+        active: () => {
+          fontsLoaded = true;
+          console.log('✅ All fonts loaded successfully:', fontFamilies);
+          resolve();
+        },
+        inactive: () => {
+          console.warn('⚠️ Some fonts failed to load');
+          // Log which fonts failed to load
+          try {
+            const failedFonts = fonts
+              .map(font => font.family)
+              .filter(family => !isFontLoaded(family));
+            if (failedFonts.length > 0) {
+              console.warn('Failed fonts:', failedFonts);
+            }
+          } catch (e) {
+            console.warn('Error checking failed fonts:', e);
+          }
+          resolve(); // Resolve anyway to prevent blocking
+        },
+        timeout: 5000 // 5 seconds timeout
+      });
+    } catch (error) {
+      console.error('Error initializing font loader:', error);
+      resolve();
+    }
   });
 }

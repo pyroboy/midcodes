@@ -2,28 +2,49 @@
     import type { TemplateElement } from '$lib/types/types';
     import TemplateForm from './TemplateForm.svelte';
 
-    export let isLoading = false;
-    export let frontElements: TemplateElement[] = [];
-    export let backElements: TemplateElement[] = [];
-    export let frontPreview: string | null = null;
-    export let backPreview: string | null = null;
-    export let errorMessage: string = '';
-
-    export let onBack: () => void;
-    export let onSave: () => void;
-    export let onClear: () => void;
-    export let onUpdateElements: (elements: TemplateElement[], side: 'front' | 'back') => void;
-    export let onImageUpload: (files: File[], side: 'front' | 'back') => void;
-    export let onRemoveImage: (side: 'front' | 'back') => void;
-    // New props for size information
-    export let cardSize: any = null;
-    export let pixelDimensions: { width: number; height: number } | null = null;
+    let {
+        isLoading = false,
+        frontElements = [],
+        backElements = [],
+        frontPreview = null,
+        backPreview = null,
+        errorMessage = '',
+        onBack,
+        onSave,
+        onClear,
+        onUpdateElements,
+        onImageUpload,
+        onRemoveImage,
+        cardSize = null,
+        pixelDimensions = null,
+        onUpdateBackgroundPosition = () => {}
+    }: {
+        isLoading?: boolean;
+        frontElements?: TemplateElement[];
+        backElements?: TemplateElement[];
+        frontPreview?: string | null;
+        backPreview?: string | null;
+        errorMessage?: string;
+        onBack: () => void;
+        onSave: () => void;
+        onClear: () => void;
+        onUpdateElements: (elements: TemplateElement[], side: 'front' | 'back') => void;
+        onImageUpload: (files: File[], side: 'front' | 'back') => void;
+        onRemoveImage: (side: 'front' | 'back') => void;
+        cardSize?: any;
+        pixelDimensions?: { width: number; height: number } | null;
+        onUpdateBackgroundPosition?: (position: {x: number, y: number, scale: number}, side: 'front' | 'back') => void;
+    } = $props();
+    
+    // Background position state
+    let frontBackgroundPosition = $state({ x: 0, y: 0, scale: 1 });
+    let backBackgroundPosition = $state({ x: 0, y: 0, scale: 1 });
 </script>
 
 <div class="template-form-container active">
     <div class="back-button-container">
         <button 
-            on:click={onBack}
+            onclick={onBack}
             class="back-button inline-flex items-center text-lg dark:text-gray-300 text-gray-700 hover:text-primary dark:hover:text-primary-400"
         >
             <svg 
@@ -91,9 +112,11 @@
                     preview={frontPreview}
                     cardSize={cardSize}
                     pixelDimensions={pixelDimensions}
+                    bind:backgroundPosition={frontBackgroundPosition}
                     onUpdateElements={(elements:TemplateElement[], side: 'front' | 'back') => onUpdateElements(elements, side)}
                     onImageUpload={(files:File[],side: 'front' | 'back') => onImageUpload(files, side)}
                     onRemoveImage={(side: 'front' | 'back') => onRemoveImage(side)}
+                    onUpdateBackgroundPosition={onUpdateBackgroundPosition}
                 />
             </div>
             <div class="template-form">
@@ -103,9 +126,11 @@
                     preview={backPreview}
                     cardSize={cardSize}
                     pixelDimensions={pixelDimensions}
+                    bind:backgroundPosition={backBackgroundPosition}
                     onUpdateElements={(elements:TemplateElement[], side: 'front' | 'back') => onUpdateElements(elements, side)}
                     onImageUpload={(files:File[],side: 'front' | 'back') => onImageUpload(files, side)}
                     onRemoveImage={(side: 'front' | 'back') => onRemoveImage(side)}
+                    onUpdateBackgroundPosition={onUpdateBackgroundPosition}
                 />
             </div>
 
@@ -115,13 +140,13 @@
 
             <div class="mt-6 flex gap-4">
                 <button 
-                    on:click={onSave}
+                    onclick={onSave}
                     class="inline-flex justify-center rounded-md border-0 bg-blue-600 dark:bg-blue-500 px-4 py-2 text-sm font-medium text-white shadow-md hover:bg-blue-700 dark:hover:bg-blue-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 dark:focus:ring-blue-400 transition-colors duration-200 dark:shadow-blue-900/30"
                 >
                     Save Template
                 </button>
                 <button 
-                    on:click={onClear}
+                    onclick={onClear}
                     class="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-xs hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2"
                 >
                     Clear Form

@@ -19,5 +19,8 @@ export default defineConfig({
     },
     define: {
         global: 'globalThis'
+    },
+    ssr: {
+        noExternal: ['webfontloader']
     }
 } as UserConfig);

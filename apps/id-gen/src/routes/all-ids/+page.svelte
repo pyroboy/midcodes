@@ -2,20 +2,48 @@
 
     import type { HeaderRow, DataRow } from '$lib/types';
     import ImagePreviewModal from '$lib/components/ImagePreviewModal.svelte';
+    import ClientOnly from '$lib/components/ClientOnly.svelte';
+    import { browser } from '$app/environment';
     import { getSupabaseStorageUrl } from '$lib/utils/supabase';
-    import { preloadCardGeometry } from '$lib/utils/cardGeometry';
+    import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeometry';
     import JSZip from 'jszip';
     
 import type { PageData } from './$types';
 	import type { IDCard } from './+page.server';
 
     let { data }: { data: PageData } = $props();
-    const { idCards, metadata } = data;
+    const { idCards, metadata, templateDimensions } = data;
 
     console.log("Id cards",idCards);
 
-    // Preload 3D card geometry once for all modals
-    const cardGeometry = preloadCardGeometry();
+    // Preload 3D card geometries for each template based on their dimensions
+    const templateGeometries = $state<Record<string, any>>({});
+    
+    // Load geometries asynchronously on client
+    $effect(() => {
+        if (browser) {
+            Object.entries(templateDimensions).forEach(async ([templateName, dimensions]) => {
+                console.log(`Creating 3D geometry for template "${templateName}":`, dimensions);
+                
+                try {
+                    let geometry;
+                    if (dimensions.unit === 'inches') {
+                        // Use inch-based creation for inch units
+                        geometry = await createCardFromInches(dimensions.width, dimensions.height);
+                    } else {
+                        // Convert pixels to approximate inches (assuming 300 DPI) then create geometry
+                        const widthInches = dimensions.width / 300;
+                        const heightInches = dimensions.height / 300;
+                        geometry = await createCardFromInches(widthInches, heightInches);
+                    }
+                    templateGeometries[templateName] = geometry;
+                    console.log(`Loaded geometry for template "${templateName}"`);
+                } catch (error) {
+                    console.error(`Failed to load geometry for template "${templateName}":`, error);
+                }
+            });
+        }
+    });
 
 
     let searchQuery = $state('');
@@ -23,6 +51,8 @@ import type { PageData } from './$types';
     let errorMessage = '';
     let selectedFrontImage: string | null = $state(null);
     let selectedBackImage: string | null = $state(null);
+    let selectedTemplateDimensions: { width: number; height: number; unit?: string } | null = $state(null);
+    let selectedCardGeometry: any = $state(null);
     let downloadingCards = $state(new Set<string>());
     let deletingCards = $state(new Set<string>());
     let selectedCards = $state(new Set<string>());
@@ -164,12 +194,23 @@ import type { PageData } from './$types';
         console.log("Back image",card.back_image);
         selectedFrontImage = card.front_image ?? null;
         selectedBackImage = card.back_image ?? null;
+        
+        // Get template dimensions and preloaded geometry for 3D preview
+        selectedTemplateDimensions = templateDimensions[card.template_name] || null;
+        selectedCardGeometry = templateGeometries[card.template_name] || null;
+        console.log("Template preview data for", card.template_name, ":", {
+            dimensions: selectedTemplateDimensions,
+            hasGeometry: !!selectedCardGeometry
+        });
     }
 
     function closePreview() {
         selectedFrontImage = null;
         selectedBackImage = null;
+        selectedTemplateDimensions = null;
+        selectedCardGeometry = null;
     }
+
 
     async function downloadCard(card: IDCard) {
         const cardId = getCardId(card);
@@ -572,10 +613,13 @@ import type { PageData } from './$types';
 {/each}
 
 {#if selectedFrontImage || selectedBackImage}
-<ImagePreviewModal
-    frontImageUrl={selectedFrontImage ? getSupabaseStorageUrl(selectedFrontImage,'rendered-id-cards') : null}
-    backImageUrl={selectedBackImage ? getSupabaseStorageUrl(selectedBackImage,'rendered-id-cards') : null}
-{cardGeometry}
-    onClose={closePreview}
-/>
+<ClientOnly>
+    <ImagePreviewModal
+        frontImageUrl={selectedFrontImage ? getSupabaseStorageUrl(selectedFrontImage,'rendered-id-cards') : null}
+        backImageUrl={selectedBackImage ? getSupabaseStorageUrl(selectedBackImage,'rendered-id-cards') : null}
+        cardGeometry={selectedCardGeometry}
+        templateDimensions={selectedTemplateDimensions}
+        onClose={closePreview}
+    />
+</ClientOnly>
 {/if}

@@ -1,26 +1,130 @@
 <script lang="ts">
     import LoadingSpinner from './LoadingSpinner.svelte';
     import { onMount } from 'svelte';
-    import { Canvas, T, useThrelte } from '@threlte/core';
-    import { OrbitControls, useTexture } from '@threlte/extras';
-    import * as THREE from 'three';
-    import { ColorManagement, MathUtils } from 'three';
+    import { browser } from '$app/environment';
+    
+    // Dynamically import Threlte components only on client
+    let Canvas: any = $state(null);
+    let T: any = $state(null);
+    let useThrelte: any = $state(null);
+    let OrbitControls: any = $state(null);
+    let useTexture: any = $state(null);
+    let THREE: any = $state(null);
+    let ColorManagement: any = $state(null);
+    let MathUtils: any = $state(null);
+    
+    onMount(async () => {
+        if (browser) {
+            const threlteCore = await import('@threlte/core');
+            const threlteExtras = await import('@threlte/extras');
+            const threeJs = await import('three');
+            
+            Canvas = threlteCore.Canvas;
+            T = threlteCore.T;
+            useThrelte = threlteCore.useThrelte;
+            OrbitControls = threlteExtras.OrbitControls;
+            useTexture = threlteExtras.useTexture;
+            THREE = threeJs;
+            ColorManagement = threeJs.ColorManagement;
+            MathUtils = threeJs.MathUtils;
+            
+            // Enable proper color management
+            ColorManagement.enabled = true;
+        }
+    });
     import type { CardGeometry } from '$lib/utils/cardGeometry';
+    import { createRoundedRectCard, createCardFromInches } from '$lib/utils/cardGeometry';
 
-    // Enable proper color management
-    ColorManagement.enabled = true;
-
-    let { frontImageUrl = null, backImageUrl = null, onClose, cardGeometry } = $props<{
+    let { 
+        frontImageUrl = null, 
+        backImageUrl = null, 
+        onClose, 
+        cardGeometry = null,
+        templateDimensions = null
+    } = $props<{
         frontImageUrl?: string | null;
         backImageUrl?: string | null;
         onClose: () => void;
-        cardGeometry: CardGeometry;
+        cardGeometry?: CardGeometry | null;
+        templateDimensions?: { width: number; height: number; unit?: string } | null;
     }>();
 
-    // Use preloaded geometry from parent
-    const frontGeometry = cardGeometry.frontGeometry;
-    const backGeometry = cardGeometry.backGeometry;
-    const edgeGeometry = cardGeometry.edgeGeometry;
+    // Create geometry based on template dimensions or use provided geometry
+    let computedGeometry = $state<any>(null);
+    
+    // Load geometry asynchronously
+    $effect(() => {
+        if (cardGeometry) {
+            computedGeometry = cardGeometry;
+            return;
+        }
+        
+        if (templateDimensions && browser) {
+            console.log('[ImagePreviewModal] Creating custom geometry for dimensions:', templateDimensions);
+            
+            (async () => {
+                try {
+                    let geometry;
+                    // Convert template dimensions to 3D units
+                    if (templateDimensions.unit === 'inches') {
+                        geometry = await createCardFromInches(templateDimensions.width, templateDimensions.height);
+                    } else {
+                        // Assume pixels - convert to approximate inches (at 300 DPI)
+                        const widthInches = templateDimensions.width / 300;
+                        const heightInches = templateDimensions.height / 300;
+                        geometry = await createCardFromInches(widthInches, heightInches);
+                    }
+                    computedGeometry = geometry;
+                } catch (error) {
+                    console.error('[ImagePreviewModal] Failed to create geometry:', error);
+                    // Fallback to default card dimensions
+                    try {
+                        computedGeometry = await createRoundedRectCard();
+                    } catch (fallbackError) {
+                        console.error('[ImagePreviewModal] Failed to create fallback geometry:', fallbackError);
+                    }
+                }
+            })();
+        } else if (!cardGeometry && !templateDimensions && browser) {
+            // Fallback to default card dimensions
+            console.log('[ImagePreviewModal] Using default card geometry');
+            (async () => {
+                try {
+                    computedGeometry = await createRoundedRectCard();
+                } catch (error) {
+                    console.error('[ImagePreviewModal] Failed to create default geometry:', error);
+                }
+            })();
+        }
+    });
+
+    // Use computed geometry
+    const frontGeometry = $derived(computedGeometry?.frontGeometry);
+    const backGeometry = $derived(computedGeometry?.backGeometry);
+    const edgeGeometry = $derived(computedGeometry?.edgeGeometry);
+
+    // Responsive scaling for different screen sizes
+    let viewportWidth = $state(typeof window !== 'undefined' ? window.innerWidth : 1920);
+    let viewportHeight = $state(typeof window !== 'undefined' ? window.innerHeight : 1080);
+    
+    // Calculate responsive camera position and model scale
+    const responsiveSettings = $derived(() => {
+        const baseWidth = 1920;
+        const baseHeight = 1080;
+        const widthRatio = viewportWidth / baseWidth;
+        const heightRatio = viewportHeight / baseHeight;
+        const scaleRatio = Math.min(widthRatio, heightRatio);
+        
+        // Adjust camera distance and model scale based on screen size
+        const cameraDistance = Math.max(2.5, 3.5 - (scaleRatio * 0.8));
+        const modelScale = Math.min(1.8, 1.2 + (scaleRatio * 0.6));
+        
+        return {
+            cameraDistance,
+            modelScale,
+            fov: Math.min(60, 50 + (scaleRatio * 10))
+        };
+    });
 
     let canvasError: string | null = $state(null);
     let rotationY = $state(0);
@@ -51,7 +155,12 @@
         if (shouldAutoRotate) {
             targetRotationY += 0.016 * 0.4;
         }
-        rotationY = MathUtils.lerp(rotationY, targetRotationY, 0.05);
+        if (MathUtils) {
+            rotationY = MathUtils.lerp(rotationY, targetRotationY, 0.05);
+        } else {
+            // Fallback linear interpolation
+            rotationY += (targetRotationY - rotationY) * 0.05;
+        }
         animationId = requestAnimationFrame(animate);
     }
 
@@ -61,13 +170,33 @@
         }
     }
 
+    function handleResize() {
+        if (typeof window !== 'undefined') {
+            viewportWidth = window.innerWidth;
+            viewportHeight = window.innerHeight;
+        }
+    }
+
     onMount(() => {
         addDebugLog('Modal component mounted', 'info');
-        animate();
+        if (browser) {
+            animate();
+        }
+        
+        // Set initial viewport dimensions
+        if (typeof window !== 'undefined') {
+            viewportWidth = window.innerWidth;
+            viewportHeight = window.innerHeight;
+            window.addEventListener('resize', handleResize);
+        }
+        
         return () => {
             addDebugLog('Modal component unmounting', 'info');
             if (animationId) {
                 cancelAnimationFrame(animationId);
+            }
+            if (typeof window !== 'undefined') {
+                window.removeEventListener('resize', handleResize);
             }
         };
     });
@@ -88,9 +217,9 @@
             role="presentation"
             onclick={handleModalClose}
         ></div>
-        <div class="fixed inset-0 flex items-center justify-center p-4">
+        <div class="fixed inset-0 flex items-center justify-center p-2 md:p-4">
             <div
-                class="relative w-full max-w-5xl rounded-lg p-6 shadow-2xl"
+                class="relative w-full max-w-7xl rounded-lg p-3 md:p-6 shadow-2xl"
                 role="dialog"
                 aria-labelledby="modal-title"
             >
@@ -102,7 +231,7 @@
                 >
                     ✕
                 </button>
-                <div class="h-[80vh] w-full relative">
+                <div class="h-[90vh] w-full relative">
                     {#if canvasError}
                         <div
                             class="absolute inset-0 flex items-center justify-center bg-red-500/10 text-red-400 z-20"
@@ -114,18 +243,28 @@
                             </div>
                         </div>
                     {/if}
-                    <Canvas>
-                        <T.Scene>
-                            <T.Color attach="background" args={[0, 0, 0, 0]} transparent={true} />
-                            <T.PerspectiveCamera makeDefault position={[0, 0, 5]} fov={35}>
-                                <OrbitControls enableDamping />
-                                <T.HemisphereLight skyColor="#ffffff" groundColor="#ffffff" intensity={0.2} />
-                                <T.AmbientLight color={0xffffff} intensity={0.5} />
-                                <T.DirectionalLight position={[5, 1.5, 5]} intensity={0.7} />
-                                <T.DirectionalLight position={[-5, 3, 5]} intensity={0.3} color="#b1e1ff" />
-                                <T.DirectionalLight position={[-6, -3, 3]} intensity={0.2} color="#ffecd1" />
+                    {#if Canvas && T && OrbitControls && useTexture && THREE}
+                        <Canvas>
+                            <T.Scene>
+                                <T.Color attach="background" args={[0, 0, 0, 0]} transparent={true} />
+                                <T.PerspectiveCamera makeDefault position={[0, 0, responsiveSettings().cameraDistance]} fov={responsiveSettings().fov}>
+                                    <OrbitControls
+                                    enableDamping 
+                                    dampingFactor={0.05}
+                                    minDistance={1.5}
+                                    maxDistance={10}
+                                    enablePan={true}
+                                    panSpeed={0.8}
+                                    enableZoom={true}
+                                    zoomSpeed={0.8}
+                                />
+                                <T.HemisphereLight skyColor="#ffffff" groundColor="#ffffff" intensity={0.3} />
+                                <T.AmbientLight color={0xffffff} intensity={0.6} />
+                                <T.DirectionalLight position={[5, 2, 5]} intensity={0.8} />
+                                <T.DirectionalLight position={[-5, 3, 5]} intensity={0.4} color="#b1e1ff" />
+                                <T.DirectionalLight position={[-6, -3, 3]} intensity={0.3} color="#ffecd1" />
                             </T.PerspectiveCamera>
-                            <T.Group rotation.y={rotationY}>
+                            <T.Group rotation.y={rotationY} scale={responsiveSettings().modelScale}>
 
                                 {#if frontGeometry}
                                     {#await frontImageUrl ? useTexture(frontImageUrl) : Promise.resolve(null)}
@@ -137,7 +276,7 @@
                                             <T.MeshStandardMaterial
                                                 envMap={null}
                                                 color="#ffffff"
-                                                map={frontTexture as THREE.Texture}
+                                                map={frontTexture}
                                                 metalness={0.1}
                                                 roughness={0.1}
                                             />
@@ -164,7 +303,7 @@
                                     {:then backTexture}
                                         <T.Mesh position={[0, 0, -0.001]} geometry={backGeometry}>
                                             <T.MeshStandardMaterial
-                                                map={backTexture as THREE.Texture}
+                                                map={backTexture}
                                                 envMap={null}
                                                 metalness={0.1}
                                                 roughness={0.1}
@@ -191,7 +330,7 @@
                                     <T.Group
                                         position={[0, 0, 0.01]}
                                         rotation={[0, 0, -rotationY * 4]}
-                                        scale={[0.15, 0.15, 0.15]}
+                                        scale={[0.12 / responsiveSettings().modelScale, 0.12 / responsiveSettings().modelScale, 0.12 / responsiveSettings().modelScale]}
                                     >
                                         <T.Mesh>
                                             <T.RingGeometry args={[0.6, 0.8, 100, 1, 0, Math.PI * 1.5]} />
@@ -201,33 +340,42 @@
                                     <T.Group
                                         position={[0, 0, -0.011]}
                                         rotation={[0, Math.PI, -rotationY * 4]}
-                                        scale={[0.15, 0.15, 0.15]}
+                                        scale={[0.12 / responsiveSettings().modelScale, 0.12 / responsiveSettings().modelScale, 0.12 / responsiveSettings().modelScale]}
                                     >
                                         <T.Mesh>
                                             <T.RingGeometry args={[0.6, 0.8, 100, 1, 0, Math.PI * 1.5]} />
                                             <T.MeshBasicMaterial color="#ffffff" transparent opacity={0.8} />
                                         </T.Mesh>
                                     </T.Group>
-                                {:then}
-                                    {/await}
+                                {:then textures}
+                                    <!-- Loading completed, components are now rendered -->
+                                {/await}
 
                                 {#if edgeGeometry}
                                     <T.Mesh geometry={edgeGeometry}>
                                         <T.MeshStandardMaterial color="#ffffff" metalness={0} roughness={0.2} />
                                     </T.Mesh>
                                 {/if}
-                            </T.Group>
-                        </T.Scene>
-                    </Canvas>
+                                </T.Group>
+                            </T.Scene>
+                        </Canvas>
+                    {:else}
+                        <div class="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded">
+                            <p class="text-gray-500 dark:text-gray-400">Loading 3D preview...</p>
+                        </div>
+                    {/if}
                 </div>
             </div>
-            <div class="absolute bottom-6 left-1/2 -translate-x-1/2">
+            <div class="absolute bottom-4 md:bottom-6 left-1/2 -translate-x-1/2">
                 <button
                     type="button"
-                    class="rounded-full bg-white/10 px-6 py-2 text-sm font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/20"
+                    class="rounded-full bg-white/10 px-4 md:px-6 py-2 md:py-3 text-sm md:text-base font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/20 shadow-lg"
                     onclick={handleFlip}
                 >
-                    Flip Card
+                    <span class="flex items-center gap-2">
+                        🔄
+                        <span>Flip Card</span>
+                    </span>
                 </button>
             </div>
         </div>

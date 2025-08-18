@@ -5,19 +5,29 @@
     import FontSettings from './FontSettings.svelte';
     import * as Select from "$lib/components/ui/select";
     import { Input } from "$lib/components/ui/input"
-    import { ChevronDown, ChevronUp } from 'lucide-svelte';
+    import { ChevronDown, ChevronUp, Move, Scaling, Image, Settings } from '@lucide/svelte';
     import { slide } from 'svelte/transition';
     
     let { 
         elements,
         onUpdateElements,
         fontOptions, 
-        side 
+        side,
+        preview = null,
+        backgroundPosition = $bindable({ x: 0, y: 0, scale: 1 }),
+        onUpdateBackgroundPosition = null,
+        cardSize = null,
+        pixelDimensions = null
     } = $props<{
         elements: TemplateElement[];
         onUpdateElements: (elements: TemplateElement[], side: 'front' | 'back') => void;
         fontOptions: string[];
         side: 'front' | 'back';
+        preview?: string | null;
+        backgroundPosition?: { x: number, y: number, scale: number };
+        onUpdateBackgroundPosition?: ((position: {x: number, y: number, scale: number}, side: 'front' | 'back') => void) | null;
+        cardSize?: any;
+        pixelDimensions?: { width: number; height: number } | null;
     }>();
 
     let variableNameErrors: { [key: number]: string } = $state({});
@@ -104,9 +114,14 @@
     }
 
     let expandedElementIndex: number | null = $state(null);
+    let backgroundExpanded = $state(false);
 
     function toggleElement(index: number) {
         expandedElementIndex = expandedElementIndex === index ? null : index;
+    }
+    
+    function toggleBackground() {
+        backgroundExpanded = !backgroundExpanded;
     }
 
     function getOptionsString(options: string[] | undefined): string {
@@ -116,9 +131,147 @@
     function hasNameDuplicate(name: string): boolean {
         return elements.filter((el: TemplateElement) => el.variableName === name).length > 1;
     }
+
+    // Background control functions
+    function handleBackgroundStart(event: MouseEvent, mode: 'move' | 'resize') {
+        event.preventDefault();
+        event.stopPropagation();
+        
+        const startPoint = { x: event.clientX, y: event.clientY };
+        const startValues = {
+            scale: backgroundPosition.scale,
+            x: backgroundPosition.x,
+            y: backgroundPosition.y
+        };
+
+        function handleMove(e: MouseEvent) {
+            const currentPoint = { x: e.clientX, y: e.clientY };
+            const dx = currentPoint.x - startPoint.x;
+            const dy = currentPoint.y - startPoint.y;
+
+            if (mode === 'resize') {
+                const delta = Math.max(dx, dy);
+                const newScale = Math.max(0.1, Math.min(3, startValues.scale + delta / 100));
+                backgroundPosition = { ...backgroundPosition, scale: newScale };
+            } else {
+                backgroundPosition = {
+                    ...backgroundPosition,
+                    x: startValues.x + dx / 2,
+                    y: startValues.y + dy / 2
+                };
+            }
+
+            if (onUpdateBackgroundPosition) {
+                onUpdateBackgroundPosition(backgroundPosition, side);
+            }
+        }
+
+        function handleEnd() {
+            window.removeEventListener('mousemove', handleMove);
+            window.removeEventListener('mouseup', handleEnd);
+        }
+
+        window.addEventListener('mousemove', handleMove);
+        window.addEventListener('mouseup', handleEnd);
+    }
+
+    function autoFitBackground() {
+        backgroundPosition = { x: 0, y: 0, scale: 1 };
+        if (onUpdateBackgroundPosition) {
+            onUpdateBackgroundPosition(backgroundPosition, side);
+        }
+    }
+
+    function resetBackgroundPosition() {
+        backgroundPosition = { x: 0, y: 0, scale: 1 };
+        if (onUpdateBackgroundPosition) {
+            onUpdateBackgroundPosition(backgroundPosition, side);
+        }
+    }
 </script>
 
 <div class="element-list">
+    <!-- Background Image Section -->
+    {#if preview}
+        <div class="element-item background-section">
+            <div class="element-header" 
+                role="button"
+                tabindex="0"
+                onclick={toggleBackground}
+                onkeydown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleBackground();
+                    }
+                }}
+            >
+                <div class="header-content">
+                    <span class="chevron">
+                        {#if backgroundExpanded}
+                            <ChevronUp size={16} />
+                        {:else}
+                            <ChevronDown size={16} />
+                        {/if}
+                    </span>
+                    <Image size={16} />
+                    <span class="element-type">Background Image</span>
+                </div>
+            </div>
+
+            {#if backgroundExpanded}
+                <div class="element-inputs" transition:slide={{ duration: 200 }}>
+                    <div class="input-group">
+                        <label for="background-image-{side}">Background Image</label>
+                        <div id="background-image-{side}" class="background-section-layout" role="group" aria-label="Background image controls">
+                            <div class="background-thumbnail">
+                                <img src={preview} alt="Background thumbnail" />
+                            </div>
+                            <div class="background-controls-container">
+                                <div class="background-controls">
+                                    <div class="control-buttons">
+                                        <div 
+                                            class="drag-handle move-handle" 
+                                            title="Drag to move background"
+                                            onmousedown={(e) => handleBackgroundStart(e, 'move')}
+                                            role="button"
+                                            tabindex="0"
+                                            aria-label="Move background">
+                                            <Move size={16} />
+                                        </div>
+                                        <div 
+                                            class="drag-handle scale-handle" 
+                                            title="Drag to scale background"
+                                            onmousedown={(e) => handleBackgroundStart(e, 'resize')}
+                                            role="button"
+                                            tabindex="0"
+                                            aria-label="Scale background">
+                                            <Scaling size={16} />
+                                        </div>
+                                    </div>
+                                    <div class="background-info">
+                                        <div class="info-row">
+                                            <span class="info-label">Position:</span>
+                                            <span class="info-value">{Math.round(backgroundPosition.x)}, {Math.round(backgroundPosition.y)}</span>
+                                        </div>
+                                        <div class="info-row">
+                                            <span class="info-label">Scale:</span>
+                                            <span class="info-value">{Math.round(backgroundPosition.scale * 100)}%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="action-buttons">
+                                    <button onclick={autoFitBackground} class="action-btn">Auto Fit</button>
+                                    <button onclick={resetBackgroundPosition} class="action-btn">Reset Position</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {/if}
+        </div>
+    {/if}
+
+    <!-- Elements List -->
     {#each elements as element, i}
         <div class="element-item">
             <div class="element-header" 
@@ -378,5 +531,126 @@
         color: #ff4444;
         font-size: 0.8rem;
         margin-top: 4px;
+    }
+
+    /* Background Section */
+    .background-section .element-header {
+        background-color: #4a3a2a;
+    }
+
+    .background-section .element-header:hover {
+        background-color: #5f4f2f;
+    }
+
+
+    /* Background Controls */
+    .background-controls {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .control-buttons {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .drag-handle {
+        width: 32px;
+        height: 32px;
+        background: #4a4a4a;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        border: 1px solid #5a5a5a;
+        color: #e0e0e0;
+    }
+
+    .drag-handle:hover {
+        background: #5a5a5a;
+        transform: scale(1.05);
+        color: #ffffff;
+    }
+
+    .drag-handle:active {
+        background: #6a6a6a;
+        transform: scale(0.95);
+    }
+
+    .move-handle {
+        cursor: move;
+    }
+
+    .scale-handle {
+        cursor: se-resize;
+    }
+
+    .background-info {
+        flex: 1;
+    }
+
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.25rem;
+        font-size: 0.8rem;
+    }
+
+    .info-label {
+        color: #a0a0a0;
+    }
+
+    .info-value {
+        color: #e0e0e0;
+        font-weight: 500;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .action-btn {
+        flex: 1;
+        background-color: #4a4a4a;
+        border: 1px solid #5a5a5a;
+        color: #e0e0e0;
+        padding: 0.5rem;
+        cursor: pointer;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        transition: all 0.2s;
+    }
+
+    .action-btn:hover {
+        background-color: #5a5a5a;
+        color: #ffffff;
+    }
+
+    .action-btn:active {
+        background-color: #6a6a6a;
+    }
+
+    /* Background Thumbnail */
+    .background-thumbnail {
+        width: 100%;
+        border: 1px solid #5a5a5a;
+        border-radius: 4px;
+        overflow: hidden;
+        background: #2a2a2a;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 8px;
+    }
+
+    .background-thumbnail img {
+        max-width: 100%;
+        max-height: 80px;
+        object-fit: contain;
+        display: block;
     }
 </style>

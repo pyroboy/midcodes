@@ -1,6 +1,20 @@
 <script lang="ts">
-	import { T } from '@threlte/core';
-	import * as THREE from 'three';
+	import { browser } from '$app/environment';
+	import { onMount } from 'svelte';
+	
+	// Dynamically import Threlte components only on client
+	let T: any = $state(null);
+	let THREE: any = $state(null);
+	
+	onMount(async () => {
+		if (browser) {
+			const threlteCore = await import('@threlte/core');
+			const threeJs = await import('three');
+			
+			T = threlteCore.T;
+			THREE = threeJs;
+		}
+	});
 
 	const uniforms = {
 		time: { value: 0.0 },
@@ -18,7 +32,9 @@
 	
 	// Start animation
 	$effect(() => {
-		animate();
+		if (browser) {
+			animate();
+		}
 		return () => {
 			if (animationId) {
 				cancelAnimationFrame(animationId);
@@ -61,13 +77,17 @@
   `;
 </script>
 
-<T.Mesh>
-	<T.PlaneGeometry />
-	<T.ShaderMaterial
-		{fragmentShader}
-		vertexShader={`varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`}
-		{uniforms}
-		transparent={true}
-		depthWrite={false}
-	/>
-</T.Mesh>
+{#if T && THREE}
+	<T.Mesh>
+		<T.PlaneGeometry />
+		<T.ShaderMaterial
+			{fragmentShader}
+			vertexShader={`varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`}
+			{uniforms}
+			transparent={true}
+			depthWrite={false}
+		/>
+	</T.Mesh>
+{:else}
+	<div class="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+{/if}

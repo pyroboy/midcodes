@@ -2,8 +2,8 @@
 	import type { PageData } from './$types';
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
-	import { getAdminDashboardData } from './admin.remote';
-	import { getBillingSettings, togglePayments, setPaymentsBypass } from './billing.remote';
+	import { getAdminDashboardData } from '$lib/remote/admin.remote';
+	import { getBillingSettings, togglePayments, setPaymentsBypass } from '$lib/remote/billing.remote';
 
 	interface Props {
 		data: PageData;

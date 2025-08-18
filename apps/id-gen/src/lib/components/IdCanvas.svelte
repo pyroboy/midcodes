@@ -1,19 +1,31 @@
-<!-- @migration-task Error while migrating Svelte code: Can't migrate code with afterUpdate. Please migrate by hand. -->
-<!-- @migration-task Error while migrating Svelte code: Can't migrate code with afterUpdate. Please migrate by hand. -->
 <script lang="ts">
-    import { onMount, createEventDispatcher, afterUpdate, onDestroy } from 'svelte';
+    import { onMount, createEventDispatcher, onDestroy } from 'svelte';
     import { browser } from '$app/environment';
     import { debounce } from 'lodash-es';
     import type { TemplateElement } from '../stores/templateStore';
+    import { CoordinateSystem } from '$lib/utils/coordinateSystem';
 
-    export let elements: TemplateElement[];
-    export let backgroundUrl: string;
-    export let formData: { [key: string]: string };
-    export let fileUploads: { [key: string]: File | null };
-    export let imagePositions: { [key: string]: { x: number, y: number, width: number, height: number, scale: number } };
-    export let fullResolution = false;
-    export let isDragging = false;
-    export let showBoundingBoxes = false; // Flag to control bounding box visibility
+    let {
+        elements,
+        backgroundUrl,
+        formData,
+        fileUploads,
+        imagePositions,
+        fullResolution = false,
+        isDragging = false,
+        showBoundingBoxes = false, // Flag to control bounding box visibility
+        pixelDimensions = null
+    }: {
+        elements: TemplateElement[];
+        backgroundUrl: string;
+        formData: { [key: string]: string };
+        fileUploads: { [key: string]: File | null };
+        imagePositions: { [key: string]: { x: number, y: number, width: number, height: number, scale: number } };
+        fullResolution?: boolean;
+        isDragging?: boolean;
+        showBoundingBoxes?: boolean;
+        pixelDimensions?: { width: number; height: number } | null;
+    } = $props();
 
     const dispatch = createEventDispatcher<{
         error: { message: string; code: string };
@@ -47,12 +59,55 @@
     
     const DEBOUNCE_DELAY = 20;
     const PREVIEW_SCALE = 0.5;
-    const ELEMENT_SCALE = 2;
-    const FULL_WIDTH = 1013;
-    const FULL_HEIGHT = 638;
+    const LEGACY_WIDTH = 1013;
+    const LEGACY_HEIGHT = 638;
     const LOW_RES_SCALE = 0.2;
     const MAX_CACHE_SIZE = 20;
     const MEMORY_CHECK_INTERVAL = 10000;
+    
+    // Dynamic canvas dimensions based on pixelDimensions prop
+    let canvasDimensions = $derived(() => {
+        if (pixelDimensions && pixelDimensions.width > 0 && pixelDimensions.height > 0) {
+            return { width: pixelDimensions.width, height: pixelDimensions.height };
+        }
+        return { width: LEGACY_WIDTH, height: LEGACY_HEIGHT };
+    });
+    
+    // Calculate canvas scaling with adaptive preview sizing for custom dimensions
+    let canvasScaling = $derived(() => {
+        const dims = canvasDimensions();
+        if (fullResolution) {
+            // Full resolution uses 1:1 scaling
+            return { scale: 1, canvasWidth: dims.width, canvasHeight: dims.height };
+        } else {
+            // Adaptive preview scaling based on template size
+            const maxPreviewWidth = 600;  // Maximum preview width
+            const maxPreviewHeight = 400; // Maximum preview height
+            
+            // Calculate scale factors to fit within preview bounds
+            const widthScale = maxPreviewWidth / dims.width;
+            const heightScale = maxPreviewHeight / dims.height;
+            
+            // Use the smaller scale to ensure it fits within both dimensions
+            const scale = Math.min(widthScale, heightScale, 1); // Don't scale up beyond 1:1
+            
+            const previewWidth = dims.width * scale;
+            const previewHeight = dims.height * scale;
+            
+            return { 
+                scale, 
+                canvasWidth: previewWidth, 
+                canvasHeight: previewHeight 
+            };
+        }
+    });
+
+    // Coordinate system using proper canvas scaling (matches TemplateForm approach)
+    let coordSystem = $derived(() => {
+        const dims = canvasDimensions();
+        const scaling = canvasScaling();
+        return new CoordinateSystem(dims.width, dims.height, scaling.scale);
+    });
     
     const imageCache = new Map<string, { image: HTMLImageElement; lastUsed: number }>();
     const lowResImageCache = new Map<string, { image: HTMLImageElement; lastUsed: number }>();
@@ -238,9 +293,13 @@
         cleanImageCache();
     });
     
-    afterUpdate(async () => {
+    // Use reactive effect to handle canvas initialization when dependencies change
+    $effect(() => {
+        // Track dependencies that should trigger reinitializaton
+        canvasDimensions();
+        
         if (browser && !isReady && isMounted) {
-            await initializeCanvases();
+            initializeCanvases();
         }
     });
     
@@ -271,7 +330,8 @@
                 );
             }
 
-            offscreenCanvas = new OffscreenCanvas(FULL_WIDTH, FULL_HEIGHT);
+            const dims = canvasDimensions();
+            offscreenCanvas = new OffscreenCanvas(dims.width, dims.height);
             
             await new Promise(resolve => requestAnimationFrame(resolve));
             
@@ -446,15 +506,15 @@
             isRendering = true;
             renderRequested = false;
 
-            const scale = fullResolution ? 1 : PREVIEW_SCALE;
-            const width = FULL_WIDTH * scale;
-            const height = FULL_HEIGHT * scale;
+            const scaling = canvasScaling();
+            const width = Math.round(scaling.canvasWidth);
+            const height = Math.round(scaling.canvasHeight);
 
             if (bufferCanvas.width !== width || bufferCanvas.height !== height) {
                 bufferCanvas.width = width;
                 bufferCanvas.height = height;
             }
-            await renderCanvas(bufferCtx!, scale, false);
+            await renderCanvas(bufferCtx!, scaling.scale, false);
 
             if (displayCanvas.width !== width || displayCanvas.height !== height) {
                 displayCanvas.width = width;
@@ -479,6 +539,9 @@
     }
     
     async function renderCanvas(ctx: CanvasRenderingContext2D, scale: number, isOffScreen: boolean) {
+        // Create coordinate system for this specific render context
+        const dims = canvasDimensions();
+        const renderCoordSystem = new CoordinateSystem(dims.width, dims.height, scale);
         ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
         if (backgroundUrl) {
@@ -496,9 +559,9 @@
         for (const element of elements) {
             try {
                 if (element.type === 'text' || element.type === 'selection') {
-                    renderTextElement(ctx, element, scale);
+                    renderTextElement(ctx, element, renderCoordSystem);
                 } else if (element.type === 'photo' || element.type === 'signature') {
-                    await renderImageElement(ctx, element, scale, isOffScreen);
+                    await renderImageElement(ctx, element, renderCoordSystem, isOffScreen);
                 }
             } catch (error) {
                 dispatch('error', {
@@ -509,12 +572,11 @@
         }
     }
     
-    function renderTextElement(ctx: CanvasRenderingContext2D, element: TemplateElement, scale: number) {
+    function renderTextElement(ctx: CanvasRenderingContext2D, element: TemplateElement, renderCoordSystem: CoordinateSystem) {
         if (element.type !== 'text' && element.type !== 'selection') return;
      
         try {
-            const nScale = scale * ELEMENT_SCALE;
-            const fontSize = (element.size || 12) * nScale;
+            const fontSize = Math.round((element.size || 12) * renderCoordSystem.scale);
             const fontOptions = {
                 family: element.font,
                 size: fontSize,
@@ -522,7 +584,6 @@
                 style: element.fontStyle
             };
             ctx.font = getFontString(fontOptions);
-            // console.log(element.variableName,ctx.font);
             ctx.fillStyle = element.color || 'black';
             ctx.textAlign = element.alignment as CanvasTextAlign;
             ctx.textBaseline = 'middle';
@@ -545,10 +606,20 @@
                     .join(' ');
             }
 
-            const elementWidth = (element.width || 0) * nScale;
-            const elementHeight = (element.height || 0) * nScale;
-            const elementX = (element.x || 0) * nScale;
-            const elementY = (element.y || 0) * nScale;
+            // Use coordinate system for consistent positioning
+            const position = renderCoordSystem.storageToPreview({
+                x: element.x || 0,
+                y: element.y || 0
+            });
+            const dimensions = renderCoordSystem.storageToPreviewDimensions({
+                width: element.width || 0,
+                height: element.height || 0
+            });
+            
+            const elementX = Math.round(position.x);
+            const elementY = Math.round(position.y);
+            const elementWidth = Math.round(dimensions.width);
+            const elementHeight = Math.round(dimensions.height);
         
             // Draw red bounding box if enabled
             if (showBoundingBoxes) {
@@ -559,22 +630,22 @@
         
             let x = elementX;
             if (element.alignment === 'center') {
-                x += elementWidth / 2;
+                x += Math.round(elementWidth / 2);
             } else if (element.alignment === 'right') {
                 x += elementWidth;
             }
         
             const textHeight = measureTextHeight(ctx, fontOptions);
-            const y = elementY + (elementHeight / 2); // Center vertically within element height
+            const y = Math.round(elementY + (elementHeight / 2)); // Center vertically within element height
 
             if (element.textDecoration === 'underline') {
                 const metrics = ctx.measureText(text);
-                const lineY = y + textHeight/2; // Adjust underline position
+                const lineY = Math.round(y + textHeight/2); // Adjust underline position
                 ctx.beginPath();
-                ctx.moveTo(x - (element.alignment === 'right' ? metrics.width : 0), lineY);
-                ctx.lineTo(x + (element.alignment === 'left' ? metrics.width : 0), lineY);
+                ctx.moveTo(Math.round(x - (element.alignment === 'right' ? metrics.width : 0)), lineY);
+                ctx.lineTo(Math.round(x + (element.alignment === 'left' ? metrics.width : 0)), lineY);
                 ctx.strokeStyle = element.color || 'black';
-                ctx.lineWidth = Math.max(1, fontSize * 0.05);
+                ctx.lineWidth = Math.max(1, Math.round(fontSize * 0.05));
                 ctx.stroke();
             }
 
@@ -592,18 +663,27 @@
         }
     }
     
-    async function renderImageElement(ctx: CanvasRenderingContext2D, element: TemplateElement, scale: number, isOffScreen: boolean) {
+    async function renderImageElement(ctx: CanvasRenderingContext2D, element: TemplateElement, renderCoordSystem: CoordinateSystem, isOffScreen: boolean) {
         if (element.type !== 'photo' && element.type !== 'signature') return;
     
         try {
-            const nScale = scale * ELEMENT_SCALE;
             const file = fileUploads[element.variableName];
             const pos = imagePositions[element.variableName];
         
-            const elementX = (element.x || 0) * nScale;
-            const elementY = (element.y || 0) * nScale;
-            const elementWidth = (element.width || 100) * nScale;
-            const elementHeight = (element.height || 100) * nScale;
+            // Use coordinate system for consistent positioning
+            const position = renderCoordSystem.storageToPreview({
+                x: element.x || 0,
+                y: element.y || 0
+            });
+            const dimensions = renderCoordSystem.storageToPreviewDimensions({
+                width: element.width || 100,
+                height: element.height || 100
+            });
+            
+            const elementX = Math.round(position.x);
+            const elementY = Math.round(position.y);
+            const elementWidth = Math.round(dimensions.width);
+            const elementHeight = Math.round(dimensions.height);
         
             // Draw red bounding box if enabled
             if (showBoundingBoxes) {
@@ -626,17 +706,23 @@
                     const imgAspectRatio = image.width / image.height;
                     const elementAspectRatio = elementWidth / elementHeight;
                     
-                    let drawWidth = elementWidth * (pos.scale || 1);
-                    let drawHeight = elementHeight * (pos.scale || 1);
+                    let drawWidth = Math.round(elementWidth * (pos.scale || 1));
+                    let drawHeight = Math.round(elementHeight * (pos.scale || 1));
         
                     if (imgAspectRatio > elementAspectRatio) {
-                        drawHeight = drawWidth / imgAspectRatio;
+                        drawHeight = Math.round(drawWidth / imgAspectRatio);
                     } else {
-                        drawWidth = drawHeight * imgAspectRatio;
+                        drawWidth = Math.round(drawHeight * imgAspectRatio);
                     }
         
-                    const x = elementX + (elementWidth - drawWidth) / 2 + (pos.x || 0) * nScale;
-                    const y = elementY + (elementHeight - drawHeight) / 2 + (pos.y || 0) * nScale;
+                    // Apply position offset from imagePositions, scaled through coordinate system
+                    const offsetPosition = renderCoordSystem.storageToPreview({
+                        x: pos.x || 0,
+                        y: pos.y || 0
+                    });
+                    
+                    const x = Math.round(elementX + (elementWidth - drawWidth) / 2 + offsetPosition.x);
+                    const y = Math.round(elementY + (elementHeight - drawHeight) / 2 + offsetPosition.y);
         
                     if (element.type === 'signature') {
                         ctx.globalCompositeOperation = 'multiply';
@@ -646,7 +732,7 @@
                     ctx.globalCompositeOperation = 'source-over';
                 } catch (error: any) {
                     if (!isOffScreen) {
-                        renderPlaceholder(ctx, elementX, elementY, elementWidth, elementHeight, "Error Photo", nScale);
+                        renderPlaceholder(ctx, elementX, elementY, elementWidth, elementHeight, "Error Photo", renderCoordSystem.scale);
                     }
                     throw new CanvasOperationError(
                         `Failed to load image for ${element.variableName}: ${error.message || 'Unknown error'}`,
@@ -654,7 +740,7 @@
                     );
                 }
             } else if (!isOffScreen) {
-                renderPlaceholder(ctx, elementX, elementY, elementWidth, elementHeight, element.type, nScale);
+                renderPlaceholder(ctx, elementX, elementY, elementWidth, elementHeight, element.type, renderCoordSystem.scale);
             }
         
             ctx.restore();
@@ -670,15 +756,20 @@
         if (!browser) return;
         
         try {
+            const roundedX = Math.round(x);
+            const roundedY = Math.round(y);
+            const roundedWidth = Math.round(width);
+            const roundedHeight = Math.round(height);
+            
             ctx.fillStyle = '#f0f0f0';
-            ctx.fillRect(x, y, width, height);
+            ctx.fillRect(roundedX, roundedY, roundedWidth, roundedHeight);
             ctx.strokeStyle = '#999';
-            ctx.strokeRect(x, y, width, height);
+            ctx.strokeRect(roundedX, roundedY, roundedWidth, roundedHeight);
             ctx.fillStyle = '#999';
-            ctx.font = `${12 * scale}px Arial`;
+            ctx.font = `${Math.round(12 * scale)}px Arial`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(type, x + width / 2, y + height / 2);
+            ctx.fillText(type, Math.round(roundedX + roundedWidth / 2), Math.round(roundedY + roundedHeight / 2));
         } catch (error: any) {
             throw new CanvasOperationError(
                 'Failed to render placeholder',
@@ -718,9 +809,10 @@
                 );
             }
 
-            offscreenCanvas.width = FULL_WIDTH;
-            offscreenCanvas.height = FULL_HEIGHT;
-            offscreenCtx.clearRect(0, 0, FULL_WIDTH, FULL_HEIGHT);
+            const dims = canvasDimensions();
+            offscreenCanvas.width = dims.width;
+            offscreenCanvas.height = dims.height;
+            offscreenCtx.clearRect(0, 0, dims.width, dims.height);
 
             await renderCanvas(offscreenCtx as unknown as CanvasRenderingContext2D, 1, true);
 
@@ -747,11 +839,27 @@
         }
     }
     
-    $: if (elements || formData || fileUploads || imagePositions || fullResolution || isDragging) {
+    // Trigger render when any of the dependencies change
+    $effect(() => {
+        // Track all dependencies that should trigger a render
+        elements;
+        fileUploads;
+        imagePositions;
+        fullResolution;
+        isDragging;
+        
+        // Track individual formData properties being used in text elements
+        elements.forEach(element => {
+            if (element.type === 'text' || element.type === 'selection') {
+                // Access the specific formData property to trigger reactivity
+                formData[element.variableName];
+            }
+        });
+        
         if (browser) {
             debouncedRender();
         }
-    }
+    });
 </script>
 
 <canvas 

@@ -7,7 +7,7 @@
     import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '$lib/components/ui/dialog';
     import { RadioGroup, RadioGroupItem } from '$lib/components/ui/radio-group';
     import { Switch } from '$lib/components/ui/switch';
-    import { RotateCw } from 'lucide-svelte';
+    import { RotateCw } from '@lucide/svelte';
     import { 
         COMMON_CARD_SIZES, 
         createCustomCardSize, 

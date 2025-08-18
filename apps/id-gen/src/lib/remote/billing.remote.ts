@@ -1,6 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { query, command, getRequestEvent } from '$app/server';
-import { getUsersData } from './admin.remote'; // for refreshing users after credit changes
+import { getUsersData } from '$lib/remote/admin.remote'; // for refreshing users after credit changes
 
 // Import schemas following AZPOS pattern
 import {

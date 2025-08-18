@@ -10,8 +10,15 @@ export const load: LayoutServerLoad = async ({ locals, url }) => {
 	}
 
 	// Check if user has admin permissions
-	const hasAdminRole = user.role && ['super_admin', 'org_admin', 'id_gen_admin'].includes(user.role);
+	// The roles are stored in app_metadata, not in a direct role property
+	const userRoles = user.app_metadata?.role ? [user.app_metadata.role] : 
+		(user.app_metadata?.roles || []);
+	
+	const adminRoles = ['super_admin', 'org_admin', 'id_gen_admin', 'property_admin'];
+	const hasAdminRole = userRoles.some((role: string) => adminRoles.includes(role));
+	
 	if (!hasAdminRole) {
+		console.log('Access denied. User roles:', userRoles, 'Required:', adminRoles);
 		throw error(403, 'Access denied. Admin privileges required.');
 	}
 

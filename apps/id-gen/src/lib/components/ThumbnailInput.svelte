@@ -1,7 +1,7 @@
 <script lang="ts">
     import { run } from 'svelte/legacy';
     import { onMount } from 'svelte';
-    import { Move, Scaling } from "lucide-svelte";
+    import { Move, Scaling } from "@lucide/svelte";
     import { debounce } from 'lodash-es';
     import { createEventDispatcher } from 'svelte';
 

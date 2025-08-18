@@ -3,11 +3,13 @@
     import { onMount } from 'svelte';
     import TemplateList from '$lib/components/TemplateList.svelte';
     import TemplateEdit from '$lib/components/TemplateEdit.svelte';
+    import CroppingConfirmationDialog from '$lib/components/CroppingConfirmationDialog.svelte';
     import { uploadImage } from '$lib/database';
     import { pushState } from '$app/navigation';
     import type { TemplateData, TemplateElement } from '$lib/stores/templateStore';
     import type { CardSize } from '$lib/utils/sizeConversion';
     import { cardSizeToPixels, DEFAULT_DPI } from '$lib/utils/sizeConversion';
+    import { needsCropping, cropBackgroundImage, getImageDimensions, type BackgroundPosition } from '$lib/utils/imageCropper';
 
     // data means get data from server
     let { data } = $props();
@@ -35,6 +37,18 @@
     let isLoading = $state(false);
     let isEditMode = $state(false);
 
+    // Background position tracking for cropping
+    let frontBackgroundPosition: BackgroundPosition = $state({ x: 0, y: 0, scale: 1 });
+    let backBackgroundPosition: BackgroundPosition = $state({ x: 0, y: 0, scale: 1 });
+
+    // Cropping dialog state
+    let showCroppingDialog = $state(false);
+    let pendingSave = $state(false);
+    let croppingDialogData = $state<{
+        front?: { originalSize: { width: number; height: number }; needsCropping: boolean; filename: string };
+        back?: { originalSize: { width: number; height: number }; needsCropping: boolean; filename: string };
+    }>({});
+
 
     async function validateBackgrounds(): Promise<boolean> {
         if ((!frontBackground && !frontPreview) || (!backBackground && !backPreview)) {
@@ -42,6 +56,7 @@
             return false;
         }
 
+        // Only validate that images can be loaded - cropping handles size requirements
         if (frontBackground) {
             const frontValid = await validateImage(frontBackground, 'front');
             if (!frontValid) return false;
@@ -64,21 +79,12 @@
                 img.src = url;
             });
 
-            // Use dynamic dimensions if available, otherwise fall back to legacy size
-            const expectedWidth = requiredPixelDimensions?.width || 1013;
-            const expectedHeight = requiredPixelDimensions?.height || 638;
-
-            if (img.width !== expectedWidth || img.height !== expectedHeight) {
-                const sizeInfo = currentCardSize 
-                    ? `${currentCardSize.widthInches}" × ${currentCardSize.heightInches}" (${expectedWidth}px × ${expectedHeight}px)`
-                    : `${expectedWidth}px × ${expectedHeight}px`;
-                errorMessage = `${side.charAt(0).toUpperCase() + side.slice(1)} background must be exactly ${sizeInfo}.`;
-                return false;
-            }
-
+            // With cropping enabled, we only need to validate that the image loads
+            // Size validation is now handled by the cropping workflow
+            URL.revokeObjectURL(url);
             return true;
         } catch {
-            errorMessage = `Error validating ${side} background image. Please try again.`;
+            errorMessage = `Error loading ${side} background image. Please try again.`;
             return false;
         }
     }
@@ -87,38 +93,102 @@
         if (!(await validateBackgrounds())) {
             return;
         }
+
+        // Check if cropping is needed before proceeding
+        if (!pendingSave) {
+            await checkAndShowCroppingDialog();
+            return;
+        }
+
         try {
+            // Reset pending save flag
+            pendingSave = false;
+
             let frontUrl = frontPreview;
             let backUrl = backPreview;
 
-            if (frontBackground) {
-                frontUrl = await uploadImage(frontBackground, 'front', user?.id);
-                console.log('✅ Front background uploaded:', frontUrl);
+            // Process front background with cropping if needed
+            if (frontBackground && requiredPixelDimensions) {
+                console.log('🖼️ Processing front background...');
+                const frontResult = await cropBackgroundImage(
+                    frontBackground,
+                    requiredPixelDimensions,
+                    frontBackgroundPosition
+                );
+                
+                // Use the cropped file for upload
+                frontBackground = frontResult.croppedFile;
+                frontUrl = await uploadImage(frontResult.croppedFile, 'front', user?.id, org_id);
+                console.log('✅ Front background processed and uploaded:', {
+                    wasCropped: frontResult.wasCropped,
+                    originalSize: frontResult.originalSize,
+                    finalSize: frontResult.croppedSize,
+                    url: frontUrl
+                });
             }
-            if (backBackground) {
-                backUrl = await uploadImage(backBackground, 'back', user?.id);
-                console.log('✅ Back background uploaded:', backUrl);
+
+            // Process back background with cropping if needed
+            if (backBackground && requiredPixelDimensions) {
+                console.log('🖼️ Processing back background...');
+                const backResult = await cropBackgroundImage(
+                    backBackground,
+                    requiredPixelDimensions,
+                    backBackgroundPosition
+                );
+                
+                // Use the cropped file for upload
+                backBackground = backResult.croppedFile;
+                backUrl = await uploadImage(backResult.croppedFile, 'back', user?.id, org_id);
+                console.log('✅ Back background processed and uploaded:', {
+                    wasCropped: backResult.wasCropped,
+                    originalSize: backResult.originalSize,
+                    finalSize: backResult.croppedSize,
+                    url: backUrl
+                });
             }
 
             // Combine front and back elements
             const allElements = [...frontElements, ...backElements];
 
+            // Debug elements state
+            console.log('🔍 Elements debug:', {
+                frontElements: frontElements.length,
+                backElements: backElements.length,
+                allElements: allElements.length,
+                frontElementsData: frontElements,
+                backElementsData: backElements
+            });
+
             // Validate elements
             if (allElements.length === 0) {
                 console.error('❌ No template elements found');
-                throw new Error('No template elements provided');
+                throw new Error('No template elements provided - elements may not have been created yet. Try adding some elements to the template first.');
             }
+
+            console.log('🔍 URLs before saving to database:', {
+                frontUrl: frontUrl,
+                backUrl: backUrl,
+                frontUrlType: typeof frontUrl,
+                backUrlType: typeof backUrl
+            });
 
             const templateDataToSave: TemplateData = {
                 id: currentTemplate?.id || crypto.randomUUID(),
                 user_id: user?.id ?? '',
                 name: currentTemplate?.name || 'Untitled Template',
-                front_background: frontUrl || '',  // Provide default empty string
-                back_background: backUrl || '',    // Provide default empty string
+                front_background: frontUrl || '',
+                back_background: backUrl || '',
                 orientation: currentTemplate?.orientation ?? 'landscape',
-                template_elements: allElements,  // Use the combined elements
+                template_elements: allElements,
                 created_at: currentTemplate?.created_at || new Date().toISOString(),
-                org_id: org_id ?? ''
+                org_id: org_id ?? '',
+                // Add the database schema fields
+                width_pixels: requiredPixelDimensions?.width || currentTemplate?.width_pixels,
+                height_pixels: requiredPixelDimensions?.height || currentTemplate?.height_pixels,
+                dpi: currentTemplate?.dpi || DEFAULT_DPI,
+                unit_type: currentCardSize?.unit || currentTemplate?.unit_type || 'pixels',
+                unit_width: currentCardSize?.width || currentTemplate?.unit_width,
+                unit_height: currentCardSize?.height || currentTemplate?.unit_height
             };
 
             if (!templateDataToSave.user_id) {
@@ -171,6 +241,99 @@
         }
     }
 
+    async function checkAndShowCroppingDialog() {
+        if (!requiredPixelDimensions || (!frontBackground && !backBackground)) {
+            // No cropping needed or no files to check
+            pendingSave = true;
+            await saveTemplate();
+            return;
+        }
+
+        try {
+            const cropCheckResults: Array<{
+                side: 'front' | 'back';
+                file: File;
+                needsCropping: boolean;
+                originalSize: { width: number; height: number };
+            }> = [];
+
+            // Check front background
+            if (frontBackground) {
+                const frontSize = await getImageDimensions(frontBackground);
+                const frontNeedsCropping = needsCropping(
+                    frontSize,
+                    requiredPixelDimensions,
+                    frontBackgroundPosition
+                );
+                cropCheckResults.push({
+                    side: 'front',
+                    file: frontBackground,
+                    needsCropping: frontNeedsCropping,
+                    originalSize: frontSize
+                });
+            }
+
+            // Check back background
+            if (backBackground) {
+                const backSize = await getImageDimensions(backBackground);
+                const backNeedsCropping = needsCropping(
+                    backSize,
+                    requiredPixelDimensions,
+                    backBackgroundPosition
+                );
+                cropCheckResults.push({
+                    side: 'back',
+                    file: backBackground,
+                    needsCropping: backNeedsCropping,
+                    originalSize: backSize
+                });
+            }
+
+            // Populate dialog data
+            croppingDialogData = {};
+            cropCheckResults.forEach(result => {
+                if (result.side === 'front') {
+                    croppingDialogData.front = {
+                        originalSize: result.originalSize,
+                        needsCropping: result.needsCropping,
+                        filename: result.file.name
+                    };
+                } else {
+                    croppingDialogData.back = {
+                        originalSize: result.originalSize,
+                        needsCropping: result.needsCropping,
+                        filename: result.file.name
+                    };
+                }
+            });
+
+            // If any cropping is needed, show dialog
+            const anyCroppingNeeded = cropCheckResults.some(result => result.needsCropping);
+            
+            if (anyCroppingNeeded || cropCheckResults.length > 0) {
+                showCroppingDialog = true;
+            } else {
+                // No cropping needed, proceed directly
+                pendingSave = true;
+                await saveTemplate();
+            }
+        } catch (error) {
+            console.error('❌ Error checking cropping requirements:', error);
+            errorMessage = `Error checking images: ${error instanceof Error ? error.message : 'Unknown error'}`;
+        }
+    }
+
+    function handleCroppingConfirm() {
+        showCroppingDialog = false;
+        pendingSave = true;
+        saveTemplate();
+    }
+
+    function handleCroppingCancel() {
+        showCroppingDialog = false;
+        pendingSave = false;
+    }
+
     async function handleImageUpload(files:File[], side: 'front' | 'back' ) {
         const file = files[0];
         if (side === 'front') {
@@ -179,6 +342,45 @@
         } else {
             backBackground = file;
             backPreview = URL.createObjectURL(file);
+        }
+
+        // Trigger element creation if elements are empty and dimensions are available
+        await triggerElementCreation();
+    }
+
+    async function triggerElementCreation() {
+        // Wait a bit for the dimensions to be processed
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        if (requiredPixelDimensions && frontElements.length === 0 && backElements.length === 0) {
+            console.log('🔧 Creating default template elements...');
+            
+            // Import the element creation utility
+            const { createAdaptiveElements } = await import('$lib/utils/adaptiveElements');
+            
+            // Create elements for both sides
+            const frontElems = createAdaptiveElements(
+                requiredPixelDimensions.width,
+                requiredPixelDimensions.height,
+                'front',
+                'aspect-ratio'
+            );
+            
+            const backElems = createAdaptiveElements(
+                requiredPixelDimensions.width,
+                requiredPixelDimensions.height,
+                'back',
+                'aspect-ratio'
+            );
+            
+            // Update the elements arrays
+            frontElements = frontElems;
+            backElements = backElems;
+            
+            console.log('✅ Created template elements:', {
+                front: frontElems.length,
+                back: backElems.length
+            });
         }
     }
 
@@ -297,14 +499,17 @@
             name: templateName,
             front_background: '',
             back_background: '',
-            orientation: cardSize.widthInches >= cardSize.heightInches ? 'landscape' : 'portrait',
+            orientation: cardSize.width >= cardSize.height ? 'landscape' : 'portrait',
             template_elements: [],
             created_at: new Date().toISOString(),
             org_id: org_id ?? '',
             // Add size information for new templates
-            width_inches: cardSize.widthInches,
-            height_inches: cardSize.heightInches,
-            dpi: DEFAULT_DPI
+            width_pixels: requiredPixelDimensions?.width,
+            height_pixels: requiredPixelDimensions?.height, 
+            dpi: DEFAULT_DPI,
+            unit_type: cardSize.unit,
+            unit_width: cardSize.width,
+            unit_height: cardSize.height
         };
 
         // Clear existing data
@@ -368,9 +573,27 @@
                 onUpdateElements={(elements, side) => updateElements(elements, side)}
                 onImageUpload={(files, side) => handleImageUpload(files, side)}
                 onRemoveImage={(side) => handleRemoveImage(side)}
+                onUpdateBackgroundPosition={(position, side) => {
+                    console.log(`Background position updated for ${side}:`, position);
+                    if (side === 'front') {
+                        frontBackgroundPosition = { ...position };
+                    } else {
+                        backBackgroundPosition = { ...position };
+                    }
+                }}
             />
         {/if}
     </div>
+
+    <!-- Cropping Confirmation Dialog -->
+    <CroppingConfirmationDialog
+        bind:open={showCroppingDialog}
+        frontImageInfo={croppingDialogData.front || null}
+        backImageInfo={croppingDialogData.back || null}
+        templateSize={requiredPixelDimensions || { width: 1013, height: 638 }}
+        onConfirm={handleCroppingConfirm}
+        onCancel={handleCroppingCancel}
+    />
 </main>
 
 <style>

@@ -11,7 +11,7 @@
     import * as Select from "$lib/components/ui/select";
     import { darkMode } from '$lib/stores/darkMode';
     import ThumbnailInput from '$lib/components/ThumbnailInput.svelte';
-    import { Loader } from 'lucide-svelte';
+    import { Loader } from '@lucide/svelte';
     import { goto } from '$app/navigation';
     import { enhance } from '$app/forms';
     import type { TemplateElement } from '$lib/stores/templateStore';
@@ -30,6 +30,12 @@
         front_background: string;
         back_background: string;
         orientation: 'landscape' | 'portrait';
+        width_pixels?: number;
+        height_pixels?: number;
+        dpi?: number;
+        unit_type?: string;
+        unit_width?: number;
+        unit_height?: number;
     }
 
     interface ImagePosition {
@@ -159,7 +165,11 @@
         console.log(' [Use Template] Initializing with template:', {
             id: template.id,
             name: template.name,
-            elementsCount: template.template_elements?.length || 0
+            elementsCount: template.template_elements?.length || 0,
+            frontBackground: template.front_background,
+            backBackground: template.back_background,
+            frontBackgroundType: typeof template.front_background,
+            backBackgroundType: typeof template.back_background
         });
         
         initializeFormData();
@@ -335,7 +345,7 @@
                     <div class="front-canvas">
                         <h3 class="text-lg font-semibold mb-2">Front</h3>
                         {#if template}
-                        <div class="w-full aspect-1013/638">
+                        <div class="w-full" style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels || 638}">
                             <IdCanvas
                                 bind:this={frontCanvasComponent}
                                 elements={template.template_elements.filter(el => el.side === 'front')}
@@ -345,6 +355,8 @@
                                 {imagePositions}
                                 {fullResolution}
                                 isDragging={mouseMoving}
+                                pixelDimensions={template.width_pixels && template.height_pixels ? 
+                                    { width: template.width_pixels, height: template.height_pixels } : null}
                                 on:ready={() => handleCanvasReady('front')}
                                 on:error={({ detail }) => addDebugMessage(`Front Canvas Error: ${detail.code} - ${detail.message}`)}
                             />
@@ -354,18 +366,22 @@
                     <div class="back-canvas">
                         <h3 class="text-lg font-semibold mb-2">Back</h3>
                         {#if template}
-                            <IdCanvas
-                                bind:this={backCanvasComponent}
-                                elements={template.template_elements.filter(el => el.side === 'back')}
-                                backgroundUrl={template.back_background}
-                                {formData}
-                                {fileUploads}
-                                {imagePositions}
-                                {fullResolution}
-                                isDragging={mouseMoving}
-                                on:ready={() => handleCanvasReady('back')}
-                                on:error={({ detail }) => addDebugMessage(`Back Canvas Error: ${detail.code} - ${detail.message}`)}
-                            />
+                            <div class="w-full" style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels || 638}">
+                                <IdCanvas
+                                    bind:this={backCanvasComponent}
+                                    elements={template.template_elements.filter(el => el.side === 'back')}
+                                    backgroundUrl={template.back_background}
+                                    {formData}
+                                    {fileUploads}
+                                    {imagePositions}
+                                    {fullResolution}
+                                    isDragging={mouseMoving}
+                                    pixelDimensions={template.width_pixels && template.height_pixels ? 
+                                        { width: template.width_pixels, height: template.height_pixels } : null}
+                                    on:ready={() => handleCanvasReady('back')}
+                                    on:error={({ detail }) => addDebugMessage(`Back Canvas Error: ${detail.code} - ${detail.message}`)}
+                                />
+                            </div>
                         {/if}
                     </div>
                 </div>

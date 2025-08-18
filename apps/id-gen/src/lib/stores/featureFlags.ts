@@ -1,6 +1,6 @@
 import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
-import { getBillingSettings } from '../../routes/admin/billing.remote';
+import { getBillingSettings } from '$lib/remote/billing.remote';
 
 interface PaymentFlags {
   paymentsEnabled: boolean;

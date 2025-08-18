@@ -1,7 +1,7 @@
 <script lang="ts">
     import { fade } from 'svelte/transition';
     import { Button } from "$lib/components/ui/button";
-    import { Copy, Trash2, Edit, Plus } from 'lucide-svelte';
+    import { Copy, Trash2, Edit, Plus } from '@lucide/svelte';
     import type { TemplateData } from '../stores/templateStore';
     import { goto } from '$app/navigation';
     import { invalidate } from '$app/navigation';
@@ -151,6 +151,23 @@
     function handleSizeSelectionCancel() {
         showSizeDialog = false;
     }
+
+    // Calculate aspect ratio for template card display
+    function getTemplateAspectRatio(template: TemplateData): string {
+        // Use template dimensions if available
+        if (template.width_pixels && template.height_pixels) {
+            const aspectRatio = template.width_pixels / template.height_pixels;
+            return `${template.width_pixels}/${template.height_pixels}`;
+        }
+        
+        // Legacy templates - use orientation as fallback
+        if (template.orientation === 'portrait') {
+            return '638/1013'; // 1:1.6 inverted
+        }
+        
+        // Default landscape fallback
+        return '1013/638'; // 1.6:1
+    }
 </script>
 
 <div class="h-full w-full overflow-y-auto bg-background p-6">
@@ -179,13 +196,19 @@
                     data-sveltekit-reload="off"
                 >
                     {#if template.front_background}
-                        <img 
-                            src={template.front_background} 
-                            alt={template.name}
-                            class="aspect-[1.6/1] w-full object-cover"
-                        />
+                        <div class="flex justify-center items-center bg-muted">
+                            <img 
+                                src={template.front_background} 
+                                alt={template.name}
+                                class="object-contain max-h-60"
+                                style="aspect-ratio: {getTemplateAspectRatio(template)}"
+                            />
+                        </div>
                     {:else}
-                        <div class="aspect-[1.6/1] w-full flex items-center justify-center bg-muted dark:bg-gray-700">
+                        <div 
+                            class="flex items-center justify-center bg-muted dark:bg-gray-700 max-h-60"
+                            style="aspect-ratio: {getTemplateAspectRatio(template)}"
+                        >
                             <span class="text-muted-foreground dark:text-gray-400">No preview</span>
                         </div>
                     {/if}
