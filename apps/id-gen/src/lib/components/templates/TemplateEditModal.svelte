@@ -10,7 +10,7 @@
 			<h3 class="text-lg font-semibold mb-2">Edit Template</h3>
 			<div class="text-sm text-muted-foreground">Modal placeholder</div>
 			<div class="mt-4 flex justify-end">
-				<button class="px-3 py-1 rounded bg-gray-200" on:click={() => (open = false)}>Close</button>
+				<button class="px-3 py-1 rounded bg-gray-200" onclick={() => (open = false)}>Close</button>
 			</div>
 		</div>
 	</div>

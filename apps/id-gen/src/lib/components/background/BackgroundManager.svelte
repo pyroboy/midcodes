@@ -2,6 +2,7 @@
 	import ImageUploader from './ImageUploader.svelte';
 	import ImageCropper from './ImageCropper.svelte';
 	import ThumbnailPreview from './ThumbnailPreview.svelte';
+    import LegacyBackgroundThumbnail from '../BackgroundThumbnail.svelte';
 
 	let {
 		imageUrl = $bindable<string | null>(null),
@@ -14,7 +15,13 @@
 	<ImageUploader bind:imageUrl />
 	{#if imageUrl}
 		<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-			<ImageCropper bind:position {imageUrl} {templateDimensions} />
+			<!-- Transitional: Render legacy cropper until migration completes -->
+			<LegacyBackgroundThumbnail
+				imageUrl={imageUrl}
+				templateDimensions={templateDimensions}
+				position={position}
+				onPositionChange={(p) => (position = p)}
+			/>
 			<ThumbnailPreview bind:position {imageUrl} {templateDimensions} />
 		</div>
 	{/if}

@@ -13,7 +13,7 @@
 		{#each items as item}
 			<li class="p-3 flex items-center justify-between">
 				<span>{item.name}</span>
-				<button class="text-primary" on:click={() => dispatch('edit', { id: item.id })}>Edit</button>
+				<button class="text-primary" onclick={() => dispatch('edit', { id: item.id })}>Edit</button>
 			</li>
 		{/each}
 	</ul>

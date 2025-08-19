@@ -9,10 +9,10 @@
 </script>
 
 <footer class="flex items-center gap-2">
-	<Button disabled={disabled} on:click={() => onCreate?.()}>
+	<Button disabled={disabled} onclick={() => onCreate?.()}>
 		Create
 	</Button>
-	<Button variant="destructive" disabled={disabled} on:click={() => onDelete?.()}>
+	<Button variant="destructive" disabled={disabled} onclick={() => onDelete?.()}>
 		Delete
 	</Button>
 </footer>
