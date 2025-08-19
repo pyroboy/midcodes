@@ -44,13 +44,13 @@ This Claude session has access to two important directories:
 **Naming Conventions**: Repository files are classified into two types with different naming patterns:
 
 ### **SPECIFICATIONS** (Instructions/Plans): `Spec-NN-MMMDD-Title-With-Dashes.md`
-- **Repository**: `/specs/` folder (source files with original names)
-- **Vault**: `/repo-specs/` folder (numbered with naming convention)
+- **Repository**: `/specs/` folder (source files using naming convention)
+- **Vault**: `/repo-specs/` folder (mirrored with same names)
 - **Purpose**: Technical specifications, implementation plans, instructions
 - **Format**: `Spec-NN-MMMDD-Title-With-Dashes.md`
 - **Examples**:
-  - `REFACTORING_PLAN_PHASE_1.md` → `Spec-01-Aug20-REFACTORING-PLAN-PHASE-1.md`
-  - `DASHBOARD_UI_IMPROVEMENTS.md` → `Spec-02-Aug20-DASHBOARD-UI-IMPROVEMENTS.md`
+  - `Spec-01-Aug20-REFACTORING-PLAN-PHASE-1.md`
+  - `Spec-02-Aug20-DASHBOARD-UI-IMPROVEMENTS.md`
 
 ### **DOCUMENTATION** (Reports/Summaries): `CAPITALIZED_TITLES.md`
 - **Repository**: `/docs/` folder (source files)
@@ -129,13 +129,16 @@ mirror_doc() {
 ```
 
 **Auto-Mirror Workflow**: 
-1. **File Creation**: When creating new documentation, use the naming convention immediately
+1. **File Creation**: 
+   - Specifications: Create in `/specs/` with `Spec-NN-MMMDD-Title-With-Dashes.md` format
+   - Documentation: Create in `/docs/` with `CAPITALIZED_TITLES.md` format
 2. **Automatic Sync**: Run mirror command after any documentation updates
 3. **Batch Processing**: Use the loop command to sync all files with proper naming
 4. **Single File**: Use `mirror_doc` function for individual file updates
 
 **Integration with Development Workflow**:
-- Create docs with spec naming convention from start
+- Create specifications in `/specs/` using naming convention from start
+- Create documentation in `/docs/` using CAPITALIZED format
 - Mirror immediately after creating/updating documentation
 - Maintain vault synchronization for centralized knowledge management
 - Use date-based naming for chronological organization and easy reference
@@ -157,18 +160,18 @@ mirror_doc() {
 - **`/specs/`**: 8 specification files (plans, instructions, implementations)
 
 **VAULT MIRROR**:
-- **`/repo-docs/`**: 11 files with original names preserved
-- **`/repo-specs/`**: 8 files with numbered naming convention
+- **`/repo-docs/`**: 11 files with original names preserved  
+- **`/repo-specs/`**: 8 files with same naming convention as repository
 
 **SPECIFICATIONS** (Repository: `/specs/` → Vault: `/repo-specs/`):
-- `DASHBOARD_UI_IMPROVEMENTS.md` → `Spec-01-Aug20-DASHBOARD-UI-IMPROVEMENTS.md`
-- `ID_GEN_ROLE_INSTRUCTIONS.md` → `Spec-02-Aug20-ID-GEN-ROLE-INSTRUCTIONS.md`
-- `MOBILE_OPTIMIZATION_PLAN.md` → `Spec-03-Aug20-MOBILE-OPTIMIZATION-PLAN.md`
-- `PAYMENT_BYPASS_IMPLEMENTATION.md` → `Spec-04-Aug20-PAYMENT-BYPASS-IMPLEMENTATION.md`
-- `PAYMENT_STRUCTURE.md` → `Spec-05-Aug20-PAYMENT-STRUCTURE.md`
-- `QA_CHECKLIST_AND_ROLLOUT.md` → `Spec-06-Aug20-QA-CHECKLIST-AND-ROLLOUT.md`
-- `REFACTORING_PLAN_PHASE_1.md` → `Spec-07-Aug20-REFACTORING-PLAN-PHASE-1.md`
-- `ROUTE_DOCUMENTATION.md` → `Spec-08-Aug20-ROUTE-DOCUMENTATION.md`
+- `Spec-01-Aug20-DASHBOARD-UI-IMPROVEMENTS.md` (both repo and vault)
+- `Spec-02-Aug20-ID-GEN-ROLE-INSTRUCTIONS.md` (both repo and vault)
+- `Spec-03-Aug20-MOBILE-OPTIMIZATION-PLAN.md` (both repo and vault)
+- `Spec-04-Aug20-PAYMENT-BYPASS-IMPLEMENTATION.md` (both repo and vault)
+- `Spec-05-Aug20-PAYMENT-STRUCTURE.md` (both repo and vault)
+- `Spec-06-Aug20-QA-CHECKLIST-AND-ROLLOUT.md` (both repo and vault)
+- `Spec-07-Aug20-REFACTORING-PLAN-PHASE-1.md` (both repo and vault)
+- `Spec-08-Aug20-ROUTE-DOCUMENTATION.md` (both repo and vault)
 
 **DOCUMENTATION** (Repository: `/docs/` → Vault: `/repo-docs/`):
 - All files preserved with original names for easy recognition
@@ -252,7 +255,7 @@ Role hierarchy: `super_admin` > `org_admin` > `id_gen_admin` > `id_gen_user`
 **ID Generation**: All roles can generate IDs from available templates
 **Data Scope**: All operations are organization-scoped via `org_id`
 
-See `src/routes/ID_GEN_ROLE_INSTRUCTIONS.md` for detailed role implementation guidelines.
+See `specs/Spec-02-Aug20-ID-GEN-ROLE-INSTRUCTIONS.md` for detailed role implementation guidelines.
 
 ### 3D Rendering
 
