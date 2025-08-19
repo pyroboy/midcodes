@@ -7,7 +7,7 @@
 	import { loadGoogleFonts, getAllFontFamilies, isFontLoaded, fonts } from '../config/fonts';
 	import { CoordinateSystem } from '$lib/utils/coordinateSystem';
 import { createAdaptiveElements } from '$lib/utils/adaptiveElements';
-import { cssForBackground, clampBackgroundPosition, computeDraw } from '$lib/utils/backgroundGeometry';
+import { cssForBackground, clampBackgroundPosition, computeDraw, computeContainerViewportInImage } from '$lib/utils/backgroundGeometry';
 import type { Dims } from '$lib/utils/backgroundGeometry';
 import { browser } from '$app/environment';
 import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
@@ -546,7 +546,6 @@ import {
 		};
 		
 		// Calculate what part of the image the container viewport "sees" (same as red box)
-		const { computeContainerViewportInImage } = await import('$lib/utils/backgroundGeometry');
 		const viewportRect = computeContainerViewportInImage(imageDims, containerDims, backgroundPosition);
 		
 		console.log('🎯 Canvas draw parameters (VIEWPORT SYNC):', {
