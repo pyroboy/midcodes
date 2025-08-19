@@ -371,6 +371,9 @@
 			drawThumbnail();
 		}
 	});
+
+	// Debug state is now updated only during user interactions
+	// No automatic $effect to prevent infinite loops
 </script>
 
 <div class="background-thumbnail" class:disabled class:dragging={isDragging}>

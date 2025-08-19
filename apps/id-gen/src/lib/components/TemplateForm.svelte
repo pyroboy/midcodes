@@ -82,7 +82,7 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 		enabled: true // Enable debug by default
 	});
 
-	// Calculate background CSS using shared geometry utility
+	// Calculate background CSS using direct approach for better reactivity
 	let backgroundCSS = $derived(() => {
 		const currentBase = baseDimensions();
 		const container = previewDimensions;
@@ -91,25 +91,28 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 		if (currentBase.actualWidth === 0 || currentBase.actualHeight === 0) {
 			return {
 				size: 'cover',
-				position: 'center'
+				position: 'center',
+				transform: 'none'
 			};
 		}
 
-		const image: Dims = {
-			width: currentBase.actualWidth,
-			height: currentBase.actualHeight
-		};
-		const containerDims: Dims = {
-			width: container.width,
-			height: container.height
-		};
-
-		// Get accurate CSS values using shared math
-		const css = cssForBackground(image, containerDims, backgroundPosition, 1);
+		// Use a more direct approach for background positioning
+		// Calculate the scale factor for cover behavior
+		const scaleX = container.width / currentBase.actualWidth;
+		const scaleY = container.height / currentBase.actualHeight;
+		const baseCoverScale = Math.max(scaleX, scaleY);
+		
+		// Apply user scale on top of cover scale
+		const finalScale = baseCoverScale * backgroundPosition.scale;
+		
+		// Calculate final dimensions
+		const finalWidth = currentBase.actualWidth * finalScale;
+		const finalHeight = currentBase.actualHeight * finalScale;
 
 		return {
-			size: `${css.sizePx.w}px ${css.sizePx.h}px`,
-			position: `calc(50% + ${css.posPx.x}px) calc(50% + ${css.posPx.y}px)`
+			size: `${finalWidth}px ${finalHeight}px`,
+			position: `calc(50% + ${backgroundPosition.x}px) calc(50% + ${backgroundPosition.y}px)`,
+			transform: `scale(${backgroundPosition.scale})`
 		};
 	});
 
@@ -393,16 +396,35 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 	}
 
 	function updateBackgroundPosition() {
+		const currentBase = baseDimensions();
+		
+		// Early return if dimensions not available
+		if (currentBase.actualWidth === 0 || currentBase.actualHeight === 0) {
+			console.warn('⚠️ Cannot update background position: dimensions not available');
+			return;
+		}
+
+		// Notify parent component first
 		if (onUpdateBackgroundPosition) {
 			onUpdateBackgroundPosition(backgroundPosition, side);
 		}
 
-		// Only log debug info on actual position changes, not continuous updates
+		// Debug logging
 		if (debugState.enabled && browser) {
+			const container = { width: previewDimensions.width, height: previewDimensions.height };
+			const image = { width: currentBase.actualWidth, height: currentBase.actualHeight };
+			
 			const newCssValues = { 
 				size: backgroundCSS().size, 
 				position: backgroundCSS().position 
 			};
+
+			console.log('🎯 Background Position Updated:', {
+				position: backgroundPosition,
+				cssValues: newCssValues,
+				containerDims: container,
+				imageDims: image
+			});
 
 			// Update debug state
 			debugState = {
@@ -413,7 +435,7 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 				cssValues: newCssValues
 			};
 
-			// Only log when this is called from a user interaction (not reactive updates)
+			// Debug info for logging
 			const debugInfo: DebugInfo = {
 				component: 'TemplateForm',
 				position: backgroundPosition,
@@ -492,8 +514,8 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 				class:has-preview={preview}
 				bind:this={templateContainer}
 			style="background-image: {preview ? `url('${preview}')` : 'none'}; 
-                       background-size: {preview ? backgroundCSS.size : 'cover'};
-                       background-position: {preview ? backgroundCSS.position : 'center'};
+                       background-size: {preview ? backgroundCSS().size : 'cover'};
+                       background-position: {preview ? backgroundCSS().position : 'center'};
                        background-repeat: no-repeat;
                        background-color: white;"
 			>
@@ -565,6 +587,34 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 						<div class="placeholder-grid"></div>
 					</label>
 				{:else}
+					<!-- Background manipulation controls -->
+					{#if preview}
+						<!-- Draggable overlay for background positioning -->
+						<div 
+							class="background-drag-overlay"
+							title="Drag to reposition background"
+							onmousedown={(e) => handleBackgroundStart(e, 'move')}
+						></div>
+						
+						<!-- Scale control handle -->
+						<div 
+							class="background-scale-handle"
+							title="Drag to scale background"
+							onmousedown={(e) => handleBackgroundStart(e, 'resize')}
+						>
+							<Scaling class="w-4 h-4" />
+						</div>
+						
+						<!-- Move control handle -->
+						<div 
+							class="background-move-handle"
+							title="Drag to move background"
+							onmousedown={(e) => handleBackgroundStart(e, 'move')}
+						>
+							<Move class="w-4 h-4" />
+						</div>
+					{/if}
+					
 					{#each elements as element, i}
 						<div
 							class="template-element {element.type}"
@@ -917,4 +967,76 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 		right: -4px;
 		cursor: nwse-resize;
 	}
+
+	/* Background manipulation controls */
+	.background-drag-overlay {
+		position: absolute;
+		inset: 0;
+		z-index: 5;
+		cursor: move;
+		transition: background-color 0.2s;
+	}
+
+	.background-drag-overlay:hover {
+		background-color: rgba(0, 0, 0, 0.02);
+	}
+
+	.background-scale-handle {
+		position: absolute;
+		top: 15px;
+		left: 15px;
+		width: 32px;
+		height: 32px;
+		background: rgba(255, 255, 255, 0.9);
+		border: 1px solid #ccc;
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: nw-resize;
+		z-index: 15;
+		transition: all 0.2s ease;
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+	}
+
+	.background-scale-handle:hover {
+		background: rgba(255, 255, 255, 1);
+		border-color: #999;
+		transform: scale(1.1);
+		box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+	}
+
+	.background-move-handle {
+		position: absolute;
+		top: 15px;
+		left: 55px;
+		width: 32px;
+		height: 32px;
+		background: rgba(255, 255, 255, 0.9);
+		border: 1px solid #ccc;
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: move;
+		z-index: 15;
+		transition: all 0.2s ease;
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+	}
+
+	.background-move-handle:hover {
+		background: rgba(255, 255, 255, 1);
+		border-color: #999;
+		transform: scale(1.1);
+		box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+	}
+
+	/* Hide background controls when hovering over elements to avoid conflicts */
+	.template-container:has(.template-element:hover) .background-drag-overlay,
+	.template-container:has(.template-element:hover) .background-scale-handle,
+	.template-container:has(.template-element:hover) .background-move-handle {
+		pointer-events: none;
+		opacity: 0.3;
+	}
+
 </style>
