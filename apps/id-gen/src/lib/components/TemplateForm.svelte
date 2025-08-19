@@ -3,7 +3,7 @@
 	import type { TemplateElement } from '$lib/types/types';
 	import ElementList from './ElementList.svelte';
 	import { Button } from '$lib/components/ui/button';
-	import { Upload, Image, Plus, X, Move, Scaling } from '@lucide/svelte';
+	import { Upload, Image as ImageIcon, Plus, X, Move, Scaling } from '@lucide/svelte';
 	import { loadGoogleFonts, getAllFontFamilies, isFontLoaded, fonts } from '../config/fonts';
 	import { CoordinateSystem } from '$lib/utils/coordinateSystem';
 import { createAdaptiveElements } from '$lib/utils/adaptiveElements';
@@ -65,6 +65,9 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 	let isResizingBackground = false;
 	let backgroundResizeHandle: string | null = null;
 	let templateContainer: HTMLElement | undefined = $state();
+	let mainCanvas: HTMLCanvasElement;
+	let mainCtx: CanvasRenderingContext2D;
+	let mainImageElement: HTMLImageElement | null = $state(null);
 	let fontOptions: string[] = $state([]);
 	let fontsLoaded = false;
 	let previewDimensions = $state({
@@ -90,29 +93,26 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 		// Return early if dimensions are not yet available
 		if (currentBase.actualWidth === 0 || currentBase.actualHeight === 0) {
 			return {
-				size: 'cover',
+				size: 'auto',
 				position: 'center',
 				transform: 'none'
 			};
 		}
 
-		// Use a more direct approach for background positioning
-		// Calculate the scale factor for cover behavior
-		const scaleX = container.width / currentBase.actualWidth;
-		const scaleY = container.height / currentBase.actualHeight;
-		const baseCoverScale = Math.max(scaleX, scaleY);
+		// NEW LOGIC: Use actual image dimensions instead of cover behavior
+		// Scale the image dimensions to the preview scale, then apply user scale
+		const previewScale = container.scale || 1;
+		const baseWidth = currentBase.actualWidth * previewScale;
+		const baseHeight = currentBase.actualHeight * previewScale;
 		
-		// Apply user scale on top of cover scale
-		const finalScale = baseCoverScale * backgroundPosition.scale;
-		
-		// Calculate final dimensions
-		const finalWidth = currentBase.actualWidth * finalScale;
-		const finalHeight = currentBase.actualHeight * finalScale;
+		// Apply user scale on top of preview scale
+		const finalWidth = baseWidth * backgroundPosition.scale;
+		const finalHeight = baseHeight * backgroundPosition.scale;
 
 		return {
 			size: `${finalWidth}px ${finalHeight}px`,
 			position: `calc(50% + ${backgroundPosition.x}px) calc(50% + ${backgroundPosition.y}px)`,
-			transform: `scale(${backgroundPosition.scale})`
+			transform: 'none' // Remove the duplicate scale transform
 		};
 	});
 
@@ -206,6 +206,39 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 		}
 
 		return () => resizeObserver.disconnect();
+	});
+
+	// Initialize canvas context and handle all canvas-related updates
+	$effect(() => {
+		if (mainCanvas && !mainCtx) {
+			mainCtx = mainCanvas.getContext('2d')!;
+			console.log('🎨 Main canvas context initialized');
+		}
+		
+		// Update canvas dimensions when preview dimensions change
+		if (mainCanvas && previewDimensions.width > 0 && previewDimensions.height > 0) {
+			if (mainCanvas.width !== previewDimensions.width || mainCanvas.height !== previewDimensions.height) {
+				mainCanvas.width = previewDimensions.width;
+				mainCanvas.height = previewDimensions.height;
+				console.log('🔧 Canvas dimensions updated:', previewDimensions);
+				
+				// Re-get context after dimension change (some browsers require this)
+				if (mainCtx) {
+					mainCtx = mainCanvas.getContext('2d')!;
+				}
+			}
+		}
+		
+		// Load image when preview changes and canvas is ready
+		if (preview && mainCtx && previewDimensions.width > 0) {
+			console.log('🖼️ Loading main canvas image:', preview);
+			loadMainImage();
+		}
+		
+		// Redraw when background position changes or dimensions change
+		if (backgroundPosition && mainImageElement && mainCtx && previewDimensions.width > 0) {
+			drawMainCanvas();
+		}
 	});
 
 	function updateElements() {
@@ -351,48 +384,117 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 		backgroundResizeHandle = null;
 	}
 
-	// Background manipulation functions similar to ThumbnailInput
-	function handleBackgroundStart(event: MouseEvent, mode: 'move' | 'resize') {
-		event.preventDefault();
-		event.stopPropagation();
+	// Background manipulation removed - use thumbnail controls only
 
-		const startPoint = { x: event.clientX, y: event.clientY };
-		const startValues = {
-			scale: backgroundPosition.scale,
-			x: backgroundPosition.x,
-			y: backgroundPosition.y
-		};
-
-		function handleMove(e: MouseEvent) {
-			const currentPoint = { x: e.clientX, y: e.clientY };
-			const dx = currentPoint.x - startPoint.x;
-			const dy = currentPoint.y - startPoint.y;
-
-			if (mode === 'resize') {
-				// Scale based on diagonal movement like ThumbnailInput
-				const delta = Math.max(dx, dy);
-				const newScale = Math.max(0.1, Math.min(3, startValues.scale + delta / 100));
-				backgroundPosition = { ...backgroundPosition, scale: newScale };
+	function loadMainImage() {
+		if (!preview) {
+			console.log('🚫 No preview URL provided');
+			return;
+		}
+		
+		if (!mainCtx) {
+			console.log('🚫 Canvas context not ready');
+			return;
+		}
+		
+		console.log('🔄 Loading main image:', preview);
+		
+		// Clear previous image
+		mainImageElement = null;
+		
+		const img = new Image();
+		img.crossOrigin = 'anonymous';
+		
+		img.onload = () => {
+			console.log('✅ Main image loaded successfully:', {
+				url: preview,
+				naturalWidth: img.naturalWidth,
+				naturalHeight: img.naturalHeight,
+				hasValidDimensions: img.naturalWidth > 0 && img.naturalHeight > 0
+			});
+			
+			if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+				mainImageElement = img;
+				// Force a redraw
+				setTimeout(() => drawMainCanvas(), 0);
 			} else {
-				// Move position - scale the movement appropriately
-				const scale = coordSystem().scale;
-				backgroundPosition = {
-					...backgroundPosition,
-					x: startValues.x + dx / scale,
-					y: startValues.y + dy / scale
-				};
+				console.error('❌ Image loaded but has invalid dimensions');
 			}
+		};
+		
+		img.onerror = (error) => {
+			console.error('❌ Failed to load main canvas image:', {
+				url: preview,
+				error: error
+			});
+			mainImageElement = null;
+		};
+		
+		img.src = preview;
+	}
 
-			updateBackgroundPosition();
+	function drawMainCanvas() {
+		if (!mainCtx || !mainImageElement || !previewDimensions.width || !previewDimensions.height) {
+			console.log('❌ Main canvas draw failed - missing requirements:', {
+				hasCtx: !!mainCtx,
+				hasImage: !!mainImageElement,
+				previewDims: previewDimensions
+			});
+			return;
 		}
 
-		function handleEnd() {
-			window.removeEventListener('mousemove', handleMove);
-			window.removeEventListener('mouseup', handleEnd);
-		}
+		console.log('🎨 Drawing main canvas...', {
+			canvasSize: { width: previewDimensions.width, height: previewDimensions.height },
+			imageSize: { width: mainImageElement.naturalWidth, height: mainImageElement.naturalHeight },
+			backgroundPosition
+		});
 
-		window.addEventListener('mousemove', handleMove);
-		window.addEventListener('mouseup', handleEnd);
+		// Clear canvas
+		mainCtx.clearRect(0, 0, previewDimensions.width, previewDimensions.height);
+		
+		// Reset transforms
+		mainCtx.resetTransform();
+		
+		const imageDims: Dims = {
+			width: mainImageElement.naturalWidth,
+			height: mainImageElement.naturalHeight
+		};
+		
+		// Use same logic as main template CSS but with canvas
+		const currentBase = baseDimensions();
+		const container = previewDimensions;
+		
+		if (currentBase.actualWidth === 0 || currentBase.actualHeight === 0) {
+			console.log('❌ Base dimensions not available:', currentBase);
+			return;
+		}
+		
+		// Use actual image dimensions instead of cover behavior (same as updated CSS logic)
+		const previewScale = container.scale || 1;
+		const baseWidth = currentBase.actualWidth * previewScale;
+		const baseHeight = currentBase.actualHeight * previewScale;
+		
+		// Apply user scale on top of preview scale
+		const finalWidth = baseWidth * backgroundPosition.scale;
+		const finalHeight = baseHeight * backgroundPosition.scale;
+		
+		// Calculate center position with user offset (same as CSS calc(50% + offset))
+		const centerX = container.width / 2;
+		const centerY = container.height / 2;
+		
+		const drawX = centerX + backgroundPosition.x - finalWidth / 2;
+		const drawY = centerY + backgroundPosition.y - finalHeight / 2;
+		
+		console.log('🎯 Canvas draw parameters:', {
+			finalSize: { width: finalWidth, height: finalHeight },
+			drawPosition: { x: drawX, y: drawY },
+			centerPoint: { x: centerX, y: centerY }
+		});
+		
+		// Draw the image with calculated position and scale
+		mainCtx.drawImage(mainImageElement, drawX, drawY, finalWidth, finalHeight);
+		
+		console.log('✅ Main canvas draw complete');
 	}
 
 	function updateBackgroundPosition() {
@@ -513,12 +615,32 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 				class="template-container {side} group"
 				class:has-preview={preview}
 				bind:this={templateContainer}
-			style="background-image: {preview ? `url('${preview}')` : 'none'}; 
-                       background-size: {preview ? backgroundCSS().size : 'cover'};
-                       background-position: {preview ? backgroundCSS().position : 'center'};
-                       background-repeat: no-repeat;
-                       background-color: white;"
+				style="background-color: white;"
 			>
+				<!-- Background layer with fallback -->
+				{#if preview}
+					<!-- CSS background as fallback -->
+					<div 
+						class="css-background-fallback"
+						style="
+							background-image: url('{preview}');
+							background-size: {backgroundCSS().size};
+							background-position: {backgroundCSS().position};
+							background-repeat: no-repeat;
+						"
+					></div>
+					
+					<!-- Canvas overlay for precise rendering -->
+					<canvas
+						bind:this={mainCanvas}
+						width={previewDimensions.width}
+						height={previewDimensions.height}
+						class="background-canvas"
+						style="opacity: {mainImageElement ? 1 : 0};"
+					></canvas>
+				{/if}
+				
+				<!-- Elements overlay layer -->
 				{#if debugState.enabled && preview}
 					<div class="debug-overlay">
 						<div 
@@ -551,7 +673,7 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 						/>
 						<div class="placeholder-content">
 							<div class="icon-container">
-								<Image class="w-8 h-8 mb-2 text-muted-foreground/40" />
+								<ImageIcon class="w-8 h-8 mb-2 text-muted-foreground/40" />
 								<Plus class="w-4 h-4 text-primary absolute -right-1 -bottom-1" />
 							</div>
 							<h3 class="text-lg font-medium text-foreground/80 mb-1">Add Template Background</h3>
@@ -587,34 +709,9 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 						<div class="placeholder-grid"></div>
 					</label>
 				{:else}
-					<!-- Background manipulation controls -->
-					{#if preview}
-						<!-- Draggable overlay for background positioning -->
-						<div 
-							class="background-drag-overlay"
-							title="Drag to reposition background"
-							onmousedown={(e) => handleBackgroundStart(e, 'move')}
-						></div>
-						
-						<!-- Scale control handle -->
-						<div 
-							class="background-scale-handle"
-							title="Drag to scale background"
-							onmousedown={(e) => handleBackgroundStart(e, 'resize')}
-						>
-							<Scaling class="w-4 h-4" />
-						</div>
-						
-						<!-- Move control handle -->
-						<div 
-							class="background-move-handle"
-							title="Drag to move background"
-							onmousedown={(e) => handleBackgroundStart(e, 'move')}
-						>
-							<Move class="w-4 h-4" />
-						</div>
-					{/if}
+					<!-- Background manipulation controls removed - use thumbnail controls only -->
 					
+				<div class="elements-overlay">
 					{#each elements as element, i}
 						<div
 							class="template-element {element.type}"
@@ -697,6 +794,7 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 							🐛
 						</Button>
 					{/if}
+					</div> <!-- Close elements-overlay -->
 				{/if}
 			</div>
 		</div>
@@ -757,11 +855,37 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 		height: 100%;
 		border: 1px solid #000;
 		position: relative;
-		background-size: cover;
-		background-position: center;
-		background-repeat: no-repeat;
 		background-color: white;
 		overflow: hidden;
+	}
+
+	.css-background-fallback {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+		z-index: 1;
+		transition: opacity 0.3s ease;
+	}
+
+	.background-canvas {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+		z-index: 2;
+		transition: opacity 0.3s ease;
+	}
+
+	.elements-overlay {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+		z-index: 2;
 	}
 
 	.placeholder-design {
@@ -968,75 +1092,6 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 		cursor: nwse-resize;
 	}
 
-	/* Background manipulation controls */
-	.background-drag-overlay {
-		position: absolute;
-		inset: 0;
-		z-index: 5;
-		cursor: move;
-		transition: background-color 0.2s;
-	}
-
-	.background-drag-overlay:hover {
-		background-color: rgba(0, 0, 0, 0.02);
-	}
-
-	.background-scale-handle {
-		position: absolute;
-		top: 15px;
-		left: 15px;
-		width: 32px;
-		height: 32px;
-		background: rgba(255, 255, 255, 0.9);
-		border: 1px solid #ccc;
-		border-radius: 50%;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		cursor: nw-resize;
-		z-index: 15;
-		transition: all 0.2s ease;
-		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-	}
-
-	.background-scale-handle:hover {
-		background: rgba(255, 255, 255, 1);
-		border-color: #999;
-		transform: scale(1.1);
-		box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-	}
-
-	.background-move-handle {
-		position: absolute;
-		top: 15px;
-		left: 55px;
-		width: 32px;
-		height: 32px;
-		background: rgba(255, 255, 255, 0.9);
-		border: 1px solid #ccc;
-		border-radius: 50%;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		cursor: move;
-		z-index: 15;
-		transition: all 0.2s ease;
-		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-	}
-
-	.background-move-handle:hover {
-		background: rgba(255, 255, 255, 1);
-		border-color: #999;
-		transform: scale(1.1);
-		box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-	}
-
-	/* Hide background controls when hovering over elements to avoid conflicts */
-	.template-container:has(.template-element:hover) .background-drag-overlay,
-	.template-container:has(.template-element:hover) .background-scale-handle,
-	.template-container:has(.template-element:hover) .background-move-handle {
-		pointer-events: none;
-		opacity: 0.3;
-	}
+	/* Background manipulation controls removed - use thumbnail controls only */
 
 </style>
