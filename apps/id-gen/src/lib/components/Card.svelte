@@ -16,9 +16,9 @@
 
 	// --- One-time Geometry Creation ---
 	// Create geometry once on component initialization
-	let frontGeom: THREE.BufferGeometry;
-	let backGeom: THREE.BufferGeometry;
-	let edgeGeom: THREE.BufferGeometry;
+	let frontGeom: THREE.BufferGeometry = $state()!;
+	let backGeom: THREE.BufferGeometry = $state()!;
+	let edgeGeom: THREE.BufferGeometry = $state()!;
 
 	// Initialize geometry in onMount or use a simpler approach
 	$effect(() => {

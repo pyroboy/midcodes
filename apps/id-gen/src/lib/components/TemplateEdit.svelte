@@ -38,6 +38,7 @@ let {
 			position: { x: number; y: number; scale: number },
 			side: 'front' | 'back'
 		) => void;
+		version?: number;
 	} = $props();
 
 	// Background position state

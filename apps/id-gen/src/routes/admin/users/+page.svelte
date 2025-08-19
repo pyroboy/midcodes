@@ -22,6 +22,14 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { getUsersData, addUser, updateUserRole, deleteUser } from '../admin.remote';
 
+	type UserProfile = {
+		id: string;
+		email: string;
+		role: string;
+		created_at: string;
+		updated_at: string;
+	};
+
 	// Use remote function to get users data
 	const usersData = getUsersData();
 
@@ -299,7 +307,7 @@
 				<CardDescription>Loading users...</CardDescription>
 			{:then data}
 				{@const users = data?.users || []}
-				{@const filteredUsers = users.filter((user) => {
+				{@const filteredUsers = users.filter((user: UserProfile) => {
 					const matchesSearch =
 						!searchQuery || user.email?.toLowerCase().includes(searchQuery.toLowerCase());
 
@@ -322,7 +330,7 @@
 				<p class="text-sm text-muted-foreground">Loading users...</p>
 			{:then data}
 				{@const users = data?.users || []}
-				{@const filteredUsers = users.filter((user) => {
+				{@const filteredUsers = users.filter((user: UserProfile) => {
 					const matchesSearch =
 						!searchQuery || user.email?.toLowerCase().includes(searchQuery.toLowerCase());
 
