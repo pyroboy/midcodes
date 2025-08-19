@@ -20,21 +20,28 @@
 		org_id: string;
 		front_background: string;
 		back_background: string;
-		front_background_url?: string | null;
-		back_background_url?: string | null;
 		orientation: 'landscape' | 'portrait';
 		template_elements: TemplateElement[];
 		created_at: string;
 		updated_at?: string | null;
 	};
+
+	// Type for server response
+	type ServerResponse = {
+		success: boolean;
+		data: DatabaseTemplate;
+		message: string;
+	};
 import {
 	needsCropping,
 	cropBackgroundImage,
 	getImageDimensions,
+	generateCropPreviewUrl,
 	type BackgroundPosition
 } from '$lib/utils/imageCropper';
 import { browser } from '$app/environment';
 import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeometry';
+import { toast } from 'svelte-sonner';
 
 	// data means get data from server
 	let { data } = $props();
@@ -78,11 +85,13 @@ import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeom
 			originalSize: { width: number; height: number };
 			needsCropping: boolean;
 			filename: string;
+			previewUrl?: string;
 		};
 		back?: {
 			originalSize: { width: number; height: number };
 			needsCropping: boolean;
 			filename: string;
+			previewUrl?: string;
 		};
 	}>({});
 
@@ -137,6 +146,15 @@ import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeom
 			return;
 		}
 
+		// Set loading state
+		isLoading = true;
+		errorMessage = '';
+
+		// Show initial progress toast
+		const toastId = toast.loading('Preparing template for save...', {
+			duration: Infinity // Keep it until we update or dismiss it
+		});
+
 		try {
 			// Reset pending save flag
 			pendingSave = false;
@@ -144,44 +162,93 @@ import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeom
 			let frontUrl = frontPreview;
 			let backUrl = backPreview;
 
+			// Update progress: Processing images
+			toast.loading('Processing background images...', { id: toastId });
+
 			// Process front background with cropping if needed
 			if (frontBackground && requiredPixelDimensions) {
 				console.log('🖼️ Processing front background...');
+				
+				// Update progress: Cropping front image
+				toast.loading('Cropping front background image...', { id: toastId });
+				
 				const frontResult = await cropBackgroundImage(
 					frontBackground,
 					requiredPixelDimensions,
 					frontBackgroundPosition
 				);
 
-				// Use the cropped file for upload
-				frontBackground = frontResult.croppedFile;
-				frontUrl = await uploadImage(frontResult.croppedFile, 'front', user?.id);
-				console.log('✅ Front background processed and uploaded:', {
+				console.log('✅ Front image cropped:', {
 					wasCropped: frontResult.wasCropped,
 					originalSize: frontResult.originalSize,
-					finalSize: frontResult.croppedSize,
-					url: frontUrl
+					finalSize: frontResult.croppedSize
 				});
+
+				// Update progress: Uploading front image
+				toast.loading('Uploading front background to storage...', { id: toastId });
+				
+			// Upload the cropped file with improved error handling and progress updates
+			try {
+				// 📄 Show detailed upload progress
+				toast.loading('Uploading front image to cloud storage...', { id: toastId });
+				console.log('📄 Starting front image upload...');
+				
+				frontUrl = await uploadImage(frontResult.croppedFile, `front_${Date.now()}`, user?.id);
+				
+				if (!frontUrl || typeof frontUrl !== 'string') {
+					throw new Error('Upload succeeded but returned invalid URL');
+				}
+				
+				console.log('✅ Front background uploaded successfully:', frontUrl);
+				toast.loading('Front image uploaded ✓ Processing back image...', { id: toastId });
+			} catch (uploadError) {
+				console.error('❌ Front image upload failed:', uploadError);
+				const errorMsg = uploadError instanceof Error ? uploadError.message : 'Unknown upload error';
+				throw new Error(`Failed to upload front background: ${errorMsg}`);
+			}
 			}
 
 			// Process back background with cropping if needed
 			if (backBackground && requiredPixelDimensions) {
 				console.log('🖼️ Processing back background...');
+				
+				// Update progress: Cropping back image
+				toast.loading('Cropping back background image...', { id: toastId });
+				
 				const backResult = await cropBackgroundImage(
 					backBackground,
 					requiredPixelDimensions,
 					backBackgroundPosition
 				);
 
-				// Use the cropped file for upload
-				backBackground = backResult.croppedFile;
-				backUrl = await uploadImage(backResult.croppedFile, 'back', user?.id);
-				console.log('✅ Back background processed and uploaded:', {
+				console.log('✅ Back image cropped:', {
 					wasCropped: backResult.wasCropped,
 					originalSize: backResult.originalSize,
-					finalSize: backResult.croppedSize,
-					url: backUrl
+					finalSize: backResult.croppedSize
 				});
+
+				// Update progress: Uploading back image
+				toast.loading('Uploading back background to storage...', { id: toastId });
+				
+			// Upload the cropped file with improved error handling and progress updates
+			try {
+				// 📄 Show detailed upload progress
+				toast.loading('Uploading back image to cloud storage...', { id: toastId });
+				console.log('📄 Starting back image upload...');
+				
+				backUrl = await uploadImage(backResult.croppedFile, `back_${Date.now()}`, user?.id);
+				
+				if (!backUrl || typeof backUrl !== 'string') {
+					throw new Error('Upload succeeded but returned invalid URL');
+				}
+				
+				console.log('✅ Back background uploaded successfully:', backUrl);
+				toast.loading('Both images uploaded ✓ Preparing to save...', { id: toastId });
+			} catch (uploadError) {
+				console.error('❌ Back image upload failed:', uploadError);
+				const errorMsg = uploadError instanceof Error ? uploadError.message : 'Unknown upload error';
+				throw new Error(`Failed to upload back background: ${errorMsg}`);
+			}
 			}
 
 			// Combine front and back elements
@@ -211,6 +278,16 @@ import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeom
 				backUrlType: typeof backUrl
 			});
 
+			// 🚨 DEBUG: Track template ID handling
+			console.log('🏷️ Template ID Debug:', {
+				currentTemplate: currentTemplate,
+				currentTemplateId: currentTemplate?.id,
+				isEditingExisting: !!currentTemplate?.id,
+				isCreatingNew: !currentTemplate?.id,
+				willUseExistingId: !!currentTemplate?.id,
+				willGenerateNewId: !currentTemplate?.id
+			});
+
 			const templateDataToSave = {
 				id: currentTemplate?.id || crypto.randomUUID(),
 				user_id: user?.id ?? '',
@@ -223,6 +300,14 @@ import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeom
 				org_id: org_id ?? ''
 			};
 
+			// 🚨 DEBUG: Confirm the final ID being sent
+			console.log('💾 Final template data to save:', {
+				id: templateDataToSave.id,
+				name: templateDataToSave.name,
+				isUpdate: !!currentTemplate?.id,
+				hasExistingId: currentTemplate?.id === templateDataToSave.id
+			});
+
 			if (!templateDataToSave.user_id) {
 				throw new Error('User ID is required');
 			}
@@ -231,7 +316,15 @@ import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeom
 				throw new Error('Organization ID is required');
 			}
 
+			// Update progress: Saving to database
+			toast.loading('Saving template to database...', { id: toastId });
+
 			console.log('💾 Saving to database...');
+
+			// Validate URLs before saving
+			if (!frontUrl || !backUrl) {
+				throw new Error('Failed to process background images - missing URLs');
+			}
 
 			// Create form data
 			const formData = new FormData();
@@ -249,27 +342,167 @@ import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeom
 				throw new Error(`Server error: ${errorText}`);
 			}
 
-			const result = await response.json();
-
-			if (result.type === 'failure') {
-				console.error('❌ Server action failed:', result);
-				throw new Error(result.message || 'Failed to save template');
+			// 🚨 DEBUG: Parse response as raw text first to see what we're actually getting
+			const responseText = await response.text();
+			console.log('🔍 RAW server response text:', responseText);
+			console.log('🔍 RAW response text length:', responseText.length);
+			
+			// Try to parse as JSON
+			let result;
+			try {
+				result = JSON.parse(responseText);
+				console.log('🔍 Parsed JSON result:', {
+					result: result,
+					type: typeof result,
+					isArray: Array.isArray(result),
+					keys: result && typeof result === 'object' ? Object.keys(result) : 'N/A'
+				});
+			} catch (jsonError) {
+				console.error('❌ Failed to parse JSON response:', jsonError);
+				throw new Error(`Server returned invalid JSON: ${responseText.substring(0, 200)}...`);
 			}
 
-			if (!result.data) {
-				console.error('❌ No template data received');
-				throw new Error('No template data received');
+			// Handle server response based on actual format
+			if (result && typeof result === 'object') {
+				// Check for SvelteKit form action format: { type: 'success', data: {...} } 
+				if (result.type === 'success' && result.data) {
+					console.log('✅ SvelteKit form action success format detected');
+					result.success = true; // Normalize to our expected format
+				} else if (result.type === 'failure') {
+					console.error('❌ SvelteKit form action failed:', result);
+					throw new Error(result.message || 'Server form action failed');
+				}
+				
+				// Check for our custom format: { success: true, data: {...} }
+				if (result.success === false) {
+					const errorMsg = result.message || 'Server action failed';
+					console.error('❌ Server action failed:', errorMsg);
+					throw new Error(errorMsg);
+				}
+				
+				// Ensure we have data
+				if (!result.data) {
+					console.error('❌ No template data in server response. Full result:', result);
+					throw new Error('No template data received from server');
+				}
+			} else {
+				console.error('❌ Unexpected response format:', typeof result, result);
+				throw new Error('Server returned unexpected response format');
 			}
 
-			console.log('✅ Template saved successfully:', {
-				savedData: result.data
+			const savedTemplate = result.data;
+			
+			// Debug the saved template structure
+			console.log('✅ Template data received:', {
+				id: savedTemplate.id,
+				name: savedTemplate.name,
+				hasElements: !!savedTemplate.template_elements,
+				elementsCount: savedTemplate.template_elements?.length
+			});
+			if (!savedTemplate.id) {
+				console.error('❌ Template saved but no ID returned');
+				throw new Error('Template was not saved properly - no ID returned');
+			}
+
+			// Validate that critical data was saved correctly
+			if (!savedTemplate.name || !savedTemplate.front_background || !savedTemplate.back_background) {
+				console.error('❌ Template saved but missing critical data:', {
+					hasName: !!savedTemplate.name,
+					hasFrontBg: !!savedTemplate.front_background,
+					hasBackBg: !!savedTemplate.back_background
+				});
+				throw new Error('Template was saved but some data appears to be missing');
+			}
+
+			// Validate that template elements were saved
+			if (!savedTemplate.template_elements || savedTemplate.template_elements.length === 0) {
+				console.error('❌ Template saved but no elements found');
+				throw new Error('Template was saved but template elements were not stored properly');
+			}
+
+			console.log('✅ Template saved and validated successfully:', {
+				id: savedTemplate.id,
+				name: savedTemplate.name,
+				elementsCount: savedTemplate.template_elements?.length,
+				action: templateDataToSave.id ? 'updated' : 'created',
+				frontBgUrl: !!savedTemplate.front_background,
+				backBgUrl: !!savedTemplate.back_background
 			});
 
-			alert('Template saved successfully!');
-			window.location.reload();
+			// Show success toast notification
+			const action = templateDataToSave.id ? 'updated' : 'created';
+			toast.success(`Template ${action} successfully!`, {
+				description: `"${savedTemplate.name}" with ${savedTemplate.template_elements.length} elements has been saved.`,
+				duration: 4000
+			});
+
+			// Update local templates array instead of full page reload
+			await refreshTemplatesList(savedTemplate);
+			
+			// Go back to templates list if we were creating/editing
+			if (isEditMode) {
+				handleBack();
+			}
 		} catch (error) {
 			console.error('❌ Error saving template:', error);
-			errorMessage = `Error saving template: ${error instanceof Error ? error.message : JSON.stringify(error)}`;
+			const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+			errorMessage = `Error saving template: ${errorMsg}`;
+			
+			// Show error toast notification
+			toast.error('Failed to save template', {
+				description: errorMsg,
+				duration: 6000
+			});
+		} finally {
+			// Always reset loading state
+			isLoading = false;
+			
+			// Dismiss the progress toast
+			toast.dismiss(toastId);
+		}
+	}
+
+	/**
+	 * Updates the local templates list without requiring a full page reload
+	 */
+	async function refreshTemplatesList(savedTemplate: DatabaseTemplate) {
+		try {
+			// Check if this is an update or create
+			const existingIndex = templates.findIndex(t => t.id === savedTemplate.id);
+			
+			if (existingIndex >= 0) {
+				// Update existing template
+				templates[existingIndex] = savedTemplate;
+				console.log('📝 Updated template in local list:', savedTemplate.name);
+			} else {
+				// Add new template to the beginning of the list
+				templates = [savedTemplate, ...templates];
+				console.log('➕ Added new template to local list:', savedTemplate.name);
+			}
+			
+			// Optional: Fetch fresh data from server to ensure consistency
+			// This is a fallback in case the local update doesn't work perfectly
+			setTimeout(async () => {
+				try {
+					const response = await fetch('/templates');
+					if (response.ok) {
+						const html = await response.text();
+						// We could parse the HTML to extract fresh template data if needed
+						console.log('🔄 Background refresh completed');
+					}
+				} catch (error) {
+					console.warn('⚠️ Background refresh failed:', error);
+				}
+			}, 2000); // Refresh in background after 2 seconds
+			
+		} catch (error) {
+			console.error('❌ Error refreshing templates list:', error);
+			// Fallback: reload the page if local update fails
+			toast.info('Refreshing templates...', {
+				description: 'The page will reload to show the latest templates.',
+				duration: 2000
+			});
+			setTimeout(() => window.location.reload(), 2000);
 		}
 	}
 
@@ -321,23 +554,60 @@ import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeom
 				});
 			}
 
-			// Populate dialog data
+			// Generate preview URLs and populate dialog data
 			croppingDialogData = {};
-			cropCheckResults.forEach((result) => {
-				if (result.side === 'front') {
-					croppingDialogData.front = {
-						originalSize: result.originalSize,
+			
+			// Process each result and generate preview URLs
+			for (const result of cropCheckResults) {
+				try {
+					// Generate preview URL using the new utility
+					const position = result.side === 'front' ? frontBackgroundPosition : backBackgroundPosition;
+					const previewUrl = await generateCropPreviewUrl(
+						result.file,
+						requiredPixelDimensions,
+						position
+					);
+					
+					if (result.side === 'front') {
+						croppingDialogData.front = {
+							originalSize: result.originalSize,
+							needsCropping: result.needsCropping,
+							filename: result.file.name,
+							previewUrl
+						};
+					} else {
+						croppingDialogData.back = {
+							originalSize: result.originalSize,
+							needsCropping: result.needsCropping,
+							filename: result.file.name,
+							previewUrl
+						};
+					}
+					
+					console.log(`🖼️ Generated crop preview for ${result.side}:`, {
 						needsCropping: result.needsCropping,
-						filename: result.file.name
-					};
-				} else {
-					croppingDialogData.back = {
 						originalSize: result.originalSize,
-						needsCropping: result.needsCropping,
-						filename: result.file.name
-					};
+						position,
+						previewLength: previewUrl.length
+					});
+				} catch (error) {
+					console.warn(`⚠️ Failed to generate preview for ${result.side}:`, error);
+					// Continue without preview URL
+					if (result.side === 'front') {
+						croppingDialogData.front = {
+							originalSize: result.originalSize,
+							needsCropping: result.needsCropping,
+							filename: result.file.name
+						};
+					} else {
+						croppingDialogData.back = {
+							originalSize: result.originalSize,
+							needsCropping: result.needsCropping,
+							filename: result.file.name
+						};
+					}
 				}
-			});
+			}
 
 			// If any cropping is needed, show dialog
 			const anyCroppingNeeded = cropCheckResults.some((result) => result.needsCropping);
@@ -510,17 +780,9 @@ import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeom
 		frontElements = [];
 		backElements = [];
 		errorMessage = '';
-		currentTemplate = {
-			id: '',
-			user_id: user?.id ?? '',
-			name: '',
-			front_background: '',
-			back_background: '',
-			orientation: 'landscape' as const,
-			template_elements: [],
-			created_at: new Date().toISOString(),
-			org_id: org_id ?? ''
-		};
+		// Reset currentTemplate to null instead of empty object
+		// This ensures ID generation works correctly for new templates
+		currentTemplate = null;
 		console.log('✅ EditTemplate: Form cleared');
 	}
 

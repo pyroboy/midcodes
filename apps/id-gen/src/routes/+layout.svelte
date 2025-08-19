@@ -11,6 +11,7 @@
 	import MobileHeader from '$lib/components/MobileHeader.svelte';
 	import BottomNavigation from '$lib/components/BottomNavigation.svelte';
 	import HamburgerMenu from '$lib/components/HamburgerMenu.svelte';
+	import { Toaster } from '$lib/components/ui/sonner';
 
 	let { data, children }: LayoutProps = $props();
 
@@ -101,6 +102,9 @@
 		</main>
 	{/if}
 </div>
+
+<!-- Toast notifications -->
+<Toaster richColors closeButton />
 
 <style>
 	:global(body) {

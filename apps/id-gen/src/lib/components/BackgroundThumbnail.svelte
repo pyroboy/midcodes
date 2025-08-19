@@ -148,8 +148,8 @@
 		
 		// NEW LOGIC: Always draw the full image, thumbnail now matches image aspect ratio
 		const imageDims: Dims = {
-			width: imageElement.naturalWidth,
-			height: imageElement.naturalHeight
+			width: imageElement!.naturalWidth,
+			height: imageElement!.naturalHeight
 		};
 		
 		// Draw the full image scaled to fit the thumbnail (object-fit: contain)
@@ -279,7 +279,7 @@
 					};
 					
 					// Apply clamping even in fallback case
-					if (imageElement) {
+					if (imageElement && imageElement instanceof HTMLImageElement && imageElement.naturalWidth > 0 && imageElement.naturalHeight > 0) {
 						const imageDims: Dims = {
 							width: imageElement.naturalWidth,
 							height: imageElement.naturalHeight
@@ -329,10 +329,10 @@
 		}
 		
 		const imageDims: Dims = {
-			width: imageElement.naturalWidth,
-			height: imageElement.naturalHeight
+			width: imageElement!.naturalWidth,
+			height: imageElement!.naturalHeight
 		};
-		
+
 		const containerDims: Dims = templateDimensions;
 		const thumbDims = thumbnailDimensions();
 		
@@ -343,6 +343,24 @@
 		
 		// Then map to thumbnail coordinates using the ground truth mapping function
 		const thumbnailRect = mapImageRectToThumb(viewportRect, imageDims, thumbDims);
+		
+		// ✅ DEBUG: Log the coordinate transformation for verification
+		if (debugState.enabled && browser) {
+			console.log('🎯 Crop Frame Calculation:', {
+				position,
+				imageDims,
+				containerDims,
+				thumbDims,
+				viewportRect,
+				thumbnailRect,
+				mappedResult: {
+					x: Math.round(thumbnailRect.x * 100) / 100,
+					y: Math.round(thumbnailRect.y * 100) / 100,
+					width: Math.round(thumbnailRect.width * 100) / 100,
+					height: Math.round(thumbnailRect.height * 100) / 100
+				}
+			});
+		}
 		
 		// The viewport can extend beyond image bounds, so we don't clamp to thumbnail bounds
 		// This allows the red box to show the true container viewport position
@@ -359,8 +377,8 @@
 		if (!imageElement) return true;
 		
 		const imageDims: Dims = {
-			width: imageElement.naturalWidth,
-			height: imageElement.naturalHeight
+			width: imageElement!.naturalWidth,
+			height: imageElement!.naturalHeight
 		};
 		
 		const containerDims: Dims = templateDimensions;
@@ -469,7 +487,7 @@
 				};
 				
 				// Apply clamping even in fallback case
-				if (imageElement) {
+				if (imageElement && imageElement instanceof HTMLImageElement && imageElement.naturalWidth > 0 && imageElement.naturalHeight > 0) {
 					const imageDims: Dims = {
 						width: imageElement.naturalWidth,
 						height: imageElement.naturalHeight
@@ -561,8 +579,8 @@
 			
 			// Calculate the corresponding position change
 			const imageDims: Dims = {
-				width: imageElement.naturalWidth,
-				height: imageElement.naturalHeight
+				width: imageElement!.naturalWidth,
+				height: imageElement!.naturalHeight
 			};
 			
 			const newPos = calculatePositionFromFrame(
