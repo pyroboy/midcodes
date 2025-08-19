@@ -27,19 +27,37 @@ export type Rect = Dims & {
 
 /**
  * Compute the base CSS background-size: cover dimensions
- * @param image - Natural image dimensions
- * @param container - Container dimensions
- * @returns Base scale factor and cover dimensions
+ * 
+ * 📌 CORE FUNCTION: This is the foundation of all coordinate calculations!
+ * 
+ * CSS background-size: cover behavior:
+ * - Scale image to fill container completely (no white space)
+ * - May crop image if aspect ratios don't match
+ * - Always choose the larger scale factor to ensure full coverage
+ * 
+ * @param image - Natural image dimensions (e.g., 1920x1080 from image file)
+ * @param container - Container dimensions (e.g., 400x300 preview area)
+ * @returns Object with:
+ *   - s0: Base scale factor (multiplier to apply to image)
+ *   - coverW: Image width when scaled to cover container
+ *   - coverH: Image height when scaled to cover container
  */
 export function coverBase(image: Dims, container: Dims) {
 	if (image.width === 0 || image.height === 0 || container.width === 0 || container.height === 0) {
 		return { s0: 1, coverW: 0, coverH: 0 };
 	}
 
-	// CSS background-size: cover scales to fill container completely
-	const s0 = Math.max(container.width / image.width, container.height / image.height);
-	const coverW = image.width * s0;
-	const coverH = image.height * s0;
+	// Calculate scale factors for both width and height
+	const scaleX = container.width / image.width;   // How much to scale to fit width
+	const scaleY = container.height / image.height; // How much to scale to fit height
+	
+	// CSS background-size: cover uses the LARGER scale factor
+	// This ensures the image covers the entire container (may crop, but no white space)
+	const s0 = Math.max(scaleX, scaleY);
+	
+	// Calculate final scaled dimensions
+	const coverW = image.width * s0;  // Final width (may be larger than container)
+	const coverH = image.height * s0; // Final height (may be larger than container)
 
 	return { s0, coverW, coverH };
 }
@@ -102,9 +120,18 @@ export function cssForBackground(
 
 /**
  * Compute the visible rectangle of the image in image coordinates
- * @param image - Natural image dimensions
- * @param container - Container dimensions
- * @param pos - User-defined position and scale
+ * 
+ * ⚠️ CRITICAL FUNCTION: This determines what part of the image is visible in the container
+ * 
+ * ALGORITHM:
+ * 1. Get draw position/size from computeDraw() 
+ * 2. Calculate visible bounds in container space (what's not clipped)
+ * 3. Convert those bounds back to image coordinates
+ * 4. Return rectangle showing which pixels of the image are visible
+ * 
+ * @param image - Natural image dimensions (e.g., 1920x1080)
+ * @param container - Container dimensions (e.g., 400x300)
+ * @param pos - User-defined position and scale (x: offset from center, y: offset from center, scale: multiplier)
  * @returns Rectangle in image pixel coordinates showing what's visible
  */
 export function computeVisibleRectInImage(
@@ -124,27 +151,38 @@ export function computeVisibleRectInImage(
 		return { x: 0, y: 0, width: 0, height: 0 };
 	}
 	
+	// Get the draw parameters: where the image is positioned and how big it is
 	const { topLeft, s0 } = computeDraw(image, container, pos);
 	
 	if (s0 === 0 || pos.scale === 0) {
 		return { x: 0, y: 0, width: 0, height: 0 };
 	}
 
+	// Calculate the total scale applied to the image
 	const effectiveScale = s0 * pos.scale;
 	
-	// Calculate visible bounds in container coordinates
-	const visibleLeft = Math.max(0, -topLeft.x);
-	const visibleTop = Math.max(0, -topLeft.y);
-	const visibleRight = Math.min(container.width, container.width - topLeft.x);
-	const visibleBottom = Math.min(container.height, container.height - topLeft.y);
+	// STEP 1: Calculate what part of the container shows the image
+	// If image extends beyond container, we only see part of it
+	const visibleLeft = Math.max(0, -topLeft.x);  // Left edge of visible area in container coords
+	const visibleTop = Math.max(0, -topLeft.y);   // Top edge of visible area in container coords
 	
-	// Convert back to image coordinates
+	// ✅ FIXED: Calculate the actual visible bounds correctly
+	// We need to find where the image ends vs where the container ends
+	const { drawW, drawH } = computeDraw(image, container, pos);
+	const imageRight = topLeft.x + drawW;  // Right edge of image in container coords
+	const imageBottom = topLeft.y + drawH; // Bottom edge of image in container coords
+	
+	const visibleRight = Math.min(container.width, imageRight);   // Rightmost visible pixel
+	const visibleBottom = Math.min(container.height, imageBottom); // Bottom visible pixel
+	
+	// STEP 2: Convert container coordinates back to image coordinates
+	// Divide by effectiveScale to get original image pixel positions
 	const left = visibleLeft / effectiveScale;
 	const top = visibleTop / effectiveScale;
 	const right = visibleRight / effectiveScale;
 	const bottom = visibleBottom / effectiveScale;
 	
-	// Apply bounds checking to ensure visible rect stays within image bounds
+	// STEP 3: Clamp to image bounds to ensure we don't go outside the actual image
 	const clampedLeft = Math.max(0, Math.min(left, image.width));
 	const clampedTop = Math.max(0, Math.min(top, image.height));
 	const clampedRight = Math.max(clampedLeft, Math.min(right, image.width));
@@ -155,6 +193,70 @@ export function computeVisibleRectInImage(
 		y: clampedTop,
 		width: Math.max(0, clampedRight - clampedLeft),
 		height: Math.max(0, clampedBottom - clampedTop)
+	};
+}
+
+/**
+ * NEW FUNCTION: Compute the container viewport rectangle mapped to image coordinates
+ * 
+ * This function returns what part of the image the container viewport "sees"
+ * The size should remain constant when panning (only position changes)
+ * 
+ * @param image - Natural image dimensions (e.g., 1920x1080)
+ * @param container - Container dimensions (e.g., 400x300)
+ * @param pos - User-defined position and scale
+ * @returns Rectangle in image coordinates showing container viewport bounds
+ */
+export function computeContainerViewportInImage(
+	image: Dims, 
+	container: Dims, 
+	pos: BackgroundPosition
+): Rect {
+	// Safety checks for valid dimensions and position
+	if (!isFinite(image.width) || !isFinite(image.height) ||
+		!isFinite(container.width) || !isFinite(container.height) ||
+		!isFinite(pos.x) || !isFinite(pos.y) || !isFinite(pos.scale) ||
+		image.width <= 0 || image.height <= 0 ||
+		container.width <= 0 || container.height <= 0) {
+		console.warn('⚠️ Invalid dimensions or position in computeContainerViewportInImage:', {
+			image, container, pos
+		});
+		return { x: 0, y: 0, width: 0, height: 0 };
+	}
+	
+	// Get the draw parameters: where the image is positioned and how big it is
+	const { topLeft, s0 } = computeDraw(image, container, pos);
+	
+	if (s0 === 0 || pos.scale === 0) {
+		return { x: 0, y: 0, width: 0, height: 0 };
+	}
+
+	// Calculate the total scale applied to the image
+	const effectiveScale = s0 * pos.scale;
+	
+	// FIXED APPROACH: Map the entire container viewport to image coordinates
+	// The container always "sees" a rectangle of the image, regardless of image position
+	// This rectangle should have constant size (only position changes when panning)
+	
+	// Container viewport in container coordinates (always the full container)
+	const viewportLeft = 0;
+	const viewportTop = 0;
+	const viewportRight = container.width;
+	const viewportBottom = container.height;
+	
+	// Convert viewport corners to image coordinates
+	// We need to account for the image offset when mapping back to image space
+	const imageLeft = (viewportLeft - topLeft.x) / effectiveScale;
+	const imageTop = (viewportTop - topLeft.y) / effectiveScale;
+	const imageRight = (viewportRight - topLeft.x) / effectiveScale;
+	const imageBottom = (viewportBottom - topLeft.y) / effectiveScale;
+	
+	// The viewport rectangle in image coordinates (can extend beyond image bounds)
+	return {
+		x: imageLeft,
+		y: imageTop,
+		width: imageRight - imageLeft,
+		height: imageBottom - imageTop
 	};
 }
 
@@ -229,10 +331,14 @@ export function clampBackgroundPosition(
 
 /**
  * Calculate the exact crop frame dimensions for thumbnail display
+ * 
+ * ⚠️ DEPRECATED: This function assumes square thumbnails!
+ * Use computeVisibleRectInImage + mapImageRectToThumb directly for better flexibility.
+ * 
  * @param image - Original image dimensions
- * @param container - Template dimensions
+ * @param container - Template dimensions  
  * @param pos - Current background position
- * @param thumbnailSize - Size of the square thumbnail (default 120)
+ * @param thumbnailSize - Size of the square thumbnail (default 120) - ASSUMES SQUARE!
  * @returns Rectangle in thumbnail coordinates showing exact crop area
  */
 export function calculateCropFrame(
@@ -253,16 +359,18 @@ export function calculateCropFrame(
 		return { x: 0, y: 0, width: thumbnailSize, height: thumbnailSize };
 	}
 
-	// Get the visible rectangle in image coordinates
+	// STEP 1: Get the visible rectangle in image coordinates
+	// This tells us which part of the original image will be visible in the container
 	const visibleRect = computeVisibleRectInImage(image, container, pos);
 	
-	// Create thumbnail dimensions (square)
+	// STEP 2: Create thumbnail dimensions (ASSUMES SQUARE - this is the limitation!)
 	const thumbnailDims = { width: thumbnailSize, height: thumbnailSize };
 	
-	// Map to thumbnail coordinates
+	// STEP 3: Map the visible image rectangle to thumbnail coordinate space
+	// This converts from image pixels to thumbnail pixels
 	const thumbnailRect = mapImageRectToThumb(visibleRect, image, thumbnailDims);
 	
-	// Ensure the crop frame shows exactly what will be cropped
+	// STEP 4: Clamp to thumbnail bounds and ensure minimum size
 	return {
 		x: Math.max(0, thumbnailRect.x),
 		y: Math.max(0, thumbnailRect.y),

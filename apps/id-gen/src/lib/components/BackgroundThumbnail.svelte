@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { Move, Scaling, RotateCcw, BugPlay } from '@lucide/svelte';
-	import { calculateCropFrame, validateCropFrameAlignment, calculatePositionFromFrame, coverBase, computeDraw, type Dims, type BackgroundPosition } from '$lib/utils/backgroundGeometry';
+	import { calculateCropFrame, validateCropFrameAlignment, calculatePositionFromFrame, coverBase, computeDraw, computeVisibleRectInImage, computeContainerViewportInImage, mapImageRectToThumb, type Dims, type BackgroundPosition } from '$lib/utils/backgroundGeometry';
 	import { browser } from '$app/environment';
 	import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 	
@@ -58,14 +58,6 @@
 				width: Math.round(thumbWidth),
 				height: Math.round(thumbHeight)
 			};
-			
-			console.log('📐 Thumbnail dimensions calculated:', {
-				imageSize: { width: imageElement.naturalWidth, height: imageElement.naturalHeight },
-				imageAspect: imageAspect.toFixed(2),
-				maxWidth: maxThumbnailWidth,
-				result
-			});
-			
 			return result;
 		}
 		
@@ -243,8 +235,8 @@
 					}
 					
 					position = {
-						x: startValues.x + dx / imageDisplayScale,
-						y: startValues.y + dy / imageDisplayScale,
+						x: startValues.x - dx / imageDisplayScale,
+						y: startValues.y - dy / imageDisplayScale,
 						scale: startValues.scale
 					};
 				} else {
@@ -289,7 +281,7 @@
 		logThumbnailDebug(true);
 	}
 
-	// Calculate crop frame to show template boundaries on the full image
+	// Calculate crop frame to show template boundaries using GROUND TRUTH function
 	let cropFrame = $derived(() => {
 		if (!imageElement || !templateDimensions.width || !templateDimensions.height) {
 			return null;
@@ -300,53 +292,24 @@
 			height: imageElement.naturalHeight
 		};
 		
+		const containerDims: Dims = templateDimensions;
 		const thumbDims = thumbnailDimensions();
 		
-		// Calculate how the image is drawn in the thumbnail
-		const imgAspect = imageDims.width / imageDims.height;
-		const thumbAspect = thumbDims.width / thumbDims.height;
+		// ✅ FIXED: Use container viewport instead of visible rect for consistent size
+		// The red box represents the container viewport boundaries, not the visible image area
+		// This ensures the red box maintains constant size when panning (only position changes)
+		const viewportRect = computeContainerViewportInImage(imageDims, containerDims, position);
 		
-		let drawWidth, drawHeight, offsetX, offsetY;
+		// Then map to thumbnail coordinates using the ground truth mapping function
+		const thumbnailRect = mapImageRectToThumb(viewportRect, imageDims, thumbDims);
 		
-		if (imgAspect > thumbAspect) {
-			drawWidth = thumbDims.width;
-			drawHeight = thumbDims.width / imgAspect;
-			offsetX = 0;
-			offsetY = (thumbDims.height - drawHeight) / 2;
-		} else {
-			drawHeight = thumbDims.height;
-			drawWidth = thumbDims.height * imgAspect;
-			offsetX = (thumbDims.width - drawWidth) / 2;
-			offsetY = 0;
-		}
-		
-		// Calculate template viewport dimensions in thumbnail space
-		// Scale template dimensions to match the image scale in thumbnail
-		const imageScaleInThumb = drawWidth / imageDims.width; // pixels per image pixel
-		
-		const templateWidthInThumb = templateDimensions.width * imageScaleInThumb;
-		const templateHeightInThumb = templateDimensions.height * imageScaleInThumb;
-		
-		// Calculate position offset in thumbnail space
-		const posOffsetX = position.x * imageScaleInThumb;
-		const posOffsetY = position.y * imageScaleInThumb;
-		
-		// Calculate scale effect
-		const scaledTemplateWidth = templateWidthInThumb / position.scale;
-		const scaledTemplateHeight = templateHeightInThumb / position.scale;
-		
-		// Center the crop frame and apply position offset
-		const centerX = offsetX + drawWidth / 2;
-		const centerY = offsetY + drawHeight / 2;
-		
-		const cropX = centerX - scaledTemplateWidth / 2 - posOffsetX;
-		const cropY = centerY - scaledTemplateHeight / 2 - posOffsetY;
-		
+		// The viewport can extend beyond image bounds, so we don't clamp to thumbnail bounds
+		// This allows the red box to show the true container viewport position
 		return {
-			x: cropX,
-			y: cropY,
-			width: scaledTemplateWidth,
-			height: scaledTemplateHeight
+			x: thumbnailRect.x,
+			y: thumbnailRect.y,
+			width: Math.max(1, thumbnailRect.width), // Minimum 1px to ensure visibility
+			height: Math.max(1, thumbnailRect.height) // Minimum 1px to ensure visibility
 		};
 	});
 	
@@ -371,13 +334,27 @@
 		if (!frame) return null;
 		
 		const handleSize = 8; // Handle size in pixels
-		const offset = handleSize / 2;
+		const offset = handleSize / 2; // Center the handle on the corner
 		
+		// Position handles relative to the red box (crop-frame) div, not absolute thumbnail
+		// Since the handles are children of the crop-frame div, we use relative positioning
 		return {
-			topLeft: { x: frame.x - offset, y: frame.y - offset },
-			topRight: { x: frame.x + frame.width - offset, y: frame.y - offset },
-			bottomLeft: { x: frame.x - offset, y: frame.y + frame.height - offset },
-			bottomRight: { x: frame.x + frame.width - offset, y: frame.y + frame.height - offset }
+			topLeft: { 
+				x: -offset, // Top-left corner of red box
+				y: -offset 
+			},
+			topRight: { 
+				x: frame.width - offset, // Top-right corner of red box
+				y: -offset 
+			},
+			bottomLeft: { 
+				x: -offset, // Bottom-left corner of red box
+				y: frame.height - offset 
+			},
+			bottomRight: { 
+				x: frame.width - offset, // Bottom-right corner of red box
+				y: frame.height - offset 
+			}
 		};
 	});
 
@@ -567,16 +544,25 @@
 							></div>
 						{/if}
 						
-						<!-- Crop preview overlay -->
-						{#if isDragging && debugMode}
-							<div class="crop-preview">
-								<div class="preview-indicator">
-									<span>Crop: {Math.round(frame.width)}×{Math.round(frame.height)}px</span>
-									<span>Scale: {(position.scale * 100).toFixed(0)}%</span>
-									<span>Pos: {Math.round(position.x)}, {Math.round(position.y)}</span>
-								</div>
+							<!-- Template area center point indicator (center of red box) -->
+							<div 
+								class="template-center-indicator" 
+								style="left: {frame.x + frame.width/2}px; top: {frame.y + frame.height/2}px;">
+								🎯
 							</div>
-						{/if}
+							
+							<!-- Crop preview overlay -->
+							{#if isDragging && debugMode}
+								<div class="crop-preview">
+									<div class="preview-indicator">
+										<span>Crop: {Math.round(frame.width)}×{Math.round(frame.height)}px</span>
+										<span>Scale: {(position.scale * 100).toFixed(0)}%</span>
+										<span>Pos: {Math.round(position.x)}, {Math.round(position.y)}</span>
+										<span><strong>Thumbnail Red Box:</strong></span>
+										<span>Top-Left: ({Math.round(frame.x)}, {Math.round(frame.y)})</span>
+									</div>
+								</div>
+							{/if}
 					</div>
 				{/if}
 			</div>
@@ -638,6 +624,37 @@
 				<span class="info-label">Scale:</span>
 				<span class="info-value">{(position.scale * 100).toFixed(0)}%</span>
 			</div>
+			{#if cropFrame()}
+				{@const frame = cropFrame()!}
+				<div class="info-row">
+					<span class="info-label"><strong>Red Box Corners:</strong></span>
+					<span class="info-value"></span>
+				</div>
+				<div class="info-row">
+					<span class="info-label">Top-Left:</span>
+					<span class="info-value">
+						({Math.round(frame.x)}, {Math.round(frame.y)})
+					</span>
+				</div>
+				<div class="info-row">
+					<span class="info-label">Top-Right:</span>
+					<span class="info-value">
+						({Math.round(frame.x + frame.width)}, {Math.round(frame.y)})
+					</span>
+				</div>
+				<div class="info-row">
+					<span class="info-label">Bottom-Left:</span>
+					<span class="info-value">
+						({Math.round(frame.x)}, {Math.round(frame.y + frame.height)})
+					</span>
+				</div>
+				<div class="info-row">
+					<span class="info-label">Bottom-Right:</span>
+					<span class="info-value">
+						({Math.round(frame.x + frame.width)}, {Math.round(frame.y + frame.height)})
+					</span>
+				</div>
+			{/if}
 			{#if debugMode && cropFrame()}
 				{@const frame = cropFrame()!}
 				<div class="debug-info">
@@ -938,5 +955,17 @@
 
 	.background-thumbnail.dragging .resize-handle {
 		transition: none;
+	}
+	
+	/* Template center indicator */
+	.template-center-indicator {
+		position: absolute;
+		font-size: 16px;
+		transition: all 0.2s ease;
+		margin-left: -8px;
+		margin-top: -16px;
+		filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+		z-index: 12;
+		pointer-events: none;
 	}
 </style>

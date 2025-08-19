@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy, untrack } from 'svelte';
 	import type { TemplateElement } from '$lib/types/types';
 	import ElementList from './ElementList.svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -7,10 +7,18 @@
 	import { loadGoogleFonts, getAllFontFamilies, isFontLoaded, fonts } from '../config/fonts';
 	import { CoordinateSystem } from '$lib/utils/coordinateSystem';
 import { createAdaptiveElements } from '$lib/utils/adaptiveElements';
-import { cssForBackground, clampBackgroundPosition } from '$lib/utils/backgroundGeometry';
+import { cssForBackground, clampBackgroundPosition, computeDraw } from '$lib/utils/backgroundGeometry';
 import type { Dims } from '$lib/utils/backgroundGeometry';
 import { browser } from '$app/environment';
 import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
+import { 
+	debounce, 
+	throttle, 
+	CanvasRenderManager, 
+	ImageCache, 
+	CoordinateCache, 
+	PerformanceMonitor 
+} from '$lib/utils/canvasPerformance';
 
 	let {
 		side,
@@ -65,9 +73,10 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 	let isResizingBackground = false;
 	let backgroundResizeHandle: string | null = null;
 	let templateContainer: HTMLElement | undefined = $state();
-	let mainCanvas: HTMLCanvasElement;
+	let mainCanvas: HTMLCanvasElement | undefined = $state();
 	let mainCtx: CanvasRenderingContext2D;
 	let mainImageElement: HTMLImageElement | null = $state(null);
+	let loadedImageSize = $state<{width: number, height: number} | null>(null);
 	let fontOptions: string[] = $state([]);
 	let fontsLoaded = false;
 	let previewDimensions = $state({
@@ -85,36 +94,21 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 		enabled: true // Enable debug by default
 	});
 
-	// Calculate background CSS using direct approach for better reactivity
-	let backgroundCSS = $derived(() => {
-		const currentBase = baseDimensions();
-		const container = previewDimensions;
+	// Performance optimization instances
+	let canvasRenderManager: CanvasRenderManager | null = null;
+	let imageCache: ImageCache;
+	let coordinateCache: CoordinateCache;
+	let performanceMonitor: PerformanceMonitor;
 
-		// Return early if dimensions are not yet available
-		if (currentBase.actualWidth === 0 || currentBase.actualHeight === 0) {
-			return {
-				size: 'auto',
-				position: 'center',
-				transform: 'none'
-			};
-		}
+	// Debounced and throttled functions
+	let debouncedUpdateBackground: (...args: any[]) => void;
+	let throttledDraw: (...args: any[]) => void;
+	let debouncedUpdateElements: (...args: any[]) => void;
 
-		// NEW LOGIC: Use actual image dimensions instead of cover behavior
-		// Scale the image dimensions to the preview scale, then apply user scale
-		const previewScale = container.scale || 1;
-		const baseWidth = currentBase.actualWidth * previewScale;
-		const baseHeight = currentBase.actualHeight * previewScale;
-		
-		// Apply user scale on top of preview scale
-		const finalWidth = baseWidth * backgroundPosition.scale;
-		const finalHeight = baseHeight * backgroundPosition.scale;
+	// Performance timing functions
+	let endImageLoadTiming: (() => void) | null = null;
+	let endCanvasDrawTiming: (() => void) | null = null;
 
-		return {
-			size: `${finalWidth}px ${finalHeight}px`,
-			position: `calc(50% + ${backgroundPosition.x}px) calc(50% + ${backgroundPosition.y}px)`,
-			transform: 'none' // Remove the duplicate scale transform
-		};
-	});
 
 	// Simplified coordinate system - use preview scale directly
 	let coordSystem = $derived(() => {
@@ -147,20 +141,6 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 
 		const scale = containerWidth / currentBase.width;
 
-		// Debug dimensions
-		console.log('🔍 Dimensions Debug:', {
-			parentWidth,
-			currentBase,
-			containerWidth,
-			containerHeight,
-			scale,
-			templateContainerSize: templateContainer
-				? {
-						width: templateContainer.offsetWidth,
-						height: templateContainer.offsetHeight
-					}
-				: 'not available'
-		});
 
 		previewDimensions = {
 			width: containerWidth,
@@ -172,6 +152,17 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 	}
 
 	onMount(() => {
+		// Initialize performance optimization instances
+		// Note: CanvasRenderManager will be initialized once we have the canvas element
+		imageCache = new ImageCache();
+		coordinateCache = new CoordinateCache();
+		performanceMonitor = new PerformanceMonitor();
+
+		// Initialize debounced and throttled functions
+		debouncedUpdateBackground = debounce(updateBackgroundPosition, 100);
+		throttledDraw = throttle(drawMainCanvas, 16); // ~60fps
+		debouncedUpdateElements = debounce(updateElements, 50);
+
 		// Wait for dimensions to be available before creating elements
 		if (elements.length === 0) {
 			const currentBase = baseDimensions();
@@ -205,14 +196,43 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 			updatePreviewDimensions();
 		}
 
-		return () => resizeObserver.disconnect();
+		return () => {
+			resizeObserver.disconnect();
+		};
 	});
 
+	onDestroy(() => {
+		// Cleanup performance optimization instances
+		if (canvasRenderManager) {
+			canvasRenderManager.destroy();
+		}
+		if (imageCache) {
+			imageCache.clearAll();
+		}
+		if (coordinateCache) {
+			coordinateCache.clear();
+		}
+		if (performanceMonitor) {
+			performanceMonitor.clear(); // Log final performance report
+		}
+	});
+
+	// Track last loaded preview URL to prevent redundant reloads
+	let lastLoadedPreview: string | null = null;
+	
 	// Initialize canvas context and handle all canvas-related updates
 	$effect(() => {
 		if (mainCanvas && !mainCtx) {
 			mainCtx = mainCanvas.getContext('2d')!;
 			console.log('🎨 Main canvas context initialized');
+		}
+		
+		// Initialize CanvasRenderManager once we have the canvas
+		if (mainCanvas && !canvasRenderManager) {
+			canvasRenderManager = new CanvasRenderManager(mainCanvas);
+			// Add the drawing callback to the render manager
+			canvasRenderManager.addRenderCallback(drawMainCanvas);
+			console.log('🚀 CanvasRenderManager initialized with render callback');
 		}
 		
 		// Update canvas dimensions when preview dimensions change
@@ -226,18 +246,42 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 				if (mainCtx) {
 					mainCtx = mainCanvas.getContext('2d')!;
 				}
+				
+				// Trigger redraw after canvas resize if we have image
+				if (mainImageElement) {
+					throttledDraw();
+				}
 			}
 		}
+	});
+	
+	// Separate effect for image loading to prevent excessive reloads
+	$effect(() => {
+		console.log('🔍 Image loading effect triggered:', {
+			preview,
+			lastLoadedPreview,
+			hasMainCtx: !!mainCtx,
+			previewWidth: previewDimensions.width,
+			side
+		});
 		
-		// Load image when preview changes and canvas is ready
-		if (preview && mainCtx && previewDimensions.width > 0) {
-			console.log('🖼️ Loading main canvas image:', preview);
+		// Only reload if preview URL actually changed
+		if (preview && preview !== lastLoadedPreview && mainCtx && previewDimensions.width > 0) {
+			console.log('🖼️ Loading main canvas image (URL changed):', preview);
+			lastLoadedPreview = preview;
 			loadMainImage();
+		} else if (!preview) {
+			console.log('⚠️ No preview URL provided for', side);
+		} else if (preview === lastLoadedPreview) {
+			console.log('ℹ️ Preview URL unchanged, skipping reload:', preview);
 		}
-		
-		// Redraw when background position changes or dimensions change
+	});
+	
+	// Separate effect for drawing/redrawing
+	$effect(() => {
+		// Only redraw when background position changes or we have a valid image
 		if (backgroundPosition && mainImageElement && mainCtx && previewDimensions.width > 0) {
-			drawMainCanvas();
+			throttledDraw();
 		}
 	});
 
@@ -397,10 +441,22 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 			return;
 		}
 		
+		// Check if image is already cached
+		const cachedImage = imageCache?.get(preview);
+		if (cachedImage) {
+			console.log('🚀 Using cached image:', preview);
+			mainImageElement = cachedImage;
+			throttledDraw();
+			return;
+		}
+		
 		console.log('🔄 Loading main image:', preview);
 		
 		// Clear previous image
 		mainImageElement = null;
+		
+		// Start performance tracking
+		const stopTiming = performanceMonitor?.startTiming('imageLoad');
 		
 		const img = new Image();
 		img.crossOrigin = 'anonymous';
@@ -413,12 +469,18 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 				hasValidDimensions: img.naturalWidth > 0 && img.naturalHeight > 0
 			});
 			
+			stopTiming?.();
+			
 			if (img.naturalWidth > 0 && img.naturalHeight > 0) {
 				mainImageElement = img;
-				// Force a redraw
-				setTimeout(() => drawMainCanvas(), 0);
+				loadedImageSize = { width: img.naturalWidth, height: img.naturalHeight };
+				// Cache the loaded image
+				imageCache?.set(preview, img);
+				// Use throttled draw for better performance
+				throttledDraw();
 			} else {
 				console.error('❌ Image loaded but has invalid dimensions');
+				loadedImageSize = null;
 			}
 		};
 		
@@ -427,7 +489,9 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 				url: preview,
 				error: error
 			});
+			stopTiming?.();
 			mainImageElement = null;
+			loadedImageSize = null;
 		};
 		
 		img.src = preview;
@@ -443,6 +507,12 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 			return;
 		}
 
+		// Use CanvasRenderManager for optimized rendering
+		canvasRenderManager?.markDirty();
+		
+		// Start performance tracking
+		const stopTiming = performanceMonitor?.startTiming('canvasDraw');
+		
 		console.log('🎨 Drawing main canvas...', {
 			canvasSize: { width: previewDimensions.width, height: previewDimensions.height },
 			imageSize: { width: mainImageElement.naturalWidth, height: mainImageElement.naturalHeight },
@@ -466,34 +536,35 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 		
 		if (currentBase.actualWidth === 0 || currentBase.actualHeight === 0) {
 			console.log('❌ Base dimensions not available:', currentBase);
+			stopTiming?.();
 			return;
 		}
+				// FIXED: Use the same logic as thumbnail red box to show the container viewport
+		const containerDims: Dims = {
+			width: currentBase.actualWidth,
+			height: currentBase.actualHeight
+		};
 		
-		// Use actual image dimensions instead of cover behavior (same as updated CSS logic)
-		const previewScale = container.scale || 1;
-		const baseWidth = currentBase.actualWidth * previewScale;
-		const baseHeight = currentBase.actualHeight * previewScale;
+		// Calculate what part of the image the container viewport "sees" (same as red box)
+		const { computeContainerViewportInImage } = await import('$lib/utils/backgroundGeometry');
+		const viewportRect = computeContainerViewportInImage(imageDims, containerDims, backgroundPosition);
 		
-		// Apply user scale on top of preview scale
-		const finalWidth = baseWidth * backgroundPosition.scale;
-		const finalHeight = baseHeight * backgroundPosition.scale;
-		
-		// Calculate center position with user offset (same as CSS calc(50% + offset))
-		const centerX = container.width / 2;
-		const centerY = container.height / 2;
-		
-		const drawX = centerX + backgroundPosition.x - finalWidth / 2;
-		const drawY = centerY + backgroundPosition.y - finalHeight / 2;
-		
-		console.log('🎯 Canvas draw parameters:', {
-			finalSize: { width: finalWidth, height: finalHeight },
-			drawPosition: { x: drawX, y: drawY },
-			centerPoint: { x: centerX, y: centerY }
+		console.log('🎯 Canvas draw parameters (VIEWPORT SYNC):', {
+			viewportInImage: viewportRect,
+			containerDims,
+			backgroundPosition,
+			canvasSize: { width: container.width, height: container.height }
 		});
 		
-		// Draw the image with calculated position and scale
-		mainCtx.drawImage(mainImageElement, drawX, drawY, finalWidth, finalHeight);
+		// Draw only the viewport portion of the image, scaled to fill the entire canvas
+		// This matches what the red box represents in the thumbnail
+		mainCtx.drawImage(
+			mainImageElement,
+			viewportRect.x, viewportRect.y, viewportRect.width, viewportRect.height, // Source rect in image
+			0, 0, container.width, container.height // Destination rect (fill entire canvas)
+		);
 		
+		stopTiming?.();
 		console.log('✅ Main canvas draw complete');
 	}
 
@@ -516,10 +587,10 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 			const container = { width: previewDimensions.width, height: previewDimensions.height };
 			const image = { width: currentBase.actualWidth, height: currentBase.actualHeight };
 			
-			const newCssValues = { 
-				size: backgroundCSS().size, 
-				position: backgroundCSS().position 
-			};
+				const newCssValues = { 
+					size: 'canvas-only', 
+					position: 'canvas-only' 
+				};
 
 			console.log('🎯 Background Position Updated:', {
 				position: backgroundPosition,
@@ -619,35 +690,60 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 			>
 				<!-- Background layer with fallback -->
 				{#if preview}
-					<!-- CSS background as fallback -->
-					<div 
-						class="css-background-fallback"
-						style="
-							background-image: url('{preview}');
-							background-size: {backgroundCSS().size};
-							background-position: {backgroundCSS().position};
-							background-repeat: no-repeat;
-						"
-					></div>
-					
-					<!-- Canvas overlay for precise rendering -->
+					<!-- Canvas-only rendering -->
 					<canvas
 						bind:this={mainCanvas}
 						width={previewDimensions.width}
 						height={previewDimensions.height}
-						class="background-canvas"
-						style="opacity: {mainImageElement ? 1 : 0};"
-					></canvas>
+				class="background-canvas"
+				style="display: block;"
+			></canvas>
 				{/if}
 				
 				<!-- Elements overlay layer -->
 				{#if debugState.enabled && preview}
 					<div class="debug-overlay">
+						<!-- Background position indicator (user offset from center) -->
 						<div 
 							class="position-indicator" 
 							style="left: calc(50% + {backgroundPosition.x}px); 
 							       top: calc(50% + {backgroundPosition.y}px);">
 							📍
+						</div>
+						
+						<!-- Template center point (50%, 50%) -->
+						<div 
+							class="template-center-indicator" 
+							style="left: 50%; top: 50%;">
+							🎯
+						</div>
+						
+						<!-- Crop frame boundaries (simplified visualization) -->
+						<div class="crop-bounds-indicator">
+							<div class="crop-info">
+								Template: {baseDimensions().actualWidth}×{baseDimensions().actualHeight}px
+								<br>Position: {Math.round(backgroundPosition.x)}, {Math.round(backgroundPosition.y)}
+								<br>Scale: {(backgroundPosition.scale * 100).toFixed(0)}%
+								<br><br><strong>Main Canvas Red Box Corners:</strong>
+								{#if mainImageElement && previewDimensions.width > 0}
+									{@const imageDims = { width: mainImageElement.naturalWidth, height: mainImageElement.naturalHeight }}
+									{@const containerDims = { width: previewDimensions.width, height: previewDimensions.height }}
+									{@const { drawW, drawH, topLeft } = computeDraw(imageDims, containerDims, backgroundPosition)}
+									<br>Top-Left: ({Math.round(topLeft.x)}, {Math.round(topLeft.y)})
+									<br>Top-Right: ({Math.round(topLeft.x + drawW)}, {Math.round(topLeft.y)})
+									<br>Bottom-Left: ({Math.round(topLeft.x)}, {Math.round(topLeft.y + drawH)})
+									<br>Bottom-Right: ({Math.round(topLeft.x + drawW)}, {Math.round(topLeft.y + drawH)})
+									<br>Box Size: {Math.round(drawW)}×{Math.round(drawH)}px
+								{:else}
+									<br>Corners: (not calculated)
+								{/if}
+								<br><br><strong>Loaded Image Size:</strong>
+								{#if loadedImageSize}
+									<br>{loadedImageSize.width}×{loadedImageSize.height}px
+								{:else}
+									<br>No image loaded
+								{/if}
+							</div>
 						</div>
 						<div class="debug-controls">
 							<button 
@@ -853,21 +949,13 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 	.template-container {
 		width: 100%;
 		height: 100%;
-		border: 1px solid #000;
 		position: relative;
 		background-color: white;
 		overflow: hidden;
+		border-radius: 2px;
+		box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
 	}
 
-	.css-background-fallback {
-		position: absolute;
-		top: 0;
-		left: 0;
-		width: 100%;
-		height: 100%;
-		z-index: 1;
-		transition: opacity 0.3s ease;
-	}
 
 	.background-canvas {
 		position: absolute;
@@ -1069,6 +1157,36 @@ import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 	
 	.debug-button:hover {
 		background: rgba(0, 0, 0, 0.9);
+	}
+	
+	.template-center-indicator {
+		position: absolute;
+		font-size: 24px;
+		transition: all 0.2s ease;
+		margin-left: -12px;
+		margin-top: -24px;
+		filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+		z-index: 102;
+	}
+	
+	.crop-bounds-indicator {
+		position: absolute;
+		top: 10px;
+		left: 10px;
+		z-index: 101;
+		pointer-events: none;
+	}
+	
+	.crop-info {
+		background: rgba(0, 0, 0, 0.8);
+		color: white;
+		padding: 6px 10px;
+		border-radius: 4px;
+		font-size: 11px;
+		font-family: monospace;
+		line-height: 1.4;
+		border: 1px solid rgba(255, 255, 255, 0.2);
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 	}
 
 	.resize-handle.top-left {

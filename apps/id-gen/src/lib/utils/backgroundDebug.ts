@@ -56,12 +56,12 @@ export function logDebugInfo(info: DebugInfo) {
 		debugLog = debugLog.slice(-50);
 	}
 	
-	console.log(`📊 ${info.component} Debug:`, {
-		position: info.position,
-		cssValues: info.cssValues,
-		cropFrame: info.cropFrame,
-		time: new Date(info.timestamp).toLocaleTimeString()
-	});
+	// console.log(`📊 ${info.component} Debug:`, {
+	// 	position: info.position,
+	// 	cssValues: info.cssValues,
+	// 	cropFrame: info.cropFrame,
+	// 	time: new Date(info.timestamp).toLocaleTimeString()
+	// });
 }
 
 /**
