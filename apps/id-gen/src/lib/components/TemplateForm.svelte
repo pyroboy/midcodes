@@ -355,7 +355,7 @@ import {
 
 	function updateElements() {
 		onUpdateElements?.(
-			elements.map((el: TemplateElement) => ({ ...el, side })),
+			(elements?.map((el: TemplateElement) => ({ ...el, side })) ?? []),
 			side
 		);
 	}
@@ -368,7 +368,7 @@ import {
 		height?: number,
 		metrics?: TextMetrics
 	) {
-		elements = elements.map((el: TemplateElement, i: number) => {
+		elements = (elements ?? []).map((el: TemplateElement, i: number) => {
 			if (i === index) {
 				let newEl = { ...el, side };
 				if (templateContainer) {
