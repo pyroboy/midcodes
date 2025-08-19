@@ -2,6 +2,185 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Multi-Repository Context
+
+This Claude session has access to two important directories:
+
+1. **Current ID-Gen Repository**: `/data/data/com.termux/files/home/midcodes/apps/id-gen/`
+   - Active development repository for the ID Generation application
+   - Contains all source code, documentation, and project files
+
+2. **Obsidian Vault (Knowledge Base)**: `/data/data/com.termux/files/home/storage/shared/arjoencrypted/midcodes/`
+   - Comprehensive knowledge management system with PARA organization
+   - Contains business documentation, speedruns, personal development resources
+   - Includes complete Midcodes documentation and technical specifications
+   - Reference the main CLAUDE.md in the home directory for detailed vault structure
+
+### Cross-Repository Usage Patterns
+
+- **Research & Planning**: Use the Obsidian vault for business requirements, similar project patterns, and strategic planning
+- **Implementation**: Apply patterns and documentation from vault to active development in this repository
+- **Documentation**: Create or update vault documentation based on development learnings
+- **Speedrun Integration**: This ID-Gen project corresponds to the ID-GEN speedrun in the vault's speedruns directory
+- **Repo Docs Mirroring**: Repository documentation is automatically mirrored to vault for centralized knowledge management
+
+### Documentation Mirroring Strategy
+
+**Repository Structure**: 
+- **Source Docs**: `/data/data/com.termux/files/home/midcodes/apps/id-gen/docs/`
+- **Source Specs**: `/data/data/com.termux/files/home/midcodes/apps/id-gen/specs/`
+
+**Vault Targets**:
+- **Mirror Docs**: `/data/data/com.termux/files/home/storage/shared/arjoencrypted/midcodes/01 - Midcodes/SPEEDRUNS🏃‍♂️💨/ID-GEN/repo-docs/`
+- **Mirror Specs**: `/data/data/com.termux/files/home/storage/shared/arjoencrypted/midcodes/01 - Midcodes/SPEEDRUNS🏃‍♂️💨/ID-GEN/repo-specs/`
+
+**Purpose**: 
+- Maintain centralized technical documentation in Obsidian vault
+- Separate specifications (plans/instructions) from documentation (reports/summaries)
+- Enable cross-linking between repo docs and business documentation
+- Preserve development history and technical decisions in knowledge base
+- Allow vault-based analysis and relationship mapping of technical documentation
+
+**Naming Conventions**: Repository files are classified into two types with different naming patterns:
+
+### **SPECIFICATIONS** (Instructions/Plans): `Spec-NN-MMMDD-Title-With-Dashes.md`
+- **Repository**: `/specs/` folder (source files with original names)
+- **Vault**: `/repo-specs/` folder (numbered with naming convention)
+- **Purpose**: Technical specifications, implementation plans, instructions
+- **Format**: `Spec-NN-MMMDD-Title-With-Dashes.md`
+- **Examples**:
+  - `REFACTORING_PLAN_PHASE_1.md` → `Spec-01-Aug20-REFACTORING-PLAN-PHASE-1.md`
+  - `DASHBOARD_UI_IMPROVEMENTS.md` → `Spec-02-Aug20-DASHBOARD-UI-IMPROVEMENTS.md`
+
+### **DOCUMENTATION** (Reports/Summaries): `CAPITALIZED_TITLES.md`
+- **Repository**: `/docs/` folder (source files)
+- **Vault**: `/repo-docs/` folder (same names)
+- **Purpose**: Analysis reports, summaries, completion documentation
+- **Format**: Original filename preserved
+- **Examples**:
+  - `BUG_ANALYSIS_REPORT.md` → `BUG_ANALYSIS_REPORT.md`
+  - `VERIFICATION_REPORT.md` → `VERIFICATION_REPORT.md`
+
+### **Classification Criteria**:
+- **SPEC**: Contains plans, instructions, implementation guidelines, "how-to" content
+- **DOC**: Contains reports, analysis results, summaries, "what happened" content
+
+**Mirroring Commands**:
+```bash
+# Create mirror directory
+mkdir -p "/data/data/com.termux/files/home/storage/shared/arjoencrypted/midcodes/01 - Midcodes/SPEEDRUNS🏃‍♂️💨/ID-GEN/repo-docs"
+
+# Get next sequence number
+get_next_spec_number() {
+    local vault_docs="/data/data/com.termux/files/home/storage/shared/arjoencrypted/midcodes/01 - Midcodes/SPEEDRUNS🏃‍♂️💨/ID-GEN/repo-docs"
+    local max_num=$(ls "$vault_docs"/Spec-*-*.md 2>/dev/null | sed -n 's/.*Spec-\([0-9][0-9]\)-.*/\1/p' | sort -n | tail -1)
+    if [[ -z "$max_num" ]]; then
+        echo "01"
+    else
+        printf "%02d" $((10#$max_num + 1))
+    fi
+}
+
+# Convert title to dash-separated format
+format_title() {
+    local title="$1"
+    # Remove .md extension, convert to proper case with dashes
+    echo "$title" | sed 's/\.md$//' | sed 's/[_-]/ /g' | sed 's/\b\w/\U&/g' | sed 's/ /-/g'
+}
+
+# Mirror all docs with naming convention
+for file in "/data/data/com.termux/files/home/midcodes/apps/id-gen/docs/"*.md; do
+    if [[ -f "$file" ]]; then
+        filename=$(basename "$file")
+        # Check if already follows new naming convention
+        if [[ $filename =~ ^Spec-[0-9]{2}-[A-Z][a-z]{2}[0-9]{2}-.+\.md$ ]]; then
+            cp "$file" "/data/data/com.termux/files/home/storage/shared/arjoencrypted/midcodes/01 - Midcodes/SPEEDRUNS🏃‍♂️💨/ID-GEN/repo-docs/"
+        else
+            # Apply new naming convention
+            spec_num=$(get_next_spec_number)
+            today=$(date +"%b%d")
+            title=$(format_title "$filename")
+            new_name="Spec-${spec_num}-${today}-${title}.md"
+            cp "$file" "/data/data/com.termux/files/home/storage/shared/arjoencrypted/midcodes/01 - Midcodes/SPEEDRUNS🏃‍♂️💨/ID-GEN/repo-docs/${new_name}"
+        fi
+    fi
+done
+
+# Quick mirror single file with auto-naming
+mirror_doc() {
+    local file="$1"
+    local custom_title="$2"
+    local spec_num=$(get_next_spec_number)
+    local today=$(date +"%b%d")
+    local title
+    
+    if [[ -n "$custom_title" ]]; then
+        title=$(echo "$custom_title" | sed 's/ /-/g')
+    else
+        title=$(format_title "$file")
+    fi
+    
+    local new_name="Spec-${spec_num}-${today}-${title}.md"
+    cp "/data/data/com.termux/files/home/midcodes/apps/id-gen/docs/${file}" "/data/data/com.termux/files/home/storage/shared/arjoencrypted/midcodes/01 - Midcodes/SPEEDRUNS🏃‍♂️💨/ID-GEN/repo-docs/${new_name}"
+    echo "Mirrored: ${file} → ${new_name}"
+}
+
+# Usage: mirror_doc "BUG_ANALYSIS_REPORT.md" "Bug-Analysis-Report"
+```
+
+**Auto-Mirror Workflow**: 
+1. **File Creation**: When creating new documentation, use the naming convention immediately
+2. **Automatic Sync**: Run mirror command after any documentation updates
+3. **Batch Processing**: Use the loop command to sync all files with proper naming
+4. **Single File**: Use `mirror_doc` function for individual file updates
+
+**Integration with Development Workflow**:
+- Create docs with spec naming convention from start
+- Mirror immediately after creating/updating documentation
+- Maintain vault synchronization for centralized knowledge management
+- Use date-based naming for chronological organization and easy reference
+
+**Convenience Script**: Use `./mirror-docs.sh` for automatic mirroring
+```bash
+# Mirror all documentation and specifications
+./mirror-docs.sh
+
+# Mirror specific file from either folder
+./mirror-docs.sh "BUG_ANALYSIS_REPORT.md"     # From docs/
+./mirror-docs.sh "REFACTORING_PLAN_PHASE_1.md" # From specs/
+```
+
+**Current Mirror Status**: All 19 files successfully organized and mirrored to vault:
+
+**REPOSITORY STRUCTURE**:
+- **`/docs/`**: 11 documentation files (reports, summaries, analysis)
+- **`/specs/`**: 8 specification files (plans, instructions, implementations)
+
+**VAULT MIRROR**:
+- **`/repo-docs/`**: 11 files with original names preserved
+- **`/repo-specs/`**: 8 files with numbered naming convention
+
+**SPECIFICATIONS** (Repository: `/specs/` → Vault: `/repo-specs/`):
+- `DASHBOARD_UI_IMPROVEMENTS.md` → `Spec-01-Aug20-DASHBOARD-UI-IMPROVEMENTS.md`
+- `ID_GEN_ROLE_INSTRUCTIONS.md` → `Spec-02-Aug20-ID-GEN-ROLE-INSTRUCTIONS.md`
+- `MOBILE_OPTIMIZATION_PLAN.md` → `Spec-03-Aug20-MOBILE-OPTIMIZATION-PLAN.md`
+- `PAYMENT_BYPASS_IMPLEMENTATION.md` → `Spec-04-Aug20-PAYMENT-BYPASS-IMPLEMENTATION.md`
+- `PAYMENT_STRUCTURE.md` → `Spec-05-Aug20-PAYMENT-STRUCTURE.md`
+- `QA_CHECKLIST_AND_ROLLOUT.md` → `Spec-06-Aug20-QA-CHECKLIST-AND-ROLLOUT.md`
+- `REFACTORING_PLAN_PHASE_1.md` → `Spec-07-Aug20-REFACTORING-PLAN-PHASE-1.md`
+- `ROUTE_DOCUMENTATION.md` → `Spec-08-Aug20-ROUTE-DOCUMENTATION.md`
+
+**DOCUMENTATION** (Repository: `/docs/` → Vault: `/repo-docs/`):
+- All files preserved with original names for easy recognition
+
+### Search Strategy for Multi-Repository Context
+
+When searching for information:
+1. **Code-specific queries**: Search this repository first
+2. **Business/strategic queries**: Search the Obsidian vault at `/data/data/com.termux/files/home/storage/shared/arjoencrypted/midcodes/`
+3. **Cross-reference**: Use vault documentation to inform code decisions and vice versa
+4. **Fallback to Bash**: If Grep tool fails, use standard bash grep commands for reliable searching
+
 ## Commands
 
 ### Development
@@ -104,3 +283,5 @@ Uses Threlte wrapper around Three.js for 3D ID card visualization and rendering.
 - Vite optimizes deps for 3D libraries and UI components
 - Uses session storage for auth persistence (not localStorage)
 - Environment variables through SvelteKit's `$env` modules
+
+- i want the docs mirroed to my speedrun obisidian vault but in a separste folder repo-docs.
