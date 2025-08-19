@@ -1,342 +1,343 @@
 <script lang="ts">
-	import { run, preventDefault } from 'svelte/legacy';
-	import { onMount, onDestroy } from 'svelte';
-	import { page } from '$app/stores';
-	import { auth, session, user } from '$lib/stores/auth';
-	import IdCanvas from '$lib/components/IdCanvas.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Card } from '$lib/components/ui/card';
-	import { Input } from '$lib/components/ui/input';
-	import { Label } from '$lib/components/ui/label';
-	import * as Select from '$lib/components/ui/select';
-	import { darkMode } from '$lib/stores/darkMode';
-	import ThumbnailInput from '$lib/components/ThumbnailInput.svelte';
-	import { Loader } from '@lucide/svelte';
-	import { goto } from '$app/navigation';
-	import { enhance } from '$app/forms';
-	import type { TemplateElement } from '$lib/stores/templateStore';
+import { run, preventDefault } from 'svelte/legacy';
+import { onMount, onDestroy } from 'svelte';
+import { page } from '$app/stores';
+import { auth, session, user } from '$lib/stores/auth';
+import IdCanvas from '$lib/components/IdCanvas.svelte';
+import { Button } from '$lib/components/ui/button';
+import { Card } from '$lib/components/ui/card';
+import { Input } from '$lib/components/ui/input';
+import { Label } from '$lib/components/ui/label';
+import * as Select from '$lib/components/ui/select';
+import { darkMode } from '$lib/stores/darkMode';
+import ThumbnailInput from '$lib/components/ThumbnailInput.svelte';
+import { Loader } from '@lucide/svelte';
+import { goto } from '$app/navigation';
+import { enhance } from '$app/forms';
+import type { TemplateElement } from '$lib/stores/templateStore';
 
-	// Enhanced type definitions for better type safety
-	interface SelectOption {
-		value: string;
-		label: string;
-	}
+// Enhanced type definitions for better type safety
+interface SelectOption {
+    value: string;
+    label: string;
+}
 
-	interface Template {
-		id: string;
-		name: string;
-		org_id: string;
-		template_elements: TemplateElement[];
-		front_background: string;
-		back_background: string;
-		orientation: 'landscape' | 'portrait';
-		width_pixels?: number;
-		height_pixels?: number;
-		dpi?: number;
-		unit_type?: string;
-		unit_width?: number;
-		unit_height?: number;
-	}
+interface Template {
+    id: string;
+    name: string;
+    org_id: string;
+    template_elements: TemplateElement[];
+    front_background: string;
+    back_background: string;
+    orientation: 'landscape' | 'portrait';
+    width_pixels?: number;
+    height_pixels?: number;
+    dpi?: number;
+    unit_type?: string;
+    unit_width?: number;
+    unit_height?: number;
+}
 
-	interface ImagePosition {
-		x: number;
-		y: number;
-		width: number;
-		height: number;
-		scale: number;
-	}
+interface ImagePosition {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    scale: number;
+}
 
-	interface FileUploads {
-		[key: string]: File | null;
-	}
+interface FileUploads {
+    [key: string]: File | null;
+}
 
-	interface Props {
-		data: {
-			template: {
-				id: string;
-				name: string;
-				org_id: string;
-				template_elements: TemplateElement[];
-				front_background: string;
-				back_background: string;
-				orientation: 'landscape' | 'portrait';
-			};
-		};
-	}
+interface Props {
+    data: {
+        template: {
+            id: string;
+            name: string;
+            org_id: string;
+            template_elements: TemplateElement[];
+            front_background: string;
+            back_background: string;
+            orientation: 'landscape' | 'portrait';
+        };
+    };
+}
 
-	// Props initialization
-	let { data }: Props = $props();
+// Props initialization
+let { data }: Props = $props();
 
-	// State management using Svelte's reactive stores
-	let templateId = $page.params.id;
-	let template: Template = {
-		...data.template,
-		template_elements: data.template.template_elements.map((element) => ({
-			...element,
-			width: element.width ?? 100,
-			height: element.height ?? 100
-		}))
-	};
+// State management using Svelte's reactive stores
+let templateId = $page.params.id;
+let template: Template = {
+    ...data.template,
+    template_elements:
+        data.template.template_elements?.map((element) => ({
+            ...element,
+            width: element.width ?? 100,
+            height: element.height ?? 100
+        })) ?? []
+};
 
-	// Component state declarations with $state
-	let loading = $state(false);
-	let error = $state<string | null>(null);
-	let formElement = $state<HTMLFormElement | null>(null);
-	let debugMessages = $state<string[]>([]);
-	let formData = $state<Record<string, string>>({});
-	let fileUploads = $state<FileUploads>({});
-	let imagePositions = $state<Record<string, ImagePosition>>({});
-	let frontCanvasComponent = $state<IdCanvas | null>(null);
-	let backCanvasComponent = $state<IdCanvas | null>(null);
-	let frontCanvasReady = $state(false);
-	let backCanvasReady = $state(false);
-	let fullResolution = $state(false);
-	let mouseMoving = $state(false);
-	let formErrors = $state<Record<string, boolean>>({});
-	let fileUrls = $state<Record<string, string>>({});
+// Component state declarations with $state
+let loading = $state(false);
+let error = $state<string | null>(null);
+let formElement = $state<HTMLFormElement | null>(null);
+let debugMessages = $state<string[]>([]);
+let formData = $state<Record<string, string>>({});
+let fileUploads = $state<FileUploads>({});
+let imagePositions = $state<Record<string, ImagePosition>>({});
+let frontCanvasComponent = $state<IdCanvas | null>(null);
+let backCanvasComponent = $state<IdCanvas | null>(null);
+let frontCanvasReady = $state(false);
+let backCanvasReady = $state(false);
+let fullResolution = $state(false);
+let mouseMoving = $state(false);
+let formErrors = $state<Record<string, boolean>>({});
+let fileUrls = $state<Record<string, string>>({});
 
-	// Enhanced Select handling
-	interface SelectState {
-		value: string | undefined;
-		label: string;
-		options: SelectOption[];
-	}
+// Enhanced Select handling
+interface SelectState {
+    value: string | undefined;
+    label: string;
+    options: SelectOption[];
+}
 
-	let selectStates = $state<Record<string, SelectState>>({});
+let selectStates = $state<Record<string, SelectState>>({});
 
-	// Initialize select states with getters and setters
-	function initializeSelectStates() {
-		template.template_elements.forEach((element) => {
-			if (element.type === 'selection' && element.variableName && element.options) {
-				const options = element.options.map((opt) => ({
-					value: opt,
-					label: opt
-				}));
+// Initialize select states with getters and setters
+function initializeSelectStates() {
+    template.template_elements.forEach((element) => {
+        if (element.type === 'selection' && element.variableName && element.options) {
+            const options = element.options.map((opt) => ({
+                value: opt,
+                label: opt
+            }));
 
-				selectStates[element.variableName] = {
-					value: formData[element.variableName] || undefined,
-					label: formData[element.variableName] || 'Select an option',
-					options
-				};
-			}
-		});
-	}
+            selectStates[element.variableName] = {
+                value: formData[element.variableName] || undefined,
+                label: formData[element.variableName] || 'Select an option',
+                options
+            };
+        }
+    });
+}
 
-	// Derived content for select triggers using $derived
-	let triggerContent = $derived(
-		(variableName: string) => formData[variableName] || 'Select an option'
-	);
+// Derived content for select triggers using $derived
+let triggerContent = $derived(
+    (variableName: string) => formData[variableName] || 'Select an option'
+);
 
-	// Lifecycle hooks
-	run(() => {
-		console.log('Use Template Page: Session exists:', !!$session);
-		console.log('Use Template Page: User exists:', !!$user);
-	});
+// Lifecycle hooks
+run(() => {
+    console.log('Use Template Page: Session exists:', !!$session);
+    console.log('Use Template Page: User exists:', !!$user);
+});
 
-	function initializeFormData() {
-		if (!template?.template_elements) return;
+function initializeFormData() {
+    if (!template?.template_elements) return;
 
-		template.template_elements.forEach((element) => {
-			if (!element.variableName) return;
+    template.template_elements.forEach((element) => {
+        if (!element.variableName) return;
 
-			if (element.type === 'text' || element.type === 'selection') {
-				formData[element.variableName] = element.content || '';
-			} else if (element.type === 'photo' || element.type === 'signature') {
-				fileUploads[element.variableName] = null;
-				imagePositions[element.variableName] = {
-					x: 0,
-					y: 0,
-					width: element.width || 100,
-					height: element.height || 100,
-					scale: 1
-				};
-			}
-		});
+        if (element.type === 'text' || element.type === 'selection') {
+            formData[element.variableName] = element.content || '';
+        } else if (element.type === 'photo' || element.type === 'signature') {
+            fileUploads[element.variableName] = null;
+            imagePositions[element.variableName] = {
+                x: 0,
+                y: 0,
+                width: element.width || 100,
+                height: element.height || 100,
+                scale: 1
+            };
+        }
+    });
 
-		initializeSelectStates();
-	}
+    initializeSelectStates();
+}
 
-	onMount(async () => {
-		if (!templateId) {
-			error = 'No template ID provided';
-			return;
-		}
+onMount(async () => {
+    if (!templateId) {
+        error = 'No template ID provided';
+        return;
+    }
 
-		console.log(' [Use Template] Initializing with template:', {
-			id: template.id,
-			name: template.name,
-			elementsCount: template.template_elements?.length || 0,
-			frontBackground: template.front_background,
-			backBackground: template.back_background,
-			frontBackgroundType: typeof template.front_background,
-			backBackgroundType: typeof template.back_background
-		});
+    console.log(' [Use Template] Initializing with template:', {
+        id: template.id,
+        name: template.name,
+        elementsCount: template.template_elements?.length || 0,
+        frontBackground: template.front_background,
+        backBackground: template.back_background,
+        frontBackgroundType: typeof template.front_background,
+        backBackgroundType: typeof template.back_background
+    });
 
-		initializeFormData();
-	});
+    initializeFormData();
+});
 
-	// Event handlers
-	function handleCanvasReady(side: 'front' | 'back') {
-		if (side === 'front') {
-			frontCanvasReady = true;
-		} else {
-			backCanvasReady = true;
-		}
-	}
+// Event handlers
+function handleCanvasReady(side: 'front' | 'back') {
+    if (side === 'front') {
+        frontCanvasReady = true;
+    } else {
+        backCanvasReady = true;
+    }
+}
 
-	function handleSelectionChange(value: string, variableName: string) {
-		// Update form data
-		formData[variableName] = value;
+function handleSelectionChange(value: string, variableName: string) {
+    // Update form data
+    formData[variableName] = value;
 
-		// Update select state
-		if (selectStates[variableName]) {
-			selectStates[variableName] = {
-				...selectStates[variableName],
-				value,
-				label: value
-			};
-		}
+    // Update select state
+    if (selectStates[variableName]) {
+        selectStates[variableName] = {
+            ...selectStates[variableName],
+            value,
+            label: value
+        };
+    }
 
-		// Clear any errors
-		if (formErrors[variableName]) {
-			formErrors[variableName] = false;
-		}
-	}
+    // Clear any errors
+    if (formErrors[variableName]) {
+        formErrors[variableName] = false;
+    }
+}
 
-	function handleImageUpdate(
-		event: CustomEvent<{ scale: number; x: number; y: number }>,
-		variableName: string
-	) {
-		const { scale, x, y } = event.detail;
-		imagePositions[variableName] = {
-			...imagePositions[variableName],
-			scale,
-			x,
-			y
-		};
-	}
+function handleImageUpdate(
+    event: CustomEvent<{ scale: number; x: number; y: number }>,
+    variableName: string
+) {
+    const { scale, x, y } = event.detail;
+    imagePositions[variableName] = {
+        ...imagePositions[variableName],
+        scale,
+        x,
+        y
+    };
+}
 
-	async function handleSubmit(event: Event) {
-		event.preventDefault();
+async function handleSubmit(event: Event) {
+    event.preventDefault();
 
-		try {
-			if (!validateForm()) {
-				error = 'Please fill in all required fields';
-				return;
-			}
+    try {
+        if (!validateForm()) {
+            error = 'Please fill in all required fields';
+            return;
+        }
 
-			loading = true;
-			error = null;
+        loading = true;
+        error = null;
 
-			if (!template || !frontCanvasComponent || !backCanvasComponent) {
-				error = 'Missing required components';
-				return;
-			}
+        if (!template || !frontCanvasComponent || !backCanvasComponent) {
+            error = 'Missing required components';
+            return;
+        }
 
-			const [frontBlob, backBlob] = await Promise.all([
-				frontCanvasComponent.renderFullResolution(),
-				backCanvasComponent.renderFullResolution()
-			]);
+        const [frontBlob, backBlob] = await Promise.all([
+            frontCanvasComponent.renderFullResolution(),
+            backCanvasComponent.renderFullResolution()
+        ]);
 
-			const form = event.target as HTMLFormElement;
-			const formData = new FormData(form);
+        const form = event.target as HTMLFormElement;
+        const formData = new FormData(form);
 
-			// Add required data to form
-			formData.append('templateId', $page.params.id);
-			formData.append('frontImage', frontBlob, 'front.png');
-			formData.append('backImage', backBlob, 'back.png');
+        // Add required data to form
+        formData.append('templateId', $page.params.id);
+        formData.append('frontImage', frontBlob, 'front.png');
+        formData.append('backImage', backBlob, 'back.png');
 
-			const response = await fetch('?/saveIdCard', {
-				method: 'POST',
-				body: formData
-			});
+        const response = await fetch('?/saveIdCard', {
+            method: 'POST',
+            body: formData
+        });
 
-			const result = await response.json();
-			console.log('Save response:', result);
+        const result = await response.json();
+        console.log('Save response:', result);
 
-			if (response.ok && (result.type === 'success' || (result.data && result.data[0]?.success))) {
-				goto('/all-ids');
-			} else {
-				error = (result.data && result.data[0]?.error) || 'Failed to save ID card';
-				console.error('Save error:', error);
-			}
-		} catch (err) {
-			console.error('Submit error:', err);
-			error = err instanceof Error ? err.message : 'An unexpected error occurred';
-		} finally {
-			loading = false;
-		}
-	}
+        if (response.ok && (result.type === 'success' || (result.data && result.data[0]?.success))) {
+            goto('/all-ids');
+        } else {
+            error = (result.data && result.data[0]?.error) || 'Failed to save ID card';
+            console.error('Save error:', error);
+        }
+    } catch (err) {
+        console.error('Submit error:', err);
+        error = err instanceof Error ? err.message : 'An unexpected error occurred';
+    } finally {
+        loading = false;
+    }
+}
 
-	function handleMouseDown() {
-		mouseMoving = true;
-	}
+function handleMouseDown() {
+    mouseMoving = true;
+}
 
-	function handleMouseUp() {
-		mouseMoving = false;
-	}
+function handleMouseUp() {
+    mouseMoving = false;
+}
 
-	function handleToggle(checked: boolean) {
-		darkMode.set(checked);
-	}
+function handleToggle(checked: boolean) {
+    darkMode.set(checked);
+}
 
-	function handleSelectFile(variableName: string) {
-		const input = document.createElement('input');
-		input.type = 'file';
-		input.accept = 'image/*';
-		input.onchange = (e) => handleFileUpload(e, variableName);
-		input.click();
-	}
+function handleSelectFile(variableName: string) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = (e) => handleFileUpload(e, variableName);
+    input.click();
+}
 
-	function handleFileUpload(event: Event, variableName: string) {
-		const input = event.target as HTMLInputElement;
-		if (!input.files?.length) return;
+function handleFileUpload(event: Event, variableName: string) {
+    const input = event.target as HTMLInputElement;
+    if (!input.files?.length) return;
 
-		const file = input.files[0];
-		fileUploads[variableName] = file;
+    const file = input.files[0];
+    fileUploads[variableName] = file;
 
-		if (fileUrls[variableName]) {
-			URL.revokeObjectURL(fileUrls[variableName]);
-		}
+    if (fileUrls[variableName]) {
+        URL.revokeObjectURL(fileUrls[variableName]);
+    }
 
-		const url = URL.createObjectURL(file);
-		fileUrls[variableName] = url;
-	}
+    const url = URL.createObjectURL(file);
+    fileUrls[variableName] = url;
+}
 
-	function validateForm(): boolean {
-		formErrors = {};
-		let isValid = true;
-		let emptyFields: string[] = [];
+function validateForm(): boolean {
+    formErrors = {};
+    let isValid = true;
+    let emptyFields: string[] = [];
 
-		if (!template) return false;
+    if (!template) return false;
 
-		template.template_elements.forEach((element) => {
-			if (!element.variableName) return;
+    template.template_elements.forEach((element) => {
+        if (!element.variableName) return;
 
-			if (element.type === 'text' || element.type === 'selection') {
-				if (!formData[element.variableName]?.trim()) {
-					formErrors[element.variableName] = true;
-					emptyFields.push(element.variableName);
-					isValid = false;
-				}
-			}
-		});
+        if (element.type === 'text' || element.type === 'selection') {
+            if (!formData[element.variableName]?.trim()) {
+                formErrors[element.variableName] = true;
+                emptyFields.push(element.variableName);
+                isValid = false;
+            }
+        }
+    });
 
-		if (!isValid) {
-			addDebugMessage(`Please fill in the following fields: ${emptyFields.join(', ')}`);
-		}
+    if (!isValid) {
+        addDebugMessage(`Please fill in the following fields: ${emptyFields.join(', ')}`);
+    }
 
-		return isValid;
-	}
+    return isValid;
+}
 
-	function addDebugMessage(message: string) {
-		debugMessages = [...debugMessages, message];
-	}
+function addDebugMessage(message: string) {
+    debugMessages = [...debugMessages, message];
+}
 
-	onDestroy(() => {
-		// Cleanup file URLs
-		Object.values(fileUrls).forEach(URL.revokeObjectURL);
-	});
+onDestroy(() => {
+    // Cleanup file URLs
+    Object.values(fileUrls).forEach(URL.revokeObjectURL);
+});
 </script>
 
 <div class="container mx-auto p-4 flex flex-col md:flex-row gap-4">
@@ -359,7 +360,7 @@
 							>
 								<IdCanvas
 									bind:this={frontCanvasComponent}
-									elements={template.template_elements.filter((el) => el.side === 'front')}
+									elements={(template.template_elements?.filter((el) => el.side === 'front')) ?? []}
 									backgroundUrl={template.front_background}
 									{formData}
 									{fileUploads}
@@ -386,7 +387,7 @@
 							>
 								<IdCanvas
 									bind:this={backCanvasComponent}
-									elements={template.template_elements.filter((el) => el.side === 'back')}
+									elements={(template.template_elements?.filter((el) => el.side === 'back')) ?? []}
 									backgroundUrl={template.back_background}
 									{formData}
 									{fileUploads}

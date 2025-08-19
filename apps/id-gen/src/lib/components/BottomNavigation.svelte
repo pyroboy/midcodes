@@ -3,7 +3,7 @@
 	import { Button } from '$lib/components/ui/button';
 
 	interface Props {
-		user?: any;
+		user?: { role?: string };
 	}
 
 	let { user }: Props = $props();

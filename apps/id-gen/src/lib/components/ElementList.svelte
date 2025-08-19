@@ -39,14 +39,13 @@ import BackgroundThumbnail from './BackgroundThumbnail.svelte';
 
 	// Helper function to create a new element array with an update at specific index
 	function updateElementAtIndex(index: number, updates: Partial<TemplateElement>) {
-		const updatedElements = elements.map((el: TemplateElement, i: number) =>
-			i === index ? { ...el, ...updates } : el
-		);
+		const updatedElements =
+			elements?.map((el: TemplateElement, i: number) => (i === index ? { ...el, ...updates } : el)) ?? [];
 		onUpdateElements(updatedElements, side);
 	}
 
 	function removeElement(index: number) {
-		const updatedElements = elements.filter((_: TemplateElement, i: number) => i !== index);
+		const updatedElements = elements?.filter((_: TemplateElement, i: number) => i !== index) ?? [];
 		onUpdateElements(updatedElements, side);
 	}
 
@@ -78,12 +77,14 @@ import BackgroundThumbnail from './BackgroundThumbnail.svelte';
 						}
 					: {})
 		};
-		onUpdateElements([...elements, newElement], side);
+		onUpdateElements([...(elements ?? []), newElement], side);
 	}
 
 	function isDuplicateVariableName(name: string, currentIndex: number): boolean {
-		return elements.some(
-			(el: TemplateElement, index: number) => index !== currentIndex && el.variableName === name
+		return (
+			elements?.some(
+				(el: TemplateElement, index: number) => index !== currentIndex && el.variableName === name
+			) ?? false
 		);
 	}
 
@@ -152,7 +153,7 @@ import BackgroundThumbnail from './BackgroundThumbnail.svelte';
 	}
 
 	function hasNameDuplicate(name: string): boolean {
-		return elements.filter((el: TemplateElement) => el.variableName === name).length > 1;
+		return (elements?.filter((el: TemplateElement) => el.variableName === name) ?? []).length > 1;
 	}
 
 	// Note: Background control functions now handled by BackgroundThumbnail component

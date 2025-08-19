@@ -1,5 +1,15 @@
-import adapter from '@sveltejs/adapter-vercel';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
+
+let adapter;
+try {
+    adapter = (await import('@sveltejs/adapter-vercel')).default;
+} catch (e) {
+    try {
+        adapter = (await import('@sveltejs/adapter-auto')).default;
+    } catch {
+        adapter = () => ({ name: 'noop-adapter', adapt: async () => {} });
+    }
+}
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
