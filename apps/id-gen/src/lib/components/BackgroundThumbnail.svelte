@@ -31,10 +31,11 @@
 	let imageElement: HTMLImageElement | null = $state(null);
 	
 	// Debug state for visual feedback verification
+	interface CropFrameRect { x: number; y: number; width: number; height: number }
 	let debugState = $state({
 		lastUpdate: Date.now(),
 		position,
-		cropFrameInfo: null as any,
+		cropFrameInfo: null as CropFrameRect | null,
 		validationInfo: true,
 		enabled: true // Enable debug by default
 	});
