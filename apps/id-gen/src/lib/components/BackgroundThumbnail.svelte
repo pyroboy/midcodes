@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { Move, Scaling, RotateCcw, BugPlay } from '@lucide/svelte';
-	import { calculateCropFrame, validateCropFrameAlignment, calculatePositionFromFrame, coverBase, computeDraw, computeVisibleRectInImage, computeContainerViewportInImage, mapImageRectToThumb, type Dims, type BackgroundPosition } from '$lib/utils/backgroundGeometry';
+	import { calculateCropFrame, validateCropFrameAlignment, calculatePositionFromFrame, coverBase, computeDraw, computeVisibleRectInImage, computeContainerViewportInImage, mapImageRectToThumb, clampBackgroundPosition, type Dims, type BackgroundPosition } from '$lib/utils/backgroundGeometry';
 	import { browser } from '$app/environment';
 	import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 	
@@ -207,11 +207,33 @@
 				// Scale based on diagonal movement like ThumbnailInput
 				const delta = Math.max(dx, dy);
 				const newScale = Math.max(0.1, Math.min(3, startValues.scale + delta / 100));
-				position = { 
+				const newPosition = { 
 					x: startValues.x,
 					y: startValues.y,
 					scale: newScale 
 				};
+				
+				// Apply clamping to scale operations with scale constraints
+				if (imageElement) {
+					const imageDims: Dims = {
+						width: imageElement.naturalWidth,
+						height: imageElement.naturalHeight
+					};
+					
+					// Calculate minimum scale to ensure image always covers template area
+					const { s0 } = coverBase(imageDims, templateDimensions);
+					const minScale = Math.max(0.1, s0 > 0 ? 1 / s0 : 0.1); // Minimum scale to maintain coverage
+					const maxScale = 3; // Maximum scale limit
+					
+					// Clamp scale first
+					const clampedScale = Math.max(minScale, Math.min(maxScale, newPosition.scale));
+					const scaleClampedPosition = { ...newPosition, scale: clampedScale };
+					
+					// Then apply position clamping
+					position = clampBackgroundPosition(imageDims, templateDimensions, scaleClampedPosition);
+				} else {
+					position = newPosition;
+				}
 			} else {
 				// Move position - convert screen pixels to template coordinates
 				// SYNCHRONIZED WITH MAIN CANVAS: Use exact same coordinate conversion
@@ -234,19 +256,38 @@
 						imageDisplayScale = thumbDims.height / imageElement.naturalHeight;
 					}
 					
-					position = {
+					const newPosition = {
 						x: startValues.x - dx / imageDisplayScale,
 						y: startValues.y - dy / imageDisplayScale,
 						scale: startValues.scale
 					};
+					
+					// Apply clamping to prevent red box from going out of bounds
+					const imageDims: Dims = {
+						width: imageElement.naturalWidth,
+						height: imageElement.naturalHeight
+					};
+					
+					position = clampBackgroundPosition(imageDims, templateDimensions, newPosition);
 				} else {
 					// Fallback to old logic if image not available
 					const thumbnailDisplayScale = thumbDims.width / templateDimensions.width;
-					position = {
+					const newPosition = {
 						x: startValues.x + dx / thumbnailDisplayScale,
 						y: startValues.y + dy / thumbnailDisplayScale,
 						scale: startValues.scale
 					};
+					
+					// Apply clamping even in fallback case
+					if (imageElement) {
+						const imageDims: Dims = {
+							width: imageElement.naturalWidth,
+							height: imageElement.naturalHeight
+						};
+						position = clampBackgroundPosition(imageDims, templateDimensions, newPosition);
+					} else {
+						position = newPosition; // No clamping if no image available
+					}
 				}
 			}
 
@@ -358,6 +399,107 @@
 		};
 	});
 
+	// Handle red box dragging (moving the entire crop area)
+	function handleRedBoxDrag(event: MouseEvent | TouchEvent) {
+		if (disabled) return;
+		
+		// Check if the click is on a resize handle - if so, don't start drag
+		const target = event.target as HTMLElement;
+		if (target.classList.contains('resize-handle')) {
+			return; // Let resize handle take precedence
+		}
+		
+		event.preventDefault();
+		event.stopPropagation();
+		isDragging = true;
+
+		const startPoint = 'touches' in event
+			? { x: event.touches[0].clientX, y: event.touches[0].clientY }
+			: { x: event.clientX, y: event.clientY };
+
+		const startValues = { ...position };
+
+		function handleMove(e: MouseEvent | TouchEvent) {
+			if (!isDragging) return;
+
+			const currentPoint = 'touches' in e
+				? { x: e.touches[0].clientX, y: e.touches[0].clientY }
+				: { x: (e as MouseEvent).clientX, y: (e as MouseEvent).clientY };
+
+			const dx = currentPoint.x - startPoint.x;
+			const dy = currentPoint.y - startPoint.y;
+
+			// Use the same coordinate conversion logic as existing move operation
+			const thumbDims = thumbnailDimensions();
+			
+			if (imageElement) {
+				const imageAspect = imageElement.naturalWidth / imageElement.naturalHeight;
+				const thumbAspect = thumbDims.width / thumbDims.height;
+				
+				// Calculate how image is displayed in thumbnail (object-fit: contain)
+				let imageDisplayScale;
+				if (imageAspect > thumbAspect) {
+					// Image fits to thumbnail width
+					imageDisplayScale = thumbDims.width / imageElement.naturalWidth;
+				} else {
+					// Image fits to thumbnail height  
+					imageDisplayScale = thumbDims.height / imageElement.naturalHeight;
+				}
+				
+				const newPosition = {
+					x: startValues.x - dx / imageDisplayScale,
+					y: startValues.y - dy / imageDisplayScale,
+					scale: startValues.scale
+				};
+				
+				// Apply clamping to prevent red box from going out of bounds
+				const imageDims: Dims = {
+					width: imageElement.naturalWidth,
+					height: imageElement.naturalHeight
+				};
+				
+				position = clampBackgroundPosition(imageDims, templateDimensions, newPosition);
+			} else {
+				// Fallback to old logic if image not available
+				const thumbnailDisplayScale = thumbDims.width / templateDimensions.width;
+				const newPosition = {
+					x: startValues.x + dx / thumbnailDisplayScale,
+					y: startValues.y + dy / thumbnailDisplayScale,
+					scale: startValues.scale
+				};
+				
+				// Apply clamping even in fallback case
+				if (imageElement) {
+					const imageDims: Dims = {
+						width: imageElement.naturalWidth,
+						height: imageElement.naturalHeight
+					};
+					position = clampBackgroundPosition(imageDims, templateDimensions, newPosition);
+				} else {
+					position = newPosition; // No clamping if no image available
+				}
+			}
+
+			onPositionChange(position);
+			
+			// Log debug info for user interaction
+			logThumbnailDebug(true);
+		}
+
+		function handleEnd() {
+			isDragging = false;
+			window.removeEventListener('mousemove', handleMove);
+			window.removeEventListener('mouseup', handleEnd);
+			window.removeEventListener('touchmove', handleMove);
+			window.removeEventListener('touchend', handleEnd);
+		}
+
+		window.addEventListener('mousemove', handleMove);
+		window.addEventListener('mouseup', handleEnd);
+		window.addEventListener('touchmove', handleMove);
+		window.addEventListener('touchend', handleEnd);
+	}
+
 	// Handle resize operations
 	function handleResize(event: MouseEvent | TouchEvent, handle: string) {
 		if (disabled) return;
@@ -433,8 +575,11 @@
 				THUMB_SIZE
 			);
 			
-			position = newPos;
-			onPositionChange(newPos);
+			// Apply clamping to resize operations as well
+			const clampedPos = clampBackgroundPosition(imageDims, templateDimensions, newPos);
+			
+			position = clampedPos;
+			onPositionChange(clampedPos);
 			
 			// Log debug info for user interaction
 			logThumbnailDebug(true);
@@ -497,18 +642,25 @@
 					<div 
 						class="crop-frame"
 						class:invalid={!isValidCropAlignment()}
+						class:draggable={!disabled}
 						style="
 							left: {frame.x}px;
 							top: {frame.y}px;
 							width: {frame.width}px;
 							height: {frame.height}px;
+							cursor: {disabled ? 'default' : 'move'};
 						"
+						onmousedown={(e) => !disabled && handleRedBoxDrag(e)}
+						ontouchstart={(e) => !disabled && handleRedBoxDrag(e)}
+						role="button"
+						aria-label="Drag to move crop area"
+						tabindex="0"
 					>
 						<!-- Resize handles -->
 						{#if !disabled}
 							<div 
 								class="resize-handle top-left"
-								style="left: {handles.topLeft.x}px; top: {handles.topLeft.y}px"
+								style="left: {handles.topLeft.x}px; top: {handles.topLeft.y}px; cursor: nw-resize;"
 								onmousedown={(e) => handleResize(e, 'top-left')}
 								ontouchstart={(e) => handleResize(e, 'top-left')}
 								role="button"
@@ -517,7 +669,7 @@
 							></div>
 							<div 
 								class="resize-handle top-right"
-								style="left: {handles.topRight.x}px; top: {handles.topRight.y}px"
+								style="left: {handles.topRight.x}px; top: {handles.topRight.y}px; cursor: ne-resize;"
 								onmousedown={(e) => handleResize(e, 'top-right')}
 								ontouchstart={(e) => handleResize(e, 'top-right')}
 								role="button"
@@ -526,7 +678,7 @@
 							></div>
 							<div 
 								class="resize-handle bottom-left"
-								style="left: {handles.bottomLeft.x}px; top: {handles.bottomLeft.y}px"
+								style="left: {handles.bottomLeft.x}px; top: {handles.bottomLeft.y}px; cursor: sw-resize;"
 								onmousedown={(e) => handleResize(e, 'bottom-left')}
 								ontouchstart={(e) => handleResize(e, 'bottom-left')}
 								role="button"
@@ -535,7 +687,7 @@
 							></div>
 							<div 
 								class="resize-handle bottom-right"
-								style="left: {handles.bottomRight.x}px; top: {handles.bottomRight.y}px"
+								style="left: {handles.bottomRight.x}px; top: {handles.bottomRight.y}px; cursor: se-resize;"
 								onmousedown={(e) => handleResize(e, 'bottom-right')}
 								ontouchstart={(e) => handleResize(e, 'bottom-right')}
 								role="button"
@@ -547,13 +699,13 @@
 						<!-- Template area center point indicator (center of red box) -->
 						<div 
 							class="template-center-indicator" 
-							style="left: 50%; top: 50%;">
+							style="left: 50%; top: 50%; pointer-events: none;">
 							🎯
 						</div>
 						
 						<!-- Crop preview overlay -->
 						{#if isDragging && debugMode}
-								<div class="crop-preview">
+								<div class="crop-preview" style="pointer-events: none;">
 									<div class="preview-indicator">
 										<span>Crop: {Math.round(frame.width)}×{Math.round(frame.height)}px</span>
 										<span>Scale: {(position.scale * 100).toFixed(0)}%</span>
@@ -731,6 +883,41 @@
 			0 0 0 9999px rgba(0, 0, 0, 0.4);
 		transition: all 0.2s ease;
 		z-index: 10;
+		pointer-events: auto; /* Enable pointer events for dragging */
+		cursor: move !important; /* Force move cursor everywhere on the crop frame */
+	}
+	
+	/* Add a pseudo-element to ensure the entire area is clickable */
+	.crop-frame::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		cursor: move !important;
+		z-index: 1; /* Below resize handles but above background */
+	}
+	
+	/* Ultra-specific selector to override any parent styles */
+	.background-thumbnail .crop-overlay .crop-frame {
+		cursor: move !important;
+	}
+	
+	.background-thumbnail .crop-overlay .crop-frame:hover {
+		cursor: move !important;
+	}
+	
+	/* Ensure draggable cursor is visible */
+	.crop-frame[role="button"] {
+		cursor: move !important;
+	}
+	
+	.crop-frame.draggable {
+		cursor: move !important;
+	}
+	
+	.crop-frame.draggable:hover {
+		background: rgba(239, 68, 68, 0.25) !important;
+		border-color: #dc2626 !important;
+		cursor: move !important;
 	}
 	
 	.crop-frame::before {
@@ -871,7 +1058,7 @@
 		border: 1px solid white;
 		border-radius: 50%;
 		cursor: pointer;
-		z-index: 10;
+		z-index: 15; /* Higher than crop-frame to show resize cursors */
 		pointer-events: auto;
 		transition: all 0.15s ease;
 		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
