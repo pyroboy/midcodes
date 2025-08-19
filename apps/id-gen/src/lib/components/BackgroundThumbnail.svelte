@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { Move, Scaling, RotateCcw, BugPlay } from '@lucide/svelte';
-	import { calculateCropFrame, validateCropFrameAlignment, calculatePositionFromFrame, type Dims, type BackgroundPosition } from '$lib/utils/backgroundGeometry';
+	import { calculateCropFrame, validateCropFrameAlignment, calculatePositionFromFrame, coverBase, computeDraw, type Dims, type BackgroundPosition } from '$lib/utils/backgroundGeometry';
 	import { browser } from '$app/environment';
 	import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 	
@@ -39,8 +39,36 @@
 		enabled: true // Enable debug by default
 	});
 	
-	// Use dynamic thumbnail size from props instead of hard-coded value
-	const THUMB_SIZE = $derived(maxThumbnailWidth);
+	// Calculate thumbnail dimensions to match template aspect ratio
+	const thumbnailDimensions = $derived(() => {
+		if (templateDimensions.width > 0 && templateDimensions.height > 0) {
+			const templateAspect = templateDimensions.width / templateDimensions.height;
+			
+			// Calculate dimensions that fit within maxThumbnailWidth while maintaining aspect ratio
+			let thumbWidth = maxThumbnailWidth;
+			let thumbHeight = maxThumbnailWidth / templateAspect;
+			
+			// If height exceeds maxThumbnailWidth, constrain by height instead
+			if (thumbHeight > maxThumbnailWidth) {
+				thumbHeight = maxThumbnailWidth;
+				thumbWidth = maxThumbnailWidth * templateAspect;
+			}
+			
+			return {
+				width: Math.round(thumbWidth),
+				height: Math.round(thumbHeight)
+			};
+		}
+		
+		// Fallback to square if template dimensions not available
+		return {
+			width: maxThumbnailWidth,
+			height: maxThumbnailWidth
+		};
+	});
+
+	// Legacy THUMB_SIZE for compatibility (use width as primary dimension)
+	const THUMB_SIZE = $derived(thumbnailDimensions().width);
 
 	// Only log debug info when explicitly called, not on reactive updates
 	function logThumbnailDebug(isUserInteraction = false) {
@@ -112,28 +140,70 @@
 		// Clear canvas
 		ctx.clearRect(0, 0, THUMB_SIZE, THUMB_SIZE);
 		
-		// Calculate how to fit the image in the thumbnail
-		const imgAspect = imageElement.naturalWidth / imageElement.naturalHeight;
-		const thumbAspect = 1; // Square thumbnail
+		// Reset transforms
+		ctx.resetTransform();
 		
-		let drawWidth, drawHeight, offsetX, offsetY;
-		
-		if (imgAspect > thumbAspect) {
-			// Image is wider - fit to width
-			drawWidth = THUMB_SIZE;
-			drawHeight = THUMB_SIZE / imgAspect;
-			offsetX = 0;
-			offsetY = (THUMB_SIZE - drawHeight) / 2;
+		// If we have template dimensions and position, draw with cover behavior like main template
+		if (templateDimensions.width > 0 && templateDimensions.height > 0) {
+			const imageDims: Dims = {
+				width: imageElement.naturalWidth,
+				height: imageElement.naturalHeight
+			};
+			
+			// Use square thumbnail as container for calculations
+			const thumbContainerDims: Dims = {
+				width: THUMB_SIZE,
+				height: THUMB_SIZE
+			};
+			
+			// Calculate cover dimensions for the thumbnail
+			const { s0, coverW, coverH } = coverBase(imageDims, thumbContainerDims);
+			
+			// Apply user scale on top of cover scale (same as main template logic)
+			const finalScale = s0 * position.scale;
+			const finalWidth = imageDims.width * finalScale;
+			const finalHeight = imageDims.height * finalScale;
+			
+			// Calculate center position with user offset (same as main template logic)
+			const centerX = THUMB_SIZE / 2;
+			const centerY = THUMB_SIZE / 2;
+			
+			// Scale the position offset to thumbnail size
+			// The position values are in template coordinates, scale them to thumbnail
+			const scaleToThumb = THUMB_SIZE / Math.max(templateDimensions.width, templateDimensions.height);
+			const thumbOffsetX = position.x * scaleToThumb;
+			const thumbOffsetY = position.y * scaleToThumb;
+			
+			// Calculate final position (center + user offset - half of scaled image size)
+			const drawX = centerX + thumbOffsetX - finalWidth / 2;
+			const drawY = centerY + thumbOffsetY - finalHeight / 2;
+			
+			// Draw the image with the calculated position and scale
+			ctx.drawImage(imageElement, drawX, drawY, finalWidth, finalHeight);
 		} else {
-			// Image is taller - fit to height
-			drawHeight = THUMB_SIZE;
-			drawWidth = THUMB_SIZE * imgAspect;
-			offsetX = (THUMB_SIZE - drawWidth) / 2;
-			offsetY = 0;
+			// Fallback: draw the entire image with object-fit: contain
+			const imgAspect = imageElement.naturalWidth / imageElement.naturalHeight;
+			const thumbAspect = 1; // Square thumbnail
+			
+			let drawWidth, drawHeight, offsetX, offsetY;
+			
+			if (imgAspect > thumbAspect) {
+				// Image is wider - fit to width
+				drawWidth = THUMB_SIZE;
+				drawHeight = THUMB_SIZE / imgAspect;
+				offsetX = 0;
+				offsetY = (THUMB_SIZE - drawHeight) / 2;
+			} else {
+				// Image is taller - fit to height
+				drawHeight = THUMB_SIZE;
+				drawWidth = THUMB_SIZE * imgAspect;
+				offsetX = (THUMB_SIZE - drawWidth) / 2;
+				offsetY = 0;
+			}
+			
+			// Draw the entire image
+			ctx.drawImage(imageElement, offsetX, offsetY, drawWidth, drawHeight);
 		}
-		
-		// Draw the image
-		ctx.drawImage(imageElement, offsetX, offsetY, drawWidth, drawHeight);
 		
 		// Draw border
 		ctx.strokeStyle = '#e5e7eb';
@@ -368,6 +438,13 @@
 	// Redraw when thumbnail size changes
 	$effect(() => {
 		if (THUMB_SIZE && imageElement && ctx) {
+			drawThumbnail();
+		}
+	});
+
+	// Redraw when position changes
+	$effect(() => {
+		if (position && imageElement && ctx) {
 			drawThumbnail();
 		}
 	});
