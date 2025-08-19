@@ -279,7 +279,7 @@
 					};
 					
 					// Apply clamping even in fallback case
-					if (imageElement && imageElement instanceof HTMLImageElement && imageElement.naturalWidth > 0 && imageElement.naturalHeight > 0) {
+					if (imageElement && imageElement.naturalWidth > 0 && imageElement.naturalHeight > 0) {
 						const imageDims: Dims = {
 							width: imageElement.naturalWidth,
 							height: imageElement.naturalHeight
@@ -487,7 +487,7 @@
 				};
 				
 				// Apply clamping even in fallback case
-				if (imageElement && imageElement instanceof HTMLImageElement && imageElement.naturalWidth > 0 && imageElement.naturalHeight > 0) {
+				if (imageElement && imageElement.naturalWidth > 0 && imageElement.naturalHeight > 0) {
 					const imageDims: Dims = {
 						width: imageElement.naturalWidth,
 						height: imageElement.naturalHeight

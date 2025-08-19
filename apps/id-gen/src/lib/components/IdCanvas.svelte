@@ -83,15 +83,15 @@
 			return { scale: 1, canvasWidth: dims.width, canvasHeight: dims.height };
 		} else {
 			// Adaptive preview scaling based on template size
-			const maxPreviewWidth = 600; // Maximum preview width
-			const maxPreviewHeight = 400; // Maximum preview height
+			const maxPreviewWidth = 600; // Align with TemplateForm maxWidth
+			const maxPreviewHeight = 600; // Use same cap to derive the same min-scale formula
 
-			// Calculate scale factors to fit within preview bounds
+			// Calculate scale factors to fit within preview bounds (match TemplateForm logic)
 			const widthScale = maxPreviewWidth / dims.width;
 			const heightScale = maxPreviewHeight / dims.height;
 
-			// Use the smaller scale to ensure it fits within both dimensions
-			const scale = Math.min(widthScale, heightScale, 1); // Don't scale up beyond 1:1
+			// Use the smaller scale to ensure it fits (equivalent to TemplateForm base scale)
+			const scale = Math.min(widthScale, heightScale, 1); // Never upscale beyond 1:1
 
 			const previewWidth = dims.width * scale;
 			const previewHeight = dims.height * scale;

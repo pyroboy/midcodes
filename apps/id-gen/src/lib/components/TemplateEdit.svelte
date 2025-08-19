@@ -2,7 +2,7 @@
 	import type { TemplateElement } from '$lib/types/types';
 	import TemplateForm from './TemplateForm.svelte';
 
-	let {
+let {
 		isLoading = false,
 		frontElements = [],
 		backElements = [],
@@ -17,7 +17,8 @@
 		onRemoveImage,
 		cardSize = null,
 		pixelDimensions = null,
-		onUpdateBackgroundPosition = () => {}
+		onUpdateBackgroundPosition = () => {},
+		version = 0
 	}: {
 		isLoading?: boolean;
 		frontElements?: TemplateElement[];
@@ -121,6 +122,7 @@
 			</div>
 		{:else}
 			<div class="template-form">
+				{#key `front-${version}`}
 				<TemplateForm
 					side="front"
 					elements={frontElements}
@@ -133,9 +135,12 @@
 					onImageUpload={(files: File[], side: 'front' | 'back') => onImageUpload(files, side)}
 					onRemoveImage={(side: 'front' | 'back') => onRemoveImage(side)}
 					{onUpdateBackgroundPosition}
+					version={version}
 				/>
+				{/key}
 			</div>
 			<div class="template-form">
+				{#key `back-${version}`}
 				<TemplateForm
 					side="back"
 					elements={backElements}
@@ -149,6 +154,7 @@
 					onRemoveImage={(side: 'front' | 'back') => onRemoveImage(side)}
 					{onUpdateBackgroundPosition}
 				/>
+				{/key}
 			</div>
 
 			{#if errorMessage}

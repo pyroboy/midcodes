@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	import { onMount } from 'svelte';
+	import { goto, invalidate } from '$app/navigation';
+	import { onMount, tick } from 'svelte';
 	import TemplateList from '$lib/components/TemplateList.svelte';
 	import TemplateEdit from '$lib/components/TemplateEdit.svelte';
 	import CroppingConfirmationDialog from '$lib/components/CroppingConfirmationDialog.svelte';
@@ -42,6 +42,17 @@ import {
 import { browser } from '$app/environment';
 import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeometry';
 import { toast } from 'svelte-sonner';
+import { imageCache } from '$lib/utils/imageCache';
+
+	// Convert a Blob/File to a base64 data URL for stable, in-memory previews
+	async function blobToDataUrl(fileOrBlob: Blob): Promise<string> {
+		return new Promise((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onerror = () => reject(new Error('Failed to read blob as data URL'));
+			reader.onload = () => resolve(reader.result as string);
+			reader.readAsDataURL(fileOrBlob);
+		});
+	}
 
 	// data means get data from server
 	let { data } = $props();
@@ -59,6 +70,8 @@ import { toast } from 'svelte-sonner';
 	let currentTemplate: DatabaseTemplate | null = $state(null);
 	let frontElements: TemplateElement[] = $state([]);
 	let backElements: TemplateElement[] = $state([]);
+	// Force-reload knob for the editor when child components hold internal state
+	let editorVersion = $state(0);
 
 	// Current template size info
 	let currentCardSize: CardSize | null = $state(null);
@@ -184,6 +197,14 @@ import { toast } from 'svelte-sonner';
 					finalSize: frontResult.croppedSize
 				});
 
+				// Immediately preview the cropped image using a stable data URL
+				try {
+					const dataUrl = await blobToDataUrl(frontResult.croppedFile);
+					frontPreview = dataUrl; // Stable, no need to revoke
+				} catch (e) {
+					console.warn('Failed converting front blob to data URL', e);
+				}
+
 				// Update progress: Uploading front image
 				toast.loading('Uploading front background to storage...', { id: toastId });
 				
@@ -226,6 +247,14 @@ import { toast } from 'svelte-sonner';
 					originalSize: backResult.originalSize,
 					finalSize: backResult.croppedSize
 				});
+
+				// Immediately preview the cropped image using a stable data URL
+				try {
+					const dataUrl = await blobToDataUrl(backResult.croppedFile);
+					backPreview = dataUrl;
+				} catch (e) {
+					console.warn('Failed converting back blob to data URL', e);
+				}
 
 				// Update progress: Uploading back image
 				toast.loading('Uploading back background to storage...', { id: toastId });
@@ -381,7 +410,7 @@ import { toast } from 'svelte-sonner';
 				}
 				
 				// Ensure we have data
-				if (!result.data) {
+				if (!('data' in result)) {
 					console.error('❌ No template data in server response. Full result:', result);
 					throw new Error('No template data received from server');
 				}
@@ -390,7 +419,123 @@ import { toast } from 'svelte-sonner';
 				throw new Error('Server returned unexpected response format');
 			}
 
-			const savedTemplate = result.data;
+			// Robustly extract the saved template from various server shapes
+			let savedTemplate: any = null;
+			try {
+				if (result.data && typeof result.data === 'string') {
+					// Server returned stringified JSON
+					const parsed = JSON.parse(result.data);
+					if (Array.isArray(parsed)) {
+						// Prefer an object that looks like a template; ignore primitives (numbers/strings)
+						const candidates = parsed.filter((item: any) =>
+							item && typeof item === 'object' && (
+								('front_background' in item) ||
+								('back_background' in item) ||
+								('template_elements' in item) ||
+								('id' in item && 'name' in item)
+							)
+						);
+						savedTemplate = candidates.length ? candidates[candidates.length - 1] : undefined;
+					} else {
+						savedTemplate = parsed;
+					}
+				} else if (result.data && typeof result.data === 'object' && 'template' in result.data) {
+					// Some APIs return { template: {...} }
+					savedTemplate = (result.data as any).template;
+				} else {
+					savedTemplate = result.data;
+				}
+			} catch (e) {
+				console.error('❌ Failed to parse nested template data:', e);
+				throw new Error('Failed to parse template data from server response');
+			}
+
+			if (!savedTemplate || typeof savedTemplate !== 'object') {
+				throw new Error('Template was not saved properly - invalid data returned');
+			}
+
+			// Ensure the saved template has a stable string id (fallback to the one we sent)
+			if (typeof savedTemplate.id !== 'string' || !savedTemplate.id) {
+				console.warn('⚠️ Server returned non-string or missing id; falling back to client id', {
+					serverId: savedTemplate.id,
+					clientId: templateDataToSave.id
+				});
+				savedTemplate.id = templateDataToSave.id;
+			}
+
+			// If extraction failed, throw early with diagnostics
+			if (!savedTemplate) {
+				console.error('❌ Could not extract a template object from server response:', result.data);
+				throw new Error('Failed to extract saved template from server response');
+			}
+
+			// Revoke any previous blob: previews to avoid stale object URLs
+			try {
+				if (frontPreview?.startsWith('blob:')) URL.revokeObjectURL(frontPreview);
+				if (backPreview?.startsWith('blob:')) URL.revokeObjectURL(backPreview);
+			} catch (e) {
+				console.warn('Failed to revoke old blob URLs', e);
+			}
+
+			// Force a re-render before setting the new image URLs
+			frontPreview = null;
+			backPreview = null;
+			await tick();
+
+			// Ensure previews use the full public URL and bust cache to show immediately
+			const makePublicUrl = (value: unknown) => {
+				if (!value) return null;
+				// Handle strings directly
+				if (typeof value === 'string') {
+					// If it's a blob/data URL, use it as-is (no cache-busting)
+					if (value.startsWith('blob:') || value.startsWith('data:')) return value;
+					// Full URL — append cache-buster
+					if (value.startsWith('http')) return `${value}?t=${Date.now()}`;
+					// Storage path — convert to public URL and append cache-buster
+					const url = getSupabaseStorageUrl(value, 'templates');
+					return `${url}?t=${Date.now()}`;
+				}
+				// Handle possible objects like { publicUrl } or { path }
+				try {
+					const maybeObj = value as any;
+					const fromObj = (maybeObj?.publicUrl || maybeObj?.url || maybeObj?.path) as string | undefined;
+					if (fromObj && typeof fromObj === 'string') {
+						if (fromObj.startsWith('blob:') || fromObj.startsWith('data:')) return fromObj;
+						const url = fromObj.startsWith('http') ? fromObj : getSupabaseStorageUrl(fromObj, 'templates');
+						return `${url}?t=${Date.now()}`;
+					}
+				} catch {}
+				return null;
+			};
+			// Prefer the freshly uploaded URLs if available (most reliable)
+			if (typeof frontUrl === 'string' && frontUrl.startsWith('http')) {
+				frontPreview = `${frontUrl}?t=${Date.now()}`;
+			} else {
+				frontPreview = makePublicUrl(savedTemplate.front_background);
+			}
+			if (typeof backUrl === 'string' && backUrl.startsWith('http')) {
+				backPreview = `${backUrl}?t=${Date.now()}`;
+			} else {
+				backPreview = makePublicUrl(savedTemplate.back_background);
+			}
+
+			// Persist public URLs in cache and resolve
+			const templateKeyAfterSave = savedTemplate.id ?? currentTemplate?.id ?? 'temp';
+			const frontKey = imageCache.key(templateKeyAfterSave, 'front');
+			const backKey = imageCache.key(templateKeyAfterSave, 'back');
+			if (frontPreview) imageCache.setPublic(frontKey, frontPreview);
+			if (backPreview) imageCache.setPublic(backKey, backPreview);
+			frontPreview = imageCache.resolve(frontKey);
+			backPreview = imageCache.resolve(backKey);
+			
+			// Use the just-sent elements as source of truth to avoid stale server echoes
+			savedTemplate.template_elements = allElements;
+
+			// Build safe values for name and element count
+			const safeName: string = typeof savedTemplate.name === 'string' ? savedTemplate.name : (currentTemplate?.name ?? 'Untitled Template');
+			const elementsCount: number = Array.isArray(savedTemplate.template_elements)
+				? savedTemplate.template_elements.length
+				: (Array.isArray(allElements) ? allElements.length : 0);
 			
 			// Debug the saved template structure
 			console.log('✅ Template data received:', {
@@ -422,8 +567,8 @@ import { toast } from 'svelte-sonner';
 
 			console.log('✅ Template saved and validated successfully:', {
 				id: savedTemplate.id,
-				name: savedTemplate.name,
-				elementsCount: savedTemplate.template_elements?.length,
+				name: safeName,
+				elementsCount,
 				action: templateDataToSave.id ? 'updated' : 'created',
 				frontBgUrl: !!savedTemplate.front_background,
 				backBgUrl: !!savedTemplate.back_background
@@ -432,12 +577,57 @@ import { toast } from 'svelte-sonner';
 			// Show success toast notification
 			const action = templateDataToSave.id ? 'updated' : 'created';
 			toast.success(`Template ${action} successfully!`, {
-				description: `"${savedTemplate.name}" with ${savedTemplate.template_elements.length} elements has been saved.`,
+				description: `"${safeName}" with ${elementsCount} elements has been saved.`,
 				duration: 4000
 			});
 
+			// Normalize data we pass to list — prefer the preview URLs we just set
+			// Prefer the known uploaded URLs for the list as well
+			const listFront = (typeof frontUrl === 'string' && frontUrl.startsWith('http'))
+				? `${frontUrl}?t=${Date.now()}`
+				: (frontPreview ?? makePublicUrl(savedTemplate.front_background));
+			const listBack = (typeof backUrl === 'string' && backUrl.startsWith('http'))
+				? `${backUrl}?t=${Date.now()}`
+				: (backPreview ?? makePublicUrl(savedTemplate.back_background));
+			const normalizedForList = {
+				...savedTemplate,
+				id: savedTemplate.id as string,
+				name: safeName,
+				front_background: listFront ?? '',
+				back_background: listBack ?? '',
+				template_elements: allElements
+			};
+
+			console.log('📦 List normalization:', {
+				savedFront: savedTemplate.front_background,
+				savedBack: savedTemplate.back_background,
+				listFront,
+				listBack
+			});
+
+			// Update local current template and element arrays to reflect latest positions immediately
+			currentTemplate = {
+				...(currentTemplate ?? savedTemplate),
+				...savedTemplate,
+				template_elements: allElements
+			} as DatabaseTemplate;
+			frontElements = allElements.filter((el) => el.side === 'front').map((el) => ({ ...el }));
+			backElements = allElements.filter((el) => el.side === 'back').map((el) => ({ ...el }));
+			// Bump version to remount the editor and purge any internal caches
+			editorVersion++;
+
 			// Update local templates array instead of full page reload
-			await refreshTemplatesList(savedTemplate);
+			await refreshTemplatesList(normalizedForList as any);
+
+			// Invalidate server data to fetch fresh rows without hard reload
+			try {
+				await Promise.all([
+					invalidate((url) => url.pathname === '/templates'),
+					invalidate(`/templates?id=${savedTemplate.id}`)
+				]);
+			} catch (e) {
+				console.warn('invalidate failed (non-fatal):', e);
+			}
 			
 			// Go back to templates list if we were creating/editing
 			if (isEditMode) {
@@ -467,17 +657,51 @@ import { toast } from 'svelte-sonner';
 	 */
 	async function refreshTemplatesList(savedTemplate: DatabaseTemplate) {
 		try {
+			// Normalize URLs to full Supabase public URLs for consistency
+			const toUrl = (v: unknown) => {
+				if (!v) return '';
+				if (typeof v === 'string') {
+					if (v.startsWith('blob:') || v.startsWith('data:')) return v; // leave blob/data untouched
+					if (v.startsWith('http')) return v;
+					return getSupabaseStorageUrl(v, 'templates');
+				}
+				try {
+					const obj = v as any;
+					const s = (obj?.publicUrl || obj?.url || obj?.path) as string | undefined;
+					if (s && typeof s === 'string') {
+						if (s.startsWith('blob:') || s.startsWith('data:')) return s;
+						return s.startsWith('http') ? s : getSupabaseStorageUrl(s, 'templates');
+					}
+				} catch {}
+				return '';
+			};
+			const timestamp = Date.now();
+			const baseFront = toUrl((savedTemplate as any).front_background);
+			const baseBack = toUrl((savedTemplate as any).back_background);
+			console.log('🧭 refreshTemplatesList URL resolution:', { baseFront, baseBack });
+			const addBuster = (url: string) => {
+				if (!url) return '';
+				if (url.startsWith('blob:') || url.startsWith('data:')) return url; // don't append to blob/data URLs
+				const sep = url.includes('?') ? '&' : '?';
+				return `${url}${sep}t=${timestamp}`;
+			};
+			const normalized: DatabaseTemplate = {
+				...savedTemplate,
+				front_background: addBuster(baseFront),
+				back_background: addBuster(baseBack)
+			};
+
 			// Check if this is an update or create
-			const existingIndex = templates.findIndex(t => t.id === savedTemplate.id);
+			const existingIndex = templates.findIndex(t => t.id === normalized.id);
 			
 			if (existingIndex >= 0) {
 				// Update existing template
-				templates[existingIndex] = savedTemplate;
-				console.log('📝 Updated template in local list:', savedTemplate.name);
+				templates[existingIndex] = normalized;
+				console.log('📝 Updated template in local list:', normalized.name);
 			} else {
 				// Add new template to the beginning of the list
-				templates = [savedTemplate, ...templates];
-				console.log('➕ Added new template to local list:', savedTemplate.name);
+				templates = [normalized, ...templates];
+				console.log('➕ Added new template to local list:', normalized.name);
 			}
 			
 			// Optional: Fetch fresh data from server to ensure consistency
@@ -636,14 +860,52 @@ import { toast } from 'svelte-sonner';
 		pendingSave = false;
 	}
 
-	async function handleImageUpload(files: File[], side: 'front' | 'back') {
+async function handleImageUpload(files: File[], side: 'front' | 'back') {
 		const file = files[0];
+		const templateKey = (currentTemplate?.id ?? 'temp');
+		const key = imageCache.key(templateKey, side);
+
+		// Store the raw file for later save/crop
 		if (side === 'front') {
 			frontBackground = file;
-			frontPreview = URL.createObjectURL(file);
 		} else {
 			backBackground = file;
-			backPreview = URL.createObjectURL(file);
+		}
+
+		// If we already know the required card dimensions, generate a card-fitted preview now
+		if (requiredPixelDimensions) {
+			try {
+				const position = side === 'front' ? frontBackgroundPosition : backBackgroundPosition;
+				const fittedPreview = await generateCropPreviewUrl(
+					file,
+					requiredPixelDimensions,
+					position
+				);
+				// Use the fitted data URL directly (stable, matches card template)
+				if (side === 'front') {
+					frontPreview = fittedPreview;
+				} else {
+					backPreview = fittedPreview;
+				}
+			} catch (e) {
+				console.warn('Failed to create fitted preview, falling back to blob URL', e);
+				const blobUrl = URL.createObjectURL(file);
+				imageCache.setPreview(key, blobUrl);
+				if (side === 'front') {
+					frontPreview = imageCache.resolve(key);
+				} else {
+					backPreview = imageCache.resolve(key);
+				}
+			}
+		} else {
+			// Dimensions unknown yet, show immediate blob preview and refine later
+			const blobUrl = URL.createObjectURL(file);
+			imageCache.setPreview(key, blobUrl);
+			if (side === 'front') {
+				frontPreview = imageCache.resolve(key);
+			} else {
+				backPreview = imageCache.resolve(key);
+			}
 		}
 
 		// Trigger element creation if elements are empty and dimensions are available
@@ -702,6 +964,8 @@ import { toast } from 'svelte-sonner';
 
 			// Navigate to new URL (this will handle state properly)
 			await goto(`/templates?id=${id}`, { replaceState: true });
+			// Ensure fresh editor mount when switching templates
+			editorVersion++;
 
 			if (data.selectedTemplate) {
 				currentTemplate = data.selectedTemplate;
@@ -783,6 +1047,8 @@ import { toast } from 'svelte-sonner';
 		// Reset currentTemplate to null instead of empty object
 		// This ensures ID generation works correctly for new templates
 		currentTemplate = null;
+		// Clear any cached blob URLs to avoid memory leaks
+		try { imageCache.clear(); } catch {}
 		console.log('✅ EditTemplate: Form cleared');
 	}
 
@@ -815,6 +1081,8 @@ import { toast } from 'svelte-sonner';
 
 		// Enter edit mode
 		isEditMode = true;
+		// Fresh mount for new template
+		editorVersion++;
 
 		console.log('✅ New template created:', {
 			name: templateName,
@@ -887,7 +1155,9 @@ import { toast } from 'svelte-sonner';
 				onCreateNew={handleCreateNewTemplate}
 			/>
 		{:else}
-			<TemplateEdit
+			{#key editorVersion}
+				<TemplateEdit
+				version={editorVersion}
 				{isLoading}
 				{frontElements}
 				{backElements}
@@ -912,6 +1182,7 @@ import { toast } from 'svelte-sonner';
 					}
 				}}
 			/>
+			{/key}
 		{/if}
 	</div>
 

@@ -75,20 +75,46 @@ export const actions = {
 			templateData.user_id = session?.user?.id;
 			templateData.org_id = org_id;
 
-			console.log('🎨 Server: Processing template save:', {
+			// Build a strict payload to avoid accidental schema drift
+			const now = new Date().toISOString();
+			const payload = {
 				id: templateData.id,
-				name: templateData.name,
+				user_id: templateData.user_id,
 				org_id: templateData.org_id,
-				elementsCount: templateData.template_elements?.length
+				name: templateData.name,
+				front_background: templateData.front_background,
+				back_background: templateData.back_background,
+				orientation: templateData.orientation,
+				template_elements: templateData.template_elements,
+				created_at: templateData.created_at ?? now,
+				updated_at: now
+			};
+
+			console.log('🎨 Server: Processing template save:', {
+				id: payload.id,
+				name: payload.name,
+				org_id: payload.org_id,
+				elementsCount: Array.isArray(payload.template_elements) ? payload.template_elements.length : 0
 			});
 
-			// Set the user_id from the session
-
-			const { data, error: dbError } = await supabase
-				.from('templates')
-				.upsert(templateData)
-				.select()
-				.single();
+			// Create or update explicitly to ensure JSONB fields are written
+			let data, dbError;
+			if (payload.id) {
+				// Update existing
+				({ data, error: dbError } = await supabase
+					.from('templates')
+					.update(payload)
+					.eq('id', payload.id)
+					.select('*')
+					.single());
+			} else {
+				// Insert new
+				({ data, error: dbError } = await supabase
+					.from('templates')
+					.insert(payload)
+					.select('*')
+					.single());
+			}
 
 			if (dbError) {
 				console.error('❌ Server: Database error:', dbError);
@@ -103,14 +129,14 @@ export const actions = {
 				id: data.id,
 				name: data.name,
 				org_id: data.org_id,
-				elementsCount: data.template_elements?.length,
-				action: templateData.id ? 'updated' : 'created'
+				elementsCount: Array.isArray(data.template_elements) ? data.template_elements.length : 0,
+				action: payload.id ? 'updated' : 'created'
 			});
 
 			return {
 				success: true,
 				data,
-				message: `Template ${templateData.id ? 'updated' : 'created'} successfully`
+				message: `Template ${payload.id ? 'updated' : 'created'} successfully`
 			};
 		} catch (err) {
 			console.error('❌ Server: Error in create action:', err);

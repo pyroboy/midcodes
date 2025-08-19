@@ -36,14 +36,16 @@ import {
 			y: number;
 			scale: number;
 		}),
-		onUpdateBackgroundPosition = null // (position: {x: number, y: number, scale: number}, side: 'front' | 'back') => void
+		onUpdateBackgroundPosition = null, // (position: {x: number, y: number, scale: number}, side: 'front' | 'back') => void
+		// Optional version bump to force re-derivation of internal caches without remount
+		version = 0
 	} = $props();
 
 	// Calculate dynamic base dimensions
 	let baseDimensions = $derived(() => {
 		if (pixelDimensions && pixelDimensions.width > 0 && pixelDimensions.height > 0) {
-			// Use actual pixel dimensions, scaled down for UI
-			const maxWidth = 700; // Max width for preview
+			// Use actual pixel dimensions, scaled down for UI (align with IdCanvas)
+			const maxWidth = 600; // Max width for preview (must match IdCanvas)
 			const scale = Math.min(maxWidth / pixelDimensions.width, maxWidth / pixelDimensions.height);
 			return {
 				width: pixelDimensions.width * scale,
@@ -109,8 +111,33 @@ import {
 	let endImageLoadTiming: (() => void) | null = null;
 	let endCanvasDrawTiming: (() => void) | null = null;
 
+	function resetInternalCaches(reason: string) {
+		console.log('♻️ Resetting internal caches in TemplateForm due to:', reason);
+		// Destroy and null-out CanvasRenderManager so it can be recreated
+		if (canvasRenderManager) {
+			try { canvasRenderManager.destroy(); } catch {}
+			canvasRenderManager = null;
+		}
+		// Clear caches
+		if (imageCache) {
+			try { imageCache.clearAll?.(); } catch {}
+		}
+		if (coordinateCache) {
+			try { coordinateCache.clear?.(); } catch {}
+		}
+		if (performanceMonitor) {
+			try { performanceMonitor.clear?.(); } catch {}
+		}
+		// Recreate debounced/throttled wrappers to avoid capturing stale state
+		debouncedUpdateBackground = debounce(updateBackgroundPosition, 100);
+		throttledDraw = throttle(drawMainCanvas, 16);
+		debouncedUpdateElements = debounce(updateElements, 50);
+		// Force image to reload on next effect pass
+		lastLoadedPreview = null;
+	}
 
-	// Simplified coordinate system - use preview scale directly
+
+	// Coordinate system scale must mirror the baseDimensions downscale (actual -> preview)
 	let coordSystem = $derived(() => {
 		const currentBase = baseDimensions();
 
@@ -119,8 +146,10 @@ import {
 			return new CoordinateSystem(100, 100, 1); // Default fallback
 		}
 
-		// Use the preview dimensions scale
-		const scale = previewDimensions.scale;
+		// Compute base scale factor between actual pixels and preview pixels
+		const scale = currentBase.width > 0
+			? currentBase.width / currentBase.actualWidth
+			: 1;
 
 		return new CoordinateSystem(currentBase.actualWidth, currentBase.actualHeight, scale);
 	});
@@ -135,11 +164,11 @@ import {
 			return previewDimensions;
 		}
 
-		const parentWidth = templateContainer.parentElement.offsetWidth;
-		const containerWidth = Math.min(parentWidth, currentBase.width);
-		const containerHeight = (containerWidth / currentBase.width) * currentBase.height;
+		// Use fixed base preview size to match IdCanvas scaling (avoid parent-driven resizes)
+		const containerWidth = currentBase.width;
+		const containerHeight = currentBase.height;
 
-		const scale = containerWidth / currentBase.width;
+		const scale = 1; // Already scaled by baseDimensions; keep 1:1 here to match IdCanvas
 
 
 		previewDimensions = {
@@ -297,6 +326,22 @@ import {
 			console.log('🔄 Canvas ready - loading pending image:', preview);
 			lastLoadedPreview = preview;
 			loadMainImage();
+		}
+	});
+
+	// When version changes, explicitly re-derive internal caches without requiring a remount
+	$effect(() => {
+		// Access version to create a dependency
+		const v = version;
+		if (v !== undefined) {
+			resetInternalCaches('version changed');
+			// If canvas is available, allow CanvasRenderManager to be reinitialized by existing effects
+			// and trigger a redraw once image is (re)loaded
+			if (preview && mainCtx) {
+				loadMainImage();
+			} else if (canvasRenderManager) {
+				canvasRenderManager.markDirty();
+			}
 		}
 	});
 	
