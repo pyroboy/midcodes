@@ -544,15 +544,15 @@
 							></div>
 						{/if}
 						
-							<!-- Template area center point indicator (center of red box) -->
-							<div 
-								class="template-center-indicator" 
-								style="left: {frame.x + frame.width/2}px; top: {frame.y + frame.height/2}px;">
-								🎯
-							</div>
-							
-							<!-- Crop preview overlay -->
-							{#if isDragging && debugMode}
+						<!-- Template area center point indicator (center of red box) -->
+						<div 
+							class="template-center-indicator" 
+							style="left: 50%; top: 50%;">
+							🎯
+						</div>
+						
+						<!-- Crop preview overlay -->
+						{#if isDragging && debugMode}
 								<div class="crop-preview">
 									<div class="preview-indicator">
 										<span>Crop: {Math.round(frame.width)}×{Math.round(frame.height)}px</span>
@@ -962,8 +962,7 @@
 		position: absolute;
 		font-size: 16px;
 		transition: all 0.2s ease;
-		margin-left: -8px;
-		margin-top: -16px;
+		transform: translate(-50%, -50%); /* Center the emoji on the exact center point */
 		filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
 		z-index: 12;
 		pointer-events: none;

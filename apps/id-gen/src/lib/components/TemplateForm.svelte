@@ -262,18 +262,41 @@ import {
 			lastLoadedPreview,
 			hasMainCtx: !!mainCtx,
 			previewWidth: previewDimensions.width,
-			side
+			side,
+			urlChanged: preview !== lastLoadedPreview
 		});
 		
 		// Only reload if preview URL actually changed
-		if (preview && preview !== lastLoadedPreview && mainCtx && previewDimensions.width > 0) {
-			console.log('🖼️ Loading main canvas image (URL changed):', preview);
-			lastLoadedPreview = preview;
-			loadMainImage();
+		if (preview && preview !== lastLoadedPreview) {
+			if (mainCtx && previewDimensions.width > 0) {
+				console.log('🖼️ Loading main canvas image (URL changed):', preview);
+				lastLoadedPreview = preview;
+				loadMainImage();
+			} else {
+				console.log('⏳ Delaying image load - waiting for canvas setup:', {
+					hasMainCtx: !!mainCtx,
+					previewWidth: previewDimensions.width
+				});
+				// Don't update lastLoadedPreview yet, so it will retry when canvas is ready
+			}
 		} else if (!preview) {
 			console.log('⚠️ No preview URL provided for', side);
+			// Clear the image when preview is removed
+			mainImageElement = null;
+			loadedImageSize = null;
+			lastLoadedPreview = null;
 		} else if (preview === lastLoadedPreview) {
 			console.log('ℹ️ Preview URL unchanged, skipping reload:', preview);
+		}
+	});
+	
+	// Additional effect to retry loading when canvas becomes ready
+	$effect(() => {
+		// Retry loading if we have a preview URL but haven't loaded it yet due to canvas not being ready
+		if (preview && preview !== lastLoadedPreview && mainCtx && previewDimensions.width > 0) {
+			console.log('🔄 Canvas ready - loading pending image:', preview);
+			lastLoadedPreview = preview;
+			loadMainImage();
 		}
 	});
 	
@@ -452,8 +475,15 @@ import {
 		
 		console.log('🔄 Loading main image:', preview);
 		
-		// Clear previous image
+		// Clear previous image and canvas
 		mainImageElement = null;
+		loadedImageSize = null;
+		
+		// Immediately clear the canvas to show loading state
+		if (mainCtx && previewDimensions.width > 0 && previewDimensions.height > 0) {
+			mainCtx.clearRect(0, 0, previewDimensions.width, previewDimensions.height);
+			console.log('🧹 Cleared canvas for new image load');
+		}
 		
 		// Start performance tracking
 		const stopTiming = performanceMonitor?.startTiming('imageLoad');
@@ -476,8 +506,9 @@ import {
 				loadedImageSize = { width: img.naturalWidth, height: img.naturalHeight };
 				// Cache the loaded image
 				imageCache?.set(preview, img);
-				// Use throttled draw for better performance
-				throttledDraw();
+				// Force immediate draw for new image (not throttled)
+				console.log('🎨 Forcing immediate canvas redraw for new image');
+				drawMainCanvas();
 			} else {
 				console.error('❌ Image loaded but has invalid dimensions');
 				loadedImageSize = null;
