@@ -137,44 +137,45 @@
 	function drawThumbnail() {
 		if (!ctx || !imageElement) return;
 
+		const thumbDims = thumbnailDimensions();
+		
 		// Clear canvas
-		ctx.clearRect(0, 0, THUMB_SIZE, THUMB_SIZE);
+		ctx.clearRect(0, 0, thumbDims.width, thumbDims.height);
 		
 		// Reset transforms
 		ctx.resetTransform();
 		
-		// If we have template dimensions and position, draw with cover behavior like main template
+		// If we have template dimensions and position, draw with exact same logic as main template
 		if (templateDimensions.width > 0 && templateDimensions.height > 0) {
 			const imageDims: Dims = {
 				width: imageElement.naturalWidth,
 				height: imageElement.naturalHeight
 			};
 			
-			// Use square thumbnail as container for calculations
-			const thumbContainerDims: Dims = {
-				width: THUMB_SIZE,
-				height: THUMB_SIZE
-			};
+			// Use aspect-matched thumbnail dimensions (same aspect ratio as template)
+			const thumbContainerDims: Dims = thumbDims;
 			
-			// Calculate cover dimensions for the thumbnail
-			const { s0, coverW, coverH } = coverBase(imageDims, thumbContainerDims);
+			// Calculate cover dimensions using same logic as main template
+			const scaleX = thumbContainerDims.width / imageDims.width;
+			const scaleY = thumbContainerDims.height / imageDims.height;
+			const baseCoverScale = Math.max(scaleX, scaleY);
 			
-			// Apply user scale on top of cover scale (same as main template logic)
-			const finalScale = s0 * position.scale;
+			// Apply user scale on top of cover scale (identical to main template)
+			const finalScale = baseCoverScale * position.scale;
 			const finalWidth = imageDims.width * finalScale;
 			const finalHeight = imageDims.height * finalScale;
 			
-			// Calculate center position with user offset (same as main template logic)
-			const centerX = THUMB_SIZE / 2;
-			const centerY = THUMB_SIZE / 2;
+			// Calculate center position with user offset (identical to main template)
+			const centerX = thumbContainerDims.width / 2;
+			const centerY = thumbContainerDims.height / 2;
 			
-			// Scale the position offset to thumbnail size
-			// The position values are in template coordinates, scale them to thumbnail
-			const scaleToThumb = THUMB_SIZE / Math.max(templateDimensions.width, templateDimensions.height);
-			const thumbOffsetX = position.x * scaleToThumb;
-			const thumbOffsetY = position.y * scaleToThumb;
+			// Since aspect ratios match, scale position directly proportional to container size
+			const scaleFactorX = thumbContainerDims.width / templateDimensions.width;
+			const scaleFactorY = thumbContainerDims.height / templateDimensions.height;
+			const thumbOffsetX = position.x * scaleFactorX;
+			const thumbOffsetY = position.y * scaleFactorY;
 			
-			// Calculate final position (center + user offset - half of scaled image size)
+			// Use same positioning logic as CSS: calc(50% + offset) - half of scaled image
 			const drawX = centerX + thumbOffsetX - finalWidth / 2;
 			const drawY = centerY + thumbOffsetY - finalHeight / 2;
 			
@@ -183,21 +184,21 @@
 		} else {
 			// Fallback: draw the entire image with object-fit: contain
 			const imgAspect = imageElement.naturalWidth / imageElement.naturalHeight;
-			const thumbAspect = 1; // Square thumbnail
+			const thumbAspect = thumbDims.width / thumbDims.height;
 			
 			let drawWidth, drawHeight, offsetX, offsetY;
 			
 			if (imgAspect > thumbAspect) {
 				// Image is wider - fit to width
-				drawWidth = THUMB_SIZE;
-				drawHeight = THUMB_SIZE / imgAspect;
+				drawWidth = thumbDims.width;
+				drawHeight = thumbDims.width / imgAspect;
 				offsetX = 0;
-				offsetY = (THUMB_SIZE - drawHeight) / 2;
+				offsetY = (thumbDims.height - drawHeight) / 2;
 			} else {
 				// Image is taller - fit to height
-				drawHeight = THUMB_SIZE;
-				drawWidth = THUMB_SIZE * imgAspect;
-				offsetX = (THUMB_SIZE - drawWidth) / 2;
+				drawHeight = thumbDims.height;
+				drawWidth = thumbDims.height * imgAspect;
+				offsetX = (thumbDims.width - drawWidth) / 2;
 				offsetY = 0;
 			}
 			
@@ -208,7 +209,7 @@
 		// Draw border
 		ctx.strokeStyle = '#e5e7eb';
 		ctx.lineWidth = 1;
-		ctx.strokeRect(0.5, 0.5, THUMB_SIZE - 1, THUMB_SIZE - 1);
+		ctx.strokeRect(0.5, 0.5, thumbDims.width - 1, thumbDims.height - 1);
 	}
 
 	function handleStart(event: MouseEvent | TouchEvent, mode: 'move' | 'resize') {
@@ -297,8 +298,9 @@
 		
 		const containerDims: Dims = templateDimensions;
 		const positionData: BackgroundPosition = position;
+		const thumbDims = thumbnailDimensions();
 		
-		return calculateCropFrame(imageDims, containerDims, positionData, THUMB_SIZE);
+		return calculateCropFrame(imageDims, containerDims, positionData, Math.max(thumbDims.width, thumbDims.height));
 	});
 	
 	// Validation for debugging
@@ -455,11 +457,11 @@
 
 <div class="background-thumbnail" class:disabled class:dragging={isDragging}>
 	<div class="thumbnail-container">
-		<div class="thumbnail-wrapper" style="--thumb-size: {THUMB_SIZE}px;">
+		<div class="thumbnail-wrapper" style="--thumb-width: {thumbnailDimensions().width}px; --thumb-height: {thumbnailDimensions().height}px;">
 			<canvas
 				bind:this={canvas}
-				width={THUMB_SIZE}
-				height={THUMB_SIZE}
+				width={thumbnailDimensions().width}
+				height={thumbnailDimensions().height}
 				class="thumbnail-canvas"
 			></canvas>
 			
@@ -639,8 +641,8 @@
 		border-radius: 6px;
 		overflow: hidden;
 		background: #f9fafb;
-		width: var(--thumb-size, 150px);
-		height: var(--thumb-size, 150px);
+		width: var(--thumb-width, 150px);
+		height: var(--thumb-height, 150px);
 	}
 
 	.thumbnail-canvas {
