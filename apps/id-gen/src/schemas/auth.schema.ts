@@ -35,20 +35,20 @@ export const resetPasswordSchema = z.object({
 	path: ['confirm_password']
 });
 
-// User profile schemas (profiles table)
+// User profile schemas (profiles table - matches actual database schema)
 export const userProfileSchema = z.object({
 	id: z.string().uuid(),
-	email: z.string().email(),
-	role: userRoleSchema,
-	created_at: z.string().datetime(),
-	updated_at: z.string().datetime(),
+	email: z.string().email().nullable(),
+	role: userRoleSchema.nullable(),
+	created_at: z.string().datetime().nullable(),
+	updated_at: z.string().datetime().nullable(),
 	org_id: z.string().uuid().nullable(),
 	context: z.record(z.string(), z.any()).nullable(),
-	credits_balance: z.number().default(0),
-	card_generation_count: z.number().default(0),
-	template_count: z.number().default(0),
-	unlimited_templates: z.boolean().default(false),
-	remove_watermarks: z.boolean().default(false)
+	credits_balance: z.number().int(),
+	card_generation_count: z.number().int(),
+	template_count: z.number().int(),
+	unlimited_templates: z.boolean(),
+	remove_watermarks: z.boolean()
 });
 
 export const userProfileUpdateSchema = z.object({

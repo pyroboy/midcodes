@@ -1,17 +1,12 @@
 import { z } from 'zod';
 
-// Organization creation schema
+// Organization creation schema (matches actual database schema)
 export const organizationCreationSchema = z.object({
 	name: z
 		.string()
 		.min(1, 'Organization name is required')
 		.max(100, 'Organization name must be less than 100 characters')
-		.trim(),
-	description: z
-		.string()
-		.max(500, 'Description must be less than 500 characters')
-		.optional(),
-	settings: z.record(z.string(), z.any()).default({})
+		.trim()
 });
 
 // Organization database schema (matches organizations table)
@@ -21,17 +16,15 @@ export const organizationDataSchema = organizationCreationSchema.extend({
 	updated_at: z.string().datetime().optional()
 });
 
-// Organization response schema
+// Organization response schema (matches actual database structure)
 export const organizationResponseSchema = z.object({
 	id: z.string().uuid(),
 	name: z.string(),
-	description: z.string().nullable(),
-	settings: z.record(z.string(), z.any()).nullable(),
 	created_at: z.string().datetime(),
 	updated_at: z.string().datetime()
 });
 
-// Organization update schema
+// Organization update schema (matches database schema)
 export const organizationUpdateSchema = z.object({
 	id: z.string().uuid(),
 	name: z
@@ -39,12 +32,7 @@ export const organizationUpdateSchema = z.object({
 		.min(1, 'Organization name is required')
 		.max(100, 'Organization name must be less than 100 characters')
 		.trim()
-		.optional(),
-	description: z
-		.string()
-		.max(500, 'Description must be less than 500 characters')
-		.optional(),
-	settings: z.record(z.string(), z.any()).optional()
+		.optional()
 });
 
 // Organization settings schema (org_settings table)

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { templateElementSchema } from './template-element.schema.js';
 import { dpiSchema, pixelDimensionSchema } from './template-creation.schema.js';
 
-// Template update input schema (what user can modify)
+// Template update input schema (what user can modify - matches database)
 export const templateUpdateInputSchema = z.object({
 	name: z
 		.string()
@@ -10,19 +10,17 @@ export const templateUpdateInputSchema = z.object({
 		.max(100, 'Template name must be less than 100 characters')
 		.trim()
 		.optional(),
-	description: z
-		.string()
-		.max(500, 'Description must be less than 500 characters')
-		.optional(),
 	width_pixels: pixelDimensionSchema.optional(),
 	height_pixels: pixelDimensionSchema.optional(),
 	dpi: dpiSchema.optional(),
 	orientation: z.enum(['landscape', 'portrait']).optional(),
 	template_elements: z.array(templateElementSchema).optional(),
-	front_background: z.string().url('Front background must be a valid URL').optional(),
-	back_background: z.string().url('Back background must be a valid URL').optional(),
-	front_background_url: z.string().url().optional(),
-	back_background_url: z.string().url().optional()
+	front_background: z.string().optional(), // Can be URL or path
+	back_background: z.string().optional(), // Can be URL or path
+	// Legacy fields (existing in database)
+	unit_type: z.string().optional(),
+	unit_width: z.number().optional(),
+	unit_height: z.number().optional()
 });
 
 // Complete template update schema (includes system fields)
