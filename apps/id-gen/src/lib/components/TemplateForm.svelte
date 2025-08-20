@@ -10,7 +10,6 @@ import { createAdaptiveElements } from '$lib/utils/adaptiveElements';
 import { cssForBackground, clampBackgroundPosition, computeDraw, computeContainerViewportInImage } from '$lib/utils/backgroundGeometry';
 import type { Dims } from '$lib/utils/backgroundGeometry';
 import { browser } from '$app/environment';
-import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
 import { 
 	debounce, 
 	throttle, 
@@ -65,7 +64,9 @@ import {
 
 	let files: File[] = $state([]);
 	let isDragging = false;
-	let isResizing = false;
+let isResizing = false;
+// Shared hover state between canvas and element list
+let hoveredElementId: string | null = $state(null);
 	let startX: number, startY: number;
 	let currentElementIndex: number | null = null;
 	let resizeHandle: string | null = null;
@@ -87,14 +88,6 @@ import {
 		scale: 1
 	});
 
-	// Debug state for visual feedback verification
-	let debugState = $state({
-		lastUpdate: Date.now(),
-		position: backgroundPosition,
-		previewBounds: null as DOMRect | null,
-		cssValues: { size: '', position: '' },
-		enabled: true // Enable debug by default
-	});
 
 	// Performance optimization instances
 	let canvasRenderManager: CanvasRenderManager | null = null;
@@ -657,46 +650,6 @@ import {
 			onUpdateBackgroundPosition(backgroundPosition, side);
 		}
 
-		// Debug logging
-		if (debugState.enabled && browser) {
-			const container = { width: previewDimensions.width, height: previewDimensions.height };
-			const image = { width: currentBase.actualWidth, height: currentBase.actualHeight };
-			
-				const newCssValues = { 
-					size: 'canvas-only', 
-					position: 'canvas-only' 
-				};
-
-			console.log('🎯 Background Position Updated:', {
-				position: backgroundPosition,
-				cssValues: newCssValues,
-				containerDims: container,
-				imageDims: image
-			});
-
-			// Update debug state
-			debugState = {
-				...debugState,
-				lastUpdate: Date.now(),
-				position: { ...backgroundPosition },
-				previewBounds: templateContainer?.getBoundingClientRect() || null,
-				cssValues: newCssValues
-			};
-
-			// Debug info for logging
-			const debugInfo: DebugInfo = {
-				component: 'TemplateForm',
-				position: backgroundPosition,
-				cssValues: newCssValues,
-				timestamp: Date.now()
-			};
-
-			logDebugInfo(debugInfo);
-
-			window.dispatchEvent(new CustomEvent('background-position-update', {
-				detail: debugInfo
-			}));
-		}
 	}
 
 	let elementStyle = $derived((element: TemplateElement) => {
@@ -776,60 +729,6 @@ import {
 				{/if}
 				
 				<!-- Elements overlay layer -->
-				{#if debugState.enabled && preview}
-					<div class="debug-overlay">
-						<!-- Background position indicator (user offset from center) -->
-						<div 
-							class="position-indicator" 
-							style="left: calc(50% + {backgroundPosition.x}px); 
-							       top: calc(50% + {backgroundPosition.y}px);">
-							📍
-						</div>
-						
-						<!-- Template center point (50%, 50%) -->
-						<div 
-							class="template-center-indicator" 
-							style="left: 50%; top: 50%;">
-							🎯
-						</div>
-						
-						<!-- Crop frame boundaries (simplified visualization) -->
-						<div class="crop-bounds-indicator">
-							<div class="crop-info">
-								Template: {baseDimensions().actualWidth}×{baseDimensions().actualHeight}px
-								<br>Position: {Math.round(backgroundPosition.x)}, {Math.round(backgroundPosition.y)}
-								<br>Scale: {(backgroundPosition.scale * 100).toFixed(0)}%
-								<br><br><strong>Main Canvas Red Box Corners:</strong>
-								{#if mainImageElement && previewDimensions.width > 0}
-									{@const imageDims = { width: mainImageElement.naturalWidth, height: mainImageElement.naturalHeight }}
-									{@const containerDims = { width: previewDimensions.width, height: previewDimensions.height }}
-									{@const { drawW, drawH, topLeft } = computeDraw(imageDims, containerDims, backgroundPosition)}
-									<br>Top-Left: ({Math.round(topLeft.x)}, {Math.round(topLeft.y)})
-									<br>Top-Right: ({Math.round(topLeft.x + drawW)}, {Math.round(topLeft.y)})
-									<br>Bottom-Left: ({Math.round(topLeft.x)}, {Math.round(topLeft.y + drawH)})
-									<br>Bottom-Right: ({Math.round(topLeft.x + drawW)}, {Math.round(topLeft.y + drawH)})
-									<br>Box Size: {Math.round(drawW)}×{Math.round(drawH)}px
-								{:else}
-									<br>Corners: (not calculated)
-								{/if}
-								<br><br><strong>Loaded Image Size:</strong>
-								{#if loadedImageSize}
-									<br>{loadedImageSize.width}×{loadedImageSize.height}px
-								{:else}
-									<br>No image loaded
-								{/if}
-							</div>
-						</div>
-						<div class="debug-controls">
-							<button 
-								class="debug-button" 
-								title="Toggle debug overlay"
-								onclick={() => debugState.enabled = false}>
-								❌ Debug
-							</button>
-						</div>
-					</div>
-				{/if}
 				{#if !preview}
 					<label class="placeholder-design clickable-container">
 						<input
@@ -885,14 +784,17 @@ import {
 				<div class="elements-overlay">
 					{#each elements as element, i}
 						<div
-							class="template-element {element.type}"
-							style={Object.entries(elementStyle(element))
-								.map(([key, value]) => `${key}: ${value}`)
-								.join(';')}
-							onmousedown={(e) => onMouseDown(e, i)}
-							role="button"
-							tabindex="0"
-							aria-label="{element.type} element"
+						class="template-element {element.type}"
+						class:highlighted={hoveredElementId === element.id}
+						style={Object.entries(elementStyle(element))
+							.map(([key, value]) => `${key}: ${value}`)
+							.join(';')}
+						onmouseenter={() => (hoveredElementId = element.id)}
+						onmouseleave={() => (hoveredElementId = null)}
+						onmousedown={(e) => onMouseDown(e, i)}
+						role="button"
+						tabindex="0"
+						aria-label="{element.type} element"
 						>
 							{#if element.type === 'text' || element.type === 'selection'}
 								<span
@@ -954,17 +856,6 @@ import {
 						<X class="w-4 h-4" />
 					</Button>
 					
-					{#if !debugState.enabled}
-						<Button
-							variant="outline"
-							size="icon"
-							class="debug-toggle"
-							onclick={() => debugState.enabled = true}
-							title="Enable debug mode"
-						>
-							🐛
-						</Button>
-					{/if}
 					</div> <!-- Close elements-overlay -->
 				{/if}
 			</div>
@@ -978,7 +869,9 @@ import {
 			bind:backgroundPosition
 			{onUpdateBackgroundPosition}
 			{cardSize}
-			{pixelDimensions}
+{pixelDimensions}
+		hoveredElementId={hoveredElementId}
+onHoverElement={(id) => { hoveredElementId = id; }}
 		/>
 	</div>
 </div>
@@ -1110,13 +1003,21 @@ import {
 		background-size: 20px 20px;
 	}
 
-	.template-element {
+.template-element {
 		position: absolute;
 		cursor: move;
 		border: 1px solid cyan;
 		box-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
 		box-sizing: border-box;
 		opacity: 0.5;
+		transition: opacity 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+	}
+
+	.template-element.highlighted,
+	.template-element:hover {
+		opacity: 1;
+		box-shadow: 0 0 10px rgba(0, 255, 255, 0.9);
+		border-color: #0ff;
 	}
 
 	.template-element:hover {
@@ -1188,81 +1089,14 @@ import {
 		z-index: 10;
 	}
 
-	.debug-toggle {
-		position: absolute;
-		top: 10px;
-		right: 50px;
-		z-index: 10;
-		font-size: 12px;
-	}
 	
-	.debug-overlay {
-		position: absolute;
-		inset: 0;
-		pointer-events: none;
-		z-index: 100;
-	}
 	
-	.position-indicator {
-		position: absolute;
-		font-size: 20px;
-		transition: all 0.2s ease;
-		margin-left: -10px;
-		margin-top: -20px;
-		filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
-	}
 	
-	.debug-controls {
-		position: absolute;
-		top: 50px;
-		right: 10px;
-		z-index: 101;
-		pointer-events: auto;
-	}
 	
-	.debug-button {
-		background: rgba(0, 0, 0, 0.7);
-		color: white;
-		border: none;
-		padding: 4px 8px;
-		border-radius: 4px;
-		font-size: 12px;
-		cursor: pointer;
-	}
 	
-	.debug-button:hover {
-		background: rgba(0, 0, 0, 0.9);
-	}
 	
-	.template-center-indicator {
-		position: absolute;
-		font-size: 24px;
-		transition: all 0.2s ease;
-		margin-left: -12px;
-		margin-top: -24px;
-		filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
-		z-index: 102;
-	}
 	
-	.crop-bounds-indicator {
-		position: absolute;
-		top: 10px;
-		left: 10px;
-		z-index: 101;
-		pointer-events: none;
-	}
 	
-	.crop-info {
-		background: rgba(0, 0, 0, 0.8);
-		color: white;
-		padding: 6px 10px;
-		border-radius: 4px;
-		font-size: 11px;
-		font-family: monospace;
-		line-height: 1.4;
-		border: 1px solid rgba(255, 255, 255, 0.2);
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-	}
 
 	.resize-handle.top-left {
 		top: -4px;

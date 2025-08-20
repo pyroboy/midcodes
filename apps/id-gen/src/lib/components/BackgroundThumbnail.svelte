@@ -30,15 +30,7 @@
 	let isDragging = $state(false);
 	let imageElement: HTMLImageElement | null = $state(null);
 	
-	// Debug state for visual feedback verification
-	let debugState = $state({
-		lastUpdate: Date.now(),
-		position,
-		cropFrameInfo: null as any,
-		validationInfo: true,
-		enabled: true // Enable debug by default
-	});
-	
+
 	// Calculate thumbnail dimensions to match selected image aspect ratio
 	const thumbnailDimensions = $derived(() => {
 		if (imageElement && imageElement.naturalWidth > 0 && imageElement.naturalHeight > 0) {
@@ -71,33 +63,6 @@
 	// Legacy THUMB_SIZE for compatibility (use width as primary dimension)
 	const THUMB_SIZE = $derived(thumbnailDimensions().width);
 
-	// Only log debug info when explicitly called, not on reactive updates
-	function logThumbnailDebug(isUserInteraction = false) {
-		if (debugState.enabled && browser && isUserInteraction) {
-			// Update debug state
-			debugState = {
-				...debugState,
-				lastUpdate: Date.now(),
-				position: { ...position },
-				cropFrameInfo: cropFrame(),
-				validationInfo: isValidCropAlignment()
-			};
-
-			// Broadcast position update for debugging
-			const debugInfo: DebugInfo = {
-				component: 'BackgroundThumbnail',
-				position,
-				cropFrame: debugState.cropFrameInfo,
-				timestamp: Date.now()
-			};
-
-			logDebugInfo(debugInfo);
-
-			window.dispatchEvent(new CustomEvent('background-position-update', {
-				detail: debugInfo
-			}));
-		}
-	}
 
 	// Listen for position updates from other components
 	onMount(() => {
@@ -296,8 +261,7 @@
 
 				onPositionChange(position);
 				
-				// Log debug info for user interaction
-				logThumbnailDebug(true);
+
 		}
 
 		function handleEnd() {
@@ -320,9 +284,7 @@
 		const newPosition = { x: 0, y: 0, scale: 1 };
 		position = newPosition;
 		onPositionChange(newPosition);
-		
-		// Log debug info for user interaction
-		logThumbnailDebug(true);
+
 	}
 
 	// Calculate crop frame to show template boundaries using GROUND TRUTH function
@@ -347,23 +309,7 @@
 		// Then map to thumbnail coordinates using the ground truth mapping function
 		const thumbnailRect = mapImageRectToThumb(viewportRect, imageDims, thumbDims);
 		
-		// ✅ DEBUG: Log the coordinate transformation for verification
-		if (debugState.enabled && browser) {
-			console.log('🎯 Crop Frame Calculation:', {
-				position,
-				imageDims,
-				containerDims,
-				thumbDims,
-				viewportRect,
-				thumbnailRect,
-				mappedResult: {
-					x: Math.round(thumbnailRect.x * 100) / 100,
-					y: Math.round(thumbnailRect.y * 100) / 100,
-					width: Math.round(thumbnailRect.width * 100) / 100,
-					height: Math.round(thumbnailRect.height * 100) / 100
-				}
-			});
-		}
+
 		
 		// The viewport can extend beyond image bounds, so we don't clamp to thumbnail bounds
 		// This allows the red box to show the true container viewport position
@@ -505,8 +451,6 @@
 
 			onPositionChange(position);
 			
-			// Log debug info for user interaction
-			logThumbnailDebug(true);
 		}
 
 		function handleEnd() {
@@ -603,9 +547,7 @@
 			
 			position = clampedPos;
 			onPositionChange(clampedPos);
-			
-			// Log debug info for user interaction
-			logThumbnailDebug(true);
+
 		}
 		
 		function handleEnd() {
@@ -719,12 +661,7 @@
 							></div>
 						{/if}
 						
-						<!-- Template area center point indicator (center of red box) -->
-						<div 
-							class="template-center-indicator" 
-							style="left: 50%; top: 50%; pointer-events: none;">
-							🎯
-						</div>
+				
 						
 						<!-- Crop preview overlay -->
 						{#if isDragging && debugMode}
@@ -777,84 +714,10 @@
 			<RotateCcw size={14} />
 		</button>
 		
-		<button
-			class="control-handle debug-handle"
-			class:active={debugState.enabled}
-			onclick={() => debugState.enabled = !debugState.enabled}
-			disabled={disabled}
-			title="Toggle debug mode"
-		>
-			<BugPlay size={14} />
-		</button>
+
 	</div>
 
-	<!-- Position info -->
-	{#if !disabled}
-		<div class="position-info">
-			<div class="info-row">
-				<span class="info-label">Position:</span>
-				<span class="info-value">{Math.round(position.x)}, {Math.round(position.y)}</span>
-			</div>
-			<div class="info-row">
-				<span class="info-label">Scale:</span>
-				<span class="info-value">{(position.scale * 100).toFixed(0)}%</span>
-			</div>
-			{#if cropFrame()}
-				{@const frame = cropFrame()!}
-				<div class="info-row">
-					<span class="info-label"><strong>Red Box Corners:</strong></span>
-					<span class="info-value"></span>
-				</div>
-				<div class="info-row">
-					<span class="info-label">Top-Left:</span>
-					<span class="info-value">
-						({Math.round(frame.x)}, {Math.round(frame.y)})
-					</span>
-				</div>
-				<div class="info-row">
-					<span class="info-label">Top-Right:</span>
-					<span class="info-value">
-						({Math.round(frame.x + frame.width)}, {Math.round(frame.y)})
-					</span>
-				</div>
-				<div class="info-row">
-					<span class="info-label">Bottom-Left:</span>
-					<span class="info-value">
-						({Math.round(frame.x)}, {Math.round(frame.y + frame.height)})
-					</span>
-				</div>
-				<div class="info-row">
-					<span class="info-label">Bottom-Right:</span>
-					<span class="info-value">
-						({Math.round(frame.x + frame.width)}, {Math.round(frame.y + frame.height)})
-					</span>
-				</div>
-			{/if}
-			{#if debugMode && cropFrame()}
-				{@const frame = cropFrame()!}
-				<div class="debug-info">
-					<div class="info-row">
-						<span class="info-label">Crop Frame:</span>
-						<span class="info-value">
-							x={Math.round(frame.x)}, y={Math.round(frame.y)}
-						</span>
-					</div>
-					<div class="info-row">
-						<span class="info-label">Crop Size:</span>
-						<span class="info-value">
-							{Math.round(frame.width)}×{Math.round(frame.height)}
-						</span>
-					</div>
-					<div class="info-row">
-						<span class="info-label">Valid:</span>
-						<span class="info-value" class:valid={isValidCropAlignment()} class:invalid={!isValidCropAlignment()}>
-							{isValidCropAlignment() ? 'Yes' : 'No'}
-						</span>
-					</div>
-				</div>
-			{/if}
-		</div>
-	{/if}
+
 </div>
 
 <style>
@@ -1009,68 +872,9 @@
 		cursor: se-resize;
 	}
 
-	.debug-handle {
-		color: #6b7280;
-	}
 
-	.debug-handle.active {
-		background: #3b82f6;
-		border-color: #2563eb;
-		color: white;
-	}
 
-	.debug-handle:not(:disabled):hover {
-		background: #e5e7eb;
-		border-color: #9ca3af;
-		color: #374151;
-	}
 
-	.debug-handle.active:not(:disabled):hover {
-		background: #2563eb;
-		border-color: #1d4ed8;
-		color: white;
-	}
-
-	.position-info {
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-		font-size: 11px;
-		color: #6b7280;
-	}
-
-	.info-row {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-	}
-
-	.info-label {
-		font-weight: 500;
-	}
-
-	.info-value {
-		font-family: monospace;
-		background: #f3f4f6;
-		padding: 1px 4px;
-		border-radius: 3px;
-	}
-
-	.debug-info {
-		border-top: 1px solid #e5e7eb;
-		padding-top: 4px;
-		margin-top: 4px;
-	}
-
-	.info-value.valid {
-		background: #dcfce7;
-		color: #16a34a;
-	}
-
-	.info-value.invalid {
-		background: #fee2e2;
-		color: #dc2626;
-	}
 
 	/* Resize Handles */
 	.resize-handle {
@@ -1167,14 +971,5 @@
 		transition: none;
 	}
 	
-	/* Template center indicator */
-	.template-center-indicator {
-		position: absolute;
-		font-size: 16px;
-		transition: all 0.2s ease;
-		transform: translate(-50%, -50%); /* Center the emoji on the exact center point */
-		filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
-		z-index: 12;
-		pointer-events: none;
-	}
+
 </style>

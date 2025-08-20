@@ -11,7 +11,7 @@ import { computeVisibleRectInImage, mapImageRectToThumb, clampBackgroundPosition
 import type { Dims } from '$lib/utils/backgroundGeometry';
 import BackgroundThumbnail from './BackgroundThumbnail.svelte';
 
-	let {
+let {
 		elements,
 		onUpdateElements,
 		fontOptions,
@@ -20,7 +20,9 @@ import BackgroundThumbnail from './BackgroundThumbnail.svelte';
 		backgroundPosition = $bindable({ x: 0, y: 0, scale: 1 }),
 		onUpdateBackgroundPosition = null,
 		cardSize = null,
-		pixelDimensions = null
+		pixelDimensions = null,
+		hoveredElementId = null as string | null,
+		onHoverElement = null as ((id: string | null) => void) | null
 	} = $props<{
 		elements: TemplateElement[];
 		onUpdateElements: (elements: TemplateElement[], side: 'front' | 'back') => void;
@@ -33,6 +35,8 @@ import BackgroundThumbnail from './BackgroundThumbnail.svelte';
 			| null;
 		cardSize?: any;
 		pixelDimensions?: { width: number; height: number } | null;
+		hoveredElementId?: string | null;
+		onHoverElement?: (id: string | null) => void | null;
 	}>();
 
 	let variableNameErrors: { [key: number]: string } = $state({});
@@ -130,15 +134,6 @@ import BackgroundThumbnail from './BackgroundThumbnail.svelte';
 	let expandedElementIndex: number | null = $state(null);
 	let backgroundExpanded = $state(false);
 
-	// Debug logging to see what props are being passed
-	console.log('ElementList props:', {
-		side,
-		preview: preview ? 'present' : 'null',
-		pixelDimensions,
-		backgroundPosition,
-		backgroundExpanded
-	});
-
 	function toggleElement(index: number) {
 		expandedElementIndex = expandedElementIndex === index ? null : index;
 	}
@@ -223,12 +218,14 @@ import BackgroundThumbnail from './BackgroundThumbnail.svelte';
 	{/if}
 
 	<!-- Elements List -->
-	{#each elements as element, i}
-		<div class="element-item">
-			<div
+{#each elements as element, i}
+		<div class="element-item" class:highlighted={hoveredElementId === element.id}>
+<div
 				class="element-header"
 				role="button"
 				tabindex="0"
+				onmouseenter={() => onHoverElement?.(element.id)}
+				onmouseleave={() => onHoverElement?.(null)}
 				onclick={() => toggleElement(i)}
 				onkeydown={(e) => {
 					if (e.key === 'Enter' || e.key === ' ') {
@@ -345,12 +342,17 @@ import BackgroundThumbnail from './BackgroundThumbnail.svelte';
 		overflow-y: auto;
 	}
 
-	.element-item {
+.element-item {
 		background-color: #2d2d2d;
 		border-radius: 0.375rem;
 		margin-bottom: 0.25rem;
 		overflow: hidden;
-	}
+}
+
+.element-item.highlighted .element-header {
+		background-color: #4a4a4a;
+		box-shadow: 0 0 0 1px rgba(0,255,255,0.4) inset, 0 0 8px rgba(0,255,255,0.35);
+}
 
 	.element-header {
 		display: flex;
@@ -363,9 +365,9 @@ import BackgroundThumbnail from './BackgroundThumbnail.svelte';
 		min-height: 2rem;
 	}
 
-	.element-header:hover {
+.element-header:hover {
 		background-color: #404040;
-	}
+}
 
 	.header-content {
 		display: flex;
@@ -499,9 +501,5 @@ import BackgroundThumbnail from './BackgroundThumbnail.svelte';
 		gap: 1rem;
 	}
 
-	.background-controls-container {
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-	}
+
 </style>
