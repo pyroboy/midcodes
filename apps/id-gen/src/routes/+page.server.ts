@@ -31,30 +31,115 @@ export const load: PageServerLoad = async ({ locals }) => {
 	//     throw error(500, 'Organization ID not found - User is not associated with any organization');
 	// }
 
-	// Get statistics for the dashboard
+	// Get enhanced statistics for the dashboard
 	const { data: recentCards, error: cardsError } = await supabase
 		.from('idcards')
-		.select('id, template_id, front_image, back_image, created_at, data')
+		.select(`
+			id, 
+			template_id, 
+			front_image, 
+			back_image, 
+			created_at, 
+			data
+		`)
 		.eq('org_id', effectiveOrgId)
 		.order('created_at', { ascending: false })
-		.limit(5);
+		.limit(12); // Increased to 12 for better grid display
+
+	// Get template names separately to avoid circular references
+	let templateNames: Record<number, string> = {};
+	if (recentCards && recentCards.length > 0) {
+		const templateIds = [...new Set(recentCards.map(card => card.template_id).filter(Boolean))];
+		if (templateIds.length > 0) {
+			const { data: templates } = await supabase
+				.from('templates')
+				.select('id, name')
+				.in('id', templateIds);
+			
+			if (templates) {
+				templateNames = templates.reduce((acc, template) => {
+					acc[template.id] = template.name;
+					return acc;
+				}, {} as Record<number, string>);
+			}
+		}
+	}
 
 	const { count: totalCards, error: countError } = await supabase
 		.from('idcards')
 		.select('*', { count: 'exact', head: true })
 		.eq('org_id', effectiveOrgId);
 
+	// Get template count for statistics
+	const { count: totalTemplates, error: templatesError } = await supabase
+		.from('templates')
+		.select('*', { count: 'exact', head: true })
+		.eq('org_id', effectiveOrgId);
+
+	// Get this week's cards count
+	const oneWeekAgo = new Date();
+	oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+	const { count: weeklyCards, error: weeklyError } = await supabase
+		.from('idcards')
+		.select('*', { count: 'exact', head: true })
+		.eq('org_id', effectiveOrgId)
+		.gte('created_at', oneWeekAgo.toISOString());
+
+	// Enhanced error logging for debugging
 	if (cardsError) {
-		console.error('Error fetching recent cards:', cardsError);
+		console.error('❌ [SERVER] Error fetching recent cards:', {
+			error: cardsError,
+			message: cardsError.message,
+			code: cardsError.code,
+			details: cardsError.details,
+			hint: cardsError.hint
+		});
 	}
 
 	if (countError) {
-		console.error('Error fetching total cards:', countError);
+		console.error('❌ [SERVER] Error fetching total cards:', {
+			error: countError,
+			message: countError.message,
+			code: countError.code
+		});
 	}
 
-	return {
-		recentCards: recentCards || [],
+	if (templatesError) {
+		console.error('❌ [SERVER] Error fetching templates count:', {
+			error: templatesError,
+			message: templatesError.message,
+			code: templatesError.code
+		});
+	}
+
+	if (weeklyError) {
+		console.error('❌ [SERVER] Error fetching weekly cards:', {
+			error: weeklyError,
+			message: weeklyError.message,
+			code: weeklyError.code
+		});
+	}
+
+	// Debug successful queries too
+	console.log('✅ [SERVER] Dashboard data loaded:', {
+		recentCardsCount: recentCards?.length || 0,
 		totalCards: totalCards || 0,
-		error: cardsError || countError
+		totalTemplates: totalTemplates || 0,
+		weeklyCards: weeklyCards || 0,
+		orgId: effectiveOrgId
+	});
+
+	// Transform recent cards data to include template names
+	const enhancedRecentCards = (recentCards || []).map(card => ({
+		...card,
+		template_name: templateNames[card.template_id] || 'Unknown Template'
+	}));
+
+	return {
+		recentCards: enhancedRecentCards,
+		totalCards: totalCards || 0,
+		totalTemplates: totalTemplates || 0,
+		weeklyCards: weeklyCards || 0,
+		error: cardsError || countError || templatesError || weeklyError
 	};
 };

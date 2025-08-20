@@ -97,24 +97,13 @@ export const actions = {
 				elementsCount: Array.isArray(payload.template_elements) ? payload.template_elements.length : 0
 			});
 
-			// Create or update explicitly to ensure JSONB fields are written
+			// Use upsert so client-generated IDs work for new templates and updates
 			let data, dbError;
-			if (payload.id) {
-				// Update existing
-				({ data, error: dbError } = await supabase
-					.from('templates')
-					.update(payload)
-					.eq('id', payload.id)
-					.select('*')
-					.single());
-			} else {
-				// Insert new
-				({ data, error: dbError } = await supabase
-					.from('templates')
-					.insert(payload)
-					.select('*')
-					.single());
-			}
+			({ data, error: dbError } = await supabase
+				.from('templates')
+				.upsert(payload, { onConflict: 'id' })
+				.select('*')
+				.single());
 
 			if (dbError) {
 				console.error('❌ Server: Database error:', dbError);

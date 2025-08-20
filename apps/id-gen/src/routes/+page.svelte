@@ -8,6 +8,10 @@
 		CardTitle
 	} from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
+	import DashboardStatsCard from '$lib/components/DashboardStatsCard.svelte';
+	import IDThumbnailCard from '$lib/components/IDThumbnailCard.svelte';
+	import IDPreviewModal from '$lib/components/IDPreviewModal.svelte';
+	import { formatDate, formatDateShort } from '$lib/utils/dateFormat';
 
 	interface Props {
 		data: PageData & { user?: any };
@@ -15,7 +19,20 @@
 
 	let { data }: Props = $props();
 
-	import { formatDate, formatDateShort } from '$lib/utils/dateFormat';
+	// Modal state
+	let modalOpen = $state(false);
+	let selectedCards = $state([]);
+	let selectedIndex = $state(0);
+	let downloadingCards = $state(new Set());
+
+	// Debug modal state changes
+	$effect(() => {
+		console.log('🔍 Modal state changed:', {
+			modalOpen,
+			selectedCardsLength: selectedCards.length,
+			selectedIndex
+		});
+	});
 
 	function getIdNumber(cardData: any) {
 		try {
@@ -44,6 +61,93 @@
 		if (hour < 17) return 'Good afternoon';
 		return 'Good evening';
 	}
+
+	// Modal and interaction functions
+	function openPreview(cards: any[], index: number = 0) {
+		console.log('openPreview called with:', { cardsLength: cards.length, index });
+		selectedCards = cards;
+		selectedIndex = index;
+		modalOpen = true;
+		console.log('Modal state set to:', modalOpen);
+	}
+
+	function openSinglePreview(card: any) {
+		console.log('Opening preview for card:', card);
+		const cardIndex = transformedCards.findIndex(c => c.idcard_id === card.idcard_id);
+		console.log('Card index found:', cardIndex, 'Total cards:', transformedCards.length);
+		openPreview(transformedCards, cardIndex >= 0 ? cardIndex : 0);
+	}
+
+	function closePreview() {
+		modalOpen = false;
+		selectedCards = [];
+		selectedIndex = 0;
+	}
+
+	async function downloadCard(card: any) {
+		const cardId = card.id?.toString();
+		if (!cardId) return;
+
+		downloadingCards.add(cardId);
+		downloadingCards = downloadingCards;
+
+		try {
+			// Implement download logic here
+			console.log('Downloading card:', cardId);
+			// You can reuse the download logic from all-ids route
+		} catch (error) {
+			console.error('Download failed:', error);
+		} finally {
+			downloadingCards.delete(cardId);
+			downloadingCards = downloadingCards;
+		}
+	}
+
+	function editCard(card: any) {
+		// Navigate to template editing with this card's data
+		window.location.href = `/templates?edit=${card.id}`;
+	}
+
+	// Transform recent cards for thumbnail component
+	function transformRecentCards(cards: any[]) {
+		return cards.map(card => ({
+			idcard_id: card.id,
+			template_name: card.template_name || 'Unknown Template',
+			front_image: card.front_image,
+			back_image: card.back_image,
+			created_at: card.created_at,
+			fields: {
+				Name: { value: getName(card.data) },
+				ID: { value: getIdNumber(card.data) }
+			}
+		}));
+	}
+
+	// Get stats for dashboard
+	function getDashboardStats() {
+		const totalCards = data.totalCards || 0;
+		const recentCardsCount = data.recentCards?.length || 0;
+		const templatesCount = data.totalTemplates || 0;
+		const weeklyCards = data.weeklyCards || 0;
+		
+		return {
+			totalCards,
+			recentCardsCount,
+			templatesCount,
+			weeklyCards
+		};
+	}
+
+	const stats = getDashboardStats();
+	const transformedCards = transformRecentCards(data.recentCards || []);
+
+	// Debug transformed cards
+	console.log('🎯 Dashboard data loaded:', {
+		totalCards: data.totalCards,
+		recentCardsCount: data.recentCards?.length,
+		transformedCardsCount: transformedCards.length,
+		transformedCards: transformedCards.slice(0, 2) // Show first 2 for debugging
+	});
 
 	// Quick actions based on user role
 	function getQuickActions(user: any) {
@@ -86,68 +190,75 @@
 	}
 </script>
 
-<div class="container mx-auto px-4 py-6 space-y-6">
+<div class="container mx-auto px-4 py-6 space-y-8">
 	<!-- Hero Section -->
-	<div class="bg-gradient-to-br from-primary/10 to-primary/5 rounded-2xl p-6 md:p-8">
+	<div class="bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-2xl p-6 md:p-8">
 		<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
 			<div>
-				<h1 class="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">
+				<h1 class="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-2">
 					{getTimeGreeting()}, {data.user ? getUserFirstName(data.user) : 'User'}!
 				</h1>
-				<p class="text-gray-600 dark:text-gray-300 text-lg">Ready to create some ID cards today?</p>
-			</div>
-			<div class="flex flex-col items-end">
-				<div class="text-3xl md:text-4xl font-bold text-primary">{data.totalCards || 0}</div>
-				<p class="text-sm text-gray-500 dark:text-gray-400">Total ID Cards</p>
+				<p class="text-gray-600 dark:text-gray-300 text-lg mb-4">Here's what's happening with your ID generation</p>
+				<div class="flex flex-wrap gap-3">
+					<Button href="/templates" size="lg">
+						<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+						</svg>
+						Create New ID
+					</Button>
+					<Button href="/templates" variant="outline" size="lg">
+						<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+						</svg>
+						Manage Templates
+					</Button>
+				</div>
 			</div>
 		</div>
 	</div>
 
-	<!-- Quick Actions Grid -->
+	<!-- Statistics Grid -->
 	<div class="space-y-4">
-		<h2 class="text-xl font-semibold text-gray-900 dark:text-white">Quick Actions</h2>
-		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-			{#each getQuickActions(data.user) as action}
-				<Card class="hover:shadow-lg transition-shadow cursor-pointer group">
-					<a href={action.href} class="block h-full">
-						<CardHeader class="pb-3">
-							<div class="flex items-center gap-3">
-								<div
-									class="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors"
-								>
-									<svg
-										xmlns="http://www.w3.org/2000/svg"
-										class="h-6 w-6 text-primary"
-										fill="none"
-										viewBox="0 0 24 24"
-										stroke="currentColor"
-									>
-										{@html action.icon}
-									</svg>
-								</div>
-								<div>
-									<CardTitle class="text-lg font-semibold">{action.title}</CardTitle>
-									<CardDescription>{action.description}</CardDescription>
-								</div>
-							</div>
-						</CardHeader>
-					</a>
-				</Card>
-			{/each}
+		<h2 class="text-2xl font-bold text-gray-900 dark:text-white">Overview</h2>
+		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+			<DashboardStatsCard 
+				title="Total IDs Created" 
+				value={stats.totalCards} 
+				icon="id-card" 
+				href="/all-ids"
+			/>
+			<DashboardStatsCard 
+				title="Templates Available" 
+				value={stats.templatesCount} 
+				icon="layout-template" 
+				href="/templates"
+			/>
+			<DashboardStatsCard 
+				title="Recent Activity" 
+				value={stats.recentCardsCount} 
+				icon="trending-up" 
+			/>
+			<DashboardStatsCard 
+				title="This Week" 
+				value={stats.weeklyCards} 
+				icon="calendar" 
+				change="+12%" 
+				changeType="positive"
+			/>
 		</div>
 	</div>
 
-	<!-- Recent Activity -->
+
+	<!-- Recent ID Cards -->
 	{#if data.error}
 		<Card class="border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800">
 			<CardContent class="p-6">
 				<div class="flex items-center gap-3">
 					<svg
-						xmlns="http://www.w3.org/2000/svg"
 						class="h-5 w-5 text-red-600"
 						fill="none"
-						viewBox="0 0 24 24"
 						stroke="currentColor"
+						viewBox="0 0 24 24"
 					>
 						<path
 							stroke-linecap="round"
@@ -162,191 +273,82 @@
 				</div>
 			</CardContent>
 		</Card>
-	{:else if data.recentCards?.length > 0}
-		<div class="space-y-4">
+	{:else if transformedCards.length > 0}
+		<div class="space-y-6">
 			<div class="flex items-center justify-between">
-				<h2 class="text-xl font-semibold text-gray-900 dark:text-white">Recent ID Cards</h2>
-				<Button href="/all-ids" variant="outline" size="sm">
-					View All
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-4 w-4 ml-2"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M9 5l7 7-7 7"
-						/>
-					</svg>
-				</Button>
+				<h2 class="text-2xl font-bold text-gray-900 dark:text-white">Recent ID Cards</h2>
+				<div class="flex gap-2">
+					<!-- Debug button -->
+					<Button variant="outline" onclick={() => { 
+						console.log('🧪 Test button clicked'); 
+						if (transformedCards.length > 0) {
+							openSinglePreview(transformedCards[0]);
+						} else {
+							console.log('No cards to preview');
+						}
+					}}>
+						Test Modal
+					</Button>
+					<Button href="/all-ids" variant="outline">
+						View All
+						<svg class="h-4 w-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+						</svg>
+					</Button>
+				</div>
 			</div>
 
-			<!-- Mobile Card View -->
-			<div class="md:hidden space-y-3">
-				{#each (data.recentCards || []).slice(0, 3) as card}
-					<Card>
-						<CardContent class="p-4">
-							<div class="flex items-start justify-between">
-								<div class="flex-1 min-w-0">
-									<h3 class="font-medium text-gray-900 dark:text-white truncate">
-										{getName(card.data)}
-									</h3>
-									<p class="text-sm text-gray-500 dark:text-gray-400">
-										ID: {getIdNumber(card.data)}
-									</p>
-									<p class="text-xs text-gray-400 dark:text-gray-500">
-										{formatDateShort(card.created_at)}
-									</p>
-								</div>
-								<div class="flex gap-1 ml-3">
-									{#if card.front_image}
-										<span
-											class="px-2 py-1 text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-full"
-											>F</span
-										>
-									{/if}
-									{#if card.back_image}
-										<span
-											class="px-2 py-1 text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-full"
-											>B</span
-										>
-									{/if}
-									{#if !card.front_image && !card.back_image}
-										<span
-											class="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-full"
-											>—</span
-										>
-									{/if}
-								</div>
-							</div>
-						</CardContent>
-					</Card>
+			<!-- Thumbnail Grid -->
+			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+				{#each transformedCards.slice(0, 8) as card, index}
+					<IDThumbnailCard 
+						{card}
+						onPreview={() => openSinglePreview(card)}
+						onDownload={() => downloadCard(card)}
+						onEdit={() => editCard(card)}
+						downloading={downloadingCards.has(card.idcard_id?.toString() || '')}
+					/>
 				{/each}
 			</div>
-
-			<!-- Desktop Table View -->
-			<Card class="hidden md:block">
-				<CardContent class="p-0">
-					<div class="overflow-x-auto">
-						<table class="w-full">
-							<thead>
-								<tr class="border-b border-gray-200 dark:border-gray-700">
-									<th
-										class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-										>Name</th
-									>
-									<th
-										class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-										>ID Number</th
-									>
-									<th
-										class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-										>Created</th
-									>
-									<th
-										class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-										>Images</th
-									>
-								</tr>
-							</thead>
-							<tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-								{#each data.recentCards || [] as card}
-									<tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-										<td class="px-6 py-4 whitespace-nowrap">
-											<div class="font-medium text-gray-900 dark:text-white">
-												{getName(card.data)}
-											</div>
-										</td>
-										<td class="px-6 py-4 whitespace-nowrap">
-											<div class="text-sm font-mono text-gray-600 dark:text-gray-400">
-												{getIdNumber(card.data)}
-											</div>
-										</td>
-										<td class="px-6 py-4 whitespace-nowrap">
-											<div class="text-sm text-gray-600 dark:text-gray-400">
-												{formatDate(card.created_at)}
-											</div>
-										</td>
-										<td class="px-6 py-4 whitespace-nowrap">
-											<div class="flex gap-2">
-												{#if card.front_image}
-													<span
-														class="px-2 py-1 text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-full"
-														>Front</span
-													>
-												{/if}
-												{#if card.back_image}
-													<span
-														class="px-2 py-1 text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-full"
-														>Back</span
-													>
-												{/if}
-												{#if !card.front_image && !card.back_image}
-													<span
-														class="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-full"
-														>No Images</span
-													>
-												{/if}
-											</div>
-										</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
+		</div>
+	{:else}
+		<div class="space-y-6">
+			<h2 class="text-2xl font-bold text-gray-900 dark:text-white">Recent ID Cards</h2>
+			<Card>
+				<CardContent class="p-12 text-center">
+					<div class="w-20 h-20 mx-auto mb-6 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
+						<svg class="h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V4a2 2 0 114 0v2m-4 0a2 2 0 104 0m-4 0V4a2 2 0 014 0v2"/>
+						</svg>
 					</div>
+					<h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-3">No ID Cards Yet</h3>
+					<p class="text-gray-500 dark:text-gray-400 mb-6 max-w-md mx-auto">
+						Get started by creating your first ID card. Choose from our available templates and customize them to your needs.
+					</p>
+					<Button href="/templates" size="lg">
+						<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+						</svg>
+						Create Your First ID
+					</Button>
 				</CardContent>
 			</Card>
 		</div>
-	{:else}
-		<Card>
-			<CardContent class="p-8 text-center">
-				<div
-					class="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center"
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-8 w-8 text-gray-400"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V4a2 2 0 114 0v2m-4 0a2 2 0 104 0m-4 0V4a2 2 0 014 0v2"
-						/>
-					</svg>
-				</div>
-				<h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">No ID Cards Yet</h3>
-				<p class="text-gray-500 dark:text-gray-400 mb-4">
-					Get started by creating your first ID card.
-				</p>
-				<Button href="/templates">
-					Browse Templates
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-4 w-4 ml-2"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M9 5l7 7-7 7"
-						/>
-					</svg>
-				</Button>
-			</CardContent>
-		</Card>
 	{/if}
 </div>
+
+<!-- Preview Modal -->
+{#if modalOpen}
+	<IDPreviewModal 
+		open={modalOpen}
+		cards={selectedCards}
+		initialIndex={selectedIndex}
+		mode="simple"
+		onClose={closePreview}
+		onDownload={downloadCard}
+		onEdit={editCard}
+	/>
+{/if}
 
 <style>
 	:global(.dark) {
