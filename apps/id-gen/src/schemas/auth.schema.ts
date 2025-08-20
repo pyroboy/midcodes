@@ -62,16 +62,16 @@ export const userProfileUpdateSchema = z.object({
 	remove_watermarks: z.boolean().optional()
 });
 
-// User roles assignment schemas (user_roles table)
+// User roles assignment schemas (user_roles table - matches database)
 export const userRoleAssignmentSchema = z.object({
-	id: z.number().optional(),
+	id: z.number().int().optional(), // bigint in database
 	user_id: z.string().uuid(),
 	role: userRoleSchema
 });
 
-// Role permissions schemas (role_permissions table)  
+// Role permissions schemas (role_permissions table - matches database)  
 export const rolePermissionSchema = z.object({
-	id: z.number().optional(),
+	id: z.number().int().optional(), // bigint in database
 	role: userRoleSchema,
 	permission: z.enum([
 		// Template permissions

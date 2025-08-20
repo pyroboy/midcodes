@@ -35,13 +35,13 @@ export const organizationUpdateSchema = z.object({
 		.optional()
 });
 
-// Organization settings schema (org_settings table)
+// Organization settings schema (org_settings table - matches database exactly)
 export const orgSettingsSchema = z.object({
-	org_id: z.string().uuid(),
-	payments_enabled: z.boolean().default(true),
-	payments_bypass: z.boolean().default(false),
-	updated_by: z.string().uuid().optional(),
-	updated_at: z.string().datetime().optional()
+	org_id: z.string().uuid(), // NOT NULL
+	payments_enabled: z.boolean(), // NOT NULL
+	payments_bypass: z.boolean(), // NOT NULL
+	updated_by: z.string().uuid().optional(), // nullable
+	updated_at: z.string().datetime() // NOT NULL timestamp
 });
 
 // Organization settings update schema
