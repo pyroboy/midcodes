@@ -1,0 +1,111 @@
+import { z } from 'zod';
+
+// Admin audit log schema (admin_audit table)
+export const adminAuditSchema = z.object({
+	id: z.string().uuid().optional(),
+	org_id: z.string().uuid(),
+	admin_id: z.string().uuid(),
+	action: z.string().max(100),
+	target_type: z.string().max(50), // 'template', 'user', 'organization', etc.
+	target_id: z.string().uuid(),
+	metadata: z.record(z.string(), z.any()).default({}),
+	created_at: z.string().datetime().optional()
+});
+
+// Admin audit log creation input
+export const adminAuditInputSchema = adminAuditSchema.omit({ 
+	id: true, 
+	created_at: true 
+});
+
+// Admin audit log search/filter schema
+export const adminAuditSearchSchema = z.object({
+	org_id: z.string().uuid(),
+	admin_id: z.string().uuid().optional(),
+	action: z.string().optional(),
+	target_type: z.string().optional(),
+	target_id: z.string().uuid().optional(),
+	date_from: z.string().datetime().optional(),
+	date_to: z.string().datetime().optional(),
+	limit: z.number().min(1).max(100).default(50),
+	offset: z.number().min(0).default(0)
+});
+
+// Common admin actions enum
+export const adminActionSchema = z.enum([
+	'user_created',
+	'user_updated',
+	'user_deleted',
+	'user_role_changed',
+	'template_created',
+	'template_updated',
+	'template_deleted',
+	'template_published',
+	'organization_updated',
+	'organization_settings_changed',
+	'credits_added',
+	'credits_removed',
+	'billing_updated',
+	'feature_toggled',
+	'bulk_operation'
+]);
+
+// Admin statistics schema
+export const adminStatsSchema = z.object({
+	total_actions: z.number(),
+	actions_today: z.number(),
+	actions_this_week: z.number(),
+	actions_this_month: z.number(),
+	most_active_admin: z.object({
+		admin_id: z.string().uuid(),
+		admin_email: z.string().email(),
+		action_count: z.number()
+	}).optional(),
+	action_breakdown: z.array(z.object({
+		action: z.string(),
+		count: z.number()
+	})),
+	recent_activity: z.array(adminAuditSchema).optional()
+});
+
+// System-wide admin overview schema
+export const systemOverviewSchema = z.object({
+	total_organizations: z.number(),
+	total_users: z.number(),
+	total_templates: z.number(),
+	total_id_cards: z.number(),
+	system_health: z.object({
+		database_status: z.enum(['healthy', 'warning', 'critical']),
+		storage_usage: z.object({
+			used_bytes: z.number(),
+			total_bytes: z.number(),
+			percentage: z.number()
+		}),
+		active_sessions: z.number(),
+		error_rate: z.number()
+	}),
+	growth_metrics: z.object({
+		new_orgs_this_month: z.number(),
+		new_users_this_month: z.number(),
+		templates_created_this_month: z.number(),
+		cards_generated_this_month: z.number()
+	})
+});
+
+// Admin action with context schema
+export const adminActionWithContextSchema = z.object({
+	action: adminActionSchema,
+	target_type: z.string(),
+	target_id: z.string().uuid(),
+	context: z.record(z.string(), z.any()).default({}),
+	reason: z.string().max(200).optional()
+});
+
+// Inferred types
+export type AdminAudit = z.infer<typeof adminAuditSchema>;
+export type AdminAuditInput = z.infer<typeof adminAuditInputSchema>;
+export type AdminAuditSearch = z.infer<typeof adminAuditSearchSchema>;
+export type AdminAction = z.infer<typeof adminActionSchema>;
+export type AdminStats = z.infer<typeof adminStatsSchema>;
+export type SystemOverview = z.infer<typeof systemOverviewSchema>;
+export type AdminActionWithContext = z.infer<typeof adminActionWithContextSchema>;
