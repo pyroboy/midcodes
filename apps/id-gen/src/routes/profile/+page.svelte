@@ -81,13 +81,7 @@
 			.join(' ');
 	}
 
-	function formatDate(dateStr: string) {
-		return new Date(dateStr).toLocaleDateString('en-US', {
-			year: 'numeric',
-			month: 'long',
-			day: 'numeric'
-		});
-	}
+	import { formatDate } from '$lib/utils/dateFormat';
 </script>
 
 <div class="space-y-8">
@@ -216,7 +210,7 @@
 								<Label for="member_since">Member Since</Label>
 								<Input
 									id="member_since"
-									value={formatDate(profile.created_at)}
+value={formatDate(profile.created_at, 'date')}
 									disabled
 									class="bg-muted"
 								/>
@@ -491,7 +485,7 @@
 					</div>
 					<div class="flex items-center justify-between">
 						<span class="text-sm text-muted-foreground">Last Login</span>
-						<span class="text-sm">{formatDate(profile.updated_at)}</span>
+									span class="text-sm"{formatDate(profile.updated_at, 'date')}/span
 					</div>
 					<div class="flex items-center justify-between">
 						<span class="text-sm text-muted-foreground">ID Cards Created</span>

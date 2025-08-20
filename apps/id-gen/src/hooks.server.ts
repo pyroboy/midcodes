@@ -7,6 +7,7 @@ import type { Handle } from '@sveltejs/kit';
 import { jwtDecode } from 'jwt-decode';
 import { getUserPermissions } from '$lib/services/permissions';
 import type { UserJWTPayload } from '$lib/types/auth';
+import '$lib/utils/setup-logging';
 
 export interface GetSessionResult {
 	session: Session | null;

@@ -15,22 +15,7 @@
 
 	let { data }: Props = $props();
 
-	function formatDate(dateStr: string) {
-		return new Date(dateStr).toLocaleDateString('en-US', {
-			year: 'numeric',
-			month: 'short',
-			day: 'numeric',
-			hour: '2-digit',
-			minute: '2-digit'
-		});
-	}
-
-	function formatDateShort(dateStr: string) {
-		return new Date(dateStr).toLocaleDateString('en-US', {
-			month: 'short',
-			day: 'numeric'
-		});
-	}
+	import { formatDate, formatDateShort } from '$lib/utils/dateFormat';
 
 	function getIdNumber(cardData: any) {
 		try {

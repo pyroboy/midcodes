@@ -1,3 +1,16 @@
+import type { ComponentType } from 'svelte';
+
+export interface SearchItem {
+  id: string;
+  type: 'template' | 'id-card' | 'navigation' | 'action';
+  title: string;
+  subtitle?: string;
+  href?: string;
+  action?: () => void;
+  icon: ComponentType;
+  keywords: string[];
+}
+
 export interface TemplateElement {
 	id: string;
 	type: 'text' | 'image' | 'qr' | 'photo' | 'signature' | 'selection';

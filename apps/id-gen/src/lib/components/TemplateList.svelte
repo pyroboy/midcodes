@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { fade } from 'svelte/transition';
 	import { Button } from '$lib/components/ui/button';
-	import { Copy, Trash2, Edit, Plus } from '@lucide/svelte';
+	import { Copy, Trash2, Edit, Plus, FileText } from '@lucide/svelte';
 	import type { TemplateData } from '../stores/templateStore';
 	import { goto } from '$app/navigation';
 	import { invalidate } from '$app/navigation';
 	import SizeSelectionDialog from './SizeSelectionDialog.svelte';
+	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import type { CardSize } from '$lib/utils/sizeConversion';
 
 	let { templates = $bindable([]), onSelect, onCreateNew } = $props();
@@ -182,6 +183,17 @@
 		</Button>
 	</div>
 
+	{#if templates.length === 0}
+		<!-- Empty state for templates -->
+		<!-- Use base component to wire into local create flow -->
+		<!-- Keeping header button as secondary affordance -->
+		<EmptyState
+			icon={FileText}
+			title="No templates yet"
+			description="Create your first ID card template to get started with generating professional ID cards."
+			action={{ label: 'Create Template', onclick: handleCreateNew }}
+		/>
+	{:else}
 	<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
 		{#each templates as template (template.id)}
 			<div
@@ -254,6 +266,7 @@
 			</div>
 		{/each}
 	</div>
+	{/if}
 </div>
 
 <!-- Size Selection Dialog -->

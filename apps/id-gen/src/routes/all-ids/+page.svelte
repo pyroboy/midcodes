@@ -6,6 +6,10 @@
 	import { getSupabaseStorageUrl } from '$lib/utils/supabase';
 	import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeometry';
 	import JSZip from 'jszip';
+	import ViewModeToggle from '$lib/components/ViewModeToggle.svelte';
+	import { viewMode } from '$lib/stores/viewMode';
+	import SimpleIDCard from '$lib/components/SimpleIDCard.svelte';
+	import EmptyIDs from '$lib/components/empty-states/EmptyIDs.svelte';
 
 	import type { PageData } from './$types';
 	import type { IDCard } from './+page.server';
@@ -107,14 +111,14 @@
 		selectedCards = newSelectedCards;
 	}
 
-	interface SelectionState {
+	type SelectionState = {
 		isSelected: (cardId: string) => boolean;
 		isGroupSelected: (cards: IDCard[]) => boolean;
 		toggleSelection: (cardId: string) => void;
 		toggleGroupSelection: (cards: IDCard[]) => void;
 		getSelectedCount: () => number;
 		clearSelection: () => void;
-	}
+	};
 
 	let isSelected = (cardId: string) => selectedCards.has(cardId);
 	let isGroupSelected = (cards: IDCard[]) => {
@@ -179,9 +183,7 @@
 		const target = event.target as HTMLElement;
 		if (
 			target.closest('input[type="checkbox"]') ||
-			target.closest('button') ||
-			target.closest('.flex.items-center') ||
-			target.closest('.flex.gap-2')
+			target.closest('button')
 		) {
 			return;
 		}
@@ -499,7 +501,7 @@
 
 	let templateFields = $derived(metadata?.templates || {});
 
-	let groupedCards = $derived(
+let groupedCards = $derived(
 		(() => {
 			const groups: Record<string, IDCard[]> = {};
 			dataRows.forEach((card) => {
@@ -511,9 +513,17 @@
 			return groups;
 		})()
 	);
+
+// Card zoom control
+let cardWidth = $state(300);
+const MIN_WIDTH = 200;
+const MAX_WIDTH = 600;
+const STEP = 50;
+function zoomOut() { cardWidth = Math.max(MIN_WIDTH, cardWidth - STEP); }
+function zoomIn() { cardWidth = Math.min(MAX_WIDTH, cardWidth + STEP); }
 </script>
 
-<div class="mb-4 flex justify-between items-center">
+<div class="mb-4 flex flex-wrap gap-3 items-center justify-between">
 	<input
 		type="text"
 		placeholder="Search..."
@@ -536,10 +546,24 @@
 			</button>
 		</div>
 	{/if}
+
+	<div class="flex items-center gap-2 ml-auto">
+		{#if $viewMode !== 'table'}
+			<button type="button" class="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700" onclick={zoomOut} aria-label="Zoom out">−</button>
+			<div class="text-sm text-gray-600 dark:text-gray-300 w-16 text-center">{cardWidth}px</div>
+			<button type="button" class="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700" onclick={zoomIn} aria-label="Zoom in">+</button>
+		{/if}
+		<div class="ml-4">
+			<ViewModeToggle />
+		</div>
+	</div>
 </div>
 
-{#each Object.entries(groupedCards) as [templateName, cards]}
-	<div class="mb-8">
+{#if dataRows.length === 0}
+	<EmptyIDs />
+{:else if $viewMode === 'table'}
+	{#each Object.entries(groupedCards) as [templateName, cards]}
+		<div class="mb-8">
 		<h3 class="text-xl font-semibold mb-4">{templateName}</h3>
 		<div class="relative overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
 			<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -660,7 +684,29 @@
 			</table>
 		</div>
 	</div>
-{/each}
+	{/each}
+{:else}
+	{#each Object.entries(groupedCards) as [templateName, cards]}
+		<div class="mb-8">
+			<h3 class="text-xl font-semibold mb-4">{templateName}</h3>
+			<div class="grid gap-4" style={`grid-template-columns: repeat(auto-fill, ${cardWidth}px);`}>
+				{#each cards as card}
+								<SimpleIDCard
+						card={card}
+						isSelected={selectionManager.isSelected(getCardId(card))}
+						onToggleSelect={() => selectionManager.toggleSelection(getCardId(card))}
+						onDownload={downloadCard}
+						onDelete={handleDelete}
+						onOpenPreview={openPreview}
+						deleting={deletingCards.has(getCardId(card))}
+						downloading={downloadingCards.has(getCardId(card))}
+						width={cardWidth}
+					/>
+				{/each}
+			</div>
+		</div>
+	{/each}
+{/if}
 
 {#if selectedFrontImage || selectedBackImage}
 	<ClientOnly>
