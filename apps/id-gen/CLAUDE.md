@@ -164,15 +164,6 @@ mirror_doc() {
 - **`/repo-specs/`**: 8 files with same naming convention as repository
 
 **SPECIFICATIONS** (Repository: `/specs/` → Vault: `/repo-specs/`):
-- `Spec-01-Aug20-DASHBOARD-UI-IMPROVEMENTS.md` (both repo and vault)
-- `Spec-02-Aug20-ID-GEN-ROLE-INSTRUCTIONS.md` (both repo and vault)
-- `Spec-03-Aug20-MOBILE-OPTIMIZATION-PLAN.md` (both repo and vault)
-- `Spec-04-Aug20-PAYMENT-BYPASS-IMPLEMENTATION.md` (both repo and vault)
-- `Spec-05-Aug20-PAYMENT-STRUCTURE.md` (both repo and vault)
-- `Spec-06-Aug20-QA-CHECKLIST-AND-ROLLOUT.md` (both repo and vault)
-- `Spec-07-Aug20-REFACTORING-PLAN-PHASE-1.md` (both repo and vault)
-- `Spec-08-Aug20-ROUTE-DOCUMENTATION.md` (both repo and vault)
-
 **DOCUMENTATION** (Repository: `/docs/` → Vault: `/repo-docs/`):
 - All files preserved with original names for easy recognition
 
@@ -186,36 +177,6 @@ When searching for information:
 
 ## Commands
 
-### Development
-
-- `npm run dev` - Start development server on localhost:5173
-- `npm run dev -- --open` - Start dev server and open in browser
-
-### Building and Testing
-
-- `npm run build` - Create production build
-- `npm run preview` - Preview production build locally
-- `npm run check` - Run Svelte type checking
-- `npm run check:watch` - Run type checking in watch mode
-- `npm run test` - Run all tests (integration + unit)
-- `npm run test:integration` - Run Playwright integration tests
-- `npm run test:unit` - Run Vitest unit tests
-
-### Code Quality
-
-- `npm run lint` - Check code formatting and linting (Prettier + ESLint)
-- `npm run format` - Auto-format code with Prettier
-
-### Supabase Edge Functions
-
-- `npm run serve:edge` - Serve edge functions locally with env vars
-- `npm run deploy:edge` - Deploy role-emulation edge function
-
-### Cleanup
-
-- `npm run clean` - Remove build artifacts and cache
-
-## Architecture
 
 ### Core Technology Stack
 
@@ -287,4 +248,83 @@ Uses Threlte wrapper around Three.js for 3D ID card visualization and rendering.
 - Uses session storage for auth persistence (not localStorage)
 - Environment variables through SvelteKit's `$env` modules
 
-- i want the docs mirroed to my speedrun obisidian vault but in a separste folder repo-docs.
+## Specification Creation Prompt
+
+When creating technical specifications, use this structured approach to ensure comprehensive and consistent documentation:
+
+### **Senior Software Engineer Specification Process**
+
+You are acting as a **senior software engineer**. Follow these steps strictly and in order.
+
+---
+
+### **Step 0 – Input Reading (No Output)**
+
+- Read the provided user request carefully.
+- Store everything in working context silently.
+- Do **not output anything** yet.
+- This step is for grounding only.
+
+---
+
+### **Step 1 – Requirement Extraction**
+
+- Break the request down into **clear, actionable technical requirements**.
+- Identify **what the system must do**.
+- If vague, restate in precise engineering terms.
+
+---
+
+### **Step 2 – Context Awareness**
+
+- Assume we are building with **Svelte 5 + SvelteKit + Supabase**.
+- Use **Supabase MCP** for ground-truth database handling details.
+- Use **Context7 MCP** when dealing with NPM library documentation or usage patterns.
+- If database design is involved → align with Supabase handling.
+- If NPM packages are mentioned → check via Context7 for correct usage.
+
+---
+
+### **Step 3 – Spec Expansion**
+
+- Expand the requirements into a **Technical Specification**.
+- Include:
+    - **Data flow** (where input comes from, where it goes, what transforms happen).
+    - **State handling** (Svelte store, props, Supabase persistence).
+    - **Function-level behavior** (important functions, error handling, edge cases).
+    - **UI implications** (if minor, mark as UI minor).
+    - **UX implications** (if minor, mark as UX minor).
+    - **Database & API calls** (Supabase queries, inserts, auth).
+    - **Dependencies** (libraries, MCP references).
+
+---
+
+### **Step 4 – Implementation Guidance**
+
+- Provide a **high-level code strategy** (but not raw code).
+- Reference **which files/components** are affected.
+- Suggest **best practices** (error handling, performance, maintainability).
+- Clarify assumptions explicitly.
+
+---
+
+### **Step 5 – Output Checklist (Always Output This)**
+
+For each type of change, assign a bite-sized complexity level (1–10).
+1 = trivial tweak, 10 = deep multi-file/system refactor before each category
+
+At the end of your response, always provide a **checklist summary** like below:
+
+✅ **Checklist:**
+
+1. **UI Changes** – Are they only minor cosmetic adjustments?
+2. **UX Changes** – Are they only minor interaction tweaks?
+3. **Data Handling** – Any modifications to database schema or Supabase queries?
+4. **Function Logic** – Any important business logic updates?
+5. **ID/Key Consistency** – Ensure stable unique IDs/keys across state, DB, and UI.
+
+---
+
+⚡ **Important**: Output must always follow **Steps 1–5 in order**. Step 5 checklist is mandatory.
+
+## Commands
