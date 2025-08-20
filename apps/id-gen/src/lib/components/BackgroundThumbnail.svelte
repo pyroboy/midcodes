@@ -279,9 +279,12 @@
 					};
 					
 					// Apply clamping even in fallback case
+					// @ts-ignore
 					if (imageElement && imageElement.naturalWidth > 0 && imageElement.naturalHeight > 0) {
 						const imageDims: Dims = {
+							// @ts-ignore
 							width: imageElement.naturalWidth,
+							// @ts-ignore
 							height: imageElement.naturalHeight
 						};
 						position = clampBackgroundPosition(imageDims, templateDimensions, newPosition);
