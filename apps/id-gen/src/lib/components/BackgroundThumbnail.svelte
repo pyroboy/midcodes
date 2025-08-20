@@ -520,11 +520,12 @@
 					break;
 			}
 			
-			// Clamp to thumbnail bounds
-			newX = Math.max(0, Math.min(THUMB_SIZE - newWidth, newX));
-			newY = Math.max(0, Math.min(THUMB_SIZE - newHeight, newY));
-			newWidth = Math.min(THUMB_SIZE - newX, newWidth);
-			newHeight = Math.min(THUMB_SIZE - newY, newHeight);
+			// Clamp to actual thumbnail bounds (not hardcoded square)
+			const thumbDims = thumbnailDimensions();
+			newX = Math.max(0, Math.min(thumbDims.width - newWidth, newX));
+			newY = Math.max(0, Math.min(thumbDims.height - newHeight, newY));
+			newWidth = Math.min(thumbDims.width - newX, newWidth);
+			newHeight = Math.min(thumbDims.height - newY, newHeight);
 			
 			// Calculate the corresponding position change
 			const imageDims: Dims = {
@@ -539,7 +540,7 @@
 				newY, 
 				imageDims, 
 				templateDimensions,
-				THUMB_SIZE
+				thumbDims.width // Use actual thumbnail width instead of THUMB_SIZE
 			);
 			
 			// Apply clamping to resize operations as well

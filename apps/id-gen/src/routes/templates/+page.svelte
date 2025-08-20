@@ -66,6 +66,9 @@ import { imageCache } from '$lib/utils/imageCache';
 	let backBackground: File | null = null;
 	let frontPreview: string | null = $state(null);
 	let backPreview: string | null = $state(null);
+	// Separate crop preview URLs for final output validation
+	let frontCropPreview: string | null = $state(null);
+	let backCropPreview: string | null = $state(null);
 	let errorMessage = $state('');
 	let currentTemplate: DatabaseTemplate | null = $state(null);
 	let frontElements: TemplateElement[] = $state([]);
@@ -872,44 +875,25 @@ async function handleImageUpload(files: File[], side: 'front' | 'back') {
 			backBackground = file;
 		}
 
-		// If we already know the required card dimensions, generate a card-fitted preview now
-		if (requiredPixelDimensions) {
-			try {
-				const position = side === 'front' ? frontBackgroundPosition : backBackgroundPosition;
-				const fittedPreview = await generateCropPreviewUrl(
-					file,
-					requiredPixelDimensions,
-					position
-				);
-				// Use the fitted data URL directly (stable, matches card template)
-				if (side === 'front') {
-					frontPreview = fittedPreview;
-				} else {
-					backPreview = fittedPreview;
-				}
-			} catch (e) {
-				console.warn('Failed to create fitted preview, falling back to blob URL', e);
-				const blobUrl = URL.createObjectURL(file);
-				imageCache.setPreview(key, blobUrl);
-				if (side === 'front') {
-					frontPreview = imageCache.resolve(key);
-				} else {
-					backPreview = imageCache.resolve(key);
-				}
-			}
+		// Always show full-resolution original image for main editing
+		// The main canvas should display the complete image, not a cropped version
+		const fullResolutionUrl = URL.createObjectURL(file);
+		imageCache.setPreview(key, fullResolutionUrl);
+		
+		if (side === 'front') {
+			frontPreview = imageCache.resolve(key);
 		} else {
-			// Dimensions unknown yet, show immediate blob preview and refine later
-			const blobUrl = URL.createObjectURL(file);
-			imageCache.setPreview(key, blobUrl);
-			if (side === 'front') {
-				frontPreview = imageCache.resolve(key);
-			} else {
-				backPreview = imageCache.resolve(key);
-			}
+			backPreview = imageCache.resolve(key);
 		}
+		
+		// Note: Crop preview generation is now handled separately when needed
+		// This ensures users can see the full image quality during editing
 
 		// Trigger element creation if elements are empty and dimensions are available
 		await triggerElementCreation();
+		
+		// Generate initial crop preview if dimensions are available
+		await updateCropPreviews();
 	}
 
 	async function triggerElementCreation() {
@@ -948,13 +932,53 @@ async function handleImageUpload(files: File[], side: 'front' | 'back') {
 		}
 	}
 
+	/**
+	 * Generate crop previews for both front and back images
+	 * This creates separate cropped preview images that show what the final output will look like
+	 */
+	async function updateCropPreviews() {
+		if (!requiredPixelDimensions) return;
+		
+		// Generate front crop preview
+		if (frontBackground) {
+			try {
+				const cropPreviewUrl = await generateCropPreviewUrl(
+					frontBackground,
+					requiredPixelDimensions,
+					frontBackgroundPosition
+				);
+				frontCropPreview = cropPreviewUrl;
+			} catch (e) {
+				console.warn('Failed to generate front crop preview:', e);
+				frontCropPreview = null;
+			}
+		}
+		
+		// Generate back crop preview
+		if (backBackground) {
+			try {
+				const cropPreviewUrl = await generateCropPreviewUrl(
+					backBackground,
+					requiredPixelDimensions,
+					backBackgroundPosition
+				);
+				backCropPreview = cropPreviewUrl;
+			} catch (e) {
+				console.warn('Failed to generate back crop preview:', e);
+				backCropPreview = null;
+			}
+		}
+	}
+
 	function handleRemoveImage(side: 'front' | 'back') {
 		if (side === 'front') {
 			frontBackground = null;
 			frontPreview = null;
+			frontCropPreview = null;
 		} else {
 			backBackground = null;
 			backPreview = null;
+			backCropPreview = null;
 		}
 	}
 
@@ -1172,7 +1196,7 @@ async function handleImageUpload(files: File[], side: 'front' | 'back') {
 				onUpdateElements={(elements, side) => updateElements(elements, side)}
 				onImageUpload={(files, side) => handleImageUpload(files, side)}
 				onRemoveImage={(side) => handleRemoveImage(side)}
-				onUpdateBackgroundPosition={(position, side) => {
+				onUpdateBackgroundPosition={async (position, side) => {
 			$state.snapshot(`Background side updated for ${side}:`);
 			$state.snapshot(`Background position updated for ${position}`);
 					if (side === 'front') {
@@ -1180,6 +1204,8 @@ async function handleImageUpload(files: File[], side: 'front' | 'back') {
 					} else {
 						backBackgroundPosition = { ...position };
 					}
+					// Regenerate crop previews when position changes
+					await updateCropPreviews();
 				}}
 			/>
 			{/key}
