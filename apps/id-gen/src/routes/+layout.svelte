@@ -5,6 +5,7 @@
 		children: any;
 	}
 
+	import '$lib/utils/setup-logging';
 	import '../app.css';
 	import { onMount } from 'svelte';
 	import { loadGoogleFonts } from '$lib/config/fonts';

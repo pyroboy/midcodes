@@ -37,13 +37,7 @@
 		await setPaymentsBypass({ bypass });
 	}
 
-	function formatDate(dateStr: string) {
-		return new Date(dateStr).toLocaleDateString('en-US', {
-			year: 'numeric',
-			month: 'short',
-			day: 'numeric'
-		});
-	}
+	import { formatDate } from '$lib/utils/dateFormat';
 </script>
 
 <div class="space-y-8">
@@ -297,7 +291,7 @@
 			<CardContent>
 				<div class="text-2xl font-bold">Active</div>
 				<p class="text-xs text-muted-foreground">
-					Since {data.organization ? formatDate(data.organization.created_at) : 'Unknown'}
+					Since {data.organization ? formatDate(data.organization.created_at, 'date') : 'Unknown'}
 				</p>
 			</CardContent>
 		</Card>
@@ -380,7 +374,7 @@
 										</div>
 										<div>
 											<p class="text-sm font-medium">{activity.description}</p>
-											<p class="text-xs text-muted-foreground">{formatDate(activity.created_at)}</p>
+											p class="text-xs text-muted-foreground"{formatDate(activity.created_at, 'date')}/p
 										</div>
 									</div>
 								</div>

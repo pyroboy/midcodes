@@ -295,13 +295,13 @@
 
 {#if frontImageUrlProp || backImageUrlProp}
 	<div class="fixed inset-0 z-50">
-		<div class="fixed inset-0 bg-black/80 backdrop-blur-sm modal-backdrop" role="presentation" onclick={handleModalClose}></div>
+		<div class="fixed inset-0 bg-black/80 backdrop-blur-sm modal-backdrop" role="presentation" on:click={handleModalClose}></div>
 
 		<div class="fixed inset-0 flex items-center justify-center p-2 md:p-4">
-			<div class="relative w-full max-w-7xl rounded-lg p-3 md:p-6 shadow-2xl" role="dialog">
-				<button type="button" class="absolute right-4 top-4 z-10 rounded-full bg-white/10 p-2 text-white hover:bg-white/20" onclick={onClose} aria-label="Close preview">✕</button>
+				<div class="relative w-full max-w-7xl rounded-lg p-3 md:p-6 shadow-2xl" role="dialog" on:click={onClose}>
+				<button type="button" class="absolute right-4 top-4 z-10 rounded-full bg-white/10 p-2 text-white hover:bg-white/20" on:click={onClose} aria-label="Close preview">✕</button>
 
-				<div class="relative h-[90vh] w-full">
+					<div class="relative h-[90vh] w-full" on:click|stopPropagation>
 					{#if canvasError}
 						<div class="absolute inset-0 z-20 flex items-center justify-center bg-red-500/10 text-red-400" role="alert">
 							<div class="text-center p-4">
@@ -485,7 +485,7 @@
 			</div>
 
 			<div class="absolute bottom-4 left-1/2 -translate-x-1/2 md:bottom-6">
-				<button type="button" class="rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm shadow-lg transition-colors hover:bg-white/20 md:px-6 md:py-3 md:text-base" onclick={handleFlip}>
+				<button type="button" class="rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm shadow-lg transition-colors hover:bg-white/20 md:px-6 md:py-3 md:text-base" on:click={handleFlip}>
 					<span class="flex items-center gap-2">🔄 <span>Flip Card</span></span>
 				</button>
 			</div>
