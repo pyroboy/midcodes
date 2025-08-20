@@ -95,7 +95,7 @@ import { imageCache } from '$lib/utils/imageCache';
 
 	// Drag performance optimization state
 	let isDraggingBackground = $state(false);
-	let dragUpdateTimeout: number | null = null;
+	let dragUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
 	let lastPositionUpdateTime = $state(0);
 	let positionUpdateCount = $state(0);
 

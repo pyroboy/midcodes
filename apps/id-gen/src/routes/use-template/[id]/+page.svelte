@@ -11,7 +11,7 @@
 	import * as Select from '$lib/components/ui/select';
 	import { darkMode } from '$lib/stores/darkMode';
 	import ThumbnailInput from '$lib/components/ThumbnailInput.svelte';
-	import { Loader } from '@lucide/svelte';
+	import { Loader, ChevronLeft, ChevronRight } from '@lucide/svelte';
 	import { goto } from '$app/navigation';
 	import { enhance } from '$app/forms';
 	import type { TemplateElement } from '$lib/stores/templateStore';
@@ -92,6 +92,9 @@
 	let backCanvasReady = $state(false);
 	let fullResolution = $state(false);
 	let mouseMoving = $state(false);
+	// Responsive preview state (mobile toggle vs desktop side-by-side)
+	let isMobile = $state(false);
+	let currentView: 'front' | 'back' = $state('front');
 	let formErrors = $state<Record<string, boolean>>({});
 	let fileUrls = $state<Record<string, string>>({});
 
@@ -156,7 +159,11 @@
 		initializeSelectStates();
 	}
 
-	onMount(async () => {
+onMount(async () => {
+		// initialize responsive state
+		if (typeof window !== 'undefined') {
+			isMobile = window.innerWidth < 768;
+		}
 		if (!templateId) {
 			error = 'No template ID provided';
 			return;
@@ -280,6 +287,12 @@
 		darkMode.set(checked);
 	}
 
+	function handleResize() {
+		if (typeof window !== 'undefined') {
+			isMobile = window.innerWidth < 768;
+		}
+	}
+
 	function handleSelectFile(variableName: string) {
 		const input = document.createElement('input');
 		input.type = 'file';
@@ -339,71 +352,139 @@
 	});
 </script>
 
+<svelte:window on:resize={handleResize} />
 <div class="container mx-auto p-4 flex flex-col md:flex-row gap-4">
 	<div class="w-full md:w-1/2">
 		<Card class="h-full">
 			<div class="p-4">
 				<h2 class="text-2xl font-bold mb-4">ID Card Preview</h2>
-				<div
-					class="canvas-wrapper"
-					class:landscape={template?.orientation === 'landscape'}
-					class:portrait={template?.orientation === 'portrait'}
-				>
-					<div class="front-canvas">
-						<h3 class="text-lg font-semibold mb-2">Front</h3>
-						{#if template}
-							<div
-								class="w-full"
-								style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels ||
-									638}"
+
+				{#if !isMobile}
+					<!-- Desktop: show both front and back side-by-side/stacked by orientation -->
+					<div
+						class="canvas-wrapper"
+						class:landscape={template?.orientation === 'landscape'}
+						class:portrait={template?.orientation === 'portrait'}
+					>
+						<div class="flex-1">
+							<h3 class="text-lg font-semibold mb-2 text-center">Front View</h3>
+							{#if template}
+								<div
+									class="w-full"
+									style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels || 638}"
+								>
+									<IdCanvas
+										bind:this={frontCanvasComponent}
+										elements={template.template_elements.filter((el) => el.side === 'front')}
+										backgroundUrl={template.front_background}
+										{formData}
+										{fileUploads}
+										{imagePositions}
+										{fullResolution}
+										isDragging={mouseMoving}
+										pixelDimensions={template.width_pixels && template.height_pixels
+											? { width: template.width_pixels, height: template.height_pixels }
+											: null}
+										on:ready={() => handleCanvasReady('front')}
+										on:error={({ detail }) =>
+											addDebugMessage(`Front Canvas Error: ${detail.code} - ${detail.message}`)}
+									/>
+								</div>
+							{/if}
+						</div>
+						<div class="flex-1">
+							<h3 class="text-lg font-semibold mb-2 text-center">Back View</h3>
+							{#if template}
+								<div
+									class="w-full"
+									style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels || 638}"
+								>
+									<IdCanvas
+										bind:this={backCanvasComponent}
+										elements={template.template_elements.filter((el) => el.side === 'back')}
+										backgroundUrl={template.back_background}
+										{formData}
+										{fileUploads}
+										{imagePositions}
+										{fullResolution}
+										isDragging={mouseMoving}
+										pixelDimensions={template.width_pixels && template.height_pixels
+											? { width: template.width_pixels, height: template.height_pixels }
+											: null}
+										on:ready={() => handleCanvasReady('back')}
+										on:error={({ detail }) =>
+											addDebugMessage(`Back Canvas Error: ${detail.code} - ${detail.message}`)}
+									/>
+								</div>
+							{/if}
+						</div>
+					</div>
+				{:else}
+					<!-- Mobile: toggle between front/back with buttons -->
+					<div class="flex flex-col space-y-4 w-full max-w-md mx-auto">
+						<div class="flex items-center justify-between w-full mb-2">
+							<button
+								onclick={() => (currentView = 'front')}
+								class={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl transition-colors duration-200 text-sm font-bold ${currentView === 'front' ? 'bg-emerald-500 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-700'}`}
 							>
-								<IdCanvas
-									bind:this={frontCanvasComponent}
-									elements={template.template_elements.filter((el) => el.side === 'front')}
-									backgroundUrl={template.front_background}
-									{formData}
-									{fileUploads}
-									{imagePositions}
-									{fullResolution}
-									isDragging={mouseMoving}
-									pixelDimensions={template.width_pixels && template.height_pixels
-										? { width: template.width_pixels, height: template.height_pixels }
-										: null}
-									on:ready={() => handleCanvasReady('front')}
-									on:error={({ detail }) =>
-										addDebugMessage(`Front Canvas Error: ${detail.code} - ${detail.message}`)}
-								/>
-							</div>
+								<ChevronLeft size={16} />
+								<span>Front View</span>
+							</button>
+							<div class="w-4"></div>
+							<button
+								onclick={() => (currentView = 'back')}
+								class={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl transition-colors duration-200 text-sm font-bold ${currentView === 'back' ? 'bg-emerald-500 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-700'}`}
+							>
+								<span>Back View</span>
+								<ChevronRight size={16} />
+							</button>
+						</div>
+
+						{#if currentView === 'front'}
+							{#if template}
+								<div class="w-full" style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels || 638}">
+									<IdCanvas
+										bind:this={frontCanvasComponent}
+										elements={template.template_elements.filter((el) => el.side === 'front')}
+										backgroundUrl={template.front_background}
+										{formData}
+										{fileUploads}
+										{imagePositions}
+										{fullResolution}
+										isDragging={mouseMoving}
+										pixelDimensions={template.width_pixels && template.height_pixels
+											? { width: template.width_pixels, height: template.height_pixels }
+											: null}
+										on:ready={() => handleCanvasReady('front')}
+										on:error={({ detail }) =>
+											addDebugMessage(`Front Canvas Error: ${detail.code} - ${detail.message}`)}
+									/>
+								</div>
+							{/if}
+						{:else}
+							{#if template}
+								<div class="w-full" style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels || 638}">
+									<IdCanvas
+										bind:this={backCanvasComponent}
+										elements={template.template_elements.filter((el) => el.side === 'back')}
+										backgroundUrl={template.back_background}
+										{formData}
+										{fileUploads}
+										{imagePositions}
+										{fullResolution}
+										isDragging={mouseMoving}
+										pixelDimensions={template.width_pixels && template.height_pixels
+											? { width: template.width_pixels, height: template.height_pixels }
+											: null}
+										on:ready={() => handleCanvasReady('back')}
+										on:error={({ detail }) =>
+											addDebugMessage(`Back Canvas Error: ${detail.code} - ${detail.message}`)}
+									/>
+								</div>
+							{/if}
 						{/if}
 					</div>
-					<div class="back-canvas">
-						<h3 class="text-lg font-semibold mb-2">Back</h3>
-						{#if template}
-							<div
-								class="w-full"
-								style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels ||
-									638}"
-							>
-								<IdCanvas
-									bind:this={backCanvasComponent}
-									elements={template.template_elements.filter((el) => el.side === 'back')}
-									backgroundUrl={template.back_background}
-									{formData}
-									{fileUploads}
-									{imagePositions}
-									{fullResolution}
-									isDragging={mouseMoving}
-									pixelDimensions={template.width_pixels && template.height_pixels
-										? { width: template.width_pixels, height: template.height_pixels }
-										: null}
-									on:ready={() => handleCanvasReady('back')}
-									on:error={({ detail }) =>
-										addDebugMessage(`Back Canvas Error: ${detail.code} - ${detail.message}`)}
-								/>
-							</div>
-						{/if}
-					</div>
-				</div>
+				{/if}
 			</div>
 		</Card>
 	</div>
