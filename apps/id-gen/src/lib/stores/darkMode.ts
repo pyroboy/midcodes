@@ -2,7 +2,7 @@ import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
 
 function createDarkModeStore() {
-	const defaultValue = browser ? window.matchMedia('(prefers-color-scheme: dark)').matches : false;
+	const defaultValue = false; // Always default to light mode
 	const storedValue = browser ? localStorage.getItem('darkMode') : null;
 	const initialValue = storedValue ? JSON.parse(storedValue) : defaultValue;
 

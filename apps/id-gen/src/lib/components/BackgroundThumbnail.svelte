@@ -4,6 +4,8 @@
 	import { calculateCropFrame, validateCropFrameAlignment, calculatePositionFromFrame, coverBase, computeDraw, computeVisibleRectInImage, computeContainerViewportInImage, mapImageRectToThumb, clampBackgroundPosition, type Dims, type BackgroundPosition } from '$lib/utils/backgroundGeometry';
 	import { browser } from '$app/environment';
 	import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
+	import { globalProxyManager, proxyPerformanceMonitor } from '$lib/utils/imageProxy';
+	import { usePerformanceMonitoring } from '$lib/utils/dragPerformanceMonitor';
 	
 	interface Props {
 		imageUrl: string;
@@ -29,6 +31,16 @@
 	let ctx: CanvasRenderingContext2D;
 	let isDragging = $state(false);
 	let imageElement: HTMLImageElement | null = $state(null);
+	
+	// Performance optimization state
+	let isPerformanceDrag = $state(false);
+	let lowResImageElement: HTMLImageElement | null = $state(null);
+	let proxyGenerationInProgress = $state(false);
+	let lastProxyGenerationTime = $state(0);
+	
+	// Performance monitoring
+	const performanceMonitor = usePerformanceMonitoring();
+	let currentDragSession: any = null;
 	
 
 	// Calculate thumbnail dimensions to match selected image aspect ratio
@@ -88,9 +100,12 @@
 		const img = new Image();
 		img.crossOrigin = 'anonymous';
 		
-		img.onload = () => {
+		img.onload = async () => {
 			imageElement = img;
 			drawThumbnail();
+			
+			// Generate low-resolution proxy for performance optimization
+			await generateProxyImage();
 		};
 		
 		img.onerror = () => {
@@ -98,6 +113,84 @@
 		};
 		
 		img.src = imageUrl;
+	}
+
+	/**
+	 * Generate low-resolution proxy image for drag performance
+	 */
+	async function generateProxyImage() {
+		if (!imageElement || !browser || proxyGenerationInProgress) return;
+		
+		try {
+			proxyGenerationInProgress = true;
+			const startTime = proxyPerformanceMonitor.startGeneration();
+			
+			// Create cache key based on image URL and dimensions
+			const cacheKey = `thumb_${imageUrl}_${imageElement.naturalWidth}x${imageElement.naturalHeight}`;
+			
+			// Generate proxy with max 400px dimension for thumbnail (smaller than main canvas)
+			lowResImageElement = await globalProxyManager.getOrCreateProxy(
+				imageElement,
+				cacheKey,
+				{ maxDimension: 400, quality: 0.7 }
+			);
+			
+			const generationTime = proxyPerformanceMonitor.endGeneration(startTime);
+			lastProxyGenerationTime = generationTime;
+			
+			if (debugMode) {
+				console.log(`🚀 Proxy generated for thumbnail in ${generationTime.toFixed(1)}ms`);
+			}
+		} catch (error) {
+			console.warn('⚠️ Failed to generate proxy image:', error);
+			lowResImageElement = null;
+		} finally {
+			proxyGenerationInProgress = false;
+		}
+	}
+
+	/**
+	 * Start performance drag mode
+	 */
+	function startPerformanceDrag() {
+		if (lowResImageElement && !isPerformanceDrag) {
+			isPerformanceDrag = true;
+			
+			// Start performance monitoring
+			currentDragSession = performanceMonitor.startDrag(`thumb_${imageUrl}_${Date.now()}`);
+			
+			if (debugMode) {
+				console.log('🎯 Starting performance drag mode with monitoring');
+			}
+		}
+	}
+
+	/**
+	 * End performance drag mode and restore full quality
+	 */
+	function endPerformanceDrag() {
+		if (isPerformanceDrag) {
+			isPerformanceDrag = false;
+			
+			// End performance monitoring and get metrics
+			const metrics = performanceMonitor.endDrag();
+			if (metrics && debugMode) {
+				console.log('📊 Drag performance metrics:', {
+					avgFPS: metrics.averageFps.toFixed(1),
+					duration: `${metrics.dragDuration.toFixed(1)}ms`,
+					frames: metrics.frameCount,
+					proxyGenTime: `${lastProxyGenerationTime.toFixed(1)}ms`
+				});
+			}
+			
+			currentDragSession = null;
+			
+			// Redraw with full resolution
+			drawThumbnail();
+			if (debugMode) {
+				console.log('✨ Restored full quality after drag');
+			}
+		}
 	}
 
 	function drawThumbnail() {
@@ -111,7 +204,20 @@
 		// Reset transforms
 		ctx.resetTransform();
 		
-		// NEW LOGIC: Always draw the full image, thumbnail now matches image aspect ratio
+		// Choose image based on performance mode
+		const activeImage = (isPerformanceDrag && lowResImageElement) ? lowResImageElement : imageElement;
+		
+		// Configure canvas quality based on performance mode
+		if (isPerformanceDrag) {
+			ctx.imageSmoothingEnabled = true;
+			ctx.imageSmoothingQuality = 'low';
+		} else {
+			ctx.imageSmoothingEnabled = true;
+			ctx.imageSmoothingQuality = 'high';
+		}
+		
+		// Use original image dimensions for calculations (not proxy dimensions)
+		// This ensures coordinate system consistency regardless of display image
 		const imageDims: Dims = {
 			width: imageElement!.naturalWidth,
 			height: imageElement!.naturalHeight
@@ -137,8 +243,8 @@
 			offsetY = 0;
 		}
 		
-		// Draw the entire image
-		ctx.drawImage(imageElement, offsetX, offsetY, drawWidth, drawHeight);
+		// Draw the entire image using active image (proxy during drag, full-res otherwise)
+		ctx.drawImage(activeImage, offsetX, offsetY, drawWidth, drawHeight);
 		
 		// Draw border around thumbnail
 		ctx.strokeStyle = '#e5e7eb';
@@ -151,6 +257,9 @@
 		
 		event.preventDefault();
 		isDragging = true;
+		
+		// Start performance drag mode for smooth operations
+		startPerformanceDrag();
 
 		const startPoint = 'touches' in event
 			? { x: event.touches[0].clientX, y: event.touches[0].clientY }
@@ -266,6 +375,10 @@
 
 		function handleEnd() {
 			isDragging = false;
+			
+			// End performance drag mode and restore full quality
+			endPerformanceDrag();
+			
 			window.removeEventListener('mousemove', handleMove);
 			window.removeEventListener('mouseup', handleEnd);
 			window.removeEventListener('touchmove', handleMove);
@@ -379,6 +492,9 @@
 		event.preventDefault();
 		event.stopPropagation();
 		isDragging = true;
+		
+		// Start performance drag mode for smooth red box dragging
+		startPerformanceDrag();
 
 		const startPoint = 'touches' in event
 			? { x: event.touches[0].clientX, y: event.touches[0].clientY }
@@ -455,6 +571,10 @@
 
 		function handleEnd() {
 			isDragging = false;
+			
+			// End performance drag mode and restore full quality
+			endPerformanceDrag();
+			
 			window.removeEventListener('mousemove', handleMove);
 			window.removeEventListener('mouseup', handleEnd);
 			window.removeEventListener('touchmove', handleMove);
@@ -473,6 +593,9 @@
 		
 		event.preventDefault();
 		isDragging = true;
+		
+		// Start performance drag mode for smooth resizing
+		startPerformanceDrag();
 		
 		const startPoint = 'touches' in event
 			? { x: event.touches[0].clientX, y: event.touches[0].clientY }
@@ -553,6 +676,10 @@
 		
 		function handleEnd() {
 			isDragging = false;
+			
+			// End performance drag mode and restore full quality
+			endPerformanceDrag();
+			
 			window.removeEventListener('mousemove', handleMove);
 			window.removeEventListener('mouseup', handleEnd);
 			window.removeEventListener('touchmove', handleMove);
@@ -673,9 +800,24 @@
 										<span>Pos: {Math.round(position.x)}, {Math.round(position.y)}</span>
 										<span><strong>Thumbnail Red Box:</strong></span>
 										<span>Top-Left: ({Math.round(frame.x)}, {Math.round(frame.y)})</span>
+										{#if isPerformanceDrag}
+											<span class="performance-indicator">🚀 Performance Mode</span>
+											<span>FPS: {performanceMonitor.getCurrentFPS()}</span>
+										{/if}
 									</div>
 								</div>
 							{/if}
+						
+						<!-- Performance indicator (always visible in debug mode) -->
+						{#if debugMode && (isPerformanceDrag || proxyGenerationInProgress)}
+							<div class="performance-badge" style="pointer-events: none;">
+								{#if proxyGenerationInProgress}
+									⚙️ Generating proxy...
+								{:else if isPerformanceDrag}
+									🚀 Performance mode
+								{/if}
+							</div>
+						{/if}
 					</div>
 				{/if}
 			</div>
@@ -972,5 +1114,26 @@
 		transition: none;
 	}
 	
+	/* Performance indicators */
+	.performance-indicator {
+		color: #10b981 !important;
+		font-weight: bold !important;
+	}
+	
+	.performance-badge {
+		position: absolute;
+		top: -40px;
+		right: 0;
+		background: rgba(16, 185, 129, 0.9);
+		color: white;
+		padding: 2px 6px;
+		border-radius: 4px;
+		font-size: 10px;
+		font-weight: 500;
+		z-index: 20;
+		white-space: nowrap;
+		border: 1px solid rgba(255, 255, 255, 0.3);
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+	}
 
 </style>

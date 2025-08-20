@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
+	import { Avatar, AvatarImage, AvatarFallback } from '$lib/components/ui/avatar';
 	import { paymentFlags } from '$lib/stores/featureFlags';
 
 	interface Props {
@@ -114,15 +115,17 @@
 					<div class="relative">
 						<Button
 						variant="ghost"
-						class="relative h-10 w-10 rounded-full"
+						class="relative h-10 w-10 rounded-full p-0"
 						aria-label="User account menu"
 						onclick={toggleDropdown}
 					>
-						<div
-							class="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white text-sm font-medium"
-						>
-							{getUserInitials(user)}
-						</div>
+						<Avatar class="h-8 w-8">
+							<AvatarImage src={user?.avatar_url} alt={user?.email || 'User avatar'} />
+							<AvatarFallback class="bg-primary text-white text-sm font-medium">
+								<img src="/default-avatar.svg" alt="Default avatar" class="h-6 w-6 opacity-60" />
+								<span class="sr-only">{getUserInitials(user)}</span>
+							</AvatarFallback>
+						</Avatar>
 					</Button>
 
 					{#if isDropdownOpen}

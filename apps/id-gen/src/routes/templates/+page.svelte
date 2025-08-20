@@ -93,6 +93,12 @@ import { imageCache } from '$lib/utils/imageCache';
 	let frontBackgroundPosition: BackgroundPosition = $state({ x: 0, y: 0, scale: 1 });
 	let backBackgroundPosition: BackgroundPosition = $state({ x: 0, y: 0, scale: 1 });
 
+	// Drag performance optimization state
+	let isDraggingBackground = $state(false);
+	let dragUpdateTimeout: number | null = null;
+	let lastPositionUpdateTime = $state(0);
+	let positionUpdateCount = $state(0);
+
 	// Cropping dialog state
 	let showCroppingDialog = $state(false);
 	let pendingSave = $state(false);
@@ -933,11 +939,55 @@ async function handleImageUpload(files: File[], side: 'front' | 'back') {
 	}
 
 	/**
+	 * Handle background position updates with drag performance optimization
+	 */
+	async function handleBackgroundPositionUpdate(position: BackgroundPosition, side: 'front' | 'back') {
+		// Update position immediately for responsiveness
+		if (side === 'front') {
+			frontBackgroundPosition = { ...position };
+		} else {
+			backBackgroundPosition = { ...position };
+		}
+		
+		// Detect if this is likely a drag operation based on update frequency
+		const now = performance.now();
+		const timeSinceLastUpdate = now - lastPositionUpdateTime;
+		lastPositionUpdateTime = now;
+		
+		// Consider it dragging if updates come within 50ms of each other
+		const isLikelyDragging = timeSinceLastUpdate < 50;
+		
+		if (isLikelyDragging) {
+			positionUpdateCount++;
+			isDraggingBackground = true;
+			
+			// Clear existing timeout
+			if (dragUpdateTimeout) {
+				clearTimeout(dragUpdateTimeout);
+			}
+			
+			// Debounce expensive crop preview updates during drag
+			dragUpdateTimeout = setTimeout(async () => {
+				await updateCropPreviews();
+				isDraggingBackground = false;
+				positionUpdateCount = 0;
+				dragUpdateTimeout = null;
+			}, 150); // Wait 150ms after drag movement stops
+		} else {
+			// Immediate update when not dragging (single position change)
+			isDraggingBackground = false;
+			positionUpdateCount = 0;
+			await updateCropPreviews();
+		}
+	}
+
+	/**
 	 * Generate crop previews for both front and back images
 	 * This creates separate cropped preview images that show what the final output will look like
 	 */
 	async function updateCropPreviews() {
-		if (!requiredPixelDimensions) return;
+		// Skip expensive operations during active drag
+		if (isDraggingBackground || !requiredPixelDimensions) return;
 		
 		// Generate front crop preview
 		if (frontBackground) {
@@ -1199,13 +1249,8 @@ async function handleImageUpload(files: File[], side: 'front' | 'back') {
 				onUpdateBackgroundPosition={async (position, side) => {
 			$state.snapshot(`Background side updated for ${side}:`);
 			$state.snapshot(`Background position updated for ${position}`);
-					if (side === 'front') {
-						frontBackgroundPosition = { ...position };
-					} else {
-						backBackgroundPosition = { ...position };
-					}
-					// Regenerate crop previews when position changes
-					await updateCropPreviews();
+					// Use optimized background position handler with drag performance
+					await handleBackgroundPositionUpdate(position, side);
 				}}
 			/>
 			{/key}
