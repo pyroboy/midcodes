@@ -9,6 +9,19 @@
  * - Import types for TypeScript: `import type { TemplateElement } from '@/schemas'`
  */
 
+// Local type imports for internal type references
+import type { TemplateCreationData, TemplateCreationInput } from './template-creation.schema';
+import type {
+  TemplateElement,
+  TextElement,
+  ImageElement,
+  QrElement,
+  PhotoElement,
+  SignatureElement,
+  SelectionElement
+} from './template-element.schema';
+import type { TemplateDimensionSummary } from './display-conversion.schema';
+
 // Re-export all schemas and types from individual schema modules
 
 // Template Creation Schemas & Types
@@ -23,7 +36,7 @@ export {
 	type TemplateCreationData,
 	type TemplatePreset,
 	type DpiOption
-} from './template-creation.schema.js';
+} from './template-creation.schema';
 
 // Template Element Schemas & Types
 export {
@@ -61,7 +74,7 @@ export {
 	type PhotoElement,
 	type SignatureElement,
 	type SelectionElement
-} from './template-element.schema.js';
+} from './template-element.schema';
 
 // Template Update Schemas & Types
 export {
@@ -85,7 +98,7 @@ export {
 	type TemplateValidation,
 	type TemplateExport,
 	type TemplateImport
-} from './template-update.schema.js';
+} from './template-update.schema';
 
 // Display & Conversion Schemas & Types
 export {
@@ -117,7 +130,7 @@ export {
 	type ImageUploadValidation,
 	type DimensionValidation,
 	type PrintSpecification
-} from './display-conversion.schema.js';
+} from './display-conversion.schema';
 
 // ID Card Schemas & Types
 export {
@@ -149,7 +162,7 @@ export {
 	type StorageUpload,
 	type IdCardValidation,
 	type IdCardStats
-} from './idcard.schema.js';
+} from './idcard.schema';
 
 // Organization Schemas & Types
 export {
@@ -179,7 +192,7 @@ export {
 	type OrganizationLimits,
 	type OrganizationBilling,
 	type OrganizationSearch
-} from './organization.schema.js';
+} from './organization.schema';
 
 // Authentication Schemas & Types
 export {
@@ -196,7 +209,6 @@ export {
 	authStateSchema,
 	permissionCheckSchema,
 	userInvitationSchema,
-	creditTransactionSchema,
 	changePasswordSchema,
 	updateAccountSchema,
 	deleteAccountSchema,
@@ -215,13 +227,12 @@ export {
 	type AuthState,
 	type PermissionCheck,
 	type UserInvitation,
-	type CreditTransaction,
 	type ChangePassword,
 	type UpdateAccount,
 	type DeleteAccount,
 	type Enable2FA,
 	type Verify2FA
-} from './auth.schema.js';
+} from './auth.schema';
 
 // Admin Schemas & Types
 export {
@@ -239,7 +250,7 @@ export {
 	type AdminStats,
 	type SystemOverview,
 	type AdminActionWithContext
-} from './admin.schema.js';
+} from './admin.schema';
 
 // Billing & Payment Schemas & Types  
 export {
@@ -267,7 +278,7 @@ export {
 	type UsageAnalytics,
 	type PaymentRefund,
 	type CreditAdjustment
-} from './billing.schema.js';
+} from './billing.schema';
 
 // Utility type helpers for common use cases
 export type Template = TemplateCreationData & {
@@ -288,7 +299,7 @@ export type ElementsByType = {
 };
 
 export type TemplateFormData = {
-	basic: Pick<TemplateCreationInput, 'name' | 'description'>;
+	basic: Pick<TemplateCreationInput, 'name'>;
 	dimensions: Pick<TemplateCreationInput, 'width_pixels' | 'height_pixels' | 'dpi'>;
 	backgrounds: {
 		front?: string;

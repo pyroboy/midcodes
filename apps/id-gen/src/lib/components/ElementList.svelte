@@ -218,7 +218,7 @@ let {
 	{/if}
 
 	<!-- Elements List -->
-{#each elements as element, i}
+{#each elements ?? [] as element, i}
 		<div class="element-item" class:highlighted={hoveredElementId === element.id}>
 <div
 				class="element-header"

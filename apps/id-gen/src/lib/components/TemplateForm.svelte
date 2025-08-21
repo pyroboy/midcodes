@@ -186,7 +186,7 @@ let hoveredElementId: string | null = $state(null);
 		debouncedUpdateElements = debounce(updateElements, 50);
 
 		// Wait for dimensions to be available before creating elements
-		if (elements.length === 0) {
+		if ((elements?.length ?? 0) === 0) {
 			const currentBase = baseDimensions();
 			if (currentBase.actualWidth > 0 && currentBase.actualHeight > 0) {
 				elements = createAdaptiveElements(
@@ -408,7 +408,7 @@ let hoveredElementId: string | null = $state(null);
 		// Use coordinate system for mouse movement conversion
 		const storageDelta = coordSystem().scaleMouseDelta(dx, dy);
 
-		const element = elements[currentElementIndex];
+		const element = elements?.[currentElementIndex];
 		if (!element) return;
 
 		const updatedElements = [...elements];
@@ -782,7 +782,7 @@ let hoveredElementId: string | null = $state(null);
 					<!-- Background manipulation controls removed - use thumbnail controls only -->
 					
 				<div class="elements-overlay">
-					{#each elements as element, i}
+				{#each elements ?? [] as element, i}
 						<div
 						class="template-element {element.type}"
 						class:highlighted={hoveredElementId === element.id}

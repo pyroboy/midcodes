@@ -9,6 +9,7 @@
 	import '../app.css';
 	import { onMount } from 'svelte';
 	import { loadGoogleFonts } from '$lib/config/fonts';
+	import { setupGlobalErrorHandlers } from '$lib/utils/errorHandling';
 	import MobileHeader from '$lib/components/MobileHeader.svelte';
 	import BottomNavigation from '$lib/components/BottomNavigation.svelte';
 	import HamburgerMenu from '$lib/components/HamburgerMenu.svelte';
@@ -29,6 +30,7 @@
 
 	onMount(async () => {
 		try {
+			setupGlobalErrorHandlers();
 			await loadGoogleFonts();
 		} catch (error) {
 			console.error('Failed to load fonts:', error);

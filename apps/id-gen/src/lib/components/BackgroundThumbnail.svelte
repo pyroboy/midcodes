@@ -81,7 +81,7 @@
 		if (browser) {
 			const listener = (e: Event) => {
 				if (debugMode && e instanceof CustomEvent) {
-					console.log('📡 Position sync:', e.detail);
+					// Avoid verbose console in production; debugMode is typically off in prod
 				}
 			};
 			window.addEventListener('background-position-update', listener);
@@ -139,7 +139,7 @@
 			lastProxyGenerationTime = generationTime;
 			
 			if (debugMode) {
-				console.log(`🚀 Proxy generated for thumbnail in ${generationTime.toFixed(1)}ms`);
+				// Dev-only debug output suppressed in production builds
 			}
 		} catch (error) {
 			console.warn('⚠️ Failed to generate proxy image:', error);
@@ -160,7 +160,7 @@
 			currentDragSession = performanceMonitor.startDrag(`thumb_${imageUrl}_${Date.now()}`);
 			
 			if (debugMode) {
-				console.log('🎯 Starting performance drag mode with monitoring');
+				// Dev-only debug output suppressed in production builds
 			}
 		}
 	}
@@ -175,12 +175,7 @@
 			// End performance monitoring and get metrics
 			const metrics = performanceMonitor.endDrag();
 			if (metrics && debugMode) {
-				console.log('📊 Drag performance metrics:', {
-					avgFPS: metrics.averageFps.toFixed(1),
-					duration: `${metrics.dragDuration.toFixed(1)}ms`,
-					frames: metrics.frameCount,
-					proxyGenTime: `${lastProxyGenerationTime.toFixed(1)}ms`
-				});
+				// Dev-only debug output suppressed in production builds
 			}
 			
 			currentDragSession = null;
@@ -188,7 +183,7 @@
 			// Redraw with full resolution
 			drawThumbnail();
 			if (debugMode) {
-				console.log('✨ Restored full quality after drag');
+				// Dev-only debug output suppressed in production builds
 			}
 		}
 	}

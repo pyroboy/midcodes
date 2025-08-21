@@ -8,6 +8,7 @@ import { jwtDecode } from 'jwt-decode';
 import { getUserPermissions } from '$lib/services/permissions';
 import type { UserJWTPayload } from '$lib/types/auth';
 import '$lib/utils/setup-logging';
+import { logger } from '$lib/utils/logger';
 
 export interface GetSessionResult {
 	session: Session | null;
@@ -112,8 +113,11 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
 		const permissions = decodedToken
 			? await getUserPermissions(decodedToken.user_roles, event.locals.supabase)
 			: [];
-		console.log('USERROLES:', decodedToken?.user_roles);
-		console.log('USER_METADATA:', user.user_metadata);
+		// Sanitized logging only; never log raw roles or metadata in production
+		logger.info('User authenticated', {
+			userId: user.id,
+			hasRoles: Boolean(decodedToken?.user_roles?.length)
+		});
 		return {
 			session: currentSession,
 			error: null,
@@ -128,14 +132,22 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
 };
 
 const authGuard: Handle = async ({ event, resolve }) => {
-	console.log(' [Auth Guard] Checking session for path:', event.url.pathname);
+	// Set baseline security headers on all responses
+	event.setHeaders({
+		'X-Frame-Options': 'DENY',
+		'X-Content-Type-Options': 'nosniff',
+		'Referrer-Policy': 'strict-origin-when-cross-origin',
+		'Permissions-Policy': 'geolocation=(), microphone=(), camera=()'
+	});
+
+	logger.debug('[Auth Guard] Checking session for path:', event.url.pathname);
 	const sessionInfo = await event.locals.safeGetSession();
 
-	console.log(' [Auth Guard] Session info:', {
+	logger.debug('[Auth Guard] Session info', {
 		hasSession: !!sessionInfo.session,
 		hasUser: !!sessionInfo.user,
 		hasOrgId: !!sessionInfo.org_id,
-		permissions: sessionInfo.permissions?.length || 0
+		permissionsCount: sessionInfo.permissions?.length || 0
 	});
 
 	// Set all info in locals
@@ -150,7 +162,7 @@ const authGuard: Handle = async ({ event, resolve }) => {
 	// Handle API routes
 	if (event.url.pathname.startsWith('/api')) {
 		if (!sessionInfo.user) {
-			console.log(' [Auth Guard] API route unauthorized');
+			logger.warn('[Auth Guard] API route unauthorized');
 			throw throwError(401, 'Unauthorized');
 		}
 		return resolve(event);
@@ -158,13 +170,13 @@ const authGuard: Handle = async ({ event, resolve }) => {
 
 	// Allow access to auth routes when not authenticated
 	if (event.url.pathname.startsWith('/auth')) {
-		console.log(' [Auth Guard] Auth route access');
+		logger.debug('[Auth Guard] Auth route access');
 		// If user is already authenticated and trying to access auth routes (except signout),
 		// handle role-based redirects
 		if (sessionInfo.session && event.url.pathname !== '/auth/signout') {
 			const returnTo = event.url.searchParams.get('returnTo');
 			if (returnTo) {
-				console.log(' [Auth Guard] Redirecting authenticated user to:', returnTo);
+				logger.debug('[Auth Guard] Redirecting authenticated user', { returnTo });
 				throw redirect(303, returnTo);
 			}
 		}
@@ -173,7 +185,7 @@ const authGuard: Handle = async ({ event, resolve }) => {
 
 	// Require authentication for all other routes
 	if (!sessionInfo.session && !event.url.pathname.startsWith('/auth')) {
-		console.log(' [Auth Guard] No session, redirecting to auth');
+		logger.info('[Auth Guard] No session, redirecting to auth');
 		throw redirect(303, `/auth?returnTo=${event.url.pathname}`);
 	}
 
