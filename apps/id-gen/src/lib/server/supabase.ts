@@ -11,40 +11,14 @@ export const supabaseAdmin = createClient<Database>(PUBLIC_SUPABASE_URL, PRIVATE
 	}
 });
 
-// Local fallbacks for table types (avoid depending on generated Database table names that may not exist)
-export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
+// Use the generated database types for consistency
+export type Json = Database['public']['Tables']['payment_records']['Row']['metadata'];
 
-export interface PaymentRecord {
-	id: string;
-	user_id: string;
-	session_id: string | null;
-	provider_payment_id: string | null;
-	kind: string;
-	sku_id: string;
-	amount_php: number;
-	currency: string;
-	status: 'pending' | 'paid' | 'failed' | 'refunded';
-	method: string | null;
-	method_allowed: string[];
-	idempotency_key: string;
-	metadata: Json | null;
-	paid_at?: string | null;
-	raw_event?: Json | null;
-	reason: string | null;
-	created_at: string;
-	updated_at: string;
-}
+// Use the generated database types directly to avoid type mismatches
+export type PaymentRecord = Database['public']['Tables']['payment_records']['Row'];
+export type PaymentRecordInsert = Database['public']['Tables']['payment_records']['Insert'];
+export type PaymentRecordUpdate = Database['public']['Tables']['payment_records']['Update'];
 
-export type PaymentRecordInsert = Omit<PaymentRecord, 'id' | 'created_at' | 'updated_at'>;
-export type PaymentRecordUpdate = Partial<PaymentRecord>;
-
-// Minimal webhook event types so importing modules can type-check
-export interface WebhookEvent {
-	id: string;
-	event_id: string;
-	event_type: string;
-	provider: string;
-	raw_payload: Json | null;
-	created_at: string;
-}
-export type WebhookEventInsert = Omit<WebhookEvent, 'id' | 'created_at'>;
+// Use generated webhook event types
+export type WebhookEvent = Database['public']['Tables']['webhook_events']['Row'];
+export type WebhookEventInsert = Database['public']['Tables']['webhook_events']['Insert'];

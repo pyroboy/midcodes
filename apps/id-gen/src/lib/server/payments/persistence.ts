@@ -9,11 +9,10 @@ import {
 	type PaymentRecordInsert,
 	type PaymentRecordUpdate,
 	type WebhookEvent,
-	type WebhookEventInsert
+	type WebhookEventInsert,
+	type Json
 } from '$lib/server/supabase';
 import type { PurchaseKind, PaymentStatus, PaymentMethod } from '$lib/payments/types';
-// Local Json type to avoid dependency on generated types
-type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 
 // Interface definitions for better type safety
 interface RecordCheckoutInitParams {
