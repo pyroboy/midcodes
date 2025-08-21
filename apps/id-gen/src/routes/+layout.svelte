@@ -10,6 +10,7 @@
 	import { onMount } from 'svelte';
 	import { loadGoogleFonts } from '$lib/config/fonts';
 	import { setupGlobalErrorHandlers } from '$lib/utils/errorHandling';
+	import { theme } from '$lib/stores/theme';
 	import MobileHeader from '$lib/components/MobileHeader.svelte';
   import DesktopHeader from '$lib/components/DesktopHeader.svelte';
 	import BottomNavigation from '$lib/components/BottomNavigation.svelte';
@@ -29,12 +30,18 @@
 		isMenuOpen = false;
 	}
 
+	// Initialize theme on mount
 	onMount(async () => {
 		try {
 			setupGlobalErrorHandlers();
 			await loadGoogleFonts();
+			
+			// Initialize theme store (this will apply stored theme or default)
+			// The theme store already handles DOM application in its initialization
+			const currentTheme = theme.getCurrentTheme();
+			console.log('Theme initialized:', currentTheme);
 		} catch (error) {
-			console.error('Failed to load fonts:', error);
+			console.error('Failed to initialize app:', error);
 		}
 	});
 </script>

@@ -5,6 +5,7 @@
   import CreditsDisplay from './ui/CreditsDisplay.svelte';
   import { Button } from './ui/button';
   import UserDropdown from './UserDropdown.svelte';
+  import ThemeToggle from './ThemeToggle.svelte';
   
   let { user, class: className = '' } = $props();
 </script>
@@ -47,6 +48,9 @@
       <Button variant="ghost" size="icon" aria-label="Notifications">
         <Bell class="h-5 w-5" />
       </Button>
+      
+      <!-- Theme Toggle -->
+      <ThemeToggle variant="ghost" />
       
       <!-- Credits -->
       <CreditsDisplay {user} />

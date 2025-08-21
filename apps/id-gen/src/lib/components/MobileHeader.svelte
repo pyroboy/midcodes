@@ -2,6 +2,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Avatar, AvatarImage, AvatarFallback } from '$lib/components/ui/avatar';
 	import { paymentFlags } from '$lib/stores/featureFlags';
+	import ThemeToggle from './ThemeToggle.svelte';
 
 	interface Props {
 		user?: any;
@@ -108,9 +109,12 @@
 				</a>
 			</div>
 
-			<!-- Right: Credits + User Account -->
+			<!-- Right: Theme Toggle + Credits + User Account -->
 			{#if user}
-				<div class="flex items-center gap-3">
+				<div class="flex items-center gap-2">
+					<!-- Theme Toggle -->
+					<ThemeToggle size="sm" variant="ghost" class="" />
+					
 					<!-- Credits Display -->
 					<div class="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-full">
 						<svg class="h-4 w-4 text-primary" fill="currentColor" viewBox="0 0 20 20">
