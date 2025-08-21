@@ -9,7 +9,7 @@
 	import { pushState } from '$app/navigation';
 	import type { TemplateElement, TemplateData } from '$lib/stores/templateStore';
 	import type { CardSize } from '$lib/utils/sizeConversion';
-	import { cardSizeToPixels } from '$lib/utils/sizeConversion';
+	import { cardSizeToPixels, LEGACY_CARD_SIZE, COMMON_CARD_SIZES, findClosestCardSize } from '$lib/utils/sizeConversion';
 
 	// Type that matches the actual database schema
 	type DatabaseTemplate = {
@@ -116,6 +116,73 @@ import { imageCache } from '$lib/utils/imageCache';
 			previewUrl?: string;
 		};
 	}>({});
+
+	/**
+	 * Find the best default size for legacy templates by analyzing existing templates
+	 * or falling back to a reasonable standard size
+	 */
+	function findBestDefaultSize(): CardSize {
+		// If no templates exist, use the standard credit card size
+		if (!templates || templates.length === 0) {
+			return COMMON_CARD_SIZES.find(size => size.name === 'Credit Card') || LEGACY_CARD_SIZE;
+		}
+
+		// Try to find templates with size information to analyze patterns
+		const templatesWithSizes = templates.filter(t => 
+			(t as any).width_pixels && (t as any).height_pixels
+		) as Array<DatabaseTemplate & { width_pixels: number; height_pixels: number }>;
+
+		if (templatesWithSizes.length > 0) {
+			// Count occurrences of each size to find the most common
+			const sizeMap = new Map<string, { count: number; width: number; height: number }>();
+			
+			templatesWithSizes.forEach(template => {
+				const key = `${template.width_pixels}x${template.height_pixels}`;
+				if (sizeMap.has(key)) {
+					sizeMap.get(key)!.count++;
+				} else {
+					sizeMap.set(key, { count: 1, width: template.width_pixels, height: template.height_pixels });
+				}
+			});
+
+			// Find the most common size
+			let mostCommon = { count: 0, width: 0, height: 0 };
+			for (const sizeInfo of sizeMap.values()) {
+				if (sizeInfo.count > mostCommon.count) {
+					mostCommon = sizeInfo;
+				}
+			}
+
+			if (mostCommon.count > 0) {
+				// Try to match it to a standard card size or create a custom one
+				const closestStandardSize = findClosestCardSize({ 
+					width: mostCommon.width, 
+					height: mostCommon.height 
+				}, 300);
+				
+				// If it's close to a standard size (within 5% difference), use the standard
+				const standardPixels = cardSizeToPixels(closestStandardSize, 300);
+				const widthDiff = Math.abs(standardPixels.width - mostCommon.width) / mostCommon.width;
+				const heightDiff = Math.abs(standardPixels.height - mostCommon.height) / mostCommon.height;
+				
+				if (widthDiff <= 0.05 && heightDiff <= 0.05) {
+					return closestStandardSize;
+				} else {
+					// Create a custom size based on the most common dimensions
+					return {
+						name: 'Most Common Template Size',
+						width: mostCommon.width,
+						height: mostCommon.height,
+						unit: 'pixels',
+						description: `Most common size in existing templates (${mostCommon.width}px × ${mostCommon.height}px)`
+					};
+				}
+			}
+		}
+
+		// If no patterns found or analysis failed, use Credit Card as the most common standard
+		return COMMON_CARD_SIZES.find(size => size.name === 'Credit Card') || LEGACY_CARD_SIZE;
+	}
 
 	async function validateBackgrounds(): Promise<boolean> {
 		if ((!frontBackground && !frontPreview) || (!backBackground && !backPreview)) {
@@ -1075,17 +1142,15 @@ async function handleImageUpload(files: File[], side: 'front' | 'back') {
 						height: data.selectedTemplate.height_pixels
 					};
 				} else {
-					// Legacy template - use hardcoded dimensions
-					currentCardSize = {
-						name: 'Legacy Template',
-						width: 1013,
-						height: 638,
-						unit: 'pixels' as const
-					};
+					// Legacy template - try to find the most common size among existing templates,
+					// otherwise fall back to the standard legacy size
+					const defaultSize = findBestDefaultSize();
+					currentCardSize = defaultSize;
 					requiredPixelDimensions = {
-						width: 1013,
-						height: 638
+						width: defaultSize.width,
+						height: defaultSize.height
 					};
+					console.log('📏 Using fallback size for legacy template:', defaultSize);
 				}
 			}
 		} catch (err: unknown) {
@@ -1262,7 +1327,7 @@ async function handleImageUpload(files: File[], side: 'front' | 'back') {
 		bind:open={showCroppingDialog}
 		frontImageInfo={croppingDialogData.front || null}
 		backImageInfo={croppingDialogData.back || null}
-		templateSize={requiredPixelDimensions || { width: 1013, height: 638 }}
+	templateSize={requiredPixelDimensions || { width: LEGACY_CARD_SIZE.width, height: LEGACY_CARD_SIZE.height }}
 		onConfirm={handleCroppingConfirm}
 		onCancel={handleCroppingCancel}
 	/>
