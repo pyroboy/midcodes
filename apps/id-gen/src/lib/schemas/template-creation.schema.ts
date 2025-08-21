@@ -21,6 +21,7 @@ export const templateCreationInputSchema = z.object({
 		.min(1, 'Template name is required')
 		.max(100, 'Template name must be less than 100 characters')
 		.trim(),
+	description: z.string().optional(),
 	width_pixels: pixelDimensionSchema,
 	height_pixels: pixelDimensionSchema,
 	dpi: dpiSchema

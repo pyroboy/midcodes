@@ -154,10 +154,44 @@ export const templateElementSchema = z.discriminatedUnion('type', [
 ]);
 
 // Element creation input (before ID assignment)
-export const templateElementInputSchema = templateElementSchema.omit({ id: true });
+// Base for input (omits id)
+const baseInputElementSchema = baseTemplateElementSchema.omit({ id: true });
+
+// Create input versions of each element schema
+const textInputElementSchema = baseInputElementSchema.extend(textElementSchema.shape);
+const imageInputElementSchema = baseInputElementSchema.extend(imageElementSchema.shape);
+const qrInputElementSchema = baseInputElementSchema.extend(qrElementSchema.shape);
+const photoInputElementSchema = baseInputElementSchema.extend(photoElementSchema.shape);
+const signatureInputElementSchema = baseInputElementSchema.extend(signatureElementSchema.shape);
+const selectionInputElementSchema = baseInputElementSchema.extend(selectionElementSchema.shape);
+
+// Element creation input (before ID assignment)
+export const templateElementInputSchema = z.discriminatedUnion('type', [
+	textInputElementSchema,
+	imageInputElementSchema,
+	qrInputElementSchema,
+	photoInputElementSchema,
+	signatureInputElementSchema,
+	selectionInputElementSchema
+]);
 
 // Element update schema (partial updates allowed)
-export const templateElementUpdateSchema = templateElementSchema.partial().required({ id: true });
+// Create partial versions of each element schema for updates
+const partialTextElementSchema = textElementSchema.partial();
+const partialImageElementSchema = imageElementSchema.partial();
+const partialQrElementSchema = qrElementSchema.partial();
+const partialPhotoElementSchema = photoElementSchema.partial();
+const partialSignatureElementSchema = signatureElementSchema.partial();
+const partialSelectionElementSchema = selectionElementSchema.partial();
+
+export const templateElementUpdateSchema = z.discriminatedUnion('type', [
+	partialTextElementSchema,
+	partialImageElementSchema,
+	partialQrElementSchema,
+	partialPhotoElementSchema,
+	partialSignatureElementSchema,
+	partialSelectionElementSchema
+]).and(z.object({ id: z.string().uuid() }));
 
 // Inferred types for export
 export type ElementType = z.infer<typeof elementTypeSchema>;

@@ -2,6 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+
+## meta-instruction
+Now think hard and write elegant code that completes this.
+Do not add backwards compatibility unless explicitly requested.
+After every code block you write, lint, compile, and write corresponding tests and run them before writing the next code block
+
+
 ## Multi-Repository Context
 
 This Claude session has access to two important directories:
@@ -212,6 +219,7 @@ When searching for information:
   - `stores/` - Svelte stores for state management (auth, darkMode, templateStore)
   - `types/` - TypeScript type definitions including generated Supabase types
   - `utils/` - Helper functions for card geometry and ID card operations
+  - `schemas/`  - all the schema files  for the codebase, 
 - `src/routes/` - SvelteKit file-based routing
   - `templates/` - Template management pages (admin only)
   - `use-template/` - ID generation from templates
@@ -390,6 +398,7 @@ You are acting as a **senior data architect**. Follow these steps strictly and i
 
 ### **Step 3 – Technical Specification (Expanded)**
 
+
 - Translate requirements into a **structured specification**.
 - Cover:
     - **Data flow** → Input → Processing → Output.
@@ -403,7 +412,6 @@ You are acting as a **senior data architect**. Follow these steps strictly and i
 ---
 
 ### **Step 4 – Implementation Plan**
-
 - Propose a **step-by-step plan** for how to implement.
 - Specify **which files/components** are involved.
 - Highlight **best practices** (error handling, validation, testing, maintainability).
@@ -416,6 +424,12 @@ You are acting as a **senior data architect**. Follow these steps strictly and i
 - Outline **how to test the implementation**:
     - Unit tests → Functions.
     - Integration tests → Supabase + SvelteKit flow.
+    
+    !!! USE SUPABASE commands as if the using the supabase API NOT MCP COMMMANDS
+    !!!Implement mechanisms to seed test data before running tests and clean up created records after tests complete
+    !!! to ensure accurate and reliable test results MIRROR the tables to the schema "test_integration" 
+
+    
     - E2E tests → User-level behavior in browser.
 - Mention **edge cases** and how to confirm correctness.
 

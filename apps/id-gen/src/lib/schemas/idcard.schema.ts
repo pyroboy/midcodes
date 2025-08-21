@@ -72,9 +72,10 @@ export const idCardBulkOperationSchema = z.object({
 
 // Image upload handling schemas
 export const imageUploadSchema = z.object({
-	file: z.any(), // File object
-	max_size: z.number().default(10 * 1024 * 1024), // 10MB default
-	allowed_types: z.array(z.string()).default(['image/png', 'image/jpeg', 'image/webp'])
+    file: z.instanceof(File),
+    side: z.enum(['front', 'back']),
+    expectedWidth: z.number().min(1),
+    expectedHeight: z.number().min(1),
 });
 
 export const imageUploadResultSchema = z.object({

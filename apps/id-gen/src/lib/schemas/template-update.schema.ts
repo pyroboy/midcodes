@@ -14,9 +14,9 @@ export const templateUpdateInputSchema = z.object({
 	height_pixels: pixelDimensionSchema.optional(),
 	dpi: dpiSchema.optional(),
 	orientation: z.enum(['landscape', 'portrait']).optional(),
-	template_elements: z.array(templateElementSchema).optional(),
-	front_background: z.string().optional(), // Can be URL or path
-	back_background: z.string().optional(), // Can be URL or path
+	template_elements: z.array(z.any()).optional(),
+	front_background: z.string().url().optional(), // Can be URL or path
+	back_background: z.string().url().optional(), // Can be URL or path
 	// Legacy fields (existing in database)
 	unit_type: z.string().optional(),
 	unit_width: z.number().optional(),
@@ -26,9 +26,9 @@ export const templateUpdateInputSchema = z.object({
 // Complete template update schema (includes system fields)
 export const templateUpdateDataSchema = templateUpdateInputSchema.extend({
 	id: z.string().uuid(),
-	user_id: z.string().uuid(),
-	org_id: z.string().uuid(),
-	created_at: z.string().datetime(),
+	user_id: z.string().uuid().optional(),
+	org_id: z.string().uuid().optional(),
+	created_at: z.string().datetime().optional(),
 	updated_at: z.string().datetime().optional()
 });
 
@@ -51,7 +51,7 @@ export const templateDuplicateSchema = z.object({
 		.max(500, 'Description must be less than 500 characters')
 		.optional(),
 	user_id: z.string().uuid(),
-	org_id: z.string().uuid()
+	org_id: z.string().uuid().optional(),
 });
 
 // Template publish schema (for sharing templates)

@@ -11,6 +11,7 @@
 	import { loadGoogleFonts } from '$lib/config/fonts';
 	import { setupGlobalErrorHandlers } from '$lib/utils/errorHandling';
 	import MobileHeader from '$lib/components/MobileHeader.svelte';
+  import DesktopHeader from '$lib/components/DesktopHeader.svelte';
 	import BottomNavigation from '$lib/components/BottomNavigation.svelte';
 	import HamburgerMenu from '$lib/components/HamburgerMenu.svelte';
 	import { Toaster } from '$lib/components/ui/sonner';
@@ -50,18 +51,26 @@
 <div class="min-h-screen bg-gray-50 dark:bg-gray-950">
 	{#if data.user}
 		<!-- Mobile Header -->
-		<MobileHeader user={data.user} onMenuToggle={toggleMenu} />
+		<MobileHeader user={data.user} onMenuToggle={toggleMenu} class="lg:hidden" />
+
+		<!-- Desktop Header (hidden on mobile) -->
+		<DesktopHeader user={data.user} class="hidden lg:block" />
 
 		<!-- Hamburger Menu -->
 		<HamburgerMenu isOpen={isMenuOpen} user={data.user} onClose={closeMenu} />
 
 		<!-- Main Content with proper spacing -->
-		<main class="lg:ml-64">
+		<main class="lg:ml-64 lg:pt-16">
 			<!-- Content padding to account for fixed header and bottom nav -->
 			<div class="pt-0 pb-20 lg:pb-4 min-h-screen">
 				{@render children()}
 			</div>
 		</main>
+
+		<!-- Sidebar integration for desktop -->
+		<div class="hidden lg:flex lg:fixed lg:top-16 lg:left-0 lg:w-64 lg:h-[calc(100vh-4rem)] lg:border-r lg:border-gray-200 dark:lg:border-gray-700">
+			<BottomNavigation user={data.user} class="lg:flex lg:flex-col lg:w-full lg:relative lg:top-0" />
+		</div>
 
 		<!-- Bottom Navigation -->
 		<BottomNavigation user={data.user} />
