@@ -89,7 +89,7 @@ export const checkoutInitResultSchema = z.object({
 export const paymentRecordSchema = z.object({
 	id: z.string(),
 	user_id: z.string(),
-	session_id: z.string(),
+	session_id: z.string().nullable(),
 	provider_payment_id: z.string().nullable(),
 	kind: z.string(), // Database stores as string, not enum
 	sku_id: z.string(),
@@ -100,8 +100,8 @@ export const paymentRecordSchema = z.object({
 	method_allowed: z.array(z.string()),
 	metadata: z.any(), // Database stores as Json type
 	reason: z.string().nullable(),
-	paid_at: z.string().nullable(),
-	raw_event: z.any(), // Database stores as Json type
+	paid_at: z.string().nullable().optional(),
+	raw_event: z.any().optional(), // Database stores as Json type
 	idempotency_key: z.string(),
 	created_at: z.string(),
 	updated_at: z.string()

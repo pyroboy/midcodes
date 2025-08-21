@@ -226,7 +226,7 @@
 							<CardHeader>
 								<div class="flex items-center justify-between">
 									<div class="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-r from-blue-500 to-purple-500">
-										<svelte:component this={feature.icon} class="h-6 w-6 text-white" />
+										<feature.icon class="h-6 w-6 text-white" />
 									</div>
 									{#if feature.demo}
 										<Badge variant="secondary" class="text-xs">
@@ -270,7 +270,7 @@
 							<CardHeader>
 								<div class="flex items-center space-x-4">
 									<div class="flex h-12 w-12 items-center justify-center rounded-lg {useCase.color}">
-										<svelte:component this={useCase.icon} class="h-6 w-6" />
+										<useCase.icon class="h-6 w-6" />
 									</div>
 									<div>
 										<CardTitle class="text-xl">{useCase.title}</CardTitle>

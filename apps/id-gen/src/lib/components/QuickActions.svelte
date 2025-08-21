@@ -1,9 +1,18 @@
 <script lang='ts'>
   import { Plus, Zap, Download, Upload } from '@lucide/svelte';
+  import { Button } from '$lib/components/ui/button';
   
   let { user } = $props();
   
-  const actions = [
+  interface Action {
+    href: string;
+    label: string;
+    icon: any;
+    variant: 'link' | 'default' | 'destructive' | 'secondary' | 'outline' | 'ghost';
+    roles: string[];
+  }
+
+  const actions: Action[] = [
     {
       href: '/templates',
       label: 'New Template',
@@ -43,7 +52,7 @@
         href={action.href}
         class="hidden xl:flex"
       >
-        <svelte:component this={action.icon} class="h-4 w-4 mr-2" />
+        <action.icon class="h-4 w-4 mr-2" />
         {action.label}
       </Button>
     {/if}

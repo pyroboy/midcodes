@@ -150,11 +150,18 @@ export const getAdminDashboardData = query(async (): Promise<AdminDashboardData>
 		return {
 			stats: {
 				totalCards: totalCards || 0,
-				newCardsThisMonth
+				newCardsThisMonth,
+				totalUsers: users?.length || 0,
+				totalTemplates: templates?.length || 0
 			},
 			users: users || [],
 			templates: templates || [],
-			recentActivity: allActivities,
+			recentActivity: allActivities.map((a) => ({
+				id: String(a.id),
+				type: a.type as 'card_generated' | 'user_added',
+				description: a.description,
+				created_at: String(a.created_at)
+			})),
 			errors: {
 				users: usersError?.message || null,
 				templates: templatesError?.message || null,

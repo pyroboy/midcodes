@@ -119,13 +119,17 @@ describe('Template Creation Supabase Integration Tests', () => {
                     expect(insertResult.data.id).toBe(validatedData.id);
                     expect(insertResult.data.name).toBe(validatedData.name);
                     
-                    createdTemplateIds.push(validatedData.id);
+if (validatedData.id) {
+                        createdTemplateIds.push(validatedData.id);
+                    }
 
-                    // Step 6: Verify data can be retrieved
-                    const selectResult = await selectTemplate(validatedData.id, TEST_ORG_ID);
-                    if (!selectResult.error) {
-                        expect(selectResult.data.id).toBe(validatedData.id);
-                        expect(selectResult.data.org_id).toBe(TEST_ORG_ID);
+// Step 6: Verify data can be retrieved
+                    if (validatedData.id) {
+                        const selectResult = await selectTemplate(validatedData.id, TEST_ORG_ID);
+                        if (!selectResult.error) {
+                            expect(selectResult.data.id).toBe(validatedData.id);
+                            expect(selectResult.data.org_id).toBe(TEST_ORG_ID);
+                        }
                     }
                 }
             } catch (error) {

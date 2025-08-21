@@ -12,7 +12,8 @@ import {
 	type WebhookEventInsert
 } from '$lib/server/supabase';
 import type { PurchaseKind, PaymentStatus, PaymentMethod } from '$lib/payments/types';
-import type { Json } from '$lib/types/database.types';
+// Local Json type to avoid dependency on generated types
+type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 
 // Interface definitions for better type safety
 interface RecordCheckoutInitParams {
@@ -80,15 +81,17 @@ export async function recordCheckoutInit({
 	const insertData: PaymentRecordInsert = {
 		user_id: userId,
 		session_id: sessionId,
-		provider_payment_id: providerPaymentId,
+		provider_payment_id: providerPaymentId || null,
 		kind,
 		sku_id: skuId,
 		amount_php: amountPhp,
 		currency: 'PHP',
-		status,
+		status: status === 'expired' ? 'failed' : status, // Map expired to failed for database
+		method: null, // Will be set when payment is completed
 		method_allowed: methodAllowed,
 		idempotency_key: idempotencyKey,
-		metadata: metadata as Json
+		metadata: metadata as Json,
+		reason: null // Will be set if payment fails
 	};
 
 	const { data, error } = await supabaseAdmin

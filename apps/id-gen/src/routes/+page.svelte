@@ -21,9 +21,17 @@
 
 	// Modal state
 	let modalOpen = $state(false);
-	let selectedCards = $state([]);
+	interface PreviewCard {
+		idcard_id?: number;
+		template_name: string;
+		front_image?: string | null;
+		back_image?: string | null;
+		created_at?: string;
+		fields?: Record<string, { value: string }>;
+	}
+	let selectedCards = $state<PreviewCard[]>([]);
 	let selectedIndex = $state(0);
-	let downloadingCards = $state(new Set());
+	let downloadingCards = $state(new Set<string>());
 
 	// Debug modal state changes
 	$effect(() => {
@@ -63,7 +71,7 @@
 	}
 
 	// Modal and interaction functions
-	function openPreview(cards: any[], index: number = 0) {
+	function openPreview(cards: PreviewCard[], index: number = 0) {
 		console.log('openPreview called with:', { cardsLength: cards.length, index });
 		selectedCards = cards;
 		selectedIndex = index;
@@ -71,7 +79,7 @@
 		console.log('Modal state set to:', modalOpen);
 	}
 
-	function openSinglePreview(card: any) {
+	function openSinglePreview(card: PreviewCard) {
 		console.log('Opening preview for card:', card);
 		const cardIndex = transformedCards.findIndex(c => c.idcard_id === card.idcard_id);
 		console.log('Card index found:', cardIndex, 'Total cards:', transformedCards.length);

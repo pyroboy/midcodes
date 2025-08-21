@@ -1,14 +1,9 @@
-import type {
-	InventoryItem,
-	Supplier,
-	SupplierPerformanceData,
-	LowStockItem,
-	SalesSummaryData
-} from '$lib/schemas/models';
+// Types module not present in this app; using broad types instead
+// import type { InventoryItem, Supplier, SupplierPerformanceData, LowStockItem, SalesSummaryData } from '$lib/schemas/models';
 
 // Export functions for generating inventory reports
 
-export function exportLowStockReport(data: LowStockItem[]): string {
+export function exportLowStockReport(data: any[]): string {
 	const headers = ['SKU', 'Name', 'Current Qty', 'Min Qty', 'Reorder Qty', 'Supplier'];
 	const rows = data.map((item) => [
 		item.sku,
@@ -22,7 +17,7 @@ export function exportLowStockReport(data: LowStockItem[]): string {
 	return generateCSV([headers, ...rows]);
 }
 
-export function exportSupplierPerformanceReport(data: SupplierPerformanceData[]): string {
+export function exportSupplierPerformanceReport(data: any[]): string {
 	const headers = [
 		'Supplier',
 		'Total Orders',
@@ -43,12 +38,12 @@ export function exportSupplierPerformanceReport(data: SupplierPerformanceData[])
 	return generateCSV([headers, ...rows]);
 }
 
-export function exportSalesSummaryReport(data: SalesSummaryData): string {
+export function exportSalesSummaryReport(data: any): string {
 	const headers = ['Period', 'Total Revenue', 'Total Orders'];
 	const summaryRows = [[data.period, data.total_revenue.toFixed(2), data.total_orders.toString()]];
 
 	const itemHeaders = ['Item Name', 'Quantity Sold', 'Revenue'];
-	const itemRows = data.top_selling_items.map((item) => [
+const itemRows = data.top_selling_items.map((item: any) => [
 		item.item_name,
 		item.quantity_sold.toString(),
 		item.revenue.toFixed(2)

@@ -3,21 +3,21 @@
 	import DrawerOverlay from './drawer-overlay.svelte';
 	import { cn } from '$lib/utils.js';
 
+	type ExtraProps = { portalProps?: any };
+
 	let {
-		ref = $bindable(null),
+		el = $bindable(),
 		class: className,
 		portalProps,
 		children,
 		...restProps
-	}: DrawerPrimitive.ContentProps & {
-		portalProps?: DrawerPrimitive.PortalProps;
-	} = $props();
+	}: DrawerPrimitive.ContentProps & ExtraProps = $props();
 </script>
 
 <DrawerPrimitive.Portal {...portalProps}>
 	<DrawerOverlay />
 	<DrawerPrimitive.Content
-		bind:ref
+		bind:el
 		data-slot="drawer-content"
 		class={cn(
 			'group/drawer-content bg-background fixed z-50 flex h-auto flex-col',

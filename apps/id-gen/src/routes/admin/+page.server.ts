@@ -191,7 +191,7 @@ export const actions: Actions = {
 			}
 
 			// Prevent self-deletion
-			if (userId === user.id) {
+			if (user?.id && userId === user.id) {
 				return fail(400, { error: 'Cannot delete your own account' });
 			}
 

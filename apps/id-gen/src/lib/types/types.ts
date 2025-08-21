@@ -52,6 +52,9 @@ export interface TemplateData {
 	template_elements: TemplateElement[];
 	created_at: string;
 	updated_at?: string;
+	width_pixels: number;
+	height_pixels: number;
+	dpi: number;
 }
 
 export interface IDCardField {
@@ -90,31 +93,4 @@ export interface DataRow {
 	fields: {
 		[fieldName: string]: IDCardField;
 	};
-}
-
-export interface TemplateElement {
-	id: string;
-	type: 'text' | 'image' | 'qr' | 'photo' | 'signature' | 'selection';
-	x: number;
-	y: number;
-	width: number;
-	height: number;
-	content?: string;
-	variableName: string;
-	fontSize?: number;
-	fontFamily?: string;
-	fontWeight?: string;
-	fontStyle?: 'normal' | 'italic' | 'oblique';
-	color?: string;
-	textDecoration?: 'none' | 'underline';
-	textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
-	opacity?: number;
-	visible?: boolean;
-	font?: string;
-	size?: number;
-	alignment?: 'left' | 'center' | 'right' | 'justify';
-	options?: string[];
-	side: 'front' | 'back';
-	letterSpacing?: number;
-	lineHeight?: number | string;
 }

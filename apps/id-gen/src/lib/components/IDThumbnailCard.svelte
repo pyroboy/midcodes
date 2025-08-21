@@ -45,7 +45,7 @@
 	);
 
 	// Event handlers
-	function handlePreview(event: MouseEvent) {
+function handlePreview(event: Event) {
 		console.log('🖱️ IDThumbnailCard: handlePreview called', { card, event });
 		// Don't trigger preview if clicking on actual action buttons (not the card itself)
 		const target = event.target as HTMLElement;
@@ -70,16 +70,16 @@
 
 <div 
 	class="group relative bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer {className}"
-	on:click={handlePreview}
+onclick={handlePreview}
 	role="button"
 	tabindex="0"
 	data-card-container
-	on:keydown={(e) => {
+onkeydown={(e) => {
 		if (e.key === 'Enter' || e.key === ' ') {
 			e.preventDefault();
-			handlePreview(e);
+			onPreview(card);
 		}
-	}}
+}}
 	aria-label="Preview {cardDisplayName}"
 >
 	<!-- Thumbnail Image -->
@@ -136,7 +136,7 @@
 			<button 
 				type="button"
 				class="flex-1 px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:text-blue-300 dark:hover:bg-blue-900/50 rounded transition-colors"
-				on:click={handleDownload}
+onclick={handleDownload}
 				disabled={downloading}
 				aria-label="Download {cardDisplayName}"
 			>
@@ -157,7 +157,7 @@
 			<button 
 				type="button"
 				class="px-2 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:bg-gray-700 rounded transition-colors"
-				on:click={handleEdit}
+onclick={handleEdit}
 				aria-label="Edit {cardDisplayName}"
 			>
 				<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

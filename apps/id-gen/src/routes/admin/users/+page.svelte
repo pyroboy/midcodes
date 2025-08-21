@@ -361,8 +361,8 @@
 												{formatRoleName(user.role)}
 											</Badge>
 										</TableCell>
-									TableCell{formatDate(user.created_at, 'date')}/TableCell
-									TableCell{formatDate(user.updated_at, 'date')}/TableCell
+										<TableCell>{formatDate(user.created_at, 'date')}</TableCell>
+										<TableCell>{formatDate(user.updated_at, 'date')}</TableCell>
 										<TableCell class="text-right">
 											<div class="flex justify-end gap-2">
 												{#if canEditUser(user, data?.currentUserRole)}
@@ -472,11 +472,13 @@
 						{/each}
 					</div>
 				{:else}
-					<svelte:component
-						this={(await import('$lib/components/empty-states/EmptyUsers.svelte')).default}
+				{#await import('$lib/components/empty-states/EmptyUsers.svelte') then module}
+					{@const EmptyUsersComponent = module.default}
+					<EmptyUsersComponent
 						isFiltered={Boolean(searchQuery) || selectedRole !== 'all'}
 						onInvite={() => { showAddUserDialog = true; }}
 					/>
+				{/await}
 				{/if}
 			{/await}
 		</CardContent>

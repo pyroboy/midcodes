@@ -44,13 +44,10 @@ export interface TemplateData {
 	// New fields for flexible sizing
 	width_inches?: number;
 	height_inches?: number;
-	dpi?: number;
+	dpi: number;
 	// Pixel dimensions for display
-	width_pixels?: number;
-	height_pixels?: number;
-	unit_type?: string;
-	unit_width?: number;
-	unit_height?: number;
+	width_pixels: number;
+	height_pixels: number;
 }
 
 function createTemplateStore() {
@@ -70,10 +67,7 @@ function createTemplateStore() {
 		dpi: 300,
 		// Default pixel dimensions (3.375" * 300 DPI = 1012.5px, 2.125" * 300 DPI = 637.5px)
 		width_pixels: 1013,
-		height_pixels: 638,
-		unit_type: 'pixels',
-		unit_width: 1013,
-		unit_height: 638
+		height_pixels: 638
 	});
 
 	return {
@@ -100,10 +94,7 @@ function createTemplateStore() {
 				dpi: 300,
 				// Default pixel dimensions (3.375" * 300 DPI = 1012.5px, 2.125" * 300 DPI = 637.5px)
 				width_pixels: 1013,
-				height_pixels: 638,
-				unit_type: 'pixels',
-				unit_width: 1013,
-				unit_height: 638
+				height_pixels: 638
 			})
 	};
 }

@@ -4,15 +4,15 @@ import { z } from 'zod';
 
 // Import schemas following AZPOS pattern
 import {
-	updateProfileSchema,
-	changePasswordSchema,
-	profileDataSchema,
-	profileActionResultSchema,
+	updateProfileInputSchema,
+	changePasswordInputSchema,
+	profileOutputSchema,
+	updateProfileResultSchema,
 	passwordChangeResultSchema,
-	type UpdateProfile,
-	type ChangePassword,
-	type ProfileData,
-	type ProfileActionResult,
+	type UpdateProfileInput,
+	type ChangePasswordInput,
+	type ProfileOutput,
+	type UpdateProfileResult,
 	type PasswordChangeResult
 } from '$lib/types/profile.schema';
 

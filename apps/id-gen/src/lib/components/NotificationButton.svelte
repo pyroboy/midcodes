@@ -1,5 +1,6 @@
 <script lang='ts'>
   import { Bell, BellRing } from '@lucide/svelte';
+  import { Button } from '$lib/components/ui/button';
   
   let hasNotifications = $state(false);
   let notificationCount = $state(0);

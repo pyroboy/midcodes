@@ -13,10 +13,11 @@
 
   export let card: IDCardType;
   export let isSelected: boolean = false;
-  export let onToggleSelect: (card: IDCardType) => void;
-  export let onDownload: (card: IDCardType) => void;
-  export let onDelete: (card: IDCardType) => void;
-  export let onOpenPreview: (e: MouseEvent, card: IDCardType) => void;
+  // Loosen callback parameter types to interop with parent handlers
+  export let onToggleSelect: (card: any) => void;
+  export let onDownload: (card: any) => void;
+  export let onDelete: (card: any) => void;
+  export let onOpenPreview: (e: MouseEvent, card: any) => void;
   export let downloading: boolean = false;
   export let deleting: boolean = false;
   export let width: number = 300; // controlled from parent

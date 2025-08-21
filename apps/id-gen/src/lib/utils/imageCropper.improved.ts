@@ -272,7 +272,8 @@ function calculateCropArea(
         
     } catch (error) {
         console.error('❌ Error in calculateCropArea:', error);
-        throw new Error(`Crop area calculation failed: ${error.message}`);
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`Crop area calculation failed: ${message}`);
     }
 }
 
@@ -371,25 +372,24 @@ export async function cropBackgroundImage(
                     console.log('🔍 Drawing cropped image:', cropArea);
 
                     // Validate all drawing parameters
-                    const drawParams = [
-                        Math.max(0, Math.min(cropArea.sourceX, originalSize.width)),
-                        Math.max(0, Math.min(cropArea.sourceY, originalSize.height)),
-                        Math.max(1, Math.min(cropArea.sourceWidth, originalSize.width - cropArea.sourceX)),
-                        Math.max(1, Math.min(cropArea.sourceHeight, originalSize.height - cropArea.sourceY)),
-                        Math.max(0, Math.min(cropArea.destX, templateSize.width)),
-                        Math.max(0, Math.min(cropArea.destY, templateSize.height)),
-                        Math.max(1, Math.min(cropArea.destWidth, templateSize.width - cropArea.destX)),
-                        Math.max(1, Math.min(cropArea.destHeight, templateSize.height - cropArea.destY))
-                    ];
+                    const sx = Math.max(0, Math.min(cropArea.sourceX, originalSize.width));
+                    const sy = Math.max(0, Math.min(cropArea.sourceY, originalSize.height));
+                    const sWidth = Math.max(1, Math.min(cropArea.sourceWidth, originalSize.width - cropArea.sourceX));
+                    const sHeight = Math.max(1, Math.min(cropArea.sourceHeight, originalSize.height - cropArea.sourceY));
+                    const dx = Math.max(0, Math.min(cropArea.destX, templateSize.width));
+                    const dy = Math.max(0, Math.min(cropArea.destY, templateSize.height));
+                    const dWidth = Math.max(1, Math.min(cropArea.destWidth, templateSize.width - cropArea.destX));
+                    const dHeight = Math.max(1, Math.min(cropArea.destHeight, templateSize.height - cropArea.destY));
 
-                    console.log('🎨 Final draw parameters:', drawParams);
+                    console.log('🎨 Final draw parameters:', [sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight]);
 
                     // Validate parameters before drawing
-                    if (drawParams.some(param => !isFinite(param) || param < 0)) {
-                        throw new Error(`Invalid drawing parameters: ${JSON.stringify(drawParams)}`);
+                    const allParams = [sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight];
+                    if (allParams.some(param => !isFinite(param) || param < 0)) {
+                        throw new Error(`Invalid drawing parameters: ${JSON.stringify(allParams)}`);
                     }
 
-                    ctx.drawImage(img, ...drawParams);
+                    ctx.drawImage(img, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
                 } else {
                     console.log('📐 Drawing image to fit template exactly');
                     ctx.drawImage(img, 0, 0, templateSize.width, templateSize.height);
@@ -436,7 +436,8 @@ export async function cropBackgroundImage(
                             resolve(result);
                             
                         } catch (fileError) {
-                            reject(new Error(`Failed to create result file: ${fileError.message}`));
+                            const message = fileError instanceof Error ? fileError.message : String(fileError);
+                            reject(new Error(`Failed to create result file: ${message}`));
                         }
                     },
                     format,
@@ -446,7 +447,8 @@ export async function cropBackgroundImage(
             } catch (processingError) {
                 cleanup();
                 console.error('❌ Error during image processing:', processingError);
-                reject(new Error(`Image processing failed: ${processingError.message}`));
+                const message = processingError instanceof Error ? processingError.message : String(processingError);
+                reject(new Error(`Image processing failed: ${message}`));
             }
         };
 
@@ -463,7 +465,8 @@ export async function cropBackgroundImage(
             console.log('📂 Image loading started...');
         } catch (urlError) {
             cleanup();
-            reject(new Error(`Failed to create object URL for image: ${urlError.message}`));
+            const message = urlError instanceof Error ? urlError.message : String(urlError);
+            reject(new Error(`Failed to create object URL for image: ${message}`));
         }
     });
 }
@@ -511,7 +514,8 @@ export function getImageDimensions(file: File): Promise<ImageDimensions> {
                 
             } catch (error) {
                 cleanup();
-                reject(new Error(`Failed to get valid image dimensions: ${error.message}`));
+                const message = error instanceof Error ? error.message : String(error);
+                reject(new Error(`Failed to get valid image dimensions: ${message}`));
             }
         };
 
@@ -526,7 +530,8 @@ export function getImageDimensions(file: File): Promise<ImageDimensions> {
             img.src = objectUrl;
         } catch (error) {
             cleanup();
-            reject(new Error(`Failed to create object URL: ${error.message}`));
+            const message = error instanceof Error ? error.message : String(error);
+            reject(new Error(`Failed to create object URL: ${message}`));
         }
     });
 }

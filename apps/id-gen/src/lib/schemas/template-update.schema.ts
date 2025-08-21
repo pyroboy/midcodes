@@ -16,11 +16,7 @@ export const templateUpdateInputSchema = z.object({
 	orientation: z.enum(['landscape', 'portrait']).optional(),
 	template_elements: z.array(z.any()).optional(),
 	front_background: z.string().url().optional(), // Can be URL or path
-	back_background: z.string().url().optional(), // Can be URL or path
-	// Legacy fields (existing in database)
-	unit_type: z.string().optional(),
-	unit_width: z.number().optional(),
-	unit_height: z.number().optional()
+	back_background: z.string().url().optional() // Can be URL or path
 });
 
 // Complete template update schema (includes system fields)

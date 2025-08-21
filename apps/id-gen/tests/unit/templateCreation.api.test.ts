@@ -86,10 +86,7 @@ describe('Template Creation API Schema Tests', () => {
                 front_background: 'front-bg.jpg',
                 back_background: 'back-bg.jpg',
                 created_at: '2024-08-21T10:30:00Z',
-                updated_at: '2024-08-21T10:30:00Z',
-                unit_type: 'inches',
-                unit_width: 3.375,
-                unit_height: 2.125
+                updated_at: '2024-08-21T10:30:00Z'
             };
 
             const result = templateCreationDataSchema.safeParse(templateWithOptionals);
@@ -98,7 +95,6 @@ describe('Template Creation API Schema Tests', () => {
                 expect(result.data.description).toBe('Template description');
                 expect(result.data.front_background).toBe('front-bg.jpg');
                 expect(result.data.back_background).toBe('back-bg.jpg');
-                expect(result.data.unit_type).toBe('inches');
             }
         });
 

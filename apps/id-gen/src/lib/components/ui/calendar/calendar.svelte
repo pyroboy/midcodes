@@ -1,10 +1,21 @@
 <script lang="ts">
 	import { Calendar as CalendarPrimitive } from 'bits-ui';
 	import * as Calendar from './index.js';
-	import { cn, type WithoutChildrenOrChild } from '$lib/utils.js';
+	import { cn } from '$lib/utils.js';
 	import type { ButtonVariant } from '../button/button.svelte';
 	import { isEqualMonth, type DateValue } from '@internationalized/date';
 	import type { Snippet } from 'svelte';
+
+	type ExtraProps = {
+		buttonVariant?: ButtonVariant;
+		captionLayout?: 'dropdown' | 'dropdown-months' | 'dropdown-years' | 'label';
+		months?: CalendarPrimitive.MonthSelectProps['months'];
+		years?: CalendarPrimitive.YearSelectProps['years'];
+		monthFormat?: CalendarPrimitive.MonthSelectProps['monthFormat'];
+		yearFormat?: CalendarPrimitive.YearSelectProps['yearFormat'];
+		day?: Snippet<[{ day: DateValue; outsideMonth: boolean }]>;
+		type?: 'single' | 'multiple';
+	};
 
 	let {
 		ref = $bindable(null),
@@ -20,17 +31,10 @@
 		monthFormat: monthFormatProp,
 		yearFormat = 'numeric',
 		day,
+		type = 'single',
 		disableDaysOutsideMonth = false,
 		...restProps
-	}: WithoutChildrenOrChild<CalendarPrimitive.RootProps> & {
-		buttonVariant?: ButtonVariant;
-		captionLayout?: 'dropdown' | 'dropdown-months' | 'dropdown-years' | 'label';
-		months?: CalendarPrimitive.MonthSelectProps['months'];
-		years?: CalendarPrimitive.YearSelectProps['years'];
-		monthFormat?: CalendarPrimitive.MonthSelectProps['monthFormat'];
-		yearFormat?: CalendarPrimitive.YearSelectProps['yearFormat'];
-		day?: Snippet<[{ day: DateValue; outsideMonth: boolean }]>;
-	} = $props();
+	}: ExtraProps & Record<string, any> = $props();
 
 	const monthFormat = $derived.by(() => {
 		if (monthFormatProp) return monthFormatProp;
@@ -56,6 +60,7 @@ get along, so we shut typescript up by casting `value` to `never`.
 	{locale}
 	{monthFormat}
 	{yearFormat}
+	{type}
 	{...restProps}
 >
 	{#snippet children({ months, weekdays })}

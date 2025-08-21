@@ -1066,9 +1066,9 @@ async function handleImageUpload(files: File[], side: 'front' | 'back') {
 					// Template has new size fields
 					currentCardSize = {
 						name: data.selectedTemplate.name,
-						width: data.selectedTemplate.unit_width || data.selectedTemplate.width_pixels,
-						height: data.selectedTemplate.unit_height || data.selectedTemplate.height_pixels,
-						unit: (data.selectedTemplate.unit_type as any) || 'pixels'
+						width: data.selectedTemplate.width_pixels,
+						height: data.selectedTemplate.height_pixels,
+						unit: 'pixels'
 					};
 					requiredPixelDimensions = {
 						width: data.selectedTemplate.width_pixels,

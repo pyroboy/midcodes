@@ -71,7 +71,7 @@ export const load = (async ({ locals }) => {
 
 	const { data: templates, error: templatesError } = await supabase
 		.from('templates')
-		.select('name, width_pixels, height_pixels, unit_width, unit_height, unit_type')
+		.select('name, width_pixels, height_pixels')
 		.eq('org_id', org_id)
 		.in('name', templateNames);
 
@@ -84,26 +84,11 @@ export const load = (async ({ locals }) => {
 
 	if (templates) {
 		templates.forEach((template) => {
-			if (template.width_pixels && template.height_pixels) {
-				templateDimensions[template.name] = {
-					width: template.width_pixels,
-					height: template.height_pixels,
-					unit: 'pixels'
-				};
-			} else if (template.unit_width && template.unit_height && template.unit_type) {
-				templateDimensions[template.name] = {
-					width: template.unit_width,
-					height: template.unit_height,
-					unit: template.unit_type
-				};
-			} else {
-				// Fallback to legacy dimensions
-				templateDimensions[template.name] = {
-					width: 1013,
-					height: 638,
-					unit: 'pixels'
-				};
-			}
+			templateDimensions[template.name] = {
+				width: template.width_pixels || 1013,
+				height: template.height_pixels || 638,
+				unit: 'pixels'
+			};
 		});
 	}
 
