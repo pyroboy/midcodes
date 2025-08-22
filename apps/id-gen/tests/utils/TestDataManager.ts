@@ -65,6 +65,16 @@ class TestDataManager {
     
     this.createdData.profileIds.push(profile.id);
 
+    // Initialize mock data for this user
+    if (typeof globalThis !== 'undefined' && (globalThis as any).__mockUserData) {
+      (globalThis as any).__mockUserData.set(profileId, {
+        templates_created: profile.templates_created,
+        unlimited_templates: profile.unlimited_templates,
+        credits: profile.credits,
+        credits_used: profile.credits_used
+      });
+    }
+
     return {
       organization,
       profile
