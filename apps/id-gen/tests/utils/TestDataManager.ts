@@ -78,27 +78,16 @@ class TestDataManager {
     credits?: number;
     creditsUsed?: number;
     templatesCreated?: number;
+    unlimited_templates?: boolean;
   } = {}): Promise<TestData> {
     const testData = await this.createMinimalTestData();
     
-    // Update profile with credit information if provided
-    if (config.credits !== undefined || config.creditsUsed !== undefined || config.templatesCreated !== undefined) {
-      const { data: updatedProfile } = await supabase
-        .from('profiles')
-        .update({
-          credits: config.credits ?? 5,
-          credits_used: config.creditsUsed ?? 0,
-          templates_created: config.templatesCreated ?? 0,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', testData.profile.id)
-        .select()
-        .single();
-
-      if (updatedProfile) {
-        testData.profile = updatedProfile;
-      }
-    }
+    // Update profile with credit information
+    testData.profile.credits = config.credits ?? 5;
+    testData.profile.credits_used = config.creditsUsed ?? 0;
+    testData.profile.templates_created = config.templatesCreated ?? 0;
+    testData.profile.unlimited_templates = config.unlimited_templates ?? false;
+    testData.profile.updated_at = new Date().toISOString();
 
     return testData;
   }
