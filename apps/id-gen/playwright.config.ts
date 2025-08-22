@@ -3,6 +3,7 @@ import { devices } from '@playwright/test';
 
 const config: PlaywrightTestConfig = {
   testDir: './tests',
+  testMatch: /.*\.spec\.(js|ts)$/,
   timeout: 30000,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,

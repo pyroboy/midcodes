@@ -1,8 +1,7 @@
 import '@testing-library/jest-dom';
 import { beforeAll } from 'vitest';
-import { config } from 'dotenv';
 
-// Load environment variables from .env.local for tests
+// Test setup for Svelte components
 beforeAll(() => {
-  config({ path: '.env.local' });
+  // Any global test setup can go here
 });

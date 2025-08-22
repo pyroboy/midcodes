@@ -40,7 +40,7 @@ export const orgSettingsSchema = z.object({
 	org_id: z.string().uuid(), // NOT NULL
 	payments_enabled: z.boolean(), // NOT NULL
 	payments_bypass: z.boolean(), // NOT NULL
-	updated_by: z.string().uuid().optional(), // nullable
+	updated_by: z.string().uuid().nullable(), // nullable
 	updated_at: z.string().datetime() // NOT NULL timestamp
 });
 
