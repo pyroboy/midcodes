@@ -157,6 +157,14 @@ class TestDataManager {
         });
       }
 
+      // Clean up deleted users tracking
+      if (typeof globalThis !== 'undefined' && (globalThis as any).__deletedUsers) {
+        const deletedUsers = (globalThis as any).__deletedUsers;
+        this.createdData.profileIds.forEach(id => {
+          deletedUsers.delete(id);
+        });
+      }
+
       // Reset tracking
       this.createdData = {
         organizationIds: [],
