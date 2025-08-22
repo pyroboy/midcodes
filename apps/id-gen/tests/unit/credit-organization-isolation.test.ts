@@ -154,8 +154,8 @@ describe('Multi-Tenant Organization Isolation', () => {
         .eq('id', profile2.id)
         .single();
 
-      expect(profile1Data.org_id).toBe(org1.id);
-      expect(profile2Data.org_id).toBe(org2.id);
+      expect(profile1Data!.org_id).toBe(org1.id);
+      expect(profile2Data!.org_id).toBe(org2.id);
     });
 
     it('should maintain organization scope during credit operations', async () => {
@@ -208,7 +208,7 @@ describe('Multi-Tenant Organization Isolation', () => {
 
       // Create multiple users in org1
       const org1User2 = await testDataManager.createUserWithCredits({
-        credits_balance: 50,
+        credits: 50,
         card_generation_count: 0,
         template_count: 0
       });

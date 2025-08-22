@@ -77,6 +77,20 @@ function createTemplateStore() {
 		select: (template: TemplateData) => {
 			set(template);
 		},
+		loadTemplate: (template: TemplateData) => {
+			set(template);
+		},
+		updateElement: (elementId: string, updates: Partial<TemplateElement>) => {
+			update(template => {
+				const updatedElements = template.template_elements.map(element =>
+					element.id === elementId ? { ...element, ...updates } : element
+				);
+				return { ...template, template_elements: updatedElements };
+			});
+		},
+		updateTemplateName: (name: string) => {
+			update(template => ({ ...template, name }));
+		},
 		reset: () =>
 			set({
 				id: '',

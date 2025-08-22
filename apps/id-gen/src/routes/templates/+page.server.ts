@@ -42,7 +42,7 @@ export const load = async ({ locals: { supabase, session, org_id, user }, url })
                 template_elements
             `
 		)
-		.eq('org_id', org_id)
+		                .eq('org_id', org_id!)
 		.order('created_at', { ascending: false });
 
 	if (templates.error) {
@@ -106,9 +106,9 @@ export const actions = {
 			// Use upsert so client-generated IDs work for new templates and updates
 			let data, dbError;
 			({ data, error: dbError } = await supabase
-				.from('templates')
-				.upsert(payload, { onConflict: 'id' })
-				.select('*')
+				                                .from('templates')
+                                .upsert(payload as any, { onConflict: 'id' })
+                                .select('*')
 				.single());
 
 			if (dbError) {
@@ -120,13 +120,13 @@ export const actions = {
 				throw error(500, 'No data returned from database');
 			}
 
-			console.log('✅ Server: Template saved successfully:', {
-				id: data.id,
-				name: data.name,
-				org_id: data.org_id,
-				elementsCount: Array.isArray(data.template_elements) ? data.template_elements.length : 0,
-				action: payload.id ? 'updated' : 'created'
-			});
+			                        console.log('✅ Server: Template saved successfully:', {
+                                id: (data as any).id,
+                                name: (data as any).name,
+                                org_id: (data as any).org_id,
+                                elementsCount: Array.isArray((data as any).template_elements) ? (data as any).template_elements.length : 0,
+                                action: payload.id ? 'updated' : 'created'
+                        });
 
 			return {
 				success: true,

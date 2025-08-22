@@ -25,7 +25,7 @@ describe('Database Function Security Testing - get_idcards_by_org', () => {
         name: 'Other Organization'
       });
       
-      const user2 = TestDataFactory.createProfile({
+      const user2 = TestDataFactory.createUserProfile({
         id: 'user-2',
         org_id: org2.id,
         email: 'user2@other-org.com'
@@ -33,13 +33,13 @@ describe('Database Function Security Testing - get_idcards_by_org', () => {
       
       // Create ID cards in both organizations
       const org1Cards = [
-        TestDataFactory.createIdCard({
+        TestDataFactory.createIDCard({
           id: 'card-org1-1',
           org_id: org1.id,
           user_id: user1.id,
           card_data: { name: 'User 1 Card 1' }
         }),
-        TestDataFactory.createIdCard({
+        TestDataFactory.createIDCard({
           id: 'card-org1-2', 
           org_id: org1.id,
           user_id: user1.id,
@@ -48,7 +48,7 @@ describe('Database Function Security Testing - get_idcards_by_org', () => {
       ];
       
       const org2Cards = [
-        TestDataFactory.createIdCard({
+        TestDataFactory.createIDCard({
           id: 'card-org2-1',
           org_id: org2.id,
           user_id: user2.id,
@@ -151,14 +151,14 @@ describe('Database Function Security Testing - get_idcards_by_org', () => {
       const { profile: user, organization: org } = testData;
       
       // Create cards with different user ownership within same org
-      const userCard = TestDataFactory.createIdCard({
+      const userCard = TestDataFactory.createIDCard({
         id: 'user-own-card',
         org_id: org.id,
         user_id: user.id,
         card_data: { name: 'Own Card' }
       });
       
-      const otherUserCard = TestDataFactory.createIdCard({
+      const otherUserCard = TestDataFactory.createIDCard({
         id: 'other-user-card',
         org_id: org.id,
         user_id: 'other-user-same-org',
@@ -196,7 +196,7 @@ describe('Database Function Security Testing - get_idcards_by_org', () => {
       
       // Mock large dataset scenario
       const mockLargeDataset = Array.from({ length: totalCards }, (_, index) => 
-        TestDataFactory.createIdCard({
+        TestDataFactory.createIDCard({
           id: `large-card-${index}`,
           org_id: org.id,
           user_id: 'test-user',
@@ -278,7 +278,7 @@ describe('Database Function Security Testing - get_idcards_by_org', () => {
       
       // Create cards with known timestamps
       const testCards = Array.from({ length: 25 }, (_, index) => 
-        TestDataFactory.createIdCard({
+        TestDataFactory.createIDCard({
           id: `order-test-${index}`,
           org_id: org.id,
           user_id: 'test-user',
@@ -406,7 +406,7 @@ describe('Database Function Security Testing - get_idcards_by_org', () => {
       
       // Test cards with special characters
       const specialCharCards = [
-        TestDataFactory.createIdCard({
+        TestDataFactory.createIDCard({
           id: 'special-1',
           org_id: org.id,
           user_id: 'test-user',
@@ -416,7 +416,7 @@ describe('Database Function Security Testing - get_idcards_by_org', () => {
             notes: 'Quote: "Hello World"' 
           }
         }),
-        TestDataFactory.createIdCard({
+        TestDataFactory.createIDCard({
           id: 'special-2',
           org_id: org.id,
           user_id: 'test-user',
@@ -469,13 +469,13 @@ describe('Database Function Security Testing - get_idcards_by_org', () => {
       
       // Create cards from different users
       const userCards = [
-        TestDataFactory.createIdCard({
+        TestDataFactory.createIDCard({
           id: 'own-card-1',
           org_id: org.id,
           user_id: user.id,
           card_data: { name: 'Own Card 1' }
         }),
-        TestDataFactory.createIdCard({
+        TestDataFactory.createIDCard({
           id: 'other-card-1',
           org_id: org.id,
           user_id: 'other-user-id',
@@ -517,7 +517,7 @@ describe('Database Function Security Testing - get_idcards_by_org', () => {
       const { profile: user, organization: org } = testData;
       
       // Create card with sensitive and non-sensitive data
-      const sensitiveCard = TestDataFactory.createIdCard({
+      const sensitiveCard = TestDataFactory.createIDCard({
         id: 'sensitive-card',
         org_id: org.id,
         user_id: 'other-user',

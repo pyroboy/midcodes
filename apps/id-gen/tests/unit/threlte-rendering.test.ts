@@ -140,12 +140,13 @@ describe('3D Rendering & Texture Management', () => {
 			const texture = new THREE.Texture();
 			let errorCaught = false;
 			
-			texture.onError = () => {
+			// Mock error handling for texture
+			const mockErrorHandler = () => {
 				errorCaught = true;
 			};
 			
 			// Simulate loading error
-			texture.onError();
+			mockErrorHandler();
 			
 			expect(errorCaught).toBe(true);
 		});

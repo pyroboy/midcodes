@@ -833,7 +833,7 @@ describe('Feature Integration - Credit Requirements for Different Card Types', (
             ],
             back: [
               { type: 'magnetic_stripe', data: 'encoded_data' },
-              { type: 'chip', type: 'rfid' }
+              { type: 'rfid', data: 'chip_data' }
             ]
           }
         }
@@ -1126,7 +1126,7 @@ describe('Feature Integration - Credit-Based Quality and Resolution Settings', (
       expect(successfulQuality).toHaveLength(4); // All should succeed with 15 credits
 
       // Verify total credits used: 1 + 1 + 2 + 3 = 7
-      const totalCreditsUsed = successfulQuality.reduce((sum, r) => sum + r.creditsUsed, 0);
+      const totalCreditsUsed = successfulQuality.reduce((sum, r) => sum + (r.creditsUsed || 0), 0);
       expect(totalCreditsUsed).toBe(7);
 
       // Verify cards have correct quality metadata
@@ -1450,15 +1450,12 @@ describe('Feature Integration - UI State Calculations', () => {
         showGenerateButton: canGenerate.canGenerate,
         showUpgradeButton: !canGenerate.canGenerate && canGenerate.needsCredits,
         showPremiumBadge: credits?.unlimited_templates || credits?.remove_watermarks,
-        premiumFeatures: {
-          unlimitedTemplates: credits?.unlimited_templates,
-          watermarkRemoval: credits?.remove_watermarks
-        }
+        // Premium features are handled separately in the UI
       };
 
       expect(uiState.showPremiumBadge).toBe(true);
-      expect(uiState.premiumFeatures.unlimitedTemplates).toBe(true);
-      expect(uiState.premiumFeatures.watermarkRemoval).toBe(true);
+      expect(credits?.unlimited_templates).toBe(true);
+      expect(credits?.remove_watermarks).toBe(true);
     });
   });
 

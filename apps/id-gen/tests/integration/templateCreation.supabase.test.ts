@@ -52,7 +52,7 @@ describe('Template Creation Supabase Integration Tests', () => {
     async function insertTemplate(templateData: TemplateCreationData) {
         return await supabase
             .from('templates')
-            .insert(templateData)
+            .insert(templateData as any)
             .select()
             .single();
     }
@@ -116,8 +116,8 @@ describe('Template Creation Supabase Integration Tests', () => {
                 } else {
                     // Step 5: Verify successful insertion
                     expect(insertResult.data).toBeDefined();
-                    expect(insertResult.data.id).toBe(validatedData.id);
-                    expect(insertResult.data.name).toBe(validatedData.name);
+                    expect((insertResult.data as any).id).toBe(validatedData.id);
+                    expect((insertResult.data as any).name).toBe(validatedData.name);
                     
 if (validatedData.id) {
                         createdTemplateIds.push(validatedData.id);
@@ -127,8 +127,8 @@ if (validatedData.id) {
                     if (validatedData.id) {
                         const selectResult = await selectTemplate(validatedData.id, TEST_ORG_ID);
                         if (!selectResult.error) {
-                            expect(selectResult.data.id).toBe(validatedData.id);
-                            expect(selectResult.data.org_id).toBe(TEST_ORG_ID);
+                            expect((selectResult.data as any).id).toBe(validatedData.id);
+                            expect((selectResult.data as any).org_id).toBe(TEST_ORG_ID);
                         }
                     }
                 }

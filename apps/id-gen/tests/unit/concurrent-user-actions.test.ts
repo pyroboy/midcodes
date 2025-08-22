@@ -424,8 +424,8 @@ describe('Concurrent User Actions & Race Conditions', () => {
         ? [10, 15, 5, 20].slice(0, successfulTransactions.length).reduce((a, b) => a + b, 0)
         : 0;
 
-      expect(finalProfile.credits_balance).toBe(100 - totalDeducted);
-      expect(finalProfile.credits_balance).toBeGreaterThanOrEqual(0); // Should never go negative
+      expect(finalProfile!.credits_balance).toBe(100 - totalDeducted);
+      expect(finalProfile!.credits_balance).toBeGreaterThanOrEqual(0); // Should never go negative
     });
 
     it('should prevent race conditions in credit balance checks', async () => {
@@ -463,7 +463,7 @@ describe('Concurrent User Actions & Race Conditions', () => {
         .eq('id', profile1.id)
         .single();
 
-      expect(finalProfile.credits_balance).toBeGreaterThanOrEqual(0);
+      expect(finalProfile!.credits_balance).toBeGreaterThanOrEqual(0);
 
       // Verify transaction history is consistent
       const { data: transactions } = await supabase
@@ -476,7 +476,7 @@ describe('Concurrent User Actions & Race Conditions', () => {
         ?.filter(t => t.amount < 0)
         .reduce((sum, t) => sum + Math.abs(t.amount), 0) || 0;
 
-      expect(25 - totalSpent).toBe(finalProfile.credits_balance);
+      expect(25 - totalSpent).toBe(finalProfile!.credits_balance);
     });
   });
 

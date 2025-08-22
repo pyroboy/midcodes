@@ -234,7 +234,7 @@ describe('WebGL Context Recovery & Management', () => {
         mockWebGL.context.bindTexture(mockWebGL.context.TEXTURE_2D, texture);
       } catch (error) {
         textureOperationFailed = true;
-        expect(error.message).toContain('Context lost');
+        expect((error as Error).message).toContain('Context lost');
       }
 
       expect(textureOperationFailed).toBe(true);
@@ -261,15 +261,17 @@ describe('WebGL Context Recovery & Management', () => {
   });
 
   describe('Context Recovery Process', () => {
-    it('should detect context restoration', (done) => {
+    it('should detect context restoration', async () => {
       let contextRestored = false;
 
       // Setup context restoration handler
-      mockWebGL.canvas.addEventListener('webglcontextrestored', () => {
-        contextRestored = true;
-        expect(mockWebGL.isContextLost()).toBe(false);
-        expect(contextRestored).toBe(true);
-        done();
+      const restorationPromise = new Promise<void>((resolve) => {
+        mockWebGL.canvas.addEventListener('webglcontextrestored', () => {
+          contextRestored = true;
+          expect(mockWebGL.isContextLost()).toBe(false);
+          expect(contextRestored).toBe(true);
+          resolve();
+        });
       });
 
       // Simulate context loss and restoration
@@ -277,9 +279,11 @@ describe('WebGL Context Recovery & Management', () => {
       setTimeout(() => {
         mockWebGL.loseContextExtension.restoreContext();
       }, 10);
+
+      await restorationPromise;
     });
 
-    it('should reinitialize resources after context restoration', (done) => {
+    it('should reinitialize resources after context restoration', async () => {
       const originalTexture = { id: 'original-texture' };
       let resourcesReinitialized = false;
 
@@ -288,16 +292,18 @@ describe('WebGL Context Recovery & Management', () => {
         const newTexture = mockWebGL.context.createTexture();
         resourcesReinitialized = true;
         expect(newTexture).toBeTruthy();
-        done();
       };
 
       // Setup handlers
-      mockWebGL.canvas.addEventListener('webglcontextlost', (event: Event) => {
-        event.preventDefault();
-      });
+      const restorationPromise = new Promise<void>((resolve) => {
+        mockWebGL.canvas.addEventListener('webglcontextlost', (event: Event) => {
+          event.preventDefault();
+        });
 
-      mockWebGL.canvas.addEventListener('webglcontextrestored', () => {
-        reinitializeResources();
+        mockWebGL.canvas.addEventListener('webglcontextrestored', () => {
+          reinitializeResources();
+          resolve();
+        });
       });
 
       // Simulate context loss and restoration
@@ -305,9 +311,11 @@ describe('WebGL Context Recovery & Management', () => {
       setTimeout(() => {
         mockWebGL.loseContextExtension.restoreContext();
       }, 10);
+
+      await restorationPromise;
     });
 
-    it('should restore card geometry after context recovery', (done) => {
+    it('should restore card geometry after context recovery', async () => {
       let geometryRestored = false;
 
       const restoreCardGeometry = () => {
@@ -316,19 +324,25 @@ describe('WebGL Context Recovery & Management', () => {
         cardMesh.geometry.dispose();
         cardMesh.geometry = geometry;
         geometryRestored = true;
-        done();
       };
 
-      mockWebGL.canvas.addEventListener('webglcontextrestored', restoreCardGeometry);
+      const restorationPromise = new Promise<void>((resolve) => {
+        mockWebGL.canvas.addEventListener('webglcontextrestored', () => {
+          restoreCardGeometry();
+          resolve();
+        });
+      });
 
       // Simulate context loss and restoration
       mockWebGL.loseContextExtension.loseContext();
       setTimeout(() => {
         mockWebGL.loseContextExtension.restoreContext();
       }, 10);
+
+      await restorationPromise;
     });
 
-    it('should restore card textures after context recovery', (done) => {
+    it('should restore card textures after context recovery', async () => {
       const originalFrontTexture = new THREE.Texture();
       const originalBackTexture = new THREE.Texture();
       let texturesRestored = false;
@@ -347,21 +361,27 @@ describe('WebGL Context Recovery & Management', () => {
         texturesRestored = true;
         expect(newFrontTexture).toBeTruthy();
         expect(newBackTexture).toBeTruthy();
-        done();
       };
 
-      mockWebGL.canvas.addEventListener('webglcontextrestored', restoreCardTextures);
+      const restorationPromise = new Promise<void>((resolve) => {
+        mockWebGL.canvas.addEventListener('webglcontextrestored', () => {
+          restoreCardTextures();
+          resolve();
+        });
+      });
 
       // Simulate context loss and restoration
       mockWebGL.loseContextExtension.loseContext();
       setTimeout(() => {
         mockWebGL.loseContextExtension.restoreContext();
       }, 10);
+
+      await restorationPromise;
     });
   });
 
   describe('Context Recovery Error Handling', () => {
-    it('should handle failed context restoration gracefully', (done) => {
+    it('should handle failed context restoration gracefully', async () => {
       let recoveryAttempted = false;
       let fallbackActivated = false;
 
@@ -374,18 +394,24 @@ describe('WebGL Context Recovery & Management', () => {
         } catch (error) {
           // Activate fallback mode
           fallbackActivated = true;
-          expect(error.message).toContain('restoration failed');
-          done();
+          expect((error as Error).message).toContain('restoration failed');
         }
       };
 
-      mockWebGL.canvas.addEventListener('webglcontextrestored', handleContextRecovery);
+      const restorationPromise = new Promise<void>((resolve) => {
+        mockWebGL.canvas.addEventListener('webglcontextrestored', () => {
+          handleContextRecovery();
+          resolve();
+        });
+      });
 
       // Simulate context loss and attempted restoration
       mockWebGL.loseContextExtension.loseContext();
       setTimeout(() => {
         mockWebGL.loseContextExtension.restoreContext();
       }, 10);
+
+      await restorationPromise;
     });
 
     it('should provide user feedback during context recovery', () => {
@@ -532,7 +558,7 @@ describe('WebGL Context Recovery & Management', () => {
   });
 
   describe('Integration with Card Rendering', () => {
-    it('should maintain card state during context recovery', (done) => {
+    it('should maintain card state during context recovery', async () => {
       const cardState = {
         frontImage: 'front-texture.jpg',
         backImage: 'back-texture.jpg',
@@ -548,22 +574,28 @@ describe('WebGL Context Recovery & Management', () => {
         expect(cardMesh.position.y).toBe(cardState.position.y);
         expect(cardMesh.position.z).toBe(cardState.position.z);
         statePreserved = true;
-        done();
       };
 
       // Set initial card state
       cardMesh.position.set(cardState.position.x, cardState.position.y, cardState.position.z);
 
-      mockWebGL.canvas.addEventListener('webglcontextrestored', preserveCardState);
+      const restorationPromise = new Promise<void>((resolve) => {
+        mockWebGL.canvas.addEventListener('webglcontextrestored', () => {
+          preserveCardState();
+          resolve();
+        });
+      });
 
       // Simulate context loss and restoration
       mockWebGL.loseContextExtension.loseContext();
       setTimeout(() => {
         mockWebGL.loseContextExtension.restoreContext();
       }, 10);
+
+      await restorationPromise;
     });
 
-    it('should re-render card properly after context recovery', (done) => {
+    it('should re-render card properly after context recovery', async () => {
       let rerenderSuccessful = false;
 
       const testRerender = () => {
@@ -575,22 +607,32 @@ describe('WebGL Context Recovery & Management', () => {
           }
           
           expect(rerenderSuccessful).toBe(true);
-          done();
         } catch (error) {
-          done(error);
+          throw error;
         }
       };
 
-      mockWebGL.canvas.addEventListener('webglcontextrestored', testRerender);
+      const restorationPromise = new Promise<void>((resolve, reject) => {
+        mockWebGL.canvas.addEventListener('webglcontextrestored', () => {
+          try {
+            testRerender();
+            resolve();
+          } catch (error) {
+            reject(error);
+          }
+        });
+      });
 
       // Simulate context loss and restoration
       mockWebGL.loseContextExtension.loseContext();
       setTimeout(() => {
         mockWebGL.loseContextExtension.restoreContext();
       }, 10);
+
+      await restorationPromise;
     });
 
-    it('should handle card animation continuity during recovery', (done) => {
+    it('should handle card animation continuity during recovery', async () => {
       const animationState = {
         isAnimating: true,
         rotationSpeed: 0.01,
@@ -608,16 +650,22 @@ describe('WebGL Context Recovery & Management', () => {
         
         expect(animationResumed).toBe(true);
         expect(cardMesh.rotation.y).toBe(animationState.currentRotation);
-        done();
       };
 
-      mockWebGL.canvas.addEventListener('webglcontextrestored', resumeAnimation);
+      const restorationPromise = new Promise<void>((resolve) => {
+        mockWebGL.canvas.addEventListener('webglcontextrestored', () => {
+          resumeAnimation();
+          resolve();
+        });
+      });
 
       // Simulate context loss and restoration
       mockWebGL.loseContextExtension.loseContext();
       setTimeout(() => {
         mockWebGL.loseContextExtension.restoreContext();
       }, 10);
+
+      await restorationPromise;
     });
   });
 });

@@ -1,3 +1,4 @@
+import { expect } from 'vitest';
 import { testDataManager } from './TestDataManager';
 import { supabase } from '$lib/supabaseClient';
 import { addCredits, getUserCredits, getCreditHistory } from '$lib/utils/credits';
@@ -412,4 +413,3 @@ export const creditTestScenarios = {
   }
 };
 
-export { CreditTestUtils };

@@ -63,7 +63,7 @@ describe('User Creation and Initial State', () => {
       await testDataManager.cleanupAll();
 
       const customTestData = await testDataManager.createUserWithCredits({
-        credits_balance: 100,
+        credits: 100,
         card_generation_count: 5,
         template_count: 1,
         unlimited_templates: true,
@@ -99,7 +99,7 @@ describe('User Creation and Initial State', () => {
       await testDataManager.cleanupAll();
 
       const zeroTestData = await testDataManager.createUserWithCredits({
-        credits_balance: 0,
+        credits: 0,
         card_generation_count: 0,
         template_count: 0,
         unlimited_templates: false,
@@ -130,7 +130,7 @@ describe('User Creation and Initial State', () => {
         .eq('id', profile.id)
         .single();
 
-      expect(userProfile.role).toBeDefined();
+      expect(userProfile!.role).toBeDefined();
       
       // Should be one of the valid role values
       const validRoles = [
@@ -151,7 +151,7 @@ describe('User Creation and Initial State', () => {
         .eq('id', profile.id)
         .single();
 
-      expect(userProfile.org_id).toBe(organization.id);
+      expect(userProfile!.org_id).toBe(organization.id);
     });
 
     it('should create users with consistent email and ID', async () => {
@@ -163,8 +163,8 @@ describe('User Creation and Initial State', () => {
         .eq('id', profile.id)
         .single();
 
-      expect(userProfile.id).toBe(profile.id);
-      expect(userProfile.email).toBeDefined();
+      expect(userProfile!.id).toBe(profile.id);
+      expect(userProfile!.email).toBeDefined();
       expect(typeof userProfile.email).toBe('string');
     });
 
@@ -205,7 +205,7 @@ describe('User Creation and Initial State', () => {
         .single();
 
       // Context can be null or an object
-      expect(userProfile.context === null || typeof userProfile.context === 'object').toBe(true);
+      expect(userProfile!.context === null || typeof userProfile.context === 'object').toBe(true);
     });
 
     it('should track creation and update timestamps', async () => {
@@ -217,8 +217,8 @@ describe('User Creation and Initial State', () => {
         .eq('id', profile.id)
         .single();
 
-      expect(userProfile.created_at).toBeDefined();
-      expect(userProfile.updated_at).toBeDefined();
+      expect(userProfile!.created_at).toBeDefined();
+      expect(userProfile!.updated_at).toBeDefined();
       
       const createdTime = new Date(userProfile.created_at).getTime();
       const updatedTime = new Date(userProfile.updated_at).getTime();
@@ -238,7 +238,7 @@ describe('User Creation and Initial State', () => {
 
       if (userProfile.email) {
         // If email exists, it should be valid format
-        expect(userProfile.email).toMatch(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
+        expect(userProfile!.email).toMatch(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
       }
     });
   });
@@ -330,7 +330,7 @@ describe('User Creation and Initial State', () => {
         .eq('id', profile.id)
         .single();
 
-      expect(userProfile.organizations.id).toBe(organization.id);
+      expect((userProfile!.organizations as any).id).toBe(organization.id);
     });
   });
 
@@ -361,9 +361,9 @@ describe('User Creation and Initial State', () => {
       expect(typeof userProfile.card_generation_count).toBe('number');
       expect(typeof userProfile.template_count).toBe('number');
 
-      expect(userProfile.credits_balance).toBeGreaterThanOrEqual(0);
-      expect(userProfile.card_generation_count).toBeGreaterThanOrEqual(0);
-      expect(userProfile.template_count).toBeGreaterThanOrEqual(0);
+      expect(userProfile!.credits_balance).toBeGreaterThanOrEqual(0);
+      expect(userProfile!.card_generation_count).toBeGreaterThanOrEqual(0);
+      expect(userProfile!.template_count).toBeGreaterThanOrEqual(0);
     });
 
     it('should handle null/undefined values appropriately', async () => {

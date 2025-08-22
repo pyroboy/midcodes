@@ -303,6 +303,27 @@ export const ValidationHelpers = {
     if (permissions.includes('*')) return true;
     
     return requiredPermissions.every(perm => permissions.includes(perm));
+  },
+
+  /**
+   * Validate element property values
+   */
+  validateElementProperty(property: string, value: any, element: any): boolean {
+    switch (property) {
+      case 'x':
+      case 'y':
+      case 'width':
+      case 'height':
+        return typeof value === 'number' && value >= 0;
+      case 'content':
+        return typeof value === 'string' && value.length > 0;
+      case 'fontSize':
+        return typeof value === 'number' && value > 0 && value <= 72;
+      case 'color':
+        return typeof value === 'string' && /^#[0-9A-F]{6}$/i.test(value);
+      default:
+        return true;
+    }
   }
 };
 
