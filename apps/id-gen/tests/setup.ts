@@ -42,32 +42,35 @@ vi.mock('$lib/supabaseClient', () => {
         }))
       })),
       update: vi.fn((updateData: any) => ({
-        eq: vi.fn((column: string, value: string) => ({
-          select: vi.fn(() => ({
-            single: vi.fn(() => {
-              // Handle profile updates by updating mock data
-              if (table === 'profiles' && column === 'id') {
-                const userData = mockUserData.get(value);
-                if (userData && updateData) {
-                  // Update the mock data with the provided updates
-                  Object.assign(userData, updateData);
-                  // Handle template_count field mapping
-                  if (updateData.template_count !== undefined) {
-                    userData.templates_created = updateData.template_count;
-                  }
-                  mockUserData.set(value, userData);
-                }
+        eq: vi.fn((column: string, value: string) => {
+          // Handle profile updates by updating mock data
+          if (table === 'profiles' && column === 'id') {
+            const userData = mockUserData.get(value);
+            if (userData && updateData) {
+              // Update the mock data with the provided updates
+              Object.assign(userData, updateData);
+              // Handle template_count field mapping
+              if (updateData.template_count !== undefined) {
+                userData.templates_created = updateData.template_count;
               }
-              return Promise.resolve({ data: null, error: null });
-            })
-          }))
-        }))
+              mockUserData.set(value, userData);
+              console.log(`Mock update: ${value}`, updateData, userData); // Debug log
+            }
+          }
+          
+          return {
+            select: vi.fn(() => ({
+              single: vi.fn(() => Promise.resolve({ data: null, error: null }))
+            }))
+          };
+        })
       })),
       delete: vi.fn(() => ({
         eq: vi.fn((column: string, value: string) => {
           // Simulate user deletion for error testing
           if (column === 'id') {
             deletedUsers.add(value);
+            console.log(`Mock delete: ${value}`); // Debug log
           }
           return Promise.resolve({ error: null });
         }),
