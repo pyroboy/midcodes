@@ -99,29 +99,23 @@ class TestDataManager {
     const testData = userData || await this.createMinimalTestData();
     
     const templateId = `template-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const { data: template } = await supabase
-      .from('templates')
-      .insert({
-        id: templateId,
-        name: data.name || 'Test Template',
-        org_id: testData.organization.id,
-        user_id: testData.profile.id,
-        front_background: data.front_background || '#ffffff',
-        back_background: data.back_background || '#f0f0f0',
-        orientation: data.orientation || 'landscape',
-        template_elements: data.template_elements || [],
-        created_at: new Date().toISOString(),
-        dpi: data.dpi || 300,
-        width_pixels: data.width_pixels || 1013,
-        height_pixels: data.height_pixels || 638,
-        ...data
-      })
-      .select()
-      .single();
+    const template: Template = {
+      id: templateId,
+      name: data.name || 'Test Template',
+      org_id: testData.organization.id,
+      user_id: testData.profile.id,
+      front_background: data.front_background || '#ffffff',
+      back_background: data.back_background || '#f0f0f0',
+      orientation: data.orientation || 'landscape',
+      template_elements: data.template_elements || [],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      dpi: data.dpi || 300,
+      width_pixels: data.width_pixels || 1013,
+      height_pixels: data.height_pixels || 638,
+      ...data
+    };
 
-    if (!template) {
-      throw new Error('Failed to create test template');
-    }
     this.createdData.templateIds.push(template.id);
 
     return {
