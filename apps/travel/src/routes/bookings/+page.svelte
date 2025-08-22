@@ -4,11 +4,11 @@
   import BookingModal from './BookingModal.svelte';
   import type { Room } from './types';
   
-  const $props = {
+  const props = {
     data: {} as PageData
   };
   
-  let $state = {
+  let state = {
     showModal: false,
     selectedRoom: null as Room | null,
     successMessage: '',
@@ -16,13 +16,13 @@
   };
   
   const handleOpenModal = (room: Room) => {
-    $state.selectedRoom = room;
-    $state.showModal = true;
+    state.selectedRoom = room;
+    state.showModal = true;
   };
   
   const handleCloseModal = () => {
-    $state.showModal = false;
-    $state.selectedRoom = null;
+    state.showModal = false;
+    state.selectedRoom = null;
   };
   
   const handleSubmitBooking = async (bookingData: any) => {
@@ -43,22 +43,22 @@
       const result = await response.json();
       
       if (result.success) {
-        $state.successMessage = 'Booking created successfully!';
-        $state.errorMessage = '';
+        state.successMessage = 'Booking created successfully!';
+        state.errorMessage = '';
         handleCloseModal();
         
         // Clear success message after 5 seconds
         setTimeout(() => {
-          $state.successMessage = '';
+          state.successMessage = '';
         }, 5000);
       } else {
-        $state.errorMessage = result.message || 'Failed to create booking';
-        $state.successMessage = '';
+        state.errorMessage = result.message || 'Failed to create booking';
+        state.successMessage = '';
       }
     } catch (error) {
       console.error('Error submitting booking:', error);
-      $state.errorMessage = 'An unexpected error occurred';
-      $state.successMessage = '';
+      state.errorMessage = 'An unexpected error occurred';
+      state.successMessage = '';
     }
   };
 </script>
@@ -71,12 +71,12 @@
 <div class="container mx-auto px-4 py-8">
   <h1 class="text-3xl font-bold mb-8">Bookings</h1>
   
-  {#if $state.successMessage}
+  {#if state.successMessage}
     <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-6" role="alert">
-      <span class="block sm:inline">{$state.successMessage}</span>
+      <span class="block sm:inline">{state.successMessage}</span>
       <button 
         class="absolute top-0 bottom-0 right-0 px-4 py-3"
-        onclick={() => $state.successMessage = ''}
+        onclick={() => state.successMessage = ''}
       >
         <span class="sr-only">Close</span>
         <span class="text-2xl">&times;</span>
@@ -84,12 +84,12 @@
     </div>
   {/if}
   
-  {#if $state.errorMessage}
+  {#if state.errorMessage}
     <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-6" role="alert">
-      <span class="block sm:inline">{$state.errorMessage}</span>
+      <span class="block sm:inline">{state.errorMessage}</span>
       <button 
         class="absolute top-0 bottom-0 right-0 px-4 py-3"
-        onclick={() => $state.errorMessage = ''}
+        onclick={() => state.errorMessage = ''}
       >
         <span class="sr-only">Close</span>
         <span class="text-2xl">&times;</span>
@@ -129,10 +129,10 @@
   </div>
 </div>
 
-{#if $state.showModal && $state.selectedRoom}
-  <BookingModal
-    room={$state.selectedRoom}
-    show={$state.showModal}
+  {#if state.showModal && state.selectedRoom}
+    <BookingModal
+      room={state.selectedRoom}
+      show={state.showModal}
     onClose={handleCloseModal}
     onSubmit={handleSubmitBooking}
   />

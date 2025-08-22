@@ -43,12 +43,12 @@ https://svelte.dev/e/legacy_reactive_statement_invalid -->
         available: number;
     }
     
-    $: displayTickets = data.ticketTypes.map(ticket => ({
+    const displayTickets = $derived(data.ticketTypes.map(ticket => ({
         ...ticket,
         available: ticket.quantity - ticket.sold
-    }));
+    })));
 
-    $: selectedTicket = displayTickets.find(t => t.id === $form.ticketType);
+    const selectedTicket = $derived(displayTickets.find(t => t.id === $form.ticketType));
 </script>
 
 <svelte:head>
