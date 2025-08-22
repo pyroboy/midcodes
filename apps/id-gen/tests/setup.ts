@@ -26,7 +26,7 @@ const mockUserData = new Map();
 // Mock Supabase for testing
 vi.mock('$lib/supabaseClient', () => {
   const mockSupabase = {
-    from: vi.fn(() => ({
+    from: vi.fn((table: string) => ({
       select: vi.fn(() => ({
         eq: vi.fn(() => ({
           single: vi.fn(() => Promise.resolve({ data: null, error: null })),
@@ -40,10 +40,21 @@ vi.mock('$lib/supabaseClient', () => {
           single: vi.fn(() => Promise.resolve({ data: null, error: null }))
         }))
       })),
-      update: vi.fn(() => ({
-        eq: vi.fn(() => ({
+      update: vi.fn((updateData: any) => ({
+        eq: vi.fn((column: string, value: string) => ({
           select: vi.fn(() => ({
-            single: vi.fn(() => Promise.resolve({ data: null, error: null }))
+            single: vi.fn(() => {
+              // Handle profile updates by updating mock data
+              if (table === 'profiles' && column === 'id') {
+                const userData = mockUserData.get(value);
+                if (userData && updateData) {
+                  // Update the mock data with the provided updates
+                  Object.assign(userData, updateData);
+                  mockUserData.set(value, userData);
+                }
+              }
+              return Promise.resolve({ data: null, error: null });
+            })
           }))
         }))
       })),
