@@ -99,6 +99,16 @@ class TestDataManager {
     testData.profile.unlimited_templates = config.unlimited_templates ?? false;
     testData.profile.updated_at = new Date().toISOString();
 
+    // Update mock data as well
+    if (typeof globalThis !== 'undefined' && (globalThis as any).__mockUserData) {
+      (globalThis as any).__mockUserData.set(testData.profile.id, {
+        templates_created: testData.profile.templates_created,
+        unlimited_templates: testData.profile.unlimited_templates,
+        credits: testData.profile.credits,
+        credits_used: testData.profile.credits_used
+      });
+    }
+
     return testData;
   }
 
