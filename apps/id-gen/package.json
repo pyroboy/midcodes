@@ -16,6 +16,18 @@
 		"format": "prettier --write .",
 		"test:integration": "playwright test",
 		"test:unit": "vitest",
+		"test:credits": "pnpm exec vitest --run tests/unit/credit-*.test.ts",
+		"test:credits:watch": "pnpm exec vitest tests/unit/credit-*.test.ts",
+		"test:credits:coverage": "pnpm exec vitest --run --coverage tests/unit/credit-*.test.ts",
+		"test:credits:templates": "pnpm exec vitest --run tests/unit/credit-template.test.ts",
+		"test:credits:generation": "pnpm exec vitest --run tests/unit/credit-card-generation.test.ts",
+		"test:credits:insufficient": "pnpm exec vitest --run tests/unit/credit-insufficient.test.ts",
+		"test:credits:transactions": "pnpm exec vitest --run tests/unit/credit-transactions.test.ts",
+		"test:credits:balance": "pnpm exec vitest --run tests/unit/credit-balance-verification.test.ts",
+		"test:credits:bypasses": "pnpm exec vitest --run tests/unit/credit-bypasses.test.ts",
+		"test:credits:users": "pnpm exec vitest --run tests/unit/credit-user-creation.test.ts",
+		"test:credits:isolation": "pnpm exec vitest --run tests/unit/credit-organization-isolation.test.ts",
+		"test:credits:roles": "pnpm exec vitest --run tests/unit/credit-role-permissions.test.ts",
 		"clean": "rm -rf .svelte-kit build node_modules/.cache/turbo"
 	},
 	"devDependencies": {
