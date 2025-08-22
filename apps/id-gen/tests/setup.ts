@@ -86,8 +86,8 @@ vi.mock('$lib/utils/credits', () => ({
   canCreateTemplate: vi.fn(async (userId: string) => {
     const userData = mockUserData.get(userId);
     
-    // Return false for invalid user IDs (not in mock data)
-    if (!userData) return false;
+    // Return false for invalid user IDs (not in mock data or deleted)
+    if (!userData || deletedUsers.has(userId)) return false;
     
     if (userData.unlimited_templates) return true;
     return userData.templates_created < 2; // Free limit is 2 templates
@@ -96,8 +96,8 @@ vi.mock('$lib/utils/credits', () => ({
   incrementTemplateCount: vi.fn(async (userId: string) => {
     const userData = mockUserData.get(userId);
     
-    // Handle invalid user ID
-    if (!userData) {
+    // Handle invalid user ID or deleted users
+    if (!userData || deletedUsers.has(userId)) {
       return {
         success: false,
         newCount: 0
@@ -116,8 +116,8 @@ vi.mock('$lib/utils/credits', () => ({
   getUserCredits: vi.fn(async (userId: string) => {
     const userData = mockUserData.get(userId);
     
-    // Return null for invalid user IDs
-    if (!userData) return null;
+    // Return null for invalid user IDs or deleted users
+    if (!userData || deletedUsers.has(userId)) return null;
     
     return {
       template_count: userData.templates_created,
@@ -128,5 +128,6 @@ vi.mock('$lib/utils/credits', () => ({
   })
 }));
 
-// Export mock data store for test control
+// Export mock data store and deleted users for test control
 (globalThis as any).__mockUserData = mockUserData;
+(globalThis as any).__deletedUsers = deletedUsers;
