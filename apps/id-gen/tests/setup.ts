@@ -22,6 +22,7 @@ if (!(globalThis as any).File) {
 
 // Mock data store for credits and templates
 const mockUserData = new Map();
+const deletedUsers = new Set(); // Track deleted users for error simulation
 
 // Mock Supabase for testing
 vi.mock('$lib/supabaseClient', () => {
@@ -50,6 +51,10 @@ vi.mock('$lib/supabaseClient', () => {
                 if (userData && updateData) {
                   // Update the mock data with the provided updates
                   Object.assign(userData, updateData);
+                  // Handle template_count field mapping
+                  if (updateData.template_count !== undefined) {
+                    userData.templates_created = updateData.template_count;
+                  }
                   mockUserData.set(value, userData);
                 }
               }
@@ -59,7 +64,13 @@ vi.mock('$lib/supabaseClient', () => {
         }))
       })),
       delete: vi.fn(() => ({
-        eq: vi.fn(() => Promise.resolve({ error: null })),
+        eq: vi.fn((column: string, value: string) => {
+          // Simulate user deletion for error testing
+          if (column === 'id') {
+            deletedUsers.add(value);
+          }
+          return Promise.resolve({ error: null });
+        }),
         in: vi.fn(() => Promise.resolve({ error: null }))
       }))
     }))
