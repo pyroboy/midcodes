@@ -54,7 +54,6 @@ vi.mock('$lib/supabaseClient', () => {
                 userData.templates_created = updateData.template_count;
               }
               mockUserData.set(value, userData);
-              console.log(`Mock update: ${value}`, updateData, userData); // Debug log
             }
           }
           
@@ -70,7 +69,6 @@ vi.mock('$lib/supabaseClient', () => {
           // Simulate user deletion for error testing
           if (column === 'id') {
             deletedUsers.add(value);
-            console.log(`Mock delete: ${value}`); // Debug log
           }
           return Promise.resolve({ error: null });
         }),
