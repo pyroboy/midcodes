@@ -63,7 +63,7 @@ describe('User Creation and Initial State', () => {
       await testDataManager.cleanupAll();
 
       const customTestData = await testDataManager.createUserWithCredits({
-        credits: 100,
+        credits_balance: 100,
         card_generation_count: 5,
         template_count: 1,
         unlimited_templates: true,
@@ -99,7 +99,7 @@ describe('User Creation and Initial State', () => {
       await testDataManager.cleanupAll();
 
       const zeroTestData = await testDataManager.createUserWithCredits({
-        credits: 0,
+        credits_balance: 0,
         card_generation_count: 0,
         template_count: 0,
         unlimited_templates: false,
@@ -386,6 +386,89 @@ describe('User Creation and Initial State', () => {
       expect(typeof credits?.credits_balance).toBe('number');
       expect(typeof credits?.card_generation_count).toBe('number');
       expect(typeof credits?.template_count).toBe('number');
+    });
+  });
+
+  describe('Avatar and Watermark Features', () => {
+    it('should create users with avatar URLs', async () => {
+      await testDataManager.cleanupAll();
+
+      const avatarUrl = 'https://example.com/avatars/test-user.jpg';
+      const testDataWithAvatar = await testDataManager.createUserWithAvatar(avatarUrl);
+
+      expect(testDataWithAvatar.profile.avatar_url).toBe(avatarUrl);
+
+      // Verify in database
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('avatar_url')
+        .eq('id', testDataWithAvatar.profile.id)
+        .single();
+
+      expect(userProfile?.avatar_url).toBe(avatarUrl);
+
+      await testDataManager.cleanupAll();
+    });
+
+    it('should create users with watermark removal enabled', async () => {
+      await testDataManager.cleanupAll();
+
+      const testDataWithWatermarks = await testDataManager.createUserWithWatermarkRemoval();
+
+      expect(testDataWithWatermarks.profile.remove_watermarks).toBe(true);
+
+      // Verify in database
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('remove_watermarks')
+        .eq('id', testDataWithWatermarks.profile.id)
+        .single();
+
+      expect(userProfile?.remove_watermarks).toBe(true);
+
+      await testDataManager.cleanupAll();
+    });
+
+    it('should create premium users with both avatar and watermark removal', async () => {
+      await testDataManager.cleanupAll();
+
+      const customAvatarUrl = 'https://example.com/avatars/premium-user.jpg';
+      const premiumTestData = await testDataManager.createPremiumUser(customAvatarUrl);
+
+      expect(premiumTestData.profile.avatar_url).toBe(customAvatarUrl);
+      expect(premiumTestData.profile.remove_watermarks).toBe(true);
+      expect(premiumTestData.profile.unlimited_templates).toBe(true);
+      expect(premiumTestData.profile.credits_balance).toBe(100);
+
+      // Verify in database
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('avatar_url, remove_watermarks, unlimited_templates, credits_balance')
+        .eq('id', premiumTestData.profile.id)
+        .single();
+
+      expect(userProfile).toMatchObject({
+        avatar_url: customAvatarUrl,
+        remove_watermarks: true,
+        unlimited_templates: true,
+        credits_balance: 100
+      });
+
+      await testDataManager.cleanupAll();
+    });
+
+    it('should handle null avatar URLs correctly', async () => {
+      await testDataManager.cleanupAll();
+
+      const testDataWithNullAvatar = await testDataManager.createUserWithCredits({
+        avatar_url: null,
+        remove_watermarks: false
+      });
+
+      expect(testDataWithNullAvatar.profile.avatar_url).toBeNull();
+      expect(testDataWithNullAvatar.profile.remove_watermarks).toBe(false);
+
+      await testDataManager.cleanupAll();
     });
   });
 });

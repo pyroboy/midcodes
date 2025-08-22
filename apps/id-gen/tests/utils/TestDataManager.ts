@@ -51,16 +51,16 @@ class TestDataManager {
       id: profileId,
       org_id: organization.id,
       email: `test-${Date.now()}@example.com`,
-      full_name: 'Test User',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
       avatar_url: null,
+      card_generation_count: 0,
+      context: null,
+      created_at: new Date().toISOString(),
+      credits_balance: 5,
+      remove_watermarks: false,
       role: 'user',
-      credits: 5,
-      credits_used: 0,
-      templates_created: 0,
+      template_count: 0,
       unlimited_templates: false,
-      unlimited_generations: false
+      updated_at: new Date().toISOString()
     };
     
     this.createdData.profileIds.push(profile.id);
@@ -68,10 +68,10 @@ class TestDataManager {
     // Initialize mock data for this user
     if (typeof globalThis !== 'undefined' && (globalThis as any).__mockUserData) {
       (globalThis as any).__mockUserData.set(profileId, {
-        templates_created: profile.templates_created,
+        template_count: profile.template_count,
         unlimited_templates: profile.unlimited_templates,
-        credits: profile.credits,
-        credits_used: profile.credits_used
+        credits_balance: profile.credits_balance,
+        card_generation_count: profile.card_generation_count
       });
     }
 
@@ -85,31 +85,65 @@ class TestDataManager {
    * Create user with specific credit configuration
    */
   async createUserWithCredits(config: {
-    credits?: number;
-    creditsUsed?: number;
-    templatesCreated?: number;
+    credits_balance?: number;
+    card_generation_count?: number;
+    template_count?: number;
     unlimited_templates?: boolean;
+    remove_watermarks?: boolean;
+    avatar_url?: string | null;
   } = {}): Promise<TestData> {
     const testData = await this.createMinimalTestData();
     
     // Update profile with credit information
-    testData.profile.credits = config.credits ?? 5;
-    testData.profile.credits_used = config.creditsUsed ?? 0;
-    testData.profile.templates_created = config.templatesCreated ?? 0;
+    testData.profile.credits_balance = config.credits_balance ?? 5;
+    testData.profile.card_generation_count = config.card_generation_count ?? 0;
+    testData.profile.template_count = config.template_count ?? 0;
     testData.profile.unlimited_templates = config.unlimited_templates ?? false;
+    testData.profile.remove_watermarks = config.remove_watermarks ?? false;
+    testData.profile.avatar_url = config.avatar_url ?? null;
     testData.profile.updated_at = new Date().toISOString();
 
     // Update mock data as well
     if (typeof globalThis !== 'undefined' && (globalThis as any).__mockUserData) {
       (globalThis as any).__mockUserData.set(testData.profile.id, {
-        templates_created: testData.profile.templates_created,
+        template_count: testData.profile.template_count,
         unlimited_templates: testData.profile.unlimited_templates,
-        credits: testData.profile.credits,
-        credits_used: testData.profile.credits_used
+        credits_balance: testData.profile.credits_balance,
+        card_generation_count: testData.profile.card_generation_count
       });
     }
 
     return testData;
+  }
+
+  /**
+   * Create user with avatar URL
+   */
+  async createUserWithAvatar(avatarUrl: string): Promise<TestData> {
+    return this.createUserWithCredits({
+      avatar_url: avatarUrl
+    });
+  }
+
+  /**
+   * Create user with watermarks removal enabled
+   */
+  async createUserWithWatermarkRemoval(): Promise<TestData> {
+    return this.createUserWithCredits({
+      remove_watermarks: true
+    });
+  }
+
+  /**
+   * Create premium user with both avatar and watermark removal
+   */
+  async createPremiumUser(avatarUrl?: string): Promise<TestData> {
+    return this.createUserWithCredits({
+      avatar_url: avatarUrl || `https://example.com/avatars/test-${Date.now()}.jpg`,
+      remove_watermarks: true,
+      unlimited_templates: true,
+      credits_balance: 100
+    });
   }
 
   /**
