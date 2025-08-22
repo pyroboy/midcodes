@@ -88,6 +88,7 @@ vi.mock('$lib/supabaseClient', () => {
 vi.mock('$lib/utils/credits', () => ({
   canCreateTemplate: vi.fn(async (userId: string) => {
     const userData = mockUserData.get(userId);
+    console.log(`canCreateTemplate check: ${userId}`, userData); // Debug log
     
     // Return false for invalid user IDs (not in mock data or deleted)
     if (!userData || deletedUsers.has(userId)) return false;
@@ -98,6 +99,7 @@ vi.mock('$lib/utils/credits', () => ({
 
   incrementTemplateCount: vi.fn(async (userId: string) => {
     const userData = mockUserData.get(userId);
+    console.log(`incrementTemplateCount: ${userId}`, userData); // Debug log
     
     // Handle invalid user ID or deleted users
     if (!userData || deletedUsers.has(userId)) {
@@ -118,6 +120,7 @@ vi.mock('$lib/utils/credits', () => ({
 
   getUserCredits: vi.fn(async (userId: string) => {
     const userData = mockUserData.get(userId);
+    console.log(`getUserCredits: ${userId}`, userData); // Debug log
     
     // Return null for invalid user IDs or deleted users
     if (!userData || deletedUsers.has(userId)) return null;
