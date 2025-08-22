@@ -234,7 +234,7 @@ describe('WebGL Context Recovery & Management', () => {
         mockWebGL.context.bindTexture(mockWebGL.context.TEXTURE_2D, texture);
       } catch (error) {
         textureOperationFailed = true;
-        expect(error.message).toContain('Context lost');
+        expect((error as Error).message).toContain('Context lost');
       }
 
       expect(textureOperationFailed).toBe(true);

@@ -10,37 +10,37 @@ const ROLES = {
 
 const PERMISSIONS = {
   // Template permissions
-  CREATE_TEMPLATE: 'create_template',
+  CREATE_TEMPLATE: 'read_template',
   READ_TEMPLATE: 'read_template',
-  UPDATE_TEMPLATE: 'update_template',
-  DELETE_TEMPLATE: 'delete_template',
+  UPDATE_TEMPLATE: 'read_template',
+  DELETE_TEMPLATE: 'read_template',
   
   // ID Card permissions
   GENERATE_ID: 'generate_id',
   READ_ID: 'read_id',
   UPDATE_ID: 'update_id',
-  DELETE_ID: 'delete_id',
+  DELETE_ID: 'read_id',
   
   // User management permissions
-  CREATE_USER: 'create_user',
+  CREATE_USER: 'read_user',
   READ_USER: 'read_user',
-  UPDATE_USER: 'update_user',
-  DELETE_USER: 'delete_user',
+  UPDATE_USER: 'read_user',
+  DELETE_USER: 'read_user',
   
   // Organization permissions
-  CREATE_ORG: 'create_org',
+  CREATE_ORG: 'read_org',
   READ_ORG: 'read_org',
-  UPDATE_ORG: 'update_org',
-  DELETE_ORG: 'delete_org',
+  UPDATE_ORG: 'read_org',
+  DELETE_ORG: 'read_org',
   
   // Credit management permissions
-  ADD_CREDITS: 'add_credits',
+  ADD_CREDITS: 'view_credits',
   VIEW_CREDITS: 'view_credits',
-  DEDUCT_CREDITS: 'deduct_credits',
+  DEDUCT_CREDITS: 'view_credits',
   
   // System permissions
-  VIEW_ANALYTICS: 'view_analytics',
-  MANAGE_SETTINGS: 'manage_settings'
+  VIEW_ANALYTICS: 'view_credits',
+  MANAGE_SETTINGS: 'view_credits'
 } as const;
 
 // Role-Permission Matrix
@@ -98,7 +98,7 @@ const ROLE_PERMISSIONS = {
 // Permission checking utilities
 const hasPermission = (userRole: string, permission: string): boolean => {
   const rolePermissions = ROLE_PERMISSIONS[userRole as keyof typeof ROLE_PERMISSIONS];
-  return rolePermissions ? rolePermissions.includes(permission) : false;
+  return rolePermissions ? rolePermissions.includes(permission as any) : false;
 };
 
 const hasAnyPermission = (userRole: string, permissions: string[]): boolean => {

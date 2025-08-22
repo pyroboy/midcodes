@@ -340,7 +340,7 @@ describe('State Management - Template Store', () => {
 
       // Initial subscription should trigger notification
       expect(notificationCount).toBe(1);
-      expect(lastNotifiedValue?.name).toBe('');
+      expect(lastNotifiedValue!.name).toBe('');
 
       // Update should trigger notification
       templateData.update(store => ({
@@ -349,13 +349,13 @@ describe('State Management - Template Store', () => {
       }));
 
       expect(notificationCount).toBe(2);
-      expect(lastNotifiedValue?.name).toBe('Test Template');
+      expect(lastNotifiedValue!.name).toBe('Test Template');
 
       // Reset should trigger notification
       templateData.reset();
       
       expect(notificationCount).toBe(3);
-      expect(lastNotifiedValue?.name).toBe('');
+      expect(lastNotifiedValue!.name).toBe('');
 
       unsubscribe();
     });
