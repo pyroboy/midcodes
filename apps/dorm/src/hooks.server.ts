@@ -2,7 +2,9 @@ import { createServerClient } from '@supabase/ssr';
 import type { User, Session } from '@supabase/supabase-js';
 import { sequence } from '@sveltejs/kit/hooks';
 import { redirect, error as throwError } from '@sveltejs/kit';
-import { env as publicEnv } from '$env/dynamic/public';
+// Environment variables for Supabase
+const PUBLIC_SUPABASE_URL = process.env.PUBLIC_SUPABASE_URL || 'https://wnkqlrfmtiibrqnncgqu.supabase.co'
+const PUBLIC_SUPABASE_ANON_KEY = process.env.PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indua3FscmZtdGlpYnJxbm5jZ3F1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjIyMjEzNzMsImV4cCI6MjAzNzc5NzM3M30.lsv6u5'
 import type { Handle } from '@sveltejs/kit';
 import { jwtDecode } from 'jwt-decode';
 import { getUserPermissions } from '$lib/services/permissions';
@@ -17,8 +19,8 @@ export interface GetSessionResult {
 }
 
 const initializeSupabase: Handle = async ({ event, resolve }) => {
-    const supabaseUrl = publicEnv.PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = publicEnv.PUBLIC_SUPABASE_ANON_KEY;
+    const supabaseUrl = PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = PUBLIC_SUPABASE_ANON_KEY;
 
     if (!supabaseUrl || !supabaseAnonKey) {
         console.error('Supabase environment variables are missing. Please set PUBLIC_SUPABASE_URL and PUBLIC_SUPABASE_ANON_KEY.');

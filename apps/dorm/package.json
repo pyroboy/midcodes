@@ -9,7 +9,7 @@
 		"dev:fix-hmr": "powershell -ExecutionPolicy Bypass -File scripts/fix-hmr.ps1",
 		"serve:edge": "supabase functions serve role-emulation --env-file .env.local",
 		"deploy:edge": "supabase functions deploy role-emulation",
-		"# build": "vite build",
+		"build": "vite build",
 		"preview": "vite preview",
 		"test": "pnpm run test:integration && pnpm run test:unit",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
