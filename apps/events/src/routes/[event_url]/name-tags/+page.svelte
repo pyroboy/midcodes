@@ -31,14 +31,14 @@ https://svelte.dev/e/legacy_reactive_statement_invalid -->
     let showPrintPreview = false;
     let selectedAttendees: Attendee[] = [];
 
-    $: filteredAttendees = data.attendees.filter(attendee => {
+    const filteredAttendees = $derived(data.attendees.filter(attendee => {
         const searchLower = searchQuery.toLowerCase();
         return (
             attendee.first_name.toLowerCase().includes(searchLower) ||
             attendee.last_name.toLowerCase().includes(searchLower) ||
             attendee.reference_code.toLowerCase().includes(searchLower)
         );
-    });
+    }));
 
     function toggleAttendee(attendee: Attendee) {
         const index = selectedAttendees.findIndex(a => a.id === attendee.id);
