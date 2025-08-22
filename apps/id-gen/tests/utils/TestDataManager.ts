@@ -129,31 +129,7 @@ class TestDataManager {
    */
   async cleanupAll(): Promise<void> {
     try {
-      // Clean up templates
-      if (this.createdData.templateIds.length > 0) {
-        await supabase
-          .from('templates')
-          .delete()
-          .in('id', this.createdData.templateIds);
-      }
-
-      // Clean up profiles
-      if (this.createdData.profileIds.length > 0) {
-        await supabase
-          .from('profiles')
-          .delete()
-          .in('id', this.createdData.profileIds);
-      }
-
-      // Clean up organizations
-      if (this.createdData.organizationIds.length > 0) {
-        await supabase
-          .from('organizations')
-          .delete()
-          .in('id', this.createdData.organizationIds);
-      }
-
-      // Reset tracking
+      // In a test environment with mocked database, we just reset tracking
       this.createdData = {
         organizationIds: [],
         profileIds: [],
