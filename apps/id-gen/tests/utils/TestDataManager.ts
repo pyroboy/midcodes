@@ -34,42 +34,35 @@ class TestDataManager {
    * Create minimal test data with organization and profile
    */
   async createMinimalTestData(): Promise<TestData> {
-    // Create organization
+    // Create organization data
     const orgData = OrganizationFactory.createOrganization();
-    const { data: organization } = await supabase
-      .from('organizations')
-      .insert({
-        id: orgData.id,
-        name: orgData.name,
-        created_at: orgData.created_at,
-        updated_at: orgData.updated_at
-      })
-      .select()
-      .single();
-
-    if (!organization) {
-      throw new Error('Failed to create test organization');
-    }
+    const organization: Organization = {
+      id: orgData.id,
+      name: orgData.name,
+      created_at: orgData.created_at,
+      updated_at: orgData.updated_at
+    };
+    
     this.createdData.organizationIds.push(organization.id);
 
-    // Create profile
+    // Create profile data
     const profileId = `profile-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const { data: profile } = await supabase
-      .from('profiles')
-      .insert({
-        id: profileId,
-        org_id: organization.id,
-        email: `test-${Date.now()}@example.com`,
-        full_name: 'Test User',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .select()
-      .single();
-
-    if (!profile) {
-      throw new Error('Failed to create test profile');
-    }
+    const profile: Profile = {
+      id: profileId,
+      org_id: organization.id,
+      email: `test-${Date.now()}@example.com`,
+      full_name: 'Test User',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      avatar_url: null,
+      role: 'user',
+      credits: 5,
+      credits_used: 0,
+      templates_created: 0,
+      unlimited_templates: false,
+      unlimited_generations: false
+    };
+    
     this.createdData.profileIds.push(profile.id);
 
     return {
