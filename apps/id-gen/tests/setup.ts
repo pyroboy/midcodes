@@ -62,20 +62,25 @@ vi.mock('$lib/supabaseClient', () => {
 // Mock credit utility functions
 vi.mock('$lib/utils/credits', () => ({
   canCreateTemplate: vi.fn(async (userId: string) => {
-    const userData = mockUserData.get(userId) || { 
-      templates_created: 0, 
-      unlimited_templates: false 
-    };
+    const userData = mockUserData.get(userId);
+    
+    // Return false for invalid user IDs (not in mock data)
+    if (!userData) return false;
     
     if (userData.unlimited_templates) return true;
     return userData.templates_created < 2; // Free limit is 2 templates
   }),
 
   incrementTemplateCount: vi.fn(async (userId: string) => {
-    const userData = mockUserData.get(userId) || { 
-      templates_created: 0, 
-      unlimited_templates: false 
-    };
+    const userData = mockUserData.get(userId);
+    
+    // Handle invalid user ID
+    if (!userData) {
+      return {
+        success: false,
+        newCount: 0
+      };
+    }
     
     userData.templates_created += 1;
     mockUserData.set(userId, userData);
@@ -87,12 +92,10 @@ vi.mock('$lib/utils/credits', () => ({
   }),
 
   getUserCredits: vi.fn(async (userId: string) => {
-    const userData = mockUserData.get(userId) || { 
-      templates_created: 0, 
-      unlimited_templates: false,
-      credits: 5,
-      credits_used: 0
-    };
+    const userData = mockUserData.get(userId);
+    
+    // Return null for invalid user IDs
+    if (!userData) return null;
     
     return {
       template_count: userData.templates_created,
