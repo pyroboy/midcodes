@@ -1,13 +1,9 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-
 ## meta-instruction
 Now think hard and write elegant code that completes this.
 Do not add backwards compatibility unless explicitly requested.
 After every code block you write, lint, compile, and write corresponding tests and run them before writing the next code block
-
 
 ## Multi-Repository Context
 
@@ -383,7 +379,9 @@ You are acting as a **senior data architect**. Follow these steps strictly and i
 ---
 
 ### **Step 2 – Context Awareness**
-
+    
+    run   mcp__supabase__generate_typescript_types
+  to  get the latest supabase types for ground truth   
 - Assume we are building with **Svelte 5 + SvelteKit + Supabase**.
 - Use **Supabase MCP** for ground-truth database handling details.
 - Use **Context7 MCP** when dealing with NPM library documentation or usage patterns.
@@ -424,7 +422,7 @@ You are acting as a **senior data architect**. Follow these steps strictly and i
 - Outline **how to test the implementation**:
     - Unit tests → Functions.
     - Integration tests → Supabase + SvelteKit flow.
-    
+    FOR INTEGRATION TEST
     !!! USE SUPABASE commands as if the using the supabase API NOT MCP COMMMANDS
     !!!Implement mechanisms to seed test data before running tests and clean up created records after tests complete
     !!! to ensure accurate and reliable test results MIRROR the tables to the schema "test_integration" 
