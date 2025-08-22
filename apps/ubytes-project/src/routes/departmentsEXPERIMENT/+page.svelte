@@ -150,22 +150,22 @@
         console.log(`${field} variants received:`, event.detail.variants);
         
         if (!event.detail.variants.length) {
-            $form[field] = null;
+            form.update(f => ({ ...f, [field]: null }));
             return;
         }
 
         // Set preview
-        $form[field] = event.detail.previewUrl;
+        form.update(f => ({ ...f, [field]: event.detail.previewUrl }));
 
         // Add variant files to form
-        const form = document.querySelector('form');
-        if (form) {
+        const formElement = document.querySelector('form');
+        if (formElement) {
             event.detail.variants.forEach(variant => {
                 const fieldName = `${field}_${variant.size}`;
                 console.log(`Adding ${fieldName} to form`);
                 
                 // Remove existing input if it exists
-                const existingInput = form.querySelector(`input[name="${fieldName}"]`);
+                const existingInput = formElement.querySelector(`input[name="${fieldName}"]`);
                 if (existingInput) {
                     existingInput.remove();
                 }
@@ -181,7 +181,7 @@
                 dataTransfer.items.add(variant.file);
                 input.files = dataTransfer.files;
 
-                form.appendChild(input);
+                formElement.appendChild(input);
             });
         }
     }

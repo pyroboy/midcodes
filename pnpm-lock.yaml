@@ -655,6 +655,9 @@ importers:
       '@faker-js/faker':
         specifier: ^9.3.0
         version: 9.9.0
+      '@fontsource/fira-mono':
+        specifier: ^5.0.0
+        version: 5.2.6
       '@fontsource/inter':
         specifier: ^5.1.1
         version: 5.2.6

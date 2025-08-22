@@ -2,8 +2,11 @@ import { createServerClient } from '@supabase/ssr';
 import type { User, Session } from '@supabase/supabase-js';
 import { sequence } from '@sveltejs/kit/hooks';
 import { redirect, error as throwError } from '@sveltejs/kit';
-import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
 import type { Handle } from '@sveltejs/kit';
+
+// Environment variables for Supabase
+const PUBLIC_SUPABASE_URL = process.env.PUBLIC_SUPABASE_URL || 'https://wnkqlrfmtiibrqnncgqu.supabase.co'
+const PUBLIC_SUPABASE_ANON_KEY = process.env.PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indua3FscmZtdGlpYnJxbm5jZ3F1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjIyMjEzNzMsImV4cCI6MjAzNzc5NzM3M30.lsv6u5'
 import { jwtDecode } from 'jwt-decode';
 import { getUserPermissions } from '$lib/services/permissions';
 import type { UserJWTPayload } from '$lib/types/auth';
