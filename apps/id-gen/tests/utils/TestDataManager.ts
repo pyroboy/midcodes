@@ -149,7 +149,15 @@ class TestDataManager {
    */
   async cleanupAll(): Promise<void> {
     try {
-      // In a test environment with mocked database, we just reset tracking
+      // Clean up mock data
+      if (typeof globalThis !== 'undefined' && (globalThis as any).__mockUserData) {
+        const mockUserData = (globalThis as any).__mockUserData;
+        this.createdData.profileIds.forEach(id => {
+          mockUserData.delete(id);
+        });
+      }
+
+      // Reset tracking
       this.createdData = {
         organizationIds: [],
         profileIds: [],
