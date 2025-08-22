@@ -1,3 +1,4 @@
+import { expect } from 'vitest';
 import { testDataManager } from './TestDataManager';
 import { supabase } from '$lib/supabaseClient';
 import { addCredits, grantUnlimitedTemplates, grantWatermarkRemoval } from '$lib/utils/credits';
@@ -288,19 +289,19 @@ export class BypassTestUtils {
       .eq('id', userId)
       .single();
 
-    expect(profile.role).toBe(expectedRole);
+    expect(profile!.role).toBe(expectedRole);
 
     if (expectedCapabilities.canBypassTemplateLimit !== undefined) {
-      expect(profile.unlimited_templates).toBe(expectedCapabilities.canBypassTemplateLimit);
+      expect(profile!.unlimited_templates).toBe(expectedCapabilities.canBypassTemplateLimit);
     }
 
     if (expectedCapabilities.canRemoveWatermarks !== undefined) {
-      expect(profile.remove_watermarks).toBe(expectedCapabilities.canRemoveWatermarks);
+      expect(profile!.remove_watermarks).toBe(expectedCapabilities.canRemoveWatermarks);
     }
 
     if (expectedCapabilities.hasUnlimitedCredits !== undefined) {
       // This would be implementation-specific based on how unlimited credits work
-      expect(profile.credits_balance > 1000).toBe(expectedCapabilities.hasUnlimitedCredits);
+      expect(profile!.credits_balance > 1000).toBe(expectedCapabilities.hasUnlimitedCredits);
     }
 
     return profile;
@@ -474,4 +475,3 @@ export const bypassScenarios = {
   }
 };
 
-export { BypassTestUtils };

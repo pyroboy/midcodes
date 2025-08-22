@@ -10,7 +10,7 @@ import { describe, test, expect, beforeAll, afterAll, beforeEach, afterEach } fr
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '$lib/types/database.types.js';
 import type { TemplateElement } from '$lib/schemas/template-element.schema.js';
-import { v4 as uuidv4 } from 'uuid';
+import { faker } from '@faker-js/faker';
 
 // Supabase client setup
 const supabaseUrl = 'https://db.wnkqlrfmtiibrqnncgqu.supabase.co';
@@ -80,8 +80,8 @@ async function setupTestEnvironment() {
   console.log('🔧 Setting up test environment...');
   
   // Create test organizations
-  const testOrg1Id = uuidv4();
-  const testOrg2Id = uuidv4();
+  const testOrg1Id = faker.string.uuid();
+  const testOrg2Id = faker.string.uuid();
   const now = new Date().toISOString();
   
   const organizations: TestOrganization[] = [
@@ -102,7 +102,7 @@ async function setupTestEnvironment() {
   // Create test profiles with different roles
   const profiles: TestProfile[] = [
     {
-      id: uuidv4(),
+      id: faker.string.uuid(),
       email: 'superadmin@test.com',
       org_id: testOrg1Id,
       role: 'super_admin',

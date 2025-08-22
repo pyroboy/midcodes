@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { testDataManager } from '../utils/TestDataManager';
 import { TestDataFactory, MockUtilities, ValidationHelpers } from '../utils/test-helpers';
-import { templateStore, type TemplateElement } from '$lib/stores/templateStore';
+import { templateData as templateStore, type TemplateElement } from '$lib/stores/templateStore';
 import { get } from 'svelte/store';
 
 // Mock DOM APIs for testing

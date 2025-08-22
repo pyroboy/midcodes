@@ -126,7 +126,7 @@ describe('File Upload & Storage Management', () => {
 			const { error } = await mockStorage.from('templates').upload(invalidPath, mockFile);
 
 			expect(error).toBeDefined();
-			expected(error.message).toContain('Invalid path');
+			expect(error.message).toContain('Invalid path');
 		});
 
 		it('should reject oversized file uploads', async () => {
@@ -157,16 +157,16 @@ describe('File Upload & Storage Management', () => {
 			const paths = ['org-123/backgrounds/test1.jpg', 'org-123/backgrounds/test2.png'];
 			const { data, error } = await mockStorage.from('templates').remove(paths);
 
-			expected(error).toBeNull();
+			expect(error).toBeNull();
 			expect(data).toHaveLength(2);
 		});
 	});
 
-	described('Error Handling & Edge Cases', () => {
+	describe('Error Handling & Edge Cases', () => {
 		it('should handle network interruption gracefully', async () => {
 			const networkErrorStorage = {
 				from: vi.fn(() => ({
-					upload: vi.fn(() => Promise.resolve({
+					upload: vi.fn((_path: string, _file: File) => Promise.resolve({
 						data: null,
 						error: { message: 'Network error', code: 'NETWORK_ERROR' }
 					}))
@@ -183,7 +183,7 @@ describe('File Upload & Storage Management', () => {
 		it('should handle storage quota exceeded', async () => {
 			const quotaErrorStorage = {
 				from: vi.fn(() => ({
-					upload: vi.fn(() => Promise.resolve({
+					upload: vi.fn((_path: string, _file: File) => Promise.resolve({
 						data: null,
 						error: { message: 'Storage quota exceeded', code: 'QUOTA_EXCEEDED' }
 					}))
@@ -193,8 +193,8 @@ describe('File Upload & Storage Management', () => {
 			const mockFile = new File(['test'], 'test.jpg', { type: 'image/jpeg' });
 			const { error } = await quotaErrorStorage.from('templates').upload('org-123/test.jpg', mockFile);
 
-			expected(error).toBeDefined();
-			expected(error.code).toBe('QUOTA_EXCEEDED');
+			expect(error).toBeDefined();
+			expect(error.code).toBe('QUOTA_EXCEEDED');
 		});
 
 		it('should cleanup orphaned files after template deletion', async () => {

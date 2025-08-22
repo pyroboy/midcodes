@@ -34,80 +34,9 @@ vi.mock('$app/server', () => ({
 	getRequestEvent: vi.fn()
 }));
 
-// Mock organization remote module
+// Mock organization remote module with flexible structure
 const mockSupabase = {
-	from: vi.fn(() => ({
-		select: vi.fn(() => ({
-			eq: vi.fn(() => ({
-				single: vi.fn(),
-				range: vi.fn(),
-				order: vi.fn(() => ({
-					range: vi.fn()
-				})),
-				gte: vi.fn(() => ({
-					lt: vi.fn()
-				})),
-				lt: vi.fn(),
-				neq: vi.fn(() => ({
-					single: vi.fn()
-				}))
-			})),
-			ilike: vi.fn(() => ({
-				gte: vi.fn(() => ({
-					lte: vi.fn(() => ({
-						order: vi.fn(() => ({
-							range: vi.fn()
-						}))
-					}))
-				})),
-				lte: vi.fn(() => ({
-					order: vi.fn(() => ({
-						range: vi.fn()
-					}))
-				})),
-				order: vi.fn(() => ({
-					range: vi.fn()
-				}))
-			})),
-			gte: vi.fn(() => ({
-				lte: vi.fn(() => ({
-					order: vi.fn(() => ({
-						range: vi.fn()
-					}))
-				})),
-				lt: vi.fn(() => ({
-					order: vi.fn(() => ({
-						range: vi.fn()
-					}))
-				}))
-			})),
-			lte: vi.fn(() => ({
-				order: vi.fn(() => ({
-					range: vi.fn()
-				}))
-			})),
-			order: vi.fn(() => ({
-				range: vi.fn()
-			})),
-			count: 'exact',
-			head: true
-		})),
-		insert: vi.fn(() => ({
-			select: vi.fn(() => ({
-				single: vi.fn()
-			}))
-		})),
-		update: vi.fn(() => ({
-			eq: vi.fn(() => ({
-				select: vi.fn(() => ({
-					single: vi.fn()
-				}))
-			}))
-		})),
-		delete: vi.fn(() => ({
-			eq: vi.fn()
-		}))
-	}))
+	from: vi.fn()
 };
 
 // Test data factories
@@ -735,7 +664,7 @@ describe('Error Handling and Edge Cases', () => {
 
 	test('missing organization ID', async () => {
 		const { getRequestEvent } = await import('$app/server');
-		(getRequestEvent as any).mockReturnValue(createMockRequestEvent(createMockUser('org_admin'), null));
+		(getRequestEvent as any).mockReturnValue(createMockRequestEvent(createMockUser('org_admin'), undefined));
 
 		await expect(organizationFunctions.getOrganizationStats())
 			.rejects.toThrow('Organization ID not found');
