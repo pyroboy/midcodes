@@ -292,7 +292,7 @@ describe('Cross-Feature Integration Tests', () => {
         .eq('id', user.id)
         .single();
 
-      expect(updatedUser.role).toBe('id_gen_user');
+      expect(updatedUser!.role).toBe('id_gen_user');
     });
   });
 
@@ -353,8 +353,8 @@ describe('Cross-Feature Integration Tests', () => {
         .eq('id', user.id)
         .single();
 
-      expect(updatedUser.credits_balance).toBe(45);
-      expect(updatedUser.card_generation_count).toBe(16);
+      expect(updatedUser!.credits_balance).toBe(45);
+      expect(updatedUser!.card_generation_count).toBe(16);
 
       // Record credit transaction
       await supabase
@@ -417,7 +417,7 @@ describe('Cross-Feature Integration Tests', () => {
         .eq('id', user.id)
         .single();
 
-      const hasInsufficientCredits = userCredits.credits_balance < 5;
+      const hasInsufficientCredits = userCredits!.credits_balance < 5;
       expect(hasInsufficientCredits).toBe(true);
 
       // Application should prevent ID generation
@@ -622,7 +622,7 @@ describe('Cross-Feature Integration Tests', () => {
 
       const { result, time } = await PerformanceHelpers.measureExecutionTime(async () => {
         return PerformanceHelpers.simulateConcurrentOperations(
-          highLoadOperations,
+          highLoadOperations.map(op => op().then(() => 'success').catch(() => 'error')),
           10 // Max 10 concurrent operations
         );
       });

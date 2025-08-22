@@ -447,7 +447,7 @@ describe('Auth Callback Security Testing', () => {
     });
 
     it('should log security events for monitoring', async () => {
-      const securityEvents = [];
+      const securityEvents: Array<{ type: string; timestamp: string }> = [];
       
       const logSecurityEvent = (event: any) => {
         securityEvents.push({

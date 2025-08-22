@@ -116,7 +116,7 @@ async function setupTestEnvironment() {
       updated_at: null
     },
     {
-      id: uuidv4(),
+      id: faker.string.uuid(),
       email: 'orgadmin@test.com',
       org_id: testOrg1Id,
       role: 'org_admin',
@@ -130,7 +130,7 @@ async function setupTestEnvironment() {
       updated_at: null
     },
     {
-      id: uuidv4(),
+      id: faker.string.uuid(),
       email: 'idgenadmin@test.com',
       org_id: testOrg1Id,
       role: 'id_gen_admin',
@@ -144,7 +144,7 @@ async function setupTestEnvironment() {
       updated_at: null
     },
     {
-      id: uuidv4(),
+      id: faker.string.uuid(),
       email: 'idgenuser@test.com',
       org_id: testOrg1Id,
       role: 'id_gen_user',
@@ -158,7 +158,7 @@ async function setupTestEnvironment() {
       updated_at: null
     },
     {
-      id: uuidv4(),
+      id: faker.string.uuid(),
       email: 'otherorg@test.com',
       org_id: testOrg2Id,
       role: 'org_admin',
@@ -175,7 +175,7 @@ async function setupTestEnvironment() {
 
   // Create sample template elements
   const sampleTextElement: TemplateElement = {
-    id: uuidv4(),
+    id: faker.string.uuid(),
     type: 'text',
     x: 50,
     y: 100,
@@ -193,7 +193,7 @@ async function setupTestEnvironment() {
   };
 
   const sampleImageElement: TemplateElement = {
-    id: uuidv4(),
+    id: faker.string.uuid(),
     type: 'image',
     x: 300,
     y: 50,
@@ -210,7 +210,7 @@ async function setupTestEnvironment() {
   // Create test templates
   const templates: TestTemplate[] = [
     {
-      id: uuidv4(),
+      id: faker.string.uuid(),
       name: 'Employee ID Template',
       user_id: profiles[0].id, // Super admin
       org_id: testOrg1Id,
@@ -225,7 +225,7 @@ async function setupTestEnvironment() {
       updated_at: null
     },
     {
-      id: uuidv4(),
+      id: faker.string.uuid(),
       name: 'Student ID Template',
       user_id: profiles[1].id, // Org admin
       org_id: testOrg1Id,
@@ -318,13 +318,13 @@ async function verifyTemplateUpdate(templateId: string, expectedChanges: Partial
   Object.keys(expectedChanges).forEach(key => {
     if (key === 'updated_at') {
       // For updated_at, just verify it's recent
-      const updatedAt = new Date(template[key]);
+      const updatedAt = new Date(template[key] as string);
       const now = new Date();
       const diffMs = now.getTime() - updatedAt.getTime();
       expect(diffMs).toBeLessThan(5000); // Within 5 seconds
-    } else {
-      expect(template[key]).toEqual(expectedChanges[key]);
-    }
+          } else {
+        expect(template[key as keyof typeof template]).toEqual(expectedChanges[key as keyof typeof expectedChanges]);
+      }
   });
 
   return template;
@@ -333,7 +333,7 @@ async function verifyTemplateUpdate(templateId: string, expectedChanges: Partial
 // Helper function to create sample template element
 function createSampleElement(type: TemplateElement['type'], overrides = {}): TemplateElement {
   const baseElement = {
-    id: uuidv4(),
+    id: faker.string.uuid(),
     x: 10,
     y: 10,
     width: 100,
@@ -541,7 +541,7 @@ describe('Template Update Integration Tests', () => {
       expect(updatedTemplate.template_elements).toHaveLength(6);
       
       // Verify element types
-      const elementTypes = updatedTemplate.template_elements.map(el => el.type);
+      const elementTypes = (updatedTemplate.template_elements as TemplateElement[]).map(el => el.type);
       expect(elementTypes).toContain('text');
       expect(elementTypes).toContain('image');
       expect(elementTypes).toContain('qr');
@@ -584,7 +584,7 @@ describe('Template Update Integration Tests', () => {
       });
 
       // Verify text element updates
-      const updatedTextElement = updatedTemplate.template_elements.find(el => el.type === 'text');
+      const updatedTextElement = (updatedTemplate.template_elements as TemplateElement[]).find(el => el.type === 'text');
       expect(updatedTextElement).toBeTruthy();
       if (updatedTextElement && updatedTextElement.type === 'text') {
         expect(updatedTextElement.content).toBe('Updated Text Content');
@@ -594,7 +594,7 @@ describe('Template Update Integration Tests', () => {
       }
 
       // Verify image element updates
-      const updatedImageElement = updatedTemplate.template_elements.find(el => el.type === 'image');
+      const updatedImageElement = (updatedTemplate.template_elements as TemplateElement[]).find(el => el.type === 'image');
       expect(updatedImageElement).toBeTruthy();
       if (updatedImageElement && updatedImageElement.type === 'image') {
         expect(updatedImageElement.src).toBe('https://example.com/new-image.jpg');
@@ -628,7 +628,7 @@ describe('Template Update Integration Tests', () => {
       
       // Verify the removed element is not present
       const removedElementId = originalElements[0].id;
-      const stillExists = updatedTemplate.template_elements.some(el => el.id === removedElementId);
+      const stillExists = updatedTemplate.template_elements as TemplateElement[]).some(el => el.id === removedElementId);
       expect(stillExists).toBe(false);
     });
 
@@ -665,8 +665,8 @@ describe('Template Update Integration Tests', () => {
       });
 
       // Verify elements are on correct sides
-      const frontElements = updatedTemplate.template_elements.filter(el => el.side === 'front');
-      const backElements = updatedTemplate.template_elements.filter(el => el.side === 'back');
+      const frontElements = updatedTemplate.template_elements as TemplateElement[]).filter(el => el.side === 'front');
+      const backElements = updatedTemplate.template_elements as TemplateElement[]).filter(el => el.side === 'back');
 
       expect(frontElements.length).toBeGreaterThan(0);
       expect(backElements.length).toBeGreaterThan(0);
@@ -714,7 +714,7 @@ describe('Template Update Integration Tests', () => {
       const invalidElements = [
         {
           // Missing required fields
-          id: uuidv4(),
+          id: faker.string.uuid(),
           type: 'text'
           // Missing x, y, width, height, etc.
         }
@@ -768,7 +768,7 @@ describe('Template Update Integration Tests', () => {
         .from('templates')
         .update({ name: 'Org Admin Updated' })
         .eq('id', template.id)
-        .eq('org_id', testData.testUsers.orgAdmin.org_id);
+        .eq('org_id', testData.testUsers.orgAdmin.org_id!);
 
       expect(orgAdminError).toBeNull();
 
@@ -784,7 +784,7 @@ describe('Template Update Integration Tests', () => {
         .from('templates')
         .update({ name: 'Creator Updated' })
         .eq('id', template.id)
-        .eq('user_id', template.user_id);
+        .eq('user_id', template.user_id!);
 
       expect(creatorError).toBeNull();
 
@@ -794,7 +794,7 @@ describe('Template Update Integration Tests', () => {
         .from('templates')
         .update({ name: 'Cross Org Attempt' })
         .eq('id', template.id)
-        .eq('org_id', testData.testUsers.otherOrgUser.org_id);
+        .eq('org_id', testData.testUsers.otherOrgUser.org_id!);
 
       // With proper RLS, this should fail or return no rows
     });
@@ -910,7 +910,7 @@ describe('Template Update Integration Tests', () => {
 
     test('6.2 Template Duplication', async () => {
       const sourceTemplate = testData.templates[0];
-      const newTemplateId = uuidv4();
+      const newTemplateId = faker.string.uuid();
       
       // Create a duplicate template
       const duplicateTemplate = {
@@ -1005,7 +1005,7 @@ describe('Template Update Integration Tests', () => {
       // Create complex elements with all possible properties
       const complexElements = [
         {
-          id: uuidv4(),
+          id: faker.string.uuid(),
           type: 'text' as const,
           x: 10,
           y: 10,
@@ -1028,7 +1028,7 @@ describe('Template Update Integration Tests', () => {
           lineHeight: '1.4'
         },
         {
-          id: uuidv4(),
+          id: faker.string.uuid(),
           type: 'selection' as const,
           x: 10,
           y: 60,

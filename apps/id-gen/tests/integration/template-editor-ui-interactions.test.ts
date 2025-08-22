@@ -644,7 +644,7 @@ describe('Template Editor UI Interactions', () => {
       const mockSupabase = MockUtilities.createSupabaseMock();
       const updatedTemplate = get(templateStore);
 
-      mockSupabase.supabase
+      mockSupabase
         .from('templates')
         .update({
           name: updatedTemplate.name,
