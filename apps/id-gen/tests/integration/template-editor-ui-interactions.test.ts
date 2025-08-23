@@ -370,8 +370,7 @@ describe('Template Editor UI Interactions', () => {
         const isValid = ValidationHelpers.validateElementProperty(
           test.property,
           test.value,
-          element,
-          template
+          element
         );
         
         expect(isValid).toBe(test.isValid);

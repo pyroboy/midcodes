@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi, expect } from 'vitest';
 import type { TemplateData, TemplateElement } from '$lib/stores/templateStore';
 
 /**
@@ -134,31 +134,30 @@ export const MockUtilities = {
    * Create a mock Supabase client with common operations
    */
   createSupabaseMock() {
+    const createMockQuery = () => {
+      const mockQuery = {
+        eq: vi.fn(() => mockQuery),
+        single: vi.fn(() => Promise.resolve({ data: null, error: null })),
+        select: vi.fn(() => mockQuery),
+        order: vi.fn(() => mockQuery),
+        limit: vi.fn(() => Promise.resolve({ data: [], error: null })),
+        in: vi.fn(() => Promise.resolve({ data: [], error: null })),
+        mockResolvedValueOnce: vi.fn(() => mockQuery),
+        mockRejectedValueOnce: vi.fn(() => mockQuery)
+      };
+      return mockQuery;
+    };
+
     return {
       from: vi.fn((table: string) => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            single: vi.fn(() => Promise.resolve({ data: null, error: null })),
-            order: vi.fn(() => ({
-              limit: vi.fn(() => Promise.resolve({ data: [], error: null }))
-            }))
-          })),
-          in: vi.fn(() => Promise.resolve({ data: [], error: null })),
-          order: vi.fn(() => ({
-            limit: vi.fn(() => Promise.resolve({ data: [], error: null }))
-          }))
-        })),
+        select: vi.fn(() => createMockQuery()),
         insert: vi.fn(() => ({
           select: vi.fn(() => ({
             single: vi.fn(() => Promise.resolve({ data: null, error: null }))
           }))
         })),
-        update: vi.fn(() => ({
-          eq: vi.fn(() => Promise.resolve({ data: [], error: null }))
-        })),
-        delete: vi.fn(() => ({
-          eq: vi.fn(() => Promise.resolve({ data: [], error: null }))
-        })),
+        update: vi.fn(() => createMockQuery()),
+        delete: vi.fn(() => createMockQuery()),
         upsert: vi.fn(() => ({
           select: vi.fn(() => ({
             single: vi.fn(() => Promise.resolve({ data: null, error: null }))
@@ -168,7 +167,7 @@ export const MockUtilities = {
       
       storage: {
         from: vi.fn((bucket: string) => ({
-          upload: vi.fn(() => Promise.resolve({ data: { path: 'test/path.jpg' }, error: null })),
+          upload: vi.fn((_path: string, _file: File) => Promise.resolve({ data: { path: 'test/path.jpg' }, error: null })),
           remove: vi.fn(() => Promise.resolve({ data: [], error: null })),
           getPublicUrl: vi.fn(() => ({ data: { publicUrl: 'https://example.com/test.jpg' } })),
           list: vi.fn(() => Promise.resolve({ data: [], error: null }))
@@ -324,6 +323,14 @@ export const ValidationHelpers = {
       default:
         return true;
     }
+  },
+
+  /**
+   * Validate UUID format
+   */
+  isValidUUID(uuid: string): boolean {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(uuid);
   }
 };
 
@@ -334,7 +341,7 @@ export const AssertionHelpers = {
    */
   expectTemplateToMatch(actual: any, expected: Partial<TemplateData>) {
     Object.keys(expected).forEach(key => {
-      expect(actual[key]).toEqual(expected[key]);
+      expect((actual as any)[key]).toEqual((expected as any)[key]);
     });
   },
 
@@ -549,12 +556,4 @@ export const DatabaseHelpers = {
   }
 };
 
-// Export all utilities
-export {
-  TestDataFactory,
-  MockUtilities,
-  ValidationHelpers,
-  AssertionHelpers,
-  PerformanceHelpers,
-  DatabaseHelpers
-};
+// All utilities are already exported above

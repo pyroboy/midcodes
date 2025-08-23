@@ -1450,7 +1450,8 @@ describe('Feature Integration - UI State Calculations', () => {
         showGenerateButton: canGenerate.canGenerate,
         showUpgradeButton: !canGenerate.canGenerate && canGenerate.needsCredits,
         showPremiumBadge: credits?.unlimited_templates || credits?.remove_watermarks,
-        // Premium features are handled separately in the UI
+        creditsDisplay: credits?.credits_balance || 0,
+        generationsDisplay: `${credits?.card_generation_count || 0}/10 free used`
       };
 
       expect(uiState.showPremiumBadge).toBe(true);

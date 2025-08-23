@@ -1,19 +1,5 @@
 import { supabase } from '../supabaseClient';
-
-export interface CreditTransaction {
-	id: string;
-	user_id: string;
-	org_id: string;
-	transaction_type: 'purchase' | 'usage' | 'refund' | 'bonus';
-	amount: number;
-	credits_before: number;
-	credits_after: number;
-	description: string | null;
-	reference_id: string | null;
-	metadata: Record<string, any>;
-	created_at: string;
-	updated_at: string;
-}
+import type { CreditTransaction } from '../schemas/billing.schema';
 
 export interface UserCredits {
 	credits_balance: number;
@@ -128,7 +114,7 @@ export async function deductCardGenerationCredit(
 				credits_before: credits.credits_balance,
 				credits_after: newBalance,
 				description: 'Card generation',
-				reference_id: cardId || null,
+				reference_id: cardId || undefined,
 				metadata: { type: 'card_generation' }
 			});
 		}
@@ -305,7 +291,7 @@ export async function incrementTemplateCount(
 /**
  * Get user's credit transaction history
  */
-export async function getCreditHistory(userId: string, limit = 50): Promise<CreditTransaction[]> {
+export async function getCreditHistory(userId: string, limit: number = 10): Promise<CreditTransaction[]> {
 	const { data, error } = await supabase
 		.from('credit_transactions')
 		.select('*')
@@ -318,7 +304,15 @@ export async function getCreditHistory(userId: string, limit = 50): Promise<Cred
 		return [];
 	}
 
-	return data || [];
+	// Convert null values to undefined to match schema types
+	return (data || []).map(transaction => ({
+		...transaction,
+		description: transaction.description ?? undefined,
+		reference_id: transaction.reference_id ?? undefined,
+		metadata: transaction.metadata as Record<string, any> | undefined,
+		created_at: transaction.created_at ?? undefined,
+		updated_at: transaction.updated_at ?? undefined
+	}));
 }
 
 /**
@@ -338,7 +332,15 @@ async function createCreditTransaction(
 		return null;
 	}
 
-	return data;
+	// Convert null values to undefined to match schema types
+	return data ? {
+		...data,
+		description: data.description ?? undefined,
+		reference_id: data.reference_id ?? undefined,
+		metadata: data.metadata as Record<string, any> | undefined,
+		created_at: data.created_at ?? undefined,
+		updated_at: data.updated_at ?? undefined
+	} : null;
 }
 
 /**

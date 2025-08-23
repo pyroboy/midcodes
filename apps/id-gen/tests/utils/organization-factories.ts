@@ -6,6 +6,7 @@
  */
 
 import { faker } from '@faker-js/faker';
+import { expect } from 'vitest';
 import type { Database } from '$lib/types/database.types.js';
 import type {
 	OrganizationResponse,
@@ -359,8 +360,8 @@ export const OrgBillingFactory = {
 		},
 		subscription: {
 			status: 'active',
-			current_period_start: faker.date.past({ days: 30 }).toISOString(),
-			current_period_end: faker.date.future({ days: 30 }).toISOString()
+			current_period_start: faker.date.past({ years: 1 }).toISOString(),
+			current_period_end: faker.date.future({ years: 1 }).toISOString()
 		}
 	})
 };

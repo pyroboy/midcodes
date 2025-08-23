@@ -113,15 +113,16 @@ export const getAdminDashboardData = query(async (): Promise<AdminDashboardData>
 		thisMonth.setHours(0, 0, 0, 0);
 
 		const newCardsThisMonth =
-			recentCards?.filter((card) => new Date(card.created_at) >= thisMonth).length || 0;
+			recentCards?.filter((card) => card.created_at && new Date(card.created_at) >= thisMonth).length || 0;
 
 		// Create recent activity from recent cards
 		const recentActivity =
 			recentCards
+				?.filter(card => card.created_at) // Only include cards with created_at
 				?.map((card) => ({
 					id: card.id,
 					type: 'card_generated',
-					description: `ID card generated for ${card.data?.name || card.data?.full_name || 'Unknown'}`,
+					description: `ID card generated for ${(card.data as any)?.name || (card.data as any)?.full_name || 'Unknown'}`,
 					created_at: card.created_at
 				}))
 				.slice(0, 5) || [];
@@ -130,6 +131,7 @@ export const getAdminDashboardData = query(async (): Promise<AdminDashboardData>
 		const recentUsers =
 			users
 				?.filter((user) => {
+					if (!user.created_at) return false;
 					const userDate = new Date(user.created_at);
 					const sevenDaysAgo = new Date();
 					sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -144,7 +146,8 @@ export const getAdminDashboardData = query(async (): Promise<AdminDashboardData>
 
 		// Combine and sort activities
 		const allActivities = [...recentActivity, ...recentUsers]
-			.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+			.filter(activity => activity.created_at) // Only include activities with created_at
+			.sort((a, b) => new Date(b.created_at!).getTime() - new Date(a.created_at!).getTime())
 			.slice(0, 10);
 
 		return {
@@ -154,8 +157,19 @@ export const getAdminDashboardData = query(async (): Promise<AdminDashboardData>
 				totalUsers: users?.length || 0,
 				totalTemplates: templates?.length || 0
 			},
-			users: users || [],
-			templates: templates || [],
+			users: (users || []).filter(user => user.email && user.role && user.created_at && user.updated_at).map(user => ({
+				id: user.id,
+				email: user.email!,
+				role: user.role!,
+				created_at: user.created_at!,
+				updated_at: user.updated_at!
+			})),
+			templates: (templates || []).filter(template => template.created_at && template.user_id).map(template => ({
+				id: template.id,
+				name: template.name,
+				created_at: template.created_at!,
+				user_id: template.user_id!
+			})),
 			recentActivity: allActivities.map((a) => ({
 				id: String(a.id),
 				type: a.type as 'card_generated' | 'user_added',
@@ -195,7 +209,13 @@ export const getUsersData = query(async (): Promise<UsersData> => {
 		}
 
 		return {
-			users: users || [],
+			users: (users || []).filter(user => user.email && user.role && user.created_at && user.updated_at).map(user => ({
+				id: user.id,
+				email: user.email!,
+				role: user.role!,
+				created_at: user.created_at!,
+				updated_at: user.updated_at!
+			})),
 			currentUserId: user?.id,
 			currentUserRole: user?.role
 		};
@@ -208,6 +228,10 @@ export const getUsersData = query(async (): Promise<UsersData> => {
 // Command functions
 export const addUser = command('unchecked', async ({ email, role }: any) => {
 	const { user, supabase, org_id } = await requireUserManagementPermissions();
+
+	if (!email || typeof email !== 'string') {
+		throw error(400, 'Email is required');
+	}
 
 	try {
 		// Validate role
@@ -294,6 +318,10 @@ export const addUser = command('unchecked', async ({ email, role }: any) => {
 export const updateUserRole = command('unchecked', async ({ userId, role }: any) => {
 	const { user, supabase, org_id } = await requireUserManagementPermissions();
 
+	if (!userId || typeof userId !== 'string') {
+		throw error(400, 'User ID is required');
+	}
+
 	try {
 		// Validate the new role
 		const validRoles = ['super_admin', 'org_admin', 'id_gen_admin', 'id_gen_user'];
@@ -362,6 +390,10 @@ export const updateUserRole = command('unchecked', async ({ userId, role }: any)
 
 export const deleteUser = command('unchecked', async ({ userId }: any) => {
 	const { user, supabase, org_id } = await requireUserManagementPermissions();
+
+	if (!userId || typeof userId !== 'string') {
+		throw error(400, 'User ID is required');
+	}
 
 	try {
 		// Prevent self-deletion

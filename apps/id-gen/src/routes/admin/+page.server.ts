@@ -62,11 +62,12 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 		thisMonth.setHours(0, 0, 0, 0);
 
 		const newCardsThisMonth =
-			recentCards?.filter((card) => new Date(card.created_at) >= thisMonth).length || 0;
+			recentCards?.filter((card) => card.created_at && new Date(card.created_at) >= thisMonth).length || 0;
 
 		// Create recent activity from recent cards
 		const recentActivity =
 			recentCards
+				?.filter(card => card.created_at) // Only include cards with created_at
 				?.map((card) => ({
 					id: card.id,
 					type: 'card_generated',
@@ -79,6 +80,7 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 		const recentUsers =
 			users
 				?.filter((user) => {
+					if (!user.created_at) return false;
 					const userDate = new Date(user.created_at);
 					const sevenDaysAgo = new Date();
 					sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -93,7 +95,8 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 
 		// Combine and sort activities
 		const allActivities = [...recentActivity, ...recentUsers]
-			.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+			.filter(activity => activity.created_at) // Only include activities with created_at
+			.sort((a, b) => new Date(b.created_at!).getTime() - new Date(a.created_at!).getTime())
 			.slice(0, 10);
 
 		return {

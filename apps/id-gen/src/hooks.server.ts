@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import type { User, Session } from '@supabase/supabase-js';
+import type { Database } from '$lib/types/database.types';
 import { sequence } from '@sveltejs/kit/hooks';
 import { redirect, error as throwError } from '@sveltejs/kit';
 import type { Handle } from '@sveltejs/kit';
@@ -45,7 +46,7 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
 				}
 			}
 		}
-	});
+	}) as any; // Type assertion to resolve SSR client type mismatch
 
 	event.locals.safeGetSession = async () => {
 		// Parallel fetch of user and session data

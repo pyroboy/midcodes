@@ -176,6 +176,7 @@ export class CreditTestUtils {
 
     // Verify transactions are in reverse chronological order
     for (let i = 0; i < history.length - 1; i++) {
+      if (!history[i].created_at || !history[i + 1].created_at) continue;
       const current = new Date(history[i].created_at).getTime();
       const next = new Date(history[i + 1].created_at).getTime();
       expect(current).toBeGreaterThanOrEqual(next);

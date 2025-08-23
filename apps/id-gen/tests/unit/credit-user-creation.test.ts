@@ -139,7 +139,7 @@ describe('User Creation and Initial State', () => {
         'property_maintenance', 'property_utility'
       ];
       
-      expect(validRoles.includes(userProfile.role)).toBe(true);
+      expect(userProfile && validRoles.includes(userProfile.role)).toBe(true);
     });
 
     it('should create users within organization scope', async () => {
@@ -164,8 +164,8 @@ describe('User Creation and Initial State', () => {
         .single();
 
       expect(userProfile!.id).toBe(profile.id);
-      expect(userProfile!.email).toBeDefined();
-      expect(typeof userProfile.email).toBe('string');
+      expect(userProfile?.email).toBeDefined();
+      expect(typeof userProfile?.email).toBe('string');
     });
 
     it('should handle role-specific default permissions', async () => {
@@ -205,7 +205,7 @@ describe('User Creation and Initial State', () => {
         .single();
 
       // Context can be null or an object
-      expect(userProfile!.context === null || typeof userProfile.context === 'object').toBe(true);
+      expect(userProfile?.context === null || typeof userProfile?.context === 'object').toBe(true);
     });
 
     it('should track creation and update timestamps', async () => {
@@ -220,8 +220,8 @@ describe('User Creation and Initial State', () => {
       expect(userProfile!.created_at).toBeDefined();
       expect(userProfile!.updated_at).toBeDefined();
       
-      const createdTime = new Date(userProfile.created_at).getTime();
-      const updatedTime = new Date(userProfile.updated_at).getTime();
+      const createdTime = new Date(userProfile?.created_at || '').getTime();
+      const updatedTime = new Date(userProfile?.updated_at || '').getTime();
       
       expect(createdTime).toBeLessThanOrEqual(Date.now());
       expect(updatedTime).toBeLessThanOrEqual(Date.now());
@@ -236,7 +236,7 @@ describe('User Creation and Initial State', () => {
         .eq('id', profile.id)
         .single();
 
-      if (userProfile.email) {
+      if (userProfile?.email) {
         // If email exists, it should be valid format
         expect(userProfile!.email).toMatch(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
       }
@@ -344,8 +344,8 @@ describe('User Creation and Initial State', () => {
         .eq('id', profile.id)
         .single();
 
-      expect(typeof userProfile.unlimited_templates).toBe('boolean');
-      expect(typeof userProfile.remove_watermarks).toBe('boolean');
+      expect(typeof userProfile?.unlimited_templates).toBe('boolean');
+      expect(typeof userProfile?.remove_watermarks).toBe('boolean');
     });
 
     it('should validate numeric fields', async () => {
@@ -357,9 +357,9 @@ describe('User Creation and Initial State', () => {
         .eq('id', profile.id)
         .single();
 
-      expect(typeof userProfile.credits_balance).toBe('number');
-      expect(typeof userProfile.card_generation_count).toBe('number');
-      expect(typeof userProfile.template_count).toBe('number');
+      expect(typeof userProfile?.credits_balance).toBe('number');
+      expect(typeof userProfile?.card_generation_count).toBe('number');
+      expect(typeof userProfile?.template_count).toBe('number');
 
       expect(userProfile!.credits_balance).toBeGreaterThanOrEqual(0);
       expect(userProfile!.card_generation_count).toBeGreaterThanOrEqual(0);
