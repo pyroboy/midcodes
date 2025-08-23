@@ -1,7 +1,7 @@
 // See https://kit.svelte.dev/docs/types#app
 // for information about these interfaces
 import type { Session, SupabaseClient, User } from '@supabase/supabase-js';
-import type { Database } from './lib/types/database';
+import type { Database } from './lib/types/database.types';
 import type { ProfileData } from './lib/types/roleEmulation';
 import type { UserJWTPayload, GetSessionResult } from './lib/types/auth';
 

@@ -21,7 +21,13 @@ export async function deleteTemplate(id: string) {
 }
 
 export async function saveTemplate(template: TemplateData) {
-	const { data, error } = await supabase.from('templates').upsert(template).select();
+	// Convert TemplateData to database schema format
+	const dbTemplate = {
+		...template,
+		template_elements: template.template_elements as any // Convert to Json type for database
+	};
+	
+	const { data, error } = await supabase.from('templates').upsert(dbTemplate).select();
 
 	if (error) throw error;
 	return data[0];

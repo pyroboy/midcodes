@@ -202,7 +202,7 @@ export const actions = {
 		const formData = await request.formData();
 		const templateId = formData.get('id');
 
-		if (!templateId) {
+		if (!templateId || typeof templateId !== 'string') {
 			return fail(400, { message: 'Template ID is required' });
 		}
 

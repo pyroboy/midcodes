@@ -19,7 +19,7 @@ const mockLocals = (userId: string, orgId: string, role: string = 'id_gen_user')
   session: { user: { id: userId } },
   user: { id: userId, role },
   org_id: orgId,
-  supabase: MockUtilities.createSupabaseMock().supabase
+  supabase: MockUtilities.createSupabaseMock()
 });
 
 describe('API Endpoint: /api/id-cards/[id]', () => {
@@ -39,7 +39,7 @@ describe('API Endpoint: /api/id-cards/[id]', () => {
       const { profile: user, organization: org } = testData;
       
       // Create a mock ID card
-      const mockIdCard = TestDataFactory.createIdCard({
+      const mockIdCard = TestDataFactory.createIDCard({
         id: 'test-card-123',
         org_id: org.id,
         user_id: user.id,
@@ -49,7 +49,7 @@ describe('API Endpoint: /api/id-cards/[id]', () => {
       });
 
       const mockSupabase = MockUtilities.createSupabaseMock();
-      mockSupabase.supabase
+      mockSupabase
         .from('idcards')
         .select()
         .eq('id', 'test-card-123')
@@ -96,7 +96,7 @@ describe('API Endpoint: /api/id-cards/[id]', () => {
       const otherOrgId = 'other-org-456';
       
       const mockSupabase = MockUtilities.createSupabaseMock();
-      mockSupabase.supabase
+      mockSupabase
         .from('idcards')
         .select()
         .eq('id', 'cross-org-card')
@@ -124,7 +124,7 @@ describe('API Endpoint: /api/id-cards/[id]', () => {
       const { profile: user, organization: org } = testData;
       
       const mockSupabase = MockUtilities.createSupabaseMock();
-      mockSupabase.supabase
+      mockSupabase
         .from('idcards')
         .select()
         .eq('id', 'non-existent-card')
@@ -184,7 +184,7 @@ describe('API Endpoint: /api/id-cards/[id]', () => {
       const mockSupabase = MockUtilities.createSupabaseMock();
       
       // Mock template validation
-      mockSupabase.supabase
+      mockSupabase
         .from('templates')
         .select()
         .eq('id', 'template-123')
@@ -196,7 +196,7 @@ describe('API Endpoint: /api/id-cards/[id]', () => {
         });
 
       // Mock ID card creation
-      const createdCard = TestDataFactory.createIdCard({
+      const createdCard = TestDataFactory.createIDCard({
         id: 'new-card-123',
         org_id: org.id,
         user_id: user.id,
@@ -205,7 +205,7 @@ describe('API Endpoint: /api/id-cards/[id]', () => {
         status: 'draft'
       });
 
-      mockSupabase.supabase
+      mockSupabase
         .from('idcards')
         .insert()
         .select()
@@ -262,7 +262,7 @@ describe('API Endpoint: /api/id-cards/[id]', () => {
       const mockSupabase = MockUtilities.createSupabaseMock();
       
       // Mock template not found
-      mockSupabase.supabase
+      mockSupabase
         .from('templates')
         .select()
         .eq('id', 'non-existent-template')
@@ -295,7 +295,7 @@ describe('API Endpoint: /api/id-cards/[id]', () => {
         status: 'completed'
       };
 
-      const existingCard = TestDataFactory.createIdCard({
+      const existingCard = TestDataFactory.createIDCard({
         id: 'update-card-123',
         org_id: org.id,
         user_id: user.id,
@@ -307,7 +307,7 @@ describe('API Endpoint: /api/id-cards/[id]', () => {
       const mockSupabase = MockUtilities.createSupabaseMock();
       
       // Mock existing card lookup
-      mockSupabase.supabase
+      mockSupabase
         .from('idcards')
         .select()
         .eq('id', 'update-card-123')
@@ -317,7 +317,7 @@ describe('API Endpoint: /api/id-cards/[id]', () => {
 
       // Mock update operation
       const updatedCard = { ...existingCard, ...updateData };
-      mockSupabase.supabase
+      mockSupabase
         .from('idcards')
         .update()
         .eq('id', 'update-card-123')
@@ -336,7 +336,7 @@ describe('API Endpoint: /api/id-cards/[id]', () => {
 
     it('should prevent updates to cards from other organizations', async () => {
       const { profile: user } = testData;
-      const otherOrgCard = TestDataFactory.createIdCard({
+      const otherOrgCard = TestDataFactory.createIDCard({
         id: 'other-org-card',
         org_id: 'other-org-456',
         user_id: 'other-user',
@@ -348,7 +348,7 @@ describe('API Endpoint: /api/id-cards/[id]', () => {
       const mockSupabase = MockUtilities.createSupabaseMock();
       
       // Mock card lookup - should not find card in user's org
-      mockSupabase.supabase
+      mockSupabase
         .from('idcards')
         .select()
         .eq('id', 'other-org-card')
@@ -376,7 +376,7 @@ describe('API Endpoint: /api/id-cards/[id]', () => {
     it('should delete ID card with proper admin permissions', async () => {
       const { profile: adminUser, organization: org } = testData;
       
-      const cardToDelete = TestDataFactory.createIdCard({
+      const cardToDelete = TestDataFactory.createIDCard({
         id: 'delete-card-123',
         org_id: org.id,
         user_id: 'other-user-id',
@@ -386,7 +386,7 @@ describe('API Endpoint: /api/id-cards/[id]', () => {
       const mockSupabase = MockUtilities.createSupabaseMock();
       
       // Mock card lookup
-      mockSupabase.supabase
+      mockSupabase
         .from('idcards')
         .select()
         .eq('id', 'delete-card-123')
@@ -395,7 +395,7 @@ describe('API Endpoint: /api/id-cards/[id]', () => {
         .mockResolvedValueOnce({ data: cardToDelete, error: null });
 
       // Mock deletion
-      mockSupabase.supabase
+      mockSupabase
         .from('idcards')
         .delete()
         .eq('id', 'delete-card-123')
@@ -444,7 +444,7 @@ describe('API Endpoint: /api/id-cards/[id]', () => {
       const mockSupabase = MockUtilities.createSupabaseMock();
       
       // Mock database connection error
-      mockSupabase.supabase
+      mockSupabase
         .from('idcards')
         .select()
         .mockRejectedValueOnce(new Error('Database connection failed'));
@@ -508,13 +508,13 @@ describe('API Endpoint: /api/id-cards/[id]', () => {
       // Mock multiple concurrent card lookups
       const concurrentRequests = Array.from({ length: 5 }, (_, i) => {
         const cardId = `concurrent-card-${i}`;
-        const mockCard = TestDataFactory.createIdCard({
+        const mockCard = TestDataFactory.createIDCard({
           id: cardId,
           org_id: org.id,
           user_id: user.id
         });
 
-        mockSupabase.supabase
+        mockSupabase
           .from('idcards')
           .select()
           .eq('id', cardId)

@@ -123,7 +123,7 @@ describe('Payment & Billing System - Edge Cases', () => {
         .eq('id', user.id)
         .single();
 
-      expect(finalProfile.credits_balance).toBeGreaterThanOrEqual(-10); // Reasonable overdraft limit
+      expect(finalProfile?.credits_balance).toBeGreaterThanOrEqual(-10); // Reasonable overdraft limit
     });
 
     it('should handle payment refunds and reversals', async () => {
@@ -209,7 +209,7 @@ describe('Payment & Billing System - Edge Cases', () => {
         .insert(invalidPaymentData);
 
       expect(error).toBeTruthy();
-      expect(error.message).toContain('enum'); // Schema validation should catch this
+      expect(error?.message).toContain('enum'); // Schema validation should catch this
     });
 
     it('should handle duplicate reference numbers', async () => {

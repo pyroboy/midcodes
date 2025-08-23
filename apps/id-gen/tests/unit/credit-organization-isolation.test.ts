@@ -208,7 +208,7 @@ describe('Multi-Tenant Organization Isolation', () => {
 
       // Create multiple users in org1
       const org1User2 = await testDataManager.createUserWithCredits({
-        credits: 50,
+        credits_balance: 50,
         card_generation_count: 0,
         template_count: 0
       });

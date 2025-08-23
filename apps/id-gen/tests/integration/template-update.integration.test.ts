@@ -628,7 +628,7 @@ describe('Template Update Integration Tests', () => {
       
       // Verify the removed element is not present
       const removedElementId = originalElements[0].id;
-      const stillExists = updatedTemplate.template_elements as TemplateElement[]).some(el => el.id === removedElementId);
+      const stillExists = (updatedTemplate.template_elements as TemplateElement[]).some(el => el.id === removedElementId);
       expect(stillExists).toBe(false);
     });
 
@@ -665,8 +665,8 @@ describe('Template Update Integration Tests', () => {
       });
 
       // Verify elements are on correct sides
-      const frontElements = updatedTemplate.template_elements as TemplateElement[]).filter(el => el.side === 'front');
-      const backElements = updatedTemplate.template_elements as TemplateElement[]).filter(el => el.side === 'back');
+      const frontElements = (updatedTemplate.template_elements as TemplateElement[]).filter(el => el.side === 'front');
+      const backElements = (updatedTemplate.template_elements as TemplateElement[]).filter(el => el.side === 'back');
 
       expect(frontElements.length).toBeGreaterThan(0);
       expect(backElements.length).toBeGreaterThan(0);
