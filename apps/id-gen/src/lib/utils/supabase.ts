@@ -1,5 +1,7 @@
 import { supabase } from '$lib/supabaseClient';
-import { PUBLIC_SUPABASE_URL } from '$env/static/public';
+
+// Environment variables for Supabase
+const PUBLIC_SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL || 'https://wnkqlrfmtiibrqnncgqu.supabase.co'
 
 export function getSupabaseStorageUrl(path: string, bucket: string = 'templates'): string {
 	if (!path) return '';

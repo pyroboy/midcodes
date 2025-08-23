@@ -27,7 +27,7 @@ https://svelte.dev/e/legacy_reactive_statement_invalid -->
 
     const { form, enhance } = superForm<PaymentStatusSchema>(data.form);
 
-    $: filteredPayments = data.payments.filter(payment => {
+    const filteredPayments = $derived(data.payments.filter(payment => {
         const searchLower = searchQuery.toLowerCase();
         return (
             payment.attendee.first_name.toLowerCase().includes(searchLower) ||
@@ -35,7 +35,7 @@ https://svelte.dev/e/legacy_reactive_statement_invalid -->
             payment.attendee.reference_code.toLowerCase().includes(searchLower) ||
             payment.payment_reference.toLowerCase().includes(searchLower)
         );
-    });
+    }));
 </script>
 
 <svelte:head>

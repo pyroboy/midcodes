@@ -1,7 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_SUPABASE_URL } from '$env/static/public';
-import { PRIVATE_SERVICE_ROLE } from '$env/static/private';
 import type { Database } from '$lib/types/database.types';
+
+// Environment variables for Supabase
+const PUBLIC_SUPABASE_URL = process.env.PUBLIC_SUPABASE_URL || 'https://wnkqlrfmtiibrqnncgqu.supabase.co'
+const PRIVATE_SERVICE_ROLE = process.env.PRIVATE_SERVICE_ROLE || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indua3FscmZtdGlpYnJxbm5jZ3F1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcyMjIyMTM3MywiZXhwIjoyMDM3Nzk3MzczfQ.dummy'
 
 // Create a server-side client with service role key for backend operations
 export const supabaseAdmin = createClient<Database>(PUBLIC_SUPABASE_URL, PRIVATE_SERVICE_ROLE, {

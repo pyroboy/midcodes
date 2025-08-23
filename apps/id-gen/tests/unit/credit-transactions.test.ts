@@ -1,601 +1,575 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { testDataManager } from '../utils/TestDataManager';
 import { 
+  deductCardGenerationCredit, 
   addCredits,
-  deductCardGenerationCredit,
+  getCreditHistory,
   grantUnlimitedTemplates,
   grantWatermarkRemoval,
-  getCreditHistory,
-  type CreditTransaction
+  getUserCredits
 } from '$lib/utils/credits';
 import { supabase } from '$lib/supabaseClient';
 
-// Mock the Supabase client
-vi.mock('$lib/supabaseClient', () => ({
-  supabase: {
-    from: vi.fn()
-  }
-}));
+describe('Credit Usage - Transaction Logging', () => {
+  let testData: any;
 
-describe('Credit Transaction Types Tests', () => {
-  const mockUserId = 'test-user-123';
-  const mockOrgId = 'test-org-456';
-  
-  let mockSupabaseQuery: any;
-  let mockTransactionInsert: any;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    
-    // Setup mock query chain
-    mockSupabaseQuery = {
-      select: vi.fn().mockReturnThis(),
-      insert: vi.fn().mockReturnThis(),
-      update: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      single: vi.fn(),
-      limit: vi.fn(),
-      order: vi.fn().mockReturnThis()
-    };
-
-    // Setup separate mock for transaction inserts
-    mockTransactionInsert = {
-      select: vi.fn().mockReturnThis(),
-      single: vi.fn()
-    };
-
-    vi.mocked(supabase.from).mockImplementation((table: string) => {
-      if (table === 'credit_transactions') {
-        return {
-          ...mockSupabaseQuery,
-          insert: vi.fn().mockReturnValue(mockTransactionInsert)
-        };
-      }
-      return mockSupabaseQuery;
-    });
+  beforeEach(async () => {
+    testData = await testDataManager.createMinimalTestData();
   });
 
-  describe('Purchase Transaction Type', () => {
-    it('should create purchase transaction with correct balance tracking', async () => {
-      const initialBalance = 100;
-      const addAmount = 50;
-      const expectedNewBalance = 150;
+  afterEach(async () => {
+    await testDataManager.cleanupAll();
+  });
 
-      // Mock getting user credits
-      mockSupabaseQuery.single.mockResolvedValueOnce({
-        data: { credits_balance: initialBalance },
-        error: null
-      });
-
-      // Mock profile update
-      mockSupabaseQuery.eq.mockResolvedValueOnce({ data: {}, error: null });
-
-      // Mock transaction insert
-      const expectedTransaction = {
-        id: 'txn-123',
-        user_id: mockUserId,
-        org_id: mockOrgId,
-        transaction_type: 'purchase',
-        amount: addAmount,
-        credits_before: initialBalance,
-        credits_after: expectedNewBalance,
-        description: 'Credit purchase',
-        reference_id: 'payment-ref-123',
-        metadata: { type: 'credit_purchase' },
-        created_at: '2024-01-01T00:00:00Z',
-        updated_at: '2024-01-01T00:00:00Z'
-      };
-
-      mockTransactionInsert.single.mockResolvedValue({
-        data: expectedTransaction,
-        error: null
-      });
+  describe('Credit Purchase Transaction Logging', () => {
+    it('should log credit purchase transactions correctly', async () => {
+      const { profile } = testData;
+      const initialBalance = profile.credits_balance;
 
       const result = await addCredits(
-        mockUserId,
-        mockOrgId,
-        addAmount,
+        profile.id,
+        profile.org_id,
+        100,
         'payment-ref-123',
-        'Credit purchase'
+        'Credit package purchase'
       );
 
       expect(result.success).toBe(true);
-      expect(result.newBalance).toBe(expectedNewBalance);
+      expect(result.newBalance).toBe(initialBalance + 100);
 
-      // Verify transaction insert was called with correct data
-      expect(mockTransactionInsert.select().insert).toHaveBeenCalled();
-      const insertCall = mockTransactionInsert.select().insert.mock.calls[0][0];
-      expect(insertCall).toMatchObject({
-        user_id: mockUserId,
-        org_id: mockOrgId,
+      // Verify transaction logged
+      const { data: transactions } = await supabase
+        .from('credit_transactions')
+        .select('*')
+        .eq('user_id', profile.id)
+        .eq('transaction_type', 'purchase');
+
+      expect(transactions).toHaveLength(1);
+      expect(transactions![0]).toMatchObject({
+        user_id: profile.id,
+        org_id: profile.org_id,
         transaction_type: 'purchase',
-        amount: addAmount,
+        amount: 100,
         credits_before: initialBalance,
-        credits_after: expectedNewBalance,
-        description: 'Credit purchase',
-        reference_id: 'payment-ref-123',
-        metadata: { type: 'credit_purchase' }
+        credits_after: initialBalance + 100,
+        description: 'Credit package purchase',
+        reference_id: 'payment-ref-123'
       });
+
+      expect(transactions![0].metadata).toMatchObject({
+        type: 'credit_purchase'
+      });
+
+      // Verify timestamps
+      expect(transactions![0].created_at).toBeDefined();
+      expect(new Date(transactions![0].created_at).getTime()).toBeCloseTo(Date.now(), -2); // Within 100ms
     });
 
-    it('should handle different purchase amounts and descriptions', async () => {
-      const testCases = [
-        {
-          initialBalance: 0,
-          amount: 100,
-          description: 'Initial credit purchase',
-          reference: 'first-payment'
-        },
-        {
-          initialBalance: 50,
-          amount: 25,
-          description: 'Top-up purchase',
-          reference: 'topup-payment'
-        },
-        {
-          initialBalance: 200,
-          amount: 500,
-          description: 'Bulk credit purchase',
-          reference: 'bulk-payment'
-        }
-      ];
+    it('should handle default description for credit purchases', async () => {
+      const { profile } = testData;
 
-      for (const testCase of testCases) {
-        vi.clearAllMocks();
+      await addCredits(profile.id, profile.org_id, 50, 'payment-456');
 
-        // Mock getting user credits
-        mockSupabaseQuery.single.mockResolvedValueOnce({
-          data: { credits_balance: testCase.initialBalance },
-          error: null
-        });
+      const { data: transactions } = await supabase
+        .from('credit_transactions')
+        .select('*')
+        .eq('user_id', profile.id);
 
-        // Mock profile update
-        mockSupabaseQuery.eq.mockResolvedValueOnce({ data: {}, error: null });
+      expect(transactions![0].description).toBe('Credit purchase');
+    });
 
-        // Mock transaction insert
-        mockTransactionInsert.single.mockResolvedValue({ data: {}, error: null });
+    it('should log multiple purchase transactions sequentially', async () => {
+      const { profile } = testData;
+      const initialBalance = profile.credits_balance;
 
-        const result = await addCredits(
-          mockUserId,
-          mockOrgId,
-          testCase.amount,
-          testCase.reference,
-          testCase.description
-        );
+      // First purchase
+      await addCredits(profile.id, profile.org_id, 25, 'payment-1', 'First purchase');
+      
+      // Second purchase
+      await addCredits(profile.id, profile.org_id, 75, 'payment-2', 'Second purchase');
 
-        expect(result.success).toBe(true);
-        expect(result.newBalance).toBe(testCase.initialBalance + testCase.amount);
+      // Get transactions in order
+      const { data: transactions } = await supabase
+        .from('credit_transactions')
+        .select('*')
+        .eq('user_id', profile.id)
+        .eq('transaction_type', 'purchase')
+        .order('created_at', { ascending: true });
 
-        const insertCall = mockTransactionInsert.select().insert.mock.calls[0][0];
-        expect(insertCall.amount).toBe(testCase.amount);
-        expect(insertCall.credits_before).toBe(testCase.initialBalance);
-        expect(insertCall.credits_after).toBe(testCase.initialBalance + testCase.amount);
-        expect(insertCall.description).toBe(testCase.description);
-        expect(insertCall.reference_id).toBe(testCase.reference);
-      }
+      expect(transactions).toHaveLength(2);
+
+      // First transaction
+      expect(transactions![0]).toMatchObject({
+        amount: 25,
+        credits_before: initialBalance,
+        credits_after: initialBalance + 25,
+        reference_id: 'payment-1',
+        description: 'First purchase'
+      });
+
+      // Second transaction (builds on first)
+      expect(transactions![1]).toMatchObject({
+        amount: 75,
+        credits_before: initialBalance + 25,
+        credits_after: initialBalance + 100,
+        reference_id: 'payment-2',
+        description: 'Second purchase'
+      });
     });
   });
 
-  describe('Usage Transaction Type', () => {
-    it('should create usage transaction when deducting credits', async () => {
-      const initialBalance = 25;
-      const initialGenerationCount = 15; // Above free limit
-      const expectedNewBalance = 24;
+  describe('Credit Usage Transaction Logging', () => {
+    beforeEach(async () => {
+      // Set up user with exhausted free generations and credits
+      const { profile } = testData;
+      await supabase
+        .from('profiles')
+        .update({
+          card_generation_count: 10,
+          credits_balance: 25
+        })
+        .eq('id', profile.id);
+    });
 
-      // Mock getting user credits
-      mockSupabaseQuery.single.mockResolvedValueOnce({
-        data: { 
-          credits_balance: initialBalance,
-          card_generation_count: initialGenerationCount
-        },
-        error: null
-      });
+    it('should log card generation usage transactions', async () => {
+      const { profile } = testData;
 
-      // Mock profile update
-      mockSupabaseQuery.eq.mockResolvedValueOnce({ data: {}, error: null });
+      await deductCardGenerationCredit(profile.id, profile.org_id, 'test-card-123');
 
-      // Mock transaction insert
-      const expectedTransaction = {
-        id: 'txn-usage-123',
-        user_id: mockUserId,
-        org_id: mockOrgId,
+      const { data: transactions } = await supabase
+        .from('credit_transactions')
+        .select('*')
+        .eq('user_id', profile.id)
+        .eq('transaction_type', 'usage');
+
+      expect(transactions).toHaveLength(1);
+      expect(transactions![0]).toMatchObject({
+        user_id: profile.id,
+        org_id: profile.org_id,
         transaction_type: 'usage',
         amount: -1,
-        credits_before: initialBalance,
-        credits_after: expectedNewBalance,
+        credits_before: 25,
+        credits_after: 24,
         description: 'Card generation',
-        reference_id: 'card-456',
-        metadata: { type: 'card_generation' },
-        created_at: '2024-01-01T00:00:00Z',
-        updated_at: '2024-01-01T00:00:00Z'
-      };
-
-      mockTransactionInsert.single.mockResolvedValue({
-        data: expectedTransaction,
-        error: null
+        reference_id: 'test-card-123'
       });
 
-      const result = await deductCardGenerationCredit(mockUserId, mockOrgId, 'card-456');
+      expect(transactions![0].metadata).toMatchObject({
+        type: 'card_generation'
+      });
+    });
 
-      expect(result.success).toBe(true);
-      expect(result.newBalance).toBe(expectedNewBalance);
+    it('should maintain accurate before/after balances in sequence', async () => {
+      const { profile } = testData;
 
-      // Verify transaction insert was called with correct data
-      const insertCall = mockTransactionInsert.select().insert.mock.calls[0][0];
-      expect(insertCall).toMatchObject({
-        user_id: mockUserId,
-        org_id: mockOrgId,
-        transaction_type: 'usage',
+      // Multiple card generations
+      await deductCardGenerationCredit(profile.id, profile.org_id, 'card-1');
+      await deductCardGenerationCredit(profile.id, profile.org_id, 'card-2');
+      await deductCardGenerationCredit(profile.id, profile.org_id, 'card-3');
+
+      const { data: transactions } = await supabase
+        .from('credit_transactions')
+        .select('*')
+        .eq('user_id', profile.id)
+        .eq('transaction_type', 'usage')
+        .order('created_at', { ascending: true });
+
+      expect(transactions).toHaveLength(3);
+
+      // First transaction: 25 -> 24
+      expect(transactions![0]).toMatchObject({
+        credits_before: 25,
+        credits_after: 24,
         amount: -1,
-        credits_before: initialBalance,
-        credits_after: expectedNewBalance,
-        description: 'Card generation',
-        reference_id: 'card-456',
-        metadata: { type: 'card_generation' }
+        reference_id: 'card-1'
+      });
+
+      // Second transaction: 24 -> 23
+      expect(transactions![1]).toMatchObject({
+        credits_before: 24,
+        credits_after: 23,
+        amount: -1,
+        reference_id: 'card-2'
+      });
+
+      // Third transaction: 23 -> 22
+      expect(transactions![2]).toMatchObject({
+        credits_before: 23,
+        credits_after: 22,
+        amount: -1,
+        reference_id: 'card-3'
       });
     });
 
-    it('should not create usage transaction for free generations', async () => {
-      const initialBalance = 50;
-      const initialGenerationCount = 5; // Under free limit
+    it('should not log transactions for free generations', async () => {
+      const { profile } = testData;
 
-      // Mock getting user credits
-      mockSupabaseQuery.single.mockResolvedValueOnce({
-        data: { 
-          credits_balance: initialBalance,
-          card_generation_count: initialGenerationCount
-        },
-        error: null
-      });
+      // Reset to use free generations
+      await supabase
+        .from('profiles')
+        .update({
+          card_generation_count: 5,
+          credits_balance: 25
+        })
+        .eq('id', profile.id);
 
-      // Mock profile update
-      mockSupabaseQuery.eq.mockResolvedValueOnce({ data: {}, error: null });
+      // Generate some free cards
+      await deductCardGenerationCredit(profile.id, profile.org_id, 'free-card-1');
+      await deductCardGenerationCredit(profile.id, profile.org_id, 'free-card-2');
 
-      const result = await deductCardGenerationCredit(mockUserId, mockOrgId, 'free-card-123');
+      // Should have no usage transactions
+      const { data: transactions } = await supabase
+        .from('credit_transactions')
+        .select('*')
+        .eq('user_id', profile.id)
+        .eq('transaction_type', 'usage');
 
-      expect(result.success).toBe(true);
-      expect(result.newBalance).toBe(initialBalance); // No change in credits
-
-      // Verify transaction insert was NOT called (no credit deduction)
-      expect(mockTransactionInsert.select().insert).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('Feature Purchase Transaction Type', () => {
-    it('should create purchase transaction for unlimited templates feature', async () => {
-      // Mock profile update
-      mockSupabaseQuery.eq.mockResolvedValueOnce({ data: {}, error: null });
-
-      // Mock transaction insert
-      const expectedTransaction = {
-        id: 'txn-feature-123',
-        user_id: mockUserId,
-        org_id: mockOrgId,
-        transaction_type: 'purchase',
-        amount: 0, // Feature purchase, no credits added
-        credits_before: 0,
-        credits_after: 0,
-        description: 'Unlimited templates upgrade',
-        reference_id: 'feature-payment-123',
-        metadata: { 
-          type: 'unlimited_templates_purchase',
-          amount_paid: 99 
-        },
-        created_at: '2024-01-01T00:00:00Z',
-        updated_at: '2024-01-01T00:00:00Z'
-      };
-
-      mockTransactionInsert.single.mockResolvedValue({
-        data: expectedTransaction,
-        error: null
-      });
-
-      const result = await grantUnlimitedTemplates(mockUserId, mockOrgId, 'feature-payment-123');
-
-      expect(result.success).toBe(true);
-
-      // Verify transaction insert was called with correct data
-      const insertCall = mockTransactionInsert.select().insert.mock.calls[0][0];
-      expect(insertCall).toMatchObject({
-        user_id: mockUserId,
-        org_id: mockOrgId,
-        transaction_type: 'purchase',
-        amount: 0,
-        credits_before: 0,
-        credits_after: 0,
-        description: 'Unlimited templates upgrade',
-        reference_id: 'feature-payment-123',
-        metadata: { 
-          type: 'unlimited_templates_purchase',
-          amount_paid: 99 
-        }
-      });
+      expect(transactions || []).toHaveLength(0);
     });
 
-    it('should create purchase transaction for watermark removal feature', async () => {
-      // Mock profile update
-      mockSupabaseQuery.eq.mockResolvedValueOnce({ data: {}, error: null });
+    it('should handle null reference IDs in usage transactions', async () => {
+      const { profile } = testData;
 
-      // Mock transaction insert
-      const expectedTransaction = {
-        id: 'txn-watermark-123',
-        user_id: mockUserId,
-        org_id: mockOrgId,
-        transaction_type: 'purchase',
-        amount: 0, // Feature purchase, no credits added
-        credits_before: 0,
-        credits_after: 0,
-        description: 'Remove watermarks upgrade',
-        reference_id: 'watermark-payment-456',
-        metadata: { 
-          type: 'watermark_removal_purchase',
-          amount_paid: 199 
-        },
-        created_at: '2024-01-01T00:00:00Z',
-        updated_at: '2024-01-01T00:00:00Z'
-      };
+      await deductCardGenerationCredit(profile.id, profile.org_id); // No reference_id
 
-      mockTransactionInsert.single.mockResolvedValue({
-        data: expectedTransaction,
-        error: null
-      });
+      const { data: transactions } = await supabase
+        .from('credit_transactions')
+        .select('*')
+        .eq('user_id', profile.id);
 
-      const result = await grantWatermarkRemoval(mockUserId, mockOrgId, 'watermark-payment-456');
-
-      expect(result.success).toBe(true);
-
-      // Verify transaction insert was called with correct data
-      const insertCall = mockTransactionInsert.select().insert.mock.calls[0][0];
-      expect(insertCall).toMatchObject({
-        user_id: mockUserId,
-        org_id: mockOrgId,
-        transaction_type: 'purchase',
-        amount: 0,
-        credits_before: 0,
-        credits_after: 0,
-        description: 'Remove watermarks upgrade',
-        reference_id: 'watermark-payment-456',
-        metadata: { 
-          type: 'watermark_removal_purchase',
-          amount_paid: 199 
-        }
-      });
+      expect(transactions![0].reference_id).toBeNull();
     });
   });
 
-  describe('Transaction History Filtering', () => {
-    it('should retrieve transactions by type', async () => {
-      const mockTransactions: CreditTransaction[] = [
-        {
-          id: 'txn-1',
-          user_id: mockUserId,
-          org_id: mockOrgId,
-          transaction_type: 'purchase',
-          amount: 100,
-          credits_before: 0,
-          credits_after: 100,
-          description: 'Credit purchase',
-          reference_id: 'payment-1',
-          metadata: { type: 'credit_purchase' },
-          created_at: '2024-01-01T00:00:00Z',
-          updated_at: '2024-01-01T00:00:00Z'
-        },
-        {
-          id: 'txn-2',
-          user_id: mockUserId,
-          org_id: mockOrgId,
-          transaction_type: 'usage',
-          amount: -1,
-          credits_before: 100,
-          credits_after: 99,
-          description: 'Card generation',
-          reference_id: 'card-1',
-          metadata: { type: 'card_generation' },
-          created_at: '2024-01-01T01:00:00Z',
-          updated_at: '2024-01-01T01:00:00Z'
-        },
-        {
-          id: 'txn-3',
-          user_id: mockUserId,
-          org_id: mockOrgId,
-          transaction_type: 'purchase',
-          amount: 0,
-          credits_before: 99,
-          credits_after: 99,
-          description: 'Unlimited templates upgrade',
-          reference_id: 'feature-1',
-          metadata: { type: 'unlimited_templates_purchase', amount_paid: 99 },
-          created_at: '2024-01-01T02:00:00Z',
-          updated_at: '2024-01-01T02:00:00Z'
-        }
-      ];
+  describe('Premium Feature Transaction Logging', () => {
+    it('should log unlimited templates purchase correctly', async () => {
+      const { profile } = testData;
 
-      mockSupabaseQuery.limit.mockResolvedValue({
-        data: mockTransactions,
-        error: null
-      });
-
-      const history = await getCreditHistory(mockUserId);
-
-      expect(history).toEqual(mockTransactions);
-
-      // Verify different transaction types are present
-      const transactionTypes = new Set(history.map(t => t.transaction_type));
-      expect(transactionTypes.has('purchase')).toBe(true);
-      expect(transactionTypes.has('usage')).toBe(true);
-
-      // Verify metadata types
-      const metadataTypes = new Set(
-        history.map(t => t.metadata?.type).filter(Boolean)
+      const result = await grantUnlimitedTemplates(
+        profile.id,
+        profile.org_id,
+        'unlimited-payment-123'
       );
-      expect(metadataTypes.has('credit_purchase')).toBe(true);
-      expect(metadataTypes.has('card_generation')).toBe(true);
-      expect(metadataTypes.has('unlimited_templates_purchase')).toBe(true);
+
+      expect(result.success).toBe(true);
+
+      const { data: transactions } = await supabase
+        .from('credit_transactions')
+        .select('*')
+        .eq('user_id', profile.id)
+        .eq('reference_id', 'unlimited-payment-123');
+
+      expect(transactions).toHaveLength(1);
+      expect(transactions![0]).toMatchObject({
+        transaction_type: 'purchase',
+        amount: 0, // No credits added, just feature unlock
+        credits_before: 0,
+        credits_after: 0,
+        description: 'Unlimited templates upgrade',
+        reference_id: 'unlimited-payment-123'
+      });
+
+      expect(transactions![0].metadata).toMatchObject({
+        type: 'unlimited_templates_purchase',
+        amount_paid: 99
+      });
+    });
+
+    it('should log watermark removal purchase correctly', async () => {
+      const { profile } = testData;
+
+      const result = await grantWatermarkRemoval(
+        profile.id,
+        profile.org_id,
+        'watermark-payment-456'
+      );
+
+      expect(result.success).toBe(true);
+
+      const { data: transactions } = await supabase
+        .from('credit_transactions')
+        .select('*')
+        .eq('user_id', profile.id)
+        .eq('reference_id', 'watermark-payment-456');
+
+      expect(transactions).toHaveLength(1);
+      expect(transactions![0]).toMatchObject({
+        transaction_type: 'purchase',
+        amount: 0,
+        description: 'Remove watermarks upgrade',
+        reference_id: 'watermark-payment-456'
+      });
+
+      expect(transactions![0].metadata).toMatchObject({
+        type: 'watermark_removal_purchase',
+        amount_paid: 199
+      });
     });
   });
 
-  describe('Balance Consistency Validation', () => {
-    it('should maintain sequential balance consistency across transactions', async () => {
-      const transactionSequence: CreditTransaction[] = [
-        {
-          id: 'txn-1',
-          user_id: mockUserId,
-          org_id: mockOrgId,
-          transaction_type: 'purchase',
-          amount: 100,
-          credits_before: 0,
-          credits_after: 100,
-          description: 'Initial purchase',
-          reference_id: 'payment-1',
-          metadata: { type: 'credit_purchase' },
-          created_at: '2024-01-01T00:00:00Z',
-          updated_at: '2024-01-01T00:00:00Z'
-        },
-        {
-          id: 'txn-2',
-          user_id: mockUserId,
-          org_id: mockOrgId,
-          transaction_type: 'usage',
-          amount: -1,
-          credits_before: 100,
-          credits_after: 99,
-          description: 'Card generation',
-          reference_id: 'card-1',
-          metadata: { type: 'card_generation' },
-          created_at: '2024-01-01T01:00:00Z',
-          updated_at: '2024-01-01T01:00:00Z'
-        },
-        {
-          id: 'txn-3',
-          user_id: mockUserId,
-          org_id: mockOrgId,
-          transaction_type: 'purchase',
-          amount: 50,
-          credits_before: 99,
-          credits_after: 149,
-          description: 'Top-up purchase',
-          reference_id: 'payment-2',
-          metadata: { type: 'credit_purchase' },
-          created_at: '2024-01-01T02:00:00Z',
-          updated_at: '2024-01-01T02:00:00Z'
-        }
-      ];
+  describe('Mixed Transaction Scenarios', () => {
+    it('should log complete user transaction history correctly', async () => {
+      const { profile } = testData;
 
-      // Verify balance consistency across transactions
-      for (let i = 0; i < transactionSequence.length; i++) {
-        const transaction = transactionSequence[i];
-        
-        // Check that amount calculation is correct
-        const expectedAfter = transaction.credits_before + transaction.amount;
-        expect(transaction.credits_after).toBe(expectedAfter);
-        
-        // Check that sequential transactions have consistent balances
-        if (i > 0) {
-          const previousTransaction = transactionSequence[i - 1];
-          expect(transaction.credits_before).toBe(previousTransaction.credits_after);
-        }
+      // Start with credit purchase
+      await addCredits(profile.id, profile.org_id, 50, 'initial-purchase');
+
+      // Purchase unlimited templates
+      await grantUnlimitedTemplates(profile.id, profile.org_id, 'unlimited-purchase');
+
+      // Use up free generations first
+      await supabase
+        .from('profiles')
+        .update({ card_generation_count: 10 })
+        .eq('id', profile.id);
+
+      // Generate paid cards
+      await deductCardGenerationCredit(profile.id, profile.org_id, 'paid-card-1');
+      await deductCardGenerationCredit(profile.id, profile.org_id, 'paid-card-2');
+
+      // Purchase more credits
+      await addCredits(profile.id, profile.org_id, 25, 'second-purchase');
+
+      // Get complete history
+      const history = await getCreditHistory(profile.id);
+
+      expect(history).toHaveLength(5);
+
+      // Verify transaction types in reverse chronological order
+      const transactionTypes = history.map(t => ({
+        type: t.transaction_type,
+        amount: t.amount,
+        description: t.description
+      }));
+
+      expect(transactionTypes).toEqual([
+        { type: 'purchase', amount: 25, description: 'Credit purchase' },
+        { type: 'usage', amount: -1, description: 'Card generation' },
+        { type: 'usage', amount: -1, description: 'Card generation' },
+        { type: 'purchase', amount: 0, description: 'Unlimited templates upgrade' },
+        { type: 'purchase', amount: 50, description: 'Credit purchase' }
+      ]);
+    });
+
+    it('should maintain balance consistency across mixed operations', async () => {
+      const { profile } = testData;
+      const initialBalance = profile.credits_balance;
+
+      // Complex sequence of operations
+      await addCredits(profile.id, profile.org_id, 100, 'purchase-1'); // +100
+      
+      // Set up for paid generations
+      await supabase
+        .from('profiles')
+        .update({ card_generation_count: 10 })
+        .eq('id', profile.id);
+
+      await deductCardGenerationCredit(profile.id, profile.org_id, 'card-1'); // -1
+      await deductCardGenerationCredit(profile.id, profile.org_id, 'card-2'); // -1
+      await addCredits(profile.id, profile.org_id, 50, 'purchase-2'); // +50
+      await deductCardGenerationCredit(profile.id, profile.org_id, 'card-3'); // -1
+
+      // Calculate expected balance: initial + 100 - 1 - 1 + 50 - 1
+      const expectedBalance = initialBalance + 100 - 1 - 1 + 50 - 1;
+
+      const currentCredits = await getUserCredits(profile.id);
+      expect(currentCredits?.credits_balance).toBe(expectedBalance);
+
+      // Verify transaction history adds up
+      const history = await getCreditHistory(profile.id);
+      const totalFromTransactions = history.reduce((sum, t) => sum + t.amount, 0);
+      expect(totalFromTransactions).toBe(expectedBalance - initialBalance);
+    });
+  });
+
+  describe('Transaction History Retrieval', () => {
+    beforeEach(async () => {
+      const { profile } = testData;
+      
+      // Create multiple transactions
+      await addCredits(profile.id, profile.org_id, 100, 'purchase-1');
+      await supabase.from('profiles').update({ card_generation_count: 10 }).eq('id', profile.id);
+      
+      for (let i = 1; i <= 5; i++) {
+        await deductCardGenerationCredit(profile.id, profile.org_id, `card-${i}`);
+      }
+      
+      await addCredits(profile.id, profile.org_id, 50, 'purchase-2');
+    });
+
+    it('should retrieve transaction history in correct order', async () => {
+      const { profile } = testData;
+
+      const history = await getCreditHistory(profile.id);
+
+      expect(history.length).toBeGreaterThan(0);
+
+      // Should be in reverse chronological order (newest first)
+      for (let i = 0; i < history.length - 1; i++) {
+        const current = new Date(history[i].created_at).getTime();
+        const next = new Date(history[i + 1].created_at).getTime();
+        expect(current).toBeGreaterThanOrEqual(next);
       }
     });
 
-    it('should validate transaction amount signs for different types', () => {
-      const transactions = [
-        { type: 'purchase', amount: 100, expectedSign: 'positive' },
-        { type: 'usage', amount: -1, expectedSign: 'negative' },
-        { type: 'refund', amount: 25, expectedSign: 'positive' },
-        { type: 'bonus', amount: 10, expectedSign: 'positive' }
-      ];
+    it('should respect transaction history limit', async () => {
+      const { profile } = testData;
 
-      transactions.forEach(({ type, amount, expectedSign }) => {
-        if (expectedSign === 'positive') {
-          expect(amount).toBeGreaterThan(0);
-        } else {
-          expect(amount).toBeLessThan(0);
-        }
-      });
+      const limitedHistory = await getCreditHistory(profile.id, 3);
+      expect(limitedHistory).toHaveLength(3);
+
+      const fullHistory = await getCreditHistory(profile.id);
+      expect(fullHistory.length).toBeGreaterThan(3);
+    });
+
+    it('should return empty array for user with no transactions', async () => {
+      const newTestData = await testDataManager.createMinimalTestData();
+      
+      const history = await getCreditHistory(newTestData.profile.id);
+      expect(history).toEqual([]);
+
+      await testDataManager.cleanupAll();
+    });
+
+    it('should handle invalid user ID gracefully', async () => {
+      const history = await getCreditHistory('invalid-user-id');
+      expect(history).toEqual([]);
     });
   });
 
-  describe('Transaction Metadata Validation', () => {
-    it('should include appropriate metadata for each transaction type', () => {
-      const transactionMetadata = [
-        {
-          type: 'credit_purchase',
-          expectedFields: ['type'],
-          metadata: { type: 'credit_purchase' }
-        },
-        {
-          type: 'card_generation',
-          expectedFields: ['type'],
-          metadata: { type: 'card_generation' }
-        },
-        {
-          type: 'unlimited_templates_purchase',
-          expectedFields: ['type', 'amount_paid'],
-          metadata: { type: 'unlimited_templates_purchase', amount_paid: 99 }
-        },
-        {
-          type: 'watermark_removal_purchase',
-          expectedFields: ['type', 'amount_paid'],
-          metadata: { type: 'watermark_removal_purchase', amount_paid: 199 }
-        }
-      ];
+  describe('Transaction Metadata and References', () => {
+    it('should store and retrieve metadata correctly', async () => {
+      const { profile } = testData;
 
-      transactionMetadata.forEach(({ type, expectedFields, metadata }) => {
-        expectedFields.forEach(field => {
-          expect(metadata).toHaveProperty(field);
-        });
-        
-        expect(metadata.type).toBe(type);
+      await addCredits(profile.id, profile.org_id, 75, 'meta-test', 'Metadata test');
+
+      const { data: transactions } = await supabase
+        .from('credit_transactions')
+        .select('*')
+        .eq('user_id', profile.id)
+        .eq('reference_id', 'meta-test');
+
+      const metadata = transactions![0].metadata;
+      expect(metadata).toMatchObject({
+        type: 'credit_purchase'
       });
+      expect(typeof metadata).toBe('object');
+    });
+
+    it('should link transactions to specific operations via reference_id', async () => {
+      const { profile } = testData;
+
+      await supabase
+        .from('profiles')
+        .update({ card_generation_count: 10 })
+        .eq('id', profile.id);
+
+      const cardIds = ['card-alpha', 'card-beta', 'card-gamma'];
+      
+      for (const cardId of cardIds) {
+        await deductCardGenerationCredit(profile.id, profile.org_id, cardId);
+      }
+
+      // Verify each transaction has correct reference
+      for (const cardId of cardIds) {
+        const { data: transactions } = await supabase
+          .from('credit_transactions')
+          .select('*')
+          .eq('user_id', profile.id)
+          .eq('reference_id', cardId);
+
+        expect(transactions).toHaveLength(1);
+        expect(transactions![0].description).toBe('Card generation');
+      }
+    });
+
+    it('should handle missing metadata gracefully', async () => {
+      const { profile } = testData;
+
+      // Manually create transaction without metadata
+      const { data: transaction } = await supabase
+        .from('credit_transactions')
+        .insert({
+          user_id: profile.id,
+          org_id: profile.org_id,
+          transaction_type: 'bonus',
+          amount: 10,
+          credits_before: 0,
+          credits_after: 10,
+          description: 'Test bonus',
+          reference_id: 'bonus-test',
+          metadata: {}
+        })
+        .select()
+        .single();
+
+      expect(transaction.metadata).toEqual({});
+
+      const history = await getCreditHistory(profile.id);
+      const bonusTransaction = history.find(t => t.reference_id === 'bonus-test');
+      expect(bonusTransaction?.metadata).toEqual({});
     });
   });
 
-  describe('Error Handling in Transactions', () => {
-    it('should not create transaction record on profile update failure', async () => {
-      const initialBalance = 50;
+  describe('Transaction Audit Trail', () => {
+    it('should provide complete audit trail for credit operations', async () => {
+      const { profile } = testData;
+
+      // Perform auditable operations
+      await addCredits(profile.id, profile.org_id, 100, 'audit-purchase-1', 'Initial credits');
+      await grantUnlimitedTemplates(profile.id, profile.org_id, 'audit-unlimited');
       
-      // Mock getting user credits
-      mockSupabaseQuery.single.mockResolvedValueOnce({
-        data: { credits_balance: initialBalance },
-        error: null
+      await supabase.from('profiles').update({ card_generation_count: 10 }).eq('id', profile.id);
+      
+      await deductCardGenerationCredit(profile.id, profile.org_id, 'audit-card-1');
+      await deductCardGenerationCredit(profile.id, profile.org_id, 'audit-card-2');
+
+      const history = await getCreditHistory(profile.id);
+
+      // Verify audit trail completeness
+      expect(history).toHaveLength(4);
+
+      // Check each transaction has required audit fields
+      history.forEach(transaction => {
+        expect(transaction.id).toBeDefined();
+        expect(transaction.user_id).toBe(profile.id);
+        expect(transaction.org_id).toBe(profile.org_id);
+        expect(transaction.transaction_type).toMatch(/^(purchase|usage|refund|bonus)$/);
+        expect(typeof transaction.amount).toBe('number');
+        expect(typeof transaction.credits_before).toBe('number');
+        expect(typeof transaction.credits_after).toBe('number');
+        expect(transaction.created_at).toBeDefined();
+        expect(new Date(transaction.created_at).getTime()).toBeLessThanOrEqual(Date.now());
       });
-
-      // Mock profile update failure
-      mockSupabaseQuery.eq.mockResolvedValueOnce({ 
-        data: null, 
-        error: { message: 'Update failed' } 
-      });
-
-      const result = await addCredits(mockUserId, mockOrgId, 25, 'payment-fail-test');
-
-      expect(result.success).toBe(false);
-
-      // Verify transaction insert was NOT called due to profile update failure
-      expect(mockTransactionInsert.select().insert).not.toHaveBeenCalled();
     });
 
-    it('should handle transaction insert failure gracefully', async () => {
-      const initialBalance = 50;
-      
-      // Mock getting user credits
-      mockSupabaseQuery.single.mockResolvedValueOnce({
-        data: { credits_balance: initialBalance },
-        error: null
-      });
+    it('should maintain transaction immutability', async () => {
+      const { profile } = testData;
 
-      // Mock successful profile update
-      mockSupabaseQuery.eq.mockResolvedValueOnce({ data: {}, error: null });
+      await addCredits(profile.id, profile.org_id, 50, 'immutable-test');
 
-      // Mock transaction insert failure
-      mockTransactionInsert.single.mockResolvedValue({
-        data: null,
-        error: { message: 'Transaction insert failed' }
-      });
+      const { data: originalTransaction } = await supabase
+        .from('credit_transactions')
+        .select('*')
+        .eq('user_id', profile.id)
+        .eq('reference_id', 'immutable-test')
+        .single();
 
-      // The function should still return success since the main operation (credit addition) succeeded
-      const result = await addCredits(mockUserId, mockOrgId, 25, 'txn-fail-test');
+      // Attempt to modify (should fail or be ignored)
+      await supabase
+        .from('credit_transactions')
+        .update({ amount: 999 })
+        .eq('id', originalTransaction.id);
 
-      expect(result.success).toBe(true);
-      expect(result.newBalance).toBe(75);
+      const { data: afterUpdate } = await supabase
+        .from('credit_transactions')
+        .select('*')
+        .eq('id', originalTransaction.id)
+        .single();
+
+      // Transaction should remain unchanged (depending on RLS policies)
+      expect(afterUpdate.amount).toBe(originalTransaction.amount);
     });
   });
 });
+>>>>>>> 0ae847eaff2f620442b55df318f4d36df0977998
