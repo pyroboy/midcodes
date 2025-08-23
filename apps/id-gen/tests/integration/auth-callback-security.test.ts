@@ -215,7 +215,7 @@ describe('Auth Callback Security Testing', () => {
         try {
           mockRedirect(303, redirectUrl);
         } catch (error) {
-          expect(error.message).toContain(`Redirect: 303 -> ${redirectUrl}`);
+          expect((error as Error).message).toContain(`Redirect: 303 -> ${redirectUrl}`);
         }
       }
     });
@@ -322,13 +322,13 @@ describe('Auth Callback Security Testing', () => {
       try {
         await mockAuthCallback.exchangeCodeForSession(failingCode);
       } catch (error) {
-        expect(error.message).toContain('Network error');
+        expect((error as Error).message).toContain('Network error');
         
         // Should redirect to error page or login
         try {
           mockRedirect(303, '/auth?error=callback_failed');
         } catch (redirectError) {
-          expect(redirectError.message).toContain('Redirect: 303 -> /auth?error=callback_failed');
+          expect((redirectError as Error).message).toContain('Redirect: 303 -> /auth?error=callback_failed');
         }
       }
     });
@@ -396,7 +396,7 @@ describe('Auth Callback Security Testing', () => {
           const attempts = this.attempts.get(ip) || [];
           
           // Clean old attempts
-          const recentAttempts = attempts.filter(time => now - time < timeWindow);
+          const recentAttempts = attempts.filter((time: number) => now - time < timeWindow);
           this.attempts.set(ip, recentAttempts);
           
           return recentAttempts.length < maxAttempts;
@@ -475,7 +475,7 @@ describe('Auth Callback Security Testing', () => {
       // Each event should have timestamp
       securityEvents.forEach(event => {
         expect(event.timestamp).toBeTruthy();
-        expect(event.ip).toBeTruthy();
+        expect((event as any).ip).toBeTruthy();
       });
     });
   });

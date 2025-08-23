@@ -166,7 +166,7 @@ describe('Role-Based Credit Permissions', () => {
 
       // Create user in same organization
       const sameOrgUser = await testDataManager.createUserWithCredits({
-        credits: 0,
+        credits_balance: 0,
         card_generation_count: 0,
         template_count: 0
       });

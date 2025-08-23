@@ -77,6 +77,10 @@ describe('Credit Usage - Template Creation', () => {
         .from('profiles')
         .update({ unlimited_templates: true })
         .eq('id', profile.id);
+        
+      // Sync mock data
+      const { testDataUtils } = await import('../utils/TestDataManager');
+      testDataUtils.syncDatabaseUpdate(profile.id, { unlimited_templates: true });
     });
 
     it('should bypass template limits for unlimited_templates users', async () => {
@@ -148,6 +152,10 @@ describe('Credit Usage - Template Creation', () => {
         .from('profiles')
         .delete()
         .eq('id', profile.id);
+      
+      // Also simulate deletion in mock data for consistency
+      const { testDataUtils } = await import('../utils/TestDataManager');
+      testDataUtils.simulateUserDeletion(profile.id);
 
       const result = await incrementTemplateCount(profile.id);
       expect(result.success).toBe(false);
@@ -158,6 +166,7 @@ describe('Credit Usage - Template Creation', () => {
   describe('Template Permission Logic', () => {
     it('should correctly evaluate unlimited_templates flag', async () => {
       const { profile } = testData;
+      const { testDataUtils } = await import('../utils/TestDataManager');
 
       // Start as regular user
       await supabase
@@ -167,6 +176,12 @@ describe('Credit Usage - Template Creation', () => {
           unlimited_templates: false 
         })
         .eq('id', profile.id);
+        
+      // Sync mock data
+      testDataUtils.syncDatabaseUpdate(profile.id, { 
+        template_count: 5,
+        unlimited_templates: false 
+      });
 
       let canCreate = await canCreateTemplate(profile.id);
       expect(canCreate).toBe(false); // Over limit
@@ -176,6 +191,9 @@ describe('Credit Usage - Template Creation', () => {
         .from('profiles')
         .update({ unlimited_templates: true })
         .eq('id', profile.id);
+        
+      // Sync mock data
+      testDataUtils.syncDatabaseUpdate(profile.id, { unlimited_templates: true });
 
       canCreate = await canCreateTemplate(profile.id);
       expect(canCreate).toBe(true); // Now unlimited
@@ -207,6 +225,10 @@ describe('Credit Usage - Template Creation', () => {
         .from('profiles')
         .update({ template_count: 2 })
         .eq('id', profile.id);
+        
+      // Sync the mock data with database changes
+      const { testDataUtils } = await import('../utils/TestDataManager');
+      testDataUtils.syncDatabaseUpdate(profile.id, { template_count: 2 });
 
       const canCreate = await canCreateTemplate(profile.id);
       expect(canCreate).toBe(false);

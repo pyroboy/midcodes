@@ -1,19 +1,19 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { testDataManager } from '../utils/TestDataManager';
+import { testDataManager, testDataUtils } from '../utils/TestDataManager';
 import { 
   deductCardGenerationCredit, 
   canGenerateCard, 
   canCreateTemplate,
   getUserCredits,
-  addCredits
+  addCredits,
+  getCreditHistory
 } from '$lib/utils/credits';
-import { supabase } from '$lib/supabaseClient';
 
 describe('Credit Usage - Insufficient Credit Scenarios', () => {
   let testData: any;
 
   beforeEach(async () => {
-    testData = await testDataManager.createMinimalTestData();
+    testData = await testDataManager.createUserWithCredits();
   });
 
   afterEach(async () => {
@@ -24,13 +24,10 @@ describe('Credit Usage - Insufficient Credit Scenarios', () => {
     beforeEach(async () => {
       // Set up user with no credits and exhausted free generations
       const { profile } = testData;
-      await supabase
-        .from('profiles')
-        .update({
-          card_generation_count: 10, // Used all free generations
-          credits_balance: 0
-        })
-        .eq('id', profile.id);
+      testDataUtils.syncDatabaseUpdate(profile.id, {
+        card_generation_count: 10, // Used all free generations
+        credits_balance: 0
+      });
     });
 
     it('should detect when user cannot generate cards', async () => {
@@ -66,12 +63,8 @@ describe('Credit Usage - Insufficient Credit Scenarios', () => {
       await deductCardGenerationCredit(profile.id, profile.org_id, 'blocked-card');
 
       // Verify no transactions created
-      const { data: transactions } = await supabase
-        .from('credit_transactions')
-        .select('*')
-        .eq('user_id', profile.id);
-
-      expect(transactions || []).toHaveLength(0);
+      const transactions = await getCreditHistory(profile.id);
+      expect(transactions).toHaveLength(0);
     });
 
     it('should allow operations after purchasing credits', async () => {
@@ -105,13 +98,10 @@ describe('Credit Usage - Insufficient Credit Scenarios', () => {
       const { profile } = testData;
 
       // Set up user with exactly 1 credit
-      await supabase
-        .from('profiles')
-        .update({
-          card_generation_count: 10,
-          credits_balance: 1
-        })
-        .eq('id', profile.id);
+      testDataUtils.syncDatabaseUpdate(profile.id, {
+        card_generation_count: 10,
+        credits_balance: 1
+      });
 
       // Should be able to generate one card
       const canGenerate = await canGenerateCard(profile.id);
@@ -144,13 +134,10 @@ describe('Credit Usage - Insufficient Credit Scenarios', () => {
       const { profile } = testData;
 
       // Set up user with 3 credits
-      await supabase
-        .from('profiles')
-        .update({
-          card_generation_count: 10,
-          credits_balance: 3
-        })
-        .eq('id', profile.id);
+      testDataUtils.syncDatabaseUpdate(profile.id, {
+        card_generation_count: 10,
+        credits_balance: 3
+      });
 
       // Deplete credits one by one
       for (let i = 1; i <= 3; i++) {
@@ -178,13 +165,10 @@ describe('Credit Usage - Insufficient Credit Scenarios', () => {
       const { profile } = testData;
 
       // Set negative balance (edge case that shouldn't happen)
-      await supabase
-        .from('profiles')
-        .update({
-          card_generation_count: 10,
-          credits_balance: -5
-        })
-        .eq('id', profile.id);
+      testDataUtils.syncDatabaseUpdate(profile.id, {
+        card_generation_count: 10,
+        credits_balance: -5
+      });
 
       const canGenerate = await canGenerateCard(profile.id);
       expect(canGenerate.canGenerate).toBe(false);
@@ -202,13 +186,10 @@ describe('Credit Usage - Insufficient Credit Scenarios', () => {
       const { profile } = testData;
 
       // Start with 0 credits
-      await supabase
-        .from('profiles')
-        .update({
-          card_generation_count: 10,
-          credits_balance: 0
-        })
-        .eq('id', profile.id);
+      testDataUtils.syncDatabaseUpdate(profile.id, {
+        card_generation_count: 10,
+        credits_balance: 0
+      });
 
       const result = await deductCardGenerationCredit(
         profile.id,
@@ -229,13 +210,10 @@ describe('Credit Usage - Insufficient Credit Scenarios', () => {
       const { profile } = testData;
 
       // Set up user with only 1 credit
-      await supabase
-        .from('profiles')
-        .update({
-          card_generation_count: 10,
-          credits_balance: 1
-        })
-        .eq('id', profile.id);
+      testDataUtils.syncDatabaseUpdate(profile.id, {
+        card_generation_count: 10,
+        credits_balance: 1
+      });
 
       // Attempt 3 concurrent operations with only 1 credit
       const promises = [
@@ -255,26 +233,19 @@ describe('Credit Usage - Insufficient Credit Scenarios', () => {
       expect(finalCredits?.credits_balance).toBe(0);
 
       // Verify exactly 1 transaction was created
-      const { data: transactions } = await supabase
-        .from('credit_transactions')
-        .select('*')
-        .eq('user_id', profile.id)
-        .eq('transaction_type', 'usage');
-
-      expect(transactions).toHaveLength(1);
+      const transactions = await getCreditHistory(profile.id);
+      const usageTransactions = transactions.filter(t => t.transaction_type === 'usage');
+      expect(usageTransactions).toHaveLength(1);
     });
 
     it('should handle race conditions safely', async () => {
       const { profile } = testData;
 
       // Set up user with 2 credits
-      await supabase
-        .from('profiles')
-        .update({
-          card_generation_count: 10,
-          credits_balance: 2
-        })
-        .eq('id', profile.id);
+      testDataUtils.syncDatabaseUpdate(profile.id, {
+        card_generation_count: 10,
+        credits_balance: 2
+      });
 
       // Launch many concurrent operations
       const promises = Array.from({ length: 10 }, (_, i) =>
@@ -292,13 +263,9 @@ describe('Credit Usage - Insufficient Credit Scenarios', () => {
       expect(finalCredits?.credits_balance).toBeGreaterThanOrEqual(0);
 
       // Transaction count should match successful operations
-      const { data: transactions } = await supabase
-        .from('credit_transactions')
-        .select('*')
-        .eq('user_id', profile.id)
-        .eq('transaction_type', 'usage');
-
-      expect(transactions).toHaveLength(successCount);
+      const transactions = await getCreditHistory(profile.id);
+      const usageTransactions = transactions.filter(t => t.transaction_type === 'usage');
+      expect(usageTransactions).toHaveLength(successCount);
     });
   });
 
@@ -307,13 +274,10 @@ describe('Credit Usage - Insufficient Credit Scenarios', () => {
       const { profile } = testData;
 
       // Set user to template limit
-      await supabase
-        .from('profiles')
-        .update({
-          template_count: 2,
-          unlimited_templates: false
-        })
-        .eq('id', profile.id);
+      testDataUtils.syncDatabaseUpdate(profile.id, {
+        template_count: 2,
+        unlimited_templates: false
+      });
 
       const canCreate = await canCreateTemplate(profile.id);
       expect(canCreate).toBe(false);
@@ -323,13 +287,10 @@ describe('Credit Usage - Insufficient Credit Scenarios', () => {
       const { profile } = testData;
 
       // Set user to high template count but with unlimited
-      await supabase
-        .from('profiles')
-        .update({
-          template_count: 100,
-          unlimited_templates: true
-        })
-        .eq('id', profile.id);
+      testDataUtils.syncDatabaseUpdate(profile.id, {
+        template_count: 100,
+        unlimited_templates: true
+      });
 
       const canCreate = await canCreateTemplate(profile.id);
       expect(canCreate).toBe(true);
@@ -338,48 +299,28 @@ describe('Credit Usage - Insufficient Credit Scenarios', () => {
 
   describe('Error Recovery Scenarios', () => {
     it('should recover gracefully from invalid user state', async () => {
-      // Create user with invalid/null values
-      const { data: invalidProfile } = await supabase
-        .from('profiles')
-        .insert({
-          id: 'invalid-test-user',
-          email: 'invalid@test.com',
-          org_id: testData.organization.id,
-          role: 'id_gen_user',
-          credits_balance: null, // Invalid null
-          card_generation_count: null, // Invalid null
-          template_count: null
-        })
-        .select()
-        .single();
+      const nonExistentUserId = 'invalid-test-user-' + Date.now();
 
-      const canGenerate = await canGenerateCard(invalidProfile.id);
+      const canGenerate = await canGenerateCard(nonExistentUserId);
       expect(canGenerate.canGenerate).toBe(false);
+      expect(canGenerate.needsCredits).toBe(false);
 
       const result = await deductCardGenerationCredit(
-        invalidProfile.id,
+        nonExistentUserId,
         testData.organization.id,
         'invalid-test'
       );
       expect(result.success).toBe(false);
-
-      // Cleanup
-      await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', invalidProfile.id);
     });
 
     it('should handle database constraint violations', async () => {
       const { profile } = testData;
 
-      // Manually set invalid state that violates business logic
-      await supabase
-        .rpc('update_profile_unsafe', {
-          profile_id: profile.id,
-          new_balance: 0,
-          new_count: 10
-        });
+      // Set invalid state (negative balance)
+      testDataUtils.syncDatabaseUpdate(profile.id, {
+        credits_balance: 0,
+        card_generation_count: 10
+      });
 
       const result = await deductCardGenerationCredit(
         profile.id,
@@ -396,13 +337,10 @@ describe('Credit Usage - Insufficient Credit Scenarios', () => {
       const { profile } = testData;
 
       // Set borderline state
-      await supabase
-        .from('profiles')
-        .update({
-          card_generation_count: 9,
-          credits_balance: 0
-        })
-        .eq('id', profile.id);
+      testDataUtils.syncDatabaseUpdate(profile.id, {
+        card_generation_count: 9,
+        credits_balance: 0
+      });
 
       // Should be able to generate (still has 1 free left)
       const canGenerate1 = await canGenerateCard(profile.id);

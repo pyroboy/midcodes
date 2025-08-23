@@ -80,9 +80,10 @@ describe('Credits Integration Tests', () => {
     it('should enforce template limits for users without unlimited feature', async () => {
       // Create a new test user without unlimited templates
       const newProfiles = await testDataManager.createTestProfiles(testOrg.id);
-      const limitedUser = newProfiles.find(p => !p.unlimited_templates);
+      const limitedUser = newProfiles.find((p: any) => !p.unlimited_templates);
       
       expect(limitedUser).toBeTruthy();
+      if (!limitedUser) return;
       
       // Should be able to create templates up to limit
       let canCreate = await canCreateTemplate(limitedUser.id);
@@ -138,9 +139,10 @@ describe('Credits Integration Tests', () => {
     it('should prevent generation when no credits available', async () => {
       // Create a user with no credits and exceeded free limit
       const profiles = await testDataManager.createTestProfiles(testOrg.id);
-      const poorUser = profiles.find(p => p.credits_balance === 50); // Find a user with credits
+      const poorUser = profiles.find((p: any) => p.credits_balance === 50); // Find a user with credits
       
       expect(poorUser).toBeTruthy();
+      if (!poorUser) return;
       
       // Set them to have no credits and high generation count
       const { supabase } = await import('$lib/supabaseClient');
@@ -224,9 +226,10 @@ describe('Credits Integration Tests', () => {
   describe('Premium Features Integration', () => {
     it('should grant and track unlimited templates feature', async () => {
       const freshProfiles = await testDataManager.createTestProfiles(testOrg.id);
-      const user = freshProfiles.find(p => !p.unlimited_templates);
+      const user = freshProfiles.find((p: any) => !p.unlimited_templates);
       
       expect(user).toBeTruthy();
+      if (!user) return;
       
       // Initially should not have unlimited templates
       let credits = await getUserCredits(user.id);
@@ -256,9 +259,10 @@ describe('Credits Integration Tests', () => {
 
     it('should grant and track watermark removal feature', async () => {
       const freshProfiles = await testDataManager.createTestProfiles(testOrg.id);
-      const user = freshProfiles.find(p => !p.remove_watermarks);
+      const user = freshProfiles.find((p: any) => !p.remove_watermarks);
       
       expect(user).toBeTruthy();
+      if (!user) return;
       
       // Initially should not have watermark removal
       let credits = await getUserCredits(user.id);

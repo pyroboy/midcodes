@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi, expect } from 'vitest';
 import type { TemplateData, TemplateElement } from '$lib/stores/templateStore';
 
 /**
@@ -125,6 +125,13 @@ export const TestDataFactory = {
       created_at: new Date().toISOString(),
       ...overrides
     };
+  },
+
+  /**
+   * Alias for createIDCard for camelCase consistency
+   */
+  createIdCard(overrides: any = {}) {
+    return this.createIDCard(overrides);
   }
 };
 
@@ -134,37 +141,37 @@ export const MockUtilities = {
    * Create a mock Supabase client with common operations
    */
   createSupabaseMock() {
-    return {
-      from: vi.fn((table: string) => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            single: vi.fn(() => Promise.resolve({ data: null, error: null })),
-            order: vi.fn(() => ({
-              limit: vi.fn(() => Promise.resolve({ data: [], error: null }))
+    const supabaseClient = {
+      from: vi.fn((table: string) => {
+        // Create a simple mock that returns itself for chaining
+        const mockChain: any = {
+          select: vi.fn((columns?: string) => mockChain),
+          eq: vi.fn((column: string, value: any) => mockChain),
+          single: vi.fn(() => Promise.resolve({ data: null, error: null })),
+          in: vi.fn((column: string, values: any[]) => mockChain),
+          order: vi.fn((column: string, options?: any) => mockChain),
+          limit: vi.fn((count: number) => Promise.resolve({ data: [], error: null })),
+          mockResolvedValueOnce: vi.fn((value: any) => mockChain),
+          mockRejectedValueOnce: vi.fn((error: any) => mockChain)
+        };
+        
+        return {
+          select: vi.fn((columns?: string) => mockChain),
+          insert: vi.fn((data?: any) => ({
+            select: vi.fn(() => ({
+              single: vi.fn(() => Promise.resolve({ data: null, error: null })),
+              mockResolvedValueOnce: vi.fn((value: any) => Promise.resolve(value))
             }))
           })),
-          in: vi.fn(() => Promise.resolve({ data: [], error: null })),
-          order: vi.fn(() => ({
-            limit: vi.fn(() => Promise.resolve({ data: [], error: null }))
+          update: vi.fn((data?: any) => mockChain),
+          delete: vi.fn(() => mockChain),
+          upsert: vi.fn((data: any) => ({
+            select: vi.fn(() => ({
+              single: vi.fn(() => Promise.resolve({ data: null, error: null }))
+            }))
           }))
-        })),
-        insert: vi.fn(() => ({
-          select: vi.fn(() => ({
-            single: vi.fn(() => Promise.resolve({ data: null, error: null }))
-          }))
-        })),
-        update: vi.fn(() => ({
-          eq: vi.fn(() => Promise.resolve({ data: [], error: null }))
-        })),
-        delete: vi.fn(() => ({
-          eq: vi.fn(() => Promise.resolve({ data: [], error: null }))
-        })),
-        upsert: vi.fn(() => ({
-          select: vi.fn(() => ({
-            single: vi.fn(() => Promise.resolve({ data: null, error: null }))
-          }))
-        }))
-      })),
+        };
+      }),
       
       storage: {
         from: vi.fn((bucket: string) => ({
@@ -185,6 +192,10 @@ export const MockUtilities = {
           error: null 
         }))
       }
+    };
+
+    return {
+      supabase: supabaseClient
     };
   },
 
@@ -324,6 +335,16 @@ export const ValidationHelpers = {
       default:
         return true;
     }
+  },
+
+  /**
+   * Validate UUID format
+   */
+  isValidUUID(uuid: string): boolean {
+    if (typeof uuid !== 'string') return false;
+    
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(uuid);
   }
 };
 
@@ -334,7 +355,7 @@ export const AssertionHelpers = {
    */
   expectTemplateToMatch(actual: any, expected: Partial<TemplateData>) {
     Object.keys(expected).forEach(key => {
-      expect(actual[key]).toEqual(expected[key]);
+      expect(actual[key as keyof TemplateData]).toEqual(expected[key as keyof TemplateData]);
     });
   },
 
@@ -549,12 +570,3 @@ export const DatabaseHelpers = {
   }
 };
 
-// Export all utilities
-export {
-  TestDataFactory,
-  MockUtilities,
-  ValidationHelpers,
-  AssertionHelpers,
-  PerformanceHelpers,
-  DatabaseHelpers
-};

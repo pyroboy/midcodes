@@ -6,6 +6,7 @@
  */
 
 import { faker } from '@faker-js/faker';
+import { expect } from 'vitest';
 import type { Database } from '$lib/types/database.types.js';
 import type {
 	OrganizationResponse,
@@ -23,7 +24,9 @@ faker.seed(12345);
 
 // Helper to generate consistent UUIDs
 const generateTestUUID = (prefix: string = 'test'): string => {
-	return `${prefix}-${faker.string.uuid().slice(5)}`;
+	// Generate a proper UUID and optionally prefix it for debugging
+	// For database compatibility, we need proper UUID format
+	return faker.string.uuid();
 };
 
 // Generate timestamp ranges
@@ -359,8 +362,8 @@ export const OrgBillingFactory = {
 		},
 		subscription: {
 			status: 'active',
-			current_period_start: faker.date.past({ days: 30 }).toISOString(),
-			current_period_end: faker.date.future({ days: 30 }).toISOString()
+		current_period_start: faker.date.past({ years: 1 }).toISOString(),
+		current_period_end: faker.date.future({ years: 1 }).toISOString()
 		}
 	})
 };

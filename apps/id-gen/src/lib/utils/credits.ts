@@ -58,9 +58,11 @@ export async function canCreateTemplate(userId: string): Promise<boolean> {
  */
 export async function canGenerateCard(
 	userId: string
-): Promise<{ canGenerate: boolean; needsCredits: boolean }> {
+): Promise<{ canGenerate: boolean; needsCredits: boolean; error?: string }> {
 	const credits = await getUserCredits(userId);
-	if (!credits) return { canGenerate: false, needsCredits: false };
+	if (!credits) {
+		return { canGenerate: false, needsCredits: false, error: "User not found" };
+	}
 
 	// Check if user has free generations left
 	if (credits.card_generation_count < 10) {

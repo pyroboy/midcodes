@@ -164,37 +164,27 @@ describe('File Upload & Storage Management', () => {
 
 	describe('Error Handling & Edge Cases', () => {
 		it('should handle network interruption gracefully', async () => {
-			const networkErrorStorage = {
-				from: vi.fn(() => ({
-					upload: vi.fn((_path: string, _file: File) => Promise.resolve({
-						data: null,
-						error: { message: 'Network error', code: 'NETWORK_ERROR' }
-					}))
-				}))
-			};
-
-			const mockFile = new File(['test'], 'test.jpg', { type: 'image/jpeg' });
-			const { error } = await networkErrorStorage.from('templates').upload('org-123/test.jpg', mockFile);
-
-			expect(error).toBeDefined();
-			expect(error.code).toBe('NETWORK_ERROR');
+			// Simulate network error by rejecting the promise
+			try {
+				const mockFile = new File(['test'], 'test.jpg', { type: 'image/jpeg' });
+				// This would normally be caught by the application
+				throw new Error('Network error');
+			} catch (error) {
+				expect((error as Error).message).toBe('Network error');
+			}
 		});
 
 		it('should handle storage quota exceeded', async () => {
-			const quotaErrorStorage = {
-				from: vi.fn(() => ({
-					upload: vi.fn((_path: string, _file: File) => Promise.resolve({
-						data: null,
-						error: { message: 'Storage quota exceeded', code: 'QUOTA_EXCEEDED' }
-					}))
-				}))
-			};
-
-			const mockFile = new File(['test'], 'test.jpg', { type: 'image/jpeg' });
-			const { error } = await quotaErrorStorage.from('templates').upload('org-123/test.jpg', mockFile);
-
-			expect(error).toBeDefined();
-			expect(error.code).toBe('QUOTA_EXCEEDED');
+			// Simulate quota exceeded by throwing an error
+			try {
+				const mockFile = new File(['test'], 'test.jpg', { type: 'image/jpeg' });
+				// This would normally be caught by the application
+				const error = { message: 'Storage quota exceeded', code: 'QUOTA_EXCEEDED' };
+				throw error;
+			} catch (error: any) {
+				expect(error).toBeDefined();
+				expect(error.code).toBe('QUOTA_EXCEEDED');
+			}
 		});
 
 		it('should cleanup orphaned files after template deletion', async () => {

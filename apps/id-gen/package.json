@@ -45,6 +45,7 @@
 		"@types/webfontloader": "^1.6.38",
 		"bits-ui": "^2.9.3",
 		"clsx": "^2.1.1",
+		"dotenv": "^16.4.5",
 		"embla-carousel-svelte": "^8.6.0",
 		"eslint": "^8.56.0",
 		"eslint-config-prettier": "^9.1.0",

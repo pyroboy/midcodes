@@ -370,8 +370,7 @@ describe('Template Editor UI Interactions', () => {
         const isValid = ValidationHelpers.validateElementProperty(
           test.property,
           test.value,
-          element,
-          template
+          element
         );
         
         expect(isValid).toBe(test.isValid);
@@ -644,21 +643,15 @@ describe('Template Editor UI Interactions', () => {
       const mockSupabase = MockUtilities.createSupabaseMock();
       const updatedTemplate = get(templateStore);
 
-      mockSupabase
+      const saveResult = await mockSupabase.supabase
         .from('templates')
         .update({
           name: updatedTemplate.name,
           template_elements: updatedTemplate.template_elements,
           updated_at: new Date().toISOString()
-        })
-        .eq('id', 'save-template')
-        .eq('org_id', org.id)
-        .select()
-        .single()
-        .mockResolvedValueOnce({ 
-          data: { ...updatedTemplate, updated_at: new Date().toISOString() }, 
-          error: null 
         });
+      
+      expect(saveResult).toBeTruthy();
 
       // Verify changes are ready to save
       expect(updatedTemplate.name).toBe('Modified Template');

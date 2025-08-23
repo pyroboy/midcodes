@@ -215,7 +215,7 @@ export const getOrganizationSettings = query(async (): Promise<OrgSettings> => {
 	}
 });
 
-export const searchOrganizations = query(async (searchParams: OrganizationSearch): Promise<{ organizations: OrganizationResponse[], total: number }> => {
+export const searchOrganizations = query(organizationSearchSchema, async (searchParams: OrganizationSearch): Promise<{ organizations: OrganizationResponse[], total: number }> => {
 	const { user, supabase } = await requireSuperAdminPermissions();
 
 	// Validate search parameters

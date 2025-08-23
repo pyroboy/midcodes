@@ -15,7 +15,7 @@ describe('Cross-Feature Integration Tests', () => {
 
   beforeEach(async () => {
     testData = await testDataManager.createMinimalTestData();
-    mockStorage = MockUtilities.createSupabaseMock().storage;
+    mockStorage = MockUtilities.createSupabaseMock().supabase.storage;
   });
 
   afterEach(async () => {
@@ -622,7 +622,14 @@ describe('Cross-Feature Integration Tests', () => {
 
       const { result, time } = await PerformanceHelpers.measureExecutionTime(async () => {
         return PerformanceHelpers.simulateConcurrentOperations(
-          highLoadOperations.map(op => op().then(() => 'success').catch(() => 'error')),
+          highLoadOperations.map(op => async () => {
+            try {
+              await op();
+              return 'success';
+            } catch {
+              return 'error';
+            }
+          }),
           10 // Max 10 concurrent operations
         );
       });
