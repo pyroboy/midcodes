@@ -270,6 +270,30 @@ Uses Threlte wrapper around Three.js for 3D ID card visualization and rendering.
 - Uses session storage for auth persistence (not localStorage)
 - Environment variables through SvelteKit's `$env` modules
 
+## Commands
+
+### BMad Orchestrator Access
+
+**File Location**: `/data/data/com.termux/files/home/midcodes/apps/id-gen/.claude/commands/BMad/agents/bmad-orchestrator.md`
+
+**Direct Command Access**: Since slash commands are difficult to execute, you can directly read and execute the BMad Orchestrator by referencing this file path. The orchestrator provides:
+
+- Master workflow coordination
+- Specialized agent transformation 
+- Multi-agent task orchestration
+- Dynamic resource loading
+- Commands start with `*` prefix (e.g., `*help`, `*agent`, `*workflow`)
+
+**Key Commands Available**:
+- `*help` - Show available agents and workflows
+- `*agent [name]` - Transform into specialized agent 
+- `*workflow [name]` - Start specific workflows
+- `*task [name]` - Run specific tasks
+- `*kb-mode` - Load full BMad knowledge base
+- `*chat-mode` - Start conversational assistance
+
+**Usage Pattern**: Read the orchestrator file directly to activate BMad Method capabilities without relying on slash command execution.
+
 ## Specification Creation Prompt
 
 When creating technical specifications, use this structured approach to ensure comprehensive and consistent documentation:
