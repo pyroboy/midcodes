@@ -161,9 +161,9 @@
 
 					<!-- Sort Filter -->
 					<div class="space-y-2">
-						<label class="text-sm font-medium text-slate-700">Sort By</label>
+						<label for="sort-select" class="text-sm font-medium text-slate-700">Sort By</label>
 						<Select.Root type="single" bind:value={filters.sortBy}>
-							<Select.Trigger class="w-full h-9">
+							<Select.Trigger id="sort-select" class="w-full h-9">
 								{filters.sortBy === 'name-az'
 									? 'Name A-Z'
 									: filters.sortBy === 'name-za'

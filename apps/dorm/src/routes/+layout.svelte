@@ -28,27 +28,34 @@
 	let { data, children }: { data: PageData; children: any } = $props();
 
 	let ready = $state(false);
-	let isAuthRoute = $derived($page.url.pathname.startsWith('/auth'));
+	let isAuthRoute = $state(false);
 	
 	onMount(() => {
 		ready = true;
+		isAuthRoute = $page.url.pathname.startsWith('/auth');
 
-		// Preload related pages based on current route
-		if (data.user) {
-			const userRoles = data.user.user_metadata?.roles || [];
-			contextualPreload($page.url.pathname, userRoles);
-		}
+		// Subscribe to page changes to update auth route status
+		const unsubscribe = page.subscribe(($page) => {
+			isAuthRoute = $page.url.pathname.startsWith('/auth');
+		});
 
-		// Preload heavy components for better performance
-		preloadHeavyComponents();
+		// Preloading disabled due to SSR issues
+		// TODO: Re-enable when SSR is working properly
+		// if (data.user) {
+		//   const userRoles = data.user.user_metadata?.roles || [];
+		//   contextualPreload($page.url.pathname, userRoles);
+		// }
+		// preloadHeavyComponents();
+
+		return unsubscribe;
 	});
 
 	// Enhanced hover preloading for navigation sections
 	function onSectionHover(sectionLinks: { href: string; label: string }[]) {
-		// Preload all pages in this section when user hovers over section
-		sectionLinks.forEach((link) => {
-			safePreloadData(link.href);
-		});
+		// Preloading disabled due to SSR issues
+		// sectionLinks.forEach((link) => {
+		//   safePreloadData(link.href);
+		// });
 	}
 
 	// Initialize properties store - simplified approach
@@ -155,7 +162,7 @@
 											<a
 												href={link.href}
 												class="block no-underline"
-												data-sveltekit-preload-data="hover"
+												data-sveltekit-preload-data="off"
 											>
 												<Sidebar.MenuItem>
 													<Sidebar.MenuButton>
@@ -182,7 +189,7 @@
 									<a
 										href="/auth/signout"
 										class="flex items-center space-x-2 text-sm text-red-600 hover:text-red-800"
-										data-sveltekit-preload-data="hover"
+										data-sveltekit-preload-data="off"
 									>
 										<LogOut class="w-4 h-4" />
 										<span>Sign out</span>
@@ -192,7 +199,7 @@
 								<a
 									href="/auth"
 									class="flex items-center space-x-2 text-sm text-blue-600 hover:text-blue-800"
-									data-sveltekit-preload-data="hover"
+									data-sveltekit-preload-data="off"
 								>
 									<User class="w-4 h-4" />
 									<span>Sign in</span>
