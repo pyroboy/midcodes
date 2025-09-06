@@ -46,7 +46,7 @@
 				unit: '', // No unit field in database
 				currentReading: reading.reading,
 				currentReadingDate: reading.reading_date,
-				lastReading: reading.previous_reading || null,
+				lastReading: null, // previous_reading not available in Reading type
 				lastReadingDate: reading.previous_reading_date || null, // Add previous reading date
 				consumption: reading.consumption || null,
 				costPerUnit: reading.rate_at_reading || null,

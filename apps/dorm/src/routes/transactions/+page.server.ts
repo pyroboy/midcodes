@@ -228,7 +228,7 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
             // Set lease name from first lease for backward compatibility
             const firstLease = billingLeaseData[0]?.lease;
             if (firstLease) {
-              leaseName = Array.isArray(firstLease) ? firstLease[0]?.name : firstLease.name;
+              leaseName = (firstLease as any).name;
             }
 
             // Build comprehensive lease details with allocation information

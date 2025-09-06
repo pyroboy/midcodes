@@ -198,12 +198,12 @@
 			<div class="flex-1">
 				<Label for={`${id}-month`} class="text-xs text-gray-600">Month</Label>
 				<Input
-					bind:this={monthRef}
+					bind:ref={monthRef}
 					id={`${id}-month`}
 					type="text"
 					inputmode="numeric"
 					placeholder="MM"
-					maxlength="2"
+maxlength={2}
 					class={`text-center ${error ? 'border-red-500' : ''}`}
 					value={month}
 					oninput={handleMonthInput}
@@ -217,12 +217,12 @@
 			<div class="flex-1">
 				<Label for={`${id}-day`} class="text-xs text-gray-600">Day</Label>
 				<Input
-					bind:this={dayRef}
+					bind:ref={dayRef}
 					id={`${id}-day`}
 					type="text"
 					inputmode="numeric"
 					placeholder="DD"
-					maxlength="2"
+maxlength={2}
 					class={`text-center ${error ? 'border-red-500' : ''}`}
 					value={day}
 					oninput={handleDayInput}
@@ -236,12 +236,12 @@
 			<div class="flex-[1.5]">
 				<Label for={`${id}-year`} class="text-xs text-gray-600">Year</Label>
 				<Input
-					bind:this={yearRef}
+					bind:ref={yearRef}
 					id={`${id}-year`}
 					type="text"
 					inputmode="numeric"
 					placeholder="YYYY"
-					maxlength="4"
+maxlength={4}
 					class={`text-center ${error ? 'border-red-500' : ''}`}
 					value={year}
 					oninput={handleYearInput}
@@ -279,5 +279,6 @@
 
 	:global(input[type="text"][inputmode="numeric"]) {
 		-moz-appearance: textfield;
+		appearance: textfield;
 	}
 </style>

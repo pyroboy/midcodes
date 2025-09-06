@@ -4,15 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Development Commands
 
-- **Start development server**: `npm run dev`
-- **Build for production**: `npm run build`
-- **Run tests**: `npm run test` (runs both integration and unit tests)
-- **Run unit tests only**: `npm run test:unit` (Vitest)
-- **Run integration tests only**: `npm run test:integration` (Playwright)
-- **Type checking**: `npm run check`
-- **Linting**: `npm run lint` (Prettier + ESLint)
-- **Format code**: `npm run format`
-- **Clean build artifacts**: `npm run clean`
+- **Start development server**: `pnpm dev`
+- **Build for production**: `pnpm build`
+- **Run tests**: `pnpm test` (runs both integration and unit tests)
+- **Run unit tests only**: `pnpm test:unit` (Vitest)
+- **Run integration tests only**: `pnpm test:integration` (Playwright)
+- **Type checking**: `pnpm check`
+- **Linting**: `pnpm lint` (Prettier + ESLint)
+- **Format code**: `pnpm format`
+- **Clean build artifacts**: `pnpm clean`
 
 ## Architecture Overview
 

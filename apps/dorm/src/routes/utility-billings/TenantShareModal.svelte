@@ -41,14 +41,19 @@
 		leases
 			.filter((lease) => lease)
 			.flatMap((lease) =>
-				(lease.tenants || []).map((tenant) => ({
-					leaseId: lease.id,
-					leaseName: lease.name,
-					roomName: lease.roomName || 'Unknown Room',
-					leaseStatus: lease.status,
-					tenant: tenant,
-					tenantStatus: tenant.tenant_status || 'UNKNOWN'
-				}))
+				(lease.tenants || [])
+					.filter((tenant) => 
+						tenant.tenant_status !== 'INACTIVE' && 
+						tenant.tenant_status !== 'TERMINATED'
+					)
+					.map((tenant) => ({
+						leaseId: lease.id,
+						leaseName: lease.name,
+						roomName: lease.roomName || 'Unknown Room',
+						leaseStatus: lease.status,
+						tenant: tenant,
+						tenantStatus: tenant.tenant_status || 'UNKNOWN'
+					}))
 			)
 	);
 

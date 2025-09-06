@@ -361,7 +361,6 @@
 		{#if modals.reading && selectedProperty}
 			<ReadingEntryModal
 				bind:open={modals.reading}
-				previousReadingGroups={processedData.previousReadingGroups}
 				property={selectedProperty}
 				utilityType={readingEntry.utilityType}
 				meters={allMeters}

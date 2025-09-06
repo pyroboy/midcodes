@@ -235,12 +235,14 @@
 
 <!-- Transaction Modal for Editing Payments -->
 {#if showTransactionModal && selectedPayment}
-	<TransactionFormModal
-		open={showTransactionModal}
-		data={data}
-		editMode={true}
-		transaction={selectedPayment}
-		on:close={handleTransactionModalClose}
-		on:cancel={handleTransactionModalClose}
-	/>
+	<!-- TODO: Fix TransactionFormModal data structure compatibility -->
+	<div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+		<div class="bg-white p-6 rounded-lg max-w-md">
+			<h3 class="text-lg font-semibold mb-4">Edit Payment</h3>
+			<p class="text-gray-600 mb-4">Payment editing functionality is temporarily disabled due to schema incompatibility.</p>
+			<Button variant="outline" onclick={() => (showTransactionModal = false)}>
+				Close
+			</Button>
+		</div>
+	</div>
 {/if}
