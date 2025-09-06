@@ -434,6 +434,8 @@
 					onShareReading={openTenantShareModal}
 					meterLastBilledDates={processedData.meterLastBilledDates}
 					actualBilledDates={processedData.actualBilledDates}
+					leaseMeterBilledDates={processedData.leaseMeterBilledDates}
+					leases={processedData.leases}
 				/>
 			{/if}
 		</div>

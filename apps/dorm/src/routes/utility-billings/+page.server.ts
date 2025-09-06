@@ -177,7 +177,9 @@ async function loadLeasesData(supabase: any) {
         id,
         name,
         number,
-        type
+        type,
+        floor_id,
+        property_id
       ),
       lease_tenants(
         tenants(

@@ -106,6 +106,8 @@ export type Lease = {
 		name: string;
 		number: number;
 		type: string;
+		floor_id: number;
+		property_id: number;
 	} | null;
 	roomName?: string;
 	tenants: Tenant[] | null;
@@ -187,6 +189,11 @@ export interface MeterData {
 	totalCost: number | null;
 	daysDiff?: number | null; // Days between readings for billing period
 	history: Reading[];
+	// Location information for filtering leases
+	property_id?: number | null;
+	floor_id?: number | null;
+	rental_unit_id?: number | null;
+	location_type?: 'PROPERTY' | 'FLOOR' | 'RENTAL_UNIT' | null;
 }
 
 // Reading group structure for previous readings

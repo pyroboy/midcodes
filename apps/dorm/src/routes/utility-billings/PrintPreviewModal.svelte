@@ -2,6 +2,8 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import type { MeterData, ShareData } from './types';
 	import { Button } from '$lib/components/ui/button';
+	import * as Switch from '$lib/components/ui/switch';
+	import { Label } from '$lib/components/ui/label';
 	type Props = {
 		open: boolean;
 		reading: MeterData | null;
@@ -18,6 +20,7 @@
 	}: Props & { close: () => void } = $props();
 
 	let loading = $state(true);
+	let roundNumbers = $state(false); // Rounding option state
 
 	function handleClose() {
 		close();
@@ -29,6 +32,26 @@
 	function formatDate(date: string | null) {
 		if (!date) return 'N/A';
 		return new Date(date).toLocaleDateString();
+	}
+
+	// Format numbers based on rounding preference
+	function formatAmount(amount: number | null | undefined): string {
+		if (amount === null || amount === undefined) return '0.00';
+		if (roundNumbers) {
+			// Round to nearest 10
+			return (Math.round(amount / 10) * 10).toString();
+		}
+		return amount.toFixed(2);
+	}
+
+	// Format currency based on rounding preference
+	function formatCurrency(amount: number | null | undefined): string {
+		if (amount === null || amount === undefined) return '₱0';
+		if (roundNumbers) {
+			// Round to nearest 10
+			return `₱${Math.round(amount / 10) * 10}`;
+		}
+		return `₱${amount.toFixed(2)}`;
 	}
 
 	function getHtml(meter: MeterData, data: ShareData[]) {
@@ -62,7 +85,7 @@
           <dt>Meter</dt><dd>${meter.meterName}</dd>
           <dt>Period</dt><dd>${formatDate(meter.lastReadingDate)} – ${formatDate(meter.currentReadingDate)}</dd>
           ${meter.daysDiff ? `<dt>Days Gap</dt><dd>${meter.daysDiff} days</dd>` : ''}
-          <dt>Consumption</dt><dd>${meter.consumption?.toFixed(2)}</dd>
+          <dt>Consumption</dt><dd>${formatAmount(meter.consumption)}</dd>
         </div>
       </div>
 
@@ -81,13 +104,13 @@
             <tr>
               <td>${r.tenant.full_name}</td>
               <td>${r.lease.name}</td>
-              <td style="text-align:right">₱${r.share.toFixed(2)}</td>
+              <td style="text-align:right">${formatCurrency(r.share)}</td>
             </tr>`
 						)
 						.join('')}
           <tr class="total-row">
             <td colspan="2"><strong>Total</strong></td>
-            <td style="text-align:right"><strong>₱${data.reduce((s, d) => s + d.share, 0).toFixed(2)}</strong></td>
+            <td style="text-align:right"><strong>${formatCurrency(data.reduce((s, d) => s + d.share, 0))}</strong></td>
           </tr>
         </tbody>
       </table>
@@ -103,7 +126,12 @@
 			loading = true;
 			// Defer the expensive work to prevent blocking the UI
 			const timer = setTimeout(() => {
-				// Create and append iframe
+				// Remove existing iframe if it exists
+				if (iframe) {
+					iframe.remove();
+				}
+
+				// Create and append new iframe
 				iframe = document.createElement('iframe');
 				iframe.style.position = 'absolute';
 				iframe.style.width = '0';
@@ -135,6 +163,19 @@
 		};
 	});
 
+	// Regenerate iframe when rounding option changes
+	$effect(() => {
+		if (open && reading && roundNumbers !== undefined) {
+			// Regenerate the iframe content when rounding changes
+			if (iframe) {
+				const html = getHtml(reading, data);
+				iframe.contentDocument?.open();
+				iframe.contentDocument?.write(html);
+				iframe.contentDocument?.close();
+			}
+		}
+	});
+
 	function handlePrint() {
 		if (iframe) {
 			iframe.contentWindow?.print();
@@ -155,6 +196,21 @@
 			</div>
 		{:else if reading && data.length}
 			<div class="space-y-4">
+				<!-- Rounding Option -->
+				<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+					<div class="flex items-center space-x-2">
+						<Switch.Root bind:checked={roundNumbers} id="round-numbers">
+							<Switch.Thumb />
+						</Switch.Root>
+						<Label for="round-numbers" class="text-sm font-medium">
+							Round numbers to nearest 10s
+						</Label>
+					</div>
+					<span class="text-xs text-muted-foreground">
+						{roundNumbers ? 'Rounded to 10s (e.g., ₱127 → ₱130)' : 'Showing exact decimals'}
+					</span>
+				</div>
+
 				<div>
 					<p><strong>Meter:</strong> {reading.meterName}</p>
 					<p>
@@ -164,8 +220,8 @@
 					{#if reading.daysDiff}
 						<p><strong>Days Gap:</strong> {reading.daysDiff} days</p>
 					{/if}
-					<p><strong>Consumption:</strong> {reading.consumption?.toFixed(2)}</p>
-					<p><strong>Total Cost:</strong> ₱{data.reduce((s, d) => s + d.share, 0).toFixed(2)}</p>
+					<p><strong>Consumption:</strong> {formatAmount(reading.consumption)}</p>
+					<p><strong>Total Cost:</strong> {formatCurrency(data.reduce((s, d) => s + d.share, 0))}</p>
 				</div>
 
 				<table class="w-full text-sm text-left">
@@ -181,7 +237,7 @@
 							<tr class="border-b">
 								<td class="p-2">{row.tenant.full_name}</td>
 								<td class="p-2">{row.lease.name}</td>
-								<td class="p-2 text-right">₱{row.share.toFixed(2)}</td>
+								<td class="p-2 text-right">{formatCurrency(row.share)}</td>
 							</tr>
 						{/each}
 					</tbody>
