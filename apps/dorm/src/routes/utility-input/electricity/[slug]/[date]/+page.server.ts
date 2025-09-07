@@ -462,11 +462,12 @@ export const actions: Actions = {
 
 			const meterIds = readings.map((r) => r.meter_id);
 
-			// Load previous readings to enforce monotonic increase
+			// Load previous readings to enforce monotonic increase (only readings BEFORE the current date)
 			const { data: previousReadings, error: prevError } = await supabase
 				.from('readings')
 				.select('meter_id, reading, reading_date')
 				.in('meter_id', meterIds)
+				.lt('reading_date', form.data.reading_date) // Only get readings BEFORE the current input date
 				.order('reading_date', { ascending: false });
 			if (prevError) {
 				return fail(500, { form, error: `Error fetching previous readings: ${prevError.message}` });
@@ -495,18 +496,58 @@ export const actions: Actions = {
 			const readingsToInsert = readings.map((r) => {
 				const current = Number(r.reading);
 				const previous = previousReadingMap[r.meter_id] ?? initialReadingMap[r.meter_id] ?? 0;
+				const meterName = meterNameMap[r.meter_id] || `ID ${r.meter_id}`;
 
+				// Validate reading is not less than previous reading
 				if (current < previous) {
 					throw new Error(
-						`Invalid reading for meter ${meterNameMap[r.meter_id] || `ID ${r.meter_id}`}: ${current} is less than previous reading ${previous}`
+						`Invalid reading for meter ${meterName}: ${current} is less than previous reading ${previous}. Readings must be monotonically increasing.`
 					);
 				}
 
+				// Calculate consumption
 				const consumption = current - previous;
-				if (consumption > 500) {
+
+				// Enhanced high consumption validation with context
+				const HIGH_CONSUMPTION_THRESHOLD = 500;
+
+				// Determine reading context
+				const hasValidPreviousReading = previousReadingMap[r.meter_id] !== undefined;
+				const isUsingInitialReading = !hasValidPreviousReading && previous === (initialReadingMap[r.meter_id] ?? 0);
+				const isFirstReading = isUsingInitialReading;
+
+				// Skip high consumption check for normal daily usage (when we have recent readings)
+				const isNormalDailyUsage = hasValidPreviousReading && consumption <= 50; // Daily usage typically < 50 units
+
+				// Set threshold based on context
+				let adjustedThreshold = HIGH_CONSUMPTION_THRESHOLD;
+				let thresholdReason = 'regular reading';
+
+				if (isFirstReading) {
+					adjustedThreshold = HIGH_CONSUMPTION_THRESHOLD * 2;
+					thresholdReason = 'first reading after installation';
+				} else if (isNormalDailyUsage) {
+					adjustedThreshold = HIGH_CONSUMPTION_THRESHOLD; // Keep normal threshold for daily usage
+					thresholdReason = 'normal daily usage';
+				}
+
+				// Debug logging
+				console.log(`🔍 [VALIDATION] Meter ${meterName}: current=${current}, previous=${previous}, consumption=${consumption}, threshold=${adjustedThreshold}, reason=${thresholdReason}`);
+
+				if (consumption > adjustedThreshold) {
 					throw new Error(
-						`Unusually high consumption detected for meter ${meterNameMap[r.meter_id] || `ID ${r.meter_id}`}: ${consumption} units. Please verify the reading.`
+						`⚠️ High Consumption Alert for meter ${meterName}:\n` +
+						`• Current reading: ${current}\n` +
+						`• Previous reading: ${previous}\n` +
+						`• Consumption: ${consumption} units\n` +
+						`• Threshold exceeded: ${consumption} > ${adjustedThreshold} (for ${thresholdReason})\n\n` +
+						`Please verify this reading is correct before proceeding.`
 					);
+				}
+
+				// Additional validation: Check for unrealistic zero consumption (except for first readings)
+				if (!isFirstReading && consumption === 0 && current === previous) {
+					console.warn(`⚠️ Zero consumption detected for meter ${meterName}: Reading unchanged from previous value`);
 				}
 
 				return {
