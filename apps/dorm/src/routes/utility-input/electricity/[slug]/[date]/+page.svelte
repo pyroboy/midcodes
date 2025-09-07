@@ -211,7 +211,7 @@
 			</div>
 
 			<!-- Backdating Information - Only show for past dates -->
-			{#if data.date && new Date(data.date) < new Date()}
+			{#if data.date && data.currentServerDate && new Date(data.date) < new Date(data.currentServerDate)}
 				<div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
 					<div class="flex items-start">
 						<div class="text-blue-600 text-lg mr-3">ℹ️</div>
@@ -220,7 +220,7 @@
 								Meter Reading Backdating
 							</h3>
 							<p class="text-sm text-blue-800">
-								You are currently viewing/inputting meter readings for a past date. Today's date is <strong>{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</strong>.
+								You are currently viewing/inputting meter readings for a past date. Today's date is <strong>{new Date(data.currentServerDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</strong>.
 								This allows you to backdate meter readings when data entry occurs after the actual reading date.
 							</p>
 						</div>

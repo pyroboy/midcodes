@@ -394,7 +394,8 @@ export const load: ServerLoad = async ({ params, locals }) => {
 		property: property,
 		date: date || '',
 		errors: errors,
-		form
+		form,
+		currentServerDate: new Date().toISOString().split('T')[0] // YYYY-MM-DD format
 	};
 };
 

@@ -11,6 +11,7 @@ export interface PageData {
 	date: string;
 	errors: string[];
 	form: any;
+	currentServerDate: string;
 }
 
 export interface ElectricityMeter {
