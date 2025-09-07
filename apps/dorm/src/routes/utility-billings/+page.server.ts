@@ -32,6 +32,7 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
 		properties: [],
 		meters: [],
 		readings: [],
+		allReadings: [], // Include all readings for pending review
 		availableReadingDates: [],
 		rental_unitTenantCounts: {},
 		leases: [],
@@ -103,7 +104,8 @@ async function loadReadingsData(supabase: any) {
       meter_id,
       reading,
       reading_date,
-      rate_at_reading
+      rate_at_reading,
+      review_status
     `
 		)
 		.order('reading_date', { ascending: true });
@@ -214,6 +216,7 @@ async function loadAllReadingsData(supabase: any) {
 			reading,
 			reading_date,
 			rate_at_reading,
+			review_status,
 			meters!inner(
 				id,
 				name,
@@ -270,6 +273,50 @@ function groupReadingsByMonth(readings: any[]) {
 }
 
 export const actions: Actions = {
+	approvePendingReadings: async ({ request, locals: { supabase, safeGetSession } }) => {
+		const session = await safeGetSession();
+		if (!session) return fail(401, { error: 'Unauthorized' });
+
+		const formData = await request.formData();
+		const idsJson = formData.get('reading_ids') as string;
+		if (!idsJson) return fail(400, { error: 'Missing reading_ids' });
+		let ids: number[] = [];
+		try {
+			ids = JSON.parse(idsJson);
+			if (!Array.isArray(ids)) throw new Error('reading_ids must be an array');
+		} catch (e: any) {
+			return fail(400, { error: 'Invalid reading_ids payload' });
+		}
+
+		const { error: updateError } = await supabase
+			.from('readings')
+			.update({ review_status: 'APPROVED' })
+			.in('id', ids);
+		if (updateError) return fail(500, { error: `Failed to approve readings: ${updateError.message}` });
+		return { success: true };
+	},
+	rejectPendingReadings: async ({ request, locals: { supabase, safeGetSession } }) => {
+		const session = await safeGetSession();
+		if (!session) return fail(401, { error: 'Unauthorized' });
+
+		const formData = await request.formData();
+		const idsJson = formData.get('reading_ids') as string;
+		if (!idsJson) return fail(400, { error: 'Missing reading_ids' });
+		let ids: number[] = [];
+		try {
+			ids = JSON.parse(idsJson);
+			if (!Array.isArray(ids)) throw new Error('reading_ids must be an array');
+		} catch (e: any) {
+			return fail(400, { error: 'Invalid reading_ids payload' });
+		}
+
+		const { error: updateError } = await supabase
+			.from('readings')
+			.update({ review_status: 'REJECTED' })
+			.in('id', ids);
+		if (updateError) return fail(500, { error: `Failed to reject readings: ${updateError.message}` });
+		return { success: true };
+	},
 
 
 	createUtilityBillings: async ({ request, locals: { supabase, safeGetSession } }) => {

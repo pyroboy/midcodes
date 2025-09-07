@@ -6,6 +6,7 @@ export interface Reading {
 	rate_at_reading?: number | null; // Actual database field
 	meter_name?: string | null;
 	created_at?: string; // Added from actual database schema
+	review_status?: 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED';
 	// Calculated fields (not stored in database, computed for UI)
 	consumption?: number | null; // Calculated: reading - previous_reading (from window function)
 	cost?: number | null; // Calculated: consumption * rate_at_reading

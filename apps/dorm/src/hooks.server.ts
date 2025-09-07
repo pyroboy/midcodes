@@ -203,6 +203,11 @@ const authGuard: Handle = async ({ event, resolve }) => {
 		return resolve(event);
 	}
 
+	// Allow PUBLIC access to utility input routes
+	if (event.url.pathname.startsWith('/utility-input/')) {
+		return resolve(event);
+	}
+
 	// Require authentication for all other routes
 	if (!sessionInfo.session && !event.url.pathname.startsWith('/auth')) {
 		throw redirect(303, `/auth?returnTo=${event.url.pathname}`);

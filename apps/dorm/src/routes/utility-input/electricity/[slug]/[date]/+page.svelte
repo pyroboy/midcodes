@@ -152,22 +152,22 @@
 </script>
 
 <div class="container mx-auto px-3 sm:px-4 py-4 sm:py-6 lg:py-8">
-	<!-- Error Display -->
+	<!-- Message Display -->
 	{#if data.errors && data.errors.length > 0}
 		<div class="mb-8">
-			<div class="bg-red-50 border-2 border-red-300 rounded-lg p-4 sm:p-6 shadow-md">
+			<div class="{data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? 'bg-green-50 border-2 border-green-300' : 'bg-red-50 border-2 border-red-300'} rounded-lg p-4 sm:p-6 shadow-md">
 				<div class="flex items-center mb-4">
-					<div class="text-red-600 text-xl mr-3">
-						⚠️
+					<div class="{data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? 'text-green-600' : 'text-red-600'} text-xl mr-3">
+						{data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? '✅' : '⚠️'}
 					</div>
-					<h2 class="text-lg sm:text-xl font-bold text-red-800">
-						Error{data.errors.length > 1 ? 's' : ''} Detected
+					<h2 class="text-lg sm:text-xl font-bold {data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? 'text-green-800' : 'text-red-800'}">
+						{data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? 'Information' : 'Error'}{data.errors.length > 1 ? 's' : ''} Detected
 					</h2>
 				</div>
 				<div class="space-y-2">
 					{#each data.errors as error}
-						<div class="bg-red-100 border-l-4 border-red-500 p-3 rounded">
-							<div class="text-red-800 text-sm sm:text-base whitespace-pre-line">
+						<div class="{data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? 'bg-green-100 border-l-4 border-green-500' : 'bg-red-100 border-l-4 border-red-500'} p-3 rounded">
+							<div class="{data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? 'text-green-800' : 'text-red-800'} text-sm sm:text-base whitespace-pre-line">
 								{@html error
 									.replace(
 										/<select class="([^"]+)">([\s\S]*?)<\/select>/g,

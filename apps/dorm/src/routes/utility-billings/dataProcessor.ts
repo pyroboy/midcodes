@@ -51,7 +51,13 @@ export function processUtilityBillingsData(
 
 	// Process each meter's readings
 	for (const [meterId, meterReadings] of Object.entries(grouped)) {
-		const sorted = (meterReadings as any[]).sort(
+		// Filter out unapproved readings from consolidated data
+		// Only include readings that are explicitly approved or have no review status (legacy data)
+		const approvedReadings = (meterReadings as any[]).filter(
+			(r: any) => r.review_status === 'APPROVED' || r.review_status === null || r.review_status === undefined
+		);
+
+		const sorted = approvedReadings.sort(
 			(a: any, b: any) => new Date(a.reading_date).getTime() - new Date(b.reading_date).getTime()
 		);
 
@@ -117,18 +123,23 @@ export function processUtilityBillingsData(
 			}
 		}
 
-		// Fallback: if only one reading exists, show it without consumption
+		// Fallback: if only one approved reading exists, show it without consumption
 		if (sorted.length === 1) {
 			const r = sorted[0];
-			displayedReadings.push({
-				...r,
-				previous_reading: null,
-				consumption: null,
-				cost: null,
-				days_diff: null,
-				period: r.reading_date.slice(0, 7)
-			});
-			console.log(`📝 Single reading fallback for meter ${meterId}`);
+			// Double-check that this single reading is approved or has no review status (legacy data)
+			if (r.review_status === 'APPROVED' || r.review_status === null || r.review_status === undefined) {
+				displayedReadings.push({
+					...r,
+					previous_reading: null,
+					consumption: null,
+					cost: null,
+					days_diff: null,
+					period: r.reading_date.slice(0, 7)
+				});
+				console.log(`📝 Single approved reading fallback for meter ${meterId}`);
+			} else {
+				console.log(`⚠️ Skipping unapproved single reading for meter ${meterId}`);
+			}
 		}
 	}
 
@@ -230,7 +241,8 @@ export function processUtilityBillingsData(
 	return {
 		properties,
 		meters,
-		readings: displayedReadings, // Use the new grouped readings
+		readings: displayedReadings, // Use the new grouped readings (only approved)
+		allReadings, // Include ALL readings for pending review functionality
 		availableReadingDates: uniqueDates,
 		rental_unitTenantCounts,
 		leases,

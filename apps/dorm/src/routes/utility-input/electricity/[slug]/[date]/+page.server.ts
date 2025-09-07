@@ -8,7 +8,7 @@ import { zod } from 'sveltekit-superforms/adapters';
 import { readingSubmissionSchema } from './formSchema';
 import type { Actions } from '@sveltejs/kit';
 import { fail, error } from '@sveltejs/kit';
-import { getUserPermissions } from '$lib/services/permissions';
+// import { getUserPermissions } from '$lib/services/permissions'; // COMMENTED OUT - PUBLIC ACCESS ENABLED
 
 export const load: ServerLoad = async ({ params, locals }) => {
 	const { slug: propertySlug, date } = params;
@@ -268,10 +268,10 @@ export const load: ServerLoad = async ({ params, locals }) => {
 				`${meter.name} (reading date: ${new Date(meter.latest_reading!.date).toLocaleDateString()})`
 			).join(', ');
 
-			const problematicCount = futureReadings.length;
-			const futureReadingMessage = `⚠️ Future Readings Found\n\nYour data contains ${problematicCount} meter reading${problematicCount > 1 ? 's' : ''} from ${mostRecentDateStr}, which is after your requested date of ${urlDateStr}.\n\nPlease ensure all meter readings are dated on or before ${urlDateStr} before proceeding.`;
-			// Always add future reading errors, regardless of other errors
-			if (!errorDetails.some(error => error.includes('Future Readings found'))) {
+			const readingsCount = futureReadings.length;
+			const futureReadingMessage = `✅ Success! Data Found\n\nThis date already has ${readingsCount} meter reading${readingsCount > 1 ? 's' : ''} recorded.`;
+			// Always add success message for existing data, regardless of other errors
+			if (!errorDetails.some(error => error.includes('Success! Data Found'))) {
 				errorDetails.push(futureReadingMessage);
 			}
 		}
@@ -281,17 +281,20 @@ export const load: ServerLoad = async ({ params, locals }) => {
 	if (errorDetails.length > 0) {
 		let consolidatedError = '';
 
-		// If we have both date restriction and future readings errors, combine them into one message
+		// If we have both date restriction and data found messages, combine them
 		const hasDateRestriction = errorDetails.some(error => error.includes('Date Restriction'));
-		const hasFutureReadings = errorDetails.some(error => error.includes('Future Readings Found'));
+		const hasDataFound = errorDetails.some(error => error.includes('Success! Data Found'));
 
-		if (hasDateRestriction && hasFutureReadings && errorDetails.length === 2) {
+		if (hasDateRestriction && hasDataFound && errorDetails.length === 2) {
 			const dateError = errorDetails.find(error => error.includes('Date Restriction'))!;
-			const futureError = errorDetails.find(error => error.includes('Future Readings Found'))!;
-			consolidatedError = `${dateError}\n\n⚠️ Additional Issue:\n${futureError}`;
+			const dataFoundMsg = errorDetails.find(error => error.includes('Success! Data Found'))!;
+			consolidatedError = `${dateError}\n\n✅ Additional Info:\n${dataFoundMsg}`;
 		} else {
-			// For single errors or multiple different errors, use numbered list
-			consolidatedError = `Issues found:\n${errorDetails.map((detail, index) => `${index + 1}. ${detail}`).join('\n')}`;
+			// For single messages or multiple different messages, use numbered list
+			// Check if we have any success messages
+			const hasSuccessMessages = errorDetails.some(error => error.includes('✅ Success!'));
+			const title = hasSuccessMessages ? 'Information:' : 'Issues found:';
+			consolidatedError = `${title}\n${errorDetails.map((detail, index) => `${index + 1}. ${detail}`).join('\n')}`;
 		}
 
 		errors = [consolidatedError];
@@ -307,7 +310,7 @@ export const load: ServerLoad = async ({ params, locals }) => {
 };
 
 export const actions: Actions = {
-	addReadings: async ({ request, locals: { supabase, safeGetSession } }) => {
+	addReadings: async ({ request, locals: { supabase } }) => {
 		console.log('🚀 Server: addReadings action started');
 
 		// Validate request with Superforms
@@ -323,6 +326,8 @@ export const actions: Actions = {
 		console.log('📊 Server: Form data:', form.data);
 
 		try {
+			// COMMENTED OUT AUTHENTICATION - PUBLIC ACCESS ENABLED
+			/*
 			const session = await safeGetSession();
 			if (!session) throw error(401, 'Unauthorized');
 
@@ -354,6 +359,9 @@ export const actions: Actions = {
 			if (!hasReadingsPermission && !isSuperAdmin && !isPropertyAdmin && !isPropertyUser) {
 				return fail(403, { form, error: 'Insufficient permissions to add meter readings.' });
 			}
+			*/
+
+			// PUBLIC ACCESS: Skip authentication checks
 
 			// Parse readings
 			const readings = JSON.parse(form.data.readings_json) as Array<{
@@ -414,7 +422,8 @@ export const actions: Actions = {
 				return {
 					meter_id: r.meter_id,
 					reading: current,
-					reading_date: r.reading_date
+					reading_date: r.reading_date,
+					review_status: 'PENDING_REVIEW'
 				};
 			});
 
