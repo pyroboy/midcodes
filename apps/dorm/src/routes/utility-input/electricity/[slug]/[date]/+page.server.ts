@@ -28,11 +28,11 @@ export const load: ServerLoad = async ({ params, locals }) => {
 	// Create service role client for public route (bypasses RLS)
 	let supabaseClient = locals.supabase;
 	try {
-		if (env.SUPABASE_SERVICE_ROLE_KEY) {
-			supabaseClient = createClient(PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
+		if (env.PRIVATE_SERVICE_ROLE) {
+			supabaseClient = createClient(PUBLIC_SUPABASE_URL, env.PRIVATE_SERVICE_ROLE);
 			console.log('✅ Using service role client for public access');
 		} else {
-			console.warn('❌ Service role key not found, falling back to regular client');
+			console.warn('❌ Private service role key not found, falling back to regular client');
 		}
 	} catch (error) {
 		console.error('❌ Error creating service role client:', error);
