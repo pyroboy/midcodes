@@ -25,32 +25,44 @@ export const load: ServerLoad = async ({ params, locals }) => {
 		errorDetails.push('Date parameter is required');
 	}
 
-	// Create service role client for temporarily public route (bypasses RLS)
+	// Create service role client for public route (bypasses RLS)
 	let supabaseClient = locals.supabase;
 	try {
 		if (env.SUPABASE_SERVICE_ROLE_KEY) {
 			supabaseClient = createClient(PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
+			console.log('✅ Using service role client for public access');
+		} else {
+			console.warn('❌ Service role key not found, falling back to regular client');
 		}
 	} catch (error) {
-		console.warn('Service role key not available, using regular client with RLS');
+		console.error('❌ Error creating service role client:', error);
+		console.warn('Falling back to regular client with RLS');
 	}
 
-	// Fetch property details by slug (temporarily public route - no RLS restrictions)
+	// Fetch property details by slug (public route - no RLS restrictions)
 	let property = null;
 	if (propertySlug && !errors.length) {
+		console.log(`🔍 Looking for property with slug: "${propertySlug}"`);
+
 		const { data: propertyData, error: propertyError } = await supabaseClient
 			.from('properties')
 			.select('id, name, slug, status')
 			.eq('slug', propertySlug)
 			.maybeSingle();
 
+		console.log('🔍 Property query result:', { data: propertyData, error: propertyError });
+
 		if (propertyError) {
+			console.error('❌ Database error:', propertyError);
 			errorDetails.push(`Database error: ${propertyError.message}`);
 		} else if (!propertyData) {
+			console.warn(`❌ Property with slug "${propertySlug}" not found`);
 			errorDetails.push(`Property with slug "${propertySlug}" not found`);
 		} else if (propertyData.status !== 'ACTIVE') {
+			console.warn(`❌ Property is not active: ${propertyData.status}`);
 			errorDetails.push(`Property is not active`);
 		} else {
+			console.log(`✅ Property found: ${propertyData.name} (${propertyData.slug})`);
 			property = propertyData;
 		}
 	}
