@@ -9,6 +9,19 @@
 
 	let { data }: { data: PageData } = $props();
 
+	// Helper functions for date navigation
+	function getPreviousDate(currentDate: string): string {
+		const date = new Date(currentDate);
+		date.setDate(date.getDate() - 1);
+		return date.toISOString().split('T')[0];
+	}
+
+	function getNextDate(currentDate: string): string {
+		const date = new Date(currentDate);
+		date.setDate(date.getDate() + 1);
+		return date.toISOString().split('T')[0];
+	}
+
 	// Simple client-side validation state
 	let fieldErrors = $state<Record<string, string>>({});
 
@@ -156,22 +169,74 @@
 </script>
 
 <div class="container mx-auto px-3 sm:px-4 py-4 sm:py-6 lg:py-8">
+
+
+	<!-- Combined Date and Property Display -->
+		{#if data.date}
+			<div class="mb-6 sm:mb-8">
+				<div class="bg-white border-2 border-gray-300 rounded-lg py-4 sm:py-6 lg:py-8 px-16 sm:px-20 lg:px-24 shadow-md relative min-h-[80px] sm:min-h-[100px] lg:min-h-[120px]">
+					<!-- Previous Day Button -->
+					<div class="absolute left-6 top-1/2 transform -translate-y-1/2 z-10">
+						<a
+							href="/utility-input/electricity/{data.property?.slug}/{getPreviousDate(data.date)}"
+							class="inline-flex items-center justify-center w-14 h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full transition-colors duration-200 shadow-lg hover:shadow-xl border-2 border-white"
+							title="Previous Day"
+							aria-label="Go to previous day"
+						>
+							<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+							</svg>
+						</a>
+					</div>
+
+					<div class="text-center">
+						<div class="text-2xl sm:text-3xl md:text-4xl lg:text-6xl font-bold text-gray-900 mb-2 sm:mb-3 lg:mb-4">
+							{new Date(data.date).toLocaleDateString('en-US', {
+								weekday: 'long',
+								year: 'numeric',
+								month: 'long',
+								day: 'numeric'
+							})}
+						</div>
+						{#if data.property}
+							<h1 class="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900">
+								{data.property.name}
+							</h1>
+						{/if}
+					</div>
+
+					<!-- Next Day Button -->
+					<div class="absolute right-4 top-1/2 transform -translate-y-1/2">
+						<a
+							href="/utility-input/electricity/{data.property?.slug}/{getNextDate(data.date)}"
+							class="inline-flex items-center justify-center w-12 h-12 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full transition-colors duration-200 shadow-sm hover:shadow-md"
+							title="Next Day"
+							aria-label="Go to next day"
+						>
+							<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+							</svg>
+						</a>
+					</div>
+				</div>
+			</div>
+		{/if}
 	<!-- Message Display -->
 	{#if data.errors && data.errors.length > 0}
 		<div class="mb-8">
-			<div class="{data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? 'bg-green-50 border-2 border-green-300' : 'bg-red-50 border-2 border-red-300'} rounded-lg p-4 sm:p-6 shadow-md">
+			<div class="{data.errors.some(e => e.includes('ℹ️ Information:')) && !data.errors.some(e => e.includes('⚠️')) ? 'bg-blue-50 border-2 border-blue-300' : data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? 'bg-green-50 border-2 border-green-300' : 'bg-red-50 border-2 border-red-300'} rounded-lg p-4 sm:p-6 shadow-md">
 				<div class="flex items-center mb-4">
-					<div class="{data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? 'text-green-600' : 'text-red-600'} text-xl mr-3">
-						{data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? '✅' : '⚠️'}
+					<div class="{data.errors.some(e => e.includes('ℹ️ Information:')) && !data.errors.some(e => e.includes('⚠️')) ? 'text-blue-600' : data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? 'text-green-600' : 'text-red-600'} text-xl mr-3">
+						{data.errors.some(e => e.includes('ℹ️ Information:')) && !data.errors.some(e => e.includes('⚠️')) ? 'ℹ️' : data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? '✅' : '⚠️'}
 					</div>
-					<h2 class="text-lg sm:text-xl font-bold {data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? 'text-green-800' : 'text-red-800'}">
-						{data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? 'Information' : 'Error'}{data.errors.length > 1 ? 's' : ''} Detected
+					<h2 class="text-lg sm:text-xl font-bold {data.errors.some(e => e.includes('ℹ️ Information:')) && !data.errors.some(e => e.includes('⚠️')) ? 'text-blue-800' : data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? 'text-green-800' : 'text-red-800'}">
+						{data.errors.some(e => e.includes('ℹ️ Information:')) && !data.errors.some(e => e.includes('⚠️')) ? 'Information' : data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? 'Success' : 'Error'}{data.errors.length > 1 ? 's' : ''} Detected
 					</h2>
 				</div>
 				<div class="space-y-2">
 					{#each data.errors as error}
-						<div class="{data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? 'bg-green-100 border-l-4 border-green-500' : 'bg-red-100 border-l-4 border-red-500'} p-3 rounded">
-							<div class="{data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? 'text-green-800' : 'text-red-800'} text-sm sm:text-base whitespace-pre-line">
+						<div class="{data.errors.some(e => e.includes('ℹ️ Information:')) && !data.errors.some(e => e.includes('⚠️')) ? 'bg-blue-100 border-l-4 border-blue-500' : data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? 'bg-green-100 border-l-4 border-green-500' : 'bg-red-100 border-l-4 border-red-500'} p-3 rounded">
+							<div class="{data.errors.some(e => e.includes('ℹ️ Information:')) && !data.errors.some(e => e.includes('⚠️')) ? 'text-blue-800' : data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? 'text-green-800' : 'text-red-800'} text-sm sm:text-base whitespace-pre-line">
 								{@html error
 									.replace(
 										/<select class="([^"]+)">([\s\S]*?)<\/select>/g,
@@ -189,66 +254,6 @@
 			</div>
 		</div>
 	{/if}
-
-	<!-- Combined Date and Property Display -->
-		{#if (!data.errors || data.errors.length === 0) && data.date}
-			<div class="mb-6 sm:mb-8 text-center">
-				<div class="bg-white border-2 border-gray-300 rounded-lg py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8 shadow-md">
-					<div class="text-2xl sm:text-3xl md:text-4xl lg:text-6xl font-bold text-gray-900 mb-2 sm:mb-3 lg:mb-4">
-						{new Date(data.date).toLocaleDateString('en-US', {
-							weekday: 'long',
-							year: 'numeric',
-							month: 'long',
-							day: 'numeric'
-						})}
-					</div>
-					{#if data.property}
-						<h1 class="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900">
-							{data.property.name}
-						</h1>
-					{/if}
-				</div>
-			</div>
-
-			<!-- Backdating Information - Only show for past dates -->
-			{#if data.date && data.currentServerDate && new Date(data.date) < new Date(data.currentServerDate)}
-				<div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-					<div class="flex items-start">
-						<div class="text-blue-600 text-lg mr-3">ℹ️</div>
-						<div>
-							<h3 class="text-sm sm:text-base font-medium text-blue-900 mb-1">
-								Meter Reading Backdating
-							</h3>
-							<p class="text-sm text-blue-800">
-								You are currently viewing/inputting meter readings for a past date. Today's date is <strong>{new Date(data.currentServerDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</strong>.
-								This allows you to backdate meter readings when data entry occurs after the actual reading date.
-							</p>
-						</div>
-					</div>
-				</div>
-			{/if}
-		{/if}
-
-		<!-- Show date info even when showing success message -->
-		{#if data.errors && data.errors.length > 0 && data.errors.some(error => error.includes('✅ Success!')) && data.date}
-			<div class="mb-6 sm:mb-8 text-center">
-				<div class="bg-white border-2 border-gray-300 rounded-lg py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8 shadow-md">
-					<div class="text-2xl sm:text-3xl md:text-4xl lg:text-6xl font-bold text-gray-900 mb-2 sm:mb-3 lg:mb-4">
-						{new Date(data.date).toLocaleDateString('en-US', {
-							weekday: 'long',
-							year: 'numeric',
-							month: 'long',
-							day: 'numeric'
-						})}
-					</div>
-					{#if data.property}
-						<h1 class="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900">
-							{data.property.name}
-						</h1>
-					{/if}
-				</div>
-			</div>
-		{/if}
 
 	<!-- Meter Cards Section -->
 	{#if (!data.errors || data.errors.length === 0) && data.date && data.meters && data.meters.length > 0}
@@ -351,21 +356,4 @@
 		</form>
 	{/if}
 
-	<!-- Message when success message is shown but no meters (data exists) -->
-	{#if data.errors && data.errors.length > 0 && data.errors.some(error => error.includes('✅ Success!')) && (!data.meters || data.meters.length === 0)}
-		<div class="mt-6 p-4 border rounded-lg bg-blue-50 border-blue-200">
-			<div class="flex items-start">
-				<div class="text-blue-600 text-lg mr-3">ℹ️</div>
-				<div>
-					<h3 class="text-sm sm:text-base font-medium text-blue-900 mb-1">
-						Data Management
-					</h3>
-					<p class="text-sm text-blue-800">
-						Meter readings for this date have been successfully recorded. The input form is hidden to prevent duplicate entries.
-						If you need to update the readings, please contact an administrator.
-					</p>
-				</div>
-			</div>
-		</div>
-	{/if}
 </div>

@@ -42,7 +42,7 @@ export const load: ServerLoad = async ({ params, locals }) => {
 
 	// Fetch property details by slug (public route - no RLS restrictions)
 	let property = null;
-	if (propertySlug && !errors.length) {
+	if (propertySlug && !errorDetails.length) {
 		console.log(`🔍 Looking for property with slug: "${propertySlug}"`);
 
 		const { data: propertyData, error: propertyError } = await supabaseClient
@@ -68,6 +68,41 @@ export const load: ServerLoad = async ({ params, locals }) => {
 		}
 	}
 
+	// Helper function to generate future date links
+	function generateFutureDateLinks(propertySlug: string, currentDate: string) {
+		const serverToday = new Date().toISOString().split('T')[0];
+		const currentDateObj = new Date(currentDate);
+		const todayObj = new Date(serverToday);
+
+		// Generate links for tomorrow's date only
+		const futureDates = [];
+		const tomorrowDate = new Date(todayObj);
+		tomorrowDate.setDate(todayObj.getDate() + 1);
+		const tomorrowStr = tomorrowDate.toISOString().split('T')[0];
+
+		const tomorrowFormatted = tomorrowDate.toLocaleDateString('en-US', {
+			weekday: 'short',
+			month: 'long',
+			day: 'numeric'
+		});
+
+		const isCurrentViewingDate = tomorrowStr === currentDate;
+		const label = tomorrowFormatted;
+
+		// Make current viewing date non-clickable (plain text), tomorrow as link
+		if (isCurrentViewingDate) {
+			futureDates.push(`${label} *(current)*`);
+		} else {
+			futureDates.push(`[${label}](/utility-input/electricity/${propertySlug}/${tomorrowStr})`);
+		}
+
+		if (futureDates.length > 0) {
+			return `\n\n📅 **Tomorrow's input:**\n${futureDates.join('')}`;
+		}
+
+		return '';
+	}
+
 	// EARLY CHECK: If property exists, check for existing readings BEFORE fetching meters
 	let existingReadingsCount = 0;
 	if (property && date && !errorDetails.length) {
@@ -90,26 +125,50 @@ export const load: ServerLoad = async ({ params, locals }) => {
 			// Now check for existing readings on this date for these meters
 			const { data: existingReadings, error: readingsCheckError } = await supabaseClient
 				.from('readings')
-				.select('id, meter_id, reading_date')
+				.select('id, meter_id, reading_date, reading')
 				.eq('reading_date', date)
-				.in('meter_id', meterIdList);
+				.in('meter_id', meterIdList)
+				.not('reading', 'is', null); // Ensure reading value is not null
 
 			if (readingsCheckError) {
 				console.warn('⚠️ Could not check for existing readings:', readingsCheckError);
+				console.log(`🔄 [EARLY CHECK] Continuing to show input form due to error`);
 			} else if (existingReadings && existingReadings.length > 0) {
-				existingReadingsCount = existingReadings.length;
-				console.log(`✅ [EARLY CHECK] Found ${existingReadingsCount} existing readings for ${date}`);
+				// Double-check that we have valid readings with actual values
+				const validReadings = existingReadings.filter(reading => reading.reading !== null && reading.reading !== undefined);
+				existingReadingsCount = validReadings.length;
 
-				// Create success message for existing data
-				const successMessage = `✅ Success! Data Found\n\nThis date already has ${existingReadingsCount} meter reading${existingReadingsCount > 1 ? 's' : ''} recorded.\n\nYou can view or update the existing readings below.`;
+				console.log(`✅ [EARLY CHECK] Found ${existingReadingsCount} valid readings for ${date}`);
+				console.log(`📊 [EARLY CHECK] Reading details:`, validReadings.map(r => ({ id: r.id, meter_id: r.meter_id, reading: r.reading })));
 
-				return {
-					meters: [], // Empty meters since we're showing success message
-					property: property,
-					date: date,
-					errors: [successMessage],
-					form: await superValidate(zod(readingSubmissionSchema))
-				};
+				if (existingReadingsCount > 0) {
+					// Generate future date links
+					const futureDateLinks = generateFutureDateLinks(property.slug, date);
+
+					// Format the date for display
+					const displayDate = new Date(date).toLocaleDateString('en-US', {
+						weekday: 'long',
+						year: 'numeric',
+						month: 'long',
+						day: 'numeric'
+					});
+
+					// Create informational message for existing data
+					const successMessage = `ℹ️ Information:\n📊 Existing Data Found\n\n**${displayDate}** already has ${existingReadingsCount} meter reading${existingReadingsCount > 1 ? 's' : ''} recorded.\n\nYou can view or update the existing readings below.${futureDateLinks}`;
+
+					console.log(`🎯 [EARLY CHECK] Returning success response for ${existingReadingsCount} readings`);
+
+					return {
+						meters: [], // Empty meters since we're showing success message
+						property: property,
+						date: date,
+						errors: [successMessage],
+						form: await superValidate(zod(readingSubmissionSchema)),
+						currentServerDate: new Date().toISOString().split('T')[0] // YYYY-MM-DD format
+					};
+				} else {
+					console.log(`⚠️ [EARLY CHECK] Found readings but none have valid values, showing input form`);
+				}
 			} else {
 				console.log(`ℹ️ [EARLY CHECK] No existing readings found for ${date}, will show input form`);
 			}
@@ -322,71 +381,12 @@ export const load: ServerLoad = async ({ params, locals }) => {
 		}
 	}
 
-	// Check if any meter has a reading date in the future relative to the URL date
-	if (date) {
-		const urlDate = new Date(date);
-		urlDate.setHours(0, 0, 0, 0);
+	// (Removed redundant future-reading message logic; date restriction above already handles this case)
 
-		const futureReadings = metersWithReadings.filter(meter =>
-			meter.latest_reading && new Date(meter.latest_reading.date) > urlDate
-		);
-
-		if (futureReadings.length > 0) {
-
-			const urlDateStr = urlDate.toLocaleDateString();
-
-			// Find the most recent future reading date
-			const mostRecentFutureDate = new Date(Math.max(...futureReadings.map(meter =>
-				new Date(meter.latest_reading!.date).getTime()
-			)));
-			const mostRecentDateStr = mostRecentFutureDate.toLocaleDateString();
-
-			const futureMeterDetails = futureReadings.map(meter =>
-				`${meter.name} (reading date: ${new Date(meter.latest_reading!.date).toLocaleDateString()})`
-			).join(', ');
-
-			const readingsCount = futureReadings.length;
-			const futureReadingMessage = `✅ Success! Data Found\n\nThis date already has ${readingsCount} meter reading${readingsCount > 1 ? 's' : ''} recorded.`;
-
-			console.log(`✅ [LOAD] Generating success message for ${readingsCount} readings`);
-			console.log(`✅ [LOAD] Success message:`, futureReadingMessage);
-
-			// Always add success message for existing data, regardless of other errors
-			if (!errorDetails.some(error => error.includes('Success! Data Found'))) {
-				errorDetails.push(futureReadingMessage);
-				console.log(`✅ [LOAD] Added success message to errorDetails`);
-			} else {
-				console.log(`⚠️ [LOAD] Success message already exists in errorDetails`);
-			}
-		}
-	}
-
-	// Create consolidated error message
+	// Pass collected messages directly to the client (avoid redundant consolidation)
 	if (errorDetails.length > 0) {
-		console.log(`📋 [LOAD] Creating consolidated message from ${errorDetails.length} error details`);
-		console.log(`📋 [LOAD] Error details:`, errorDetails);
-
-		let consolidatedError = '';
-
-		// If we have both date restriction and data found messages, combine them
-		const hasDateRestriction = errorDetails.some(error => error.includes('Date Restriction'));
-		const hasDataFound = errorDetails.some(error => error.includes('Success! Data Found'));
-		console.log(`📋 [LOAD] Has date restriction: ${hasDateRestriction}, Has data found: ${hasDataFound}`);
-
-		if (hasDateRestriction && hasDataFound && errorDetails.length === 2) {
-			const dateError = errorDetails.find(error => error.includes('Date Restriction'))!;
-			const dataFoundMsg = errorDetails.find(error => error.includes('Success! Data Found'))!;
-			consolidatedError = `${dateError}\n\n✅ Additional Info:\n${dataFoundMsg}`;
-		} else {
-			// For single messages or multiple different messages, use numbered list
-			// Check if we have any success messages
-			const hasSuccessMessages = errorDetails.some(error => error.includes('✅ Success!'));
-			const title = hasSuccessMessages ? 'Information:' : 'Issues found:';
-			consolidatedError = `${title}\n${errorDetails.map((detail, index) => `${index + 1}. ${detail}`).join('\n')}`;
-		}
-
-		console.log(`📋 [LOAD] Final consolidated error:`, consolidatedError);
-		errors = [consolidatedError];
+		console.log(`📋 [LOAD] Returning ${errorDetails.length} message(s)`);
+		errors = errorDetails;
 	}
 
 	return {
