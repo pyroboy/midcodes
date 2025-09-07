@@ -16,12 +16,16 @@
 		validators: zodClient(readingSubmissionSchema),
 		resetForm: false,
 		onResult: async ({ result }) => {
+			console.log('📥 Form submission result:', result);
 			if (result.type === 'success') {
+				console.log('✅ Submission successful, reloading data...');
 				toast.success(result.data?.message || 'Readings saved successfully');
 				await invalidateAll();
+				console.log('🔄 Data invalidated, page should reload');
 				reset();
 				// Clear field errors on success
 				fieldErrors = {};
+				console.log('🧹 Form reset and errors cleared');
 			} else if (result.type === 'failure') {
 				// Aggregate server-side errors for toast
 				const serverMessage = (result.data as any)?.error as string | undefined;
@@ -187,46 +191,67 @@
 	{/if}
 
 	<!-- Combined Date and Property Display -->
-	{#if (!data.errors || data.errors.length === 0) && data.date}
-		<div class="mb-6 sm:mb-8 text-center">
-			<div class="bg-white border-2 border-gray-300 rounded-lg py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8 shadow-md">
-				<div class="text-2xl sm:text-3xl md:text-4xl lg:text-6xl font-bold text-gray-900 mb-2 sm:mb-3 lg:mb-4">
-					{new Date(data.date).toLocaleDateString('en-US', {
-						weekday: 'long',
-						year: 'numeric',
-						month: 'long',
-						day: 'numeric'
-					})}
-				</div>
-				{#if data.property}
-					<h1 class="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900">
-						{data.property.name}
-					</h1>
-				{/if}
-			</div>
-		</div>
-
-		<!-- Backdating Information - Only show for past dates -->
-		{#if data.date && new Date(data.date) < new Date()}
-			<div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-				<div class="flex items-start">
-					<div class="text-blue-600 text-lg mr-3">ℹ️</div>
-					<div>
-						<h3 class="text-sm sm:text-base font-medium text-blue-900 mb-1">
-							Meter Reading Backdating
-						</h3>
-						<p class="text-sm text-blue-800">
-							You are currently viewing/inputting meter readings for a past date. Today's date is <strong>{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</strong>.
-							This allows you to backdate meter readings when data entry occurs after the actual reading date.
-						</p>
+		{#if (!data.errors || data.errors.length === 0) && data.date}
+			<div class="mb-6 sm:mb-8 text-center">
+				<div class="bg-white border-2 border-gray-300 rounded-lg py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8 shadow-md">
+					<div class="text-2xl sm:text-3xl md:text-4xl lg:text-6xl font-bold text-gray-900 mb-2 sm:mb-3 lg:mb-4">
+						{new Date(data.date).toLocaleDateString('en-US', {
+							weekday: 'long',
+							year: 'numeric',
+							month: 'long',
+							day: 'numeric'
+						})}
 					</div>
+					{#if data.property}
+						<h1 class="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900">
+							{data.property.name}
+						</h1>
+					{/if}
+				</div>
+			</div>
+
+			<!-- Backdating Information - Only show for past dates -->
+			{#if data.date && new Date(data.date) < new Date()}
+				<div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+					<div class="flex items-start">
+						<div class="text-blue-600 text-lg mr-3">ℹ️</div>
+						<div>
+							<h3 class="text-sm sm:text-base font-medium text-blue-900 mb-1">
+								Meter Reading Backdating
+							</h3>
+							<p class="text-sm text-blue-800">
+								You are currently viewing/inputting meter readings for a past date. Today's date is <strong>{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</strong>.
+								This allows you to backdate meter readings when data entry occurs after the actual reading date.
+							</p>
+						</div>
+					</div>
+				</div>
+			{/if}
+		{/if}
+
+		<!-- Show date info even when showing success message -->
+		{#if data.errors && data.errors.length > 0 && data.errors.some(error => error.includes('✅ Success!')) && data.date}
+			<div class="mb-6 sm:mb-8 text-center">
+				<div class="bg-white border-2 border-gray-300 rounded-lg py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-8 shadow-md">
+					<div class="text-2xl sm:text-3xl md:text-4xl lg:text-6xl font-bold text-gray-900 mb-2 sm:mb-3 lg:mb-4">
+						{new Date(data.date).toLocaleDateString('en-US', {
+							weekday: 'long',
+							year: 'numeric',
+							month: 'long',
+							day: 'numeric'
+						})}
+					</div>
+					{#if data.property}
+						<h1 class="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-gray-900">
+							{data.property.name}
+						</h1>
+					{/if}
 				</div>
 			</div>
 		{/if}
-	{/if}
 
 	<!-- Meter Cards Section -->
-	{#if (!data.errors || data.errors.length === 0) && data.date}
+	{#if (!data.errors || data.errors.length === 0) && data.date && data.meters && data.meters.length > 0}
 		<form method="POST" action="?/addReadings" use:enhance>
 			<!-- Hidden fields managed by superforms -->
 			<input type="hidden" name="readings_json" bind:value={$form.readings_json} />
@@ -324,5 +349,23 @@
 				</div>
 			</div>
 		</form>
+	{/if}
+
+	<!-- Message when success message is shown but no meters (data exists) -->
+	{#if data.errors && data.errors.length > 0 && data.errors.some(error => error.includes('✅ Success!')) && (!data.meters || data.meters.length === 0)}
+		<div class="mt-6 p-4 border rounded-lg bg-blue-50 border-blue-200">
+			<div class="flex items-start">
+				<div class="text-blue-600 text-lg mr-3">ℹ️</div>
+				<div>
+					<h3 class="text-sm sm:text-base font-medium text-blue-900 mb-1">
+						Data Management
+					</h3>
+					<p class="text-sm text-blue-800">
+						Meter readings for this date have been successfully recorded. The input form is hidden to prevent duplicate entries.
+						If you need to update the readings, please contact an administrator.
+					</p>
+				</div>
+			</div>
+		</div>
 	{/if}
 </div>

@@ -12,6 +12,7 @@ import { fail, error } from '@sveltejs/kit';
 
 export const load: ServerLoad = async ({ params, locals }) => {
 	const { slug: propertySlug, date } = params;
+	console.log(`🔄 [LOAD] Loading utility input page for ${propertySlug}/${date}`);
 
 	// Initialize error state
 	let errors: string[] = [];
@@ -67,6 +68,56 @@ export const load: ServerLoad = async ({ params, locals }) => {
 		}
 	}
 
+	// EARLY CHECK: If property exists, check for existing readings BEFORE fetching meters
+	let existingReadingsCount = 0;
+	if (property && date && !errorDetails.length) {
+		console.log(`🔍 [EARLY CHECK] Checking for existing readings for property ${property.id} on date ${date}`);
+
+		// First get meter IDs for this property
+		const { data: meterIds, error: meterError } = await supabaseClient
+			.from('meters')
+			.select('id')
+			.eq('property_id', property.id)
+			.eq('type', 'ELECTRICITY')
+			.eq('is_active', true);
+
+		if (meterError) {
+			console.warn('⚠️ Could not fetch meter IDs:', meterError);
+		} else if (meterIds && meterIds.length > 0) {
+			const meterIdList = meterIds.map(m => m.id);
+			console.log(`🔍 [EARLY CHECK] Found ${meterIdList.length} active electricity meters`);
+
+			// Now check for existing readings on this date for these meters
+			const { data: existingReadings, error: readingsCheckError } = await supabaseClient
+				.from('readings')
+				.select('id, meter_id, reading_date')
+				.eq('reading_date', date)
+				.in('meter_id', meterIdList);
+
+			if (readingsCheckError) {
+				console.warn('⚠️ Could not check for existing readings:', readingsCheckError);
+			} else if (existingReadings && existingReadings.length > 0) {
+				existingReadingsCount = existingReadings.length;
+				console.log(`✅ [EARLY CHECK] Found ${existingReadingsCount} existing readings for ${date}`);
+
+				// Create success message for existing data
+				const successMessage = `✅ Success! Data Found\n\nThis date already has ${existingReadingsCount} meter reading${existingReadingsCount > 1 ? 's' : ''} recorded.\n\nYou can view or update the existing readings below.`;
+
+				return {
+					meters: [], // Empty meters since we're showing success message
+					property: property,
+					date: date,
+					errors: [successMessage],
+					form: await superValidate(zod(readingSubmissionSchema))
+				};
+			} else {
+				console.log(`ℹ️ [EARLY CHECK] No existing readings found for ${date}, will show input form`);
+			}
+		} else {
+			console.log(`ℹ️ [EARLY CHECK] No active electricity meters found for property, will show input form`);
+		}
+	}
+
 	// Fetch active electricity meters for this property
 	let meters = null;
 	if (property && !errorDetails.length) {
@@ -111,12 +162,20 @@ export const load: ServerLoad = async ({ params, locals }) => {
 	const meterIds = meters?.map((m: any) => m.id) || [];
 	let latestReadings: Record<number, { value: number; date: string }> = {};
 
+	console.log(`🔍 [LOAD] Looking for readings for meter IDs:`, meterIds);
+
 	if (meterIds.length > 0 && !errorDetails.length) {
 		const { data: readings, error: readingsError } = await supabaseClient
 			.from('readings')
 			.select('meter_id, reading, reading_date')
 			.in('meter_id', meterIds)
 			.order('reading_date', { ascending: false });
+
+		console.log(`🔍 [LOAD] Readings query result:`, {
+			count: readings?.length || 0,
+			error: readingsError,
+			sample: readings?.slice(0, 3)
+		});
 
 		if (readingsError) {
 			errorDetails.push(`Failed to fetch meter readings: ${readingsError.message}`);
@@ -130,6 +189,7 @@ export const load: ServerLoad = async ({ params, locals }) => {
 					};
 				}
 			});
+			console.log(`✅ [LOAD] Found ${Object.keys(latestReadings).length} meters with readings`);
 		}
 	}
 
@@ -156,8 +216,13 @@ export const load: ServerLoad = async ({ params, locals }) => {
 
 	// Validate date is not before the last reading date
 	if (date && metersWithReadings.length > 0) {
+		console.log(`🔍 [LOAD] Checking future readings for date: ${date}`);
+		console.log(`🔍 [LOAD] Meters with readings: ${metersWithReadings.length}`);
+
 		// Find the most recent reading date across all meters
 		const metersWithReadingsFiltered = metersWithReadings.filter(meter => meter.latest_reading);
+		console.log(`🔍 [LOAD] Meters with latest readings: ${metersWithReadingsFiltered.length}`);
+
 		if (metersWithReadingsFiltered.length > 0) {
 			// Find the most recent reading date
 			const maxTimestamp = Math.max(...metersWithReadingsFiltered
@@ -282,20 +347,31 @@ export const load: ServerLoad = async ({ params, locals }) => {
 
 			const readingsCount = futureReadings.length;
 			const futureReadingMessage = `✅ Success! Data Found\n\nThis date already has ${readingsCount} meter reading${readingsCount > 1 ? 's' : ''} recorded.`;
+
+			console.log(`✅ [LOAD] Generating success message for ${readingsCount} readings`);
+			console.log(`✅ [LOAD] Success message:`, futureReadingMessage);
+
 			// Always add success message for existing data, regardless of other errors
 			if (!errorDetails.some(error => error.includes('Success! Data Found'))) {
 				errorDetails.push(futureReadingMessage);
+				console.log(`✅ [LOAD] Added success message to errorDetails`);
+			} else {
+				console.log(`⚠️ [LOAD] Success message already exists in errorDetails`);
 			}
 		}
 	}
 
 	// Create consolidated error message
 	if (errorDetails.length > 0) {
+		console.log(`📋 [LOAD] Creating consolidated message from ${errorDetails.length} error details`);
+		console.log(`📋 [LOAD] Error details:`, errorDetails);
+
 		let consolidatedError = '';
 
 		// If we have both date restriction and data found messages, combine them
 		const hasDateRestriction = errorDetails.some(error => error.includes('Date Restriction'));
 		const hasDataFound = errorDetails.some(error => error.includes('Success! Data Found'));
+		console.log(`📋 [LOAD] Has date restriction: ${hasDateRestriction}, Has data found: ${hasDataFound}`);
 
 		if (hasDateRestriction && hasDataFound && errorDetails.length === 2) {
 			const dateError = errorDetails.find(error => error.includes('Date Restriction'))!;
@@ -309,6 +385,7 @@ export const load: ServerLoad = async ({ params, locals }) => {
 			consolidatedError = `${title}\n${errorDetails.map((detail, index) => `${index + 1}. ${detail}`).join('\n')}`;
 		}
 
+		console.log(`📋 [LOAD] Final consolidated error:`, consolidatedError);
 		errors = [consolidatedError];
 	}
 
