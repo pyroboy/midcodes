@@ -166,6 +166,11 @@
 		}
 		return base;
 	}
+
+	// Safe parsing - replace XSS vulnerability
+	function parseErrorMessage(error: string) {
+		return [{type: 'text', content: error}];
+	}
 </script>
 
 <div class="container mx-auto px-3 sm:px-4 py-4 sm:py-6 lg:py-8">
@@ -237,16 +242,7 @@
 					{#each data.errors as error}
 						<div class="{data.errors.some(e => e.includes('ℹ️ Information:')) && !data.errors.some(e => e.includes('⚠️')) ? 'bg-blue-100 border-l-4 border-blue-500' : data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? 'bg-green-100 border-l-4 border-green-500' : 'bg-red-100 border-l-4 border-red-500'} p-3 rounded">
 							<div class="{data.errors.some(e => e.includes('ℹ️ Information:')) && !data.errors.some(e => e.includes('⚠️')) ? 'text-blue-800' : data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? 'text-green-800' : 'text-red-800'} text-sm sm:text-base whitespace-pre-line">
-								{@html error
-									.replace(
-										/<select class="([^"]+)">([\s\S]*?)<\/select>/g,
-										'<select class="$1" onchange="window.location.href = this.value">$2</select>'
-									)
-									.replace(
-										/\[([^\]]+)\]\((\/utility-input\/electricity\/[^)]+)\)/g,
-										'<a href="$2" class="inline-block mt-2 mr-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md shadow-sm transition-colors duration-200">$1</a>'
-									)
-								}
+								{error}
 							</div>
 						</div>
 					{/each}

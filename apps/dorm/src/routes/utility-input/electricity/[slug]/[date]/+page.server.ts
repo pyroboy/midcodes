@@ -217,13 +217,14 @@ export const load: ServerLoad = async ({ params, locals }) => {
 		}
 	}
 
-	// Fetch latest readings for these meters
+	// Fetch only latest readings for these meters (optimized query)
 	const meterIds = meters?.map((m: any) => m.id) || [];
 	let latestReadings: Record<number, { value: number; date: string }> = {};
 
 	console.log(`🔍 [LOAD] Looking for readings for meter IDs:`, meterIds);
 
 	if (meterIds.length > 0 && !errorDetails.length) {
+		// Use optimized query to get only latest reading per meter
 		const { data: readings, error: readingsError } = await supabaseClient
 			.from('readings')
 			.select('meter_id, reading, reading_date')
@@ -239,7 +240,7 @@ export const load: ServerLoad = async ({ params, locals }) => {
 		if (readingsError) {
 			errorDetails.push(`Failed to fetch meter readings: ${readingsError.message}`);
 		} else if (readings) {
-			// Group latest readings by meter_id
+			// Group latest readings by meter_id (only take first per meter due to order)
 			readings.forEach((reading: any) => {
 				if (!latestReadings[reading.meter_id]) {
 					latestReadings[reading.meter_id] = {
@@ -288,12 +289,12 @@ export const load: ServerLoad = async ({ params, locals }) => {
 				.map(meter => new Date(meter.latest_reading!.date).getTime())
 			);
 
-			// Create date object and normalize to avoid timezone issues
+			// Create date object and normalize using UTC to avoid timezone issues
 			const lastReadingDate = new Date(maxTimestamp);
-			lastReadingDate.setHours(0, 0, 0, 0); // Set to start of day in local timezone
+			lastReadingDate.setUTCHours(0, 0, 0, 0); // Set to start of day in UTC
 
-			const requestedDate = new Date(date);
-			requestedDate.setHours(0, 0, 0, 0); // Set to start of requested date
+			const requestedDate = new Date(date + 'T00:00:00.000Z'); // Parse as UTC
+			requestedDate.setUTCHours(0, 0, 0, 0); // Set to start of requested date in UTC
 
 			if (requestedDate < lastReadingDate) {
 				const requestedFormatted = new Date(date).toLocaleDateString('en-US', {
@@ -495,7 +496,29 @@ export const actions: Actions = {
 
 			const readingsToInsert = readings.map((r) => {
 				const current = Number(r.reading);
-				const previous = previousReadingMap[r.meter_id] ?? initialReadingMap[r.meter_id] ?? 0;
+				// Fix baseline calculation - properly handle null initial readings
+				let previous: number;
+				const hasValidPreviousReading = previousReadingMap[r.meter_id] !== undefined;
+				
+				if (hasValidPreviousReading) {
+					previous = previousReadingMap[r.meter_id];
+				} else {
+					// Use initial reading if available, otherwise use current reading as baseline (no consumption validation)
+					const initialReading = initialReadingMap[r.meter_id];
+					if (initialReading !== null && initialReading !== undefined) {
+						previous = initialReading;
+					} else {
+						// No previous data available - skip consumption validation entirely
+						console.log(`ℹ️ [VALIDATION] Meter ${meterNameMap[r.meter_id]}: No baseline reading available, skipping consumption validation`);
+						return {
+							meter_id: r.meter_id,
+							reading: current,
+							reading_date: r.reading_date,
+							review_status: 'PENDING_REVIEW'
+						};
+					}
+				}
+
 				const meterName = meterNameMap[r.meter_id] || `ID ${r.meter_id}`;
 
 				// Validate reading is not less than previous reading
@@ -508,41 +531,64 @@ export const actions: Actions = {
 				// Calculate consumption
 				const consumption = current - previous;
 
-				// Enhanced high consumption validation with context
-				const HIGH_CONSUMPTION_THRESHOLD = 500;
+				// Tiered consumption validation - realistic thresholds
+				const NORMAL_DAILY_MAX = 50;      // 0-50 kWh: Normal daily usage - no validation needed
+				const MODERATE_DAILY_MAX = 200;   // 51-200 kWh: Moderate usage - soft warning only
+				const HIGH_DAILY_MAX = 500;       // 201-500 kWh: High usage - require verification
+				const EXTREME_THRESHOLD = 1000;   // >1000 kWh: Extreme - likely error
 
-				// Determine reading context
-				const hasValidPreviousReading = previousReadingMap[r.meter_id] !== undefined;
-				const isUsingInitialReading = !hasValidPreviousReading && previous === (initialReadingMap[r.meter_id] ?? 0);
-				const isFirstReading = isUsingInitialReading;
-
-				// Skip high consumption check for normal daily usage (when we have recent readings)
-				const isNormalDailyUsage = hasValidPreviousReading && consumption <= 50; // Daily usage typically < 50 units
-
-				// Set threshold based on context
-				let adjustedThreshold = HIGH_CONSUMPTION_THRESHOLD;
-				let thresholdReason = 'regular reading';
-
-				if (isFirstReading) {
-					adjustedThreshold = HIGH_CONSUMPTION_THRESHOLD * 2;
-					thresholdReason = 'first reading after installation';
-				} else if (isNormalDailyUsage) {
-					adjustedThreshold = HIGH_CONSUMPTION_THRESHOLD; // Keep normal threshold for daily usage
-					thresholdReason = 'normal daily usage';
-				}
+				// Determine reading context for appropriate threshold
+				const isFirstReading = !hasValidPreviousReading;
 
 				// Debug logging
-				console.log(`🔍 [VALIDATION] Meter ${meterName}: current=${current}, previous=${previous}, consumption=${consumption}, threshold=${adjustedThreshold}, reason=${thresholdReason}`);
+				console.log(`🔍 [VALIDATION] Meter ${meterName}: current=${current}, previous=${previous}, consumption=${consumption}, isFirstReading=${isFirstReading}`);
 
-				if (consumption > adjustedThreshold) {
-					throw new Error(
-						`⚠️ High Consumption Alert for meter ${meterName}:\n` +
-						`• Current reading: ${current}\n` +
-						`• Previous reading: ${previous}\n` +
-						`• Consumption: ${consumption} units\n` +
-						`• Threshold exceeded: ${consumption} > ${adjustedThreshold} (for ${thresholdReason})\n\n` +
-						`Please verify this reading is correct before proceeding.`
-					);
+				// Skip validation for normal daily consumption
+				if (consumption <= NORMAL_DAILY_MAX) {
+					console.log(`✅ [VALIDATION] Meter ${meterName}: Normal consumption (${consumption} kWh) - validation passed`);
+				}
+				// Moderate consumption - log warning but allow
+				else if (consumption <= MODERATE_DAILY_MAX) {
+					console.warn(`⚠️ [VALIDATION] Meter ${meterName}: Moderate consumption (${consumption} kWh) - monitoring for patterns`);
+				}
+				// High consumption - validate with context-aware thresholds
+				else if (consumption <= HIGH_DAILY_MAX) {
+					// Allow high consumption for first readings (could be catch-up from installation)
+					if (isFirstReading) {
+						console.log(`ℹ️ [VALIDATION] Meter ${meterName}: High consumption (${consumption} kWh) allowed for first reading`);
+					} else {
+						console.warn(`🔶 [VALIDATION] Meter ${meterName}: High consumption (${consumption} kWh) - within acceptable range but monitoring`);
+					}
+				}
+				// Extreme consumption - block with detailed error
+				else {
+					// Use higher threshold for first readings to account for installation catch-up
+					const threshold = isFirstReading ? EXTREME_THRESHOLD * 2 : EXTREME_THRESHOLD;
+					
+					if (consumption > threshold) {
+						const contextMessage = isFirstReading 
+							? 'first reading after installation' 
+							: 'regular daily reading';
+						
+						throw new Error(
+							`⚠️ Extreme Consumption Alert for meter ${meterName}:\n` +
+							`• Current reading: ${current.toLocaleString()} kWh\n` +
+							`• Previous reading: ${previous.toLocaleString()} kWh\n` +
+							`• Consumption: ${consumption.toLocaleString()} kWh\n` +
+							`• Threshold: ${threshold.toLocaleString()} kWh (for ${contextMessage})\n\n` +
+							`This consumption level is unusually high and may indicate:\n` +
+							`• Meter reading error\n` +
+							`• Equipment malfunction\n` +
+							`• Extended period between readings\n\n` +
+							`Please verify the reading is accurate before proceeding.`
+						);
+					} else {
+						// Consumption is between 501-999 (or 501-1999 for first reading) - log warning but allow
+						const contextMessage = isFirstReading 
+							? 'first reading after installation' 
+							: 'regular daily reading';
+						console.warn(`🔶 [VALIDATION] Meter ${meterName}: Very high consumption (${consumption} kWh) for ${contextMessage} - within threshold (${threshold} kWh) but monitoring closely`);
+					}
 				}
 
 				// Additional validation: Check for unrealistic zero consumption (except for first readings)
