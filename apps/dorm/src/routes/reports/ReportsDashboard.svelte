@@ -1,7 +1,9 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { Building2, Receipt, PiggyBank, Wallet, Loader2, Users, Info } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
+	import { propertyStore } from '$lib/stores/property';
 	import type {
 		FloorData,
 		FloorDataMap,
@@ -13,13 +15,53 @@
 	} from './types';
 
 	// Props
-	let { reportData, year, month, propertyId, properties } = $props<{
-		reportData?: MonthData;
+	let { year, month, propertyId } = $props<{
 		year: string;
 		month: string;
 		propertyId: string | null;
-		properties: Property[];
 	}>();
+
+	// Global state
+	let selectedProperty = $derived($propertyStore.selectedProperty);
+	let properties = $derived($propertyStore.properties || []);
+
+	// Component state
+	let reportData: MonthData | null = $state(null);
+	let isLoading = $state(false);
+
+	// Load report data when property or date filters change
+	async function loadReportData(propId: string, yr: string, mo: string) {
+		if (!propId) return;
+		
+		isLoading = true;
+		try {
+			const params = new URLSearchParams({
+				propertyId: propId,
+				year: yr,
+				month: mo
+			});
+			
+			const response = await fetch(`/api/reports?${params}`);
+			if (!response.ok) throw new Error('Failed to fetch report data');
+			
+			const data = await response.json();
+			reportData = data.reportData;
+		} catch (error) {
+			console.error('Error loading report data:', error);
+			reportData = null;
+		} finally {
+			isLoading = false;
+		}
+	}
+
+	// Reactive effect to load data when dependencies change
+	$effect(() => {
+		if (propertyId && year && month) {
+			loadReportData(propertyId, year, month);
+		} else {
+			reportData = null;
+		}
+	});
 
 	// Format currency
 	function formatCurrency(amount: number): string {
@@ -143,15 +185,13 @@
 
 	// Handle filter changes
 	function updateFilters(
-		newPropertyId: string | null = null,
 		newYear: string | null = null,
 		newMonth: string | null = null
 	): void {
 		const params = new URLSearchParams();
 
-		if (newPropertyId !== null) {
-			if (newPropertyId) params.set('propertyId', newPropertyId);
-		} else if (propertyId) {
+		// Always include current property if available
+		if (propertyId) {
 			params.set('propertyId', propertyId);
 		}
 
@@ -190,37 +230,14 @@
 					</span>
 				</div>
 
-				{#if propertyId && properties}
-					{#each properties as property}
-						{#if property.id.toString() === propertyId}
-							<h2 class="text-xl text-blue-700 font-semibold">{property.name}</h2>
-						{/if}
-					{/each}
+				{#if selectedProperty}
+					<h2 class="text-xl text-blue-700 font-semibold">{selectedProperty.name}</h2>
 				{:else}
 					<p class="text-gray-500 mt-2">Track income, expenses, and profit distribution</p>
 				{/if}
 			</div>
 
-			<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-				<!-- Property Selector -->
-				<div class="w-full">
-					<label for="property" class="block text-sm font-medium text-gray-700 mb-1">Property</label
-					>
-					<select
-						id="property"
-						class="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
-						value={propertyId || ''}
-						onchange={(e: Event) => {
-							const select = e.target as HTMLSelectElement;
-							updateFilters(select.value || null, null, null);
-						}}
-					>
-						<option value="">Select a property</option>
-						{#each properties as property}
-							<option value={property.id}>{property.name}</option>
-						{/each}
-					</select>
-				</div>
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
 				<!-- Year Selector -->
 				<div class="w-full">
@@ -231,7 +248,7 @@
 						value={year}
 						onchange={(e: Event) => {
 							const select = e.target as HTMLSelectElement;
-							updateFilters(null, select.value, null);
+							updateFilters(select.value, null);
 						}}
 					>
 						{#each years as yearOption}
@@ -249,7 +266,7 @@
 						value={month}
 						onchange={(e: Event) => {
 							const select = e.target as HTMLSelectElement;
-							updateFilters(null, null, select.value);
+							updateFilters(null, select.value);
 						}}
 					>
 						{#each months as monthOption}
@@ -260,20 +277,28 @@
 			</div>
 		</div>
 
-		{#if !propertyId}
+		{#if !selectedProperty}
 			<div class="bg-white p-8 rounded-xl shadow-md text-center">
 				<Building2 class="h-16 w-16 mx-auto text-blue-500 mb-4" />
 				<h2 class="text-2xl font-semibold text-gray-700 mb-4">Please Select a Property</h2>
 				<p class="text-gray-600 max-w-md mx-auto">
-					Select a property from the dropdown above to view the financial report for {formatMonth(
+					Use the property selector in the top navigation to choose a property and view the financial report for {formatMonth(
 						month
 					)}
 					{year}.
 				</p>
 			</div>
-		{:else if !reportData}
+		{:else if isLoading}
 			<div class="flex justify-center items-center h-64 bg-white rounded-xl shadow-md">
 				<Loader2 class="h-10 w-10 animate-spin text-blue-500" />
+			</div>
+		{:else if !reportData}
+			<div class="bg-white p-8 rounded-xl shadow-md text-center">
+				<Info class="h-16 w-16 mx-auto text-gray-500 mb-4" />
+				<h2 class="text-2xl font-semibold text-gray-700 mb-4">No Report Data</h2>
+				<p class="text-gray-600 max-w-md mx-auto">
+					No report data available for {selectedProperty.name} in {formatMonth(month)} {year}.
+				</p>
 			</div>
 		{:else}
 			<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
