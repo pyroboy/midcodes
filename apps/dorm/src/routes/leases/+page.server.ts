@@ -24,7 +24,8 @@ interface PaymentDetails {
 	billing_ids: number[];
 }
 
-async function loadLeasesData(locals: any) {
+// Fast core lease data - essential info for initial render
+async function loadCoreLeasesData(locals: any) {
 	const { supabase } = locals;
 
 	const { data: leasesData, error: fetchError } = await supabase
@@ -52,62 +53,8 @@ async function loadLeasesData(locals: any) {
 		.order('created_at', { ascending: false });
 
 	if (fetchError) {
-		console.error('Error fetching leases:', fetchError);
-		throw new Error('Failed to load leases');
-	}
-
-	// Fetch payment allocations and calculate penalties for all billings
-	const allBillingIds = leasesData
-		.flatMap((lease: any) => lease.billings.map((b: Billing) => b.id))
-		.filter(Boolean);
-
-	if (allBillingIds.length > 0) {
-		const [allocationsResponse, ...penaltyResponses] = await Promise.all([
-			supabase
-				.from('payment_allocations')
-				.select('*, payment:payments(*)')
-				.in('billing_id', allBillingIds),
-			...allBillingIds.map((id: any) => supabase.rpc('calculate_penalty', { p_billing_id: id }))
-		]);
-
-		const { data: allocationsData, error: allocationsError } = allocationsResponse;
-		if (allocationsError) {
-			console.error('Error fetching payment allocations:', allocationsError);
-		}
-
-		const allocationsMap = new Map<number, any[]>();
-		if (allocationsData) {
-			for (const allocation of allocationsData) {
-				// Skip allocations from reverted payments
-				if (allocation.payment && allocation.payment.reverted_at) {
-					continue;
-				}
-				if (!allocationsMap.has(allocation.billing_id)) {
-					allocationsMap.set(allocation.billing_id, []);
-				}
-				allocationsMap.get(allocation.billing_id)?.push(allocation);
-			}
-		}
-
-		const penaltiesMap = new Map<number, number>();
-		penaltyResponses.forEach((res, index) => {
-			if (res.error) {
-				console.error(`Error calculating penalty for billing ${allBillingIds[index]}:`, res.error);
-			} else if (res.data > 0) {
-				penaltiesMap.set(allBillingIds[index], res.data);
-			}
-		});
-
-		// Attach allocations and penalties to each billing
-		for (const lease of leasesData) {
-			for (const billing of lease.billings) {
-				billing.allocations = allocationsMap.get(billing.id) || [];
-				billing.penalty = penaltiesMap.get(billing.id) || 0;
-				if (billing.penalty > 0 && billing.status === 'PENDING') {
-					billing.status = 'PENALIZED';
-				}
-			}
-		}
+		console.error('Error fetching core leases:', fetchError);
+		throw new Error('Failed to load core leases');
 	}
 
 	const floors = await supabase.from('floors').select('*');
@@ -121,6 +68,79 @@ async function loadLeasesData(locals: any) {
 	}
 
 	return leasesData.map((lease: any) => mapLeaseData(lease, floorsMap));
+}
+
+// Heavy financial data - payment allocations and penalties
+async function loadLeasesFinancialData(locals: any, leasesData: any[]) {
+	const { supabase } = locals;
+
+	// Extract all billing IDs from the leases
+	const allBillingIds = leasesData
+		.flatMap((lease: any) => lease.billings.map((b: Billing) => b.id))
+		.filter(Boolean);
+
+	if (allBillingIds.length === 0) {
+		return leasesData; // No billings to process
+	}
+
+	const [allocationsResponse, ...penaltyResponses] = await Promise.all([
+		supabase
+			.from('payment_allocations')
+			.select('*, payment:payments(*)')
+			.in('billing_id', allBillingIds),
+		...allBillingIds.map((id: any) => supabase.rpc('calculate_penalty', { p_billing_id: id }))
+	]);
+
+	const { data: allocationsData, error: allocationsError } = allocationsResponse;
+	if (allocationsError) {
+		console.error('Error fetching payment allocations:', allocationsError);
+	}
+
+	const allocationsMap = new Map<number, any[]>();
+	if (allocationsData) {
+		for (const allocation of allocationsData) {
+			// Skip allocations from reverted payments
+			if (allocation.payment && allocation.payment.reverted_at) {
+				continue;
+			}
+			if (!allocationsMap.has(allocation.billing_id)) {
+				allocationsMap.set(allocation.billing_id, []);
+			}
+			allocationsMap.get(allocation.billing_id)?.push(allocation);
+		}
+	}
+
+	const penaltiesMap = new Map<number, number>();
+	penaltyResponses.forEach((res, index) => {
+		if (res.error) {
+			console.error(`Error calculating penalty for billing ${allBillingIds[index]}:`, res.error);
+		} else if (res.data > 0) {
+			penaltiesMap.set(allBillingIds[index], res.data);
+		}
+	});
+
+	// Create enhanced leases with financial data
+	return leasesData.map((lease: any) => {
+		const enhancedLease = { ...lease };
+		enhancedLease.billings = lease.billings.map((billing: any) => {
+			const penalty = penaltiesMap.get(billing.id) || 0;
+			return {
+				...billing,
+				allocations: allocationsMap.get(billing.id) || [],
+				penalty: penalty,
+				status: penalty > 0 && billing.status === 'PENDING'
+					? 'PENALIZED'
+					: billing.status
+			};
+		});
+		return enhancedLease;
+	});
+}
+
+// Legacy function for backward compatibility and actions
+async function loadLeasesData(locals: any) {
+	const coreLeasesData = await loadCoreLeasesData(locals);
+	return await loadLeasesFinancialData(locals, coreLeasesData);
 }
 
 async function loadTenantsData(locals: any) {
@@ -166,6 +186,12 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
 		const form = await superValidate(zod(leaseSchema));
 		const deleteForm = await superValidate(zod(deleteLeaseSchema));
 
+		// Progressive loading helper
+		async function loadFinancialDataAsync() {
+			const coreLeases = await loadCoreLeasesData({ supabase });
+			return await loadLeasesFinancialData({ supabase }, coreLeases);
+		}
+
 		// Return minimal data for instant navigation
 		return {
 			form,
@@ -176,10 +202,12 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
 			rental_units: [],
 			// Flag to indicate lazy loading
 			lazy: true,
-			// Return promises that resolve with the actual data
-			leasesPromise: loadLeasesData({ supabase }),
+			// Progressive loading: fast core data first
+			coreLeasesPromise: loadCoreLeasesData({ supabase }),
 			tenantsPromise: loadTenantsData({ supabase }),
-			rentalUnitsPromise: loadRentalUnitsData({ supabase })
+			rentalUnitsPromise: loadRentalUnitsData({ supabase }),
+			// Heavy financial data loaded as a complete promise
+			financialLeasesPromise: loadFinancialDataAsync()
 		};
 	} catch (err) {
 		console.error('Error in load function:', err);

@@ -26,20 +26,31 @@
 	// Add activeFilter state for summary card filtering
 	let activeFilter = $state<'all' | 'paid' | 'pending' | 'partial' | 'overdue'>('all');
 
-	// Function to load data from promises
+	// Progressive loading: load core data first, then financial data
 	async function loadDataFromPromises() {
-		if (data.leasesPromise && data.tenantsPromise && data.rentalUnitsPromise) {
+		if (data.coreLeasesPromise && data.tenantsPromise && data.rentalUnitsPromise && data.financialLeasesPromise) {
 			try {
-				const [loadedLeases, loadedTenants, loadedRentalUnits] = await Promise.all([
-					data.leasesPromise,
+				// Load core data first for fast initial render
+				const [coreLeases, loadedTenants, loadedRentalUnits] = await Promise.all([
+					data.coreLeasesPromise,
 					data.tenantsPromise,
 					data.rentalUnitsPromise
 				]);
 
-				leases = loadedLeases;
+				// Set core data immediately (without financial calculations)
+				leases = coreLeases;
 				tenants = loadedTenants;
 				rentalUnits = loadedRentalUnits;
 				isLoading = false;
+
+				// Load enhanced financial data in background (non-blocking)
+				try {
+					const enhancedLeases = await data.financialLeasesPromise;
+					leases = enhancedLeases;
+				} catch (financialError) {
+					console.error('Error loading financial data (continuing with core data):', financialError);
+					// Continue with core data if financial data fails
+				}
 			} catch (error) {
 				console.error('Error loading lease data:', error);
 				isLoading = false;
@@ -53,12 +64,12 @@
 		try {
 			// Invalidate all dependencies to get fresh data
 			await invalidateAll();
-			
+
 			// After invalidation, the data object should have new promises
 			// We need to wait for the next tick to ensure data is updated
 			await new Promise(resolve => setTimeout(resolve, 0));
-			
-			// Reload data from new promises
+
+			// Reload data from new promises (now using progressive loading)
 			await loadDataFromPromises();
 		} catch (error) {
 			console.error('Error refreshing data:', error);
