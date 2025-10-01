@@ -38,6 +38,7 @@
 
 	// Import processing function
 	import { processUtilityBillingsData } from './dataProcessor';
+	import { cache, CACHE_TTL, cacheKeys } from '$lib/services/cache';
 
 	// Props
 	let { data } = $props<{ data: PageData }>();
@@ -164,6 +165,11 @@
 				// Update the processed data
 				processedData = processed;
 				isLoading = false;
+
+				// Mirror to client cache for debug panel
+				cache.set(cacheKeys.meters(), loadedMeters, CACHE_TTL.MEDIUM);
+				cache.set(cacheKeys.readings(), loadedReadings, CACHE_TTL.SHORT);
+				cache.set(cacheKeys.utilityBillings(), loadedBillings, CACHE_TTL.SHORT);
 
 				console.log('Utility billings data loaded successfully');
 			} catch (error) {

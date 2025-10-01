@@ -11,6 +11,7 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { onMount } from 'svelte';
 	import { printAllLeases } from '$lib/utils/print';
+	import { cache, cacheKeys, CACHE_TTL } from '$lib/services/cache';
 
 	type FormType = z.infer<typeof leaseSchema>;
 
@@ -43,10 +44,17 @@
 				rentalUnits = loadedRentalUnits;
 				isLoading = false;
 
+				// Mirror server cache to client-side for debug panel visibility
+				cache.set(cacheKeys.leasesCore(), coreLeases, CACHE_TTL.SHORT);
+				cache.set(cacheKeys.tenants(), loadedTenants, CACHE_TTL.MEDIUM);
+				cache.set(cacheKeys.rentalUnits(), loadedRentalUnits, CACHE_TTL.MEDIUM);
+
 				// Load enhanced financial data in background (non-blocking)
 				try {
 					const enhancedLeases = await data.financialLeasesPromise;
 					leases = enhancedLeases;
+					// Update cache with enhanced data
+					cache.set(cacheKeys.leasesCore(), enhancedLeases, CACHE_TTL.SHORT);
 				} catch (financialError) {
 					console.error('Error loading financial data (continuing with core data):', financialError);
 					// Continue with core data if financial data fails
@@ -89,6 +97,17 @@
 			leases = data.leases;
 			tenants = data.tenants;
 			rentalUnits = data.rental_units;
+
+			// Mirror to client-side cache for debug panel
+			if (leases.length > 0) {
+				cache.set(cacheKeys.leasesCore(), leases, CACHE_TTL.SHORT);
+			}
+			if (tenants.length > 0) {
+				cache.set(cacheKeys.tenants(), tenants, CACHE_TTL.MEDIUM);
+			}
+			if (rentalUnits.length > 0) {
+				cache.set(cacheKeys.rentalUnits(), rentalUnits, CACHE_TTL.MEDIUM);
+			}
 		}
 	});
 

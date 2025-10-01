@@ -7,6 +7,7 @@ import type { Database } from '$lib/database.types';
 import { batchReadingsSchema, meterReadingSchema } from './meterReadingSchema';
 import type { z } from 'zod';
 import { getUserPermissions } from '$lib/services/permissions';
+import { cache, cacheKeys, CACHE_TTL } from '$lib/services/cache';
 
 // Use Node runtime; avoid ISR on authed routes to prevent cache/redirect issues
 export const config = { runtime: 'nodejs20.x' };
@@ -72,7 +73,15 @@ async function loadPropertiesData(supabase: any) {
 }
 
 async function loadMetersData(supabase: any) {
-	console.log('Loading meters data...');
+	const cacheKey = cacheKeys.meters();
+	const cached = cache.get<any[]>(cacheKey);
+
+	if (cached) {
+		console.log('🎯 CACHE HIT: Returning cached meters data');
+		return cached;
+	}
+
+	console.log('💾 CACHE MISS: Loading meters data...');
 	const result = await supabase.from('meters').select(`
       id,
       name,
@@ -91,11 +100,23 @@ async function loadMetersData(supabase: any) {
 		throw error(500, `Error fetching meters: ${result.error.message}`);
 	}
 
-	return result.data || [];
+	const data = result.data || [];
+	cache.set(cacheKey, data, CACHE_TTL.MEDIUM);
+	console.log('✅ Cached meters data');
+
+	return data;
 }
 
 async function loadReadingsData(supabase: any) {
-	console.log('Loading readings data...');
+	const cacheKey = cacheKeys.readings();
+	const cached = cache.get<any[]>(cacheKey);
+
+	if (cached) {
+		console.log('🎯 CACHE HIT: Returning cached readings data');
+		return cached;
+	}
+
+	console.log('💾 CACHE MISS: Loading readings data...');
 	const result = await supabase
 		.from('readings')
 		.select(
@@ -115,7 +136,11 @@ async function loadReadingsData(supabase: any) {
 		throw error(500, `Error fetching readings: ${result.error.message}`);
 	}
 
-	return result.data || [];
+	const data = result.data || [];
+	cache.set(cacheKey, data, CACHE_TTL.SHORT);
+	console.log('✅ Cached readings data');
+
+	return data;
 }
 
 async function loadBillingsData(supabase: any) {
@@ -598,6 +623,11 @@ export const actions: Actions = {
 					details: insertError
 				});
 			}
+
+			// Invalidate utility billings cache
+			cache.deletePattern(/^readings:/);
+			cache.deletePattern(/^meters:/);
+			console.log('🗑️ Invalidated readings and meters cache');
 
 			return {
 				form, // ← required by Superforms

@@ -4,6 +4,7 @@ import { zod } from 'sveltekit-superforms/adapters';
 import { paymentSchema, type UserRole } from './formSchema';
 import { transactionSchema } from '../transactions/schema';
 import { supabase } from '$lib/supabaseClient';
+import { cache, CACHE_TTL, cacheKeys } from '$lib/services/cache';
 import {
 	calculatePenalty,
 	getPenaltyConfig,
@@ -14,11 +15,22 @@ import {
 	logAuditEvent
 } from './utils';
 
-export const load = async ({ locals }) => {
+// Separate async function for loading payments data with caching
+async function loadPaymentsData(locals: any) {
 	const session = await locals.safeGetSession();
 	if (!session) {
-		return fail(401, { message: 'Unauthorized' });
+		return { payments: [], billings: [], userRole: 'user', isAdminLevel: false, isAccountant: false, isUtility: false, isFrontdesk: false, isResident: false };
 	}
+
+	// Check cache first
+	const cacheKey = cacheKeys.payments();
+	const cached = cache.get<any>(cacheKey);
+	if (cached) {
+		console.log('🎯 CACHE HIT: Returning cached payments data');
+		return cached;
+	}
+
+	console.log('💾 CACHE MISS: Fetching payments from database');
 
 	const [{ data: userRole }, { data: payments }, { data: unpaidBillings }, { data: allBillings }] = await Promise.all([
 		supabase.from('profiles').select('role').eq('id', session.user.id).single(),
@@ -94,50 +106,77 @@ export const load = async ({ locals }) => {
 			.order('due_date')
 	]);
 
-	console.log('📊 DATA LOADING: Raw payments data:', payments);
-	console.log('📊 DATA LOADING: All billings data count:', allBillings?.length);
+	// OPTIMIZATION: Create billing lookup map for O(1) access instead of O(n) find
+	const billingsMap = new Map<number, any>();
+	if (allBillings) {
+		for (const billing of allBillings) {
+			billingsMap.set(billing.id, billing);
+		}
+	}
 
 	// Manually join payment data with billing/lease information
-	const enrichedPayments = payments?.map((payment, index) => {
-		console.log(`📊 DATA LOADING: Processing payment ${index + 1}:`, payment);
-		
-		// Find the first billing for this payment to get lease info
-		const primaryBilling = payment.billing_ids && payment.billing_ids.length > 0 
-			? allBillings?.find(b => b.id === payment.billing_ids[0])
+	const enrichedPayments = payments?.map((payment) => {
+		// Use map lookup instead of array.find for better performance
+		const primaryBilling = payment.billing_ids && payment.billing_ids.length > 0
+			? billingsMap.get(payment.billing_ids[0])
 			: null;
-			
-		console.log(`📊 DATA LOADING: Found primary billing for payment ${payment.id}:`, primaryBilling);
-			
-		const enriched = {
+
+		return {
 			...payment,
 			billing: primaryBilling
 		};
-		
-		console.log(`📊 DATA LOADING: Enriched payment ${payment.id}:`, enriched);
-		return enriched;
 	}) || [];
-	
-	console.log('📊 DATA LOADING: Final enriched payments:', enrichedPayments);
 
-	const form = await superValidate(zod(paymentSchema));
-	const transactionForm = await superValidate(zod(transactionSchema));
 	const isAdminLevel = ['super_admin', 'property_admin'].includes(userRole?.role || '');
 	const isAccountant = userRole?.role === 'property_accountant';
 	const isUtility = userRole?.role === 'property_utility';
 	const isFrontdesk = userRole?.role === 'property_frontdesk';
 	const isResident = userRole?.role === 'property_resident';
 
-	return {
-		form,
-		transactionForm,
+	const result = {
 		payments: enrichedPayments,
-		billings: unpaidBillings, // For payment creation
+		billings: unpaidBillings,
 		userRole: userRole?.role || 'user',
 		isAdminLevel,
 		isAccountant,
 		isUtility,
 		isFrontdesk,
 		isResident
+	};
+
+	// Cache the result
+	cache.set(cacheKey, result, CACHE_TTL.SHORT);
+	console.log('✅ Cached payments data');
+
+	return result;
+}
+
+export const load = async ({ locals, depends }) => {
+	// Set up cache invalidation dependency
+	depends('app:payments');
+
+	const session = await locals.safeGetSession();
+	if (!session) {
+		return fail(401, { message: 'Unauthorized' });
+	}
+
+	const form = await superValidate(zod(paymentSchema));
+	const transactionForm = await superValidate(zod(transactionSchema));
+
+	// Return minimal data for instant navigation with lazy loading
+	return {
+		form,
+		transactionForm,
+		payments: [],
+		billings: [],
+		userRole: 'user',
+		isAdminLevel: false,
+		isAccountant: false,
+		isUtility: false,
+		isFrontdesk: false,
+		isResident: false,
+		lazy: true,
+		paymentsPromise: loadPaymentsData(locals)
 	};
 };
 
@@ -320,6 +359,10 @@ export const actions = {
 				await createPenaltyBilling(supabase, billing, penaltyAmount);
 			}
 
+			// Invalidate cache
+			cache.delete(cacheKeys.payments());
+			console.log('🗑️ Invalidated payments cache');
+
 			return {
 				form,
 				success: true,
@@ -409,6 +452,10 @@ export const actions = {
 			});
 		}
 
+		// Invalidate cache
+		cache.delete(cacheKeys.payments());
+		console.log('🗑️ Invalidated payments cache');
+
 		return { form };
 		},
 
@@ -472,6 +519,10 @@ export const actions = {
 				console.error('Failed to revert payment:', revertError);
 				return fail(500, { error: 'Failed to revert payment' });
 			}
+
+			// Invalidate cache
+			cache.delete(cacheKeys.payments());
+			console.log('🗑️ Invalidated payments cache');
 
 			return { success: true, result: revertResult };
 		},
@@ -552,8 +603,12 @@ export const actions = {
 				error: 'Failed to update payment record'
 			});
 		}
-		
+
 		console.log('✅ DATABASE UPDATE: Payment updated successfully:', updateResult);
+
+		// Invalidate cache
+		cache.delete(cacheKeys.payments());
+		console.log('🗑️ Invalidated payments cache');
 
 		return { form };
 	}

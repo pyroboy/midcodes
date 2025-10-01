@@ -10,6 +10,8 @@
 	import { page } from '$app/stores';
 	import { contextualPreload, safePreloadData } from '$lib/utils/prefetch';
 	import { preloadHeavyComponents } from '$lib/utils/lazyLoad';
+	import CacheDebugPanel from '$lib/components/debug/CacheDebugPanel.svelte';
+	import { dev } from '$app/environment';
 
 	// Import Lucide icons
 	import {
@@ -29,7 +31,7 @@
 
 	let ready = $state(false);
 	let isAuthRoute = $state(false);
-	
+
 	onMount(() => {
 		ready = true;
 		isAuthRoute = $page.url.pathname.startsWith('/auth');
@@ -182,7 +184,8 @@
 												<a
 													href={link.href}
 													class="block no-underline"
-													data-sveltekit-preload-data="off"
+													data-sveltekit-preload-data="hover"
+													data-sveltekit-preload-code="hover"
 												>
 													<Sidebar.MenuItem>
 														<Sidebar.MenuButton>
@@ -275,6 +278,11 @@
 					</main>
 				</div>
 			</Sidebar.Provider>
+		{/if}
+
+		<!-- Cache Debug Panel (Development Only) - Visible on all non-auth routes -->
+		{#if dev && !isAuthRoute}
+			<CacheDebugPanel />
 		{/if}
 	{/if}
 {/if}

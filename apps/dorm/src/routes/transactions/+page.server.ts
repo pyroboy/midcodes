@@ -3,6 +3,7 @@ import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { transactionSchema } from './schema';
 import type { Actions, PageServerLoad } from './$types';
+import { cache, cacheKeys, CACHE_TTL } from '$lib/services/cache';
 
 // Manual payment creation function
 async function createPaymentManually(supabase: any, transactionData: any, userId: string, form: any) {
@@ -30,6 +31,10 @@ async function createPaymentManually(supabase: any, transactionData: any, userId
 
 	// If no billing IDs, just return the standalone payment
 	if (!transactionData.billing_ids || transactionData.billing_ids.length === 0) {
+		// Invalidate transactions cache
+		cache.deletePattern(/^transactions:/);
+		console.log('🗑️ Invalidated transactions cache');
+
 		return { form, success: true, operation: 'create', transaction: payment };
 	}
 
@@ -104,23 +109,38 @@ async function createPaymentManually(supabase: any, transactionData: any, userId
 	};
 }
 
-export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession }, url }) => {
-	const session = await safeGetSession();
-	if (!session) {
-		throw error(401, 'Unauthorized');
-	}
+// Async function to load transactions data with server-side caching
+async function loadTransactionsData(supabase: any, url: URL) {
+	// Get query parameters for filtering
+	const method = url.searchParams.get('method') || null;
+	const dateFrom = url.searchParams.get('dateFrom') || null;
+	const dateTo = url.searchParams.get('dateTo') || null;
+	const searchTerm = url.searchParams.get('searchTerm') || null;
+	const includeReverted = url.searchParams.get('includeReverted') === 'true';
 
-	try {
-		// Get query parameters for filtering
-		const method = url.searchParams.get('method') || null;
-		const dateFrom = url.searchParams.get('dateFrom') || null;
-		const dateTo = url.searchParams.get('dateTo') || null;
-		const searchTerm = url.searchParams.get('searchTerm') || null;
+	console.log('Query parameters:', { method, dateFrom, dateTo, searchTerm, includeReverted });
 
-		console.log('Query parameters:', { method, dateFrom, dateTo, searchTerm });
+	// Create cache key based on filters (use 'default' for unfiltered view)
+	const hasFilters = method || dateFrom || dateTo || searchTerm || includeReverted;
+	const filterKey = hasFilters
+		? `filtered:${method || 'none'}_${dateFrom || 'none'}_${dateTo || 'none'}_${searchTerm ? 'search' : 'none'}_${includeReverted ? 'reverted' : 'active'}`
+		: 'default';
+	const cacheKey = cacheKeys.transactions(filterKey);
+
+		// Check cache first
+		const cachedData = cache.get<any>(cacheKey);
+
+		if (cachedData) {
+			console.log('🎯 CACHE HIT: Returning cached transactions data');
+			return {
+				transactions: cachedData.transactions,
+				billingsById: cachedData.billingsById || {}
+			};
+		}
+
+		console.log('💾 CACHE MISS: Fetching transactions from database');
 
     // First, get the payments; exclude reverted by default
-    const includeReverted = url.searchParams.get('includeReverted') === 'true';
     let query = supabase
       .from('payments')
       .select(`
@@ -180,166 +200,188 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
       }
     }
 
-    const transactions = await Promise.all(
-      formattedTransactions.map(async (transaction) => {
-        let leaseName: string | null = null;
-        let leaseDetails: any[] = [];
-        let uniqueLeases: any[] = [];
-        
-        if (transaction.billing_ids && transaction.billing_ids.length > 0) {
-          // Get comprehensive lease information for all billings
-          const { data: billingLeaseData, error: billingLeaseError } = await supabase
-            .from('billings')
-            .select(`
-              id,
-              type,
-              utility_type,
-              amount,
-              due_date,
-              lease:leases(
-                id,
-                name,
-                start_date,
-                end_date,
-                rent_amount,
-                security_deposit,
-                status,
-                rental_unit(
-                  id,
-                  number,
-                  floors(
-                    floor_number,
-                    wing
-                  )
-                ),
-                lease_tenants(
-                  tenant:tenants(
-                    id,
-                    name,
-                    email,
-                    contact_number
-                  )
-                )
-              )
-            `)
-            .in('id', transaction.billing_ids);
-
-          if (billingLeaseData && billingLeaseData.length > 0) {
-            // Set lease name from first lease for backward compatibility
-            const firstLease = billingLeaseData[0]?.lease;
-            if (firstLease) {
-              leaseName = (firstLease as any).name;
-            }
-
-            // Build comprehensive lease details with allocation information
-            const allocations = allocationsByPayment.get(transaction.id) || [];
-            
-            leaseDetails = billingLeaseData.map((billing: any) => {
-              const lease = Array.isArray(billing.lease) ? billing.lease[0] : billing.lease;
-              const allocation = allocations.find(a => a.billing_id === billing.id);
-              
-              const processedLease = {
-                id: lease?.id,
-                name: lease?.name,
-                start_date: lease?.start_date,
-                end_date: lease?.end_date,
-                rent_amount: lease?.rent_amount,
-                security_deposit: lease?.security_deposit,
-                status: lease?.status,
-                rental_unit: lease?.rental_unit ? {
-                  id: lease.rental_unit.id,
-                  rental_unit_number: lease.rental_unit.number,
-                  floor: lease.rental_unit.floors ? {
-                    floor_number: lease.rental_unit.floors.floor_number,
-                    wing: lease.rental_unit.floors.wing
-                  } : undefined
-                } : undefined,
-                tenants: lease?.lease_tenants?.map((lt: any) => ({
-                  id: lt.tenant?.id,
-                  name: lt.tenant?.name,
-                  email: lt.tenant?.email,
-                  phone: lt.tenant?.contact_number
-                })).filter((t: any) => t.id) || []
-              };
-
-              return {
-                billing_id: billing.id,
-                billing_type: billing.type,
-                utility_type: billing.utility_type,
-                billing_amount: billing.amount,
-                allocated_amount: allocation?.amount || 0,
-                due_date: billing.due_date,
-                lease: processedLease
-              };
-            });
-
-            // Extract unique leases for summary display
-            const leaseMap = new Map();
-            leaseDetails.forEach(detail => {
-              if (detail.lease?.id && !leaseMap.has(detail.lease.id)) {
-                leaseMap.set(detail.lease.id, detail.lease);
-              }
-            });
-            uniqueLeases = Array.from(leaseMap.values());
-          }
-        }
-        
-        return {
-          ...transaction,
-          lease_name: leaseName,
-          allocations: allocationsByPayment.get(transaction.id) || [],
-          lease_details: leaseDetails,
-          unique_leases: uniqueLeases
-        } as any;
-      })
-    );
-
-    // Fetch detailed billing records for all referenced billing_ids
-    const allBillingIds = Array.from(
+    // OPTIMIZATION: Batch fetch all billing data upfront (eliminates N+1 query)
+    const allBillingIdsInTransactions = Array.from(
       new Set(
-        transactions.flatMap((t: any) => (Array.isArray(t.billing_ids) ? t.billing_ids : [])).filter(Boolean)
+        formattedTransactions.flatMap((t: any) =>
+          (Array.isArray(t.billing_ids) ? t.billing_ids : [])
+        ).filter(Boolean)
       )
     );
 
-    let billingsById: Record<number, any> = {};
-    if (allBillingIds.length > 0) {
-      const { data: billingsData, error: billingsError } = await supabase
+    let billingDataMap = new Map<number, any>();
+    if (allBillingIdsInTransactions.length > 0) {
+      const { data: allBillingData, error: batchError } = await supabase
         .from('billings')
         .select(`
           id,
           type,
           utility_type,
           amount,
-          paid_amount,
-          balance,
-          status,
           due_date,
-          lease:leases(id, name,
-            rental_unit:rental_unit(
-              rental_unit_number,
-              floor:floors(floor_number, wing)
+          lease:leases(
+            id,
+            name,
+            start_date,
+            end_date,
+            rent_amount,
+            security_deposit,
+            status,
+            rental_unit(
+              id,
+              number,
+              floors(
+                floor_number,
+                wing
+              )
+            ),
+            lease_tenants(
+              tenant:tenants(
+                id,
+                name,
+                email,
+                contact_number
+              )
             )
           )
         `)
-        .in('id', allBillingIds);
-      if (!billingsError && billingsData) {
-        for (const b of billingsData) {
-          billingsById[b.id] = b;
+        .in('id', allBillingIdsInTransactions);
+
+      if (!batchError && allBillingData) {
+        for (const billing of allBillingData) {
+          billingDataMap.set(billing.id, billing);
         }
       }
     }
 
+    // Now process transactions synchronously using pre-fetched data
+    const transactions = formattedTransactions.map((transaction: any) => {
+      let leaseName: string | null = null;
+      let leaseDetails: any[] = [];
+      let uniqueLeases: any[] = [];
+
+      if (transaction.billing_ids && transaction.billing_ids.length > 0) {
+        // Use pre-fetched billing data instead of querying
+        const billingLeaseData = transaction.billing_ids
+          .map((id: number) => billingDataMap.get(id))
+          .filter(Boolean);
+
+        if (billingLeaseData.length > 0) {
+          // Set lease name from first lease for backward compatibility
+          const firstLease = billingLeaseData[0]?.lease;
+          if (firstLease) {
+            leaseName = (firstLease as any).name;
+          }
+
+          // Build comprehensive lease details with allocation information
+          const allocations = allocationsByPayment.get(transaction.id) || [];
+
+          leaseDetails = billingLeaseData.map((billing: any) => {
+            const lease = Array.isArray(billing.lease) ? billing.lease[0] : billing.lease;
+            const allocation = allocations.find(a => a.billing_id === billing.id);
+
+            const processedLease = {
+              id: lease?.id,
+              name: lease?.name,
+              start_date: lease?.start_date,
+              end_date: lease?.end_date,
+              rent_amount: lease?.rent_amount,
+              security_deposit: lease?.security_deposit,
+              status: lease?.status,
+              rental_unit: lease?.rental_unit ? {
+                id: lease.rental_unit.id,
+                rental_unit_number: lease.rental_unit.number,
+                floor: lease.rental_unit.floors ? {
+                  floor_number: lease.rental_unit.floors.floor_number,
+                  wing: lease.rental_unit.floors.wing
+                } : undefined
+              } : undefined,
+              tenants: lease?.lease_tenants?.map((lt: any) => ({
+                id: lt.tenant?.id,
+                name: lt.tenant?.name,
+                email: lt.tenant?.email,
+                phone: lt.tenant?.contact_number
+              })).filter((t: any) => t.id) || []
+            };
+
+            return {
+              billing_id: billing.id,
+              billing_type: billing.type,
+              utility_type: billing.utility_type,
+              billing_amount: billing.amount,
+              allocated_amount: allocation?.amount || 0,
+              due_date: billing.due_date,
+              lease: processedLease
+            };
+          });
+
+          // Extract unique leases for summary display
+          const leaseMap = new Map();
+          leaseDetails.forEach(detail => {
+            if (detail.lease?.id && !leaseMap.has(detail.lease.id)) {
+              leaseMap.set(detail.lease.id, detail.lease);
+            }
+          });
+          uniqueLeases = Array.from(leaseMap.values());
+        }
+      }
+
+      return {
+        ...transaction,
+        lease_name: leaseName,
+        allocations: allocationsByPayment.get(transaction.id) || [],
+        lease_details: leaseDetails,
+        unique_leases: uniqueLeases
+      } as any;
+    });
+
+    // OPTIMIZATION: Reuse the billingDataMap we already fetched above (no duplicate query)
+    let billingsById: Record<number, any> = {};
+    for (const [id, billing] of billingDataMap.entries()) {
+      billingsById[id] = billing;
+    }
+
 		console.log('Transactions loaded:', transactions.length);
 
+		// Cache transactions data with billingsById (2 minutes for filtered data)
+		const dataToCache = {
+			transactions,
+			billingsById
+		};
+		cache.set(cacheKey, dataToCache, CACHE_TTL.SHORT);
+		console.log('✅ Cached transactions data');
+
+		return {
+			transactions,
+			billingsById
+		};
+}
+
+export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession }, url, depends }) => {
+	const session = await safeGetSession();
+	if (!session) {
+		throw error(401, 'Unauthorized');
+	}
+
+	// Set up dependency for cache invalidation
+	depends('app:transactions');
+
+	try {
 		// Create form for superForm
 		const form = await superValidate(zod(transactionSchema));
 
-    return {
-      transactions,
-      form,
-      user: session.user,
-      billingsById
-    };
+		// Return minimal data for instant navigation
+		return {
+			// Start with empty arrays for instant rendering
+			transactions: [],
+			billingsById: {},
+			form,
+			user: session.user,
+			// Flag to indicate lazy loading
+			lazy: true,
+			// Return promise that resolves with the actual data (server-side cached)
+			transactionsPromise: loadTransactionsData(supabase, url)
+		};
 	} catch (err) {
 		console.error('Error in load function:', err);
 		throw error(500, 'An error occurred while loading transactions');
@@ -407,6 +449,10 @@ export const actions: Actions = {
             console.error('Error updating transaction:', updateError);
             return fail(500, { form, message: 'Failed to update transaction' });
           }
+
+					// Invalidate transactions cache
+					cache.deletePattern(/^transactions:/);
+					console.log('🗑️ Invalidated transactions cache');
 
           return { form, success: true, operation: 'update', transaction: data?.[0] };
         } else {

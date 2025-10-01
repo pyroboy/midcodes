@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
+	import { onMount } from 'svelte';
 	import TenantFormModal from './TenantFormModal.svelte';
 	import TenantCard from './TenantCard.svelte';
 	import TenantTable from './TenantTable.svelte';
@@ -22,61 +23,65 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { toast } from 'svelte-sonner';
 	import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
-	import { onMount } from 'svelte';
+	import { cache, cacheKeys, CACHE_TTL } from '$lib/services/cache';
 
 	let { data } = $props<{ data: PageData }>();
-	let tenants = $state<TenantResponse[]>(data.tenants);
-	let properties = $state(data.properties);
 
-	// Update local state when data changes (after invalidateAll())
-	$effect(() => {
-		// Always update when data changes, unless we're currently lazy loading
-		if (!isLoading && !data.lazy) {
-			tenants = data.tenants;
-			properties = data.properties;
-		}
-	});
+	// Server-side caching for DB queries, client-side cache for debug panel visibility
+	let tenants = $state<TenantResponse[]>(data.tenants);
+	let properties = $state<any[]>(data.properties);
+	let isLoading = $state(data.lazy === true);
+
 	let showModal = $state(false);
 	let selectedTenant: TenantResponse | undefined = $state();
 	let editMode = $state(false);
 	let searchTerm = $state('');
 	let selectedStatus = $state('');
-	let isLoading = $state(data.lazy === true); // Loading state for skeletons
-	let viewMode = $state<'card' | 'list'>('card'); // Toggle between card and list view
-	let activeFilter = $state<'all' | 'active' | 'inactive' | 'pending' | 'blacklisted'>('active'); // Filter for stats
+	let viewMode = $state<'card' | 'list'>('card');
+	let activeFilter = $state<'all' | 'active' | 'inactive' | 'pending' | 'blacklisted'>('active');
 
-	// Load data lazily if needed
-	onMount(async () => {
-		if (data.lazy && data.tenantsPromise && data.propertiesPromise) {
+	// Load data lazily from server promises
+	async function loadDataFromPromises() {
+		if (data.tenantsPromise && data.propertiesPromise) {
 			try {
-				// Load data in background
 				const [loadedTenants, loadedProperties] = await Promise.all([
 					data.tenantsPromise,
 					data.propertiesPromise
 				]);
 
-				// Update state
+				console.log('📥 Loaded tenants from promise:', loadedTenants.length);
 				tenants = loadedTenants;
 				properties = loadedProperties;
 				isLoading = false;
+
+				// Mirror server cache to client-side for debug panel visibility
+				cache.set(cacheKeys.tenants(), loadedTenants, CACHE_TTL.MEDIUM);
+				cache.set(cacheKeys.activeProperties(), loadedProperties, CACHE_TTL.LONG);
 			} catch (error) {
 				console.error('Error loading tenant data:', error);
-				toast.error('Failed to load tenant data');
 				isLoading = false;
 			}
 		}
-	});
+	}
 
-	$effect(() => {
-		if (!data.lazy) {
-			tenants = data.tenants;
-			properties = data.properties;
+	// Load data lazily on mount
+	onMount(async () => {
+		console.log('🎯 Tenants page mounted, lazy:', data.lazy);
+		if (data.lazy && data.tenantsPromise) {
+			await loadDataFromPromises();
 		}
 	});
 
 	// Filtered tenants
 	let filteredTenants = $derived.by(() => {
-		return tenants.filter((tenant: TenantResponse) => {
+		console.log('🔍 Filtering tenants:', {
+			totalTenants: tenants.length,
+			searchTerm,
+			selectedStatus,
+			activeFilter
+		});
+
+		const filtered = tenants.filter((tenant: TenantResponse) => {
 			const searchMatch =
 				!searchTerm || tenant.name.toLowerCase().includes(searchTerm.toLowerCase());
 			const statusMatch = !selectedStatus || tenant.tenant_status === selectedStatus;
@@ -89,6 +94,9 @@
 
 			return searchMatch && statusMatch && filterMatch;
 		});
+
+		console.log('✅ Filtered result:', filtered.length);
+		return filtered;
 	});
 
 	// Stats calculations
@@ -425,16 +433,16 @@
 					<div class="text-center py-12">
 						<Users class="w-12 h-12 mx-auto mb-4 text-gray-400" />
 						<p class="text-gray-500 text-lg font-medium">
-							{searchTerm || selectedStatus
+							{searchTerm || selectedStatus || activeFilter !== 'all'
 								? 'No tenants found matching your criteria'
 								: 'No tenants found'}
 						</p>
 						<p class="text-gray-400 text-sm mt-2">
-							{searchTerm || selectedStatus
+							{searchTerm || selectedStatus || activeFilter !== 'all'
 								? 'Try adjusting your search or filter criteria'
 								: 'Get started by adding your first tenant'}
 						</p>
-						{#if !searchTerm && !selectedStatus}
+						{#if !searchTerm && !selectedStatus && activeFilter === 'all'}
 							<Button onclick={handleAddTenant} class="mt-4">
 								<Plus class="w-4 h-4 mr-2" />
 								Add First Tenant
