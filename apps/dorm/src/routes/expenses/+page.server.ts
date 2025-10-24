@@ -1,55 +1,65 @@
-import { error, fail } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { expenseSchema } from './schema';
 import type { Actions, PageServerLoad } from './$types';
+import {
+	requireAuth,
+	executeQuery,
+	executeInsert,
+	executeUpdate,
+	executeDelete,
+	handleValidationError,
+	logAuditEvent
+} from '$lib/utils/errorHandlers';
+import {
+	createInternalError,
+	throwError,
+	failWithError
+} from '$lib/utils/errors';
 
 export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession } }) => {
 	const session = await safeGetSession();
-	if (!session) {
-		throw error(401, 'Unauthorized');
-	}
+
+	// Ensure user is authenticated
+	requireAuth(session, { action: 'load_expenses' });
 
 	try {
-		// Fetch expenses and properties in parallel
-		const [
-			{ data: expensesData, error: expensesError },
-			{ data: propertiesData, error: propertiesError }
-		] = await Promise.all([
-			supabase
-				.from('expenses')
-				.select(
-					`
+		// Fetch expenses and properties in parallel using consistent error handling
+		const [expensesData, propertiesData] = await Promise.all([
+			executeQuery(
+				supabase
+					.from('expenses')
+					.select(
+						`
           *,
           property:properties(id, name)
         `
-				)
-				.order('expense_date', { ascending: false }),
+					)
+					.order('expense_date', { ascending: false }),
+				{
+					resourceType: 'expense',
+					errorMessage: 'Failed to load expenses',
+					context: { userId: session.user.id, action: 'load_expenses' }
+				}
+			),
 
-			supabase
-				.from('properties')
-				.select('id, name')
-				// .eq('is_active', true)
-				.order('name')
+			executeQuery(
+				supabase
+					.from('properties')
+					.select('id, name')
+					.eq('status', 'ACTIVE')
+					.order('name'),
+				{
+					resourceType: 'property',
+					errorMessage: 'Failed to load properties',
+					context: { userId: session.user.id, action: 'load_properties' }
+				}
+			)
 		]);
-
-		// Handle errors
-		if (expensesError) {
-			console.error('Error fetching expenses:', expensesError);
-			throw error(500, `Error fetching expenses: ${expensesError.message}`);
-		}
-
-		if (propertiesError) {
-			console.error('Error fetching properties:', propertiesError);
-			throw error(500, `Error fetching properties: ${propertiesError.message}`);
-		}
-
-		// Create a mutable copy of properties data
-		let properties = propertiesData || [];
 
 		// Format dates for expenses
 		const expenses =
-			expensesData?.map((expense) => ({
+			expensesData?.map((expense: any) => ({
 				...expense,
 				expense_date: new Date(expense.expense_date).toLocaleDateString('en-US', {
 					year: 'numeric',
@@ -58,51 +68,9 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
 				})
 			})) || [];
 
-		// Debug logging
 		console.log(
-			`Loaded ${expenses?.length || 0} expenses and ${properties.length || 0} properties`
+			`✅ Loaded ${expenses.length} expenses and ${propertiesData?.length || 0} properties`
 		);
-		console.log('Properties data:', properties);
-
-		// If no properties found with is_active=true, try without the filter
-		if (properties.length === 0) {
-			console.log('No properties found with is_active=true, trying with status=ACTIVE');
-
-			// Try with status=ACTIVE
-			const { data: activeProperties, error: activePropertiesError } = await supabase
-				.from('properties')
-				.select('id, name')
-				.eq('status', 'ACTIVE')
-				.order('name');
-
-			if (activePropertiesError) {
-				console.error('Error fetching properties with status=ACTIVE:', activePropertiesError);
-			} else if (activeProperties && activeProperties.length > 0) {
-				console.log(
-					`Found ${activeProperties.length} properties with status=ACTIVE:`,
-					activeProperties
-				);
-				properties = activeProperties;
-			} else {
-				console.log('No properties found with status=ACTIVE, trying without any filter');
-
-				// Try without any filter
-				const { data: allProperties, error: allPropertiesError } = await supabase
-					.from('properties')
-					.select('id, name')
-					.order('name');
-
-				if (allPropertiesError) {
-					console.error('Error fetching all properties:', allPropertiesError);
-				} else {
-					console.log(
-						`Found ${allProperties?.length || 0} properties without filter:`,
-						allProperties
-					);
-					properties = allProperties;
-				}
-			}
-		}
 
 		// Create form for superForm
 		const form = await superValidate(zod(expenseSchema));
@@ -110,59 +78,90 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
 		return {
 			form,
 			expenses,
-			properties,
+			properties: propertiesData || [],
 			user: session.user
 		};
 	} catch (err) {
-		console.error('Error in load function:', err);
-		throw error(500, 'Failed to load data');
+		// Re-throw if it's already an AppError, otherwise wrap it
+		if (err && typeof err === 'object' && 'status' in err) {
+			throw err;
+		}
+		throwError(
+			createInternalError('Failed to load expenses data', err, {
+				userId: session.user.id,
+				action: 'load_expenses'
+			})
+		);
 	}
 };
 
 export const actions: Actions = {
 	upsert: async ({ request, locals: { supabase, safeGetSession } }) => {
 		const session = await safeGetSession();
-		if (!session) {
-			throw error(401, 'Unauthorized');
-		}
+
+		// Ensure user is authenticated
+		requireAuth(session, { action: 'upsert_expense' });
 
 		const form = await superValidate(request, zod(expenseSchema));
 
 		if (!form.valid) {
-			console.error('Form validation error:', form.errors);
-			return fail(400, { form });
+			return handleValidationError(
+				form,
+				'Please check the form for errors',
+				undefined,
+				{ userId: session.user.id, action: 'upsert_expense' }
+			);
 		}
 
 		try {
 			const { id, ...expenseData } = form.data;
 
-			// Determine if we're creating or updating
+			const context = {
+				userId: session.user.id,
+				resourceType: 'expense',
+				resourceId: id,
+				action: id ? 'update' : 'create'
+			};
+
+			let result;
+
 			if (id) {
-				// This is an update
-				const { data, error: updateError } = await supabase
-					.from('expenses')
-					.update({
+				// Update existing expense
+				result = await executeUpdate(
+					supabase,
+					'expenses',
+					id,
+					{
 						property_id: expenseData.property_id,
 						amount: expenseData.amount,
 						description: expenseData.description,
 						type: expenseData.type,
 						status: expenseData.expense_status,
 						expense_date: expenseData.expense_date
-					})
-					.eq('id', id)
-					.select();
+					},
+					{
+						resourceType: 'expense',
+						errorMessage: 'Failed to update expense',
+						context
+					}
+				);
 
-				if (updateError) {
-					console.error('Error updating expense:', updateError);
-					return fail(500, { form, message: 'Failed to update expense' });
-				}
+				console.log('✅ Updated expense:', id);
 
-				return { form, success: true, operation: 'update', expense: data?.[0] };
+				// Log audit event
+				await logAuditEvent(supabase, {
+					action: 'expense_updated',
+					user_id: session.user.id,
+					details: { expense_id: id, ...expenseData }
+				});
+
+				return { form, success: true, operation: 'update', expense: result };
 			} else {
-				// This is a creation
-				const { data, error: insertError } = await supabase
-					.from('expenses')
-					.insert({
+				// Create new expense
+				result = await executeInsert(
+					supabase,
+					'expenses',
+					{
 						property_id: expenseData.property_id,
 						amount: expenseData.amount,
 						description: expenseData.description,
@@ -170,66 +169,95 @@ export const actions: Actions = {
 						status: expenseData.expense_status,
 						expense_date: expenseData.expense_date,
 						created_by: session.user.id
-					})
-					.select();
+					},
+					{
+						resourceType: 'expense',
+						errorMessage: 'Failed to create expense',
+						context
+					}
+				);
 
-				console.log('Creating expense with data:', {
-					inputData: expenseData,
-					dbData: data,
-					type: expenseData.type
+				console.log('✅ Created expense:', result);
+
+				// Log audit event
+				await logAuditEvent(supabase, {
+					action: 'expense_created',
+					user_id: session.user.id,
+					details: expenseData
 				});
 
-				if (insertError) {
-					console.error('Error creating expense:', insertError);
-					return fail(500, { form, message: 'Failed to create expense' });
-				}
-
-				return { form, success: true, operation: 'create', expense: data?.[0] };
+				return { form, success: true, operation: 'create', expense: result };
 			}
 		} catch (err) {
-			console.error('Error in upsert operation:', err);
-			return fail(500, { form, message: 'An unexpected error occurred' });
+			// If it's already an AppError, convert it to a fail response
+			if (err && typeof err === 'object' && 'code' in err) {
+				return failWithError(err as any, form);
+			}
+			// Otherwise, create an internal error
+			return failWithError(
+				createInternalError('An unexpected error occurred', err, {
+					userId: session.user.id,
+					action: 'upsert_expense'
+				}),
+				form
+			);
 		}
 	},
 
 	delete: async ({ request, locals: { supabase, safeGetSession } }) => {
 		const session = await safeGetSession();
-		if (!session) {
-			throw error(401, 'Unauthorized');
-		}
 
-		let id;
+		// Ensure user is authenticated
+		requireAuth(session, { action: 'delete_expense' });
 
 		try {
-			// Parse the request body as form data
 			const formData = await request.formData();
-			id = formData.get('id');
+			const id = formData.get('id');
 
-			console.log('Received delete request with ID:', id);
-
-			if (!id) {
-				console.error('Error: Expense ID is required but was not provided');
-				return fail(400, { message: 'Expense ID is required' });
+			if (!id || typeof id !== 'string') {
+				return failWithError(
+					{
+						code: 'VALIDATION_ERROR' as any,
+						message: 'Expense ID is required',
+						status: 400
+					},
+					undefined
+				);
 			}
 
-			console.log('Attempting to delete expense with ID:', id);
-			const { data, error: deleteError } = await supabase
-				.from('expenses')
-				.delete()
-				.eq('id', id)
-				.select();
+			// Delete the expense
+			await executeDelete(supabase, 'expenses', id, {
+				resourceType: 'expense',
+				errorMessage: 'Failed to delete expense',
+				context: {
+					userId: session.user.id,
+					resourceId: id,
+					action: 'delete_expense'
+				}
+			});
 
-			console.log('Delete result:', { data, error: deleteError });
+			console.log('✅ Deleted expense:', id);
 
-			if (deleteError) {
-				console.error('Error deleting expense:', deleteError);
-				return fail(500, { message: 'Failed to delete expense' });
-			}
+			// Log audit event
+			await logAuditEvent(supabase, {
+				action: 'expense_deleted',
+				user_id: session.user.id,
+				details: { expense_id: id }
+			});
 
 			return { success: true };
 		} catch (err) {
-			console.error('Error processing delete request:', err);
-			return fail(500, { message: 'An error occurred while processing the delete request' });
+			// If it's already an AppError, convert it to a fail response
+			if (err && typeof err === 'object' && 'code' in err) {
+				return failWithError(err as any);
+			}
+			// Otherwise, create an internal error
+			return failWithError(
+				createInternalError('Failed to delete expense', err, {
+					userId: session.user.id,
+					action: 'delete_expense'
+				})
+			);
 		}
 	}
 };
