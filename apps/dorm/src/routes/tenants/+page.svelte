@@ -13,7 +13,8 @@
 		AlertTriangle,
 		Search,
 		LayoutGrid,
-		List
+		List,
+		Clock
 	} from 'lucide-svelte';
 	import type { TenantResponse } from '$lib/types/tenant';
 	import type { PageData } from './$types';
@@ -24,6 +25,7 @@
 	import { toast } from 'svelte-sonner';
 	import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
 	import { cache, cacheKeys, CACHE_TTL } from '$lib/services/cache';
+	import BottomActionBar from '$lib/components/BottomActionBar.svelte';
 
 	let { data } = $props<{ data: PageData }>();
 
@@ -295,7 +297,7 @@
 
 				<Button
 					onclick={handleAddTenant}
-					class="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+					class="hidden md:flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all duration-200"
 				>
 					<Plus class="w-4 h-4" />
 					Add Tenant
@@ -468,6 +470,63 @@
 		</div>
 	</div>
 </div>
+
+<!-- Mobile Bottom Action Bar -->
+<BottomActionBar>
+	<!-- Quick Filter Buttons -->
+	<button
+		onclick={() => handleFilterClick('active')}
+		class="flex flex-col items-center justify-center min-w-[60px] min-h-[44px] px-2 py-1 rounded-lg transition-all {activeFilter ===
+		'active'
+			? 'bg-green-100 text-green-700'
+			: 'text-slate-600 hover:bg-slate-100'}"
+	>
+		<UserCheck class="w-5 h-5 mb-0.5" />
+		<span class="text-[10px] font-medium">Active</span>
+	</button>
+
+	<button
+		onclick={() => handleFilterClick('all')}
+		class="flex flex-col items-center justify-center min-w-[60px] min-h-[44px] px-2 py-1 rounded-lg transition-all {activeFilter ===
+		'all'
+			? 'bg-blue-100 text-blue-700'
+			: 'text-slate-600 hover:bg-slate-100'}"
+	>
+		<Users class="w-5 h-5 mb-0.5" />
+		<span class="text-[10px] font-medium">All</span>
+	</button>
+
+	<!-- Primary Add Button -->
+	<button
+		onclick={handleAddTenant}
+		class="flex items-center justify-center gap-1.5 min-h-[44px] px-6 py-2 rounded-full bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg active:scale-95 transition-transform"
+	>
+		<Plus class="w-5 h-5" />
+		<span class="font-medium text-sm">Add Tenant</span>
+	</button>
+
+	<button
+		onclick={() => handleFilterClick('pending')}
+		class="flex flex-col items-center justify-center min-w-[60px] min-h-[44px] px-2 py-1 rounded-lg transition-all {activeFilter ===
+		'pending'
+			? 'bg-yellow-100 text-yellow-700'
+			: 'text-slate-600 hover:bg-slate-100'}"
+	>
+		<Clock class="w-5 h-5 mb-0.5" />
+		<span class="text-[10px] font-medium">Pending</span>
+	</button>
+
+	<button
+		onclick={() => handleFilterClick('inactive')}
+		class="flex flex-col items-center justify-center min-w-[60px] min-h-[44px] px-2 py-1 rounded-lg transition-all {activeFilter ===
+		'inactive'
+			? 'bg-gray-100 text-gray-700'
+			: 'text-slate-600 hover:bg-slate-100'}"
+	>
+		<UserX class="w-5 h-5 mb-0.5" />
+		<span class="text-[10px] font-medium">Inactive</span>
+	</button>
+</BottomActionBar>
 
 <!-- Modal for Create/Edit -->
 <TenantFormModal
