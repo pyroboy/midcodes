@@ -1,10 +1,43 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '$lib/components/ui/card';
-	import { Building, Users, FileText, CreditCard } from 'lucide-svelte';
+	import { Building, Users, FileText, CreditCard, Loader2 } from 'lucide-svelte';
 	import type { PageData } from './$types';
+	import { onMount } from 'svelte';
 
 	let { data } = $props<{ data: PageData }>();
+
+	// Loading state for cache preloading
+	let isPreloading = $state(true);
+	let preloadProgress = $state(0);
+	let totalPreloads = 5;
+
+	onMount(async () => {
+		if (!data.user || !data.preloadPromises) {
+			isPreloading = false;
+			return;
+		}
+
+		// Progressive cache preloading
+		const promises = [
+			data.preloadPromises.properties.then(() => preloadProgress++),
+			data.preloadPromises.tenants.then(() => preloadProgress++),
+			data.preloadPromises.leases.then(() => preloadProgress++),
+			data.preloadPromises.transactions.then(() => preloadProgress++),
+			data.preloadPromises.rentalUnits.then(() => preloadProgress++)
+		];
+
+		try {
+			await Promise.all(promises);
+		} catch (error) {
+			console.error('Error during cache preloading:', error);
+		} finally {
+			// Small delay to show completion
+			setTimeout(() => {
+				isPreloading = false;
+			}, 300);
+		}
+	});
 </script>
 
 <div class="container mx-auto p-6 space-y-8">
@@ -15,7 +48,23 @@
 		</p>
 	</div>
 
-	{#if data.user}
+	{#if isPreloading}
+		<div class="flex flex-col items-center justify-center py-12 space-y-4">
+			<Loader2 class="w-12 h-12 text-primary animate-spin" />
+			<div class="text-center space-y-2">
+				<p class="text-lg font-medium">Loading app data...</p>
+				<p class="text-sm text-muted-foreground">
+					Caching {preloadProgress} of {totalPreloads} modules
+				</p>
+			</div>
+			<div class="w-64 h-2 bg-gray-200 rounded-full overflow-hidden">
+				<div
+					class="h-full bg-primary transition-all duration-300"
+					style="width: {(preloadProgress / totalPreloads) * 100}%"
+				></div>
+			</div>
+		</div>
+	{:else if data.user}
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
 			<Card class="hover:shadow-lg transition-shadow">
 				<CardHeader class="flex flex-row items-center justify-between space-y-0 pb-2">

@@ -12,11 +12,62 @@
 	import { zodClient } from 'sveltekit-superforms/adapters';
 	import { invalidate, invalidateAll } from '$app/navigation';
 	import SuperDebug from 'sveltekit-superforms/client/SuperDebug.svelte';
+	import { onMount } from 'svelte';
+	import { cache, cacheKeys, CACHE_TTL } from '$lib/services/cache';
 
 	let { data } = $props<{ data: PageData }>();
 
+	// Server-side caching for DB queries, client-side cache for debug panel visibility
+	let transactions = $state<Transaction[]>(data.transactions);
+	let billingsById = $state(data.billingsById);
+	let isLoading = $state(data.lazy === true);
+
 	// Debug logging
 	console.log('Page data:', data);
+
+	// Load data lazily from server promises
+	async function loadDataFromPromises() {
+		if (data.transactionsPromise) {
+			try {
+				const loadedData = await data.transactionsPromise;
+				transactions = loadedData.transactions;
+				billingsById = loadedData.billingsById;
+				isLoading = false;
+
+				// Mirror server cache to client-side for debug panel visibility
+				cache.set(cacheKeys.transactions('default'), {
+					transactions: loadedData.transactions,
+					billingsById: loadedData.billingsById
+				}, CACHE_TTL.SHORT);
+			} catch (error) {
+				console.error('Error loading transactions data:', error);
+				isLoading = false;
+			}
+		}
+	}
+
+	// Load data lazily on mount
+	onMount(async () => {
+		if (data.lazy) {
+			await loadDataFromPromises();
+		}
+	});
+
+	// Update when data changes from server (after mutations)
+	$effect(() => {
+		if (!data.lazy) {
+			transactions = data.transactions;
+			billingsById = data.billingsById;
+
+			// Mirror to client-side cache for debug panel
+			if (transactions.length > 0) {
+				cache.set(cacheKeys.transactions('default'), {
+					transactions,
+					billingsById
+				}, CACHE_TTL.SHORT);
+			}
+		}
+	});
 
 	// Form for adding/editing transactions
 	const { form, errors, enhance, constraints, submitting, reset } = superForm(data.form, {
@@ -275,7 +326,7 @@
 
 	<!-- Transaction List -->
 	<TransactionList
-		transactions={data.transactions}
+		{transactions}
 		on:edit={handleEditTransaction}
 		on:delete={handleDeleteTransaction}
 		on:add={handleAddTransaction}

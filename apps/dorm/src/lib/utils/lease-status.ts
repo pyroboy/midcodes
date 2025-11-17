@@ -9,6 +9,13 @@ export interface LeaseBalanceStatus {
 	partialBalance: number;
 	nextDueDate: string | null;
 	daysOverdue: number;
+	// Utility billing specific status
+	utilityOverdueBalance: number;
+	utilityPendingBalance: number;
+	utilityPartialBalance: number;
+	hasUtilityOverdue: boolean;
+	hasUtilityPending: boolean;
+	hasUtilityPartial: boolean;
 }
 
 export function calculateLeaseBalanceStatus(lease: Lease): LeaseBalanceStatus {
@@ -21,16 +28,35 @@ export function calculateLeaseBalanceStatus(lease: Lease): LeaseBalanceStatus {
 			pendingBalance: 0,
 			partialBalance: 0,
 			nextDueDate: null,
-			daysOverdue: 0
+			daysOverdue: 0,
+			utilityOverdueBalance: 0,
+			utilityPendingBalance: 0,
+			utilityPartialBalance: 0,
+			hasUtilityOverdue: false,
+			hasUtilityPending: false,
+			hasUtilityPartial: false
 		};
 	}
 
 	const today = new Date();
-	const overdueBillings = lease.billings.filter(
+	
+	// Separate regular billings from utility billings
+	const regularBillings = lease.billings.filter((b) => b.type !== 'UTILITY');
+	const utilityBillings = lease.billings.filter((b) => b.type === 'UTILITY');
+	
+	// Regular billings
+	const overdueBillings = regularBillings.filter(
 		(b) => b.status === 'OVERDUE' || b.status === 'PENALIZED'
 	);
-	const pendingBillings = lease.billings.filter((b) => b.status === 'PENDING');
-	const partialBillings = lease.billings.filter((b) => b.status === 'PARTIAL');
+	const pendingBillings = regularBillings.filter((b) => b.status === 'PENDING');
+	const partialBillings = regularBillings.filter((b) => b.status === 'PARTIAL');
+	
+	// Utility billings
+	const utilityOverdueBillings = utilityBillings.filter(
+		(b) => b.status === 'OVERDUE' || b.status === 'PENALIZED'
+	);
+	const utilityPendingBillings = utilityBillings.filter((b) => b.status === 'PENDING');
+	const utilityPartialBillings = utilityBillings.filter((b) => b.status === 'PARTIAL');
 
 	// Calculate next due date from pending billings
 	const nextDueDate =
@@ -58,7 +84,14 @@ export function calculateLeaseBalanceStatus(lease: Lease): LeaseBalanceStatus {
 		pendingBalance: pendingBillings.reduce((sum, b) => sum + b.balance, 0),
 		partialBalance: partialBillings.reduce((sum, b) => sum + b.balance, 0),
 		nextDueDate,
-		daysOverdue
+		daysOverdue,
+		// Utility billing status
+		hasUtilityOverdue: utilityOverdueBillings.length > 0,
+		hasUtilityPending: utilityPendingBillings.length > 0,
+		hasUtilityPartial: utilityPartialBillings.length > 0,
+		utilityOverdueBalance: utilityOverdueBillings.reduce((sum, b) => sum + b.balance, 0),
+		utilityPendingBalance: utilityPendingBillings.reduce((sum, b) => sum + b.balance, 0),
+		utilityPartialBalance: utilityPartialBillings.reduce((sum, b) => sum + b.balance, 0)
 	};
 }
 
@@ -104,4 +137,44 @@ export function getLeaseDisplayStatus(status: LeaseBalanceStatus) {
 		textColor: 'text-green-600',
 		icon: 'CheckCircle'
 	};
+}
+
+export function getUtilityDisplayStatus(status: LeaseBalanceStatus) {
+	if (status.hasUtilityOverdue) {
+		return {
+			label: 'Utility Overdue',
+			variant: 'destructive' as const,
+			color: 'red',
+			bgColor: 'bg-red-50',
+			textColor: 'text-red-600',
+			icon: 'AlertCircle',
+			amount: status.utilityOverdueBalance
+		};
+	}
+
+	if (status.hasUtilityPartial) {
+		return {
+			label: 'Utility Partial',
+			variant: 'secondary' as const,
+			color: 'amber',
+			bgColor: 'bg-amber-50',
+			textColor: 'text-amber-600',
+			icon: 'AlertTriangle',
+			amount: status.utilityPartialBalance
+		};
+	}
+
+	if (status.hasUtilityPending) {
+		return {
+			label: 'Utility Pending',
+			variant: 'secondary' as const,
+			color: 'blue',
+			bgColor: 'bg-blue-50',
+			textColor: 'text-blue-600',
+			icon: 'Clock',
+			amount: status.utilityPendingBalance
+		};
+	}
+
+	return null; // No utility billings or all paid
 }

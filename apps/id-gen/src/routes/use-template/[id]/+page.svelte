@@ -1,521 +1,634 @@
 <script lang="ts">
-    import { run, preventDefault } from 'svelte/legacy';
-    import { onMount, onDestroy } from 'svelte';
-    import { page } from '$app/stores';
-    import { auth, session, user } from '$lib/stores/auth';
-    import IdCanvas from '$lib/components/IdCanvas.svelte';
-    import { Button } from "$lib/components/ui/button";
-    import { Card } from "$lib/components/ui/card";
-    import { Input } from "$lib/components/ui/input";
-    import { Label } from "$lib/components/ui/label";
-    import * as Select from "$lib/components/ui/select";
-    import { darkMode } from '$lib/stores/darkMode';
-    import ThumbnailInput from '$lib/components/ThumbnailInput.svelte';
-    import { Loader } from 'lucide-svelte';
-    import { goto } from '$app/navigation';
-    import { enhance } from '$app/forms';
-    import type { TemplateElement } from '$lib/stores/templateStore';
+	import { run, preventDefault } from 'svelte/legacy';
+	import { onMount, onDestroy } from 'svelte';
+	import { page } from '$app/stores';
+	import { auth, session, user } from '$lib/stores/auth';
+	import IdCanvas from '$lib/components/IdCanvas.svelte';
+	import { Button } from '$lib/components/ui/button';
+	import { Card } from '$lib/components/ui/card';
+	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
+	import * as Select from '$lib/components/ui/select';
+	import { darkMode } from '$lib/stores/darkMode';
+	import ThumbnailInput from '$lib/components/ThumbnailInput.svelte';
+	import { Loader, ChevronLeft, ChevronRight } from '@lucide/svelte';
+	import { goto } from '$app/navigation';
+	import { enhance } from '$app/forms';
+	import type { TemplateElement } from '$lib/stores/templateStore';
 
-    // Enhanced type definitions for better type safety
-    interface SelectOption {
-        value: string;
-        label: string;
-    }
+	// Enhanced type definitions for better type safety
+	interface SelectOption {
+		value: string;
+		label: string;
+	}
 
-    interface Template {
-        id: string;
-        name: string;
-        org_id: string;
-        template_elements: TemplateElement[];
-        front_background: string;
-        back_background: string;
-        orientation: 'landscape' | 'portrait';
-    }
+	interface Template {
+		id: string;
+		name: string;
+		org_id: string;
+		template_elements: TemplateElement[];
+		front_background: string;
+		back_background: string;
+		orientation: 'landscape' | 'portrait';
+		width_pixels?: number;
+		height_pixels?: number;
+		dpi?: number;
+		unit_type?: string;
+		unit_width?: number;
+		unit_height?: number;
+	}
 
-    interface ImagePosition {
-        x: number;
-        y: number;
-        width: number;
-        height: number;
-        scale: number;
-    }
+	interface ImagePosition {
+		x: number;
+		y: number;
+		width: number;
+		height: number;
+		scale: number;
+	}
 
-    interface FileUploads {
-        [key: string]: File | null;
-    }
+	interface FileUploads {
+		[key: string]: File | null;
+	}
 
-    interface Props {
-        data: {
-            template: {
-                id: string;
-                name: string;
-                org_id: string;
-                template_elements: TemplateElement[];
-                front_background: string;
-                back_background: string;
-                orientation: 'landscape' | 'portrait';
-            };
-        };
-    }
+	interface Props {
+		data: {
+			template: {
+				id: string;
+				name: string;
+				org_id: string;
+				template_elements: TemplateElement[];
+				front_background: string;
+				back_background: string;
+				orientation: 'landscape' | 'portrait';
+			};
+		};
+	}
 
-    // Props initialization
-    let { data }: Props = $props();
+	// Props initialization
+	let { data }: Props = $props();
 
-    // State management using Svelte's reactive stores
-    let templateId = $page.params.id;
-    let template: Template = {
-        ...data.template,
-        template_elements: data.template.template_elements.map(element => ({
-            ...element,
-            width: element.width ?? 100,
-            height: element.height ?? 100
-        }))
-    };
+	// State management using Svelte's reactive stores
+	let templateId = $page.params.id;
+	let template: Template = {
+		...data.template,
+		template_elements: data.template.template_elements.map((element) => ({
+			...element,
+			width: element.width ?? 100,
+			height: element.height ?? 100
+		}))
+	};
 
-    // Component state declarations with $state
-    let loading = $state(false);
-    let error = $state<string | null>(null);
-    let formElement = $state<HTMLFormElement | null>(null);
-    let debugMessages = $state<string[]>([]);
-    let formData = $state<Record<string, string>>({});
-    let fileUploads = $state<FileUploads>({});
-    let imagePositions = $state<Record<string, ImagePosition>>({});
-    let frontCanvasComponent = $state<IdCanvas | null>(null);
-    let backCanvasComponent = $state<IdCanvas | null>(null);
-    let frontCanvasReady = $state(false);
-    let backCanvasReady = $state(false);
-    let fullResolution = $state(false);
-    let mouseMoving = $state(false);
-    let formErrors = $state<Record<string, boolean>>({});
-    let fileUrls = $state<Record<string, string>>({});
+	// Component state declarations with $state
+	let loading = $state(false);
+	let error = $state<string | null>(null);
+	let formElement = $state<HTMLFormElement | null>(null);
+	let debugMessages = $state<string[]>([]);
+	let formData = $state<Record<string, string>>({});
+	let fileUploads = $state<FileUploads>({});
+	let imagePositions = $state<Record<string, ImagePosition>>({});
+	let frontCanvasComponent = $state<IdCanvas | null>(null);
+	let backCanvasComponent = $state<IdCanvas | null>(null);
+	let frontCanvasReady = $state(false);
+	let backCanvasReady = $state(false);
+	let fullResolution = $state(false);
+	let mouseMoving = $state(false);
+	// Responsive preview state (mobile toggle vs desktop side-by-side)
+	let isMobile = $state(false);
+	let currentView: 'front' | 'back' = $state('front');
+	let formErrors = $state<Record<string, boolean>>({});
+	let fileUrls = $state<Record<string, string>>({});
 
-    // Enhanced Select handling
-    interface SelectState {
-        value: string | undefined;
-        label: string;
-        options: SelectOption[];
-    }
+	// Enhanced Select handling
+	interface SelectState {
+		value: string | undefined;
+		label: string;
+		options: SelectOption[];
+	}
 
-    let selectStates = $state<Record<string, SelectState>>({});
+	let selectStates = $state<Record<string, SelectState>>({});
 
-    // Initialize select states with getters and setters
-    function initializeSelectStates() {
-        template.template_elements.forEach((element) => {
-            if (element.type === 'selection' && element.variableName && element.options) {
-                const options = element.options.map(opt => ({
-                    value: opt,
-                    label: opt
-                }));
+	// Initialize select states with getters and setters
+	function initializeSelectStates() {
+		template.template_elements.forEach((element) => {
+			if (element.type === 'selection' && element.variableName && element.options) {
+				const options = element.options.map((opt) => ({
+					value: opt,
+					label: opt
+				}));
 
-                selectStates[element.variableName] = {
-                    value: formData[element.variableName] || undefined,
-                    label: formData[element.variableName] || 'Select an option',
-                    options
-                };
-            }
-        });
-    }
+				selectStates[element.variableName] = {
+					value: formData[element.variableName] || undefined,
+					label: formData[element.variableName] || 'Select an option',
+					options
+				};
+			}
+		});
+	}
 
-    // Derived content for select triggers using $derived
-    let triggerContent = $derived((variableName: string) => 
-        formData[variableName] || "Select an option"
-    );
+	// Derived content for select triggers using $derived
+	let triggerContent = $derived(
+		(variableName: string) => formData[variableName] || 'Select an option'
+	);
 
-    // Lifecycle hooks
-    run(() => {
-        console.log('Use Template Page: Session exists:', !!$session);
-        console.log('Use Template Page: User exists:', !!$user);
-    });
+	// Lifecycle hooks
+	run(() => {
+		console.log('Use Template Page: Session exists:', !!$session);
+		console.log('Use Template Page: User exists:', !!$user);
+	});
 
-    function initializeFormData() {
-        if (!template?.template_elements) return;
+	function initializeFormData() {
+		if (!template?.template_elements) return;
 
-        template.template_elements.forEach((element) => {
-            if (!element.variableName) return;
-            
-            if (element.type === 'text' || element.type === 'selection') {
-                formData[element.variableName] = element.content || '';
-            } else if (element.type === 'photo' || element.type === 'signature') {
-                fileUploads[element.variableName] = null;
-                imagePositions[element.variableName] = {
-                    x: 0,
-                    y: 0,
-                    width: element.width || 100,
-                    height: element.height || 100,
-                    scale: 1
-                };
-            }
-        });
+		template.template_elements.forEach((element) => {
+			if (!element.variableName) return;
 
-        initializeSelectStates();
-    }
+			if (element.type === 'text' || element.type === 'selection') {
+				formData[element.variableName] = element.content || '';
+			} else if (element.type === 'photo' || element.type === 'signature') {
+				fileUploads[element.variableName] = null;
+				imagePositions[element.variableName] = {
+					x: 0,
+					y: 0,
+					width: element.width || 100,
+					height: element.height || 100,
+					scale: 1
+				};
+			}
+		});
 
-    onMount(async () => {
-        if (!templateId) {
-            error = 'No template ID provided';
-            return;
-        }
-        
-        console.log(' [Use Template] Initializing with template:', {
-            id: template.id,
-            name: template.name,
-            elementsCount: template.template_elements?.length || 0
-        });
-        
-        initializeFormData();
-    });
+		initializeSelectStates();
+	}
 
-    // Event handlers
-    function handleCanvasReady(side: 'front' | 'back') {
-        if (side === 'front') {
-            frontCanvasReady = true;
-        } else {
-            backCanvasReady = true;
-        }
-    }
+onMount(async () => {
+		// initialize responsive state
+		if (typeof window !== 'undefined') {
+			isMobile = window.innerWidth < 768;
+		}
+		if (!templateId) {
+			error = 'No template ID provided';
+			return;
+		}
 
-    function handleSelectionChange(value: string, variableName: string) {
-        // Update form data
-        formData[variableName] = value;
-        
-        // Update select state
-        if (selectStates[variableName]) {
-            selectStates[variableName] = {
-                ...selectStates[variableName],
-                value,
-                label: value
-            };
-        }
+		console.log(' [Use Template] Initializing with template:', {
+			id: template.id,
+			name: template.name,
+			elementsCount: template.template_elements?.length || 0,
+			frontBackground: template.front_background,
+			backBackground: template.back_background,
+			frontBackgroundType: typeof template.front_background,
+			backBackgroundType: typeof template.back_background
+		});
 
-        // Clear any errors
-        if (formErrors[variableName]) {
-            formErrors[variableName] = false;
-        }
-    }
+		initializeFormData();
+	});
 
-    function handleImageUpdate(event: CustomEvent<{ scale: number; x: number; y: number }>, variableName: string) {
-        const { scale, x, y } = event.detail;
-        imagePositions[variableName] = {
-            ...imagePositions[variableName],
-            scale,
-            x,
-            y
-        };
-    }
+	// Event handlers
+	function handleCanvasReady(side: 'front' | 'back') {
+		if (side === 'front') {
+			frontCanvasReady = true;
+		} else {
+			backCanvasReady = true;
+		}
+	}
 
-    async function handleSubmit(event: Event) {
-        event.preventDefault();
-        
-        try {
-            if (!validateForm()) {
-                error = 'Please fill in all required fields';
-                return;
-            }
+	function handleSelectionChange(value: string, variableName: string) {
+		// Update form data
+		formData[variableName] = value;
 
-            loading = true;
-            error = null;
+		// Update select state
+		if (selectStates[variableName]) {
+			selectStates[variableName] = {
+				...selectStates[variableName],
+				value,
+				label: value
+			};
+		}
 
-            if (!template || !frontCanvasComponent || !backCanvasComponent) {
-                error = 'Missing required components';
-                return;
-            }
+		// Clear any errors
+		if (formErrors[variableName]) {
+			formErrors[variableName] = false;
+		}
+	}
 
-            const [frontBlob, backBlob] = await Promise.all([
-                frontCanvasComponent.renderFullResolution(),
-                backCanvasComponent.renderFullResolution()
-            ]);
+	function handleImageUpdate(
+		event: CustomEvent<{ scale: number; x: number; y: number }>,
+		variableName: string
+	) {
+		const { scale, x, y } = event.detail;
+		imagePositions[variableName] = {
+			...imagePositions[variableName],
+			scale,
+			x,
+			y
+		};
+	}
 
-            const form = event.target as HTMLFormElement;
-            const formData = new FormData(form);
+	async function handleSubmit(event: Event) {
+		event.preventDefault();
 
-            // Add required data to form
-            formData.append('templateId', $page.params.id);
-            formData.append('frontImage', frontBlob, 'front.png');
-            formData.append('backImage', backBlob, 'back.png');
+		try {
+			if (!validateForm()) {
+				error = 'Please fill in all required fields';
+				return;
+			}
 
-            const response = await fetch('?/saveIdCard', {
-                method: 'POST',
-                body: formData
-            });
+			loading = true;
+			error = null;
 
-            const result = await response.json();
-            console.log('Save response:', result);
+			if (!template || !frontCanvasComponent || !backCanvasComponent) {
+				error = 'Missing required components';
+				return;
+			}
 
-            if (response.ok && (result.type === 'success' || (result.data && result.data[0]?.success))) {
-                goto('/all-ids');
-            } else {
-                error = (result.data && result.data[0]?.error) || 'Failed to save ID card';
-                console.error('Save error:', error);
-            }
-        } catch (err) {
-            console.error('Submit error:', err);
-            error = err instanceof Error ? err.message : 'An unexpected error occurred';
-        } finally {
-            loading = false;
-        }
-    }
+			const [frontBlob, backBlob] = await Promise.all([
+				frontCanvasComponent.renderFullResolution(),
+				backCanvasComponent.renderFullResolution()
+			]);
 
-    function handleMouseDown() {
-        mouseMoving = true;
-    }
+			const form = event.target as HTMLFormElement;
+			const formData = new FormData(form);
 
-    function handleMouseUp() {
-        mouseMoving = false;
-    }
+			// Add required data to form
+			formData.append('templateId', $page.params.id);
+			formData.append('frontImage', frontBlob, 'front.png');
+			formData.append('backImage', backBlob, 'back.png');
 
-    function handleToggle(checked: boolean) {
-        darkMode.set(checked);
-    }
+			const response = await fetch('?/saveIdCard', {
+				method: 'POST',
+				body: formData
+			});
 
-    function handleSelectFile(variableName: string) {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*';
-        input.onchange = (e) => handleFileUpload(e, variableName);
-        input.click();
-    }
+			const result = await response.json();
+			console.log('Save response:', result);
 
-    function handleFileUpload(event: Event, variableName: string) {
-        const input = event.target as HTMLInputElement;
-        if (!input.files?.length) return;
+			if (response.ok && (result.type === 'success' || (result.data && result.data[0]?.success))) {
+				goto('/all-ids');
+			} else {
+				error = (result.data && result.data[0]?.error) || 'Failed to save ID card';
+				console.error('Save error:', error);
+			}
+		} catch (err) {
+			console.error('Submit error:', err);
+			error = err instanceof Error ? err.message : 'An unexpected error occurred';
+		} finally {
+			loading = false;
+		}
+	}
 
-        const file = input.files[0];
-        fileUploads[variableName] = file;
+	function handleMouseDown() {
+		mouseMoving = true;
+	}
 
-        if (fileUrls[variableName]) {
-            URL.revokeObjectURL(fileUrls[variableName]);
-        }
+	function handleMouseUp() {
+		mouseMoving = false;
+	}
 
-        const url = URL.createObjectURL(file);
-        fileUrls[variableName] = url;
-    }
+	function handleToggle(checked: boolean) {
+		darkMode.set(checked);
+	}
 
-    function validateForm(): boolean {
-        formErrors = {};
-        let isValid = true;
-        let emptyFields: string[] = [];
+	function handleResize() {
+		if (typeof window !== 'undefined') {
+			isMobile = window.innerWidth < 768;
+		}
+	}
 
-        if (!template) return false;
+	function handleSelectFile(variableName: string) {
+		const input = document.createElement('input');
+		input.type = 'file';
+		input.accept = 'image/*';
+		input.onchange = (e) => handleFileUpload(e, variableName);
+		input.click();
+	}
 
-        template.template_elements.forEach((element) => {
-            if (!element.variableName) return;
+	function handleFileUpload(event: Event, variableName: string) {
+		const input = event.target as HTMLInputElement;
+		if (!input.files?.length) return;
 
-            if (element.type === 'text' || element.type === 'selection') {
-                if (!formData[element.variableName]?.trim()) {
-                    formErrors[element.variableName] = true;
-                    emptyFields.push(element.variableName);
-                    isValid = false;
-                }
-            }
-        });
+		const file = input.files[0];
+		fileUploads[variableName] = file;
 
-        if (!isValid) {
-            addDebugMessage(`Please fill in the following fields: ${emptyFields.join(', ')}`);
-        }
+		if (fileUrls[variableName]) {
+			URL.revokeObjectURL(fileUrls[variableName]);
+		}
 
-        return isValid;
-    }
+		const url = URL.createObjectURL(file);
+		fileUrls[variableName] = url;
+	}
 
-    function addDebugMessage(message: string) {
-        debugMessages = [...debugMessages, message];
-    }
+	function validateForm(): boolean {
+		formErrors = {};
+		let isValid = true;
+		let emptyFields: string[] = [];
 
-    onDestroy(() => {
-        // Cleanup file URLs
-        Object.values(fileUrls).forEach(URL.revokeObjectURL);
-    });
+		if (!template) return false;
+
+		template.template_elements.forEach((element) => {
+			if (!element.variableName) return;
+
+			if (element.type === 'text' || element.type === 'selection') {
+				if (!formData[element.variableName]?.trim()) {
+					formErrors[element.variableName] = true;
+					emptyFields.push(element.variableName);
+					isValid = false;
+				}
+			}
+		});
+
+		if (!isValid) {
+			addDebugMessage(`Please fill in the following fields: ${emptyFields.join(', ')}`);
+		}
+
+		return isValid;
+	}
+
+	function addDebugMessage(message: string) {
+		debugMessages = [...debugMessages, message];
+	}
+
+	onDestroy(() => {
+		// Cleanup file URLs
+		Object.values(fileUrls).forEach(URL.revokeObjectURL);
+	});
 </script>
 
+<svelte:window on:resize={handleResize} />
 <div class="container mx-auto p-4 flex flex-col md:flex-row gap-4">
-    <div class="w-full md:w-1/2">
-        <Card class="h-full">
-            <div class="p-4">
-                <h2 class="text-2xl font-bold mb-4">ID Card Preview</h2>
-                <div class="canvas-wrapper" class:landscape={template?.orientation === 'landscape'} class:portrait={template?.orientation === 'portrait'}>
-                    <div class="front-canvas">
-                        <h3 class="text-lg font-semibold mb-2">Front</h3>
-                        {#if template}
-                        <div class="w-full aspect-1013/638">
-                            <IdCanvas
-                                bind:this={frontCanvasComponent}
-                                elements={template.template_elements.filter(el => el.side === 'front')}
-                                backgroundUrl={template.front_background}
-                                {formData}
-                                {fileUploads}
-                                {imagePositions}
-                                {fullResolution}
-                                isDragging={mouseMoving}
-                                on:ready={() => handleCanvasReady('front')}
-                                on:error={({ detail }) => addDebugMessage(`Front Canvas Error: ${detail.code} - ${detail.message}`)}
-                            />
-                        </div>
-                        {/if}
-                    </div>
-                    <div class="back-canvas">
-                        <h3 class="text-lg font-semibold mb-2">Back</h3>
-                        {#if template}
-                            <IdCanvas
-                                bind:this={backCanvasComponent}
-                                elements={template.template_elements.filter(el => el.side === 'back')}
-                                backgroundUrl={template.back_background}
-                                {formData}
-                                {fileUploads}
-                                {imagePositions}
-                                {fullResolution}
-                                isDragging={mouseMoving}
-                                on:ready={() => handleCanvasReady('back')}
-                                on:error={({ detail }) => addDebugMessage(`Back Canvas Error: ${detail.code} - ${detail.message}`)}
-                            />
-                        {/if}
-                    </div>
-                </div>
-            </div>
-        </Card>
-    </div>
-    <div class="w-full md:w-1/2">
-        <Card class="h-full">
-            <div class="p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-2xl font-bold">ID Card Form</h2>
-                </div>
-                <p class="text-muted-foreground mb-6">Please fill out these details for your ID card.</p>
+	<div class="w-full md:w-1/2">
+		<Card class="h-full">
+			<div class="p-4">
+				<h2 class="text-2xl font-bold mb-4">ID Card Preview</h2>
 
-                {#if template && template.template_elements}
-                    <form 
-                        bind:this={formElement}
-                        action="?/saveIdCard"
-                        method="POST"
-                        enctype="multipart/form-data"
-                        onsubmit={preventDefault(handleSubmit)}
-                        use:enhance
-                    >
-                        {#each template.template_elements as element (element.variableName)}
-                            {#if element.variableName}
-                                <div 
-                                    role="button" 
-                                    tabindex="-1" 
-                                    class="grid grid-cols-[auto_1fr] gap-4 items-center mb-4" 
-                                    onmousedown={handleMouseDown} 
-                                    onmouseup={handleMouseUp}
-                                >
-                                    <Label for={element.variableName} class="text-right">
-                                        {element.variableName}
-                                        {#if element.type === 'text' || element.type === 'selection'}
-                                            <span class="text-red-500">*</span>
-                                        {/if}
-                                    </Label>
-                                    {#if element.type === 'text'}
-                                        <div class="w-full">
-                                            <Input 
-                                                type="text"
-                                                id={element.variableName}
-                                                name={element.variableName}
-                                                bind:value={formData[element.variableName]}
-                                                class="w-full"
-                                                placeholder={`Enter ${element.variableName}`}
-                                            />
-                                            {#if formErrors[element.variableName]}
-                                                <p class="mt-1 text-sm text-destructive">This field is required</p>
-                                                {/if}
-                                            </div>
-                                        {:else if element.type === 'selection' && element.options}
-                                            <div class="relative w-full">
-                                                <Select.Root
-                                                    type="single"
-                                                    value={selectStates[element.variableName]?.value}
-                                                    onValueChange={(value) => handleSelectionChange(value, element.variableName)}
-                                                >
-                                                    <Select.Trigger class="w-full">
-                                                        {triggerContent(element.variableName)}
-                                                    </Select.Trigger>
-                                                    <Select.Content>
-                                                        {#each element.options as option}
-                                                            <Select.Item value={option}>
-                                                                {option}
-                                                            </Select.Item>
-                                                        {/each}
-                                                    </Select.Content>
-                                                </Select.Root>
-                                                {#if formErrors[element.variableName]}
-                                                    <p class="mt-1 text-sm text-destructive">Please select an option</p>
-                                                {/if}
-                                            </div>
-                                        {:else if element.type === 'photo' || element.type === 'signature'}
-                                            <ThumbnailInput
-                                                width={element.width}
-                                                height={element.height}
-                                                fileUrl={fileUrls[element.variableName]}
-                                                initialScale={imagePositions[element.variableName]?.scale ?? 1}
-                                                initialX={imagePositions[element.variableName]?.x ?? 0}
-                                                initialY={imagePositions[element.variableName]?.y ?? 0}
-                                                isSignature={element.type === 'signature'}
-                                                on:selectfile={() => handleSelectFile(element.variableName)}
-                                                on:update={(e) => handleImageUpdate(e, element.variableName)}
-                                            />
-                                        {/if}
-                                    </div>
-                                {/if}
-                            {/each}
-                            
-                            <div class="mt-6 space-y-4">
-                                <Button 
-                                    type="submit" 
-                                    class="w-full" 
-                                    disabled={loading}
-                                >
-                                    {#if loading}
-                                        <Loader class="mr-2 h-4 w-4 animate-spin" />
-                                    {/if}
-                                    Generate and Save ID Card
-                                </Button>
-                                
-                                {#if error}
-                                    <p class="text-sm text-destructive">{error}</p>
-                                {/if}
-                            </div>
-                        </form>
-                    {/if}
-    
-                    {#if debugMessages.length > 0}
-                        <div class="mt-6 p-4 rounded-lg bg-secondary/10">
-                            <h3 class="font-bold mb-2">Debug Messages:</h3>
-                            <div class="space-y-1">
-                                {#each debugMessages as message}
-                                    <div class="py-1 text-muted-foreground">{message}</div>
-                                {/each}
-                            </div>
-                        </div>
-                    {/if}
-                </div>
-            </Card>
-        </div>
-    </div>
-    
-    <style>
-        :global(.dark) {
-            color-scheme: dark;
-        }
-        
-        .canvas-wrapper {
-            display: flex;
-            gap: 20px;
-        }
-        
-        .canvas-wrapper.landscape {
-            flex-direction: column;
-        }
-        
-        .canvas-wrapper.portrait {
-            flex-direction: row;
-        }
-    
-        :global(.select-error) {
-            border-color: hsl(var(--destructive));
-            --tw-ring-color: hsl(var(--destructive));
-        }
-    
-        :global(.input-error) {
-            border-color: hsl(var(--destructive));
-            --tw-ring-color: hsl(var(--destructive));
-        }
-    </style>
+				{#if !isMobile}
+					<!-- Desktop: show both front and back side-by-side/stacked by orientation -->
+					<div
+						class="canvas-wrapper"
+						class:landscape={template?.orientation === 'landscape'}
+						class:portrait={template?.orientation === 'portrait'}
+					>
+						<div class="flex-1">
+							<h3 class="text-lg font-semibold mb-2 text-center">Front View</h3>
+							{#if template}
+								<div
+									class="w-full"
+									style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels || 638}"
+								>
+									<IdCanvas
+										bind:this={frontCanvasComponent}
+										elements={template.template_elements.filter((el) => el.side === 'front')}
+										backgroundUrl={template.front_background}
+										{formData}
+										{fileUploads}
+										{imagePositions}
+										{fullResolution}
+										isDragging={mouseMoving}
+										pixelDimensions={template.width_pixels && template.height_pixels
+											? { width: template.width_pixels, height: template.height_pixels }
+											: null}
+										on:ready={() => handleCanvasReady('front')}
+										on:error={({ detail }) =>
+											addDebugMessage(`Front Canvas Error: ${detail.code} - ${detail.message}`)}
+									/>
+								</div>
+							{/if}
+						</div>
+						<div class="flex-1">
+							<h3 class="text-lg font-semibold mb-2 text-center">Back View</h3>
+							{#if template}
+								<div
+									class="w-full"
+									style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels || 638}"
+								>
+									<IdCanvas
+										bind:this={backCanvasComponent}
+										elements={template.template_elements.filter((el) => el.side === 'back')}
+										backgroundUrl={template.back_background}
+										{formData}
+										{fileUploads}
+										{imagePositions}
+										{fullResolution}
+										isDragging={mouseMoving}
+										pixelDimensions={template.width_pixels && template.height_pixels
+											? { width: template.width_pixels, height: template.height_pixels }
+											: null}
+										on:ready={() => handleCanvasReady('back')}
+										on:error={({ detail }) =>
+											addDebugMessage(`Back Canvas Error: ${detail.code} - ${detail.message}`)}
+									/>
+								</div>
+							{/if}
+						</div>
+					</div>
+				{:else}
+					<!-- Mobile: toggle between front/back with buttons -->
+					<div class="flex flex-col space-y-4 w-full max-w-md mx-auto">
+						<div class="flex items-center justify-between w-full mb-2">
+							<button
+								onclick={() => (currentView = 'front')}
+								class={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl transition-colors duration-200 text-sm font-bold ${currentView === 'front' ? 'bg-emerald-500 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-700'}`}
+							>
+								<ChevronLeft size={16} />
+								<span>Front View</span>
+							</button>
+							<div class="w-4"></div>
+							<button
+								onclick={() => (currentView = 'back')}
+								class={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl transition-colors duration-200 text-sm font-bold ${currentView === 'back' ? 'bg-emerald-500 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-700'}`}
+							>
+								<span>Back View</span>
+								<ChevronRight size={16} />
+							</button>
+						</div>
+
+						{#if currentView === 'front'}
+							{#if template}
+								<div class="w-full" style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels || 638}">
+									<IdCanvas
+										bind:this={frontCanvasComponent}
+										elements={template.template_elements.filter((el) => el.side === 'front')}
+										backgroundUrl={template.front_background}
+										{formData}
+										{fileUploads}
+										{imagePositions}
+										{fullResolution}
+										isDragging={mouseMoving}
+										pixelDimensions={template.width_pixels && template.height_pixels
+											? { width: template.width_pixels, height: template.height_pixels }
+											: null}
+										on:ready={() => handleCanvasReady('front')}
+										on:error={({ detail }) =>
+											addDebugMessage(`Front Canvas Error: ${detail.code} - ${detail.message}`)}
+									/>
+								</div>
+							{/if}
+						{:else}
+							{#if template}
+								<div class="w-full" style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels || 638}">
+									<IdCanvas
+										bind:this={backCanvasComponent}
+										elements={template.template_elements.filter((el) => el.side === 'back')}
+										backgroundUrl={template.back_background}
+										{formData}
+										{fileUploads}
+										{imagePositions}
+										{fullResolution}
+										isDragging={mouseMoving}
+										pixelDimensions={template.width_pixels && template.height_pixels
+											? { width: template.width_pixels, height: template.height_pixels }
+											: null}
+										on:ready={() => handleCanvasReady('back')}
+										on:error={({ detail }) =>
+											addDebugMessage(`Back Canvas Error: ${detail.code} - ${detail.message}`)}
+									/>
+								</div>
+							{/if}
+						{/if}
+					</div>
+				{/if}
+			</div>
+		</Card>
+	</div>
+	<div class="w-full md:w-1/2">
+		<Card class="h-full">
+			<div class="p-6">
+				<div class="flex justify-between items-center mb-4">
+					<h2 class="text-2xl font-bold">ID Card Form</h2>
+				</div>
+				<p class="text-muted-foreground mb-6">Please fill out these details for your ID card.</p>
+
+				{#if template && template.template_elements}
+					<form
+						bind:this={formElement}
+						action="?/saveIdCard"
+						method="POST"
+						enctype="multipart/form-data"
+						onsubmit={preventDefault(handleSubmit)}
+						use:enhance
+					>
+						{#each template.template_elements as element (element.variableName)}
+							{#if element.variableName}
+								<div
+									role="button"
+									tabindex="-1"
+									class="grid grid-cols-[auto_1fr] gap-4 items-center mb-4"
+									onmousedown={handleMouseDown}
+									onmouseup={handleMouseUp}
+								>
+									<Label for={element.variableName} class="text-right">
+										{element.variableName}
+										{#if element.type === 'text' || element.type === 'selection'}
+											<span class="text-red-500">*</span>
+										{/if}
+									</Label>
+									{#if element.type === 'text'}
+										<div class="w-full">
+											<Input
+												type="text"
+												id={element.variableName}
+												name={element.variableName}
+												bind:value={formData[element.variableName]}
+												class="w-full"
+												placeholder={`Enter ${element.variableName}`}
+											/>
+											{#if formErrors[element.variableName]}
+												<p class="mt-1 text-sm text-destructive">This field is required</p>
+											{/if}
+										</div>
+									{:else if element.type === 'selection' && element.options}
+										<div class="relative w-full">
+											<Select.Root
+												type="single"
+												value={selectStates[element.variableName]?.value}
+												onValueChange={(value) =>
+													handleSelectionChange(value, element.variableName)}
+											>
+												<Select.Trigger class="w-full">
+													{triggerContent(element.variableName)}
+												</Select.Trigger>
+												<Select.Content>
+													{#each element.options as option}
+														<Select.Item value={option}>
+															{option}
+														</Select.Item>
+													{/each}
+												</Select.Content>
+											</Select.Root>
+											{#if formErrors[element.variableName]}
+												<p class="mt-1 text-sm text-destructive">Please select an option</p>
+											{/if}
+										</div>
+									{:else if element.type === 'photo' || element.type === 'signature'}
+										<ThumbnailInput
+											width={element.width}
+											height={element.height}
+											fileUrl={fileUrls[element.variableName]}
+											initialScale={imagePositions[element.variableName]?.scale ?? 1}
+											initialX={imagePositions[element.variableName]?.x ?? 0}
+											initialY={imagePositions[element.variableName]?.y ?? 0}
+											isSignature={element.type === 'signature'}
+											on:selectfile={() => handleSelectFile(element.variableName)}
+											on:update={(e) => handleImageUpdate(e, element.variableName)}
+										/>
+									{/if}
+								</div>
+							{/if}
+						{/each}
+
+						<div class="mt-6 space-y-4">
+							<Button type="submit" class="w-full" disabled={loading}>
+								{#if loading}
+									<Loader class="mr-2 h-4 w-4 animate-spin" />
+								{/if}
+								Generate and Save ID Card
+							</Button>
+
+							{#if error}
+								<p class="text-sm text-destructive">{error}</p>
+							{/if}
+						</div>
+					</form>
+				{/if}
+
+				{#if debugMessages.length > 0}
+					<div class="mt-6 p-4 rounded-lg bg-secondary/10">
+						<h3 class="font-bold mb-2">Debug Messages:</h3>
+						<div class="space-y-1">
+							{#each debugMessages as message}
+								<div class="py-1 text-muted-foreground">{message}</div>
+							{/each}
+						</div>
+					</div>
+				{/if}
+			</div>
+		</Card>
+	</div>
+</div>
+
+<style>
+	:global(.dark) {
+		color-scheme: dark;
+	}
+
+	.canvas-wrapper {
+		display: flex;
+		gap: 20px;
+	}
+
+	.canvas-wrapper.landscape {
+		flex-direction: column;
+	}
+
+	.canvas-wrapper.portrait {
+		flex-direction: row;
+	}
+
+	:global(.select-error) {
+		border-color: hsl(var(--destructive));
+		--tw-ring-color: hsl(var(--destructive));
+	}
+
+	:global(.input-error) {
+		border-color: hsl(var(--destructive));
+		--tw-ring-color: hsl(var(--destructive));
+	}
+</style>

@@ -1,4 +1,4 @@
-import { error } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
 import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { leaseReportFilterSchema } from './reportSchema';
@@ -422,5 +422,30 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
 	} catch (err) {
 		console.error('LR-1005 - Error in load function:', err);
 		throw error(500, 'LR-1005 - Internal server error');
+	}
+};
+
+export const actions: Actions = {
+	default: async ({ request, url }) => {
+		const formData = await request.formData();
+		
+		// Extract form values and build URL parameters
+		const params = new URLSearchParams();
+		
+		const startMonth = formData.get('startMonth') as string;
+		const monthCount = formData.get('monthCount') as string;
+		const propertyId = formData.get('propertyId') as string;
+		const floorId = formData.get('floorId') as string;
+		const showInactiveLeases = formData.get('showInactiveLeases') as string;
+		
+		if (startMonth) params.set('startMonth', startMonth);
+		if (monthCount) params.set('monthCount', monthCount);
+		if (propertyId) params.set('propertyId', propertyId);
+		if (floorId) params.set('floorId', floorId);
+		if (showInactiveLeases) params.set('showInactiveLeases', 'true');
+		
+		// Redirect to the same page with updated URL parameters
+		const newUrl = url.pathname + '?' + params.toString();
+		throw redirect(302, newUrl);
 	}
 };

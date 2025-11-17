@@ -1,0 +1,13 @@
+{
+  "name": "@midcodes/tailwind-config",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "index.cjs",
+  "peerDependencies": {
+    "tailwindcss": "^3.4.17"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.17"
+  }
+}

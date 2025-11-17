@@ -5,6 +5,7 @@ import { superValidate } from 'sveltekit-superforms/server';
 import { zod } from 'sveltekit-superforms/adapters';
 import { rental_unitSchema } from './formSchema';
 import type { Database } from '$lib/database.types';
+import { cache, cacheKeys, CACHE_TTL } from '$lib/services/cache';
 
 type DBRentalUnit = Database['public']['Tables']['rental_unit']['Row'];
 type DBProperty = Database['public']['Tables']['properties']['Row'];
@@ -14,18 +15,25 @@ export type RentalUnitResponse = DBRentalUnit & {
 	property: Pick<DBProperty, 'id' | 'name'> | null;
 	floor: Pick<DBFloor, 'id' | 'property_id' | 'floor_number' | 'wing'> | null;
 };
-export const load: PageServerLoad = async ({ locals }) => {
-	// console.log('🔄 Starting server-side load function for rental units');
 
+// Separate async function for loading rental units data with caching
+async function loadRentalUnitsData(locals: any) {
 	const { user, permissions } = await locals.safeGetSession();
 	const hasAccess = permissions.includes('properties.create');
 
 	if (!hasAccess) {
-		throw error(401, 'Unauthorized');
+		return { rentalUnits: [], properties: [], floors: [] };
 	}
 
-	// console.log('📊 Initiating database queries');
-	// const startTime = performance.now();
+	// Check cache first
+	const cacheKey = cacheKeys.rentalUnits();
+	const cached = cache.get<any>(cacheKey);
+	if (cached) {
+		console.log('🎯 CACHE HIT: Returning cached rental units data');
+		return cached;
+	}
+
+	console.log('💾 CACHE MISS: Fetching rental units from database');
 
 	try {
 		const [rentalUnitsResult, propertiesResult, floorsResult] = await Promise.all([
@@ -54,14 +62,6 @@ export const load: PageServerLoad = async ({ locals }) => {
 			throw error(500, 'Failed to load rental units');
 		}
 
-		// const queryTime = performance.now() - startTime;
-		// console.log('🏢 Rental Units Query Result:', {
-		//   units: rentalUnitsResult.data,
-		//   error: rentalUnitsResult.error,
-		//   count: rentalUnitsResult.data?.length || 0,
-		//   time: `${queryTime.toFixed(2)}ms`
-		// });
-
 		// Map the relationships manually
 		const rentalUnits = (rentalUnitsResult.data || []).map((unit) => ({
 			...unit,
@@ -69,26 +69,50 @@ export const load: PageServerLoad = async ({ locals }) => {
 			floor: unit.floor || null
 		}));
 
-		const form = await superValidate(zod(rental_unitSchema));
-
-		return {
-			form,
-			rental_unit: rentalUnits, // Added to satisfy the PageData type
-			rentalUnits, // kept for backward compatibility if used elsewhere
+		const result = {
+			rentalUnits,
 			properties: propertiesResult.data || [],
 			floors: floorsResult.data || []
 		};
-	} catch (error) {
-		console.error('Error in database queries:', error);
-		// Return empty data instead of throwing an error
-		const form = await superValidate(zod(rental_unitSchema));
+
+		// Cache the result
+		cache.set(cacheKey, result, CACHE_TTL.MEDIUM);
+		console.log('✅ Cached rental units data');
+
+		return result;
+	} catch (err) {
+		console.error('Error in database queries:', err);
 		return {
-			form,
 			rentalUnits: [],
 			properties: [],
 			floors: []
 		};
 	}
+}
+
+export const load: PageServerLoad = async ({ locals, depends }) => {
+	// Set up cache invalidation dependency
+	depends('app:rental-units');
+
+	const { user, permissions } = await locals.safeGetSession();
+	const hasAccess = permissions.includes('properties.create');
+
+	if (!hasAccess) {
+		throw error(401, 'Unauthorized');
+	}
+
+	const form = await superValidate(zod(rental_unitSchema));
+
+	// Return minimal data for instant navigation with lazy loading
+	return {
+		form,
+		rental_unit: [],
+		rentalUnits: [],
+		properties: [],
+		floors: [],
+		lazy: true,
+		rentalUnitsPromise: loadRentalUnitsData(locals)
+	};
 };
 
 export const actions: Actions = {
@@ -123,6 +147,10 @@ export const actions: Actions = {
 			console.error('Error creating rental unit:', insertError);
 			return fail(500, { form });
 		}
+
+		// Invalidate rental units cache
+		cache.delete(cacheKeys.rentalUnits());
+		console.log('🗑️ Invalidated rental units cache');
 
 		return { form };
 	},
@@ -159,6 +187,10 @@ export const actions: Actions = {
 			return fail(500, { form, message: 'Failed to update rental unit' });
 		}
 
+		// Invalidate rental units cache
+		cache.delete(cacheKeys.rentalUnits());
+		console.log('🗑️ Invalidated rental units cache');
+
 		return { form };
 	},
 
@@ -192,6 +224,10 @@ export const actions: Actions = {
 			}
 			return fail(500, { message: 'Failed to delete rental unit' });
 		}
+
+		// Invalidate rental units cache
+		cache.delete(cacheKeys.rentalUnits());
+		console.log('🗑️ Invalidated rental units cache');
 
 		return { success: true };
 	}

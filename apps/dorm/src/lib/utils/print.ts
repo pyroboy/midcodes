@@ -555,8 +555,8 @@ function generateAllLeasesPrintHTML(leases: any[]): string {
             // Find the earliest due date among unpaid billings
             const dueDates = unpaidBillings
               .map((billing: any) => billing.due_date ? new Date(billing.due_date) : null)
-              .filter(date => date !== null)
-              .sort((a, b) => a!.getTime() - b!.getTime());
+              .filter((date: Date | null) => date !== null)
+              .sort((a: Date, b: Date) => a.getTime() - b.getTime());
             
             if (dueDates.length > 0) {
               nextDueDate = dueDates[0];

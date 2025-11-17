@@ -129,9 +129,9 @@
 
 					<!-- Status Filter -->
 					<div class="space-y-2">
-						<label class="text-sm font-medium text-slate-700">Status</label>
+						<label for="status-select" class="text-sm font-medium text-slate-700">Status</label>
 						<Select.Root type="single" bind:value={filters.status}>
-							<Select.Trigger class="w-full h-9">
+							<Select.Trigger id="status-select" class="w-full h-9">
 								{filters.status || 'All Status'}
 							</Select.Trigger>
 							<Select.Content>
@@ -145,9 +145,9 @@
 
 					<!-- Year Filter -->
 					<div class="space-y-2">
-						<label class="text-sm font-medium text-slate-700">Year</label>
+						<label for="year-select" class="text-sm font-medium text-slate-700">Year</label>
 						<Select.Root type="single" bind:value={filters.year}>
-							<Select.Trigger class="w-full h-9">
+							<Select.Trigger id="year-select" class="w-full h-9">
 								{filters.year || 'All Years'}
 							</Select.Trigger>
 							<Select.Content>
@@ -161,9 +161,9 @@
 
 					<!-- Sort Filter -->
 					<div class="space-y-2">
-						<label class="text-sm font-medium text-slate-700">Sort By</label>
+						<label for="sort-select" class="text-sm font-medium text-slate-700">Sort By</label>
 						<Select.Root type="single" bind:value={filters.sortBy}>
-							<Select.Trigger class="w-full h-9">
+							<Select.Trigger id="sort-select" class="w-full h-9">
 								{filters.sortBy === 'name-az'
 									? 'Name A-Z'
 									: filters.sortBy === 'name-za'

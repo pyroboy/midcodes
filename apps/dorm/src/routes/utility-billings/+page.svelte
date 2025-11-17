@@ -8,6 +8,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import { tick, onMount } from 'svelte';
 	import type { PageData } from './$types';
+	import { toast } from 'svelte-sonner';
 
 	// Import components
 	import ReadingFiltersPanel from './ReadingFiltersPanel.svelte';
@@ -37,6 +38,7 @@
 
 	// Import processing function
 	import { processUtilityBillingsData } from './dataProcessor';
+	import { cache, CACHE_TTL, cacheKeys } from '$lib/services/cache';
 
 	// Props
 	let { data } = $props<{ data: PageData }>();
@@ -164,6 +166,11 @@
 				processedData = processed;
 				isLoading = false;
 
+				// Mirror to client cache for debug panel
+				cache.set(cacheKeys.meters(), loadedMeters, CACHE_TTL.MEDIUM);
+				cache.set(cacheKeys.readings(), loadedReadings, CACHE_TTL.SHORT);
+				cache.set(cacheKeys.utilityBillings(), loadedBillings, CACHE_TTL.SHORT);
+
 				console.log('Utility billings data loaded successfully');
 			} catch (error) {
 				console.error('Error loading utility billings data:', error);
@@ -175,7 +182,8 @@
 	// Data sources - use processed data
 	const allProperties = $derived(processedData.properties);
 	const allMeters = $derived(processedData.meters);
-	const allReadings = $derived(processedData.readings);
+	const allReadings = $derived((processedData as any).allReadings || []); // ALL readings for pending review
+	const displayReadings = $derived(processedData.readings || []); // Filtered readings for display
 	const availableDates = $derived(processedData.availableReadingDates);
 
 	let leases = $derived(processedData.leases);
@@ -191,6 +199,63 @@
 		return readings.length > 0
 			? { reading: readings[0].reading, date: readings[0].reading_date }
 			: { reading: null, date: null };
+	}
+
+	// Type for pending review groups
+	type PendingReviewGroup = {
+		date: string;
+		readings: Reading[];
+	};
+
+	// Pending review grouping
+	let pendingReviewGroups = $derived.by(() => {
+		const pending: Reading[] = allReadings.filter((r: Reading) => r.review_status === 'PENDING_REVIEW');
+		const byDate: Record<string, Reading[]> = {};
+		for (const r of pending) {
+			const key = r.reading_date;
+			(byDate[key] ||= []).push(r);
+		}
+		return Object.entries(byDate).map(([date, readings]): PendingReviewGroup => ({ date, readings }));
+	});
+
+	let hasPendingReview = $derived.by(() => {
+		if (!allReadings || !Array.isArray(allReadings)) {
+			return false;
+		}
+
+		return allReadings.some((r: Reading) => r.review_status === 'PENDING_REVIEW');
+	});
+
+	async function approveGroup(readingIds: number[]) {
+		try {
+			const form = new FormData();
+			form.append('reading_ids', JSON.stringify(readingIds));
+			const res = await fetch('?/approvePendingReadings', { method: 'POST', body: form });
+			if (!res.ok) {
+				const data = await res.json().catch(() => ({}));
+				throw new Error(data?.error || 'Failed to approve readings');
+			}
+			toast.success('Readings approved');
+			await invalidateAll();
+		} catch (e: any) {
+			toast.error(e?.message || 'Failed to approve readings');
+		}
+	}
+
+	async function rejectGroup(readingIds: number[]) {
+		try {
+			const form = new FormData();
+			form.append('reading_ids', JSON.stringify(readingIds));
+			const res = await fetch('?/rejectPendingReadings', { method: 'POST', body: form });
+			if (!res.ok) {
+				const data = await res.json().catch(() => ({}));
+				throw new Error(data?.error || 'Failed to reject readings');
+			}
+			toast.success('Readings rejected');
+			await invalidateAll();
+		} catch (e: any) {
+			toast.error(e?.message || 'Failed to reject readings');
+		}
 	}
 
 	// Event handlers
@@ -332,6 +397,39 @@
 		addReadings={openReadingModal}
 	/>
 
+	<!-- Pending Review Card -->
+	{#if hasPendingReview}
+		<div class="mt-6 p-4 border rounded-lg bg-amber-50 border-amber-200">
+			<h2 class="text-lg font-semibold text-amber-800 mb-2">Pending Review</h2>
+			<div class="space-y-3">
+				{#each pendingReviewGroups as group (group.date)}
+					<div class="p-3 bg-white border rounded">
+						<div class="flex items-center justify-between">
+							<div>
+								<p class="text-sm text-gray-600">Date</p>
+								<p class="font-medium">{new Date(group.date).toLocaleDateString()}</p>
+							</div>
+							<div class="flex items-center gap-2">
+								<Button variant="outline" onclick={() => rejectGroup(group.readings.map((r) => r.id))}>Reject</Button>
+								<Button onclick={() => approveGroup(group.readings.map((r) => r.id))}>Approve</Button>
+							</div>
+						</div>
+						<div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+							{#each group.readings as r}
+								<div class="p-2 border rounded text-sm">
+									<div class="flex items-center justify-between">
+										<span>Meter #{r.meter_id}</span>
+										<span class="text-gray-600">{r.reading}</span>
+									</div>
+								</div>
+							{/each}
+						</div>
+					</div>
+				{/each}
+			</div>
+		</div>
+	{/if}
+
 	<TenantShareModal
 		bind:open={modals.tenantShare}
 		reading={tenantShare.selectedMeter}
@@ -361,7 +459,6 @@
 		{#if modals.reading && selectedProperty}
 			<ReadingEntryModal
 				bind:open={modals.reading}
-				previousReadingGroups={processedData.previousReadingGroups}
 				property={selectedProperty}
 				utilityType={readingEntry.utilityType}
 				meters={allMeters}
@@ -386,7 +483,7 @@
 
 	<BillingPeriodsGraphModal
 		bind:open={modals.billingGraph}
-		readings={allReadings}
+		readings={displayReadings}
 		meters={allMeters}
 		properties={allProperties}
 		close={() => (modals.billingGraph = false)}
@@ -405,7 +502,7 @@
 						variant="outline"
 						onclick={() => (modals.billingGraph = true)}
 						class="flex items-center gap-2"
-						disabled={allReadings.length === 0}
+						disabled={displayReadings.length === 0}
 					>
 						<BarChart class="h-4 w-4 mr-1" />
 						Graph Analysis
@@ -416,7 +513,7 @@
 						variant="outline"
 						onclick={() => (modals.export = true)}
 						class="flex items-center gap-2"
-						disabled={allReadings.length === 0}
+						disabled={displayReadings.length === 0}
 					>
 						<Download class="h-4 w-4 mr-1" />
 						Export Data
@@ -428,13 +525,15 @@
 				<UtilityBillingSkeleton />
 			{:else}
 				<ConsolidatedReadingsTable
-					readings={allReadings}
+					readings={displayReadings}
 					meters={allMeters}
 					properties={allProperties}
 					filters={activeFilters}
 					onShareReading={openTenantShareModal}
 					meterLastBilledDates={processedData.meterLastBilledDates}
 					actualBilledDates={processedData.actualBilledDates}
+					leaseMeterBilledDates={processedData.leaseMeterBilledDates}
+					leases={processedData.leases}
 				/>
 			{/if}
 		</div>
@@ -442,7 +541,7 @@
 
 	<!-- Summary Statistics -->
 	{#if !isLoading}
-		<SummaryStatistics readings={allReadings} meters={allMeters} readingDates={availableDates} />
+		<SummaryStatistics readings={displayReadings} meters={allMeters} readingDates={availableDates} />
 	{/if}
 
 	{#if import.meta.env.DEV}

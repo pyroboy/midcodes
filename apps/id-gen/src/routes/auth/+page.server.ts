@@ -3,103 +3,108 @@ import type { Actions, PageServerLoad } from './$types';
 import { AuthApiError } from '@supabase/supabase-js';
 
 export const load: PageServerLoad = async ({ locals: { safeGetSession }, url }) => {
-    const { session } = await safeGetSession();
-    
-    if (session) {
-        const returnTo = url.searchParams.get('returnTo');
-        // If returnTo parameter exists, redirect there, otherwise go to home
-        if (returnTo) {
-            throw redirect(303, returnTo);
-        }
-        throw redirect(303, '/');
-    }
+	const { session } = await safeGetSession();
 
-    return {
-        session: null,
-        profile: null
-    };
+	if (session) {
+		const returnTo = url.searchParams.get('returnTo');
+		// If returnTo parameter exists, redirect there, otherwise go to home
+		if (returnTo) {
+			throw redirect(303, returnTo);
+		}
+		throw redirect(303, '/');
+	}
+
+	return {
+		session: null,
+		profile: null
+	};
 };
 
 export interface AuthActionData {
-    success: boolean;
-    error?: string;
-    email?: string;
-    message?: string;
-    [key: string]: unknown;
+	success: boolean;
+	error?: string;
+	email?: string;
+	message?: string;
+	[key: string]: unknown;
 }
 
 export const actions: Actions = {
-    signin: async ({ request, locals: { supabase } }) => {
-        const formData = await request.formData();
-        const email = formData.get('email') as string;
-        const password = formData.get('password') as string;
+	signin: async ({ request, locals: { supabase } }) => {
+		const formData = await request.formData();
+		const email = formData.get('email') as string;
+		const password = formData.get('password') as string;
 
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email,
-            password
-        });
+		const { data, error } = await supabase.auth.signInWithPassword({
+			email,
+			password
+		});
 
-        if (error) {
-            if (error instanceof AuthApiError && error.status === 400) {
-                return fail(400, {
-                    error: 'Invalid credentials',
-                    success: false,
-                    email
-                });
-            }
-            return fail(500, {
-                error: 'Server error. Please try again later.',
-                success: false
-            });
-        }
+		if (error) {
+			if (error instanceof AuthApiError && error.status === 400) {
+				return fail(400, {
+					error: 'Invalid credentials',
+					success: false,
+					email
+				});
+			}
+			return fail(500, {
+				error: 'Server error. Please try again later.',
+				success: false
+			});
+		}
 
-        return {
-            success: true,
-            email
-        };
-    },
+		return {
+			success: true,
+			email
+		};
+	},
 
-    signup: async ({ request, url, locals: { supabase } }) => {
-        const formData = await request.formData();
-        const email = formData.get('email') as string;
-        const password = formData.get('password') as string;
-        const confirmPassword = formData.get('confirmPassword') as string;
+	signup: async ({ request, url, locals: { supabase } }) => {
+		const formData = await request.formData();
+		const email = formData.get('email') as string;
+		const password = formData.get('password') as string;
+		const confirmPassword = formData.get('confirmPassword') as string;
 
-        if (password !== confirmPassword) {
-            return fail(400, {
-                error: 'Passwords do not match',
-                success: false,
-                email
-            });
-        }
+		if (password !== confirmPassword) {
+			return fail(400, {
+				error: 'Passwords do not match',
+				success: false,
+				email
+			});
+		}
 
-        const { data, error: err } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-                emailRedirectTo: `${url.origin}/auth/callback`
-            }
-        });
+		const returnTo = url.searchParams.get('returnTo');
+		const emailRedirectTo = returnTo
+			? `${url.origin}/auth/callback?returnTo=${encodeURIComponent(returnTo)}`
+			: `${url.origin}/auth/callback`;
 
-        if (err) {
-            if (err instanceof AuthApiError && err.status === 400) {
-                return fail(400, {
-                    error: 'Invalid credentials',
-                    success: false,
-                    email
-                });
-            }
+		const { data, error: err } = await supabase.auth.signUp({
+			email,
+			password,
+			options: {
+				emailRedirectTo
+			}
+		});
 
-            return fail(500, {
-                error: 'Server error. Please try again later.',
-                success: false
-            });
-        }
+		if (err) {
+			if (err instanceof AuthApiError && err.status === 400) {
+				return fail(400, {
+					error: 'Invalid credentials',
+					success: false,
+					email
+				});
+			}
 
-        return {
-            success: true,
-            email,
-            message: 'Please check your email for a confirmation link.'
-        };
-    }
+			return fail(500, {
+				error: 'Server error. Please try again later.',
+				success: false
+			});
+		}
+
+		return {
+			success: true,
+			email,
+			message: 'Please check your email for a confirmation link.'
+		};
+	}
 };

@@ -1,8 +1,10 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { propertyStore } from '$lib/stores/property';
 	import RentalUnitForm from './Rental_UnitForm.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
+	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { superForm } from 'sveltekit-superforms/client';
 	import { zodClient } from 'sveltekit-superforms/adapters';
 	import { rental_unitSchema } from './formSchema';
@@ -14,10 +16,34 @@
 	import type { PageData } from './$types';
 	import { Pencil, Trash2, Users, Tag, List } from 'lucide-svelte';
 	import * as AccordionPrimitive from '$lib/components/ui/accordion';
+	import { cache, CACHE_TTL, cacheKeys } from '$lib/services/cache';
 
 	let { data } = $props<{ data: PageData }>();
 
 	let expandedUnits = $state(new Set<number>());
+	let isLoading = $state(data.lazy === true);
+	let rentalUnits = $state<RentalUnitResponse[]>(data.rentalUnits || []);
+	let properties = $state(data.properties || []);
+	let floors = $state(data.floors || []);
+
+	// Load data lazily on mount
+	onMount(async () => {
+		if (data.lazy && data.rentalUnitsPromise) {
+			try {
+				const loadedData = await data.rentalUnitsPromise;
+				rentalUnits = loadedData.rentalUnits;
+				properties = loadedData.properties;
+				floors = loadedData.floors;
+				isLoading = false;
+
+				// Mirror to client cache
+				cache.set(cacheKeys.rentalUnits(), loadedData, CACHE_TTL.MEDIUM);
+			} catch (error) {
+				console.error('Error loading rental units data:', error);
+				isLoading = false;
+			}
+		}
+	});
 
 	function toggleAccordion(unitId: number) {
 		if (expandedUnits.has(unitId)) {
@@ -28,20 +54,17 @@
 		expandedUnits = expandedUnits; // Trigger reactivity for the Set
 	}
 
-	// --- FIX START ---
-
 	// Reactively get the selected property from the global store using $derived.
 	let selectedProperty = $derived($propertyStore.selectedProperty);
 
 	// Reactively filter the rental units. Explicitly type the 'unit' parameter.
 	let filteredRentalUnits = $derived(
-		selectedProperty && data.rentalUnits
-			? data.rentalUnits.filter(
+		selectedProperty && rentalUnits
+			? rentalUnits.filter(
 					(unit: RentalUnitResponse) => unit.property_id === selectedProperty!.id
 				)
 			: []
 	);
-	// --- FIX END ---
 
 	let editMode = $state(false);
 	let formError = $state('');
@@ -187,7 +210,26 @@
 				</div>
 
 				<div class="border rounded-md">
-					{#if !filteredRentalUnits.length}
+					{#if isLoading}
+						<!-- Skeleton loaders -->
+						<div class="space-y-2 p-4">
+							{#each Array(5) as _, i (i)}
+								<div class="border border-slate-200 rounded-lg p-4">
+									<div class="flex items-center justify-between">
+										<div class="flex items-center gap-3 flex-1">
+											<Skeleton class="h-4 w-32" />
+											<Skeleton class="h-4 w-24" />
+										</div>
+										<div class="flex items-center gap-2">
+											<Skeleton class="h-6 w-20" />
+											<Skeleton class="h-8 w-8 rounded" />
+											<Skeleton class="h-8 w-8 rounded" />
+										</div>
+									</div>
+								</div>
+							{/each}
+						</div>
+					{:else if !filteredRentalUnits.length}
 						<div class="text-center py-8">
 							<p class="text-gray-500">No rental units found for this property.</p>
 						</div>

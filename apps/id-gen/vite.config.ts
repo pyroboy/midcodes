@@ -2,26 +2,32 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import type { UserConfig } from 'vite';
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
-import tailwind from 'tailwindcss';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
-    plugins: [
-        sveltekit(),
-        tailwind()
-    ],
-    server: {
-        host: true, // Allows access on the local network
-      },
-    // optimizeDeps: {
-    //     include: ['three']
-    // },
-    // resolve: {
-    //     alias: {
-    //         'three/examples/jsm/objects/GroundProjectedSkybox': resolve('node_modules/three/examples/jsm/objects/GroundProjectedSkybox.js'),
-    //         'three/examples/jsm': resolve('node_modules/three/examples/jsm')
-    //     }
-    // },
-    ssr: {
-        noExternal: ['three', '@threlte/core', '@threlte/extras']
-    }
+	plugins: [tailwindcss(), sveltekit()],
+	server: {
+		host: '127.0.0.1', // Bind to localhost specifically for Windows
+		port: 5173
+	},
+	optimizeDeps: {
+		exclude: ['ws', 'events', '@sveltejs/kit'],
+		include: [
+			'jszip', 
+			'three', 
+			'@threlte/core', 
+			'@threlte/extras',
+			'bits-ui'
+		]
+	},
+	define: {
+		global: 'globalThis'
+	},
+	ssr: {
+		noExternal: ['webfontloader', '@threlte/core', '@threlte/extras', 'three'],
+		external: ['@sveltejs/kit']
+	},
+	resolve: {
+		dedupe: ['@sveltejs/kit', 'svelte']
+	}
 } as UserConfig);

@@ -1,411 +1,537 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
-    import { Canvas } from '@threlte/core';
-    import { T } from '@threlte/core';
-    import { Mesh } from 'three'
-    import { AsciiRenderer, OrbitControls } from '@threlte/extras'
-    import * as THREE from 'three';
+	// --- IMPORTS ---
+	import { T, Canvas } from '@threlte/core';
+	import { OrbitControls, useTexture } from '@threlte/extras';
+	import * as THREE from 'three';
+	import { onMount } from 'svelte';
+	import { browser } from '$app/environment';
 
-    // Enable proper color management
-    THREE.ColorManagement.enabled = true;
+	// --- LOCAL IMPORTS ---
+	import type { CardGeometry } from '$lib/utils/cardGeometry';
+	import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeometry';
 
-    let { frontImageUrl = null, backImageUrl = null, onClose } = $props();
-    let sceneState = $state({
-        frontTextureLoaded: false,
-        backTextureLoaded: false,
-        meshInitialized: false,
-        lastError: null as string | null
-    });
+	// --- TYPES ---
+	type GeometryDimensions = { width: number; height: number } | null;
 
+	/**
+	 * 🔧 DEBUG VERSION: Simple texture transform for testing
+	 */
+	function transformTextureToFit(
+		texture: THREE.Texture,
+		templateDims: TemplateDimensions,
+		geoDims: GeometryDimensions | null
+	): THREE.Texture {
+		console.log('🔍 DEBUG - Input parameters:', {
+			templateDims,
+			geoDims,
+			textureSize: { width: texture.image?.width, height: texture.image?.height }
+		});
 
-    let canvasError: string | null = $state(null);
-    let canvasInitialized = $state(false);
-    let debugMode = $state(false);
-    let modalRef: HTMLDialogElement | undefined = $state();
+		// Basic texture setup
+		texture.flipY = true;
+		texture.wrapS = THREE.ClampToEdgeWrapping;
+		texture.wrapT = THREE.ClampToEdgeWrapping;
 
-    let rotationY = $state(0);
-    let animationFrameId: number | null = null;
-    let autoRotateId: number | null = null;
-    let isFlipping = false;
-    let shouldAutoRotate = true;
+		// DEBUG: Try different approaches
+		if (!templateDims || !geoDims) {
+			console.log('🚨 Missing dimensions - using 1:1 mapping');
+			texture.repeat.set(1, 1);
+			texture.offset.set(0, 0);
+			return texture;
+		}
 
-    function easeInOutCubic(x: number): number {
-        return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
-    }
+		const templateAspect = templateDims.width / templateDims.height;
+		const geometryAspect = geoDims.width / geoDims.height;
+		const imageAspect = texture.image ? texture.image.width / texture.image.height : templateAspect;
 
-    function startAutoRotate() {
-        if (!autoRotateId && !isFlipping && shouldAutoRotate) {
-            function animate() {
-                rotationY += 0.005;
-                autoRotateId = requestAnimationFrame(animate);
-            }
-            autoRotateId = requestAnimationFrame(animate);
-        }
-    }
+		console.log('📊 Aspect Ratios:', {
+			template: templateAspect.toFixed(3),
+			geometry: geometryAspect.toFixed(3),
+			image: imageAspect.toFixed(3)
+		});
 
-    function stopAutoRotate() {
-        if (autoRotateId) {
-            cancelAnimationFrame(autoRotateId);
-            autoRotateId = null;
-        }
-    }
+		// For debugging, try using image aspect ratio directly
+		const actualAspect = imageAspect;
+		let scaleX = 1;
+		let scaleY = 1;
 
-    function createRoundedRectCard(width = 2, height = 1.25, depth = 0.007, radius = 0.08) {
-        const roundedRectShape = new THREE.Shape();
-        
-        const x = -width / 2;
-        const y = -height / 2;
-        const w = width;
-        const h = height;
-        const r = radius;
+		if (actualAspect > geometryAspect) {
+			// Image is wider than geometry - fit by height
+			scaleX = geometryAspect / actualAspect;
+			scaleY = 1;
+		} else {
+			// Image is taller than geometry - fit by width
+			scaleX = 1;
+			scaleY = actualAspect / geometryAspect;
+		}
 
-        roundedRectShape.moveTo(x + r, y);
-        roundedRectShape.lineTo(x + w - r, y);
-        roundedRectShape.bezierCurveTo(
-            x + w - r/2, y,
-            x + w, y + r/2,
-            x + w, y + r
-        );
-        roundedRectShape.lineTo(x + w, y + h - r);
-        roundedRectShape.bezierCurveTo(
-            x + w, y + h - r/2,
-            x + w - r/2, y + h,
-            x + w - r, y + h
-        );
-        roundedRectShape.lineTo(x + r, y + h);
-        roundedRectShape.bezierCurveTo(
-            x + r/2, y + h,
-            x, y + h - r/2,
-            x, y + h - r
-        );
-        roundedRectShape.lineTo(x, y + r);
-        roundedRectShape.bezierCurveTo(
-            x, y + r/2,
-            x + r/2, y,
-            x + r, y
-        );
-        roundedRectShape.closePath();
+		// Apply scaling and centering
+		texture.repeat.set(scaleX, scaleY);
+		texture.offset.set((1 - scaleX) / 2, (1 - scaleY) / 2);
 
-        const extrudeSettings = {
-            depth: depth,
-            bevelEnabled: true,
-            bevelThickness: 0.002,
-            bevelSize: 0.002,
-            bevelSegments: 2,
-            steps: 1,
-            curveSegments: 32
-        };
+		console.log('✅ Final Transform:', {
+			scale: { x: scaleX.toFixed(3), y: scaleY.toFixed(3) },
+			repeat: { x: texture.repeat.x.toFixed(3), y: texture.repeat.y.toFixed(3) },
+			offset: { x: texture.offset.x.toFixed(3), y: texture.offset.y.toFixed(3) }
+		});
 
-        const geometry = new THREE.ExtrudeGeometry(roundedRectShape, extrudeSettings);
-        
-        const frontGeometry = new THREE.BufferGeometry();
-        const backGeometry = new THREE.BufferGeometry();
-        const edgeGeometry = new THREE.BufferGeometry();
-        
-        const position = geometry.getAttribute('position');
-        const normal = geometry.getAttribute('normal');
-        
-        const frontPositions = [];
-        const frontNormals = [];
-        const frontUvs = [];
-        const backPositions = [];
-        const backNormals = [];
-        const backUvs = [];
-        const edgePositions = [];
-        const edgeNormals = [];
-        
-        for (let i = 0; i < position.count; i++) {
-            const normalZ = normal.getZ(i);
-            const px = position.getX(i);
-            const py = position.getY(i);
-            const pz = position.getZ(i);
-            const nx = normal.getX(i);
-            const ny = normal.getY(i);
-            const nz = normal.getZ(i);
-            
-            if (normalZ > 0.5) {
-                frontPositions.push(px, py, pz);
-                frontNormals.push(nx, ny, nz);
-                frontUvs.push(
-                    (px - x) / w,
-                    1 - (py - y) / h
-                );
-            } else if (normalZ < -0.5) {
-                backPositions.push(px, py, pz);
-                backNormals.push(nx, ny, nz);
-                backUvs.push(
-                    1 - (px - x) / w,
-                    1 - (py - y) / h
-                );
-            } else {
-                edgePositions.push(px, py, pz);
-                edgeNormals.push(nx, ny, nz);
-            }
-        }
-        
-        frontGeometry.setAttribute('position', new THREE.Float32BufferAttribute(frontPositions, 3));
-        frontGeometry.setAttribute('normal', new THREE.Float32BufferAttribute(frontNormals, 3));
-        frontGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(frontUvs, 2));
-        
-        backGeometry.setAttribute('position', new THREE.Float32BufferAttribute(backPositions, 3));
-        backGeometry.setAttribute('normal', new THREE.Float32BufferAttribute(backNormals, 3));
-        backGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(backUvs, 2));
-        
-        edgeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(edgePositions, 3));
-        edgeGeometry.setAttribute('normal', new THREE.Float32BufferAttribute(edgeNormals, 3));
-        
-        return { frontGeometry, backGeometry, edgeGeometry };
-    }
+		texture.needsUpdate = true;
+		return texture;
+	}
 
-    function handleKeydown(event: KeyboardEvent) {
-        if (event.key === 'Escape') {
-            onClose();
-        } else if (event.key === 'd') {
-            debugMode = !debugMode;
-        }
-    }
+	// --- PROPS ---
+	let {
+		frontImageUrl: frontImageUrlProp = null,
+		backImageUrl: backImageUrlProp = null,
+		onClose = () => {},
+		cardGeometry: cardGeometryProp = null,
+		templateDimensions: templateDimensionsProp = null
+	} = $props<{
+		frontImageUrl?: string | null | (() => Promise<string | null> | string | null);
+		backImageUrl?: string | null | (() => Promise<string | null> | string | null);
+		onClose?: (event?: MouseEvent) => void;
+		cardGeometry?: CardGeometry | null | (() => Promise<CardGeometry | null> | CardGeometry | null);
+		templateDimensions?: TemplateDimensions | (() => Promise<TemplateDimensions> | TemplateDimensions);
+	}>();
 
-    function handleImageError(isFront: boolean, error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        sceneState.lastError = `Error loading ${isFront ? 'front' : 'back'} image: ${errorMessage}`;
-        canvasError = sceneState.lastError;
-    }
+	type TemplateDimensions = { width: number; height: number; unit?: string } | null;
 
-    function createTexture(url: string): THREE.Texture {
-        const texture = new THREE.TextureLoader().load(
-            url,
-            (tex) => {
-                tex.flipY = false;
-                tex.colorSpace = THREE.SRGBColorSpace;  // Explicitly set sRGB for color textures
-                tex.repeat.set(1, 1);
-                tex.center.set(0.5, 0.5);
-                tex.magFilter = THREE.LinearFilter;
-                tex.minFilter = THREE.LinearFilter;
-                tex.needsUpdate = true;
-                
-                if (url === frontImageUrl) {
-                    handleImageLoad(true);
-                } else {
-                    handleImageLoad(false);
-                }
-            },
-            undefined,
-            (error) => handleImageError(url === frontImageUrl, error)
-        );
-        return texture;
-    }
+	// --- STATE ---
+	let currentGeometry = $state<CardGeometry | null>(null);
+	let geometryDimensions = $state<GeometryDimensions>(null);
+	let isLoadingGeometry = $state(true); // Start in a loading state
+	let canvasError = $state<string | null>(null);
 
-    onMount(() => {
-        startAutoRotate();
-        if (modalRef) {
-            modalRef.showModal();
-        }
-        return () => {
-            if (animationFrameId) {
-                cancelAnimationFrame(animationFrameId);
-            }
-            stopAutoRotate();
-        };
-    });
-
-    function handleFlip() {
-        stopAutoRotate();
-        shouldAutoRotate = false;
-        isFlipping = true;
-        const startRotation = rotationY;
-        const targetRotation = startRotation + Math.PI;
-        let startTime: number | null = null;
-        const duration = 1000;
-        
-        function animate(currentTime: number) {
-            if (!startTime) startTime = currentTime;
-            const elapsed = currentTime - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-            
-            rotationY = startRotation + (targetRotation - startRotation) * easeInOutCubic(progress);
-            
-            if (progress < 1) {
-                animationFrameId = requestAnimationFrame(animate);
-            } else {
-                rotationY = targetRotation;
-                animationFrameId = null;
-                isFlipping = false;
-            }
-        }
-        
-        if (!animationFrameId) {
-            animationFrameId = requestAnimationFrame(animate);
-        }
-    }
-
-    function handleImageLoad(isFront: boolean) {
-        if (isFront) {
-            sceneState.frontTextureLoaded = true;
-        } else {
-            sceneState.backTextureLoaded = true;
-        }
-    }
-
-    function handleModalClose(event: MouseEvent) {
-        const target = event.target as HTMLElement;
-        if (target.classList.contains('modal-backdrop')) {
-            onClose();
-        }
-    }
+	// --- REACTIVE PROP HANDLING ---
+	let resolvedFrontUrl = $state<string | null>(null);
+	let resolvedBackUrl = $state<string | null>(null);
+	let resolvedCardGeometry = $state<CardGeometry | null>(null);
+	let resolvedTemplateDimensions = $state<TemplateDimensions>(null);
 
 
+	// Effect 1: Resolve incoming props, which may be functions or promises
+	$effect(() => {
+		const resolveProp = async (prop: any) => (typeof prop === 'function' ? await prop() : prop);
+		(async () => {
+			try {
+				isLoadingGeometry = true;
+				const [front, back, geo, dims] = await Promise.all([
+					resolveProp(frontImageUrlProp),
+					resolveProp(backImageUrlProp),
+					resolveProp(cardGeometryProp),
+					resolveProp(templateDimensionsProp)
+				]);
+				resolvedFrontUrl = front;
+				resolvedBackUrl = back;
+				resolvedCardGeometry = geo;
+				resolvedTemplateDimensions = dims;
+			} catch (error) {
+				console.error('❌ Failed to resolve component props:', error);
+				canvasError = 'Failed to load input data.';
+				isLoadingGeometry = false;
+			}
+		})();
+	});
+
+	// Effect 2: Generate the 3D geometry once the resolved props are ready
+	$effect(() => {
+		const updateGeometry = async () => {
+			canvasError = null;
+			try {
+			let geometry: CardGeometry | null = null;
+			console.log('🔄 Geometry Path Debug:', {
+				resolvedCardGeometry: !!resolvedCardGeometry,
+				resolvedTemplateDimensions: resolvedTemplateDimensions
+			});
+			
+			if (resolvedCardGeometry) {
+				console.log('📍 Taking Custom Geometry Path');
+				geometry = resolvedCardGeometry;
+				
+				// FIXED: Use template dimensions to calculate correct geometry dimensions
+				// even when we have custom geometry
+				if (resolvedTemplateDimensions) {
+					console.log('🔧 Using template dimensions for custom geometry scaling');
+					const { width, height, unit } = resolvedTemplateDimensions;
+					const isInches = ['in', 'inch', 'inches'].includes(unit?.toLowerCase() ?? '');
+					
+					// Convert pixels to a sensible inch-like scale, assuming 300 DPI
+					const widthInches = isInches ? width : width / 300;
+					const heightInches = isInches ? height : height / 300;
+					
+					// Convert to 3D world units using the same scale factor as createCardFromInches
+					const scaleInchesToUnits = 0.5;
+					const worldWidth = widthInches * scaleInchesToUnits;
+					const worldHeight = heightInches * scaleInchesToUnits;
+					
+					// Store the actual 3D world dimensions for texture transform
+					geometryDimensions = { width: worldWidth, height: worldHeight };
+					
+					console.log('📐 Custom Geometry Dimensions:', {
+						template: { width, height, unit },
+						inches: { width: widthInches, height: heightInches },
+						worldUnits: { width: worldWidth, height: worldHeight }
+					});
+				} else {
+					console.log('⚠️ No template dimensions available, using default geometry dimensions');
+					geometryDimensions = { width: 2, height: 1.25 };
+				}
+			} else if (resolvedTemplateDimensions) {
+				console.log('📍 Taking Template Dimensions Path');
+				const { width, height, unit } = resolvedTemplateDimensions;
+				const isInches = ['in', 'inch', 'inches'].includes(unit?.toLowerCase() ?? '');
+				
+				// Convert pixels to a sensible inch-like scale, assuming 300 DPI
+				const widthInches = isInches ? width : width / 300;
+				const heightInches = isInches ? height : height / 300;
+				
+				// Convert to 3D world units using the same scale factor as createCardFromInches
+				const scaleInchesToUnits = 0.5;
+				const worldWidth = widthInches * scaleInchesToUnits;
+				const worldHeight = heightInches * scaleInchesToUnits;
+				
+				// Store the actual 3D world dimensions for texture transform
+				geometryDimensions = { width: worldWidth, height: worldHeight };
+				
+				// Also update resolved template dimensions to use the actual card size in inches
+				// This ensures texture transformation uses the correct aspect ratio
+				resolvedTemplateDimensions = {
+					width: widthInches,
+					height: heightInches,
+					unit: 'inches'
+				};
+				
+				// Create geometry with the calculated dimensions
+				geometry = await createCardFromInches(widthInches, heightInches);
+				
+				console.log('📐 Geometry Dimensions:', {
+					template: { width, height, unit },
+					inches: { width: widthInches, height: heightInches },
+					worldUnits: { width: worldWidth, height: worldHeight }
+				});
+			} else {
+				console.log('📍 Taking Default Geometry Path (no template dimensions)');
+				geometry = await createRoundedRectCard();
+				geometryDimensions = { width: 2, height: 1.25 };
+			}
+				currentGeometry = geometry;
+			} catch (error: any) {
+				console.error('❌ Failed to create geometry:', error);
+				canvasError = `Failed to load 3D model: ${error.message}`;
+				currentGeometry = null;
+			} finally {
+				isLoadingGeometry = false;
+			}
+		};
+		
+		if (resolvedFrontUrl || resolvedBackUrl) {
+			updateGeometry();
+		} else {
+			isLoadingGeometry = false;
+		}
+	});
+
+	// --- RESPONSIVE CALCULATIONS ---
+	let viewportWidth = $state(browser ? window.innerWidth : 1920);
+	let viewportHeight = $state(browser ? window.innerHeight : 1080);
+
+	const responsiveSettings = $derived.by(() => {
+		const scaleRatio = Math.min(viewportWidth / 1920, viewportHeight / 1080);
+		let cardAspectRatio = 1.6; // Default
+		if (resolvedTemplateDimensions) {
+			cardAspectRatio = resolvedTemplateDimensions.width / resolvedTemplateDimensions.height;
+		}
+		const baseCameraDistance = cardAspectRatio > 1.2 ? 2.8 : 3.5; // Adjust for portrait vs landscape
+		return {
+			cameraDistance: Math.max(1.5, baseCameraDistance - scaleRatio * 0.5),
+			fov: 60
+		};
+	});
+
+	// --- ANIMATION & INTERACTION ---
+	let rotationY = $state(0);
+	let shouldAutoRotate = $state(true);
+	let targetRotationY = $state(0);
+	let animationId: number | null = null;
+
+	function animate() {
+		if (shouldAutoRotate) targetRotationY += 0.005;
+		rotationY = THREE.MathUtils.lerp(rotationY, targetRotationY, 0.05);
+		animationId = requestAnimationFrame(animate);
+	}
+
+	function handleFlip() {
+		shouldAutoRotate = false;
+		targetRotationY = Math.round(targetRotationY / Math.PI) * Math.PI + Math.PI;
+	}
+
+	function handleKeydown(event: KeyboardEvent) {
+		if (event.key === 'Escape') onClose();
+	}
+	
+	function handleResize() {
+		viewportWidth = window.innerWidth;
+		viewportHeight = window.innerHeight;
+	}
+
+	function handleModalClose(event: MouseEvent) {
+		if ((event.target as HTMLElement).classList.contains('modal-backdrop')) onClose();
+	}
+
+	function handleModalCloseKeyboard(event: KeyboardEvent) {
+		if (event.key === 'Enter') onClose();
+	}
+
+	function handleDialogCloseKeyboard(event: KeyboardEvent) {
+		if (event.key === 'Enter') onClose();
+	}
+
+	function handleCanvasClickKeyboard(event: KeyboardEvent) {
+		if (event.key === 'Enter') event.stopPropagation();
+	}
+
+	// --- LIFECYCLE ---
+	onMount(() => {
+		if (!browser) return;
+		THREE.ColorManagement.enabled = true;
+		animate();
+		window.addEventListener('resize', handleResize);
+		return () => {
+			if (animationId) cancelAnimationFrame(animationId);
+			window.removeEventListener('resize', handleResize);
+		};
+	});
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
 
-{#if frontImageUrl || backImageUrl}
-<div class="fixed inset-0 z-50">
-    <div 
-        class="fixed inset-0 bg-black/80 backdrop-blur-sm"
-        role="presentation"
-        onclick={handleModalClose}
-    ></div>
-    
-    <div class="fixed inset-0 flex items-center justify-center p-4">
-        <div 
-            class="relative w-full max-w-5xl rounded-lg p-6 shadow-2xl"
-            role="dialog"
-            aria-labelledby="modal-title"
-        >
-            <button 
-                type="button"
-                class="absolute right-4 top-4 z-10 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
-                onclick={onClose}
-                aria-label="Close preview"
-            >
-                ✕
-            </button>
+{#if frontImageUrlProp || backImageUrlProp}
+	<div class="fixed inset-0 z-50">
+		<div 
+			class="fixed inset-0 bg-black/80 backdrop-blur-sm modal-backdrop" 
+			role="presentation" 
+			onclick={handleModalClose}
+			onkeydown={handleModalCloseKeyboard}
+			tabindex="-1"
+		></div>
 
-            <div class="h-[80vh] w-full">
-                {#if canvasError}
-                    <p class="absolute inset-0 flex items-center justify-center bg-red-500/10 text-red-400" role="alert">
-                        Error: {canvasError}
-                    </p>
-                {/if}
+		<div class="fixed inset-0 flex items-center justify-center p-2 md:p-4">
+			<div 
+				class="relative w-full max-w-7xl rounded-lg p-3 md:p-6 shadow-2xl" 
+				role="dialog" 
+				aria-modal="true"
+				aria-labelledby="modal-title"
+				onclick={onClose}
+				onkeydown={handleDialogCloseKeyboard}
+				tabindex="0"
+			>
+				<h2 id="modal-title" class="sr-only">Image Preview</h2>
+				<button 
+					type="button" 
+					class="absolute right-4 top-4 z-10 rounded-full bg-white/10 p-2 text-white hover:bg-white/20" 
+					onclick={onClose} 
+					aria-label="Close preview"
+				>✕</button>
 
-                <Canvas>
-                        <T.Scene>
-                            <T.Color attach="background" args={[0, 0, 0, 0]} transparent={true} />
-                       
-                        <T.PerspectiveCamera
-                            makeDefault
-                            position={[0,0,5]}
-                    
-                            
-                            fov={35}
-                        >
-                        <OrbitControls enableDamping />
-                        <T.HemisphereLight skyColor="#ffffff" groundColor="#ffffff"  intensity={0.2} />
-                        <T.AmbientLight color={0xffffff} intensity={0.5} />
-                        <T.DirectionalLight position={[5, 1.5, 5]} intensity={0.7} />
-                        <T.DirectionalLight position={[-5, 3, 5]} intensity={0.3} color="#b1e1ff" />
-                        <T.DirectionalLight position={[-6, -3, 3]} intensity={0.2} color="#ffecd1" />
-                        <!-- <T.SpotLight position={[0, 0, 6]} intensity={100} color="#ffffff" /> -->
-                        </T.PerspectiveCamera>
-           
-                        <T.Group rotation.y={rotationY}>
-                            <!-- <T.RoundedBox radius={0.15} smoothness={16} castShadow rotation={[0, 0.5, 0]} position={[0, 0.705, 0]}>
-                                <T.MeshTransmissionMaterial thickness={2} anisotropy={0.1} chromaticAberration={0.04} />
-                              </T.RoundedBox> -->
-                            {#if frontImageUrl}
-                            <T is={Mesh}>
-                                    <T.BufferGeometry
+				<div 
+					class="relative h-[90vh] w-full" 
+					onclick={(e) => e.stopPropagation()}
+					onkeydown={handleCanvasClickKeyboard}
+					role="presentation"
+					tabindex="-1"
+				>
+					{#if canvasError}
+						<div class="absolute inset-0 z-20 flex items-center justify-center bg-red-500/10 text-red-400" role="alert">
+							<div class="text-center p-4">
+								<div class="mb-2 text-lg font-semibold">Error</div>
+								<div class="text-sm">{canvasError}</div>
+							</div>
+						</div>
+					{:else if !isLoadingGeometry && currentGeometry}
+						<Canvas>
+							<T.Scene>
+								<T.PerspectiveCamera makeDefault position={[0, 0, responsiveSettings.cameraDistance]} fov={responsiveSettings.fov}>
+									<OrbitControls enableDamping dampingFactor={0.05} minDistance={1} maxDistance={10} enablePan={false}/>
+								</T.PerspectiveCamera>
 
-                                        oncreate={(ref) => {
-                                            if (ref) {
-                                                const { frontGeometry } = createRoundedRectCard();
-                                                ref.copy(frontGeometry);
-                                            }
-                                            return () => {
-                                                // Cleanup
-                                            }
-                                        }}
-                                    />
-                                    <T.MeshStandardMaterial
-                                    envMap={null}
-                                    color="#ffffff"
-                                        map={createTexture(frontImageUrl)}
-                                        metalness={0.1}
-                                        roughness={0.1}
-                            
-                                    />
-                                </T>
-                            {/if}
-                            {#if backImageUrl}
-                            <T is={Mesh} position={[0, 0, -0.001]}>
-                                <T.BufferGeometry
-                                    oncreate={(ref) => {
-                                        if (ref) {
-                                            const { backGeometry } = createRoundedRectCard();
-                                            ref.copy(backGeometry);
-                                        }
-                                        return () => {
-                                            // Cleanup
-                                        }
-                                    }}
-                                />
-                              
-                                <T.MeshStandardMaterial
-                                    map={createTexture(backImageUrl)}
-                                             envMap={null}
-                                    metalness={0.1}
-                                    roughness={0.1}
-                                />
-                            </T>
-                            {/if}
-                            <T.Mesh>
-                                <T.BufferGeometry
-                                    oncreate={(ref) => {
-                                        if (ref) {
-                                            const { edgeGeometry } = createRoundedRectCard();
-                                            ref.copy(edgeGeometry);
-                                        }
-                                        return () => {
-                                            // Cleanup
-                                        }
-                                    }}
-                                />
-                                <T.MeshStandardMaterial
-                                    color="#ffffff"
-                                    metalness={0}
-                                    roughness={0.2}
-                                />
-                            </T.Mesh>
-                        </T.Group>
-                    </T.Scene>
-                </Canvas>
-            </div>
+								<T.AmbientLight intensity={0.8} />
+								<T.DirectionalLight position={[5, 5, 5]} intensity={1.5} />
+								
+								<T.Group rotation.y={rotationY}>
+									{#if currentGeometry.frontGeometry && resolvedFrontUrl}
+										{@const frontTexture = useTexture(resolvedFrontUrl, { 
+											transform: (texture) => transformTextureToFit(texture, resolvedTemplateDimensions, geometryDimensions)
+										})}
+										
+										{#await frontTexture}
+											<!-- Front texture loading -->
+											<T.Mesh geometry={currentGeometry.frontGeometry}>
+												<T.MeshBasicMaterial color="#1a1a1a" transparent opacity={0.9} />
+											</T.Mesh>
+											<!-- Front loading spinner overlay -->
+											<T.Group position={[0, 0, 0.01]} rotation.z={rotationY * 4}>
+												<T.Mesh scale={[0.4, 0.4, 0.01]}>
+													<T.PlaneGeometry args={[1, 1]} />
+													<T.ShaderMaterial 
+														vertexShader={`
+															varying vec2 vUv;
+															void main() {
+																vUv = uv;
+																gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+															}
+														`}
+														fragmentShader={`
+															uniform float time;
+															varying vec2 vUv;
+															
+															void main() {
+																vec2 center = vec2(0.5, 0.5);
+																vec2 pos = vUv - center;
+																float dist = length(pos);
+																float angle = atan(pos.y, pos.x);
+																
+																// Create spinner arc
+																float innerRadius = 0.15;
+																float outerRadius = 0.25;
+																float arcStart = -1.57; // -90 degrees
+																float arcEnd = arcStart + 4.71; // 270 degrees
+																
+																// Check if we're in the ring and arc
+																float ring = step(innerRadius, dist) * (1.0 - step(outerRadius, dist));
+																float inArc = step(arcStart, angle) * (1.0 - step(arcEnd, angle));
+																
+																// Create fade effect
+																float fade = smoothstep(arcStart, arcEnd, angle);
+																
+																float alpha = ring * inArc * fade;
+																gl_FragColor = vec4(1.0, 1.0, 1.0, alpha);
+															}
+														`}
+														uniforms={{ time: { value: rotationY } }}
+														transparent
+														depthWrite={false}
+													/>
+												</T.Mesh>
+											</T.Group>
+										{:then map}
+											<!-- Front texture loaded -->
+											<T.Mesh geometry={currentGeometry.frontGeometry}>
+												<T.MeshStandardMaterial {map} roughness={0.4} />
+											</T.Mesh>
+										{:catch error}
+											<!-- Front texture error -->
+											<T.Mesh geometry={currentGeometry.frontGeometry}>
+												<T.MeshStandardMaterial color="#ff6b6b" />
+											</T.Mesh>
+											{console.error('Front texture failed to load:', error)}
+										{/await}
+									{:else if currentGeometry.frontGeometry}
+										<!-- Front geometry without texture -->
+										<T.Mesh geometry={currentGeometry.frontGeometry}>
+											<T.MeshStandardMaterial color="#e0e0e0" roughness={0.8} />
+										</T.Mesh>
+									{/if}
+									
+									{#if currentGeometry.backGeometry && resolvedBackUrl}
+										{@const backTexture = useTexture(resolvedBackUrl, { 
+											transform: (texture) => transformTextureToFit(texture, resolvedTemplateDimensions, geometryDimensions)
+										})}
+										
+										{#await backTexture}
+											<!-- Back texture loading -->
+											<T.Mesh geometry={currentGeometry.backGeometry}>
+												<T.MeshBasicMaterial color="#1a1a1a" transparent opacity={0.9} />
+											</T.Mesh>
+											<!-- Back loading spinner overlay -->
+											<T.Group position={[0, 0, -0.01]} rotation={[0, Math.PI, -rotationY * 4]}>
+												<T.Mesh scale={[0.4, 0.4, 0.01]}>
+													<T.PlaneGeometry args={[1, 1]} />
+													<T.ShaderMaterial 
+														vertexShader={`
+															varying vec2 vUv;
+															void main() {
+																vUv = uv;
+																gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+															}
+														`}
+														fragmentShader={`
+															uniform float time;
+															varying vec2 vUv;
+															
+															void main() {
+																vec2 center = vec2(0.5, 0.5);
+																vec2 pos = vUv - center;
+																float dist = length(pos);
+																float angle = atan(pos.y, pos.x);
+																
+																// Create spinner arc
+																float innerRadius = 0.15;
+																float outerRadius = 0.25;
+																float arcStart = -1.57; // -90 degrees
+																float arcEnd = arcStart + 4.71; // 270 degrees
+																
+																// Check if we're in the ring and arc
+																float ring = step(innerRadius, dist) * (1.0 - step(outerRadius, dist));
+																float inArc = step(arcStart, angle) * (1.0 - step(arcEnd, angle));
+																
+																// Create fade effect
+																float fade = smoothstep(arcStart, arcEnd, angle);
+																
+																float alpha = ring * inArc * fade;
+																gl_FragColor = vec4(1.0, 1.0, 1.0, alpha);
+															}
+														`}
+														uniforms={{ time: { value: rotationY } }}
+														transparent
+														depthWrite={false}
+													/>
+												</T.Mesh>
+											</T.Group>
+										{:then map}
+											<!-- Back texture loaded -->
+											<T.Mesh geometry={currentGeometry.backGeometry}>
+												<T.MeshStandardMaterial {map} roughness={0.4} />
+											</T.Mesh>
+										{:catch error}
+											<!-- Back texture error -->
+											<T.Mesh geometry={currentGeometry.backGeometry}>
+												<T.MeshStandardMaterial color="#ff6b6b" />
+											</T.Mesh>
+											{console.error('Back texture failed to load:', error)}
+										{/await}
+									{:else if currentGeometry.backGeometry}
+										<!-- Back geometry without texture -->
+										<T.Mesh geometry={currentGeometry.backGeometry}>
+											<T.MeshStandardMaterial color="#e0e0e0" roughness={0.8} />
+										</T.Mesh>
+									{/if}
 
-            <div class="absolute bottom-6 left-1/2 -translate-x-1/2">
-                <button 
-                    type="button"
-                    class="rounded-full bg-white/10 px-6 py-2 text-sm font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/20"
-                    onclick={handleFlip}
-                >
-                    Flip Card
-                </button>
-            </div>
+									{#if currentGeometry.edgeGeometry}
+										<T.Mesh geometry={currentGeometry.edgeGeometry}>
+											<T.MeshStandardMaterial color="#f0f0f0" metalness={0.1} roughness={0.6} />
+										</T.Mesh>
+									{/if}
+								</T.Group>
+							</T.Scene>
+						</Canvas>
+					{:else}
+						<div class="absolute inset-0 flex items-center justify-center">
+							<div class="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+						</div>
+					{/if}
+				</div>
+			</div>
 
-            {#if debugMode}
-                <div 
-                    class="fixed bottom-4 right-4 rounded-md bg-black/50 p-4 text-xs font-mono text-white backdrop-blur-sm" 
-                    role="status" 
-                >
-                    <pre>
-Canvas: {canvasInitialized ? '✓' : '✗'}
-Mesh: {sceneState.meshInitialized ? '✓' : '✗'}
-Front: {sceneState.frontTextureLoaded ? '✓' : '✗'}
-Back: {sceneState.backTextureLoaded ? '✓' : '✗'}
-Error: {sceneState.lastError || 'None'}
-                    </pre>
-                </div>
-            {/if}
-        </div>
-    </div>
-</div>
+			<div class="absolute bottom-4 left-1/2 -translate-x-1/2 md:bottom-6">
+				<button 
+					type="button" 
+					class="rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm shadow-lg transition-colors hover:bg-white/20 md:px-6 md:py-3 md:text-base" 
+					onclick={handleFlip}
+					aria-label="Flip card to see other side"
+				>
+					<span class="flex items-center gap-2">🔄 <span>Flip Card</span></span>
+				</button>
+			</div>
+		</div>
+	</div>
 {/if}

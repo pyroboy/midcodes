@@ -3,15 +3,9 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
 	plugins: [sveltekit()],
-  ssr: {
-    // Ensure these packages are bundled for SSR on Vercel
-    noExternal: [
-      'bits-ui',
-      'lucide-svelte',
-      'svelte-sonner',
-      'mode-watcher',
-      '@supabase/ssr'
-    ]
+  ssr: { 
+    external: ['@supabase/postgrest-js', 'style-to-object'], // exclude problematic packages from SSR
+    noExternal: []
   },
 	server: {
 		host: '127.0.0.1',
@@ -25,9 +19,19 @@ export default defineConfig({
 		exclude: [
 			'@supabase/supabase-js',
 			'lucide-svelte',
-			'bits-ui',
 			'svelte-sonner',
 			'mode-watcher'
-		]
+		],
+		include: ['style-to-object', '@supabase/postgrest-js'] // pre-bundle for the browser
+	},
+	define: {
+		global: 'globalThis'
+	},
+	build: {
+		ssr: false, // turn server-side rendering OFF
+		commonjsOptions: {
+			include: [/style-to-object/, /svelte-toolbelt/, /node_modules/],
+			transformMixedEsModules: true
+		}
 	}
 });

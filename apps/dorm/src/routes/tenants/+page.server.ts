@@ -11,6 +11,7 @@ import {
 } from './formSchema';
 import type { Database } from '$lib/database.types';
 import type { TenantResponse } from '$lib/types/tenant';
+import { cache, cacheKeys, CACHE_TTL } from '$lib/services/cache';
 
 export const load: PageServerLoad = async ({ locals, depends }) => {
 	const { user, permissions } = await locals.safeGetSession();
@@ -27,21 +28,30 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 		form: await superValidate(zod(tenantFormSchema)),
 		// Flag to indicate lazy loading
 		lazy: true,
-		// Return a promise that resolves with the actual data
+		// Return promises that resolve with the actual data (server-side cached)
 		tenantsPromise: loadTenantsData(locals),
 		propertiesPromise: loadPropertiesData(locals)
 	};
 };
 
-// Separate function to load tenants data
+// Separate function to load tenants data with server-side caching
 async function loadTenantsData(locals: any) {
+	// Check cache first
+	const cacheKey = cacheKeys.tenants();
+	const cached = cache.get<TenantResponse[]>(cacheKey);
+	if (cached) {
+		console.log('🎯 CACHE HIT: Returning cached tenants data');
+		return cached;
+	}
+
+	console.log('💾 CACHE MISS: Fetching tenants from database');
 	const tenantsResult = await locals.supabase
 		.from('tenants')
 		.select(
 			`
       *,
-      lease_tenants:lease_tenants!left(
-        lease:leases!left(
+      lease_tenants:lease_tenants!tenant_id(
+        lease:leases(
           id,
           name,
           start_date,
@@ -66,6 +76,8 @@ async function loadTenantsData(locals: any) {
 		throw error(500, 'Failed to load tenants');
 	}
 
+	console.log(`📊 Fetched ${tenantsResult.data?.length || 0} tenants from database`);
+
 	// Process all leases for each tenant (not just the first one)
 	const tenants = tenantsResult.data.map((tenant: any) => {
 		// Extract all leases for this tenant
@@ -85,31 +97,60 @@ async function loadTenantsData(locals: any) {
 					property: lease.rental_unit.property
 				} : null
 			})) || [];
-		
+
 		// For backward compatibility, set the primary lease (first active lease or first lease)
 		const primaryLease = leases.find((l: any) => l.status === 'ACTIVE') || leases[0] || null;
-		
+
 		// eslint-disable-next-line @typescript-eslint/no-unused-vars
 		const { lease_tenants, ...rest } = tenant;
-		return { 
-			...rest, 
+
+		const processedTenant = {
+			...rest,
 			leases,
 			lease: primaryLease // backward compatibility
 		};
+
+		return processedTenant;
 	}) as TenantResponse[];
+
+	console.log(`✅ Processed ${tenants.length} tenants with status breakdown:`, {
+		active: tenants.filter(t => t.tenant_status === 'ACTIVE').length,
+		inactive: tenants.filter(t => t.tenant_status === 'INACTIVE').length,
+		pending: tenants.filter(t => t.tenant_status === 'PENDING').length,
+		blacklisted: tenants.filter(t => t.tenant_status === 'BLACKLISTED').length
+	});
+
+	// Cache the data (5 minutes TTL)
+	cache.set(cacheKey, tenants, CACHE_TTL.MEDIUM);
+	console.log('✅ Cached tenants data');
 
 	return tenants;
 }
 
-// Separate function to load properties data
+// Separate function to load properties data with server-side caching
 async function loadPropertiesData(locals: any) {
+	// Check cache first
+	const cacheKey = cacheKeys.activeProperties();
+	const cached = cache.get<any[]>(cacheKey);
+	if (cached) {
+		console.log('🎯 CACHE HIT: Returning cached properties data');
+		return cached;
+	}
+
+	console.log('💾 CACHE MISS: Fetching properties from database');
 	const propertiesResult = await locals.supabase
 		.from('properties')
 		.select('id, name')
 		.eq('status', 'ACTIVE')
 		.order('name');
 
-	return propertiesResult.data || [];
+	const properties = propertiesResult.data || [];
+
+	// Cache the data (10 minutes TTL)
+	cache.set(cacheKey, properties, CACHE_TTL.LONG);
+	console.log('✅ Cached properties data');
+
+	return properties;
 }
 
 // Base tenant insert type from database
@@ -230,6 +271,11 @@ export const actions: Actions = {
 		}
 
 		console.log('✅ Create action - Successfully created tenant');
+
+		// Invalidate tenants cache after create
+		cache.delete(cacheKeys.tenants());
+		console.log('🗑️ Invalidated tenants cache');
+
 		return { form };
 	},
 
@@ -338,6 +384,11 @@ export const actions: Actions = {
 		}
 
 		console.log('✅ Update action - Successfully updated tenant');
+
+		// Invalidate tenants cache after update
+		cache.delete(cacheKeys.tenants());
+		console.log('🗑️ Invalidated tenants cache');
+
 		return { form };
 	},
 
@@ -383,6 +434,10 @@ export const actions: Actions = {
 			}
 			return fail(500, { message: 'Failed to delete tenant' });
 		}
+
+		// Invalidate tenants cache after delete
+		cache.delete(cacheKeys.tenants());
+		console.log('🗑️ Invalidated tenants cache');
 
 		return {
 			success: true,

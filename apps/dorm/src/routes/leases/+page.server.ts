@@ -8,6 +8,7 @@ import type { PostgrestError } from '@supabase/postgrest-js';
 import { createPaymentSchedules } from './utils';
 import { mapLeaseData, getLeaseData } from '$lib/utils/lease';
 import type { LeaseResponse, Billing } from '$lib/types/lease';
+import { cache, cacheKeys, CACHE_TTL } from '$lib/services/cache';
 
 interface PaymentAllocation {
 	billingId: number;
@@ -24,9 +25,19 @@ interface PaymentDetails {
 	billing_ids: number[];
 }
 
-async function loadLeasesData(locals: any) {
+// Fast core lease data - essential info for initial render with caching
+async function loadCoreLeasesData(locals: any) {
 	const { supabase } = locals;
 
+	// Check cache first
+	const cacheKey = cacheKeys.leasesCore();
+	const cached = cache.get<any[]>(cacheKey);
+	if (cached) {
+		console.log('🎯 CACHE HIT: Returning cached core leases data');
+		return cached;
+	}
+
+	console.log('💾 CACHE MISS: Fetching core leases from database');
 	const { data: leasesData, error: fetchError } = await supabase
 		.from('leases')
 		.select(
@@ -52,62 +63,8 @@ async function loadLeasesData(locals: any) {
 		.order('created_at', { ascending: false });
 
 	if (fetchError) {
-		console.error('Error fetching leases:', fetchError);
-		throw new Error('Failed to load leases');
-	}
-
-	// Fetch payment allocations and calculate penalties for all billings
-	const allBillingIds = leasesData
-		.flatMap((lease: any) => lease.billings.map((b: Billing) => b.id))
-		.filter(Boolean);
-
-	if (allBillingIds.length > 0) {
-		const [allocationsResponse, ...penaltyResponses] = await Promise.all([
-			supabase
-				.from('payment_allocations')
-				.select('*, payment:payments(*)')
-				.in('billing_id', allBillingIds),
-			...allBillingIds.map((id: any) => supabase.rpc('calculate_penalty', { p_billing_id: id }))
-		]);
-
-		const { data: allocationsData, error: allocationsError } = allocationsResponse;
-		if (allocationsError) {
-			console.error('Error fetching payment allocations:', allocationsError);
-		}
-
-		const allocationsMap = new Map<number, any[]>();
-		if (allocationsData) {
-			for (const allocation of allocationsData) {
-				// Skip allocations from reverted payments
-				if (allocation.payment && allocation.payment.reverted_at) {
-					continue;
-				}
-				if (!allocationsMap.has(allocation.billing_id)) {
-					allocationsMap.set(allocation.billing_id, []);
-				}
-				allocationsMap.get(allocation.billing_id)?.push(allocation);
-			}
-		}
-
-		const penaltiesMap = new Map<number, number>();
-		penaltyResponses.forEach((res, index) => {
-			if (res.error) {
-				console.error(`Error calculating penalty for billing ${allBillingIds[index]}:`, res.error);
-			} else if (res.data > 0) {
-				penaltiesMap.set(allBillingIds[index], res.data);
-			}
-		});
-
-		// Attach allocations and penalties to each billing
-		for (const lease of leasesData) {
-			for (const billing of lease.billings) {
-				billing.allocations = allocationsMap.get(billing.id) || [];
-				billing.penalty = penaltiesMap.get(billing.id) || 0;
-				if (billing.penalty > 0 && billing.status === 'PENDING') {
-					billing.status = 'PENALIZED';
-				}
-			}
-		}
+		console.error('Error fetching core leases:', fetchError);
+		throw new Error('Failed to load core leases');
 	}
 
 	const floors = await supabase.from('floors').select('*');
@@ -120,11 +77,107 @@ async function loadLeasesData(locals: any) {
 		}
 	}
 
-	return leasesData.map((lease: any) => mapLeaseData(lease, floorsMap));
+	const mappedData = leasesData.map((lease: any) => mapLeaseData(lease, floorsMap));
+
+	// Cache for 3 minutes
+	cache.set(cacheKey, mappedData, CACHE_TTL.SHORT);
+	console.log('✅ Cached core leases data');
+
+	return mappedData;
+}
+
+// Heavy financial data - payment allocations and penalties
+async function loadLeasesFinancialData(locals: any, leasesData: any[]) {
+	const { supabase } = locals;
+
+	// Extract all billing IDs from the leases
+	const allBillingIds = leasesData
+		.flatMap((lease: any) => lease.billings.map((b: Billing) => b.id))
+		.filter(Boolean);
+
+	if (allBillingIds.length === 0) {
+		return leasesData; // No billings to process
+	}
+
+	// OPTIMIZATION: Batch fetch allocations and penalties in parallel
+	const [allocationsResponse, penaltiesResponse] = await Promise.all([
+		supabase
+			.from('payment_allocations')
+			.select('*, payment:payments(*)')
+			.in('billing_id', allBillingIds),
+		// Use batch penalty calculation instead of individual calls
+		supabase.rpc('calculate_penalties_batch', { p_billing_ids: allBillingIds })
+	]);
+
+	const { data: allocationsData, error: allocationsError } = allocationsResponse;
+	if (allocationsError) {
+		console.error('Error fetching payment allocations:', allocationsError);
+	}
+
+	const allocationsMap = new Map<number, any[]>();
+	if (allocationsData) {
+		for (const allocation of allocationsData) {
+			// Skip allocations from reverted payments
+			if (allocation.payment && allocation.payment.reverted_at) {
+				continue;
+			}
+			if (!allocationsMap.has(allocation.billing_id)) {
+				allocationsMap.set(allocation.billing_id, []);
+			}
+			allocationsMap.get(allocation.billing_id)?.push(allocation);
+		}
+	}
+
+	// Process batch penalty results
+	const penaltiesMap = new Map<number, number>();
+	const { data: penaltyData, error: penaltyError } = penaltiesResponse;
+	if (penaltyError) {
+		console.error('Error calculating penalties:', penaltyError);
+		// Fallback to zero penalties if batch calculation fails
+	} else if (penaltyData) {
+		for (const result of penaltyData) {
+			if (result.penalty_amount > 0) {
+				penaltiesMap.set(result.billing_id, result.penalty_amount);
+			}
+		}
+	}
+
+	// Create enhanced leases with financial data
+	return leasesData.map((lease: any) => {
+		const enhancedLease = { ...lease };
+		enhancedLease.billings = lease.billings.map((billing: any) => {
+			const penalty = penaltiesMap.get(billing.id) || 0;
+			return {
+				...billing,
+				allocations: allocationsMap.get(billing.id) || [],
+				penalty: penalty,
+				status: penalty > 0 && billing.status === 'PENDING'
+					? 'PENALIZED'
+					: billing.status
+			};
+		});
+		return enhancedLease;
+	});
+}
+
+// Legacy function for backward compatibility and actions
+async function loadLeasesData(locals: any) {
+	const coreLeasesData = await loadCoreLeasesData(locals);
+	return await loadLeasesFinancialData(locals, coreLeasesData);
 }
 
 async function loadTenantsData(locals: any) {
 	const { supabase } = locals;
+
+	// Check cache first
+	const cacheKey = cacheKeys.tenants();
+	const cached = cache.get<any[]>(cacheKey);
+	if (cached) {
+		console.log('🎯 CACHE HIT: Returning cached tenants data (leases route)');
+		return cached;
+	}
+
+	console.log('💾 CACHE MISS: Fetching tenants from database (leases route)');
 	const { data, error } = await supabase
 		.from('tenants')
     .select('id, name, email, contact_number, profile_picture_url')
@@ -136,11 +189,25 @@ async function loadTenantsData(locals: any) {
 		return [];
 	}
 
+	// Cache the data
+	cache.set(cacheKey, data || [], CACHE_TTL.MEDIUM);
+	console.log('✅ Cached tenants data (leases route)');
+
 	return data || [];
 }
 
 async function loadRentalUnitsData(locals: any) {
 	const { supabase } = locals;
+
+	// Check cache first
+	const cacheKey = cacheKeys.rentalUnits();
+	const cached = cache.get<any[]>(cacheKey);
+	if (cached) {
+		console.log('🎯 CACHE HIT: Returning cached rental units data (leases route)');
+		return cached;
+	}
+
+	console.log('💾 CACHE MISS: Fetching rental units from database (leases route)');
 	const { data, error } = await supabase
 		.from('rental_unit')
 		.select(`*, property:properties!rental_unit_property_id_fkey(id, name)`);
@@ -149,6 +216,10 @@ async function loadRentalUnitsData(locals: any) {
 		console.error('Error fetching rental units:', error);
 		return [];
 	}
+
+	// Cache the data
+	cache.set(cacheKey, data || [], CACHE_TTL.MEDIUM);
+	console.log('✅ Cached rental units data (leases route)');
 
 	return data || [];
 }
@@ -166,6 +237,12 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
 		const form = await superValidate(zod(leaseSchema));
 		const deleteForm = await superValidate(zod(deleteLeaseSchema));
 
+		// Progressive loading helper
+		async function loadFinancialDataAsync() {
+			const coreLeases = await loadCoreLeasesData({ supabase });
+			return await loadLeasesFinancialData({ supabase }, coreLeases);
+		}
+
 		// Return minimal data for instant navigation
 		return {
 			form,
@@ -176,10 +253,18 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession, supabase 
 			rental_units: [],
 			// Flag to indicate lazy loading
 			lazy: true,
-			// Return promises that resolve with the actual data
-			leasesPromise: loadLeasesData({ supabase }),
+			// Progressive loading: fast core data first
+			coreLeasesPromise: loadCoreLeasesData({ supabase }),
 			tenantsPromise: loadTenantsData({ supabase }),
-			rentalUnitsPromise: loadRentalUnitsData({ supabase })
+			rentalUnitsPromise: loadRentalUnitsData({ supabase }),
+			// Heavy financial data loaded as a complete promise
+			financialLeasesPromise: loadFinancialDataAsync(),
+			// Cache status for debugging
+			cacheStatus: {
+				leasesCached: !!cache.get(cacheKeys.leasesCore()),
+				tenantsCached: !!cache.get(cacheKeys.tenants()),
+				rentalUnitsCached: !!cache.get(cacheKeys.rentalUnits())
+			}
 		};
 	} catch (err) {
 		console.error('Error in load function:', err);
@@ -276,6 +361,10 @@ export const actions: Actions = {
 			const floors = await supabase.from('floors').select('*');
 			const floorsMap = new Map((floors.data || []).map((f) => [f.id, f]));
 			const mappedLease = mapLeaseData(newLease, floorsMap);
+
+			// Invalidate leases cache
+			cache.deletePattern(/^leases:/);
+			console.log('🗑️ Invalidated leases cache');
 
 			return {
 				form,
@@ -384,6 +473,10 @@ export const actions: Actions = {
 				}
 			}
 
+			// Invalidate leases cache
+			cache.deletePattern(/^leases:/);
+			console.log('🗑️ Invalidated leases cache');
+
 			return { success: true, lease: updatedLease };
 		} catch (error) {
 			console.error('Lease update failed:', error);
@@ -417,6 +510,10 @@ export const actions: Actions = {
 				console.error('Error soft deleting lease:', deleteError);
 				throw new Error(deleteError.message);
 			}
+
+			// Invalidate leases cache
+			cache.deletePattern(/^leases:/);
+			console.log('🗑️ Invalidated leases cache');
 
 			return { success: true, deletedLeaseId: leaseId };
 		} catch (error) {

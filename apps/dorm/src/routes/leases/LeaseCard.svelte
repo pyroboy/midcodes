@@ -33,6 +33,7 @@
 	import { formatCurrency, formatDate } from '$lib/utils/format';
 	import { getSecurityDepositStatus } from '$lib/utils/lease';
 	import { featureFlags } from '$lib/stores/featureFlags';
+	import { getUtilityDisplayStatus } from '$lib/utils/lease-status';
 
 	interface Props {
 		lease: Lease & { balanceStatus?: any };
@@ -202,6 +203,12 @@
 		};
 	});
 
+	// Utility billing status
+	let utilityStatus = $derived.by(() => {
+		if (!lease.balanceStatus) return null;
+		return getUtilityDisplayStatus(lease.balanceStatus);
+	});
+
 	async function handleStatusChange(newStatus: string) {
 		try {
 			const formData = new FormData();
@@ -268,13 +275,20 @@
 					{:else if lease.balanceStatus}
 						<div class="text-sm text-slate-600 text-right">
 							{#if lease.balanceStatus.overdueBalance > 0}
-								<span class="text-red-600">₱{lease.balanceStatus.overdueBalance.toLocaleString()}</span>
+								<span class="text-red-600">Rent: ₱{lease.balanceStatus.overdueBalance.toLocaleString()}</span>
 							{:else if lease.balanceStatus.partialBalance > 0}
-								<span class="text-amber-600">₱{lease.balanceStatus.partialBalance.toLocaleString()}</span>
+								<span class="text-amber-600">Rent: ₱{lease.balanceStatus.partialBalance.toLocaleString()}</span>
 							{:else if lease.balanceStatus.pendingBalance > 0}
-								<span class="text-orange-600">₱{lease.balanceStatus.pendingBalance.toLocaleString()}</span>
+								<span class="text-orange-600">Rent: ₱{lease.balanceStatus.pendingBalance.toLocaleString()}</span>
 							{:else}
-								<span class="text-green-600">Paid</span>
+								<span class="text-green-600">Rent: Paid</span>
+							{/if}
+							{#if utilityStatus}
+								<div class="mt-1">
+									<span class="{utilityStatus.textColor} text-xs">
+										Utilities: ₱{utilityStatus.amount.toLocaleString()}
+									</span>
+								</div>
 							{/if}
 						</div>
 					{/if}
@@ -433,13 +447,18 @@
 				{:else if lease.balanceStatus}
 					<div class="text-base text-slate-600">
 						{#if lease.balanceStatus.overdueBalance > 0}
-							<span class="text-red-600">₱{lease.balanceStatus.overdueBalance.toLocaleString()}</span>
+							<span class="text-red-600">Rent: ₱{lease.balanceStatus.overdueBalance.toLocaleString()}</span>
 						{:else if lease.balanceStatus.partialBalance > 0}
-							<span class="text-amber-600">₱{lease.balanceStatus.partialBalance.toLocaleString()}</span>
+							<span class="text-amber-600">Rent: ₱{lease.balanceStatus.partialBalance.toLocaleString()}</span>
 						{:else if lease.balanceStatus.pendingBalance > 0}
-							<span class="text-orange-600">₱{lease.balanceStatus.pendingBalance.toLocaleString()}</span>
+							<span class="text-orange-600">Rent: ₱{lease.balanceStatus.pendingBalance.toLocaleString()}</span>
 						{:else}
-							<span class="text-green-600">Paid</span>
+							<span class="text-green-600">Rent: Paid</span>
+						{/if}
+						{#if utilityStatus}
+							<span class="ml-2 {utilityStatus.textColor}">
+								| Utilities: ₱{utilityStatus.amount.toLocaleString()}
+							</span>
 						{/if}
 					</div>
 					<!-- Status Context -->

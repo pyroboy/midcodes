@@ -3,8 +3,8 @@ import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/publi
 import { browser } from '$app/environment';
 
 export const supabase = createClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, {
-    auth: {
-      persistSession: false,
-      storage: browser ? sessionStorage : undefined
-    }
-  })
+	auth: {
+		persistSession: false,
+		storage: browser ? sessionStorage : undefined
+	}
+});

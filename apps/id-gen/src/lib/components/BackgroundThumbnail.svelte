@@ -1,0 +1,1134 @@
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import { Move, Scaling, RotateCcw, BugPlay } from '@lucide/svelte';
+	import { calculateCropFrame, validateCropFrameAlignment, calculatePositionFromFrame, coverBase, computeDraw, computeVisibleRectInImage, computeContainerViewportInImage, mapImageRectToThumb, clampBackgroundPosition, type Dims, type BackgroundPosition } from '$lib/utils/backgroundGeometry';
+	import { browser } from '$app/environment';
+	import { logDebugInfo, type DebugInfo } from '$lib/utils/backgroundDebug';
+	import { globalProxyManager, proxyPerformanceMonitor } from '$lib/utils/imageProxy';
+	import { usePerformanceMonitoring } from '$lib/utils/dragPerformanceMonitor';
+	
+	interface Props {
+		imageUrl: string;
+		templateDimensions: { width: number; height: number };
+		position: { x: number; y: number; scale: number };
+		onPositionChange: (position: { x: number; y: number; scale: number }) => void;
+		maxThumbnailWidth?: number;
+		disabled?: boolean;
+		debugMode?: boolean;
+	}
+
+	let {
+		imageUrl,
+		templateDimensions,
+		position = $bindable({ x: 0, y: 0, scale: 1 }),
+		onPositionChange,
+		maxThumbnailWidth = 150,
+		disabled = false,
+		debugMode = false
+	}: Props = $props();
+
+	let canvas: HTMLCanvasElement;
+	let ctx: CanvasRenderingContext2D;
+	let isDragging = $state(false);
+	let imageElement: HTMLImageElement | null = $state(null);
+	
+	// Performance optimization state
+	let isPerformanceDrag = $state(false);
+	let lowResImageElement: HTMLImageElement | null = $state(null);
+	let proxyGenerationInProgress = $state(false);
+	let lastProxyGenerationTime = $state(0);
+	
+	// Performance monitoring
+	const performanceMonitor = usePerformanceMonitoring();
+	let currentDragSession: any = null;
+	
+
+	// Calculate thumbnail dimensions to match selected image aspect ratio
+	const thumbnailDimensions = $derived(() => {
+		if (imageElement && imageElement.naturalWidth > 0 && imageElement.naturalHeight > 0) {
+			const imageAspect = imageElement.naturalWidth / imageElement.naturalHeight;
+			
+			// Calculate dimensions that fit within maxThumbnailWidth while maintaining image aspect ratio
+			let thumbWidth = maxThumbnailWidth;
+			let thumbHeight = maxThumbnailWidth / imageAspect;
+			
+			// If height exceeds maxThumbnailWidth, constrain by height instead
+			if (thumbHeight > maxThumbnailWidth) {
+				thumbHeight = maxThumbnailWidth;
+				thumbWidth = maxThumbnailWidth * imageAspect;
+			}
+			
+			const result = {
+				width: Math.round(thumbWidth),
+				height: Math.round(thumbHeight)
+			};
+			return result;
+		}
+		
+		// Fallback to square if no image loaded yet
+		return {
+			width: maxThumbnailWidth,
+			height: maxThumbnailWidth
+		};
+	});
+
+	// Legacy THUMB_SIZE for compatibility (use width as primary dimension)
+	const THUMB_SIZE = $derived(thumbnailDimensions().width);
+
+
+	// Listen for position updates from other components
+	onMount(() => {
+		if (browser) {
+			const listener = (e: Event) => {
+				if (debugMode && e instanceof CustomEvent) {
+					// Avoid verbose console in production; debugMode is typically off in prod
+				}
+			};
+			window.addEventListener('background-position-update', listener);
+			return () => window.removeEventListener('background-position-update', listener);
+		}
+	});
+
+	onMount(() => {
+		ctx = canvas.getContext('2d')!;
+		loadImage();
+	});
+
+	function loadImage() {
+		if (!imageUrl) return;
+		
+		const img = new Image();
+		img.crossOrigin = 'anonymous';
+		
+		img.onload = async () => {
+			imageElement = img;
+			drawThumbnail();
+			
+			// Generate low-resolution proxy for performance optimization
+			await generateProxyImage();
+		};
+		
+		img.onerror = () => {
+			console.error('Failed to load image');
+		};
+		
+		img.src = imageUrl;
+	}
+
+	/**
+	 * Generate low-resolution proxy image for drag performance
+	 */
+	async function generateProxyImage() {
+		if (!imageElement || !browser || proxyGenerationInProgress) return;
+		
+		try {
+			proxyGenerationInProgress = true;
+			const startTime = proxyPerformanceMonitor.startGeneration();
+			
+			// Create cache key based on image URL and dimensions
+			const cacheKey = `thumb_${imageUrl}_${imageElement.naturalWidth}x${imageElement.naturalHeight}`;
+			
+			// Generate proxy with max 400px dimension for thumbnail (smaller than main canvas)
+			lowResImageElement = await globalProxyManager.getOrCreateProxy(
+				imageElement,
+				cacheKey,
+				{ maxDimension: 400, quality: 0.7 }
+			);
+			
+			const generationTime = proxyPerformanceMonitor.endGeneration(startTime);
+			lastProxyGenerationTime = generationTime;
+			
+			if (debugMode) {
+				// Dev-only debug output suppressed in production builds
+			}
+		} catch (error) {
+			console.warn('⚠️ Failed to generate proxy image:', error);
+			lowResImageElement = null;
+		} finally {
+			proxyGenerationInProgress = false;
+		}
+	}
+
+	/**
+	 * Start performance drag mode
+	 */
+	function startPerformanceDrag() {
+		if (lowResImageElement && !isPerformanceDrag) {
+			isPerformanceDrag = true;
+			
+			// Start performance monitoring
+			currentDragSession = performanceMonitor.startDrag(`thumb_${imageUrl}_${Date.now()}`);
+			
+			if (debugMode) {
+				// Dev-only debug output suppressed in production builds
+			}
+		}
+	}
+
+	/**
+	 * End performance drag mode and restore full quality
+	 */
+	function endPerformanceDrag() {
+		if (isPerformanceDrag) {
+			isPerformanceDrag = false;
+			
+			// End performance monitoring and get metrics
+			const metrics = performanceMonitor.endDrag();
+			if (metrics && debugMode) {
+				// Dev-only debug output suppressed in production builds
+			}
+			
+			currentDragSession = null;
+			
+			// Redraw with full resolution
+			drawThumbnail();
+			if (debugMode) {
+				// Dev-only debug output suppressed in production builds
+			}
+		}
+	}
+
+	function drawThumbnail() {
+		if (!ctx || !imageElement) return;
+
+		const thumbDims = thumbnailDimensions();
+		
+		// Clear canvas
+		ctx.clearRect(0, 0, thumbDims.width, thumbDims.height);
+		
+		// Reset transforms
+		ctx.resetTransform();
+		
+		// Choose image based on performance mode
+		const activeImage = (isPerformanceDrag && lowResImageElement) ? lowResImageElement : imageElement;
+		
+		// Configure canvas quality based on performance mode
+		if (isPerformanceDrag) {
+			ctx.imageSmoothingEnabled = true;
+			ctx.imageSmoothingQuality = 'low';
+		} else {
+			ctx.imageSmoothingEnabled = true;
+			ctx.imageSmoothingQuality = 'high';
+		}
+		
+		// Use original image dimensions for calculations (not proxy dimensions)
+		// This ensures coordinate system consistency regardless of display image
+		const imageDims: Dims = {
+			width: imageElement!.naturalWidth,
+			height: imageElement!.naturalHeight
+		};
+		
+		// Draw the full image scaled to fit the thumbnail (object-fit: contain)
+		const imgAspect = imageDims.width / imageDims.height;
+		const thumbAspect = thumbDims.width / thumbDims.height;
+		
+		let drawWidth, drawHeight, offsetX, offsetY;
+		
+		if (imgAspect > thumbAspect) {
+			// Image is wider - fit to width
+			drawWidth = thumbDims.width;
+			drawHeight = thumbDims.width / imgAspect;
+			offsetX = 0;
+			offsetY = (thumbDims.height - drawHeight) / 2;
+		} else {
+			// Image is taller - fit to height
+			drawHeight = thumbDims.height;
+			drawWidth = thumbDims.height * imgAspect;
+			offsetX = (thumbDims.width - drawWidth) / 2;
+			offsetY = 0;
+		}
+		
+		// Draw the entire image using active image (proxy during drag, full-res otherwise)
+		ctx.drawImage(activeImage, offsetX, offsetY, drawWidth, drawHeight);
+		
+		// Draw border around thumbnail
+		ctx.strokeStyle = '#e5e7eb';
+		ctx.lineWidth = 1;
+		ctx.strokeRect(0.5, 0.5, thumbDims.width - 1, thumbDims.height - 1);
+	}
+
+	function handleStart(event: MouseEvent | TouchEvent, mode: 'move' | 'resize') {
+		if (disabled) return;
+		
+		event.preventDefault();
+		isDragging = true;
+		
+		// Start performance drag mode for smooth operations
+		startPerformanceDrag();
+
+		const startPoint = 'touches' in event
+			? { x: event.touches[0].clientX, y: event.touches[0].clientY }
+			: { x: event.clientX, y: event.clientY };
+
+		const startValues = { ...position };
+
+		function handleMove(e: MouseEvent | TouchEvent) {
+			if (!isDragging) return;
+
+			const currentPoint = 'touches' in e
+				? { x: e.touches[0].clientX, y: e.touches[0].clientY }
+				: { x: (e as MouseEvent).clientX, y: (e as MouseEvent).clientY };
+
+			const dx = currentPoint.x - startPoint.x;
+			const dy = currentPoint.y - startPoint.y;
+
+			if (mode === 'resize') {
+				// Scale based on diagonal movement like ThumbnailInput
+				const delta = Math.max(dx, dy);
+				const newScale = Math.max(0.1, Math.min(3, startValues.scale + delta / 100));
+				const newPosition = { 
+					x: startValues.x,
+					y: startValues.y,
+					scale: newScale 
+				};
+				
+				// Apply clamping to scale operations with scale constraints
+				if (imageElement) {
+					const imageDims: Dims = {
+						width: imageElement.naturalWidth,
+						height: imageElement.naturalHeight
+					};
+					
+					// Calculate minimum scale to ensure image always covers template area
+					const { s0 } = coverBase(imageDims, templateDimensions);
+					const minScale = Math.max(0.1, s0 > 0 ? 1 / s0 : 0.1); // Minimum scale to maintain coverage
+					const maxScale = 3; // Maximum scale limit
+					
+					// Clamp scale first
+					const clampedScale = Math.max(minScale, Math.min(maxScale, newPosition.scale));
+					const scaleClampedPosition = { ...newPosition, scale: clampedScale };
+					
+					// Then apply position clamping
+					position = clampBackgroundPosition(imageDims, templateDimensions, scaleClampedPosition);
+				} else {
+					position = newPosition;
+				}
+			} else {
+				// Move position - convert screen pixels to template coordinates
+				// SYNCHRONIZED WITH MAIN CANVAS: Use exact same coordinate conversion
+				const thumbDims = thumbnailDimensions();
+				
+				// Use the same logic as main canvas: image dimensions scaled by thumbnail display scale
+				// Main uses: previewScale = previewDimensions.scale (calculated as containerWidth / baseWidth)
+				// For thumbnail: calculate equivalent scale
+				if (imageElement) {
+					const imageAspect = imageElement.naturalWidth / imageElement.naturalHeight;
+					const thumbAspect = thumbDims.width / thumbDims.height;
+					
+					// Calculate how image is displayed in thumbnail (object-fit: contain)
+					let imageDisplayScale;
+					if (imageAspect > thumbAspect) {
+						// Image fits to thumbnail width
+						imageDisplayScale = thumbDims.width / imageElement.naturalWidth;
+					} else {
+						// Image fits to thumbnail height  
+						imageDisplayScale = thumbDims.height / imageElement.naturalHeight;
+					}
+					
+					const newPosition = {
+						x: startValues.x - dx / imageDisplayScale,
+						y: startValues.y - dy / imageDisplayScale,
+						scale: startValues.scale
+					};
+					
+					// Apply clamping to prevent red box from going out of bounds
+					const imageDims: Dims = {
+						width: imageElement.naturalWidth,
+						height: imageElement.naturalHeight
+					};
+					
+					position = clampBackgroundPosition(imageDims, templateDimensions, newPosition);
+				} else {
+					// Fallback to old logic if image not available
+					const thumbnailDisplayScale = thumbDims.width / templateDimensions.width;
+					const newPosition = {
+						x: startValues.x + dx / thumbnailDisplayScale,
+						y: startValues.y + dy / thumbnailDisplayScale,
+						scale: startValues.scale
+					};
+					
+					// Apply clamping even in fallback case
+					// @ts-ignore
+					if (imageElement && imageElement.naturalWidth > 0 && imageElement.naturalHeight > 0) {
+						const imageDims: Dims = {
+							// @ts-ignore
+							width: imageElement.naturalWidth,
+							// @ts-ignore
+							height: imageElement.naturalHeight
+						};
+						position = clampBackgroundPosition(imageDims, templateDimensions, newPosition);
+					} else {
+						position = newPosition; // No clamping if no image available
+					}
+				}
+			}
+
+				onPositionChange(position);
+				
+
+		}
+
+		function handleEnd() {
+			isDragging = false;
+			
+			// End performance drag mode and restore full quality
+			endPerformanceDrag();
+			
+			window.removeEventListener('mousemove', handleMove);
+			window.removeEventListener('mouseup', handleEnd);
+			window.removeEventListener('touchmove', handleMove);
+			window.removeEventListener('touchend', handleEnd);
+		}
+
+		window.addEventListener('mousemove', handleMove);
+		window.addEventListener('mouseup', handleEnd);
+		window.addEventListener('touchmove', handleMove);
+		window.addEventListener('touchend', handleEnd);
+	}
+
+	function autoFit() {
+		if (disabled) return;
+		
+		const newPosition = { x: 0, y: 0, scale: 1 };
+		position = newPosition;
+		onPositionChange(newPosition);
+
+	}
+
+	// Calculate crop frame to show template boundaries using GROUND TRUTH function
+	let cropFrame = $derived(() => {
+		if (!imageElement || !templateDimensions.width || !templateDimensions.height) {
+			return null;
+		}
+		
+		const imageDims: Dims = {
+			width: imageElement!.naturalWidth,
+			height: imageElement!.naturalHeight
+		};
+
+		const containerDims: Dims = templateDimensions;
+		const thumbDims = thumbnailDimensions();
+		
+		// ✅ FIXED: Use container viewport instead of visible rect for consistent size
+		// The red box represents the container viewport boundaries, not the visible image area
+		// This ensures the red box maintains constant size when panning (only position changes)
+		const viewportRect = computeContainerViewportInImage(imageDims, containerDims, position);
+		
+		// Then map to thumbnail coordinates using the ground truth mapping function
+		const thumbnailRect = mapImageRectToThumb(viewportRect, imageDims, thumbDims);
+		
+
+		
+		// The viewport can extend beyond image bounds, so we don't clamp to thumbnail bounds
+		// This allows the red box to show the true container viewport position
+		return {
+			x: thumbnailRect.x,
+			y: thumbnailRect.y,
+			width: Math.max(1, thumbnailRect.width), // Minimum 1px to ensure visibility
+			height: Math.max(1, thumbnailRect.height) // Minimum 1px to ensure visibility
+		};
+	});
+	
+	// Validation for debugging
+	let isValidCropAlignment = $derived(() => {
+		if (!imageElement) return true;
+		
+		const imageDims: Dims = {
+			width: imageElement!.naturalWidth,
+			height: imageElement!.naturalHeight
+		};
+		
+		const containerDims: Dims = templateDimensions;
+		const positionData: BackgroundPosition = position;
+		
+		return validateCropFrameAlignment(imageDims, containerDims, positionData);
+	});
+
+	// Calculate handle positions
+	let handlePositions = $derived(() => {
+		const frame = cropFrame();
+		if (!frame) return null;
+		
+		const handleSize = 8; // Handle size in pixels
+		const offset = handleSize / 2; // Center the handle on the corner
+		
+		// Position handles relative to the red box (crop-frame) div, not absolute thumbnail
+		// Since the handles are children of the crop-frame div, we use relative positioning
+		return {
+			topLeft: { 
+				x: -offset, // Top-left corner of red box
+				y: -offset 
+			},
+			topRight: { 
+				x: frame.width - offset, // Top-right corner of red box
+				y: -offset 
+			},
+			bottomLeft: { 
+				x: -offset, // Bottom-left corner of red box
+				y: frame.height - offset 
+			},
+			bottomRight: { 
+				x: frame.width - offset, // Bottom-right corner of red box
+				y: frame.height - offset 
+			}
+		};
+	});
+
+	// Handle red box dragging (moving the entire crop area)
+	function handleRedBoxDrag(event: MouseEvent | TouchEvent) {
+		if (disabled) return;
+		
+		// Check if the click is on a resize handle - if so, don't start drag
+		const target = event.target as HTMLElement;
+		if (target.classList.contains('resize-handle')) {
+			return; // Let resize handle take precedence
+		}
+		
+		event.preventDefault();
+		event.stopPropagation();
+		isDragging = true;
+		
+		// Start performance drag mode for smooth red box dragging
+		startPerformanceDrag();
+
+		const startPoint = 'touches' in event
+			? { x: event.touches[0].clientX, y: event.touches[0].clientY }
+			: { x: event.clientX, y: event.clientY };
+
+		const startValues = { ...position };
+
+		function handleMove(e: MouseEvent | TouchEvent) {
+			if (!isDragging) return;
+
+			const currentPoint = 'touches' in e
+				? { x: e.touches[0].clientX, y: e.touches[0].clientY }
+				: { x: (e as MouseEvent).clientX, y: (e as MouseEvent).clientY };
+
+			const dx = currentPoint.x - startPoint.x;
+			const dy = currentPoint.y - startPoint.y;
+
+			// Use the same coordinate conversion logic as existing move operation
+			const thumbDims = thumbnailDimensions();
+			
+			if (imageElement) {
+				const imageAspect = imageElement.naturalWidth / imageElement.naturalHeight;
+				const thumbAspect = thumbDims.width / thumbDims.height;
+				
+				// Calculate how image is displayed in thumbnail (object-fit: contain)
+				let imageDisplayScale;
+				if (imageAspect > thumbAspect) {
+					// Image fits to thumbnail width
+					imageDisplayScale = thumbDims.width / imageElement.naturalWidth;
+				} else {
+					// Image fits to thumbnail height  
+					imageDisplayScale = thumbDims.height / imageElement.naturalHeight;
+				}
+				
+				const newPosition = {
+					x: startValues.x - dx / imageDisplayScale,
+					y: startValues.y - dy / imageDisplayScale,
+					scale: startValues.scale
+				};
+				
+				// Apply clamping to prevent red box from going out of bounds
+				const imageDims: Dims = {
+					width: imageElement.naturalWidth,
+					height: imageElement.naturalHeight
+				};
+				
+				position = clampBackgroundPosition(imageDims, templateDimensions, newPosition);
+			} else {
+				// Fallback to old logic if image not available
+				const thumbnailDisplayScale = thumbDims.width / templateDimensions.width;
+				const newPosition = {
+					x: startValues.x + dx / thumbnailDisplayScale,
+					y: startValues.y + dy / thumbnailDisplayScale,
+					scale: startValues.scale
+				};
+				
+				// Apply clamping even in fallback case
+				// @ts-ignore
+				if (imageElement && imageElement.naturalWidth > 0 && imageElement.naturalHeight > 0) {
+					const img = imageElement as HTMLImageElement;
+					const imageDims: Dims = {
+						width: img.naturalWidth,
+						height: img.naturalHeight
+					};
+					position = clampBackgroundPosition(imageDims, templateDimensions, newPosition);
+				} else {
+					position = newPosition; // No clamping if no image available
+				}
+			}
+
+			onPositionChange(position);
+			
+		}
+
+		function handleEnd() {
+			isDragging = false;
+			
+			// End performance drag mode and restore full quality
+			endPerformanceDrag();
+			
+			window.removeEventListener('mousemove', handleMove);
+			window.removeEventListener('mouseup', handleEnd);
+			window.removeEventListener('touchmove', handleMove);
+			window.removeEventListener('touchend', handleEnd);
+		}
+
+		window.addEventListener('mousemove', handleMove);
+		window.addEventListener('mouseup', handleEnd);
+		window.addEventListener('touchmove', handleMove);
+		window.addEventListener('touchend', handleEnd);
+	}
+
+	// Handle resize operations
+	function handleResize(event: MouseEvent | TouchEvent, handle: string) {
+		if (disabled) return;
+		
+		event.preventDefault();
+		isDragging = true;
+		
+		// Start performance drag mode for smooth resizing
+		startPerformanceDrag();
+		
+		const startPoint = 'touches' in event
+			? { x: event.touches[0].clientX, y: event.touches[0].clientY }
+			: { x: event.clientX, y: event.clientY };
+		
+		const startFrame = cropFrame();
+		if (!startFrame || !imageElement) return;
+		
+		function handleMove(e: MouseEvent | TouchEvent) {
+			if (!isDragging || !startFrame || !imageElement) return;
+			
+			const currentPoint = 'touches' in e
+				? { x: e.touches[0].clientX, y: e.touches[0].clientY }
+				: { x: (e as MouseEvent).clientX, y: (e as MouseEvent).clientY };
+			
+			const dx = currentPoint.x - startPoint.x;
+			const dy = currentPoint.y - startPoint.y;
+			
+			// Calculate new frame dimensions based on handle direction
+			let newWidth = startFrame.width;
+			let newHeight = startFrame.height;
+			let newX = startFrame.x;
+			let newY = startFrame.y;
+			
+			switch (handle) {
+				case 'top-left':
+					newWidth = Math.max(20, startFrame.width - dx);
+					newHeight = Math.max(20, startFrame.height - dy);
+					newX = startFrame.x + (startFrame.width - newWidth);
+					newY = startFrame.y + (startFrame.height - newHeight);
+					break;
+				case 'top-right':
+					newWidth = Math.max(20, startFrame.width + dx);
+					newHeight = Math.max(20, startFrame.height - dy);
+					newY = startFrame.y + (startFrame.height - newHeight);
+					break;
+				case 'bottom-left':
+					newWidth = Math.max(20, startFrame.width - dx);
+					newHeight = Math.max(20, startFrame.height + dy);
+					newX = startFrame.x + (startFrame.width - newWidth);
+					break;
+				case 'bottom-right':
+					newWidth = Math.max(20, startFrame.width + dx);
+					newHeight = Math.max(20, startFrame.height + dy);
+					break;
+			}
+			
+			// Clamp to actual thumbnail bounds (not hardcoded square)
+			const thumbDims = thumbnailDimensions();
+			newX = Math.max(0, Math.min(thumbDims.width - newWidth, newX));
+			newY = Math.max(0, Math.min(thumbDims.height - newHeight, newY));
+			newWidth = Math.min(thumbDims.width - newX, newWidth);
+			newHeight = Math.min(thumbDims.height - newY, newHeight);
+			
+			// Calculate the corresponding position change
+			const imageDims: Dims = {
+				width: imageElement!.naturalWidth,
+				height: imageElement!.naturalHeight
+			};
+			
+			const newPos = calculatePositionFromFrame(
+				newWidth, 
+				newHeight, 
+				newX, 
+				newY, 
+				imageDims, 
+				templateDimensions,
+				thumbDims.width // Use actual thumbnail width instead of THUMB_SIZE
+			);
+			
+			// Apply clamping to resize operations as well
+			const clampedPos = clampBackgroundPosition(imageDims, templateDimensions, newPos);
+			
+			position = clampedPos;
+			onPositionChange(clampedPos);
+
+		}
+		
+		function handleEnd() {
+			isDragging = false;
+			
+			// End performance drag mode and restore full quality
+			endPerformanceDrag();
+			
+			window.removeEventListener('mousemove', handleMove);
+			window.removeEventListener('mouseup', handleEnd);
+			window.removeEventListener('touchmove', handleMove);
+			window.removeEventListener('touchend', handleEnd);
+		}
+		
+		window.addEventListener('mousemove', handleMove);
+		window.addEventListener('mouseup', handleEnd);
+		window.addEventListener('touchmove', handleMove);
+		window.addEventListener('touchend', handleEnd);
+	}
+
+	// Redraw when image changes
+	$effect(() => {
+		if (imageUrl) {
+			loadImage();
+		}
+	});
+
+	// Redraw when thumbnail size changes
+	$effect(() => {
+		if (THUMB_SIZE && imageElement && ctx) {
+			drawThumbnail();
+		}
+	});
+
+	// Redraw when position changes
+	$effect(() => {
+		if (position && imageElement && ctx) {
+			drawThumbnail();
+		}
+	});
+
+	// Debug state is now updated only during user interactions
+	// No automatic $effect to prevent infinite loops
+</script>
+
+<div class="background-thumbnail" class:disabled class:dragging={isDragging}>
+	<div class="thumbnail-container">
+		<div class="thumbnail-wrapper" style="--thumb-width: {thumbnailDimensions().width}px; --thumb-height: {thumbnailDimensions().height}px;">
+			<canvas
+				bind:this={canvas}
+				width={thumbnailDimensions().width}
+				height={thumbnailDimensions().height}
+				class="thumbnail-canvas"
+			></canvas>
+			
+			<!-- Calculated crop frame overlay -->
+			<div class="crop-overlay">
+				{#if cropFrame() && handlePositions()}
+					{@const frame = cropFrame()!}
+					{@const handles = handlePositions()!}
+					<div 
+						class="crop-frame"
+						class:invalid={!isValidCropAlignment()}
+						class:draggable={!disabled}
+						style="
+							left: {frame.x}px;
+							top: {frame.y}px;
+							width: {frame.width}px;
+							height: {frame.height}px;
+							cursor: {disabled ? 'default' : 'move'};
+						"
+						onmousedown={(e) => !disabled && handleRedBoxDrag(e)}
+						ontouchstart={(e) => !disabled && handleRedBoxDrag(e)}
+						role="button"
+						aria-label="Drag to move crop area"
+						tabindex="0"
+					>
+						<!-- Resize handles -->
+						{#if !disabled}
+							<div 
+								class="resize-handle top-left"
+								style="left: {handles.topLeft.x}px; top: {handles.topLeft.y}px; cursor: nw-resize;"
+								onmousedown={(e) => handleResize(e, 'top-left')}
+								ontouchstart={(e) => handleResize(e, 'top-left')}
+								role="button"
+								aria-label="Resize top-left"
+								tabindex="0"
+							></div>
+							<div 
+								class="resize-handle top-right"
+								style="left: {handles.topRight.x}px; top: {handles.topRight.y}px; cursor: ne-resize;"
+								onmousedown={(e) => handleResize(e, 'top-right')}
+								ontouchstart={(e) => handleResize(e, 'top-right')}
+								role="button"
+								aria-label="Resize top-right"
+								tabindex="0"
+							></div>
+							<div 
+								class="resize-handle bottom-left"
+								style="left: {handles.bottomLeft.x}px; top: {handles.bottomLeft.y}px; cursor: sw-resize;"
+								onmousedown={(e) => handleResize(e, 'bottom-left')}
+								ontouchstart={(e) => handleResize(e, 'bottom-left')}
+								role="button"
+								aria-label="Resize bottom-left"
+								tabindex="0"
+							></div>
+							<div 
+								class="resize-handle bottom-right"
+								style="left: {handles.bottomRight.x}px; top: {handles.bottomRight.y}px; cursor: se-resize;"
+								onmousedown={(e) => handleResize(e, 'bottom-right')}
+								ontouchstart={(e) => handleResize(e, 'bottom-right')}
+								role="button"
+								aria-label="Resize bottom-right"
+								tabindex="0"
+							></div>
+						{/if}
+						
+				
+						
+						<!-- Crop preview overlay -->
+						{#if isDragging && debugMode}
+								<div class="crop-preview" style="pointer-events: none;">
+									<div class="preview-indicator">
+										<span>Crop: {Math.round(frame.width)}×{Math.round(frame.height)}px</span>
+										<span>Scale: {(position.scale * 100).toFixed(0)}%</span>
+										<span>Pos: {Math.round(position.x)}, {Math.round(position.y)}</span>
+										<span><strong>Thumbnail Red Box:</strong></span>
+										<span>Top-Left: ({Math.round(frame.x)}, {Math.round(frame.y)})</span>
+										{#if isPerformanceDrag}
+											<span class="performance-indicator">🚀 Performance Mode</span>
+											<span>FPS: {performanceMonitor.getCurrentFPS()}</span>
+										{/if}
+									</div>
+								</div>
+							{/if}
+						
+						<!-- Performance indicator (always visible in debug mode) -->
+						{#if debugMode && (isPerformanceDrag || proxyGenerationInProgress)}
+							<div class="performance-badge" style="pointer-events: none;">
+								{#if proxyGenerationInProgress}
+									⚙️ Generating proxy...
+								{:else if isPerformanceDrag}
+									🚀 Performance mode
+								{/if}
+							</div>
+						{/if}
+					</div>
+				{/if}
+			</div>
+		</div>
+	</div>
+
+	<!-- Control handles -->
+	<div class="control-handles">
+		<button
+			class="control-handle move-handle"
+			class:dragging={isDragging}
+			onmousedown={(e) => handleStart(e, 'move')}
+			ontouchstart={(e) => handleStart(e, 'move')}
+			disabled={disabled}
+			title="Drag to move background"
+		>
+			<Move size={14} />
+		</button>
+		
+		<button
+			class="control-handle scale-handle"
+			class:dragging={isDragging}
+			onmousedown={(e) => handleStart(e, 'resize')}
+			ontouchstart={(e) => handleStart(e, 'resize')}
+			disabled={disabled}
+			title="Drag to scale background"
+		>
+			<Scaling size={14} />
+		</button>
+		
+		<button
+			class="control-handle auto-fit-handle"
+			onclick={autoFit}
+			disabled={disabled}
+			title="Auto-fit background"
+		>
+			<RotateCcw size={14} />
+		</button>
+		
+
+	</div>
+
+
+</div>
+
+<style>
+	.background-thumbnail {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		user-select: none;
+	}
+
+	.background-thumbnail.disabled {
+		opacity: 0.6;
+		pointer-events: none;
+	}
+
+	.thumbnail-container {
+		display: flex;
+		justify-content: center;
+	}
+
+	.thumbnail-wrapper {
+		position: relative;
+		border-radius: 6px;
+		overflow: hidden;
+		background: #f9fafb;
+		width: var(--thumb-width, 150px);
+		height: var(--thumb-height, 150px);
+	}
+
+	.thumbnail-canvas {
+		display: block;
+		width: 100%;
+		height: 100%;
+	}
+
+	.crop-overlay {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+	}
+
+	.crop-frame {
+		position: absolute;
+		/* Dynamic positioning via inline styles */
+		border: 3px solid #ef4444;
+		background: rgba(239, 68, 68, 0.15);
+		box-shadow: 
+			0 0 0 2px rgba(255, 255, 255, 0.9),
+			0 0 0 9999px rgba(0, 0, 0, 0.4);
+		transition: all 0.2s ease;
+		z-index: 10;
+		pointer-events: auto; /* Enable pointer events for dragging */
+		cursor: move !important; /* Force move cursor everywhere on the crop frame */
+	}
+	
+	/* Add a pseudo-element to ensure the entire area is clickable */
+	.crop-frame::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		cursor: move !important;
+		z-index: 1; /* Below resize handles but above background */
+	}
+	
+	/* Ultra-specific selector to override any parent styles */
+	.background-thumbnail .crop-overlay .crop-frame {
+		cursor: move !important;
+	}
+	
+	.background-thumbnail .crop-overlay .crop-frame:hover {
+		cursor: move !important;
+	}
+	
+	/* Ensure draggable cursor is visible */
+	.crop-frame[role="button"] {
+		cursor: move !important;
+	}
+	
+	.crop-frame.draggable {
+		cursor: move !important;
+	}
+	
+	.crop-frame.draggable:hover {
+		background: rgba(239, 68, 68, 0.25) !important;
+		border-color: #dc2626 !important;
+		cursor: move !important;
+	}
+	
+	.crop-frame::before {
+		content: 'Template Area';
+		position: absolute;
+		top: -25px;
+		left: 0;
+		background: #ef4444;
+		color: white;
+		padding: 2px 8px;
+		border-radius: 4px;
+		font-size: 11px;
+		font-weight: 500;
+		white-space: nowrap;
+		z-index: 11;
+	}
+
+	.crop-frame.invalid {
+		border-color: #ef4444;
+		background: rgba(239, 68, 68, 0.1);
+	}
+
+	.control-handles {
+		display: flex;
+		justify-content: center;
+		gap: 4px;
+	}
+
+	.control-handle {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 28px;
+		height: 28px;
+		background: #f3f4f6;
+		border: 1px solid #d1d5db;
+		border-radius: 6px;
+		cursor: pointer;
+		transition: all 0.15s ease;
+		color: #6b7280;
+	}
+
+	.control-handle:hover:not(:disabled) {
+		background: #e5e7eb;
+		border-color: #9ca3af;
+		color: #374151;
+	}
+
+	.control-handle:active:not(:disabled),
+	.control-handle.dragging {
+		background: #d1d5db;
+		border-color: #6b7280;
+		color: #111827;
+	}
+
+	.control-handle:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.move-handle:not(:disabled) {
+		cursor: move;
+	}
+
+	.scale-handle:not(:disabled) {
+		cursor: se-resize;
+	}
+
+
+
+
+
+	/* Resize Handles */
+	.resize-handle {
+		position: absolute;
+		width: 8px;
+		height: 8px;
+		background-color: #3b82f6;
+		border: 1px solid white;
+		border-radius: 50%;
+		cursor: pointer;
+		z-index: 15; /* Higher than crop-frame to show resize cursors */
+		pointer-events: auto;
+		transition: all 0.15s ease;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+	}
+
+	.resize-handle:hover {
+		background-color: #2563eb;
+		transform: scale(1.2);
+		box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+	}
+
+	.resize-handle:active {
+		background-color: #1d4ed8;
+		transform: scale(1.1);
+	}
+
+	/* Cursor styles for different resize directions */
+	.resize-handle.top-left {
+		cursor: nw-resize;
+	}
+
+	.resize-handle.top-right {
+		cursor: ne-resize;
+	}
+
+	.resize-handle.bottom-left {
+		cursor: sw-resize;
+	}
+
+	.resize-handle.bottom-right {
+		cursor: se-resize;
+	}
+
+	/* Crop Preview Overlay */
+	.crop-preview {
+		position: absolute;
+		top: 5px;
+		left: 5px;
+		background: rgba(0, 0, 0, 0.8);
+		color: white;
+		padding: 6px 8px;
+		border-radius: 4px;
+		font-size: 11px;
+		z-index: 20;
+		pointer-events: none;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+		border: 1px solid rgba(255, 255, 255, 0.2);
+	}
+
+	.preview-indicator {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		line-height: 1.2;
+	}
+
+	.preview-indicator span {
+		font-family: monospace;
+		font-size: 10px;
+		white-space: nowrap;
+	}
+
+	/* Enhanced crop frame styling */
+	.crop-frame {
+		pointer-events: none; /* Allow handles to receive events */
+	}
+
+	.crop-frame.invalid .resize-handle {
+		background-color: #ef4444;
+		border-color: white;
+	}
+
+	.crop-frame.invalid .resize-handle:hover {
+		background-color: #dc2626;
+	}
+
+	/* Improved transitions when dragging */
+	.background-thumbnail.dragging .crop-frame {
+		transition: none;
+	}
+
+	.background-thumbnail.dragging .resize-handle {
+		transition: none;
+	}
+	
+	/* Performance indicators */
+	.performance-indicator {
+		color: #10b981 !important;
+		font-weight: bold !important;
+	}
+	
+	.performance-badge {
+		position: absolute;
+		top: -40px;
+		right: 0;
+		background: rgba(16, 185, 129, 0.9);
+		color: white;
+		padding: 2px 6px;
+		border-radius: 4px;
+		font-size: 10px;
+		font-weight: 500;
+		z-index: 20;
+		white-space: nowrap;
+		border: 1px solid rgba(255, 255, 255, 0.3);
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+	}
+
+</style>

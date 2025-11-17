@@ -1,0 +1,10 @@
+{
+  "name": "@midcodes/tsconfig",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./svelte-app": "./svelte-app.json",
+    "./library": "./library.json"
+  }
+}

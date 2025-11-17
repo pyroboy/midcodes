@@ -1,54 +1,45 @@
 import { supabase } from './supabaseClient';
 import type { TemplateData } from './stores/templateStore';
-import { uploadFile, deleteFile } from './utils/supabase';
+import { uploadFile, deleteFile, getSupabaseStorageUrl } from './utils/supabase';
 
 export async function uploadImage(file: File, path: string, userId?: string): Promise<string> {
-  try {
-    const finalPath = userId ? `${userId}/${path}` : path;
-    const result = await uploadFile('templates', finalPath, file);
-    return result.path;
-  } catch (error) {
-    console.error('Error uploading image:', error);
-    throw error;
-  }
+	try {
+		const finalPath = userId ? `${userId}/${path}` : path;
+		const result = await uploadFile('templates', finalPath, file);
+		// Return the full URL instead of just the path
+		return getSupabaseStorageUrl(result.path, 'templates');
+	} catch (error) {
+		console.error('Error uploading image:', error);
+		throw error;
+	}
 }
 
 export async function deleteTemplate(id: string) {
-  const { error } = await supabase
-    .from('templates')
-    .delete()
-    .match({ id });
+	const { error } = await supabase.from('templates').delete().match({ id });
 
-  if (error) throw error;
+	if (error) throw error;
 }
 
 export async function saveTemplate(template: TemplateData) {
-  const { data, error } = await supabase
-    .from('templates')
-    .upsert(template)
-    .select();
+	const { data, error } = await supabase.from('templates').upsert(template).select();
 
-  if (error) throw error;
-  return data[0];
+	if (error) throw error;
+	return data[0];
 }
 
 export async function getTemplate(id: string) {
-  const { data, error } = await supabase
-    .from('templates')
-    .select('*')
-    .eq('id', id)
-    .single();
+	const { data, error } = await supabase.from('templates').select('*').eq('id', id).single();
 
-  if (error) throw error;
-  return data;
+	if (error) throw error;
+	return data;
 }
 
 export async function listTemplates() {
-  const { data, error } = await supabase
-    .from('templates')
-    .select('*')
-    .order('created_at', { ascending: false });
+	const { data, error } = await supabase
+		.from('templates')
+		.select('*')
+		.order('created_at', { ascending: false });
 
-  if (error) throw error;
-  return data;
+	if (error) throw error;
+	return data;
 }

@@ -3,6 +3,7 @@ import { superValidate } from 'sveltekit-superforms/server';
 import type { PageServerLoad, Actions, RequestEvent } from './$types';
 import { zod } from 'sveltekit-superforms/adapters';
 import { propertySchema, preparePropertyData } from './formSchema';
+import { cache, cacheKeys } from '$lib/services/cache';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const { supabase, permissions } = locals;
@@ -61,6 +62,9 @@ export const actions: Actions = {
 			return fail(500, { form, message: 'Failed to create property' });
 		}
 
+		// Invalidate properties cache after create
+		cache.deletePattern(/^properties:/);
+
 		return { form };
 	},
 	update: async ({ request, locals: { supabase } }: RequestEvent) => {
@@ -81,6 +85,9 @@ export const actions: Actions = {
 				error: 'Failed to update property'
 			});
 		}
+
+		// Invalidate properties cache after update
+		cache.deletePattern(/^properties:/);
 
 		return { form };
 	},
@@ -108,6 +115,9 @@ export const actions: Actions = {
 				});
 				throw deleteError;
 			}
+
+			// Invalidate properties cache after delete
+			cache.deletePattern(/^properties:/);
 
 			return { success: true };
 		} catch (error: any) {

@@ -7,6 +7,7 @@ import type { Database } from '$lib/database.types';
 import { batchReadingsSchema, meterReadingSchema } from './meterReadingSchema';
 import type { z } from 'zod';
 import { getUserPermissions } from '$lib/services/permissions';
+import { cache, cacheKeys, CACHE_TTL } from '$lib/services/cache';
 
 // Use Node runtime; avoid ISR on authed routes to prevent cache/redirect issues
 export const config = { runtime: 'nodejs20.x' };
@@ -32,6 +33,7 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
 		properties: [],
 		meters: [],
 		readings: [],
+		allReadings: [], // Include all readings for pending review
 		availableReadingDates: [],
 		rental_unitTenantCounts: {},
 		leases: [],
@@ -71,7 +73,15 @@ async function loadPropertiesData(supabase: any) {
 }
 
 async function loadMetersData(supabase: any) {
-	console.log('Loading meters data...');
+	const cacheKey = cacheKeys.meters();
+	const cached = cache.get<any[]>(cacheKey);
+
+	if (cached) {
+		console.log('🎯 CACHE HIT: Returning cached meters data');
+		return cached;
+	}
+
+	console.log('💾 CACHE MISS: Loading meters data...');
 	const result = await supabase.from('meters').select(`
       id,
       name,
@@ -90,11 +100,23 @@ async function loadMetersData(supabase: any) {
 		throw error(500, `Error fetching meters: ${result.error.message}`);
 	}
 
-	return result.data || [];
+	const data = result.data || [];
+	cache.set(cacheKey, data, CACHE_TTL.MEDIUM);
+	console.log('✅ Cached meters data');
+
+	return data;
 }
 
 async function loadReadingsData(supabase: any) {
-	console.log('Loading readings data...');
+	const cacheKey = cacheKeys.readings();
+	const cached = cache.get<any[]>(cacheKey);
+
+	if (cached) {
+		console.log('🎯 CACHE HIT: Returning cached readings data');
+		return cached;
+	}
+
+	console.log('💾 CACHE MISS: Loading readings data...');
 	const result = await supabase
 		.from('readings')
 		.select(
@@ -103,7 +125,8 @@ async function loadReadingsData(supabase: any) {
       meter_id,
       reading,
       reading_date,
-      rate_at_reading
+      rate_at_reading,
+      review_status
     `
 		)
 		.order('reading_date', { ascending: true });
@@ -113,7 +136,11 @@ async function loadReadingsData(supabase: any) {
 		throw error(500, `Error fetching readings: ${result.error.message}`);
 	}
 
-	return result.data || [];
+	const data = result.data || [];
+	cache.set(cacheKey, data, CACHE_TTL.SHORT);
+	console.log('✅ Cached readings data');
+
+	return data;
 }
 
 async function loadBillingsData(supabase: any) {
@@ -177,7 +204,9 @@ async function loadLeasesData(supabase: any) {
         id,
         name,
         number,
-        type
+        type,
+        floor_id,
+        property_id
       ),
       lease_tenants(
         tenants(
@@ -212,6 +241,7 @@ async function loadAllReadingsData(supabase: any) {
 			reading,
 			reading_date,
 			rate_at_reading,
+			review_status,
 			meters!inner(
 				id,
 				name,
@@ -268,6 +298,50 @@ function groupReadingsByMonth(readings: any[]) {
 }
 
 export const actions: Actions = {
+	approvePendingReadings: async ({ request, locals: { supabase, safeGetSession } }) => {
+		const session = await safeGetSession();
+		if (!session) return fail(401, { error: 'Unauthorized' });
+
+		const formData = await request.formData();
+		const idsJson = formData.get('reading_ids') as string;
+		if (!idsJson) return fail(400, { error: 'Missing reading_ids' });
+		let ids: number[] = [];
+		try {
+			ids = JSON.parse(idsJson);
+			if (!Array.isArray(ids)) throw new Error('reading_ids must be an array');
+		} catch (e: any) {
+			return fail(400, { error: 'Invalid reading_ids payload' });
+		}
+
+		const { error: updateError } = await supabase
+			.from('readings')
+			.update({ review_status: 'APPROVED' })
+			.in('id', ids);
+		if (updateError) return fail(500, { error: `Failed to approve readings: ${updateError.message}` });
+		return { success: true };
+	},
+	rejectPendingReadings: async ({ request, locals: { supabase, safeGetSession } }) => {
+		const session = await safeGetSession();
+		if (!session) return fail(401, { error: 'Unauthorized' });
+
+		const formData = await request.formData();
+		const idsJson = formData.get('reading_ids') as string;
+		if (!idsJson) return fail(400, { error: 'Missing reading_ids' });
+		let ids: number[] = [];
+		try {
+			ids = JSON.parse(idsJson);
+			if (!Array.isArray(ids)) throw new Error('reading_ids must be an array');
+		} catch (e: any) {
+			return fail(400, { error: 'Invalid reading_ids payload' });
+		}
+
+		const { error: updateError } = await supabase
+			.from('readings')
+			.update({ review_status: 'REJECTED' })
+			.in('id', ids);
+		if (updateError) return fail(500, { error: `Failed to reject readings: ${updateError.message}` });
+		return { success: true };
+	},
 
 
 	createUtilityBillings: async ({ request, locals: { supabase, safeGetSession } }) => {
@@ -549,6 +623,11 @@ export const actions: Actions = {
 					details: insertError
 				});
 			}
+
+			// Invalidate utility billings cache
+			cache.deletePattern(/^readings:/);
+			cache.deletePattern(/^meters:/);
+			console.log('🗑️ Invalidated readings and meters cache');
 
 			return {
 				form, // ← required by Superforms
