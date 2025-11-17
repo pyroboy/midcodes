@@ -118,6 +118,9 @@
 			<li class="mobile-cta">
 				<a href="/contact" class="visit-btn-mobile" on:click={closeMobileMenu}>Visit Us</a>
 			</li>
+			<li aria-current={$page.url.pathname === '/news' ? 'page' : undefined}>
+				<a href="/news" on:click={closeMobileMenu}>News</a>
+			</li>
 		</ul>
 	</nav>
 </header>
