@@ -86,7 +86,7 @@
 		images: ArticleImage[];
 		content: ContentBlock[];
 	} = {
-		title: "Endure and Proclaim: March of Faith's 51st Anniversary Celebration",
+		title: 'March of Faith Inc. Honors 51-Year Legacy, Celebrates Unified Mission',
 		date: 'November 16, 2024',
 		category: 'Events',
 		images: [
@@ -204,8 +204,76 @@
 </script>
 
 <svelte:head>
-	<title>{article.title} - March of Faith News</title>
-	<meta name="description" content={metaDescription} />
+	<!-- Primary Meta Tags -->
+	<title>{article.title} | March of Faith Inc.</title>
+	<meta name="title" content="{article.title} | March of Faith Inc." />
+	<meta name="description" content="March of Faith Inc. celebrates its 51st Foundation Day with unified worship across 12 locations in Bohol and Negros Oriental. Honoring Dr. Rev. Rudy Trigo's legacy and advancing the gospel." />
+	<meta name="keywords" content="March of Faith, 51st anniversary, Foundation Day, Dr. Rev. Rudy Trigo, Ralph Steven Trigo, Bohol church, Negros Oriental, Christian ministry, Tagbilaran City, faith celebration" />
+	<meta name="author" content="March of Faith Inc." />
+	<meta name="robots" content="index, follow" />
+	<link rel="canonical" href="https://marchoffaith.org/news/51st-anniversary-celebration" />
+	
+	<!-- Open Graph / Facebook -->
+	<meta property="og:type" content="article" />
+	<meta property="og:url" content="https://marchoffaith.org/news/51st-anniversary-celebration" />
+	<meta property="og:title" content="{article.title}" />
+	<meta property="og:description" content="March of Faith Inc. celebrates its 51st Foundation Day with unified worship across 12 locations in Bohol and Negros Oriental. Honoring Dr. Rev. Rudy Trigo's legacy." />
+	<meta property="og:image" content="{article.images[0].url}" />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
+	<meta property="og:site_name" content="March of Faith Inc." />
+	<meta property="article:published_time" content="{new Date(article.date).toISOString()}" />
+	<meta property="article:author" content="March of Faith Inc." />
+	<meta property="article:section" content="{article.category}" />
+	<meta property="article:tag" content="Anniversary" />
+	<meta property="article:tag" content="Ministry" />
+	<meta property="article:tag" content="Bohol" />
+	
+	<!-- Twitter -->
+	<meta property="twitter:card" content="summary_large_image" />
+	<meta property="twitter:url" content="https://marchoffaith.org/news/51st-anniversary-celebration" />
+	<meta property="twitter:title" content="{article.title}" />
+	<meta property="twitter:description" content="March of Faith Inc. celebrates its 51st Foundation Day with unified worship across 12 locations in Bohol and Negros Oriental." />
+	<meta property="twitter:image" content="{article.images[0].url}" />
+	
+	<!-- Additional SEO -->
+	<meta name="geo.region" content="PH-BOH" />
+	<meta name="geo.placename" content="Tagbilaran City, Bohol" />
+	<meta name="language" content="English" />
+	
+	<!-- Structured Data / JSON-LD -->
+	<script type="application/ld+json">
+	{JSON.stringify({
+		"@context": "https://schema.org",
+		"@type": "Article",
+		"headline": article.title,
+		"description": "March of Faith Inc. celebrates its 51st Foundation Day with unified worship across 12 locations in Bohol and Negros Oriental. Honoring Dr. Rev. Rudy Trigo's legacy and advancing the gospel.",
+		"image": article.images.map(img => img.url),
+		"datePublished": new Date(article.date).toISOString(),
+		"dateModified": new Date(article.date).toISOString(),
+		"author": {
+			"@type": "Organization",
+			"name": "March of Faith Inc.",
+			"url": "https://marchoffaith.org"
+		},
+		"publisher": {
+			"@type": "Organization",
+			"name": "March of Faith Inc.",
+			"logo": {
+				"@type": "ImageObject",
+				"url": "https://marchoffaith.org/logo.png"
+			}
+		},
+		"mainEntityOfPage": {
+			"@type": "WebPage",
+			"@id": "https://marchoffaith.org/news/51st-anniversary-celebration"
+		},
+		"articleSection": article.category,
+		"keywords": "March of Faith, 51st anniversary, Foundation Day, Dr. Rev. Rudy Trigo, Ralph Steven Trigo, Bohol church, Negros Oriental, Christian ministry"
+	})}
+	</script>
+	
+	<!-- Fonts -->
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
 	<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&display=swap" rel="stylesheet">
