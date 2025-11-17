@@ -156,7 +156,7 @@
 					<div class="info-list">
 						<div class="info-item">
 							<strong>Founded:</strong>
-							<span>January 1, 1975</span>
+							<span>November 19, 1975</span>
 						</div>
 						<div class="info-item">
 							<strong>Location:</strong>

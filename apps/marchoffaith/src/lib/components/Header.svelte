@@ -83,6 +83,9 @@
 			<li aria-current={$page.url.pathname === '/contact' ? 'page' : undefined}>
 				<a href="/contact">Contact</a>
 			</li>
+				<li aria-current={$page.url.pathname === '/news' ? 'page' : undefined}>
+				<a href="/news">News</a>
+			</li>
 		</ul>
 	</nav>
 

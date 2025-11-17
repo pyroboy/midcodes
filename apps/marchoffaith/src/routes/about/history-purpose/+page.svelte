@@ -70,7 +70,7 @@
 								<div class="foundation-content">
 									<div class="foundation-text">
 										<h3>Foundation and Incorporation</h3>
-										<p>March of Faith Incorporated was officially established on January 1, 1975, with SEC Registration No. 0000058834. Under the divine guidance and leadership of Rev. Rudy Salomon Trigo, D.D., the church began its mission to serve the spiritual needs of the Bohol community.</p>
+										<p>March of Faith Incorporated was officially established on November 19, 1975, with SEC Registration No. 0000058834. Under the divine guidance and leadership of Rev. Rudy Salomon Trigo, D.D., the church began its mission to serve the spiritual needs of the Bohol community.</p>
 									</div>
 									<div class="founder-image">
 										<img 
