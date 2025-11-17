@@ -42,13 +42,13 @@
 	<div class="header-brand">
 		<a href="/" class="brand-link">
 			<img 
-				src="https://res.cloudinary.com/dexcw6vg0/image/upload/v1740474451/MOFI_web_logo_yrzxyh.webp" 
+				src="https://res.cloudinary.com/dexcw6vg0/image/upload/v1763355713/ojlomimmfvtgwzxjyptq.webp" 
 				alt="March of Faith Logo" 
 				class="brand-logo"
 			/>
 			<div class="brand-text">
-				<span class="brand-name">March of Faith</span>
-				<span class="brand-subtitle">Incorporated</span>
+				<span class="brand-name">March of Faith Inc.</span>
+				<span class="brand-subtitle">Every Creature is Reachable</span>
 			</div>
 		</a>
 	</div>

@@ -31,16 +31,16 @@
 		</div>
 		<div class="hero-overlay"></div>
 		<img 
-			src="https://res.cloudinary.com/dexcw6vg0/image/upload/v1740474451/MOFI_web_logo_yrzxyh.webp" 
+			src="https://res.cloudinary.com/dexcw6vg0/image/upload/v1763355713/ojlomimmfvtgwzxjyptq.webp" 
 			alt="March of Faith Logo" 
 			class="hero-logo"
 			style="transform: translateY({scrollY * 0.5}px)"
 		/>
 	</div>
 	<div class="hero-content">
-		<h1 class="hero-title">March of Faith Incorporated</h1>
-		<p class="hero-subtitle">Headquarters Church • Tagbilaran, Bohol</p>
-		<p class="hero-description">Strengthening faith, building community, and spreading God's love throughout the Philippines</p>
+		<h1 class="hero-title">March of Faith Inc.</h1>
+		<p class="hero-subtitle">Every Creature is Reachable</p>
+		<p class="hero-description">Reach the unreached. Preach Jesus. Make disciples</p>
 		<div class="hero-buttons">
 			<a href="/about" class="btn btn-primary">Learn More</a>
 			<a href="/contact" class="btn btn-secondary">Visit Us</a>
@@ -52,16 +52,18 @@
 <section class="welcome">
 	<div class="container">
 		<div class="welcome-content">
-			<h2>Welcome to Our Church Family</h2>
-			<p>At March of Faith Incorporated, we believe in the power of community, the strength of faith, and the transformative love of Christ. As our headquarters church in the beautiful province of Bohol, we serve as a beacon of hope and spiritual guidance for believers across the Philippines.</p>
+			<h2>Reaching the Unreached With the Love of Christ</h2>
+			<p>We believe that the love of Christ knows no limits and no boundaries. With a global vision of reaching every creature, we are committed to creating a community of believers who impact nations with the gospel.</p>
+			<!-- <p>As our headquarters church in the beautiful province of Bohol, we serve as a beacon of hope and spiritual guidance for believers across the Philippines.</p> -->
 			<div class="welcome-stats">
 				<div class="stat">
 					<h3>Founded</h3>
-					<p>Established in Bohol</p>
+					<p>Established in Bohol Nov 19, 1974</p>
+					<p>by Rev. Rudy Salomon Trigo, D.D.</p>
 				</div>
 				<div class="stat">
 					<h3>Mission</h3>
-					<p>Spreading God's Love</p>
+					<p>Reach the unreached. Preach Jesus. Make disciples</p>
 				</div>
 				<div class="stat">
 					<h3>Community</h3>
@@ -76,82 +78,112 @@
 <section class="services">
 	<div class="container">
 		<h2>Our Ministry</h2>
-		<div class="services-grid">
+<div class="services-grid">
+	
+<div class="service-card">
+	<div class="service-icon">⛪</div>
+	<h3>Children</h3>
+	<p>Following the wisdom of Proverbs 22:6, our ministry lovingly guides children, setting a joyful foundation for a lifelong walk with Christ where they are equipped to love God, to understand the Bible, and to be kind to others.</p>
+</div>
+
+	<div class="service-card">
+		<div class="service-icon">👥</div>
+		<h3>Youth</h3>
+		<p>A ministry dedicated to guiding young people toward Christ through fellowship, discipleship, and purposeful activities that help them grow in faith and character.</p>
+	</div>
+
+
+	<div class="service-card">
+		<div class="service-icon">🎓</div>
+		<h3>Minister's Training</h3>
+		<p>We are dedicated to equipping and training ministers to be true shepherds who lovingly guide, biblically feed, and faithfully protect God's flock, following the example of Christ.</p>
+	</div>
+
+
 			<div class="service-card">
-				<div class="service-icon">⛪</div>
-				<h3>Worship Services</h3>
-				<p>Join us for meaningful worship experiences that inspire and uplift your spirit every Sunday.</p>
-			</div>
-			<div class="service-card">
-				<div class="service-icon">🤝</div>
-				<h3>Community Fellowship</h3>
-				<p>Build lasting relationships with fellow believers through our various fellowship programs and events.</p>
-			</div>
-			<div class="service-card">
-				<div class="service-icon">📖</div>
-				<h3>Bible Study</h3>
-				<p>Deepen your understanding of God's word through our comprehensive Bible study programs.</p>
-			</div>
-			<div class="service-card">
-				<div class="service-icon">❤️</div>
-				<h3>Community Outreach</h3>
-				<p>Serve others and make a difference in our community through our various outreach initiatives.</p>
-			</div>
-		</div>
+		<div class="service-icon">🌱</div>
+		<h3>Church Planting</h3>
+		<p>Our commitment to expanding God’s kingdom by establishing new churches, training leaders, and reaching communities across the world with the gospel.</p>
+	</div>
+
+
+	<div class="service-card">
+		<div class="service-icon">🎵</div>
+		<h3>Music</h3>
+		<p>A place where worship, creativity, and talent grow—training young and aspiring musicians to lead others into God’s presence.</p>
+	</div>
+
+	<div class="service-card">
+		<div class="service-icon">🤲</div>
+		<h3>Outreach</h3>
+		<p>Focused on sharing the love of Jesus through acts of compassion, evangelism, and service—reaching the unreached and bringing hope where it’s needed most.</p>
+	</div>
+
+	<div class="service-card">
+		<div class="service-icon">📻</div>
+		<h3>Radio Ministry</h3>
+		<p>Bringing the Good News to listeners far and wide, sharing sermons, worship, and biblical teaching over the radio.</p>
+	</div>
+
+</div>
 	</div>
 </section>
 
-<!-- Location Section -->
 <section class="location">
-	<div class="section-shapes location-shapes">
-		<div class="angular-shape angular-1"></div>
-		<div class="angular-shape angular-2"></div>
-		<div class="white-accent white-1"></div>
-	</div>
-	<div class="container">
-		<div class="location-content">
-			<div class="location-text">
-				<h2>Visit Us in Bohol</h2>
-				<p>Located in the heart of Tagbilaran, our church serves as the headquarters for March of Faith Incorporated. We welcome visitors and new members to join our growing community of faith.</p>
-				<div class="location-details">
-					<div class="detail">
-						<strong>Sunday Services:</strong>
-						<span>8:00 AM & 10:30 AM</span>
-					</div>
-					<div class="detail">
-						<strong>Wednesday Bible Study:</strong>
-						<span>7:00 PM</span>
-					</div>
-					<div class="detail">
-						<strong>Location:</strong>
-						<span>Tagbilaran City, Bohol</span>
-					</div>
-				</div>
-				<a href="/contact" class="btn btn-primary">Get Directions</a>
-			</div>
-			<div class="location-image">
-				<div class="image-stack">
-					<img 
-						src="https://res.cloudinary.com/dexcw6vg0/image/upload/c_fill,w_600,h_400,g_center/v1/sample" 
-						alt="Church Building" 
-						class="location-img main-img"
-					/>
-					<div class="founder-overlay">
-						<img 
-							src="https://res.cloudinary.com/dexcw6vg0/image/upload/v1754821750/rcpqj7mzayco2ndwioqp.png" 
-							alt="Rev. Rudy Salomon Trigo, D.D." 
-							class="founder-overlay-img"
-						/>
-						<div class="founder-overlay-text">
-							<p>Founded by Rev. Rudy Salomon Trigo, D.D.</p>
-						</div>
-					</div>
-				</div>
-			</div>
-		</div>
-	</div>
-</section>
+    <div class="section-shapes location-shapes">
+        <div class="angular-shape angular-1"></div>
+        <div class="angular-shape angular-2"></div>
+        <div class="white-accent white-1"></div>
+    </div>
+    <div class="container">
+        <div class="location-content">
+            <div class="location-text">
+            <h2>Worship With Us</h2>
+                
+        <p>Our headquarters in Tagbilaran City, Bohol serves a growing network of March of Faith churches around the nation. We warmly invite you to join us at our Tagbilaran location or at any of our congregations across the nation.</p>
+                <div class="location-details">
+                    <div class="detail">
+                        <strong>Sunday Services:</strong>
+                        <span>9:00 - 11:00 AM</span>
+                        <span>4:00 - 6:00 PM</span>
+                    </div>
+                    <div class="detail">
+                        <strong>Wednesday Bible Study:</strong>
+                        <span>7:00 PM</span>
+                    </div>
+                    <div class="detail">
+                        <strong>Location:</strong>
+                        <span>Tagbilaran City, Bohol</span>
+                    </div>
+                </div>
 
+                <div class="location-buttons">
+                    <a href="/contact" class="btn btn-primary">Get Directions</a>
+                    <a href="/churches" class="btn btn-secondary">See All Our Churches</a>
+                </div>
+            </div>
+            <div class="location-image">
+                <div class="image-stack">
+                    <img 
+                        src="https://res.cloudinary.com/dexcw6vg0/image/upload/c_fill,w_600,h_400,g_center/v1/sample" 
+                        alt="Church Building" 
+                        class="location-img main-img"
+                    />
+                    <div class="founder-overlay">
+                        <img 
+                            src="https://res.cloudinary.com/dexcw6vg0/image/upload/v1754821750/rcpqj7mzayco2ndwioqp.png" 
+                            alt="Rev. Rudy Salomon Trigo, D.D." 
+                            class="founder-overlay-img"
+                        />
+                        <div class="founder-overlay-text">
+                            <p>Founded by Rev. Rudy Salomon Trigo, D.D.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
 
 <style>
 	/* Global Styles */

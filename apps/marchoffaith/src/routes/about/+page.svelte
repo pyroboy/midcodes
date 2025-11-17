@@ -12,7 +12,7 @@
 	<div class="container">
 		<div class="hero-content">
 			<h1>About March of Faith</h1>
-			<p class="hero-subtitle">Strengthening faith and building community since 1975</p>
+			<p class="hero-subtitle">Every Creature is Reachable</p>
 		</div>
 	</div>
 </section>
