@@ -48,20 +48,17 @@
 		| ListBlock
 		| CarouselBlock;
 
-	// --- CAROUSEL FUNCTIONS (with types) ---
+	// --- CAROUSEL FUNCTIONS ---
 	const nextSlide = () => {
 		currentSlide = (currentSlide + 1) % article.images.length;
-		console.log('Next slide:', currentSlide); // Added for debugging
 	};
 
 	const prevSlide = () => {
 		currentSlide = (currentSlide - 1 + article.images.length) % article.images.length;
-		console.log('Previous slide:', currentSlide); // Added for debugging
 	};
 
 	const goToSlide = (index: number) => {
 		currentSlide = index;
-		console.log('Go to slide:', currentSlide); // Added for debugging
 	};
 
 	const handleTouchStart = (e: TouchEvent) => {
@@ -81,7 +78,7 @@
 		}
 	};
 
-	// --- ARTICLE DATA (with types) ---
+	// --- ARTICLE DATA ---
 	const article: {
 		title: string;
 		date: string;
@@ -89,9 +86,9 @@
 		images: ArticleImage[];
 		content: ContentBlock[];
 	} = {
-		title: 'March of Faith Inc. Honors 51-Year Legacy, Celebrates Unified Mission',
+		title: "Endure and Proclaim: March of Faith's 51st Anniversary Celebration",
 		date: 'November 16, 2024',
-		category: 'Announcements',
+		category: 'Events',
 		images: [
 			{
 				url: 'https://res.cloudinary.com/dexcw6vg0/image/upload/v1763359983/tp0rs7obrolyxzzx88ww.jpg',
@@ -130,7 +127,6 @@
 			}
 		],
 		content: [
-			// MOVED CAROUSEL TO THE TOP
 			{
 				type: 'imageCarousel'
 			},
@@ -194,16 +190,13 @@
 		]
 	};
 
-	// --- FIX for meta description ---
-	// Safely get the 'text' property from the first content block that has it.
-	// Provides a fallback if no text-based block is found early.
 	const firstTextBlock = article.content.find(
 		(block) => (block as ParagraphBlock | HeadingBlock | QuoteBlock).text !== undefined
 	);
 	const metaDescription =
 		firstTextBlock && 'text' in firstTextBlock
 			? firstTextBlock.text
-			: 'Read the latest news from March of Faith Inc.'; // Fallback description
+			: 'Read the latest news from March of Faith Inc.';
 
 	onMount(() => {
 		// Add any client-side JavaScript here
@@ -213,136 +206,117 @@
 <svelte:head>
 	<title>{article.title} - March of Faith News</title>
 	<meta name="description" content={metaDescription} />
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+	<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&display=swap" rel="stylesheet">
 </svelte:head>
 
-<nav class="breadcrumb">
-	<div class="container">
-		<a href="/">Home</a> /
-		<a href="/news">News</a> /
-		<span>Article</span>
-	</div>
-</nav>
-
-<header class="article-header">
-	<div class="container">
-		<div class="article-meta">
-			<span class="article-category">{article.category}</span>
-			<time datetime={new Date(article.date).toISOString().split('T')[0]} class="article-date">
-				{article.date}
-			</time>
+<div class="page-wrapper">
+	<!-- Breadcrumb -->
+	<nav class="breadcrumb">
+		<div class="breadcrumb-container">
+			<a href="/">Home</a>
+			<span class="separator">/</span>
+			<a href="/news">News</a>
+			<span class="separator">/</span>
+			<span class="current">Article</span>
 		</div>
-		<h1 class="article-title">{article.title}</h1>
-	</div>
-</header>
+	</nav>
 
-<article class="article-content">
-	<div class="container">
-		<div class="article-body">
-			{#each article.content as block, i}
+	<!-- Article Header -->
+	<header class="article-header">
+		<div class="header-container">
+			<div class="article-meta">
+				<span class="article-category">{article.category}</span>
+				<span class="meta-separator">·</span>
+				<time datetime={new Date(article.date).toISOString().split('T')[0]} class="article-date">
+					{article.date}
+				</time>
+			</div>
+			<h1 class="article-title">{article.title}</h1>
+		</div>
+	</header>
+
+	<!-- Article Content -->
+	<article class="article-content">
+		<div class="content-container">
+			{#each article.content as block}
 				{#if block.type === 'imageCarousel'}
-					<div class="carousel-container">
-						<div
-							class="carousel-track"
-							style:transform="translateX(-{currentSlide * 100}%)"
-							ontouchstart={handleTouchStart}
-							ontouchmove={handleTouchMove}
-							ontouchend={handleTouchEnd}
-						>
-							{#each article.images as image, j}
-								<figure class="carousel-slide">
-									<img
-										src={image.url}
-										alt={image.alt}
-										class="article-featured-image"
-										loading="lazy"
-									/>
-									<figcaption class="image-caption">{image.caption}</figcaption>
-								</figure>
-							{/each}
-						</div>
-
-						<button
-							class="carousel-button prev"
-							onclick={prevSlide}
-							aria-label="Previous image"
-						>
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								width="24"
-								height="24"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="2"
-								stroke-linecap="round"
-								stroke-linejoin="round"
+					<div class="carousel-wrapper">
+						<div class="carousel-container">
+							<div
+								class="carousel-track"
+								style:transform="translateX(-{currentSlide * 100}%)"
+								ontouchstart={handleTouchStart}
+								ontouchmove={handleTouchMove}
+								ontouchend={handleTouchEnd}
 							>
-								<path d="M15 18l-6-6 6-6" />
-							</svg>
-						</button>
-						<button
-							class="carousel-button next"
-							onclick={nextSlide}
-							aria-label="Next image"
-						>
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								width="24"
-								height="24"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="2"
-								stroke-linecap="round"
-								stroke-linejoin="round"
-							>
-								<path d="M9 18l6-6-6-6" />
-							</svg>
-						</button>
+								{#each article.images as image}
+									<figure class="carousel-slide">
+										<img
+											src={image.url}
+											alt={image.alt}
+											class="carousel-image"
+											loading="lazy"
+										/>
+										<figcaption class="carousel-caption">{image.caption}</figcaption>
+									</figure>
+								{/each}
+							</div>
 
-						<div class="carousel-dots">
-							{#each article.images as _, k}
-								<button
-									class="dot {k === currentSlide ? 'active' : ''}"
-									onclick={() => goToSlide(k)}
-									aria-label={`Go to slide ${k + 1}`}
-								></button>
-							{/each}
+							<button class="carousel-btn prev-btn" onclick={prevSlide} aria-label="Previous image">
+								<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+									<path d="M15 18l-6-6 6-6" />
+								</svg>
+							</button>
+							<button class="carousel-btn next-btn" onclick={nextSlide} aria-label="Next image">
+								<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+									<path d="M9 18l6-6-6-6" />
+								</svg>
+							</button>
+
+							<div class="carousel-indicators">
+								{#each article.images as _, k}
+									<button
+										class="indicator {k === currentSlide ? 'active' : ''}"
+										onclick={() => goToSlide(k)}
+										aria-label={`Go to slide ${k + 1}`}
+									></button>
+								{/each}
+							</div>
 						</div>
 					</div>
 				{:else if block.type === 'paragraph'}
-					<p class="article-paragraph">{@html block.text}</p>
+					<p class="paragraph">{@html block.text}</p>
 				{:else if block.type === 'heading'}
-					<h2 class="article-heading">{block.text}</h2>
+					<h2 class="heading">{block.text}</h2>
 				{:else if block.type === 'quote'}
-					<blockquote class="article-quote">
+					<blockquote class="quote">
 						<p>{block.text}</p>
 					</blockquote>
 				{:else if block.type === 'image'}
-					<figure class="article-figure">
-						<img
-							src={block.src}
-							alt={block.alt}
-							class="article-image"
-							loading="lazy"
-						/>
+					<figure class="image-figure">
+						<img src={block.src} alt={block.alt} class="content-image" loading="lazy" />
 						<figcaption class="image-caption">{block.caption}</figcaption>
 					</figure>
 				{:else if block.type === 'list'}
-					<ul class="article-list">
+					<ul class="list">
 						{#each block.items as item}
-							<li class="article-list-item">{item}</li>
+							<li class="list-item">{item}</li>
 						{/each}
 					</ul>
 				{/if}
 			{/each}
 		</div>
+	</article>
 
-		<aside class="related-articles">
-			<h3 class="related-title">More News</h3>
+	<!-- Related Articles -->
+	<aside class="related-section">
+		<div class="related-container">
+			<h3 class="related-title">More from March of Faith</h3>
 			<div class="related-grid">
-				<a href="/news" class="related-article">
-					<div class="related-image-container">
+				<a href="/news" class="related-card">
+					<div class="related-image-wrapper">
 						<img
 							src="https://res.cloudinary.com/dexcw6vg0/image/upload/v1763355713/ojlomimmfvtgwzxjyptq.webp"
 							alt="Related Article"
@@ -350,97 +324,149 @@
 							loading="lazy"
 						/>
 					</div>
-					<h4>View All News & Updates</h4>
-					<p>Stay updated with the latest from March of Faith Inc.</p>
+					<h4 class="related-card-title">View All News & Updates</h4>
+					<p class="related-card-text">Stay updated with the latest from March of Faith Inc.</p>
 				</a>
 			</div>
-		</aside>
-	</div>
-</article>
+		</div>
+	</aside>
 
-<button
-	class="back-to-top"
-	onclick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-	aria-label="Back to top"
->
-	↑
-</button>
+	<!-- Back to Top -->
+	<button
+		class="back-to-top"
+		onclick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+		aria-label="Back to top"
+	>
+		<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+			<path d="M18 15l-6-6-6 6" />
+		</svg>
+	</button>
+</div>
 
 <style>
+	:global(body) {
+		margin: 0;
+		padding: 0;
+		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+		background: #fff;
+		color: #242424;
+	}
+
+	.page-wrapper {
+		min-height: 100vh;
+		background: #fff;
+	}
+
 	/* Breadcrumb */
 	.breadcrumb {
-		background-color: #f8f9fa;
-		padding: 1rem 0;
-		font-size: 0.9rem;
-		color: #6c757d;
+		border-bottom: 1px solid #f2f2f2;
+		background: #fff;
+		padding: 16px 0;
+	}
+
+	.breadcrumb-container {
+		max-width: 680px;
+		margin: 0 auto;
+		padding: 0 24px;
+		font-size: 14px;
+		color: #6B6B6B;
 	}
 
 	.breadcrumb a {
-		color: var(--primary-color);
+		color: #6B6B6B;
 		text-decoration: none;
-		transition: color 0.2s ease;
+		transition: color 0.15s ease;
 	}
 
 	.breadcrumb a:hover {
-		text-decoration: underline;
+		color: #242424;
 	}
 
-	.breadcrumb span {
-		color: #6c757d;
+	.separator {
+		margin: 0 8px;
+		color: #E6E6E6;
+	}
+
+	.current {
+		color: #242424;
 	}
 
 	/* Article Header */
 	.article-header {
-		padding: 3rem 0 2rem;
-		background: white;
+		padding: 56px 0 40px;
+		background: #fff;
+	}
+
+	.header-container {
+		max-width: 680px;
+		margin: 0 auto;
+		padding: 0 24px;
 	}
 
 	.article-meta {
 		display: flex;
 		align-items: center;
-		margin-bottom: 1rem;
-		font-size: 0.9rem;
+		margin-bottom: 16px;
+		font-size: 14px;
+		color: #6B6B6B;
 	}
 
 	.article-category {
-		display: inline-block;
-		background: var(--primary-color);
-		color: white;
-		padding: 0.25rem 0.75rem;
-		border-radius: 20px;
-		font-weight: 600;
-		text-transform: uppercase;
-		font-size: 0.75rem;
-		letter-spacing: 0.5px;
+		color: #1A8917;
+		font-weight: 500;
+		font-size: 13px;
+		letter-spacing: 0.2px;
+	}
+
+	.meta-separator {
+		margin: 0 8px;
+		color: #E6E6E6;
 	}
 
 	.article-date {
-		color: #6b7280;
-		margin-left: 1rem;
+		color: #6B6B6B;
 	}
 
 	.article-title {
-		font-size: 2.5rem;
-		font-weight: 800;
-		line-height: 1.2;
-		margin: 0 0 1.5rem;
-		color: #1f2937;
+		font-family: 'Source Serif 4', 'Georgia', 'Cambria', 'Times New Roman', serif;
+		font-size: 42px;
+		font-weight: 700;
+		line-height: 1.18;
+		letter-spacing: -0.022em;
+		margin: 0;
+		color: #242424;
+	}
+
+	/* Article Content */
+	.article-content {
+		padding: 0 0 80px;
+		background: #fff;
+	}
+
+	.content-container {
+		max-width: 680px;
+		margin: 0 auto;
+		padding: 0 24px;
+	}
+
+	/* Carousel - Constrained Width */
+	.carousel-wrapper {
+		margin: 0 0 48px;
 	}
 
 	.carousel-container {
 		position: relative;
-		margin: 2rem 0; /* Adjust this margin if you want it tighter to the header */
-		border-radius: 8px;
+		width: 100%;
+		max-width: 100%;
+		margin: 0 auto;
 		overflow: hidden;
-		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-		max-width: 1200px;
-		margin-left: auto;
-		margin-right: auto;
+		background: #fff;
+		border-radius: 4px;
 	}
 
 	.carousel-track {
 		display: flex;
-		transition: transform 0.5s ease-in-out;
+		transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 		width: 100%;
 	}
 
@@ -448,79 +474,13 @@
 		min-width: 100%;
 		position: relative;
 		height: 0;
-		padding-bottom: 75%; /* 4:3 aspect ratio (taller than 16:9) */
+		padding-bottom: 66%; /* Slightly taller than 16:9 for Medium-like proportions */
 		overflow: hidden;
-		margin: 0; /* Reset default figure margin */
+		margin: 0;
+		background: #f9f9f9;
 	}
 
-	.carousel-button {
-		position: absolute;
-		top: 50%;
-		transform: translateY(-50%);
-		background: rgba(255, 255, 255, 0.8);
-		border: none;
-		width: 40px;
-		height: 40px;
-		border-radius: 50%;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		cursor: pointer;
-		transition: all 0.3s ease;
-		z-index: 10;
-		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-	}
-
-	.carousel-button:hover {
-		background: rgba(255, 255, 255, 0.9);
-		transform: translateY(-50%) scale(1.1);
-	}
-
-	.carousel-button.prev {
-		left: 15px;
-	}
-
-	.carousel-button.next {
-		right: 15px;
-	}
-
-	.carousel-button svg {
-		width: 20px;
-		height: 20px;
-	}
-
-	.carousel-dots {
-		position: absolute;
-		bottom: 20px;
-		left: 0;
-		right: 0;
-		display: flex;
-		justify-content: center;
-		gap: 8px;
-		z-index: 5;
-	}
-
-	.dot {
-		width: 10px;
-		height: 10px;
-		border-radius: 50%;
-		background: rgba(255, 255, 255, 0.5);
-		border: none;
-		padding: 0;
-		cursor: pointer;
-		transition: all 0.3s ease;
-	}
-
-	.dot.active {
-		background: white;
-		transform: scale(1.2);
-	}
-
-	.dot:hover:not(.active) {
-		background: rgba(255, 255, 255, 0.8);
-	}
-
-	.article-featured-image {
+	.carousel-image {
 		position: absolute;
 		top: 0;
 		left: 0;
@@ -530,138 +490,194 @@
 		display: block;
 	}
 
-	.image-caption {
+	.carousel-btn {
 		position: absolute;
-		bottom: 0;
+		top: 50%;
+		transform: translateY(-50%);
+		background: rgba(255, 255, 255, 0.95);
+		border: none;
+		width: 48px;
+		height: 48px;
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		z-index: 10;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+		color: #242424;
+	}
+
+	.carousel-btn:hover {
+		background: #fff;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+	}
+
+	.prev-btn {
+		left: 24px;
+	}
+
+	.next-btn {
+		right: 24px;
+	}
+
+	.carousel-indicators {
+		position: absolute;
+		bottom: 24px;
 		left: 0;
 		right: 0;
-		text-align: center;
-		font-size: 0.875rem;
-		color: white;
-		background: linear-gradient(to top, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0));
-		padding: 1.5rem 1rem 0.75rem;
-		font-style: italic;
-		z-index: 2;
+		display: flex;
+		justify-content: center;
+		gap: 8px;
+		z-index: 5;
 	}
 
-	/* Article Content */
-	.article-content {
-		padding: 2rem 0 4rem;
-		background: #f9fafb;
+	.indicator {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: rgba(255, 255, 255, 0.4);
+		border: none;
+		padding: 0;
+		cursor: pointer;
+		transition: all 0.2s ease;
 	}
 
-	.article-body {
-		max-width: 800px;
-		margin: 0 auto 4rem;
-		background: white;
-		padding: 2.5rem;
-		border-radius: 8px;
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+	.indicator.active {
+		background: rgba(255, 255, 255, 0.95);
+		transform: scale(1.25);
 	}
 
-	.article-paragraph {
-		font-size: 1.1rem;
+	.indicator:hover:not(.active) {
+		background: rgba(255, 255, 255, 0.7);
+	}
+
+	/* Typography */
+	.paragraph {
+		font-family: 'Source Serif 4', 'Georgia', 'Cambria', serif;
+		font-size: 20px;
 		line-height: 1.8;
-		color: #374151;
-		margin-bottom: 1.5rem;
+		letter-spacing: -0.003em;
+		color: #242424;
+		margin: 0 0 32px;
+		word-wrap: break-word;
 	}
 
-	.article-heading {
-		font-size: 1.75rem;
+	.paragraph:first-of-type {
+		font-size: 21px;
+	}
+
+	.heading {
+		font-family: 'Source Serif 4', 'Georgia', 'Cambria', serif;
+		font-size: 32px;
 		font-weight: 700;
-		margin: 2.5rem 0 1.5rem;
-		color: #111827;
-		line-height: 1.3;
+		line-height: 1.25;
+		letter-spacing: -0.016em;
+		margin: 56px 0 16px;
+		color: #242424;
 	}
 
-	.article-quote {
-		border-left: 4px solid var(--primary-color);
-		padding: 1rem 0 1rem 1.5rem;
-		margin: 2rem 0;
+	.quote {
+		border-left: 3px solid #242424;
+		padding: 0 0 0 23px;
+		margin: 32px 0;
+		font-family: 'Source Serif 4', 'Georgia', 'Cambria', serif;
+		font-size: 21px;
 		font-style: italic;
-		color: #4b5563;
-		background: #f9fafb;
-		border-radius: 0 4px 4px 0;
+		line-height: 1.7;
+		letter-spacing: -0.003em;
+		color: #242424;
 	}
 
-	.article-quote p {
+	.quote p {
 		margin: 0;
-		font-size: 1.2rem;
-		line-height: 1.6;
 	}
 
-	.article-figure {
-		margin: 2.5rem 0;
+	.image-figure {
+		margin: 48px 0;
+		text-align: center;
 	}
 
-	.article-image {
+	.content-image {
 		width: 100%;
 		height: auto;
-		border-radius: 6px;
+		border-radius: 4px;
 	}
 
-	.article-figure .image-caption {
+	.image-caption {
 		text-align: center;
-		font-size: 0.875rem;
-		color: #6b7280;
-		margin-top: 0.5rem;
-		font-style: italic;
-		position: static; /* Override carousel caption styles */
-		background: none; /* Override carousel caption styles */
-		padding: 0; /* Override carousel caption styles */
+		font-size: 14px;
+		color: #6B6B6B;
+		margin-top: 12px;
+		font-style: normal;
+		line-height: 1.4;
 	}
 
-	.article-list {
-		margin: 1.5rem 0;
-		padding-left: 1.5rem;
+	.list {
+		margin: 32px 0;
+		padding-left: 28px;
+		font-family: 'Source Serif 4', 'Georgia', 'Cambria', serif;
+		font-size: 20px;
+		line-height: 1.8;
+		letter-spacing: -0.003em;
 	}
 
-	.article-list-item {
-		margin-bottom: 0.75rem;
-		line-height: 1.6;
-		color: #374151;
+	.list-item {
+		margin-bottom: 12px;
+		color: #242424;
+		padding-left: 4px;
 	}
 
-	/* Related Articles */
-	.related-articles {
-		margin-top: 4rem;
-		padding-top: 3rem;
-		border-top: 1px solid #e5e7eb;
+	/* Related Section */
+	.related-section {
+		margin-top: 80px;
+		padding: 80px 0;
+		background: #F9F9F9;
+		border-top: 1px solid #F2F2F2;
+	}
+
+	.related-container {
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: 0 24px;
 	}
 
 	.related-title {
-		font-size: 1.5rem;
-		margin-bottom: 1.5rem;
-		color: #111827;
+		font-size: 24px;
+		font-weight: 600;
+		margin: 0 0 32px;
+		color: #242424;
+		letter-spacing: -0.011em;
 	}
 
 	.related-grid {
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-		gap: 1.5rem;
+		gap: 32px;
 	}
 
-	.related-article {
+	.related-card {
 		text-decoration: none;
 		color: inherit;
 		display: block;
 		transition: transform 0.2s ease;
+		background: #fff;
+		border-radius: 4px;
+		overflow: hidden;
+		border: 1px solid #F2F2F2;
 	}
 
-	.related-article:hover {
-		transform: translateY(-3px);
+	.related-card:hover {
+		transform: translateY(-4px);
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
 	}
 
-	.related-article:hover h4 {
-		color: var(--primary-color);
-	}
-
-	.related-image-container {
+	.related-image-wrapper {
 		position: relative;
 		padding-top: 56.25%;
-		border-radius: 6px;
 		overflow: hidden;
-		margin-bottom: 1rem;
+		background: #f2f2f2;
 	}
 
 	.related-image {
@@ -671,109 +687,163 @@
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
-		transition: transform 0.5s ease;
+		transition: transform 0.3s ease;
 	}
 
-	.related-article:hover .related-image {
+	.related-card:hover .related-image {
 		transform: scale(1.05);
 	}
 
-	.related-article h4 {
-		font-size: 1.1rem;
-		margin: 0.5rem 0;
-		transition: color 0.2s ease;
-	}
-
-	.related-article p {
-		color: #6b7280;
+	.related-card-title {
+		font-size: 18px;
+		font-weight: 600;
 		margin: 0;
+		padding: 20px 20px 8px;
+		color: #242424;
+		line-height: 1.4;
 	}
 
-	/* Back to Top Button */
+	.related-card-text {
+		color: #6B6B6B;
+		margin: 0;
+		padding: 0 20px 20px;
+		font-size: 15px;
+		line-height: 1.5;
+	}
+
+	/* Back to Top */
 	.back-to-top {
 		position: fixed;
-		bottom: 2rem;
-		right: 2rem;
-		width: 3rem;
-		height: 3rem;
+		bottom: 32px;
+		right: 32px;
+		width: 48px;
+		height: 48px;
 		border-radius: 50%;
-		background: var(--primary-color);
-		color: white;
+		background: #242424;
+		color: #fff;
 		border: none;
-		font-size: 1.5rem;
 		cursor: pointer;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 		transition: all 0.2s ease;
+		z-index: 100;
 	}
 
 	.back-to-top:hover {
-		transform: translateY(-3px);
-		box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+		transform: translateY(-4px);
+		box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+		background: #1a1a1a;
 	}
 
 	/* Responsive Design */
 	@media (max-width: 768px) {
 		.article-title {
-			font-size: 2rem;
+			font-size: 32px;
+			line-height: 1.2;
 		}
 
-		.article-body {
-			padding: 1.5rem;
+		.heading {
+			font-size: 26px;
+			margin: 40px 0 12px;
 		}
 
-		.article-paragraph {
-			font-size: 1rem;
+		.paragraph,
+		.list {
+			font-size: 18px;
+			line-height: 1.7;
 		}
 
-		.article-heading {
-			font-size: 1.5rem;
+		.quote {
+			font-size: 19px;
+			padding-left: 20px;
 		}
 
-		.back-to-top {
-			width: 2.5rem;
-			height: 2.5rem;
-			font-size: 1.25rem;
+		.article-header {
+			padding: 40px 0 32px;
+		}
+
+		.header-container,
+		.content-container,
+		.breadcrumb-container {
+			padding: 0 20px;
 		}
 
 		.carousel-slide {
-			padding-bottom: 100%; /* Square aspect ratio on mobile */
+			padding-bottom: 75%; /* Taller on mobile */
 		}
 
-		.carousel-button {
-			width: 32px;
-			height: 32px;
+		.carousel-btn {
+			width: 40px;
+			height: 40px;
 		}
 
-		.carousel-button svg {
-			width: 16px;
-			height: 16px;
+		.carousel-btn svg {
+			width: 20px;
+			height: 20px;
 		}
 
-		.image-caption {
-			font-size: 0.75rem;
-			padding: 1rem 0.75rem 0.5rem;
+		.prev-btn {
+			left: 16px;
+		}
+
+		.next-btn {
+			right: 16px;
+		}
+
+		.carousel-caption {
+			font-size: 13px;
+			padding: 40px 16px 12px;
+		}
+
+		.back-to-top {
+			width: 44px;
+			height: 44px;
+			bottom: 20px;
+			right: 20px;
+		}
+
+		.related-section {
+			padding: 60px 0;
+		}
+
+		.related-container {
+			padding: 0 20px;
+		}
+
+		.related-grid {
+			grid-template-columns: 1fr;
+			gap: 24px;
 		}
 	}
 
 	@media (max-width: 480px) {
 		.article-title {
-			font-size: 1.75rem;
+			font-size: 28px;
 		}
 
-		.article-body {
-			padding: 1.25rem;
+		.heading {
+			font-size: 24px;
 		}
 
-		.related-title {
-			font-size: 1.25rem;
+		.paragraph,
+		.list {
+			font-size: 17px;
 		}
 
-		.back-to-top {
-			bottom: 1rem;
-			right: 1rem;
+		.quote {
+			font-size: 18px;
+		}
+
+		.carousel-btn {
+			width: 36px;
+			height: 36px;
+		}
+
+		.carousel-btn svg {
+			width: 18px;
+			height: 18px;
 		}
 	}
 </style>
