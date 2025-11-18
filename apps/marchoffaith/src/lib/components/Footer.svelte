@@ -39,7 +39,6 @@
 						<li><a href="/churches">Our Churches</a></li>
 						<li><a href="/pastors">Our Pastors</a></li>
 						<li><a href="/docs">Resources</a></li>
-						<li><a href="/outreach">Community Outreach</a></li>
 					</ul>
 				</div>
 
