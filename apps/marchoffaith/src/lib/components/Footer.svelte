@@ -1,89 +1,105 @@
+
 <!-- Footer -->
 <footer class="footer">
 	<div class="container">
 		<div class="footer-content">
-			<div class="footer-section">
+			<!-- Brand Section -->
+			<div class="footer-brand">
 				<div class="footer-logo">
 					<img 
 						src="https://res.cloudinary.com/dexcw6vg0/image/upload/v1740474451/MOFI_web_logo_yrzxyh.webp" 
 						alt="March of Faith Logo" 
 						class="footer-logo-img"
 					/>
-					<h3>March of Faith Incorporated</h3>
+					<div>
+						<h3>March of Faith Inc.</h3>
+						<p class="tagline">Every Creature is Reachable</p>
+					</div>
 				</div>
-				<p>Strengthening faith and building community in Bohol and throughout the Philippines since 1975.</p>
-				<div class="footer-social">
-					<p class="social-text">Connect with us and stay updated on our ministry</p>
+				<p class="brand-description">Strengthening faith and building community in Bohol and throughout the Philippines.</p>
+			</div>
+
+			<!-- Links Grid -->
+			<div class="footer-links-grid">
+				<!-- Quick Links -->
+				<div class="footer-column">
+					<h4>About</h4>
+					<ul>
+						<li><a href="/about">Overview</a></li>
+						<li><a href="/about/history-purpose">History & Purpose</a></li>
+						<li><a href="/about/founding-minister">Founding Minister</a></li>
+						<li><a href="/about/presiding-minister">Presiding Minister</a></li>
+					</ul>
 				</div>
-			</div>
-			<div class="footer-section">
-				<h4>About Us</h4>
-				<ul>
-					<li><a href="/about">Overview</a></li>
-					<li><a href="/about/history-purpose">History & Purpose</a></li>
-					<li><a href="/about/founding-minister">Founding Minister</a></li>
-					<li><a href="/about/presiding-minister">Presiding Minister</a></li>
-				</ul>
-			</div>
-			<div class="footer-section">
-				<h4>Ministry</h4>
-				<ul>
-					<li><a href="/churches">Our Churches</a></li>
-					<li><a href="/pastors">Our Pastors</a></li>
-					<li><a href="/docs">Resources</a></li>
-					<li>Community Outreach</li>
-				</ul>
-			</div>
-			<div class="footer-section">
-				<h4>Service Times</h4>
-				<ul class="service-times">
-					<li>
-						<strong>Sunday Morning:</strong>
-						<span>8:00 AM</span>
-					</li>
-					<li>
-						<strong>Sunday Evening:</strong>
-						<span>10:30 AM</span>
-					</li>
-					<li>
-						<strong>Wednesday Bible Study:</strong>
-						<span>7:00 PM</span>
-					</li>
-					<li>
-						<strong>Prayer Meeting:</strong>
-						<span>6:00 AM Daily</span>
-					</li>
-				</ul>
-			</div>
-			<div class="footer-section">
-				<h4>Contact Info</h4>
-				<ul class="contact-info">
-					<li>
-						<strong>Address:</strong>
-						<span>San Isidro District<br>Tagbilaran City, Bohol</span>
-					</li>
-					<li>
-						<strong>Phone:</strong>
-						<span>+63 99 9953 6700</span>
-					</li>
-					<li>
-						<strong>Email:</strong>
-						<span>marchoffaithincorporated@gmail.com</span>
-					</li>
-				</ul>
-				<a href="/contact" class="footer-cta">Visit Us Today</a>
+
+				<!-- Ministry -->
+				<div class="footer-column">
+					<h4>Ministry</h4>
+					<ul>
+						<li><a href="/churches">Our Churches</a></li>
+						<li><a href="/pastors">Our Pastors</a></li>
+						<li><a href="/docs">Resources</a></li>
+						<li><a href="/outreach">Community Outreach</a></li>
+					</ul>
+				</div>
+
+				<!-- Service Times -->
+				<div class="footer-column">
+					<h4>Service Times</h4>
+					<ul class="service-list">
+						<li>
+							<div class="service-label">Sunday Morning</div>
+							<div class="service-time">9:00 - 11:00 AM</div>
+						</li>
+						<li>
+							<div class="service-label">Sunday Evening</div>
+							<div class="service-time">4:00 - 6:00 PM</div>
+						</li>
+						<li>
+							<div class="service-label">Prayer Meeting</div>
+							<div class="service-time">6:00 AM Daily</div>
+						</li>
+					</ul>
+				</div>
+
+				<!-- Contact -->
+				<div class="footer-column">
+					<h4>Contact Us</h4>
+					<ul class="contact-list">
+						<li>
+							<div class="contact-label">Address</div>
+							<div class="contact-detail">San Isidro District<br>Tagbilaran City, Bohol</div>
+						</li>
+						<li>
+							<div class="contact-label">Phone</div>
+							<div class="contact-detail">+63 99 9953 6700</div>
+						</li>
+						<li>
+							<div class="contact-label">Email</div>
+							<div class="contact-detail">marchoffaithincorporated@gmail.com</div>
+						</li>
+					</ul>
+					<a href="/contact" class="footer-cta">Visit Us</a>
+				</div>
 			</div>
 		</div>
+
+		<!-- Footer Bottom -->
 		<div class="footer-bottom">
-			<div class="footer-bottom-content">
-				<p>&copy; 2025 March of Faith Incorporated. All rights reserved.</p>
-				<p class="footer-subtitle">Headquarters: Tagbilaran, Bohol, Philippines • SEC Registration: 0000058834</p>
-			</div>
+			<p>&copy; 2025 March of Faith Incorporated. All rights reserved.</p>
+			<p class="footer-meta">SEC Registration: 0000058834 • Tagbilaran, Bohol, Philippines</p>
 		</div>
 	</div>
 </footer>
 
 <style>
+	* {
+		margin: 0;
+		padding: 0;
+		box-sizing: border-box;
+	}
+
+
 	/* Container */
 	.container {
 		max-width: 1200px;
@@ -94,60 +110,24 @@
 	/* Footer */
 	.footer {
 		background: #2c3e50;
-		color: white;
+		color: #ffffff;
 		padding: 4rem 0 0;
 		margin-top: auto;
 	}
 
 	.footer-content {
 		display: grid;
-		grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
-		gap: 3rem;
-		margin-bottom: 3rem;
+		grid-template-columns: 1.5fr 2fr;
+		gap: 4rem;
+		padding-bottom: 3rem;
+		border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 	}
 
-	/* Footer Sections */
-	.footer-section h3,
-	.footer-section h4 {
-		color: #C1272D;
-		margin-bottom: 1.5rem;
-		font-weight: 600;
-		font-size: 1.1rem;
+	/* Brand Section */
+	.footer-brand {
+		max-width: 400px;
 	}
 
-	.footer-section h3 {
-		font-size: 1.3rem;
-		margin-bottom: 1rem;
-	}
-
-	.footer-section p {
-		color: #bdc3c7;
-		line-height: 1.6;
-		margin-bottom: 1.5rem;
-	}
-
-	.footer-section ul {
-		list-style: none;
-		padding: 0;
-		margin: 0;
-	}
-
-	.footer-section li {
-		margin-bottom: 0.75rem;
-	}
-
-	.footer-section a {
-		color: #bdc3c7;
-		text-decoration: none;
-		transition: color 0.3s ease;
-		display: block;
-	}
-
-	.footer-section a:hover {
-		color: #C1272D;
-	}
-
-	/* Footer Logo */
 	.footer-logo {
 		display: flex;
 		align-items: center;
@@ -156,102 +136,172 @@
 	}
 
 	.footer-logo-img {
-		width: 60px;
-		height: auto;
+		width: 70px;
+		height: 70px;
+		object-fit: contain;
+		flex-shrink: 0;
 	}
 
 	.footer-logo h3 {
-		margin: 0;
-		color: white;
-		font-size: 1.3rem;
+		font-size: 1.375rem;
+		font-weight: 800;
+		color: #ffffff;
+		line-height: 1.2;
+		margin-bottom: 0.375rem;
+		letter-spacing: -0.02em;
 	}
 
-	/* Service Times & Contact Info */
-	.service-times li,
-	.contact-info li {
-		display: flex;
-		justify-content: space-between;
-		align-items: flex-start;
-		padding: 0.5rem 0;
-		border-bottom: 1px solid #34495e;
-	}
-
-	.service-times li:last-child,
-	.contact-info li:last-child {
-		border-bottom: none;
-	}
-
-	.service-times strong,
-	.contact-info strong {
-		color: #ecf0f1;
-		font-weight: 600;
-		min-width: 120px;
-	}
-
-	.service-times span,
-	.contact-info span {
+	.tagline {
+		font-size: 0.8125rem;
 		color: #C1272D;
-		text-align: right;
+		font-weight: 600;
+		letter-spacing: 0.02em;
+	}
+
+	.brand-description {
+		color: #bdc3c7;
+		line-height: 1.65;
+		font-size: 0.9375rem;
+		font-weight: 400;
+		letter-spacing: -0.01em;
+	}
+
+	/* Links Grid */
+	.footer-links-grid {
+		display: grid;
+		grid-template-columns: repeat(4, 1fr);
+		gap: 2.5rem;
+	}
+
+	.footer-column h4 {
+		font-size: 0.8125rem;
+		font-weight: 800;
+		color: #ffffff;
+		text-transform: uppercase;
+		letter-spacing: 1.2px;
+		margin-bottom: 1.5rem;
+	}
+
+	.footer-column ul {
+		list-style: none;
+	}
+
+	.footer-column li {
+		margin-bottom: 0.75rem;
+	}
+
+	.footer-column a {
+		color: #bdc3c7;
+		text-decoration: none;
+		font-size: 0.9375rem;
+		font-weight: 450;
+		transition: color 0.2s ease;
+		letter-spacing: -0.01em;
+		line-height: 1.5;
+	}
+
+	.footer-column a:hover {
+		color: #C1272D;
+	}
+
+	/* Service List */
+	.service-list li {
+		margin-bottom: 1.125rem;
+		padding-bottom: 1.125rem;
+		border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+	}
+
+	.service-list li:last-child {
+		border-bottom: none;
+		margin-bottom: 0;
+		padding-bottom: 0;
+	}
+
+	.service-label {
+		font-size: 0.8125rem;
+		color: #bdc3c7;
+		margin-bottom: 0.375rem;
 		font-weight: 500;
+		letter-spacing: 0.01em;
+	}
+
+	.service-time {
+		font-size: 1rem;
+		color: #C1272D;
+		font-weight: 700;
+		letter-spacing: -0.02em;
+	}
+
+	/* Contact List */
+	.contact-list li {
+		margin-bottom: 1rem;
+	}
+
+	.contact-label {
+		font-size: 0.8125rem;
+		color: #bdc3c7;
+		margin-bottom: 0.375rem;
+		font-weight: 500;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+	}
+
+	.contact-detail {
+		font-size: 0.9375rem;
+		color: #ecf0f1;
+		line-height: 1.6;
+		font-weight: 450;
+		letter-spacing: -0.01em;
 	}
 
 	/* Footer CTA */
 	.footer-cta {
 		display: inline-block;
-		margin-top: 1.5rem;
-		padding: 0.75rem 1.5rem;
+		margin-top: 1.75rem;
+		padding: 0.875rem 2.25rem;
 		background: #C1272D;
 		color: white !important;
 		text-decoration: none;
-		border-radius: 25px;
-		font-weight: 600;
+		border-radius: 6px;
+		font-weight: 700;
+		font-size: 0.9375rem;
 		transition: all 0.3s ease;
+		text-align: center;
+		letter-spacing: 0.02em;
 	}
 
 	.footer-cta:hover {
 		background: #981B1E;
 		transform: translateY(-2px);
-		box-shadow: 0 5px 15px rgba(193, 39, 45, 0.3);
-	}
-
-	/* Social Section */
-	.footer-social {
-		margin-top: 1rem;
-	}
-
-	.social-text {
-		font-size: 0.9rem;
-		color: #95a5a6;
-		font-style: italic;
+		box-shadow: 0 4px 12px rgba(193, 39, 45, 0.4);
 	}
 
 	/* Footer Bottom */
 	.footer-bottom {
 		background: #34495e;
 		padding: 2rem 0;
+		text-align: center;
 		border-top: 1px solid #4a6741;
 	}
 
-	.footer-bottom-content {
-		text-align: center;
-	}
-
 	.footer-bottom p {
-		margin: 0;
 		color: #bdc3c7;
-		font-size: 0.9rem;
+		font-size: 0.875rem;
+		margin-bottom: 0.5rem;
+		font-weight: 500;
+		letter-spacing: -0.01em;
 	}
 
-	.footer-subtitle {
-		margin-top: 0.5rem !important;
-		font-size: 0.8rem !important;
+	.footer-meta {
+		font-size: 0.8125rem !important;
 		color: #95a5a6 !important;
+		font-weight: 450 !important;
 	}
 
 	/* Responsive Design */
 	@media (max-width: 1024px) {
-		.footer-content {
-			grid-template-columns: 2fr 1fr 1fr 1fr;
+		.footer-links-grid {
+			grid-template-columns: repeat(2, 1fr);
 			gap: 2rem;
 		}
 	}
@@ -262,36 +312,51 @@
 		}
 
 		.footer-content {
-			grid-template-columns: 1fr 1fr;
+			grid-template-columns: 1fr;
+			gap: 3rem;
+		}
+
+		.footer-brand {
+			max-width: 100%;
+		}
+
+		.footer-links-grid {
+			grid-template-columns: repeat(2, 1fr);
 			gap: 2rem;
 		}
 
 		.container {
-			padding: 0 1rem;
+			padding: 0 1.5rem;
 		}
 	}
 
 	@media (max-width: 480px) {
 		.footer-content {
+			gap: 2.5rem;
+		}
+
+		.footer-links-grid {
 			grid-template-columns: 1fr;
 			gap: 2rem;
 		}
 
 		.footer-logo {
-			flex-direction: column;
+			flex-direction: row;
+			align-items: center;
+		}
+
+		.footer-logo-img {
+			width: 60px;
+			height: 60px;
+		}
+
+		.footer-logo h3 {
+			font-size: 1.1rem;
+		}
+
+		.footer-cta {
+			display: block;
 			text-align: center;
-		}
-
-		.service-times li,
-		.contact-info li {
-			flex-direction: column;
-			align-items: flex-start;
-			gap: 0.25rem;
-		}
-
-		.service-times span,
-		.contact-info span {
-			text-align: left;
 		}
 	}
 </style>
