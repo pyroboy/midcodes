@@ -24,73 +24,79 @@
 
     // --- UNIFIED MAP DATA ---
     let mapItems = $state([
-    {
-        "type": "location",
-        "name": "Tagbilaran HQ",
-        "top": 67.8,
-        "left": 68,
-        "main": true
-    },
-    {
-        "type": "location",
-        "name": "Tubigon",
-        "top": 66.9,
-        "left": 69.5
-    },
-    {
-        "type": "location",
-        "name": "Alicia",
-        "top": 67.8,
-        "left": 71
-    },
-    {
-        "type": "location",
-        "name": "Catigbian",
-        "top": 66.3,
-        "left": 70.2
-    },
-    {
-        "type": "location",
-        "name": "Dumaguete",
-        "top": 69.9,
-        "left": 61.2,
-        "main": true
-    },
-    {
-        "type": "location",
-        "name": "Sibulan",
-        "top": 67.3,
-        "left": 59.6
-    },
-    {
-        "type": "location",
-        "name": "Manjuyod",
-        "top": 68.4,
-        "left": 60.7
-    },
-    {
-        "type": "location",
-        "name": "Tayasan",
-        "top": 66.6,
-        "left": 61
-    },
-    {
-        "type": "label",
-        "name": "BOHOL",
-        "top": 70.2,
-        "left": 73
-    },
-    {
-        "type": "label",
-        "name": "NEGROS",
-        "top": 70.2,
-        "left": 54.2
-    }
-]);
+        {
+            "type": "location",
+            "name": "Tagbilaran HQ",
+            "top": 67.8,
+            "left": 68,
+            "main": true
+        },
+        {
+            "type": "location",
+            "name": "Tubigon",
+            "top": 66.9,
+            "left": 69.5
+        },
+        {
+            "type": "location",
+            "name": "Alicia",
+            "top": 67.8,
+            "left": 71
+        },
+        {
+            "type": "location",
+            "name": "Catigbian",
+            "top": 66.3,
+            "left": 70.2
+        },
+        {
+            "type": "location",
+            "name": "Dumaguete",
+            "top": 69.9,
+            "left": 61.2,
+            "main": true
+        },
+        {
+            "type": "location",
+            "name": "Sibulan",
+            "top": 67.3,
+            "left": 59.6
+        },
+        {
+            "type": "location",
+            "name": "Manjuyod",
+            "top": 68.4,
+            "left": 60.7
+        },
+        {
+            "type": "location",
+            "name": "Tayasan",
+            "top": 66.6,
+            "left": 61
+        },
+        {
+            "type": "location",
+            "name": "Sta. Catalina",
+            "top": 71.2,
+            "left": 58.5
+        },
+        {
+            "type": "label",
+            "name": "BOHOL",
+            "top": 70.2,
+            "left": 73
+        },
+        {
+            "type": "label",
+            "name": "NEGROS",
+            "top": 70.2,
+            "left": 54.2
+        }
+    ]);
 
     // --- METRICS DATA ---
     const metricsData = [
-        { val: "12+", label: "Churches" },
+        { val: "13+", label: "Churches" },
         { val: "50+", label: "Years" },
         { val: "1", label: "Global Mission" }
     ];
