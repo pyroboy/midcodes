@@ -1,361 +1,421 @@
+<script lang="ts">
+	// Get current year automatically
+	const currentYear: number = new Date().getFullYear();
+</script>
 
-<!-- Footer -->
-<footer class="footer">
-	<div class="container">
-		<div class="footer-content">
-			<!-- Brand Section -->
-			<div class="footer-brand">
-				<div class="footer-logo">
-					<img 
-						src="https://res.cloudinary.com/dexcw6vg0/image/upload/v1740474451/MOFI_web_logo_yrzxyh.webp" 
-						alt="March of Faith Logo" 
-						class="footer-logo-img"
-					/>
-					<div>
-						<h3>March of Faith Inc.</h3>
-						<p class="tagline">Every Creature is Reachable</p>
-					</div>
-				</div>
-				<p class="brand-description">Strengthening faith and building community in Bohol and throughout the Philippines.</p>
-			</div>
+<footer class="site-footer">
+    <!-- Top Decorative Brand Line -->
+    <div class="footer-border"></div>
 
-			<!-- Links Grid -->
-			<div class="footer-links-grid">
-				<!-- Quick Links -->
-				<div class="footer-column">
-					<h4>About</h4>
-					<ul>
-						<li><a href="/about">Overview</a></li>
-						<li><a href="/about/history-purpose">History & Purpose</a></li>
-						<li><a href="/about/founding-minister">Founding Minister</a></li>
-						<li><a href="/about/presiding-minister">Presiding Minister</a></li>
-					</ul>
-				</div>
+    <div class="container">
+        <div class="footer-grid">
+            <!-- 1. Brand Column -->
+            <div class="footer-col brand-col">
+                <div class="footer-logo">
+                    <img 
+                        src="https://res.cloudinary.com/dexcw6vg0/image/upload/v1763355713/ojlomimmfvtgwzxjyptq.webp" 
+                        alt="March of Faith Logo" 
+                        class="logo-img"
+                    />
+                    <div class="brand-text">
+                        <h3>March of Faith Inc.</h3>
+                        <span class="tagline">Every Creature is Reachable</span>
+                    </div>
+                </div>
+                <p class="about-text">
+                    Strengthening faith and building community in Bohol and throughout the Philippines. A legacy of spiritual fatherhood since 1974.
+                </p>
+                <div class="social-links">
+                    <a href="https://facebook.com" target="_blank" aria-label="Facebook" class="social-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
+                    </a>
+                    <a href="https://youtube.com" target="_blank" aria-label="YouTube" class="social-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17"></path><path d="m10 15 5-3-5-3z"></path></svg>
+                    </a>
+                    <a href="mailto:marchoffaithincorporated@gmail.com" aria-label="Email" class="social-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg>
+                    </a>
+                </div>
+            </div>
 
-				<!-- Ministry -->
-				<div class="footer-column">
-					<h4>Ministry</h4>
-					<ul>
-						<li><a href="/churches">Our Churches</a></li>
-						<li><a href="/pastors">Our Pastors</a></li>
-						<li><a href="/docs">Resources</a></li>
-					</ul>
-				</div>
+            <!-- 2. Quick Links Column -->
+            <div class="footer-col links-col">
+                <h4>Quick Links</h4>
+                <ul class="footer-links">
+                    <li><a href="/about">About Us</a></li>
+                    <li><a href="/churches">Our Churches</a></li>
+                    <li><a href="/pastors">Leadership</a></li>
+                    <li><a href="/docs">Resources</a></li>
+                    <li><a href="/news">News & Updates</a></li>
+                </ul>
+            </div>
 
-				<!-- Service Times -->
-				<div class="footer-column">
-					<h4>Service Times</h4>
-					<ul class="service-list">
-						<li>
-							<div class="service-label">Sunday Morning</div>
-							<div class="service-time">9:00 - 11:00 AM</div>
-						</li>
-						<li>
-							<div class="service-label">Sunday Evening</div>
-							<div class="service-time">4:00 - 6:00 PM</div>
-						</li>
-						<li>
-							<div class="service-label">Prayer Meeting</div>
-							<div class="service-time">6:00 AM Daily</div>
-						</li>
-					</ul>
-				</div>
+            <!-- 3. Service Schedule Column -->
+            <div class="footer-col schedule-col">
+                <h4>Service Schedule</h4>
+                <ul class="schedule-list">
+                    <li>
+                        <span class="day">Sunday Morning</span>
+                        <span class="time">9:00 AM</span>
+                    </li>
+                    <li>
+                        <span class="day">Sunday Evening</span>
+                        <span class="time">4:00 PM</span>
+                    </li>
+                    <li>
+                        <span class="day">Wed. Bible Study</span>
+                        <span class="time">7:00 PM</span>
+                    </li>
+                    <li>
+                        <span class="day">Daily Prayer</span>
+                        <span class="time">6:00 AM</span>
+                    </li>
+                </ul>
+            </div>
 
-				<!-- Contact -->
-				<div class="footer-column">
-					<h4>Contact Us</h4>
-					<ul class="contact-list">
-						<li>
-							<div class="contact-label">Address</div>
-							<div class="contact-detail">San Isidro District<br>Tagbilaran City, Bohol</div>
-						</li>
-						<li>
-							<div class="contact-label">Phone</div>
-							<div class="contact-detail">+63 99 9953 6700</div>
-						</li>
-						<li>
-							<div class="contact-label">Email</div>
-							<div class="contact-detail">marchoffaithincorporated@gmail.com</div>
-						</li>
-					</ul>
-					<a href="/contact" class="footer-cta">Visit Us</a>
-				</div>
-			</div>
-		</div>
+            <!-- 4. Contact Column -->
+            <div class="footer-col contact-col">
+                <h4>Contact Us</h4>
+                <div class="contact-info">
+                    <div class="contact-item">
+                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" /></svg>
+                        <span>San Isidro District<br>Tagbilaran City, Bohol</span>
+                    </div>
+                    <div class="contact-item">
+                        <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 0 0 2.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 0 1-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 0 0-1.091-.852H4.5A2.25 2.25 0 0 0 2.25 4.5v2.25Z" /></svg>
+                        <a href="tel:+639999536700">+63 99 9953 6700</a>
+                    </div>
+                </div>
+                <a href="/contact" class="footer-btn">Plan Your Visit</a>
+            </div>
+        </div>
+    </div>
 
-		<!-- Footer Bottom -->
-		<div class="footer-bottom">
-			<p>&copy; 2025 March of Faith Incorporated. All rights reserved.</p>
-			<p class="footer-meta">SEC Registration: 0000058834 • Tagbilaran, Bohol, Philippines</p>
-		</div>
-	</div>
+    <!-- Bottom Bar -->
+    <div class="footer-bottom">
+        <div class="container bottom-container">
+            <div class="copyright">
+                &copy; {currentYear} March of Faith Incorporated.
+            </div>
+            <div class="legal">
+                <span>SEC Reg. No. 0000058834</span>
+                <span class="separator">•</span>
+                <a href="/docs">Privacy Policy</a>
+            </div>
+        </div>
+    </div>
 </footer>
 
 <style>
-	* {
-		margin: 0;
-		padding: 0;
-		box-sizing: border-box;
-	}
+    /* --- Variables --- */
+    :root {
+        /* Original Base Color (#2c3e50) modified with a darker gradient end */
+        --footer-bg-start: #2c3e50;
+        --footer-bg-end: #1a252f; 
+        --footer-text: #d1d5db;
+        --footer-heading: #ffffff;
+        --accent-red: #C1272D; /* Brand Red for highlights */
+    }
 
+    /* --- Layout & Background --- */
+    .site-footer {
+        /* Professional Gradient based on the original color */
+        background: linear-gradient(150deg, var(--footer-bg-start) 0%, var(--footer-bg-end) 100%);
+        color: var(--footer-text);
+        font-family: 'Montserrat', sans-serif;
+        position: relative;
+        padding-top: 5rem;
+        font-size: 0.95rem;
+    }
 
-	/* Container */
-	.container {
-		max-width: 1200px;
-		margin: 0 auto;
-		padding: 0 2rem;
-	}
+    /* Top Border Line (Brand Red) */
+    .footer-border {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 4px;
+        background: linear-gradient(90deg, #981B1E, #C1272D, #981B1E);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
 
-	/* Footer */
-	.footer {
-		background: #2c3e50;
-		color: #ffffff;
-		padding: 4rem 0 0;
-		margin-top: auto;
-	}
+    .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 2rem;
+    }
 
-	.footer-content {
-		display: grid;
-		grid-template-columns: 1.5fr 2fr;
-		gap: 4rem;
-		padding-bottom: 3rem;
-		border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-	}
+    .footer-grid {
+        display: grid;
+        grid-template-columns: 1.5fr 1fr 1fr 1.2fr;
+        gap: 3rem;
+        padding-bottom: 4rem;
+    }
 
-	/* Brand Section */
-	.footer-brand {
-		max-width: 400px;
-	}
+    /* --- Typography --- */
+    h4 {
+        font-family: 'Roboto Slab', serif;
+        color: var(--footer-heading);
+        font-size: 1.15rem;
+        margin-bottom: 1.5rem;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        position: relative;
+        display: inline-block;
+    }
 
-	.footer-logo {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-		margin-bottom: 1.5rem;
-	}
+    /* Subtle underline for headings */
+    h4::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        bottom: -8px;
+        width: 30px;
+        height: 2px;
+        background-color: var(--accent-red);
+        border-radius: 2px;
+    }
 
-	.footer-logo-img {
-		width: 70px;
-		height: 70px;
-		object-fit: contain;
-		flex-shrink: 0;
-	}
+    /* --- Column 1: Brand --- */
+    .footer-logo {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
 
-	.footer-logo h3 {
-		font-size: 1.375rem;
-		font-weight: 800;
-		color: #ffffff;
-		line-height: 1.2;
-		margin-bottom: 0.375rem;
-		letter-spacing: -0.02em;
-	}
+    .logo-img {
+        width: 60px;
+        height: 60px;
+        object-fit: contain;
+    }
 
-	.tagline {
-		font-size: 0.8125rem;
-		color: #C1272D;
-		font-weight: 600;
-		letter-spacing: 0.02em;
-	}
+    .brand-text h3 {
+        font-family: 'Roboto Slab', serif;
+        font-size: 1.25rem;
+        color: white;
+        margin: 0;
+        line-height: 1;
+        font-weight: 700;
+    }
 
-	.brand-description {
-		color: #bdc3c7;
-		line-height: 1.65;
-		font-size: 0.9375rem;
-		font-weight: 400;
-		letter-spacing: -0.01em;
-	}
+    .tagline {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #a8b2c1; /* Light blue-grey to match background tone */
+        font-weight: 600;
+        margin-top: 4px;
+        display: block;
+    }
 
-	/* Links Grid */
-	.footer-links-grid {
-		display: grid;
-		grid-template-columns: repeat(4, 1fr);
-		gap: 2.5rem;
-	}
+    .about-text {
+        line-height: 1.6;
+        margin-bottom: 1.5rem;
+        opacity: 0.9;
+        max-width: 320px;
+    }
 
-	.footer-column h4 {
-		font-size: 0.8125rem;
-		font-weight: 800;
-		color: #ffffff;
-		text-transform: uppercase;
-		letter-spacing: 1.2px;
-		margin-bottom: 1.5rem;
-	}
+    .social-links {
+        display: flex;
+        gap: 0.75rem;
+    }
 
-	.footer-column ul {
-		list-style: none;
-	}
+    .social-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 38px;
+        height: 38px;
+        background: rgba(255,255,255,0.1);
+        color: white;
+        border-radius: 50%;
+        transition: all 0.3s ease;
+        border: 1px solid rgba(255,255,255,0.1);
+    }
 
-	.footer-column li {
-		margin-bottom: 0.75rem;
-	}
+    .social-icon:hover {
+        background: var(--accent-red);
+        border-color: var(--accent-red);
+        transform: translateY(-3px);
+    }
 
-	.footer-column a {
-		color: #bdc3c7;
-		text-decoration: none;
-		font-size: 0.9375rem;
-		font-weight: 450;
-		transition: color 0.2s ease;
-		letter-spacing: -0.01em;
-		line-height: 1.5;
-	}
+    /* --- Column 2: Links --- */
+    .footer-links {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
 
-	.footer-column a:hover {
-		color: #C1272D;
-	}
+    .footer-links li {
+        margin-bottom: 0.8rem;
+    }
 
-	/* Service List */
-	.service-list li {
-		margin-bottom: 1.125rem;
-		padding-bottom: 1.125rem;
-		border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-	}
+    .footer-links a {
+        color: var(--footer-text);
+        text-decoration: none;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+    }
 
-	.service-list li:last-child {
-		border-bottom: none;
-		margin-bottom: 0;
-		padding-bottom: 0;
-	}
+    .footer-links a:hover {
+        color: white;
+        transform: translateX(5px);
+        color: var(--accent-red);
+    }
 
-	.service-label {
-		font-size: 0.8125rem;
-		color: #bdc3c7;
-		margin-bottom: 0.375rem;
-		font-weight: 500;
-		letter-spacing: 0.01em;
-	}
+    /* --- Column 3: Schedule --- */
+    .schedule-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
 
-	.service-time {
-		font-size: 1rem;
-		color: #C1272D;
-		font-weight: 700;
-		letter-spacing: -0.02em;
-	}
+    .schedule-list li {
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 1rem;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+        padding-bottom: 0.5rem;
+    }
 
-	/* Contact List */
-	.contact-list li {
-		margin-bottom: 1rem;
-	}
+    .schedule-list li:last-child {
+        border: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
 
-	.contact-label {
-		font-size: 0.8125rem;
-		color: #bdc3c7;
-		margin-bottom: 0.375rem;
-		font-weight: 500;
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-	}
+    .schedule-list .day {
+        color: white;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
 
-	.contact-detail {
-		font-size: 0.9375rem;
-		color: #ecf0f1;
-		line-height: 1.6;
-		font-weight: 450;
-		letter-spacing: -0.01em;
-	}
+    .schedule-list .time {
+        color: #a8b2c1;
+        font-size: 0.85rem;
+        margin-top: 2px;
+    }
 
-	/* Footer CTA */
-	.footer-cta {
-		display: inline-block;
-		margin-top: 1.75rem;
-		padding: 0.875rem 2.25rem;
-		background: #C1272D;
-		color: white !important;
-		text-decoration: none;
-		border-radius: 6px;
-		font-weight: 700;
-		font-size: 0.9375rem;
-		transition: all 0.3s ease;
-		text-align: center;
-		letter-spacing: 0.02em;
-	}
+    /* --- Column 4: Contact --- */
+    .contact-info {
+        margin-bottom: 1.5rem;
+    }
 
-	.footer-cta:hover {
-		background: #981B1E;
-		transform: translateY(-2px);
-		box-shadow: 0 4px 12px rgba(193, 39, 45, 0.4);
-	}
+    .contact-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        margin-bottom: 1rem;
+        line-height: 1.4;
+    }
 
-	/* Footer Bottom */
-	.footer-bottom {
-		background: #34495e;
-		padding: 2rem 0;
-		text-align: center;
-		border-top: 1px solid #4a6741;
-	}
+    .contact-item .icon {
+        width: 20px;
+        height: 20px;
+        color: var(--accent-red);
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
 
-	.footer-bottom p {
-		color: #bdc3c7;
-		font-size: 0.875rem;
-		margin-bottom: 0.5rem;
-		font-weight: 500;
-		letter-spacing: -0.01em;
-	}
+    .contact-item a {
+        color: var(--footer-text);
+        text-decoration: none;
+        transition: color 0.2s;
+    }
 
-	.footer-meta {
-		font-size: 0.8125rem !important;
-		color: #95a5a6 !important;
-		font-weight: 450 !important;
-	}
+    .contact-item a:hover {
+        color: white;
+    }
 
-	/* Responsive Design */
-	@media (max-width: 1024px) {
-		.footer-links-grid {
-			grid-template-columns: repeat(2, 1fr);
-			gap: 2rem;
-		}
-	}
+    .footer-btn {
+        display: inline-block;
+        padding: 0.8rem 1.5rem;
+        background: var(--accent-red);
+        color: white;
+        text-decoration: none;
+        font-size: 0.85rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-radius: 4px;
+        transition: all 0.3s ease;
+        text-align: center;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
 
-	@media (max-width: 768px) {
-		.footer {
-			padding: 3rem 0 0;
-		}
+    .footer-btn:hover {
+        background: #981B1E;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    }
 
-		.footer-content {
-			grid-template-columns: 1fr;
-			gap: 3rem;
-		}
+    /* --- Bottom Bar --- */
+    .footer-bottom {
+        background-color: rgba(0,0,0,0.2); /* Darker overlay */
+        padding: 1.5rem 0;
+        border-top: 1px solid rgba(255,255,255,0.05);
+        font-size: 0.85rem;
+        color: #889099;
+    }
 
-		.footer-brand {
-			max-width: 100%;
-		}
+    .bottom-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
 
-		.footer-links-grid {
-			grid-template-columns: repeat(2, 1fr);
-			gap: 2rem;
-		}
+    .legal a {
+        color: #889099;
+        text-decoration: none;
+        transition: color 0.2s;
+    }
 
-		.container {
-			padding: 0 1.5rem;
-		}
-	}
+    .legal a:hover {
+        color: white;
+        text-decoration: underline;
+    }
 
-	@media (max-width: 480px) {
-		.footer-content {
-			gap: 2.5rem;
-		}
+    .separator {
+        margin: 0 0.5rem;
+        opacity: 0.5;
+    }
 
-		.footer-links-grid {
-			grid-template-columns: 1fr;
-			gap: 2rem;
-		}
+    /* --- Responsive --- */
+    @media (max-width: 1024px) {
+        .footer-grid {
+            grid-template-columns: 1fr 1fr;
+            gap: 2.5rem;
+        }
+    }
 
-		.footer-logo {
-			flex-direction: row;
-			align-items: center;
-		}
+    @media (max-width: 768px) {
+        .site-footer {
+            padding-top: 4rem;
+        }
 
-		.footer-logo-img {
-			width: 60px;
-			height: 60px;
-		}
+        .footer-grid {
+            grid-template-columns: 1fr;
+            gap: 3rem;
+            text-align: left; /* Or center if preferred */
+        }
 
-		.footer-logo h3 {
-			font-size: 1.1rem;
-		}
+        .bottom-container {
+            flex-direction: column;
+            text-align: center;
+        }
 
-		.footer-cta {
-			display: block;
-			text-align: center;
-		}
-	}
+        .footer-logo {
+            /* Align logo with text */
+            justify-content: flex-start;
+        }
+        
+        .footer-btn {
+            display: block;
+            width: 100%;
+        }
+    }
 </style>
