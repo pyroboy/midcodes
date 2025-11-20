@@ -1,5 +1,6 @@
 <script>
 	import { page } from '$app/stores';
+	import Hero from '$lib/components/Hero.svelte';
 
 	const articles = [
 		{
@@ -19,15 +20,9 @@
 	<meta name="description" content="Stay updated with the latest news and events from March of Faith Incorporated" />
 </svelte:head>
 
-<!-- Hero Section -->
-<section class="news-hero">
-	<div class="container">
-		<div class="hero-content">
-			<h1>News & Updates</h1>
-			<p class="hero-subtitle">Stay connected with the latest from our ministry</p>
-		</div>
-	</div>
-</section>
+<Hero subtitle="Stay connected with the latest from our ministry">
+	News & Updates
+</Hero>
 
 <!-- News Grid -->
 <section class="news-grid-section">
@@ -61,37 +56,10 @@
 </section>
 
 <style>
-	/* Hero Section */
-	.news-hero {
-		background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-		color: white;
-		padding: 5rem 1rem;
-		text-align: center;
-		position: relative;
-		overflow: hidden;
-	}
-
-	.news-hero .container {
-		position: relative;
-		z-index: 2;
-	}
-
-	.news-hero h1 {
-		font-size: 3rem;
-		margin-bottom: 0.5rem;
-		font-weight: 800;
-	}
-
-	.hero-subtitle {
-		font-size: 1.25rem;
-		opacity: 0.9;
-		max-width: 700px;
-		margin: 0 auto;
-	}
-
 	/* News Grid */
 	.news-grid-section {
 		padding: 4rem 0;
+		background: #f8fafc; /* Match About page --bg-light */
 	}
 
 	.news-grid {
@@ -102,15 +70,16 @@
 
 	.news-card {
 		background: white;
-		border-radius: 8px;
+		border-radius: 16px; /* Match About page card radius */
 		overflow: hidden;
 		transition: transform 0.3s ease, box-shadow 0.3s ease;
-		border: 1px solid #e5e7eb;
+		border: 1px solid rgba(0,0,0,0.04); /* Match About page border */
+		box-shadow: 0 10px 30px rgba(0,0,0,0.04); /* Match About page shadow */
 	}
 
 	.news-card:hover {
 		transform: translateY(-5px);
-		box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+		box-shadow: 0 20px 40px rgba(0,0,0,0.08);
 	}
 
 	.news-card-link {

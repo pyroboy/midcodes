@@ -211,54 +211,9 @@
 </div>
 
 <style>
-    /* --- 1. HEADER OVERRIDES (THE SMART FIX) --- 
-       These selectors use :global() to target the Header component 
-       that lives in your layout, forcing it to look correct on this white page.
+    /* --- 1. HEADER OVERRIDES (REMOVED) --- 
+       The global Header component now handles this logic automatically based on the route.
     */
-
-    /* Force Global Header to be White with Shadow */
-    :global(header) {
-        background-color: #ffffff !important;
-        box-shadow: 0 2px 15px rgba(0,0,0,0.05);
-        border-bottom: 1px solid #f0f0f0;
-        backdrop-filter: none !important;
-    }
-
-    /* Force Brand Name to Red */
-    :global(.brand-name) {
-        color: #981B1E !important;
-        text-shadow: none !important;
-    }
-
-    /* Force Nav Links to Dark Grey */
-    :global(.desktop-nav a) {
-        color: #444 !important;
-        text-shadow: none !important;
-    }
-    
-    /* Hover state for nav links */
-    :global(.desktop-nav a:hover) {
-        color: #981B1E !important;
-    }
-
-    /* Force Hamburger lines to Black (so they show on white) */
-    :global(.hamburger span) {
-        background-color: #333 !important;
-        box-shadow: none !important;
-    }
-    
-    /* Reset Logo Filter (if white logo was used) */
-    :global(.brand-logo) {
-        filter: none !important;
-    }
-
-    /* Visit Button Color (keep it red) */
-    :global(.visit-btn) {
-        background-color: #C1272D !important;
-        color: white !important;
-        box-shadow: 0 4px 10px rgba(193, 39, 45, 0.3) !important;
-    }
-
 
     /* --- 2. PAGE LAYOUT --- */
     .page-wrapper {

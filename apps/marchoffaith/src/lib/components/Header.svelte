@@ -6,6 +6,36 @@
 	let scrollY = 0;
 	let isScrolled = false;
 
+	// List of routes that should have a transparent header initially (Hero sections)
+	// Sub-routes are NOT automatically included unless specified or logic is adjusted.
+	// Currently, we check for exact matches or specific startsWith logic if needed.
+	const transparentRoutes = [
+		'/',
+		'/about',
+		'/churches',
+		'/pastors',
+		'/docs',
+		'/news',
+		'/contact'
+	];
+
+	// Check if current path is in the transparent list
+	// We also want to handle sub-routes of /about since they seem to have hero sections too based on file structure,
+	// but let's stick to the plan. The user's request implies "smart" behavior.
+	// Looking at the file structure, /about/history-purpose etc might have hero sections.
+	// Let's check if the pathname STARTS with any of these, but be careful.
+	// Actually, the plan said: "Define a list of routes... and any subpages found to have hero sections".
+	// I verified /about/history-purpose has a hero.
+	// Let's make it robust:
+	$: isTransparentPage = transparentRoutes.some(route => 
+		$page.url.pathname === route || 
+		($page.url.pathname.startsWith('/about/') && route === '/about') 
+	);
+
+	// If it's NOT a transparent page, it should be solid immediately.
+	// If it IS a transparent page, it becomes solid only after scrolling.
+	$: isSolid = !isTransparentPage || isScrolled;
+
 	function toggleMobileMenu() {
 		isMobileMenuOpen = !isMobileMenuOpen;
 		updateBodyScroll();
@@ -56,7 +86,7 @@
 	- Default: Transparent background, White Text
 	- Scrolled: White background, Red Text
 -->
-<header class:scrolled={isScrolled} class:mobile-open={isMobileMenuOpen}>
+<header class:scrolled={isSolid} class:mobile-open={isMobileMenuOpen}>
 	<div class="header-container">
 		<div class="header-brand">
 			<a href="/" class="brand-link">

@@ -1,111 +1,39 @@
 <script>
 	import { page } from '$app/stores';
+	import Hero from '$lib/components/Hero.svelte';
+	import AboutNav from '$lib/components/AboutNav.svelte';
 </script>
 
 <svelte:head>
-	<title>Founding Minister - Rev. Rudy Salomon Trigo, D.D.</title>
-	<meta name="description" content="Learn about Rev. Rudy Salomon Trigo, D.D., the founding minister of March of Faith Incorporated (1938-2011)" />
+	<title>Founding Minister - March of Faith Incorporated</title>
+	<meta name="description" content="Life and legacy of Rev. Rudy Salomon Trigo, D.D., founding minister of March of Faith Incorporated" />
 </svelte:head>
 
-<!-- Hero Section -->
-<section class="about-hero">
-	<div class="container">
-		<div class="hero-content">
-			<h1>Our Founding Minister</h1>
-			<p class="hero-subtitle">Rev. Rudy Salomon Trigo, D.D. (July 15, 1938 – April 7, 2011)</p>
-		</div>
-	</div>
-</section>
+<Hero subtitle="The visionary leader who established March of Faith Incorporated">
+	Our Founding Minister
+</Hero>
 
 <!-- Navigation Tabs -->
-<section class="about-nav">
-	<div class="container">
-		<nav class="tab-navigation">
-			<a 
-				href="/about" 
-				class="tab-link" 
-				class:active={$page.url.pathname === '/about'}
-			>
-				Overview
-			</a>
-			<a 
-				href="/about/history-purpose" 
-				class="tab-link"
-				class:active={$page.url.pathname === '/about/history-purpose'}
-			>
-				History & Purpose
-			</a>
-			<a 
-				href="/about/founding-minister" 
-				class="tab-link"
-				class:active={$page.url.pathname === '/about/founding-minister'}
-			>
-				Founding Minister
-			</a>
-			<a 
-				href="/about/presiding-minister" 
-				class="tab-link"
-				class:active={$page.url.pathname === '/about/presiding-minister'}
-			>
-				Presiding Minister
-			</a>
-		</nav>
-	</div>
-</section>
+<AboutNav />
 
-<!-- Minister Content -->
-<section class="minister-content">
+<!-- Founder Content -->
+<section class="founder-content">
 	<div class="container">
 		<div class="content-layout">
 			<div class="main-content">
-				<div class="minister-profile">
-					<div class="profile-header">
-						<div class="profile-image">
+				<div class="biography-card">
+					<div class="bio-header">
+						<div class="bio-image-wrapper">
 							<img 
 								src="https://res.cloudinary.com/dexcw6vg0/image/upload/v1754821750/rcpqj7mzayco2ndwioqp.png" 
 								alt="Rev. Rudy Salomon Trigo, D.D." 
-								class="minister-photo"
+								class="bio-image"
 							/>
+							<div class="image-decoration"></div>
 						</div>
-						<div class="profile-info">
+						<div class="bio-intro">
+							<span class="bio-label">The Visionary</span>
 							<h2>Rev. Rudy Salomon Trigo, D.D.</h2>
-							<p class="title">Founding Minister & Spiritual Father</p>
-							<p class="dates">July 15, 1938 – April 7, 2011</p>
-							<p class="memorial">In loving memory of our beloved founder whose vision and dedication laid the foundation for March of Faith Incorporated.</p>
-						</div>
-					</div>
-				</div>
-
-				<div class="biography-section">
-					<h3>Life and Ministry</h3>
-					<div class="bio-content">
-						<p class="lead-paragraph">
-							Rev. Rudy Salomon Trigo, Doctor of Divinity, was a man of extraordinary faith whose life was dedicated to serving God and building His kingdom in the Philippines. Born on July 15, 1938, he answered God's call to ministry at a young age and devoted his entire life to preaching the Gospel and shepherding God's people.
-						</p>
-
-						<h4>Early Life and Calling</h4>
-						<p>
-							Growing up in a faith-filled environment, Rev. Trigo demonstrated exceptional spiritual maturity from an early age. His deep love for Scripture and natural gift for teaching became evident during his youth, pointing to God's calling on his life for ministry.
-						</p>
-
-						<h4>Educational Background</h4>
-						<p>
-							Rev. Trigo pursued theological education with great dedication, ultimately earning his Doctor of Divinity degree. His academic excellence was matched by his practical ministry experience, making him a well-rounded spiritual leader capable of both teaching and pastoral care.
-						</p>
-
-						<h4>Founding March of Faith Incorporated</h4>
-						<p>
-							In 1975, under divine guidance and with unwavering faith, Rev. Trigo established March of Faith Incorporated in Tagbilaran, Bohol. His vision was to create a spiritual home where believers could grow in their faith, experience genuine fellowship, and be equipped for service in God's kingdom.
-						</p>
-
-						<h4>Legacy and Impact</h4>
-						<p>
-							Throughout his ministry, Rev. Trigo touched countless lives through his preaching, teaching, and pastoral care. His emphasis on biblical truth, combined with genuine love for people, created a strong foundation that continues to guide March of Faith Incorporated today.
-						</p>
-					</div>
-				</div>
-
-				<div class="ministry-highlights">
 					<h3>Ministry Highlights</h3>
 					<div class="highlights-grid">
 						<div class="highlight-card">
@@ -188,29 +116,6 @@
 		max-width: 1200px;
 		margin: 0 auto;
 		padding: 0 2rem;
-	}
-
-	/* Hero Section */
-	.about-hero {
-		background: #981B1E;
-		color: white;
-		padding: 4rem 0;
-		text-align: center;
-	}
-
-	.hero-content h1 {
-		font-size: 3rem;
-		font-weight: 700;
-		margin-bottom: 1rem;
-		color: white;
-	}
-
-	.hero-subtitle {
-		font-size: 1.3rem;
-		font-weight: 300;
-		opacity: 0.9;
-		max-width: 600px;
-		margin: 0 auto;
 	}
 
 	/* Navigation Tabs */

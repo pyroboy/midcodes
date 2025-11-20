@@ -1,17 +1,15 @@
+<script>
+	import Hero from '$lib/components/Hero.svelte';
+</script>
+
 <svelte:head>
 	<title>Contact Us - March of Faith Incorporated</title>
 	<meta name="description" content="Connect with March of Faith Incorporated in Tagbilaran City, Bohol. Phone: +63 99 9953 6700. Strengthening faith, building community since 1975." />
 </svelte:head>
 
-<!-- Hero Section -->
-<section class="hero-section" role="banner" aria-labelledby="hero-title">
-	<div class="container">
-		<div class="hero-content">
-			<h1 id="hero-title">CONNECT WITH US</h1>
-			<p class="hero-subtitle">We'd love to hear from you and welcome you to our church family in Tagbilaran, Bohol</p>
-		</div>
-	</div>
-</section>
+<Hero subtitle="We'd love to hear from you and welcome you to our church family in Tagbilaran, Bohol">
+	CONNECT WITH US
+</Hero>
 
 <!-- Contact Content -->
 <section class="contact-content" role="main" aria-labelledby="contact-main">
@@ -141,34 +139,6 @@
 		max-width: 1200px;
 		margin: 0 auto;
 		padding: 0 1.5rem;
-	}
-
-	/* Hero Section */
-	.hero-section {
-		background: var(--deep-red);
-		color: var(--white);
-		padding: 3rem 0;
-		text-align: center;
-	}
-
-	.hero-content h1 {
-		font-family: 'Montserrat', sans-serif;
-		font-size: 2.5rem;
-		font-weight: 800;
-		margin-bottom: 1rem;
-		color: var(--white);
-		text-transform: uppercase;
-		letter-spacing: 1px;
-	}
-
-	.hero-subtitle {
-		font-family: 'Montserrat', sans-serif;
-		font-size: 1.2rem;
-		font-weight: 400;
-		opacity: 0.95;
-		max-width: 700px;
-		margin: 0 auto;
-		line-height: 1.5;
 	}
 
 	/* Main Content */

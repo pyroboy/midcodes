@@ -1,5 +1,7 @@
 <script>
 	import { page } from '$app/stores';
+	import Hero from '$lib/components/Hero.svelte';
+	import AboutNav from '$lib/components/AboutNav.svelte';
 </script>
 
 <svelte:head>
@@ -7,51 +9,12 @@
 	<meta name="description" content="Meet our current presiding minister who continues the legacy of spiritual leadership at March of Faith Incorporated" />
 </svelte:head>
 
-<!-- Hero Section -->
-<section class="about-hero">
-	<div class="container">
-		<div class="hero-content">
-			<h1>Our Presiding Minister</h1>
-			<p class="hero-subtitle">Continuing the legacy of faithful ministry and spiritual leadership</p>
-		</div>
-	</div>
-</section>
+<Hero subtitle="Continuing the legacy of faithful ministry and spiritual leadership">
+	Our Presiding Minister
+</Hero>
 
 <!-- Navigation Tabs -->
-<section class="about-nav">
-	<div class="container">
-		<nav class="tab-navigation">
-			<a 
-				href="/about" 
-				class="tab-link" 
-				class:active={$page.url.pathname === '/about'}
-			>
-				Overview
-			</a>
-			<a 
-				href="/about/history-purpose" 
-				class="tab-link"
-				class:active={$page.url.pathname === '/about/history-purpose'}
-			>
-				History & Purpose
-			</a>
-			<a 
-				href="/about/founding-minister" 
-				class="tab-link"
-				class:active={$page.url.pathname === '/about/founding-minister'}
-			>
-				Founding Minister
-			</a>
-			<a 
-				href="/about/presiding-minister" 
-				class="tab-link"
-				class:active={$page.url.pathname === '/about/presiding-minister'}
-			>
-				Presiding Minister
-			</a>
-		</nav>
-	</div>
-</section>
+<AboutNav />
 
 <!-- Minister Content -->
 <section class="minister-content">
@@ -238,29 +201,6 @@
 		max-width: 1200px;
 		margin: 0 auto;
 		padding: 0 2rem;
-	}
-
-	/* Hero Section */
-	.about-hero {
-		background: #981B1E;
-		color: white;
-		padding: 4rem 0;
-		text-align: center;
-	}
-
-	.hero-content h1 {
-		font-size: 3rem;
-		font-weight: 700;
-		margin-bottom: 1rem;
-		color: white;
-	}
-
-	.hero-subtitle {
-		font-size: 1.3rem;
-		font-weight: 300;
-		opacity: 0.9;
-		max-width: 600px;
-		margin: 0 auto;
 	}
 
 	/* Navigation Tabs */

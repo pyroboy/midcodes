@@ -2,12 +2,13 @@
 export interface Address {
   street: string;
   city: string;
+  province: string;
 }
 
 export interface Social {
-  facebook: string;
-  instagram: string;
-  youtube: string;
+  facebook?: string;
+  instagram?: string;
+  youtube?: string;
 }
 
 export interface Contact {
@@ -18,7 +19,7 @@ export interface Contact {
 
 export interface Service {
   day: string;
-  time: string;
+  time: string; // Now supports ranges like "9:00 AM - 11:00 AM"
   type: string;
 }
 
@@ -47,132 +48,317 @@ export interface Church {
 export const churches: Church[] = [
   {
     id: 1,
-    name: "Main Campus",
+    name: "March of Faith Tagbilaran",
     address: {
-      street: "123 Main Street",
-      city: "Cityville"
+      street: "Tagbilaran City",
+      city: "Tagbilaran City",
+      province: "Bohol"
     },
     contact: {
-      phone: "(555) 123-4567",
-      email: "info@maincampus.church",
+      phone: "(038) 411-1234",
+      email: "tagbilaran@marchoffaith.org",
       social: {
-        facebook: "MainCampusChurch",
-        instagram: "@maincampuschurch",
-        youtube: "MainCampusChurch"
+        facebook: "MOFTagbilaran"
       }
     },
     services: [
-      { day: 'Sunday', time: "09:00", type: "traditional" },
-      { day: 'Sunday', time: "11:00", type: "contemporary" },
-      { day: 'Wednesday', time: "19:00", type: "bible-study" },
-      { day: 'Thursday', time: "18:30", type: "youth" },
-      { day: 'Saturday', time: "17:00", type: "prayer" }
+      { day: 'Sunday', time: "9:00 AM - 11:00 AM", type: "Worship Service" },
+      { day: 'Wednesday', time: "6:00 PM - 7:30 PM", type: "Midweek Service" }
     ],
     pastors: [
-      { name: "John Smith", role: "Senior Pastor", since: "2018" },
-      { name: "Sarah Johnson", role: "Youth Pastor", since: "2020" },
-      { name: "Michael Chen", role: "Worship Pastor", since: "2019" }
+      { name: "Ptr. Ralph Steven D. Trigo", role: "Senior Pastor", since: "2010" }
     ],
     stats: {
-      totalMembers: 2500,
-      yearFounded: 1985
+      totalMembers: 500,
+      yearFounded: 1974
     }
   },
   {
     id: 2,
-    name: "North Valley Community Church",
+    name: "March of Faith Triple Union",
     address: {
-      street: "456 Valley Road",
-      city: "Valleytown"
+      street: "Triple Union",
+      city: "Catigbian",
+      province: "Bohol"
     },
     contact: {
-      phone: "(555) 234-5678",
-      email: "info@northvalley.church",
-      social: {
-        facebook: "NorthValleyChurch",
-        instagram: "@northvalleychurch",
-        youtube: "NorthValleyChurch"
-      }
+      phone: "0912-345-6789",
+      email: "tripleunion@marchoffaith.org",
+      social: {}
     },
     services: [
-      { day: 'Sunday', time: "08:30", type: "traditional" },
-      { day: 'Sunday', time: "10:30", type: "family" },
-      { day: 'Tuesday', time: "19:00", type: "bible-study" },
-      { day: 'Friday', time: "18:00", type: "youth" }
+      { day: 'Sunday', time: "9:00 AM - 11:00 AM", type: "Worship Service" }
     ],
     pastors: [
-      { name: "David Williams", role: "Lead Pastor", since: "2015" },
-      { name: "Emily Rodriguez", role: "Children's Pastor", since: "2019" },
-      { name: "James Lee", role: "Executive Pastor", since: "2017" }
+      { name: "TBA", role: "Resident Pastor", since: "2024" }
     ],
     stats: {
-      totalMembers: 1800,
-      yearFounded: 1992
+      totalMembers: 120,
+      yearFounded: 1980
     }
   },
   {
     id: 3,
-    name: "Riverside Fellowship",
+    name: "March of Faith Caningag",
     address: {
-      street: "789 River Drive",
-      city: "Riverside"
+      street: "Caningag",
+      city: "Alicia",
+      province: "Bohol"
     },
     contact: {
-      phone: "(555) 345-6789",
-      email: "hello@riverside.church",
-      social: {
-        facebook: "RiversideFellowship",
-        instagram: "@riversidefellowship",
-        youtube: "RiversideFellowship"
-      }
+      phone: "0912-345-6789",
+      email: "caningag@marchoffaith.org",
+      social: {}
     },
     services: [
-      { day: 'Sunday', time: "09:30", type: "blended" },
-      { day: 'Sunday', time: "11:30", type: "contemporary" },
-      { day: 'Wednesday', time: "18:30", type: "midweek" },
-      { day: 'Saturday', time: "18:00", type: "young-adults" }
+      { day: 'Sunday', time: "9:00 AM - 11:00 AM", type: "Worship Service" }
     ],
     pastors: [
-      { name: "Robert Taylor", role: "Senior Pastor", since: "2016" },
-      { name: "Lisa Chang", role: "Worship Pastor", since: "2018" },
-      { name: "Mark Anderson", role: "Community Pastor", since: "2020" }
+      { name: "TBA", role: "Resident Pastor", since: "2024" }
     ],
     stats: {
-      totalMembers: 2100,
-      yearFounded: 1978
+      totalMembers: 80,
+      yearFounded: 1985
     }
   },
   {
     id: 4,
-    name: "Grace Harbor Church",
+    name: "March of Faith Libertad",
     address: {
-      street: "321 Harbor View",
-      city: "Harborside"
+      street: "Libertad",
+      city: "Tubigon",
+      province: "Bohol"
     },
     contact: {
-      phone: "(555) 456-7890",
-      email: "contact@graceharbor.church",
-      social: {
-        facebook: "GraceHarborChurch",
-        instagram: "@graceharborchurch",
-        youtube: "GraceHarborChurch"
-      }
+      phone: "0912-345-6789",
+      email: "libertad@marchoffaith.org",
+      social: {}
     },
     services: [
-      { day: 'Sunday', time: "08:00", type: "traditional" },
-      { day: 'Sunday', time: "10:00", type: "contemporary" },
-      { day: 'Sunday', time: "17:00", type: "evening" },
-      { day: 'Thursday', time: "19:00", type: "bible-study" },
-      { day: 'Friday', time: "19:30", type: "youth" }
+      { day: 'Sunday', time: "9:00 AM - 11:00 AM", type: "Worship Service" }
     ],
     pastors: [
-      { name: "Thomas Wilson", role: "Lead Pastor", since: "2014" },
-      { name: "Rachel Kim", role: "Family Ministry Pastor", since: "2017" },
-      { name: "Daniel Martinez", role: "Teaching Pastor", since: "2019" }
+      { name: "TBA", role: "Resident Pastor", since: "2024" }
     ],
     stats: {
-      totalMembers: 3200,
-      yearFounded: 1965
+      totalMembers: 100,
+      yearFounded: 1990
+    }
+  },
+  {
+    id: 5,
+    name: "March of Faith Ajong",
+    address: {
+      street: "Ajong",
+      city: "Sibulan",
+      province: "Negros Oriental"
+    },
+    contact: {
+      phone: "0912-345-6789",
+      email: "ajong@marchoffaith.org",
+      social: {}
+    },
+    services: [
+      { day: 'Sunday', time: "9:00 AM - 11:00 AM", type: "Worship Service" }
+    ],
+    pastors: [
+      { name: "TBA", role: "Resident Pastor", since: "2024" }
+    ],
+    stats: {
+      totalMembers: 150,
+      yearFounded: 1995
+    }
+  },
+  {
+    id: 6,
+    name: "March of Faith Poblacion Sibulan",
+    address: {
+      street: "Poblacion",
+      city: "Sibulan",
+      province: "Negros Oriental"
+    },
+    contact: {
+      phone: "0912-345-6789",
+      email: "sibulan@marchoffaith.org",
+      social: {}
+    },
+    services: [
+      { day: 'Sunday', time: "9:00 AM - 11:00 AM", type: "Worship Service" }
+    ],
+    pastors: [
+      { name: "TBA", role: "Resident Pastor", since: "2024" }
+    ],
+    stats: {
+      totalMembers: 200,
+      yearFounded: 1998
+    }
+  },
+  {
+    id: 7,
+    name: "March of Faith Magatas",
+    address: {
+      street: "Magatas",
+      city: "Sibulan",
+      province: "Negros Oriental"
+    },
+    contact: {
+      phone: "0912-345-6789",
+      email: "magatas@marchoffaith.org",
+      social: {}
+    },
+    services: [
+      { day: 'Sunday', time: "9:00 AM - 11:00 AM", type: "Worship Service" }
+    ],
+    pastors: [
+      { name: "TBA", role: "Resident Pastor", since: "2024" }
+    ],
+    stats: {
+      totalMembers: 100,
+      yearFounded: 2000
+    }
+  },
+  {
+    id: 8,
+    name: "March of Faith Pinucawan",
+    address: {
+      street: "Pinucawan",
+      city: "Tayasan",
+      province: "Negros Oriental"
+    },
+    contact: {
+      phone: "0912-345-6789",
+      email: "pinucawan@marchoffaith.org",
+      social: {}
+    },
+    services: [
+      { day: 'Sunday', time: "9:00 AM - 11:00 AM", type: "Worship Service" }
+    ],
+    pastors: [
+      { name: "TBA", role: "Resident Pastor", since: "2024" }
+    ],
+    stats: {
+      totalMembers: 80,
+      yearFounded: 2005
+    }
+  },
+  {
+    id: 9,
+    name: "March of Faith Cambaye",
+    address: {
+      street: "Cambaye",
+      city: "Tayasan",
+      province: "Negros Oriental"
+    },
+    contact: {
+      phone: "0912-345-6789",
+      email: "cambaye@marchoffaith.org",
+      social: {}
+    },
+    services: [
+      { day: 'Sunday', time: "9:00 AM - 11:00 AM", type: "Worship Service" }
+    ],
+    pastors: [
+      { name: "TBA", role: "Resident Pastor", since: "2024" }
+    ],
+    stats: {
+      totalMembers: 70,
+      yearFounded: 2008
+    }
+  },
+  {
+    id: 10,
+    name: "March of Faith Linao",
+    address: {
+      street: "Linao",
+      city: "Tayasan",
+      province: "Negros Oriental"
+    },
+    contact: {
+      phone: "0912-345-6789",
+      email: "linao@marchoffaith.org",
+      social: {}
+    },
+    services: [
+      { day: 'Sunday', time: "9:00 AM - 11:00 AM", type: "Worship Service" }
+    ],
+    pastors: [
+      { name: "TBA", role: "Resident Pastor", since: "2024" }
+    ],
+    stats: {
+      totalMembers: 60,
+      yearFounded: 2010
+    }
+  },
+  {
+    id: 11,
+    name: "March of Faith Dumaguete",
+    address: {
+      street: "Dumaguete City",
+      city: "Dumaguete City",
+      province: "Negros Oriental"
+    },
+    contact: {
+      phone: "0912-345-6789",
+      email: "dumaguete@marchoffaith.org",
+      social: {}
+    },
+    services: [
+      { day: 'Sunday', time: "9:00 AM - 11:00 AM", type: "Worship Service" }
+    ],
+    pastors: [
+      { name: "TBA", role: "Resident Pastor", since: "2024" }
+    ],
+    stats: {
+      totalMembers: 300,
+      yearFounded: 2015
+    }
+  },
+  {
+    id: 12,
+    name: "March of Faith Bolisong",
+    address: {
+      street: "Bolisong",
+      city: "Manjuyod",
+      province: "Negros Oriental"
+    },
+    contact: {
+      phone: "0912-345-6789",
+      email: "bolisong@marchoffaith.org",
+      social: {}
+    },
+    services: [
+      { day: 'Sunday', time: "9:00 AM - 11:00 AM", type: "Worship Service" }
+    ],
+    pastors: [
+      { name: "TBA", role: "Resident Pastor", since: "2024" }
+    ],
+    stats: {
+      totalMembers: 90,
+      yearFounded: 2018
+    }
+  },
+  {
+    id: 13,
+    name: "March of Faith Manlawaan",
+    address: {
+      street: "Manlawaan",
+      city: "Sta. Catalina",
+      province: "Negros Oriental"
+    },
+    contact: {
+      phone: "0912-345-6789",
+      email: "manlawaan@marchoffaith.org",
+      social: {}
+    },
+    services: [
+      { day: 'Sunday', time: "9:00 AM - 11:00 AM", type: "Worship Service" }
+    ],
+    pastors: [
+      { name: "TBA", role: "Resident Pastor", since: "2024" }
+    ],
+    stats: {
+      totalMembers: 50,
+      yearFounded: 2020
     }
   }
 ];

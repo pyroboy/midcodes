@@ -1,17 +1,15 @@
+<script>
+	import Hero from '$lib/components/Hero.svelte';
+</script>
+
 <svelte:head>
 	<title>Resources & Documents - March of Faith Incorporated</title>
 	<meta name="description" content="Access official church documents, ministry resources, and important information for March of Faith Incorporated in Tagbilaran, Bohol." />
 </svelte:head>
 
-<!-- Hero Section -->
-<section class="hero-section" role="banner" aria-labelledby="hero-title">
-	<div class="container">
-		<div class="hero-content">
-			<h1 id="hero-title">RESOURCES & DOCUMENTS</h1>
-			<p class="hero-subtitle">Official church documents, ministry resources, and important information for our community</p>
-		</div>
-	</div>
-</section>
+<Hero subtitle="Official church documents, ministry resources, and important information for our community">
+	RESOURCES & DOCUMENTS
+</Hero>
 
 <!-- Resources Content -->
 <section class="resources-content" role="main">
@@ -151,34 +149,6 @@
 		max-width: 1200px;
 		margin: 0 auto;
 		padding: 0 1.5rem;
-	}
-
-	/* Hero Section */
-	.hero-section {
-		background: var(--deep-red);
-		color: var(--white);
-		padding: 3rem 0;
-		text-align: center;
-	}
-
-	.hero-content h1 {
-		font-family: 'Montserrat', sans-serif;
-		font-size: 2.5rem;
-		font-weight: 800;
-		margin-bottom: 1rem;
-		color: var(--white);
-		text-transform: uppercase;
-		letter-spacing: 1px;
-	}
-
-	.hero-subtitle {
-		font-family: 'Montserrat', sans-serif;
-		font-size: 1.2rem;
-		font-weight: 400;
-		opacity: 0.95;
-		max-width: 700px;
-		margin: 0 auto;
-		line-height: 1.5;
 	}
 
 	/* Main Content */
