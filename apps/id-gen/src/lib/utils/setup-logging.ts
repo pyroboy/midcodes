@@ -1,5 +1,5 @@
 import { dev } from '$app/environment';
-import { logger } from './logger';
+// import { logger } from './logger'; // REMOVED: This caused the infinite loop
 
 // Only patch once
 if (!(globalThis as any).__LOG_PATCHED__) {
@@ -19,22 +19,11 @@ if (!(globalThis as any).__LOG_PATCHED__) {
       if (!dev && !(level === 'warn' || level === 'error')) return;
 
       try {
-        switch (level) {
-          case 'debug':
-            logger.debug(...args);
-            break;
-          case 'info':
-            logger.info(...args);
-            break;
-          case 'warn':
-            logger.warn(...args);
-            break;
-          case 'error':
-            logger.error(...args);
-            break;
-        }
+        // FIX: Call the original function directly instead of the logger wrapper
+        // This prevents the infinite recursion of console.log -> logger -> console.log
+        fn(...args);
       } catch {
-        // Fallback to original if logger fails for any reason
+        // Fallback to original if something fails
         fn(...args);
       }
     };

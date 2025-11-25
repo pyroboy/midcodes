@@ -1,4 +1,4 @@
-import type { CreditPackage, FeatureSKU } from './types.js';
+import type { CreditPackage, FeatureSKU } from './types';
 
 // Credit packages with canonical server-side pricing
 export const CREDIT_PACKAGES: readonly CreditPackage[] = [
@@ -71,6 +71,25 @@ export const FEATURE_SKUS: readonly FeatureSKU[] = [
 		isActive: true
 	}
 ] as const;
+
+// Premium features for backward compatibility with credits.ts
+export const PREMIUM_FEATURES = [
+	{
+		id: 'unlimited_templates',
+		name: 'Unlimited Templates',
+		price: 99,
+		description: 'Create unlimited custom templates',
+		type: 'one_time'
+	},
+	{
+		id: 'remove_watermarks',
+		name: 'Remove Watermarks',
+		price: 199,
+		description: 'Remove watermarks from all generated cards',
+		type: 'one_time'
+	}
+] as const;
+
 
 // Maps for quick lookups by ID
 export const CREDIT_PACKAGE_MAP = new Map(CREDIT_PACKAGES.map((pkg) => [pkg.id, pkg]));

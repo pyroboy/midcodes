@@ -1,4 +1,4 @@
-import { supabase } from '../supabaseClient';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export interface CreditTransaction {
 	id: string;
@@ -341,67 +341,5 @@ async function createCreditTransaction(
 	return data;
 }
 
-/**
- * Credit package definitions
- */
-export const CREDIT_PACKAGES = [
-	{
-		id: 'small',
-		name: 'Small Package',
-		credits: 50,
-		price: 250,
-		pricePerCard: 5,
-		description: 'Perfect for small businesses and events',
-		popular: false
-	},
-	{
-		id: 'medium',
-		name: 'Medium Package',
-		credits: 100,
-		price: 450,
-		pricePerCard: 4.5,
-		description: 'Great for medium-sized organizations',
-		popular: true,
-		discount: 10
-	},
-	{
-		id: 'large',
-		name: 'Large Package',
-		credits: 250,
-		price: 1000,
-		pricePerCard: 4,
-		description: 'Best value for frequent users',
-		popular: false,
-		discount: 20
-	},
-	{
-		id: 'enterprise',
-		name: 'Enterprise Package',
-		credits: 500,
-		price: 1800,
-		pricePerCard: 3.6,
-		description: 'For schools and large corporations',
-		popular: false,
-		discount: 28
-	}
-];
-
-/**
- * Premium feature definitions
- */
-export const PREMIUM_FEATURES = [
-	{
-		id: 'unlimited_templates',
-		name: 'Unlimited Templates',
-		price: 99,
-		description: 'Create unlimited custom templates',
-		type: 'one_time'
-	},
-	{
-		id: 'remove_watermarks',
-		name: 'Remove Watermarks',
-		price: 199,
-		description: 'Remove watermarks from all generated cards',
-		type: 'one_time'
-	}
-];
+// NOTE: CREDIT_PACKAGES and PREMIUM_FEATURES removed to prevent circular dependency
+// Import directly from '$lib/payments/catalog' where needed

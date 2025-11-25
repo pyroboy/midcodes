@@ -46,15 +46,15 @@
 {#if href}
 	<a 
 		{href}
-		class="block bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow duration-200 {className}"
+		class="block bg-card border border-border rounded-lg p-6 shadow-sm hover:shadow-md transition-all duration-200 {className}"
 	>
 		<div class="flex items-center justify-between">
 			<div class="flex-1">
-				<p class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+				<p class="text-sm font-medium text-muted-foreground mb-1">
 					{title}
 				</p>
 				<div class="flex items-baseline">
-					<p class="text-2xl font-bold text-gray-900 dark:text-white">
+					<p class="text-2xl font-bold text-foreground">
 						{formattedValue}
 					</p>
 					{#if change !== null}
@@ -75,14 +75,14 @@
 		</div>
 	</a>
 {:else}
-	<div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm {className}">
+	<div class="bg-card border border-border rounded-lg p-6 shadow-sm {className}">
 		<div class="flex items-center justify-between">
 			<div class="flex-1">
-				<p class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
+				<p class="text-sm font-medium text-muted-foreground mb-1">
 					{title}
 				</p>
 				<div class="flex items-baseline">
-					<p class="text-2xl font-bold text-gray-900 dark:text-white">
+					<p class="text-2xl font-bold text-foreground">
 						{formattedValue}
 					</p>
 					{#if change !== null}

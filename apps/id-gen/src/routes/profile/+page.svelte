@@ -486,7 +486,7 @@ value={formatDate(profile.created_at, 'date')}
 					</div>
 					<div class="flex items-center justify-between">
 						<span class="text-sm text-muted-foreground">Last Login</span>
-									span class="text-sm"{formatDate(profile.updated_at, 'date')}/span
+									<span class="text-sm">{formatDate(profile.updated_at, 'date')}</span>
 					</div>
 					<div class="flex items-center justify-between">
 						<span class="text-sm text-muted-foreground">ID Cards Created</span>

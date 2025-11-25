@@ -55,7 +55,7 @@
 	/>
 </svelte:head>
 
-<div class="min-h-screen">
+<div class="min-h-screen bg-background text-foreground theme-transition">
 	{#if data.user}
 		<!-- Mobile Header -->
 		<MobileHeader user={data.user} onMenuToggle={toggleMenu} class="lg:hidden" />
@@ -75,7 +75,7 @@
 		</main>
 
 		<!-- Sidebar integration for desktop -->
-		<div class="hidden lg:flex lg:fixed lg:top-16 lg:left-0 lg:w-64 lg:h-[calc(100vh-4rem)] lg:border-r lg:border-gray-200 dark:lg:border-gray-700">
+		<div class="hidden lg:flex lg:fixed lg:top-16 lg:left-0 lg:w-64 lg:h-[calc(100vh-4rem)] border-r border-border bg-background">
 			<BottomNavigation user={data.user} class="lg:flex lg:flex-col lg:w-full lg:relative lg:top-0" />
 		</div>
 
@@ -83,7 +83,7 @@
 		<BottomNavigation user={data.user} />
 	{:else}
 		<!-- Unauthenticated layout - simple header -->
-		<header class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+		<header class="bg-background border-b border-border sticky top-0 z-50">
 			<div class="container mx-auto px-4">
 				<div class="flex justify-between items-center h-16">
 					<a href="/" class="flex items-center gap-2">
@@ -103,27 +103,27 @@
 								/>
 							</svg>
 						</div>
-						<span class="text-xl font-bold text-gray-900 dark:text-white"> ID Generator </span>
+						<span class="text-xl font-bold text-foreground">ID Generator</span>
 					</a>
 
 					<a
-						href="/auth"
-						class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-					>
+					href="/auth"
+					class="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
+				>	>
 						Sign In
 					</a>
 				</div>
 			</div>
 		</header>
 
-		<main class="min-h-screen">
+		<main class="min-h-screen bg-background">
 			{@render children()}
 		</main>
 	{/if}
 </div>
 
 <!-- Toast notifications -->
-<Toaster richColors closeButton />
+<Toaster richColors closeButton theme={$theme} />
 
 <style>
 	:global(body) {

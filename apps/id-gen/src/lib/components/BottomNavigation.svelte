@@ -46,7 +46,7 @@
 <div class={className}>
 	<!-- Bottom Navigation - Mobile/Tablet -->
 	<nav
-		class="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 z-40"
+		class="lg:hidden fixed bottom-0 left-0 right-0 bg-background border-t border-border z-40"
 	>
 		<div class="grid grid-cols-3 h-16">
 			{#each navItems as item}
@@ -54,8 +54,8 @@
 					href={item.href}
 					class="flex flex-col items-center justify-center gap-1 px-2 py-2 transition-colors
 						{isActive(item.href, $page.url.pathname)
-						? 'text-primary bg-primary/5'
-						: 'text-gray-600 dark:text-gray-400 hover:text-primary hover:bg-primary/5'}"
+						? 'text-primary bg-primary/10'
+						: 'text-muted-foreground hover:text-foreground hover:bg-muted'}"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -76,11 +76,11 @@
 
 	<!-- Desktop Navigation - Hidden on mobile -->
 	<nav
-		class="hidden lg:flex lg:fixed lg:top-16 lg:left-0 lg:w-64 lg:h-full lg:bg-white lg:dark:bg-gray-900 lg:border-r lg:border-gray-200 lg:dark:border-gray-700 lg:z-30"
+		class="hidden lg:flex lg:fixed lg:top-16 lg:left-0 lg:w-64 lg:h-full lg:bg-background lg:border-r lg:border-border lg:z-30"
 	>
 		<div class="flex flex-col w-full p-4 space-y-2">
 			<div class="mb-4">
-				<h2 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">Main Navigation</h2>
+				<h2 class="text-sm font-semibold text-foreground mb-2">Main Navigation</h2>
 			</div>
 
 			{#each navItems as item}
@@ -88,8 +88,8 @@
 					href={item.href}
 					class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors
 						{isActive(item.href, $page.url.pathname)
-						? 'bg-primary text-white'
-						: 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'}"
+						? 'bg-primary text-primary-foreground'
+						: 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -105,14 +105,14 @@
 			{/each}
 
 			{#if user?.role && ['super_admin', 'org_admin', 'id_gen_admin'].includes(user.role)}
-				<div class="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-					<h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">Administration</h3>
+				<div class="mt-6 pt-4 border-t border-border">
+					<h3 class="text-sm font-semibold text-foreground mb-2">Administration</h3>
 					<a
 						href="/admin"
 						class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors
 							{isActive('/admin', $page.url.pathname)
-							? 'bg-primary text-white'
-							: 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'}"
+							? 'bg-primary text-primary-foreground'
+							: 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"

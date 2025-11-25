@@ -1,4 +1,5 @@
-import type { CREDIT_PACKAGES, PREMIUM_FEATURES } from '$lib/utils/credits';
+import { CREDIT_PACKAGES, PREMIUM_FEATURES } from '$lib/payments/catalog';
+import { addCredits, grantUnlimitedTemplates, grantWatermarkRemoval } from '$lib/utils/credits';
 
 // PayMongo types
 export interface PayMongoPaymentIntent {
@@ -126,14 +127,12 @@ export async function createCreditPackagePayment(
 	userId: string,
 	orgId: string
 ): Promise<PayMongoPaymentIntent> {
-	const creditPackage = (await import('$lib/utils/credits')).CREDIT_PACKAGES.find(
-		(p) => p.id === packageId
-	);
+	const creditPackage = CREDIT_PACKAGES.find((p) => p.id === packageId);
 	if (!creditPackage) {
 		throw new Error('Invalid credit package');
 	}
 
-	const amount = creditPackage.price * 100; // Convert to centavos
+	const amount = creditPackage.amountPhp * 100; // Convert to centavos
 	const metadata = {
 		type: 'credit_purchase',
 		package_id: packageId,
@@ -154,9 +153,7 @@ export async function createPremiumFeaturePayment(
 	userId: string,
 	orgId: string
 ): Promise<PayMongoPaymentIntent> {
-	const premiumFeature = (await import('$lib/utils/credits')).PREMIUM_FEATURES.find(
-		(f) => f.id === featureId
-	);
+	const premiumFeature = PREMIUM_FEATURES.find((f) => f.id === featureId);
 	if (!premiumFeature) {
 		throw new Error('Invalid premium feature');
 	}
@@ -183,10 +180,6 @@ export async function processSuccessfulPayment(
 	if (!metadata) {
 		throw new Error('No metadata found in payment intent');
 	}
-
-	const { addCredits, grantUnlimitedTemplates, grantWatermarkRemoval } = await import(
-		'$lib/utils/credits'
-	);
 
 	switch (metadata.type) {
 		case 'credit_purchase':

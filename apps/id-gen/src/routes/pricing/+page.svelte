@@ -2,7 +2,7 @@
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
-	import { CREDIT_PACKAGES, PREMIUM_FEATURES } from '$lib/utils/credits';
+	import { CREDIT_PACKAGES, PREMIUM_FEATURES } from '$lib/payments/catalog';
 	import { createCreditPayment, createFeaturePayment } from '$lib/remote/payments.remote';
 	import { paymentFlags } from '$lib/stores/featureFlags';
 
@@ -21,6 +21,15 @@
 	const paymentsEnabled = $derived(
 		(data?.paymentsEnabled ?? true) && $paymentFlags.paymentsEnabled
 	);
+
+	// Enhance packages with computed UI properties
+	const enhancedPackages = CREDIT_PACKAGES.map((pkg, index) => ({
+		...pkg,
+		price: pkg.amountPhp,
+		pricePerCard: pkg.amountPhp / pkg.credits,
+		discount: index > 0 ? Math.round((1 - (pkg.amountPhp / pkg.credits) / (CREDIT_PACKAGES[0].amountPhp / CREDIT_PACKAGES[0].credits)) * 100) : 0,
+		popular: pkg.id === 'credits_1000' // Mark 1000 credits as most popular
+	}));
 
 	function formatPrice(price: number): string {
 		return new Intl.NumberFormat('en-PH', {
@@ -183,7 +192,7 @@
 		</div>
 
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-			{#each CREDIT_PACKAGES as pkg}
+			{#each enhancedPackages as pkg}
 				<Card
 					class="relative transition-all duration-200 hover:shadow-xl {pkg.popular
 						? 'ring-2 ring-primary scale-105'
