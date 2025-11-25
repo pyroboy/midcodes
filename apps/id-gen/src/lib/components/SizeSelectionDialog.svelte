@@ -122,7 +122,8 @@
 </script>
 
 <Dialog bind:open>
-	<DialogContent class="max-w-2xl">
+	<!-- Adjusted Dialog Content for better mobile fit: w-[95vw], scrollable max height, responsive width -->
+	<DialogContent class="w-[95vw] max-w-lg sm:max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6 gap-6">
 		<DialogHeader>
 			<DialogTitle>Create New Template</DialogTitle>
 			<DialogDescription>
@@ -138,50 +139,51 @@
 					id="templateName"
 					bind:value={templateName}
 					placeholder="Enter template name"
-					class="w-full"
+					class="w-full bg-background"
 				/>
 			</div>
 
 			<!-- Size Selection -->
 			<div class="space-y-4">
-				<div class="flex items-center justify-between">
+				<div class="flex flex-wrap items-center justify-between gap-2">
 					<Label class="text-base font-semibold">Card Size</Label>
 					<!-- Orientation Toggle -->
-					<div class="flex items-center space-x-2">
-						<RotateCw class="w-4 h-4" />
-						<Label for="portrait-toggle" class="text-sm">Portrait</Label>
+					<div class="flex items-center space-x-2 bg-muted/50 px-3 py-1.5 rounded-md">
+						<RotateCw class="w-4 h-4 text-muted-foreground" />
+						<Label for="portrait-toggle" class="text-sm cursor-pointer">Portrait</Label>
 						<Switch id="portrait-toggle" bind:checked={isPortrait} />
 					</div>
 				</div>
 
-				<RadioGroup value={selectedSizeType} onValueChange={handleSizeTypeChange}>
+				<RadioGroup value={selectedSizeType} onValueChange={handleSizeTypeChange} class="flex flex-row gap-6">
 					<div class="flex items-center space-x-2">
 						<RadioGroupItem value="common" id="common" />
-						<Label for="common">Common Sizes</Label>
+						<Label for="common" class="cursor-pointer">Common Sizes</Label>
 					</div>
 					<div class="flex items-center space-x-2">
 						<RadioGroupItem value="custom" id="custom" />
-						<Label for="custom">Custom Size</Label>
+						<Label for="custom" class="cursor-pointer">Custom Size</Label>
 					</div>
 				</RadioGroup>
 
 				{#if selectedSizeType === 'common'}
-					<div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+					<!-- Grid: 1 col on mobile, 2 on small tablets, 3 on desktop -->
+					<div class="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 gap-3">
 						{#each COMMON_CARD_SIZES as size}
 							{@const currentSize = isPortrait ? switchOrientation(size) : size}
 							{@const pixels = cardSizeToPixels(currentSize)}
 							{@const aspectRatio = currentSize.width / currentSize.height}
 							<Card
-								class="cursor-pointer transition-colors {selectedCommonSize === size
+								class="cursor-pointer transition-all hover:shadow-md active:scale-95 {selectedCommonSize === size
 									? 'border-primary bg-primary/5'
 									: 'hover:border-primary/50'}"
 								onclick={() => handleCommonSizeChange(size)}
 							>
 								<CardContent class="p-3">
 									<!-- Visual Preview -->
-									<div class="flex justify-center mb-2">
+									<div class="flex justify-center mb-2 h-[60px] items-center">
 										<div
-											class="border border-border bg-muted"
+											class="border border-foreground/20 bg-background shadow-sm"
 											style="width: {Math.min(60, 60 * aspectRatio)}px; height: {Math.min(
 												60 / aspectRatio,
 												60
@@ -189,11 +191,11 @@
 										></div>
 									</div>
 									<div class="text-center">
-										<div class="text-sm font-medium">{size.name}</div>
+										<div class="text-sm font-medium truncate">{size.name}</div>
 										<div class="text-xs text-muted-foreground">
 											{formatDimensions(currentSize, false)}
 										</div>
-										<div class="text-xs text-muted-foreground">
+										<div class="text-[10px] text-muted-foreground/70 mt-0.5 hidden sm:block">
 											{pixels.width}×{pixels.height}px
 										</div>
 									</div>
@@ -210,6 +212,7 @@
 								bind:value={customSizeName}
 								placeholder="Enter custom size name"
 								oninput={handleCustomSizeChange}
+								class="bg-background"
 							/>
 						</div>
 
@@ -238,6 +241,7 @@
 									max={customUnit === 'pixels' ? '5000' : customUnit === 'mm' ? '600' : '24'}
 									step={customUnit === 'pixels' ? '1' : customUnit === 'mm' ? '1' : '0.1'}
 									oninput={handleCustomSizeChange}
+									class="bg-background"
 								/>
 							</div>
 							<div class="space-y-2">
@@ -250,12 +254,13 @@
 									max={customUnit === 'pixels' ? '5000' : customUnit === 'mm' ? '600' : '24'}
 									step={customUnit === 'pixels' ? '1' : customUnit === 'mm' ? '1' : '0.1'}
 									oninput={handleCustomSizeChange}
+									class="bg-background"
 								/>
 							</div>
 						</div>
 
 						<!-- Custom Size Preview -->
-						<div class="bg-muted p-4 rounded-lg">
+						<div class="bg-muted/50 p-4 rounded-lg border border-border">
 							<div class="flex items-center justify-between mb-2">
 								<span class="text-sm font-medium">Preview</span>
 								<span class="text-xs text-muted-foreground">
@@ -265,9 +270,9 @@
 							{#snippet customPreview()}
 								{@const finalSize = finalCardSize()}
 								{@const aspectRatio = finalSize.width / finalSize.height}
-								<div class="flex justify-center">
+								<div class="flex justify-center py-2">
 									<div
-										class="border-2 border-border bg-background"
+										class="border-2 border-foreground/20 bg-background shadow-sm"
 										style="width: {Math.min(80, 80 * aspectRatio)}px; height: {Math.min(
 											80 / aspectRatio,
 											80
@@ -286,12 +291,12 @@
 
 			<!-- Current Selection Summary -->
 			<div class="bg-primary/5 border border-primary/20 p-4 rounded-lg">
-				<div class="flex items-center justify-between mb-3">
-					<h4 class="font-semibold">Selected Configuration</h4>
+				<div class="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
+					<h4 class="font-semibold text-sm sm:text-base">Selected Configuration</h4>
 					{#snippet summaryPreview()}
 						{@const finalSize = finalCardSize()}
 						{@const aspectRatio = finalSize.width / finalSize.height}
-						<div class="flex justify-center">
+						<div class="flex justify-center sm:justify-end">
 							<div
 								class="border border-primary bg-primary/10"
 								style="width: {Math.min(40, 40 * aspectRatio)}px; height: {Math.min(
@@ -303,30 +308,36 @@
 					{/snippet}
 					{@render summaryPreview()}
 				</div>
-				<div class="text-sm space-y-1">
-					<div><strong>Template:</strong> {templateName || 'Not specified'}</div>
-					<div>
-						<strong>Size:</strong>
-						{formatDimensions(finalCardSize(), false)}
-						{isPortrait ? '(Portrait)' : '(Landscape)'}
+				<div class="text-xs sm:text-sm space-y-1.5 text-muted-foreground">
+					<div class="flex justify-between">
+						<strong>Template:</strong> 
+						<span class="truncate ml-2 max-w-[200px] text-foreground">{templateName || 'Not specified'}</span>
 					</div>
-					<div>
+					<div class="flex justify-between">
+						<strong>Size:</strong>
+						<span class="text-foreground">
+							{formatDimensions(finalCardSize(), false)}
+							{isPortrait ? '(Portrait)' : '(Landscape)'}
+						</span>
+					</div>
+					<div class="flex justify-between">
 						<strong>Image:</strong>
-						{pixelDimensions.width} × {pixelDimensions.height} pixels @ {DEFAULT_DPI} DPI
+						<span class="text-foreground">{pixelDimensions.width} × {pixelDimensions.height} px @ {DEFAULT_DPI} DPI</span>
 					</div>
 				</div>
 			</div>
 
 			{#if error}
-				<div class="text-sm text-destructive bg-destructive/10 p-3 rounded">
+				<div class="text-sm text-destructive bg-destructive/10 p-3 rounded-md border border-destructive/20">
 					{error}
 				</div>
 			{/if}
 		</div>
 
-		<DialogFooter>
-			<Button variant="outline" onclick={handleCancel}>Cancel</Button>
-			<Button onclick={handleConfirm}>Create Template</Button>
+		<!-- Footer with Stacked buttons on mobile -->
+		<DialogFooter class="flex-col sm:flex-row gap-2 sm:gap-0">
+			<Button variant="outline" onclick={handleCancel} class="w-full sm:w-auto mt-2 sm:mt-0">Cancel</Button>
+			<Button onclick={handleConfirm} class="w-full sm:w-auto">Create Template</Button>
 		</DialogFooter>
 	</DialogContent>
 </Dialog>

@@ -514,212 +514,201 @@ let groupedCards = $derived(
 		})()
 	);
 
-// Card zoom control
-let cardWidth = $state(300);
-const MIN_WIDTH = 200;
-const MAX_WIDTH = 600;
-const STEP = 50;
-function zoomOut() { cardWidth = Math.max(MIN_WIDTH, cardWidth - STEP); }
-function zoomIn() { cardWidth = Math.min(MAX_WIDTH, cardWidth + STEP); }
+	// Card zoom control
+	let cardMinWidth = $state(250); // Default min width
+	const MIN_WIDTH = 150;
+	const MAX_WIDTH = 450;
+	const STEP = 25;
+
+	function zoomOut() { cardMinWidth = Math.max(MIN_WIDTH, cardMinWidth - STEP); }
+	function zoomIn() { cardMinWidth = Math.min(MAX_WIDTH, cardMinWidth + STEP); }
 </script>
 
-<div class="mb-4 flex flex-wrap gap-3 items-center justify-between">
-	<input
-		type="text"
-		placeholder="Search..."
-		class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
-		bind:value={searchQuery}
-	/>
-	{#if selectedCount > 0}
-		<div class="ml-4 flex gap-2">
-			<button
-				class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-				onclick={downloadSelectedCards}
-			>
-				Download Selected ({selectedCount})
-			</button>
-			<button
-				class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-hidden focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-				onclick={deleteSelectedCards}
-			>
-				Delete Selected ({selectedCount})
-			</button>
+<div class="container mx-auto px-4 py-6 min-h-screen flex flex-col gap-6">
+	<!-- Controls Header -->
+	<div class="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center bg-card border border-border p-4 rounded-xl shadow-sm">
+		<!-- Search -->
+		<div class="relative w-full md:max-w-sm">
+			<input
+				type="text"
+				placeholder="Search cards..."
+				class="w-full pl-10 pr-4 py-2 bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm"
+				bind:value={searchQuery}
+			/>
+			<svg class="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
 		</div>
-	{/if}
 
-	<div class="flex items-center gap-2 ml-auto">
-		{#if $viewMode !== 'table'}
-			<button type="button" class="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700" onclick={zoomOut} aria-label="Zoom out">−</button>
-			<div class="text-sm text-gray-600 dark:text-gray-300 w-16 text-center">{cardWidth}px</div>
-			<button type="button" class="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700" onclick={zoomIn} aria-label="Zoom in">+</button>
-		{/if}
-		<div class="ml-4">
-			<ViewModeToggle />
-		</div>
-	</div>
-</div>
+		<!-- Actions & Toggles -->
+		<div class="flex flex-wrap items-center gap-3 w-full md:w-auto justify-between md:justify-end">
+			{#if selectedCount > 0}
+				<div class="flex gap-2">
+					<button
+						class="px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium rounded-md hover:bg-primary/90 transition-colors shadow-sm"
+						onclick={downloadSelectedCards}
+					>
+						Download ({selectedCount})
+					</button>
+					<button
+						class="px-3 py-1.5 bg-destructive text-destructive-foreground text-xs font-medium rounded-md hover:bg-destructive/90 transition-colors shadow-sm"
+						onclick={deleteSelectedCards}
+					>
+						Delete ({selectedCount})
+					</button>
+				</div>
+			{/if}
 
-{#if dataRows.length === 0}
-	<EmptyIDs />
-{:else if $viewMode === 'table'}
-	{#each Object.entries(groupedCards) as [templateName, cards]}
-		<div class="mb-8">
-		<h3 class="text-xl font-semibold mb-4">{templateName}</h3>
-		<div class="relative overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-			<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-				<thead class="bg-gray-50 dark:bg-gray-800 sticky top-0 z-20">
-					<tr>
-						<th scope="col" class="sticky left-0 z-30 w-16 px-4 py-2 bg-gray-50 dark:bg-gray-800">
-							<div class="flex items-center justify-center">
-								<input
-									type="checkbox"
-									class="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-									checked={groupSelectionStates.get(templateName)}
-									onchange={(e) => handleGroupCheckboxClick(e, cards)}
-								/>
-							</div>
-						</th>
-						<th scope="col" class="sticky left-[57px] z-30 px-4 py-2 bg-gray-50 dark:bg-gray-800">
-							<span
-								class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-								>Preview</span
-							>
-						</th>
-						{#if templateFields[templateName]}
-							{#each templateFields[templateName] || [] as field (field.variableName)}
-								<th
-									scope="col"
-									class="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200 {field.side ===
-									'front'
-										? 'bg-blue-50/50 dark:bg-blue-900/10'
-										: 'bg-green-50/50 dark:bg-green-900/10'}"
-								>
-									<span
-										class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-										>{field.variableName}</span
-									>
-								</th>
-							{/each}
-						{/if}
-						<th scope="col" class="sticky right-0 z-30 px-4 py-2 bg-gray-50 dark:bg-gray-800">
-							<span
-								class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
-								>Actions</span
-							>
-						</th>
-					</tr>
-				</thead>
-				<tbody class="bg-white divide-y divide-gray-200 dark:divide-gray-700 dark:bg-gray-900">
-					{#each cards as card}
-						<tr
-							class="group hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
-							onclick={(e) => openPreview(e, card)}
-						>
-							<td
-								class="sticky left-0 z-20 w-16 px-4 py-2 bg-white dark:bg-gray-900 group-hover:bg-gray-100 dark:group-hover:bg-gray-700"
-							>
-								<div class="flex items-center justify-center">
-									<input
-										type="checkbox"
-										class="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-										checked={selectionManager.isSelected(getCardId(card))}
-										onchange={(e) => handleCheckboxClick(e, card)}
-									/>
-								</div>
-							</td>
-							<td
-								class="sticky left-[57px] z-20 px-4 py-2 bg-white dark:bg-gray-900 group-hover:bg-gray-100 dark:group-hover:bg-gray-700"
-							>
-								<div
-									class="w-8 h-8 bg-gray-200 dark:bg-gray-600 rounded flex items-center justify-center"
-								>
-									<svg
-										class="w-4 h-4 text-gray-400"
-										fill="none"
-										stroke="currentColor"
-										viewBox="0 0 24 24"
-									>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="2"
-											d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-										></path>
-									</svg>
-								</div>
-							</td>
-							{#if templateFields[templateName]}
-								{#each templateFields[templateName] || [] as field (field.variableName)}
-									<td
-										class="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200 {field.side ===
-										'front'
-											? 'bg-blue-50/50 dark:bg-blue-900/10'
-											: 'bg-green-50/50 dark:bg-green-900/10'}"
-									>
-										{card.fields?.[field.variableName]?.value || ''}
-									</td>
-								{/each}
-							{/if}
-							<td
-								class="sticky right-0 z-20 px-4 py-2 bg-white dark:bg-gray-900 group-hover:bg-gray-100 dark:group-hover:bg-gray-700 flex gap-2 items-center"
-							>
-								<button
-									class="px-3 py-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-150"
-									onclick={() => downloadCard(card)}
-									disabled={downloadingCards.has(getCardId(card))}
-								>
-									{downloadingCards.has(getCardId(card)) ? 'Downloading...' : 'Download'}
-								</button>
-								<button
-									class="px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors duration-150"
-									onclick={() => handleDelete(card)}
-									disabled={deletingCards.has(getCardId(card))}
-								>
-									{deletingCards.has(getCardId(card)) ? 'Deleting...' : 'Delete'}
-								</button>
-							</td>
-						</tr>
-					{/each}
-				</tbody>
-			</table>
-		</div>
-	</div>
-	{/each}
-{:else}
-	{#each Object.entries(groupedCards) as [templateName, cards]}
-		<div class="mb-8">
-			<h3 class="text-xl font-semibold mb-4">{templateName}</h3>
-			<div class="grid gap-4" style={`grid-template-columns: repeat(auto-fill, ${cardWidth}px);`}>
-				{#each cards as card}
-								<SimpleIDCard
-						card={card}
-						isSelected={selectionManager.isSelected(getCardId(card))}
-						onToggleSelect={() => selectionManager.toggleSelection(getCardId(card))}
-						onDownload={downloadCard}
-						onDelete={handleDelete}
-						onOpenPreview={openPreview}
-						deleting={deletingCards.has(getCardId(card))}
-						downloading={downloadingCards.has(getCardId(card))}
-						width={cardWidth}
-					/>
-				{/each}
+			<div class="flex items-center gap-2 ml-auto border-l border-border pl-3">
+				{#if $viewMode !== 'table'}
+					<!-- Mobile-friendly Zoom Controls -->
+					<div class="flex items-center bg-muted rounded-lg p-0.5">
+						<button class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-background text-muted-foreground" onclick={zoomOut}>−</button>
+						<button class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-background text-muted-foreground" onclick={zoomIn}>+</button>
+					</div>
+				{/if}
+				<ViewModeToggle />
 			</div>
 		</div>
-	{/each}
-{/if}
+	</div>
 
+	<!-- Content Area -->
+	{#if dataRows.length === 0}
+		<EmptyIDs />
+	{:else if $viewMode === 'table'}
+		<!-- Table View -->
+		<div class="space-y-8">
+			{#each Object.entries(groupedCards) as [templateName, cards]}
+				<div class="space-y-3">
+					<div class="flex items-center justify-between">
+						<h3 class="text-lg font-semibold text-foreground flex items-center gap-2">
+							<div class="h-6 w-1 bg-primary rounded-full"></div>
+							{templateName}
+						</h3>
+						<span class="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">{cards.length} items</span>
+					</div>
+					
+					<div class="relative w-full overflow-x-auto rounded-lg border border-border bg-card shadow-sm">
+						<table class="w-full text-sm text-left">
+							<thead class="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-border">
+								<tr>
+									<th class="w-10 px-4 py-3">
+										<input type="checkbox" class="rounded border-muted-foreground" checked={groupSelectionStates.get(templateName)} onchange={(e) => handleGroupCheckboxClick(e, cards)} />
+									</th>
+									<th class="px-4 py-3 font-medium">Preview</th>
+									{#if templateFields[templateName]}
+										{#each templateFields[templateName] || [] as field}
+											<th class="px-4 py-3 font-medium whitespace-nowrap">{field.variableName}</th>
+										{/each}
+									{/if}
+									<th class="px-4 py-3 font-medium text-right">Actions</th>
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-border">
+								{#each cards as card}
+									<tr class="hover:bg-muted/30 transition-colors group">
+										<td class="px-4 py-3">
+											<input type="checkbox" class="rounded border-muted-foreground" checked={selectionManager.isSelected(getCardId(card))} onchange={(e) => handleCheckboxClick(e, card)} />
+										</td>
+										<td class="px-4 py-2 w-24" onclick={(e) => openPreview(e, card)}>
+											<div class="h-10 w-16 bg-muted rounded overflow-hidden cursor-pointer border border-border hover:border-primary transition-colors">
+												{#if card.front_image}
+													<img src={getSupabaseStorageUrl(card.front_image, 'rendered-id-cards')} alt="Thumb" class="w-full h-full object-cover" loading="lazy" />
+												{/if}
+											</div>
+										</td>
+										{#if templateFields[templateName]}
+											{#each templateFields[templateName] || [] as field}
+												<td class="px-4 py-3 whitespace-nowrap text-foreground">
+													{card.fields?.[field.variableName]?.value || '-'}
+												</td>
+											{/each}
+										{/if}
+										<td class="px-4 py-3 text-right">
+											<div class="flex justify-end gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+												<button class="p-1.5 hover:bg-muted rounded text-blue-500" onclick={() => downloadCard(card)} title="Download">
+													<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+												</button>
+												<button class="p-1.5 hover:bg-muted rounded text-red-500" onclick={() => handleDelete(card)} title="Delete">
+													<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+												</button>
+											</div>
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				</div>
+			{/each}
+		</div>
+	{:else}
+		<!-- Responsive Grid View -->
+		<!-- Using CSS Variables for dynamic Grid sizing -->
+		<div class="space-y-10" style="--card-min-width: {cardMinWidth}px;">
+			{#each Object.entries(groupedCards) as [templateName, cards]}
+				<div class="space-y-4">
+					<div class="flex items-center gap-3 border-b border-border pb-2">
+						<h3 class="text-lg font-semibold text-foreground">{templateName}</h3>
+						<span class="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{cards.length}</span>
+					</div>
+					
+					<div class="responsive-grid">
+						{#each cards as card}
+							<div class="card-wrapper">
+								<SimpleIDCard
+									card={card}
+									isSelected={selectionManager.isSelected(getCardId(card))}
+									onToggleSelect={() => selectionManager.toggleSelection(getCardId(card))}
+									onDownload={downloadCard}
+									onDelete={handleDelete}
+									onOpenPreview={openPreview}
+									deleting={deletingCards.has(getCardId(card))}
+									downloading={downloadingCards.has(getCardId(card))}
+								/>
+							</div>
+						{/each}
+					</div>
+				</div>
+			{/each}
+		</div>
+	{/if}
+</div>
+
+<!-- Keep modals same as before -->
 {#if selectedFrontImage || selectedBackImage}
 	<ClientOnly>
 		<ImagePreviewModal
-			frontImageUrl={selectedFrontImage
-				? getSupabaseStorageUrl(selectedFrontImage, 'rendered-id-cards')
-				: null}
-			backImageUrl={selectedBackImage
-				? getSupabaseStorageUrl(selectedBackImage, 'rendered-id-cards')
-				: null}
+			frontImageUrl={selectedFrontImage ? getSupabaseStorageUrl(selectedFrontImage, 'rendered-id-cards') : null}
+			backImageUrl={selectedBackImage ? getSupabaseStorageUrl(selectedBackImage, 'rendered-id-cards') : null}
 			cardGeometry={selectedCardGeometry}
 			templateDimensions={selectedTemplateDimensions}
 			onClose={closePreview}
 		/>
 	</ClientOnly>
 {/if}
+
+<style>
+	/* Responsive Grid Logic */
+	.responsive-grid {
+		display: grid;
+		/* Fluid grid: columns fill space, min width controlled by JS variable, max 1fr */
+		grid-template-columns: repeat(auto-fill, minmax(var(--card-min-width), 1fr));
+		gap: 1rem;
+		width: 100%;
+	}
+
+	/* Ensure cards don't get too squashed on tiny screens */
+	@media (max-width: 480px) {
+		.responsive-grid {
+			grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+		}
+	}
+
+	/* Aspect Ratio wrapper for the grid item */
+	.card-wrapper {
+		height: auto;
+		width: 100%;
+		/* Ensure it stretches to fill the grid cell */
+		display: flex; 
+		flex-direction: column;
+	}
+</style>

@@ -1,66 +1,113 @@
 <script lang="ts">
-  import Card from '$lib/components/ui/card/card.svelte';
-  import CardContent from '$lib/components/ui/card/card-content.svelte';
-  import { getSupabaseStorageUrl } from '$lib/utils/supabase';
+	import Card from '$lib/components/ui/card/card.svelte';
+	import CardContent from '$lib/components/ui/card/card-content.svelte';
+	import { Button } from '$lib/components/ui/button';
+	import { Download, Trash2, Eye } from 'lucide-svelte';
+	import { getSupabaseStorageUrl } from '$lib/utils/supabase';
 
-  type IDCardType = {
-    idcard_id: string;
-    template_name: string;
-    front_image?: string | null;
-    back_image?: string | null;
-    fields?: Record<string, { value: string | null; side: 'front' | 'back' } | undefined>;
-  };
+	// Remove rigid type constraints to allow flexibility
+	export let card: any;
+	export let isSelected: boolean = false;
+	export let onToggleSelect: (card: any) => void;
+	export let onDownload: (card: any) => void;
+	export let onDelete: (card: any) => void;
+	export let onOpenPreview: (e: MouseEvent, card: any) => void;
+	export let downloading: boolean = false;
+	export let deleting: boolean = false;
+	// Note: 'width' prop is removed; we control size via CSS Grid in the parent
 
-  export let card: IDCardType;
-  export let isSelected: boolean = false;
-  // Loosen callback parameter types to interop with parent handlers
-  export let onToggleSelect: (card: any) => void;
-  export let onDownload: (card: any) => void;
-  export let onDelete: (card: any) => void;
-  export let onOpenPreview: (e: MouseEvent, card: any) => void;
-  export let downloading: boolean = false;
-  export let deleting: boolean = false;
-  export let width: number = 300; // controlled from parent
+	function handleClick(e: MouseEvent) {
+		// Prevent triggering if clicking buttons/checkbox
+		const target = e.target as HTMLElement;
+		if (target.closest('button') || target.closest('input')) return;
+		onOpenPreview?.(e, card);
+	}
 
-  function handleClick(e: MouseEvent) {
-    onOpenPreview?.(e, card);
-  }
-
-  const frontUrl = card.front_image
-    ? getSupabaseStorageUrl(card.front_image, 'rendered-id-cards')
-    : null;
+	const frontUrl = card.front_image
+		? getSupabaseStorageUrl(card.front_image, 'rendered-id-cards')
+		: null;
 </script>
 
-<div class="relative" role="button" tabindex="0" on:click={handleClick} on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(new MouseEvent('click')); } }} style={`width: ${width}px;`}>
-  <input
-    aria-label="Select card"
-    type="checkbox"
-    checked={isSelected}
-    on:click|stopPropagation={() => onToggleSelect(card)}
-    class="absolute top-2 left-2 z-10 w-5 h-5 text-blue-600 bg-white/90 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 shadow"
-  />
+<div 
+	class="group relative h-full w-full" 
+	role="button" 
+	tabindex="0" 
+	on:click={handleClick} 
+	on:keydown={(e) => { if (e.key === 'Enter') handleClick(new MouseEvent('click')); }}
+>
+	<!-- Selection Checkbox (Absolute Top Left) -->
+	<div class="absolute top-2 left-2 z-10">
+		<input
+			aria-label="Select card"
+			type="checkbox"
+			checked={isSelected}
+			on:click={(e) => { e.stopPropagation(); onToggleSelect(card); }}
+			class="h-5 w-5 rounded border-muted-foreground text-primary focus:ring-primary"
+		/>
+	</div>
 
-  <Card class="p-3 hover:shadow-md transition-shadow cursor-pointer">
-    <div class="w-full bg-gray-100 dark:bg-gray-800 rounded-md overflow-hidden flex items-center justify-center" style="aspect-ratio: 1013/638;">
-      {#if frontUrl}
-        <img src={frontUrl} alt="Card preview" class="w-full h-full object-contain" />
-      {:else}
-        <svg class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
-      {/if}
-    </div>
+	<Card class="h-full flex flex-col overflow-hidden border-border bg-card hover:shadow-md transition-all duration-200 hover:border-primary/50">
+		<!-- Image Area -->
+		<div class="relative w-full aspect-[1.58/1] bg-muted/50 flex items-center justify-center overflow-hidden border-b border-border">
+			{#if frontUrl}
+				<img 
+					src={frontUrl} 
+					alt="Card preview" 
+					class="w-full h-full object-contain p-2 transition-transform duration-300 group-hover:scale-105" 
+					loading="lazy"
+				/>
+			{:else}
+				<div class="flex flex-col items-center text-muted-foreground">
+					<Eye class="w-8 h-8 mb-1 opacity-50" />
+					<span class="text-xs">No Preview</span>
+				</div>
+			{/if}
+			
+			<!-- Mobile overlay hint -->
+			<div class="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors"></div>
+		</div>
 
-    <CardContent class="pt-3">
-      <div class="flex gap-3">
-        <button class="px-3 py-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors" on:click|stopPropagation={() => onDownload(card)} disabled={downloading}>
-          {downloading ? 'Downloading...' : 'Download'}
-        </button>
-        <button class="px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors" on:click|stopPropagation={() => onDelete(card)} disabled={deleting}>
-          {deleting ? 'Deleting...' : 'Delete'}
-        </button>
-      </div>
-    </CardContent>
-  </Card>
+		<CardContent class="flex-1 p-3 flex flex-col justify-between gap-3">
+			<!-- Text Info -->
+			<div class="space-y-1">
+				<h3 class="font-semibold text-sm text-foreground truncate" title={card.fields?.['Name']?.value}>
+					{card.fields?.['Name']?.value || card.fields?.['name']?.value || 'Untitled ID'}
+				</h3>
+				<p class="text-xs text-muted-foreground truncate">
+					{card.template_name}
+				</p>
+			</div>
+
+			<!-- Action Buttons -->
+			<div class="flex gap-2 pt-2 border-t border-border/50">
+				<Button 
+					variant="outline" 
+					size="sm" 
+					class="flex-1 h-8 text-xs px-2 bg-background hover:bg-muted hover:text-foreground"
+					onclick={(e) => { e.stopPropagation(); onDownload(card); }}
+					disabled={downloading}
+				>
+					{#if downloading}
+						<span class="animate-spin mr-1">
+							⏳
+						</span>
+					{:else}
+						<Download class="w-3 h-3 mr-1.5" />
+					{/if}
+					<span class="hidden sm:inline">Download</span>
+					<span class="sm:hidden">Save</span>
+				</Button>
+				
+				<Button 
+					variant="ghost" 
+					size="icon" 
+					class="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+					onclick={(e) => { e.stopPropagation(); onDelete(card); }}
+					disabled={deleting}
+				>
+					<Trash2 class="w-3.5 h-3.5" />
+				</Button>
+			</div>
+		</CardContent>
+	</Card>
 </div>
-
