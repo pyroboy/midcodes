@@ -42,7 +42,7 @@ export const getProfileData = query(async (): Promise<any> => {
 
 	try {
 		// Get user profile with preferences
-		const { data: profile, error: profileError } = await supabase
+		const { data: profileData, error: profileError } = await supabase
 			.from('profiles')
 			.select('id, email, role, created_at, updated_at, context')
 			.eq('id', user.id)
@@ -52,6 +52,8 @@ export const getProfileData = query(async (): Promise<any> => {
 			console.error('Error fetching profile:', profileError);
 			throw error(500, 'Failed to load profile data');
 		}
+
+		const profile = profileData as any;
 
 		// Get organization information
 		let organization = null;
@@ -87,7 +89,8 @@ export const getProfileData = query(async (): Promise<any> => {
 			.eq('user_id', user.id);
 
 		// Extract preferences from context
-		const preferences = profile.context?.preferences || {
+		const p = profile as any;
+		const preferences = p.context?.preferences || {
 			darkMode: false,
 			emailNotifications: true,
 			adminNotifications: true,
@@ -96,11 +99,11 @@ export const getProfileData = query(async (): Promise<any> => {
 
 		return {
 			profile: {
-				id: profile.id,
-				email: profile.email,
-				role: profile.role,
-				created_at: profile.created_at,
-				updated_at: profile.updated_at
+				id: p.id,
+				email: p.email,
+				role: p.role,
+				created_at: p.created_at,
+				updated_at: p.updated_at
 			},
 			organization,
 			preferences,
@@ -124,7 +127,7 @@ export const updateProfile = command('unchecked', async () => {
 		// Email updates should go through proper email verification flow
 
 		// Update timestamp
-		const { error: updateError } = await supabase
+		const { error: updateError } = await (supabase as any)
 			.from('profiles')
 			.update({
 				updated_at: new Date().toISOString()
@@ -170,9 +173,10 @@ export const updatePreferences = command(
 				throw error(500, 'Failed to fetch current profile');
 			}
 
-			// Update preferences in context
+			// Build updated context with preferences
+			const existingContext = (currentProfile as any)?.context || {};
 			const updatedContext = {
-				...currentProfile.context,
+				...existingContext,
 				preferences: {
 					darkMode,
 					emailNotifications,
@@ -181,7 +185,8 @@ export const updatePreferences = command(
 				}
 			};
 
-			const { error: updateError } = await supabase
+			// Update profile context
+			const { error: updateError } = await (supabase as any)
 				.from('profiles')
 				.update({
 					context: updatedContext,
@@ -260,20 +265,20 @@ export const exportData = command('unchecked', async () => {
 
 	try {
 		// Get user's profile data
-		const { data: profile, error: profileError } = await supabase
+		const { data: profileData, error: profileError } = await supabase
 			.from('profiles')
 			.select('*')
 			.eq('id', user.id)
 			.single();
 
 		// Get user's created ID cards
-		const { data: idCards, error: cardsError } = await supabase
+		const { data: idCardsData, error: cardsError } = await supabase
 			.from('idcards')
 			.select('id, template_id, created_at, data')
 			.eq('user_id', user.id);
 
 		// Get user's created templates (if any)
-		const { data: templates, error: templatesError } = await supabase
+		const { data: templatesData, error: templatesError } = await supabase
 			.from('templates')
 			.select('id, name, created_at')
 			.eq('user_id', user.id);
@@ -283,28 +288,33 @@ export const exportData = command('unchecked', async () => {
 			throw error(500, 'Failed to export data');
 		}
 
+		const profile = profileData as any;
+		const idCards = (idCardsData as any[]) || [];
+		const templates = (templatesData as any[]) || [];
+
 		// Create export data
+		const p = profile as any;
 		const exportData = {
 			exportDate: new Date().toISOString(),
 			profile: {
-				id: profile.id,
-				email: profile.email,
-				role: profile.role,
-				created_at: profile.created_at,
-				updated_at: profile.updated_at,
-				preferences: profile.context?.preferences || {}
+				id: p.id,
+				email: p.email,
+				role: p.role,
+				created_at: p.created_at,
+				updated_at: p.updated_at,
+				preferences: p.context?.preferences || {}
 			},
 			idCards:
-				idCards?.map((card) => ({
+				idCards.map((card: any) => ({
 					id: card.id,
 					template_id: card.template_id,
 					created_at: card.created_at,
 					data: card.data
-				})) || [],
-			templates: templates || [],
+				})),
+			templates,
 			statistics: {
-				totalIdCards: idCards?.length || 0,
-				totalTemplates: templates?.length || 0
+				totalIdCards: idCards.length,
+				totalTemplates: templates.length
 			}
 		};
 
@@ -344,12 +354,13 @@ export const deleteAccount = command('unchecked', async () => {
 		}
 
 		// Check if user has admin role - prevent deletion of last admin
-		if (currentProfile.role && ['super_admin', 'org_admin'].includes(currentProfile.role)) {
+		const currentProfileAny = currentProfile as any;
+		if (currentProfileAny.role && ['super_admin', 'org_admin'].includes(currentProfileAny.role)) {
 			// Count other admins in organization
 			const { count: adminCount } = await supabase
 				.from('profiles')
 				.select('*', { count: 'exact', head: true })
-				.eq('org_id', currentProfile.org_id || '')
+				.eq('org_id', currentProfileAny.org_id || '')
 				.in('role', ['super_admin', 'org_admin'])
 				.neq('id', user.id);
 

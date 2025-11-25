@@ -42,8 +42,10 @@ export const load = async ({ locals: { supabase, session, org_id, user }, url })
                 template_elements
             `
 		)
-		.eq('org_id', org_id)
+		.eq('org_id', org_id!)
 		.order('created_at', { ascending: false });
+
+	const templatesData = (templates.data as any[]) || [];
 
 	if (templates.error) {
 		console.error('Error fetching templates:', templates.error);
@@ -53,7 +55,7 @@ export const load = async ({ locals: { supabase, session, org_id, user }, url })
 	// console.log('Templates:', templates.data);
 
 	return {
-		templates: templates.data,
+		templates: templatesData,
 		selectedTemplate,
 		user,
 		org_id
@@ -107,7 +109,7 @@ export const actions = {
 			let data, dbError;
 			({ data, error: dbError } = await supabase
 				.from('templates')
-				.upsert(payload, { onConflict: 'id' })
+				.upsert(payload as any, { onConflict: 'id' })
 				.select('*')
 				.single());
 
@@ -120,11 +122,15 @@ export const actions = {
 				throw error(500, 'No data returned from database');
 			}
 
+			const dataAny = data as any;
+
 			console.log('✅ Server: Template saved successfully:', {
-				id: data.id,
-				name: data.name,
-				org_id: data.org_id,
-				elementsCount: Array.isArray(data.template_elements) ? data.template_elements.length : 0,
+				id: dataAny.id,
+				name: dataAny.name,
+				org_id: dataAny.org_id,
+				elementsCount: Array.isArray(dataAny.template_elements)
+					? dataAny.template_elements.length
+					: 0,
 				action: payload.id ? 'updated' : 'created'
 			});
 
@@ -158,7 +164,7 @@ export const actions = {
 			console.log('🗑️ Server: Processing template delete:', { templateId });
 
 			// First, update ID cards that use this template
-			const { error: updateError } = await supabase
+			const { error: updateError } = await (supabase as any)
 				.from('idcards')
 				.update({ template_id: null })
 				.eq('template_id', templateId);
@@ -169,7 +175,7 @@ export const actions = {
 			}
 
 			// Then delete the template, ensuring it belongs to the user
-			const { error: deleteError } = await supabase
+			const { error: deleteError } = await (supabase as any)
 				.from('templates')
 				.delete()
 				.match({ id: templateId })
@@ -207,7 +213,7 @@ export const actions = {
 		}
 
 		try {
-			const { data: template, error: templateError } = await supabase
+			const { data: templateData, error: templateError } = await supabase
 				.from('templates')
 				.select('*')
 				.eq('id', templateId)
@@ -218,27 +224,29 @@ export const actions = {
 				return fail(500, { message: 'Failed to fetch template' });
 			}
 
-			if (!template) {
+			if (!templateData) {
 				return fail(404, { message: 'Template not found' });
 			}
+
+			const t = templateData as any;
 
 			// Return a properly structured form action response
 			return {
 				type: 'success',
 				data: {
-					id: template.id,
-					user_id: template.user_id,
-					name: template.name,
-					width_pixels: template.width_pixels,
-					height_pixels: template.height_pixels,
-					dpi: template.dpi,
-					front_background: template.front_background,
-					back_background: template.back_background,
-					orientation: template.orientation,
-					created_at: template.created_at,
-					updated_at: template.updated_at,
-					template_elements: template.template_elements,
-					org_id: template.org_id
+					id: t.id,
+					user_id: t.user_id,
+					name: t.name,
+					width_pixels: t.width_pixels,
+					height_pixels: t.height_pixels,
+					dpi: t.dpi,
+					front_background: t.front_background,
+					back_background: t.back_background,
+					orientation: t.orientation,
+					created_at: t.created_at,
+					updated_at: t.updated_at,
+					template_elements: t.template_elements,
+					org_id: t.org_id
 				}
 			};
 		} catch (err) {

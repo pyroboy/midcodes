@@ -52,7 +52,7 @@ describe('Template Creation Supabase Integration Tests', () => {
     async function insertTemplate(templateData: TemplateCreationData) {
         return await supabase
             .from('templates')
-            .insert(templateData)
+            .insert(templateData as any)
             .select()
             .single();
     }
@@ -114,22 +114,29 @@ describe('Template Creation Supabase Integration Tests', () => {
                     // Schema validation passed, which is what we're primarily testing
                     expect(validation.success).toBe(true);
                 } else {
-                    // Step 5: Verify successful insertion
-                    expect(insertResult.data).toBeDefined();
-                    expect(insertResult.data.id).toBe(validatedData.id);
-                    expect(insertResult.data.name).toBe(validatedData.name);
+                    const resultData = insertResult.data as any;
+                    expect(insertResult.error).toBeNull();
+                    expect(resultData).toBeDefined();
+                    expect(resultData.id).toBe(validatedData.id);
+                    expect(resultData.name).toBe(validatedData.name);
                     
-if (validatedData.id) {
+                    if (validatedData.id) {
                         createdTemplateIds.push(validatedData.id);
                     }
 
-// Step 6: Verify data can be retrieved
+                    // Step 6: Verify data can be retrieved
                     if (validatedData.id) {
-                        const selectResult = await selectTemplate(validatedData.id, TEST_ORG_ID);
-                        if (!selectResult.error) {
-                            expect(selectResult.data.id).toBe(validatedData.id);
-                            expect(selectResult.data.org_id).toBe(TEST_ORG_ID);
-                        }
+                        const selectResult = await supabase
+                            .from('templates')
+                            .select('*')
+                            .eq('id', validatedData.id)
+                            .single();
+
+                        const selectResultData = selectResult.data as any;
+                        expect(selectResult.error).toBeNull();
+                        expect(selectResultData).toBeDefined();
+                        expect(selectResultData.id).toBe(validatedData.id);
+                        expect(selectResultData.org_id).toBe(TEST_ORG_ID);
                     }
                 }
             } catch (error) {

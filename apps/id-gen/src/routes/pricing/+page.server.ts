@@ -6,12 +6,13 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	// Check if payments are enabled for this organization
 	if (org_id) {
-		const { data: settings } = await supabase
+		const { data: settingsData } = await supabase
 			.from('org_settings')
 			.select('payments_enabled')
 			.eq('org_id', org_id)
 			.single();
 
+		const settings = settingsData as any;
 		paymentsEnabled = settings?.payments_enabled ?? true;
 	}
 

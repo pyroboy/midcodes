@@ -15,9 +15,9 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 		// Get organization stats
 		const [
 			{ count: totalCards },
-			{ data: users, error: usersError },
-			{ data: templates, error: templatesError },
-			{ data: recentCards, error: recentCardsError }
+			{ data: usersData, error: usersError },
+			{ data: templatesData, error: templatesError },
+			{ data: recentCardsData, error: recentCardsError }
 		] = await Promise.all([
 			// Total cards count
 			supabase.from('idcards').select('*', { count: 'exact', head: true }).eq('org_id', org_id),
@@ -55,6 +55,11 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 		if (recentCardsError) {
 			console.error('Error fetching recent cards:', recentCardsError);
 		}
+
+		// Cast query results to flexible types for dashboard computations
+		const users = usersData as any[] | null;
+		const templates = templatesData as any[] | null;
+		const recentCards = recentCardsData as any[] | null;
 
 		// Calculate new cards this month
 		const thisMonth = new Date();
@@ -149,11 +154,10 @@ export const actions: Actions = {
 			}
 
 			// Update user role
-			const { error: updateError } = await supabase
-				.from('profiles')
-				.update({ role: newRole, updated_at: new Date().toISOString() })
+			const { error: updateError } = await (supabase.from('profiles') as any)
+				.update({ role: newRole, updated_at: new Date().toISOString() } as any)
 				.eq('id', userId)
-				.eq('org_id', org_id); // Ensure user belongs to same org
+				.eq('org_id', org_id!); // Ensure user belongs to same org
 
 			if (updateError) {
 				console.error('Error updating user role:', updateError);
@@ -196,11 +200,10 @@ export const actions: Actions = {
 			}
 
 			// Delete user profile (this should cascade to related data)
-			const { error: deleteError } = await supabase
-				.from('profiles')
+			const { error: deleteError } = await (supabase.from('profiles') as any)
 				.delete()
 				.eq('id', userId)
-				.eq('org_id', org_id); // Ensure user belongs to same org
+				.eq('org_id', org_id!); // Ensure user belongs to same org
 
 			if (deleteError) {
 				console.error('Error deleting user:', deleteError);

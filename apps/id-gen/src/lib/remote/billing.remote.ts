@@ -30,6 +30,7 @@ async function requireSuperAdminPermissions() {
 
 export const getBillingSettings = query(async (): Promise<any> => {
 	const { supabase, org_id } = await requireSuperAdminPermissions();
+	if (!org_id) throw error(500, 'Org ID missing');
 
 	// Ensure a row exists (idempotent)
 	const { data: settings, error: fetchError } = await supabase
@@ -41,7 +42,7 @@ export const getBillingSettings = query(async (): Promise<any> => {
 	if (fetchError?.code === 'PGRST116') {
 		const { data: inserted, error: insertError } = await supabase
 			.from('org_settings')
-			.insert({ org_id, payments_enabled: true, payments_bypass: false })
+			.insert({ org_id, payments_enabled: true, payments_bypass: false } as any)
 			.select('payments_enabled, payments_bypass, updated_at, updated_by')
 			.single();
 		if (insertError) throw error(500, 'Failed to initialize org settings');
@@ -61,18 +62,18 @@ const toggleSchema = z.object({
 
 export const togglePayments = command('unchecked', async ({ enabled, keyword }: any) => {
 	const { user, supabase, org_id } = await requireSuperAdminPermissions();
+	if (!org_id) throw error(500, 'Org ID missing');
 
 	if (keyword !== 'TOGGLE_PAYMENTS') {
 		throw error(400, 'Keyword confirmation failed. Type TOGGLE_PAYMENTS to proceed.');
 	}
 
-	const { error: updateError } = await supabase
-		.from('org_settings')
+	const { error: updateError } = await (supabase.from('org_settings') as any)
 		.update({
 			payments_enabled: enabled,
-			updated_by: user.id,
+			updated_by: user?.id ?? null,
 			updated_at: new Date().toISOString()
-		})
+		} as any)
 		.eq('org_id', org_id);
 
 	if (updateError) throw error(500, 'Failed to update payments flag');
@@ -85,10 +86,10 @@ const bypassSchema = z.object({ bypass: z.boolean() });
 
 export const setPaymentsBypass = command('unchecked', async ({ bypass }: any) => {
 	const { user, supabase, org_id } = await requireSuperAdminPermissions();
+	if (!org_id) throw error(500, 'Org ID missing');
 
-	const { error: updateError } = await supabase
-		.from('org_settings')
-		.update({ payments_bypass: bypass, updated_by: user.id, updated_at: new Date().toISOString() })
+	const { error: updateError } = await (supabase.from('org_settings') as any)
+		.update({ payments_bypass: bypass, updated_by: user.id, updated_at: new Date().toISOString() } as any)
 		.eq('org_id', org_id);
 
 	if (updateError) throw error(500, 'Failed to update bypass flag');
@@ -99,6 +100,7 @@ export const setPaymentsBypass = command('unchecked', async ({ bypass }: any) =>
 
 export const getUsersWithCredits = query(async (): Promise<any[]> => {
 	const { supabase, org_id } = await requireSuperAdminPermissions();
+	if (!org_id) throw error(500, 'Org ID missing');
 
 	const { data, error: usersError } = await supabase
 		.from('profiles')
@@ -120,6 +122,7 @@ const adjustCreditsSchema = z.object({
 
 export const adjustUserCredits = command('unchecked', async ({ userId, delta, reason }: any) => {
 	const { supabase, org_id } = await requireSuperAdminPermissions();
+	if (!org_id) throw error(500, 'Org ID missing');
 
 	// Fetch current
 	const { data: profile, error: fetchError } = await supabase
@@ -131,12 +134,12 @@ export const adjustUserCredits = command('unchecked', async ({ userId, delta, re
 
 	if (fetchError) throw error(404, 'User not found');
 
-	const before = profile.credits_balance || 0;
+	const profileData = profile as { credits_balance?: number };
+	const before = profileData.credits_balance || 0;
 	const after = Math.max(0, before + delta);
 
-	const { error: updateError } = await supabase
-		.from('profiles')
-		.update({ credits_balance: after, updated_at: new Date().toISOString() })
+	const { error: updateError } = await (supabase.from('profiles') as any)
+		.update({ credits_balance: after, updated_at: new Date().toISOString() } as any)
 		.eq('id', userId)
 		.eq('org_id', org_id);
 
@@ -155,7 +158,7 @@ export const adjustUserCredits = command('unchecked', async ({ userId, delta, re
 		description,
 		reference_id: null,
 		metadata: { adjusted_by: 'super_admin' }
-	});
+	} as any);
 
 	if (txError) {
 		// Not fatal to user balance, but log for audit

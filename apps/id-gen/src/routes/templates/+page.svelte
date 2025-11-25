@@ -55,7 +55,9 @@ import { imageCache } from '$lib/utils/imageCache';
 	}
 
 	// data means get data from server
-	let { data } = $props();
+	let { data }: {
+		data: { templates: DatabaseTemplate[]; selectedTemplate?: any; user: any; org_id: string };
+	} = $props();
 
 	let templates = $state<DatabaseTemplate[]>(data.templates);
 

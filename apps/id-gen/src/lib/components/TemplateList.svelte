@@ -289,11 +289,11 @@
 						<div class="absolute inset-[1px] border border-white/10 rounded-xl pointer-events-none"></div>
 
 						<!-- Action buttons -->
-						<div class="absolute right-2 top-2 flex gap-1 bg-white/80 dark:bg-gray-800/80 backdrop-blur-xs rounded-md p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+						<div class="absolute right-2 top-2 flex gap-1 bg-background/80 backdrop-blur-xs rounded-md p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
 							<Button
 								variant="ghost"
 								size="sm"
-								class="h-8 w-8 p-0 hover:bg-gray-200 dark:hover:bg-gray-700 text-foreground dark:text-gray-200"
+								class="h-8 w-8 p-0 hover:bg-accent hover:text-accent-foreground text-foreground"
 								onclick={(e) => handleActionClick(e, template, 'edit')}
 								aria-label={`Edit ${template.name}`}
 							>
@@ -302,7 +302,7 @@
 							<Button
 								variant="ghost"
 								size="sm"
-								class="h-8 w-8 p-0 hover:bg-gray-200 dark:hover:bg-gray-700 text-foreground dark:text-gray-200"
+								class="h-8 w-8 p-0 hover:bg-accent hover:text-accent-foreground text-foreground"
 								onclick={(e) => handleActionClick(e, template, 'duplicate')}
 								aria-label={`Duplicate ${template.name}`}
 							>
@@ -311,7 +311,7 @@
 							<Button
 								variant="ghost"
 								size="sm"
-								class="h-8 w-8 p-0 hover:bg-gray-200 dark:hover:bg-gray-700 text-foreground dark:text-gray-200"
+								class="h-8 w-8 p-0 hover:bg-accent hover:text-accent-foreground text-foreground"
 								onclick={(e) => handleActionClick(e, template, 'delete')}
 								aria-label={`Delete ${template.name}`}
 							>

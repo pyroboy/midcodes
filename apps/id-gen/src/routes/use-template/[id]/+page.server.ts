@@ -18,11 +18,13 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	console.log(' [Use Template] Loading template:', { templateId });
 
 	// Fetch the template with organization info
-	const { data: template, error: templateError } = await supabase
+	const { data: templateData, error: templateError } = await supabase
 		.from('templates')
 		.select('*, organizations(*)')
 		.eq('id', templateId)
 		.single();
+
+	const template = templateData as any;
 
 	console.log(' [Use Template] Template query result:', {
 		hasTemplate: !!template,
@@ -69,11 +71,13 @@ export const actions: Actions = {
 			}
 
 			// Verify template access
-			const { data: template, error: templateError } = await supabase
+			const { data: templateData, error: templateError } = await supabase
 				.from('templates')
 				.select('org_id, organizations(*), template_elements')
 				.eq('id', templateId)
 				.single();
+
+			const template = templateData as any;
 
 			console.log('[Save ID Card] Template lookup:', {
 				found: !!template,

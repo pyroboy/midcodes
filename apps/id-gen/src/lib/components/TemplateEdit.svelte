@@ -50,7 +50,7 @@ let {
 	<div class="back-button-container">
 		<button
 			onclick={onBack}
-			class="back-button inline-flex items-center text-lg dark:text-gray-300 text-gray-700 hover:text-primary dark:hover:text-primary-400"
+			class="back-button inline-flex items-center text-lg text-muted-foreground hover:text-primary transition-colors"
 		>
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
@@ -103,21 +103,21 @@ let {
 			<div class="animate-pulse space-y-8">
 				<!-- Skeleton for front template form -->
 				<div class="space-y-4">
-					<div class="h-8 bg-gray-200 rounded w-1/4"></div>
-					<div class="h-64 bg-gray-200 rounded"></div>
+					<div class="h-8 bg-muted rounded w-1/4"></div>
+					<div class="h-64 bg-muted rounded"></div>
 					<div class="space-y-2">
-						<div class="h-4 bg-gray-200 rounded w-1/3"></div>
-						<div class="h-4 bg-gray-200 rounded w-1/4"></div>
+						<div class="h-4 bg-muted rounded w-1/3"></div>
+						<div class="h-4 bg-muted rounded w-1/4"></div>
 					</div>
 				</div>
 
 				<!-- Skeleton for back template form -->
 				<div class="space-y-4">
-					<div class="h-8 bg-gray-200 rounded w-1/4"></div>
-					<div class="h-64 bg-gray-200 rounded"></div>
+					<div class="h-8 bg-muted rounded w-1/4"></div>
+					<div class="h-64 bg-muted rounded"></div>
 					<div class="space-y-2">
-						<div class="h-4 bg-gray-200 rounded w-1/3"></div>
-						<div class="h-4 bg-gray-200 rounded w-1/4"></div>
+						<div class="h-4 bg-muted rounded w-1/3"></div>
+						<div class="h-4 bg-muted rounded w-1/4"></div>
 					</div>
 				</div>
 			</div>
@@ -165,13 +165,13 @@ let {
 			<div class="mt-6 flex gap-4">
 				<button
 					onclick={onSave}
-					class="inline-flex justify-center rounded-md border-0 bg-blue-600 dark:bg-blue-500 px-4 py-2 text-sm font-medium text-white shadow-md hover:bg-blue-700 dark:hover:bg-blue-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 dark:focus:ring-blue-400 transition-colors duration-200 dark:shadow-blue-900/30"
+					class="inline-flex justify-center rounded-md border-0 bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-md hover:bg-primary/90 focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors duration-200"
 				>
 					Save Template
 				</button>
 				<button
 					onclick={onClear}
-					class="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-xs hover:bg-gray-50 focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-offset-2"
+					class="inline-flex justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground shadow-xs hover:bg-accent hover:text-accent-foreground focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2"
 				>
 					Clear Form
 				</button>

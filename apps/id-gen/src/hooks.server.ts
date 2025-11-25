@@ -42,7 +42,7 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
 				}
 			}
 		}
-	});
+	}) as any;
 
 	event.locals.safeGetSession = async () => {
 		// Parallel fetch of user and session data

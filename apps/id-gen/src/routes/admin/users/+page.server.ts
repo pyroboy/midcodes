@@ -16,7 +16,7 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 		const { data: users, error: usersError } = await supabase
 			.from('profiles')
 			.select('id, email, role, created_at, updated_at')
-			.eq('org_id', org_id)
+			.eq('org_id', org_id!)
 			.order('created_at', { ascending: false });
 
 		if (usersError) {
@@ -70,7 +70,7 @@ export const actions: Actions = {
 				.from('profiles')
 				.select('id')
 				.eq('email', email)
-				.eq('org_id', org_id)
+				.eq('org_id', org_id!)
 				.single();
 
 			if (checkError && checkError.code !== 'PGRST116') {
@@ -103,11 +103,11 @@ export const actions: Actions = {
 			const { error: profileError } = await supabase.from('profiles').insert({
 				id: authUser.user.id,
 				email,
-				role,
+				role: role as any,
 				org_id,
 				created_at: new Date().toISOString(),
 				updated_at: new Date().toISOString()
-			});
+			} as any);
 
 			if (profileError) {
 				console.error('Error creating profile:', profileError);
@@ -128,7 +128,7 @@ export const actions: Actions = {
 			const { data: updatedUsers, error: fetchError } = await supabase
 				.from('profiles')
 				.select('id, email, role, created_at, updated_at')
-				.eq('org_id', org_id)
+				.eq('org_id', org_id!)
 				.order('created_at', { ascending: false });
 
 			if (fetchError) {
@@ -174,17 +174,19 @@ export const actions: Actions = {
 			}
 
 			// Get current user to check permissions
-			const { data: targetUser, error: fetchError } = await supabase
+			const { data: targetUserData, error: fetchError } = await supabase
 				.from('profiles')
 				.select('role')
 				.eq('id', userId)
-				.eq('org_id', org_id)
+				.eq('org_id', org_id!)
 				.single();
 
 			if (fetchError) {
 				console.error('Error fetching target user:', fetchError);
 				return fail(500, { error: 'Failed to find user' });
 			}
+
+			const targetUser = targetUserData as any;
 
 			// Only super_admin can modify super_admin roles
 			if (targetUser.role === 'super_admin' && user.role !== 'super_admin') {
@@ -197,14 +199,14 @@ export const actions: Actions = {
 			}
 
 			// Update user role
-			const { error: updateError } = await supabase
+			const { error: updateError } = await (supabase as any)
 				.from('profiles')
 				.update({
 					role: newRole,
 					updated_at: new Date().toISOString()
 				})
 				.eq('id', userId)
-				.eq('org_id', org_id);
+				.eq('org_id', org_id!);
 
 			if (updateError) {
 				console.error('Error updating user role:', updateError);
@@ -215,7 +217,7 @@ export const actions: Actions = {
 			const { data: updatedUsers, error: fetchUsersError } = await supabase
 				.from('profiles')
 				.select('id, email, role, created_at, updated_at')
-				.eq('org_id', org_id)
+				.eq('org_id', org_id!)
 				.order('created_at', { ascending: false });
 
 			if (fetchUsersError) {
@@ -254,14 +256,16 @@ export const actions: Actions = {
 			}
 
 			// Get target user details
-			const { data: targetUser, error: fetchError } = await supabase
+			const { data: targetUserData, error: fetchError } = await supabase
 				.from('profiles')
 				.select('role, email')
 				.eq('id', userId)
-				.eq('org_id', org_id)
+				.eq('org_id', org_id!)
 				.single();
 
-			if (fetchError) {
+			const targetUser = targetUserData as any;
+
+			if (fetchError || !targetUser) {
 				console.error('Error fetching target user:', fetchError);
 				return fail(500, { error: 'Failed to find user' });
 			}
@@ -271,7 +275,7 @@ export const actions: Actions = {
 				const { count: adminCount } = await supabase
 					.from('profiles')
 					.select('*', { count: 'exact', head: true })
-					.eq('org_id', org_id)
+					.eq('org_id', org_id!)
 					.in('role', ['super_admin', 'org_admin'])
 					.neq('id', userId);
 
@@ -287,7 +291,7 @@ export const actions: Actions = {
 				.from('profiles')
 				.delete()
 				.eq('id', userId)
-				.eq('org_id', org_id);
+				.eq('org_id', org_id!);
 
 			if (deleteError) {
 				console.error('Error deleting profile:', deleteError);
@@ -305,13 +309,13 @@ export const actions: Actions = {
 			const { data: updatedUsers, error: fetchUsersError } = await supabase
 				.from('profiles')
 				.select('id, email, role, created_at, updated_at')
-				.eq('org_id', org_id)
+				.eq('org_id', org_id!)
 				.order('created_at', { ascending: false });
 
 			if (fetchUsersError) {
 				console.error('Error fetching updated users:', fetchUsersError);
 			}
-
+				
 			return {
 				success: true,
 				message: `User ${targetUser.email} deleted successfully`,

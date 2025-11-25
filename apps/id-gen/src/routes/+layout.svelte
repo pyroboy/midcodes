@@ -55,7 +55,7 @@
 	/>
 </svelte:head>
 
-<div class="min-h-screen bg-gray-50 dark:bg-gray-950">
+<div class="min-h-screen">
 	{#if data.user}
 		<!-- Mobile Header -->
 		<MobileHeader user={data.user} onMenuToggle={toggleMenu} class="lg:hidden" />

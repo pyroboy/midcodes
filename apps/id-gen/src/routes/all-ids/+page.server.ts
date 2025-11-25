@@ -50,7 +50,7 @@ export const load = (async ({ locals }) => {
 		org_id: org_id,
 		page_limit: null,
 		page_offset: 0
-	});
+	} as any);
 
 	if (fetchError) throw error(500, fetchError.message);
 	if (!data) throw error(404, 'No ID cards found');
@@ -83,7 +83,8 @@ export const load = (async ({ locals }) => {
 	const templateDimensions: Record<string, { width: number; height: number; unit: string }> = {};
 
 	if (templates) {
-		templates.forEach((template) => {
+		const safeTemplates = templates as any[];
+		safeTemplates.forEach((template: any) => {
 			templateDimensions[template.name] = {
 				width: template.width_pixels || 1013,
 				height: template.height_pixels || 638,
@@ -110,7 +111,7 @@ export const actions: Actions = {
 
 		try {
 			// First get the card details to get the image paths
-			const { data: card, error: fetchError } = await supabase
+			const { data: cardData, error: fetchError } = await supabase
 				.from('idcards')
 				.select('front_image, back_image')
 				.eq('id', cardId)
@@ -120,6 +121,8 @@ export const actions: Actions = {
 				console.error('Error fetching card:', fetchError);
 				return fail(500, { error: 'Failed to fetch card details' });
 			}
+
+			const card = cardData as any;
 
 			// Delete images from storage if they exist
 			const imagesToDelete = [];
@@ -167,7 +170,7 @@ export const actions: Actions = {
 			}
 
 			// First get all cards to get their image paths
-			const { data: cards, error: fetchError } = await supabase
+			const { data: cardsData, error: fetchError } = await supabase
 				.from('idcards')
 				.select('id, front_image, back_image')
 				.in('id', ids);
@@ -176,6 +179,8 @@ export const actions: Actions = {
 				console.error('Error fetching cards:', fetchError);
 				return fail(500, { error: 'Failed to fetch card details' });
 			}
+
+			const cards = cardsData as any[] | null;
 
 			// Collect all image paths to delete
 			const imagesToDelete = [];

@@ -56,7 +56,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 			.eq('user_id', user.id);
 
 		// Extract preferences from context
-		const preferences = profile.context?.preferences || {
+		const profileData = profile as any;
+		const preferences = profileData.context?.preferences || {
 			darkMode: false,
 			emailNotifications: true,
 			adminNotifications: true,
@@ -65,11 +66,11 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 		return {
 			profile: {
-				id: profile.id,
-				email: profile.email,
-				role: profile.role,
-				created_at: profile.created_at,
-				updated_at: profile.updated_at
+				id: profileData.id,
+				email: profileData.email,
+				role: profileData.role,
+				created_at: profileData.created_at,
+				updated_at: profileData.updated_at
 			},
 			organization,
 			preferences,
@@ -99,7 +100,7 @@ export const actions: Actions = {
 			// Email updates should go through proper email verification flow
 
 			// Update timestamp
-			const { error: updateError } = await supabase
+			const { error: updateError } = await (supabase as any)
 				.from('profiles')
 				.update({
 					updated_at: new Date().toISOString()
@@ -151,8 +152,9 @@ export const actions: Actions = {
 			}
 
 			// Update preferences in context
+			const currentProfileData = currentProfile as any;
 			const updatedContext = {
-				...currentProfile.context,
+				...currentProfileData.context,
 				preferences: {
 					darkMode,
 					emailNotifications,
@@ -161,7 +163,7 @@ export const actions: Actions = {
 				}
 			};
 
-			const { error: updateError } = await supabase
+			const { error: updateError } = await (supabase as any)
 				.from('profiles')
 				.update({
 					context: updatedContext,
@@ -273,18 +275,20 @@ export const actions: Actions = {
 			}
 
 			// Create export data
+			const profileData = profile as any;
+			const idCardsData = idCards as any[];
 			const exportData = {
 				exportDate: new Date().toISOString(),
 				profile: {
-					id: profile.id,
-					email: profile.email,
-					role: profile.role,
-					created_at: profile.created_at,
-					updated_at: profile.updated_at,
-					preferences: profile.context?.preferences || {}
+					id: profileData.id,
+					email: profileData.email,
+					role: profileData.role,
+					created_at: profileData.created_at,
+					updated_at: profileData.updated_at,
+					preferences: profileData.context?.preferences || {}
 				},
 				idCards:
-					idCards?.map((card) => ({
+					idCardsData?.map((card) => ({
 						id: card.id,
 						template_id: card.template_id,
 						created_at: card.created_at,
@@ -334,12 +338,13 @@ export const actions: Actions = {
 			// that includes email verification and a grace period
 
 			// Check if user has admin role - prevent deletion of last admin
-			if (profile.role && ['super_admin', 'org_admin'].includes(profile.role)) {
+			const profileData = profile as any;
+			if (profileData.role && ['super_admin', 'org_admin'].includes(profileData.role)) {
 				// Count other admins in organization
 				const { count: adminCount } = await supabase
 					.from('profiles')
 					.select('*', { count: 'exact', head: true })
-					.eq('org_id', profile.org_id || org_id || '')
+					.eq('org_id', profileData.org_id || org_id || '')
 					.in('role', ['super_admin', 'org_admin'])
 					.neq('id', user.id);
 
