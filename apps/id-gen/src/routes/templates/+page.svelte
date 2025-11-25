@@ -119,6 +119,14 @@ import { imageCache } from '$lib/utils/imageCache';
 		};
 	}>({});
 
+	// NEW: Auto-load from URL data
+	$effect(() => {
+		// If server provided a template (via ?id=...) AND we haven't loaded it yet
+		if (data.selectedTemplate && currentTemplate?.id !== data.selectedTemplate.id) {
+			initializeEditor(data.selectedTemplate);
+		}
+	});
+
 	/**
 	 * Find the best default size for legacy templates by analyzing existing templates
 	 * or falling back to a reasonable standard size
@@ -606,14 +614,21 @@ import { imageCache } from '$lib/utils/imageCache';
 			frontPreview = imageCache.resolve(frontKey);
 			backPreview = imageCache.resolve(backKey);
 			
-			// Use the just-sent elements as source of truth to avoid stale server echoes
+			// Use the just-sent elements as source of truth
 			savedTemplate.template_elements = allElements;
 
-			// Build safe values for name and element count
+			// Build safe values
 			const safeName: string = typeof savedTemplate.name === 'string' ? savedTemplate.name : (currentTemplate?.name ?? 'Untitled Template');
 			const elementsCount: number = Array.isArray(savedTemplate.template_elements)
 				? savedTemplate.template_elements.length
 				: (Array.isArray(allElements) ? allElements.length : 0);
+			
+			// --- FIX START --- 
+			// Explicitly grab dimensions from our local state to ensure preview aspect ratio is correct immediately
+			const safeWidth = savedTemplate.width_pixels || requiredPixelDimensions?.width || LEGACY_CARD_SIZE.width;
+			const safeHeight = savedTemplate.height_pixels || requiredPixelDimensions?.height || LEGACY_CARD_SIZE.height;
+			const safeDpi = savedTemplate.dpi || 300;
+			// --- FIX END ---
 			
 			// Debug the saved template structure
 			console.log('✅ Template data received:', {
@@ -660,21 +675,33 @@ import { imageCache } from '$lib/utils/imageCache';
 			});
 
 			// Normalize data we pass to list — prefer the preview URLs we just set
-			// Prefer the known uploaded URLs for the list as well
-			const listFront = (typeof frontUrl === 'string' && frontUrl.startsWith('http'))
-				? `${frontUrl}?t=${Date.now()}`
-				: (frontPreview ?? makePublicUrl(savedTemplate.front_background));
-			const listBack = (typeof backUrl === 'string' && backUrl.startsWith('http'))
-				? `${backUrl}?t=${Date.now()}`
-				: (backPreview ?? makePublicUrl(savedTemplate.back_background));
-			const normalizedForList = {
-				...savedTemplate,
-				id: savedTemplate.id as string,
-				name: safeName,
-				front_background: listFront ?? '',
-				back_background: listBack ?? '',
-				template_elements: allElements
-			};
+		// Prefer the known uploaded URLs for the list as well
+		const listFront = (typeof frontUrl === 'string' && frontUrl.startsWith('http'))
+			? `${frontUrl}?t=${Date.now()}`
+			: (frontPreview ?? makePublicUrl(savedTemplate.front_background));
+		const listBack = (typeof backUrl === 'string' && backUrl.startsWith('http'))
+			? `${backUrl}?t=${Date.now()}`
+			: (backPreview ?? makePublicUrl(savedTemplate.back_background));
+		
+		// --- FIX START: Force dimensions into list object ---
+		const currentWidth = requiredPixelDimensions?.width || savedTemplate.width_pixels || LEGACY_CARD_SIZE.width;
+		const currentHeight = requiredPixelDimensions?.height || savedTemplate.height_pixels || LEGACY_CARD_SIZE.height;
+
+		const normalizedForList = {
+			...savedTemplate,
+			id: savedTemplate.id as string,
+			name: safeName,
+			// Ensure we use the stable URLs
+			front_background: listFront ?? '',
+			back_background: listBack ?? '',
+			template_elements: allElements,
+			// CRITICAL: Explicitly set dimensions from local state so the list preview isn't a square
+			width_pixels: Number(currentWidth),
+			height_pixels: Number(currentHeight),
+			orientation: currentWidth >= currentHeight ? 'landscape' : 'portrait',
+			dpi: savedTemplate.dpi || 300
+		};
+		// --- FIX END ---
 
 			console.log('📦 List normalization:', {
 				savedFront: savedTemplate.front_background,
@@ -1101,59 +1128,88 @@ async function handleImageUpload(files: File[], side: 'front' | 'back') {
 		}
 	}
 
+	// NEW: Centralized initialization function
+	function initializeEditor(templateData: DatabaseTemplate) {
+		console.log('🚀 Initializing Editor with:', templateData.name);
+		
+		// A. Enable Edit Mode
+		isEditMode = true;
+		currentTemplate = templateData;
+
+		// B. Setup Previews (Handle both URLs and Storage Paths)
+		// Helper to ensure we have a usable URL
+		const resolveUrl = (pathOrUrl: string | null) => {
+			if (!pathOrUrl) return null;
+			if (pathOrUrl.startsWith('http') || pathOrUrl.startsWith('blob:')) return pathOrUrl;
+			return getSupabaseStorageUrl(pathOrUrl, 'templates');
+		};
+
+		frontPreview = resolveUrl(templateData.front_background);
+		backPreview = resolveUrl(templateData.back_background);
+
+		// C. Sanitize Elements (CRITICAL for Bounding Boxes)
+		const sanitizeElement = (el: TemplateElement) => ({
+			...el,
+			// Ensure width/height are numbers and > 0
+			width: (typeof el.width === 'number' && el.width > 0) ? el.width : 100,
+			height: (typeof el.height === 'number' && el.height > 0) ? el.height : 30,
+			// Ensure coordinates exist
+			x: Number(el.x) || 0,
+			y: Number(el.y) || 0,
+			// Ensure content exists
+			content: el.content || (el.type === 'text' ? 'Text' : '')
+		});
+
+		// Split and Sanitize
+		frontElements = (templateData.template_elements as TemplateElement[])
+			.filter((el) => el.side === 'front')
+			.map(sanitizeElement);
+			
+		backElements = (templateData.template_elements as TemplateElement[])
+			.filter((el) => el.side === 'back')
+			.map(sanitizeElement);
+
+		// D. Set Dimensions
+		if (templateData.width_pixels && templateData.height_pixels) {
+			currentCardSize = {
+				name: templateData.name,
+				width: templateData.width_pixels,
+				height: templateData.height_pixels,
+				unit: 'pixels'
+			};
+			requiredPixelDimensions = {
+				width: templateData.width_pixels,
+				height: templateData.height_pixels
+			};
+		} else {
+			// Legacy fallback
+			const defaultSize = findBestDefaultSize();
+			currentCardSize = defaultSize;
+			requiredPixelDimensions = cardSizeToPixels(defaultSize, 300);
+		}
+
+		// E. Force Editor Refresh
+		editorVersion++;
+		
+		console.log('✅ Editor Initialized. Elements:', {
+			front: frontElements.length,
+			back: backElements.length
+		});
+	}
+
 	async function handleTemplateSelect(id: string) {
 		try {
-			isEditMode = true;
-
-			// Navigate to new URL (this will handle state properly)
+			// 1. Navigate
 			await goto(`/templates?id=${id}`, { replaceState: true });
-			// Ensure fresh editor mount when switching templates
-			editorVersion++;
-
-			if (data.selectedTemplate) {
-				currentTemplate = data.selectedTemplate;
-				// Convert storage paths to full URLs if they're not already URLs
-				frontPreview = data.selectedTemplate.front_background?.startsWith('http') 
-					? data.selectedTemplate.front_background
-					: data.selectedTemplate.front_background 
-						? getSupabaseStorageUrl(data.selectedTemplate.front_background, 'templates')
-						: null;
-				backPreview = data.selectedTemplate.back_background?.startsWith('http')
-					? data.selectedTemplate.back_background
-					: data.selectedTemplate.back_background
-						? getSupabaseStorageUrl(data.selectedTemplate.back_background, 'templates')
-						: null;
-				frontElements = (data.selectedTemplate.template_elements as TemplateElement[]).filter(
-					(el) => el.side === 'front'
-				);
-				backElements = (data.selectedTemplate.template_elements as TemplateElement[]).filter(
-					(el) => el.side === 'back'
-				);
-
-				// Set size data for existing template
-				if (data.selectedTemplate.width_pixels && data.selectedTemplate.height_pixels) {
-					// Template has new size fields
-					currentCardSize = {
-						name: data.selectedTemplate.name,
-						width: data.selectedTemplate.width_pixels,
-						height: data.selectedTemplate.height_pixels,
-						unit: 'pixels'
-					};
-					requiredPixelDimensions = {
-						width: data.selectedTemplate.width_pixels,
-						height: data.selectedTemplate.height_pixels
-					};
-				} else {
-					// Legacy template - try to find the most common size among existing templates,
-					// otherwise fall back to the standard legacy size
-					const defaultSize = findBestDefaultSize();
-					currentCardSize = defaultSize;
-					requiredPixelDimensions = {
-						width: defaultSize.width,
-						height: defaultSize.height
-					};
-					console.log('📏 Using fallback size for legacy template:', defaultSize);
-				}
+			
+			// 2. The navigation updates `data.selectedTemplate` automatically via SvelteKit load functions.
+			//    The $effect we added in Step 2 will detect this change and call initializeEditor.
+			//    HOWEVER, for immediate responsiveness without waiting for network, 
+			//    we can find the template in the list and load it immediately:
+			
+			const selected = templates.find(t => t.id === id);
+			if (selected) {
+				initializeEditor(selected);
 			}
 		} catch (err: unknown) {
 			const error = err instanceof Error ? err : new Error('An unexpected error occurred');

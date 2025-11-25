@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { fade } from 'svelte/transition';
 	import { Button } from '$lib/components/ui/button';
-	import { Copy, Trash2, Edit, Plus, FileText } from '@lucide/svelte';
-	import type { TemplateData } from '../stores/templateStore';
+	import { Copy, Trash2, Edit, Plus, FileText, Image as ImageIcon, Type } from '@lucide/svelte';
+	import type { TemplateData, TemplateElement } from '../stores/templateStore';
 	import { goto } from '$app/navigation';
 	import { invalidate } from '$app/navigation';
 	import SizeSelectionDialog from './SizeSelectionDialog.svelte';
@@ -39,6 +39,21 @@
 		return `${uw.toFixed(precision)}${units} × ${uh.toFixed(precision)}${units}`;
 	}
 
+	// Helper to calculate percentage positions
+	function getElementStyle(el: TemplateElement, templateW: number, templateH: number) {
+		const left = (el.x / templateW) * 100;
+		const top = (el.y / templateH) * 100;
+		const width = (el.width / templateW) * 100;
+		const height = (el.height / templateH) * 100;
+		
+		return `
+			left: ${left}%; 
+			top: ${top}%; 
+			width: ${width}%; 
+			height: ${height}%;
+		`;
+	}
+
 	let selectedTemplate: TemplateData | null = null;
 	let notification: string | null = $state(null);
 	let hoveredTemplate: string | null = $state(null);
@@ -46,22 +61,11 @@
 
 	async function deleteTemplate(template: TemplateData) {
 		try {
-			if (!confirm(`Are you sure you want to delete "${template.name}"?`)) {
-				return;
-			}
-
+			if (!confirm(`Are you sure you want to delete "${template.name}"?`)) return;
 			const formData = new FormData();
 			formData.append('templateId', template.id);
-
-			const response = await fetch('/templates?/delete', {
-				method: 'POST',
-				body: formData
-			});
-
-			if (!response.ok) {
-				throw new Error('Failed to delete template');
-			}
-
+			const response = await fetch('/templates?/delete', { method: 'POST', body: formData });
+			if (!response.ok) throw new Error('Failed to delete template');
 			templates = templates.filter((t) => t.id !== template.id);
 			showNotification('Template deleted successfully');
 		} catch (err) {
@@ -72,34 +76,15 @@
 
 	async function duplicateTemplate(template: TemplateData) {
 		try {
-			if (!template || !template.id) {
-				throw new Error('Invalid template data');
-			}
-
-			const newTemplate = {
-				...template,
-				id: crypto.randomUUID(),
-				name: `Copy of ${template.name}`,
-				created_at: new Date().toISOString(),
-				user_id: template.user_id,
-				org_id: template.org_id
-			};
-
 			const formData = new FormData();
-			formData.append('templateData', JSON.stringify(newTemplate));
-
-			const response = await fetch('/templates?/create', {
-				method: 'POST',
-				body: formData
-			});
-
-			if (!response.ok) {
-				throw new Error('Failed to duplicate template');
-			}
-
+			formData.append('templateId', template.id);
+			const response = await fetch('/templates?/duplicate', { method: 'POST', body: formData });
 			const result = await response.json();
-			templates = [result.data, ...templates];
-			showNotification('Template duplicated successfully');
+			if (result.type === 'failure' || result.status >= 400) throw new Error(result.data?.message || 'Failed to duplicate');
+			const newTemplate = result.data?.data || result.data;
+			if (!newTemplate) throw new Error('Server did not return the new template');
+			templates = [newTemplate, ...templates];
+			showNotification(`Duplicated "${template.name}" successfully`);
 			await invalidate('app:templates');
 		} catch (err) {
 			console.error('Error duplicating template:', err);
@@ -107,50 +92,27 @@
 		}
 	}
 
-	function useTemplate(id: string) {
-		goto(`/use-template/${id}`, { replaceState: false });
-	}
-
-	function showNotification(message: string) {
-		notification = message;
-		setTimeout(() => {
-			notification = null;
-		}, 3000);
-	}
-
-	function selectTemplate(template: TemplateData) {
-		selectedTemplate = template;
-		onSelect(selectedTemplate.id);
-	}
-
-	function handleActionClick(e: Event, template: TemplateData, action: string) {
+	function useTemplate(id: string) { goto(`/use-template/${id}`, { replaceState: false }); }
+	function showNotification(message: string) { notification = message; setTimeout(() => { notification = null; }, 3000); }
+	function selectTemplate(template: TemplateData) { selectedTemplate = template; onSelect(selectedTemplate.id); }
+	
+	function handleActionClick(e: Event, template: TemplateData, action: 'edit' | 'use' | 'duplicate' | 'delete') {
 		e.stopPropagation();
 		switch (action) {
-			case 'edit':
-				selectTemplate(template);
-				break;
-			case 'duplicate':
-				duplicateTemplate(template);
-				break;
-			case 'delete':
-				deleteTemplate(template);
-				break;
+			case 'edit': selectTemplate(template); break;
+			case 'use': useTemplate(template.id); break;
+			case 'duplicate': duplicateTemplate(template); break;
+			case 'delete': deleteTemplate(template); break;
 		}
 	}
 
-	function handleCreateNew() {
-		showSizeDialog = true;
-	}
-
-	function handleSizeSelected(event: any) {
+	function handleCreateNew() { showSizeDialog = true; }
+	function handleSizeSelected(event: CustomEvent<{ cardSize: CardSize; templateName: string }>) {
 		const { cardSize, templateName } = event.detail;
 		showSizeDialog = false;
 		onCreateNew?.(cardSize, templateName);
 	}
-
-	function handleSizeSelectionCancel() {
-		showSizeDialog = false;
-	}
+	function handleSizeSelectionCancel() { showSizeDialog = false; }
 </script>
 
 <div class="h-full w-full overflow-y-auto bg-background p-6">
@@ -164,7 +126,7 @@
 
 	{#if templates.length === 0}
 		<EmptyState
-			icon={FileText}
+			icon={FileText as any}
 			title="No templates yet"
 			description="Create your first ID card template to get started."
 			action={{ label: 'Create Template', onclick: handleCreateNew }}
@@ -176,39 +138,85 @@
 				<div
 					class="group relative flex flex-col bg-card border border-border rounded-xl shadow-sm transition-all duration-300 hover:shadow-md hover:border-primary/50 overflow-hidden h-full"
 					role="article"
+					aria-label={`Template card for ${template.name}`}
 					onmouseenter={() => (hoveredTemplate = template.id)}
 					onmouseleave={() => (hoveredTemplate = null)}
 				>
 					<!-- Aspect Ratio Container -->
 					<div class="relative w-full pt-4 px-4 flex-1 flex items-center justify-center bg-muted/30">
 						<a
-							href="/use-template/{template.id}"
-							class="relative w-full flex items-center justify-center"
-							style="height: 200px;"
-							data-sveltekit-reload="off"
+						href="/use-template/{template.id}"
+						class="relative w-full flex items-center justify-center"
+						style="height: 200px;"
+						data-sveltekit-reload="off"
+					>
+						<div 
+							class="relative shadow-md rounded-lg overflow-hidden bg-white transition-transform duration-300 group-hover:scale-105"
+							style="aspect-ratio: {dims.w} / {dims.h}; width: 100%; max-height: 100%; container-type: size;"
 						>
-							<div 
-								class="relative shadow-md rounded-lg overflow-hidden bg-white transition-transform duration-300 group-hover:scale-105"
-								style="aspect-ratio: {dims.w} / {dims.h}; max-height: 100%; max-width: 100%;"
-							>
-								{#if template.front_background}
+							<!-- 1. Background Image -->
+							{#if template.front_background}
 									<img 
 										src={template.front_background} 
 										alt={template.name} 
 										class="w-full h-full object-cover" 
 										loading="lazy"
 									/>
-								{:else}
+							{:else}
 									<div class="w-full h-full flex items-center justify-center bg-muted text-muted-foreground text-xs">
 										No Preview
 									</div>
-								{/if}
-								
-								<!-- Hover Overlay -->
-								<div class="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-200"></div>
-							</div>
-						</a>
-					</div>
+							{/if}
+
+							<!-- 2. Elements Overlay (Preview) -->
+							{#if template.template_elements && template.template_elements.length > 0}
+								<div class="absolute inset-0 pointer-events-none overflow-hidden">
+									{#each template.template_elements.filter(el => el.side === 'front') as el}
+										<div 
+											class="absolute flex items-center overflow-hidden border border-dashed leading-none select-none"
+											class:justify-center={!el.alignment || el.alignment === 'center'}
+											class:justify-start={el.alignment === 'left'}
+											class:justify-end={el.alignment === 'right'}
+											style="{getElementStyle(el, dims.w, dims.h)}; 
+													background-color: {el.type === 'photo' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(0,0,0,0)'};
+													border-color: rgba(0,0,0,0.1);"
+										>
+											{#if el.type === 'photo'}
+												<ImageIcon class="w-3 h-3 text-blue-500/50" />
+											{:else if el.type === 'text' || el.type === 'selection'}
+												<span 
+													class="truncate px-0.5 block" 
+													style="
+														width: 100%;
+														color: {el.color ?? '#000000'}; 
+														font-family: {el.fontFamily ?? 'Arial'}, sans-serif;
+														font-weight: {el.fontWeight ?? 'normal'};
+														font-style: {el.fontStyle ?? 'normal'};
+														text-decoration: {el.textDecoration ?? 'none'};
+														text-align: {el.alignment ?? 'left'};
+														line-height: {el.lineHeight ?? '1.2'};
+														font-size: {((el.size ?? 16) / dims.w) * 100}cqw;
+													"
+												>
+													{el.content || el.variableName || 'Text'}
+												</span>
+											{:else if el.type === 'qr'}
+												<div class="w-full h-full bg-black/10 flex items-center justify-center">
+													<div class="w-1/2 h-1/2 bg-black/20"></div>
+												</div>
+											{:else if el.type === 'signature'}
+												<span class="text-slate-400 italic" style="font-size: 3cqw;">Signature</span>
+											{/if}
+										</div>
+									{/each}
+								</div>
+							{/if}
+							
+							<!-- Hover Overlay -->
+							<div class="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-200"></div>
+						</div>
+					</a>
+				</div>
 
 					<!-- Footer Info -->
 					<div class="p-4 border-t border-border bg-card z-10">
