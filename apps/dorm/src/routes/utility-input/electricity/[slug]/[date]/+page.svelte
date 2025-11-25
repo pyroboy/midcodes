@@ -135,16 +135,22 @@
 			return;
 		}
 
+		// Check maximum value (matches server-side schema)
+		if (num > 999999999) {
+			fieldErrors[fieldName] = 'Reading too large (max 999,999,999)';
+			return;
+		}
+
 		const baseline = getBaselineReading(meter);
 		if (num < baseline) {
-			fieldErrors[fieldName] = `Must be ≥ ${baseline}`;
+			fieldErrors[fieldName] = `Must be ≥ ${baseline.toLocaleString()}`;
 			return;
 		}
 
 		// Check for unusually high consumption (>500 units above baseline)
 		const consumption = num - baseline;
 		if (consumption > 500) {
-			fieldErrors[fieldName] = `Unusually high consumption (${consumption} units). Please verify the reading.`;
+			fieldErrors[fieldName] = `Unusually high consumption (${consumption.toLocaleString()} units). Please verify the reading.`;
 			return;
 		}
 
@@ -167,9 +173,41 @@
 		return base;
 	}
 
-	// Safe parsing - replace XSS vulnerability
+	// Parse error messages with markdown links
 	function parseErrorMessage(error: string) {
-		return [{type: 'text', content: error}];
+		const parts: Array<{type: 'text' | 'link', content: string, href?: string}> = [];
+		const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+		let lastIndex = 0;
+		let match;
+
+		while ((match = linkRegex.exec(error)) !== null) {
+			// Add text before the link
+			if (match.index > lastIndex) {
+				parts.push({
+					type: 'text',
+					content: error.slice(lastIndex, match.index)
+				});
+			}
+
+			// Add the link
+			parts.push({
+				type: 'link',
+				content: match[1], // Link text
+				href: match[2]      // URL
+			});
+
+			lastIndex = match.index + match[0].length;
+		}
+
+		// Add remaining text
+		if (lastIndex < error.length) {
+			parts.push({
+				type: 'text',
+				content: error.slice(lastIndex)
+			});
+		}
+
+		return parts.length > 0 ? parts : [{type: 'text', content: error}];
 	}
 </script>
 
@@ -242,7 +280,13 @@
 					{#each data.errors as error}
 						<div class="{data.errors.some(e => e.includes('ℹ️ Information:')) && !data.errors.some(e => e.includes('⚠️')) ? 'bg-blue-100 border-l-4 border-blue-500' : data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? 'bg-green-100 border-l-4 border-green-500' : 'bg-red-100 border-l-4 border-red-500'} p-3 rounded">
 							<div class="{data.errors.some(e => e.includes('ℹ️ Information:')) && !data.errors.some(e => e.includes('⚠️')) ? 'text-blue-800' : data.errors.some(e => e.includes('✅ Success!')) && !data.errors.some(e => e.includes('⚠️')) ? 'text-green-800' : 'text-red-800'} text-sm sm:text-base whitespace-pre-line">
-								{error}
+								{#each parseErrorMessage(error) as part}
+									{#if part.type === 'link'}
+										<a href={part.href} class="text-blue-600 hover:text-blue-800 underline font-semibold">{part.content}</a>
+									{:else}
+										{part.content}
+									{/if}
+								{/each}
 							</div>
 						</div>
 					{/each}

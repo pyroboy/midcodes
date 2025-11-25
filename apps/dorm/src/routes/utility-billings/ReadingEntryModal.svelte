@@ -67,9 +67,9 @@
 
 	// Calculate recommended date ranges based on backdating toggle with enhanced constraints
 	let dateConstraints = $derived.by(() => {
-		// Set maximum date to 1 month from now
+		// Set maximum date to at least 31 days from now
 		const maxDate = new Date();
-		maxDate.setMonth(maxDate.getMonth() + 1);
+		maxDate.setDate(maxDate.getDate() + 31);
 
 		// Get all existing reading dates from meter readings
 		const existingReadingDates = new Set<string>();
@@ -114,7 +114,7 @@
 		} else {
 			// When backdating is disabled:
 			// - Min date: Today (no backdating)
-			// - Max date: 1 month from now
+			// - Max date: 31 days from now
 			minDate = new Date();
 			maxDateConstraint = maxDate;
 			suggestion = 'Select today or a recent date';
@@ -350,14 +350,14 @@ const { form, errors, enhance, submitting, message } = superForm(formData, {
 		const currentDate = new Date(selectedDate);
 		const now = new Date();
 
-		// Check if date is too far in the future (now more lenient - 1 month)
-		const oneMonthFromNow = new Date(now);
-		oneMonthFromNow.setMonth(oneMonthFromNow.getMonth() + 1);
+		// Check if date is too far in the future (now more lenient - 31 days)
+		const thirtyOneDaysFromNow = new Date(now);
+		thirtyOneDaysFromNow.setDate(thirtyOneDaysFromNow.getDate() + 31);
 
-		if (currentDate > oneMonthFromNow) {
+		if (currentDate > thirtyOneDaysFromNow) {
 			return {
 				isValid: false,
-				error: 'Reading date cannot be more than 1 month in the future',
+				error: 'Reading date cannot be more than 31 days in the future',
 				level: 'error',
 				icon: '❌'
 			};

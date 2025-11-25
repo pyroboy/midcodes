@@ -55,15 +55,16 @@ export const meterReadingSchema = z
 				(val) => {
 					const date = new Date(val);
 					const now = new Date();
-					// Relaxed future date validation: Allow up to 1 month in future
-					const oneMonthFromNow = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
+					// Relaxed future date validation: Allow at least 31 days in future
+					const thirtyOneDaysFromNow = new Date(now);
+					thirtyOneDaysFromNow.setDate(thirtyOneDaysFromNow.getDate() + 31);
 					// Backdating support: Allow up to 1 year in the past
 					const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
-					return date >= oneYearAgo && date <= oneMonthFromNow;
+					return date >= oneYearAgo && date <= thirtyOneDaysFromNow;
 				},
 				{
 					message:
-						'Reading date must be within the last year and not more than 1 month in the future'
+						'Reading date must be within the last year and not more than 31 days in the future'
 				}
 			),
 		// New field to track if backdating was enabled for audit purposes
@@ -136,11 +137,12 @@ export const batchReadingsSchema = z
 				(val) => {
 					const date = new Date(val + 'T00:00:00'); // Ensure local timezone
 					const now = new Date();
-					// Relaxed future date validation: Allow up to 1 month in future
-					const oneMonthFromNow = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
+					// Relaxed future date validation: Allow at least 31 days in future
+					const thirtyOneDaysFromNow = new Date(now);
+					thirtyOneDaysFromNow.setDate(thirtyOneDaysFromNow.getDate() + 31);
 					// Backdating support: Allow up to 1 year in the past
 					const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
-					const isInRange = date >= oneYearAgo && date <= oneMonthFromNow;
+					const isInRange = date >= oneYearAgo && date <= thirtyOneDaysFromNow;
 					if (!isInRange) {
 						console.error(
 							'Date out of range:',
@@ -150,14 +152,14 @@ export const batchReadingsSchema = z
 							'Range:',
 							oneYearAgo,
 							'to',
-							oneMonthFromNow
+							thirtyOneDaysFromNow
 						);
 					}
 					return isInRange;
 				},
 				{
 					message:
-						'Reading date must be within the last year and not more than 1 month in the future'
+						'Reading date must be within the last year and not more than 31 days in the future'
 				}
 			),
 		rate_at_reading: z.coerce

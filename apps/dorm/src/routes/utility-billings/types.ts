@@ -13,6 +13,7 @@ export interface Reading {
 	previous_reading_date?: string | null; // Date of the previous reading (for UI)
 	days_diff?: number | null; // Days between readings for billing period (for UI)
 	period?: string | null; // Billing period (e.g., "2025-04") (for UI)
+	isMonthEnd?: boolean; // Reading near end of month (day >= 20) - indicates billing period completeness
 	meters?: {
 		id: number;
 		name: string;

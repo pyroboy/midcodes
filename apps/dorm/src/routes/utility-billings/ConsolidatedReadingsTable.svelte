@@ -483,7 +483,14 @@
 						</Table.Cell>
 						<Table.Cell class="font-medium">
 							<div class="text-right">
-								<div>{formatNumber(reading.reading)}</div>
+								<div class="flex items-center justify-end gap-1">
+									<span>{formatNumber(reading.reading)}</span>
+									{#if reading.isMonthEnd}
+										<span class="text-green-600" title="Reading near end of month">✅</span>
+									{:else}
+										<span class="text-gray-400" title="Month in progress">⏳</span>
+									{/if}
+								</div>
 								<div class="text-xs text-muted-foreground">{formatDate(reading.reading_date)}</div>
 							</div>
 						</Table.Cell>

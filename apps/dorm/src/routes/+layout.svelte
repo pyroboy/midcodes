@@ -280,8 +280,8 @@
 			</Sidebar.Provider>
 		{/if}
 
-		<!-- Cache Debug Panel (Development Only) - Visible on all non-auth routes -->
-		{#if dev && !isAuthRoute}
+		<!-- Cache Debug Panel (Development Only) - Visible on all non-auth routes except utility-input -->
+		{#if dev && !isAuthRoute && !$page.url.pathname.startsWith('/utility-input')}
 			<CacheDebugPanel />
 		{/if}
 	{/if}

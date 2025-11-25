@@ -114,7 +114,9 @@ export function processUtilityBillingsData(
 					cost,
 					days_diff: Math.round(daysDiff),
 					// The period is now the current month's key
-					period: currentMonthKey
+					period: currentMonthKey,
+					// Simple completion flag: reading near end of month (day >= 20)
+					isMonthEnd: new Date(curr.reading_date).getDate() >= 20
 				});
 
 				console.log(
