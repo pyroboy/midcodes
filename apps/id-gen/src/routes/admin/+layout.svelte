@@ -2,7 +2,7 @@
 	import type { LayoutData } from './$types';
 
 	interface Props {
-		data: LayoutData;
+		data: LayoutData & { organization?: any };
 		children: any;
 	}
 

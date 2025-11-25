@@ -42,7 +42,7 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
 				}
 			}
 		}
-	});
+	}) as any;
 
 	event.locals.safeGetSession = async () => {
 		// Parallel fetch of user and session data
@@ -140,15 +140,7 @@ const authGuard: Handle = async ({ event, resolve }) => {
 		'Permissions-Policy': 'geolocation=(), microphone=(), camera=()'
 	});
 
-	logger.debug('[Auth Guard] Checking session for path:', event.url.pathname);
 	const sessionInfo = await event.locals.safeGetSession();
-
-	logger.debug('[Auth Guard] Session info', {
-		hasSession: !!sessionInfo.session,
-		hasUser: !!sessionInfo.user,
-		hasOrgId: !!sessionInfo.org_id,
-		permissionsCount: sessionInfo.permissions?.length || 0
-	});
 
 	// Set all info in locals
 	event.locals = {
@@ -159,37 +151,62 @@ const authGuard: Handle = async ({ event, resolve }) => {
 		org_id: sessionInfo.org_id ?? undefined
 	};
 
-	// Handle API routes
-	if (event.url.pathname.startsWith('/api')) {
+	const path = event.url.pathname;
+
+	// 1. Handle API routes first - simple return 401, no redirect loops
+	if (path.startsWith('/api')) {
 		if (!sessionInfo.user) {
-			logger.warn('[Auth Guard] API route unauthorized');
-			throw throwError(401, 'Unauthorized');
+			// Returning Response directly stops SvelteKit from doing anything else
+			return new Response(JSON.stringify({ error: 'Unauthorized' }), { 
+				status: 401,
+				headers: { 'Content-Type': 'application/json' }
+			});
 		}
 		return resolve(event);
 	}
 
-	// Allow access to auth routes when not authenticated
-	if (event.url.pathname.startsWith('/auth')) {
-		logger.debug('[Auth Guard] Auth route access');
-		// If user is already authenticated and trying to access auth routes (except signout),
-		// handle role-based redirects
-		if (sessionInfo.session && event.url.pathname !== '/auth/signout') {
+	// 2. Identify public routes
+	const isAuthRoute = path.startsWith('/auth');
+	const isPublicRoute = 
+		path === '/' || 
+		path.startsWith('/features') || 
+		path.startsWith('/pricing') || 
+		path.startsWith('/contact') ||
+		path.startsWith('/privacy') ||
+		path.startsWith('/terms');
+	
+	// 3. Logic:
+	// If User is Logged In:
+	//   - If trying to access /auth/signin or /auth/signup -> Redirect to dashboard /all-ids
+	//   - If accessing /auth/signout -> Allow
+	//   - Otherwise -> Allow
+
+	if (sessionInfo.session) {
+		if (isAuthRoute && !path.startsWith('/auth/signout')) {
+			// Check for specific returnTo to avoid loops, but default to dashboard
 			const returnTo = event.url.searchParams.get('returnTo');
-			if (returnTo) {
-				logger.debug('[Auth Guard] Redirecting authenticated user', { returnTo });
+			// Prevent redirecting back to auth pages
+			if (returnTo && !returnTo.startsWith('/auth')) {
 				throw redirect(303, returnTo);
 			}
+			throw redirect(303, '/all-ids');
 		}
+		// Allow access to everything else for logged in users
 		return resolve(event);
 	}
 
-	// Require authentication for all other routes
-	if (!sessionInfo.session && !event.url.pathname.startsWith('/auth')) {
-		logger.info('[Auth Guard] No session, redirecting to auth');
-		throw redirect(303, `/auth?returnTo=${event.url.pathname}`);
+	// If User is NOT Logged In:
+	//   - If accessing Public Route -> Allow
+	//   - If accessing Auth Route -> Allow
+	//   - Otherwise -> Redirect to /auth
+
+	if (isAuthRoute || isPublicRoute) {
+		return resolve(event);
 	}
 
-	return resolve(event);
+	// Redirect unauthenticated users to auth page with return URL
+	const returnTo = path === '/' ? '' : `?returnTo=${encodeURIComponent(path)}`;
+	throw redirect(303, `/auth${returnTo}`);
 };
 
 export const handle = sequence(initializeSupabase, authGuard);

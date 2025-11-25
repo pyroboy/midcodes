@@ -16,7 +16,7 @@
 	} from '$lib/remote/billing.remote';
 
 	interface Props {
-		data: PageData;
+		data: PageData & { organization?: any };
 	}
 
 	let { data }: Props = $props();
@@ -290,8 +290,9 @@
 			</CardHeader>
 			<CardContent>
 				<div class="text-2xl font-bold">Active</div>
+				{@const org = data.organization as any}
 				<p class="text-xs text-muted-foreground">
-					Since {data.organization ? formatDate(data.organization.created_at, 'date') : 'Unknown'}
+					Since {org?.created_at ? formatDate(org.created_at, 'date') : 'Unknown'}
 				</p>
 			</CardContent>
 		</Card>
@@ -306,9 +307,6 @@
 				<CardDescription>Latest ID card generations and user activities</CardDescription>
 			</CardHeader>
 			<CardContent>
-				{#await dashboardData}
-					<p class="text-sm text-muted-foreground">Loading recent activity...</p>
-				{:then data}
 					{@const recentActivity = data?.recentActivity || []}
 					{#if recentActivity && recentActivity.length > 0}
 						<div class="space-y-4">
@@ -374,7 +372,9 @@
 										</div>
 										<div>
 											<p class="text-sm font-medium">{activity.description}</p>
-											p class="text-xs text-muted-foreground"{formatDate(activity.created_at, 'date')}/p
+											<p class="text-xs text-muted-foreground">
+												{formatDate(activity.created_at, 'date')}
+											</p>
 										</div>
 									</div>
 								</div>
@@ -383,7 +383,6 @@
 					{:else}
 						<p class="text-sm text-muted-foreground">No recent activity to display.</p>
 					{/if}
-				{/await}
 			</CardContent>
 		</Card>
 

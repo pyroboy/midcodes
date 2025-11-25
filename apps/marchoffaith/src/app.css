@@ -1,8 +1,10 @@
-@import '@fontsource/fira-mono';
+@import '@fontsource/fira-mono/400.css'; /* <-- This is the fixed line */
 @import '@fontsource/inter/400.css';
 @import '@fontsource/inter/500.css';
 @import '@fontsource/inter/600.css';
 @import '@fontsource/inter/700.css';
+
+@tailwind base;
 
 @tailwind base;
 @tailwind components;

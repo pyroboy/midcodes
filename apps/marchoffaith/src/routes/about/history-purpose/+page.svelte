@@ -1,5 +1,7 @@
 <script>
 	import { page } from '$app/stores';
+	import Hero from '$lib/components/Hero.svelte';
+	import AboutNav from '$lib/components/AboutNav.svelte';
 </script>
 
 <svelte:head>
@@ -7,51 +9,12 @@
 	<meta name="description" content="Learn about the rich history and divine purpose of March of Faith Incorporated since 1975" />
 </svelte:head>
 
-<!-- Hero Section -->
-<section class="about-hero">
-	<div class="container">
-		<div class="hero-content">
-			<h1>Our History & Purpose</h1>
-			<p class="hero-subtitle">Five decades of faith, service, and spiritual growth in Bohol</p>
-		</div>
-	</div>
-</section>
+<Hero subtitle="Five decades of faith, service, and spiritual growth in Bohol">
+	Our History & Purpose
+</Hero>
 
 <!-- Navigation Tabs -->
-<section class="about-nav">
-	<div class="container">
-		<nav class="tab-navigation">
-			<a 
-				href="/about" 
-				class="tab-link" 
-				class:active={$page.url.pathname === '/about'}
-			>
-				Overview
-			</a>
-			<a 
-				href="/about/history-purpose" 
-				class="tab-link"
-				class:active={$page.url.pathname === '/about/history-purpose'}
-			>
-				History & Purpose
-			</a>
-			<a 
-				href="/about/founding-minister" 
-				class="tab-link"
-				class:active={$page.url.pathname === '/about/founding-minister'}
-			>
-				Founding Minister
-			</a>
-			<a 
-				href="/about/presiding-minister" 
-				class="tab-link"
-				class:active={$page.url.pathname === '/about/presiding-minister'}
-			>
-				Presiding Minister
-			</a>
-		</nav>
-	</div>
-</section>
+<AboutNav />
 
 <!-- History Content -->
 <section class="history-content">
@@ -70,7 +33,7 @@
 								<div class="foundation-content">
 									<div class="foundation-text">
 										<h3>Foundation and Incorporation</h3>
-										<p>March of Faith Incorporated was officially established on January 1, 1975, with SEC Registration No. 0000058834. Under the divine guidance and leadership of Rev. Rudy Salomon Trigo, D.D., the church began its mission to serve the spiritual needs of the Bohol community.</p>
+										<p>March of Faith Incorporated was officially established on November 19, 1975, with SEC Registration No. 0000058834. Under the divine guidance and leadership of Rev. Rudy Salomon Trigo, D.D., the church began its mission to serve the spiritual needs of the Bohol community.</p>
 									</div>
 									<div class="founder-image">
 										<img 
@@ -190,36 +153,6 @@
 		max-width: 1200px;
 		margin: 0 auto;
 		padding: 0 2rem;
-	}
-
-	/* Hero Section */
-	.about-hero {
-		background: #981B1E;
-		color: white;
-		padding: 4rem 0;
-		text-align: center;
-	}
-
-	.hero-content h1 {
-		font-size: 3rem;
-		font-weight: 700;
-		margin-bottom: 1rem;
-		color: white;
-	}
-
-	.hero-subtitle {
-		font-size: 1.3rem;
-		font-weight: 300;
-		opacity: 0.9;
-		max-width: 600px;
-		margin: 0 auto;
-	}
-
-	/* Navigation Tabs */
-	.about-nav {
-		background: white;
-		border-bottom: 1px solid #e5e5e5;
-		padding: 0;
 	}
 
 	.tab-navigation {

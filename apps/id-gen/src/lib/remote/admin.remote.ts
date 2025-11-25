@@ -66,9 +66,9 @@ export const getAdminDashboardData = query(async (): Promise<AdminDashboardData>
 		// Get organization stats
 		const [
 			{ count: totalCards },
-			{ data: users, error: usersError },
-			{ data: templates, error: templatesError },
-			{ data: recentCards, error: recentCardsError }
+			{ data: usersData, error: usersError },
+			{ data: templatesData, error: templatesError },
+			{ data: recentCardsData, error: recentCardsError }
 		] = await Promise.all([
 			// Total cards count
 			supabase.from('idcards').select('*', { count: 'exact', head: true }).eq('org_id', org_id),
@@ -107,6 +107,11 @@ export const getAdminDashboardData = query(async (): Promise<AdminDashboardData>
 			console.error('Error fetching recent cards:', recentCardsError);
 		}
 
+		// Cast results to flexible arrays for dashboard computations
+		const users = (usersData as any[]) || [];
+		const templates = (templatesData as any[]) || [];
+		const recentCards = (recentCardsData as any[]) || [];
+
 		// Calculate new cards this month
 		const thisMonth = new Date();
 		thisMonth.setDate(1);
@@ -116,8 +121,9 @@ export const getAdminDashboardData = query(async (): Promise<AdminDashboardData>
 			recentCards?.filter((card) => new Date(card.created_at) >= thisMonth).length || 0;
 
 		// Create recent activity from recent cards
+		const recentCardsAny = (recentCards as any[]) || [];
 		const recentActivity =
-			recentCards
+			recentCardsAny
 				?.map((card) => ({
 					id: card.id,
 					type: 'card_generated',
@@ -127,8 +133,9 @@ export const getAdminDashboardData = query(async (): Promise<AdminDashboardData>
 				.slice(0, 5) || [];
 
 		// Add user registration activities
+		const usersAny = (users as any[]) || [];
 		const recentUsers =
-			users
+			usersAny
 				?.filter((user) => {
 					const userDate = new Date(user.created_at);
 					const sevenDaysAgo = new Date();
@@ -221,7 +228,7 @@ export const addUser = command('unchecked', async ({ email, role }: any) => {
 			.from('profiles')
 			.select('id')
 			.eq('email', email)
-			.eq('org_id', org_id)
+			.eq('org_id', org_id!)
 			.single();
 
 		if (checkError && checkError.code !== 'PGRST116') {
@@ -251,10 +258,10 @@ export const addUser = command('unchecked', async ({ email, role }: any) => {
 		}
 
 		// Create profile
-		const { error: profileError } = await supabase.from('profiles').insert({
+		const { error: profileError } = await (supabase as any).from('profiles').insert({
 			id: authUser.user.id,
 			email,
-			role,
+			role: role,
 			org_id,
 			created_at: new Date().toISOString(),
 			updated_at: new Date().toISOString()
@@ -294,6 +301,11 @@ export const addUser = command('unchecked', async ({ email, role }: any) => {
 export const updateUserRole = command('unchecked', async ({ userId, role }: any) => {
 	const { user, supabase, org_id } = await requireUserManagementPermissions();
 
+	// Ensure org_id is defined
+	if (!org_id) {
+		throw error(500, 'Organization context missing');
+	}
+
 	try {
 		// Validate the new role
 		const validRoles = ['super_admin', 'org_admin', 'id_gen_admin', 'id_gen_user'];
@@ -314,13 +326,14 @@ export const updateUserRole = command('unchecked', async ({ userId, role }: any)
 			.eq('org_id', org_id)
 			.single();
 
-		if (fetchError) {
+		if (fetchError || !targetUser) {
 			console.error('Error fetching target user:', fetchError);
 			throw error(500, 'Failed to find user');
 		}
 
 		// Only super_admin can modify super_admin roles
-		if (targetUser.role === 'super_admin' && user.role !== 'super_admin') {
+		const safeTargetUser = targetUser as any;
+		if (safeTargetUser.role === 'super_admin' && user.role !== 'super_admin') {
 			throw error(403, 'Only super administrators can modify super admin roles');
 		}
 
@@ -330,14 +343,14 @@ export const updateUserRole = command('unchecked', async ({ userId, role }: any)
 		}
 
 		// Update user role
-		const { error: updateError } = await supabase
+		const { error: updateError } = await (supabase as any)
 			.from('profiles')
 			.update({
 				role: role,
 				updated_at: new Date().toISOString()
 			})
 			.eq('id', userId)
-			.eq('org_id', org_id);
+			.eq('org_id', org_id!);
 
 		if (updateError) {
 			console.error('Error updating user role:', updateError);
@@ -363,6 +376,11 @@ export const updateUserRole = command('unchecked', async ({ userId, role }: any)
 export const deleteUser = command('unchecked', async ({ userId }: any) => {
 	const { user, supabase, org_id } = await requireUserManagementPermissions();
 
+	// Ensure org_id is defined
+	if (!org_id) {
+		throw error(500, 'Organization context missing');
+	}
+
 	try {
 		// Prevent self-deletion
 		if (userId === user.id) {
@@ -370,14 +388,16 @@ export const deleteUser = command('unchecked', async ({ userId }: any) => {
 		}
 
 		// Get target user details
-		const { data: targetUser, error: fetchError } = await supabase
+		const { data: targetUserData, error: fetchError } = await supabase
 			.from('profiles')
 			.select('role, email')
 			.eq('id', userId)
-			.eq('org_id', org_id)
+			.eq('org_id', org_id!)
 			.single();
 
-		if (fetchError) {
+		const targetUser = targetUserData as any;
+
+		if (fetchError || !targetUser) {
 			console.error('Error fetching target user:', fetchError);
 			throw error(500, 'Failed to find user');
 		}
@@ -420,7 +440,7 @@ export const deleteUser = command('unchecked', async ({ userId }: any) => {
 
 		return {
 			success: true,
-			message: `User ${targetUser.email} deleted successfully`
+			message: `User ${(targetUser as any).email} deleted successfully`
 		};
 	} catch (err) {
 		console.error('Error in deleteUser command:', err);

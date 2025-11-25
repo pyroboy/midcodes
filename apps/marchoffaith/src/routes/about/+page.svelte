@@ -1,626 +1,560 @@
-<script>
-	import { page } from '$app/stores';
+<script lang="ts">
+    import { page } from '$app/stores';
+    import Hero from '$lib/components/Hero.svelte';
+    import AboutNav from '$lib/components/AboutNav.svelte';
 </script>
 
 <svelte:head>
-	<title>About - March of Faith Incorporated</title>
-	<meta name="description" content="Learn about March of Faith Incorporated's rich history, mission, and values that have guided us since 1975" />
+	<title>About Us - March of Faith Incorporated</title>
+	<meta name="description" content="Learn about March of Faith Incorporated - our history, mission, leadership, and beliefs. Serving the community in Tagbilaran City, Bohol since 1975." />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@700;900&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
 </svelte:head>
 
-<!-- Hero Section -->
-<section class="about-hero">
-	<div class="container">
-		<div class="hero-content">
-			<h1>About March of Faith</h1>
-			<p class="hero-subtitle">Strengthening faith and building community since 1975</p>
-		</div>
-	</div>
-</section>
+<Hero subtitle="A community of believers dedicated to spreading God's love and serving the people of Bohol since 1975">
+	ABOUT US
+</Hero>
 
 <!-- Navigation Tabs -->
-<section class="about-nav">
-	<div class="container">
-		<nav class="tab-navigation">
-			<a 
-				href="/about" 
-				class="tab-link" 
-				class:active={$page.url.pathname === '/about'}
-			>
-				Overview
-			</a>
-			<a 
-				href="/about/history-purpose" 
-				class="tab-link"
-				class:active={$page.url.pathname === '/about/history-purpose'}
-			>
-				History & Purpose
-			</a>
-			<a 
-				href="/about/founding-minister" 
-				class="tab-link"
-				class:active={$page.url.pathname === '/about/founding-minister'}
-			>
-				Founding Minister
-			</a>
-			<a 
-				href="/about/presiding-minister" 
-				class="tab-link"
-				class:active={$page.url.pathname === '/about/presiding-minister'}
-			>
-				Presiding Minister
-			</a>
-		</nav>
-	</div>
-</section>
+<AboutNav />
 
 <!-- Main Content -->
 <section class="about-content">
-	<div class="container">
-		<div class="content-layout">
-			<div class="main-content">
-				<!-- Welcome Section -->
-				<div class="welcome-card">
-					<div class="card-header">
-						<h2>Welcome to Our Church Family</h2>
-						<p class="lead-text">For nearly five decades, March of Faith Incorporated has been a cornerstone of faith in Bohol, Philippines, serving as our headquarters church and spiritual home to countless believers.</p>
-					</div>
-					
-					<div class="founder-section">
-						<div class="founder-image">
-							<img 
-								src="https://res.cloudinary.com/dexcw6vg0/image/upload/v1754821750/rcpqj7mzayco2ndwioqp.png" 
-								alt="Rev. Rudy Salomon Trigo, D.D. - Our Founding Minister" 
-								class="founder-photo"
-							/>
-						</div>
-						<div class="founder-info">
-							<h3>Our Founding Minister</h3>
-							<p>Rev. Rudy Salomon Trigo, D.D. (1938-2011) established March of Faith Incorporated in 1975 with a vision to create a spiritual home where believers could grow in faith and experience genuine fellowship.</p>
-							<a href="/about/founding-minister" class="founder-link">Learn More About Our Founder</a>
-						</div>
-					</div>
-					
-					<div class="welcome-stats">
-						<div class="stat-card">
-							<div class="stat-number">1975</div>
-							<div class="stat-label">Founded</div>
-						</div>
-						<div class="stat-card">
-							<div class="stat-number">50+</div>
-							<div class="stat-label">Years of Ministry</div>
-						</div>
-						<div class="stat-card">
-							<div class="stat-number">∞</div>
-							<div class="stat-label">Lives Touched</div>
-						</div>
-					</div>
-				</div>
+    <div class="container">
+        <div class="content-layout">
+            
+            <div class="main-column">
+                
+                <div class="content-card welcome-card">
+                    <div class="card-header">
+                        <span class="section-label">Est. 1975</span>
+                        <h2>Welcome to the Family</h2>
+                        <p class="lead-text">
+                            For nearly five decades, March of Faith Incorporated has been a cornerstone of faith in Bohol, Philippines. We are more than a building; we are a spiritual home to countless believers committed to the Great Commission.
+                        </p>
+                    </div>
+                    
+                    <div class="founder-block">
+                        <div class="founder-visual">
+                            <img 
+                                src="https://res.cloudinary.com/dexcw6vg0/image/upload/v1754821750/rcpqj7mzayco2ndwioqp.png" 
+                                alt="Rev. Rudy Salomon Trigo" 
+                            />
+                            <div class="visual-backdrop"></div>
+                        </div>
+                        <div class="founder-text">
+                            <h3>Our Founding Minister</h3>
+                            <p><strong>Rev. Rudy Salomon Trigo, D.D.</strong> (1938-2011) established this ministry with a divine vision: to create a sanctuary where believers could grow in grace and truth.</p>
+                            <a href="/about/founding-minister" class="text-link">Read His Story &rarr;</a>
+                        </div>
+                    </div>
 
-				<!-- Mission Section -->
-				<div class="mission-vision-grid">
-					<div class="mission-card">
-						<div class="card-icon">🎯</div>
-						<h3>Our Mission</h3>
-						<p>To be a Christ-centered community that strengthens faith, builds meaningful relationships, and spreads God's love throughout the Philippines and beyond through worship, discipleship, and service.</p>
-					</div>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-num">50+</span>
+                            <span class="stat-lbl">Years of Grace</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-num">13+</span>
+                            <span class="stat-lbl">Churches</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-num">∞</span>
+                            <span class="stat-lbl">Lives Changed</span>
+                        </div>
+                    </div>
+                </div>
 
-					<div class="vision-card">
-						<div class="card-icon">🌟</div>
-						<h3>Our Vision</h3>
-						<p>To see transformed lives and thriving communities as we make disciples of Jesus Christ, equipped for service in God's kingdom and empowered to be salt and light in our world.</p>
-					</div>
-				</div>
+                <div class="mv-grid">
+                    <div class="mv-card mission">
+                        <div class="mv-icon">🎯</div>
+                        <h3>Our Mission</h3>
+                        <p>To be a Christ-centered community that strengthens faith, builds meaningful relationships, and spreads God's love throughout the Philippines and beyond.</p>
+                    </div>
+                    <div class="mv-card vision">
+                        <div class="mv-icon">🌟</div>
+                        <h3>Our Vision</h3>
+                        <p>To see transformed lives and thriving communities as we make disciples of Jesus Christ, equipped for service and empowered to be salt and light.</p>
+                    </div>
+                </div>
 
-				<!-- Core Values -->
-				<div class="values-section">
-					<h2>Our Core Values</h2>
-					<div class="values-grid">
-						<div class="value-card">
-							<div class="value-icon">📖</div>
-							<h4>Biblical Foundation</h4>
-							<p>We believe in the authority and sufficiency of Scripture as our guide for faith, life, and ministry practice.</p>
-						</div>
-						<div class="value-card">
-							<div class="value-icon">❤️</div>
-							<h4>Christ-Centered Love</h4>
-							<p>We demonstrate God's love through genuine care, compassion, and service to one another and our community.</p>
-						</div>
-						<div class="value-card">
-							<div class="value-icon">🤝</div>
-							<h4>Community Fellowship</h4>
-							<p>We foster authentic relationships and create welcoming spaces where everyone can belong and grow.</p>
-						</div>
-						<div class="value-card">
-							<div class="value-icon">🌱</div>
-							<h4>Spiritual Growth</h4>
-							<p>We are committed to lifelong learning, discipleship, and spiritual maturation in Christ.</p>
-						</div>
-						<div class="value-card">
-							<div class="value-icon">✋</div>
-							<h4>Faithful Service</h4>
-							<p>We serve with excellence, using our God-given gifts to build His kingdom and bless others.</p>
-						</div>
-						<div class="value-card">
-							<div class="value-icon">🌍</div>
-							<h4>Global Perspective</h4>
-							<p>We embrace our calling to reach beyond our local community with the Gospel message.</p>
-						</div>
-					</div>
-				</div>
-			</div>
+                <div class="values-section">
+                    <h2>Our Core Values</h2>
+                    <div class="values-grid">
+                        {#each [
+                            {icon: '📖', title: 'Biblical Foundation', desc: 'Scripture is our ultimate guide for faith and life.'},
+                            {icon: '❤️', title: 'Christ-Centered Love', desc: 'Demonstrating compassion and service to all.'},
+                            {icon: '🤝', title: 'Community Fellowship', desc: 'Creating spaces where everyone belongs.'},
+                            {icon: '🌱', title: 'Spiritual Growth', desc: 'Committed to lifelong discipleship.'},
+                            {icon: '✋', title: 'Faithful Service', desc: 'Using our gifts to build His kingdom.'},
+                            {icon: '🌍', title: 'Global Perspective', desc: 'Reaching beyond our local borders.'}
+                        ] as val}
+                            <div class="value-item">
+                                <span class="val-icon">{val.icon}</span>
+                                <div class="val-content">
+                                    <h4>{val.title}</h4>
+                                    <p>{val.desc}</p>
+                                </div>
+                            </div>
+                        {/each}
+                    </div>
+                </div>
 
-			<div class="sidebar-content">
-				<!-- Quick Info -->
-				<div class="info-card">
-					<h3>Quick Information</h3>
-					<div class="info-list">
-						<div class="info-item">
-							<strong>Founded:</strong>
-							<span>January 1, 1975</span>
-						</div>
-						<div class="info-item">
-							<strong>Location:</strong>
-							<span>Tagbilaran City, Bohol</span>
-						</div>
-						<div class="info-item">
-							<strong>Registration:</strong>
-							<span>SEC No. 0000058834</span>
-						</div>
-						<div class="info-item">
-							<strong>Status:</strong>
-							<span>Headquarters Church</span>
-						</div>
-					</div>
-				</div>
+            </div>
 
-				<!-- Scripture Card -->
-				<div class="scripture-card">
-					<h3>Our Foundation</h3>
-					<blockquote>
-						"And he gave the apostles, the prophets, the evangelists, the shepherds and teachers, to equip the saints for the work of ministry, for building up the body of Christ."
-						<cite>- Ephesians 4:11-12</cite>
-					</blockquote>
-				</div>
+            <aside class="sidebar-column">
+                
+                <div class="widget-card info-widget">
+                    <h3>Quick Facts</h3>
+                    <ul class="info-list">
+                        <li>
+                            <span class="label">Founded</span>
+                            <span class="value">Nov 19, 1975</span>
+                        </li>
+                        <li>
+                            <span class="label">HQ Location</span>
+                            <span class="value">Tagbilaran City</span>
+                        </li>
+                        <li>
+                            <span class="label">SEC Reg.</span>
+                            <span class="value">No. 0000058834</span>
+                        </li>
+                    </ul>
+                </div>
 
-				<!-- Contact Card -->
-				<div class="contact-card">
-					<h3>Connect With Us</h3>
-					<div class="contact-info">
-						<div class="contact-item">
-							<strong>Phone:</strong>
-							<span>+63 99 9953 6700</span>
-						</div>
-						<div class="contact-item">
-							<strong>Email:</strong>
-							<span>marchoffaithincorporated@gmail.com</span>
-						</div>
-						<div class="contact-item">
-							<strong>Address:</strong>
-							<span>San Isidro District<br>Tagbilaran City, Bohol</span>
-						</div>
-					</div>
-					<a href="/contact" class="contact-button">Visit Our Church</a>
-				</div>
-			</div>
-		</div>
-	</div>
+                <div class="widget-card scripture-widget">
+                    <div class="quote-mark">"</div>
+                    <blockquote>
+                        And he gave the apostles, the prophets, the evangelists, the shepherds and teachers, to equip the saints for the work of ministry.
+                    </blockquote>
+                    <cite>— Ephesians 4:11-12</cite>
+                </div>
+
+                <div class="widget-card contact-widget">
+                    <h3>Get in Touch</h3>
+                    <p>We'd love to hear from you or pray with you.</p>
+                    <div class="contact-details">
+                        <div class="c-row">
+                            <span class="icon">📞</span>
+                            <span>+63 99 9953 6700</span>
+                        </div>
+                        <div class="c-row">
+                            <span class="icon">📧</span>
+                            <span>marchoffaith@gmail.com</span>
+                        </div>
+                    </div>
+                    <a href="/contact" class="btn-sidebar">Visit Our Church</a>
+                </div>
+
+            </aside>
+
+        </div>
+    </div>
 </section>
 
 <style>
-	/* Global Styles */
-	.container {
-		max-width: 1200px;
-		margin: 0 auto;
-		padding: 0 2rem;
-	}
+    /* --- CSS VARIABLES (Matching Main Page) --- */
+    :root {
+        --brand-red: #981B1E;
+        --brand-accent: #C1272D;
+        --dark-text: #1e293b;
+        --light-text: #64748b;
+        --bg-light: #f8fafc;
+        --card-bg: #ffffff;
+    }
 
-	/* Hero Section */
-	.about-hero {
-		background: #981B1E;
-		color: white;
-		padding: 4rem 0;
-		text-align: center;
-	}
+    /* --- GLOBAL UTILS --- */
+    .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 2rem;
+    }
 
-	.hero-content h1 {
-		font-size: 3rem;
-		font-weight: 700;
-		margin-bottom: 1rem;
-		color: white;
-	}
+    /* --- HERO SECTION --- */
+    /* Moved to Hero.svelte component */
 
-	.hero-subtitle {
-		font-size: 1.3rem;
-		font-weight: 300;
-		opacity: 0.9;
-		max-width: 600px;
-		margin: 0 auto;
-	}
+    /* .slab-highlight is used in the slot, so we might need to keep it or ensure the component handles it.
+       The component has :global(.slab-highlight), so we can remove it here.
+    */
+    .slab-highlight { display: inline-block; } /* Keeping just in case, but component has :global */
 
-	/* Navigation Tabs */
-	.about-nav {
-		background: white;
-		border-bottom: 1px solid #e5e5e5;
-		padding: 0;
-	}
+    /* --- NAVIGATION TABS --- */
+    .nav-wrapper {
+        background: white;
+        border-bottom: 1px solid #e2e8f0;
+        position: sticky;
+        top: 70px; /* Height of scrolled header approx */
+        z-index: 90;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    }
 
-	.tab-navigation {
-		display: flex;
-		gap: 0;
-		overflow-x: auto;
-	}
+    .tab-navigation {
+        display: flex;
+        overflow-x: auto;
+        gap: 2rem;
+        scrollbar-width: none; /* Hide scrollbar */
+    }
 
-	.tab-link {
-		display: block;
-		padding: 1.5rem 2rem;
-		text-decoration: none;
-		color: #666;
-		font-weight: 600;
-		border-bottom: 3px solid transparent;
-		transition: all 0.3s ease;
-		white-space: nowrap;
-	}
+    .tab-link {
+        padding: 1.25rem 0;
+        color: var(--light-text);
+        text-decoration: none;
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 600;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 3px solid transparent;
+        transition: all 0.3s ease;
+        white-space: nowrap;
+    }
 
-	.tab-link:hover {
-		color: #981B1E;
-		background: #f8f9fa;
-	}
+    .tab-link:hover { color: var(--brand-red); }
 
-	.tab-link.active {
-		color: #981B1E;
-		border-bottom-color: #C1272D;
-		background: white;
-	}
+    .tab-link.active {
+        color: var(--brand-red);
+        border-bottom-color: var(--brand-red);
+    }
 
-	/* Main Content */
-	.about-content {
-		padding: 4rem 0;
-		background: #f8f9fa;
-	}
+    /* --- CONTENT LAYOUT --- */
+    .about-content {
+        background: var(--bg-light);
+        padding: 4rem 0;
+    }
 
-	.content-layout {
-		display: grid;
-		grid-template-columns: 2fr 1fr;
-		gap: 4rem;
-		align-items: start;
-	}
+    .content-layout {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 3rem;
+        align-items: start;
+    }
 
-	/* Welcome Card */
-	.welcome-card {
-		background: white;
-		padding: 3rem;
-		border-radius: 15px;
-		box-shadow: 0 5px 25px rgba(0, 0, 0, 0.1);
-		margin-bottom: 2rem;
-	}
+    /* --- MAIN COLUMN STYLES --- */
+    .content-card {
+        background: white;
+        border-radius: 16px;
+        padding: 3rem;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.04);
+        border: 1px solid rgba(0,0,0,0.04);
+        margin-bottom: 3rem;
+    }
 
-	/* Founder Section */
-	.founder-section {
-		display: flex;
-		gap: 2rem;
-		align-items: center;
-		margin: 2rem 0;
-		padding: 2rem;
-		background: #f8f9fa;
-		border-radius: 10px;
-		border-left: 4px solid #C1272D;
-	}
+    .section-label {
+        font-family: 'Montserrat', sans-serif;
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: var(--brand-accent);
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        display: block;
+        margin-bottom: 0.5rem;
+    }
 
-	.founder-image {
-		flex-shrink: 0;
-	}
+    .welcome-card h2 {
+        font-family: 'Roboto Slab', serif;
+        font-size: 2.5rem;
+        color: var(--dark-text);
+        margin: 0 0 1.5rem 0;
+        line-height: 1.1;
+    }
 
-	.founder-photo {
-		width: 150px;
-		height: 200px;
-		object-fit: cover;
-		border-radius: 10px;
-		box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-	}
+    .lead-text {
+        font-size: 1.15rem;
+        line-height: 1.7;
+        color: #475569;
+    }
 
-	.founder-info h3 {
-		color: #981B1E;
-		font-size: 1.5rem;
-		margin-bottom: 1rem;
-		font-weight: 600;
-	}
+    /* Founder Block */
+    .founder-block {
+        display: flex;
+        gap: 2rem;
+        background: #fef2f2; /* Very light red tint */
+        padding: 2rem;
+        border-radius: 12px;
+        margin: 2.5rem 0;
+        align-items: center;
+        border-left: 4px solid var(--brand-red);
+    }
 
-	.founder-info p {
-		color: #666;
-		line-height: 1.6;
-		margin-bottom: 1.5rem;
-	}
+    .founder-visual {
+        position: relative;
+        width: 120px;
+        height: 120px;
+        flex-shrink: 0;
+    }
 
-	.founder-link {
-		display: inline-block;
-		color: #C1272D;
-		text-decoration: none;
-		font-weight: 600;
-		border-bottom: 2px solid #C1272D;
-		transition: all 0.3s ease;
-	}
+    .founder-visual img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 50%;
+        border: 3px solid white;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        position: relative;
+        z-index: 2;
+    }
 
-	.founder-link:hover {
-		color: #981B1E;
-		border-bottom-color: #981B1E;
-	}
+    .founder-text h3 {
+        font-family: 'Roboto Slab', serif;
+        color: var(--brand-red);
+        margin: 0 0 0.5rem 0;
+        font-size: 1.2rem;
+    }
 
-	.card-header h2 {
-		font-size: 2.5rem;
-		color: #981B1E;
-		margin-bottom: 1.5rem;
-		font-weight: 700;
-	}
+    .founder-text p {
+        font-size: 0.95rem;
+        line-height: 1.5;
+        color: var(--light-text);
+        margin-bottom: 1rem;
+    }
 
-	.lead-text {
-		font-size: 1.2rem;
-		line-height: 1.8;
-		color: #555;
-		margin-bottom: 2rem;
-	}
+    .text-link {
+        color: var(--brand-accent);
+        font-weight: 700;
+        text-decoration: none;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
 
-	.welcome-stats {
-		display: grid;
-		grid-template-columns: repeat(3, 1fr);
-		gap: 2rem;
-		margin-top: 3rem;
-	}
+    /* Stats */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+        border-top: 1px dashed #cbd5e1;
+        padding-top: 2rem;
+    }
 
-	.stat-card {
-		text-align: center;
-		padding: 2rem 1rem;
-		background: #f8f9fa;
-		border-radius: 10px;
-		border-top: 4px solid #C1272D;
-	}
+    .stat-item { text-align: center; }
+    
+    .stat-num {
+        display: block;
+        font-family: 'Roboto Slab', serif;
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--brand-red);
+    }
 
-	.stat-number {
-		font-size: 2.5rem;
-		font-weight: 700;
-		color: #981B1E;
-		margin-bottom: 0.5rem;
-	}
+    .stat-lbl {
+        font-family: 'Montserrat', sans-serif;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--light-text);
+    }
 
-	.stat-label {
-		color: #666;
-		font-weight: 500;
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-		font-size: 0.9rem;
-	}
+    /* Mission / Vision */
+    .mv-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+        margin-bottom: 3rem;
+    }
 
-	/* Mission Vision Grid */
-	.mission-vision-grid {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 2rem;
-		margin-bottom: 3rem;
-	}
+    .mv-card {
+        background: white;
+        padding: 2rem;
+        border-radius: 16px;
+        text-align: center;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.03);
+        transition: transform 0.3s ease;
+        border-top: 4px solid transparent;
+    }
 
-	.mission-card,
-	.vision-card {
-		background: white;
-		padding: 2.5rem;
-		border-radius: 15px;
-		box-shadow: 0 5px 25px rgba(0, 0, 0, 0.1);
-		text-align: center;
-		transition: transform 0.3s ease;
-	}
+    .mv-card.mission { border-top-color: var(--brand-red); }
+    .mv-card.vision { border-top-color: #1e293b; }
 
-	.mission-card:hover,
-	.vision-card:hover {
-		transform: translateY(-5px);
-	}
+    .mv-card:hover { transform: translateY(-5px); }
 
-	.card-icon {
-		font-size: 3rem;
-		margin-bottom: 1.5rem;
-	}
+    .mv-icon { font-size: 2.5rem; margin-bottom: 1rem; display: block; }
 
-	.mission-card h3,
-	.vision-card h3 {
-		font-size: 1.8rem;
-		color: #981B1E;
-		margin-bottom: 1.5rem;
-		font-weight: 600;
-	}
+    .mv-card h3 {
+        font-family: 'Roboto Slab', serif;
+        font-size: 1.4rem;
+        margin-bottom: 1rem;
+        color: var(--dark-text);
+    }
 
-	.mission-card p,
-	.vision-card p {
-		color: #666;
-		line-height: 1.7;
-		font-size: 1rem;
-	}
+    .mv-card p {
+        font-size: 0.95rem;
+        line-height: 1.6;
+        color: var(--light-text);
+    }
 
-	/* Values Section */
-	.values-section {
-		background: white;
-		padding: 3rem;
-		border-radius: 15px;
-		box-shadow: 0 5px 25px rgba(0, 0, 0, 0.1);
-	}
+    /* Values */
+    .values-section h2 {
+        font-family: 'Roboto Slab', serif;
+        text-align: center;
+        font-size: 2.5rem;
+        margin-bottom: 2rem;
+        color: var(--dark-text);
+    }
 
-	.values-section h2 {
-		font-size: 2.2rem;
-		color: #981B1E;
-		text-align: center;
-		margin-bottom: 3rem;
-		font-weight: 700;
-	}
+    .values-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+    }
 
-	.values-grid {
-		display: grid;
-		grid-template-columns: repeat(2, 1fr);
-		gap: 2rem;
-	}
+    .value-item {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+        border: 1px solid #f1f5f9;
+        transition: all 0.2s ease;
+    }
 
-	.value-card {
-		padding: 2rem;
-		background: #f8f9fa;
-		border-radius: 10px;
-		border-left: 4px solid #C1272D;
-		transition: all 0.3s ease;
-	}
+    .value-item:hover {
+        box-shadow: 0 10px 25px rgba(0,0,0,0.06);
+        border-color: transparent;
+    }
 
-	.value-card:hover {
-		background: white;
-		box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-		transform: translateX(10px);
-	}
+    .val-icon { font-size: 1.8rem; }
+    
+    .val-content h4 {
+        font-family: 'Montserrat', sans-serif;
+        font-weight: 700;
+        color: var(--brand-red);
+        margin: 0 0 0.5rem 0;
+    }
 
-	.value-icon {
-		font-size: 2rem;
-		margin-bottom: 1rem;
-	}
+    .val-content p {
+        margin: 0;
+        font-size: 0.9rem;
+        color: var(--light-text);
+        line-height: 1.5;
+    }
 
-	.value-card h4 {
-		color: #981B1E;
-		font-size: 1.2rem;
-		margin-bottom: 1rem;
-		font-weight: 600;
-	}
+    /* --- SIDEBAR --- */
+    .sidebar-column {
+        position: sticky;
+        top: 140px; /* Nav height + header height buffer */
+    }
 
-	.value-card p {
-		color: #666;
-		line-height: 1.6;
-		margin: 0;
-	}
+    .widget-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.04);
+        border: 1px solid #f1f5f9;
+    }
 
-	/* Sidebar */
-	.info-card,
-	.scripture-card,
-	.contact-card {
-		background: white;
-		padding: 2rem;
-		border-radius: 10px;
-		box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-		margin-bottom: 2rem;
-	}
+    .widget-card h3 {
+        font-family: 'Roboto Slab', serif;
+        font-size: 1.1rem;
+        color: var(--dark-text);
+        margin: 0 0 1rem 0;
+        padding-bottom: 0.75rem;
+        border-bottom: 2px solid #f1f5f9;
+    }
 
-	.info-card h3,
-	.scripture-card h3,
-	.contact-card h3 {
-		color: #981B1E;
-		font-size: 1.3rem;
-		margin-bottom: 1.5rem;
-		font-weight: 600;
-		border-bottom: 2px solid #C1272D;
-		padding-bottom: 0.5rem;
-	}
+    .info-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
 
-	.info-item,
-	.contact-item {
-		display: flex;
-		justify-content: space-between;
-		align-items: flex-start;
-		padding: 0.75rem 0;
-		border-bottom: 1px solid #f0f0f0;
-	}
+    .info-list li {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.75rem 0;
+        border-bottom: 1px dashed #e2e8f0;
+        font-size: 0.9rem;
+    }
+    .info-list li:last-child { border: none; }
 
-	.info-item:last-child,
-	.contact-item:last-child {
-		border-bottom: none;
-	}
+    .info-list .label { color: var(--light-text); }
+    .info-list .value { font-weight: 600; color: var(--dark-text); text-align: right; }
 
-	.info-item strong,
-	.contact-item strong {
-		color: #333;
-		font-weight: 600;
-		min-width: 80px;
-	}
+    /* Scripture Widget */
+    .scripture-widget {
+        background: var(--brand-red);
+        color: white;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .quote-mark {
+        position: absolute;
+        top: -10px; left: 10px;
+        font-size: 6rem;
+        font-family: serif;
+        opacity: 0.2;
+        line-height: 1;
+    }
 
-	.info-item span,
-	.contact-item span {
-		color: #666;
-		text-align: right;
-	}
+    .scripture-widget blockquote {
+        font-family: 'Roboto Slab', serif;
+        font-size: 1.1rem;
+        font-style: italic;
+        margin: 1rem 0;
+        position: relative;
+        z-index: 2;
+        line-height: 1.6;
+    }
 
-	.scripture-card blockquote {
-		font-style: italic;
-		color: #555;
-		line-height: 1.6;
-		margin: 0;
-		border-left: 4px solid #C1272D;
-		padding-left: 1rem;
-	}
+    .scripture-widget cite {
+        font-family: 'Montserrat', sans-serif;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        opacity: 0.9;
+    }
 
-	.scripture-card cite {
-		display: block;
-		color: #981B1E;
-		font-weight: 600;
-		margin-top: 1rem;
-		font-size: 0.9rem;
-	}
+    /* Contact Widget */
+    .contact-widget p {
+        font-size: 0.9rem;
+        color: var(--light-text);
+        margin-bottom: 1.5rem;
+    }
 
-	.contact-button {
-		display: block;
-		width: 100%;
-		padding: 1rem;
-		background: #C1272D;
-		color: white;
-		text-align: center;
-		text-decoration: none;
-		border-radius: 5px;
-		font-weight: 600;
-		margin-top: 1.5rem;
-		transition: background 0.3s ease;
-	}
+    .c-row {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+        margin-bottom: 0.75rem;
+        font-size: 0.9rem;
+        color: var(--dark-text);
+        font-weight: 500;
+    }
 
-	.contact-button:hover {
-		background: #981B1E;
-	}
+    .btn-sidebar {
+        display: block;
+        text-align: center;
+        background: var(--brand-red);
+        color: white;
+        text-decoration: none;
+        padding: 0.8rem;
+        border-radius: 6px;
+        font-weight: 700;
+        font-family: 'Montserrat', sans-serif;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        margin-top: 1.5rem;
+        transition: background 0.2s;
+    }
+    .btn-sidebar:hover { background: #7f1618; }
 
-	/* Responsive Design */
-	@media (max-width: 768px) {
-		.hero-content h1 {
-			font-size: 2rem;
-		}
+    /* --- RESPONSIVE --- */
+    @media (max-width: 900px) {
+        .content-layout { grid-template-columns: 1fr; }
+        .sidebar-column { position: static; margin-top: 3rem; }
+        .about-hero { margin-top: 0; padding-top: 0; }
+    }
 
-		.hero-subtitle {
-			font-size: 1.1rem;
-		}
-
-		.content-layout {
-			grid-template-columns: 1fr;
-			gap: 2rem;
-		}
-
-		.welcome-card,
-		.values-section {
-			padding: 2rem;
-		}
-
-		.founder-section {
-			flex-direction: column;
-			text-align: center;
-			padding: 1.5rem;
-		}
-
-		.founder-photo {
-			width: 120px;
-			height: 160px;
-		}
-
-		.welcome-stats {
-			grid-template-columns: 1fr;
-			gap: 1rem;
-		}
-
-		.mission-vision-grid {
-			grid-template-columns: 1fr;
-		}
-
-		.values-grid {
-			grid-template-columns: 1fr;
-		}
-
-		.tab-link {
-			padding: 1rem 1.5rem;
-			font-size: 0.9rem;
-		}
-
-		.container {
-			padding: 0 1rem;
-		}
-	}
+    @media (max-width: 600px) {
+        .founder-block { flex-direction: column; text-align: center; }
+        .stats-grid { grid-template-columns: 1fr; }
+        .mv-grid { grid-template-columns: 1fr; }
+        .welcome-card { padding: 1.5rem; }
+        .about-hero h1 { font-size: 2.5rem; }
+    }
 </style>

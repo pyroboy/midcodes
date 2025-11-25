@@ -7,7 +7,7 @@
 		"dev": "vite dev",
 		"serve:edge": "supabase functions serve role-emulation --env-file .env.local",
 		"deploy:edge": "supabase functions deploy role-emulation",
-		"build": "vite build",
+		"build": "svelte-kit sync && vite build",
 		"preview": "vite preview",
 		"test": "pnpm run test:integration && pnpm run test:unit",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
@@ -57,6 +57,7 @@
 	},
 	"dependencies": {
 		"@faker-js/faker": "^9.3.0",
+		"@fontsource/fira-mono": "^5.0.0",
 		"@fontsource/inter": "^5.1.1",
 		"@internationalized/date": "^3.6.0",
 		"@shadcn/ui": "^0.0.4",

@@ -931,7 +931,7 @@ onHoverElement={(id) => { hoveredElementId = id; }}
 		left: 0;
 		width: 100%;
 		height: 100%;
-		z-index: 2;
+		z-index: 1; /* Explicitly lower */
 		transition: opacity 0.3s ease;
 	}
 
@@ -941,7 +941,8 @@ onHoverElement={(id) => { hoveredElementId = id; }}
 		left: 0;
 		width: 100%;
 		height: 100%;
-		z-index: 2;
+		z-index: 10; /* Explicitly higher than canvas (1) and other potential layers */
+		pointer-events: none; /* Allow clicks to pass through empty areas */
 	}
 
 	.placeholder-design {
@@ -1011,6 +1012,11 @@ onHoverElement={(id) => { hoveredElementId = id; }}
 		box-sizing: border-box;
 		opacity: 0.5;
 		transition: opacity 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+		pointer-events: auto; /* Re-enable clicks on actual elements */
+		z-index: 20; /* Ensure individual elements are clickable */
+		/* Add a default border to ensure visibility even if content is empty */
+		min-width: 20px;
+		min-height: 20px;
 	}
 
 	.template-element.highlighted,

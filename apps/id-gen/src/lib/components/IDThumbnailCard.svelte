@@ -69,7 +69,7 @@ function handlePreview(event: Event) {
 </script>
 
 <div 
-	class="group relative bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer {className}"
+	class="group relative bg-card rounded-lg border border-border shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer {className}"
 onclick={handlePreview}
 	role="button"
 	tabindex="0"
@@ -83,7 +83,7 @@ onkeydown={(e) => {
 	aria-label="Preview {cardDisplayName}"
 >
 	<!-- Thumbnail Image -->
-	<div class="aspect-[3/2] relative overflow-hidden rounded-t-lg bg-gray-100 dark:bg-gray-800">
+	<div class="aspect-[3/2] relative overflow-hidden rounded-t-lg bg-muted">
 		{#if frontImageUrl}
 			<img 
 				src={frontImageUrl} 
@@ -92,7 +92,7 @@ onkeydown={(e) => {
 				loading="lazy"
 			/>
 		{:else}
-			<div class="w-full h-full flex items-center justify-center text-gray-400 dark:text-gray-500">
+			<div class="w-full h-full flex items-center justify-center text-muted-foreground">
 				<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
 				</svg>
@@ -100,10 +100,10 @@ onkeydown={(e) => {
 		{/if}
 
 		<!-- Hover Overlay -->
-		<div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-200 flex items-center justify-center">
+		<div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 dark:group-hover:bg-black/40 transition-colors duration-200 flex items-center justify-center">
 			<div class="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-				<div class="bg-white/90 dark:bg-gray-900/90 rounded-full p-2">
-					<svg class="w-5 h-5 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<div class="bg-background/90 rounded-full p-2 shadow-sm">
+					<svg class="w-5 h-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
 					</svg>
@@ -116,17 +116,17 @@ onkeydown={(e) => {
 	<div class="p-4">
 		<!-- Card Title and Template -->
 		<div class="mb-2">
-			<h3 class="font-medium text-gray-900 dark:text-white text-sm truncate" title={cardDisplayName}>
+			<h3 class="font-medium text-foreground text-sm truncate" title={cardDisplayName}>
 				{cardDisplayName}
 			</h3>
-			<p class="text-xs text-gray-500 dark:text-gray-400 truncate" title={card.template_name}>
+			<p class="text-xs text-muted-foreground truncate" title={card.template_name}>
 				{card.template_name}
 			</p>
 		</div>
 
 		<!-- Date -->
 		{#if formattedDate}
-			<p class="text-xs text-gray-400 dark:text-gray-500 mb-3">
+			<p class="text-xs text-muted-foreground mb-3">
 				{formattedDate}
 			</p>
 		{/if}
@@ -135,7 +135,7 @@ onkeydown={(e) => {
 		<div class="flex items-center gap-2">
 			<button 
 				type="button"
-				class="flex-1 px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:text-blue-300 dark:hover:bg-blue-900/50 rounded transition-colors"
+				class="flex-1 px-3 py-1.5 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded transition-colors"
 onclick={handleDownload}
 				disabled={downloading}
 				aria-label="Download {cardDisplayName}"
@@ -156,7 +156,7 @@ onclick={handleDownload}
 			
 			<button 
 				type="button"
-				class="px-2 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:bg-gray-700 rounded transition-colors"
+				class="px-2 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
 onclick={handleEdit}
 				aria-label="Edit {cardDisplayName}"
 			>

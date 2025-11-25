@@ -10,16 +10,16 @@
   let { user, class: className = '' } = $props();
 </script>
 
-<header class="hidden lg:block bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50 {className}">
+<header class="hidden lg:block bg-background border-b border-border sticky top-0 z-50 {className}">
   <div class="h-16 px-6 flex items-center justify-between">
     <!-- Left: Logo + Search -->
     <div class="flex items-center gap-6 flex-1">
       <!-- Logo -->
       <a href="/" class="flex items-center gap-3">
         <div class="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-          <Wallet class="h-6 w-6 text-white" />
+          <Wallet class="h-6 w-6 text-primary-foreground" />
         </div>
-        <span class="text-xl font-bold text-gray-900 dark:text-white">
+        <span class="text-xl font-bold text-foreground">
           ID Generator
         </span>
       </a>
@@ -46,7 +46,7 @@
       
       <!-- Notifications -->
       <Button variant="ghost" size="icon" aria-label="Notifications">
-        <Bell class="h-5 w-5" />
+        <Bell class="h-5 w-5 text-muted-foreground" />
       </Button>
       
       <!-- Theme Toggle -->
@@ -61,7 +61,7 @@
   </div>
   
   <!-- Breadcrumb row -->
-  <div class="px-6 pb-2 border-t border-gray-100 dark:border-gray-800">
+  <div class="px-6 pb-2 border-t border-border bg-muted/20">
     <Breadcrumb />
   </div>
 </header>

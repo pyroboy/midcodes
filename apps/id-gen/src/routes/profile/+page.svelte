@@ -17,7 +17,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 
 	interface Props {
-		data: PageData;
+		data: PageData & { organization?: any; templates?: any[] };
 		form: ActionData;
 	}
 
@@ -335,8 +335,9 @@ value={formatDate(profile.created_at, 'date')}
 									class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
 								>
 									<option value="">Select a default template</option>
-									{#each data.templates || [] as template}
-										<option value={template.id}>{template.name}</option>
+									{#each (data.templates || []) as template}
+										{@const t = template as any}
+										<option value={t.id}>{t.name}</option>
 									{/each}
 								</select>
 								<p class="text-xs text-muted-foreground">
@@ -485,7 +486,7 @@ value={formatDate(profile.created_at, 'date')}
 					</div>
 					<div class="flex items-center justify-between">
 						<span class="text-sm text-muted-foreground">Last Login</span>
-									span class="text-sm"{formatDate(profile.updated_at, 'date')}/span
+									<span class="text-sm">{formatDate(profile.updated_at, 'date')}</span>
 					</div>
 					<div class="flex items-center justify-between">
 						<span class="text-sm text-muted-foreground">ID Cards Created</span>

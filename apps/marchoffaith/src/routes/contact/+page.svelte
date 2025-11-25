@@ -1,17 +1,15 @@
+<script>
+	import Hero from '$lib/components/Hero.svelte';
+</script>
+
 <svelte:head>
 	<title>Contact Us - March of Faith Incorporated</title>
 	<meta name="description" content="Connect with March of Faith Incorporated in Tagbilaran City, Bohol. Phone: +63 99 9953 6700. Strengthening faith, building community since 1975." />
 </svelte:head>
 
-<!-- Hero Section -->
-<section class="hero-section" role="banner" aria-labelledby="hero-title">
-	<div class="container">
-		<div class="hero-content">
-			<h1 id="hero-title">CONNECT WITH US</h1>
-			<p class="hero-subtitle">We'd love to hear from you and welcome you to our church family in Tagbilaran, Bohol</p>
-		</div>
-	</div>
-</section>
+<Hero subtitle="We'd love to hear from you and welcome you to our church family in Tagbilaran, Bohol">
+	CONNECT WITH US
+</Hero>
 
 <!-- Contact Content -->
 <section class="contact-content" role="main" aria-labelledby="contact-main">
@@ -143,34 +141,6 @@
 		padding: 0 1.5rem;
 	}
 
-	/* Hero Section */
-	.hero-section {
-		background: var(--deep-red);
-		color: var(--white);
-		padding: 3rem 0;
-		text-align: center;
-	}
-
-	.hero-content h1 {
-		font-family: 'Montserrat', sans-serif;
-		font-size: 2.5rem;
-		font-weight: 800;
-		margin-bottom: 1rem;
-		color: var(--white);
-		text-transform: uppercase;
-		letter-spacing: 1px;
-	}
-
-	.hero-subtitle {
-		font-family: 'Montserrat', sans-serif;
-		font-size: 1.2rem;
-		font-weight: 400;
-		opacity: 0.95;
-		max-width: 700px;
-		margin: 0 auto;
-		line-height: 1.5;
-	}
-
 	/* Main Content */
 	.contact-content {
 		padding: 2.5rem 0;
@@ -182,127 +152,6 @@
 		grid-template-columns: 2fr 1fr;
 		gap: 2rem;
 		align-items: start;
-	}
-
-	/* Welcome Message */
-	.welcome-message {
-		background: var(--white);
-		padding: 2rem;
-		border-radius: 8px;
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-		margin-bottom: 1.5rem;
-		transition: transform 0.2s ease, box-shadow 0.2s ease;
-	}
-
-	.welcome-message:hover {
-		transform: translateY(-5px);
-		box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
-	}
-
-	.welcome-message h2 {
-		font-family: 'Montserrat', sans-serif;
-		font-size: 1.5rem;
-		color: var(--deep-red);
-		margin-bottom: 0.5rem;
-		font-weight: 700;
-	}
-
-	.lead-text {
-		font-family: 'Montserrat', sans-serif;
-		font-size: 1.1rem;
-		line-height: 1.6;
-		color: var(--dark-gray);
-		margin: 0;
-	}
-
-	/* Contact Methods */
-	.contact-methods {
-		background: var(--white);
-		padding: 2rem;
-		border-radius: 8px;
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-		margin-bottom: 1.5rem;
-	}
-
-	.contact-methods h2 {
-		font-family: 'Montserrat', sans-serif;
-		font-size: 1.3rem;
-		color: var(--deep-red);
-		margin-bottom: 0.75rem;
-		font-weight: 700;
-		border-bottom: 1px solid var(--bright-red);
-		padding-bottom: 0.5rem;
-	}
-
-	/* Card Container with Zero Gaps */
-	.card-container {
-		display: grid;
-		gap: 0;
-		grid-template-columns: repeat(2, 1fr);
-	}
-
-	.card {
-		background: var(--white);
-		border: 1px solid #e2e8f0;
-		margin: 0;
-		padding: 1.75rem;
-		transition: all 0.2s ease;
-	}
-
-	.card:hover {
-		border-color: var(--bright-red);
-		box-shadow: 0 2px 8px rgba(193, 39, 45, 0.1);
-	}
-
-	.method-card {
-		text-align: center;
-	}
-
-	/* Removed method-icon styles - no longer using emojis */
-
-	.method-card h3 {
-		font-family: 'Montserrat', sans-serif;
-		color: var(--deep-red);
-		font-size: 1.1rem;
-		margin-bottom: 0.5rem;
-		font-weight: 600;
-	}
-
-	.method-info {
-		font-family: 'Montserrat', sans-serif;
-		color: var(--dark-gray);
-		font-weight: 700;
-		margin-bottom: 0.5rem;
-		font-size: 1rem;
-		line-height: 1.4;
-	}
-
-	.method-info a {
-		color: var(--bright-red);
-		text-decoration: none;
-		transition: color 0.2s ease;
-	}
-
-	.method-info a:hover {
-		color: var(--deep-red);
-	}
-
-	.method-desc {
-		font-family: 'Montserrat', sans-serif;
-		color: #555555;
-		font-size: 0.9rem;
-		line-height: 1.5;
-		margin: 0 0 0.5rem 0;
-	}
-
-	.method-hours {
-		font-family: 'Montserrat', sans-serif;
-		color: var(--bright-red);
-		font-size: 0.8rem;
-		font-weight: 600;
-		margin: 0;
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
 	}
 
 	/* Contact Form Section */
@@ -571,19 +420,9 @@
 			gap: 1.5rem;
 		}
 
-		.welcome-message,
-		.contact-methods,
 		.contact-form-section {
 			padding: 1.5rem;
 			margin-bottom: 1.25rem;
-		}
-
-		.card {
-			padding: 1.5rem;
-		}
-
-		.card-container {
-			grid-template-columns: 1fr;
 		}
 
 		.form-row {

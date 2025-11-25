@@ -31,8 +31,18 @@ export const load: PageServerLoad = async ({ locals }) => {
 	//     throw error(500, 'Organization ID not found - User is not associated with any organization');
 	// }
 
+	if (!effectiveOrgId) {
+		return {
+			recentCards: [],
+			totalCards: 0,
+			totalTemplates: 0,
+			weeklyCards: 0,
+			error: null
+		};
+	}
+
 	// Get enhanced statistics for the dashboard
-	const { data: recentCards, error: cardsError } = await supabase
+	const { data: recentCardsData, error: cardsError } = await supabase
 		.from('idcards')
 		.select(`
 			id, 
@@ -46,10 +56,13 @@ export const load: PageServerLoad = async ({ locals }) => {
 		.order('created_at', { ascending: false })
 		.limit(12); // Increased to 12 for better grid display
 
+	// Cast recent cards to a flexible type for template lookups
+	const recentCards = recentCardsData as any[] | null;
+
 	// Get template names separately to avoid circular references
 	let templateNames: Record<number, string> = {};
 	if (recentCards && recentCards.length > 0) {
-		const templateIds = [...new Set(recentCards.map(card => card.template_id).filter(Boolean))];
+		const templateIds = [...new Set(recentCards.map((card) => card.template_id).filter(Boolean))];
 		if (templateIds.length > 0) {
 			const { data: templates } = await supabase
 				.from('templates')
@@ -57,7 +70,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 				.in('id', templateIds);
 			
 			if (templates) {
-				templateNames = templates.reduce((acc, template) => {
+				const safeTemplates = templates as any[];
+				templateNames = safeTemplates.reduce((acc, template: any) => {
 					acc[template.id] = template.name;
 					return acc;
 				}, {} as Record<number, string>);
@@ -130,7 +144,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	});
 
 	// Transform recent cards data to include template names
-	const enhancedRecentCards = (recentCards || []).map(card => ({
+	const enhancedRecentCards = (recentCards || []).map((card) => ({
 		...card,
 		template_name: templateNames[card.template_id] || 'Unknown Template'
 	}));

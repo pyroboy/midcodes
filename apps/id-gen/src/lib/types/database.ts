@@ -80,6 +80,41 @@ export interface Database {
 					updated_at?: string | null;
 				};
 			};
+			idcards: {
+				Row: {
+					id: string;
+					created_at: string;
+					template_id: string;
+					org_id: string;
+					front_image: string | null;
+					back_image: string | null;
+					data: any;
+					status: string;
+					metadata: any;
+				};
+				Insert: {
+					id?: string;
+					created_at?: string;
+					template_id: string;
+					org_id: string;
+					front_image?: string | null;
+					back_image?: string | null;
+					data?: any;
+					status?: string;
+					metadata?: any;
+				};
+				Update: {
+					id?: string;
+					created_at?: string;
+					template_id?: string;
+					org_id?: string;
+					front_image?: string | null;
+					back_image?: string | null;
+					data?: any;
+					status?: string;
+					metadata?: any;
+				};
+			};
 		};
 		Views: {
 			[_ in never]: never;

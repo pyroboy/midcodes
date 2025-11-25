@@ -9,11 +9,11 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	try {
 		// Get user's current credit balance and transactions
-		const { data: profile } = await locals.supabase
-			.from('profiles')
-			.select('credits, monthly_generations_used')
-			.eq('user_id', locals.user.id)
-			.single();
+    const { data: profile } = await locals.supabase
+      .from('profiles')
+      .select('credits_balance')
+      .eq('id', locals.user.id)
+      .single() as any;
 
 		// Get recent credit transactions
 		const { data: transactions } = await locals.supabase
@@ -51,8 +51,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 		return {
 			user: locals.user,
-			credits: profile?.credits || 0,
-			monthlyGenerationsUsed: profile?.monthly_generations_used || 0,
+			credits: profile?.credits_balance || 0,
+
 			transactions: transactions || [],
 			monthlyUsage: monthlyUsage?.length || 0,
 			totalGenerations: totalGenerations?.length || 0,

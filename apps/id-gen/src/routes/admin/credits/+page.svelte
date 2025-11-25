@@ -7,7 +7,7 @@
 		CardContent
 	} from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
-	import { getUsersWithCredits, adjustUserCredits, getBillingSettings } from '../billing.remote';
+	import { getUsersWithCredits, adjustUserCredits, getBillingSettings } from '$lib/remote/billing.remote';
 
 	const users = getUsersWithCredits();
 	const billing = getBillingSettings();
