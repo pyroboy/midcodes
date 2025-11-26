@@ -10,9 +10,14 @@ import type { Actions } from '@sveltejs/kit';
 import { fail, error } from '@sveltejs/kit';
 // import { getUserPermissions } from '$lib/services/permissions'; // COMMENTED OUT - PUBLIC ACCESS ENABLED
 
-export const load: ServerLoad = async ({ params, locals }) => {
+export const load: ServerLoad = async ({ params, locals, setHeaders }) => {
 	const { slug: propertySlug, date } = params;
 	console.log(`🔄 [LOAD] Loading utility input page for ${propertySlug}/${date}`);
+
+	// OPTIMIZATION: Cache the GET request for a short time (browser + CDN)
+	setHeaders({
+		'cache-control': 'public, max-age=60, s-maxage=60'
+	});
 
 	// Initialize error state
 	let errors: string[] = [];

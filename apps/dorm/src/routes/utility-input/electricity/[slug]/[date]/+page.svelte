@@ -6,6 +6,7 @@
 	import { toast } from 'svelte-sonner';
 	import { invalidateAll } from '$app/navigation';
 	import { z } from 'zod';
+	import { onMount, tick } from 'svelte';
 
 	let { data }: { data: PageData } = $props();
 
@@ -55,7 +56,7 @@
 		onSubmit: ({ formData, cancel }) => {
 			// Validate all fields before submission
 			let hasErrors = false;
-			data.meters.forEach(meter => {
+			data.meters.forEach((meter) => {
 				const fieldName = `reading_${meter.id}`;
 				const value = formData.get(fieldName)?.toString() || '';
 				validateField(meter, value, fieldName);
@@ -107,6 +108,31 @@
 			toast.error(msg);
 		}
 	});
+
+	// Real-time consumption helpers for UX feedback
+	function getConsumptionValue(meter: ElectricityMeter, currentValue: string): number | null {
+		if (!currentValue) return null;
+		const current = parseFloat(currentValue);
+		if (Number.isNaN(current)) return null;
+
+		const previous = getBaselineReading(meter);
+		return current - previous;
+	}
+
+	function getConsumptionStatus(diff: number): 'normal' | 'high' | 'negative' {
+		if (diff < 0) return 'negative';
+		if (diff > 500) return 'high';
+		return 'normal';
+	}
+
+	function getConsumption(
+		meter: ElectricityMeter,
+		currentValue: string
+	): { value: number; status: 'normal' | 'high' | 'negative' } | null {
+		const diff = getConsumptionValue(meter, currentValue);
+		if (diff === null) return null;
+		return { value: diff, status: getConsumptionStatus(diff) };
+	}
 
 	// Real-time field validation
 	function validateField(meter: ElectricityMeter, value: string, fieldName: string) {
@@ -174,8 +200,12 @@
 	}
 
 	// Parse error messages with markdown links
-	function parseErrorMessage(error: string) {
-		const parts: Array<{type: 'text' | 'link', content: string, href?: string}> = [];
+	type ParsedErrorPart =
+		| { type: 'text'; content: string }
+		| { type: 'link'; content: string; href: string };
+
+	function parseErrorMessage(error: string): ParsedErrorPart[] {
+		const parts: ParsedErrorPart[] = [];
 		const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
 		let lastIndex = 0;
 		let match;
@@ -207,8 +237,18 @@
 			});
 		}
 
-		return parts.length > 0 ? parts : [{type: 'text', content: error}];
+		return parts.length > 0 ? parts : [{ type: 'text', content: error }];
 	}
+
+	onMount(async () => {
+		await tick();
+		const firstInput = document.querySelector(
+			"input[type='number']:not([value]), input[type='number']"
+		) as HTMLInputElement | null;
+		if (firstInput) {
+			firstInput.focus();
+		}
+	});
 </script>
 
 <div class="container mx-auto px-3 sm:px-4 py-4 sm:py-6 lg:py-8">
@@ -304,14 +344,15 @@
 
 			<div class="bg-white shadow rounded-lg">
 				<div class="p-2">
-					{#if data.meters.length === 0}
-						<div class="text-center py-6 sm:py-8">
-							<p class="text-sm sm:text-base text-gray-500">No active electricity meters found for this property.</p>
-						</div>
-					{:else}
-						<div class="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-							{#each data.meters as meter}
-								<div class="border border-gray-200 rounded-lg p-2 hover:shadow-md transition-shadow">
+						{#if data.meters.length === 0}
+							<div class="text-center py-6 sm:py-8">
+								<p class="text-sm sm:text-base text-gray-500">No active electricity meters found for this property.</p>
+							</div>
+						{:else}
+							<div class="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+								{#each data.meters as meter}
+									{@const consumption = getConsumption(meter, $form[`reading_${meter.id}`] as string)}
+									<div class="border border-gray-200 rounded-lg p-2 hover:shadow-md transition-shadow">
 									<div class="mb-1">
 										<h3 class="font-semibold text-gray-900 text-sm sm:text-base">{meter.name}</h3>
 									</div>
@@ -355,24 +396,32 @@
 												<div class="flex-shrink-0">
 													<span class="text-xs font-medium text-gray-700" style="writing-mode: vertical-lr; text-orientation: mixed;">Current</span>
 												</div>
-												<div>
-													<div class="text-xs text-gray-500 font-medium mb-0">
-														{new Date(data.date).toLocaleDateString('en-US', {
-															month: 'short',
-															day: 'numeric',
-															year: 'numeric'
-														})}
+												<div class="w-full">
+													<div class="flex justify-between items-baseline mb-1">
+														<div class="text-xs text-gray-500 font-medium">
+															{new Date(data.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+														</div>
+														{#if consumption}
+															<span
+																class="text-xs font-bold px-1.5 py-0.5 rounded {consumption.status === 'negative' ? 'bg-red-100 text-red-700' : consumption.status === 'high' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}"
+															>
+																{consumption.value > 0 ? '+' : ''}{consumption.value.toFixed(2)} used
+															</span>
+														{/if}
 													</div>
-													<div class="flex items-baseline">
+
+													<div class="flex items-baseline relative">
 														<input
 															type="number"
+															inputmode="decimal"
 															name={`reading_${meter.id}`}
+															bind:value={$form[`reading_${meter.id}`]}
 															placeholder={meter.latest_reading ? (meter.latest_reading.value.toString().includes('.') ? '000.00' : '0000.00') : '0000.00'}
 															step="0.01"
 															class={getInputClass(meter.id)}
 															oninput={(e) => validateField(meter, (e.target as HTMLInputElement).value, `reading_${meter.id}`)}
 														/>
-														<span class="text-xs text-gray-500 ml-1">kWh</span>
+														<span class="text-xs text-gray-500 ml-1 absolute right-0 bottom-2">kWh</span>
 													</div>
 													{#if fieldErrors[`reading_${meter.id}`]}
 														<p class="mt-1 text-xs text-red-600">{fieldErrors[`reading_${meter.id}`]}</p>
