@@ -12,6 +12,7 @@
 	import { onMount } from 'svelte';
 	import { printAllLeases } from '$lib/utils/print';
 	import { cache, cacheKeys, CACHE_TTL } from '$lib/services/cache';
+	import BottomActionBar from '$lib/components/BottomActionBar.svelte';
 
 	type FormType = z.infer<typeof leaseSchema>;
 
@@ -262,7 +263,7 @@
 				<h1 class="text-lg sm:text-xl lg:text-2xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
 					Leases Dashboard
 				</h1>
-				<div class="flex items-center gap-1 sm:gap-2">
+				<div class="hidden md:flex items-center gap-1 sm:gap-2">
 					<Button
 						onclick={handlePrintAllLeases}
 						variant="outline"
@@ -474,6 +475,61 @@
 		</div>
 	</div>
 </div>
+
+<!-- Mobile Bottom Action Bar -->
+<BottomActionBar>
+	<!-- Quick Filter Buttons -->
+	<button
+		onclick={() => handleFilterClick('paid')}
+		class="flex flex-col items-center justify-center min-w-[60px] min-h-[44px] px-2 py-1 rounded-lg transition-all {activeFilter ===
+		'paid'
+			? 'bg-green-100 text-green-700'
+			: 'text-slate-600 hover:bg-slate-100'}"
+	>
+		<Check class="w-5 h-5 mb-0.5" />
+		<span class="text-[10px] font-medium">Paid</span>
+	</button>
+
+	<button
+		onclick={() => handleFilterClick('pending')}
+		class="flex flex-col items-center justify-center min-w-[60px] min-h-[44px] px-2 py-1 rounded-lg transition-all {activeFilter ===
+		'pending'
+			? 'bg-yellow-100 text-yellow-700'
+			: 'text-slate-600 hover:bg-slate-100'}"
+	>
+		<Clock class="w-5 h-5 mb-0.5" />
+		<span class="text-[10px] font-medium">Pending</span>
+	</button>
+
+	<!-- Primary Add Button -->
+	<button
+		onclick={handleAddLease}
+		class="flex items-center justify-center gap-1.5 min-h-[44px] px-6 py-2 rounded-full bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg active:scale-95 transition-transform"
+	>
+		<Plus class="w-5 h-5" />
+		<span class="font-medium text-sm">Add Lease</span>
+	</button>
+
+	<button
+		onclick={() => handleFilterClick('overdue')}
+		class="flex flex-col items-center justify-center min-w-[60px] min-h-[44px] px-2 py-1 rounded-lg transition-all {activeFilter ===
+		'overdue'
+			? 'bg-red-100 text-red-700'
+			: 'text-slate-600 hover:bg-slate-100'}"
+	>
+		<AlertTriangle class="w-5 h-5 mb-0.5" />
+		<span class="text-[10px] font-medium">Overdue</span>
+	</button>
+
+	<button
+		onclick={handlePrintAllLeases}
+		disabled={isLoading || filteredLeases.length === 0}
+		class="flex flex-col items-center justify-center min-w-[60px] min-h-[44px] px-2 py-1 rounded-lg transition-all text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+	>
+		<Printer class="w-5 h-5 mb-0.5" />
+		<span class="text-[10px] font-medium">Print</span>
+	</button>
+</BottomActionBar>
 
 <!-- Modal for Create/Edit -->
 <LeaseFormModal
