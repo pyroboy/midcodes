@@ -15,6 +15,7 @@
 	import GlobalPropertyViewer from '$lib/components/3d/GlobalPropertyViewer.svelte';
 	import { featureFlags } from '$lib/stores/featureFlags';
 	import { Button } from '$lib/components/ui/button';
+	import { cn } from '$lib/utils';
 
 	// Import Lucide icons
 	import {
@@ -28,7 +29,8 @@
 		List,
 		LogOut,
 		User,
-		Box
+		Box,
+		X
 	} from 'lucide-svelte';
 
 	let { data, children }: { data: PageData; children: any } = $props();
@@ -170,9 +172,9 @@
 		{:else}
 			<!-- Regular routes with sidebar -->
 			<Sidebar.Provider>
-				<div class="flex min-h-screen w-full">
+				<div class="flex min-h-screen w-full overflow-hidden">
 					<!-- Sidebar -->
-					<Sidebar.Root collapsible="icon" class="shrink-0">
+					<Sidebar.Root collapsible="icon" class="shrink-0 z-20">
 						<Sidebar.Header>
 							<div class="p-4 font-bold text-lg">Dorm Management</div>
 						</Sidebar.Header>
@@ -238,71 +240,93 @@
 						<Sidebar.Rail />
 					</Sidebar.Root>
 
-					<!-- Main Content Area - Full Width -->
-					<main class="flex-1 overflow-auto w-full">
+					<!-- Flex container for Main Content + 3D Panel -->
+					<div class="flex flex-1 min-w-0 flex-col h-screen">
+						<!-- Header -->
 						<div
-							class="flex items-center justify-between p-4 md:p-6 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+							class="flex items-center justify-between p-4 md:p-6 border-b bg-background/95 backdrop-blur shrink-0"
 						>
 							<div class="flex items-center gap-4">
 								<Sidebar.Trigger />
-								{#if data.user}
-									<PropertySelector />
 
-									{#if $featureFlags.enable3DView}
-										<Button
-											variant="outline"
-											size="sm"
-											class="flex items-center gap-2 ml-2 border-blue-200 text-blue-700 hover:bg-blue-50"
-											onclick={() => (show3DModel = true)}
-										>
-											<Box class="w-4 h-4" />
-											3D View
-										</Button>
-									{/if}
+								{#if data.user}
+									<div class="flex items-center gap-2">
+										<PropertySelector />
+
+										<!-- 3D Toggle Button moved here -->
+										{#if $featureFlags.enable3DView}
+											<Button
+												variant={show3DModel ? "secondary" : "outline"}
+												size="sm"
+												class="flex items-center gap-2 ml-2 border-blue-200 text-blue-700 hover:bg-blue-50 transition-colors"
+												onclick={() => (show3DModel = !show3DModel)}
+											>
+												{#if show3DModel}
+													<X class="w-4 h-4" />
+													Close 3D
+												{:else}
+													<Box class="w-4 h-4" />
+													3D View
+												{/if}
+											</Button>
+										{/if}
+									</div>
 								{/if}
 							</div>
 						</div>
-						<div class="w-full">
-							{#if !propertiesInitialized}
-								<!-- Loading state -->
-								<div class="flex items-center justify-center h-[calc(100vh-120px)]">
-									<div class="flex flex-col items-center space-y-4">
-										<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-										<p class="text-sm text-muted-foreground">Loading...</p>
-									</div>
+
+						<!-- Scrollable content area containing both Page and 3D Panel -->
+						<div class="flex flex-1 overflow-hidden">
+							<!-- Main Page Content -->
+							<main class="flex-1 overflow-y-auto p-4 md:p-6">
+								<div class="w-full max-w-[1600px] mx-auto">
+									{#if !propertiesInitialized}
+										<!-- Loading state -->
+										<div class="flex items-center justify-center h-[50vh]">
+											<div class="flex flex-col items-center space-y-4">
+												<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+												<p class="text-sm text-muted-foreground">Loading...</p>
+											</div>
+										</div>
+									{:else if resolvedProperties.length === 0 && $page.url.pathname !== '/'}
+										<!-- No properties state -->
+										<div class="flex flex-col items-center justify-center h-[50vh] text-center p-8">
+											<Building class="h-16 w-16 text-muted-foreground mb-4" />
+											<h2 class="text-2xl font-semibold mb-2">Welcome to Dorm Management</h2>
+											<p class="text-muted-foreground mb-6 max-w-md">
+												To get started, you'll need to add your first property.
+											</p>
+											<a
+												href="/properties"
+												class="inline-flex items-center justify-center rounded-md bg-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90"
+											>
+												<Building class="mr-2 h-4 w-4" />
+												Add Your First Property
+											</a>
+										</div>
+									{:else}
+										{@render children()}
+									{/if}
 								</div>
-							{:else if resolvedProperties.length === 0 && $page.url.pathname !== '/'}
-								<!-- No properties state - but only show for non-root routes -->
-								<div
-									class="flex flex-col items-center justify-center h-[calc(100vh-120px)] text-center p-8"
+							</main>
+
+							<!-- 3D Panel (Slides in from Right) -->
+							{#if data.user && $featureFlags.enable3DView}
+								<div 
+									class={cn(
+										"border-l bg-background transition-all duration-300 ease-in-out overflow-hidden flex flex-col",
+										show3DModel ? "w-[450px] opacity-100" : "w-0 opacity-0"
+									)}
 								>
-									<Building class="h-16 w-16 text-muted-foreground mb-4" />
-									<h2 class="text-2xl font-semibold mb-2">Welcome to Dorm Management</h2>
-									<p class="text-muted-foreground mb-6 max-w-md">
-										To get started, you'll need to add your first property. This will serve as the
-										foundation for managing your dorm operations.
-									</p>
-									<a
-										href="/properties"
-										class="inline-flex items-center justify-center rounded-md bg-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90"
-									>
-										<Building class="mr-2 h-4 w-4" />
-										Add Your First Property
-									</a>
+									{#if show3DModel}
+										<GlobalPropertyViewer />
+									{/if}
 								</div>
-							{:else}
-								<!-- App content - always render for root route or when properties exist -->
-								{@render children()}
 							{/if}
 						</div>
-					</main>
+					</div>
 				</div>
 			</Sidebar.Provider>
-
-			<!-- 3D Property Viewer (Global) -->
-			{#if data.user && $featureFlags.enable3DView}
-				<GlobalPropertyViewer bind:open={show3DModel} />
-			{/if}
 		{/if}
 
 		<!-- Cache Debug Panel (Development Only) - Visible on all non-auth routes except utility-input -->
