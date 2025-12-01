@@ -2,28 +2,18 @@ import { redirect } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ locals: { supabase }, cookies }) => {
-	// First, sign out from Supabase
-	const { error } = await supabase.auth.signOut();
+	// 1. Sign out from Supabase API
+	await supabase.auth.signOut();
 
-	if (error) {
-		console.error('Error signing out:', error.message);
-	}
+	// 2. Force clear cookies
+	const cookieOptions = { path: '/', expires: new Date(0) };
+	cookies.set('sb-access-token', '', cookieOptions);
+	cookies.set('sb-refresh-token', '', cookieOptions);
 
-	// Clear all Supabase-related cookies
-	cookies.delete('sb-access-token', { path: '/' });
-	cookies.delete('sb-refresh-token', { path: '/' });
+	// 3. Clear any sidebar state or app-specific cookies
+	cookies.set('sidebar:state', '', cookieOptions);
+	cookies.set('selectedOrgId', '', cookieOptions);
 
-	// Clear session from cache by setting expired cookies
-	cookies.set('sb-access-token', '', {
-		path: '/',
-		expires: new Date(0)
-	});
-	cookies.set('sb-refresh-token', '', {
-		path: '/',
-		expires: new Date(0)
-	});
-
-	// Redirect to auth page after successful signout
 	throw redirect(303, '/auth');
 };
 

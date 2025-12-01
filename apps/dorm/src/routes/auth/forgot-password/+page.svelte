@@ -1,8 +1,9 @@
 <script lang="ts">
-	import { enhance } from '$app/forms';
-	import type { ActionData } from './$types';
+	import { superForm } from 'sveltekit-superforms/client';
+	import type { PageData } from './$types';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
 	import {
 		Card,
 		CardContent,
@@ -13,11 +14,25 @@
 	import { Loader2 } from 'lucide-svelte';
 
 	interface Props {
-		form: ActionData;
+		data: PageData;
 	}
 
-	let { form }: Props = $props();
-	let isLoading = $state(false);
+	let { data }: Props = $props();
+
+	const { form, errors, enhance, delayed, message } = superForm(data.form, {
+		resetForm: false
+	});
+
+	// Check for success state from form submission
+	let success = $state(false);
+	let successMessage = $state('');
+
+	$effect(() => {
+		if (message && $message) {
+			success = true;
+			successMessage = $message;
+		}
+	});
 </script>
 
 <div class="container mx-auto flex h-screen w-screen flex-col items-center justify-center">
@@ -29,38 +44,28 @@
 			>
 		</CardHeader>
 		<CardContent>
-			<form
-				method="POST"
-				use:enhance={() => {
-					isLoading = true;
-					return async ({ update }) => {
-						await update();
-						isLoading = false;
-					};
-				}}
-				class="space-y-4"
-			>
+			<form method="POST" use:enhance class="space-y-4">
 				<div class="space-y-2">
+					<Label for="email">Email</Label>
 					<Input
 						id="email"
 						name="email"
 						type="email"
 						placeholder="Email"
-						required
-						value={form?.email ?? ''}
+						bind:value={$form.email}
+						aria-invalid={$errors.email ? 'true' : undefined}
 					/>
+					{#if $errors.email}
+						<p class="text-sm text-destructive">{$errors.email}</p>
+					{/if}
 				</div>
 
-				{#if form?.error && !form?.success}
-					<p class="text-sm text-destructive">{form.error}</p>
+				{#if success}
+					<p class="text-sm text-green-600">{successMessage}</p>
 				{/if}
 
-				{#if form?.success}
-					<p class="text-sm text-green-600">{form.message}</p>
-				{/if}
-
-				<Button type="submit" class="w-full" disabled={isLoading}>
-					{#if isLoading}
+				<Button type="submit" class="w-full" disabled={$delayed}>
+					{#if $delayed}
 						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
 						Sending reset link...
 					{:else}

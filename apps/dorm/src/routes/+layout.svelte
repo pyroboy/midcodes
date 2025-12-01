@@ -12,6 +12,9 @@
 	import { preloadHeavyComponents } from '$lib/utils/lazyLoad';
 	import CacheDebugPanel from '$lib/components/debug/CacheDebugPanel.svelte';
 	import { dev } from '$app/environment';
+	import GlobalPropertyViewer from '$lib/components/3d/GlobalPropertyViewer.svelte';
+	import { featureFlags } from '$lib/stores/featureFlags';
+	import { Button } from '$lib/components/ui/button';
 
 	// Import Lucide icons
 	import {
@@ -24,13 +27,15 @@
 		CreditCard,
 		List,
 		LogOut,
-		User
+		User,
+		Box
 	} from 'lucide-svelte';
 
 	let { data, children }: { data: PageData; children: any } = $props();
 
 	let ready = $state(false);
 	let isAuthRoute = $state(false);
+	let show3DModel = $state(false);
 
 	onMount(() => {
 		ready = true;
@@ -63,7 +68,7 @@
 	// Initialize properties store - simplified approach
 	let propertiesInitialized = $state(false);
 	let resolvedProperties = $state<Property[]>([]);
-	
+
 	$effect(() => {
 		// Reset initialization state when data changes
 		if (data.properties) {
@@ -85,7 +90,7 @@
 					});
 			} else {
 				// Properties already resolved
-				const props = data.properties as Property[] || [];
+				const props = (data.properties as Property[]) || [];
 				resolvedProperties = props;
 				propertiesInitialized = true;
 				if (props.length > 0) {
@@ -242,6 +247,18 @@
 								<Sidebar.Trigger />
 								{#if data.user}
 									<PropertySelector />
+
+									{#if $featureFlags.enable3DView}
+										<Button
+											variant="outline"
+											size="sm"
+											class="flex items-center gap-2 ml-2 border-blue-200 text-blue-700 hover:bg-blue-50"
+											onclick={() => (show3DModel = true)}
+										>
+											<Box class="w-4 h-4" />
+											3D View
+										</Button>
+									{/if}
 								{/if}
 							</div>
 						</div>
@@ -256,11 +273,14 @@
 								</div>
 							{:else if resolvedProperties.length === 0 && $page.url.pathname !== '/'}
 								<!-- No properties state - but only show for non-root routes -->
-								<div class="flex flex-col items-center justify-center h-[calc(100vh-120px)] text-center p-8">
+								<div
+									class="flex flex-col items-center justify-center h-[calc(100vh-120px)] text-center p-8"
+								>
 									<Building class="h-16 w-16 text-muted-foreground mb-4" />
 									<h2 class="text-2xl font-semibold mb-2">Welcome to Dorm Management</h2>
 									<p class="text-muted-foreground mb-6 max-w-md">
-										To get started, you'll need to add your first property. This will serve as the foundation for managing your dorm operations.
+										To get started, you'll need to add your first property. This will serve as the
+										foundation for managing your dorm operations.
 									</p>
 									<a
 										href="/properties"
@@ -278,6 +298,11 @@
 					</main>
 				</div>
 			</Sidebar.Provider>
+
+			<!-- 3D Property Viewer (Global) -->
+			{#if data.user && $featureFlags.enable3DView}
+				<GlobalPropertyViewer bind:open={show3DModel} />
+			{/if}
 		{/if}
 
 		<!-- Cache Debug Panel (Development Only) - Visible on all non-auth routes except utility-input -->
