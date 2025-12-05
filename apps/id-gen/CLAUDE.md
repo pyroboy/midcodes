@@ -1,281 +1,102 @@
 # CLAUDE.md
-## meta-instruction
-Now think hard and write elegant code that completes this.
-Do not add backwards compatibility unless explicitly requested.
-After every code block you write, lint, compile, and write corresponding tests and run them before writing the next code block
 
-### **Multi-Repository Context Overview**
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-    This project involves two main directories:
+## Development Commands
 
-    ## **1. Current ID-Gen Repository**  
-    `/data/data/com.termux/files/home/midcodes/apps/id-gen/`  
-    - Main development repository for the **ID Generation** app  
-    - Includes all **source code**, **documentation**, and **project files**  
+```bash
+# Development
+pnpm run dev              # Start dev server at 127.0.0.1:5173
+pnpm run build            # Production build
+pnpm run preview          # Preview production build
 
-    ## **2. Obsidian Vault (Knowledge Base)**  
-    `/data/data/com.termux/files/home/storage/shared/arjoencrypted/midcodes/`  
-    - Centralized knowledge management system (PARA structure)  
-    - Stores **business documentation**, **speedruns**, **personal development resources**  
-    - Contains **Midcodes documentation** and **technical specs**  
-    - Reference **CLAUDE.md** in the root for full vault structure  
+# Testing
+pnpm run test             # Run all tests (integration + unit)
+pnpm run test:unit        # Run Vitest unit tests
+pnpm run test:integration # Run Playwright E2E tests
+pnpm vitest run tests/unit/fileValidation.test.ts  # Run single test file
 
----
+# Code Quality
+pnpm run check            # TypeScript type checking
+pnpm run check:watch      # Type checking in watch mode
+pnpm run lint             # Prettier + ESLint check
+pnpm run format           # Auto-format with Prettier
 
-    ## **Cross-Repository Workflow**
+# Supabase Edge Functions
+pnpm run serve:edge       # Serve edge functions locally
+pnpm run deploy:edge      # Deploy edge functions
 
-    - **Research & Planning** → Use Obsidian Vault for strategy, patterns, and requirements  
-    - **Implementation** → Apply vault knowledge during code development  
-    - **Documentation** → Update both repo and vault after each development cycle  
-    - **Speedrun Link** → This project corresponds to **ID-GEN Speedrun** in the vault  
-    - **Mirroring** → Repo docs automatically mirrored to the vault for centralized access  
+# Maintenance
+pnpm run clean            # Clear .svelte-kit, build, and cache
+```
 
-    ---
-
-    ## **Documentation Mirroring Strategy**
-
-    ### **Repository Folders**
-    - `/docs/` → Documentation (reports, summaries)  
-    - `/specs/` → Specifications (plans, instructions)  
-    - `/tests/` → Test cases and QA reports  
-
-    ### **Vault Targets**
-    - `/repo-docs/` → Documentation (original names)  
-    - `/repo-specs/` → Specifications (with naming convention)  
-    - `/repo-tests/` → Tests (with naming convention)  
-
-    ---
-
-    ### **File Naming Conventions**
-    - **Specifications** → `Spec-NN-MMMDD-Title-With-Dashes.md`  
-    *Example:* `Spec-01-Aug20-Refactoring-Plan-Phase-1.md`  
-    - **Documentation** → Original file name in CAPS  
-    *Example:* `BUG_ANALYSIS_REPORT.md`  
-    - **Tests** → `Test-NN-MMMDD-Component-Test-Name.md`  
-    *Example:* `Test-01-Aug20-Authentication-Flow-Testing.md`  
-
-    **Classification:**  
-    - **SPEC** = Plans, guidelines, implementation steps  
-    - **DOC** = Reports, analysis, post-mortems  
-    - **TEST** = QA test cases, results  
-
-    ---
-
-    ## **Mirroring Commands & Workflow**
-
-    **Batch Mirror All Files**
-    ```bash
-    ./mirror-docs.sh
-    ```
-        Mirror Single File
-    ```bash
-    ./mirror-docs.sh "BUG_ANALYSIS_REPORT.md"```
-    Auto Naming Example
-    ```bash
-    mirror_doc "BUG_ANALYSIS_REPORT.md" "Bug-Analysis-Report"
-    ```
-
-
-
-
-
-
-### Core Technology Stack
+## Technology Stack
 
 - **SvelteKit 2.x** with TypeScript - Full-stack framework
-- **Vercel** deployment with Node.js 20.x runtime
-- **Supabase** - Database, auth, and storage backend
-- **TailwindCSS 4.x** - Utility-first styling
-- **Threlte** (@threlte/core, @threlte/extras) - 3D graphics with Three.js
-- **shadcn-svelte** - UI component library
+- **Supabase** - Database, auth, storage (type-safe via generated `database.types.ts`)
+- **TailwindCSS 4.x** - Styling with `@tailwindcss/vite`
+- **Threlte** - 3D graphics (Three.js wrapper for Svelte)
+- **shadcn-svelte** + **bits-ui** - UI component library
+- **sveltekit-superforms** + **Zod 4** - Form validation
+- **Vercel** - Deployment (Node.js 20.x runtime)
 
-### Project Structure
+## Architecture Overview
 
-- `src/lib/` - Shared utilities and stores
-  - `components/` - Reusable Svelte components including shadcn-svelte UI
-    - `ui/` - shadcn-svelte component library (buttons, cards, dialogs, etc.)
-    - `empty-states/` - Empty state components for various scenarios
-  - `stores/` - Svelte stores for state management
-    - `auth.svelte.ts` & `auth.ts` - Authentication state management
-    - `theme.ts` & `darkMode.ts` - Theme and dark mode state
-    - `templateStore.ts` - Template data management
-    - `viewMode.ts` - UI view mode toggles
-  - `types/` - TypeScript type definitions
-    - `database.types.ts` - Generated Supabase database types
-    - `auth.ts` - Authentication type definitions
-    - Various schema and interface definitions
-  - `utils/` - Helper functions and utilities
-    - Card geometry and ID card operations
-    - Image processing and cropping utilities
-    - Performance monitoring and logging
-    - Coordinate system and background utilities
-  - `schemas/` - Zod validation schemas for the codebase
-  - `config/` - Configuration files (fonts, environment, PayMongo)
-  - `server/` - Server-side utilities (Supabase, payments, crypto)
-  - `services/` - Business logic services (payments, permissions)
-  - `remote/` - Remote API interaction modules
-- `src/routes/` - SvelteKit file-based routing
-  - `templates/` - Template management pages (admin only)
-  - `use-template/[id]/` - ID generation from specific templates
-  - `all-ids/` - View and manage generated ID cards
-  - `auth/` - Authentication pages (login, signup, password reset)
-  - `account/` - User account management
-  - `admin/` - Admin dashboard and user management
-  - `profile/` - User profile management
-  - `credits/` - Credit system and billing
-  - `pricing/` - Pricing and subscription pages
-  - `features/` - Feature showcase pages
-  - `api/` - API endpoints for server operations
-  - `webhooks/` - Webhook handlers (PayMongo integration)
-- `tests/` - Testing infrastructure
-  - `unit/` - Unit tests for components and utilities
-  - `integration/` - Integration tests with Supabase
-  - `edge-cases/` - Edge case testing scenarios
-- `docs/` - Project documentation and analysis reports
-- `specs/` - Technical specifications and implementation plans
-- `static/` - Static assets (favicons, default images)
-
-### Database Integration
-
-- Uses Supabase with type-safe generated TypeScript types (`database.types.ts`)
-- Row Level Security (RLS) policies enforce role-based access control
-- Main tables: `templates`, `idcards`, `organizations`, `profiles`
-- Organization-scoped data access patterns
+### Authentication Flow
+1. `src/hooks.server.ts` initializes Supabase client and handles auth guard
+2. Session/user/permissions populated in `event.locals` via `safeGetSession()`
+3. `src/routes/+layout.server.ts` passes auth data to all routes
+4. JWT decoded for role-based permissions via `getUserPermissions()`
 
 ### Role-Based Access Control
+Hierarchy: `super_admin` > `org_admin` > `id_gen_admin` > `id_gen_user`
 
-Role hierarchy: `super_admin` > `org_admin` > `id_gen_admin` > `id_gen_user`
-
-**Template Management**: Only admin roles (`super_admin`, `org_admin`, `id_gen_admin`) can create/edit templates
-**ID Generation**: All roles can generate IDs from available templates
-**Data Scope**: All operations are organization-scoped via `org_id`
-
-See `specs/Spec-02-Aug20-ID-GEN-ROLE-INSTRUCTIONS.md` for detailed role implementation guidelines.
-
-### 3D Rendering
-
-Uses Threlte wrapper around Three.js for 3D ID card visualization and rendering. Components handle camera positioning, lighting, and card geometry calculations.
+- All data is organization-scoped via `org_id`
+- Permissions fetched from `role_permissions` table and cached (5min TTL)
+- Route protection in `+page.server.ts` files (check `session` in locals)
 
 ### State Management
+- `src/lib/stores/auth.ts` - Auth state (user, session, profile, roleEmulation)
+- `src/lib/stores/templateStore.ts` - Template data with TemplateElement interface
+- `src/lib/stores/darkMode.ts` - Theme persistence
 
-- `templateStore.ts` - Template data and elements with complex TemplateElement interface
-- `auth.ts` - User session and role management
-- `darkMode.ts` - Theme state persistence
+### Key Data Patterns
+- **Templates**: Dimensions stored as pixels + DPI (not physical units)
+- **Template Elements**: Discriminated union by `type` field (`text`, `image`, `qr`, `photo`, `signature`, `selection`)
+- **Database Operations**: Use type-safe Supabase client from `event.locals.supabase`
 
-### Key Development Patterns
+### Schemas (Single Source of Truth)
+All validation schemas in `src/lib/schemas/`:
+- `template-element.schema.ts` - Element type definitions
+- `template-creation.schema.ts` - Template creation/presets
+- `template-update.schema.ts` - Partial updates, bulk ops
+- `display-conversion.schema.ts` - Unit conversions
 
-- Server-side route protection with `requireAuth()` in `+page.server.ts` files
-- Type-safe Supabase operations with generated database types
-- Component composition with shadcn-svelte UI primitives
-- File upload/storage through Supabase Storage with organization-scoped paths
+## Key File Locations
 
-### Testing Strategy
+- `src/hooks.server.ts` - Auth initialization, route guards, security headers
+- `src/routes/+layout.server.ts` - Root data loading
+- `src/lib/types/database.types.ts` - Generated Supabase types
+- `src/lib/services/permissions.ts` - Permission checking with cache
+- `tests/setup.ts` - Test environment setup
 
-- **Integration tests**: Playwright for end-to-end scenarios
-- **Unit tests**: Vitest with Testing Library for component testing
-- **Mocking**: MSW for API mocking in tests
+## Testing Patterns
 
-### Development Notes
+- **Unit tests**: Vitest + Testing Library in `src/**/*.test.ts` or `tests/**/*.test.ts`
+- **Integration tests**: Playwright in `tests/integration/`
+- **API mocking**: MSW for Supabase mocking
+- **Test setup**: `tests/setup.ts` (includes File API mock for jsdom)
 
-- Server binds to `127.0.0.1:5173` specifically for Windows compatibility
-- Vite optimizes deps for 3D libraries and UI components
-- Uses session storage for auth persistence (not localStorage)
-- Environment variables through SvelteKit's `$env` modules
+## Development Notes
 
+- Server binds to `127.0.0.1:5173` for Windows compatibility
+- Uses session storage for auth (not localStorage)
+- Environment variables via `$env/static/public` and `$env/static/private`
+- 3D libraries optimized in `vite.config.ts` (exclude ws/events, include three/threlte)
 
-# **Unified Specification & Testing Prompt**
+## Meta-Instructions
 
-
-
-    ## **Role & Context**
-    - You are acting as a **Senior Software Engineer** for specifications and as a **Senior Data Architect** for testing.
-    - Use:
-    - **Supabase MCP** for DB details (schemas, queries, types).
-    - **Context7 MCP** for NPM usage patterns.
-
-    ---
-
-    ## **General Workflow**
-    Both specs and tests follow **Steps 0–5**. Tests add Step 6.
-
-    ---
-
-    ### **Step 0 – Input Reading (No Output)**
-    - Read user request.
-    - Store everything silently (no output yet).
-
-    ---
-
-    ### **Step 1 – Requirement Extraction**
-    - Break the request into **clear, actionable requirements**.
-    - Restate vague items in precise engineering terms.
-
-    ---
-
-    ### **Step 2 – Context Awareness**
-    - Assume SvelteKit + Supabase environment.
-    - Validate DB design and API interactions with Supabase MCP.
-    - Validate NPM usage patterns with Context7 MCP.
-
-    ---
-
-    ### **Step 3 – Technical Specification**
-    Expand requirements into a **structured specification** including:
-    - **Data flow** (input → processing → output).
-    - **State handling** (Svelte stores, props, Supabase sync).
-    - **Function behaviors** (purpose, edge cases, error handling).
-    - **Database/API** (tables, queries, CRUD operations).
-    - **UI/UX** (mark as _UI minor_ or _UX minor_ if minimal).
-    - **Dependencies** (libraries, MCP references).
-
-    ---
-
-    ### **Step 4 – Implementation Plan**
-    - High-level strategy, not raw code.
-    - Indicate **affected files/components**.
-    - Best practices for **error handling, validation, maintainability**.
-    - Clarify assumptions & constraints.
-
-    ---
-
-    ### **Step 5 – Checklist (Mandatory)**
-    Provide complexity ratings (1–10):
-    - 1 = trivial tweak, 10 = multi-file/system refactor.
-
-    ✅ **Specification Checklist**
-    1. **UI Changes** – Minor cosmetic?
-    2. **UX Changes** – Minor interaction tweaks?
-    3. **Data Handling** – DB schema or query updates?
-    4. **Function Logic** – Any major business logic changes?
-    5. **ID/Key Consistency** – Stable IDs across state, DB, UI?
-
-    ---
-
-    ### **Additional Steps for Testing**
-
-    #### **Step 6 – Testing Strategy & Checklist**
-    - Define **how to test** (unit, integration, E2E).
-    - **Supabase Integration**:
-    - Use real API commands (not MCP commands).
-    - Implement **test data seeding & cleanup**.
-    - Mirror to schema `test_integration`.
-    - Include **schemas, types, and interfaces**.
-
-    ✅ **Testing Checklist (with ratings 1–10)**  
-    1. **Unit Tests** – Valid, invalid, edge inputs.  
-    2. **Integration Tests** – DB + API + app logic.  
-    3. **E2E Scenarios** – Happy path, errors, edge flows.  
-    4. **Edge Cases** – Empty, large, duplicate, concurrency.  
-    5. **Error Handling** – Proper UI/UX feedback tested.  
-    6. **Data Consistency** – State, DB, UI alignment.  
-    7. **Repeatability** – Clean environment each run.  
-    8. **Performance/Load** – Parallel/multi-user scenarios.  
-    9. **Regression Safety** – Protect existing features.  
-    10. **Expected Outcomes** – Pass/fail conditions clear.  
-
-    ---
-
-    ## **Special Notes**
-    - Always output **Supabase schemas**, **interfaces**, and **types** for any DB-related feature.
-    - Testing must include **seed/cleanup logic** for consistency.
-    - Ask the user: **“What test are you concentrating on?”** when in testing mode.
+After writing code blocks, run lint, type check, and tests before continuing:
+```bash
+pnpm run check && pnpm run lint && pnpm run test:unit
+```

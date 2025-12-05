@@ -9,7 +9,12 @@
 	import { pushState } from '$app/navigation';
 	import type { TemplateElement, TemplateData } from '$lib/stores/templateStore';
 	import type { CardSize } from '$lib/utils/sizeConversion';
-	import { cardSizeToPixels, LEGACY_CARD_SIZE, COMMON_CARD_SIZES, findClosestCardSize } from '$lib/utils/sizeConversion';
+	import {
+		cardSizeToPixels,
+		LEGACY_CARD_SIZE,
+		COMMON_CARD_SIZES,
+		findClosestCardSize
+	} from '$lib/utils/sizeConversion';
 
 	// Type that matches the actual database schema
 	type DatabaseTemplate = {
@@ -32,17 +37,17 @@
 		data: DatabaseTemplate;
 		message: string;
 	};
-import {
-	needsCropping,
-	cropBackgroundImage,
-	getImageDimensions,
-	generateCropPreviewUrl,
-	type BackgroundPosition
-} from '$lib/utils/imageCropper';
-import { browser } from '$app/environment';
-import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeometry';
-import { toast } from 'svelte-sonner';
-import { imageCache } from '$lib/utils/imageCache';
+	import {
+		needsCropping,
+		cropBackgroundImage,
+		getImageDimensions,
+		generateCropPreviewUrl,
+		type BackgroundPosition
+	} from '$lib/utils/imageCropper';
+	import { browser } from '$app/environment';
+	import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeometry';
+	import { toast } from 'svelte-sonner';
+	import { imageCache } from '$lib/utils/imageCache';
 
 	// Convert a Blob/File to a base64 data URL for stable, in-memory previews
 	async function blobToDataUrl(fileOrBlob: Blob): Promise<string> {
@@ -55,7 +60,9 @@ import { imageCache } from '$lib/utils/imageCache';
 	}
 
 	// data means get data from server
-	let { data }: {
+	let {
+		data
+	}: {
 		data: { templates: DatabaseTemplate[]; selectedTemplate?: any; user: any; org_id: string };
 	} = $props();
 
@@ -85,7 +92,7 @@ import { imageCache } from '$lib/utils/imageCache';
 	// Add view mode state
 	let isLoading = $state(false);
 	let isEditMode = $state(false);
-	
+
 	// Preload 3D card geometries for templates
 	const templateGeometries = $state<Record<string, any>>({});
 	let readyModelsCount = $state(0);
@@ -134,24 +141,28 @@ import { imageCache } from '$lib/utils/imageCache';
 	function findBestDefaultSize(): CardSize {
 		// If no templates exist, use the standard credit card size
 		if (!templates || templates.length === 0) {
-			return COMMON_CARD_SIZES.find(size => size.name === 'Credit Card') || LEGACY_CARD_SIZE;
+			return COMMON_CARD_SIZES.find((size) => size.name === 'Credit Card') || LEGACY_CARD_SIZE;
 		}
 
 		// Try to find templates with size information to analyze patterns
-		const templatesWithSizes = templates.filter(t => 
-			(t as any).width_pixels && (t as any).height_pixels
+		const templatesWithSizes = templates.filter(
+			(t) => (t as any).width_pixels && (t as any).height_pixels
 		) as Array<DatabaseTemplate & { width_pixels: number; height_pixels: number }>;
 
 		if (templatesWithSizes.length > 0) {
 			// Count occurrences of each size to find the most common
 			const sizeMap = new Map<string, { count: number; width: number; height: number }>();
-			
-			templatesWithSizes.forEach(template => {
+
+			templatesWithSizes.forEach((template) => {
 				const key = `${template.width_pixels}x${template.height_pixels}`;
 				if (sizeMap.has(key)) {
 					sizeMap.get(key)!.count++;
 				} else {
-					sizeMap.set(key, { count: 1, width: template.width_pixels, height: template.height_pixels });
+					sizeMap.set(key, {
+						count: 1,
+						width: template.width_pixels,
+						height: template.height_pixels
+					});
 				}
 			});
 
@@ -165,16 +176,19 @@ import { imageCache } from '$lib/utils/imageCache';
 
 			if (mostCommon.count > 0) {
 				// Try to match it to a standard card size or create a custom one
-				const closestStandardSize = findClosestCardSize({ 
-					width: mostCommon.width, 
-					height: mostCommon.height 
-				}, 300);
-				
+				const closestStandardSize = findClosestCardSize(
+					{
+						width: mostCommon.width,
+						height: mostCommon.height
+					},
+					300
+				);
+
 				// If it's close to a standard size (within 5% difference), use the standard
 				const standardPixels = cardSizeToPixels(closestStandardSize, 300);
 				const widthDiff = Math.abs(standardPixels.width - mostCommon.width) / mostCommon.width;
 				const heightDiff = Math.abs(standardPixels.height - mostCommon.height) / mostCommon.height;
-				
+
 				if (widthDiff <= 0.05 && heightDiff <= 0.05) {
 					return closestStandardSize;
 				} else {
@@ -191,7 +205,7 @@ import { imageCache } from '$lib/utils/imageCache';
 		}
 
 		// If no patterns found or analysis failed, use Credit Card as the most common standard
-		return COMMON_CARD_SIZES.find(size => size.name === 'Credit Card') || LEGACY_CARD_SIZE;
+		return COMMON_CARD_SIZES.find((size) => size.name === 'Credit Card') || LEGACY_CARD_SIZE;
 	}
 
 	async function validateBackgrounds(): Promise<boolean> {
@@ -267,10 +281,10 @@ import { imageCache } from '$lib/utils/imageCache';
 			// Process front background with cropping if needed
 			if (frontBackground && requiredPixelDimensions) {
 				console.log('🖼️ Processing front background...');
-				
+
 				// Update progress: Cropping front image
 				toast.loading('Cropping front background image...', { id: toastId });
-				
+
 				const frontResult = await cropBackgroundImage(
 					frontBackground,
 					requiredPixelDimensions,
@@ -293,35 +307,36 @@ import { imageCache } from '$lib/utils/imageCache';
 
 				// Update progress: Uploading front image
 				toast.loading('Uploading front background to storage...', { id: toastId });
-				
-			// Upload the cropped file with improved error handling and progress updates
-			try {
-				// 📄 Show detailed upload progress
-				toast.loading('Uploading front image to cloud storage...', { id: toastId });
-				console.log('📄 Starting front image upload...');
-				
-				frontUrl = await uploadImage(frontResult.croppedFile, `front_${Date.now()}`, user?.id);
-				
-				if (!frontUrl || typeof frontUrl !== 'string') {
-					throw new Error('Upload succeeded but returned invalid URL');
+
+				// Upload the cropped file with improved error handling and progress updates
+				try {
+					// 📄 Show detailed upload progress
+					toast.loading('Uploading front image to cloud storage...', { id: toastId });
+					console.log('📄 Starting front image upload...');
+
+					frontUrl = await uploadImage(frontResult.croppedFile, `front_${Date.now()}`, user?.id);
+
+					if (!frontUrl || typeof frontUrl !== 'string') {
+						throw new Error('Upload succeeded but returned invalid URL');
+					}
+
+					console.log('✅ Front background uploaded successfully:', frontUrl);
+					toast.loading('Front image uploaded ✓ Processing back image...', { id: toastId });
+				} catch (uploadError) {
+					console.error('❌ Front image upload failed:', uploadError);
+					const errorMsg =
+						uploadError instanceof Error ? uploadError.message : 'Unknown upload error';
+					throw new Error(`Failed to upload front background: ${errorMsg}`);
 				}
-				
-				console.log('✅ Front background uploaded successfully:', frontUrl);
-				toast.loading('Front image uploaded ✓ Processing back image...', { id: toastId });
-			} catch (uploadError) {
-				console.error('❌ Front image upload failed:', uploadError);
-				const errorMsg = uploadError instanceof Error ? uploadError.message : 'Unknown upload error';
-				throw new Error(`Failed to upload front background: ${errorMsg}`);
-			}
 			}
 
 			// Process back background with cropping if needed
 			if (backBackground && requiredPixelDimensions) {
 				console.log('🖼️ Processing back background...');
-				
+
 				// Update progress: Cropping back image
 				toast.loading('Cropping back background image...', { id: toastId });
-				
+
 				const backResult = await cropBackgroundImage(
 					backBackground,
 					requiredPixelDimensions,
@@ -344,26 +359,27 @@ import { imageCache } from '$lib/utils/imageCache';
 
 				// Update progress: Uploading back image
 				toast.loading('Uploading back background to storage...', { id: toastId });
-				
-			// Upload the cropped file with improved error handling and progress updates
-			try {
-				// 📄 Show detailed upload progress
-				toast.loading('Uploading back image to cloud storage...', { id: toastId });
-				console.log('📄 Starting back image upload...');
-				
-				backUrl = await uploadImage(backResult.croppedFile, `back_${Date.now()}`, user?.id);
-				
-				if (!backUrl || typeof backUrl !== 'string') {
-					throw new Error('Upload succeeded but returned invalid URL');
+
+				// Upload the cropped file with improved error handling and progress updates
+				try {
+					// 📄 Show detailed upload progress
+					toast.loading('Uploading back image to cloud storage...', { id: toastId });
+					console.log('📄 Starting back image upload...');
+
+					backUrl = await uploadImage(backResult.croppedFile, `back_${Date.now()}`, user?.id);
+
+					if (!backUrl || typeof backUrl !== 'string') {
+						throw new Error('Upload succeeded but returned invalid URL');
+					}
+
+					console.log('✅ Back background uploaded successfully:', backUrl);
+					toast.loading('Both images uploaded ✓ Preparing to save...', { id: toastId });
+				} catch (uploadError) {
+					console.error('❌ Back image upload failed:', uploadError);
+					const errorMsg =
+						uploadError instanceof Error ? uploadError.message : 'Unknown upload error';
+					throw new Error(`Failed to upload back background: ${errorMsg}`);
 				}
-				
-				console.log('✅ Back background uploaded successfully:', backUrl);
-				toast.loading('Both images uploaded ✓ Preparing to save...', { id: toastId });
-			} catch (uploadError) {
-				console.error('❌ Back image upload failed:', uploadError);
-				const errorMsg = uploadError instanceof Error ? uploadError.message : 'Unknown upload error';
-				throw new Error(`Failed to upload back background: ${errorMsg}`);
-			}
 			}
 
 			// Combine front and back elements
@@ -461,7 +477,7 @@ import { imageCache } from '$lib/utils/imageCache';
 			const responseText = await response.text();
 			console.log('🔍 RAW server response text:', responseText);
 			console.log('🔍 RAW response text length:', responseText.length);
-			
+
 			// Try to parse as JSON
 			let result;
 			try {
@@ -479,7 +495,7 @@ import { imageCache } from '$lib/utils/imageCache';
 
 			// Handle server response based on actual format
 			if (result && typeof result === 'object') {
-				// Check for SvelteKit form action format: { type: 'success', data: {...} } 
+				// Check for SvelteKit form action format: { type: 'success', data: {...} }
 				if (result.type === 'success' && result.data) {
 					console.log('✅ SvelteKit form action success format detected');
 					result.success = true; // Normalize to our expected format
@@ -487,14 +503,14 @@ import { imageCache } from '$lib/utils/imageCache';
 					console.error('❌ SvelteKit form action failed:', result);
 					throw new Error(result.message || 'Server form action failed');
 				}
-				
+
 				// Check for our custom format: { success: true, data: {...} }
 				if (result.success === false) {
 					const errorMsg = result.message || 'Server action failed';
 					console.error('❌ Server action failed:', errorMsg);
 					throw new Error(errorMsg);
 				}
-				
+
 				// Ensure we have data
 				if (!('data' in result)) {
 					console.error('❌ No template data in server response. Full result:', result);
@@ -513,13 +529,14 @@ import { imageCache } from '$lib/utils/imageCache';
 					const parsed = JSON.parse(result.data);
 					if (Array.isArray(parsed)) {
 						// Prefer an object that looks like a template; ignore primitives (numbers/strings)
-						const candidates = parsed.filter((item: any) =>
-							item && typeof item === 'object' && (
-								('front_background' in item) ||
-								('back_background' in item) ||
-								('template_elements' in item) ||
-								('id' in item && 'name' in item)
-							)
+						const candidates = parsed.filter(
+							(item: any) =>
+								item &&
+								typeof item === 'object' &&
+								('front_background' in item ||
+									'back_background' in item ||
+									'template_elements' in item ||
+									('id' in item && 'name' in item))
 						);
 						savedTemplate = candidates.length ? candidates[candidates.length - 1] : undefined;
 					} else {
@@ -584,10 +601,14 @@ import { imageCache } from '$lib/utils/imageCache';
 				// Handle possible objects like { publicUrl } or { path }
 				try {
 					const maybeObj = value as any;
-					const fromObj = (maybeObj?.publicUrl || maybeObj?.url || maybeObj?.path) as string | undefined;
+					const fromObj = (maybeObj?.publicUrl || maybeObj?.url || maybeObj?.path) as
+						| string
+						| undefined;
 					if (fromObj && typeof fromObj === 'string') {
 						if (fromObj.startsWith('blob:') || fromObj.startsWith('data:')) return fromObj;
-						const url = fromObj.startsWith('http') ? fromObj : getSupabaseStorageUrl(fromObj, 'templates');
+						const url = fromObj.startsWith('http')
+							? fromObj
+							: getSupabaseStorageUrl(fromObj, 'templates');
 						return `${url}?t=${Date.now()}`;
 					}
 				} catch {}
@@ -613,23 +634,30 @@ import { imageCache } from '$lib/utils/imageCache';
 			if (backPreview) imageCache.setPublic(backKey, backPreview);
 			frontPreview = imageCache.resolve(frontKey);
 			backPreview = imageCache.resolve(backKey);
-			
+
 			// Use the just-sent elements as source of truth
 			savedTemplate.template_elements = allElements;
 
 			// Build safe values
-			const safeName: string = typeof savedTemplate.name === 'string' ? savedTemplate.name : (currentTemplate?.name ?? 'Untitled Template');
+			const safeName: string =
+				typeof savedTemplate.name === 'string'
+					? savedTemplate.name
+					: (currentTemplate?.name ?? 'Untitled Template');
 			const elementsCount: number = Array.isArray(savedTemplate.template_elements)
 				? savedTemplate.template_elements.length
-				: (Array.isArray(allElements) ? allElements.length : 0);
-			
-			// --- FIX START --- 
+				: Array.isArray(allElements)
+					? allElements.length
+					: 0;
+
+			// --- FIX START ---
 			// Explicitly grab dimensions from our local state to ensure preview aspect ratio is correct immediately
-			const safeWidth = savedTemplate.width_pixels || requiredPixelDimensions?.width || LEGACY_CARD_SIZE.width;
-			const safeHeight = savedTemplate.height_pixels || requiredPixelDimensions?.height || LEGACY_CARD_SIZE.height;
+			const safeWidth =
+				savedTemplate.width_pixels || requiredPixelDimensions?.width || LEGACY_CARD_SIZE.width;
+			const safeHeight =
+				savedTemplate.height_pixels || requiredPixelDimensions?.height || LEGACY_CARD_SIZE.height;
 			const safeDpi = savedTemplate.dpi || 300;
 			// --- FIX END ---
-			
+
 			// Debug the saved template structure
 			console.log('✅ Template data received:', {
 				id: savedTemplate.id,
@@ -643,7 +671,11 @@ import { imageCache } from '$lib/utils/imageCache';
 			}
 
 			// Validate that critical data was saved correctly
-			if (!savedTemplate.name || !savedTemplate.front_background || !savedTemplate.back_background) {
+			if (
+				!savedTemplate.name ||
+				!savedTemplate.front_background ||
+				!savedTemplate.back_background
+			) {
 				console.error('❌ Template saved but missing critical data:', {
 					hasName: !!savedTemplate.name,
 					hasFrontBg: !!savedTemplate.front_background,
@@ -675,33 +707,37 @@ import { imageCache } from '$lib/utils/imageCache';
 			});
 
 			// Normalize data we pass to list — prefer the preview URLs we just set
-		// Prefer the known uploaded URLs for the list as well
-		const listFront = (typeof frontUrl === 'string' && frontUrl.startsWith('http'))
-			? `${frontUrl}?t=${Date.now()}`
-			: (frontPreview ?? makePublicUrl(savedTemplate.front_background));
-		const listBack = (typeof backUrl === 'string' && backUrl.startsWith('http'))
-			? `${backUrl}?t=${Date.now()}`
-			: (backPreview ?? makePublicUrl(savedTemplate.back_background));
-		
-		// --- FIX START: Force dimensions into list object ---
-		const currentWidth = requiredPixelDimensions?.width || savedTemplate.width_pixels || LEGACY_CARD_SIZE.width;
-		const currentHeight = requiredPixelDimensions?.height || savedTemplate.height_pixels || LEGACY_CARD_SIZE.height;
+			// Prefer the known uploaded URLs for the list as well
+			const listFront =
+				typeof frontUrl === 'string' && frontUrl.startsWith('http')
+					? `${frontUrl}?t=${Date.now()}`
+					: (frontPreview ?? makePublicUrl(savedTemplate.front_background));
+			const listBack =
+				typeof backUrl === 'string' && backUrl.startsWith('http')
+					? `${backUrl}?t=${Date.now()}`
+					: (backPreview ?? makePublicUrl(savedTemplate.back_background));
 
-		const normalizedForList = {
-			...savedTemplate,
-			id: savedTemplate.id as string,
-			name: safeName,
-			// Ensure we use the stable URLs
-			front_background: listFront ?? '',
-			back_background: listBack ?? '',
-			template_elements: allElements,
-			// CRITICAL: Explicitly set dimensions from local state so the list preview isn't a square
-			width_pixels: Number(currentWidth),
-			height_pixels: Number(currentHeight),
-			orientation: currentWidth >= currentHeight ? 'landscape' : 'portrait',
-			dpi: savedTemplate.dpi || 300
-		};
-		// --- FIX END ---
+			// --- FIX START: Force dimensions into list object ---
+			const currentWidth =
+				requiredPixelDimensions?.width || savedTemplate.width_pixels || LEGACY_CARD_SIZE.width;
+			const currentHeight =
+				requiredPixelDimensions?.height || savedTemplate.height_pixels || LEGACY_CARD_SIZE.height;
+
+			const normalizedForList = {
+				...savedTemplate,
+				id: savedTemplate.id as string,
+				name: safeName,
+				// Ensure we use the stable URLs
+				front_background: listFront ?? '',
+				back_background: listBack ?? '',
+				template_elements: allElements,
+				// CRITICAL: Explicitly set dimensions from local state so the list preview isn't a square
+				width_pixels: Number(currentWidth),
+				height_pixels: Number(currentHeight),
+				orientation: currentWidth >= currentHeight ? 'landscape' : 'portrait',
+				dpi: savedTemplate.dpi || 300
+			};
+			// --- FIX END ---
 
 			console.log('📦 List normalization:', {
 				savedFront: savedTemplate.front_background,
@@ -733,7 +769,7 @@ import { imageCache } from '$lib/utils/imageCache';
 			} catch (e) {
 				console.warn('invalidate failed (non-fatal):', e);
 			}
-			
+
 			// Go back to templates list if we were creating/editing
 			if (isEditMode) {
 				handleBack();
@@ -742,7 +778,7 @@ import { imageCache } from '$lib/utils/imageCache';
 			console.error('❌ Error saving template:', error);
 			const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
 			errorMessage = `Error saving template: ${errorMsg}`;
-			
+
 			// Show error toast notification
 			toast.error('Failed to save template', {
 				description: errorMsg,
@@ -751,7 +787,7 @@ import { imageCache } from '$lib/utils/imageCache';
 		} finally {
 			// Always reset loading state
 			isLoading = false;
-			
+
 			// Dismiss the progress toast
 			toast.dismiss(toastId);
 		}
@@ -797,8 +833,8 @@ import { imageCache } from '$lib/utils/imageCache';
 			};
 
 			// Check if this is an update or create
-			const existingIndex = templates.findIndex(t => t.id === normalized.id);
-			
+			const existingIndex = templates.findIndex((t) => t.id === normalized.id);
+
 			if (existingIndex >= 0) {
 				// Update existing template
 				templates[existingIndex] = normalized;
@@ -808,7 +844,7 @@ import { imageCache } from '$lib/utils/imageCache';
 				templates = [normalized, ...templates];
 				console.log('➕ Added new template to local list:', normalized.name);
 			}
-			
+
 			// Optional: Fetch fresh data from server to ensure consistency
 			// This is a fallback in case the local update doesn't work perfectly
 			setTimeout(async () => {
@@ -823,7 +859,6 @@ import { imageCache } from '$lib/utils/imageCache';
 					console.warn('⚠️ Background refresh failed:', error);
 				}
 			}, 2000); // Refresh in background after 2 seconds
-			
 		} catch (error) {
 			console.error('❌ Error refreshing templates list:', error);
 			// Fallback: reload the page if local update fails
@@ -885,18 +920,19 @@ import { imageCache } from '$lib/utils/imageCache';
 
 			// Generate preview URLs and populate dialog data
 			croppingDialogData = {};
-			
+
 			// Process each result and generate preview URLs
 			for (const result of cropCheckResults) {
 				try {
 					// Generate preview URL using the new utility
-					const position = result.side === 'front' ? frontBackgroundPosition : backBackgroundPosition;
+					const position =
+						result.side === 'front' ? frontBackgroundPosition : backBackgroundPosition;
 					const previewUrl = await generateCropPreviewUrl(
 						result.file,
 						requiredPixelDimensions,
 						position
 					);
-					
+
 					if (result.side === 'front') {
 						croppingDialogData.front = {
 							originalSize: result.originalSize,
@@ -912,7 +948,7 @@ import { imageCache } from '$lib/utils/imageCache';
 							previewUrl
 						};
 					}
-					
+
 					console.log(`🖼️ Generated crop preview for ${result.side}:`, {
 						needsCropping: result.needsCropping,
 						originalSize: result.originalSize,
@@ -965,9 +1001,9 @@ import { imageCache } from '$lib/utils/imageCache';
 		pendingSave = false;
 	}
 
-async function handleImageUpload(files: File[], side: 'front' | 'back') {
+	async function handleImageUpload(files: File[], side: 'front' | 'back') {
 		const file = files[0];
-		const templateKey = (currentTemplate?.id ?? 'temp');
+		const templateKey = currentTemplate?.id ?? 'temp';
 		const key = imageCache.key(templateKey, side);
 
 		// Store the raw file for later save/crop
@@ -981,19 +1017,19 @@ async function handleImageUpload(files: File[], side: 'front' | 'back') {
 		// The main canvas should display the complete image, not a cropped version
 		const fullResolutionUrl = URL.createObjectURL(file);
 		imageCache.setPreview(key, fullResolutionUrl);
-		
+
 		if (side === 'front') {
 			frontPreview = imageCache.resolve(key);
 		} else {
 			backPreview = imageCache.resolve(key);
 		}
-		
+
 		// Note: Crop preview generation is now handled separately when needed
 		// This ensures users can see the full image quality during editing
 
 		// Trigger element creation if elements are empty and dimensions are available
 		await triggerElementCreation();
-		
+
 		// Generate initial crop preview if dimensions are available
 		await updateCropPreviews();
 	}
@@ -1037,31 +1073,34 @@ async function handleImageUpload(files: File[], side: 'front' | 'back') {
 	/**
 	 * Handle background position updates with drag performance optimization
 	 */
-	async function handleBackgroundPositionUpdate(position: BackgroundPosition, side: 'front' | 'back') {
+	async function handleBackgroundPositionUpdate(
+		position: BackgroundPosition,
+		side: 'front' | 'back'
+	) {
 		// Update position immediately for responsiveness
 		if (side === 'front') {
 			frontBackgroundPosition = { ...position };
 		} else {
 			backBackgroundPosition = { ...position };
 		}
-		
+
 		// Detect if this is likely a drag operation based on update frequency
 		const now = performance.now();
 		const timeSinceLastUpdate = now - lastPositionUpdateTime;
 		lastPositionUpdateTime = now;
-		
+
 		// Consider it dragging if updates come within 50ms of each other
 		const isLikelyDragging = timeSinceLastUpdate < 50;
-		
+
 		if (isLikelyDragging) {
 			positionUpdateCount++;
 			isDraggingBackground = true;
-			
+
 			// Clear existing timeout
 			if (dragUpdateTimeout) {
 				clearTimeout(dragUpdateTimeout);
 			}
-			
+
 			// Debounce expensive crop preview updates during drag
 			dragUpdateTimeout = setTimeout(async () => {
 				await updateCropPreviews();
@@ -1084,7 +1123,7 @@ async function handleImageUpload(files: File[], side: 'front' | 'back') {
 	async function updateCropPreviews() {
 		// Skip expensive operations during active drag
 		if (isDraggingBackground || !requiredPixelDimensions) return;
-		
+
 		// Generate front crop preview
 		if (frontBackground) {
 			try {
@@ -1099,7 +1138,7 @@ async function handleImageUpload(files: File[], side: 'front' | 'back') {
 				frontCropPreview = null;
 			}
 		}
-		
+
 		// Generate back crop preview
 		if (backBackground) {
 			try {
@@ -1131,7 +1170,7 @@ async function handleImageUpload(files: File[], side: 'front' | 'back') {
 	// NEW: Centralized initialization function
 	function initializeEditor(templateData: DatabaseTemplate) {
 		console.log('🚀 Initializing Editor with:', templateData.name);
-		
+
 		// A. Enable Edit Mode
 		isEditMode = true;
 		currentTemplate = templateData;
@@ -1151,8 +1190,8 @@ async function handleImageUpload(files: File[], side: 'front' | 'back') {
 		const sanitizeElement = (el: TemplateElement) => ({
 			...el,
 			// Ensure width/height are numbers and > 0
-			width: (typeof el.width === 'number' && el.width > 0) ? el.width : 100,
-			height: (typeof el.height === 'number' && el.height > 0) ? el.height : 30,
+			width: typeof el.width === 'number' && el.width > 0 ? el.width : 100,
+			height: typeof el.height === 'number' && el.height > 0 ? el.height : 30,
 			// Ensure coordinates exist
 			x: Number(el.x) || 0,
 			y: Number(el.y) || 0,
@@ -1164,22 +1203,23 @@ async function handleImageUpload(files: File[], side: 'front' | 'back') {
 		frontElements = (templateData.template_elements as TemplateElement[])
 			.filter((el) => el.side === 'front')
 			.map(sanitizeElement);
-			
+
 		backElements = (templateData.template_elements as TemplateElement[])
 			.filter((el) => el.side === 'back')
 			.map(sanitizeElement);
 
 		// D. Set Dimensions
-		if (templateData.width_pixels && templateData.height_pixels) {
+		const td = templateData as any;
+		if (td.width_pixels && td.height_pixels) {
 			currentCardSize = {
 				name: templateData.name,
-				width: templateData.width_pixels,
-				height: templateData.height_pixels,
+				width: td.width_pixels,
+				height: td.height_pixels,
 				unit: 'pixels'
 			};
 			requiredPixelDimensions = {
-				width: templateData.width_pixels,
-				height: templateData.height_pixels
+				width: td.width_pixels,
+				height: td.height_pixels
 			};
 		} else {
 			// Legacy fallback
@@ -1190,7 +1230,7 @@ async function handleImageUpload(files: File[], side: 'front' | 'back') {
 
 		// E. Force Editor Refresh
 		editorVersion++;
-		
+
 		console.log('✅ Editor Initialized. Elements:', {
 			front: frontElements.length,
 			back: backElements.length
@@ -1201,13 +1241,13 @@ async function handleImageUpload(files: File[], side: 'front' | 'back') {
 		try {
 			// 1. Navigate
 			await goto(`/templates?id=${id}`, { replaceState: true });
-			
+
 			// 2. The navigation updates `data.selectedTemplate` automatically via SvelteKit load functions.
 			//    The $effect we added in Step 2 will detect this change and call initializeEditor.
-			//    HOWEVER, for immediate responsiveness without waiting for network, 
+			//    HOWEVER, for immediate responsiveness without waiting for network,
 			//    we can find the template in the list and load it immediately:
-			
-			const selected = templates.find(t => t.id === id);
+
+			const selected = templates.find((t) => t.id === id);
 			if (selected) {
 				initializeEditor(selected);
 			}
@@ -1245,7 +1285,9 @@ async function handleImageUpload(files: File[], side: 'front' | 'back') {
 		// This ensures ID generation works correctly for new templates
 		currentTemplate = null;
 		// Clear any cached blob URLs to avoid memory leaks
-		try { imageCache.clear(); } catch {}
+		try {
+			imageCache.clear();
+		} catch {}
 		console.log('✅ EditTemplate: Form cleared');
 	}
 
@@ -1293,23 +1335,27 @@ async function handleImageUpload(files: File[], side: 'front' | 'back') {
 		if (browser && templates && templates.length > 0) {
 			totalTemplatesCount = templates.length;
 			readyModelsCount = 0;
-			
-			console.log(`🚀 Templates: Starting 3D model generation for ${totalTemplatesCount} templates...`);
-			
+
+			console.log(
+				`🚀 Templates: Starting 3D model generation for ${totalTemplatesCount} templates...`
+			);
+
 			// Process each template
 			templates.forEach(async (template) => {
 				const templateName = template.name;
 				try {
 					console.log(`🔄 Creating 3D model for template "${templateName}"...`);
-					
+
 					// Use default card dimensions for all templates since size fields don't exist in DB
 					const geometry = await createCardFromInches(3.375, 2.125); // Standard credit card size
-					
+
 					templateGeometries[templateName] = geometry;
 					readyModelsCount++;
-					
-					console.log(`✅ 3D model ready for template "${templateName}" (${readyModelsCount}/${totalTemplatesCount})`);
-					
+
+					console.log(
+						`✅ 3D model ready for template "${templateName}" (${readyModelsCount}/${totalTemplatesCount})`
+					);
+
 					// Log when all models are ready
 					if (readyModelsCount === totalTemplatesCount) {
 						console.log(`🎉 All ${totalTemplatesCount} template 3D models are ready!`);
@@ -1319,7 +1365,9 @@ async function handleImageUpload(files: File[], side: 'front' | 'back') {
 					// Still increment count to avoid hanging
 					readyModelsCount++;
 					if (readyModelsCount === totalTemplatesCount) {
-						console.log(`⚠️ Template 3D model generation completed with ${Object.keys(templateGeometries).length} successful models out of ${totalTemplatesCount}`);
+						console.log(
+							`⚠️ Template 3D model generation completed with ${Object.keys(templateGeometries).length} successful models out of ${totalTemplatesCount}`
+						);
 					}
 				}
 			});
@@ -1354,28 +1402,28 @@ async function handleImageUpload(files: File[], side: 'front' | 'back') {
 		{:else}
 			{#key editorVersion}
 				<TemplateEdit
-				version={editorVersion}
-				{isLoading}
-				{frontElements}
-				{backElements}
-				{frontPreview}
-				{backPreview}
-				{errorMessage}
-				cardSize={currentCardSize}
-				pixelDimensions={requiredPixelDimensions}
-				onBack={handleBack}
-				onSave={saveTemplate}
-				onClear={clearForm}
-				onUpdateElements={(elements, side) => updateElements(elements, side)}
-				onImageUpload={(files, side) => handleImageUpload(files, side)}
-				onRemoveImage={(side) => handleRemoveImage(side)}
-				onUpdateBackgroundPosition={async (position, side) => {
-			$state.snapshot(`Background side updated for ${side}:`);
-			$state.snapshot(`Background position updated for ${position}`);
-					// Use optimized background position handler with drag performance
-					await handleBackgroundPositionUpdate(position, side);
-				}}
-			/>
+					version={editorVersion}
+					{isLoading}
+					{frontElements}
+					{backElements}
+					{frontPreview}
+					{backPreview}
+					{errorMessage}
+					cardSize={currentCardSize}
+					pixelDimensions={requiredPixelDimensions}
+					onBack={handleBack}
+					onSave={saveTemplate}
+					onClear={clearForm}
+					onUpdateElements={(elements, side) => updateElements(elements, side)}
+					onImageUpload={(files, side) => handleImageUpload(files, side)}
+					onRemoveImage={(side) => handleRemoveImage(side)}
+					onUpdateBackgroundPosition={async (position, side) => {
+						$state.snapshot(`Background side updated for ${side}:`);
+						$state.snapshot(`Background position updated for ${position}`);
+						// Use optimized background position handler with drag performance
+						await handleBackgroundPositionUpdate(position, side);
+					}}
+				/>
 			{/key}
 		{/if}
 	</div>
@@ -1385,7 +1433,10 @@ async function handleImageUpload(files: File[], side: 'front' | 'back') {
 		bind:open={showCroppingDialog}
 		frontImageInfo={croppingDialogData.front || null}
 		backImageInfo={croppingDialogData.back || null}
-	templateSize={requiredPixelDimensions || { width: LEGACY_CARD_SIZE.width, height: LEGACY_CARD_SIZE.height }}
+		templateSize={requiredPixelDimensions || {
+			width: LEGACY_CARD_SIZE.width,
+			height: LEGACY_CARD_SIZE.height
+		}}
 		onConfirm={handleCroppingConfirm}
 		onCancel={handleCroppingCancel}
 	/>
@@ -1402,8 +1453,6 @@ async function handleImageUpload(files: File[], side: 'front' | 'back') {
 	.edit-template-container.edit-mode {
 		justify-content: center;
 	}
-
-
 
 	:global(.animate-pulse) {
 		animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;

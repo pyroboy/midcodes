@@ -3,12 +3,14 @@ import { browser } from '$app/environment';
 
 interface FeatureFlags {
 	showSecurityDepositIndicator: boolean;
+	enable3DView: boolean;
 }
 
 // Get initial feature flags from environment variables or localStorage
 const getInitialFeatureFlags = (): FeatureFlags => {
 	const defaults: FeatureFlags = {
-		showSecurityDepositIndicator: true // Enabled by default
+		showSecurityDepositIndicator: true, // Enabled by default
+		enable3DView: true // Set to true to enable 3D viewer
 	};
 
 	if (!browser) return defaults;
@@ -58,6 +60,18 @@ const createFeatureFlagsStore = () => {
 			update((flags) => ({
 				...flags,
 				showSecurityDepositIndicator: enabled
+			}));
+		},
+		toggle3DView: () => {
+			update((flags) => ({
+				...flags,
+				enable3DView: !flags.enable3DView
+			}));
+		},
+		set3DView: (enabled: boolean) => {
+			update((flags) => ({
+				...flags,
+				enable3DView: enabled
 			}));
 		}
 	};

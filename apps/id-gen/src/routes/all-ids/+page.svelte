@@ -61,6 +61,15 @@
 	let selectedCards = $state(new Set<string>());
 	let selectedCount = $derived(selectedCards.size);
 
+	// Inline editing state
+	let editingCell: { cardId: string; fieldName: string } | null = $state(null);
+	let editValue = $state('');
+	let savingCell = $state(false);
+
+	// Bulk download state
+	let isBulkDownloading = $state(false);
+	let bulkDownloadProgress = $state({ current: 0, total: 0 });
+
 	// Create a map to store each group's selection state
 	let groupSelectionStates = $state(new Map<string, boolean>());
 
@@ -181,10 +190,7 @@
 	async function openPreview(event: MouseEvent, card: IDCard) {
 		// Don't open preview if clicking on a checkbox, button, or their containers
 		const target = event.target as HTMLElement;
-		if (
-			target.closest('input[type="checkbox"]') ||
-			target.closest('button')
-		) {
+		if (target.closest('input[type="checkbox"]') || target.closest('button')) {
 			return;
 		}
 
@@ -313,6 +319,9 @@
 		const selectedRows = getAllSelectedCards();
 		if (selectedRows.length === 0) return;
 
+		isBulkDownloading = true;
+		bulkDownloadProgress = { current: 0, total: selectedRows.length };
+
 		try {
 			const zip = new JSZip();
 			const nameCount = new Map<string, number>();
@@ -373,7 +382,16 @@
 								console.error(`Failed to download front image for ${nameField}`);
 							} else {
 								const frontBlob = await frontResponse.blob();
-								folder.file(`${nameField}_front.jpg`, frontBlob);
+								// Detect extension from MIME type
+								const frontExt =
+									frontBlob.type === 'image/png'
+										? 'png'
+										: frontBlob.type === 'image/jpeg'
+											? 'jpg'
+											: frontBlob.type === 'image/webp'
+												? 'webp'
+												: 'png';
+								folder.file(`${nameField}_front.${frontExt}`, frontBlob);
 							}
 						}
 					}
@@ -387,7 +405,16 @@
 								console.error(`Failed to download back image for ${nameField}`);
 							} else {
 								const backBlob = await backResponse.blob();
-								folder.file(`${nameField}_back.jpg`, backBlob);
+								// Detect extension from MIME type
+								const backExt =
+									backBlob.type === 'image/png'
+										? 'png'
+										: backBlob.type === 'image/jpeg'
+											? 'jpg'
+											: backBlob.type === 'image/webp'
+												? 'webp'
+												: 'png';
+								folder.file(`${nameField}_back.${backExt}`, backBlob);
 							}
 						}
 					}
@@ -396,6 +423,8 @@
 				} finally {
 					downloadingCards.delete(cardId);
 					downloadingCards = downloadingCards;
+					bulkDownloadProgress.current++;
+					bulkDownloadProgress = bulkDownloadProgress;
 				}
 			}
 
@@ -416,6 +445,9 @@
 		} catch (error) {
 			console.error('Error downloading ID cards:', error);
 			errorMessage = 'Failed to download ID cards';
+		} finally {
+			isBulkDownloading = false;
+			bulkDownloadProgress = { current: 0, total: 0 };
 		}
 	}
 
@@ -499,16 +531,93 @@
 		}
 	}
 
+	// Inline editing functions
+	function startEditing(cardId: string, fieldName: string, currentValue: string) {
+		editingCell = { cardId, fieldName };
+		editValue = currentValue || '';
+		// Focus the input after render
+		setTimeout(() => {
+			const input = document.getElementById(`edit-${cardId}-${fieldName}`);
+			if (input) {
+				(input as HTMLInputElement).focus();
+				(input as HTMLInputElement).select();
+			}
+		}, 0);
+	}
+
+	function cancelEditing() {
+		editingCell = null;
+		editValue = '';
+	}
+
+	async function saveEdit() {
+		if (!editingCell || savingCell) return;
+
+		const { cardId, fieldName } = editingCell;
+		savingCell = true;
+
+		try {
+			const formData = new FormData();
+			formData.append('cardId', cardId);
+			formData.append('fieldName', fieldName);
+			formData.append('fieldValue', editValue);
+
+			const response = await fetch('?/updateField', {
+				method: 'POST',
+				body: formData
+			});
+
+			const result = await response.json();
+
+			if (response.ok && result.type !== 'failure') {
+				// Update local state
+				dataRows = dataRows.map((card) => {
+					if (getCardId(card) === cardId) {
+						return {
+							...card,
+							fields: {
+								...card.fields,
+								[fieldName]: { value: editValue, side: 'front' as const }
+							}
+						};
+					}
+					return card;
+				});
+			} else {
+				console.error('Failed to save edit:', result);
+				errorMessage = result.data?.error || 'Failed to save';
+			}
+		} catch (error) {
+			console.error('Error saving edit:', error);
+			errorMessage = 'Failed to save';
+		} finally {
+			savingCell = false;
+			editingCell = null;
+			editValue = '';
+		}
+	}
+
+	function handleEditKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter') {
+			e.preventDefault();
+			saveEdit();
+		} else if (e.key === 'Escape') {
+			e.preventDefault();
+			cancelEditing();
+		}
+	}
+
 	let templateFields = $derived(metadata?.templates || {});
 
-let groupedCards = $derived(
+	let groupedCards = $derived(
 		(() => {
 			const groups: Record<string, IDCard[]> = {};
 			dataRows.forEach((card) => {
-				if (!groups[card.template_name]) {
-					groups[card.template_name] = [];
+				const templateName = card.template_name || 'Unassigned';
+				if (!groups[templateName]) {
+					groups[templateName] = [];
 				}
-				groups[card.template_name].push(card);
+				groups[templateName].push(card);
 			});
 			return groups;
 		})()
@@ -520,13 +629,19 @@ let groupedCards = $derived(
 	const MAX_WIDTH = 450;
 	const STEP = 25;
 
-	function zoomOut() { cardMinWidth = Math.max(MIN_WIDTH, cardMinWidth - STEP); }
-	function zoomIn() { cardMinWidth = Math.min(MAX_WIDTH, cardMinWidth + STEP); }
+	function zoomOut() {
+		cardMinWidth = Math.max(MIN_WIDTH, cardMinWidth - STEP);
+	}
+	function zoomIn() {
+		cardMinWidth = Math.min(MAX_WIDTH, cardMinWidth + STEP);
+	}
 </script>
 
 <div class="container mx-auto px-4 py-6 min-h-screen flex flex-col gap-6">
 	<!-- Controls Header -->
-	<div class="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center bg-card border border-border p-4 rounded-xl shadow-sm">
+	<div
+		class="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center bg-card border border-border p-4 rounded-xl shadow-sm"
+	>
 		<!-- Search -->
 		<div class="relative w-full md:max-w-sm">
 			<input
@@ -535,7 +650,18 @@ let groupedCards = $derived(
 				class="w-full pl-10 pr-4 py-2 bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm"
 				bind:value={searchQuery}
 			/>
-			<svg class="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+			<svg
+				class="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground"
+				fill="none"
+				stroke="currentColor"
+				viewBox="0 0 24 24"
+				><path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					stroke-width="2"
+					d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+				/></svg
+			>
 		</div>
 
 		<!-- Actions & Toggles -->
@@ -543,10 +669,35 @@ let groupedCards = $derived(
 			{#if selectedCount > 0}
 				<div class="flex gap-2">
 					<button
-						class="px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium rounded-md hover:bg-primary/90 transition-colors shadow-sm"
+						class="px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium rounded-md hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
 						onclick={downloadSelectedCards}
+						disabled={isBulkDownloading}
 					>
-						Download ({selectedCount})
+						{#if isBulkDownloading}
+							<svg
+								class="animate-spin h-3 w-3"
+								xmlns="http://www.w3.org/2000/svg"
+								fill="none"
+								viewBox="0 0 24 24"
+							>
+								<circle
+									class="opacity-25"
+									cx="12"
+									cy="12"
+									r="10"
+									stroke="currentColor"
+									stroke-width="4"
+								></circle>
+								<path
+									class="opacity-75"
+									fill="currentColor"
+									d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+								></path>
+							</svg>
+							Downloading {bulkDownloadProgress.current}/{bulkDownloadProgress.total}...
+						{:else}
+							Download ({selectedCount})
+						{/if}
 					</button>
 					<button
 						class="px-3 py-1.5 bg-destructive text-destructive-foreground text-xs font-medium rounded-md hover:bg-destructive/90 transition-colors shadow-sm"
@@ -561,8 +712,14 @@ let groupedCards = $derived(
 				{#if $viewMode !== 'table'}
 					<!-- Mobile-friendly Zoom Controls -->
 					<div class="flex items-center bg-muted rounded-lg p-0.5">
-						<button class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-background text-muted-foreground" onclick={zoomOut}>−</button>
-						<button class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-background text-muted-foreground" onclick={zoomIn}>+</button>
+						<button
+							class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-background text-muted-foreground"
+							onclick={zoomOut}>−</button
+						>
+						<button
+							class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-background text-muted-foreground"
+							onclick={zoomIn}>+</button
+						>
 					</div>
 				{/if}
 				<ViewModeToggle />
@@ -583,15 +740,26 @@ let groupedCards = $derived(
 							<div class="h-6 w-1 bg-primary rounded-full"></div>
 							{templateName}
 						</h3>
-						<span class="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">{cards.length} items</span>
+						<span class="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full"
+							>{cards.length} items</span
+						>
 					</div>
-					
-					<div class="relative w-full overflow-x-auto rounded-lg border border-border bg-card shadow-sm">
+
+					<div
+						class="relative w-full overflow-x-auto rounded-lg border border-border bg-card shadow-sm"
+					>
 						<table class="w-full text-sm text-left">
-							<thead class="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-border">
+							<thead
+								class="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-border"
+							>
 								<tr>
 									<th class="w-10 px-4 py-3">
-										<input type="checkbox" class="rounded border-muted-foreground" checked={groupSelectionStates.get(templateName)} onchange={(e) => handleGroupCheckboxClick(e, cards)} />
+										<input
+											type="checkbox"
+											class="rounded border-muted-foreground"
+											checked={groupSelectionStates.get(templateName)}
+											onchange={(e) => handleGroupCheckboxClick(e, cards)}
+										/>
 									</th>
 									<th class="px-4 py-3 font-medium">Preview</th>
 									{#if templateFields[templateName]}
@@ -606,29 +774,86 @@ let groupedCards = $derived(
 								{#each cards as card}
 									<tr class="hover:bg-muted/30 transition-colors group">
 										<td class="px-4 py-3">
-											<input type="checkbox" class="rounded border-muted-foreground" checked={selectionManager.isSelected(getCardId(card))} onchange={(e) => handleCheckboxClick(e, card)} />
+											<input
+												type="checkbox"
+												class="rounded border-muted-foreground"
+												checked={selectionManager.isSelected(getCardId(card))}
+												onchange={(e) => handleCheckboxClick(e, card)}
+											/>
 										</td>
 										<td class="px-4 py-2 w-24" onclick={(e) => openPreview(e, card)}>
-											<div class="h-10 w-16 bg-muted rounded overflow-hidden cursor-pointer border border-border hover:border-primary transition-colors">
+											<div
+												class="h-10 w-16 bg-muted rounded overflow-hidden cursor-pointer border border-border hover:border-primary transition-colors"
+											>
 												{#if card.front_image}
-													<img src={getSupabaseStorageUrl(card.front_image, 'rendered-id-cards')} alt="Thumb" class="w-full h-full object-cover" loading="lazy" />
+													<img
+														src={getSupabaseStorageUrl(card.front_image, 'rendered-id-cards')}
+														alt="Thumb"
+														class="w-full h-full object-cover"
+														loading="lazy"
+													/>
 												{/if}
 											</div>
 										</td>
 										{#if templateFields[templateName]}
 											{#each templateFields[templateName] || [] as field}
-												<td class="px-4 py-3 whitespace-nowrap text-foreground">
-													{card.fields?.[field.variableName]?.value || '-'}
+												<td
+													class="px-4 py-3 whitespace-nowrap text-foreground cursor-pointer hover:bg-muted/50"
+													ondblclick={() =>
+														startEditing(
+															getCardId(card),
+															field.variableName,
+															card.fields?.[field.variableName]?.value || ''
+														)}
+													title="Double-click to edit"
+												>
+													{#if editingCell?.cardId === getCardId(card) && editingCell?.fieldName === field.variableName}
+														<input
+															id="edit-{getCardId(card)}-{field.variableName}"
+															type="text"
+															bind:value={editValue}
+															onkeydown={handleEditKeydown}
+															onblur={saveEdit}
+															class="w-full px-2 py-1 text-sm border border-primary rounded bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+															disabled={savingCell}
+														/>
+													{:else}
+														{card.fields?.[field.variableName]?.value || '-'}
+													{/if}
 												</td>
 											{/each}
 										{/if}
 										<td class="px-4 py-3 text-right">
-											<div class="flex justify-end gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-												<button class="p-1.5 hover:bg-muted rounded text-blue-500" onclick={() => downloadCard(card)} title="Download">
-													<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+											<div
+												class="flex justify-end gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity"
+											>
+												<button
+													class="p-1.5 hover:bg-muted rounded text-blue-500"
+													onclick={() => downloadCard(card)}
+													title="Download"
+												>
+													<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+														><path
+															stroke-linecap="round"
+															stroke-linejoin="round"
+															stroke-width="2"
+															d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+														/></svg
+													>
 												</button>
-												<button class="p-1.5 hover:bg-muted rounded text-red-500" onclick={() => handleDelete(card)} title="Delete">
-													<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+												<button
+													class="p-1.5 hover:bg-muted rounded text-red-500"
+													onclick={() => handleDelete(card)}
+													title="Delete"
+												>
+													<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+														><path
+															stroke-linecap="round"
+															stroke-linejoin="round"
+															stroke-width="2"
+															d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+														/></svg
+													>
 												</button>
 											</div>
 										</td>
@@ -648,14 +873,16 @@ let groupedCards = $derived(
 				<div class="space-y-4">
 					<div class="flex items-center gap-3 border-b border-border pb-2">
 						<h3 class="text-lg font-semibold text-foreground">{templateName}</h3>
-						<span class="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{cards.length}</span>
+						<span class="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full"
+							>{cards.length}</span
+						>
 					</div>
-					
+
 					<div class="responsive-grid">
 						{#each cards as card}
 							<div class="card-wrapper">
 								<SimpleIDCard
-									card={card}
+									{card}
 									isSelected={selectionManager.isSelected(getCardId(card))}
 									onToggleSelect={() => selectionManager.toggleSelection(getCardId(card))}
 									onDownload={downloadCard}
@@ -677,8 +904,12 @@ let groupedCards = $derived(
 {#if selectedFrontImage || selectedBackImage}
 	<ClientOnly>
 		<ImagePreviewModal
-			frontImageUrl={selectedFrontImage ? getSupabaseStorageUrl(selectedFrontImage, 'rendered-id-cards') : null}
-			backImageUrl={selectedBackImage ? getSupabaseStorageUrl(selectedBackImage, 'rendered-id-cards') : null}
+			frontImageUrl={selectedFrontImage
+				? getSupabaseStorageUrl(selectedFrontImage, 'rendered-id-cards')
+				: null}
+			backImageUrl={selectedBackImage
+				? getSupabaseStorageUrl(selectedBackImage, 'rendered-id-cards')
+				: null}
 			cardGeometry={selectedCardGeometry}
 			templateDimensions={selectedTemplateDimensions}
 			onClose={closePreview}
@@ -708,7 +939,7 @@ let groupedCards = $derived(
 		height: auto;
 		width: 100%;
 		/* Ensure it stretches to fill the grid cell */
-		display: flex; 
+		display: flex;
 		flex-direction: column;
 	}
 </style>

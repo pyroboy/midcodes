@@ -3,8 +3,8 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
 	plugins: [sveltekit()],
-  ssr: { 
-    external: ['@supabase/postgrest-js', 'style-to-object'], // exclude problematic packages from SSR
+  ssr: {
+    external: ['@supabase/postgrest-js', 'style-to-object', 'runed'], // exclude problematic packages from SSR
     noExternal: []
   },
 	server: {

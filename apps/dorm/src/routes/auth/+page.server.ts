@@ -1,34 +1,35 @@
 import { fail, redirect } from '@sveltejs/kit';
-import type { Actions, PageServerLoad } from './$types';
+import { superValidate } from 'sveltekit-superforms/server';
+import { zod } from 'sveltekit-superforms/adapters';
+import { loginSchema, registerSchema } from './schema';
+import type { PageServerLoad, Actions } from './$types';
 import { AuthApiError } from '@supabase/supabase-js';
 
 export const load: PageServerLoad = async ({ locals: { safeGetSession }, url }) => {
 	const { session } = await safeGetSession();
 
+	// If already logged in, redirect
 	if (session) {
-		const returnTo = url.searchParams.get('returnTo');
-		// If returnTo parameter exists, redirect there, otherwise go to home
-		if (returnTo) {
-			throw redirect(303, returnTo);
-		}
-		// Default redirect to home
-		throw redirect(303, '/');
+		const returnTo = url.searchParams.get('returnTo') || '/';
+		throw redirect(303, returnTo);
 	}
+
+	// Initialize both forms
+	const loginForm = await superValidate(zod(loginSchema));
+	const registerForm = await superValidate(zod(registerSchema));
+
+	return { loginForm, registerForm };
 };
 
-export interface AuthActionData {
-	success: boolean;
-	error?: string;
-	email?: string;
-	message?: string;
-	[key: string]: unknown;
-}
-
 export const actions: Actions = {
-	signin: async ({ request, locals: { supabase }, cookies }) => {
-		const formData = await request.formData();
-		const email = formData.get('email') as string;
-		const password = formData.get('password') as string;
+	login: async ({ request, locals: { supabase }, cookies }) => {
+		const form = await superValidate(request, zod(loginSchema));
+
+		if (!form.valid) {
+			return fail(400, { form });
+		}
+
+		const { email, password } = form.data;
 
 		const { data, error } = await supabase.auth.signInWithPassword({
 			email,
@@ -38,60 +39,47 @@ export const actions: Actions = {
 		if (error) {
 			if (error instanceof AuthApiError && error.status === 400) {
 				return fail(400, {
-					error: 'Invalid credentials',
-					success: false,
-					email
+					form,
+					message: 'Invalid email or password'
 				});
 			}
 			return fail(500, {
-				error: 'Server error. Please try again later.',
-				success: false
+				form,
+				message: 'Server error. Please try again later.'
 			});
 		}
 
-		if (!data.session) {
-			return fail(400, {
-				error: 'No session after sign in',
-				success: false
-			});
+		// Standard Supabase Auth Cookie setting for SSR
+		/* Note: Supabase helpers usually handle this automatically, 
+		   but explicit setting ensures reliability in some environments */
+		if (data.session) {
+			const { access_token, refresh_token } = data.session;
+			// Cookies options should match your supabase client config
+			const cookieOptions = {
+				path: '/',
+				secure: true,
+				httpOnly: true,
+				sameSite: 'lax' as const,
+				maxAge: 60 * 60 * 24 * 7 // 1 week
+			};
+
+			cookies.set('sb-access-token', access_token, cookieOptions);
+			cookies.set('sb-refresh-token', refresh_token, cookieOptions);
 		}
 
-		// Set auth cookies
-		const { access_token, refresh_token } = data.session;
-		cookies.set('sb-access-token', access_token, {
-			path: '/',
-			secure: true,
-			httpOnly: true,
-			sameSite: 'lax',
-			maxAge: 60 * 60 // 1 hour
-		});
-		cookies.set('sb-refresh-token', refresh_token, {
-			path: '/',
-			secure: true,
-			httpOnly: true,
-			sameSite: 'lax',
-			maxAge: 60 * 60 * 24 * 7 // 1 week
-		});
-
-		// Redirect to home after successful sign in
 		throw redirect(303, '/');
 	},
 
-	signup: async ({ request, url, locals: { supabase } }) => {
-		const formData = await request.formData();
-		const email = formData.get('email') as string;
-		const password = formData.get('password') as string;
-		const confirmPassword = formData.get('confirmPassword') as string;
+	register: async ({ request, url, locals: { supabase } }) => {
+		const form = await superValidate(request, zod(registerSchema));
 
-		if (password !== confirmPassword) {
-			return fail(400, {
-				error: 'Passwords do not match',
-				success: false,
-				email
-			});
+		if (!form.valid) {
+			return fail(400, { form });
 		}
 
-		const { data, error: err } = await supabase.auth.signUp({
+		const { email, password } = form.data;
+
+		const { error } = await supabase.auth.signUp({
 			email,
 			password,
 			options: {
@@ -99,24 +87,17 @@ export const actions: Actions = {
 			}
 		});
 
-		if (err) {
-			if (err instanceof AuthApiError && err.status === 400) {
-				return fail(400, {
-					error: 'Invalid email or password',
-					success: false,
-					email
-				});
-			}
-
+		if (error) {
 			return fail(500, {
-				error: 'Server error. Please try again later.',
-				success: false
+				form,
+				message: error.message
 			});
 		}
 
 		return {
+			form,
 			success: true,
-			message: 'Please check your email for a confirmation link.'
+			message: 'Registration successful! Please check your email to confirm your account.'
 		};
 	}
 };

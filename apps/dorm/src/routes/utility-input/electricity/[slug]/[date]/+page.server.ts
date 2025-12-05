@@ -10,9 +10,14 @@ import type { Actions } from '@sveltejs/kit';
 import { fail, error } from '@sveltejs/kit';
 // import { getUserPermissions } from '$lib/services/permissions'; // COMMENTED OUT - PUBLIC ACCESS ENABLED
 
-export const load: ServerLoad = async ({ params, locals }) => {
+export const load: ServerLoad = async ({ params, locals, setHeaders }) => {
 	const { slug: propertySlug, date } = params;
 	console.log(`🔄 [LOAD] Loading utility input page for ${propertySlug}/${date}`);
+
+	// OPTIMIZATION: Cache the GET request for a short time (browser + CDN)
+	setHeaders({
+		'cache-control': 'public, max-age=60, s-maxage=60'
+	});
 
 	// Initialize error state
 	let errors: string[] = [];
@@ -345,39 +350,7 @@ export const load: ServerLoad = async ({ params, locals }) => {
 				});
 				const todayButton = `[Today's Date: ${todayFormatted}](/utility-input/electricity/${propertySlug}/${todayString})`;
 
-				// Generate available dates between next day and today
-				const availableDates = [];
-				const currentDate = new Date(nextDay);
-
-				while (currentDate <= today) {
-					const dateYear = currentDate.getFullYear();
-					const dateMonth = String(currentDate.getMonth() + 1).padStart(2, '0');
-					const dateDay = String(currentDate.getDate()).padStart(2, '0');
-					const dateString = `${dateYear}-${dateMonth}-${dateDay}`;
-					const dateFormatted = currentDate.toLocaleDateString('en-US', {
-						weekday: 'long',
-						year: 'numeric',
-						month: 'long',
-						day: 'numeric'
-					});
-
-					availableDates.push({
-						label: dateFormatted,
-						value: dateString,
-						url: `/utility-input/electricity/${propertySlug}/${dateString}`
-					});
-
-					currentDate.setDate(currentDate.getDate() + 1);
-				}
-
-				// Create dropdown options
-				const dropdownOptions = availableDates.map(date =>
-					`<option value="${date.url}">${date.label}</option>`
-				).join('');
-
-				const dropdownHtml = `<select class="date-dropdown mt-2 px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">${dropdownOptions}</select>`;
-
-				errorDetails.push(`⚠️ Date Restriction\n\nYou requested: ${requestedFormatted}\nLast reading: ${lastReadingFormatted}\n\nCannot access dates before your most recent meter reading.\n\nAvailable options:\n${validDateButton}\n\nOr select any date:\n${dropdownHtml}\n\n${todayButton}`);
+				errorDetails.push(`⚠️ Date Restriction\n\nYou requested: ${requestedFormatted}\nLast reading: ${lastReadingFormatted}\n\nCannot access dates before your most recent meter reading.\n\n${validDateButton}\n\n${todayButton}`);
 			}
 		}
 	}
@@ -463,6 +436,31 @@ export const actions: Actions = {
 
 			const meterIds = readings.map((r) => r.meter_id);
 
+			// Check for duplicate readings for the same date
+			const { data: existingReadings, error: existingError } = await supabase
+				.from('readings')
+				.select('meter_id, reading_date')
+				.in('meter_id', meterIds)
+				.eq('reading_date', form.data.reading_date);
+
+			if (existingError) {
+				return fail(500, { form, error: `Error checking for existing readings: ${existingError.message}` });
+			}
+
+			if (existingReadings && existingReadings.length > 0) {
+				const duplicateMeters = existingReadings.map(r => r.meter_id);
+				const { data: meterNames } = await supabase
+					.from('meters')
+					.select('id, name')
+					.in('id', duplicateMeters);
+
+				const names = meterNames?.map(m => m.name).join(', ') || 'Unknown meters';
+				return fail(400, {
+					form,
+					error: `Readings already exist for ${form.data.reading_date} for: ${names}. Please edit existing readings or choose a different date.`
+				});
+			}
+
 			// Load previous readings to enforce monotonic increase (only readings BEFORE the current date)
 			const { data: previousReadings, error: prevError } = await supabase
 				.from('readings')
@@ -503,13 +501,29 @@ export const actions: Actions = {
 				if (hasValidPreviousReading) {
 					previous = previousReadingMap[r.meter_id];
 				} else {
-					// Use initial reading if available, otherwise use current reading as baseline (no consumption validation)
+					// Use initial reading if available
 					const initialReading = initialReadingMap[r.meter_id];
 					if (initialReading !== null && initialReading !== undefined) {
 						previous = initialReading;
 					} else {
-						// No previous data available - skip consumption validation entirely
-						console.log(`ℹ️ [VALIDATION] Meter ${meterNameMap[r.meter_id]}: No baseline reading available, skipping consumption validation`);
+						// No previous data available - validate against reasonable first reading limits
+						const meterName = meterNameMap[r.meter_id] || `ID ${r.meter_id}`;
+						console.log(`ℹ️ [VALIDATION] Meter ${meterName}: No baseline reading available, applying first reading limits`);
+
+						// For first readings with no baseline, apply absolute maximum
+						const FIRST_READING_MAX = 999999; // 999,999 kWh max for first reading
+
+						if (current > FIRST_READING_MAX) {
+							throw new Error(
+								`⚠️ First Reading Validation for meter ${meterName}:\n` +
+								`• Current reading: ${current.toLocaleString()} kWh\n` +
+								`• Maximum allowed for first reading: ${FIRST_READING_MAX.toLocaleString()} kWh\n\n` +
+								`This value exceeds the maximum allowed for a first reading.\n` +
+								`Please verify the reading is accurate.`
+							);
+						}
+
+						// Accept the reading but still require review
 						return {
 							meter_id: r.meter_id,
 							reading: current,
