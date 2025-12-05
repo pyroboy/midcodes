@@ -1,0 +1,8 @@
+# March of Faith - Robots.txt
+# https://marchoffaith.org
+
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://marchoffaith.org/sitemap.xml
