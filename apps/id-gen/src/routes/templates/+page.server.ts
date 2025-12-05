@@ -179,8 +179,8 @@ export const actions = {
 
 				if (cards && cards.length > 0) {
 					// 2. Delete images from storage
-					const imagesToDelete = [];
-					for (const card of cards) {
+					const imagesToDelete: string[] = [];
+					for (const card of cards as any[]) {
 						if (card.front_image) imagesToDelete.push(card.front_image);
 						if (card.back_image) imagesToDelete.push(card.back_image);
 					}

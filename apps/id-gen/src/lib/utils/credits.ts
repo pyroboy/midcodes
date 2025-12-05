@@ -1,5 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+// NOTE: This file requires a supabase client to be passed to each function
+// The global 'supabase' variable is a placeholder that will cause TypeScript errors
+// These functions should only be called from server-side code with proper supabase client
+declare const supabase: SupabaseClient;
+
 export interface CreditTransaction {
 	id: string;
 	user_id: string;

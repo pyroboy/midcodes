@@ -270,5 +270,53 @@ export const actions: Actions = {
 			console.error('Error in delete multiple action:', error);
 			return fail(500, { error: 'Internal server error' });
 		}
+	},
+
+	updateField: async ({ request, locals: { supabase } }) => {
+		const formData = await request.formData();
+		const cardId = formData.get('cardId')?.toString();
+		const fieldName = formData.get('fieldName')?.toString();
+		const fieldValue = formData.get('fieldValue')?.toString() ?? '';
+
+		if (!cardId || !fieldName) {
+			return fail(400, { error: 'Card ID and field name are required' });
+		}
+
+		try {
+			// First get the current data
+			const { data: cardData, error: fetchError } = await supabase
+				.from('idcards')
+				.select('data')
+				.eq('id', cardId)
+				.single();
+
+			if (fetchError) {
+				console.error('Error fetching card:', fetchError);
+				return fail(500, { error: 'Failed to fetch card' });
+			}
+
+			// Merge the new field value with existing data
+			const currentData = (cardData as any)?.data || {};
+			const updatedData = {
+				...currentData,
+				[fieldName]: fieldValue
+			};
+
+			// Update the card
+			const { error: updateError } = await (supabase as any)
+				.from('idcards')
+				.update({ data: updatedData })
+				.eq('id', cardId);
+
+			if (updateError) {
+				console.error('Error updating card:', updateError);
+				return fail(500, { error: 'Failed to update card' });
+			}
+
+			return { success: true, cardId, fieldName, fieldValue };
+		} catch (error) {
+			console.error('Error in update field action:', error);
+			return fail(500, { error: 'Internal server error' });
+		}
 	}
 };

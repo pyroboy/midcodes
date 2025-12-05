@@ -61,6 +61,15 @@
 	let selectedCards = $state(new Set<string>());
 	let selectedCount = $derived(selectedCards.size);
 
+	// Inline editing state
+	let editingCell: { cardId: string; fieldName: string } | null = $state(null);
+	let editValue = $state('');
+	let savingCell = $state(false);
+
+	// Bulk download state
+	let isBulkDownloading = $state(false);
+	let bulkDownloadProgress = $state({ current: 0, total: 0 });
+
 	// Create a map to store each group's selection state
 	let groupSelectionStates = $state(new Map<string, boolean>());
 
@@ -310,6 +319,9 @@
 		const selectedRows = getAllSelectedCards();
 		if (selectedRows.length === 0) return;
 
+		isBulkDownloading = true;
+		bulkDownloadProgress = { current: 0, total: selectedRows.length };
+
 		try {
 			const zip = new JSZip();
 			const nameCount = new Map<string, number>();
@@ -370,7 +382,16 @@
 								console.error(`Failed to download front image for ${nameField}`);
 							} else {
 								const frontBlob = await frontResponse.blob();
-								folder.file(`${nameField}_front.jpg`, frontBlob);
+								// Detect extension from MIME type
+								const frontExt =
+									frontBlob.type === 'image/png'
+										? 'png'
+										: frontBlob.type === 'image/jpeg'
+											? 'jpg'
+											: frontBlob.type === 'image/webp'
+												? 'webp'
+												: 'png';
+								folder.file(`${nameField}_front.${frontExt}`, frontBlob);
 							}
 						}
 					}
@@ -384,7 +405,16 @@
 								console.error(`Failed to download back image for ${nameField}`);
 							} else {
 								const backBlob = await backResponse.blob();
-								folder.file(`${nameField}_back.jpg`, backBlob);
+								// Detect extension from MIME type
+								const backExt =
+									backBlob.type === 'image/png'
+										? 'png'
+										: backBlob.type === 'image/jpeg'
+											? 'jpg'
+											: backBlob.type === 'image/webp'
+												? 'webp'
+												: 'png';
+								folder.file(`${nameField}_back.${backExt}`, backBlob);
 							}
 						}
 					}
@@ -393,6 +423,8 @@
 				} finally {
 					downloadingCards.delete(cardId);
 					downloadingCards = downloadingCards;
+					bulkDownloadProgress.current++;
+					bulkDownloadProgress = bulkDownloadProgress;
 				}
 			}
 
@@ -413,6 +445,9 @@
 		} catch (error) {
 			console.error('Error downloading ID cards:', error);
 			errorMessage = 'Failed to download ID cards';
+		} finally {
+			isBulkDownloading = false;
+			bulkDownloadProgress = { current: 0, total: 0 };
 		}
 	}
 
@@ -496,6 +531,82 @@
 		}
 	}
 
+	// Inline editing functions
+	function startEditing(cardId: string, fieldName: string, currentValue: string) {
+		editingCell = { cardId, fieldName };
+		editValue = currentValue || '';
+		// Focus the input after render
+		setTimeout(() => {
+			const input = document.getElementById(`edit-${cardId}-${fieldName}`);
+			if (input) {
+				(input as HTMLInputElement).focus();
+				(input as HTMLInputElement).select();
+			}
+		}, 0);
+	}
+
+	function cancelEditing() {
+		editingCell = null;
+		editValue = '';
+	}
+
+	async function saveEdit() {
+		if (!editingCell || savingCell) return;
+
+		const { cardId, fieldName } = editingCell;
+		savingCell = true;
+
+		try {
+			const formData = new FormData();
+			formData.append('cardId', cardId);
+			formData.append('fieldName', fieldName);
+			formData.append('fieldValue', editValue);
+
+			const response = await fetch('?/updateField', {
+				method: 'POST',
+				body: formData
+			});
+
+			const result = await response.json();
+
+			if (response.ok && result.type !== 'failure') {
+				// Update local state
+				dataRows = dataRows.map((card) => {
+					if (getCardId(card) === cardId) {
+						return {
+							...card,
+							fields: {
+								...card.fields,
+								[fieldName]: { value: editValue, side: 'front' as const }
+							}
+						};
+					}
+					return card;
+				});
+			} else {
+				console.error('Failed to save edit:', result);
+				errorMessage = result.data?.error || 'Failed to save';
+			}
+		} catch (error) {
+			console.error('Error saving edit:', error);
+			errorMessage = 'Failed to save';
+		} finally {
+			savingCell = false;
+			editingCell = null;
+			editValue = '';
+		}
+	}
+
+	function handleEditKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter') {
+			e.preventDefault();
+			saveEdit();
+		} else if (e.key === 'Escape') {
+			e.preventDefault();
+			cancelEditing();
+		}
+	}
+
 	let templateFields = $derived(metadata?.templates || {});
 
 	let groupedCards = $derived(
@@ -558,10 +669,35 @@
 			{#if selectedCount > 0}
 				<div class="flex gap-2">
 					<button
-						class="px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium rounded-md hover:bg-primary/90 transition-colors shadow-sm"
+						class="px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium rounded-md hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
 						onclick={downloadSelectedCards}
+						disabled={isBulkDownloading}
 					>
-						Download ({selectedCount})
+						{#if isBulkDownloading}
+							<svg
+								class="animate-spin h-3 w-3"
+								xmlns="http://www.w3.org/2000/svg"
+								fill="none"
+								viewBox="0 0 24 24"
+							>
+								<circle
+									class="opacity-25"
+									cx="12"
+									cy="12"
+									r="10"
+									stroke="currentColor"
+									stroke-width="4"
+								></circle>
+								<path
+									class="opacity-75"
+									fill="currentColor"
+									d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+								></path>
+							</svg>
+							Downloading {bulkDownloadProgress.current}/{bulkDownloadProgress.total}...
+						{:else}
+							Download ({selectedCount})
+						{/if}
 					</button>
 					<button
 						class="px-3 py-1.5 bg-destructive text-destructive-foreground text-xs font-medium rounded-md hover:bg-destructive/90 transition-colors shadow-sm"
@@ -661,8 +797,29 @@
 										</td>
 										{#if templateFields[templateName]}
 											{#each templateFields[templateName] || [] as field}
-												<td class="px-4 py-3 whitespace-nowrap text-foreground">
-													{card.fields?.[field.variableName]?.value || '-'}
+												<td
+													class="px-4 py-3 whitespace-nowrap text-foreground cursor-pointer hover:bg-muted/50"
+													ondblclick={() =>
+														startEditing(
+															getCardId(card),
+															field.variableName,
+															card.fields?.[field.variableName]?.value || ''
+														)}
+													title="Double-click to edit"
+												>
+													{#if editingCell?.cardId === getCardId(card) && editingCell?.fieldName === field.variableName}
+														<input
+															id="edit-{getCardId(card)}-{field.variableName}"
+															type="text"
+															bind:value={editValue}
+															onkeydown={handleEditKeydown}
+															onblur={saveEdit}
+															class="w-full px-2 py-1 text-sm border border-primary rounded bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+															disabled={savingCell}
+														/>
+													{:else}
+														{card.fields?.[field.variableName]?.value || '-'}
+													{/if}
 												</td>
 											{/each}
 										{/if}

@@ -225,7 +225,7 @@
 								<!-- 2. Elements Overlay (Preview) -->
 								{#if template.template_elements && template.template_elements.length > 0}
 									<div class="absolute inset-0 pointer-events-none overflow-hidden">
-										{#each template.template_elements.filter((el) => el.side === 'front') as el}
+										{#each template.template_elements.filter((el: any) => el.side === 'front') as el}
 											<div
 												class="absolute flex items-center overflow-hidden border border-dashed leading-none select-none"
 												class:justify-center={!el.alignment || el.alignment === 'center'}

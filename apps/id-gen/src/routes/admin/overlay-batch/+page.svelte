@@ -31,10 +31,18 @@
 	let totalCount = $state(0);
 	let errorMessage = $state('');
 	let successMessage = $state('');
-	let newTemplateId = $state('');
+	let newTemplateId: string = $state('');
 	let errors: string[] = $state([]);
 	let generatedTemplate: any = $state(null);
 	let generatedCards: any[] = $state([]);
+
+	// Type for source cards
+	interface SourceCard {
+		id: string;
+		front_image: string | null;
+		back_image: string | null;
+		data: Record<string, any>;
+	}
 
 	// Derived values
 	let selectedTemplate = $derived(data.templates.find((t) => t.id === selectedTemplateId));
@@ -232,16 +240,16 @@
 				throw new Error('Failed to create template');
 			}
 
-			const resultData = createResult.data;
+			const resultData = createResult.data as any;
 			if (!resultData?.success) {
-				let msg = resultData?.error || 'Failed to create template';
+				let msg: string = resultData?.error || 'Failed to create template';
 				if (!resultData?.error && !resultData?.details) {
 					msg += ` (Raw Result: ${JSON.stringify(createResult)})`;
 				}
 				throw new Error(msg);
 			}
 
-			newTemplateId = resultData.newTemplateId;
+			newTemplateId = resultData.newTemplateId as string;
 			generatedTemplate = resultData.newTemplate;
 
 			// Step 2: Get source cards
@@ -260,23 +268,23 @@
 				throw new Error('Failed to fetch source cards');
 			}
 
-			const cardsData = cardsResult.data;
+			const cardsData = cardsResult.data as any;
 			console.log('[startProcessing] Initial cardsData:', cardsData);
 
 			if (!cardsData?.cards) {
-				let msg = cardsData?.error || 'Failed to fetch cards';
+				let msg: string = cardsData?.error || 'Failed to fetch cards';
 				if (!cardsData?.error) {
 					msg += ` (Raw Result: ${JSON.stringify(cardsResult)})`;
 				}
 				throw new Error(msg);
 			}
 
-			let cards = cardsData.cards;
+			let cards: SourceCard[] = cardsData.cards as SourceCard[];
 			console.log('Cards data type:', typeof cards, 'Is Array:', Array.isArray(cards));
 
 			if (!Array.isArray(cards)) {
 				console.warn('Cards is not an array, attempting to wrap:', cards);
-				cards = [cards];
+				cards = [cards as unknown as SourceCard];
 			}
 
 			totalCount = cards.length;
@@ -333,7 +341,7 @@
 							generatedCards = [...generatedCards, saveResult.data.newCard];
 						}
 					} else {
-						const errorMsg = `Card ${card.id}: ${saveResult.data?.error || 'Unknown error'}`;
+						const errorMsg = `Card ${card.id}: ${(saveResult as any).data?.error || 'Unknown error'}`;
 						console.error(errorMsg);
 						errors = [...errors, errorMsg];
 					}
