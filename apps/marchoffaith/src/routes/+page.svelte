@@ -1,5 +1,6 @@
-<script lang="ts">
+w<script lang="ts">
     import { onMount } from 'svelte';
+    
 
     // --- CONFIGURATION ---
     // Set to true to drag points and copy new JSON
