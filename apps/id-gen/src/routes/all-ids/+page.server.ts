@@ -46,30 +46,87 @@ export const load = (async ({ locals }) => {
 	if (!session) throw error(401, 'Unauthorized');
 	if (!org_id) throw error(403, 'No organization context found');
 
-	const { data, error: fetchError } = await supabase.rpc('get_idcards_by_org', {
-		org_id: org_id,
-		page_limit: null,
-		page_offset: 0
-	} as any);
+	// Fetch ID cards with LEFT JOIN to include unassigned cards
+	const { data: cards, error: fetchError } = await supabase
+		.from('idcards')
+		.select(`
+			id,
+			template_id,
+			front_image,
+			back_image,
+			created_at,
+			data,
+			templates (
+				name
+			)
+		`)
+		.eq('org_id', org_id)
+		.order('created_at', { ascending: false });
 
 	if (fetchError) throw error(500, fetchError.message);
-	if (!data) throw error(404, 'No ID cards found');
+	if (!cards) throw error(404, 'No ID cards found');
 
-	// Type guard for the response structure
-	const response = data as IDCardResponse;
-	if (
-		!response.metadata?.organization_name ||
-		!Array.isArray(response.idcards) ||
-		!response.metadata.templates ||
-		!response.metadata.pagination
-	) {
-		throw error(500, 'Invalid API response format');
+	// Transform the data to match the expected format
+	const idCards: IDCard[] = cards.map((card: any) => {
+		const templateName = card.templates?.name || null;
+		const cardData = card.data || {};
+
+		// Convert data fields to the expected format
+		const fields: { [fieldName: string]: IDCardField } = {};
+		Object.entries(cardData).forEach(([key, value]) => {
+			if (typeof value === 'string' || value === null) {
+				fields[key] = {
+					value: value as string | null,
+					side: 'front' // Default to front, adjust if you have side info
+				};
+			}
+		});
+
+		return {
+			idcard_id: card.id,
+			template_name: templateName,
+			front_image: card.front_image,
+			back_image: card.back_image,
+			created_at: card.created_at,
+			fields
+		};
+	});
+
+	// Build metadata
+	const templateNames = Array.from(new Set(idCards.map((card) => card.template_name).filter(Boolean)));
+
+	// Fetch template info for metadata
+	const { data: templates } = await supabase
+		.from('templates')
+		.select('name, template_elements')
+		.eq('org_id', org_id)
+		.in('name', templateNames);
+
+	const templateFields: { [templateName: string]: TemplateVariable[] } = {};
+	if (templates) {
+		templates.forEach((template: any) => {
+			const elements = template.template_elements || [];
+			templateFields[template.name] = elements
+				.filter((el: any) => el.type === 'text' || el.type === 'selection')
+				.map((el: any) => ({
+					variableName: el.variableName,
+					side: el.side
+				}));
+		});
 	}
 
-	// Fetch template dimensions for 3D geometry preparation
-	const templateNames = Array.from(new Set(response.idcards.map((card) => card.template_name)));
+	const metadata: Metadata = {
+		organization_name: 'Organization', // You might want to fetch this
+		templates: templateFields,
+		pagination: {
+			total_records: idCards.length,
+			current_offset: 0,
+			limit: null
+		}
+	};
 
-	const { data: templates, error: templatesError } = await supabase
+	// Fetch template dimensions for 3D geometry preparation
+	const { data: templateDims, error: templatesError } = await supabase
 		.from('templates')
 		.select('name, width_pixels, height_pixels')
 		.eq('org_id', org_id)
@@ -82,9 +139,8 @@ export const load = (async ({ locals }) => {
 	// Create template dimensions map
 	const templateDimensions: Record<string, { width: number; height: number; unit: string }> = {};
 
-	if (templates) {
-		const safeTemplates = templates as any[];
-		safeTemplates.forEach((template: any) => {
+	if (templateDims) {
+		templateDims.forEach((template: any) => {
 			templateDimensions[template.name] = {
 				width: template.width_pixels || 1013,
 				height: template.height_pixels || 638,
@@ -94,8 +150,8 @@ export const load = (async ({ locals }) => {
 	}
 
 	return {
-		idCards: response.idcards,
-		metadata: response.metadata,
+		idCards,
+		metadata,
 		templateDimensions
 	};
 }) satisfies PageServerLoad;

@@ -161,17 +161,64 @@ export const actions = {
 				throw error(400, 'Template ID is required');
 			}
 
-			console.log('🗑️ Server: Processing template delete:', { templateId });
+			const deleteIds = formData.get('deleteIds') === 'true';
 
-			// First, update ID cards that use this template
-			const { error: updateError } = await (supabase as any)
-				.from('idcards')
-				.update({ template_id: null })
-				.eq('template_id', templateId);
+			console.log('🗑️ Server: Processing template delete:', { templateId, deleteIds });
 
-			if (updateError) {
-				console.error('❌ Server: Error updating ID cards:', updateError);
-				throw error(500, 'Error updating ID cards');
+			if (deleteIds) {
+				// 1. Fetch associated IDs to get image paths
+				const { data: cards, error: fetchError } = await supabase
+					.from('idcards')
+					.select('id, front_image, back_image')
+					.eq('template_id', templateId);
+
+				if (fetchError) {
+					console.error('❌ Server: Error fetching associated cards:', fetchError);
+					throw error(500, 'Error fetching associated cards');
+				}
+
+				if (cards && cards.length > 0) {
+					// 2. Delete images from storage
+					const imagesToDelete = [];
+					for (const card of cards) {
+						if (card.front_image) imagesToDelete.push(card.front_image);
+						if (card.back_image) imagesToDelete.push(card.back_image);
+					}
+
+					if (imagesToDelete.length > 0) {
+						const { error: storageError } = await supabase.storage
+							.from('rendered-id-cards')
+							.remove(imagesToDelete);
+
+						if (storageError) {
+							console.warn('⚠️ Server: Error deleting card images (non-fatal):', storageError);
+						}
+					}
+
+					// 3. Delete ID records
+					const { error: deleteCardsError } = await supabase
+						.from('idcards')
+						.delete()
+						.eq('template_id', templateId);
+
+					if (deleteCardsError) {
+						console.error('❌ Server: Error deleting associated cards:', deleteCardsError);
+						throw error(500, 'Error deleting associated cards');
+					}
+					console.log(`✅ Server: Deleted ${cards.length} associated ID cards`);
+				}
+			} else {
+				// Default behavior: Unlink IDs (keep them but remove template association)
+				const { error: updateError } = await (supabase as any)
+					.from('idcards')
+					.update({ template_id: null })
+					.eq('template_id', templateId);
+
+				if (updateError) {
+					console.error('❌ Server: Error updating ID cards:', updateError);
+					throw error(500, 'Error updating ID cards');
+				}
+				console.log('✅ Server: Unlinked associated ID cards');
 			}
 
 			// Then delete the template, ensuring it belongs to the user

@@ -181,10 +181,7 @@
 	async function openPreview(event: MouseEvent, card: IDCard) {
 		// Don't open preview if clicking on a checkbox, button, or their containers
 		const target = event.target as HTMLElement;
-		if (
-			target.closest('input[type="checkbox"]') ||
-			target.closest('button')
-		) {
+		if (target.closest('input[type="checkbox"]') || target.closest('button')) {
 			return;
 		}
 
@@ -501,14 +498,15 @@
 
 	let templateFields = $derived(metadata?.templates || {});
 
-let groupedCards = $derived(
+	let groupedCards = $derived(
 		(() => {
 			const groups: Record<string, IDCard[]> = {};
 			dataRows.forEach((card) => {
-				if (!groups[card.template_name]) {
-					groups[card.template_name] = [];
+				const templateName = card.template_name || 'Unassigned';
+				if (!groups[templateName]) {
+					groups[templateName] = [];
 				}
-				groups[card.template_name].push(card);
+				groups[templateName].push(card);
 			});
 			return groups;
 		})()
@@ -520,13 +518,19 @@ let groupedCards = $derived(
 	const MAX_WIDTH = 450;
 	const STEP = 25;
 
-	function zoomOut() { cardMinWidth = Math.max(MIN_WIDTH, cardMinWidth - STEP); }
-	function zoomIn() { cardMinWidth = Math.min(MAX_WIDTH, cardMinWidth + STEP); }
+	function zoomOut() {
+		cardMinWidth = Math.max(MIN_WIDTH, cardMinWidth - STEP);
+	}
+	function zoomIn() {
+		cardMinWidth = Math.min(MAX_WIDTH, cardMinWidth + STEP);
+	}
 </script>
 
 <div class="container mx-auto px-4 py-6 min-h-screen flex flex-col gap-6">
 	<!-- Controls Header -->
-	<div class="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center bg-card border border-border p-4 rounded-xl shadow-sm">
+	<div
+		class="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center bg-card border border-border p-4 rounded-xl shadow-sm"
+	>
 		<!-- Search -->
 		<div class="relative w-full md:max-w-sm">
 			<input
@@ -535,7 +539,18 @@ let groupedCards = $derived(
 				class="w-full pl-10 pr-4 py-2 bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm"
 				bind:value={searchQuery}
 			/>
-			<svg class="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+			<svg
+				class="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground"
+				fill="none"
+				stroke="currentColor"
+				viewBox="0 0 24 24"
+				><path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					stroke-width="2"
+					d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+				/></svg
+			>
 		</div>
 
 		<!-- Actions & Toggles -->
@@ -561,8 +576,14 @@ let groupedCards = $derived(
 				{#if $viewMode !== 'table'}
 					<!-- Mobile-friendly Zoom Controls -->
 					<div class="flex items-center bg-muted rounded-lg p-0.5">
-						<button class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-background text-muted-foreground" onclick={zoomOut}>−</button>
-						<button class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-background text-muted-foreground" onclick={zoomIn}>+</button>
+						<button
+							class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-background text-muted-foreground"
+							onclick={zoomOut}>−</button
+						>
+						<button
+							class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-background text-muted-foreground"
+							onclick={zoomIn}>+</button
+						>
 					</div>
 				{/if}
 				<ViewModeToggle />
@@ -583,15 +604,26 @@ let groupedCards = $derived(
 							<div class="h-6 w-1 bg-primary rounded-full"></div>
 							{templateName}
 						</h3>
-						<span class="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">{cards.length} items</span>
+						<span class="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full"
+							>{cards.length} items</span
+						>
 					</div>
-					
-					<div class="relative w-full overflow-x-auto rounded-lg border border-border bg-card shadow-sm">
+
+					<div
+						class="relative w-full overflow-x-auto rounded-lg border border-border bg-card shadow-sm"
+					>
 						<table class="w-full text-sm text-left">
-							<thead class="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-border">
+							<thead
+								class="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-border"
+							>
 								<tr>
 									<th class="w-10 px-4 py-3">
-										<input type="checkbox" class="rounded border-muted-foreground" checked={groupSelectionStates.get(templateName)} onchange={(e) => handleGroupCheckboxClick(e, cards)} />
+										<input
+											type="checkbox"
+											class="rounded border-muted-foreground"
+											checked={groupSelectionStates.get(templateName)}
+											onchange={(e) => handleGroupCheckboxClick(e, cards)}
+										/>
 									</th>
 									<th class="px-4 py-3 font-medium">Preview</th>
 									{#if templateFields[templateName]}
@@ -606,12 +638,24 @@ let groupedCards = $derived(
 								{#each cards as card}
 									<tr class="hover:bg-muted/30 transition-colors group">
 										<td class="px-4 py-3">
-											<input type="checkbox" class="rounded border-muted-foreground" checked={selectionManager.isSelected(getCardId(card))} onchange={(e) => handleCheckboxClick(e, card)} />
+											<input
+												type="checkbox"
+												class="rounded border-muted-foreground"
+												checked={selectionManager.isSelected(getCardId(card))}
+												onchange={(e) => handleCheckboxClick(e, card)}
+											/>
 										</td>
 										<td class="px-4 py-2 w-24" onclick={(e) => openPreview(e, card)}>
-											<div class="h-10 w-16 bg-muted rounded overflow-hidden cursor-pointer border border-border hover:border-primary transition-colors">
+											<div
+												class="h-10 w-16 bg-muted rounded overflow-hidden cursor-pointer border border-border hover:border-primary transition-colors"
+											>
 												{#if card.front_image}
-													<img src={getSupabaseStorageUrl(card.front_image, 'rendered-id-cards')} alt="Thumb" class="w-full h-full object-cover" loading="lazy" />
+													<img
+														src={getSupabaseStorageUrl(card.front_image, 'rendered-id-cards')}
+														alt="Thumb"
+														class="w-full h-full object-cover"
+														loading="lazy"
+													/>
 												{/if}
 											</div>
 										</td>
@@ -623,12 +667,36 @@ let groupedCards = $derived(
 											{/each}
 										{/if}
 										<td class="px-4 py-3 text-right">
-											<div class="flex justify-end gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-												<button class="p-1.5 hover:bg-muted rounded text-blue-500" onclick={() => downloadCard(card)} title="Download">
-													<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+											<div
+												class="flex justify-end gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity"
+											>
+												<button
+													class="p-1.5 hover:bg-muted rounded text-blue-500"
+													onclick={() => downloadCard(card)}
+													title="Download"
+												>
+													<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+														><path
+															stroke-linecap="round"
+															stroke-linejoin="round"
+															stroke-width="2"
+															d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+														/></svg
+													>
 												</button>
-												<button class="p-1.5 hover:bg-muted rounded text-red-500" onclick={() => handleDelete(card)} title="Delete">
-													<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+												<button
+													class="p-1.5 hover:bg-muted rounded text-red-500"
+													onclick={() => handleDelete(card)}
+													title="Delete"
+												>
+													<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+														><path
+															stroke-linecap="round"
+															stroke-linejoin="round"
+															stroke-width="2"
+															d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+														/></svg
+													>
 												</button>
 											</div>
 										</td>
@@ -648,14 +716,16 @@ let groupedCards = $derived(
 				<div class="space-y-4">
 					<div class="flex items-center gap-3 border-b border-border pb-2">
 						<h3 class="text-lg font-semibold text-foreground">{templateName}</h3>
-						<span class="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{cards.length}</span>
+						<span class="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full"
+							>{cards.length}</span
+						>
 					</div>
-					
+
 					<div class="responsive-grid">
 						{#each cards as card}
 							<div class="card-wrapper">
 								<SimpleIDCard
-									card={card}
+									{card}
 									isSelected={selectionManager.isSelected(getCardId(card))}
 									onToggleSelect={() => selectionManager.toggleSelection(getCardId(card))}
 									onDownload={downloadCard}
@@ -677,8 +747,12 @@ let groupedCards = $derived(
 {#if selectedFrontImage || selectedBackImage}
 	<ClientOnly>
 		<ImagePreviewModal
-			frontImageUrl={selectedFrontImage ? getSupabaseStorageUrl(selectedFrontImage, 'rendered-id-cards') : null}
-			backImageUrl={selectedBackImage ? getSupabaseStorageUrl(selectedBackImage, 'rendered-id-cards') : null}
+			frontImageUrl={selectedFrontImage
+				? getSupabaseStorageUrl(selectedFrontImage, 'rendered-id-cards')
+				: null}
+			backImageUrl={selectedBackImage
+				? getSupabaseStorageUrl(selectedBackImage, 'rendered-id-cards')
+				: null}
 			cardGeometry={selectedCardGeometry}
 			templateDimensions={selectedTemplateDimensions}
 			onClose={closePreview}
@@ -708,7 +782,7 @@ let groupedCards = $derived(
 		height: auto;
 		width: 100%;
 		/* Ensure it stretches to fill the grid cell */
-		display: flex; 
+		display: flex;
 		flex-direction: column;
 	}
 </style>

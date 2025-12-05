@@ -15,6 +15,7 @@
 	import { goto } from '$app/navigation';
 	import { enhance } from '$app/forms';
 	import type { TemplateElement } from '$lib/stores/templateStore';
+	import { getSupabaseStorageUrl } from '$lib/utils/supabase';
 
 	// Enhanced type definitions for better type safety
 	interface SelectOption {
@@ -159,7 +160,7 @@
 		initializeSelectStates();
 	}
 
-onMount(async () => {
+	onMount(async () => {
 		// initialize responsive state
 		if (typeof window !== 'undefined') {
 			isMobile = window.innerWidth < 768;
@@ -371,12 +372,15 @@ onMount(async () => {
 							{#if template}
 								<div
 									class="w-full"
-									style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels || 638}"
+									style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels ||
+										638}"
 								>
 									<IdCanvas
 										bind:this={frontCanvasComponent}
 										elements={template.template_elements.filter((el) => el.side === 'front')}
-										backgroundUrl={template.front_background}
+										backgroundUrl={template.front_background.startsWith('http')
+											? template.front_background
+											: getSupabaseStorageUrl(template.front_background)}
 										{formData}
 										{fileUploads}
 										{imagePositions}
@@ -397,12 +401,15 @@ onMount(async () => {
 							{#if template}
 								<div
 									class="w-full"
-									style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels || 638}"
+									style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels ||
+										638}"
 								>
 									<IdCanvas
 										bind:this={backCanvasComponent}
 										elements={template.template_elements.filter((el) => el.side === 'back')}
-										backgroundUrl={template.back_background}
+										backgroundUrl={template.back_background.startsWith('http')
+											? template.back_background
+											: getSupabaseStorageUrl(template.back_background)}
 										{formData}
 										{fileUploads}
 										{imagePositions}
@@ -442,11 +449,17 @@ onMount(async () => {
 
 						{#if currentView === 'front'}
 							{#if template}
-								<div class="w-full" style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels || 638}">
+								<div
+									class="w-full"
+									style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels ||
+										638}"
+								>
 									<IdCanvas
 										bind:this={frontCanvasComponent}
 										elements={template.template_elements.filter((el) => el.side === 'front')}
-										backgroundUrl={template.front_background}
+										backgroundUrl={template.front_background.startsWith('http')
+											? template.front_background
+											: getSupabaseStorageUrl(template.front_background)}
 										{formData}
 										{fileUploads}
 										{imagePositions}
@@ -461,27 +474,31 @@ onMount(async () => {
 									/>
 								</div>
 							{/if}
-						{:else}
-							{#if template}
-								<div class="w-full" style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels || 638}">
-									<IdCanvas
-										bind:this={backCanvasComponent}
-										elements={template.template_elements.filter((el) => el.side === 'back')}
-										backgroundUrl={template.back_background}
-										{formData}
-										{fileUploads}
-										{imagePositions}
-										{fullResolution}
-										isDragging={mouseMoving}
-										pixelDimensions={template.width_pixels && template.height_pixels
-											? { width: template.width_pixels, height: template.height_pixels }
-											: null}
-										on:ready={() => handleCanvasReady('back')}
-										on:error={({ detail }) =>
-											addDebugMessage(`Back Canvas Error: ${detail.code} - ${detail.message}`)}
-									/>
-								</div>
-							{/if}
+						{:else if template}
+							<div
+								class="w-full"
+								style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels ||
+									638}"
+							>
+								<IdCanvas
+									bind:this={backCanvasComponent}
+									elements={template.template_elements.filter((el) => el.side === 'back')}
+									backgroundUrl={template.back_background.startsWith('http')
+										? template.back_background
+										: getSupabaseStorageUrl(template.back_background)}
+									{formData}
+									{fileUploads}
+									{imagePositions}
+									{fullResolution}
+									isDragging={mouseMoving}
+									pixelDimensions={template.width_pixels && template.height_pixels
+										? { width: template.width_pixels, height: template.height_pixels }
+										: null}
+									on:ready={() => handleCanvasReady('back')}
+									on:error={({ detail }) =>
+										addDebugMessage(`Back Canvas Error: ${detail.code} - ${detail.message}`)}
+								/>
+							</div>
 						{/if}
 					</div>
 				{/if}

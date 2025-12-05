@@ -8,7 +8,9 @@
       "Bash(npm view:*)",
       "mcp__context7__resolve-library-id",
       "Bash(npm run check:*)",
-      "Bash(pnpm run test:unit:*)"
+      "Bash(pnpm run test:unit:*)",
+      "Bash(pnpm run lint)",
+      "Bash(npx prettier:*)"
     ],
     "deny": [],
     "ask": []
