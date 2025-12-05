@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
 	
@@ -66,9 +66,9 @@
 		window.addEventListener('scroll', handleScroll);
 		
 		// Close menu when clicking outside
-		function handleClickOutside(event) {
+		function handleClickOutside(event: MouseEvent) {
 			const header = document.querySelector('header');
-			if (header && !header.contains(event.target) && isMobileMenuOpen) {
+			if (header && !header.contains(event.target as Node) && isMobileMenuOpen) {
 				closeMobileMenu();
 			}
 		}

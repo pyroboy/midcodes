@@ -4,7 +4,7 @@
 
 <svelte:head>
 	<title>Contact Us - March of Faith Incorporated</title>
-	<meta name="description" content="Connect with March of Faith Incorporated in Tagbilaran City, Bohol. Phone: +63 99 9953 6700. Strengthening faith, building community since 1975." />
+	<meta name="description" content="Connect with March of Faith Incorporated in Tagbilaran City, Bohol. Phone: +63 99 9953 6700. Strengthening faith, building community since 1974." />
 </svelte:head>
 
 <Hero subtitle="We'd love to hear from you and welcome you to our church family in Tagbilaran, Bohol">
@@ -398,19 +398,6 @@
 
 	/* Responsive Design */
 	@media (max-width: 768px) {
-		.hero-section {
-			padding: 2rem 0;
-		}
-
-		.hero-content h1 {
-			font-size: 2rem;
-			margin-bottom: 0.75rem;
-		}
-
-		.hero-subtitle {
-			font-size: 1.1rem;
-		}
-
 		.contact-content {
 			padding: 2rem 0;
 		}

@@ -203,41 +203,6 @@
 		padding: 0 2rem;
 	}
 
-	/* Navigation Tabs */
-	.about-nav {
-		background: white;
-		border-bottom: 1px solid #e5e5e5;
-		padding: 0;
-	}
-
-	.tab-navigation {
-		display: flex;
-		gap: 0;
-		overflow-x: auto;
-	}
-
-	.tab-link {
-		display: block;
-		padding: 1.5rem 2rem;
-		text-decoration: none;
-		color: #666;
-		font-weight: 600;
-		border-bottom: 3px solid transparent;
-		transition: all 0.3s ease;
-		white-space: nowrap;
-	}
-
-	.tab-link:hover {
-		color: #981B1E;
-		background: #f8f9fa;
-	}
-
-	.tab-link.active {
-		color: #981B1E;
-		border-bottom-color: #C1272D;
-		background: white;
-	}
-
 	/* Minister Content */
 	.minister-content {
 		padding: 4rem 0;
@@ -546,14 +511,6 @@
 
 	/* Responsive Design */
 	@media (max-width: 768px) {
-		.hero-content h1 {
-			font-size: 2rem;
-		}
-
-		.hero-subtitle {
-			font-size: 1.1rem;
-		}
-
 		.content-layout {
 			grid-template-columns: 1fr;
 			gap: 2rem;
@@ -566,11 +523,6 @@
 		.priority-item {
 			flex-direction: column;
 			gap: 1rem;
-		}
-
-		.tab-link {
-			padding: 1rem 1.5rem;
-			font-size: 0.9rem;
 		}
 
 		.container {

@@ -6,13 +6,13 @@
 
 <svelte:head>
 	<title>About Us - March of Faith Incorporated</title>
-	<meta name="description" content="Learn about March of Faith Incorporated - our history, mission, leadership, and beliefs. Serving the community in Tagbilaran City, Bohol since 1975." />
+	<meta name="description" content="Learn about March of Faith Incorporated - our history, mission, leadership, and beliefs. Serving the community in Tagbilaran City, Bohol since 1974." />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@700;900&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </svelte:head>
 
-<Hero subtitle="A community of believers dedicated to spreading God's love and serving the people of Bohol since 1975">
+<Hero subtitle="A community of believers dedicated to spreading God's love and serving the people of Bohol since 1974">
 	ABOUT US
 </Hero>
 
@@ -22,65 +22,86 @@
 <!-- Main Content -->
 <section class="about-content">
     <div class="container">
+
+        <!-- Mission & Vision - Featured Section -->
+        <div class="mv-section">
+            <div class="mv-header">
+                <span class="mv-label">Our Purpose</span>
+                <h2>Called to Serve</h2>
+            </div>
+            <div class="mv-cards">
+                <div class="mv-card vision-card">
+                    <div class="mv-card-inner">
+                        <div class="mv-badge">Vision</div>
+                        <p class="mv-statement">"Every Creature Reachable."</p>
+                        <div class="mv-verse">Mark 16:15</div>
+                    </div>
+                </div>
+                <div class="mv-card mission-card">
+                    <div class="mv-card-inner">
+                        <div class="mv-badge">Mission</div>
+                        <p class="mv-statement">"Reach the unreached. Preach Jesus. Make disciples."</p>
+                        <div class="mv-verse">Matthew 28:19-20</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="content-layout">
-            
+
             <div class="main-column">
-                
-                <div class="content-card welcome-card">
-                    <div class="card-header">
-                        <span class="section-label">Est. 1975</span>
+
+                <!-- Welcome Section -->
+                <div class="welcome-section">
+                    <div class="welcome-header">
+                        <span class="section-badge">Est. 1974</span>
                         <h2>Welcome to the Family</h2>
-                        <p class="lead-text">
-                            For nearly five decades, March of Faith Incorporated has been a cornerstone of faith in Bohol, Philippines. We are more than a building; we are a spiritual home to countless believers committed to the Great Commission.
-                        </p>
                     </div>
-                    
-                    <div class="founder-block">
-                        <div class="founder-visual">
-                            <img 
-                                src="https://res.cloudinary.com/dexcw6vg0/image/upload/v1754821750/rcpqj7mzayco2ndwioqp.png" 
-                                alt="Rev. Rudy Salomon Trigo" 
+                    <p class="lead-text">
+                        For over five decades, March of Faith Incorporated has been a cornerstone of faith in Bohol, Philippines. We are more than a building; we are a spiritual home to countless believers committed to the Great Commission.
+                    </p>
+
+                    <!-- Founder Feature -->
+                    <a href="/about/founding-minister" class="founder-feature">
+                        <div class="founder-image">
+                            <img
+                                src="https://res.cloudinary.com/dexcw6vg0/image/upload/v1754821750/rcpqj7mzayco2ndwioqp.png"
+                                alt="Rev. Rudy Salomon Trigo, D.D."
                             />
-                            <div class="visual-backdrop"></div>
                         </div>
-                        <div class="founder-text">
-                            <h3>Our Founding Minister</h3>
-                            <p><strong>Rev. Rudy Salomon Trigo, D.D.</strong> (1938-2011) established this ministry with a divine vision: to create a sanctuary where believers could grow in grace and truth.</p>
-                            <a href="/about/founding-minister" class="text-link">Read His Story &rarr;</a>
+                        <div class="founder-info">
+                            <span class="founder-role">Our Founding Minister</span>
+                            <h3>Rev. Rudy Salomon Trigo, D.D.</h3>
+                            <p>(1938 - 2011)</p>
+                            <span class="founder-link">Read His Story <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg></span>
                         </div>
-                    </div>
+                    </a>
 
-                    <div class="stats-grid">
-                        <div class="stat-item">
-                            <span class="stat-num">50+</span>
-                            <span class="stat-lbl">Years of Grace</span>
+                    <!-- Stats -->
+                    <div class="stats-row">
+                        <div class="stat-box">
+                            <span class="stat-number">50+</span>
+                            <span class="stat-label">Years of Ministry</span>
                         </div>
-                        <div class="stat-item">
-                            <span class="stat-num">13+</span>
-                            <span class="stat-lbl">Churches</span>
+                        <div class="stat-divider"></div>
+                        <div class="stat-box">
+                            <span class="stat-number">13+</span>
+                            <span class="stat-label">Local Churches</span>
                         </div>
-                        <div class="stat-item">
-                            <span class="stat-num">∞</span>
-                            <span class="stat-lbl">Lives Changed</span>
+                        <div class="stat-divider"></div>
+                        <div class="stat-box">
+                            <span class="stat-number">∞</span>
+                            <span class="stat-label">Lives Touched</span>
                         </div>
                     </div>
                 </div>
 
-                <div class="mv-grid">
-                    <div class="mv-card mission">
-                        <div class="mv-icon">🎯</div>
-                        <h3>Our Mission</h3>
-                        <p>To be a Christ-centered community that strengthens faith, builds meaningful relationships, and spreads God's love throughout the Philippines and beyond.</p>
-                    </div>
-                    <div class="mv-card vision">
-                        <div class="mv-icon">🌟</div>
-                        <h3>Our Vision</h3>
-                        <p>To see transformed lives and thriving communities as we make disciples of Jesus Christ, equipped for service and empowered to be salt and light.</p>
-                    </div>
-                </div>
-
+                <!-- Core Values -->
                 <div class="values-section">
-                    <h2>Our Core Values</h2>
+                    <div class="values-header">
+                        <h2>Our Core Values</h2>
+                        <p>The principles that guide everything we do</p>
+                    </div>
                     <div class="values-grid">
                         {#each [
                             {icon: '📖', title: 'Biblical Foundation', desc: 'Scripture is our ultimate guide for faith and life.'},
@@ -90,12 +111,10 @@
                             {icon: '✋', title: 'Faithful Service', desc: 'Using our gifts to build His kingdom.'},
                             {icon: '🌍', title: 'Global Perspective', desc: 'Reaching beyond our local borders.'}
                         ] as val}
-                            <div class="value-item">
-                                <span class="val-icon">{val.icon}</span>
-                                <div class="val-content">
-                                    <h4>{val.title}</h4>
-                                    <p>{val.desc}</p>
-                                </div>
+                            <div class="value-card">
+                                <span class="value-icon">{val.icon}</span>
+                                <h4>{val.title}</h4>
+                                <p>{val.desc}</p>
                             </div>
                         {/each}
                     </div>
@@ -104,47 +123,53 @@
             </div>
 
             <aside class="sidebar-column">
-                
-                <div class="widget-card info-widget">
+
+                <!-- Quick Facts -->
+                <div class="sidebar-card facts-card">
                     <h3>Quick Facts</h3>
-                    <ul class="info-list">
+                    <ul class="facts-list">
                         <li>
-                            <span class="label">Founded</span>
-                            <span class="value">Nov 19, 1975</span>
+                            <span class="fact-label">Founded</span>
+                            <span class="fact-value">November 19, 1974</span>
                         </li>
                         <li>
-                            <span class="label">HQ Location</span>
-                            <span class="value">Tagbilaran City</span>
+                            <span class="fact-label">Headquarters</span>
+                            <span class="fact-value">Tagbilaran City, Bohol</span>
                         </li>
                         <li>
-                            <span class="label">SEC Reg.</span>
-                            <span class="value">No. 0000058834</span>
+                            <span class="fact-label">SEC Registration</span>
+                            <span class="fact-value">No. 0000058834</span>
                         </li>
                     </ul>
                 </div>
 
-                <div class="widget-card scripture-widget">
-                    <div class="quote-mark">"</div>
-                    <blockquote>
-                        And he gave the apostles, the prophets, the evangelists, the shepherds and teachers, to equip the saints for the work of ministry.
-                    </blockquote>
-                    <cite>— Ephesians 4:11-12</cite>
+                <!-- Scripture Card -->
+                <div class="sidebar-card scripture-card">
+                    <div class="scripture-bg"></div>
+                    <div class="scripture-content">
+                        <svg class="quote-icon" width="32" height="32" viewBox="0 0 24 24" fill="currentColor" opacity="0.3"><path d="M6 17h3l2-4V7H5v6h3zm8 0h3l2-4V7h-6v6h3z"/></svg>
+                        <blockquote>
+                            And he gave the apostles, the prophets, the evangelists, the shepherds and teachers, to equip the saints for the work of ministry.
+                        </blockquote>
+                        <cite>Ephesians 4:11-12</cite>
+                    </div>
                 </div>
 
-                <div class="widget-card contact-widget">
+                <!-- Contact Card -->
+                <div class="sidebar-card contact-card">
                     <h3>Get in Touch</h3>
                     <p>We'd love to hear from you or pray with you.</p>
-                    <div class="contact-details">
-                        <div class="c-row">
-                            <span class="icon">📞</span>
+                    <div class="contact-rows">
+                        <div class="contact-row">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
                             <span>+63 99 9953 6700</span>
                         </div>
-                        <div class="c-row">
-                            <span class="icon">📧</span>
+                        <div class="contact-row">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                             <span>marchoffaith@gmail.com</span>
                         </div>
                     </div>
-                    <a href="/contact" class="btn-sidebar">Visit Our Church</a>
+                    <a href="/contact" class="btn-contact">Visit Our Church</a>
                 </div>
 
             </aside>
@@ -154,407 +179,604 @@
 </section>
 
 <style>
-    /* --- CSS VARIABLES (Matching Main Page) --- */
+    /* --- CSS VARIABLES --- */
     :root {
-        --brand-red: #981B1E;
+        --brand-primary: #981B1E;
         --brand-accent: #C1272D;
-        --dark-text: #1e293b;
-        --light-text: #64748b;
+        --brand-dark: #7a1517;
+        --text-dark: #1e293b;
+        --text-muted: #64748b;
+        --text-light: #94a3b8;
         --bg-light: #f8fafc;
-        --card-bg: #ffffff;
+        --bg-cream: #fefdfb;
+        --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        --card-shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
     }
 
-    /* --- GLOBAL UTILS --- */
+    /* --- GLOBAL --- */
     .container {
         max-width: 1200px;
         margin: 0 auto;
         padding: 0 2rem;
     }
 
-    /* --- HERO SECTION --- */
-    /* Moved to Hero.svelte component */
-
-    /* .slab-highlight is used in the slot, so we might need to keep it or ensure the component handles it.
-       The component has :global(.slab-highlight), so we can remove it here.
-    */
-    .slab-highlight { display: inline-block; } /* Keeping just in case, but component has :global */
-
-    /* --- NAVIGATION TABS --- */
-    .nav-wrapper {
-        background: white;
-        border-bottom: 1px solid #e2e8f0;
-        position: sticky;
-        top: 70px; /* Height of scrolled header approx */
-        z-index: 90;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    .about-content {
+        background: linear-gradient(180deg, var(--bg-light) 0%, var(--bg-cream) 100%);
+        padding: 4rem 0 6rem;
     }
 
-    .tab-navigation {
-        display: flex;
-        overflow-x: auto;
-        gap: 2rem;
-        scrollbar-width: none; /* Hide scrollbar */
+    /* --- MISSION & VISION SECTION --- */
+    .mv-section {
+        margin-bottom: 4rem;
     }
 
-    .tab-link {
-        padding: 1.25rem 0;
-        color: var(--light-text);
-        text-decoration: none;
-        font-family: 'Montserrat', sans-serif;
-        font-weight: 600;
-        font-size: 0.9rem;
+    .mv-header {
+        text-align: center;
+        margin-bottom: 2.5rem;
+    }
+
+    .mv-label {
+        font-family: 'Inter', sans-serif;
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: var(--brand-accent);
         text-transform: uppercase;
-        letter-spacing: 0.5px;
-        border-bottom: 3px solid transparent;
-        transition: all 0.3s ease;
-        white-space: nowrap;
+        letter-spacing: 3px;
+        display: block;
+        margin-bottom: 0.75rem;
     }
 
-    .tab-link:hover { color: var(--brand-red); }
+    .mv-header h2 {
+        font-family: 'Playfair Display', serif;
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin: 0;
+    }
 
-    .tab-link.active {
-        color: var(--brand-red);
-        border-bottom-color: var(--brand-red);
+    .mv-cards {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 2rem;
+    }
+
+    .mv-card {
+        border-radius: 20px;
+        overflow: hidden;
+        position: relative;
+    }
+
+    .vision-card {
+        background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-dark) 100%);
+    }
+
+    .mission-card {
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    }
+
+    .mv-card-inner {
+        padding: 3rem 2.5rem;
+        text-align: center;
+        position: relative;
+        z-index: 1;
+    }
+
+    .mv-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        opacity: 0.5;
+    }
+
+    .mv-badge {
+        display: inline-block;
+        background: rgba(255,255,255,0.2);
+        color: white;
+        font-family: 'Inter', sans-serif;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        padding: 0.5rem 1.25rem;
+        border-radius: 50px;
+        margin-bottom: 1.5rem;
+    }
+
+    .mv-statement {
+        font-family: 'Playfair Display', serif;
+        font-size: 1.75rem;
+        font-weight: 600;
+        color: white;
+        line-height: 1.4;
+        margin: 0 0 1.5rem 0;
+    }
+
+    .mv-verse {
+        font-family: 'Inter', sans-serif;
+        font-size: 0.8rem;
+        color: rgba(255,255,255,0.7);
+        font-weight: 500;
     }
 
     /* --- CONTENT LAYOUT --- */
-    .about-content {
-        background: var(--bg-light);
-        padding: 4rem 0;
-    }
-
     .content-layout {
         display: grid;
-        grid-template-columns: 2fr 1fr;
+        grid-template-columns: 1fr 380px;
         gap: 3rem;
         align-items: start;
     }
 
-    /* --- MAIN COLUMN STYLES --- */
-    .content-card {
+    /* --- WELCOME SECTION --- */
+    .welcome-section {
         background: white;
-        border-radius: 16px;
+        border-radius: 24px;
         padding: 3rem;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.04);
-        border: 1px solid rgba(0,0,0,0.04);
-        margin-bottom: 3rem;
+        box-shadow: var(--card-shadow);
+        margin-bottom: 2.5rem;
     }
 
-    .section-label {
-        font-family: 'Montserrat', sans-serif;
-        font-size: 0.8rem;
+    .welcome-header {
+        margin-bottom: 1.5rem;
+    }
+
+    .section-badge {
+        display: inline-block;
+        font-family: 'Inter', sans-serif;
+        font-size: 0.7rem;
         font-weight: 700;
         color: var(--brand-accent);
         text-transform: uppercase;
         letter-spacing: 2px;
-        display: block;
-        margin-bottom: 0.5rem;
+        background: rgba(193, 39, 45, 0.1);
+        padding: 0.4rem 1rem;
+        border-radius: 50px;
+        margin-bottom: 1rem;
     }
 
-    .welcome-card h2 {
-        font-family: 'Roboto Slab', serif;
-        font-size: 2.5rem;
-        color: var(--dark-text);
-        margin: 0 0 1.5rem 0;
-        line-height: 1.1;
+    .welcome-header h2 {
+        font-family: 'Playfair Display', serif;
+        font-size: 2.25rem;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin: 0;
     }
 
     .lead-text {
-        font-size: 1.15rem;
-        line-height: 1.7;
-        color: #475569;
+        font-family: 'Inter', sans-serif;
+        font-size: 1.1rem;
+        line-height: 1.8;
+        color: var(--text-muted);
+        margin-bottom: 2rem;
     }
 
-    /* Founder Block */
-    .founder-block {
+    /* Founder Feature */
+    .founder-feature {
         display: flex;
-        gap: 2rem;
-        background: #fef2f2; /* Very light red tint */
-        padding: 2rem;
-        border-radius: 12px;
-        margin: 2.5rem 0;
+        gap: 1.5rem;
         align-items: center;
-        border-left: 4px solid var(--brand-red);
+        background: linear-gradient(135deg, #fef2f2 0%, #fff5f5 100%);
+        padding: 1.5rem;
+        border-radius: 16px;
+        text-decoration: none;
+        border: 1px solid rgba(193, 39, 45, 0.1);
+        margin-bottom: 2.5rem;
+        transition: all 0.3s ease;
     }
 
-    .founder-visual {
-        position: relative;
-        width: 120px;
-        height: 120px;
+    .founder-feature:hover {
+        transform: translateY(-3px);
+        box-shadow: var(--card-shadow-lg);
+        border-color: rgba(193, 39, 45, 0.2);
+    }
+
+    .founder-image {
+        width: 90px;
+        height: 90px;
+        border-radius: 50%;
+        overflow: hidden;
         flex-shrink: 0;
+        border: 3px solid white;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     }
 
-    .founder-visual img {
+    .founder-image img {
         width: 100%;
         height: 100%;
         object-fit: cover;
-        border-radius: 50%;
-        border: 3px solid white;
-        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-        position: relative;
-        z-index: 2;
     }
 
-    .founder-text h3 {
-        font-family: 'Roboto Slab', serif;
-        color: var(--brand-red);
-        margin: 0 0 0.5rem 0;
-        font-size: 1.2rem;
+    .founder-info {
+        flex: 1;
     }
 
-    .founder-text p {
-        font-size: 0.95rem;
-        line-height: 1.5;
-        color: var(--light-text);
-        margin-bottom: 1rem;
-    }
-
-    .text-link {
-        color: var(--brand-accent);
+    .founder-role {
+        font-family: 'Inter', sans-serif;
+        font-size: 0.7rem;
         font-weight: 700;
-        text-decoration: none;
-        font-size: 0.85rem;
+        color: var(--brand-accent);
         text-transform: uppercase;
-        letter-spacing: 1px;
+        letter-spacing: 1.5px;
+    }
+
+    .founder-info h3 {
+        font-family: 'Playfair Display', serif;
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin: 0.25rem 0 0.15rem;
+    }
+
+    .founder-info p {
+        font-family: 'Inter', sans-serif;
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        margin: 0 0 0.5rem;
+    }
+
+    .founder-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-family: 'Inter', sans-serif;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--brand-accent);
+    }
+
+    .founder-link svg {
+        transition: transform 0.2s ease;
+    }
+
+    .founder-feature:hover .founder-link svg {
+        transform: translateX(4px);
     }
 
     /* Stats */
-    .stats-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 1rem;
-        border-top: 1px dashed #cbd5e1;
+    .stats-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 2rem;
         padding-top: 2rem;
+        border-top: 1px solid #e2e8f0;
     }
 
-    .stat-item { text-align: center; }
-    
-    .stat-num {
+    .stat-box {
+        text-align: center;
+        flex: 1;
+    }
+
+    .stat-number {
         display: block;
-        font-family: 'Roboto Slab', serif;
-        font-size: 2rem;
+        font-family: 'Playfair Display', serif;
+        font-size: 2.5rem;
         font-weight: 700;
-        color: var(--brand-red);
+        color: var(--brand-primary);
+        line-height: 1;
     }
 
-    .stat-lbl {
-        font-family: 'Montserrat', sans-serif;
+    .stat-label {
+        font-family: 'Inter', sans-serif;
         font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--text-muted);
         text-transform: uppercase;
         letter-spacing: 1px;
-        color: var(--light-text);
+        margin-top: 0.5rem;
+        display: block;
     }
 
-    /* Mission / Vision */
-    .mv-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 2rem;
-        margin-bottom: 3rem;
+    .stat-divider {
+        width: 1px;
+        height: 50px;
+        background: #e2e8f0;
     }
 
-    .mv-card {
+    /* --- VALUES SECTION --- */
+    .values-section {
         background: white;
-        padding: 2rem;
-        border-radius: 16px;
+        border-radius: 24px;
+        padding: 3rem;
+        box-shadow: var(--card-shadow);
+    }
+
+    .values-header {
         text-align: center;
-        box-shadow: 0 5px 20px rgba(0,0,0,0.03);
-        transition: transform 0.3s ease;
-        border-top: 4px solid transparent;
+        margin-bottom: 2.5rem;
     }
 
-    .mv-card.mission { border-top-color: var(--brand-red); }
-    .mv-card.vision { border-top-color: #1e293b; }
-
-    .mv-card:hover { transform: translateY(-5px); }
-
-    .mv-icon { font-size: 2.5rem; margin-bottom: 1rem; display: block; }
-
-    .mv-card h3 {
-        font-family: 'Roboto Slab', serif;
-        font-size: 1.4rem;
-        margin-bottom: 1rem;
-        color: var(--dark-text);
+    .values-header h2 {
+        font-family: 'Playfair Display', serif;
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin: 0 0 0.5rem;
     }
 
-    .mv-card p {
-        font-size: 0.95rem;
-        line-height: 1.6;
-        color: var(--light-text);
-    }
-
-    /* Values */
-    .values-section h2 {
-        font-family: 'Roboto Slab', serif;
-        text-align: center;
-        font-size: 2.5rem;
-        margin-bottom: 2rem;
-        color: var(--dark-text);
+    .values-header p {
+        font-family: 'Inter', sans-serif;
+        font-size: 1rem;
+        color: var(--text-muted);
+        margin: 0;
     }
 
     .values-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 1.5rem;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.25rem;
     }
 
-    .value-item {
-        background: white;
+    .value-card {
+        background: var(--bg-light);
         padding: 1.5rem;
-        border-radius: 12px;
-        display: flex;
-        align-items: flex-start;
-        gap: 1rem;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.03);
-        border: 1px solid #f1f5f9;
-        transition: all 0.2s ease;
+        border-radius: 16px;
+        text-align: center;
+        transition: all 0.3s ease;
+        border: 1px solid transparent;
     }
 
-    .value-item:hover {
-        box-shadow: 0 10px 25px rgba(0,0,0,0.06);
-        border-color: transparent;
+    .value-card:hover {
+        background: white;
+        border-color: rgba(193, 39, 45, 0.15);
+        box-shadow: var(--card-shadow);
+        transform: translateY(-3px);
     }
 
-    .val-icon { font-size: 1.8rem; }
-    
-    .val-content h4 {
-        font-family: 'Montserrat', sans-serif;
+    .value-icon {
+        font-size: 2rem;
+        display: block;
+        margin-bottom: 0.75rem;
+    }
+
+    .value-card h4 {
+        font-family: 'Inter', sans-serif;
+        font-size: 0.95rem;
         font-weight: 700;
-        color: var(--brand-red);
-        margin: 0 0 0.5rem 0;
+        color: var(--text-dark);
+        margin: 0 0 0.5rem;
     }
 
-    .val-content p {
-        margin: 0;
-        font-size: 0.9rem;
-        color: var(--light-text);
+    .value-card p {
+        font-family: 'Inter', sans-serif;
+        font-size: 0.85rem;
+        color: var(--text-muted);
         line-height: 1.5;
+        margin: 0;
     }
 
     /* --- SIDEBAR --- */
     .sidebar-column {
         position: sticky;
-        top: 140px; /* Nav height + header height buffer */
+        top: 140px;
     }
 
-    .widget-card {
+    .sidebar-card {
         background: white;
-        border-radius: 12px;
-        padding: 1.5rem;
+        border-radius: 20px;
+        padding: 1.75rem;
         margin-bottom: 1.5rem;
-        box-shadow: 0 5px 20px rgba(0,0,0,0.04);
-        border: 1px solid #f1f5f9;
+        box-shadow: var(--card-shadow);
     }
 
-    .widget-card h3 {
-        font-family: 'Roboto Slab', serif;
-        font-size: 1.1rem;
-        color: var(--dark-text);
-        margin: 0 0 1rem 0;
+    .sidebar-card h3 {
+        font-family: 'Playfair Display', serif;
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: var(--text-dark);
+        margin: 0 0 1.25rem;
         padding-bottom: 0.75rem;
-        border-bottom: 2px solid #f1f5f9;
+        border-bottom: 2px solid var(--bg-light);
     }
 
-    .info-list {
+    /* Facts Card */
+    .facts-list {
         list-style: none;
         padding: 0;
         margin: 0;
     }
 
-    .info-list li {
+    .facts-list li {
         display: flex;
         justify-content: space-between;
-        padding: 0.75rem 0;
-        border-bottom: 1px dashed #e2e8f0;
-        font-size: 0.9rem;
+        align-items: center;
+        padding: 0.85rem 0;
+        border-bottom: 1px solid #f1f5f9;
+        font-family: 'Inter', sans-serif;
     }
-    .info-list li:last-child { border: none; }
 
-    .info-list .label { color: var(--light-text); }
-    .info-list .value { font-weight: 600; color: var(--dark-text); text-align: right; }
+    .facts-list li:last-child {
+        border: none;
+        padding-bottom: 0;
+    }
 
-    /* Scripture Widget */
-    .scripture-widget {
-        background: var(--brand-red);
-        color: white;
-        text-align: center;
+    .fact-label {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+    }
+
+    .fact-value {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--text-dark);
+        text-align: right;
+    }
+
+    /* Scripture Card */
+    .scripture-card {
+        background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-dark) 100%);
         position: relative;
         overflow: hidden;
     }
-    
-    .quote-mark {
+
+    .scripture-card h3 {
+        display: none;
+    }
+
+    .scripture-bg {
         position: absolute;
-        top: -10px; left: 10px;
-        font-size: 6rem;
-        font-family: serif;
-        opacity: 0.2;
-        line-height: 1;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
     }
 
-    .scripture-widget blockquote {
-        font-family: 'Roboto Slab', serif;
-        font-size: 1.1rem;
-        font-style: italic;
-        margin: 1rem 0;
+    .scripture-content {
         position: relative;
-        z-index: 2;
-        line-height: 1.6;
+        z-index: 1;
+        text-align: center;
     }
 
-    .scripture-widget cite {
-        font-family: 'Montserrat', sans-serif;
-        font-size: 0.8rem;
+    .quote-icon {
+        color: white;
+        margin-bottom: 0.5rem;
+    }
+
+    .scripture-card blockquote {
+        font-family: 'Playfair Display', serif;
+        font-size: 1.05rem;
+        font-style: italic;
+        color: white;
+        line-height: 1.6;
+        margin: 0 0 1rem;
+    }
+
+    .scripture-card cite {
+        font-family: 'Inter', sans-serif;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: rgba(255,255,255,0.8);
         text-transform: uppercase;
         letter-spacing: 1px;
-        opacity: 0.9;
     }
 
-    /* Contact Widget */
-    .contact-widget p {
+    /* Contact Card */
+    .contact-card p {
+        font-family: 'Inter', sans-serif;
         font-size: 0.9rem;
-        color: var(--light-text);
+        color: var(--text-muted);
+        margin: 0 0 1.25rem;
+        line-height: 1.5;
+    }
+
+    .contact-rows {
         margin-bottom: 1.5rem;
     }
 
-    .c-row {
+    .contact-row {
         display: flex;
-        gap: 0.75rem;
         align-items: center;
-        margin-bottom: 0.75rem;
+        gap: 0.75rem;
+        padding: 0.6rem 0;
+        font-family: 'Inter', sans-serif;
         font-size: 0.9rem;
-        color: var(--dark-text);
-        font-weight: 500;
+        color: var(--text-dark);
     }
 
-    .btn-sidebar {
+    .contact-row svg {
+        color: var(--brand-accent);
+        flex-shrink: 0;
+    }
+
+    .btn-contact {
         display: block;
         text-align: center;
-        background: var(--brand-red);
+        background: linear-gradient(135deg, var(--brand-accent) 0%, var(--brand-primary) 100%);
         color: white;
         text-decoration: none;
-        padding: 0.8rem;
-        border-radius: 6px;
-        font-weight: 700;
-        font-family: 'Montserrat', sans-serif;
+        padding: 0.9rem;
+        border-radius: 12px;
+        font-family: 'Inter', sans-serif;
+        font-weight: 600;
         font-size: 0.85rem;
-        text-transform: uppercase;
-        margin-top: 1.5rem;
-        transition: background 0.2s;
+        transition: all 0.3s ease;
     }
-    .btn-sidebar:hover { background: #7f1618; }
+
+    .btn-contact:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(193, 39, 45, 0.3);
+    }
 
     /* --- RESPONSIVE --- */
-    @media (max-width: 900px) {
-        .content-layout { grid-template-columns: 1fr; }
-        .sidebar-column { position: static; margin-top: 3rem; }
-        .about-hero { margin-top: 0; padding-top: 0; }
+    @media (max-width: 1024px) {
+        .content-layout {
+            grid-template-columns: 1fr;
+        }
+
+        .sidebar-column {
+            position: static;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+        }
+
+        .sidebar-card {
+            margin-bottom: 0;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .mv-cards {
+            grid-template-columns: 1fr;
+        }
+
+        .mv-statement {
+            font-size: 1.5rem;
+        }
+
+        .values-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .sidebar-column {
+            grid-template-columns: 1fr;
+        }
+
+        .stats-row {
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .stat-divider {
+            width: 60px;
+            height: 1px;
+        }
     }
 
     @media (max-width: 600px) {
-        .founder-block { flex-direction: column; text-align: center; }
-        .stats-grid { grid-template-columns: 1fr; }
-        .mv-grid { grid-template-columns: 1fr; }
-        .welcome-card { padding: 1.5rem; }
-        .about-hero h1 { font-size: 2.5rem; }
+        .about-content {
+            padding: 2rem 0 4rem;
+        }
+
+        .container {
+            padding: 0 1rem;
+        }
+
+        .welcome-section,
+        .values-section {
+            padding: 2rem 1.5rem;
+            border-radius: 16px;
+        }
+
+        .welcome-header h2 {
+            font-size: 1.75rem;
+        }
+
+        .founder-feature {
+            flex-direction: column;
+            text-align: center;
+        }
+
+        .values-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .mv-card-inner {
+            padding: 2rem 1.5rem;
+        }
     }
 </style>

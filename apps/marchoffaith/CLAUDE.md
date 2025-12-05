@@ -1,14 +1,14 @@
 # March of Faith Incorporated - Development Guide
 
 ## Project Overview
-March of Faith Incorporated is the headquarters church website located in Tagbilaran City, Bohol, Philippines. This SvelteKit application serves as the digital presence for the church organization founded in 1975.
+March of Faith Incorporated is the headquarters church website located in Tagbilaran City, Bohol, Philippines. This SvelteKit application serves as the digital presence for the church organization founded in 1974.
 
 ## Brand Identity & Design System
 
 ### Organization Details
 - **Name:** March of Faith, Inc.
 - **Location:** San Isidro District, Tagbilaran City, Bohol
-- **Founded:** January 1, 1975 (SEC Reg. No. 0000058834)
+- **Founded:** January 1, 1974 (SEC Reg. No. 0000058834)
 - **Founder:** Rev. Rudy Salomon Trigo, D.D. (July 15, 1938 – April 7, 2011)
 - **Contact:** +63 99 9953 6700
 - **Email:** marchoffaithincorporated@gmail.com
@@ -244,7 +244,7 @@ March of Faith Incorporated is the headquarters church website located in Tagbil
 ### Key Messaging
 - Primary: "Strengthening faith, building community"
 - Location: Always reference Tagbilaran, Bohol connection
-- Heritage: Acknowledge 50+ year history since 1975
+- Heritage: Acknowledge 50+ year history since 1974
 - Community: Emphasize fellowship and spiritual growth
 
 ## Technical Implementation

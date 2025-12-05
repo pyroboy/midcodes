@@ -48,7 +48,7 @@
 							<div class="doc-info">
 								<h3>SEC Registration</h3>
 								<p>Official incorporation documents (Registration No. 0000058834)</p>
-								<span class="doc-meta">PDF • 1975</span>
+								<span class="doc-meta">PDF • 1974</span>
 							</div>
 						</a>
 					</div>
@@ -364,19 +364,6 @@
 
 	/* Responsive Design */
 	@media (max-width: 768px) {
-		.hero-section {
-			padding: 2rem 0;
-		}
-
-		.hero-content h1 {
-			font-size: 2rem;
-			margin-bottom: 0.75rem;
-		}
-
-		.hero-subtitle {
-			font-size: 1.1rem;
-		}
-
 		.resources-content {
 			padding: 2rem 0;
 		}

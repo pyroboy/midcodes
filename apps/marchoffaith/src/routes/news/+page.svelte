@@ -4,12 +4,20 @@
 
 	const articles = [
 		{
+			slug: 'manlawaan-baptism-2025',
+			title: 'Rising in Newness of Life: Water Baptism at MOFI-Manlawaan',
+			excerpt: 'Brothers and sisters from MOFI–Manlawaan, Sta. Catalina, Negros Oriental publicly declared their faith through water baptism—a beautiful symbol of leaving the old life behind and rising anew in Christ.',
+			date: 'November 29, 2025',
+			image: 'https://res.cloudinary.com/dexcw6vg0/image/upload/v1764921556/ruzidig9ogfk8gjouqwj.jpg',
+			category: 'Baptism'
+		},
+		{
 			slug: '51st-anniversary-celebration',
 			title: 'March of Faith Inc. Honors 51-Year Legacy, Celebrates Unified Mission',
-			excerpt: 'March of Faith Inc. marked its 51st Foundation Day with a unified celebration across 12 locations in Bohol and Negros Oriental, honoring the legacy of its founder, the late Dr. Rev. Rudy Trigo.',
-			date: 'November 16, 2024',
+			excerpt: 'March of Faith Inc. marked its 51st Foundation Day with a unified celebration across 13 locations in Bohol and Negros Oriental, honoring the legacy of its founder, the late Dr. Rev. Rudy Trigo.',
+			date: 'November 16, 2025',
 			image: 'https://res.cloudinary.com/dexcw6vg0/image/upload/v1763355713/ojlomimmfvtgwzxjyptq.webp',
-			category: 'Announcements'
+			category: 'Events'
 		}
 		// More articles can be added here
 	];
@@ -159,14 +167,6 @@
 
 	/* Responsive Design */
 	@media (max-width: 768px) {
-		.news-hero h1 {
-			font-size: 2.25rem;
-		}
-
-		.hero-subtitle {
-			font-size: 1.1rem;
-		}
-
 		.news-grid {
 			grid-template-columns: 1fr;
 		}

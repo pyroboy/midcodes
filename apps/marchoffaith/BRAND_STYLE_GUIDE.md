@@ -5,7 +5,7 @@
 **Name:** March of Faith, Inc.  
 **Location:** San Isidro District, Tagbilaran City, Bohol  
 **SEC Reg. No.:** 0000058834  
-**Date Registered:** 01/01/1975  
+**Date Registered:** 01/01/1974  
 **Founder:** Rev. Rudy Salomon Trigo, D.D. (July 15, 1938 – April 7, 2011)  
 **Website:** [www.marchoffaithincorporated.com](http://www.marchoffaithincorporated.com)  
 **Email:** [marchoffaithincorporated@gmail.com](mailto:marchoffaithincorporated@gmail.com)  

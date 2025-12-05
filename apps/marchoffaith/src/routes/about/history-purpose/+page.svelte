@@ -6,7 +6,7 @@
 
 <svelte:head>
 	<title>History & Purpose - March of Faith Incorporated</title>
-	<meta name="description" content="Learn about the rich history and divine purpose of March of Faith Incorporated since 1975" />
+	<meta name="description" content="Learn about the rich history and divine purpose of March of Faith Incorporated since 1974" />
 </svelte:head>
 
 <Hero subtitle="Five decades of faith, service, and spiritual growth in Bohol">
@@ -27,13 +27,13 @@
 					<div class="timeline">
 						<div class="timeline-item">
 							<div class="timeline-marker">
-								<div class="timeline-year">1975</div>
+								<div class="timeline-year">1974</div>
 							</div>
 							<div class="timeline-content">
 								<div class="foundation-content">
 									<div class="foundation-text">
 										<h3>Foundation and Incorporation</h3>
-										<p>March of Faith Incorporated was officially established on November 19, 1975, with SEC Registration No. 0000058834. Under the divine guidance and leadership of Rev. Rudy Salomon Trigo, D.D., the church began its mission to serve the spiritual needs of the Bohol community.</p>
+										<p>March of Faith Incorporated was officially established on November 19, 1974, with SEC Registration No. 0000058834. Under the divine guidance and leadership of Rev. Rudy Salomon Trigo, D.D., the church began its mission to serve the spiritual needs of the Bohol community.</p>
 									</div>
 									<div class="founder-image">
 										<img 
@@ -121,7 +121,7 @@
 							<span>of faithful ministry</span>
 						</div>
 						<div class="milestone-item">
-							<strong>1975</strong>
+							<strong>1974</strong>
 							<span>Official incorporation</span>
 						</div>
 						<div class="milestone-item">
@@ -153,34 +153,6 @@
 		max-width: 1200px;
 		margin: 0 auto;
 		padding: 0 2rem;
-	}
-
-	.tab-navigation {
-		display: flex;
-		gap: 0;
-		overflow-x: auto;
-	}
-
-	.tab-link {
-		display: block;
-		padding: 1.5rem 2rem;
-		text-decoration: none;
-		color: #666;
-		font-weight: 600;
-		border-bottom: 3px solid transparent;
-		transition: all 0.3s ease;
-		white-space: nowrap;
-	}
-
-	.tab-link:hover {
-		color: #981B1E;
-		background: #f8f9fa;
-	}
-
-	.tab-link.active {
-		color: #981B1E;
-		border-bottom-color: #C1272D;
-		background: white;
 	}
 
 	/* History Content */
@@ -384,14 +356,6 @@
 
 	/* Responsive Design */
 	@media (max-width: 768px) {
-		.hero-content h1 {
-			font-size: 2rem;
-		}
-
-		.hero-subtitle {
-			font-size: 1.1rem;
-		}
-
 		.content-layout {
 			grid-template-columns: 1fr;
 			gap: 2rem;
@@ -418,11 +382,6 @@
 		.founder-photo {
 			width: 100px;
 			height: 130px;
-		}
-
-		.tab-link {
-			padding: 1rem 1.5rem;
-			font-size: 0.9rem;
 		}
 
 		.container {

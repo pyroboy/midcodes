@@ -34,6 +34,8 @@
 						<div class="bio-intro">
 							<span class="bio-label">The Visionary</span>
 							<h2>Rev. Rudy Salomon Trigo, D.D.</h2>
+						</div>
+					</div>
 					<h3>Ministry Highlights</h3>
 					<div class="highlights-grid">
 						<div class="highlight-card">
@@ -81,7 +83,7 @@
 						</div>
 						<div class="memorial-item">
 							<strong>Church Founded:</strong>
-							<span>1975</span>
+							<span>1974</span>
 						</div>
 					</div>
 				</div>
@@ -118,47 +120,7 @@
 		padding: 0 2rem;
 	}
 
-	/* Navigation Tabs */
-	.about-nav {
-		background: white;
-		border-bottom: 1px solid #e5e5e5;
-		padding: 0;
-	}
-
-	.tab-navigation {
-		display: flex;
-		gap: 0;
-		overflow-x: auto;
-	}
-
-	.tab-link {
-		display: block;
-		padding: 1.5rem 2rem;
-		text-decoration: none;
-		color: #666;
-		font-weight: 600;
-		border-bottom: 3px solid transparent;
-		transition: all 0.3s ease;
-		white-space: nowrap;
-	}
-
-	.tab-link:hover {
-		color: #981B1E;
-		background: #f8f9fa;
-	}
-
-	.tab-link.active {
-		color: #981B1E;
-		border-bottom-color: #C1272D;
-		background: white;
-	}
-
-	/* Minister Content */
-	.minister-content {
-		padding: 4rem 0;
-		background: #f8f9fa;
-	}
-
+	/* Content Layout */
 	.content-layout {
 		display: grid;
 		grid-template-columns: 2fr 1fr;
@@ -166,109 +128,7 @@
 		align-items: start;
 	}
 
-	/* Profile Section */
-	.profile-header {
-		display: flex;
-		gap: 2rem;
-		margin-bottom: 3rem;
-		background: white;
-		padding: 2rem;
-		border-radius: 15px;
-		box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-	}
-
-	.profile-image {
-		flex-shrink: 0;
-	}
-
-	.minister-photo {
-		width: 200px;
-		height: 250px;
-		object-fit: cover;
-		border-radius: 10px;
-		box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-	}
-
-	.profile-info h2 {
-		font-size: 2.2rem;
-		color: #981B1E;
-		margin-bottom: 0.5rem;
-		font-weight: 700;
-	}
-
-	.profile-info .title {
-		font-size: 1.2rem;
-		color: #C1272D;
-		font-weight: 600;
-		margin-bottom: 0.5rem;
-	}
-
-	.profile-info .dates {
-		font-size: 1rem;
-		color: #666;
-		margin-bottom: 1rem;
-		font-style: italic;
-	}
-
-	.profile-info .memorial {
-		color: #555;
-		line-height: 1.6;
-		font-size: 1rem;
-	}
-
-	/* Biography Section */
-	.biography-section {
-		background: white;
-		padding: 2rem;
-		border-radius: 10px;
-		box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-		margin-bottom: 2rem;
-	}
-
-	.biography-section h3 {
-		font-size: 2rem;
-		color: #981B1E;
-		margin-bottom: 1.5rem;
-		font-weight: 600;
-	}
-
-	.biography-section h4 {
-		font-size: 1.3rem;
-		color: #C1272D;
-		margin: 1.5rem 0 1rem 0;
-		font-weight: 600;
-	}
-
-	.lead-paragraph {
-		font-size: 1.1rem;
-		line-height: 1.8;
-		color: #444;
-		margin-bottom: 2rem;
-		font-weight: 300;
-	}
-
-	.bio-content p {
-		color: #666;
-		line-height: 1.7;
-		margin-bottom: 1rem;
-	}
-
-	/* Ministry Highlights */
-	.ministry-highlights {
-		background: white;
-		padding: 2rem;
-		border-radius: 10px;
-		box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-		margin-bottom: 2rem;
-	}
-
-	.ministry-highlights h3 {
-		font-size: 2rem;
-		color: #981B1E;
-		margin-bottom: 1.5rem;
-		font-weight: 600;
-	}
-
+	/* Highlights Grid */
 	.highlights-grid {
 		display: grid;
 		grid-template-columns: 1fr 1fr;
@@ -411,36 +271,13 @@
 
 	/* Responsive Design */
 	@media (max-width: 768px) {
-		.hero-content h1 {
-			font-size: 2rem;
-		}
-
-		.hero-subtitle {
-			font-size: 1.1rem;
-		}
-
 		.content-layout {
 			grid-template-columns: 1fr;
 			gap: 2rem;
 		}
 
-		.profile-header {
-			flex-direction: column;
-			text-align: center;
-		}
-
-		.minister-photo {
-			width: 150px;
-			height: 200px;
-		}
-
 		.highlights-grid {
 			grid-template-columns: 1fr;
-		}
-
-		.tab-link {
-			padding: 1rem 1.5rem;
-			font-size: 0.9rem;
 		}
 
 		.container {

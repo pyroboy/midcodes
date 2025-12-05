@@ -9,7 +9,7 @@ This comprehensive questionnaire will help us gather all necessary information t
 ### Organization Details
 1. **Official Church Name:** March of Faith Incorporated *(confirmed)*
 2. **Legal Registration Number:** SEC No. 0000058834 *(confirmed)*
-3. **Date Founded:** January 1, 1975 *(confirmed)*
+3. **Date Founded:** January 1, 1974 *(confirmed)*
 4. **Current Status:** Headquarters Church *(confirmed)*
 
 ### Contact Information
