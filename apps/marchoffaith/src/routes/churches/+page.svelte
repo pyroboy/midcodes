@@ -39,7 +39,11 @@
 
 <svelte:head>
   <title>Our Churches - March of Faith Incorporated</title>
-  <meta name="description" content="Explore our church locations and communities across the Philippines" />
+  <meta name="description" content="Explore our church locations and communities across Bohol and Negros Oriental, Philippines" />
+  <meta property="og:title" content="Our Churches - March of Faith Incorporated" />
+  <meta property="og:description" content="Find a March of Faith church near you. Explore our locations across Bohol and Negros Oriental." />
+  <meta name="twitter:title" content="Our Churches - March of Faith Incorporated" />
+  <meta name="twitter:description" content="Find a March of Faith church near you across the Philippines." />
 </svelte:head>
 
 {#snippet church(c: Church)}

@@ -215,10 +215,11 @@
 
 <svelte:head>
     <title>March of Faith Incorporated - Headquarters Church in Tagbilaran, Bohol</title>
-    <meta name="description" content="Welcome to March of Faith Incorporated, the headquarters church in Tagbilaran, Bohol." />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@700;900&family=Montserrat:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <meta name="description" content="Welcome to March of Faith Incorporated, the headquarters church in Tagbilaran, Bohol. Every Creature is Reachable." />
+    <meta property="og:title" content="March of Faith Incorporated - Every Creature is Reachable" />
+    <meta property="og:description" content="Welcome to March of Faith Incorporated, the headquarters church in Tagbilaran, Bohol. Spreading God's love since 1974." />
+    <meta name="twitter:title" content="March of Faith Incorporated - Every Creature is Reachable" />
+    <meta name="twitter:description" content="Welcome to March of Faith Incorporated, the headquarters church in Tagbilaran, Bohol." />
 </svelte:head>
 
 <section class="hero">

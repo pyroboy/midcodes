@@ -1,6 +1,6 @@
 <svelte:head>
-	<title>Location - Grace Community Church</title>
-	<meta name="description" content="Find our church locations and get directions" />
+	<title>Church Locations Map - March of Faith Incorporated</title>
+	<meta name="description" content="Find March of Faith church locations across Bohol and Negros Oriental. Get directions to our headquarters in Tagbilaran City and satellite churches." />
 </svelte:head>
 
 <div class="text-column">

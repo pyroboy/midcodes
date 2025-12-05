@@ -7,9 +7,10 @@
 <svelte:head>
 	<title>About Us - March of Faith Incorporated</title>
 	<meta name="description" content="Learn about March of Faith Incorporated - our history, mission, leadership, and beliefs. Serving the community in Tagbilaran City, Bohol since 1974." />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+	<meta property="og:title" content="About Us - March of Faith Incorporated" />
+	<meta property="og:description" content="Learn about March of Faith Incorporated - our history, mission, leadership, and beliefs. Serving the community since 1974." />
+	<meta name="twitter:title" content="About Us - March of Faith Incorporated" />
+	<meta name="twitter:description" content="Learn about March of Faith Incorporated - our history, mission, leadership, and beliefs." />
 </svelte:head>
 
 <Hero subtitle="A community of believers dedicated to spreading God's love and serving the people of Bohol since 1974">

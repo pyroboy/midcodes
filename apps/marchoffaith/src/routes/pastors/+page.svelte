@@ -4,7 +4,11 @@
 
 <svelte:head>
 	<title>Our Pastors & Leadership - March of Faith Incorporated</title>
-	<meta name="description" content="Meet our pastoral team and church leadership serving across the Philippines" />
+	<meta name="description" content="Meet our pastoral team and church leadership serving across Bohol and Negros Oriental, Philippines" />
+	<meta property="og:title" content="Our Pastors & Leadership - March of Faith Incorporated" />
+	<meta property="og:description" content="Meet our dedicated pastoral team and church leadership serving God's people with wisdom and compassion." />
+	<meta name="twitter:title" content="Our Pastors & Leadership - March of Faith Incorporated" />
+	<meta name="twitter:description" content="Meet our pastoral team and church leadership at March of Faith." />
 </svelte:head>
 
 <Hero subtitle="Dedicated leaders serving God's people with wisdom and compassion">

@@ -25,7 +25,11 @@
 
 <svelte:head>
 	<title>News - March of Faith Incorporated</title>
-	<meta name="description" content="Stay updated with the latest news and events from March of Faith Incorporated" />
+	<meta name="description" content="Stay updated with the latest news, events, and announcements from March of Faith Incorporated" />
+	<meta property="og:title" content="News & Updates - March of Faith Incorporated" />
+	<meta property="og:description" content="Stay updated with the latest news, events, and announcements from March of Faith Incorporated." />
+	<meta name="twitter:title" content="News & Updates - March of Faith Incorporated" />
+	<meta name="twitter:description" content="Stay updated with the latest news from March of Faith Incorporated." />
 </svelte:head>
 
 <Hero subtitle="Stay connected with the latest from our ministry">
