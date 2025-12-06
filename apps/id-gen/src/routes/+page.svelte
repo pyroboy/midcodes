@@ -11,7 +11,9 @@
 		Plus,
 		FileText,
 		Image as ImageIcon,
-		MoreVertical
+		MoreVertical,
+		ChevronLeft,
+		ChevronRight
 	} from 'lucide-svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import IDThumbnailCard from '$lib/components/IDThumbnailCard.svelte';
@@ -22,6 +24,11 @@
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import { getSupabaseStorageUrl } from '$lib/utils/supabase';
 	import type { CardSize } from '$lib/utils/sizeConversion';
+	import { recentViewMode } from '$lib/stores/recentViewMode';
+	import RecentViewModeToggle from '$lib/components/RecentViewModeToggle.svelte';
+	import IDCarouselCard from '$lib/components/IDCarouselCard.svelte';
+	import IDCarousel3D from '$lib/components/IDCarousel3D.svelte';
+	import ClientOnly from '$lib/components/ClientOnly.svelte';
 
 	interface Props {
 		data: PageData & { user?: any; templates?: any[] };
@@ -411,7 +418,12 @@
 
 	<!-- Recent Section -->
 	<section class="space-y-6">
-		<h2 class="text-2xl font-bold text-foreground">Recent</h2>
+		<div class="flex items-center justify-between">
+			<h2 class="text-2xl font-bold text-foreground">Recent</h2>
+			{#if transformedCards.length > 0}
+				<RecentViewModeToggle />
+			{/if}
+		</div>
 
 		{#if data.error}
 			<Card class="border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800">
@@ -447,18 +459,67 @@
 					</Button>
 				</div>
 
-				<!-- Thumbnail Grid -->
-				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-					{#each transformedCards.slice(0, 8) as card}
-						<IDThumbnailCard
-							{card}
-							onPreview={() => openSinglePreview(card)}
-							onDownload={() => downloadCard(card)}
-							onEdit={() => editCard(card)}
-							downloading={downloadingCards.has(card.idcard_id?.toString() || '')}
+				<!-- Carousel View (3D) -->
+				{#if $recentViewMode === 'carousel'}
+					<ClientOnly>
+						<IDCarousel3D
+							cards={transformedCards.slice(0, 12)}
+							onCardClick={(card) => openSinglePreview(card)}
 						/>
-					{/each}
-				</div>
+					</ClientOnly>
+
+					<!-- Grid View -->
+				{:else if $recentViewMode === 'grid'}
+					<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+						{#each transformedCards.slice(0, 8) as card}
+							<IDThumbnailCard
+								{card}
+								onPreview={() => openSinglePreview(card)}
+								onDownload={() => downloadCard(card)}
+								onEdit={() => editCard(card)}
+								downloading={downloadingCards.has(card.idcard_id?.toString() || '')}
+							/>
+						{/each}
+					</div>
+
+					<!-- List View -->
+				{:else}
+					<div class="space-y-3">
+						{#each transformedCards.slice(0, 10) as card}
+							<button
+								type="button"
+								class="w-full flex items-center gap-4 p-3 bg-card border border-border rounded-lg hover:shadow-md hover:border-primary/50 transition-all cursor-pointer text-left"
+								onclick={() => openSinglePreview(card)}
+							>
+								<div class="flex-none w-20 h-14 rounded-md overflow-hidden bg-muted">
+									{#if card.front_image}
+										<img
+											src={getSupabaseStorageUrl(card.front_image, 'rendered-id-cards')}
+											alt="ID Preview"
+											class="w-full h-full object-cover"
+											loading="lazy"
+										/>
+									{:else}
+										<div
+											class="w-full h-full flex items-center justify-center text-muted-foreground"
+										>
+											<ImageIcon class="w-6 h-6" />
+										</div>
+									{/if}
+								</div>
+								<div class="flex-1 min-w-0">
+									<p class="font-medium text-foreground truncate">{card.template_name}</p>
+									{#if card.created_at}
+										<p class="text-xs text-muted-foreground">
+											{new Date(card.created_at).toLocaleDateString()}
+										</p>
+									{/if}
+								</div>
+								<ChevronRight class="flex-none w-5 h-5 text-muted-foreground" />
+							</button>
+						{/each}
+					</div>
+				{/if}
 			</div>
 		{:else}
 			<Card>

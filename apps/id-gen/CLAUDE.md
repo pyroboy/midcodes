@@ -100,6 +100,136 @@ All validation schemas in `src/lib/schemas/`:
 - Environment variables via `$env/static/public` and `$env/static/private`
 - 3D libraries optimized in `vite.config.ts` (exclude ws/events, include three/threlte)
 
+## Database Schema (Supabase)
+
+### Core ID-Gen Tables
+
+#### `templates`
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | UUID (PK) | Auto-generated |
+| `user_id` | UUID | Creator reference |
+| `org_id` | UUID (FK→organizations) | Organization scope |
+| `name` | TEXT | Template name (required) |
+| `front_background` | TEXT | Front image URL |
+| `back_background` | TEXT | Back image URL |
+| `orientation` | TEXT | 'landscape' or 'portrait' |
+| `template_elements` | JSONB | Array of TemplateElement |
+| `width_pixels` | INTEGER | Width in pixels |
+| `height_pixels` | INTEGER | Height in pixels |
+| `dpi` | INTEGER | Resolution (default: 300) |
+| `created_at` | TIMESTAMPTZ | Auto-generated |
+| `updated_at` | TIMESTAMPTZ | Auto-updated |
+
+#### `idcards`
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | UUID (PK) | Auto-generated |
+| `template_id` | UUID (FK→templates) | Source template |
+| `org_id` | UUID (FK→organizations) | Organization scope |
+| `front_image` | TEXT | Rendered front image path |
+| `back_image` | TEXT | Rendered back image path |
+| `data` | JSONB | Form field data |
+| `created_at` | TIMESTAMPTZ | Auto-generated |
+
+#### `profiles`
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | UUID (PK) | References auth.users |
+| `org_id` | UUID (FK→organizations) | Organization scope |
+| `email` | TEXT | User email |
+| `role` | user_role | User role enum |
+| `credits_balance` | INTEGER | Available credits |
+| `card_generation_count` | INTEGER | Total cards generated |
+| `template_count` | INTEGER | Templates created |
+| `unlimited_templates` | BOOLEAN | Feature flag |
+| `remove_watermarks` | BOOLEAN | Feature flag |
+| `context` | JSONB | User context data |
+| `created_at` | TIMESTAMPTZ | Auto-generated |
+| `updated_at` | TIMESTAMPTZ | Auto-updated |
+
+#### `organizations`
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | UUID (PK) | Auto-generated |
+| `name` | TEXT | Organization name (required) |
+| `created_at` | TIMESTAMPTZ | Auto-generated |
+| `updated_at` | TIMESTAMPTZ | Auto-updated |
+
+#### `org_settings`
+| Column | Type | Description |
+|--------|------|-------------|
+| `org_id` | UUID (PK, FK→organizations) | One-to-one |
+| `payments_enabled` | BOOLEAN | Payment feature toggle |
+| `payments_bypass` | BOOLEAN | Bypass payment checks |
+| `updated_by` | UUID (FK→profiles) | Last updater |
+| `updated_at` | TIMESTAMPTZ | Auto-updated |
+
+#### `credit_transactions`
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | UUID (PK) | Auto-generated |
+| `user_id` | UUID (FK→profiles) | User reference |
+| `org_id` | UUID (FK→organizations) | Organization scope |
+| `transaction_type` | TEXT | 'purchase', 'deduct', 'refund' |
+| `amount` | INTEGER | Credit amount |
+| `credits_before` | INTEGER | Balance before |
+| `credits_after` | INTEGER | Balance after |
+| `description` | TEXT | Transaction description |
+| `reference_id` | TEXT | External reference |
+| `metadata` | JSONB | Additional data |
+| `created_at` | TIMESTAMPTZ | Auto-generated |
+
+#### `payment_records`
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | UUID (PK) | Auto-generated |
+| `user_id` | UUID | User reference |
+| `session_id` | TEXT | Checkout session |
+| `provider_payment_id` | TEXT | Provider reference |
+| `kind` | TEXT | 'credit' or 'feature' |
+| `sku_id` | TEXT | Product identifier |
+| `amount_php` | NUMERIC | Amount in PHP |
+| `currency` | TEXT | Currency code |
+| `status` | TEXT | 'pending', 'paid', 'failed', 'expired', 'refunded' |
+| `method` | TEXT | 'gcash', 'paymaya', 'card', 'online_banking' |
+| `method_allowed` | TEXT[] | Allowed payment methods |
+| `paid_at` | TIMESTAMPTZ | Payment completion time |
+| `idempotency_key` | TEXT | Unique key for dedup |
+| `metadata` | JSONB | Additional data |
+| `raw_event` | JSONB | Provider webhook payload |
+| `created_at` | TIMESTAMPTZ | Auto-generated |
+| `updated_at` | TIMESTAMPTZ | Auto-updated |
+
+#### `role_permissions`
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | INTEGER (PK) | Auto-generated |
+| `role` | app_role | Role enum |
+| `permission` | app_permission | Permission enum |
+
+### Enums
+
+```typescript
+// User roles hierarchy
+type user_role = 'super_admin' | 'org_admin' | 'id_gen_admin' | 'id_gen_user' | 'user' | ...;
+
+// ID-Gen specific permissions
+type app_permission = 
+  | 'templates.create' | 'templates.read' | 'templates.update' | 'templates.delete'
+  | 'idcards.create' | 'idcards.read' | 'idcards.update' | 'idcards.delete'
+  | 'organizations.create' | 'organizations.read' | 'organizations.update' | 'organizations.delete'
+  | 'profiles.read' | 'profiles.update';
+```
+
+### Storage Buckets
+
+- `template-backgrounds` - Template front/back images
+- `rendered-id-cards` - Generated ID card images
+- `user-uploads` - User-uploaded photos/signatures
+
+---
+
 ## Meta-Instructions
 
 After writing code blocks, run lint, type check, and tests before continuing:

@@ -12,10 +12,10 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	try {
 		// Fetch user credits information
-		const userCredits = await getUserCredits(user.id);
+		const userCredits = await getUserCredits(supabase, user.id);
 
 		// Fetch recent transaction history (last 30 transactions)
-		const creditHistory = await getCreditHistory(user.id, 30);
+		const creditHistory = await getCreditHistory(supabase, user.id, 30);
 
 		// Fetch dashboard stats
 		let totalCards = 0;

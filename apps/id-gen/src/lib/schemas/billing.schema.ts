@@ -169,11 +169,132 @@ export const creditAdjustmentSchema = z.object({
 	notes: z.string().max(500).optional()
 });
 
+// Invoice type enum
+export const invoiceTypeSchema = z.enum([
+	'credit_purchase',
+	'feature_purchase',
+	'refund',
+	'correction',
+	'bonus'
+]);
+
+// Invoice status enum
+export const invoiceStatusSchema = z.enum(['draft', 'sent', 'paid', 'void', 'overdue']);
+
+// Invoice item type enum
+export const invoiceItemTypeSchema = z.enum(['credits', 'feature', 'service', 'custom']);
+
+// Invoice item schema (invoice_items table)
+export const invoiceItemSchema = z.object({
+	id: z.string().uuid().optional(),
+	invoice_id: z.string().uuid(),
+	item_type: invoiceItemTypeSchema,
+	sku_id: z.string().optional(),
+	description: z.string().min(1),
+	quantity: z.number().int().positive().default(1),
+	unit_price: z.number().int().default(0), // In PHP centavos
+	total_price: z.number().int().default(0),
+	credits_granted: z.number().int().default(0),
+	metadata: z.record(z.string(), z.unknown()).default({}),
+	created_at: z.string().datetime().optional()
+});
+
+// Invoice item creation input
+export const invoiceItemInputSchema = invoiceItemSchema.omit({
+	id: true,
+	invoice_id: true,
+	created_at: true
+});
+
+// Invoice schema (invoices table)
+export const invoiceSchema = z.object({
+	id: z.string().uuid().optional(),
+	invoice_number: z.string().optional(), // Auto-generated
+	user_id: z.string().uuid(),
+	org_id: z.string().uuid(),
+	invoice_type: invoiceTypeSchema.default('credit_purchase'),
+	status: invoiceStatusSchema.default('draft'),
+	subtotal: z.number().int().default(0),
+	tax_amount: z.number().int().default(0),
+	discount_amount: z.number().int().default(0),
+	total_amount: z.number().int().default(0),
+	amount_paid: z.number().int().default(0),
+	issue_date: z.string().datetime().optional(),
+	due_date: z.string().datetime().optional(),
+	paid_at: z.string().datetime().optional(),
+	voided_at: z.string().datetime().optional(),
+	notes: z.string().optional(),
+	internal_notes: z.string().optional(),
+	payment_method: z.string().optional(),
+	payment_reference: z.string().optional(),
+	created_by: z.string().uuid().optional(),
+	paid_by: z.string().uuid().optional(),
+	voided_by: z.string().uuid().optional(),
+	created_at: z.string().datetime().optional(),
+	updated_at: z.string().datetime().optional()
+});
+
+// Invoice with items (for fetching)
+export const invoiceWithItemsSchema = invoiceSchema.extend({
+	invoice_items: z.array(invoiceItemSchema).default([]),
+	user: z
+		.object({
+			id: z.string().uuid(),
+			email: z.string().email(),
+			credits_balance: z.number().int().optional()
+		})
+		.optional()
+});
+
+// Invoice creation input
+export const invoiceCreateInputSchema = z.object({
+	user_id: z.string().uuid(),
+	invoice_type: invoiceTypeSchema.default('credit_purchase'),
+	notes: z.string().optional(),
+	internal_notes: z.string().optional(),
+	due_date: z.string().datetime().optional(),
+	items: z.array(invoiceItemInputSchema).min(1)
+});
+
+// Invoice update input
+export const invoiceUpdateInputSchema = z.object({
+	invoice_id: z.string().uuid(),
+	notes: z.string().optional(),
+	internal_notes: z.string().optional(),
+	due_date: z.string().datetime().optional(),
+	status: invoiceStatusSchema.optional()
+});
+
+// Mark invoice as paid input
+export const invoiceMarkPaidInputSchema = z.object({
+	invoice_id: z.string().uuid(),
+	payment_method: z.string().default('manual'),
+	payment_reference: z.string().optional(),
+	notes: z.string().optional()
+});
+
+// Void invoice input
+export const invoiceVoidInputSchema = z.object({
+	invoice_id: z.string().uuid(),
+	reason: z.string().min(1).max(500)
+});
+
 // Inferred types
 export type CreditTransaction = z.infer<typeof creditTransactionSchema>;
 export type CreditTransactionInput = z.infer<typeof creditTransactionInputSchema>;
 export type PaymentMethod = z.infer<typeof paymentMethodSchema>;
 export type Payment = z.infer<typeof paymentSchema>;
+export type InvoiceType = z.infer<typeof invoiceTypeSchema>;
+export type InvoiceStatus = z.infer<typeof invoiceStatusSchema>;
+export type InvoiceItemType = z.infer<typeof invoiceItemTypeSchema>;
+export type InvoiceItem = z.infer<typeof invoiceItemSchema>;
+export type InvoiceItemInput = z.infer<typeof invoiceItemInputSchema>;
+export type Invoice = z.infer<typeof invoiceSchema>;
+export type InvoiceWithItems = z.infer<typeof invoiceWithItemsSchema>;
+export type InvoiceCreateInput = z.infer<typeof invoiceCreateInputSchema>;
+export type InvoiceUpdateInput = z.infer<typeof invoiceUpdateInputSchema>;
+export type InvoiceMarkPaidInput = z.infer<typeof invoiceMarkPaidInputSchema>;
+export type InvoiceVoidInput = z.infer<typeof invoiceVoidInputSchema>;
 export type PaymentInput = z.infer<typeof paymentInputSchema>;
 export type WebhookEvent = z.infer<typeof webhookEventSchema>;
 export type WebhookProcessingResult = z.infer<typeof webhookProcessingResultSchema>;

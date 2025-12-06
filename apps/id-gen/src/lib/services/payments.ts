@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { CREDIT_PACKAGES, PREMIUM_FEATURES } from '$lib/payments/catalog';
 import { addCredits, grantUnlimitedTemplates, grantWatermarkRemoval } from '$lib/utils/credits';
 
@@ -172,8 +173,10 @@ export async function createPremiumFeaturePayment(
 
 /**
  * Process successful payment (called from webhook)
+ * Note: This function requires a supabase client with service role access
  */
 export async function processSuccessfulPayment(
+	supabase: SupabaseClient,
 	paymentIntent: PayMongoPaymentIntent
 ): Promise<void> {
 	const metadata = paymentIntent.attributes.metadata;
@@ -184,6 +187,7 @@ export async function processSuccessfulPayment(
 	switch (metadata.type) {
 		case 'credit_purchase':
 			const creditResult = await addCredits(
+				supabase,
 				metadata.user_id,
 				metadata.org_id,
 				parseInt(metadata.credits),
@@ -199,6 +203,7 @@ export async function processSuccessfulPayment(
 		case 'premium_feature_purchase':
 			if (metadata.feature_id === 'unlimited_templates') {
 				const templatesResult = await grantUnlimitedTemplates(
+					supabase,
 					metadata.user_id,
 					metadata.org_id,
 					paymentIntent.id
@@ -209,6 +214,7 @@ export async function processSuccessfulPayment(
 				}
 			} else if (metadata.feature_id === 'remove_watermarks') {
 				const watermarkResult = await grantWatermarkRemoval(
+					supabase,
 					metadata.user_id,
 					metadata.org_id,
 					paymentIntent.id

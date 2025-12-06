@@ -1,0 +1,14 @@
+﻿node.exe : npm warn config ignoring workspace config at 
+C:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen/.npmrc
+At C:\nvm4w\nodejs\npx.ps1:29 char:3
++   & $NODE_EXE $NPX_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm warn config...s\id-gen/.npmrc 
+   :String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Loading svelte-check in workspace: c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen
+Getting Svelte diagnostics...
+
+Terminate batch job (Y/N)? 
+^C^C
