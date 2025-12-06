@@ -8,7 +8,7 @@
 	THREE.Cache.enabled = true;
 	import { browser } from '$app/environment';
 	import { getSupabaseStorageUrl } from '$lib/utils/supabase';
-	import IDCarouselCard3D from './IDCarouselCard3D.svelte';
+	import Carousel3DItem from './Carousel3DItem.svelte';
 
 	// Types
 	interface IDCard {
@@ -270,7 +270,7 @@
 			{@const transform = getCardTransform(cardIndex)}
 
 			<!-- Use new component - texture handling is isolated here -->
-			<IDCarouselCard3D
+			<Carousel3DItem
 				url={getImageUrl(card)}
 				{card}
 				geometry={cardGeometry}

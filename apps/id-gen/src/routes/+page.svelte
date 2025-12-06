@@ -26,7 +26,6 @@
 	import type { CardSize } from '$lib/utils/sizeConversion';
 	import { recentViewMode } from '$lib/stores/recentViewMode';
 	import RecentViewModeToggle from '$lib/components/RecentViewModeToggle.svelte';
-	import IDCarouselCard from '$lib/components/IDCarouselCard.svelte';
 	import IDCarousel3D from '$lib/components/IDCarousel3D.svelte';
 	import ClientOnly from '$lib/components/ClientOnly.svelte';
 
