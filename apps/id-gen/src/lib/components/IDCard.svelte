@@ -24,7 +24,18 @@
 	}
 </script>
 
-<div class="relative" role="button" tabindex="0" on:click={handleClick} on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(new MouseEvent('click')); } }}>
+<div
+	class="relative"
+	role="button"
+	tabindex="0"
+	on:click={handleClick}
+	on:keydown={(e) => {
+		if (e.key === 'Enter' || e.key === ' ') {
+			e.preventDefault();
+			handleClick(new MouseEvent('click'));
+		}
+	}}
+>
 	<input
 		aria-label="Select card"
 		type="checkbox"
@@ -34,22 +45,35 @@
 	/>
 	<Card class="p-4 hover:shadow-md transition-shadow cursor-pointer">
 		<CardHeader class="pb-2">
-			<CardTitle class="text-base truncate pr-6">{card.fields?.['Name']?.value || card.fields?.['name']?.value || 'Untitled'}</CardTitle>
+			<CardTitle class="text-base truncate pr-6"
+				>{card.fields?.['Name']?.value || card.fields?.['name']?.value || 'Untitled'}</CardTitle
+			>
 		</CardHeader>
 		<CardContent class="space-y-2">
 			<div class="text-sm text-gray-500 dark:text-gray-400">Template: {card.template_name}</div>
 			<div class="flex flex-wrap gap-2 text-sm">
 				{#each Object.entries(card.fields || {}).slice(0, 4) as [key, field]}
-					<div class="px-2 py-1 rounded bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200">
-						<strong>{key}:</strong> {field?.value ?? ''}
+					<div
+						class="px-2 py-1 rounded bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200"
+					>
+						<strong>{key}:</strong>
+						{field?.value ?? ''}
 					</div>
 				{/each}
 			</div>
 			<div class="pt-2 flex gap-3">
-				<button class="px-3 py-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors" on:click|stopPropagation={() => onDownload(card)} disabled={downloading}>
+				<button
+					class="px-3 py-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+					on:click|stopPropagation={() => onDownload(card)}
+					disabled={downloading}
+				>
 					{downloading ? 'Downloading...' : 'Download'}
 				</button>
-				<button class="px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors" on:click|stopPropagation={() => onDelete(card)} disabled={deleting}>
+				<button
+					class="px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+					on:click|stopPropagation={() => onDelete(card)}
+					disabled={deleting}
+				>
 					{deleting ? 'Deleting...' : 'Delete'}
 				</button>
 			</div>

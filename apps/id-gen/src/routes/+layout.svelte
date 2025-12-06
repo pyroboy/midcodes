@@ -12,7 +12,7 @@
 	import { setupGlobalErrorHandlers } from '$lib/utils/errorHandling';
 	import { theme } from '$lib/stores/theme';
 	import MobileHeader from '$lib/components/MobileHeader.svelte';
-  import DesktopHeader from '$lib/components/DesktopHeader.svelte';
+	import DesktopHeader from '$lib/components/DesktopHeader.svelte';
 	import BottomNavigation from '$lib/components/BottomNavigation.svelte';
 	import HamburgerMenu from '$lib/components/HamburgerMenu.svelte';
 	import { Toaster } from '$lib/components/ui/sonner';
@@ -35,7 +35,7 @@
 		try {
 			setupGlobalErrorHandlers();
 			await loadGoogleFonts();
-			
+
 			// Initialize theme store (this will apply stored theme or default)
 			// The theme store already handles DOM application in its initialization
 			const currentTheme = theme.getCurrentTheme();
@@ -75,8 +75,13 @@
 		</main>
 
 		<!-- Sidebar integration for desktop -->
-		<div class="hidden lg:flex lg:fixed lg:top-16 lg:left-0 lg:w-64 lg:h-[calc(100vh-4rem)] border-r border-border bg-background">
-			<BottomNavigation user={data.user} class="lg:flex lg:flex-col lg:w-full lg:relative lg:top-0" />
+		<div
+			class="hidden lg:flex lg:fixed lg:top-16 lg:left-0 lg:w-64 lg:h-[calc(100vh-4rem)] border-r border-border bg-background"
+		>
+			<BottomNavigation
+				user={data.user}
+				class="lg:flex lg:flex-col lg:w-full lg:relative lg:top-0"
+			/>
 		</div>
 
 		<!-- Bottom Navigation -->
@@ -107,10 +112,10 @@
 					</a>
 
 					<a
-					href="/auth"
-					class="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
-				>	>
-						Sign In
+						href="/auth"
+						class="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
+					>
+						> Sign In
 					</a>
 				</div>
 			</div>

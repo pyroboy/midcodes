@@ -19,27 +19,33 @@ export const getUsersData = query(async () => {
 	};
 });
 
-export const addUser = command('unchecked', async ({
-	email,
-	role
-}: {
-	email: string;
-	role: 'id_gen_user' | 'id_gen_admin' | 'org_admin' | 'super_admin';
-}) => {
-	// Placeholder implementation
-	return { success: false, error: 'Not implemented', message: '' } as const;
-});
+export const addUser = command(
+	'unchecked',
+	async ({
+		email,
+		role
+	}: {
+		email: string;
+		role: 'id_gen_user' | 'id_gen_admin' | 'org_admin' | 'super_admin';
+	}) => {
+		// Placeholder implementation
+		return { success: false, error: 'Not implemented', message: '' } as const;
+	}
+);
 
-export const updateUserRole = command('unchecked', async ({
-	userId,
-	role
-}: {
-	userId: string;
-	role: 'id_gen_user' | 'id_gen_admin' | 'org_admin' | 'super_admin';
-}) => {
-	// Placeholder implementation
-	return { success: false, error: 'Not implemented', message: '' } as const;
-});
+export const updateUserRole = command(
+	'unchecked',
+	async ({
+		userId,
+		role
+	}: {
+		userId: string;
+		role: 'id_gen_user' | 'id_gen_admin' | 'org_admin' | 'super_admin';
+	}) => {
+		// Placeholder implementation
+		return { success: false, error: 'Not implemented', message: '' } as const;
+	}
+);
 
 export const deleteUser = command('unchecked', async ({ userId }: { userId: string }) => {
 	// Placeholder implementation

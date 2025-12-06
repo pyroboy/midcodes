@@ -12,6 +12,7 @@
 ## Step 1 – Requirement Extraction
 
 ### Core Requirements
+
 - **Remove unused Svelte components** that have 0 imports across the codebase
 - **Delete orphaned files** to reduce bundle size and maintenance overhead
 - **Clean up import paths** and ensure no broken references
@@ -24,18 +25,20 @@
 ## Step 2 – Context Awareness
 
 ### Confirmed Unused Components Analysis
+
 ```typescript
 // Components with 0 imports found:
 src/lib/components/Card.svelte                    // 3D Threlte card - 0 imports
 src/lib/components/LoadingSpinner.svelte          // Shader spinner - 0 imports
 src/lib/components/ui/accordion/                  // Complete folder - 0 imports
-src/lib/components/ui/alert-dialog/              // Complete folder - 0 imports  
+src/lib/components/ui/alert-dialog/              // Complete folder - 0 imports
 src/lib/components/ui/carousel/                  // Complete folder - 0 imports
 src/lib/components/ui/chart/                     // Complete folder - 0 imports
 src/lib/components/ui/hover-card/                // Complete folder - 0 imports
 ```
 
 ### Bundle Impact Assessment
+
 - **Card.svelte**: ~150 lines, Threlte + Three.js dependencies
 - **LoadingSpinner.svelte**: ~100 lines, complex shader code
 - **UI Components**: 5 complete shadcn-ui component folders with multiple files each
@@ -46,6 +49,7 @@ src/lib/components/ui/hover-card/                // Complete folder - 0 imports
 ## Step 3 – Spec Expansion
 
 ### Cleanup Strategy
+
 ```
 Phase 1: Backup & Documentation → Phase 2: Safe Removal → Phase 3: Import Cleanup
          ↓                              ↓                      ↓
@@ -55,24 +59,27 @@ Phase 1: Backup & Documentation → Phase 2: Safe Removal → Phase 3: Import Cl
 ### File-by-File Removal Plan
 
 #### Individual Components
+
 1. **Card.svelte** - 3D card with Threlte/Three.js (not used anywhere)
 2. **LoadingSpinner.svelte** - Complex shader-based spinner (not used anywhere)
 
 #### Complete UI Component Folders
+
 3. **accordion/** - Collapsible content component suite
-4. **alert-dialog/** - Modal dialog components  
+4. **alert-dialog/** - Modal dialog components
 5. **carousel/** - Image/content carousel components
 6. **chart/** - Data visualization components
 7. **hover-card/** - Hover tooltip card components
 
 ### Safety Verification Process
+
 ```typescript
 // Verification script to ensure safe removal
 const verifyRemoval = (componentName: string) => {
-  // Check imports across all .svelte and .ts files
-  // Check dynamic imports
-  // Check string references in templates
-  // Verify no build errors after removal
+	// Check imports across all .svelte and .ts files
+	// Check dynamic imports
+	// Check string references in templates
+	// Verify no build errors after removal
 };
 ```
 
@@ -81,6 +88,7 @@ const verifyRemoval = (componentName: string) => {
 ## Step 4 – Implementation Guidance
 
 ### Pre-Removal Verification Script
+
 ```bash
 #!/bin/bash
 # verify-unused.sh - Verify components are truly unused
@@ -100,16 +108,16 @@ COMPONENTS=(
 
 for component in "${COMPONENTS[@]}"; do
   echo "Checking: $component"
-  
+
   # Check direct imports
   imports=$(grep -r "import.*$component" src --include="*.svelte" --include="*.ts" | grep -v "ui/$component" | wc -l)
-  
+
   # Check dynamic imports
   dynamic=$(grep -r "$component" src --include="*.svelte" --include="*.ts" | grep -v "ui/$component" | wc -l)
-  
+
   echo "  Direct imports: $imports"
   echo "  References: $dynamic"
-  
+
   if [ $imports -eq 0 ] && [ $dynamic -eq 0 ]; then
     echo "  ✅ Safe to remove"
   else
@@ -120,6 +128,7 @@ done
 ```
 
 ### Removal Process
+
 ```bash
 # Phase 1: Create backup
 mkdir -p backup/unused-components
@@ -148,21 +157,23 @@ npm run build
 ```
 
 ### Documentation Creation
+
 ```markdown
 # REMOVED_COMPONENTS.md
 
 ## Components Removed on [Date]
 
 ### Individual Components
+
 - **Card.svelte** - 3D card component using Threlte
   - Reason: No imports found across codebase
   - Backup: backup/unused-components/Card.svelte
-  
 - **LoadingSpinner.svelte** - Shader-based loading spinner
-  - Reason: No imports found across codebase  
+  - Reason: No imports found across codebase
   - Backup: backup/unused-components/LoadingSpinner.svelte
 
 ### UI Component Suites
+
 - **accordion/** - Collapsible content components
 - **alert-dialog/** - Modal dialog components
 - **carousel/** - Content carousel components
@@ -170,7 +181,9 @@ npm run build
 - **hover-card/** - Hover tooltip components
 
 ### Restoration Process
+
 If any component is needed in the future:
+
 1. Copy from backup/unused-components/
 2. Restore to original location
 3. Add imports where needed
@@ -178,10 +191,11 @@ If any component is needed in the future:
 ```
 
 ### Post-Removal Verification
+
 ```bash
 # Test that everything still works
 npm run dev
-npm run build  
+npm run build
 npm run test
 npm run lint
 

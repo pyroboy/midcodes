@@ -43,12 +43,14 @@ pnpm run clean            # Clear .svelte-kit, build, and cache
 ## Architecture Overview
 
 ### Authentication Flow
+
 1. `src/hooks.server.ts` initializes Supabase client and handles auth guard
 2. Session/user/permissions populated in `event.locals` via `safeGetSession()`
 3. `src/routes/+layout.server.ts` passes auth data to all routes
 4. JWT decoded for role-based permissions via `getUserPermissions()`
 
 ### Role-Based Access Control
+
 Hierarchy: `super_admin` > `org_admin` > `id_gen_admin` > `id_gen_user`
 
 - All data is organization-scoped via `org_id`
@@ -56,17 +58,21 @@ Hierarchy: `super_admin` > `org_admin` > `id_gen_admin` > `id_gen_user`
 - Route protection in `+page.server.ts` files (check `session` in locals)
 
 ### State Management
+
 - `src/lib/stores/auth.ts` - Auth state (user, session, profile, roleEmulation)
 - `src/lib/stores/templateStore.ts` - Template data with TemplateElement interface
 - `src/lib/stores/darkMode.ts` - Theme persistence
 
 ### Key Data Patterns
+
 - **Templates**: Dimensions stored as pixels + DPI (not physical units)
 - **Template Elements**: Discriminated union by `type` field (`text`, `image`, `qr`, `photo`, `signature`, `selection`)
 - **Database Operations**: Use type-safe Supabase client from `event.locals.supabase`
 
 ### Schemas (Single Source of Truth)
+
 All validation schemas in `src/lib/schemas/`:
+
 - `template-element.schema.ts` - Element type definitions
 - `template-creation.schema.ts` - Template creation/presets
 - `template-update.schema.ts` - Partial updates, bulk ops
@@ -97,6 +103,7 @@ All validation schemas in `src/lib/schemas/`:
 ## Meta-Instructions
 
 After writing code blocks, run lint, type check, and tests before continuing:
+
 ```bash
 pnpm run check && pnpm run lint && pnpm run test:unit
 ```

@@ -91,10 +91,15 @@ export async function validateCropFrame(
 		result.details.cropFrameRect = cropFrameRect;
 
 		// Calculate expected crop area using imageCropper logic
-		const coverInfo = coverBase(originalSize.width, originalSize.height, requiredDimensions.width, requiredDimensions.height);
+		const coverInfo = coverBase(
+			originalSize.width,
+			originalSize.height,
+			requiredDimensions.width,
+			requiredDimensions.height
+		);
 		const scaledImageWidth = coverInfo.scaledWidth * backgroundPosition.scale;
 		const scaledImageHeight = coverInfo.scaledHeight * backgroundPosition.scale;
-		
+
 		const offsetX = (requiredDimensions.width - scaledImageWidth) / 2 + backgroundPosition.x;
 		const offsetY = (requiredDimensions.height - scaledImageHeight) / 2 + backgroundPosition.y;
 
@@ -112,7 +117,7 @@ export async function validateCropFrame(
 
 		result.details.expectedCropArea = {
 			x: Math.round(cropX),
-			y: Math.round(cropY), 
+			y: Math.round(cropY),
 			width: Math.round(cropWidth),
 			height: Math.round(cropHeight)
 		};
@@ -133,22 +138,31 @@ export async function validateCropFrame(
 		const hDiff = Math.abs(imageFrameFromThumb.height - result.details.expectedCropArea.height);
 
 		if (xDiff > tolerance) {
-			result.errors.push(`Crop frame X coordinate mismatch: thumbnail shows ${imageFrameFromThumb.x.toFixed(1)}, expected ${result.details.expectedCropArea.x} (diff: ${xDiff.toFixed(1)})`);
+			result.errors.push(
+				`Crop frame X coordinate mismatch: thumbnail shows ${imageFrameFromThumb.x.toFixed(1)}, expected ${result.details.expectedCropArea.x} (diff: ${xDiff.toFixed(1)})`
+			);
 		}
 		if (yDiff > tolerance) {
-			result.errors.push(`Crop frame Y coordinate mismatch: thumbnail shows ${imageFrameFromThumb.y.toFixed(1)}, expected ${result.details.expectedCropArea.y} (diff: ${yDiff.toFixed(1)})`);
+			result.errors.push(
+				`Crop frame Y coordinate mismatch: thumbnail shows ${imageFrameFromThumb.y.toFixed(1)}, expected ${result.details.expectedCropArea.y} (diff: ${yDiff.toFixed(1)})`
+			);
 		}
 		if (wDiff > tolerance) {
-			result.errors.push(`Crop frame width mismatch: thumbnail shows ${imageFrameFromThumb.width.toFixed(1)}, expected ${result.details.expectedCropArea.width} (diff: ${wDiff.toFixed(1)})`);
+			result.errors.push(
+				`Crop frame width mismatch: thumbnail shows ${imageFrameFromThumb.width.toFixed(1)}, expected ${result.details.expectedCropArea.width} (diff: ${wDiff.toFixed(1)})`
+			);
 		}
 		if (hDiff > tolerance) {
-			result.errors.push(`Crop frame height mismatch: thumbnail shows ${imageFrameFromThumb.height.toFixed(1)}, expected ${result.details.expectedCropArea.height} (diff: ${hDiff.toFixed(1)})`);
+			result.errors.push(
+				`Crop frame height mismatch: thumbnail shows ${imageFrameFromThumb.height.toFixed(1)}, expected ${result.details.expectedCropArea.height} (diff: ${hDiff.toFixed(1)})`
+			);
 		}
 
 		result.success = result.errors.length === 0;
-
 	} catch (error) {
-		result.errors.push(`Test failed with error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+		result.errors.push(
+			`Test failed with error: ${error instanceof Error ? error.message : 'Unknown error'}`
+		);
 	}
 
 	return result;
@@ -194,8 +208,8 @@ export async function runCropTestSuite(
  * Generates a summary report of test results
  */
 export function generateTestReport(results: CropValidationResult[]): string {
-	const passed = results.filter(r => r.success).length;
-	const failed = results.filter(r => !r.success).length;
+	const passed = results.filter((r) => r.success).length;
+	const failed = results.filter((r) => !r.success).length;
 	const warnings = results.reduce((sum, r) => sum + r.warnings.length, 0);
 
 	let report = `
@@ -209,27 +223,31 @@ Total Tests: ${results.length}
 
 	if (failed > 0) {
 		report += `FAILED TESTS:\n`;
-		results.filter(r => !r.success).forEach(result => {
-			report += `\n📋 ${result.testName}\n`;
-			result.errors.forEach(error => {
-				report += `   ❌ ${error}\n`;
-			});
-			if (result.warnings.length > 0) {
-				result.warnings.forEach(warning => {
-					report += `   ⚠️  ${warning}\n`;
+		results
+			.filter((r) => !r.success)
+			.forEach((result) => {
+				report += `\n📋 ${result.testName}\n`;
+				result.errors.forEach((error) => {
+					report += `   ❌ ${error}\n`;
 				});
-			}
-		});
+				if (result.warnings.length > 0) {
+					result.warnings.forEach((warning) => {
+						report += `   ⚠️  ${warning}\n`;
+					});
+				}
+			});
 	}
 
 	if (warnings > 0 && failed === 0) {
 		report += `WARNINGS:\n`;
-		results.filter(r => r.warnings.length > 0).forEach(result => {
-			report += `\n📋 ${result.testName}\n`;
-			result.warnings.forEach(warning => {
-				report += `   ⚠️  ${warning}\n`;
+		results
+			.filter((r) => r.warnings.length > 0)
+			.forEach((result) => {
+				report += `\n📋 ${result.testName}\n`;
+				result.warnings.forEach((warning) => {
+					report += `   ⚠️  ${warning}\n`;
+				});
 			});
-		});
 	}
 
 	return report;
@@ -240,26 +258,26 @@ Total Tests: ${results.length}
  */
 export function logTestResults(results: CropValidationResult[]): void {
 	console.group('🧪 Crop Frame Validation Results');
-	
-	results.forEach(result => {
+
+	results.forEach((result) => {
 		const icon = result.success ? '✅' : '❌';
 		console.group(`${icon} ${result.testName}`);
-		
+
 		console.log('Details:', result.details);
-		
+
 		if (result.errors.length > 0) {
 			console.error('Errors:', result.errors);
 		}
-		
+
 		if (result.warnings.length > 0) {
 			console.warn('Warnings:', result.warnings);
 		}
-		
+
 		console.groupEnd();
 	});
-	
+
 	console.groupEnd();
-	
+
 	// Print summary
 	const report = generateTestReport(results);
 	console.log(report);

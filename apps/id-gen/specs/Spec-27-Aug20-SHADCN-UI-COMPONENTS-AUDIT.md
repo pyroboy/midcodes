@@ -12,8 +12,9 @@
 ## Step 1 – Requirement Extraction
 
 ### Core Requirements
+
 - **Audit all shadcn-ui components** to identify unused installations
-- **Remove unused component folders** to reduce bundle size and dependencies  
+- **Remove unused component folders** to reduce bundle size and dependencies
 - **Clean up package.json dependencies** that are no longer needed
 - **Preserve actively used components** (Card, Button, Input, etc.)
 - **Create removal script** for safe component uninstallation
@@ -24,11 +25,12 @@
 ## Step 2 – Context Awareness
 
 ### shadcn-ui Component Analysis
+
 ```typescript
 // Found shadcn-ui component folders (50+ components installed):
 src/lib/components/ui/
 ├── accordion/          // ❌ 0 usage - candidate for removal
-├── alert-dialog/       // ❌ 0 usage - candidate for removal  
+├── alert-dialog/       // ❌ 0 usage - candidate for removal
 ├── alert/              // ✅ Used - keep
 ├── aspect-ratio/       // ❓ Unknown usage - needs verification
 ├── avatar/             // ❓ Unknown usage - needs verification
@@ -80,6 +82,7 @@ src/lib/components/ui/
 ## Step 3 – Spec Expansion
 
 ### Audit Strategy
+
 ```
 Phase 1: Usage Detection → Phase 2: Categorization → Phase 3: Safe Removal
        ↓                          ↓                       ↓
@@ -89,8 +92,9 @@ Phase 1: Usage Detection → Phase 2: Categorization → Phase 3: Safe Removal
 ### Component Usage Categories
 
 #### Definitely Used (Keep)
+
 - **button/** - Primary interaction component
-- **card/** - Layout component heavily used  
+- **card/** - Layout component heavily used
 - **input/** - Form input component
 - **label/** - Form label component
 - **badge/** - Status indicators
@@ -98,14 +102,16 @@ Phase 1: Usage Detection → Phase 2: Categorization → Phase 3: Safe Removal
 - **sonner/** - Toast notification system
 
 #### Definitely Unused (Remove)
+
 - **accordion/** - 0 imports found
 - **alert-dialog/** - 0 imports found
-- **breadcrumb/** - 0 imports found  
+- **breadcrumb/** - 0 imports found
 - **carousel/** - 0 imports found
 - **chart/** - 0 imports found
 - **hover-card/** - 0 imports found
 
 #### Needs Verification (Audit Required)
+
 - All other components require usage scanning
 
 ---
@@ -113,6 +119,7 @@ Phase 1: Usage Detection → Phase 2: Categorization → Phase 3: Safe Removal
 ## Step 4 – Implementation Guidance
 
 ### Comprehensive Usage Audit Script
+
 ```bash
 #!/bin/bash
 # audit-shadcn-components.sh - Complete usage analysis
@@ -132,15 +139,15 @@ UNKNOWN_COMPONENTS=()
 
 for component in "${UI_COMPONENTS[@]}"; do
   echo "Checking: $component"
-  
+
   # Count imports (exclude the component's own folder)
   import_count=$(grep -r "from.*ui/$component" src --include="*.svelte" --include="*.ts" | wc -l)
   import_count2=$(grep -r "import.*$component" src --include="*.svelte" --include="*.ts" | grep -v "ui/$component" | wc -l)
-  
+
   total_imports=$((import_count + import_count2))
-  
+
   echo "  Imports: $total_imports"
-  
+
   if [ $total_imports -eq 0 ]; then
     UNUSED_COMPONENTS+=("$component")
     echo "  Status: ❌ UNUSED"
@@ -184,16 +191,17 @@ fi
 ```
 
 ### Manual Verification for Unknown Components
+
 ```bash
 # For components with 1-10 imports, manually verify usage
 verify_component() {
   local component=$1
   echo "=== Verifying $component ==="
-  
+
   # Show actual import lines
   echo "Import statements:"
   grep -r "from.*ui/$component\|import.*$component" src --include="*.svelte" --include="*.ts" | grep -v "ui/$component/"
-  
+
   echo ""
   echo "Usage in files:"
   # Look for actual component usage (not just imports)
@@ -206,6 +214,7 @@ verify_component() {
 ```
 
 ### Safe Removal Process
+
 ```bash
 # Phase 1: Backup all components being removed
 echo "📦 Creating backup..."
@@ -214,7 +223,7 @@ mkdir -p backup/unused-shadcn-components
 # Backup confirmed unused components
 CONFIRMED_UNUSED=(
   "accordion"
-  "alert-dialog" 
+  "alert-dialog"
   "breadcrumb"
   "carousel"
   "chart"
@@ -243,6 +252,7 @@ echo -e "\n🧹 Cleaning up index.ts exports..."
 ```
 
 ### Package Dependencies Cleanup
+
 ```bash
 # Check if any package.json dependencies are now unused
 echo "📦 Checking for unused dependencies..."
@@ -253,20 +263,23 @@ echo "📦 Checking for unused dependencies..."
 ```
 
 ### Documentation Creation
+
 ```markdown
 # SHADCN_COMPONENT_AUDIT.md
 
 ## Component Audit Results - [Date]
 
 ### Removed Components (Confirmed Unused)
+
 - **accordion** - Collapsible content sections (0 imports)
-- **alert-dialog** - Modal confirmation dialogs (0 imports)  
+- **alert-dialog** - Modal confirmation dialogs (0 imports)
 - **breadcrumb** - Navigation breadcrumbs (0 imports)
 - **carousel** - Content carousel/slider (0 imports)
 - **chart** - Data visualization components (0 imports)
 - **hover-card** - Hover tooltip cards (0 imports)
 
 ### Retained Components (Active Usage)
+
 - **button** - Primary interaction component
 - **card** - Layout and content containers
 - **input** - Form input fields
@@ -276,13 +289,16 @@ echo "📦 Checking for unused dependencies..."
 - **sonner** - Toast notifications
 
 ### Benefits
+
 - Reduced bundle size
 - Fewer files to maintain
 - Cleaner component tree
 - Faster IDE performance
 
 ### Restoration Process
+
 If any removed component is needed:
+
 1. Copy from backup/unused-shadcn-components/
 2. Restore to src/lib/components/ui/
 3. Add necessary imports

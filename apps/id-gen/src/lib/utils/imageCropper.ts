@@ -59,7 +59,7 @@ export function needsCropping(
 
 /**
  * Transforms UI preview coordinates to original image coordinates
- * 
+ *
  * ✅ SYNCHRONIZED: This function now uses the same logic as backgroundGeometry.ts
  * to ensure consistent coordinate calculation between thumbnail preview and final crop.
  */
@@ -303,7 +303,7 @@ export async function generateCropPreviewUrl(
 				const previewScale = Math.min(1, 400 / Math.max(templateSize.width, templateSize.height));
 				const previewWidth = Math.round(templateSize.width * previewScale);
 				const previewHeight = Math.round(templateSize.height * previewScale);
-				
+
 				const canvas = document.createElement('canvas');
 				canvas.width = previewWidth;
 				canvas.height = previewHeight;

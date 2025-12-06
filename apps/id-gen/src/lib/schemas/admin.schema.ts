@@ -13,9 +13,9 @@ export const adminAuditSchema = z.object({
 });
 
 // Admin audit log creation input
-export const adminAuditInputSchema = adminAuditSchema.omit({ 
-	id: true, 
-	created_at: true 
+export const adminAuditInputSchema = adminAuditSchema.omit({
+	id: true,
+	created_at: true
 });
 
 // Admin audit log search/filter schema
@@ -56,15 +56,19 @@ export const adminStatsSchema = z.object({
 	actions_today: z.number(),
 	actions_this_week: z.number(),
 	actions_this_month: z.number(),
-	most_active_admin: z.object({
-		admin_id: z.string().uuid(),
-		admin_email: z.string().email(),
-		action_count: z.number()
-	}).optional(),
-	action_breakdown: z.array(z.object({
-		action: z.string(),
-		count: z.number()
-	})),
+	most_active_admin: z
+		.object({
+			admin_id: z.string().uuid(),
+			admin_email: z.string().email(),
+			action_count: z.number()
+		})
+		.optional(),
+	action_breakdown: z.array(
+		z.object({
+			action: z.string(),
+			count: z.number()
+		})
+	),
 	recent_activity: z.array(adminAuditSchema).optional()
 });
 

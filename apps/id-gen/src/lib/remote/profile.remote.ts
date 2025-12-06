@@ -304,13 +304,12 @@ export const exportData = command('unchecked', async () => {
 				updated_at: p.updated_at,
 				preferences: p.context?.preferences || {}
 			},
-			idCards:
-				idCards.map((card: any) => ({
-					id: card.id,
-					template_id: card.template_id,
-					created_at: card.created_at,
-					data: card.data
-				})),
+			idCards: idCards.map((card: any) => ({
+				id: card.id,
+				template_id: card.template_id,
+				created_at: card.created_at,
+				data: card.data
+			})),
 			templates,
 			statistics: {
 				totalIdCards: idCards.length,

@@ -30,7 +30,9 @@ export const load: PageServerLoad = async ({ locals }) => {
 	// Fetch all templates for this org with card counts
 	const { data: templates, error: templatesError } = await supabase
 		.from('templates')
-		.select('id, name, width_pixels, height_pixels, dpi, orientation, front_background, back_background')
+		.select(
+			'id, name, width_pixels, height_pixels, dpi, orientation, front_background, back_background'
+		)
 		.eq('org_id', org_id)
 		.order('name');
 
@@ -102,8 +104,14 @@ export const actions: Actions = {
 		const templateFront = formData.get('templateFront') as Blob;
 		const templateBack = formData.get('templateBack') as Blob;
 
-		console.log('Server received templateFront:', templateFront ? `Blob size: ${templateFront.size}` : 'null');
-		console.log('Server received templateBack:', templateBack ? `Blob size: ${templateBack.size}` : 'null');
+		console.log(
+			'Server received templateFront:',
+			templateFront ? `Blob size: ${templateFront.size}` : 'null'
+		);
+		console.log(
+			'Server received templateBack:',
+			templateBack ? `Blob size: ${templateBack.size}` : 'null'
+		);
 
 		let frontPath = null;
 		let backPath = null;
@@ -123,7 +131,9 @@ export const actions: Actions = {
 
 			if (frontUploadError) {
 				console.error('Template front upload error:', frontUploadError);
-				return fail(500, { error: `Failed to upload template front background: ${frontUploadError.message}` });
+				return fail(500, {
+					error: `Failed to upload template front background: ${frontUploadError.message}`
+				});
 			}
 			frontPath = frontFilename;
 		}
@@ -146,7 +156,9 @@ export const actions: Actions = {
 				if (frontPath) {
 					await supabase.storage.from('templates').remove([frontPath]);
 				}
-				return fail(500, { error: `Failed to upload template back background: ${backUploadError.message}` });
+				return fail(500, {
+					error: `Failed to upload template back background: ${backUploadError.message}`
+				});
 			}
 			backPath = backFilename;
 		}
@@ -191,7 +203,11 @@ export const actions: Actions = {
 			return { success: true, newTemplateId: typedNew.id, newTemplate: typedNew };
 		} catch (e) {
 			console.error('Unexpected error in createTemplate:', e);
-			return fail(500, { error: 'Unexpected server error during template creation: ' + (e instanceof Error ? e.message : String(e)) });
+			return fail(500, {
+				error:
+					'Unexpected server error during template creation: ' +
+					(e instanceof Error ? e.message : String(e))
+			});
 		}
 	},
 

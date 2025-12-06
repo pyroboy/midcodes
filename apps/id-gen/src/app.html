@@ -7,7 +7,7 @@
 		%sveltekit.head%
 		<script>
 			// Global error handler for debugging
-			window.addEventListener('error', function(e) {
+			window.addEventListener('error', function (e) {
 				console.error('🚨 [GLOBAL ERROR]:', e.error || e.message, {
 					filename: e.filename,
 					lineno: e.lineno,
@@ -15,8 +15,8 @@
 					stack: e.error?.stack
 				});
 			});
-			
-			window.addEventListener('unhandledrejection', function(e) {
+
+			window.addEventListener('unhandledrejection', function (e) {
 				console.error('🚨 [UNHANDLED PROMISE REJECTION]:', e.reason, {
 					promise: e.promise
 				});

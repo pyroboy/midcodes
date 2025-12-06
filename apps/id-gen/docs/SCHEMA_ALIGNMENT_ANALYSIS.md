@@ -16,7 +16,9 @@ The database schema and TypeScript type definitions have significant alignment i
 ### Database Tables (Actual Schema)
 
 #### Templates Table ✅ MOSTLY ALIGNED
+
 **Database Columns:**
+
 - `id` (uuid, NOT NULL, uuid_generate_v4())
 - `user_id` (uuid, nullable)
 - `name` (text, NOT NULL)
@@ -35,6 +37,7 @@ The database schema and TypeScript type definitions have significant alignment i
 - `unit_height` (numeric(10,3), nullable)
 
 **Missing in Types:**
+
 - `width_pixels`
 - `height_pixels`
 - `dpi`
@@ -43,7 +46,9 @@ The database schema and TypeScript type definitions have significant alignment i
 - `unit_height`
 
 #### IDCards Table ❌ COMPLETELY MISSING
+
 **Database Columns:**
+
 - `id` (uuid, NOT NULL, uuid_generate_v4())
 - `template_id` (uuid, nullable, FK to templates.id)
 - `front_image` (text, nullable)
@@ -57,7 +62,9 @@ The database schema and TypeScript type definitions have significant alignment i
 #### Organizations Table ✅ ALIGNED
 
 #### Profiles Table ⚠️ PARTIAL MISMATCH
+
 **Database Columns:**
+
 - `id` (uuid, NOT NULL)
 - `email` (text, nullable)
 - `role` (user_role enum, default 'user')
@@ -72,6 +79,7 @@ The database schema and TypeScript type definitions have significant alignment i
 - `remove_watermarks` (boolean, NOT NULL, default false)
 
 **Missing in Types:**
+
 - `credits_balance`
 - `card_generation_count`
 - `template_count`
@@ -79,17 +87,20 @@ The database schema and TypeScript type definitions have significant alignment i
 - `remove_watermarks`
 
 **Mismatched Types:**
+
 - `role`: Should be enum `user_role`, not string
 
 ### TypeScript Type Files Analysis
 
 #### Primary Issues with `/src/lib/types/database.types.ts`:
+
 1. **Missing Tables**: `templates`, `idcards` entirely absent
 2. **Incomplete Profiles**: Missing 5 new columns
 3. **Wrong Enums**: Has comprehensive enum definition but not used in profiles
 4. **Outdated Structure**: Contains mostly property/rental management tables
 
 #### Secondary File `/src/lib/types/database.ts`:
+
 1. **Better Coverage**: Has templates table definition
 2. **Outdated Profiles**: Missing new columns, wrong role type
 3. **Missing IDCards**: No idcards table definition
@@ -98,6 +109,7 @@ The database schema and TypeScript type definitions have significant alignment i
 ### Critical Missing Definitions
 
 #### IDCards Table (Completely Missing)
+
 ```typescript
 idcards: {
   Row: {
@@ -133,6 +145,7 @@ idcards: {
 ### Database Relationships (Foreign Keys)
 
 ✅ **Properly Configured:**
+
 - `idcards.template_id → templates.id`
 - `idcards.org_id → organizations.id`
 - `templates.org_id → organizations.id`
@@ -143,6 +156,7 @@ idcards: {
 ### Enum Definitions
 
 **Database Enum `user_role`:**
+
 - `'super_admin'`
 - `'org_admin'`
 - `'user'`
@@ -194,12 +208,14 @@ idcards: {
 ## Impact Assessment
 
 **High Priority**: Application will fail TypeScript compilation and runtime errors will occur when:
+
 - Accessing `idcards` table (completely missing types)
 - Using new profile columns (credits, counts, flags)
 - Working with template dimensions and units
 - Performing type-safe database operations
 
 **Medium Priority**: Development experience issues:
+
 - IntelliSense not working for missing properties
 - No compile-time safety for new database columns
 - Potential runtime errors in production

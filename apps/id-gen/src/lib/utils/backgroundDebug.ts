@@ -1,6 +1,6 @@
 /**
  * Debug verification utilities for background image movement synchronization
- * 
+ *
  * This module provides debugging tools to verify visual feedback between
  * TemplateForm's background preview and BackgroundThumbnail positioning.
  */
@@ -36,7 +36,7 @@ export function setDebugMode(enabled: boolean) {
 		console.log('🐛 Background Debug Mode: ENABLED');
 		console.log('🔧 Available utilities:');
 		console.log('  - testBackgroundSync()');
-		console.log('  - verifyImageLoad(url)'); 
+		console.log('  - verifyImageLoad(url)');
 		console.log('  - addPositionMarkers()');
 		console.log('  - clearDebugLog()');
 		console.log('  - exportDebugLog()');
@@ -48,14 +48,14 @@ export function setDebugMode(enabled: boolean) {
  */
 export function logDebugInfo(info: DebugInfo) {
 	if (!isDebugEnabled) return;
-	
+
 	debugLog.push(info);
-	
+
 	// Keep only last 50 entries
 	if (debugLog.length > 50) {
 		debugLog = debugLog.slice(-50);
 	}
-	
+
 	// console.log(`📊 ${info.component} Debug:`, {
 	// 	position: info.position,
 	// 	cssValues: info.cssValues,
@@ -74,7 +74,7 @@ export function testBackgroundSync(): void {
 	}
 
 	console.log('🧪 Testing Background Synchronization...');
-	
+
 	const recentLogs = debugLog.slice(-10);
 	if (recentLogs.length === 0) {
 		console.log('❌ No debug entries found. Enable debug mode first!');
@@ -82,8 +82,8 @@ export function testBackgroundSync(): void {
 	}
 
 	// Group logs by component
-	const templateLogs = recentLogs.filter(log => log.component === 'TemplateForm');
-	const thumbnailLogs = recentLogs.filter(log => log.component === 'BackgroundThumbnail');
+	const templateLogs = recentLogs.filter((log) => log.component === 'TemplateForm');
+	const thumbnailLogs = recentLogs.filter((log) => log.component === 'BackgroundThumbnail');
 
 	if (templateLogs.length === 0 || thumbnailLogs.length === 0) {
 		console.log('⚠️  Missing logs from both components');
@@ -91,12 +91,13 @@ export function testBackgroundSync(): void {
 	}
 
 	// Find matching timestamps (within 100ms)
-	const matches: Array<{template: DebugInfo, thumbnail: DebugInfo, timeDiff: number}> = [];
-	
-	templateLogs.forEach(templateLog => {
-		thumbnailLogs.forEach(thumbnailLog => {
+	const matches: Array<{ template: DebugInfo; thumbnail: DebugInfo; timeDiff: number }> = [];
+
+	templateLogs.forEach((templateLog) => {
+		thumbnailLogs.forEach((thumbnailLog) => {
 			const timeDiff = Math.abs(templateLog.timestamp - thumbnailLog.timestamp);
-			if (timeDiff < 100) { // Within 100ms
+			if (timeDiff < 100) {
+				// Within 100ms
 				matches.push({ template: templateLog, thumbnail: thumbnailLog, timeDiff });
 			}
 		});
@@ -108,7 +109,7 @@ export function testBackgroundSync(): void {
 	}
 
 	console.log(`✅ Found ${matches.length} synchronized updates:`);
-	
+
 	matches.forEach((match, index) => {
 		const positionDiff = {
 			x: Math.abs(match.template.position.x - match.thumbnail.position.x),
@@ -133,10 +134,10 @@ export function testBackgroundSync(): void {
 /**
  * Verify image loading for debugging
  */
-export function verifyImageLoad(url: string): Promise<{width: number, height: number}> {
+export function verifyImageLoad(url: string): Promise<{ width: number; height: number }> {
 	return new Promise((resolve, reject) => {
 		const img = new Image();
-		
+
 		img.onload = () => {
 			console.log('✅ Image loaded successfully:', {
 				url,
@@ -146,12 +147,12 @@ export function verifyImageLoad(url: string): Promise<{width: number, height: nu
 			});
 			resolve({ width: img.naturalWidth, height: img.naturalHeight });
 		};
-		
+
 		img.onerror = () => {
 			console.log('❌ Image failed to load:', url);
 			reject(new Error('Image load failed'));
 		};
-		
+
 		img.src = url;
 	});
 }
@@ -170,7 +171,7 @@ export function addPositionMarkers(): void {
 
 	// Remove existing markers
 	const existingMarkers = templateContainer.querySelectorAll('.debug-marker');
-	existingMarkers.forEach(marker => marker.remove());
+	existingMarkers.forEach((marker) => marker.remove());
 
 	// Add center marker
 	const centerMarker = document.createElement('div');
@@ -200,7 +201,7 @@ export function addPositionMarkers(): void {
 		{ x: 100, y: 100, label: '(100,100)' }
 	];
 
-	positions.forEach(pos => {
+	positions.forEach((pos) => {
 		const marker = document.createElement('div');
 		marker.className = 'debug-marker position-marker';
 		marker.style.cssText = `
@@ -239,14 +240,14 @@ export function exportDebugLog(): string {
 	const exported = JSON.stringify(debugLog, null, 2);
 	console.log('📋 Debug log exported (copied to console):');
 	console.log(exported);
-	
+
 	// Try to copy to clipboard if available
 	if (navigator.clipboard) {
 		navigator.clipboard.writeText(exported).then(() => {
 			console.log('📋 Debug log copied to clipboard!');
 		});
 	}
-	
+
 	return exported;
 }
 
@@ -271,14 +272,13 @@ export function testCoordinateTransform(
 	templateDims: Dims,
 	thumbnailSize: number
 ): DebugPosition {
-	
 	const scaleFactor = templateDims.width / thumbnailSize;
 	const transformedPos = {
 		x: thumbnailPos.x * scaleFactor,
 		y: thumbnailPos.y * scaleFactor,
 		scale: thumbnailPos.scale
 	};
-	
+
 	console.log('📐 Coordinate Transform Test:', {
 		input: thumbnailPos,
 		scaleFactor: scaleFactor.toFixed(3),
@@ -286,7 +286,7 @@ export function testCoordinateTransform(
 		templateDims,
 		thumbnailSize
 	});
-	
+
 	return transformedPos;
 }
 
@@ -294,7 +294,7 @@ export function testCoordinateTransform(
 if (browser) {
 	// Auto-enable debug mode on startup
 	setDebugMode(true);
-	
+
 	// Attach utilities to window for console access
 	(window as any).backgroundDebug = {
 		enable: () => setDebugMode(true),
@@ -307,7 +307,7 @@ if (browser) {
 		verifyCSS,
 		testTransform: testCoordinateTransform
 	};
-	
+
 	console.log('🔧 Background debug utilities available at window.backgroundDebug');
 	console.log('   Debug mode is AUTO-ENABLED. Use backgroundDebug.disable() to turn off.');
 }

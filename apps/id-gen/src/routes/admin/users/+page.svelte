@@ -472,13 +472,15 @@
 						{/each}
 					</div>
 				{:else}
-				{#await import('$lib/components/empty-states/EmptyUsers.svelte') then module}
-					{@const EmptyUsersComponent = module.default}
-					<EmptyUsersComponent
-						isFiltered={Boolean(searchQuery) || selectedRole !== 'all'}
-						onInvite={() => { showAddUserDialog = true; }}
-					/>
-				{/await}
+					{#await import('$lib/components/empty-states/EmptyUsers.svelte') then module}
+						{@const EmptyUsersComponent = module.default}
+						<EmptyUsersComponent
+							isFiltered={Boolean(searchQuery) || selectedRole !== 'all'}
+							onInvite={() => {
+								showAddUserDialog = true;
+							}}
+						/>
+					{/await}
 				{/if}
 			{/await}
 		</CardContent>

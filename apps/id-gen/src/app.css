@@ -65,8 +65,12 @@
 	body {
 		background-color: var(--color-background);
 		color: var(--color-foreground);
-		transition: background-color 0.3s ease, color 0.3s ease;
-		font-feature-settings: "rlig" 1, "calt" 1;
+		transition:
+			background-color 0.3s ease,
+			color 0.3s ease;
+		font-feature-settings:
+			'rlig' 1,
+			'calt' 1;
 	}
 
 	/* Smooth transitions for theme switching elements */

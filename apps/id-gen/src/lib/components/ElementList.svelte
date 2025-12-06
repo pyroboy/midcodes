@@ -6,12 +6,16 @@
 	import * as Select from '$lib/components/ui/select';
 	import { Input } from '$lib/components/ui/input';
 	import { ChevronDown, ChevronUp, Move, Scaling, Image, Settings } from '@lucide/svelte';
-import { slide } from 'svelte/transition';
-import { computeVisibleRectInImage, mapImageRectToThumb, clampBackgroundPosition } from '$lib/utils/backgroundGeometry';
-import type { Dims } from '$lib/utils/backgroundGeometry';
-import BackgroundThumbnail from './BackgroundThumbnail.svelte';
+	import { slide } from 'svelte/transition';
+	import {
+		computeVisibleRectInImage,
+		mapImageRectToThumb,
+		clampBackgroundPosition
+	} from '$lib/utils/backgroundGeometry';
+	import type { Dims } from '$lib/utils/backgroundGeometry';
+	import BackgroundThumbnail from './BackgroundThumbnail.svelte';
 
-let {
+	let {
 		elements,
 		onUpdateElements,
 		fontOptions,
@@ -218,9 +222,9 @@ let {
 	{/if}
 
 	<!-- Elements List -->
-{#each elements ?? [] as element, i}
+	{#each elements ?? [] as element, i}
 		<div class="element-item" class:highlighted={hoveredElementId === element.id}>
-<div
+			<div
 				class="element-header"
 				role="button"
 				tabindex="0"
@@ -342,17 +346,19 @@ let {
 		overflow-y: auto;
 	}
 
-.element-item {
+	.element-item {
 		background-color: #2d2d2d;
 		border-radius: 0.375rem;
 		margin-bottom: 0.25rem;
 		overflow: hidden;
-}
+	}
 
-.element-item.highlighted .element-header {
+	.element-item.highlighted .element-header {
 		background-color: #4a4a4a;
-		box-shadow: 0 0 0 1px rgba(0,255,255,0.4) inset, 0 0 8px rgba(0,255,255,0.35);
-}
+		box-shadow:
+			0 0 0 1px rgba(0, 255, 255, 0.4) inset,
+			0 0 8px rgba(0, 255, 255, 0.35);
+	}
 
 	.element-header {
 		display: flex;
@@ -365,9 +371,9 @@ let {
 		min-height: 2rem;
 	}
 
-.element-header:hover {
+	.element-header:hover {
 		background-color: #404040;
-}
+	}
 
 	.header-content {
 		display: flex;
@@ -500,6 +506,4 @@ let {
 		flex-direction: column;
 		gap: 1rem;
 	}
-
-
 </style>

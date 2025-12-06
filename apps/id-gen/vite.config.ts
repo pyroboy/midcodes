@@ -12,13 +12,7 @@ export default defineConfig({
 	},
 	optimizeDeps: {
 		exclude: ['ws', 'events', '@sveltejs/kit'],
-		include: [
-			'jszip', 
-			'three', 
-			'@threlte/core', 
-			'@threlte/extras',
-			'bits-ui'
-		]
+		include: ['jszip', 'three', '@threlte/core', '@threlte/extras', 'bits-ui']
 	},
 	define: {
 		global: 'globalThis'

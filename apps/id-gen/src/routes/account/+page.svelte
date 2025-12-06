@@ -5,10 +5,18 @@
 	import { Separator } from '$lib/components/ui/separator';
 	import { paymentFlags } from '$lib/stores/featureFlags';
 	import PurchaseButton from '$lib/components/ui/PurchaseButton.svelte';
+	import DashboardStatsCard from '$lib/components/DashboardStatsCard.svelte';
 	import type { PageData } from './$types';
 
 	interface Props {
-		data: PageData;
+		data: PageData & {
+			stats?: {
+				totalCards: number;
+				totalTemplates: number;
+				weeklyCards: number;
+				recentCardsCount: number;
+			};
+		};
 	}
 
 	let { data }: Props = $props();
@@ -71,7 +79,31 @@
 		</p>
 	</div>
 
-	<!-- Stats Overview -->
+	<!-- Dashboard Stats -->
+	{#if data.stats}
+		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+			<DashboardStatsCard
+				title="Total IDs Created"
+				value={data.stats.totalCards}
+				icon="id-card"
+				href="/all-ids"
+			/>
+			<DashboardStatsCard
+				title="Templates Available"
+				value={data.stats.totalTemplates}
+				icon="layout-template"
+				href="/templates"
+			/>
+			<DashboardStatsCard
+				title="Recent Activity"
+				value={data.stats.recentCardsCount}
+				icon="trending-up"
+			/>
+			<DashboardStatsCard title="This Week" value={data.stats.weeklyCards} icon="calendar" />
+		</div>
+	{/if}
+
+	<!-- Credits & Features -->
 	<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
 		<!-- Credits Balance -->
 		<Card

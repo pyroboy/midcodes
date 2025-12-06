@@ -49,7 +49,8 @@ export const load = (async ({ locals }) => {
 	// Fetch ID cards with LEFT JOIN to include unassigned cards
 	const { data: cards, error: fetchError } = await supabase
 		.from('idcards')
-		.select(`
+		.select(
+			`
 			id,
 			template_id,
 			front_image,
@@ -59,7 +60,8 @@ export const load = (async ({ locals }) => {
 			templates (
 				name
 			)
-		`)
+		`
+		)
 		.eq('org_id', org_id)
 		.order('created_at', { ascending: false });
 
@@ -93,7 +95,9 @@ export const load = (async ({ locals }) => {
 	});
 
 	// Build metadata
-	const templateNames = Array.from(new Set(idCards.map((card) => card.template_name).filter(Boolean)));
+	const templateNames = Array.from(
+		new Set(idCards.map((card) => card.template_name).filter(Boolean))
+	);
 
 	// Fetch template info for metadata
 	const { data: templates } = await supabase

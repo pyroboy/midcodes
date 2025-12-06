@@ -10,30 +10,34 @@ export const loginSchema = z.object({
 	remember: z.boolean().optional()
 });
 
-export const registerSchema = z.object({
-	email: z.string().email('Valid email is required'),
-	password: z.string().min(8, 'Password must be at least 8 characters'),
-	confirm_password: z.string(),
-	name: z.string().min(1, 'Name is required').max(100),
-	org_name: z.string().min(1, 'Organization name is required').max(100).optional(),
-	terms_accepted: z.boolean().refine(val => val === true, 'Terms must be accepted')
-}).refine(data => data.password === data.confirm_password, {
-	message: "Passwords don't match",
-	path: ['confirm_password']
-});
+export const registerSchema = z
+	.object({
+		email: z.string().email('Valid email is required'),
+		password: z.string().min(8, 'Password must be at least 8 characters'),
+		confirm_password: z.string(),
+		name: z.string().min(1, 'Name is required').max(100),
+		org_name: z.string().min(1, 'Organization name is required').max(100).optional(),
+		terms_accepted: z.boolean().refine((val) => val === true, 'Terms must be accepted')
+	})
+	.refine((data) => data.password === data.confirm_password, {
+		message: "Passwords don't match",
+		path: ['confirm_password']
+	});
 
 export const forgotPasswordSchema = z.object({
 	email: z.string().email('Valid email is required')
 });
 
-export const resetPasswordSchema = z.object({
-	token: z.string().min(1, 'Reset token is required'),
-	password: z.string().min(8, 'Password must be at least 8 characters'),
-	confirm_password: z.string()
-}).refine(data => data.password === data.confirm_password, {
-	message: "Passwords don't match",
-	path: ['confirm_password']
-});
+export const resetPasswordSchema = z
+	.object({
+		token: z.string().min(1, 'Reset token is required'),
+		password: z.string().min(8, 'Password must be at least 8 characters'),
+		confirm_password: z.string()
+	})
+	.refine((data) => data.password === data.confirm_password, {
+		message: "Passwords don't match",
+		path: ['confirm_password']
+	});
 
 // User profile schemas (profiles table - matches actual database schema)
 export const userProfileSchema = z.object({
@@ -69,7 +73,7 @@ export const userRoleAssignmentSchema = z.object({
 	role: userRoleSchema
 });
 
-// Role permissions schemas (role_permissions table - matches database)  
+// Role permissions schemas (role_permissions table - matches database)
 export const rolePermissionSchema = z.object({
 	id: z.number().int().optional(), // bigint in database
 	role: userRoleSchema,
@@ -80,27 +84,27 @@ export const rolePermissionSchema = z.object({
 		'template:update',
 		'template:delete',
 		'template:publish',
-		
+
 		// ID Card permissions
 		'idcard:create',
 		'idcard:read',
 		'idcard:update',
 		'idcard:delete',
 		'idcard:bulk_ops',
-		
+
 		// Organization permissions
 		'org:read',
 		'org:update',
 		'org:manage_users',
 		'org:manage_settings',
 		'org:view_stats',
-		
+
 		// Admin permissions
 		'admin:manage_all_orgs',
 		'admin:impersonate',
 		'admin:system_settings',
 		'admin:audit_logs',
-		
+
 		// Billing permissions
 		'billing:view',
 		'billing:manage'
@@ -151,24 +155,28 @@ export const creditTransactionSchema = z.object({
 });
 
 // Account settings schemas
-export const changePasswordSchema = z.object({
-	current_password: z.string().min(8),
-	new_password: z.string().min(8),
-	confirm_password: z.string()
-}).refine(data => data.new_password === data.confirm_password, {
-	message: "Passwords don't match",
-	path: ['confirm_password']
-});
+export const changePasswordSchema = z
+	.object({
+		current_password: z.string().min(8),
+		new_password: z.string().min(8),
+		confirm_password: z.string()
+	})
+	.refine((data) => data.new_password === data.confirm_password, {
+		message: "Passwords don't match",
+		path: ['confirm_password']
+	});
 
 export const updateAccountSchema = z.object({
 	name: z.string().min(1).max(100).optional(),
 	email: z.string().email().optional(),
 	avatar_url: z.string().url().optional(),
-	notification_preferences: z.object({
-		email_notifications: z.boolean().default(true),
-		marketing_emails: z.boolean().default(false),
-		security_alerts: z.boolean().default(true)
-	}).optional()
+	notification_preferences: z
+		.object({
+			email_notifications: z.boolean().default(true),
+			marketing_emails: z.boolean().default(false),
+			security_alerts: z.boolean().default(true)
+		})
+		.optional()
 });
 
 export const deleteAccountSchema = z.object({

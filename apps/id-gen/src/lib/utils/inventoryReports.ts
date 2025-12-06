@@ -43,7 +43,7 @@ export function exportSalesSummaryReport(data: any): string {
 	const summaryRows = [[data.period, data.total_revenue.toFixed(2), data.total_orders.toString()]];
 
 	const itemHeaders = ['Item Name', 'Quantity Sold', 'Revenue'];
-const itemRows = data.top_selling_items.map((item: any) => [
+	const itemRows = data.top_selling_items.map((item: any) => [
 		item.item_name,
 		item.quantity_sold.toString(),
 		item.revenue.toFixed(2)

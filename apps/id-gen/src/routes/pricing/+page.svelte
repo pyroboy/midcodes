@@ -27,7 +27,16 @@
 		...pkg,
 		price: pkg.amountPhp,
 		pricePerCard: pkg.amountPhp / pkg.credits,
-		discount: index > 0 ? Math.round((1 - (pkg.amountPhp / pkg.credits) / (CREDIT_PACKAGES[0].amountPhp / CREDIT_PACKAGES[0].credits)) * 100) : 0,
+		discount:
+			index > 0
+				? Math.round(
+						(1 -
+							pkg.amountPhp /
+								pkg.credits /
+								(CREDIT_PACKAGES[0].amountPhp / CREDIT_PACKAGES[0].credits)) *
+							100
+					)
+				: 0,
 		popular: pkg.id === 'credits_1000' // Mark 1000 credits as most popular
 	}));
 

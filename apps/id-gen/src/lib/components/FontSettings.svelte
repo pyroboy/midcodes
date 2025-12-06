@@ -38,7 +38,6 @@
 		'900'
 	];
 
-
 	function updateElement(updates: Partial<TemplateElement>) {
 		const updatedElements = elements.map((el: { variableName: string }) =>
 			el.variableName === element.variableName ? { ...el, ...updates } : el

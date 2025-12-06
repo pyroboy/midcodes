@@ -12,11 +12,13 @@ Complexity: 6/10 (Multi-component refactor with coordinate system changes)
 Based on analysis of the template route and BackgroundThumbnail component, the system has an image display inconsistency:
 
 ### Current Behavior Issues:
+
 1. Main canvas shows low-resolution preview - Not displaying selected image at full quality
 2. Background thumbnail doesn't show full image - Only shows partial image with aspect ratio mismatch
 3. Coordinate mismatch between main canvas and thumbnail crop positioning
 
 ### Required Technical Changes:
+
 1. Main canvas must display full-resolution selected image with proper aspect ratio
 2. Background thumbnail must show entire selected image with correct aspect ratio maintained
 3. Coordinate synchronization between main canvas and thumbnail positioning systems
@@ -26,12 +28,14 @@ Based on analysis of the template route and BackgroundThumbnail component, the s
 ## Step 2 – Context Awareness
 
 Technology Stack:
+
 - SvelteKit 2.x + TypeScript - Component framework
-- HTML5 Canvas - Image rendering and manipulation  
+- HTML5 Canvas - Image rendering and manipulation
 - BackgroundGeometry utilities - Coordinate transformation functions
 - File handling - Direct File objects and URL.createObjectURL for previews
 
 Key Files:
+
 - src/routes/templates/+page.svelte - Main template editing interface
 - src/lib/components/BackgroundThumbnail.svelte - Thumbnail with crop overlay
 - src/lib/utils/backgroundGeometry.ts - Coordinate calculation utilities
@@ -43,6 +47,7 @@ Key Files:
 ### Data Flow Analysis
 
 Current Flow:
+
 ```
 User uploads image → File object → URL.createObjectURL() → Low-res preview
                    ↓
@@ -50,6 +55,7 @@ User uploads image → File object → URL.createObjectURL() → Low-res preview
 ```
 
 Required Flow:
+
 ```
 User uploads image → File object → Full-res canvas display + Full-image thumbnail
                    ↓
@@ -73,11 +79,12 @@ User uploads image → File object → Full-res canvas display + Full-image thum
 #### BackgroundThumbnail.svelte Changes:
 
 Current Issue (Line 136-169):
+
 ```typescript
 // NEW LOGIC: Always draw the full image, thumbnail now matches image aspect ratio
 const imageDims: Dims = {
-    width: imageElement!.naturalWidth,
-    height: imageElement!.naturalHeight
+	width: imageElement!.naturalWidth,
+	height: imageElement!.naturalHeight
 };
 
 // Draw the full image scaled to fit the thumbnail (object-fit: contain)
@@ -86,6 +93,7 @@ const imageDims: Dims = {
 Problem: Thumbnail dimensions are calculated correctly, but coordinate transformation still assumes square thumbnail.
 
 Required Fix:
+
 1. Update crop frame calculations to use actual thumbnail dimensions instead of THUMB_SIZE
 2. Fix coordinate conversion in handleResize() function to use proper thumbnail bounds
 3. Update thumbnail display logic to ensure full image is always visible
@@ -93,6 +101,7 @@ Required Fix:
 #### Template Route Changes:
 
 Current Issue (Lines 875-909):
+
 ```typescript
 // If we already know the required card dimensions, generate a card-fitted preview now
 if (requiredPixelDimensions) {
@@ -108,19 +117,22 @@ if (requiredPixelDimensions) {
 Problem: Main canvas shows cropped preview instead of full-resolution original image.
 
 Required Fix:
+
 1. Separate preview generation - Main canvas shows full image, separate crop preview for final output
 2. Implement dual-display system - Full image in main editor, cropped preview in small preview panel
 
 ### UI Implications
 
 UI Minor Changes:
+
 - Background thumbnail sizing adjustments for aspect ratio accuracy
 - Main canvas display mode switching (full image vs. crop preview)
 - Coordinate indicator synchronization between views
 
-### UX Implications 
+### UX Implications
 
 UX Minor Changes:
+
 - Users can see full image quality during editing
 - More intuitive crop positioning with complete image context
 - Consistent visual feedback between main and thumbnail views
@@ -132,6 +144,7 @@ No database changes required - This is purely a frontend display and coordinate 
 ### Dependencies
 
 Existing Libraries:
+
 - backgroundGeometry.ts utility functions (already available)
 - Canvas API for image rendering
 - File API for image loading
@@ -153,6 +166,7 @@ File: src/lib/components/BackgroundThumbnail.svelte
    - Fix coordinate boundaries to use actual thumbnail dimensions
 
 2. Fix crop frame coordinate system (Lines 567-570):
+
 ```typescript
 // Replace hardcoded THUMB_SIZE with actual thumbnail dimensions
 newX = Math.max(0, Math.min(thumbnailDimensions().width - newWidth, newX));
@@ -168,6 +182,7 @@ newY = Math.max(0, Math.min(thumbnailDimensions().height - newHeight, newY));
 File: src/routes/templates/+page.svelte
 
 1. Modify image preview generation (Lines 875-909):
+
 ```typescript
 // Store original full-resolution image for main canvas
 const fullResolutionUrl = URL.createObjectURL(file);
@@ -195,16 +210,19 @@ const cropPreviewUrl = await generateCropPreviewUrl(file, requiredPixelDimension
 ### Best Practices
 
 Error Handling:
+
 - Fallback to square thumbnail if image aspect ratio calculation fails
 - Handle image load errors gracefully with placeholder content
 - Validate coordinate bounds to prevent negative or overflow values
 
 Performance:
+
 - Cache thumbnail canvas context to avoid repeated getContext calls
 - Debounce coordinate update events during drag operations
 - Use efficient image scaling for thumbnail generation
 
 Maintainability:
+
 - Extract coordinate transformation logic into reusable utility functions
 - Add comprehensive logging for coordinate calculation debugging
 - Maintain backward compatibility with existing position values
@@ -223,16 +241,16 @@ Maintainability:
 Checklist:
 
 1. UI Changes (3/10) – Minor thumbnail sizing and main canvas display adjustments
-2. UX Changes (2/10) – Improved visual feedback and image quality display  
+2. UX Changes (2/10) – Improved visual feedback and image quality display
 3. Data Handling (5/10) – Coordinate transformation refactor and dual-preview system
 4. Function Logic (6/10) – Multi-component coordinate synchronization updates
 5. ID/Key Consistency (1/10) – No ID/key changes required, only display logic
 
 Implementation Priority:
+
 1. Fix BackgroundThumbnail coordinate system (highest impact)
 2. Implement dual-preview system for main canvas
 3. Validate coordinate synchronization accuracy
 4. Performance optimization and error handling
 
 Estimated Complexity: 6/10 - Requires careful coordinate system refactoring across multiple components while maintaining existing functionality.
-

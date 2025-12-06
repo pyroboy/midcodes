@@ -63,7 +63,13 @@
 	let {
 		data
 	}: {
-		data: { templates: DatabaseTemplate[]; selectedTemplate?: any; user: any; org_id: string };
+		data: {
+			templates: DatabaseTemplate[];
+			selectedTemplate?: any;
+			user: any;
+			org_id: string;
+			newTemplateParams?: { name: string; width: number; height: number; unit: string } | null;
+		};
 	} = $props();
 
 	let templates = $state<DatabaseTemplate[]>(data.templates);
@@ -131,6 +137,23 @@
 		// If server provided a template (via ?id=...) AND we haven't loaded it yet
 		if (data.selectedTemplate && currentTemplate?.id !== data.selectedTemplate.id) {
 			initializeEditor(data.selectedTemplate);
+		}
+	});
+
+	// Handle new template creation from home page
+	let hasHandledNewTemplate = $state(false);
+	$effect(() => {
+		if (data.newTemplateParams && !hasHandledNewTemplate) {
+			hasHandledNewTemplate = true;
+			// Create CardSize from params
+			const cardSize: CardSize = {
+				name: data.newTemplateParams.name,
+				width: data.newTemplateParams.width,
+				height: data.newTemplateParams.height,
+				unit: data.newTemplateParams.unit as 'inches' | 'mm' | 'cm' | 'pixels'
+			};
+			// Trigger new template creation
+			handleCreateNewTemplate(cardSize, data.newTemplateParams.name);
 		}
 	});
 

@@ -90,7 +90,6 @@ export const PREMIUM_FEATURES = [
 	}
 ] as const;
 
-
 // Maps for quick lookups by ID
 export const CREDIT_PACKAGE_MAP = new Map(CREDIT_PACKAGES.map((pkg) => [pkg.id, pkg]));
 

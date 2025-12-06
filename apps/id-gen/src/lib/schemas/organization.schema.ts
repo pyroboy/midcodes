@@ -92,11 +92,15 @@ export const organizationStatsSchema = z.object({
 		cards_bytes: z.number(),
 		formatted_size: z.string()
 	}),
-	usage_trends: z.array(z.object({
-		date: z.string().datetime(),
-		templates_created: z.number(),
-		cards_generated: z.number()
-	})).optional()
+	usage_trends: z
+		.array(
+			z.object({
+				date: z.string().datetime(),
+				templates_created: z.number(),
+				cards_generated: z.number()
+			})
+		)
+		.optional()
 });
 
 // Organization limits schema
@@ -120,17 +124,21 @@ export const organizationBillingSchema = z.object({
 	org_id: z.string().uuid(),
 	plan: z.enum(['free', 'starter', 'professional', 'enterprise']),
 	billing_email: z.string().email().optional(),
-	payment_method: z.object({
-		type: z.enum(['credit_card', 'bank_transfer', 'invoice']),
-		last_four: z.string().optional(),
-		expires_at: z.string().optional()
-	}).optional(),
-	subscription: z.object({
-		status: z.enum(['active', 'canceled', 'past_due', 'trialing']),
-		current_period_start: z.string().datetime(),
-		current_period_end: z.string().datetime(),
-		trial_end: z.string().datetime().optional()
-	}).optional()
+	payment_method: z
+		.object({
+			type: z.enum(['credit_card', 'bank_transfer', 'invoice']),
+			last_four: z.string().optional(),
+			expires_at: z.string().optional()
+		})
+		.optional(),
+	subscription: z
+		.object({
+			status: z.enum(['active', 'canceled', 'past_due', 'trialing']),
+			current_period_start: z.string().datetime(),
+			current_period_end: z.string().datetime(),
+			trial_end: z.string().datetime().optional()
+		})
+		.optional()
 });
 
 // Organization search schema
@@ -140,11 +148,13 @@ export const organizationSearchSchema = z.object({
 	offset: z.number().min(0).default(0),
 	sort_by: z.enum(['name', 'created_at', 'updated_at']).default('created_at'),
 	sort_order: z.enum(['asc', 'desc']).default('desc'),
-	filters: z.object({
-		created_after: z.string().datetime().optional(),
-		created_before: z.string().datetime().optional(),
-		has_active_users: z.boolean().optional()
-	}).optional()
+	filters: z
+		.object({
+			created_after: z.string().datetime().optional(),
+			created_before: z.string().datetime().optional(),
+			has_active_users: z.boolean().optional()
+		})
+		.optional()
 });
 
 // Inferred types for export

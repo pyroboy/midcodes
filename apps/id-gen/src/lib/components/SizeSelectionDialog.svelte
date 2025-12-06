@@ -123,7 +123,9 @@
 
 <Dialog bind:open>
 	<!-- Adjusted Dialog Content for better mobile fit: w-[95vw], scrollable max height, responsive width -->
-	<DialogContent class="w-[95vw] max-w-lg sm:max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6 gap-6">
+	<DialogContent
+		class="w-[95vw] max-w-lg sm:max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6 gap-6"
+	>
 		<DialogHeader>
 			<DialogTitle>Create New Template</DialogTitle>
 			<DialogDescription>
@@ -155,7 +157,11 @@
 					</div>
 				</div>
 
-				<RadioGroup value={selectedSizeType} onValueChange={handleSizeTypeChange} class="flex flex-row gap-6">
+				<RadioGroup
+					value={selectedSizeType}
+					onValueChange={handleSizeTypeChange}
+					class="flex flex-row gap-6"
+				>
 					<div class="flex items-center space-x-2">
 						<RadioGroupItem value="common" id="common" />
 						<Label for="common" class="cursor-pointer">Common Sizes</Label>
@@ -174,7 +180,8 @@
 							{@const pixels = cardSizeToPixels(currentSize)}
 							{@const aspectRatio = currentSize.width / currentSize.height}
 							<Card
-								class="cursor-pointer transition-all hover:shadow-md active:scale-95 {selectedCommonSize === size
+								class="cursor-pointer transition-all hover:shadow-md active:scale-95 {selectedCommonSize ===
+								size
 									? 'border-primary bg-primary/5'
 									: 'hover:border-primary/50'}"
 								onclick={() => handleCommonSizeChange(size)}
@@ -310,8 +317,10 @@
 				</div>
 				<div class="text-xs sm:text-sm space-y-1.5 text-muted-foreground">
 					<div class="flex justify-between">
-						<strong>Template:</strong> 
-						<span class="truncate ml-2 max-w-[200px] text-foreground">{templateName || 'Not specified'}</span>
+						<strong>Template:</strong>
+						<span class="truncate ml-2 max-w-[200px] text-foreground"
+							>{templateName || 'Not specified'}</span
+						>
 					</div>
 					<div class="flex justify-between">
 						<strong>Size:</strong>
@@ -322,13 +331,17 @@
 					</div>
 					<div class="flex justify-between">
 						<strong>Image:</strong>
-						<span class="text-foreground">{pixelDimensions.width} × {pixelDimensions.height} px @ {DEFAULT_DPI} DPI</span>
+						<span class="text-foreground"
+							>{pixelDimensions.width} × {pixelDimensions.height} px @ {DEFAULT_DPI} DPI</span
+						>
 					</div>
 				</div>
 			</div>
 
 			{#if error}
-				<div class="text-sm text-destructive bg-destructive/10 p-3 rounded-md border border-destructive/20">
+				<div
+					class="text-sm text-destructive bg-destructive/10 p-3 rounded-md border border-destructive/20"
+				>
 					{error}
 				</div>
 			{/if}
@@ -336,7 +349,9 @@
 
 		<!-- Footer with Stacked buttons on mobile -->
 		<DialogFooter class="flex-col sm:flex-row gap-2 sm:gap-0">
-			<Button variant="outline" onclick={handleCancel} class="w-full sm:w-auto mt-2 sm:mt-0">Cancel</Button>
+			<Button variant="outline" onclick={handleCancel} class="w-full sm:w-auto mt-2 sm:mt-0"
+				>Cancel</Button
+			>
 			<Button onclick={handleConfirm} class="w-full sm:w-auto">Create Template</Button>
 		</DialogFooter>
 	</DialogContent>

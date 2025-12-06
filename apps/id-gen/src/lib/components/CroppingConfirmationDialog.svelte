@@ -127,7 +127,9 @@
 											class="w-32 h-20 object-cover rounded border-2 border-white shadow-sm"
 											style="aspect-ratio: {templateSize.width}/{templateSize.height}"
 										/>
-										<div class="absolute -top-1 -right-1 bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded-full font-medium">
+										<div
+											class="absolute -top-1 -right-1 bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded-full font-medium"
+										>
 											Preview
 										</div>
 									</div>
@@ -136,7 +138,7 @@
 									</p>
 								</div>
 							{/if}
-							
+
 							<!-- Image info -->
 							<div class="flex-1 min-w-0">
 								<div class="flex items-center gap-2 mb-2">
@@ -158,19 +160,23 @@
 								</p>
 								<p class="text-sm">
 									<span class="text-muted-foreground">Original:</span>
-									<span class="font-mono text-xs">{formatDimensions(frontImageInfo.originalSize)}</span>
+									<span class="font-mono text-xs"
+										>{formatDimensions(frontImageInfo.originalSize)}</span
+									>
 								</p>
 								{#if frontImageInfo.needsCropping}
 									<p class="text-sm">
 										<span class="text-muted-foreground">Final:</span>
-										<span class="font-mono text-xs font-semibold">{formatDimensions(templateSize)}</span>
+										<span class="font-mono text-xs font-semibold"
+											>{formatDimensions(templateSize)}</span
+										>
 									</p>
 								{/if}
 							</div>
 						</div>
 					</div>
 				{/if}
-				
+
 				{#if backImageInfo}
 					<div
 						class="border rounded-lg p-4 {backImageInfo.needsCropping
@@ -188,7 +194,9 @@
 											class="w-32 h-20 object-cover rounded border-2 border-white shadow-sm"
 											style="aspect-ratio: {templateSize.width}/{templateSize.height}"
 										/>
-										<div class="absolute -top-1 -right-1 bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded-full font-medium">
+										<div
+											class="absolute -top-1 -right-1 bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded-full font-medium"
+										>
 											Preview
 										</div>
 									</div>
@@ -197,7 +205,7 @@
 									</p>
 								</div>
 							{/if}
-							
+
 							<!-- Image info -->
 							<div class="flex-1 min-w-0">
 								<div class="flex items-center gap-2 mb-2">
@@ -219,12 +227,16 @@
 								</p>
 								<p class="text-sm">
 									<span class="text-muted-foreground">Original:</span>
-									<span class="font-mono text-xs">{formatDimensions(backImageInfo.originalSize)}</span>
+									<span class="font-mono text-xs"
+										>{formatDimensions(backImageInfo.originalSize)}</span
+									>
 								</p>
 								{#if backImageInfo.needsCropping}
 									<p class="text-sm">
 										<span class="text-muted-foreground">Final:</span>
-										<span class="font-mono text-xs font-semibold">{formatDimensions(templateSize)}</span>
+										<span class="font-mono text-xs font-semibold"
+											>{formatDimensions(templateSize)}</span
+										>
 									</p>
 								{/if}
 							</div>

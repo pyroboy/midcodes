@@ -1,9 +1,9 @@
 /**
  * Template Data Handling Schemas
- * 
+ *
  * This module exports all template-related Zod schemas and their inferred TypeScript types.
  * All schemas follow the pixel + DPI approach for consistent dimension handling.
- * 
+ *
  * Usage:
  * - Import schemas for validation: `import { templateCreationInputSchema } from '@/schemas'`
  * - Import types for TypeScript: `import type { TemplateElement } from '@/schemas'`
@@ -12,13 +12,13 @@
 // Local type imports for internal type references
 import type { TemplateCreationData, TemplateCreationInput } from './template-creation.schema';
 import type {
-  TemplateElement,
-  TextElement,
-  ImageElement,
-  QrElement,
-  PhotoElement,
-  SignatureElement,
-  SelectionElement
+	TemplateElement,
+	TextElement,
+	ImageElement,
+	QrElement,
+	PhotoElement,
+	SignatureElement,
+	SelectionElement
 } from './template-element.schema';
 import type { TemplateDimensionSummary } from './display-conversion.schema';
 
@@ -252,7 +252,7 @@ export {
 	type AdminActionWithContext
 } from './admin.schema';
 
-// Billing & Payment Schemas & Types  
+// Billing & Payment Schemas & Types
 export {
 	creditTransactionSchema,
 	creditTransactionInputSchema,

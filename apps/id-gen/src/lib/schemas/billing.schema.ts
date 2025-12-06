@@ -26,9 +26,15 @@ export const creditTransactionInputSchema = creditTransactionSchema.omit({
 });
 
 // Payment method enum (matches database)
-export const paymentMethodSchema = z.enum(['gcash', 'paymaya', 'card', 'online_banking', 'bank_transfer']);
+export const paymentMethodSchema = z.enum([
+	'gcash',
+	'paymaya',
+	'card',
+	'online_banking',
+	'bank_transfer'
+]);
 
-// Payment record schema (payments table) 
+// Payment record schema (payments table)
 export const paymentSchema = z.object({
 	id: z.number().int().optional(),
 	amount: z.number(),
@@ -102,16 +108,22 @@ export const billingSummarySchema = z.object({
 	current_credits: z.number().int(),
 	credits_used_this_month: z.number().int(),
 	total_spent: z.number(),
-	last_payment: z.object({
-		amount: z.number(),
-		date: z.string().datetime(),
-		method: paymentMethodSchema
-	}).optional(),
-	upcoming_charges: z.array(z.object({
-		description: z.string(),
-		amount: z.number(),
-		due_date: z.string().datetime()
-	})).default([])
+	last_payment: z
+		.object({
+			amount: z.number(),
+			date: z.string().datetime(),
+			method: paymentMethodSchema
+		})
+		.optional(),
+	upcoming_charges: z
+		.array(
+			z.object({
+				description: z.string(),
+				amount: z.number(),
+				due_date: z.string().datetime()
+			})
+		)
+		.default([])
 });
 
 // Usage analytics schema
@@ -119,13 +131,15 @@ export const usageAnalyticsSchema = z.object({
 	user_id: z.string().uuid(),
 	org_id: z.string().uuid(),
 	period: z.enum(['daily', 'weekly', 'monthly', 'yearly']),
-	data: z.array(z.object({
-		date: z.string().datetime(),
-		templates_created: z.number().int(),
-		cards_generated: z.number().int(),
-		credits_used: z.number().int(),
-		credits_purchased: z.number().int()
-	})),
+	data: z.array(
+		z.object({
+			date: z.string().datetime(),
+			templates_created: z.number().int(),
+			cards_generated: z.number().int(),
+			credits_used: z.number().int(),
+			credits_purchased: z.number().int()
+		})
+	),
 	totals: z.object({
 		templates_created: z.number().int(),
 		cards_generated: z.number().int(),

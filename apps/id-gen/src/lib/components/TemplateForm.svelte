@@ -6,18 +6,23 @@
 	import { Upload, Image as ImageIcon, Plus, X, Move, Scaling } from '@lucide/svelte';
 	import { loadGoogleFonts, getAllFontFamilies, isFontLoaded, fonts } from '../config/fonts';
 	import { CoordinateSystem } from '$lib/utils/coordinateSystem';
-import { createAdaptiveElements } from '$lib/utils/adaptiveElements';
-import { cssForBackground, clampBackgroundPosition, computeDraw, computeContainerViewportInImage } from '$lib/utils/backgroundGeometry';
-import type { Dims } from '$lib/utils/backgroundGeometry';
-import { browser } from '$app/environment';
-import { 
-	debounce, 
-	throttle, 
-	CanvasRenderManager, 
-	ImageCache, 
-	CoordinateCache, 
-	PerformanceMonitor 
-} from '$lib/utils/canvasPerformance';
+	import { createAdaptiveElements } from '$lib/utils/adaptiveElements';
+	import {
+		cssForBackground,
+		clampBackgroundPosition,
+		computeDraw,
+		computeContainerViewportInImage
+	} from '$lib/utils/backgroundGeometry';
+	import type { Dims } from '$lib/utils/backgroundGeometry';
+	import { browser } from '$app/environment';
+	import {
+		debounce,
+		throttle,
+		CanvasRenderManager,
+		ImageCache,
+		CoordinateCache,
+		PerformanceMonitor
+	} from '$lib/utils/canvasPerformance';
 
 	let {
 		side,
@@ -64,9 +69,9 @@ import {
 
 	let files: File[] = $state([]);
 	let isDragging = false;
-let isResizing = false;
-// Shared hover state between canvas and element list
-let hoveredElementId: string | null = $state(null);
+	let isResizing = false;
+	// Shared hover state between canvas and element list
+	let hoveredElementId: string | null = $state(null);
 	let startX: number, startY: number;
 	let currentElementIndex: number | null = null;
 	let resizeHandle: string | null = null;
@@ -79,7 +84,7 @@ let hoveredElementId: string | null = $state(null);
 	let mainCanvas: HTMLCanvasElement | undefined = $state();
 	let mainCtx: CanvasRenderingContext2D;
 	let mainImageElement: HTMLImageElement | null = $state(null);
-	let loadedImageSize = $state<{width: number, height: number} | null>(null);
+	let loadedImageSize = $state<{ width: number; height: number } | null>(null);
 	let fontOptions: string[] = $state([]);
 	let fontsLoaded = false;
 	let previewDimensions = $state({
@@ -87,7 +92,6 @@ let hoveredElementId: string | null = $state(null);
 		height: 0,
 		scale: 1
 	});
-
 
 	// Performance optimization instances
 	let canvasRenderManager: CanvasRenderManager | null = null;
@@ -108,18 +112,26 @@ let hoveredElementId: string | null = $state(null);
 		console.log('♻️ Resetting internal caches in TemplateForm due to:', reason);
 		// Destroy and null-out CanvasRenderManager so it can be recreated
 		if (canvasRenderManager) {
-			try { canvasRenderManager.destroy(); } catch {}
+			try {
+				canvasRenderManager.destroy();
+			} catch {}
 			canvasRenderManager = null;
 		}
 		// Clear caches
 		if (imageCache) {
-			try { imageCache.clearAll?.(); } catch {}
+			try {
+				imageCache.clearAll?.();
+			} catch {}
 		}
 		if (coordinateCache) {
-			try { coordinateCache.clear?.(); } catch {}
+			try {
+				coordinateCache.clear?.();
+			} catch {}
 		}
 		if (performanceMonitor) {
-			try { performanceMonitor.clear?.(); } catch {}
+			try {
+				performanceMonitor.clear?.();
+			} catch {}
 		}
 		// Recreate debounced/throttled wrappers to avoid capturing stale state
 		debouncedUpdateBackground = debounce(updateBackgroundPosition, 100);
@@ -128,7 +140,6 @@ let hoveredElementId: string | null = $state(null);
 		// Force image to reload on next effect pass
 		lastLoadedPreview = null;
 	}
-
 
 	// Coordinate system scale must mirror the baseDimensions downscale (actual -> preview)
 	let coordSystem = $derived(() => {
@@ -140,9 +151,7 @@ let hoveredElementId: string | null = $state(null);
 		}
 
 		// Compute base scale factor between actual pixels and preview pixels
-		const scale = currentBase.width > 0
-			? currentBase.width / currentBase.actualWidth
-			: 1;
+		const scale = currentBase.width > 0 ? currentBase.width / currentBase.actualWidth : 1;
 
 		return new CoordinateSystem(currentBase.actualWidth, currentBase.actualHeight, scale);
 	});
@@ -162,7 +171,6 @@ let hoveredElementId: string | null = $state(null);
 		const containerHeight = currentBase.height;
 
 		const scale = 1; // Already scaled by baseDimensions; keep 1:1 here to match IdCanvas
-
 
 		previewDimensions = {
 			width: containerWidth,
@@ -241,14 +249,14 @@ let hoveredElementId: string | null = $state(null);
 
 	// Track last loaded preview URL to prevent redundant reloads
 	let lastLoadedPreview: string | null = null;
-	
+
 	// Initialize canvas context and handle all canvas-related updates
 	$effect(() => {
 		if (mainCanvas && !mainCtx) {
 			mainCtx = mainCanvas.getContext('2d')!;
 			console.log('🎨 Main canvas context initialized');
 		}
-		
+
 		// Initialize CanvasRenderManager once we have the canvas
 		if (mainCanvas && !canvasRenderManager) {
 			canvasRenderManager = new CanvasRenderManager(mainCanvas);
@@ -256,19 +264,22 @@ let hoveredElementId: string | null = $state(null);
 			canvasRenderManager.addRenderCallback(drawMainCanvas);
 			console.log('🚀 CanvasRenderManager initialized with render callback');
 		}
-		
+
 		// Update canvas dimensions when preview dimensions change
 		if (mainCanvas && previewDimensions.width > 0 && previewDimensions.height > 0) {
-			if (mainCanvas.width !== previewDimensions.width || mainCanvas.height !== previewDimensions.height) {
+			if (
+				mainCanvas.width !== previewDimensions.width ||
+				mainCanvas.height !== previewDimensions.height
+			) {
 				mainCanvas.width = previewDimensions.width;
 				mainCanvas.height = previewDimensions.height;
 				console.log('🔧 Canvas dimensions updated:', previewDimensions);
-				
+
 				// Re-get context after dimension change (some browsers require this)
 				if (mainCtx) {
 					mainCtx = mainCanvas.getContext('2d')!;
 				}
-				
+
 				// Trigger redraw after canvas resize if we have image
 				if (mainImageElement) {
 					throttledDraw();
@@ -276,7 +287,7 @@ let hoveredElementId: string | null = $state(null);
 			}
 		}
 	});
-	
+
 	// Separate effect for image loading to prevent excessive reloads
 	$effect(() => {
 		console.log('🔍 Image loading effect triggered:', {
@@ -287,7 +298,7 @@ let hoveredElementId: string | null = $state(null);
 			side,
 			urlChanged: preview !== lastLoadedPreview
 		});
-		
+
 		// Only reload if preview URL actually changed
 		if (preview && preview !== lastLoadedPreview) {
 			if (mainCtx && previewDimensions.width > 0) {
@@ -311,7 +322,7 @@ let hoveredElementId: string | null = $state(null);
 			console.log('ℹ️ Preview URL unchanged, skipping reload:', preview);
 		}
 	});
-	
+
 	// Additional effect to retry loading when canvas becomes ready
 	$effect(() => {
 		// Retry loading if we have a preview URL but haven't loaded it yet due to canvas not being ready
@@ -337,7 +348,7 @@ let hoveredElementId: string | null = $state(null);
 			}
 		}
 	});
-	
+
 	// Separate effect for drawing/redrawing
 	$effect(() => {
 		// Only redraw when background position changes or we have a valid image
@@ -496,12 +507,12 @@ let hoveredElementId: string | null = $state(null);
 			console.log('🚫 No preview URL provided');
 			return;
 		}
-		
+
 		if (!mainCtx) {
 			console.log('🚫 Canvas context not ready');
 			return;
 		}
-		
+
 		// Check if image is already cached
 		const cachedImage = imageCache?.get(preview);
 		if (cachedImage) {
@@ -510,25 +521,25 @@ let hoveredElementId: string | null = $state(null);
 			throttledDraw();
 			return;
 		}
-		
+
 		console.log('🔄 Loading main image:', preview);
-		
+
 		// Clear previous image and canvas
 		mainImageElement = null;
 		loadedImageSize = null;
-		
+
 		// Immediately clear the canvas to show loading state
 		if (mainCtx && previewDimensions.width > 0 && previewDimensions.height > 0) {
 			mainCtx.clearRect(0, 0, previewDimensions.width, previewDimensions.height);
 			console.log('🧹 Cleared canvas for new image load');
 		}
-		
+
 		// Start performance tracking
 		const stopTiming = performanceMonitor?.startTiming('imageLoad');
-		
+
 		const img = new Image();
 		img.crossOrigin = 'anonymous';
-		
+
 		img.onload = () => {
 			console.log('✅ Main image loaded successfully:', {
 				url: preview,
@@ -536,9 +547,9 @@ let hoveredElementId: string | null = $state(null);
 				naturalHeight: img.naturalHeight,
 				hasValidDimensions: img.naturalWidth > 0 && img.naturalHeight > 0
 			});
-			
+
 			stopTiming?.();
-			
+
 			if (img.naturalWidth > 0 && img.naturalHeight > 0) {
 				mainImageElement = img;
 				loadedImageSize = { width: img.naturalWidth, height: img.naturalHeight };
@@ -552,7 +563,7 @@ let hoveredElementId: string | null = $state(null);
 				loadedImageSize = null;
 			}
 		};
-		
+
 		img.onerror = (error) => {
 			console.error('❌ Failed to load main canvas image:', {
 				url: preview,
@@ -562,7 +573,7 @@ let hoveredElementId: string | null = $state(null);
 			mainImageElement = null;
 			loadedImageSize = null;
 		};
-		
+
 		img.src = preview;
 	}
 
@@ -578,10 +589,10 @@ let hoveredElementId: string | null = $state(null);
 
 		// Use CanvasRenderManager for optimized rendering
 		canvasRenderManager?.markDirty();
-		
+
 		// Start performance tracking
 		const stopTiming = performanceMonitor?.startTiming('canvasDraw');
-		
+
 		console.log('🎨 Drawing main canvas...', {
 			canvasSize: { width: previewDimensions.width, height: previewDimensions.height },
 			imageSize: { width: mainImageElement.naturalWidth, height: mainImageElement.naturalHeight },
@@ -590,55 +601,65 @@ let hoveredElementId: string | null = $state(null);
 
 		// Clear canvas
 		mainCtx.clearRect(0, 0, previewDimensions.width, previewDimensions.height);
-		
+
 		// Reset transforms
 		mainCtx.resetTransform();
-		
+
 		const imageDims: Dims = {
 			width: mainImageElement.naturalWidth,
 			height: mainImageElement.naturalHeight
 		};
-		
+
 		// Use same logic as main template CSS but with canvas
 		const currentBase = baseDimensions();
 		const container = previewDimensions;
-		
+
 		if (currentBase.actualWidth === 0 || currentBase.actualHeight === 0) {
 			console.log('❌ Base dimensions not available:', currentBase);
 			stopTiming?.();
 			return;
 		}
-				// FIXED: Use the same logic as thumbnail red box to show the container viewport
+		// FIXED: Use the same logic as thumbnail red box to show the container viewport
 		const containerDims: Dims = {
 			width: currentBase.actualWidth,
 			height: currentBase.actualHeight
 		};
-		
+
 		// Calculate what part of the image the container viewport "sees" (same as red box)
-		const viewportRect = computeContainerViewportInImage(imageDims, containerDims, backgroundPosition);
-		
+		const viewportRect = computeContainerViewportInImage(
+			imageDims,
+			containerDims,
+			backgroundPosition
+		);
+
 		console.log('🎯 Canvas draw parameters (VIEWPORT SYNC):', {
 			viewportInImage: viewportRect,
 			containerDims,
 			backgroundPosition,
 			canvasSize: { width: container.width, height: container.height }
 		});
-		
+
 		// Draw only the viewport portion of the image, scaled to fill the entire canvas
 		// This matches what the red box represents in the thumbnail
 		mainCtx.drawImage(
 			mainImageElement,
-			viewportRect.x, viewportRect.y, viewportRect.width, viewportRect.height, // Source rect in image
-			0, 0, container.width, container.height // Destination rect (fill entire canvas)
+			viewportRect.x,
+			viewportRect.y,
+			viewportRect.width,
+			viewportRect.height, // Source rect in image
+			0,
+			0,
+			container.width,
+			container.height // Destination rect (fill entire canvas)
 		);
-		
+
 		stopTiming?.();
 		console.log('✅ Main canvas draw complete');
 	}
 
 	function updateBackgroundPosition() {
 		const currentBase = baseDimensions();
-		
+
 		// Early return if dimensions not available
 		if (currentBase.actualWidth === 0 || currentBase.actualHeight === 0) {
 			console.warn('⚠️ Cannot update background position: dimensions not available');
@@ -649,7 +670,6 @@ let hoveredElementId: string | null = $state(null);
 		if (onUpdateBackgroundPosition) {
 			onUpdateBackgroundPosition(backgroundPosition, side);
 		}
-
 	}
 
 	let elementStyle = $derived((element: TemplateElement) => {
@@ -723,11 +743,11 @@ let hoveredElementId: string | null = $state(null);
 						bind:this={mainCanvas}
 						width={previewDimensions.width}
 						height={previewDimensions.height}
-				class="background-canvas"
-				style="display: block;"
-			></canvas>
+						class="background-canvas"
+						style="display: block;"
+					></canvas>
 				{/if}
-				
+
 				<!-- Elements overlay layer -->
 				{#if !preview}
 					<label class="placeholder-design clickable-container">
@@ -780,83 +800,83 @@ let hoveredElementId: string | null = $state(null);
 					</label>
 				{:else}
 					<!-- Background manipulation controls removed - use thumbnail controls only -->
-					
-				<div class="elements-overlay">
-				{#each elements ?? [] as element, i}
-						<div
-						class="template-element {element.type}"
-						class:highlighted={hoveredElementId === element.id}
-						style={Object.entries(elementStyle(element))
-							.map(([key, value]) => `${key}: ${value}`)
-							.join(';')}
-						onmouseenter={() => (hoveredElementId = element.id)}
-						onmouseleave={() => (hoveredElementId = null)}
-						onmousedown={(e) => onMouseDown(e, i)}
-						role="button"
-						tabindex="0"
-						aria-label="{element.type} element"
-						>
-							{#if element.type === 'text' || element.type === 'selection'}
-								<span
-									style={Object.entries(textStyle(element))
-										.map(([key, value]) => `${key}: ${value}`)
-										.join(';')}
-								>
-									{element.type === 'selection'
-										? element.content || element.options?.[0] || 'Select option'
-										: element.content}
-								</span>
-							{:else if element.type === 'photo'}
-								<div class="placeholder photo-placeholder">
-									<span>Photo Area</span>
+
+					<div class="elements-overlay">
+						{#each elements ?? [] as element, i}
+							<div
+								class="template-element {element.type}"
+								class:highlighted={hoveredElementId === element.id}
+								style={Object.entries(elementStyle(element))
+									.map(([key, value]) => `${key}: ${value}`)
+									.join(';')}
+								onmouseenter={() => (hoveredElementId = element.id)}
+								onmouseleave={() => (hoveredElementId = null)}
+								onmousedown={(e) => onMouseDown(e, i)}
+								role="button"
+								tabindex="0"
+								aria-label="{element.type} element"
+							>
+								{#if element.type === 'text' || element.type === 'selection'}
+									<span
+										style={Object.entries(textStyle(element))
+											.map(([key, value]) => `${key}: ${value}`)
+											.join(';')}
+									>
+										{element.type === 'selection'
+											? element.content || element.options?.[0] || 'Select option'
+											: element.content}
+									</span>
+								{:else if element.type === 'photo'}
+									<div class="placeholder photo-placeholder">
+										<span>Photo Area</span>
+									</div>
+								{:else if element.type === 'signature'}
+									<div class="placeholder signature-placeholder">
+										<span>Signature Area</span>
+									</div>
+								{/if}
+								<div class="resize-handles">
+									<div
+										class="resize-handle top-left"
+										onmousedown={stopPropagation((e) => onMouseDown(e, i, 'top-left'))}
+										role="button"
+										tabindex="0"
+										aria-label="Resize top left"
+									></div>
+									<div
+										class="resize-handle top-right"
+										onmousedown={stopPropagation((e) => onMouseDown(e, i, 'top-right'))}
+										role="button"
+										tabindex="0"
+										aria-label="Resize top right"
+									></div>
+									<div
+										class="resize-handle bottom-left"
+										onmousedown={stopPropagation((e) => onMouseDown(e, i, 'bottom-left'))}
+										role="button"
+										tabindex="0"
+										aria-label="Resize bottom left"
+									></div>
+									<div
+										class="resize-handle bottom-right"
+										onmousedown={stopPropagation((e) => onMouseDown(e, i, 'bottom-right'))}
+										role="button"
+										tabindex="0"
+										aria-label="Resize bottom right"
+									></div>
 								</div>
-							{:else if element.type === 'signature'}
-								<div class="placeholder signature-placeholder">
-									<span>Signature Area</span>
-								</div>
-							{/if}
-							<div class="resize-handles">
-								<div
-									class="resize-handle top-left"
-									onmousedown={stopPropagation((e) => onMouseDown(e, i, 'top-left'))}
-									role="button"
-									tabindex="0"
-									aria-label="Resize top left"
-								></div>
-								<div
-									class="resize-handle top-right"
-									onmousedown={stopPropagation((e) => onMouseDown(e, i, 'top-right'))}
-									role="button"
-									tabindex="0"
-									aria-label="Resize top right"
-								></div>
-								<div
-									class="resize-handle bottom-left"
-									onmousedown={stopPropagation((e) => onMouseDown(e, i, 'bottom-left'))}
-									role="button"
-									tabindex="0"
-									aria-label="Resize bottom left"
-								></div>
-								<div
-									class="resize-handle bottom-right"
-									onmousedown={stopPropagation((e) => onMouseDown(e, i, 'bottom-right'))}
-									role="button"
-									tabindex="0"
-									aria-label="Resize bottom right"
-								></div>
 							</div>
-						</div>
-					{/each}
-					<Button
-						variant="destructive"
-						size="icon"
-						class="remove-image"
-						onclick={() => onRemoveImage(side)}
-					>
-						<X class="w-4 h-4" />
-					</Button>
-					
-					</div> <!-- Close elements-overlay -->
+						{/each}
+						<Button
+							variant="destructive"
+							size="icon"
+							class="remove-image"
+							onclick={() => onRemoveImage(side)}
+						>
+							<X class="w-4 h-4" />
+						</Button>
+					</div>
+					<!-- Close elements-overlay -->
 				{/if}
 			</div>
 		</div>
@@ -869,9 +889,11 @@ let hoveredElementId: string | null = $state(null);
 			bind:backgroundPosition
 			{onUpdateBackgroundPosition}
 			{cardSize}
-{pixelDimensions}
-		hoveredElementId={hoveredElementId}
-onHoverElement={(id) => { hoveredElementId = id; }}
+			{pixelDimensions}
+			{hoveredElementId}
+			onHoverElement={(id) => {
+				hoveredElementId = id;
+			}}
 		/>
 	</div>
 </div>
@@ -923,7 +945,6 @@ onHoverElement={(id) => { hoveredElementId = id; }}
 		border-radius: 2px;
 		box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
 	}
-
 
 	.background-canvas {
 		position: absolute;
@@ -1004,14 +1025,17 @@ onHoverElement={(id) => { hoveredElementId = id; }}
 		background-size: 20px 20px;
 	}
 
-.template-element {
+	.template-element {
 		position: absolute;
 		cursor: move;
 		border: 1px solid cyan;
 		box-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
 		box-sizing: border-box;
 		opacity: 0.5;
-		transition: opacity 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+		transition:
+			opacity 0.15s ease,
+			box-shadow 0.15s ease,
+			border-color 0.15s ease;
 		pointer-events: auto; /* Re-enable clicks on actual elements */
 		z-index: 20; /* Ensure individual elements are clickable */
 		/* Add a default border to ensure visibility even if content is empty */
@@ -1095,15 +1119,6 @@ onHoverElement={(id) => { hoveredElementId = id; }}
 		z-index: 10;
 	}
 
-	
-	
-	
-	
-	
-	
-	
-	
-
 	.resize-handle.top-left {
 		top: -4px;
 		left: -4px;
@@ -1126,5 +1141,4 @@ onHoverElement={(id) => { hoveredElementId = id; }}
 	}
 
 	/* Background manipulation controls removed - use thumbnail controls only */
-
 </style>

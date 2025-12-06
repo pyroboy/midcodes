@@ -41,11 +41,11 @@
 		if (browser && isLoaded) {
 			animate();
 		}
-	return () => {
-		if (animationId) {
-			cancelAnimationFrame(animationId);
-		}
-	};
+		return () => {
+			if (animationId) {
+				cancelAnimationFrame(animationId);
+			}
+		};
 	});
 
 	// GLSL for the spinner shader

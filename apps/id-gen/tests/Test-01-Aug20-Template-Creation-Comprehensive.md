@@ -24,6 +24,7 @@
 ## **Comprehensive Template Creation Test Specification**
 
 ### **Test Overview**
+
 Testing the complete template creation system including schema validation, server actions, database operations, and state management with comprehensive coverage of different template sizes, element types, and data scenarios.
 
 ---
@@ -33,6 +34,7 @@ Testing the complete template creation system including schema validation, serve
 ### **1.1 Template Creation Schema Tests**
 
 #### **Valid Template Data**
+
 ```typescript
 describe('templateCreationSchema validation', () => {
   test('accepts valid template with standard card size', () => {
@@ -53,6 +55,7 @@ describe('templateCreationSchema validation', () => {
 ```
 
 #### **Template Size Boundary Tests**
+
 ```typescript
 describe('template size boundary validation', () => {
   test('rejects template with width below minimum', () => {
@@ -95,6 +98,7 @@ describe('template size boundary validation', () => {
 ```
 
 #### **Template Name Validation Tests**
+
 ```typescript
 describe('template name validation', () => {
   test('rejects empty template name', () => {
@@ -128,11 +132,12 @@ describe('template name validation', () => {
 ### **1.2 Template Element Schema Tests**
 
 #### **Element Type Tests**
+
 ```typescript
 describe('template element validation', () => {
   test('validates all supported element types', () => {
     const elementTypes = ['text', 'image', 'qr', 'photo', 'signature', 'selection'];
-    
+
     elementTypes.forEach(type => {
       const element = {
         id: `${type}-element-1`,
@@ -161,6 +166,7 @@ describe('template element validation', () => {
 ```
 
 #### **Element Position and Size Tests**
+
 ```typescript
 describe('element positioning validation', () => {
   test('rejects negative coordinates', () => {
@@ -190,6 +196,7 @@ describe('element positioning validation', () => {
 ```
 
 #### **Text Element Property Tests**
+
 ```typescript
 describe('text element properties', () => {
   test('validates text styling properties', () => {
@@ -217,6 +224,7 @@ describe('text element properties', () => {
 ```
 
 #### **Selection Element Tests**
+
 ```typescript
 describe('selection element validation', () => {
   test('validates selection element with options', () => {
@@ -246,6 +254,7 @@ describe('selection element validation', () => {
 ### **2.1 Template Creation Flow Tests**
 
 #### **Standard Template Creation**
+
 ```typescript
 describe('template creation server action', () => {
   test('creates template with valid data', async () => {
@@ -289,6 +298,7 @@ describe('template creation server action', () => {
 ```
 
 #### **Template with Complex Elements**
+
 ```typescript
 describe('template with multiple elements', () => {
   test('creates template with diverse element types', async () => {
@@ -334,6 +344,7 @@ describe('template with multiple elements', () => {
 ### **2.2 Template Size Variation Tests**
 
 #### **Different Card Size Templates**
+
 ```typescript
 describe('template size variations', () => {
   const testSizes = [
@@ -371,6 +382,7 @@ describe('template size variations', () => {
 ### **2.3 Element List Scenario Tests**
 
 #### **Empty Elements Test**
+
 ```typescript
 describe('template element list scenarios', () => {
   test('creates template with no elements', async () => {
@@ -378,7 +390,7 @@ describe('template element list scenarios', () => {
       name: 'Blank Template',
       template_elements: []
     };
-    
+
     const result = await createTemplate(templateData);
     expect(result.success).toBe(true);
     expect(result.data.template_elements).toEqual([]);
@@ -387,6 +399,7 @@ describe('template element list scenarios', () => {
 ```
 
 #### **Single Element Tests**
+
 ```typescript
 describe('single element templates', () => {
   const singleElementTypes = [
@@ -424,6 +437,7 @@ describe('single element templates', () => {
 ```
 
 #### **High Element Count Test**
+
 ```typescript
 describe('high element count scenarios', () => {
   test('creates template with many elements', async () => {
@@ -451,6 +465,7 @@ describe('high element count scenarios', () => {
 ```
 
 #### **Overlapping Elements Test**
+
 ```typescript
 describe('overlapping elements handling', () => {
   test('allows overlapping elements', async () => {
@@ -476,6 +491,7 @@ describe('overlapping elements handling', () => {
 ### **3.1 Validation Error Tests**
 
 #### **Schema Validation Failures**
+
 ```typescript
 describe('validation error handling', () => {
   test('handles invalid template data gracefully', async () => {
@@ -491,7 +507,7 @@ describe('validation error handling', () => {
 
   test('returns meaningful error messages', async () => {
     const invalidData = { name: 'A'.repeat(101) }; // Name too long
-    
+
     try {
       await createTemplate(invalidData);
     } catch (error) {
@@ -504,6 +520,7 @@ describe('validation error handling', () => {
 ### **3.2 Database Error Tests**
 
 #### **Database Constraint Violations**
+
 ```typescript
 describe('database error handling', () => {
   test('handles database connection errors', async () => {
@@ -542,6 +559,7 @@ describe('database error handling', () => {
 ### **3.3 Authorization Tests**
 
 #### **Organization Access Control**
+
 ```typescript
 describe('organization access control', () => {
   test('prevents cross-organization template creation', async () => {
@@ -555,9 +573,9 @@ describe('organization access control', () => {
       org_id: 'user-org-id' // User's actual org
     };
 
-    const result = await actions.create({ 
-      request: createMockRequest(templateData), 
-      locals 
+    const result = await actions.create({
+      request: createMockRequest(templateData),
+      locals
     });
 
     // Should override org_id with user's org
@@ -582,6 +600,7 @@ describe('organization access control', () => {
 ### **4.1 Extreme Input Tests**
 
 #### **Maximum Data Size Tests**
+
 ```typescript
 describe('extreme input handling', () => {
   test('handles maximum element count', async () => {
@@ -622,6 +641,7 @@ describe('extreme input handling', () => {
 ```
 
 #### **Unicode and Special Characters**
+
 ```typescript
 describe('unicode and special character handling', () => {
   test('handles unicode template names', async () => {
@@ -661,10 +681,11 @@ describe('unicode and special character handling', () => {
 ### **4.2 Concurrency Tests**
 
 #### **Simultaneous Template Creation**
+
 ```typescript
 describe('concurrency handling', () => {
   test('handles multiple simultaneous template creations', async () => {
-    const promises = Array.from({ length: 10 }, (_, i) => 
+    const promises = Array.from({ length: 10 }, (_, i) =>
       createTemplate({
         name: `Concurrent Template ${i}`,
         template_elements: []
@@ -673,13 +694,13 @@ describe('concurrency handling', () => {
 
     const results = await Promise.allSettled(promises);
     const successful = results.filter(r => r.status === 'fulfilled');
-    
+
     expect(successful.length).toBe(10);
   });
 
   test('handles concurrent updates to same template', async () => {
     const templateId = 'concurrent-test-template';
-    
+
     const updatePromises = [
       updateTemplate(templateId, { name: 'Update 1' }),
       updateTemplate(templateId, { name: 'Update 2' }),
@@ -687,7 +708,7 @@ describe('concurrency handling', () => {
     ];
 
     const results = await Promise.allSettled(updatePromises);
-    
+
     // At least one should succeed, others may fail due to conflicts
     const successful = results.filter(r => r.status === 'fulfilled');
     expect(successful.length).toBeGreaterThan(0);
@@ -702,11 +723,12 @@ describe('concurrency handling', () => {
 ### **5.1 Store Synchronization Tests**
 
 #### **Template Store State Management**
+
 ```typescript
 describe('template store consistency', () => {
   test('keeps store synchronized with database', async () => {
     const initialTemplate = get(templateData);
-    
+
     const newTemplate = await createTemplate({
       name: 'Sync Test Template'
     });
@@ -724,7 +746,7 @@ describe('template store consistency', () => {
     });
 
     templateData.reset();
-    
+
     const resetTemplate = get(templateData);
     expect(resetTemplate.name).toBe('');
     expect(resetTemplate.template_elements).toEqual([]);
@@ -735,23 +757,24 @@ describe('template store consistency', () => {
 ### **5.2 Database Relationship Tests**
 
 #### **Template-IDCard Relationship**
+
 ```typescript
 describe('template-idcard relationships', () => {
   test('maintains referential integrity on template deletion', async () => {
     // Create template
     const template = await createTemplate({ name: 'To Be Deleted' });
-    
+
     // Create ID cards using this template
     const idCard1 = await createIDCard({ template_id: template.data.id });
     const idCard2 = await createIDCard({ template_id: template.data.id });
-    
+
     // Delete template
     await deleteTemplate(template.data.id);
-    
+
     // Verify ID cards have template_id set to null
     const updatedCard1 = await getIDCard(idCard1.id);
     const updatedCard2 = await getIDCard(idCard2.id);
-    
+
     expect(updatedCard1.template_id).toBeNull();
     expect(updatedCard2.template_id).toBeNull();
   });
@@ -765,6 +788,7 @@ describe('template-idcard relationships', () => {
 ### **6.1 Template Size Performance**
 
 #### **Large Template Handling**
+
 ```typescript
 describe('performance with large templates', () => {
   test('processes large templates within acceptable time', async () => {
@@ -803,6 +827,7 @@ describe('performance with large templates', () => {
 ### **7.1 Complete User Workflows**
 
 #### **Happy Path: Create Complete Employee ID Template**
+
 ```typescript
 describe('E2E template creation workflows', () => {
   test('complete employee ID template creation workflow', async () => {
@@ -813,37 +838,37 @@ describe('E2E template creation workflows', () => {
     // Step 2: Fill template details
     await page.fill('input[name="name"]', 'Employee ID Card v2');
     await page.fill('textarea[name="description"]', 'Updated employee identification card with security features');
-    
+
     // Step 3: Select card size
     await page.selectOption('select[name="cardSize"]', 'credit-card');
-    
+
     // Step 4: Upload backgrounds
     await page.setInputFiles('input[name="frontBackground"]', 'test-assets/front-bg.jpg');
     await page.setInputFiles('input[name="backBackground"]', 'test-assets/back-bg.jpg');
-    
+
     // Step 5: Add elements
     // Add employee name text field
     await page.click('button[data-testid="add-text-element"]');
     await page.fill('input[name="variableName"]', 'employee_name');
     await page.fill('input[name="fontSize"]', '16');
-    
+
     // Add employee photo
     await page.click('button[data-testid="add-photo-element"]');
     await page.fill('input[name="variableName"]', 'employee_photo');
-    
+
     // Add department selection
     await page.click('button[data-testid="add-selection-element"]');
     await page.fill('input[name="variableName"]', 'department');
     await page.fill('textarea[name="options"]', 'IT\nHR\nFinance\nMarketing');
-    
+
     // Add QR code for back
     await page.click('button[data-testid="switch-to-back"]');
     await page.click('button[data-testid="add-qr-element"]');
     await page.fill('input[name="variableName"]', 'employee_id');
-    
+
     // Step 6: Save template
     await page.click('button[data-testid="save-template"]');
-    
+
     // Step 7: Verify success
     await expect(page.locator('text=Template created successfully')).toBeVisible();
     await expect(page.locator('text=Employee ID Card v2')).toBeVisible();
@@ -852,6 +877,7 @@ describe('E2E template creation workflows', () => {
 ```
 
 #### **Error Path: Invalid Template Data**
+
 ```typescript
 describe('E2E error handling', () => {
   test('shows validation errors for invalid template', async () => {
@@ -872,13 +898,13 @@ describe('E2E error handling', () => {
 
     await page.goto('/templates');
     await page.click('button[data-testid="create-template-btn"]');
-    
+
     // Fill valid data
     await page.fill('input[name="name"]', 'Network Test Template');
-    
+
     // Try to save
     await page.click('button[data-testid="save-template"]');
-    
+
     // Verify error handling
     await expect(page.locator('text=Network error occurred')).toBeVisible();
   });
@@ -892,6 +918,7 @@ describe('E2E error handling', () => {
 ### **8.1 Backward Compatibility**
 
 #### **Legacy Template Format Support**
+
 ```typescript
 describe('backward compatibility', () => {
   test('handles templates created with old schema', async () => {
@@ -914,7 +941,7 @@ describe('backward compatibility', () => {
 
     const result = await createTemplate(legacyTemplate);
     expect(result.success).toBe(true);
-    
+
     // Should have default values for missing fields
     expect(result.data.width_inches).toBe(3.375);
     expect(result.data.dpi).toBe(300);
@@ -931,62 +958,67 @@ describe('backward compatibility', () => {
 ```typescript
 // Test data factories for creating consistent test data
 export const TemplateFactory = {
-  create: (overrides = {}) => ({
-    id: `template-${Math.random().toString(36).substr(2, 9)}`,
-    name: 'Test Template',
-    description: 'Template for testing',
-    org_id: 'test-org-123',
-    user_id: 'test-user-123',
-    front_background: 'https://example.com/front.jpg',
-    back_background: 'https://example.com/back.jpg',
-    orientation: 'landscape',
-    width_inches: 3.375,
-    height_inches: 2.125,
-    dpi: 300,
-    template_elements: [],
-    created_at: new Date().toISOString(),
-    ...overrides
-  }),
+	create: (overrides = {}) => ({
+		id: `template-${Math.random().toString(36).substr(2, 9)}`,
+		name: 'Test Template',
+		description: 'Template for testing',
+		org_id: 'test-org-123',
+		user_id: 'test-user-123',
+		front_background: 'https://example.com/front.jpg',
+		back_background: 'https://example.com/back.jpg',
+		orientation: 'landscape',
+		width_inches: 3.375,
+		height_inches: 2.125,
+		dpi: 300,
+		template_elements: [],
+		created_at: new Date().toISOString(),
+		...overrides
+	}),
 
-  withElements: (elementCount = 5) => {
-    const elements = Array.from({ length: elementCount }, (_, i) => 
-      ElementFactory.create({ id: `element-${i}` })
-    );
-    return TemplateFactory.create({ template_elements: elements });
-  },
+	withElements: (elementCount = 5) => {
+		const elements = Array.from({ length: elementCount }, (_, i) =>
+			ElementFactory.create({ id: `element-${i}` })
+		);
+		return TemplateFactory.create({ template_elements: elements });
+	},
 
-  withSize: (width, height) => 
-    TemplateFactory.create({
-      width_inches: width,
-      height_inches: height,
-      width_pixels: Math.round(width * 300),
-      height_pixels: Math.round(height * 300),
-      orientation: width >= height ? 'landscape' : 'portrait'
-    })
+	withSize: (width, height) =>
+		TemplateFactory.create({
+			width_inches: width,
+			height_inches: height,
+			width_pixels: Math.round(width * 300),
+			height_pixels: Math.round(height * 300),
+			orientation: width >= height ? 'landscape' : 'portrait'
+		})
 };
 
 export const ElementFactory = {
-  create: (overrides = {}) => ({
-    id: `element-${Math.random().toString(36).substr(2, 9)}`,
-    type: 'text',
-    x: 50, y: 50, width: 150, height: 30,
-    variableName: 'test_field',
-    side: 'front',
-    ...overrides
-  }),
+	create: (overrides = {}) => ({
+		id: `element-${Math.random().toString(36).substr(2, 9)}`,
+		type: 'text',
+		x: 50,
+		y: 50,
+		width: 150,
+		height: 30,
+		variableName: 'test_field',
+		side: 'front',
+		...overrides
+	}),
 
-  text: (overrides = {}) => ElementFactory.create({
-    type: 'text',
-    fontSize: 14,
-    fontFamily: 'Arial',
-    color: '#000000',
-    ...overrides
-  }),
+	text: (overrides = {}) =>
+		ElementFactory.create({
+			type: 'text',
+			fontSize: 14,
+			fontFamily: 'Arial',
+			color: '#000000',
+			...overrides
+		}),
 
-  selection: (options = ['Option 1', 'Option 2']) => ElementFactory.create({
-    type: 'selection',
-    options,
-  })
+	selection: (options = ['Option 1', 'Option 2']) =>
+		ElementFactory.create({
+			type: 'selection',
+			options
+		})
 };
 ```
 
@@ -995,8 +1027,9 @@ export const ElementFactory = {
 ## **Test Execution Summary**
 
 ### **Test Categories Coverage**:
+
 - ✅ **Unit Tests**: 85+ test cases covering schema validation and individual functions
-- ✅ **Integration Tests**: 30+ test cases covering server actions and database operations  
+- ✅ **Integration Tests**: 30+ test cases covering server actions and database operations
 - ✅ **E2E Tests**: 15+ test cases covering complete user workflows
 - ✅ **Edge Cases**: 25+ test cases covering extreme inputs and boundary conditions
 - ✅ **Error Handling**: 20+ test cases covering validation and database errors
@@ -1005,9 +1038,10 @@ export const ElementFactory = {
 
 ### **Total Test Count**: 200+ comprehensive test cases
 
-### **Expected Test Execution Time**: 
+### **Expected Test Execution Time**:
+
 - Unit Tests: ~30 seconds
-- Integration Tests: ~2 minutes  
+- Integration Tests: ~2 minutes
 - E2E Tests: ~5 minutes
 - Complete Suite: ~8 minutes
 

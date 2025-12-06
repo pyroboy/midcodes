@@ -26,7 +26,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			// Avoid returning sensitive metadata
 			orgId: org_id,
 			permissions: permissions,
-			userRoles: roles.length ? roles : (singleRole ? [singleRole] : [])
+			userRoles: roles.length ? roles : singleRole ? [singleRole] : []
 		}
 	};
 };

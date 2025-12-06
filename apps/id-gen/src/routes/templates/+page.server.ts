@@ -8,6 +8,17 @@ export const load = async ({ locals: { supabase, session, org_id, user }, url })
 	let templateId = url.searchParams.get('id');
 	let selectedTemplate = null;
 
+	// Check for new template creation params from home page
+	const isNewTemplate = url.searchParams.get('new') === 'true';
+	const newTemplateParams = isNewTemplate
+		? {
+				name: url.searchParams.get('name') || 'New Template',
+				width: parseFloat(url.searchParams.get('width') || '3.375'),
+				height: parseFloat(url.searchParams.get('height') || '2.125'),
+				unit: url.searchParams.get('unit') || 'inches'
+			}
+		: null;
+
 	if (templateId) {
 		const { data: template, error: templateError } = await supabase
 			.from('templates')
@@ -58,7 +69,8 @@ export const load = async ({ locals: { supabase, session, org_id, user }, url })
 		templates: templatesData,
 		selectedTemplate,
 		user,
-		org_id
+		org_id,
+		newTemplateParams
 	};
 };
 
@@ -102,7 +114,9 @@ export const actions = {
 				id: payload.id,
 				name: payload.name,
 				org_id: payload.org_id,
-				elementsCount: Array.isArray(payload.template_elements) ? payload.template_elements.length : 0
+				elementsCount: Array.isArray(payload.template_elements)
+					? payload.template_elements.length
+					: 0
 			});
 
 			// Use upsert so client-generated IDs work for new templates and updates

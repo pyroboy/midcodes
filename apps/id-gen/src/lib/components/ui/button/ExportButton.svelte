@@ -7,8 +7,8 @@
 		exportReorderReport,
 		exportSupplierPerformanceReport
 	} from '$lib/utils/inventoryReports';
-// Types are optional here; using broad types to avoid missing module errors
-// import type { FastMover, SlowMover, ReorderItem, SupplierPerformanceData } from '$lib/schemas/models';
+	// Types are optional here; using broad types to avoid missing module errors
+	// import type { FastMover, SlowMover, ReorderItem, SupplierPerformanceData } from '$lib/schemas/models';
 
 	let {
 		data,

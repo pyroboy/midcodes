@@ -89,7 +89,11 @@ export const setPaymentsBypass = command('unchecked', async ({ bypass }: any) =>
 	if (!org_id) throw error(500, 'Org ID missing');
 
 	const { error: updateError } = await (supabase.from('org_settings') as any)
-		.update({ payments_bypass: bypass, updated_by: user.id, updated_at: new Date().toISOString() } as any)
+		.update({
+			payments_bypass: bypass,
+			updated_by: user.id,
+			updated_at: new Date().toISOString()
+		} as any)
 		.eq('org_id', org_id);
 
 	if (updateError) throw error(500, 'Failed to update bypass flag');

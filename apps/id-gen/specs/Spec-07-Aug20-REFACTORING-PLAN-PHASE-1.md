@@ -1,15 +1,17 @@
 # Refactoring Plan - Phase 1: Component Splitting
 
 ## Overview
+
 This document outlines Phase 1 of the refactoring strategy to address maintenance issues in large, monolithic Svelte components. The focus is on breaking down the three most problematic files that exceed 1000+ lines.
 
 ## Critical Maintenance Issues Identified
 
 ### Current State Analysis
+
 Based on line count analysis, these files present the highest maintenance burden:
 
 1. **TemplateForm.svelte** - 1,290 lines ⚠️
-2. **templates/+page.svelte** - 1,227 lines ⚠️  
+2. **templates/+page.svelte** - 1,227 lines ⚠️
 3. **BackgroundThumbnail.svelte** - 1,177 lines ⚠️
 
 ## Phase 1 Refactoring Strategy
@@ -17,11 +19,13 @@ Based on line count analysis, these files present the highest maintenance burden
 ### 1. TemplateForm.svelte Decomposition
 
 **Current Issues:**
+
 - Massive monolithic component handling all template editing functionality
 - Mixed concerns: form logic, validation, UI rendering, event handling
 - Difficult to debug and test individual features
 
 **Proposed Component Split:**
+
 ```
 src/lib/components/template-form/
 ├── TemplateForm.svelte              # Main container (orchestrator)
@@ -32,6 +36,7 @@ src/lib/components/template-form/
 ```
 
 **Benefits:**
+
 - Isolated responsibilities per component
 - Easier testing of individual form sections
 - Reusable validation logic
@@ -42,11 +47,13 @@ src/lib/components/template-form/
 ### 2. templates/+page.svelte Decomposition
 
 **Current Issues:**
+
 - Entire template management page consolidated in single file
 - Contains list view, editing interface, and state management
 - Complex user interactions difficult to trace
 
 **Proposed Component Split:**
+
 ```
 src/lib/components/templates/
 ├── TemplateManagementPage.svelte    # Main page container
@@ -56,6 +63,7 @@ src/lib/components/templates/
 ```
 
 **Benefits:**
+
 - Clear separation between viewing and editing functionality
 - Modal editing can be reused in other contexts
 - List view becomes reusable component
@@ -66,11 +74,13 @@ src/lib/components/templates/
 ### 3. BackgroundThumbnail.svelte Decomposition
 
 **Current Issues:**
+
 - Complex background image handling logic in single component
 - Image processing, cropping, and preview generation mixed together
 - Performance bottlenecks difficult to isolate
 
 **Proposed Component Split:**
+
 ```
 src/lib/components/background/
 ├── BackgroundManager.svelte         # Main container component
@@ -80,6 +90,7 @@ src/lib/components/background/
 ```
 
 **Benefits:**
+
 - Isolated image processing logic
 - Cropper component reusable for other image needs
 - Upload component can be standardized across app
@@ -88,6 +99,7 @@ src/lib/components/background/
 ## Implementation Guidelines
 
 ### Development Approach
+
 1. **Create new component structure** without modifying existing files
 2. **Implement one component split at a time** to maintain functionality
 3. **Test each decomposed component** independently
@@ -95,12 +107,14 @@ src/lib/components/background/
 5. **Remove original files** only after full migration and testing
 
 ### File Organization Standards
+
 - **Group related components** in subdirectories under `src/lib/components/`
 - **Use descriptive naming** that reflects component responsibility
 - **Extract shared utilities** to separate `.ts` files
 - **Maintain consistent export patterns** for easy importing
 
 ### Testing Strategy
+
 - **Unit test each decomposed component** individually
 - **Integration test the composed functionality** to ensure no regression
 - **Visual regression testing** for UI components
@@ -109,26 +123,30 @@ src/lib/components/background/
 ## Success Criteria
 
 ### Measurable Outcomes
+
 - **Reduce file sizes** to under 300 lines per component
 - **Improve component reusability** across different pages
 - **Decrease debugging time** for template-related issues
 - **Increase test coverage** through isolated component testing
 
 ### Quality Metrics
+
 - **Code complexity reduction** measured by cyclomatic complexity
-- **Maintainability index improvement** 
+- **Maintainability index improvement**
 - **Reduced time to implement new features** in affected areas
 - **Fewer merge conflicts** in template-related development
 
 ## Timeline Estimate
 
 ### Recommended Sequence
+
 1. **Week 1**: BackgroundThumbnail.svelte decomposition (least complex)
 2. **Week 2**: TemplateForm.svelte decomposition (most critical)
 3. **Week 3**: templates/+page.svelte decomposition (most complex)
 4. **Week 4**: Testing, optimization, and documentation
 
 ### Risk Mitigation
+
 - **Maintain parallel development** - old components remain functional during refactor
 - **Feature flag approach** - gradually enable new components
 - **Comprehensive testing** before removing legacy components

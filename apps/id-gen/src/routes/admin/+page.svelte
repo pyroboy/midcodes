@@ -307,82 +307,82 @@
 				<CardDescription>Latest ID card generations and user activities</CardDescription>
 			</CardHeader>
 			<CardContent>
-					{@const recentActivity = data?.recentActivity || []}
-					{#if recentActivity && recentActivity.length > 0}
-						<div class="space-y-4">
-							{#each recentActivity.slice(0, 5) as activity}
-								<div class="flex items-center justify-between">
-									<div class="flex items-center space-x-3">
-										<div class="flex-shrink-0">
-											{#if activity.type === 'card_generated'}
-												<div
-													class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center"
+				{@const recentActivity = data?.recentActivity || []}
+				{#if recentActivity && recentActivity.length > 0}
+					<div class="space-y-4">
+						{#each recentActivity.slice(0, 5) as activity}
+							<div class="flex items-center justify-between">
+								<div class="flex items-center space-x-3">
+									<div class="flex-shrink-0">
+										{#if activity.type === 'card_generated'}
+											<div
+												class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center"
+											>
+												<svg
+													class="w-4 h-4 text-green-600"
+													fill="none"
+													stroke="currentColor"
+													viewBox="0 0 24 24"
 												>
-													<svg
-														class="w-4 h-4 text-green-600"
-														fill="none"
-														stroke="currentColor"
-														viewBox="0 0 24 24"
-													>
-														<path
-															stroke-linecap="round"
-															stroke-linejoin="round"
-															stroke-width="2"
-															d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-														></path>
-													</svg>
-												</div>
-											{:else if activity.type === 'user_added'}
-												<div
-													class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center"
+													<path
+														stroke-linecap="round"
+														stroke-linejoin="round"
+														stroke-width="2"
+														d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+													></path>
+												</svg>
+											</div>
+										{:else if activity.type === 'user_added'}
+											<div
+												class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center"
+											>
+												<svg
+													class="w-4 h-4 text-blue-600"
+													fill="none"
+													stroke="currentColor"
+													viewBox="0 0 24 24"
 												>
-													<svg
-														class="w-4 h-4 text-blue-600"
-														fill="none"
-														stroke="currentColor"
-														viewBox="0 0 24 24"
-													>
-														<path
-															stroke-linecap="round"
-															stroke-linejoin="round"
-															stroke-width="2"
-															d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
-														></path>
-													</svg>
-												</div>
-											{:else}
-												<div
-													class="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center"
+													<path
+														stroke-linecap="round"
+														stroke-linejoin="round"
+														stroke-width="2"
+														d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+													></path>
+												</svg>
+											</div>
+										{:else}
+											<div
+												class="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center"
+											>
+												<svg
+													class="w-4 h-4 text-gray-600"
+													fill="none"
+													stroke="currentColor"
+													viewBox="0 0 24 24"
 												>
-													<svg
-														class="w-4 h-4 text-gray-600"
-														fill="none"
-														stroke="currentColor"
-														viewBox="0 0 24 24"
-													>
-														<path
-															stroke-linecap="round"
-															stroke-linejoin="round"
-															stroke-width="2"
-															d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-														></path>
-													</svg>
-												</div>
-											{/if}
-										</div>
-										<div>
-											<p class="text-sm font-medium">{activity.description}</p>
-											<p class="text-xs text-muted-foreground">
-												{formatDate(activity.created_at, 'date')}
-											</p>
-										</div>
+													<path
+														stroke-linecap="round"
+														stroke-linejoin="round"
+														stroke-width="2"
+														d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+													></path>
+												</svg>
+											</div>
+										{/if}
+									</div>
+									<div>
+										<p class="text-sm font-medium">{activity.description}</p>
+										<p class="text-xs text-muted-foreground">
+											{formatDate(activity.created_at, 'date')}
+										</p>
 									</div>
 								</div>
-							{/each}
-						</div>
-					{:else}
-						<p class="text-sm text-muted-foreground">No recent activity to display.</p>
-					{/if}
+							</div>
+						{/each}
+					</div>
+				{:else}
+					<p class="text-sm text-muted-foreground">No recent activity to display.</p>
+				{/if}
 			</CardContent>
 		</Card>
 

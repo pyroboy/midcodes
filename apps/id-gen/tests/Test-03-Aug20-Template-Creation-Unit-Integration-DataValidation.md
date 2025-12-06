@@ -3,6 +3,7 @@
 ## **Database Schema and Types**
 
 ### **Supabase Templates Table Structure**
+
 ```sql
 CREATE TABLE templates (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -26,7 +27,7 @@ CREATE TABLE templates (
   unit_type VARCHAR(20),
   unit_width INTEGER,
   unit_height INTEGER,
-  
+
   CONSTRAINT templates_name_length CHECK (length(name) <= 100),
   CONSTRAINT templates_dimensions_check CHECK (
     width_inches >= 1 AND width_inches <= 12 AND
@@ -70,89 +71,89 @@ CREATE POLICY "templates_delete_org" ON templates
 ```typescript
 // Core Template Element Interface
 export interface TemplateElement {
-  id: string;
-  type: 'text' | 'image' | 'qr' | 'photo' | 'signature' | 'selection';
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  content?: string;
-  variableName: string;
-  fontSize?: number;
-  fontFamily?: string;
-  fontWeight?: string;
-  fontStyle?: 'normal' | 'italic' | 'oblique';
-  color?: string;
-  textDecoration?: 'none' | 'underline';
-  textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
-  opacity?: number;
-  visible?: boolean;
-  font?: string;
-  size?: number;
-  alignment?: 'left' | 'center' | 'right' | 'justify';
-  options?: string[];
-  side: 'front' | 'back';
-  letterSpacing?: number;
-  lineHeight?: number | string;
+	id: string;
+	type: 'text' | 'image' | 'qr' | 'photo' | 'signature' | 'selection';
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+	content?: string;
+	variableName: string;
+	fontSize?: number;
+	fontFamily?: string;
+	fontWeight?: string;
+	fontStyle?: 'normal' | 'italic' | 'oblique';
+	color?: string;
+	textDecoration?: 'none' | 'underline';
+	textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
+	opacity?: number;
+	visible?: boolean;
+	font?: string;
+	size?: number;
+	alignment?: 'left' | 'center' | 'right' | 'justify';
+	options?: string[];
+	side: 'front' | 'back';
+	letterSpacing?: number;
+	lineHeight?: number | string;
 }
 
 // Template Data Interface
 export interface TemplateData {
-  id: string;
-  user_id: string;
-  name: string;
-  description?: string;
-  org_id: string;
-  front_background: string;
-  back_background: string;
-  front_background_url?: string;
-  back_background_url?: string;
-  orientation: 'landscape' | 'portrait';
-  template_elements: TemplateElement[];
-  created_at: string;
-  updated_at?: string;
-  width_inches?: number;
-  height_inches?: number;
-  dpi?: number;
-  width_pixels?: number;
-  height_pixels?: number;
-  unit_type?: string;
-  unit_width?: number;
-  unit_height?: number;
+	id: string;
+	user_id: string;
+	name: string;
+	description?: string;
+	org_id: string;
+	front_background: string;
+	back_background: string;
+	front_background_url?: string;
+	back_background_url?: string;
+	orientation: 'landscape' | 'portrait';
+	template_elements: TemplateElement[];
+	created_at: string;
+	updated_at?: string;
+	width_inches?: number;
+	height_inches?: number;
+	dpi?: number;
+	width_pixels?: number;
+	height_pixels?: number;
+	unit_type?: string;
+	unit_width?: number;
+	unit_height?: number;
 }
 
 // Database Row Types
 export interface TemplateRow {
-  id: string;
-  user_id: string;
-  name: string;
-  description: string | null;
-  org_id: string;
-  front_background: string;
-  back_background: string;
-  front_background_url: string | null;
-  back_background_url: string | null;
-  orientation: string;
-  template_elements: TemplateElement[];
-  created_at: string;
-  updated_at: string | null;
-  width_inches: number;
-  height_inches: number;
-  dpi: number;
-  width_pixels: number | null;
-  height_pixels: number | null;
-  unit_type: string | null;
-  unit_width: number | null;
-  unit_height: number | null;
+	id: string;
+	user_id: string;
+	name: string;
+	description: string | null;
+	org_id: string;
+	front_background: string;
+	back_background: string;
+	front_background_url: string | null;
+	back_background_url: string | null;
+	orientation: string;
+	template_elements: TemplateElement[];
+	created_at: string;
+	updated_at: string | null;
+	width_inches: number;
+	height_inches: number;
+	dpi: number;
+	width_pixels: number | null;
+	height_pixels: number | null;
+	unit_type: string | null;
+	unit_width: number | null;
+	unit_height: number | null;
 }
 
 // Template Store State
 export interface TemplateStore {
-  subscribe: (fn: (value: TemplateData) => void) => () => void;
-  set: (value: TemplateData) => void;
-  update: (updater: (value: TemplateData) => TemplateData) => void;
-  select: (template: TemplateData) => void;
-  reset: () => void;
+	subscribe: (fn: (value: TemplateData) => void) => () => void;
+	set: (value: TemplateData) => void;
+	update: (updater: (value: TemplateData) => TemplateData) => void;
+	select: (template: TemplateData) => void;
+	reset: () => void;
 }
 ```
 
@@ -160,88 +161,89 @@ export interface TemplateStore {
 
 ```typescript
 export const templateCreationSchema = z.object({
-  name: z.string()
-    .min(1, 'Template name is required')
-    .max(100, 'Template name must be less than 100 characters')
-    .trim(),
-  description: z.string()
-    .max(500, 'Description must be less than 500 characters')
-    .optional(),
-  cardSize: z.object({
-    name: z.string().min(1, 'Card size name is required'),
-    widthInches: z.number()
-      .min(1, 'Width must be at least 1 inch')
-      .max(12, 'Width cannot exceed 12 inches'),
-    heightInches: z.number()
-      .min(1, 'Height must be at least 1 inch')
-      .max(12, 'Height cannot exceed 12 inches'),
-    description: z.string().optional()
-  }),
-  dpi: z.number()
-    .min(72, 'DPI must be at least 72')
-    .max(600, 'DPI cannot exceed 600')
-    .default(300)
+	name: z
+		.string()
+		.min(1, 'Template name is required')
+		.max(100, 'Template name must be less than 100 characters')
+		.trim(),
+	description: z.string().max(500, 'Description must be less than 500 characters').optional(),
+	cardSize: z.object({
+		name: z.string().min(1, 'Card size name is required'),
+		widthInches: z
+			.number()
+			.min(1, 'Width must be at least 1 inch')
+			.max(12, 'Width cannot exceed 12 inches'),
+		heightInches: z
+			.number()
+			.min(1, 'Height must be at least 1 inch')
+			.max(12, 'Height cannot exceed 12 inches'),
+		description: z.string().optional()
+	}),
+	dpi: z.number().min(72, 'DPI must be at least 72').max(600, 'DPI cannot exceed 600').default(300)
 });
 
 export const templateElementSchema = z.object({
-  id: z.string().min(1, 'Element ID is required'),
-  type: z.enum(['text', 'image', 'qr', 'photo', 'signature', 'selection']),
-  x: z.number().min(0, 'X coordinate cannot be negative'),
-  y: z.number().min(0, 'Y coordinate cannot be negative'),
-  width: z.number().min(1, 'Width must be positive'),
-  height: z.number().min(1, 'Height must be positive'),
-  content: z.string().optional(),
-  variableName: z.string().min(1, 'Variable name is required'),
-  fontSize: z.number().positive().optional(),
-  fontFamily: z.string().optional(),
-  fontWeight: z.string().optional(),
-  fontStyle: z.enum(['normal', 'italic', 'oblique']).optional(),
-  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid color format').optional(),
-  textDecoration: z.enum(['none', 'underline']).optional(),
-  textTransform: z.enum(['none', 'uppercase', 'lowercase', 'capitalize']).optional(),
-  opacity: z.number().min(0).max(1, 'Opacity must be between 0 and 1').optional(),
-  visible: z.boolean().optional(),
-  font: z.string().optional(),
-  size: z.number().positive().optional(),
-  alignment: z.enum(['left', 'center', 'right', 'justify']).optional(),
-  options: z.array(z.string()).optional(),
-  side: z.enum(['front', 'back']),
-  letterSpacing: z.number().optional(),
-  lineHeight: z.union([z.number(), z.string()]).optional()
+	id: z.string().min(1, 'Element ID is required'),
+	type: z.enum(['text', 'image', 'qr', 'photo', 'signature', 'selection']),
+	x: z.number().min(0, 'X coordinate cannot be negative'),
+	y: z.number().min(0, 'Y coordinate cannot be negative'),
+	width: z.number().min(1, 'Width must be positive'),
+	height: z.number().min(1, 'Height must be positive'),
+	content: z.string().optional(),
+	variableName: z.string().min(1, 'Variable name is required'),
+	fontSize: z.number().positive().optional(),
+	fontFamily: z.string().optional(),
+	fontWeight: z.string().optional(),
+	fontStyle: z.enum(['normal', 'italic', 'oblique']).optional(),
+	color: z
+		.string()
+		.regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid color format')
+		.optional(),
+	textDecoration: z.enum(['none', 'underline']).optional(),
+	textTransform: z.enum(['none', 'uppercase', 'lowercase', 'capitalize']).optional(),
+	opacity: z.number().min(0).max(1, 'Opacity must be between 0 and 1').optional(),
+	visible: z.boolean().optional(),
+	font: z.string().optional(),
+	size: z.number().positive().optional(),
+	alignment: z.enum(['left', 'center', 'right', 'justify']).optional(),
+	options: z.array(z.string()).optional(),
+	side: z.enum(['front', 'back']),
+	letterSpacing: z.number().optional(),
+	lineHeight: z.union([z.number(), z.string()]).optional()
 });
 
 export const templateUpdateSchema = z.object({
-  id: z.string().uuid('Invalid template ID format'),
-  user_id: z.string().uuid('Invalid user ID format'),
-  name: z.string()
-    .min(1, 'Template name is required')
-    .max(100, 'Template name must be less than 100 characters')
-    .trim(),
-  description: z.string().max(500).optional(),
-  org_id: z.string().uuid('Invalid organization ID format'),
-  front_background: z.string().url('Front background must be a valid URL'),
-  back_background: z.string().url('Back background must be a valid URL'),
-  front_background_url: z.string().url().optional(),
-  back_background_url: z.string().url().optional(),
-  orientation: z.enum(['landscape', 'portrait']),
-  template_elements: z.array(templateElementSchema),
-  created_at: z.string().datetime('Invalid created_at format'),
-  updated_at: z.string().datetime().optional(),
-  width_inches: z.number()
-    .min(1, 'Width must be at least 1 inch')
-    .max(12, 'Width cannot exceed 12 inches'),
-  height_inches: z.number()
-    .min(1, 'Height must be at least 1 inch')
-    .max(12, 'Height cannot exceed 12 inches'),
-  dpi: z.number()
-    .min(72, 'DPI must be at least 72')
-    .max(600, 'DPI cannot exceed 600')
-    .default(300),
-  width_pixels: z.number().positive().optional(),
-  height_pixels: z.number().positive().optional(),
-  unit_type: z.string().optional(),
-  unit_width: z.number().positive().optional(),
-  unit_height: z.number().positive().optional()
+	id: z.string().uuid('Invalid template ID format'),
+	user_id: z.string().uuid('Invalid user ID format'),
+	name: z
+		.string()
+		.min(1, 'Template name is required')
+		.max(100, 'Template name must be less than 100 characters')
+		.trim(),
+	description: z.string().max(500).optional(),
+	org_id: z.string().uuid('Invalid organization ID format'),
+	front_background: z.string().url('Front background must be a valid URL'),
+	back_background: z.string().url('Back background must be a valid URL'),
+	front_background_url: z.string().url().optional(),
+	back_background_url: z.string().url().optional(),
+	orientation: z.enum(['landscape', 'portrait']),
+	template_elements: z.array(templateElementSchema),
+	created_at: z.string().datetime('Invalid created_at format'),
+	updated_at: z.string().datetime().optional(),
+	width_inches: z
+		.number()
+		.min(1, 'Width must be at least 1 inch')
+		.max(12, 'Width cannot exceed 12 inches'),
+	height_inches: z
+		.number()
+		.min(1, 'Height must be at least 1 inch')
+		.max(12, 'Height cannot exceed 12 inches'),
+	dpi: z.number().min(72, 'DPI must be at least 72').max(600, 'DPI cannot exceed 600').default(300),
+	width_pixels: z.number().positive().optional(),
+	height_pixels: z.number().positive().optional(),
+	unit_type: z.string().optional(),
+	unit_width: z.number().positive().optional(),
+	unit_height: z.number().positive().optional()
 });
 ```
 
@@ -252,6 +254,7 @@ export const templateUpdateSchema = z.object({
 ### **1.1 Schema Validation Unit Tests**
 
 #### **Template Creation Schema Tests**
+
 ```typescript
 describe('Template Creation Schema Validation - Unit Tests', () => {
   test('validates complete template creation data', () => {
@@ -266,7 +269,7 @@ describe('Template Creation Schema Validation - Unit Tests', () => {
       },
       dpi: 300
     };
-    
+
     const result = templateCreationSchema.safeParse(validTemplate);
     expect(result.success).toBe(true);
     expect(result.data).toEqual(validTemplate);
@@ -281,7 +284,7 @@ describe('Template Creation Schema Validation - Unit Tests', () => {
         heightInches: 2.125
       }
     };
-    
+
     const result = templateCreationSchema.safeParse(invalidTemplate);
     expect(result.success).toBe(false);
     expect(result.error?.issues[0].message).toBe('Template name is required');
@@ -296,7 +299,7 @@ describe('Template Creation Schema Validation - Unit Tests', () => {
         heightInches: 2.125
       }
     };
-    
+
     const result = templateCreationSchema.safeParse(longNameTemplate);
     expect(result.success).toBe(false);
     expect(result.error?.issues[0].message).toBe('Template name must be less than 100 characters');
@@ -311,7 +314,7 @@ describe('Template Creation Schema Validation - Unit Tests', () => {
         heightInches: 2.125
       }
     };
-    
+
     const result = templateCreationSchema.safeParse(whitespaceTemplate);
     expect(result.success).toBe(true);
     expect(result.data?.name).toBe('Employee Badge');
@@ -320,6 +323,7 @@ describe('Template Creation Schema Validation - Unit Tests', () => {
 ```
 
 #### **Card Size Validation Tests**
+
 ```typescript
 describe('Card Size Validation - Unit Tests', () => {
   test('validates minimum card dimensions', () => {
@@ -331,7 +335,7 @@ describe('Card Size Validation - Unit Tests', () => {
         heightInches: 2.0
       }
     };
-    
+
     const result = templateCreationSchema.safeParse(tooSmallCard);
     expect(result.success).toBe(false);
     expect(result.error?.issues[0].path).toEqual(['cardSize', 'widthInches']);
@@ -347,7 +351,7 @@ describe('Card Size Validation - Unit Tests', () => {
         heightInches: 10.0
       }
     };
-    
+
     const result = templateCreationSchema.safeParse(tooLargeCard);
     expect(result.success).toBe(false);
     expect(result.error?.issues[0].message).toBe('Width cannot exceed 12 inches');
@@ -370,7 +374,7 @@ describe('Card Size Validation - Unit Tests', () => {
           heightInches: height
         }
       };
-      
+
       const result = templateCreationSchema.safeParse(template);
       expect(result.success).toBe(true);
     });
@@ -379,6 +383,7 @@ describe('Card Size Validation - Unit Tests', () => {
 ```
 
 #### **DPI Validation Tests**
+
 ```typescript
 describe('DPI Validation - Unit Tests', () => {
   test('validates minimum DPI constraint', () => {
@@ -391,7 +396,7 @@ describe('DPI Validation - Unit Tests', () => {
       },
       dpi: 50 // Below 72 minimum
     };
-    
+
     const result = templateCreationSchema.safeParse(lowDpiTemplate);
     expect(result.success).toBe(false);
     expect(result.error?.issues[0].message).toBe('DPI must be at least 72');
@@ -407,7 +412,7 @@ describe('DPI Validation - Unit Tests', () => {
       },
       dpi: 700 // Above 600 maximum
     };
-    
+
     const result = templateCreationSchema.safeParse(highDpiTemplate);
     expect(result.success).toBe(false);
     expect(result.error?.issues[0].message).toBe('DPI cannot exceed 600');
@@ -422,7 +427,7 @@ describe('DPI Validation - Unit Tests', () => {
         heightInches: 2.125
       }
     };
-    
+
     const result = templateCreationSchema.safeParse(templateWithoutDpi);
     expect(result.success).toBe(true);
     expect(result.data?.dpi).toBe(300);
@@ -433,13 +438,14 @@ describe('DPI Validation - Unit Tests', () => {
 ### **1.2 Template Element Schema Unit Tests**
 
 #### **Element Type Validation**
+
 ```typescript
 describe('Template Element Type Validation - Unit Tests', () => {
   test('validates all supported element types', () => {
     const elementTypes: Array<TemplateElement['type']> = [
       'text', 'image', 'qr', 'photo', 'signature', 'selection'
     ];
-    
+
     elementTypes.forEach(type => {
       const element = {
         id: `${type}-element`,
@@ -451,7 +457,7 @@ describe('Template Element Type Validation - Unit Tests', () => {
         variableName: `${type}_field`,
         side: 'front' as const
       };
-      
+
       const result = templateElementSchema.safeParse(element);
       expect(result.success).toBe(true);
       expect(result.data?.type).toBe(type);
@@ -465,7 +471,7 @@ describe('Template Element Type Validation - Unit Tests', () => {
       x: 50, y: 50, width: 100, height: 50,
       variableName: 'field', side: 'front'
     };
-    
+
     const result = templateElementSchema.safeParse(invalidElement);
     expect(result.success).toBe(false);
     expect(result.error?.issues[0].path).toEqual(['type']);
@@ -474,6 +480,7 @@ describe('Template Element Type Validation - Unit Tests', () => {
 ```
 
 #### **Element Position and Size Validation**
+
 ```typescript
 describe('Element Position and Size Validation - Unit Tests', () => {
   test('validates position constraints', () => {
@@ -487,7 +494,7 @@ describe('Element Position and Size Validation - Unit Tests', () => {
       variableName: 'field',
       side: 'front' as const
     };
-    
+
     const result = templateElementSchema.safeParse(negativePositionElement);
     expect(result.success).toBe(false);
     expect(result.error?.issues[0].message).toBe('X coordinate cannot be negative');
@@ -503,7 +510,7 @@ describe('Element Position and Size Validation - Unit Tests', () => {
       variableName: 'field',
       side: 'front' as const
     };
-    
+
     const result = templateElementSchema.safeParse(zeroWidthElement);
     expect(result.success).toBe(false);
     expect(result.error?.issues[0].message).toBe('Width must be positive');
@@ -518,7 +525,7 @@ describe('Element Position and Size Validation - Unit Tests', () => {
       variableName: 'employee_name',
       side: 'front' as const
     };
-    
+
     const result = templateElementSchema.safeParse(validElement);
     expect(result.success).toBe(true);
     expect(result.data).toEqual(validElement);
@@ -527,6 +534,7 @@ describe('Element Position and Size Validation - Unit Tests', () => {
 ```
 
 #### **Text Element Properties Validation**
+
 ```typescript
 describe('Text Element Properties Validation - Unit Tests', () => {
   test('validates color format', () => {
@@ -538,7 +546,7 @@ describe('Text Element Properties Validation - Unit Tests', () => {
       side: 'front' as const,
       color: 'invalid-color' // Invalid color format
     };
-    
+
     const result = templateElementSchema.safeParse(invalidColorElement);
     expect(result.success).toBe(false);
     expect(result.error?.issues[0].message).toBe('Invalid color format');
@@ -553,7 +561,7 @@ describe('Text Element Properties Validation - Unit Tests', () => {
       side: 'front' as const,
       color: '#FF5733'
     };
-    
+
     const result = templateElementSchema.safeParse(validColorElement);
     expect(result.success).toBe(true);
     expect(result.data?.color).toBe('#FF5733');
@@ -568,7 +576,7 @@ describe('Text Element Properties Validation - Unit Tests', () => {
       side: 'front' as const,
       opacity: 1.5 // Above maximum 1.0
     };
-    
+
     const result = templateElementSchema.safeParse(invalidOpacityElement);
     expect(result.success).toBe(false);
     expect(result.error?.issues[0].message).toBe('Opacity must be between 0 and 1');
@@ -579,6 +587,7 @@ describe('Text Element Properties Validation - Unit Tests', () => {
 ### **1.3 Template Store Unit Tests**
 
 #### **Store Initialization Tests**
+
 ```typescript
 describe('Template Store Initialization - Unit Tests', () => {
   test('initializes with default template structure', () => {
@@ -586,7 +595,7 @@ describe('Template Store Initialization - Unit Tests', () => {
     const unsubscribe = templateData.subscribe(state => {
       currentState = state;
     });
-    
+
     expect(currentState!.id).toBe('');
     expect(currentState!.name).toBe('');
     expect(currentState!.orientation).toBe('landscape');
@@ -596,7 +605,7 @@ describe('Template Store Initialization - Unit Tests', () => {
     expect(currentState!.dpi).toBe(300);
     expect(currentState!.width_pixels).toBe(1013);
     expect(currentState!.height_pixels).toBe(638);
-    
+
     unsubscribe();
   });
 
@@ -605,17 +614,18 @@ describe('Template Store Initialization - Unit Tests', () => {
     const unsubscribe = templateData.subscribe(state => {
       currentState = state;
     });
-    
+
     const timestamp = new Date(currentState!.created_at);
     expect(timestamp.getTime()).not.toBeNaN();
     expect(timestamp.getFullYear()).toBeGreaterThan(2023);
-    
+
     unsubscribe();
   });
 }
 ```
 
 #### **Store Operations Tests**
+
 ```typescript
 describe('Template Store Operations - Unit Tests', () => {
   test('updates store state correctly', () => {
@@ -623,7 +633,7 @@ describe('Template Store Operations - Unit Tests', () => {
     const unsubscribe = templateData.subscribe(state => {
       currentState = state;
     });
-    
+
     const testTemplate: TemplateData = {
       id: 'test-template-123',
       user_id: 'user-456',
@@ -644,16 +654,16 @@ describe('Template Store Operations - Unit Tests', () => {
       height_inches: 6.0,
       dpi: 350
     };
-    
+
     templateData.set(testTemplate);
-    
+
     expect(currentState!.id).toBe('test-template-123');
     expect(currentState!.name).toBe('Test Employee Badge');
     expect(currentState!.orientation).toBe('portrait');
     expect(currentState!.template_elements).toHaveLength(1);
     expect(currentState!.width_inches).toBe(4.0);
     expect(currentState!.dpi).toBe(350);
-    
+
     unsubscribe();
   });
 
@@ -662,7 +672,7 @@ describe('Template Store Operations - Unit Tests', () => {
     const unsubscribe = templateData.subscribe(state => {
       currentState = state;
     });
-    
+
     // First set a custom template
     templateData.set({
       id: 'custom-template',
@@ -681,16 +691,16 @@ describe('Template Store Operations - Unit Tests', () => {
       }],
       created_at: '2024-01-01T00:00:00Z'
     });
-    
+
     // Then reset
     templateData.reset();
-    
+
     expect(currentState!.id).toBe('');
     expect(currentState!.name).toBe('');
     expect(currentState!.orientation).toBe('landscape');
     expect(currentState!.template_elements).toEqual([]);
     expect(currentState!.width_inches).toBe(3.375);
-    
+
     unsubscribe();
   });
 
@@ -699,7 +709,7 @@ describe('Template Store Operations - Unit Tests', () => {
     const unsubscribe = templateData.subscribe(state => {
       currentState = state;
     });
-    
+
     const selectedTemplate: TemplateData = {
       id: 'selected-template',
       name: 'Selected Template',
@@ -711,12 +721,12 @@ describe('Template Store Operations - Unit Tests', () => {
       template_elements: [],
       created_at: '2024-01-01T00:00:00Z'
     };
-    
+
     templateData.select(selectedTemplate);
-    
+
     expect(currentState!.id).toBe('selected-template');
     expect(currentState!.name).toBe('Selected Template');
-    
+
     unsubscribe();
   });
 }
@@ -729,6 +739,7 @@ describe('Template Store Operations - Unit Tests', () => {
 ### **2.1 Server Action Integration Tests**
 
 #### **Basic Template Creation Flow**
+
 ```typescript
 describe('Template Creation Server Action - Integration Tests', () => {
   test('creates template with complete data flow', async () => {
@@ -738,7 +749,7 @@ describe('Template Creation Server Action - Integration Tests', () => {
       user: { id: 'user-123' }
     };
     const mockOrgId = 'org-456';
-    
+
     // Template data
     const templateData = {
       id: 'new-template-789',
@@ -762,11 +773,11 @@ describe('Template Creation Server Action - Integration Tests', () => {
       height_inches: 2.125,
       dpi: 300
     };
-    
+
     // Create form data
     const formData = new FormData();
     formData.set('templateData', JSON.stringify(templateData));
-    
+
     // Mock request and locals
     const request = { formData: () => Promise.resolve(formData) };
     const locals = {
@@ -774,7 +785,7 @@ describe('Template Creation Server Action - Integration Tests', () => {
       session: mockSession,
       org_id: mockOrgId
     };
-    
+
     // Configure mock response
     mockSupabase.from.mockReturnValue({
       upsert: jest.fn().mockReturnValue({
@@ -792,10 +803,10 @@ describe('Template Creation Server Action - Integration Tests', () => {
         })
       })
     });
-    
+
     // Execute server action
     const result = await actions.create({ request, locals });
-    
+
     // Verify results
     expect(result.success).toBe(true);
     expect(result.data.id).toBe('new-template-789');
@@ -803,7 +814,7 @@ describe('Template Creation Server Action - Integration Tests', () => {
     expect(result.data.user_id).toBe('user-123');
     expect(result.data.org_id).toBe('org-456');
     expect(result.data.template_elements).toHaveLength(1);
-    
+
     // Verify database call
     expect(mockSupabase.from).toHaveBeenCalledWith('templates');
   });
@@ -811,7 +822,7 @@ describe('Template Creation Server Action - Integration Tests', () => {
   test('handles database constraint violations', async () => {
     const mockSupabase = createMockSupabase();
     const mockSession = { user: { id: 'user-123' } };
-    
+
     const templateData = {
       name: 'A'.repeat(101), // Exceeds database constraint
       front_background: 'https://example.com/front.jpg',
@@ -819,10 +830,10 @@ describe('Template Creation Server Action - Integration Tests', () => {
       orientation: 'landscape',
       template_elements: []
     };
-    
+
     const formData = new FormData();
     formData.set('templateData', JSON.stringify(templateData));
-    
+
     // Configure mock to return constraint error
     mockSupabase.from.mockReturnValue({
       upsert: jest.fn().mockReturnValue({
@@ -837,14 +848,14 @@ describe('Template Creation Server Action - Integration Tests', () => {
         })
       })
     });
-    
+
     const request = { formData: () => Promise.resolve(formData) };
     const locals = {
       supabase: mockSupabase,
       session: mockSession,
       org_id: 'org-456'
     };
-    
+
     await expect(actions.create({ request, locals }))
       .rejects.toThrow('Error saving template');
   });
@@ -852,6 +863,7 @@ describe('Template Creation Server Action - Integration Tests', () => {
 ```
 
 #### **Template Element Integration Tests**
+
 ```typescript
 describe('Template Elements Integration - Integration Tests', () => {
   test('creates template with multiple element types', async () => {
@@ -894,7 +906,7 @@ describe('Template Elements Integration - Integration Tests', () => {
         side: 'back'
       }
     ];
-    
+
     const templateData = {
       name: 'Complex Multi-Element Template',
       description: 'Template with all element types',
@@ -906,12 +918,12 @@ describe('Template Elements Integration - Integration Tests', () => {
       height_inches: 3.0,
       dpi: 300
     };
-    
+
     const result = await createTemplateIntegrationTest(templateData);
-    
+
     expect(result.success).toBe(true);
     expect(result.data.template_elements).toHaveLength(5);
-    
+
     // Verify each element type is preserved
     const elementTypes = result.data.template_elements.map(e => e.type);
     expect(elementTypes).toContain('text');
@@ -919,12 +931,12 @@ describe('Template Elements Integration - Integration Tests', () => {
     expect(elementTypes).toContain('selection');
     expect(elementTypes).toContain('qr');
     expect(elementTypes).toContain('signature');
-    
+
     // Verify specific element properties
     const selectionElement = result.data.template_elements
       .find(e => e.type === 'selection');
     expect(selectionElement?.options).toEqual(['Engineering', 'Marketing', 'Sales', 'HR']);
-    
+
     const textElement = result.data.template_elements
       .find(e => e.type === 'text');
     expect(textElement?.fontSize).toBe(18);
@@ -943,7 +955,7 @@ describe('Template Elements Integration - Integration Tests', () => {
         side: 'front'
       }
     ];
-    
+
     const templateData = {
       name: 'Out of Bounds Test',
       front_background: 'https://example.com/front.jpg',
@@ -953,7 +965,7 @@ describe('Template Elements Integration - Integration Tests', () => {
       width_inches: 3.375,
       height_inches: 2.125
     };
-    
+
     // This should still succeed (positioning validation happens in UI)
     const result = await createTemplateIntegrationTest(templateData);
     expect(result.success).toBe(true);
@@ -964,6 +976,7 @@ describe('Template Elements Integration - Integration Tests', () => {
 ### **2.2 Database Integration Tests**
 
 #### **Database Operations Integration**
+
 ```typescript
 describe('Database Operations Integration - Integration Tests', () => {
   test('template persists correctly in database', async () => {
@@ -990,14 +1003,14 @@ describe('Database Operations Integration - Integration Tests', () => {
       height_inches: 6.0,
       dpi: 300
     };
-    
+
     // Save template
     const saved = await saveTemplate(templateData);
     expect(saved.id).toBe('db-test-template');
-    
+
     // Retrieve template
     const retrieved = await getTemplate('db-test-template');
-    
+
     expect(retrieved.name).toBe('Database Integration Test');
     expect(retrieved.description).toBe('Testing database persistence');
     expect(retrieved.user_id).toBe('user-123');
@@ -1008,7 +1021,7 @@ describe('Database Operations Integration - Integration Tests', () => {
     expect(retrieved.dpi).toBe(300);
     expect(retrieved.template_elements).toHaveLength(1);
     expect(retrieved.template_elements[0].variableName).toBe('test_field');
-    
+
     // Cleanup
     await deleteTemplate('db-test-template');
   });
@@ -1048,7 +1061,7 @@ describe('Database Operations Integration - Integration Tests', () => {
         ]
       }
     ];
-    
+
     const templateData: TemplateData = {
       id: 'jsonb-test-template',
       name: 'JSONB Complex Data Test',
@@ -1060,11 +1073,11 @@ describe('Database Operations Integration - Integration Tests', () => {
       template_elements: complexElements,
       created_at: new Date().toISOString()
     };
-    
+
     // Save and retrieve
     await saveTemplate(templateData);
     const retrieved = await getTemplate('jsonb-test-template');
-    
+
     // Verify complex text element properties
     const textElement = retrieved.template_elements.find(e => e.type === 'text');
     expect(textElement?.fontSize).toBe(20);
@@ -1073,13 +1086,13 @@ describe('Database Operations Integration - Integration Tests', () => {
     expect(textElement?.letterSpacing).toBe(2);
     expect(textElement?.lineHeight).toBe(1.5);
     expect(textElement?.opacity).toBe(0.8);
-    
+
     // Verify complex selection element
     const selectionElement = retrieved.template_elements.find(e => e.type === 'selection');
     expect(selectionElement?.options).toHaveLength(4);
     expect(selectionElement?.options?.[0]).toBe('Option with unicode 🎯');
     expect(selectionElement?.options?.[1]).toContain('quotes');
-    
+
     // Cleanup
     await deleteTemplate('jsonb-test-template');
   });
@@ -1087,7 +1100,7 @@ describe('Database Operations Integration - Integration Tests', () => {
   test('RLS policies enforce organization isolation', async () => {
     // This test would require setting up proper auth context
     // and multiple organizations to verify isolation
-    
+
     const org1Template: TemplateData = {
       id: 'org1-template',
       name: 'Organization 1 Template',
@@ -1099,7 +1112,7 @@ describe('Database Operations Integration - Integration Tests', () => {
       template_elements: [],
       created_at: new Date().toISOString()
     };
-    
+
     const org2Template: TemplateData = {
       id: 'org2-template',
       name: 'Organization 2 Template',
@@ -1111,16 +1124,16 @@ describe('Database Operations Integration - Integration Tests', () => {
       template_elements: [],
       created_at: new Date().toISOString()
     };
-    
+
     // Save templates to different organizations
     await saveTemplateWithAuth(org1Template, { org_id: 'org-111' });
     await saveTemplateWithAuth(org2Template, { org_id: 'org-222' });
-    
+
     // User from org-111 should only see their template
     const org1Templates = await listTemplatesWithAuth({ org_id: 'org-111' });
     expect(org1Templates.find(t => t.id === 'org1-template')).toBeDefined();
     expect(org1Templates.find(t => t.id === 'org2-template')).toBeUndefined();
-    
+
     // User from org-222 should only see their template
     const org2Templates = await listTemplatesWithAuth({ org_id: 'org-222' });
     expect(org2Templates.find(t => t.id === 'org2-template')).toBeDefined();
@@ -1136,6 +1149,7 @@ describe('Database Operations Integration - Integration Tests', () => {
 ### **3.1 Schema Compliance Tests**
 
 #### **Complete Template Data Validation**
+
 ```typescript
 describe('Complete Template Data Validation - Data Validation Tests', () => {
   test('validates complete template against database constraints', async () => {
@@ -1183,11 +1197,11 @@ describe('Complete Template Data Validation - Data Validation Tests', () => {
       unit_width: 1275,
       unit_height: 2025
     };
-    
+
     // Validate against update schema (most comprehensive)
     const schemaResult = templateUpdateSchema.safeParse(completeTemplate);
     expect(schemaResult.success).toBe(true);
-    
+
     // Validate database persistence
     const dbResult = await validateTemplatePersistence(completeTemplate);
     expect(dbResult.success).toBe(true);
@@ -1222,13 +1236,13 @@ describe('Complete Template Data Validation - Data Validation Tests', () => {
       height_inches: 15.0, // Above maximum
       dpi: 50 // Below minimum
     };
-    
+
     const schemaResult = templateUpdateSchema.safeParse(invalidTemplate);
     expect(schemaResult.success).toBe(false);
-    
+
     const issues = schemaResult.error?.issues || [];
     expect(issues.length).toBeGreaterThan(10); // Multiple violations
-    
+
     // Check specific violation types
     const violationMessages = issues.map(issue => issue.message);
     expect(violationMessages).toContain('Invalid template ID format');
@@ -1241,6 +1255,7 @@ describe('Complete Template Data Validation - Data Validation Tests', () => {
 ```
 
 #### **Database Constraint Validation**
+
 ```typescript
 describe('Database Constraint Validation - Data Validation Tests', () => {
   test('enforces name length constraint', async () => {
@@ -1255,7 +1270,7 @@ describe('Database Constraint Validation - Data Validation Tests', () => {
       template_elements: [],
       created_at: new Date().toISOString()
     };
-    
+
     await expect(saveTemplate(longNameTemplate))
       .rejects.toThrow(/violates check constraint "templates_name_length"/);
   });
@@ -1275,7 +1290,7 @@ describe('Database Constraint Validation - Data Validation Tests', () => {
       height_inches: 0.5, // Below minimum 1.0
       dpi: 700 // Exceeds maximum 600
     };
-    
+
     await expect(saveTemplate(invalidDimensionTemplate))
       .rejects.toThrow(/violates check constraint "templates_dimensions_check"/);
   });
@@ -1293,7 +1308,7 @@ describe('Database Constraint Validation - Data Validation Tests', () => {
       created_at: new Date().toISOString(),
       dpi: 50 // Below minimum 72
     };
-    
+
     await expect(saveTemplate(invalidDpiTemplate))
       .rejects.toThrow(/violates check constraint "templates_dpi_check"/);
   });
@@ -1303,6 +1318,7 @@ describe('Database Constraint Validation - Data Validation Tests', () => {
 ### **3.2 JSONB Element Validation**
 
 #### **Complex JSONB Data Integrity**
+
 ```typescript
 describe('JSONB Element Data Integrity - Data Validation Tests', () => {
   test('preserves element array order and structure', async () => {
@@ -1312,7 +1328,7 @@ describe('JSONB Element Data Integrity - Data Validation Tests', () => {
       { id: '3', type: 'qr', x: 0, y: 110, width: 80, height: 80, variableName: 'third', side: 'back' },
       { id: '4', type: 'photo', x: 90, y: 110, width: 120, height: 160, variableName: 'fourth', side: 'back' }
     ];
-    
+
     const template: TemplateData = {
       id: 'order-test-template',
       name: 'Element Order Test',
@@ -1324,22 +1340,22 @@ describe('JSONB Element Data Integrity - Data Validation Tests', () => {
       template_elements: orderedElements,
       created_at: new Date().toISOString()
     };
-    
+
     await saveTemplate(template);
     const retrieved = await getTemplate('order-test-template');
-    
+
     // Verify order preservation
     expect(retrieved.template_elements[0].id).toBe('1');
     expect(retrieved.template_elements[1].id).toBe('2');
     expect(retrieved.template_elements[2].id).toBe('3');
     expect(retrieved.template_elements[3].id).toBe('4');
-    
+
     // Verify type preservation
     expect(retrieved.template_elements[0].type).toBe('text');
     expect(retrieved.template_elements[1].type).toBe('image');
     expect(retrieved.template_elements[2].type).toBe('qr');
     expect(retrieved.template_elements[3].type).toBe('photo');
-    
+
     await deleteTemplate('order-test-template');
   });
 
@@ -1356,7 +1372,7 @@ describe('JSONB Element Data Integrity - Data Validation Tests', () => {
       template_elements: 'invalid-json-string', // This should be an array
       created_at: new Date().toISOString()
     };
-    
+
     await expect(saveTemplate(templateWithInvalidJson as any))
       .rejects.toThrow(/invalid input syntax for type json/);
   });
@@ -1378,7 +1394,7 @@ describe('JSONB Element Data Integrity - Data Validation Tests', () => {
         ]
       }
     ];
-    
+
     const template: TemplateData = {
       id: 'nested-data-test',
       name: 'Nested Data Validation Test',
@@ -1390,17 +1406,17 @@ describe('JSONB Element Data Integrity - Data Validation Tests', () => {
       template_elements: elementsWithNestedData,
       created_at: new Date().toISOString()
     };
-    
+
     await saveTemplate(template);
     const retrieved = await getTemplate('nested-data-test');
-    
+
     const selectionElement = retrieved.template_elements[0];
     expect(selectionElement.options).toHaveLength(5);
     expect(selectionElement.options?.[0]).toContain('nested "quotes"');
     expect(selectionElement.options?.[1]).toContain('🎯📊🔥');
     expect(selectionElement.options?.[2]).toContain('\n');
     expect(selectionElement.options?.[4]).toContain('{"nested":"object"');
-    
+
     await deleteTemplate('nested-data-test');
   });
 }
@@ -1418,7 +1434,7 @@ describe('JSONB Element Data Integrity - Data Validation Tests', () => {
 
 2. **Integration Tests** – Are database + API calls tested together with the app logic? **9/10**
    - Full server action flow from form submission to database persistence
-   - Complex element creation and retrieval workflows  
+   - Complex element creation and retrieval workflows
    - Mock Supabase integration with realistic data scenarios
    - Error handling for database constraints and network failures
 
@@ -1454,7 +1470,7 @@ describe('JSONB Element Data Integrity - Data Validation Tests', () => {
 
 8. **Performance/Load** – If relevant, is the system tested under multiple/parallel actions? **7/10**
    - Large template element array handling (100+ elements)
-   - Complex JSONB data storage and retrieval performance  
+   - Complex JSONB data storage and retrieval performance
    - Multiple simultaneous template creation scenarios
    - Database query optimization validation
 
@@ -1473,8 +1489,9 @@ describe('JSONB Element Data Integrity - Data Validation Tests', () => {
 ### **Total Test Coverage**: 185+ comprehensive test cases across Unit, Integration, and Data Validation categories
 
 ### **Key Validation Areas Covered**:
+
 - **Schema Compliance**: Complete Zod validation testing
-- **Database Constraints**: PostgreSQL constraint enforcement  
+- **Database Constraints**: PostgreSQL constraint enforcement
 - **JSONB Integrity**: Complex nested data preservation
 - **RLS Security**: Organization-scoped access control
 - **Type Safety**: TypeScript interface compliance

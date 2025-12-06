@@ -1,6 +1,6 @@
 /**
  * Canvas Performance Optimization Utilities
- * 
+ *
  * This module provides utilities for optimizing canvas rendering performance,
  * including debouncing, render batching, and animation frame management.
  */
@@ -24,10 +24,10 @@ export function debounce<T extends (...args: any[]) => any>(
 		};
 
 		const callNow = immediate && !timeout;
-		
+
 		if (timeout) clearTimeout(timeout);
 		timeout = setTimeout(later, wait);
-		
+
 		if (callNow) func(...args);
 	}) as T;
 }
@@ -35,17 +35,14 @@ export function debounce<T extends (...args: any[]) => any>(
 /**
  * Throttle utility for rate-limiting function calls
  */
-export function throttle<T extends (...args: any[]) => any>(
-	func: T,
-	limit: number
-): T {
+export function throttle<T extends (...args: any[]) => any>(func: T, limit: number): T {
 	let inThrottle = false;
-	
+
 	return ((...args: Parameters<T>) => {
 		if (!inThrottle) {
 			func(...args);
 			inThrottle = true;
-			setTimeout(() => inThrottle = false, limit);
+			setTimeout(() => (inThrottle = false), limit);
 		}
 	}) as T;
 }
@@ -209,7 +206,7 @@ export class ImageCache {
 		return new Promise((resolve, reject) => {
 			const img = new Image();
 			img.crossOrigin = 'anonymous';
-			
+
 			img.onload = () => {
 				if (img.naturalWidth > 0 && img.naturalHeight > 0) {
 					resolve(img);
@@ -217,11 +214,11 @@ export class ImageCache {
 					reject(new Error('Image loaded but has invalid dimensions'));
 				}
 			};
-			
+
 			img.onerror = () => {
 				reject(new Error(`Failed to load image: ${url}`));
 			};
-			
+
 			img.src = url;
 		});
 	}
@@ -230,7 +227,7 @@ export class ImageCache {
 	 * Preload multiple images
 	 */
 	async preloadImages(urls: string[]): Promise<HTMLImageElement[]> {
-		const promises = urls.map(url => this.getImage(url));
+		const promises = urls.map((url) => this.getImage(url));
 		return Promise.all(promises);
 	}
 
@@ -342,7 +339,7 @@ export class PerformanceMonitor {
 	 */
 	startTiming(label: string): () => void {
 		const startTime = performance.now();
-		
+
 		return () => {
 			const endTime = performance.now();
 			const duration = endTime - startTime;

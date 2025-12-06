@@ -42,24 +42,23 @@ export const templateDuplicateSchema = z.object({
 		.min(1, 'Template name is required')
 		.max(100, 'Template name must be less than 100 characters')
 		.trim(),
-	description: z
-		.string()
-		.max(500, 'Description must be less than 500 characters')
-		.optional(),
+	description: z.string().max(500, 'Description must be less than 500 characters').optional(),
 	user_id: z.string().uuid(),
-	org_id: z.string().uuid().optional(),
+	org_id: z.string().uuid().optional()
 });
 
 // Template publish schema (for sharing templates)
 export const templatePublishSchema = z.object({
 	id: z.string().uuid(),
 	isPublic: z.boolean(),
-	publishSettings: z.object({
-		allowDuplication: z.boolean().default(true),
-		allowModification: z.boolean().default(false),
-		category: z.enum(['business', 'education', 'healthcare', 'government', 'other']).optional(),
-		tags: z.array(z.string().max(20)).max(10).optional()
-	}).optional()
+	publishSettings: z
+		.object({
+			allowDuplication: z.boolean().default(true),
+			allowModification: z.boolean().default(false),
+			category: z.enum(['business', 'education', 'healthcare', 'government', 'other']).optional(),
+			tags: z.array(z.string().max(20)).max(10).optional()
+		})
+		.optional()
 });
 
 // Template archive schema
@@ -73,25 +72,33 @@ export const templateArchiveSchema = z.object({
 export const templateBulkOperationSchema = z.object({
 	templateIds: z.array(z.string().uuid()).min(1, 'At least one template ID is required'),
 	operation: z.enum(['archive', 'unarchive', 'delete', 'duplicate']),
-	parameters: z.object({
-		namePrefix: z.string().max(20).optional(), // For bulk duplicate
-		archiveReason: z.string().max(200).optional() // For bulk archive
-	}).optional()
+	parameters: z
+		.object({
+			namePrefix: z.string().max(20).optional(), // For bulk duplicate
+			archiveReason: z.string().max(200).optional() // For bulk archive
+		})
+		.optional()
 });
 
 // Template validation result schema
 export const templateValidationSchema = z.object({
 	isValid: z.boolean(),
-	errors: z.array(z.object({
-		field: z.string(),
-		message: z.string(),
-		code: z.string().optional()
-	})),
-	warnings: z.array(z.object({
-		field: z.string(),
-		message: z.string(),
-		suggestion: z.string().optional()
-	})).optional()
+	errors: z.array(
+		z.object({
+			field: z.string(),
+			message: z.string(),
+			code: z.string().optional()
+		})
+	),
+	warnings: z
+		.array(
+			z.object({
+				field: z.string(),
+				message: z.string(),
+				suggestion: z.string().optional()
+			})
+		)
+		.optional()
 });
 
 // Template import/export schemas

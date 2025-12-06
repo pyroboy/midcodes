@@ -315,7 +315,7 @@ export const actions: Actions = {
 			if (fetchUsersError) {
 				console.error('Error fetching updated users:', fetchUsersError);
 			}
-				
+
 			return {
 				success: true,
 				message: `User ${targetUser.email} deleted successfully`,

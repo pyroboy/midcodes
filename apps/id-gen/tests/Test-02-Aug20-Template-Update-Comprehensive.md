@@ -24,6 +24,7 @@
 ## **Comprehensive Template Update Test Specification**
 
 ### **Test Overview**
+
 Testing the complete template update system including upsert operations, partial modifications, element management, timestamp handling, and relationship preservation with existing ID cards.
 
 ---
@@ -33,6 +34,7 @@ Testing the complete template update system including upsert operations, partial
 ### **1.1 Template Update Schema Tests**
 
 #### **Valid Update Operations**
+
 ```typescript
 describe('templateUpdateSchema validation', () => {
   test('accepts complete template update with all fields', () => {
@@ -54,7 +56,7 @@ describe('templateUpdateSchema validation', () => {
       height_inches: 6.0,
       dpi: 350
     };
-    
+
     expect(templateUpdateSchema.parse(updateData)).toEqual(updateData);
   });
 
@@ -70,13 +72,14 @@ describe('templateUpdateSchema validation', () => {
       template_elements: [],
       created_at: '2024-01-01T00:00:00Z'
     };
-    
+
     expect(() => templateUpdateSchema.parse(invalidUpdate)).toThrow();
   });
 }
 ```
 
 #### **URL Validation for Backgrounds**
+
 ```typescript
 describe('background URL validation on updates', () => {
   test('requires valid URLs for background images', () => {
@@ -91,7 +94,7 @@ describe('background URL validation on updates', () => {
       template_elements: [],
       created_at: '2024-01-01T00:00:00Z'
     };
-    
+
     expect(() => templateUpdateSchema.parse(invalidBackgroundUpdate))
       .toThrow('Front background must be a valid URL');
   });
@@ -108,7 +111,7 @@ describe('background URL validation on updates', () => {
       template_elements: [],
       created_at: '2024-01-01T00:00:00Z'
     };
-    
+
     expect(templateUpdateSchema.parse(validUpdate)).toBeDefined();
   });
 }
@@ -117,6 +120,7 @@ describe('background URL validation on updates', () => {
 ### **1.2 Element Update Validation Tests**
 
 #### **Element Modification Tests**
+
 ```typescript
 describe('element updates in template', () => {
   test('validates updated element properties', () => {
@@ -174,6 +178,7 @@ describe('element updates in template', () => {
 ### **2.1 Basic Template Update Tests**
 
 #### **Name and Description Updates**
+
 ```typescript
 describe('template field updates', () => {
   test('updates template name and description', async () => {
@@ -227,6 +232,7 @@ describe('template field updates', () => {
 ```
 
 #### **Size and Dimension Updates**
+
 ```typescript
 describe('template size updates', () => {
   test('updates template dimensions and recalculates pixels', async () => {
@@ -285,6 +291,7 @@ describe('template size updates', () => {
 ### **2.2 Element Management Tests**
 
 #### **Adding New Elements**
+
 ```typescript
 describe('element addition during updates', () => {
   test('adds new elements to existing template', async () => {
@@ -334,6 +341,7 @@ describe('element addition during updates', () => {
 ```
 
 #### **Removing Elements**
+
 ```typescript
 describe('element removal during updates', () => {
   test('removes elements from template', async () => {
@@ -385,6 +393,7 @@ describe('element removal during updates', () => {
 ```
 
 #### **Modifying Existing Elements**
+
 ```typescript
 describe('element modification during updates', () => {
   test('modifies element properties', async () => {
@@ -469,6 +478,7 @@ describe('element modification during updates', () => {
 ### **2.3 Background Image Updates**
 
 #### **Background Replacement Tests**
+
 ```typescript
 describe('background image updates', () => {
   test('updates front and back background images', async () => {
@@ -521,6 +531,7 @@ describe('background image updates', () => {
 ### **3.1 Simultaneous Update Tests**
 
 #### **Concurrent Updates to Same Template**
+
 ```typescript
 describe('concurrent update handling', () => {
   test('handles simultaneous updates to different fields', async () => {
@@ -573,6 +584,7 @@ describe('concurrent update handling', () => {
 ```
 
 #### **Update During Active Use**
+
 ```typescript
 describe('updates during active template use', () => {
   test('allows template updates while ID cards are being generated', async () => {
@@ -602,6 +614,7 @@ describe('updates during active template use', () => {
 ### **3.2 Version Control Tests**
 
 #### **Timestamp Management**
+
 ```typescript
 describe('timestamp handling in updates', () => {
   test('preserves created_at and updates updated_at', async () => {
@@ -652,6 +665,7 @@ describe('timestamp handling in updates', () => {
 ### **4.1 ID Card Relationship Tests**
 
 #### **Template Updates with Existing ID Cards**
+
 ```typescript
 describe('template updates impact on ID cards', () => {
   test('existing ID cards remain valid after template updates', async () => {
@@ -686,7 +700,7 @@ describe('template updates impact on ID cards', () => {
     expect(existingCard2.template_id).toBe(template.data.id);
 
     // New ID cards should use updated template
-    const newCard = await generateIDCard(template.data.id, { 
+    const newCard = await generateIDCard(template.data.id, {
       employee_name: 'Charlie Brown',
       employee_photo: 'https://example.com/charlie.jpg'
     });
@@ -725,6 +739,7 @@ describe('template updates impact on ID cards', () => {
 ### **5.1 Update Validation Failures**
 
 #### **Invalid Update Data**
+
 ```typescript
 describe('update validation error handling', () => {
   test('rejects updates with invalid template ID', async () => {
@@ -773,6 +788,7 @@ describe('update validation error handling', () => {
 ### **5.2 Database Error Handling**
 
 #### **Database Constraint Violations**
+
 ```typescript
 describe('database constraint handling during updates', () => {
   test('handles template not found errors', async () => {
@@ -796,7 +812,7 @@ describe('database constraint handling during updates', () => {
   });
 
   test('handles organization access violations', async () => {
-    const template = await createTemplate({ 
+    const template = await createTemplate({
       name: 'Org Test Template',
       org_id: 'org-123'
     });
@@ -825,6 +841,7 @@ describe('database constraint handling during updates', () => {
 ### **6.1 Large Update Operations**
 
 #### **Mass Element Updates**
+
 ```typescript
 describe('performance with large updates', () => {
   test('handles updates with many elements efficiently', async () => {
@@ -878,7 +895,7 @@ describe('performance with large updates', () => {
     });
 
     // Update only first 10 elements
-    const updatedElements = template.data.template_elements.map((element, index) => 
+    const updatedElements = template.data.template_elements.map((element, index) =>
       index < 10 ? { ...element, fontSize: 16 } : element
     );
 
@@ -888,15 +905,15 @@ describe('performance with large updates', () => {
     });
 
     expect(result.success).toBe(true);
-    
+
     // Verify selective updates
     const firstTenUpdated = result.data.template_elements.slice(0, 10);
     const restUnchanged = result.data.template_elements.slice(10);
-    
+
     firstTenUpdated.forEach(element => {
       expect(element.fontSize).toBe(16);
     });
-    
+
     restUnchanged.forEach(element => {
       expect(element.fontSize).toBeUndefined();
     });
@@ -911,6 +928,7 @@ describe('performance with large updates', () => {
 ### **7.1 Complete Template Modification Scenarios**
 
 #### **Happy Path: Complete Template Redesign**
+
 ```typescript
 describe('E2E template update workflows', () => {
   test('complete template redesign workflow', async () => {
@@ -924,7 +942,7 @@ describe('E2E template update workflows', () => {
 
     // Step 3: Change template size
     await page.selectOption('select[name="cardSize"]', 'large-badge');
-    
+
     // Step 4: Replace background images
     await page.setInputFiles('input[name="frontBackground"]', 'test-assets/new-front-bg.jpg');
     await page.setInputFiles('input[name="backBackground"]', 'test-assets/new-back-bg.jpg');
@@ -937,7 +955,7 @@ describe('E2E template update workflows', () => {
     // Step 6: Add new elements
     await page.click('[data-testid="add-signature-element"]');
     await page.fill('input[name="variableName"]', 'employee_signature');
-    
+
     // Step 7: Remove an element
     await page.click('[data-testid="element-qr-1"] [data-testid="remove-element-btn"]');
     await page.click('[data-testid="confirm-remove-btn"]');
@@ -953,7 +971,7 @@ describe('E2E template update workflows', () => {
     // Step 10: Verify success and changes
     await expect(page.locator('text=Template updated successfully')).toBeVisible();
     await expect(page.locator('text=Redesigned Employee ID v3')).toBeVisible();
-    
+
     // Verify element count changed (removed 1, added 2)
     const elements = page.locator('[data-testid^="element-"]');
     await expect(elements).toHaveCount(4); // Original 3 - 1 + 2 = 4
@@ -962,6 +980,7 @@ describe('E2E template update workflows', () => {
 ```
 
 #### **Error Path: Validation Failures During Update**
+
 ```typescript
 describe('E2E update error handling', () => {
   test('shows validation errors for invalid updates', async () => {
@@ -970,17 +989,17 @@ describe('E2E update error handling', () => {
 
     // Clear required fields
     await page.fill('input[name="name"]', '');
-    
+
     // Try to save
     await page.click('[data-testid="save-template"]');
 
     // Verify error messages
     await expect(page.locator('text=Template name is required')).toBeVisible();
-    
+
     // Fix the error and retry
     await page.fill('input[name="name"]', 'Fixed Template Name');
     await page.click('[data-testid="save-template"]');
-    
+
     await expect(page.locator('text=Template updated successfully')).toBeVisible();
   });
 
@@ -990,10 +1009,10 @@ describe('E2E update error handling', () => {
 
     await page.goto('/templates');
     await page.click('[data-testid="template-card-edit-btn"]');
-    
+
     await page.fill('input[name="name"]', 'Network Test Update');
     await page.click('[data-testid="save-template"]');
-    
+
     // Verify error handling
     await expect(page.locator('text=Failed to update template')).toBeVisible();
     await expect(page.locator('text=Please try again')).toBeVisible();
@@ -1002,6 +1021,7 @@ describe('E2E update error handling', () => {
 ```
 
 #### **Partial Update Scenario**
+
 ```typescript
 describe('partial update workflows', () => {
   test('updates only specific template aspects', async () => {
@@ -1011,11 +1031,11 @@ describe('partial update workflows', () => {
     // Only change the description
     const originalName = await page.inputValue('input[name="name"]');
     await page.fill('textarea[name="description"]', 'Updated description only');
-    
+
     await page.click('[data-testid="save-template"]');
-    
+
     await expect(page.locator('text=Template updated successfully')).toBeVisible();
-    
+
     // Verify name unchanged, description updated
     await expect(page.locator(`text=${originalName}`)).toBeVisible();
     await expect(page.locator('text=Updated description only')).toBeVisible();
@@ -1030,6 +1050,7 @@ describe('partial update workflows', () => {
 ### **8.1 Update Backward Compatibility**
 
 #### **Legacy Template Update Support**
+
 ```typescript
 describe('backward compatibility for updates', () => {
   test('updates legacy templates without breaking them', async () => {
@@ -1084,47 +1105,47 @@ describe('backward compatibility for updates', () => {
 ```typescript
 // Test data factories for template updates
 export const TemplateUpdateFactory = {
-  createBasicUpdate: (originalTemplate, overrides = {}) => ({
-    ...originalTemplate,
-    updated_at: new Date().toISOString(),
-    ...overrides
-  }),
+	createBasicUpdate: (originalTemplate, overrides = {}) => ({
+		...originalTemplate,
+		updated_at: new Date().toISOString(),
+		...overrides
+	}),
 
-  createElementUpdate: (originalTemplate, elementUpdates) => ({
-    ...originalTemplate,
-    template_elements: originalTemplate.template_elements.map(element => {
-      const update = elementUpdates[element.id];
-      return update ? { ...element, ...update } : element;
-    }),
-    updated_at: new Date().toISOString()
-  }),
+	createElementUpdate: (originalTemplate, elementUpdates) => ({
+		...originalTemplate,
+		template_elements: originalTemplate.template_elements.map((element) => {
+			const update = elementUpdates[element.id];
+			return update ? { ...element, ...update } : element;
+		}),
+		updated_at: new Date().toISOString()
+	}),
 
-  createSizeUpdate: (originalTemplate, newWidth, newHeight, newDpi = 300) => ({
-    ...originalTemplate,
-    width_inches: newWidth,
-    height_inches: newHeight,
-    dpi: newDpi,
-    width_pixels: Math.round(newWidth * newDpi),
-    height_pixels: Math.round(newHeight * newDpi),
-    orientation: newWidth >= newHeight ? 'landscape' : 'portrait',
-    updated_at: new Date().toISOString()
-  })
+	createSizeUpdate: (originalTemplate, newWidth, newHeight, newDpi = 300) => ({
+		...originalTemplate,
+		width_inches: newWidth,
+		height_inches: newHeight,
+		dpi: newDpi,
+		width_pixels: Math.round(newWidth * newDpi),
+		height_pixels: Math.round(newHeight * newDpi),
+		orientation: newWidth >= newHeight ? 'landscape' : 'portrait',
+		updated_at: new Date().toISOString()
+	})
 };
 
 // Helper for creating test templates with predictable IDs
 export const createTestTemplate = async (overrides = {}) => {
-  const template = TemplateFactory.create({
-    id: generateTestUUID(),
-    ...overrides
-  });
-  return await createTemplate(template);
+	const template = TemplateFactory.create({
+		id: generateTestUUID(),
+		...overrides
+	});
+	return await createTemplate(template);
 };
 
 // Generate consistent UUIDs for testing
 export const generateTestUUID = (seed = Math.random()) => {
-  return `${seed.toString().slice(2, 10)}-1234-5678-9abc-def012345678`.replace(/./g, 
-    (c, i) => i < 8 ? c : ['a', 'b', 'c', 'd', 'e', 'f'][Math.floor(Math.random() * 6)]
-  );
+	return `${seed.toString().slice(2, 10)}-1234-5678-9abc-def012345678`.replace(/./g, (c, i) =>
+		i < 8 ? c : ['a', 'b', 'c', 'd', 'e', 'f'][Math.floor(Math.random() * 6)]
+	);
 };
 ```
 
@@ -1133,6 +1154,7 @@ export const generateTestUUID = (seed = Math.random()) => {
 ## **Test Execution Summary**
 
 ### **Test Categories Coverage**:
+
 - ✅ **Unit Tests**: 60+ test cases covering update schema validation and field modifications
 - ✅ **Integration Tests**: 45+ test cases covering upsert operations and element management
 - ✅ **E2E Tests**: 20+ test cases covering complete update workflows
@@ -1143,7 +1165,8 @@ export const generateTestUUID = (seed = Math.random()) => {
 
 ### **Total Test Count**: 160+ comprehensive test cases
 
-### **Expected Test Execution Time**: 
+### **Expected Test Execution Time**:
+
 - Unit Tests: ~25 seconds
 - Integration Tests: ~90 seconds
 - E2E Tests: ~4 minutes
@@ -1153,26 +1176,31 @@ export const generateTestUUID = (seed = Math.random()) => {
 ### **Key Update Scenarios Tested**:
 
 **📝 Field Modifications**:
+
 - Name, description, dimension updates
 - Background image replacements
 - DPI and size recalculations
 
 **🧩 Element Management**:
+
 - Adding new elements to existing templates
 - Removing elements while preserving others
 - Modifying element properties and positions
 
 **⏰ Timestamp Handling**:
+
 - Preserving created_at during updates
 - Proper updated_at timestamp management
 - Manual timestamp override support
 
 **🔄 Concurrency Control**:
+
 - Simultaneous update conflict resolution
 - Template updates during active ID card generation
 - Last-writer-wins semantics
 
 **🔗 Relationship Preservation**:
+
 - Existing ID card template references maintained
 - Template updates don't break existing ID card rendering
 - New ID cards use updated template definitions

@@ -29,24 +29,23 @@ export const idCardResponseSchema = z.object({
 // ID Card form data schema (user input for form fields)
 export const idCardFormDataSchema = z.object({
 	template_id: z.string().uuid(),
-	form_fields: z.record(z.string(), z.union([
-		z.string(),
-		z.number(),
-		z.boolean(),
-		z.null()
-	])).default({})
+	form_fields: z
+		.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
+		.default({})
 });
 
 // ID Card generation request schema
 export const idCardGenerationRequestSchema = z.object({
 	template_id: z.string().uuid(),
 	form_data: z.record(z.string(), z.any()),
-	render_options: z.object({
-		format: z.enum(['png', 'pdf', 'jpeg']).default('png'),
-		quality: z.number().min(0.1).max(1).default(1),
-		background_color: z.string().optional(),
-		include_bleed: z.boolean().default(false)
-	}).optional()
+	render_options: z
+		.object({
+			format: z.enum(['png', 'pdf', 'jpeg']).default('png'),
+			quality: z.number().min(0.1).max(1).default(1),
+			background_color: z.string().optional(),
+			include_bleed: z.boolean().default(false)
+		})
+		.optional()
 });
 
 // ID Card search/filter schema
@@ -64,18 +63,20 @@ export const idCardSearchSchema = z.object({
 export const idCardBulkOperationSchema = z.object({
 	card_ids: z.array(z.string().uuid()).min(1, 'At least one ID card ID is required'),
 	operation: z.enum(['delete', 'export', 'regenerate']),
-	parameters: z.object({
-		export_format: z.enum(['pdf', 'zip']).optional(),
-		include_metadata: z.boolean().default(false)
-	}).optional()
+	parameters: z
+		.object({
+			export_format: z.enum(['pdf', 'zip']).optional(),
+			include_metadata: z.boolean().default(false)
+		})
+		.optional()
 });
 
 // Image upload handling schemas
 export const imageUploadSchema = z.object({
-    file: z.instanceof(File),
-    side: z.enum(['front', 'back']),
-    expectedWidth: z.number().min(1),
-    expectedHeight: z.number().min(1),
+	file: z.instanceof(File),
+	side: z.enum(['front', 'back']),
+	expectedWidth: z.number().min(1),
+	expectedHeight: z.number().min(1)
 });
 
 export const imageUploadResultSchema = z.object({
@@ -100,26 +101,34 @@ export const storageUploadSchema = z.object({
 	bucket: z.string(),
 	file: z.any(), // File/Blob object
 	path: z.string(),
-	options: z.object({
-		cache_control: z.string().default('3600'),
-		content_type: z.string().default('image/png'),
-		upsert: z.boolean().default(true)
-	}).optional()
+	options: z
+		.object({
+			cache_control: z.string().default('3600'),
+			content_type: z.string().default('image/png'),
+			upsert: z.boolean().default(true)
+		})
+		.optional()
 });
 
 // ID Card validation schema
 export const idCardValidationSchema = z.object({
 	is_valid: z.boolean(),
-	errors: z.array(z.object({
-		field: z.string(),
-		message: z.string(),
-		code: z.string().optional()
-	})),
-	warnings: z.array(z.object({
-		field: z.string(),
-		message: z.string(),
-		suggestion: z.string().optional()
-	})).optional()
+	errors: z.array(
+		z.object({
+			field: z.string(),
+			message: z.string(),
+			code: z.string().optional()
+		})
+	),
+	warnings: z
+		.array(
+			z.object({
+				field: z.string(),
+				message: z.string(),
+				suggestion: z.string().optional()
+			})
+		)
+		.optional()
 });
 
 // ID Card statistics schema
@@ -127,15 +136,21 @@ export const idCardStatsSchema = z.object({
 	total_cards: z.number(),
 	cards_this_month: z.number(),
 	cards_today: z.number(),
-	most_used_template: z.object({
-		template_id: z.string().uuid(),
-		template_name: z.string(),
-		usage_count: z.number()
-	}).optional(),
-	recent_activity: z.array(z.object({
-		date: z.string().datetime(),
-		count: z.number()
-	})).optional()
+	most_used_template: z
+		.object({
+			template_id: z.string().uuid(),
+			template_name: z.string(),
+			usage_count: z.number()
+		})
+		.optional(),
+	recent_activity: z
+		.array(
+			z.object({
+				date: z.string().datetime(),
+				count: z.number()
+			})
+		)
+		.optional()
 });
 
 // Inferred types for export

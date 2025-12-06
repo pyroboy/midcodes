@@ -109,17 +109,21 @@ export const dimensionValidationSchema = z.object({
 	isValid: z.boolean(),
 	pixels: pixelDimensionsSchema,
 	dpi: dpiSchema,
-	warnings: z.array(z.object({
-		type: z.enum(['size', 'aspect', 'dpi', 'performance']),
-		message: z.string(),
-		severity: z.enum(['info', 'warning', 'error'])
-	})),
-	suggestions: z.array(z.object({
-		type: z.enum(['resize', 'dpi', 'format']),
-		message: z.string(),
-		newDimensions: pixelDimensionsSchema.optional(),
-		newDpi: dpiSchema.optional()
-	}))
+	warnings: z.array(
+		z.object({
+			type: z.enum(['size', 'aspect', 'dpi', 'performance']),
+			message: z.string(),
+			severity: z.enum(['info', 'warning', 'error'])
+		})
+	),
+	suggestions: z.array(
+		z.object({
+			type: z.enum(['resize', 'dpi', 'format']),
+			message: z.string(),
+			newDimensions: pixelDimensionsSchema.optional(),
+			newDpi: dpiSchema.optional()
+		})
+	)
 });
 
 // Print specification schema
@@ -127,13 +131,15 @@ export const printSpecificationSchema = z.object({
 	pixels: pixelDimensionsSchema,
 	dpi: dpiSchema,
 	physicalSize: physicalDimensionsSchema,
-	bleedArea: z.object({
-		top: z.number().min(0).default(0),
-		right: z.number().min(0).default(0),
-		bottom: z.number().min(0).default(0),
-		left: z.number().min(0).default(0),
-		unit: displayUnitSchema.default('mm')
-	}).optional(),
+	bleedArea: z
+		.object({
+			top: z.number().min(0).default(0),
+			right: z.number().min(0).default(0),
+			bottom: z.number().min(0).default(0),
+			left: z.number().min(0).default(0),
+			unit: displayUnitSchema.default('mm')
+		})
+		.optional(),
 	colorProfile: z.enum(['sRGB', 'CMYK', 'Adobe RGB']).default('sRGB'),
 	paperType: z.string().optional(),
 	finish: z.enum(['matte', 'glossy', 'satin']).optional()

@@ -2,7 +2,7 @@
 	import type { TemplateElement } from '$lib/types/types';
 	import TemplateForm from './TemplateForm.svelte';
 
-let {
+	let {
 		isLoading = false,
 		frontElements = [],
 		backElements = [],
@@ -124,37 +124,37 @@ let {
 		{:else}
 			<div class="template-form">
 				{#key `front-${version}`}
-				<TemplateForm
-					side="front"
-					elements={frontElements}
-					preview={frontPreview}
-					{cardSize}
-					{pixelDimensions}
-					bind:backgroundPosition={frontBackgroundPosition}
-					onUpdateElements={(elements: TemplateElement[], side: 'front' | 'back') =>
-						onUpdateElements(elements, side)}
-					onImageUpload={(files: File[], side: 'front' | 'back') => onImageUpload(files, side)}
-					onRemoveImage={(side: 'front' | 'back') => onRemoveImage(side)}
-					{onUpdateBackgroundPosition}
-					version={version}
-				/>
+					<TemplateForm
+						side="front"
+						elements={frontElements}
+						preview={frontPreview}
+						{cardSize}
+						{pixelDimensions}
+						bind:backgroundPosition={frontBackgroundPosition}
+						onUpdateElements={(elements: TemplateElement[], side: 'front' | 'back') =>
+							onUpdateElements(elements, side)}
+						onImageUpload={(files: File[], side: 'front' | 'back') => onImageUpload(files, side)}
+						onRemoveImage={(side: 'front' | 'back') => onRemoveImage(side)}
+						{onUpdateBackgroundPosition}
+						{version}
+					/>
 				{/key}
 			</div>
 			<div class="template-form">
 				{#key `back-${version}`}
-				<TemplateForm
-					side="back"
-					elements={backElements}
-					preview={backPreview}
-					{cardSize}
-					{pixelDimensions}
-					bind:backgroundPosition={backBackgroundPosition}
-					onUpdateElements={(elements: TemplateElement[], side: 'front' | 'back') =>
-						onUpdateElements(elements, side)}
-					onImageUpload={(files: File[], side: 'front' | 'back') => onImageUpload(files, side)}
-					onRemoveImage={(side: 'front' | 'back') => onRemoveImage(side)}
-					{onUpdateBackgroundPosition}
-				/>
+					<TemplateForm
+						side="back"
+						elements={backElements}
+						preview={backPreview}
+						{cardSize}
+						{pixelDimensions}
+						bind:backgroundPosition={backBackgroundPosition}
+						onUpdateElements={(elements: TemplateElement[], side: 'front' | 'back') =>
+							onUpdateElements(elements, side)}
+						onImageUpload={(files: File[], side: 'front' | 'back') => onImageUpload(files, side)}
+						onRemoveImage={(side: 'front' | 'back') => onRemoveImage(side)}
+						{onUpdateBackgroundPosition}
+					/>
 				{/key}
 			</div>
 

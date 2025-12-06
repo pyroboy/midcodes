@@ -28,12 +28,14 @@
 		: null;
 </script>
 
-<div 
-	class="group relative h-full w-full" 
-	role="button" 
-	tabindex="0" 
-	on:click={handleClick} 
-	on:keydown={(e) => { if (e.key === 'Enter') handleClick(new MouseEvent('click')); }}
+<div
+	class="group relative h-full w-full"
+	role="button"
+	tabindex="0"
+	on:click={handleClick}
+	on:keydown={(e) => {
+		if (e.key === 'Enter') handleClick(new MouseEvent('click'));
+	}}
 >
 	<!-- Selection Checkbox (Absolute Top Left) -->
 	<div class="absolute top-2 left-2 z-10">
@@ -41,19 +43,26 @@
 			aria-label="Select card"
 			type="checkbox"
 			checked={isSelected}
-			on:click={(e) => { e.stopPropagation(); onToggleSelect(card); }}
+			on:click={(e) => {
+				e.stopPropagation();
+				onToggleSelect(card);
+			}}
 			class="h-5 w-5 rounded border-muted-foreground text-primary focus:ring-primary"
 		/>
 	</div>
 
-	<Card class="h-full flex flex-col overflow-hidden border-border bg-card hover:shadow-md transition-all duration-200 hover:border-primary/50">
+	<Card
+		class="h-full flex flex-col overflow-hidden border-border bg-card hover:shadow-md transition-all duration-200 hover:border-primary/50"
+	>
 		<!-- Image Area -->
-		<div class="relative w-full aspect-[1.58/1] bg-muted/50 flex items-center justify-center overflow-hidden border-b border-border">
+		<div
+			class="relative w-full aspect-[1.58/1] bg-muted/50 flex items-center justify-center overflow-hidden border-b border-border"
+		>
 			{#if frontUrl}
-				<img 
-					src={frontUrl} 
-					alt="Card preview" 
-					class="w-full h-full object-contain p-2 transition-transform duration-300 group-hover:scale-105" 
+				<img
+					src={frontUrl}
+					alt="Card preview"
+					class="w-full h-full object-contain p-2 transition-transform duration-300 group-hover:scale-105"
 					loading="lazy"
 				/>
 			{:else}
@@ -62,7 +71,7 @@
 					<span class="text-xs">No Preview</span>
 				</div>
 			{/if}
-			
+
 			<!-- Mobile overlay hint -->
 			<div class="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors"></div>
 		</div>
@@ -70,7 +79,10 @@
 		<CardContent class="flex-1 p-3 flex flex-col justify-between gap-3">
 			<!-- Text Info -->
 			<div class="space-y-1">
-				<h3 class="font-semibold text-sm text-foreground truncate" title={card.fields?.['Name']?.value}>
+				<h3
+					class="font-semibold text-sm text-foreground truncate"
+					title={card.fields?.['Name']?.value}
+				>
 					{card.fields?.['Name']?.value || card.fields?.['name']?.value || 'Untitled ID'}
 				</h3>
 				<p class="text-xs text-muted-foreground truncate">
@@ -80,29 +92,33 @@
 
 			<!-- Action Buttons -->
 			<div class="flex gap-2 pt-2 border-t border-border/50">
-				<Button 
-					variant="outline" 
-					size="sm" 
+				<Button
+					variant="outline"
+					size="sm"
 					class="flex-1 h-8 text-xs px-2 bg-background hover:bg-muted hover:text-foreground"
-					onclick={(e) => { e.stopPropagation(); onDownload(card); }}
+					onclick={(e) => {
+						e.stopPropagation();
+						onDownload(card);
+					}}
 					disabled={downloading}
 				>
 					{#if downloading}
-						<span class="animate-spin mr-1">
-							⏳
-						</span>
+						<span class="animate-spin mr-1"> ⏳ </span>
 					{:else}
 						<Download class="w-3 h-3 mr-1.5" />
 					{/if}
 					<span class="hidden sm:inline">Download</span>
 					<span class="sm:hidden">Save</span>
 				</Button>
-				
-				<Button 
-					variant="ghost" 
-					size="icon" 
+
+				<Button
+					variant="ghost"
+					size="icon"
 					class="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-					onclick={(e) => { e.stopPropagation(); onDelete(card); }}
+					onclick={(e) => {
+						e.stopPropagation();
+						onDelete(card);
+					}}
 					disabled={deleting}
 				>
 					<Trash2 class="w-3.5 h-3.5" />

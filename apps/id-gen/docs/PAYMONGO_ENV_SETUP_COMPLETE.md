@@ -80,7 +80,7 @@ vercel --prod
 ### ✅ Automatic Validation
 
 - Environment variables are validated on application startup
-- Key format validation (sk*\*, pk*_, whsec\__)
+- Key format validation (sk*\*, pk*\_, whsec\_\_)
 - Required variables check with clear error messages
 
 ### ✅ Type Safety

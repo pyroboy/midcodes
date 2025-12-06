@@ -12,12 +12,14 @@
 Based on analysis of the current dashboard and all-ids route, there are significant UX gaps in the main dashboard:
 
 ### Current Dashboard Issues:
+
 1. **Limited visual feedback** - Recent ID cards lack image previews for quick identification
 2. **Inconsistent UX patterns** - Different interaction models between dashboard and all-ids route
 3. **Poor content hierarchy** - Recent IDs section doesn't effectively showcase user's work
 4. **Missing preview functionality** - Users can't quickly preview their recent creations without navigation
 
 ### Required Technical Changes:
+
 1. **Implement image preview modal system** similar to all-ids route for recent ID cards
 2. **Redesign dashboard layout** with improved visual hierarchy and modern card-based design
 3. **Add quick action functionality** - preview, download, and navigate to edit from dashboard
@@ -29,6 +31,7 @@ Based on analysis of the current dashboard and all-ids route, there are signific
 ## Step 2 – Context Awareness
 
 **Technology Stack:**
+
 - **SvelteKit 2.x + TypeScript** - Component framework with reactive state management
 - **shadcn-svelte** - UI component library for consistent design system
 - **TailwindCSS 4.x** - Utility-first styling with custom design tokens
@@ -36,6 +39,7 @@ Based on analysis of the current dashboard and all-ids route, there are signific
 - **Modal system** - Reusable preview modal component (existing in all-ids route)
 
 **Key Reference Components:**
+
 - `src/routes/all-ids/+page.svelte` - Existing preview modal implementation
 - `src/lib/components/IDCard.svelte` - ID card display component with preview functionality
 - `src/routes/(dashboard)/+page.svelte` - Current dashboard implementation
@@ -48,13 +52,15 @@ Based on analysis of the current dashboard and all-ids route, there are signific
 ### **Data Flow Analysis**
 
 **Current Dashboard Flow:**
+
 ```
 User visits dashboard → Basic stats display → Recent IDs list (text-only) → Click to navigate
 ```
 
 **Required Enhanced Flow:**
+
 ```
-User visits dashboard → Enhanced stats with visuals → Recent IDs grid with thumbnails → 
+User visits dashboard → Enhanced stats with visuals → Recent IDs grid with thumbnails →
 Click for instant preview modal → Quick actions (download, edit, view)
 ```
 
@@ -87,54 +93,59 @@ Click for instant preview modal → Quick actions (download, edit, view)
 **Required Changes:**
 
 1. **Enhanced Statistics Section:**
+
 ```typescript
 interface DashboardStats {
-    totalIDs: number;
-    recentTemplates: number;
-    organizationStats: {
-        totalMembers: number;
-        totalIDs: number;
-    };
-    weeklyActivity: Array<{ date: string; count: number }>;
+	totalIDs: number;
+	recentTemplates: number;
+	organizationStats: {
+		totalMembers: number;
+		totalIDs: number;
+	};
+	weeklyActivity: Array<{ date: string; count: number }>;
 }
 ```
 
 2. **Recent IDs Grid Component:**
+
 ```typescript
 interface RecentIDCard {
-    id: string;
-    template_name: string;
-    created_at: string;
-    thumbnail_url: string;
-    full_preview_url: string;
-    metadata: {
-        dimensions: { width: number; height: number };
-        format: string;
-        size: number;
-    };
+	id: string;
+	template_name: string;
+	created_at: string;
+	thumbnail_url: string;
+	full_preview_url: string;
+	metadata: {
+		dimensions: { width: number; height: number };
+		format: string;
+		size: number;
+	};
 }
 ```
 
 3. **Preview Modal Integration:**
+
 ```typescript
 interface ModalState {
-    isOpen: boolean;
-    selectedCard: RecentIDCard | null;
-    currentIndex: number;
-    totalCount: number;
-    loading: boolean;
+	isOpen: boolean;
+	selectedCard: RecentIDCard | null;
+	currentIndex: number;
+	totalCount: number;
+	loading: boolean;
 }
 ```
 
 #### **Modal System Implementation:**
 
 **Component Reuse Strategy:**
+
 1. **Extract preview modal** from all-ids route into reusable component
 2. **Create generic IDPreviewModal.svelte** that accepts ID card data
 3. **Implement navigation controls** for browsing through recent IDs
 4. **Add quick action buttons** for download and edit functionality
 
 **Modal Features:**
+
 - **High-resolution image display** with zoom functionality
 - **Metadata overlay** showing creation date, template name, dimensions
 - **Navigation arrows** for browsing through recent IDs without closing modal
@@ -146,49 +157,53 @@ interface ModalState {
 **Modern Card-Based Design:**
 
 1. **Hero Section:**
+
 ```svelte
 <div class="hero-section">
-    <h1>Welcome back, {user.name}</h1>
-    <p>Here's what's happening with your ID generation</p>
-    <div class="quick-actions">
-        <Button href="/templates">Create New ID</Button>
-        <Button variant="outline" href="/templates">Manage Templates</Button>
-    </div>
+	<h1>Welcome back, {user.name}</h1>
+	<p>Here's what's happening with your ID generation</p>
+	<div class="quick-actions">
+		<Button href="/templates">Create New ID</Button>
+		<Button variant="outline" href="/templates">Manage Templates</Button>
+	</div>
 </div>
 ```
 
 2. **Statistics Cards:**
+
 ```svelte
 <div class="stats-grid">
-    <StatsCard title="Total IDs Created" value={stats.totalIDs} icon="id-card" />
-    <StatsCard title="Templates Available" value={stats.templates} icon="layout-template" />
-    <StatsCard title="This Week" value={stats.thisWeek} icon="trending-up" />
-    <StatsCard title="Organization Total" value={stats.orgTotal} icon="users" />
+	<StatsCard title="Total IDs Created" value={stats.totalIDs} icon="id-card" />
+	<StatsCard title="Templates Available" value={stats.templates} icon="layout-template" />
+	<StatsCard title="This Week" value={stats.thisWeek} icon="trending-up" />
+	<StatsCard title="Organization Total" value={stats.orgTotal} icon="users" />
 </div>
 ```
 
 3. **Recent IDs Section:**
+
 ```svelte
 <section class="recent-ids">
-    <div class="section-header">
-        <h2>Recent ID Cards</h2>
-        <Button variant="outline" href="/all-ids">View All →</Button>
-    </div>
-    <div class="ids-grid">
-        {#each recentIDs as card}
-            <IDThumbnailCard 
-                {card} 
-                onPreview={() => openPreviewModal(card)}
-                onDownload={() => downloadCard(card)}
-            />
-        {/each}
-    </div>
+	<div class="section-header">
+		<h2>Recent ID Cards</h2>
+		<Button variant="outline" href="/all-ids">View All →</Button>
+	</div>
+	<div class="ids-grid">
+		{#each recentIDs as card}
+			<IDThumbnailCard
+				{card}
+				onPreview={() => openPreviewModal(card)}
+				onDownload={() => downloadCard(card)}
+			/>
+		{/each}
+	</div>
 </section>
 ```
 
 ### **UI Implications**
 
 **UI Major Changes (8/10):**
+
 - **Complete dashboard layout overhaul** with modern card-based design
 - **Integration of modal system** for seamless preview experience
 - **Enhanced visual hierarchy** with proper spacing, typography, and color usage
@@ -198,6 +213,7 @@ interface ModalState {
 ### **UX Implications**
 
 **UX Major Improvement (9/10):**
+
 - **Consistent interaction patterns** between dashboard and all-ids route
 - **Instant preview capability** reduces navigation friction
 - **Quick action accessibility** for common operations (download, edit)
@@ -209,29 +225,31 @@ interface ModalState {
 **Enhanced Data Fetching:**
 
 1. **Dashboard API Endpoint:**
+
 ```typescript
 // +page.server.ts
 export async function load({ locals }) {
-    const [recentIDs, stats] = await Promise.all([
-        getRecentIDCards(locals.user.id, 12), // Last 12 IDs
-        getDashboardStats(locals.user.id)
-    ]);
-    
-    return {
-        recentIDs: recentIDs.map(id => ({
-            ...id,
-            thumbnail_url: generateThumbnailUrl(id),
-            preview_url: generatePreviewUrl(id)
-        })),
-        stats
-    };
+	const [recentIDs, stats] = await Promise.all([
+		getRecentIDCards(locals.user.id, 12), // Last 12 IDs
+		getDashboardStats(locals.user.id)
+	]);
+
+	return {
+		recentIDs: recentIDs.map((id) => ({
+			...id,
+			thumbnail_url: generateThumbnailUrl(id),
+			preview_url: generatePreviewUrl(id)
+		})),
+		stats
+	};
 }
 ```
 
 2. **Optimized Queries:**
+
 ```sql
 -- Recent IDs with template info
-SELECT 
+SELECT
     ic.*,
     t.name as template_name,
     t.orientation
@@ -242,23 +260,25 @@ ORDER BY ic.created_at DESC
 LIMIT $2;
 
 -- Dashboard statistics
-SELECT 
+SELECT
     COUNT(*) as total_ids,
     COUNT(DISTINCT template_id) as unique_templates,
     COUNT(CASE WHEN created_at >= NOW() - INTERVAL '7 days' THEN 1 END) as week_count
-FROM idcards 
+FROM idcards
 WHERE user_id = $1;
 ```
 
 ### **Dependencies**
 
 **Existing Components to Leverage:**
+
 - Modal primitives from shadcn-svelte (`Dialog`, `DialogContent`, etc.)
 - Card components and layout utilities
 - Button and icon components
 - Existing ID card preview logic from all-ids route
 
 **New Components to Create:**
+
 - `IDPreviewModal.svelte` - Reusable preview modal
 - `IDThumbnailCard.svelte` - Enhanced thumbnail display for dashboard
 - `DashboardStatsCard.svelte` - Statistics display component
@@ -281,13 +301,13 @@ WHERE user_id = $1;
 
 ```typescript
 interface IDPreviewModalProps {
-    open: boolean;
-    cards: IDCard[];
-    initialIndex?: number;
-    onClose: () => void;
-    onDownload: (card: IDCard) => void;
-    onEdit: (card: IDCard) => void;
-    onDelete?: (card: IDCard) => void;
+	open: boolean;
+	cards: IDCard[];
+	initialIndex?: number;
+	onClose: () => void;
+	onDownload: (card: IDCard) => void;
+	onEdit: (card: IDCard) => void;
+	onDelete?: (card: IDCard) => void;
 }
 ```
 
@@ -319,18 +339,21 @@ interface IDPreviewModalProps {
 ### **Best Practices**
 
 **Performance:**
+
 - **Lazy load thumbnails** using intersection observer
 - **Implement virtual scrolling** for large ID collections
 - **Cache thumbnail URLs** to avoid repeated generation
 - **Optimize image sizes** for different display contexts
 
 **Accessibility:**
+
 - **Proper ARIA labels** for all interactive elements
 - **Keyboard navigation support** for modal and grid
 - **Focus management** when opening/closing modals
 - **Screen reader announcements** for dynamic content
 
 **User Experience:**
+
 - **Progressive enhancement** - ensure basic functionality without JavaScript
 - **Loading states** for all async operations
 - **Error boundaries** for graceful failure handling
@@ -357,12 +380,14 @@ interface IDPreviewModalProps {
 5. **ID/Key Consistency (2/10)** – Minor updates to data structure for thumbnail and preview URLs
 
 **Implementation Priority:**
+
 1. **Extract and enhance modal system** (foundation for preview functionality)
 2. **Redesign dashboard layout** (immediate visual impact)
 3. **Implement enhanced data fetching** (supports new functionality)
 4. **Component integration and polish** (final user experience refinement)
 
 **Success Metrics:**
+
 - **Reduced navigation friction** - Users can preview IDs without leaving dashboard
 - **Improved content discovery** - Visual thumbnails enable quick identification
 - **Consistent UX patterns** - Unified interaction model across routes

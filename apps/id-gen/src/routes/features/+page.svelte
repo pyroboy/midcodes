@@ -1,15 +1,21 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
-	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '$lib/components/ui/card';
+	import {
+		Card,
+		CardContent,
+		CardDescription,
+		CardHeader,
+		CardTitle
+	} from '$lib/components/ui/card';
 	import { Badge } from '$lib/components/ui/badge';
 	import PublicHeader from '$lib/components/PublicHeader.svelte';
 	import PublicFooter from '$lib/components/PublicFooter.svelte';
-	import { 
-		Palette, 
-		Users, 
-		Zap, 
-		Shield, 
-		Smartphone, 
+	import {
+		Palette,
+		Users,
+		Zap,
+		Shield,
+		Smartphone,
 		Download,
 		Eye,
 		CreditCard,
@@ -29,42 +35,48 @@
 		{
 			icon: Palette,
 			title: 'Advanced Template Designer',
-			description: 'Drag-and-drop interface with real-time 3D preview. Create professional ID cards with text, images, QR codes, and custom backgrounds.',
+			description:
+				'Drag-and-drop interface with real-time 3D preview. Create professional ID cards with text, images, QR codes, and custom backgrounds.',
 			highlight: 'Visual Editor',
 			demo: true
 		},
 		{
 			icon: Users,
 			title: 'Organization Management',
-			description: 'Multi-tenant platform with role-based access control. Perfect for schools, corporations, and organizations of any size.',
+			description:
+				'Multi-tenant platform with role-based access control. Perfect for schools, corporations, and organizations of any size.',
 			highlight: 'Multi-Tenant',
 			demo: false
 		},
 		{
 			icon: Zap,
 			title: 'Batch Processing',
-			description: 'Generate hundreds of ID cards from CSV data. Bulk operations with progress tracking and ZIP export functionality.',
+			description:
+				'Generate hundreds of ID cards from CSV data. Bulk operations with progress tracking and ZIP export functionality.',
 			highlight: 'Bulk Generation',
 			demo: true
 		},
 		{
 			icon: Shield,
 			title: 'Enterprise Security',
-			description: 'Supabase authentication, row-level security, and admin audit trails. Bank-level security for your sensitive data.',
+			description:
+				'Supabase authentication, row-level security, and admin audit trails. Bank-level security for your sensitive data.',
 			highlight: 'Secure',
 			demo: false
 		},
 		{
 			icon: Smartphone,
 			title: 'Mobile-First Design',
-			description: 'Fully responsive interface works perfectly on desktop, tablet, and mobile. Touch-optimized controls and PWA support.',
+			description:
+				'Fully responsive interface works perfectly on desktop, tablet, and mobile. Touch-optimized controls and PWA support.',
 			highlight: 'Responsive',
 			demo: true
 		},
 		{
 			icon: CreditCard,
 			title: 'Integrated Payments',
-			description: 'Credit-based system with PayMongo integration. Flexible packages and transparent pricing for all usage levels.',
+			description:
+				'Credit-based system with PayMongo integration. Flexible packages and transparent pricing for all usage levels.',
 			highlight: 'Pay-as-you-go',
 			demo: false
 		}
@@ -103,24 +115,27 @@
 
 	const testimonials = [
 		{
-			quote: "ID-Gen transformed our student card production from a week-long process to just a few hours. The quality is exceptional.",
-			author: "Maria Santos",
-			role: "Registrar",
-			organization: "University of Technology",
+			quote:
+				'ID-Gen transformed our student card production from a week-long process to just a few hours. The quality is exceptional.',
+			author: 'Maria Santos',
+			role: 'Registrar',
+			organization: 'University of Technology',
 			rating: 5
 		},
 		{
-			quote: "The batch processing feature saved us countless hours during new employee onboarding. Professional results every time.",
-			author: "John Rivera",
-			role: "HR Manager", 
-			organization: "Global Tech Corp",
+			quote:
+				'The batch processing feature saved us countless hours during new employee onboarding. Professional results every time.',
+			author: 'John Rivera',
+			role: 'HR Manager',
+			organization: 'Global Tech Corp',
 			rating: 5
 		},
 		{
-			quote: "Event badge creation used to be a nightmare. ID-Gen makes it simple and the 3D preview is incredibly helpful.",
-			author: "Ana Cruz",
-			role: "Event Coordinator",
-			organization: "Premier Events",
+			quote:
+				'Event badge creation used to be a nightmare. ID-Gen makes it simple and the 3D preview is incredibly helpful.',
+			author: 'Ana Cruz',
+			role: 'Event Coordinator',
+			organization: 'Premier Events',
 			rating: 5
 		}
 	];
@@ -139,9 +154,15 @@
 
 <svelte:head>
 	<title>Features - ID-Gen | Professional ID Card Generation Platform</title>
-	<meta name="description" content="Discover ID-Gen's powerful features: drag-and-drop template designer, batch processing, enterprise security, and more. Perfect for organizations of all sizes." />
+	<meta
+		name="description"
+		content="Discover ID-Gen's powerful features: drag-and-drop template designer, batch processing, enterprise security, and more. Perfect for organizations of all sizes."
+	/>
 	<meta property="og:title" content="ID-Gen Features - Professional ID Card Generation" />
-	<meta property="og:description" content="Create professional ID cards with our advanced template designer, batch processing, and enterprise-grade security features." />
+	<meta
+		property="og:description"
+		content="Create professional ID cards with our advanced template designer, batch processing, and enterprise-grade security features."
+	/>
 </svelte:head>
 
 <PublicHeader />
@@ -149,7 +170,9 @@
 <div class="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
 	<!-- Hero Section -->
 	<section class="relative overflow-hidden px-6 py-24 sm:py-32 lg:px-8">
-		<div class="absolute inset-0 -z-10 bg-[radial-gradient(45rem_50rem_at_top,theme(colors.blue.100),white)] opacity-20"></div>
+		<div
+			class="absolute inset-0 -z-10 bg-[radial-gradient(45rem_50rem_at_top,theme(colors.blue.100),white)] opacity-20"
+		></div>
 		<div class="mx-auto max-w-4xl text-center">
 			<div class="mb-8 flex justify-center">
 				<Badge variant="secondary" class="px-4 py-2 text-sm font-semibold">
@@ -165,8 +188,8 @@
 				in Minutes
 			</h1>
 			<p class="mt-6 text-lg leading-8 text-gray-600 sm:text-xl">
-				Advanced template designer, batch processing, and enterprise security. 
-				Trusted by 1000+ organizations worldwide for professional identification solutions.
+				Advanced template designer, batch processing, and enterprise security. Trusted by 1000+
+				organizations worldwide for professional identification solutions.
 			</p>
 			<div class="mt-10 flex flex-col gap-4 sm:flex-row sm:justify-center">
 				<Button size="lg" class="px-8 py-3 text-lg" href="/auth">
@@ -222,10 +245,14 @@
 			<div class="mx-auto mt-16 max-w-6xl">
 				<div class="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
 					{#each features as feature}
-						<Card class="relative overflow-hidden transition-all hover:shadow-lg hover:-translate-y-1">
+						<Card
+							class="relative overflow-hidden transition-all hover:shadow-lg hover:-translate-y-1"
+						>
 							<CardHeader>
 								<div class="flex items-center justify-between">
-									<div class="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-r from-blue-500 to-purple-500">
+									<div
+										class="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-r from-blue-500 to-purple-500"
+									>
 										<feature.icon class="h-6 w-6 text-white" />
 									</div>
 									{#if feature.demo}
@@ -269,7 +296,9 @@
 						<Card class="relative overflow-hidden">
 							<CardHeader>
 								<div class="flex items-center space-x-4">
-									<div class="flex h-12 w-12 items-center justify-center rounded-lg {useCase.color}">
+									<div
+										class="flex h-12 w-12 items-center justify-center rounded-lg {useCase.color}"
+									>
 										<useCase.icon class="h-6 w-6" />
 									</div>
 									<div>
@@ -344,7 +373,9 @@
 			</div>
 			<div class="mx-auto mt-16 max-w-lg">
 				<Card class="relative overflow-hidden border-2 border-blue-200">
-					<div class="absolute top-0 left-1/2 -translate-x-1/2 bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-1 text-xs font-semibold text-white rounded-b">
+					<div
+						class="absolute top-0 left-1/2 -translate-x-1/2 bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-1 text-xs font-semibold text-white rounded-b"
+					>
 						MOST POPULAR
 					</div>
 					<CardHeader class="text-center pt-8">
@@ -353,9 +384,7 @@
 							<span class="text-4xl font-bold text-gray-900">₱0.50</span>
 							<span class="text-gray-600">per card generated</span>
 						</div>
-						<CardDescription class="mt-2">
-							Perfect for organizations of all sizes
-						</CardDescription>
+						<CardDescription class="mt-2">Perfect for organizations of all sizes</CardDescription>
 					</CardHeader>
 					<CardContent class="space-y-4">
 						{#each pricingFeatures as feature}
@@ -391,14 +420,17 @@
 						Start Free Trial
 						<ArrowRight class="ml-2 h-5 w-5" />
 					</Button>
-					<Button variant="outline" size="lg" class="border-white text-white hover:bg-white hover:text-blue-600 px-8 py-3 text-lg" href="/contact">
+					<Button
+						variant="outline"
+						size="lg"
+						class="border-white text-white hover:bg-white hover:text-blue-600 px-8 py-3 text-lg"
+						href="/contact"
+					>
 						Contact Sales
 						<Globe class="ml-2 h-5 w-5" />
 					</Button>
 				</div>
-				<p class="mt-4 text-sm text-blue-100">
-					30-day free trial • No setup fees • Cancel anytime
-				</p>
+				<p class="mt-4 text-sm text-blue-100">30-day free trial • No setup fees • Cancel anytime</p>
 			</div>
 		</div>
 	</section>

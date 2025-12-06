@@ -4,13 +4,9 @@ import { z } from 'zod';
 export const elementTypeSchema = z.enum(['text', 'image', 'qr', 'photo', 'signature', 'selection']);
 
 // Position and dimension schemas (always in pixels)
-export const positionSchema = z
-	.number()
-	.min(0, 'Position cannot be negative');
+export const positionSchema = z.number().min(0, 'Position cannot be negative');
 
-export const dimensionSchema = z
-	.number()
-	.min(1, 'Dimension must be at least 1 pixel');
+export const dimensionSchema = z.number().min(1, 'Dimension must be at least 1 pixel');
 
 // Typography schemas
 export const fontSizeSchema = z
@@ -18,36 +14,29 @@ export const fontSizeSchema = z
 	.min(1, 'Font size must be at least 1')
 	.max(200, 'Font size cannot exceed 200');
 
-export const fontFamilySchema = z
-	.string()
-	.min(1, 'Font family is required')
-	.default('Arial');
+export const fontFamilySchema = z.string().min(1, 'Font family is required').default('Arial');
 
 export const fontWeightSchema = z
 	.enum(['normal', 'bold', '100', '200', '300', '400', '500', '600', '700', '800', '900'])
 	.default('normal');
 
-export const fontStyleSchema = z
-	.enum(['normal', 'italic', 'oblique'])
-	.default('normal');
+export const fontStyleSchema = z.enum(['normal', 'italic', 'oblique']).default('normal');
 
-export const textDecorationSchema = z
-	.enum(['none', 'underline', 'line-through'])
-	.default('none');
+export const textDecorationSchema = z.enum(['none', 'underline', 'line-through']).default('none');
 
 export const textTransformSchema = z
 	.enum(['none', 'uppercase', 'lowercase', 'capitalize'])
 	.default('none');
 
-export const textAlignmentSchema = z
-	.enum(['left', 'center', 'right', 'justify'])
-	.default('left');
+export const textAlignmentSchema = z.enum(['left', 'center', 'right', 'justify']).default('left');
 
 // Color schema (hex, rgb, rgba, named colors)
 export const colorSchema = z
 	.string()
-	.regex(/^(#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})|rgb\(.*\)|rgba\(.*\)|[a-zA-Z]+)$/, 
-		'Color must be a valid hex, rgb, rgba, or named color')
+	.regex(
+		/^(#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})|rgb\(.*\)|rgba\(.*\)|[a-zA-Z]+)$/,
+		'Color must be a valid hex, rgb, rgba, or named color'
+	)
 	.default('#000000');
 
 // Opacity schema
@@ -65,7 +54,10 @@ export const variableNameSchema = z
 	.string()
 	.min(1, 'Variable name is required')
 	.max(50, 'Variable name cannot exceed 50 characters')
-	.regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Variable name must start with a letter and contain only letters, numbers, and underscores');
+	.regex(
+		/^[a-zA-Z][a-zA-Z0-9_]*$/,
+		'Variable name must start with a letter and contain only letters, numbers, and underscores'
+	);
 
 // Base template element schema
 export const baseTemplateElementSchema = z.object({
@@ -184,14 +176,16 @@ const partialPhotoElementSchema = photoElementSchema.partial();
 const partialSignatureElementSchema = signatureElementSchema.partial();
 const partialSelectionElementSchema = selectionElementSchema.partial();
 
-export const templateElementUpdateSchema = z.discriminatedUnion('type', [
-	partialTextElementSchema,
-	partialImageElementSchema,
-	partialQrElementSchema,
-	partialPhotoElementSchema,
-	partialSignatureElementSchema,
-	partialSelectionElementSchema
-]).and(z.object({ id: z.string().uuid() }));
+export const templateElementUpdateSchema = z
+	.discriminatedUnion('type', [
+		partialTextElementSchema,
+		partialImageElementSchema,
+		partialQrElementSchema,
+		partialPhotoElementSchema,
+		partialSignatureElementSchema,
+		partialSelectionElementSchema
+	])
+	.and(z.object({ id: z.string().uuid() }));
 
 // Inferred types for export
 export type ElementType = z.infer<typeof elementTypeSchema>;

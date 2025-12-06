@@ -12,6 +12,7 @@
 ## Step 1 – Requirement Extraction
 
 ### Core Requirements
+
 - **Remove 444+ console.log statements** scattered across the codebase
 - **Replace with proper logging system** for production-ready code
 - **Maintain debug capabilities** for development environment
@@ -24,6 +25,7 @@
 ## Step 2 – Context Awareness
 
 ### Current State Analysis
+
 - **444 console statements** found across `.svelte` and `.ts` files
 - **Mixed purposes**: Debug logs, error logs, info logs, temporary debugging
 - **No standardization**: Different logging patterns throughout codebase
@@ -34,6 +36,7 @@
 ## Step 3 – Spec Expansion
 
 ### Logging System Architecture
+
 ```
 Development: Full logging with context
 Production: Error/warn only, no debug logs
@@ -41,9 +44,10 @@ Console: Clean, structured output
 ```
 
 ### Implementation Strategy
+
 1. **Create Logger Utility** (`src/lib/utils/logger.ts`)
 2. **Replace console.log** with logger.debug()
-3. **Replace console.error** with logger.error() 
+3. **Replace console.error** with logger.error()
 4. **Replace console.warn** with logger.warn()
 5. **Environment-based filtering** for production builds
 
@@ -52,6 +56,7 @@ Console: Clean, structured output
 ## Step 4 – Implementation Guidance
 
 ### Logger Utility Creation
+
 ```typescript
 // src/lib/utils/logger.ts
 import { dev } from '$app/environment';
@@ -59,42 +64,43 @@ import { dev } from '$app/environment';
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 class Logger {
-  private shouldLog(level: LogLevel): boolean {
-    if (!dev) {
-      return level === 'error' || level === 'warn';
-    }
-    return true; // Log everything in development
-  }
+	private shouldLog(level: LogLevel): boolean {
+		if (!dev) {
+			return level === 'error' || level === 'warn';
+		}
+		return true; // Log everything in development
+	}
 
-  debug(message: string, ...args: any[]): void {
-    if (this.shouldLog('debug')) {
-      console.log(`🔍 ${message}`, ...args);
-    }
-  }
+	debug(message: string, ...args: any[]): void {
+		if (this.shouldLog('debug')) {
+			console.log(`🔍 ${message}`, ...args);
+		}
+	}
 
-  info(message: string, ...args: any[]): void {
-    if (this.shouldLog('info')) {
-      console.info(`ℹ️ ${message}`, ...args);
-    }
-  }
+	info(message: string, ...args: any[]): void {
+		if (this.shouldLog('info')) {
+			console.info(`ℹ️ ${message}`, ...args);
+		}
+	}
 
-  warn(message: string, ...args: any[]): void {
-    if (this.shouldLog('warn')) {
-      console.warn(`⚠️ ${message}`, ...args);
-    }
-  }
+	warn(message: string, ...args: any[]): void {
+		if (this.shouldLog('warn')) {
+			console.warn(`⚠️ ${message}`, ...args);
+		}
+	}
 
-  error(message: string, ...args: any[]): void {
-    if (this.shouldLog('error')) {
-      console.error(`❌ ${message}`, ...args);
-    }
-  }
+	error(message: string, ...args: any[]): void {
+		if (this.shouldLog('error')) {
+			console.error(`❌ ${message}`, ...args);
+		}
+	}
 }
 
 export const logger = new Logger();
 ```
 
 ### Automated Replacement Strategy
+
 ```bash
 # Find and replace patterns
 find src -type f \( -name "*.svelte" -o -name "*.ts" \) -exec sed -i 's/console\.log(/logger.debug(/g' {} +
@@ -109,7 +115,7 @@ find src -type f \( -name "*.svelte" -o -name "*.ts" \) -exec sed -i 's/console\
 ✅ **Checklist:**
 
 1. **UI Changes (Complexity: 1/10)** – No UI changes, only console output cleanup
-2. **UX Changes (Complexity: 1/10)** – Cleaner browser console improves developer experience  
+2. **UX Changes (Complexity: 1/10)** – Cleaner browser console improves developer experience
 3. **Data Handling (Complexity: 1/10)** – No data handling changes
 4. **Function Logic (Complexity: 2/10)** – Simple logging utility and systematic replacements
 5. **ID/Key Consistency (Complexity: 1/10)** – No impact on ID/key systems

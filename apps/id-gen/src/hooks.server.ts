@@ -157,7 +157,7 @@ const authGuard: Handle = async ({ event, resolve }) => {
 	if (path.startsWith('/api')) {
 		if (!sessionInfo.user) {
 			// Returning Response directly stops SvelteKit from doing anything else
-			return new Response(JSON.stringify({ error: 'Unauthorized' }), { 
+			return new Response(JSON.stringify({ error: 'Unauthorized' }), {
 				status: 401,
 				headers: { 'Content-Type': 'application/json' }
 			});
@@ -167,14 +167,14 @@ const authGuard: Handle = async ({ event, resolve }) => {
 
 	// 2. Identify public routes
 	const isAuthRoute = path.startsWith('/auth');
-	const isPublicRoute = 
-		path === '/' || 
-		path.startsWith('/features') || 
-		path.startsWith('/pricing') || 
+	const isPublicRoute =
+		path === '/' ||
+		path.startsWith('/features') ||
+		path.startsWith('/pricing') ||
 		path.startsWith('/contact') ||
 		path.startsWith('/privacy') ||
 		path.startsWith('/terms');
-	
+
 	// 3. Logic:
 	// If User is Logged In:
 	//   - If trying to access /auth/signin or /auth/signup -> Redirect to dashboard /all-ids
