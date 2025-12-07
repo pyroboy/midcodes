@@ -481,8 +481,8 @@
 		{:else if transformedCards.length > 0}
 			<div class="space-y-4">
 
-				<!-- Carousel View (3D) - Always mounted to preserve texture cache -->
-				<div class:hidden={$recentViewMode === 'list'}>
+			<!-- Carousel View (3D) - Always mounted to preserve texture cache -->
+				<div class={$recentViewMode === 'list' ? 'invisible absolute -z-50 pointer-events-none' : ''}>
 					<ClientOnly>
 						<IDCarousel3D
 							cards={transformedCards}
