@@ -2,11 +2,7 @@
 	import { T, Canvas } from '@threlte/core';
 	import { spring } from 'svelte/motion';
 	import * as THREE from 'three';
-	import { onDestroy, onMount } from 'svelte';
-
-	// Enable texture caching
-	THREE.Cache.enabled = true;
-	import { browser } from '$app/environment';
+	import { onDestroy } from 'svelte';
 	import { getSupabaseStorageUrl } from '$lib/utils/supabase';
 	import Carousel3DItem from './Carousel3DItem.svelte';
 
@@ -39,31 +35,10 @@
 	let lastPointerX = 0;
 	let lastPointerTime = 0;
 
+	// Keep animatedIndex in sync with currentIndex
+	// Note: This is the minimal $effect needed for spring animation sync
 	$effect(() => {
 		animatedIndex.set(currentIndex);
-	});
-
-	// Preload Manager
-	// Automatically fetch next 20 textures into cache
-	$effect(() => {
-		const preloadRange = 20; // Lookahead
-		const loaded = new Set();
-
-		// Preload active zone + forward lookahead
-		for (let i = -5; i <= preloadRange; i++) {
-			const idx = currentIndex + i;
-			if (idx >= 0 && idx < cards.length) {
-				const url = getImageUrl(cards[idx]);
-				if (url && !loaded.has(url)) {
-					// Use raw loader to populate THREE.Cache
-					// We don't need the result here, just the cache side-effect
-					const loader = new THREE.TextureLoader();
-					loader.setCrossOrigin('anonymous');
-					loader.load(url);
-					loaded.add(url);
-				}
-			}
-		}
 	});
 
 	// Drag
@@ -260,6 +235,31 @@
 	onpointercancel={handlePointerUp}
 	onwheel={handleWheel}
 >
+	<!-- Texture Preview Grid -->
+	<div class="flex justify-center gap-2 mb-3 px-4 overflow-x-auto py-2">
+		{#each cards as card, i}
+			{@const url = getImageUrl(card)}
+			{#if url}
+				<button
+					type="button"
+					class="flex-shrink-0 w-12 h-8 rounded border-2 overflow-hidden transition-all hover:scale-105 {i ===
+					currentIndex
+						? 'border-primary ring-2 ring-primary/50'
+						: 'border-border/50 opacity-70 hover:opacity-100'}"
+					onclick={() => goTo(i)}
+					aria-label="Go to card {i + 1}"
+				>
+					<img
+						src={url}
+						alt="Card {i + 1} thumbnail"
+						class="w-full h-full object-cover"
+						loading="lazy"
+					/>
+				</button>
+			{/if}
+		{/each}
+	</div>
+
 	<Canvas>
 		<T.PerspectiveCamera makeDefault position={[0, 0, 9]} fov={50} />
 		<T.AmbientLight intensity={1.2} />

@@ -1,5 +1,11 @@
 <script lang="ts">
-	import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '$lib/components/ui/card';
+	import {
+		Card,
+		CardHeader,
+		CardTitle,
+		CardDescription,
+		CardContent
+	} from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
@@ -18,9 +24,15 @@
 
 	let { data } = $props();
 
+	// Type the data arrays to fix 'never' inference from Supabase
+	const invoices = $derived(data.invoices as any[]);
+	const payments = $derived(data.payments as any[]);
+
 	let activeTab = $state<'invoices' | 'payments'>('invoices');
 
-	function getStatusBadgeVariant(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
+	function getStatusBadgeVariant(
+		status: string
+	): 'default' | 'secondary' | 'destructive' | 'outline' {
 		switch (status) {
 			case 'paid':
 				return 'default';
@@ -80,7 +92,10 @@
 
 	function getTotalCredits(invoice: any): number {
 		if (!invoice.invoice_items) return 0;
-		return invoice.invoice_items.reduce((sum: number, item: any) => sum + (item.credits_granted || 0), 0);
+		return invoice.invoice_items.reduce(
+			(sum: number, item: any) => sum + (item.credits_granted || 0),
+			0
+		);
 	}
 </script>
 
@@ -105,9 +120,7 @@
 				</CardTitle>
 			</CardHeader>
 			<CardContent>
-				<Button href="/pricing" variant="outline" size="sm">
-					Buy More Credits
-				</Button>
+				<Button href="/pricing" variant="outline" size="sm">Buy More Credits</Button>
 			</CardContent>
 		</Card>
 
@@ -120,9 +133,7 @@
 				</CardTitle>
 			</CardHeader>
 			<CardContent>
-				<p class="text-xs text-muted-foreground">
-					Across all invoices and payments
-				</p>
+				<p class="text-xs text-muted-foreground">Across all invoices and payments</p>
 			</CardContent>
 		</Card>
 
@@ -145,9 +156,7 @@
 				</CardTitle>
 			</CardHeader>
 			<CardContent>
-				<Button href="/pricing" variant="outline" size="sm">
-					Upgrade
-				</Button>
+				<Button href="/pricing" variant="outline" size="sm">Upgrade</Button>
 			</CardContent>
 		</Card>
 	</div>
@@ -161,7 +170,7 @@
 			onclick={() => (activeTab = 'invoices')}
 		>
 			<FileText class="h-4 w-4 inline mr-2" />
-			Invoices ({data.invoices.length})
+			Invoices ({invoices.length})
 		</button>
 		<button
 			class="px-4 py-2 font-medium text-sm border-b-2 transition-colors {activeTab === 'payments'
@@ -170,7 +179,7 @@
 			onclick={() => (activeTab = 'payments')}
 		>
 			<Receipt class="h-4 w-4 inline mr-2" />
-			Payments ({data.payments.length})
+			Payments ({payments.length})
 		</button>
 	</div>
 
@@ -182,12 +191,10 @@
 					<FileText class="h-5 w-5" />
 					Invoices
 				</CardTitle>
-				<CardDescription>
-					Invoices issued for your account
-				</CardDescription>
+				<CardDescription>Invoices issued for your account</CardDescription>
 			</CardHeader>
 			<CardContent>
-				{#if data.invoices.length === 0}
+				{#if invoices.length === 0}
 					<EmptyState
 						icon={FileText}
 						title="No invoices yet"
@@ -196,9 +203,11 @@
 					/>
 				{:else}
 					<div class="space-y-3">
-						{#each data.invoices as invoice}
+						{#each invoices as invoice}
 							{@const StatusIcon = getStatusIcon(invoice.status)}
-							<div class="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+							<div
+								class="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+							>
 								<div class="flex items-center gap-4">
 									<div class="p-2 rounded-full bg-muted">
 										<StatusIcon class="h-4 w-4" />
@@ -250,12 +259,10 @@
 					<Receipt class="h-5 w-5" />
 					Payment Records
 				</CardTitle>
-				<CardDescription>
-					Online payments processed through PayMongo
-				</CardDescription>
+				<CardDescription>Online payments processed through PayMongo</CardDescription>
 			</CardHeader>
 			<CardContent>
-				{#if data.payments.length === 0}
+				{#if payments.length === 0}
 					<EmptyState
 						icon={Receipt}
 						title="No payments yet"
@@ -268,9 +275,11 @@
 					/>
 				{:else}
 					<div class="space-y-3">
-						{#each data.payments as payment}
+						{#each payments as payment}
 							{@const StatusIcon = getStatusIcon(payment.status)}
-							<div class="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+							<div
+								class="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+							>
 								<div class="flex items-center gap-4">
 									<div class="p-2 rounded-full bg-muted">
 										<StatusIcon class="h-4 w-4" />

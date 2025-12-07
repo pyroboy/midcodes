@@ -48,7 +48,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		let totalSpent = 0;
 
 		if (invoices) {
-			for (const invoice of invoices) {
+			for (const invoice of invoices as any[]) {
 				if (invoice.status === 'paid') {
 					totalSpent += invoice.total_amount || 0;
 				}
@@ -56,20 +56,21 @@ export const load: PageServerLoad = async ({ locals }) => {
 		}
 
 		if (payments) {
-			for (const payment of payments) {
+			for (const payment of payments as any[]) {
 				if (payment.status === 'paid') {
 					totalSpent += (payment.amount_php || 0) * 100; // Convert to centavos
 				}
 			}
 		}
 
+		const profileData = profile as any;
 		return {
 			payments: payments || [],
 			invoices: invoices || [],
 			profile: {
-				credits_balance: profile?.credits_balance || 0,
-				unlimited_templates: profile?.unlimited_templates || false,
-				remove_watermarks: profile?.remove_watermarks || false
+				credits_balance: profileData?.credits_balance || 0,
+				unlimited_templates: profileData?.unlimited_templates || false,
+				remove_watermarks: profileData?.remove_watermarks || false
 			},
 			totalSpent: totalSpent / 100 // Convert back to PHP
 		};

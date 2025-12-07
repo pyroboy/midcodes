@@ -268,7 +268,7 @@ export const invoiceUpdateInputSchema = z.object({
 // Mark invoice as paid input
 export const invoiceMarkPaidInputSchema = z.object({
 	invoice_id: z.string().uuid(),
-	payment_method: z.string().default('manual'),
+	payment_method: z.string().optional().default('manual'),
 	payment_reference: z.string().optional(),
 	notes: z.string().optional()
 });

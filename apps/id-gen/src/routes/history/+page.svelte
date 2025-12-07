@@ -1,7 +1,13 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
-	import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '$lib/components/ui/card';
+	import {
+		Card,
+		CardHeader,
+		CardTitle,
+		CardDescription,
+		CardContent
+	} from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
@@ -20,6 +26,9 @@
 	} from '@lucide/svelte';
 
 	let { data } = $props();
+
+	// Type the data arrays to fix 'never' inference from Supabase
+	const transactions = $derived(data.transactions as any[]);
 
 	const filterOptions = [
 		{ value: 'all', label: 'All' },
@@ -57,7 +66,9 @@
 		}
 	}
 
-	function getTransactionBadgeVariant(type: string): 'default' | 'secondary' | 'destructive' | 'outline' {
+	function getTransactionBadgeVariant(
+		type: string
+	): 'default' | 'secondary' | 'destructive' | 'outline' {
 		switch (type) {
 			case 'usage':
 				return 'destructive';
@@ -95,7 +106,9 @@
 			</CardHeader>
 			<CardContent>
 				<p class="text-xs text-muted-foreground">
-					{data.summary.unlimitedTemplates ? 'Unlimited templates' : `${2 - data.summary.templateCount} free templates left`}
+					{data.summary.unlimitedTemplates
+						? 'Unlimited templates'
+						: `${2 - data.summary.templateCount} free templates left`}
 				</p>
 			</CardContent>
 		</Card>
@@ -139,9 +152,7 @@
 				</CardTitle>
 			</CardHeader>
 			<CardContent>
-				<p class="text-xs text-muted-foreground">
-					From invoices and purchases
-				</p>
+				<p class="text-xs text-muted-foreground">From invoices and purchases</p>
 			</CardContent>
 		</Card>
 	</div>
@@ -171,7 +182,7 @@
 			</CardDescription>
 		</CardHeader>
 		<CardContent>
-			{#if data.transactions.length === 0}
+			{#if transactions.length === 0}
 				<EmptyState
 					icon={History}
 					title="No transactions yet"
@@ -180,9 +191,11 @@
 				/>
 			{:else}
 				<div class="space-y-3">
-					{#each data.transactions as tx}
+					{#each transactions as tx}
 						{@const Icon = getTransactionIcon(tx.transaction_type)}
-						<div class="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+						<div
+							class="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+						>
 							<div class="flex items-center gap-4">
 								<div class="p-2 rounded-full bg-muted">
 									<Icon class="h-4 w-4" />

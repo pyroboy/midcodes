@@ -149,7 +149,7 @@
 	async function handleMarkPaid(invoiceId: string) {
 		loading = true;
 		try {
-			await markInvoicePaid({ invoice_id: invoiceId });
+			await markInvoicePaid({ invoice_id: invoiceId, payment_method: 'manual' });
 			successMessage = 'Invoice marked as paid. Credits added to user.';
 			await getInvoices().refresh();
 		} catch (err: any) {

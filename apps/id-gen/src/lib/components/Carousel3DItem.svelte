@@ -21,39 +21,50 @@
 		isDragging: boolean;
 	}>();
 
-	// Texture Loading using Threlte hook
-	let textureStore = $derived(url ? useTexture(url) : null);
+	// Constants
+	const CARD_ASPECT = 3.6 / 2.4;
 
-	// Debug logging
-	const instanceId = Math.random().toString(36).substring(7);
+	// Debug: Log when component mounts with URL
 	$effect(() => {
-		if (url) console.log(`[${instanceId}] Card Mounted/Updated`, { url });
+		if (url) {
+			console.log('[Carousel3DItem] URL passed:', url?.substring(0, 80) + '...');
+		}
 	});
 
-	function setupTexture(t: any) {
-		if (!t) return;
+	// Configure texture after loading
+	function configureTexture(t: THREE.Texture): THREE.Texture {
+		console.log(
+			'[Carousel3DItem] Texture loaded successfully, image size:',
+			t.image?.width,
+			'x',
+			t.image?.height
+		);
 		t.colorSpace = THREE.SRGBColorSpace;
-		// Aspect ratio fix
-		const CARD_ASPECT = 3.6 / 2.4;
-		const width = t.image.width;
-		const height = t.image.height;
-		const imageAspect = width / height;
-
 		t.wrapS = THREE.ClampToEdgeWrapping;
 		t.wrapT = THREE.ClampToEdgeWrapping;
 
-		if (imageAspect > CARD_ASPECT) {
-			const scale = CARD_ASPECT / imageAspect;
-			t.repeat.set(scale, 1);
-			t.offset.set((1 - scale) / 2, 0);
-		} else {
-			const scale = imageAspect / CARD_ASPECT;
-			t.repeat.set(1, scale);
-			t.offset.set(0, (1 - scale) / 2);
+		// Aspect ratio fix
+		if (t.image?.width && t.image?.height) {
+			const imageAspect = t.image.width / t.image.height;
+			if (imageAspect > CARD_ASPECT) {
+				const scale = CARD_ASPECT / imageAspect;
+				t.repeat.set(scale, 1);
+				t.offset.set((1 - scale) / 2, 0);
+			} else {
+				const scale = imageAspect / CARD_ASPECT;
+				t.repeat.set(1, scale);
+				t.offset.set(0, (1 - scale) / 2);
+			}
 		}
 		t.needsUpdate = true;
-		return true; // just to make const happy
+		return t;
 	}
+
+	// Use useTexture with transform option
+	let textureStore = $derived(url ? useTexture(url, { transform: configureTexture }) : null);
+
+	// Debug state
+	let debugState = $state('init');
 </script>
 
 <T.Group
@@ -84,23 +95,29 @@
 					/>
 				{:then texture}
 					<!-- Success State -->
-					<!-- Apply texture settings on load -->
-					{@const _ = setupTexture(texture)}
-
+					{(console.log('[Carousel3DItem] Rendering texture:', texture), '')}
 					<T.MeshBasicMaterial
 						map={texture}
 						side={THREE.DoubleSide}
 						transparent={false}
 						opacity={1}
 					/>
-				{:catch error}
+				{:catch err}
 					<!-- Error State -->
-					{@const _err = console.warn('Texture failed to load:', url, error)}
+					{(console.error('[Carousel3DItem] Texture error:', err), '')}
 					<T.MeshBasicMaterial
 						color="#ef4444"
 						side={THREE.DoubleSide}
 						transparent
 						opacity={transform.opacity * 0.8}
+					/>
+					<Text
+						text="Error"
+						fontSize={0.25}
+						color="white"
+						anchorX="center"
+						anchorY="middle"
+						position.z={0.01}
 					/>
 				{/await}
 			{:else}

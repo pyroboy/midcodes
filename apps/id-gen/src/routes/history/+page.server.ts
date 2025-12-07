@@ -1,5 +1,6 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
+import type { CreditTransaction } from '$lib/schemas/billing.schema';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const { supabase, user, org_id } = locals;
@@ -56,7 +57,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		let creditsPurchasedThisMonth = 0;
 
 		if (monthlyTransactions) {
-			for (const tx of monthlyTransactions) {
+			for (const tx of monthlyTransactions as any[]) {
 				if (tx.transaction_type === 'usage' && tx.amount < 0) {
 					creditsUsedThisMonth += Math.abs(tx.amount);
 				} else if (tx.transaction_type === 'purchase' && tx.amount > 0) {
@@ -69,26 +70,27 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		const { count: cardsThisMonth } = await supabase
 			.from('idcards')
 			.select('*', { count: 'exact', head: true })
-			.eq('org_id', org_id)
+			.eq('org_id', org_id!)
 			.gte('created_at', startOfMonth.toISOString());
 
 		const { count: templatesThisMonth } = await supabase
 			.from('templates')
 			.select('*', { count: 'exact', head: true })
-			.eq('org_id', org_id)
+			.eq('org_id', org_id!)
 			.gte('created_at', startOfMonth.toISOString());
 
+		const profileData = profile as any;
 		return {
-			transactions: transactions || [],
+			transactions: (transactions || []) as CreditTransaction[],
 			totalCount: count || 0,
 			currentPage: page,
 			totalPages: Math.ceil((count || 0) / limit),
 			filterType: type,
 			summary: {
-				currentBalance: profile?.credits_balance || 0,
-				cardGenerationCount: profile?.card_generation_count || 0,
-				templateCount: profile?.template_count || 0,
-				unlimitedTemplates: profile?.unlimited_templates || false,
+				currentBalance: profileData?.credits_balance || 0,
+				cardGenerationCount: profileData?.card_generation_count || 0,
+				templateCount: profileData?.template_count || 0,
+				unlimitedTemplates: profileData?.unlimited_templates || false,
 				creditsUsedThisMonth,
 				creditsPurchasedThisMonth,
 				cardsThisMonth: cardsThisMonth || 0,

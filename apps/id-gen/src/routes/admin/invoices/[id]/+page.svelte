@@ -121,6 +121,7 @@
 		try {
 			const result = await markInvoicePaid({
 				invoice_id: invoiceId,
+				payment_method: 'manual',
 				payment_reference: paymentRef || undefined
 			});
 			successMessage = `Invoice marked as paid. ${result.creditsAdded} credits added to user.`;

@@ -458,17 +458,18 @@
 					</Button>
 				</div>
 
-				<!-- Carousel View (3D) -->
-				{#if $recentViewMode === 'carousel'}
+				<!-- Carousel View (3D) - Always mounted to preserve texture cache -->
+				<div class:hidden={$recentViewMode !== 'carousel'}>
 					<ClientOnly>
 						<IDCarousel3D
 							cards={transformedCards.slice(0, 12)}
 							onCardClick={(card) => openSinglePreview(card)}
 						/>
 					</ClientOnly>
+				</div>
 
-					<!-- Grid View -->
-				{:else if $recentViewMode === 'grid'}
+				<!-- Grid View -->
+				{#if $recentViewMode === 'grid'}
 					<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
 						{#each transformedCards.slice(0, 8) as card}
 							<IDThumbnailCard
@@ -482,7 +483,7 @@
 					</div>
 
 					<!-- List View -->
-				{:else}
+				{:else if $recentViewMode === 'list'}
 					<div class="space-y-3">
 						{#each transformedCards.slice(0, 10) as card}
 							<button
