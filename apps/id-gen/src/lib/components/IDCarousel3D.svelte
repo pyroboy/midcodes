@@ -94,7 +94,7 @@
 			
 			// Cap max card size for 3 columns to avoid oversized cards on large screens
 			if (columns === 3 && computedWidth > 550) {
-				computedWidth = 550;
+				computedWidth = 650;
 			}
 			
 			// Use manual slider value if override is on, otherwise use computed
