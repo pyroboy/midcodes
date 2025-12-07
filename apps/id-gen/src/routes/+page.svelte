@@ -2,6 +2,7 @@
 	import type { PageData } from './$types';
 	import { fade } from 'svelte/transition';
 	import { goto, invalidate } from '$app/navigation';
+	import { onMount, onDestroy } from 'svelte';
 	import { Card, CardContent } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import {
@@ -28,6 +29,7 @@
 	import RecentViewModeToggle from '$lib/components/RecentViewModeToggle.svelte';
 	import IDCarousel3D from '$lib/components/IDCarousel3D.svelte';
 	import ClientOnly from '$lib/components/ClientOnly.svelte';
+	import { Slider } from '$lib/components/ui/slider';
 
 	interface Props {
 		data: PageData & { user?: any; templates?: any[] };
@@ -53,6 +55,25 @@
 	let showDuplicateDialog = $state(false);
 	let templateToDelete: any = $state(null);
 	let templateToDuplicate: any = $state(null);
+
+	// View state
+	let gridColumns = $state(4); // Default to 4 columns
+
+	// Listen for pinch-to-change-columns events from IDCarousel3D
+	function handleColumnsChange(e: Event) {
+		const customEvent = e as CustomEvent<{ columns: number }>;
+		gridColumns = customEvent.detail.columns;
+	}
+
+	onMount(() => {
+		document.addEventListener('columnschange', handleColumnsChange);
+	});
+
+	onDestroy(() => {
+		if (typeof document !== 'undefined') {
+			document.removeEventListener('columnschange', handleColumnsChange);
+		}
+	});
 
 	// ID Preview modal state
 	let modalOpen = $state(false);
@@ -424,6 +445,21 @@
 			{/if}
 		</div>
 
+		{#if $recentViewMode === 'grid'}
+			<div class="flex items-center gap-2">
+				<span class="text-sm text-muted-foreground whitespace-nowrap">Columns: {gridColumns}</span>
+			<Slider
+					type="multiple"
+					value={[gridColumns]}
+					min={3}
+					max={7}
+					step={1}
+					onValueChange={(v: number[]) => (gridColumns = v[0])}
+					class="w-32"
+				/>
+			</div>
+		{/if}
+
 		{#if data.error}
 			<Card class="border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800">
 				<CardContent class="p-6">
@@ -444,46 +480,23 @@
 			</Card>
 		{:else if transformedCards.length > 0}
 			<div class="space-y-4">
-				<div class="flex items-center justify-end">
-					<Button href="/all-ids" variant="outline">
-						View All
-						<svg class="h-4 w-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M9 5l7 7-7 7"
-							/>
-						</svg>
-					</Button>
-				</div>
 
 				<!-- Carousel View (3D) - Always mounted to preserve texture cache -->
-				<div class:hidden={$recentViewMode !== 'carousel'}>
+				<div class:hidden={$recentViewMode === 'list'}>
 					<ClientOnly>
 						<IDCarousel3D
-							cards={transformedCards.slice(0, 12)}
+							cards={transformedCards}
+							viewMode={$recentViewMode === 'grid' ? 'grid' : 'carousel'}
+							columns={gridColumns}
 							onCardClick={(card) => openSinglePreview(card)}
 						/>
 					</ClientOnly>
 				</div>
 
-				<!-- Grid View -->
-				{#if $recentViewMode === 'grid'}
-					<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-						{#each transformedCards.slice(0, 8) as card}
-							<IDThumbnailCard
-								{card}
-								onPreview={() => openSinglePreview(card)}
-								onDownload={() => downloadCard(card)}
-								onEdit={() => editCard(card)}
-								downloading={downloadingCards.has(card.idcard_id?.toString() || '')}
-							/>
-						{/each}
-					</div>
+				<!-- Grid View - NOW HANDLED BY 3D COMPONENT -->
 
-					<!-- List View -->
-				{:else if $recentViewMode === 'list'}
+				<!-- List View -->
+				{#if $recentViewMode === 'list'}
 					<div class="space-y-3">
 						{#each transformedCards.slice(0, 10) as card}
 							<button

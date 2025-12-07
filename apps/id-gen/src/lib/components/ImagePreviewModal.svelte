@@ -3,6 +3,7 @@
 	import { T, Canvas } from '@threlte/core';
 	import { OrbitControls, useTexture } from '@threlte/extras';
 	import * as THREE from 'three';
+	import { NoToneMapping } from 'three';
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 
@@ -352,7 +353,7 @@
 							</div>
 						</div>
 					{:else if !isLoadingGeometry && currentGeometry}
-						<Canvas>
+						<Canvas toneMapping={NoToneMapping}>
 							<T.Scene>
 								<T.PerspectiveCamera
 									makeDefault

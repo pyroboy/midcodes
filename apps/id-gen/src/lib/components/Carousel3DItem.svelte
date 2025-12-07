@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { T } from '@threlte/core';
-	import { useTexture, Text } from '@threlte/extras';
+	import { Text } from '@threlte/extras';
 	import * as THREE from 'three';
+	import { onMount } from 'svelte';
 
 	// Props
 	let { url, geometry, borderGeometry, transform, onCardClick, card, isDragging } = $props<{
@@ -10,8 +11,10 @@
 		borderGeometry: THREE.BufferGeometry;
 		transform: {
 			x: number;
+			y: number;
 			z: number;
 			rotY: number;
+			rotX?: number;
 			scale: number;
 			opacity: number;
 			distFromCenter: number;
@@ -24,112 +27,127 @@
 	// Constants
 	const CARD_ASPECT = 3.6 / 2.4;
 
-	// Debug: Log when component mounts with URL
-	$effect(() => {
-		if (url) {
-			console.log('[Carousel3DItem] URL passed:', url?.substring(0, 80) + '...');
+	// Texture state
+	let texture = $state<THREE.Texture | null>(null);
+	let loading = $state(true);
+	let error = $state(false);
+
+	// Load texture using THREE.TextureLoader with CORS support
+	onMount(() => {
+		if (!url) {
+			loading = false;
+			return;
 		}
-	});
 
-	// Configure texture after loading
-	function configureTexture(t: THREE.Texture): THREE.Texture {
-		console.log(
-			'[Carousel3DItem] Texture loaded successfully, image size:',
-			t.image?.width,
-			'x',
-			t.image?.height
-		);
-		t.colorSpace = THREE.SRGBColorSpace;
-		t.wrapS = THREE.ClampToEdgeWrapping;
-		t.wrapT = THREE.ClampToEdgeWrapping;
+		const loader = new THREE.TextureLoader();
+		loader.crossOrigin = 'anonymous';
 
-		// Aspect ratio fix
-		if (t.image?.width && t.image?.height) {
-			const imageAspect = t.image.width / t.image.height;
-			if (imageAspect > CARD_ASPECT) {
-				const scale = CARD_ASPECT / imageAspect;
-				t.repeat.set(scale, 1);
-				t.offset.set((1 - scale) / 2, 0);
-			} else {
-				const scale = imageAspect / CARD_ASPECT;
-				t.repeat.set(1, scale);
-				t.offset.set(0, (1 - scale) / 2);
+		loader.load(
+			url,
+			(loadedTexture) => {
+				// Configure texture
+				loadedTexture.colorSpace = THREE.SRGBColorSpace;
+				loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
+				loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
+
+				// Aspect ratio fix
+				if (loadedTexture.image?.width && loadedTexture.image?.height) {
+					const imageAspect = loadedTexture.image.width / loadedTexture.image.height;
+					if (imageAspect > CARD_ASPECT) {
+						const scale = CARD_ASPECT / imageAspect;
+						loadedTexture.repeat.set(scale, 1);
+						loadedTexture.offset.set((1 - scale) / 2, 0);
+					} else {
+						const scale = imageAspect / CARD_ASPECT;
+						loadedTexture.repeat.set(1, scale);
+						loadedTexture.offset.set(0, (1 - scale) / 2);
+					}
+				}
+				loadedTexture.needsUpdate = true;
+
+				texture = loadedTexture;
+				loading = false;
+				console.log('[Carousel3DItem] Loaded:', url?.substring(0, 50));
+			},
+			undefined,
+			(err) => {
+				console.error('[Carousel3DItem] Error loading:', url, err);
+				error = true;
+				loading = false;
 			}
-		}
-		t.needsUpdate = true;
-		return t;
-	}
+		);
 
-	// Use useTexture with transform option
-	let textureStore = $derived(url ? useTexture(url, { transform: configureTexture }) : null);
-
-	// Debug state
-	let debugState = $state('init');
+		return () => {
+			if (texture) {
+				texture.dispose();
+			}
+		};
+	});
 </script>
 
 <T.Group
 	position.x={transform.x}
+	position.y={transform.y || 0}
 	position.z={transform.z}
+	rotation.x={transform.rotX || 0}
 	rotation.y={transform.rotY}
 	scale={[transform.scale, transform.scale, 1]}
 >
 	<!-- Card mesh -->
 	<T.Mesh onclick={() => !isDragging && onCardClick(card)}>
-		<T.Mesh {geometry}>
-			{#if textureStore}
-				{#await $textureStore}
-					<!-- Loading State -->
-					<T.MeshBasicMaterial
-						color="#1e293b"
-						side={THREE.DoubleSide}
-						transparent
-						opacity={transform.opacity * 0.8}
-					/>
-					<Text
-						text="Loading..."
-						fontSize={0.25}
-						color="white"
-						anchorX="center"
-						anchorY="middle"
-						position.z={0.01}
-					/>
-				{:then texture}
-					<!-- Success State -->
-					{(console.log('[Carousel3DItem] Rendering texture:', texture), '')}
-					<T.MeshBasicMaterial
-						map={texture}
-						side={THREE.DoubleSide}
-						transparent={false}
-						opacity={1}
-					/>
-				{:catch err}
-					<!-- Error State -->
-					{(console.error('[Carousel3DItem] Texture error:', err), '')}
-					<T.MeshBasicMaterial
-						color="#ef4444"
-						side={THREE.DoubleSide}
-						transparent
-						opacity={transform.opacity * 0.8}
-					/>
-					<Text
-						text="Error"
-						fontSize={0.25}
-						color="white"
-						anchorX="center"
-						anchorY="middle"
-						position.z={0.01}
-					/>
-				{/await}
-			{:else}
-				<!-- No URL placeholder -->
+		{#if loading}
+			<T.Mesh {geometry}>
 				<T.MeshBasicMaterial
 					color="#1e293b"
 					side={THREE.DoubleSide}
 					transparent
 					opacity={transform.opacity * 0.8}
 				/>
-			{/if}
-		</T.Mesh>
+				<Text
+					text="Loading..."
+					fontSize={0.25}
+					color="white"
+					anchorX="center"
+					anchorY="middle"
+					position.z={0.01}
+				/>
+			</T.Mesh>
+		{:else if error}
+			<T.Mesh {geometry}>
+				<T.MeshBasicMaterial
+					color="#ef4444"
+					side={THREE.DoubleSide}
+					transparent
+					opacity={transform.opacity * 0.8}
+				/>
+				<Text
+					text="Error"
+					fontSize={0.25}
+					color="white"
+					anchorX="center"
+					anchorY="middle"
+					position.z={0.01}
+				/>
+			</T.Mesh>
+		{:else if texture}
+			<T.Mesh {geometry}>
+				<T.MeshBasicMaterial
+					map={texture}
+					side={THREE.DoubleSide}
+					transparent={false}
+					opacity={1}
+				/>
+			</T.Mesh>
+		{:else}
+			<T.Mesh {geometry}>
+				<T.MeshBasicMaterial
+					color="#1e293b"
+					side={THREE.DoubleSide}
+					transparent
+					opacity={transform.opacity * 0.8}
+				/>
+			</T.Mesh>
+		{/if}
 	</T.Mesh>
 
 	<!-- Border glow for center card -->
