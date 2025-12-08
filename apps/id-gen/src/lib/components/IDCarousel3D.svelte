@@ -667,6 +667,8 @@
 		class="sticky top-0 left-0 w-full h-full z-10 outline-none"
 		style="touch-action: {viewMode === 'grid' ? 'pan-y' : 'none'};"
 		tabindex="0"
+		role="application"
+		aria-roledescription="3D card viewer"
 		onkeydown={handleKeydown}
 		onpointerdown={handlePointerDown}
 		onpointermove={handlePointerMove}

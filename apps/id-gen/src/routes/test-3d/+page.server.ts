@@ -1,11 +1,19 @@
 import type { PageServerLoad } from './$types';
 
+interface CardData {
+    id: number;
+    template_id: number;
+    front_image: string | null;
+    back_image: string | null;
+    created_at: string;
+}
+
 export const load: PageServerLoad = async ({ locals }) => {
     const { supabase, org_id } = locals;
 
     if (!org_id) {
         return {
-            cards: []
+            cards: [] as CardData[]
         };
     }
 
