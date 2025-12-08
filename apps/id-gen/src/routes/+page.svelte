@@ -14,7 +14,8 @@
 		Image as ImageIcon,
 		MoreVertical,
 		ChevronLeft,
-		ChevronRight
+		ChevronRight,
+		Settings2
 	} from 'lucide-svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import IDThumbnailCard from '$lib/components/IDThumbnailCard.svelte';
@@ -64,6 +65,53 @@
 	let activeView = $state<'templates' | 'generations'>('templates');
 	let gridColumns = $state(4); // Default to 4 columns
 	let selectedTemplateId = $state<string | null>(null);
+
+	// Debug panel state
+	let showDebugPanel = $state(false);
+	let showElementOverlays = $state(true);
+	let showOverlayColors = $state(false);
+	let showOverlayBorders = $state(true);
+	let showOverlayText = $state(true);
+	let showOverlayIcons = $state(true);
+	let showAnimateText = $state(true);
+
+	// Card rotation and opacity for shadow sync
+	let cardRotationY = $state(0);
+	let shadowOpacity = $state(0.35);
+	let shadowOblongFactor = $state(1.0); // 1.0 = full oblong, 0.0 = circular
+	let shadowSizeFactor = $state(1.0); // 1.0 = full size, smaller = reduced
+
+	// Shadow debug controls
+	let shadowSlowOpacity = $state(0.08); // Requested: 0.08
+	let shadowFastOpacity = $state(0.01); // Requested: 0.01
+	let shadowSlowOblong = $state(0.75); // Requested: 0.75
+	let shadowFastOblong = $state(0.55); // Requested: 0.55
+	let shadowSlowSize = $state(1.00);   // Requested: 1.00
+	let shadowFastSize = $state(0.80);   // Requested: 0.80
+	let shadowLerpSpeed = $state(0.18);  // Requested: 0.18
+
+	// Target values for lerping
+	let targetShadowOpacity = 0.35;
+	let targetShadowOblong = 1.0;
+	let targetShadowSize = 1.0;
+
+	// Handle rotation updates - direct follow, lerp shape properties
+	function handleRotationChange(rotation: number, isSlowSpin: boolean) {
+		cardRotationY = rotation;
+		// Set targets based on debug values
+		targetShadowOpacity = isSlowSpin ? shadowSlowOpacity : shadowFastOpacity;
+		targetShadowOblong = isSlowSpin ? shadowSlowOblong : shadowFastOblong;
+		targetShadowSize = isSlowSpin ? shadowSlowSize : shadowFastSize;
+
+		// Dynamic lerp - faster when closer to target (ease out)
+		const oblongDiff = Math.abs(targetShadowOblong - shadowOblongFactor);
+		const lerpFactor = shadowLerpSpeed + (1 - oblongDiff) * 0.4;
+
+		// Lerp towards targets
+		shadowOpacity += (targetShadowOpacity - shadowOpacity) * lerpFactor;
+		shadowOblongFactor += (targetShadowOblong - shadowOblongFactor) * lerpFactor;
+		shadowSizeFactor += (targetShadowSize - shadowSizeFactor) * lerpFactor;
+	}
 
 	// Get selected template object
 	const selectedTemplate = $derived(
@@ -294,19 +342,165 @@
 			<!-- Center: 3D Card Preview -->
 			<div class="flex flex-col items-center justify-center order-1 lg:order-1">
 				<!-- 3D Card Container - Much larger for better visibility -->
-				<div class="w-[500px] h-[450px] lg:w-[650px] lg:h-[550px]">
+				<div class="w-[500px] h-[450px] lg:w-[650px] lg:h-[550px] relative">
+					<!-- Debug toggle button -->
+					<button
+						type="button"
+						class="absolute top-2 right-2 z-10 p-2 rounded-lg bg-black/30 hover:bg-black/50 text-white/70 hover:text-white transition-colors"
+						onclick={() => (showDebugPanel = !showDebugPanel)}
+						title="Debug options"
+					>
+						<Settings2 class="w-4 h-4" />
+					</button>
+					
+					<!-- Debug panel -->
+					{#if showDebugPanel}
+						<div class="absolute top-12 right-2 z-10 bg-black/80 backdrop-blur-sm rounded-lg p-3 text-white text-sm min-w-[180px]" transition:fade={{ duration: 150 }}>
+							<div class="font-medium mb-2 text-xs uppercase tracking-wide text-white/60">Debug Options</div>
+							<label class="flex items-center gap-2 cursor-pointer hover:bg-white/10 rounded p-1 -mx-1">
+								<input type="checkbox" bind:checked={showElementOverlays} class="w-4 h-4 rounded" />
+								<span>Element Overlays</span>
+							</label>
+							{#if showElementOverlays}
+								<div class="ml-4 mt-1 space-y-1 border-l border-white/20 pl-2">
+									<label class="flex items-center gap-2 cursor-pointer hover:bg-white/10 rounded p-1 -mx-1 text-xs">
+										<input type="checkbox" bind:checked={showOverlayColors} class="w-3 h-3 rounded" />
+										<span>Colors</span>
+									</label>
+									<label class="flex items-center gap-2 cursor-pointer hover:bg-white/10 rounded p-1 -mx-1 text-xs">
+										<input type="checkbox" bind:checked={showOverlayBorders} class="w-3 h-3 rounded" />
+										<span>Borders</span>
+									</label>
+									<label class="flex items-center gap-2 cursor-pointer hover:bg-white/10 rounded p-1 -mx-1 text-xs">
+										<input type="checkbox" bind:checked={showOverlayText} class="w-3 h-3 rounded" />
+										<span>Text</span>
+									</label>
+									<label class="flex items-center gap-2 cursor-pointer hover:bg-white/10 rounded p-1 -mx-1 text-xs">
+										<input type="checkbox" bind:checked={showOverlayIcons} class="w-3 h-3 rounded" />
+										<span>Icons</span>
+									</label>
+									<label class="flex items-center gap-2 cursor-pointer hover:bg-white/10 rounded p-1 -mx-1 text-xs">
+										<input type="checkbox" bind:checked={showAnimateText} class="w-3 h-3 rounded" />
+										<span>Animate Text</span>
+									</label>
+								</div>
+							{/if}
+
+							<div class="mt-3 pt-3 border-t border-white/20">
+								<div class="font-medium mb-2 text-xs uppercase tracking-wide text-white/60">Shadow Controls</div>
+								<div class="space-y-2">
+									<div>
+										<label class="text-xs text-white/70">Slow Opacity: {shadowSlowOpacity.toFixed(2)}</label>
+										<input type="range" min="0" max="0.5" step="0.01" bind:value={shadowSlowOpacity} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
+									</div>
+									<div>
+										<label class="text-xs text-white/70">Fast Opacity: {shadowFastOpacity.toFixed(2)}</label>
+										<input type="range" min="0" max="0.2" step="0.005" bind:value={shadowFastOpacity} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
+									</div>
+									<div>
+										<label class="text-xs text-white/70">Slow Oblong: {shadowSlowOblong.toFixed(2)}</label>
+										<input type="range" min="0" max="1" step="0.05" bind:value={shadowSlowOblong} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
+									</div>
+									<div>
+										<label class="text-xs text-white/70">Fast Oblong: {shadowFastOblong.toFixed(2)}</label>
+										<input type="range" min="0" max="1" step="0.05" bind:value={shadowFastOblong} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
+									</div>
+									<div>
+										<label class="text-xs text-white/70">Slow Size: {shadowSlowSize.toFixed(2)}</label>
+										<input type="range" min="0.2" max="1.5" step="0.05" bind:value={shadowSlowSize} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
+									</div>
+									<div>
+										<label class="text-xs text-white/70">Fast Size: {shadowFastSize.toFixed(2)}</label>
+										<input type="range" min="0.2" max="1.5" step="0.05" bind:value={shadowFastSize} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
+									</div>
+									<div>
+										<label class="text-xs text-white/70">Lerp Speed: {shadowLerpSpeed.toFixed(2)}</label>
+										<input type="range" min="0.05" max="0.5" step="0.01" bind:value={shadowLerpSpeed} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
+									</div>
+								</div>
+							</div>
+						</div>
+					{/if}
+					
 					<ClientOnly>
 						<Canvas toneMapping={NoToneMapping}>
-							<T.PerspectiveCamera makeDefault position={[0, 0, 5]} fov={50} />
+						<T.PerspectiveCamera makeDefault position={[0, 0, 5]} fov={50}>
 							<OrbitControls
 								enableDamping
 								enableZoom={true}
 								enablePan={false}
 								minDistance={3}
 								maxDistance={10}
+								minAzimuthAngle={-Math.PI / 6}
+								maxAzimuthAngle={Math.PI / 6}
+								minPolarAngle={Math.PI / 3}
+								maxPolarAngle={Math.PI * 2 / 3}
 							/>
-							<T.AmbientLight intensity={1.2} />
-							<T.DirectionalLight position={[4, 4, 6]} intensity={0.7} />
+						</T.PerspectiveCamera>
+							<!-- Scene fog for depth - starts near card, fades to background -->
+							<T.Fog attach="fog" args={['#1a1a2e', 3, 12]} />
+
+							<!-- Ambient light for full color luster -->
+							<T.AmbientLight intensity={1.0} color="#ffffff" />
+							<!-- Main spotlight for visible reflection shape -->
+							<T.SpotLight
+								position={[1.5, 1.5, 5]}
+								intensity={3}
+								color="#ffffff"
+								angle={0.8}
+								penumbra={0.4}
+							/>
+							<!-- Second spotlight from opposite side -->
+							<T.SpotLight
+								position={[-2, 0.5, 5]}
+								intensity={2}
+								color="#ffffff"
+								angle={0.7}
+								penumbra={0.5}
+							/>
+
+							<!-- Shadow beneath card - oblong ellipse that rotates with card -->
+							{@const cardW = selectedTemplate?.width_pixels || 1013}
+							{@const cardH = selectedTemplate?.height_pixels || 638}
+							{@const aspect = cardW / cardH}
+							{@const baseX = aspect >= 1 ? 5.0 : 5.0 * aspect}
+							{@const baseY = aspect >= 1 ? 2.5 / aspect : 2.5}
+							{@const avgSize = (baseX + baseY) / 2}
+							<T.Mesh
+								rotation.x={-Math.PI / 2}
+								rotation.z={cardRotationY}
+								position.y={-1.8}
+								position.z={0}
+								scale.x={(baseX * shadowOblongFactor + avgSize * (1 - shadowOblongFactor)) * shadowSizeFactor}
+								scale.y={(baseY * shadowOblongFactor + avgSize * (1 - shadowOblongFactor)) * shadowSizeFactor}
+							>
+								<T.PlaneGeometry args={[1, 1, 1, 1]} />
+								<T.ShaderMaterial
+									transparent={true}
+									uniforms={{
+										uColor: { value: [0.02, 0.02, 0.05] },
+										uOpacity: { value: shadowOpacity }
+									}}
+									vertexShader={`
+										varying vec2 vUv;
+										void main() {
+											vUv = uv;
+											gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+										}
+									`}
+									fragmentShader={`
+										uniform vec3 uColor;
+										uniform float uOpacity;
+										varying vec2 vUv;
+										void main() {
+											vec2 center = vUv - 0.5;
+											float dist = length(center) * 2.0;
+											float alpha = smoothstep(1.0, 0.0, dist) * uOpacity;
+											gl_FragColor = vec4(uColor, alpha);
+										}
+									`}
+								/>
+							</T.Mesh>
 							<TemplateCard3D
 								imageUrl={selectedTemplate?.front_background
 									? selectedTemplate.front_background.startsWith('http')
@@ -321,7 +515,15 @@
 								widthPixels={selectedTemplate?.width_pixels || 1013}
 								heightPixels={selectedTemplate?.height_pixels || 638}
 								templateId={selectedTemplateId}
+								templateElements={selectedTemplate?.template_elements || []}
+								showOverlays={showElementOverlays}
+								showColors={showOverlayColors}
+								showBorders={showOverlayBorders}
+								showText={showOverlayText}
+								showIcons={showOverlayIcons}
+								animateText={showAnimateText}
 								rotating={false}
+								onRotationChange={handleRotationChange}
 							/>
 						</Canvas>
 					</ClientOnly>
@@ -352,7 +554,8 @@
 				</div>
 			</div>
 
-			<!-- Right: Template List with Thumbnails -->
+			<!-- Right: Template List with Thumbnails (only show when signed in) -->
+			{#if data.user}
 			<div class="w-full max-w-xs order-2 lg:order-2">
 				<div class="bg-card border border-border rounded-xl p-3">
 					<h3 class="font-semibold text-foreground mb-2 text-sm">Templates</h3>
@@ -441,6 +644,7 @@
 					</div>
 				</div>
 			</div>
+			{/if}
 		</section>
 	{/if}
 

@@ -14,7 +14,7 @@ export const fontSizeSchema = z
 	.min(1, 'Font size must be at least 1')
 	.max(200, 'Font size cannot exceed 200');
 
-export const fontFamilySchema = z.string().min(1, 'Font family is required').default('Arial');
+export const fontFamilySchema = z.string().min(1, 'Font family is required').default('Roboto');
 
 export const fontWeightSchema = z
 	.enum(['normal', 'bold', '100', '200', '300', '400', '500', '600', '700', '800', '900'])

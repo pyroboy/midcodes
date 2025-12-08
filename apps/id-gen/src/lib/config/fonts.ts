@@ -29,6 +29,11 @@ export const fonts: FontConfig[] = [
 		variants: ['300', '400', '500', '700']
 	},
 	{
+		family: 'Poppins',
+		category: 'sans-serif',
+		variants: ['300', '400', '500', '700']
+	},
+	{
 		family: 'Source Sans Pro',
 		category: 'sans-serif',
 		variants: ['300', '400', '600', '700']
@@ -39,6 +44,106 @@ export const fonts: FontConfig[] = [
 		variants: ['400', '500', '700']
 	}
 ];
+
+// CDN URLs for 3D rendering (jsDelivr @fontsource)
+// Used by TemplateCard3D.svelte for Threlte/Troika text rendering
+// NOTE: System fonts (Arial, Impact, etc.) are mapped to similar web fonts
+export const FONT_CDN_URLS: Record<string, Record<string, Record<string, string>>> = {
+	// System font mappings (Arial -> Roboto, Impact -> Oswald, Arial Black -> Roboto Black/900)
+	Arial: {
+		'400': {
+			normal: 'https://cdn.jsdelivr.net/npm/@fontsource/roboto/files/roboto-latin-400-normal.woff',
+			italic: 'https://cdn.jsdelivr.net/npm/@fontsource/roboto/files/roboto-latin-400-italic.woff'
+		},
+		'700': {
+			normal: 'https://cdn.jsdelivr.net/npm/@fontsource/roboto/files/roboto-latin-700-normal.woff',
+			italic: 'https://cdn.jsdelivr.net/npm/@fontsource/roboto/files/roboto-latin-700-italic.woff'
+		}
+	},
+	'Arial Black': {
+		'400': {
+			normal: 'https://cdn.jsdelivr.net/npm/@fontsource/roboto/files/roboto-latin-900-normal.woff'
+		},
+		'700': {
+			normal: 'https://cdn.jsdelivr.net/npm/@fontsource/roboto/files/roboto-latin-900-normal.woff'
+		}
+	},
+	Impact: {
+		'400': {
+			normal: 'https://cdn.jsdelivr.net/npm/@fontsource/oswald/files/oswald-latin-700-normal.woff'
+		},
+		'700': {
+			normal: 'https://cdn.jsdelivr.net/npm/@fontsource/oswald/files/oswald-latin-700-normal.woff'
+		}
+	},
+	// Standard web fonts
+	Roboto: {
+		'400': {
+			normal: 'https://cdn.jsdelivr.net/npm/@fontsource/roboto/files/roboto-latin-400-normal.woff',
+			italic: 'https://cdn.jsdelivr.net/npm/@fontsource/roboto/files/roboto-latin-400-italic.woff'
+		},
+		'700': {
+			normal: 'https://cdn.jsdelivr.net/npm/@fontsource/roboto/files/roboto-latin-700-normal.woff',
+			italic: 'https://cdn.jsdelivr.net/npm/@fontsource/roboto/files/roboto-latin-700-italic.woff'
+		}
+	},
+	'Open Sans': {
+		'400': {
+			normal:
+				'https://cdn.jsdelivr.net/npm/@fontsource/open-sans/files/open-sans-latin-400-normal.woff'
+		},
+		'700': {
+			normal:
+				'https://cdn.jsdelivr.net/npm/@fontsource/open-sans/files/open-sans-latin-700-normal.woff'
+		}
+	},
+	Lato: {
+		'400': {
+			normal: 'https://cdn.jsdelivr.net/npm/@fontsource/lato/files/lato-latin-400-normal.woff'
+		},
+		'700': {
+			normal: 'https://cdn.jsdelivr.net/npm/@fontsource/lato/files/lato-latin-700-normal.woff'
+		}
+	},
+	Montserrat: {
+		'400': {
+			normal:
+				'https://cdn.jsdelivr.net/npm/@fontsource/montserrat/files/montserrat-latin-400-normal.woff'
+		},
+		'700': {
+			normal:
+				'https://cdn.jsdelivr.net/npm/@fontsource/montserrat/files/montserrat-latin-700-normal.woff'
+		}
+	},
+	Poppins: {
+		'400': {
+			normal: 'https://cdn.jsdelivr.net/npm/@fontsource/poppins/files/poppins-latin-400-normal.woff'
+		},
+		'700': {
+			normal: 'https://cdn.jsdelivr.net/npm/@fontsource/poppins/files/poppins-latin-700-normal.woff'
+		}
+	},
+	'Source Sans Pro': {
+		'400': {
+			normal:
+				'https://cdn.jsdelivr.net/npm/@fontsource/source-sans-pro/files/source-sans-pro-latin-400-normal.woff'
+		},
+		'700': {
+			normal:
+				'https://cdn.jsdelivr.net/npm/@fontsource/source-sans-pro/files/source-sans-pro-latin-700-normal.woff'
+		}
+	},
+	'Playfair Display': {
+		'400': {
+			normal:
+				'https://cdn.jsdelivr.net/npm/@fontsource/playfair-display/files/playfair-display-latin-400-normal.woff'
+		},
+		'700': {
+			normal:
+				'https://cdn.jsdelivr.net/npm/@fontsource/playfair-display/files/playfair-display-latin-700-normal.woff'
+		}
+	}
+};
 
 export function getAllFontFamilies(): string[] {
 	return fonts.map((font) => font.family);

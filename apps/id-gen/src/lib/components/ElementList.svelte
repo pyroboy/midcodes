@@ -71,7 +71,7 @@
 			...(type === 'text'
 				? {
 						content: 'New Text',
-						fontFamily: 'Arial',
+						fontFamily: 'Roboto',
 						fontSize: 16,
 						color: '#ffffff',
 						alignment: 'left'
@@ -79,7 +79,7 @@
 				: type === 'selection'
 					? {
 							options: ['Option 1', 'Option 2', 'Option 3'],
-							fontFamily: 'Arial',
+							fontFamily: 'Roboto',
 							fontSize: 16,
 							color: '#ffffff',
 							alignment: 'left'
