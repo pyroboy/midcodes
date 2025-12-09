@@ -1,19 +1,23 @@
 {
-	"permissions": {
-		"allow": [
-			"Bash(npm run dev:*)",
-			"mcp__supabase__list_tables",
-			"mcp__supabase__execute_sql",
-			"mcp__context7__get-library-docs",
-			"Bash(npm view:*)",
-			"mcp__context7__resolve-library-id",
-			"Bash(npm run check:*)",
-			"Bash(pnpm run test:unit:*)",
-			"Bash(pnpm run lint)",
-			"Bash(npx prettier:*)",
-			"Bash(pnpm run check:*)"
-		],
-		"deny": [],
-		"ask": []
-	}
+  "permissions": {
+    "allow": [
+      "Bash(npm run dev:*)",
+      "mcp__supabase__list_tables",
+      "mcp__supabase__execute_sql",
+      "mcp__context7__get-library-docs",
+      "Bash(npm view:*)",
+      "mcp__context7__resolve-library-id",
+      "Bash(npm run check:*)",
+      "Bash(pnpm run test:unit:*)",
+      "Bash(pnpm run lint)",
+      "Bash(npx prettier:*)",
+      "Bash(pnpm run check:*)",
+      "Bash(npx svelte-check:*)",
+      "Bash(timeout 15 pnpm run dev:*)",
+      "mcp__supabase__list_projects",
+      "mcp__supabase__generate_typescript_types"
+    ],
+    "deny": [],
+    "ask": []
+  }
 }

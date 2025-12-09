@@ -189,7 +189,7 @@ const authGuard: Handle = async ({ event, resolve }) => {
 			if (returnTo && !returnTo.startsWith('/auth')) {
 				throw redirect(303, returnTo);
 			}
-			throw redirect(303, '/all-ids');
+			throw redirect(303, '/');
 		}
 		// Allow access to everything else for logged in users
 		return resolve(event);

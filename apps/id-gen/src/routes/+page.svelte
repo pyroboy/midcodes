@@ -74,6 +74,7 @@
 	let showOverlayText = $state(true);
 	let showOverlayIcons = $state(true);
 	let showAnimateText = $state(true);
+	let showShadowControls = $state(false); // Collapsed by default
 
 	// Card rotation and opacity for shadow sync
 	let cardRotationY = $state(0);
@@ -86,6 +87,36 @@
 
 	// Mobile template list collapse state
 	let templateListCollapsed = $state(true);
+
+	// Texture preloading state
+	let texturesLoading = $state(true);
+	let texturesProgress = $state(0);
+	let texturesLoaded = $state(0);
+	let texturesTotal = $state(0);
+
+	// Handle loading progress from TemplateCard3D
+	function handleLoadingProgress(progress: number, loaded: number, total: number, isReady: boolean) {
+		texturesProgress = progress;
+		texturesLoaded = loaded;
+		texturesTotal = total;
+		texturesLoading = !isReady;
+	}
+
+	// Beat system state
+	let beatMs = $state(1500); // Default 1.5 seconds per beat
+	let currentBeatCount = $state(0);
+	let lastBeatAction = $state<'texture' | 'shape' | 'spin' | null>(null);
+
+	// Wobble effect controls
+	let wobbleAmount = $state(0.15); // Amount of wobble (0-0.5)
+	let wobbleVariance = $state(0.5); // Variance in wobble (0-1)
+	let wobbleLinger = $state(0.5); // How long wobble lasts (0.1-1.0)
+
+	// Handle beat callback from TemplateCard3D
+	function handleBeat(beatCount: number, action: 'texture' | 'shape' | 'spin') {
+		currentBeatCount = beatCount;
+		lastBeatAction = action;
+	}
 
 	// Shadow debug controls
 	let shadowSlowOpacity = $state(0.08); // Requested: 0.08
@@ -403,8 +434,12 @@
 							{/if}
 
 							<div class="mt-3 pt-3 border-t border-white/20">
-								<div class="font-medium mb-2 text-xs uppercase tracking-wide text-white/60">Shadow Controls</div>
-								<div class="space-y-2">
+								<label class="flex items-center gap-2 cursor-pointer hover:bg-white/10 rounded p-1 -mx-1">
+									<input type="checkbox" bind:checked={showShadowControls} class="w-4 h-4 rounded" />
+									<span class="font-medium text-xs uppercase tracking-wide text-white/60">Shadow Controls</span>
+								</label>
+								{#if showShadowControls}
+								<div class="ml-4 mt-1 space-y-2 border-l border-white/20 pl-2">
 									<div>
 										<label class="text-xs text-white/70">Slow Opacity: {shadowSlowOpacity.toFixed(2)}</label>
 										<input type="range" min="0" max="0.5" step="0.01" bind:value={shadowSlowOpacity} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
@@ -434,10 +469,75 @@
 										<input type="range" min="0.05" max="0.5" step="0.01" bind:value={shadowLerpSpeed} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
 									</div>
 								</div>
+								{/if}
+							</div>
+
+							<div class="mt-3 pt-3 border-t border-white/20">
+								<div class="font-medium mb-2 text-xs uppercase tracking-wide text-white/60">Beat Timing</div>
+								<div class="space-y-2">
+									<div>
+										<label class="text-xs text-white/70">Beat: {beatMs}ms</label>
+										<input type="range" min="50" max="3000" step="50" bind:value={beatMs} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
+									</div>
+									<div class="flex items-center justify-between text-xs">
+										<span class="text-white/70">Count:</span>
+										<span class="font-mono text-green-400">{currentBeatCount}</span>
+									</div>
+									<div class="flex items-center justify-between text-xs">
+										<span class="text-white/70">Last:</span>
+										<span class="font-mono {lastBeatAction === 'spin' ? 'text-pink-400' : lastBeatAction === 'shape' ? 'text-yellow-400' : lastBeatAction === 'texture' ? 'text-blue-400' : 'text-white/40'}">{lastBeatAction || 'none'}</span>
+									</div>
+									<div class="mt-2 pt-2 border-t border-white/10">
+										<div class="text-xs text-white/50 mb-1">Wobble Effect</div>
+										<div>
+											<label class="text-xs text-white/70">Amount: {wobbleAmount.toFixed(2)}</label>
+											<input type="range" min="0" max="0.5" step="0.01" bind:value={wobbleAmount} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
+										</div>
+										<div>
+											<label class="text-xs text-white/70">Variance: {wobbleVariance.toFixed(2)}</label>
+											<input type="range" min="0" max="1" step="0.05" bind:value={wobbleVariance} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
+										</div>
+										<div>
+											<label class="text-xs text-white/70">Linger: {wobbleLinger.toFixed(2)}</label>
+											<input type="range" min="0.1" max="1" step="0.05" bind:value={wobbleLinger} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
+										</div>
+									</div>
+								</div>
 							</div>
 						</div>
 					{/if}
-					
+
+					<!-- Loading overlay with progress bar -->
+					{#if texturesLoading && !selectedTemplateId && (data.templateAssets?.length ?? 0) > 0}
+						<div
+							class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm rounded-xl"
+							transition:fade={{ duration: 300 }}
+						>
+							<div class="flex flex-col items-center gap-4 px-8 w-full max-w-xs">
+								<!-- Loading spinner -->
+								<div class="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+
+								<!-- Progress text -->
+								<p class="text-sm text-muted-foreground">
+									Loading templates... {texturesLoaded}/{texturesTotal}
+								</p>
+
+								<!-- Progress bar -->
+								<div class="w-full h-2 bg-muted rounded-full overflow-hidden">
+									<div
+										class="h-full bg-primary transition-all duration-200 ease-out rounded-full"
+										style="width: {texturesProgress * 100}%"
+									></div>
+								</div>
+
+								<!-- Percentage -->
+								<p class="text-xs text-muted-foreground/70">
+									{Math.round(texturesProgress * 100)}%
+								</p>
+							</div>
+						</div>
+					{/if}
+
 					<ClientOnly>
 						<Canvas toneMapping={NoToneMapping}>
 						<T.PerspectiveCamera makeDefault position={[0, 0, 5]} fov={50}>
@@ -542,7 +642,12 @@
 								rotating={false}
 								onRotationChange={handleRotationChange}
 								showcaseImages={data.templateAssets || []}
-								showcaseCycleMs={3000}
+								beatMs={beatMs}
+								onBeat={handleBeat}
+								wobbleAmount={wobbleAmount}
+								wobbleVariance={wobbleVariance}
+								wobbleLinger={wobbleLinger}
+								onLoadingProgress={handleLoadingProgress}
 							/>
 						</Canvas>
 					</ClientOnly>
@@ -837,6 +942,7 @@
 			{/if}
 		</section>
 	{/if}
+	</div>
 </div>
 
 <!-- Dialogs -->

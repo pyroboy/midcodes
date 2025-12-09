@@ -54,9 +54,18 @@
 		onRotationChange?: (rotationY: number, isSlowSpin: boolean) => void;
 		// Showcase mode: cycle through images while morphing
 		showcaseImages?: ShowcaseImage[];
-		showcaseCycleMs?: number;
+		// Unified beat timing - controls texture swaps, shape morphs, and spins
+		beatMs?: number;
 		// Click handler for immediate image change
 		onCardClick?: () => void;
+		// Loading progress callback for preloading bar
+		onLoadingProgress?: (progress: number, loaded: number, total: number, isReady: boolean) => void;
+		// Beat callback for parent UI (beat counter, current action)
+		onBeat?: (beatCount: number, action: 'texture' | 'shape' | 'spin') => void;
+		// Wobble effect controls
+		wobbleAmount?: number;
+		wobbleVariance?: number;
+		wobbleLinger?: number; // How long wobble lasts (0.1 = fast decay, 1.0 = slow decay)
 	}
 
 	let {
@@ -75,8 +84,13 @@
 		animateText = true,
 		onRotationChange,
 		showcaseImages = [],
-		showcaseCycleMs = 300,
-		onCardClick
+		beatMs = 1500,
+		onCardClick,
+		onLoadingProgress,
+		onBeat,
+		wobbleAmount = 0.15,
+		wobbleVariance = 0.5,
+		wobbleLinger = 0.5
 	}: Props = $props();
 
 	// Base scale for 3D units
@@ -97,6 +111,8 @@
 	let rotationY = $state(0);
 	let spinAnimation = $state(false);
 	let spinTarget = $state(0);
+	let spinStartRotation = $state(0); // Starting rotation for eased animation
+	let spinProgress = $state(0); // 0 to 1 progress for easing
 	let finalAngle = $state(0); // Target angle after spin
 	const BASE_TILT_X = -0.12;
 
@@ -106,10 +122,26 @@
 	const OSCILLATE_SPEED = 0.008; // Slow oscillation
 	const OSCILLATE_AMPLITUDE = (5 * Math.PI) / 180; // 5 degrees in radians
 
+	// Wobble effect after spin - multi-axis (X, Y, Z)
+	let wobbleActive = $state(false);
+	let wobbleProgress = $state(0);
+	let wobbleSpinDirection = $state(1); // Direction of the spin that triggered wobble (1 = positive, -1 = negative)
+	let wobbleIntensity = $state(0); // Current wobble intensity (with variance applied)
+	let wobbleEffectiveLinger = $state(0.5); // Effective linger with variance applied
+	// Wobble offsets for each axis
+	let wobbleOffsetX = $state(0);
+	let wobbleOffsetY = $state(0);
+	let wobbleOffsetZ = $state(0);
+	// Random phase offsets for each axis to create organic movement
+	let wobblePhaseX = $state(0);
+	let wobblePhaseY = $state(0);
+	let wobblePhaseZ = $state(0);
+	const WOBBLE_FREQUENCY = 8; // Oscillation frequency (slightly slower for smoothness)
+
 	// Rotation speeds - dynamic based on which face is visible
 	const ROTATION_SPEED_FACE = 0.002; // Front & back facing speed (linger longer on faces)
 	const ROTATION_SPEED_EDGE = 0.12; // Edge transition speed (very fast through edges)
-	const SPIN_SPEED = 0.4; // Template change spin speed
+	const SPIN_SPEED = 0.08; // Eased spin speed (progress increment per frame)
 
 	// Thresholds for speed zones (in radians)
 	const FACE_THRESHOLD = (15 * Math.PI) / 180; // 15 degrees - slow zone around front & back
@@ -157,8 +189,34 @@
 	let morphGeometries = $state<CachedGeometry[]>([]);
 	let morphGeometriesLoaded = $state(false);
 
+	// Compute available orientations from showcase images - only morph to shapes with textures
+	const availableOrientations = $derived(() => {
+		const orientations = new Set<'landscape' | 'portrait'>();
+		showcaseImages.forEach(img => {
+			if (img.orientation) orientations.add(img.orientation);
+		});
+		return orientations;
+	});
+
+	// Filter MORPH_SHAPES to only include shapes that have matching textures
+	// This ensures we NEVER show a blank card without texture
+	const validMorphShapeIndices = $derived(() => {
+		const orientations = availableOrientations();
+		if (orientations.size === 0) return [0]; // Fallback to first shape if no textures
+
+		const indices: number[] = [];
+		MORPH_SHAPES.forEach((shape, index) => {
+			const shapeOrientation = shape.w >= shape.h ? 'landscape' : 'portrait';
+			if (orientations.has(shapeOrientation)) {
+				indices.push(index);
+			}
+		});
+		return indices.length > 0 ? indices : [0]; // Fallback to first shape
+	});
+
 	// Current morph state - uses geometry from currentIndex, scales toward nextIndex
 	let currentMorphIndex = $state(0);
+	let currentValidIndex = $state(0); // Index within validMorphShapeIndices
 	// Smooth scale factors for interpolation between keyframes
 	let morphScaleX = $state(1.0);
 	let morphScaleY = $state(1.0);
@@ -175,6 +233,36 @@
 	let showcaseTextureValid = $state(false); // Only true when texture is fully loaded and ready
 	let showcaseLoadingDebounceStart = $state(0); // Time when loading started (for debounced indicator)
 	const LOADING_DEBOUNCE_MS = 200; // Show loading icon only after 200ms delay
+	
+	// Texture cache for preloaded showcase images - eliminates blank card flashes
+	let showcaseTextureCache = $state<Map<string, THREE.Texture>>(new Map());
+	let showcaseCacheReady = $state(false);
+	
+	// Unified beat system - controls all timing (texture swap, shape morph, spin)
+	let beatCount = $state(0);
+	let lastBeatTime = $state(0);
+	// Beat actions cycle: texture, texture, texture, shape+texture (every 4th beat changes shape)
+	// This creates a predictable rhythm where shape changes are less frequent than texture changes
+	const BEATS_PER_SHAPE_CHANGE = 4;
+	
+	// Spin beat tracking - detect 180-degree rotation crossings
+	// A "half rotation" is when the card completes 180 degrees, showing front or back
+	let lastHalfRotationCount = $state(0); // Tracks which 180-degree boundary we last crossed
+
+	// Loading progress tracking for preloading bar
+	let preloadProgress = $state(0); // 0 to 1
+	let preloadTotal = $state(0);
+	let preloadLoaded = $state(0);
+
+	// Export loading state for parent component to show loading bar
+	export function getLoadingState() {
+		return {
+			isLoading: !showcaseCacheReady && showcaseImages.length > 0,
+			progress: preloadProgress,
+			loaded: preloadLoaded,
+			total: preloadTotal
+		};
+	}
 
 	// Function to advance to next showcase image immediately (called on click)
 	export function advanceShowcaseImage() {
@@ -215,6 +303,13 @@
 		currentShowcaseImageOrientation !== null && 
 		currentShowcaseImageOrientation === getCurrentMorphOrientation()
 	);
+	
+	// Helper: Check if we have a cached texture ready for a given orientation
+	// This prevents shape changes that would cause the card to disappear
+	function hasReadyTextureForOrientation(orientation: 'landscape' | 'portrait'): boolean {
+		const matchingImages = showcaseImages.filter(img => img.orientation === orientation);
+		return matchingImages.some(img => showcaseTextureCache.has(img.image_url));
+	}
 	
 	// Show loading indicator after debounce delay
 	const shouldShowLoadingIndicator = $derived(
@@ -526,7 +621,7 @@
 		);
 	}
 
-	// Load showcase texture (for cycling through images)
+	// Load showcase texture (for cycling through images) - uses cache if available
 	function loadShowcaseTexture(url: string) {
 		// Don't load if URL is empty or invalid
 		if (!url || url.trim() === '') {
@@ -536,7 +631,21 @@
 			return;
 		}
 		
-		// Start loading state with debounce timer
+		// Check cache first - instant swap if available
+		const cachedTexture = showcaseTextureCache.get(url);
+		if (cachedTexture) {
+			// Dispose old showcase texture if different
+			if (showcaseTexture && showcaseTexture !== cachedTexture) {
+				// Don't dispose - it might be in cache still
+			}
+			showcaseTexture = cachedTexture;
+			showcaseTextureLoading = false;
+			showcaseTextureError = false;
+			showcaseTextureValid = true;
+			return;
+		}
+		
+		// Start loading state with debounce timer (fallback for non-cached images)
 		showcaseTextureLoading = true;
 		showcaseTextureError = false;
 		showcaseTextureValid = false;
@@ -563,10 +672,9 @@
 				loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
 				loadedTexture.needsUpdate = true;
 				
-				// Dispose old showcase texture
-				if (showcaseTexture) {
-					showcaseTexture.dispose();
-				}
+				// Add to cache for future use
+				showcaseTextureCache.set(url, loadedTexture);
+				
 				showcaseTexture = loadedTexture;
 				
 				// Mark as loaded and valid
@@ -583,11 +691,99 @@
 			}
 		);
 	}
+	
+	// Preload all showcase textures into cache on mount
+	async function preloadShowcaseTextures() {
+		if (showcaseImages.length === 0) {
+			showcaseCacheReady = true;
+			preloadProgress = 1;
+			onLoadingProgress?.(1, 0, 0, true);
+			return;
+		}
+
+		// Filter valid images
+		const validImages = showcaseImages.filter(img => img.image_url && img.image_url.trim() !== '');
+		preloadTotal = validImages.length;
+		preloadLoaded = 0;
+		preloadProgress = 0;
+
+		// Notify parent of initial loading state
+		onLoadingProgress?.(0, 0, preloadTotal, false);
+
+		console.log('[TemplateCard3D] Preloading', preloadTotal, 'showcase textures...');
+
+		const loader = new THREE.TextureLoader();
+		loader.crossOrigin = 'anonymous';
+
+		const loadPromises = validImages.map((img) => {
+			return new Promise<void>((resolve) => {
+				// Skip if already in cache
+				if (showcaseTextureCache.has(img.image_url)) {
+					preloadLoaded++;
+					preloadProgress = preloadTotal > 0 ? preloadLoaded / preloadTotal : 1;
+					onLoadingProgress?.(preloadProgress, preloadLoaded, preloadTotal, false);
+					resolve();
+					return;
+				}
+
+				loader.load(
+					img.image_url,
+					(loadedTexture) => {
+						if (loadedTexture.image && loadedTexture.image.width > 0 && loadedTexture.image.height > 0) {
+							loadedTexture.colorSpace = THREE.SRGBColorSpace;
+							loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
+							loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
+							loadedTexture.needsUpdate = true;
+							showcaseTextureCache.set(img.image_url, loadedTexture);
+						}
+						preloadLoaded++;
+						preloadProgress = preloadTotal > 0 ? preloadLoaded / preloadTotal : 1;
+						onLoadingProgress?.(preloadProgress, preloadLoaded, preloadTotal, false);
+						resolve();
+					},
+					undefined,
+					() => {
+						// Still count failed loads toward progress
+						preloadLoaded++;
+						preloadProgress = preloadTotal > 0 ? preloadLoaded / preloadTotal : 1;
+						onLoadingProgress?.(preloadProgress, preloadLoaded, preloadTotal, false);
+						resolve();
+					}
+				);
+			});
+		});
+
+		await Promise.all(loadPromises);
+		showcaseCacheReady = true;
+		preloadProgress = 1;
+		onLoadingProgress?.(1, preloadLoaded, preloadTotal, true);
+		console.log('[TemplateCard3D] Preloaded', showcaseTextureCache.size, 'showcase textures into cache');
+	}
 
 	// Initial load
 	onMount(() => {
 		// Pre-cache morph geometries for empty state
 		preCacheMorphGeometries();
+		
+		// Preload all showcase textures into cache for instant swapping
+		if (!templateId && showcaseImages.length > 0) {
+			preloadShowcaseTextures().then(() => {
+				// After preloading, load the first matching image
+				const firstShape = MORPH_SHAPES[0];
+				const firstOrientation = firstShape.w >= firstShape.h ? 'landscape' : 'portrait';
+				
+				const matchingImages = showcaseImages.filter(img => 
+					img.orientation === firstOrientation
+				);
+				const firstImage = matchingImages[0];
+				
+				if (firstImage?.image_url) {
+					loadShowcaseTexture(firstImage.image_url);
+					currentShowcaseImageOrientation = firstImage.orientation || null;
+					showcaseLastChange = performance.now();
+				}
+			});
+		}
 
 		// If we have a template, load its geometry and texture
 		if (imageUrl) {
@@ -596,25 +792,6 @@
 		}
 		if (backImageUrl) {
 			loadBackTexture(backImageUrl, widthPixels / heightPixels);
-		}
-		
-		// Load first showcase image if in showcase mode (match to first morph shape orientation)
-		if (!templateId && showcaseImages.length > 0) {
-			const firstShape = MORPH_SHAPES[0];
-			const firstOrientation = firstShape.w >= firstShape.h ? 'landscape' : 'portrait';
-			
-			// Find first image matching the orientation, or fallback to first image
-			// Only load images that STRICTLY match first shape orientation
-			const matchingImages = showcaseImages.filter(img => 
-				img.orientation === firstOrientation
-			);
-			const firstImage = matchingImages[0];
-			
-			if (firstImage?.image_url) {
-				loadShowcaseTexture(firstImage.image_url);
-				currentShowcaseImageOrientation = firstImage.orientation || null;
-				showcaseLastChange = performance.now();
-			}
 		}
 		
 		prevImageUrl = imageUrl;
@@ -632,9 +809,12 @@
 		if (backTexture) {
 			backTexture.dispose();
 		}
-		if (showcaseTexture) {
-			showcaseTexture.dispose();
-		}
+		// Dispose all cached showcase textures
+		showcaseTextureCache.forEach((tex) => {
+			tex.dispose();
+		});
+		showcaseTextureCache.clear();
+		showcaseTexture = null;
 	});
 
 	// Animation loop
@@ -653,6 +833,10 @@
 			animatedTexts.clear();
 			textAnimationFrame = 0;
 			console.log('[TemplateCard3D] Template changed, cleared animated texts cache');
+			
+			// Notify parent of spin beat
+			beatCount++;
+			onBeat?.(beatCount, 'spin');
 		}
 
 		if (widthPixels !== prevWidthPixels || heightPixels !== prevHeightPixels) {
@@ -699,116 +883,206 @@
 		prevTemplateId = templateId;
 
 		// Rotation animation
+		// In showcase mode with cache ready: rotation ONLY happens during spin beats (no freeloader spins)
+		// Outside showcase mode: continuous rotation with variable speed
+		const inShowcaseWithCache = !templateId && showcaseImages.length > 0 && showcaseCacheReady;
+		
 		if (spinAnimation) {
-			rotationY += SPIN_SPEED;
-			if (rotationY >= spinTarget) {
-				// Snap to the final front-facing angle with random offset
+			// Eased spin animation using ease-out cubic
+			spinProgress += SPIN_SPEED;
+			if (spinProgress >= 1) {
+				// Spin complete - snap to final angle and start wobble
+				spinProgress = 0;
 				rotationY = finalAngle;
 				spinAnimation = false;
+				
+				// Start wobble effect - use spin direction as initial influence
+				wobbleActive = true;
+				wobbleProgress = 0;
+				// Capture spin direction for wobble (positive = clockwise, negative = counter-clockwise)
+				wobbleSpinDirection = spinTarget > spinStartRotation ? 1 : -1;
+				// Apply variance: wobbleAmount * (1 - variance + random * variance * 2)
+				const varianceFactor = 1 - wobbleVariance + Math.random() * wobbleVariance * 2;
+				wobbleIntensity = wobbleAmount * varianceFactor;
+				// Random phase offsets for organic multi-axis movement
+				wobblePhaseX = Math.random() * Math.PI * 2;
+				wobblePhaseY = Math.random() * Math.PI * 2;
+				wobblePhaseZ = Math.random() * Math.PI * 2;
+			} else {
+				// Ease-out cubic: 1 - (1-t)^3
+				const easeOut = 1 - Math.pow(1 - spinProgress, 3);
+				const rotationDelta = spinTarget - spinStartRotation;
+				rotationY = spinStartRotation + rotationDelta * easeOut;
 			}
-		} else {
-			// Dynamic rotation: slow on front, fast through edges, medium on back
+		} else if (!inShowcaseWithCache) {
+			// Only do continuous rotation when NOT in showcase mode
+			// In showcase mode, rotation is controlled by spin beats only
 			rotationY += getRotationSpeed(rotationY);
 		}
+		// else: In showcase mode without spin animation, card stays still
+		
+		// Wobble effect - multi-axis damped oscillation after spin
+		// Uses ease-out exponential for strong start and slow decay
+		if (wobbleActive) {
+			// wobbleLinger controls decay speed: 0.1 = fast, 1.0 = slow (3x longer than before)
+			const wobbleSpeed = (0.03 + (1 - wobbleLinger) * 0.27) / 3;
+			wobbleProgress += wobbleSpeed;
+			if (wobbleProgress >= 1) {
+				wobbleActive = false;
+				wobbleProgress = 0;
+				wobbleOffsetX = 0;
+				wobbleOffsetY = 0;
+				wobbleOffsetZ = 0;
+			} else {
+				// Ease-out exponential decay: e^(-5*t) for strong start, slow decay
+				const decayFactor = Math.exp(-5 * wobbleProgress);
+				
+				// Multi-axis wobble with different frequencies for organic feel
+				// X-axis (tilt forward/back): main wobble
+				const wobbleX = Math.sin(wobbleProgress * WOBBLE_FREQUENCY * Math.PI + wobblePhaseX);
+				// Y-axis (rotation): subtle, influenced by spin direction
+				const wobbleY = Math.sin(wobbleProgress * (WOBBLE_FREQUENCY * 0.7) * Math.PI + wobblePhaseY) * wobbleSpinDirection;
+				// Z-axis (bank/roll): subtle variation
+				const wobbleZ = Math.sin(wobbleProgress * (WOBBLE_FREQUENCY * 1.3) * Math.PI + wobblePhaseZ);
+				
+				// Apply intensity and decay with axis-specific scaling
+				wobbleOffsetX = wobbleIntensity * wobbleX * decayFactor;
+				wobbleOffsetY = wobbleIntensity * 0.3 * wobbleY * decayFactor; // Y is subtler
+				wobbleOffsetZ = wobbleIntensity * 0.5 * wobbleZ * decayFactor; // Z is medium
+			}
+		}
 
-		// Oscillating tilt animation (up and down by 30 degrees)
+		// Oscillating tilt animation (up and down by 5 degrees) + wobble on X-axis
 		oscillateTime += OSCILLATE_SPEED;
-		tiltX = BASE_TILT_X + Math.sin(oscillateTime) * OSCILLATE_AMPLITUDE;
+		tiltX = BASE_TILT_X + Math.sin(oscillateTime) * OSCILLATE_AMPLITUDE + wobbleOffsetX;
 
 		// Notify parent of rotation change for shadow sync
 		const currentSpeed = getRotationSpeed(rotationY);
 		const isSlowSpin = !spinAnimation && currentSpeed === ROTATION_SPEED_FACE;
 		onRotationChange?.(rotationY, isSlowSpin);
+		
+		// Define isShowcaseMode for use in beat system and morphing
+		const isShowcaseMode = !templateId && showcaseImages.length > 0;
 
 		// Morphing animation - runs in empty state OR showcase mode (when no specific template selected)
-		// Uses smooth scale interpolation between pre-cached geometry keyframes
-		const isShowcaseMode = !templateId && showcaseImages.length > 0;
+		// Now controlled by unified beat system
+		// Note: isShowcaseMode is already defined above in spin beat detection
 		const shouldMorph = (
 			(!imageUrl && !isShowcaseMode) || isShowcaseMode
 		) && !loading && !error && !spinAnimation && morphGeometriesLoaded && morphGeometries.length > 0;
 
-		if (shouldMorph) {
-			morphTime += MORPH_SPEED;
-
-			const cycleLength = MORPH_SHAPES.length;
-			const progress = morphTime % cycleLength;
-			const fromIndex = Math.floor(progress) % cycleLength;
-			const toIndex = (fromIndex + 1) % cycleLength;
-			const rawT = progress - Math.floor(progress); // 0 to 1 between keyframes
-
-			// Apply hold duration: hold at shape for HOLD_DURATION, then transition in remaining time
-			// rawT 0 to HOLD_DURATION -> t = 0 (hold)
-			// rawT HOLD_DURATION to 1 -> t = 0 to 1 (transition)
-			let t: number;
-			if (rawT < HOLD_DURATION) {
-				t = 0; // Hold at current shape
-			} else {
-				t = (rawT - HOLD_DURATION) / (1 - HOLD_DURATION); // Remap to 0-1 for transition
-			}
-
-			// Smooth easing for the transition portion
-			const easeT = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-
-			// Switch to 'from' geometry when index changes
-			if (fromIndex !== currentMorphIndex && morphGeometries[fromIndex]) {
-				currentMorphIndex = fromIndex;
-				frontGeometry = morphGeometries[fromIndex].front;
-				backGeometry = morphGeometries[fromIndex].back;
-				edgeGeometry = morphGeometries[fromIndex].edge;
-			}
-
-			// Calculate scale to interpolate from 'from' dimensions toward 'to' dimensions
-			const fromDims = morphGeometries[fromIndex].dims;
-			const toDims = morphGeometries[toIndex].dims;
-
-			// Scale = (target dimension / current geometry dimension) interpolated by easeT
-			// At t=0: scale = 1.0 (showing from geometry at natural size)
-			// At t=1: scale = toDims/fromDims (stretched/shrunk to match 'to' size)
-			morphScaleX = lerp(1.0, toDims.width / fromDims.width, easeT);
-			morphScaleY = lerp(1.0, toDims.height / fromDims.height, easeT);
+		// === UNIFIED BEAT SYSTEM ===
+		// All visual changes happen on the beat timer: texture, shape, and spin
+		// Beat cycle pattern example: texture, spin, texture, shape+spin, texture, spin, texture, shape...
+		if (isShowcaseMode && showcaseImages.length > 0 && showcaseCacheReady) {
+			const now = performance.now();
 			
-			// When in showcase mode with texture, DON'T apply morph scaling to prevent distortion
-			// Instead, just snap between geometries (texture covers full geometry without stretching)
-			if (showcaseTexture) {
-				morphScaleX = 1.0;
-				morphScaleY = 1.0;
+			// Check if it's time for a beat
+			if (now - lastBeatTime >= beatMs) {
+				lastBeatTime = now;
+				beatCount++;
+				
+				// Determine beat action based on beat count
+				// - Every 4th beat: shape change
+				// - Every 2nd beat: spin (fast 180° rotation)
+				// - Otherwise: texture change
+				const isShapeBeat = beatCount % BEATS_PER_SHAPE_CHANGE === 0;
+				const isSpinBeat = beatCount % 2 === 0; // Every other beat is a spin
+				
+				if (isShapeBeat && shouldMorph) {
+					// === SHAPE CHANGE BEAT ===
+					const validIndices = validMorphShapeIndices();
+					const cycleLength = validIndices.length;
+					
+					if (cycleLength > 0) {
+						// Move to next valid shape
+						const nextValidIdx = (currentValidIndex + 1) % cycleLength;
+						const actualShapeIndex = validIndices[nextValidIdx];
+						const newShape = MORPH_SHAPES[actualShapeIndex];
+						const newOrientation: 'landscape' | 'portrait' = newShape.w >= newShape.h ? 'landscape' : 'portrait';
+						
+						// Only switch if we have a cached texture ready for the new orientation
+						if (hasReadyTextureForOrientation(newOrientation)) {
+							currentValidIndex = nextValidIdx;
+							currentMorphIndex = actualShapeIndex;
+							frontGeometry = morphGeometries[actualShapeIndex].front;
+							backGeometry = morphGeometries[actualShapeIndex].back;
+							edgeGeometry = morphGeometries[actualShapeIndex].edge;
+							
+							// Immediately load a matching texture from cache to prevent any flash
+							const matchingImages = showcaseImages.filter(img => img.orientation === newOrientation);
+							const cachedImage = matchingImages.find(img => showcaseTextureCache.has(img.image_url));
+							if (cachedImage) {
+								const cachedTex = showcaseTextureCache.get(cachedImage.image_url);
+								if (cachedTex) {
+									showcaseTexture = cachedTex;
+									currentShowcaseImageOrientation = newOrientation;
+									showcaseTextureValid = true;
+									showcaseTextureError = false;
+									// Reset showcaseIndex for new orientation
+									showcaseIndex = matchingImages.indexOf(cachedImage);
+								}
+							}
+							
+							// Notify parent of shape change beat
+							onBeat?.(beatCount, 'shape');
+						}
+					}
+				} else if (isSpinBeat) {
+					// === SPIN BEAT ===
+					// Trigger an eased 180-degree spin with wobble at the end
+					const halfRotation = Math.PI;
+					const targetRotation = Math.ceil(rotationY / halfRotation) * halfRotation + halfRotation;
+					
+					// Set up eased spin animation
+					spinStartRotation = rotationY;
+					spinProgress = 0;
+					spinAnimation = true;
+					spinTarget = targetRotation;
+					finalAngle = targetRotation; // Land exactly at the 180° boundary
+					
+					// Notify parent of spin beat
+					onBeat?.(beatCount, 'spin');
+				} else {
+					// === TEXTURE CHANGE BEAT ===
+					const currentShape = MORPH_SHAPES[currentMorphIndex] || MORPH_SHAPES[0];
+					const currentMorphOrientation = currentShape.w >= currentShape.h ? 'landscape' : 'portrait';
+					
+					// Filter images by matching orientation
+					const matchingImages = showcaseImages.filter(img =>
+						img.orientation === currentMorphOrientation
+					);
+					
+					if (matchingImages.length > 0) {
+						// Move to next image in the filtered set
+						showcaseIndex = (showcaseIndex + 1) % matchingImages.length;
+						const nextImage = matchingImages[showcaseIndex];
+						if (nextImage?.image_url) {
+							// Use cache for instant swap
+							const cachedTex = showcaseTextureCache.get(nextImage.image_url);
+							if (cachedTex) {
+								showcaseTexture = cachedTex;
+								currentShowcaseImageOrientation = nextImage.orientation || null;
+								showcaseTextureValid = true;
+								showcaseTextureError = false;
+							} else {
+								// Fallback to loading (should rarely happen with preloading)
+								loadShowcaseTexture(nextImage.image_url);
+								currentShowcaseImageOrientation = nextImage.orientation || null;
+							}
+						}
+					}
+					
+					// Notify parent of texture change beat
+					onBeat?.(beatCount, 'texture');
+				}
 			}
 		}
 
-		// Showcase image cycling - change image every showcaseCycleMs
-		// Match image orientation to current morph shape orientation
-		if (isShowcaseMode && showcaseImages.length > 0) {
-			const now = performance.now();
-			if (now - showcaseLastChange >= showcaseCycleMs) {
-				showcaseLastChange = now;
-				
-				// Determine current morph shape orientation
-				const currentShape = MORPH_SHAPES[currentMorphIndex] || MORPH_SHAPES[0];
-				const currentMorphOrientation = currentShape.w >= currentShape.h ? 'landscape' : 'portrait';
-				
-				// Filter images by matching orientation STRICTLY
-				const matchingImages = showcaseImages.filter(img => 
-					img.orientation === currentMorphOrientation
-				);
-				
-				// Only show texture if there are matching orientation images
-				if (matchingImages.length > 0) {
-					// Move to next image in the filtered set
-					showcaseIndex = (showcaseIndex + 1) % matchingImages.length;
-					const nextImage = matchingImages[showcaseIndex];
-					if (nextImage?.image_url) {
-						loadShowcaseTexture(nextImage.image_url);
-						currentShowcaseImageOrientation = nextImage.orientation || null;
-					}
-				} else {
-					// No matching images - clear texture so plain card shows
-					if (showcaseTexture) {
-						showcaseTexture.dispose();
-						showcaseTexture = null;
-						currentShowcaseImageOrientation = null;
-					}
-				}
-			}
+		// Keep morph scale at 1.0 - geometry switching handles size changes instantly
+		if (shouldMorph) {
+			morphScaleX = 1.0;
+			morphScaleY = 1.0;
 		}
 
 		// Text animation - mutate text every ~5 frames (~83ms at 60fps) for fast per-character effect
@@ -830,7 +1104,7 @@
 
 {#if frontGeometry}
 	<!-- Card Group -->
-	<T.Group rotation.x={tiltX} rotation.y={rotationY}>
+	<T.Group rotation.x={tiltX} rotation.y={rotationY + wobbleOffsetY} rotation.z={wobbleOffsetZ}>
 		{#if loading}
 			<T.Mesh geometry={frontGeometry}>
 				<T.MeshStandardMaterial color="#f8fafc" side={THREE.FrontSide} transparent opacity={0.9} />
@@ -1087,10 +1361,10 @@
 				{/each}
 			{/if}
 		{:else}
-		<!-- Morphing card - smooth interpolation between pre-cached geometry keyframes -->
-		<!-- Shows showcase images if available, otherwise empty card with ID GEN text -->
-		<T.Group scale.x={morphScaleX} scale.y={morphScaleY}>
+		<!-- Morphing card - ONLY render when textures are ready -->
+		<!-- NEVER show gray/plain card - wait for texture to be available -->
 		{#if shouldShowShowcaseTexture}
+			<T.Group scale.x={morphScaleX} scale.y={morphScaleY}>
 				<!-- Front face with showcase texture -->
 				<T.Mesh geometry={frontGeometry}>
 					<T.MeshBasicMaterial
@@ -1110,82 +1384,42 @@
 						side={THREE.FrontSide}
 					/>
 				</T.Mesh>
-			{:else}
-				<!-- Plain front when no showcase texture -->
-				<T.Mesh geometry={frontGeometry}>
-					<T.MeshPhysicalMaterial
-						color="#f8fafc"
-						side={THREE.FrontSide}
-						metalness={0.0}
-						roughness={0.15}
-						clearcoat={0.8}
-						clearcoatRoughness={0.1}
-						reflectivity={0.9}
-					/>
-				</T.Mesh>
-			{/if}
-			{#if backGeometry}
-			{#if shouldShowShowcaseTexture}
-				<!-- Back face with showcase texture -->
-				<T.Mesh geometry={backGeometry}>
-					<T.MeshBasicMaterial
-						map={showcaseTexture}
-						side={THREE.FrontSide}
-					/>
-				</T.Mesh>
-				<!-- Shiny overlay for reflections -->
-				<T.Mesh geometry={backGeometry} position.z={-0.001}>
-					<T.MeshPhysicalMaterial
-						transparent={true}
-						opacity={0.08}
-						roughness={0.1}
-						metalness={0.0}
-						clearcoat={1.0}
-						clearcoatRoughness={0.1}
-						side={THREE.FrontSide}
-					/>
-				</T.Mesh>
-			{:else}
-				<!-- Plain back when no showcase texture -->
-				<T.Mesh geometry={backGeometry}>
-					<T.MeshPhysicalMaterial
-						color="#e2e8f0"
-						side={THREE.FrontSide}
-						metalness={0.0}
-						roughness={0.15}
-						clearcoat={0.8}
-						clearcoatRoughness={0.1}
-						reflectivity={0.9}
-					/>
-				</T.Mesh>
-			{/if}
+				{#if backGeometry}
+					<!-- Back face with showcase texture -->
+					<T.Mesh geometry={backGeometry}>
+						<T.MeshBasicMaterial
+							map={showcaseTexture}
+							side={THREE.FrontSide}
+						/>
+					</T.Mesh>
+					<!-- Shiny overlay for reflections -->
+					<T.Mesh geometry={backGeometry} position.z={-0.001}>
+						<T.MeshPhysicalMaterial
+							transparent={true}
+							opacity={0.08}
+							roughness={0.1}
+							metalness={0.0}
+							clearcoat={1.0}
+							clearcoatRoughness={0.1}
+							side={THREE.FrontSide}
+						/>
+					</T.Mesh>
+				{/if}
+				{#if edgeGeometry}
+					<T.Mesh geometry={edgeGeometry}>
+						<T.MeshPhysicalMaterial
+							color="#475569"
+							side={THREE.DoubleSide}
+							metalness={0.0}
+							roughness={0.2}
+							clearcoat={0.6}
+							clearcoatRoughness={0.15}
+						/>
+					</T.Mesh>
+				{/if}
+			</T.Group>
 		{/if}
-			{#if edgeGeometry}
-				<T.Mesh geometry={edgeGeometry}>
-					<T.MeshPhysicalMaterial
-						color="#475569"
-						side={THREE.DoubleSide}
-						metalness={0.0}
-						roughness={0.2}
-						clearcoat={0.6}
-						clearcoatRoughness={0.15}
-					/>
-				</T.Mesh>
-			{/if}
-			<!-- Loading indicator (only show when actively loading with debounce) -->
-			{#if !shouldShowShowcaseTexture && shouldShowLoadingIndicator}
-				<T.Group scale.x={1 / morphScaleX} scale.y={1 / morphScaleY}>
-					<Text
-						text="⟳"
-						fontSize={0.4}
-						color="#60a5fa"
-						anchorX="center"
-						anchorY="middle"
-						position.z={0.06}
-					/>
-				</T.Group>
-			{/if}
-		</T.Group>
+		<!-- No else block - we NEVER show a gray/plain card. Loading overlay in parent handles waiting state -->
 		{/if}
 	</T.Group>
 {/if}

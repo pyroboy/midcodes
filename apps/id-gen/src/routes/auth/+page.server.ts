@@ -53,10 +53,7 @@ export const actions: Actions = {
 			});
 		}
 
-		return {
-			success: true,
-			email
-		};
+		throw redirect(303, '/');
 	},
 
 	signup: async ({ request, url, locals: { supabase } }) => {
