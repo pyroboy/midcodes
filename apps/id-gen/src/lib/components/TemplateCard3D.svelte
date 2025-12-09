@@ -901,9 +901,21 @@
 				wobbleProgress = 0;
 				// Capture spin direction for wobble (positive = clockwise, negative = counter-clockwise)
 				wobbleSpinDirection = spinTarget > spinStartRotation ? 1 : -1;
-				// Apply variance: wobbleAmount * (1 - variance + random * variance * 2)
-				const varianceFactor = 1 - wobbleVariance + Math.random() * wobbleVariance * 2;
-				wobbleIntensity = wobbleAmount * varianceFactor;
+				
+				// Apply variance as random range to BOTH amount and linger
+				// variance=0: exact value, variance=1: ±100% range centered on base value
+				// Example: amount=0.07, variance=0.5 → range is 0.07 ± (0.07 * 0.5) = 0.035 to 0.105
+				const randomAmount = (Math.random() - 0.5) * 2; // -1 to 1
+				const randomLinger = (Math.random() - 0.5) * 2; // -1 to 1
+				
+				// Calculate effective values with variance applied
+				const amountVariation = wobbleAmount * wobbleVariance * randomAmount;
+				const lingerVariation = wobbleLinger * wobbleVariance * randomLinger;
+				
+				// Clamp to valid ranges
+				wobbleIntensity = Math.max(0, wobbleAmount + amountVariation);
+				wobbleEffectiveLinger = Math.max(0.1, Math.min(1, wobbleLinger + lingerVariation));
+				
 				// Random phase offsets for organic multi-axis movement
 				wobblePhaseX = Math.random() * Math.PI * 2;
 				wobblePhaseY = Math.random() * Math.PI * 2;
@@ -924,8 +936,8 @@
 		// Wobble effect - multi-axis damped oscillation after spin
 		// Uses ease-out exponential for strong start and slow decay
 		if (wobbleActive) {
-			// wobbleLinger controls decay speed: 0.1 = fast, 1.0 = slow (3x longer than before)
-			const wobbleSpeed = (0.03 + (1 - wobbleLinger) * 0.27) / 3;
+			// wobbleEffectiveLinger has variance applied, controls decay speed
+			const wobbleSpeed = (0.03 + (1 - wobbleEffectiveLinger) * 0.27) / 3;
 			wobbleProgress += wobbleSpeed;
 			if (wobbleProgress >= 1) {
 				wobbleActive = false;
