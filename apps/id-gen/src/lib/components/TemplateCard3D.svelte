@@ -55,6 +55,8 @@
 		// Showcase mode: cycle through images while morphing
 		showcaseImages?: ShowcaseImage[];
 		showcaseCycleMs?: number;
+		// Click handler for immediate image change
+		onCardClick?: () => void;
 	}
 
 	let {
@@ -73,7 +75,8 @@
 		animateText = true,
 		onRotationChange,
 		showcaseImages = [],
-		showcaseCycleMs = 300
+		showcaseCycleMs = 300,
+		onCardClick
 	}: Props = $props();
 
 	// Base scale for 3D units
@@ -164,11 +167,6 @@
 	let showcaseIndex = $state(0);
 	let showcaseLastChange = $state(0);
 	let showcaseTexture = $state<THREE.Texture | null>(null);
-	let showcaseTexturePrev = $state<THREE.Texture | null>(null); // Previous texture for crossfade
-	let showcaseFadeOpacity = $state(1.0); // 0=showing prev, 1=showing current
-	let showcaseFadeStartTime = $state(0);
-	const FADE_DURATION_MS = 150; // Crossfade duration in ms
-	
 	// Track current showcase image orientation for conditional rendering
 	let currentShowcaseImageOrientation = $state<'landscape' | 'portrait' | null>(null);
 	// Loading and error tracking for showcase textures
@@ -177,21 +175,31 @@
 	let showcaseTextureValid = $state(false); // Only true when texture is fully loaded and ready
 	let showcaseLoadingDebounceStart = $state(0); // Time when loading started (for debounced indicator)
 	const LOADING_DEBOUNCE_MS = 200; // Show loading icon only after 200ms delay
-	
-	// Compute which morph shapes have matching images available
-	const getFilteredMorphShapes = () => {
-		if (showcaseImages.length === 0) return MORPH_SHAPES;
-		
-		// Get available orientations from images
-		const hasLandscape = showcaseImages.some(img => img.orientation === 'landscape');
-		const hasPortrait = showcaseImages.some(img => img.orientation === 'portrait');
-		
-		// Only include shapes that have matching images
-		return MORPH_SHAPES.filter(shape => {
-			const isLandscape = shape.w >= shape.h;
-			return (isLandscape && hasLandscape) || (!isLandscape && hasPortrait);
-		});
-	};
+
+	// Function to advance to next showcase image immediately (called on click)
+	export function advanceShowcaseImage() {
+		if (showcaseImages.length === 0) return;
+
+		// Determine current morph shape orientation
+		const currentShape = MORPH_SHAPES[currentMorphIndex] || MORPH_SHAPES[0];
+		const currentMorphOrientation = currentShape.w >= currentShape.h ? 'landscape' : 'portrait';
+
+		// Filter images by matching orientation
+		const matchingImages = showcaseImages.filter(img =>
+			img.orientation === currentMorphOrientation
+		);
+
+		if (matchingImages.length > 0) {
+			// Move to next image in the filtered set
+			showcaseIndex = (showcaseIndex + 1) % matchingImages.length;
+			const nextImage = matchingImages[showcaseIndex];
+			if (nextImage?.image_url) {
+				loadShowcaseTexture(nextImage.image_url);
+				currentShowcaseImageOrientation = nextImage.orientation || null;
+				showcaseLastChange = performance.now(); // Reset timer
+			}
+		}
+	}
 	
 	// Compute current morph shape orientation for template conditional rendering
 	const getCurrentMorphOrientation = () => {

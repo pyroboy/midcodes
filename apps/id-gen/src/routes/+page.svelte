@@ -81,6 +81,12 @@
 	let shadowOblongFactor = $state(1.0); // 1.0 = full oblong, 0.0 = circular
 	let shadowSizeFactor = $state(1.0); // 1.0 = full size, smaller = reduced
 
+	// Reference to TemplateCard3D component for click-to-change
+	let templateCard3D: TemplateCard3D | null = $state(null);
+
+	// Mobile template list collapse state
+	let templateListCollapsed = $state(true);
+
 	// Shadow debug controls
 	let shadowSlowOpacity = $state(0.08); // Requested: 0.08
 	let shadowFastOpacity = $state(0.01); // Requested: 0.01
@@ -324,25 +330,35 @@
 	const transformedCards = transformRecentCards(data.recentCards || []);
 </script>
 
-<div class="container mx-auto px-4 py-2 space-y-6">
-	<!-- View Toggle Buttons -->
-	<div class="flex flex-col gap-1 w-fit">
-		<Button variant="outline" size="sm" onclick={() => (activeView = 'templates')}>Templates</Button
-		>
-		<Button variant="outline" size="sm" onclick={() => (activeView = 'generations')}
-			>Generations</Button
-		>
-	</div>
+<div class="h-[calc(100vh-4rem)] overflow-hidden flex flex-col">
+	<div class="container mx-auto px-4 py-2 flex-1 flex flex-col overflow-hidden">
+		<!-- View Toggle Buttons -->
+		<div class="flex flex-col gap-1 w-fit flex-shrink-0">
+			<Button variant="outline" size="sm" onclick={() => (activeView = 'templates')}>Templates</Button
+			>
+			<Button variant="outline" size="sm" onclick={() => (activeView = 'generations')}
+				>Generations</Button
+			>
+		</div>
 
-	<!-- Templates View - 3 Column Layout -->
-	{#if activeView === 'templates'}
-		<section
-			class="flex flex-col lg:flex-row gap-4 lg:gap-6 items-center justify-center min-h-[500px]"
-		>
+		<!-- Templates View - 3 Column Layout -->
+		{#if activeView === 'templates'}
+			<section
+				class="relative flex flex-row gap-2 lg:gap-6 items-center justify-center flex-1 overflow-hidden"
+			>
 			<!-- Center: 3D Card Preview -->
-			<div class="flex flex-col items-center justify-center order-1 lg:order-1">
-				<!-- 3D Card Container - Much larger for better visibility -->
-				<div class="w-[500px] h-[450px] lg:w-[650px] lg:h-[550px] relative">
+			<div class="flex flex-col items-center justify-center flex-1">
+				<!-- 3D Card Container - Responsive, max width on mobile -->
+				<!-- svelte-ignore a11y_click_events_have_key_events -->
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div
+					class="w-full max-w-[500px] h-[400px] sm:h-[450px] lg:max-w-[650px] lg:h-[550px] relative cursor-pointer"
+					onclick={() => {
+						if (!selectedTemplateId && templateCard3D) {
+							templateCard3D.advanceShowcaseImage();
+						}
+					}}
+				>
 					<!-- Debug toggle button -->
 					<button
 						type="button"
@@ -502,6 +518,7 @@
 								/>
 							</T.Mesh>
 							<TemplateCard3D
+								bind:this={templateCard3D}
 								imageUrl={selectedTemplate?.front_background
 									? selectedTemplate.front_background.startsWith('http')
 										? selectedTemplate.front_background
@@ -525,7 +542,7 @@
 								rotating={false}
 								onRotationChange={handleRotationChange}
 								showcaseImages={data.templateAssets || []}
-								showcaseCycleMs={300}
+								showcaseCycleMs={3000}
 							/>
 						</Canvas>
 					</ClientOnly>
@@ -556,97 +573,121 @@
 				</div>
 			</div>
 
-			<!-- Right: Template List with Thumbnails (only show when signed in) -->
-			{#if data.user}
-			<div class="w-full max-w-xs order-2 lg:order-2">
-				<div class="bg-card border border-border rounded-xl p-3">
-					<h3 class="font-semibold text-foreground mb-2 text-sm">Templates</h3>
+			<!-- Right: Template List with Toggle - Overlays on mobile -->
+			<div class="absolute right-0 top-1/2 -translate-y-1/2 flex items-start z-30 lg:relative lg:right-auto lg:top-auto lg:translate-y-0 lg:flex-shrink-0">
+				<!-- Mobile: Collapse toggle button - always visible -->
+				<button
+					type="button"
+					class="lg:hidden flex items-center justify-center w-8 h-20 bg-primary text-primary-foreground rounded-l-xl shadow-lg hover:bg-primary/90 transition-colors"
+					onclick={() => (templateListCollapsed = !templateListCollapsed)}
+					title={templateListCollapsed ? 'Show templates' : 'Hide templates'}
+				>
+					{#if templateListCollapsed}
+						<ChevronLeft class="w-4 h-4" />
+					{:else}
+						<ChevronRight class="w-4 h-4" />
+					{/if}
+				</button>
 
-					<div class="space-y-1 max-h-[320px] overflow-y-auto">
-						<!-- New Card option to go back to empty morphing state -->
-						<button
-							type="button"
-							class="w-full flex items-center gap-3 px-2 py-2 rounded-lg text-sm transition-colors {selectedTemplateId === null
-								? 'bg-primary text-primary-foreground'
-								: 'hover:bg-muted text-foreground'}"
-							onclick={() => (selectedTemplateId = null)}
-						>
-							<!-- Morphing card icon -->
-							<div
-								class="flex-shrink-0 w-14 h-10 rounded overflow-hidden bg-gradient-to-br from-slate-700 to-slate-900 border border-border/50 flex items-center justify-center"
+				<!-- Template list panel -->
+				<div
+					class="w-64 lg:w-72 transition-all duration-300 ease-in-out shadow-xl lg:shadow-none {templateListCollapsed ? 'max-w-0 opacity-0 overflow-hidden lg:max-w-72 lg:opacity-100' : 'max-w-72 opacity-100'}"
+				>
+				{#if data.user}
+					<div class="bg-card border border-border rounded-xl p-3 {templateListCollapsed ? 'lg:block' : ''}">
+						<h3 class="font-semibold text-foreground mb-2 text-sm">Templates</h3>
+
+						<div class="space-y-1 max-h-[320px] overflow-y-auto">
+							<!-- New Card option to go back to empty morphing state -->
+							<button
+								type="button"
+								class="w-full flex items-center gap-3 px-2 py-2 rounded-lg text-sm transition-colors {selectedTemplateId === null
+									? 'bg-primary text-primary-foreground'
+									: 'hover:bg-muted text-foreground'}"
+								onclick={() => (selectedTemplateId = null)}
 							>
-								<span class="text-blue-400 font-bold text-xs">ID</span>
-							</div>
-							<span class="truncate flex-1 text-left font-medium">New Card</span>
-						</button>
-
-						{#if templates.length === 0}
-							<p class="text-sm text-muted-foreground py-4 text-center">No templates yet</p>
-						{:else}
-							{#each templates as template (template.id)}
-								{@const dims = getPixelDims(template)}
-								<button
-									type="button"
-									class="w-full flex items-center gap-3 px-2 py-2 rounded-lg text-sm transition-colors {selectedTemplateId ===
-									template.id
-										? 'bg-primary text-primary-foreground'
-										: 'hover:bg-muted text-foreground'}"
-									onclick={() => (selectedTemplateId = template.id)}
+								<!-- Morphing card icon -->
+								<div
+									class="flex-shrink-0 w-14 h-10 rounded overflow-hidden bg-gradient-to-br from-slate-700 to-slate-900 border border-border/50 flex items-center justify-center"
 								>
-									<!-- Thumbnail with Elements Overlay -->
-									<div
-										class="flex-shrink-0 w-14 h-10 rounded overflow-hidden bg-muted border border-border/50 relative"
-										style="aspect-ratio: {dims.w} / {dims.h};"
-									>
-										{#if template.front_background}
-											<img
-												src={template.front_background.startsWith('http')
-													? template.front_background
-													: getSupabaseStorageUrl(template.front_background)}
-												alt={template.name}
-												class="w-full h-full object-cover"
-												loading="lazy"
-											/>
-										{:else}
-											<div
-												class="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-gray-700"
-											>
-												<FileText class="w-3 h-3 text-muted-foreground" />
-											</div>
-										{/if}
-										<!-- Elements Overlay -->
-										{#if template.template_elements?.length > 0}
-											<div class="absolute inset-0 pointer-events-none">
-												{#each template.template_elements.filter((el: any) => el.side === 'front') as el}
-													<div
-														class="absolute border border-dashed border-black/20 bg-black/5"
-														style={getElementStyle(el, dims.w, dims.h)}
-													>
-														{#if el.type === 'text' || el.type === 'selection'}
-															<span
-																class="block w-full h-full"
-																style="font-size: 2px; color: {el.color ?? '#000'}; opacity: 0.7;"
-															></span>
-														{/if}
-													</div>
-												{/each}
-											</div>
-										{/if}
-									</div>
-									<!-- Name -->
-									<span class="truncate flex-1 text-left">{template.name}</span>
-								</button>
-							{/each}
-						{/if}
-					</div>
+									<span class="text-blue-400 font-bold text-xs">ID</span>
+								</div>
+								<span class="truncate flex-1 text-left font-medium">New Card</span>
+							</button>
 
-					<!-- View All Button -->
-					<div class="mt-3 pt-2 border-t border-border">
-						<Button variant="outline" size="sm" class="w-full" href="/templates">View All</Button>
+							{#if templates.length === 0}
+								<p class="text-sm text-muted-foreground py-4 text-center">No templates yet</p>
+							{:else}
+								{#each templates as template (template.id)}
+									{@const dims = getPixelDims(template)}
+									<button
+										type="button"
+										class="w-full flex items-center gap-3 px-2 py-2 rounded-lg text-sm transition-colors {selectedTemplateId ===
+										template.id
+											? 'bg-primary text-primary-foreground'
+											: 'hover:bg-muted text-foreground'}"
+										onclick={() => (selectedTemplateId = template.id)}
+									>
+										<!-- Thumbnail with Elements Overlay -->
+										<div
+											class="flex-shrink-0 w-14 h-10 rounded overflow-hidden bg-muted border border-border/50 relative"
+											style="aspect-ratio: {dims.w} / {dims.h};"
+										>
+											{#if template.front_background}
+												<img
+													src={template.front_background.startsWith('http')
+														? template.front_background
+														: getSupabaseStorageUrl(template.front_background)}
+													alt={template.name}
+													class="w-full h-full object-cover"
+													loading="lazy"
+												/>
+											{:else}
+												<div
+													class="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-gray-700"
+												>
+													<FileText class="w-3 h-3 text-muted-foreground" />
+												</div>
+											{/if}
+											<!-- Elements Overlay -->
+											{#if template.template_elements?.length > 0}
+												<div class="absolute inset-0 pointer-events-none">
+													{#each template.template_elements.filter((el: any) => el.side === 'front') as el}
+														<div
+															class="absolute border border-dashed border-black/20 bg-black/5"
+															style={getElementStyle(el, dims.w, dims.h)}
+														>
+															{#if el.type === 'text' || el.type === 'selection'}
+																<span
+																	class="block w-full h-full"
+																	style="font-size: 2px; color: {el.color ?? '#000'}; opacity: 0.7;"
+																></span>
+															{/if}
+														</div>
+													{/each}
+												</div>
+											{/if}
+										</div>
+										<!-- Name -->
+										<span class="truncate flex-1 text-left">{template.name}</span>
+									</button>
+								{/each}
+							{/if}
+						</div>
+
+						<!-- View All Button -->
+						<div class="mt-3 pt-2 border-t border-border">
+							<Button variant="outline" size="sm" class="w-full" href="/templates">View All</Button>
+						</div>
 					</div>
+				{:else}
+					<!-- Not signed in - show sign in prompt -->
+					<div class="bg-card border border-border rounded-xl p-4">
+						<p class="text-sm text-muted-foreground text-center">Sign in to view templates</p>
+					</div>
+				{/if}
 				</div>
 			</div>
-			{/if}
 		</section>
 	{/if}
 
