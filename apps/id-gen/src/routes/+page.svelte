@@ -108,9 +108,9 @@
 	let lastBeatAction = $state<'texture' | 'shape' | 'spin' | null>(null);
 
 	// Wobble effect controls
-	let wobbleAmount = $state(0.15); // Amount of wobble (0-0.5)
-	let wobbleVariance = $state(0.5); // Variance in wobble (0-1)
-	let wobbleLinger = $state(0.5); // How long wobble lasts (0.1-1.0)
+	let wobbleAmount = $state(0.05); // Amount of wobble (0-0.5)
+	let wobbleVariance = $state(0.10); // Variance in wobble (0-1)
+	let wobbleLinger = $state(0.95); // How long wobble lasts (0.1-1.0)
 
 	// Handle beat callback from TemplateCard3D
 	function handleBeat(beatCount: number, action: 'texture' | 'shape' | 'spin') {

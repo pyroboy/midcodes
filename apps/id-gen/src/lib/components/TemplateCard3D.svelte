@@ -88,9 +88,9 @@
 		onCardClick,
 		onLoadingProgress,
 		onBeat,
-		wobbleAmount = 0.15,
-		wobbleVariance = 0.5,
-		wobbleLinger = 0.5
+		wobbleAmount = 0.05,
+		wobbleVariance = 0.10,
+		wobbleLinger = 0.95
 	}: Props = $props();
 
 	// Base scale for 3D units
