@@ -524,6 +524,8 @@
 								animateText={showAnimateText}
 								rotating={false}
 								onRotationChange={handleRotationChange}
+								showcaseImages={data.templateAssets || []}
+								showcaseCycleMs={300}
 							/>
 						</Canvas>
 					</ClientOnly>

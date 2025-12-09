@@ -70,9 +70,43 @@ export const A4_DIMENSIONS = {
 	dpi: 300
 } as const;
 
-// Wizard step type
-export const wizardStepSchema = z.enum(['size', 'upload', 'detection']);
+// Wizard step type (now includes 'save' step)
+export const wizardStepSchema = z.enum(['size', 'upload', 'detection', 'save']);
 export type WizardStep = z.infer<typeof wizardStepSchema>;
+
+// Asset metadata for each detected region
+export const assetMetadataSchema = z.object({
+	regionId: z.string(),
+	name: z.string().min(1).max(100),
+	description: z.string().optional(),
+	category: z.string().optional(),
+	tags: z.array(z.string()).default([])
+});
+
+export type AssetMetadata = z.infer<typeof assetMetadataSchema>;
+
+// Template asset (matches database table)
+export const templateAssetSchema = z.object({
+	id: z.string().uuid(),
+	created_at: z.string(),
+	updated_at: z.string(),
+	name: z.string(),
+	description: z.string().nullable(),
+	category: z.string().nullable(),
+	tags: z.array(z.string()),
+	size_preset_id: z.string().uuid().nullable(),
+	sample_type: sampleTypeSchema,
+	orientation: orientationSchema,
+	image_path: z.string(),
+	image_url: z.string(),
+	width_pixels: z.number().int().positive(),
+	height_pixels: z.number().int().positive(),
+	is_published: z.boolean(),
+	published_at: z.string().nullable(),
+	uploaded_by: z.string().uuid().nullable()
+});
+
+export type TemplateAsset = z.infer<typeof templateAssetSchema>;
 
 // Wizard state schema
 export const wizardStateSchema = z.object({
@@ -82,6 +116,7 @@ export const wizardStateSchema = z.object({
 	uploadedImageUrl: z.string().nullable(),
 	sampleType: sampleTypeSchema.nullable(),
 	detectedRegions: z.array(detectedRegionSchema),
+	assetMetadata: z.map(z.string(), assetMetadataSchema).default(new Map()),
 	isProcessing: z.boolean(),
 	error: z.string().nullable()
 });
@@ -127,3 +162,19 @@ export function estimateCardsPerA4(sizePreset: SizePreset): {
 
 	return { columns, rows, total: columns * rows };
 }
+
+/**
+ * Asset categories for organization
+ */
+export const ASSET_CATEGORIES = [
+	'Government',
+	'Company',
+	'School',
+	'Medical',
+	'Event',
+	'Membership',
+	'Other'
+] as const;
+
+export type AssetCategory = typeof ASSET_CATEGORIES[number];
+

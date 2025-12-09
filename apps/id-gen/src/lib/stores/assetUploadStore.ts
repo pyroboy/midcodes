@@ -3,12 +3,13 @@ import type {
 	SizePreset,
 	DetectedRegion,
 	SampleType,
-	WizardStep
+	WizardStep,
+	AssetMetadata
 } from '$lib/schemas/template-assets.schema';
 
 /**
  * Asset Upload Wizard State Store
- * Manages the state for the 3-step wizard: Size → Upload → Detection
+ * Manages the state for the 4-step wizard: Size → Upload → Detection → Save
  */
 
 export interface AssetUploadState {
@@ -18,6 +19,8 @@ export interface AssetUploadState {
 	uploadedImageUrl: string | null;
 	sampleType: SampleType | null;
 	detectedRegions: DetectedRegion[];
+	// Step 4: Asset metadata per region
+	assetMetadata: Map<string, AssetMetadata>;
 	isProcessing: boolean;
 	error: string | null;
 }
@@ -30,6 +33,7 @@ function createAssetUploadStore() {
 		uploadedImageUrl: null,
 		sampleType: null,
 		detectedRegions: [],
+		assetMetadata: new Map(),
 		isProcessing: false,
 		error: null
 	};
@@ -159,6 +163,34 @@ function createAssetUploadStore() {
 
 		setError: (error: string | null) => update((s) => ({ ...s, error })),
 
+		// Step 4: Asset metadata management
+		initializeMetadata: () =>
+			update((s) => {
+				const metadata = new Map<string, AssetMetadata>();
+				s.detectedRegions
+					.filter((r) => r.isSelected)
+					.forEach((region, index) => {
+						metadata.set(region.id, {
+							regionId: region.id,
+							name: `Card ${index + 1}`,
+							description: '',
+							category: undefined,
+							tags: []
+						});
+					});
+				return { ...s, assetMetadata: metadata };
+			}),
+
+		updateAssetMetadata: (regionId: string, updates: Partial<AssetMetadata>) =>
+			update((s) => {
+				const metadata = new Map(s.assetMetadata);
+				const existing = metadata.get(regionId);
+				if (existing) {
+					metadata.set(regionId, { ...existing, ...updates });
+				}
+				return { ...s, assetMetadata: metadata };
+			}),
+
 		// Reset
 		reset: () => {
 			update((s) => {
@@ -186,6 +218,9 @@ export const canProceedToNext = derived(assetUploadStore, ($state) => {
 			return $state.uploadedImage !== null && $state.sampleType !== null;
 		case 'detection':
 			return $state.detectedRegions.some((r) => r.isSelected);
+		case 'save':
+			// Can proceed when all metadata has names
+			return Array.from($state.assetMetadata.values()).every((m) => m.name.trim().length > 0);
 		default:
 			return false;
 	}
@@ -202,7 +237,7 @@ export const selectedRegions = derived(assetUploadStore, ($state) =>
  * Get step progress information
  */
 export const stepProgress = derived(assetUploadStore, ($state) => {
-	const steps: WizardStep[] = ['size', 'upload', 'detection'];
+	const steps: WizardStep[] = ['size', 'upload', 'detection', 'save'];
 	const currentIndex = steps.indexOf($state.currentStep);
 	return {
 		current: currentIndex + 1,
@@ -217,5 +252,6 @@ export const stepProgress = derived(assetUploadStore, ($state) => {
 export const stepLabels: Record<WizardStep, string> = {
 	size: 'Select Size',
 	upload: 'Upload Image',
-	detection: 'Detect Cards'
+	detection: 'Detect Cards',
+	save: 'Save Assets'
 };

@@ -28,25 +28,37 @@
 
 <div class="container mx-auto max-w-5xl px-4 py-8">
 	<!-- Header -->
-	<div class="mb-8">
-		<div class="flex items-center gap-3">
-			<a
-				href="/admin"
-				class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-			>
-				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-				</svg>
-				Admin
-			</a>
-			<span class="text-muted-foreground">/</span>
-			<span class="text-sm font-medium text-foreground">Template Assets</span>
+	<div class="mb-8 flex items-center justify-between">
+		<div>
+			<div class="flex items-center gap-3">
+				<a
+					href="/admin"
+					class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+				>
+					<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+					</svg>
+					Admin
+				</a>
+				<span class="text-muted-foreground">/</span>
+				<span class="text-sm font-medium text-foreground">Template Assets</span>
+			</div>
+
+			<h1 class="mt-4 text-2xl font-bold text-foreground">Template Assets</h1>
+			<p class="mt-1 text-muted-foreground">
+				Upload A4 scans to detect and extract ID card templates
+			</p>
 		</div>
 
-		<h1 class="mt-4 text-2xl font-bold text-foreground">Template Assets</h1>
-		<p class="mt-1 text-muted-foreground">
-			Upload A4 scans to detect and extract ID card templates
-		</p>
+		<a
+			href="/admin/template-assets/manage"
+			class="inline-flex items-center gap-2 rounded-md border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+		>
+			<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+			</svg>
+			Manage Assets
+		</a>
 	</div>
 
 	<!-- Main content -->
@@ -54,6 +66,7 @@
 		{#if !showResults}
 			<AssetUploadWizard
 				sizePresets={data.sizePresets}
+				userId={data.user?.id}
 				onComplete={handleComplete}
 				onCancel={handleCancel}
 			/>
@@ -141,10 +154,9 @@
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
 						</svg>
 						<div>
-							<p class="text-sm font-medium text-blue-700 dark:text-blue-300">MVP Phase Complete</p>
+							<p class="text-sm font-medium text-blue-700 dark:text-blue-300">Assets Saved Successfully</p>
 							<p class="mt-1 text-sm text-blue-600/80 dark:text-blue-400/80">
-								The card detection is working! In the next phase, we'll add the ability to save these
-								detected cards as template assets with metadata (name, category, tags).
+								Your template assets have been uploaded and saved. You can now manage them in the assets dashboard.
 							</p>
 						</div>
 					</div>
@@ -155,7 +167,7 @@
 					<button
 						type="button"
 						onclick={handleReset}
-						class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+						class="inline-flex items-center gap-2 rounded-md border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
 					>
 						<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -164,10 +176,13 @@
 					</button>
 
 					<a
-						href="/admin"
-						class="inline-flex items-center gap-2 rounded-md border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+						href="/admin/template-assets/manage"
+						class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
 					>
-						Back to Admin
+						<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+						</svg>
+						Go to Manage Assets
 					</a>
 				</div>
 			</div>

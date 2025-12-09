@@ -30,6 +30,13 @@
 		alignment?: 'left' | 'center' | 'right';
 	}
 
+	interface ShowcaseImage {
+		image_url: string;
+		width_pixels?: number;
+		height_pixels?: number;
+		orientation?: 'landscape' | 'portrait';
+	}
+
 	interface Props {
 		imageUrl?: string | null;
 		backImageUrl?: string | null;
@@ -45,6 +52,9 @@
 		showIcons?: boolean;
 		animateText?: boolean;
 		onRotationChange?: (rotationY: number, isSlowSpin: boolean) => void;
+		// Showcase mode: cycle through images while morphing
+		showcaseImages?: ShowcaseImage[];
+		showcaseCycleMs?: number;
 	}
 
 	let {
@@ -61,7 +71,9 @@
 		showText = true,
 		showIcons = true,
 		animateText = true,
-		onRotationChange
+		onRotationChange,
+		showcaseImages = [],
+		showcaseCycleMs = 300
 	}: Props = $props();
 
 	// Base scale for 3D units
@@ -107,12 +119,28 @@
 	const MORPH_SPEED = 0.008; // Speed of cycling
 	const HOLD_DURATION = 0.6; // Hold at each shape (0-1 range, 0.6 = 60% of cycle is holding)
 
-	// Pre-defined morph shapes (width x height in pixels) - geometry created once at startup
+	// Pre-defined morph shapes - Real-world card sizes at 300 DPI
+	// Based on standard card dimensions used in printing
 	const MORPH_SHAPES = [
-		{ w: 1013, h: 638 }, // CR80 Landscape (standard credit card)
-		{ w: 638, h: 1013 }, // CR80 Portrait
-		{ w: 850, h: 850 }, // Square
-		{ w: 1200, h: 800 } // Wide landscape
+		// Credit Card / CR80 (3.375" x 2.125" = 1013 x 638 px)
+		{ w: 1013, h: 638 },  // CR80 Landscape
+		{ w: 638, h: 1013 },  // CR80 Portrait
+		
+		// Business Card (3.5" x 2.0" = 1050 x 600 px)
+		{ w: 1050, h: 600 },  // Business Card Landscape
+		{ w: 600, h: 1050 },  // Business Card Portrait
+		
+		// ID Badge (4.0" x 3.0" = 1200 x 900 px)
+		{ w: 1200, h: 900 },  // ID Badge Landscape
+		{ w: 900, h: 1200 },  // ID Badge Portrait
+		
+		// Mini Card (2.5" x 1.5" = 750 x 450 px)
+		{ w: 750, h: 450 },   // Mini Card Landscape
+		{ w: 450, h: 750 },   // Mini Card Portrait
+		
+		// Jumbo Card (4.25" x 2.75" = 1275 x 825 px)
+		{ w: 1275, h: 825 },  // Jumbo Card Landscape
+		{ w: 825, h: 1275 },  // Jumbo Card Portrait
 	];
 
 	// Pre-cached geometries for each morph shape (created once, never recreated)
@@ -131,6 +159,60 @@
 	// Smooth scale factors for interpolation between keyframes
 	let morphScaleX = $state(1.0);
 	let morphScaleY = $state(1.0);
+
+	// Showcase image cycling state
+	let showcaseIndex = $state(0);
+	let showcaseLastChange = $state(0);
+	let showcaseTexture = $state<THREE.Texture | null>(null);
+	let showcaseTexturePrev = $state<THREE.Texture | null>(null); // Previous texture for crossfade
+	let showcaseFadeOpacity = $state(1.0); // 0=showing prev, 1=showing current
+	let showcaseFadeStartTime = $state(0);
+	const FADE_DURATION_MS = 150; // Crossfade duration in ms
+	
+	// Track current showcase image orientation for conditional rendering
+	let currentShowcaseImageOrientation = $state<'landscape' | 'portrait' | null>(null);
+	// Loading and error tracking for showcase textures
+	let showcaseTextureLoading = $state(false);
+	let showcaseTextureError = $state(false);
+	let showcaseTextureValid = $state(false); // Only true when texture is fully loaded and ready
+	let showcaseLoadingDebounceStart = $state(0); // Time when loading started (for debounced indicator)
+	const LOADING_DEBOUNCE_MS = 200; // Show loading icon only after 200ms delay
+	
+	// Compute which morph shapes have matching images available
+	const getFilteredMorphShapes = () => {
+		if (showcaseImages.length === 0) return MORPH_SHAPES;
+		
+		// Get available orientations from images
+		const hasLandscape = showcaseImages.some(img => img.orientation === 'landscape');
+		const hasPortrait = showcaseImages.some(img => img.orientation === 'portrait');
+		
+		// Only include shapes that have matching images
+		return MORPH_SHAPES.filter(shape => {
+			const isLandscape = shape.w >= shape.h;
+			return (isLandscape && hasLandscape) || (!isLandscape && hasPortrait);
+		});
+	};
+	
+	// Compute current morph shape orientation for template conditional rendering
+	const getCurrentMorphOrientation = () => {
+		const shape = MORPH_SHAPES[currentMorphIndex] || MORPH_SHAPES[0];
+		return shape.w >= shape.h ? 'landscape' : 'portrait';
+	};
+	
+	// Check if showcase texture should be shown (orientation must match AND texture must be valid)
+	const shouldShowShowcaseTexture = $derived(
+		showcaseTexture !== null && 
+		showcaseTextureValid &&
+		!showcaseTextureError &&
+		currentShowcaseImageOrientation !== null && 
+		currentShowcaseImageOrientation === getCurrentMorphOrientation()
+	);
+	
+	// Show loading indicator after debounce delay
+	const shouldShowLoadingIndicator = $derived(
+		showcaseTextureLoading && 
+		(performance.now() - showcaseLoadingDebounceStart) >= LOADING_DEBOUNCE_MS
+	);
 
 	// Track previous values
 	let prevTemplateId: string | null = null;
@@ -430,8 +512,66 @@
 				console.log('[TemplateCard3D] Back loaded successfully');
 			},
 			undefined,
-			(err) => {
+				(err) => {
 				console.error('[TemplateCard3D] Back error:', err);
+			}
+		);
+	}
+
+	// Load showcase texture (for cycling through images)
+	function loadShowcaseTexture(url: string) {
+		// Don't load if URL is empty or invalid
+		if (!url || url.trim() === '') {
+			showcaseTextureError = true;
+			showcaseTextureLoading = false;
+			showcaseTextureValid = false;
+			return;
+		}
+		
+		// Start loading state with debounce timer
+		showcaseTextureLoading = true;
+		showcaseTextureError = false;
+		showcaseTextureValid = false;
+		showcaseLoadingDebounceStart = performance.now();
+		
+		const showcaseLoader = new THREE.TextureLoader();
+		showcaseLoader.crossOrigin = 'anonymous';
+		
+		showcaseLoader.load(
+			url,
+			(loadedTexture) => {
+				// Validate texture has actual image data
+				if (!loadedTexture.image || loadedTexture.image.width === 0 || loadedTexture.image.height === 0) {
+					console.error('[TemplateCard3D] Showcase texture invalid - no image data');
+					showcaseTextureError = true;
+					showcaseTextureLoading = false;
+					showcaseTextureValid = false;
+					loadedTexture.dispose();
+					return;
+				}
+				
+				loadedTexture.colorSpace = THREE.SRGBColorSpace;
+				loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
+				loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
+				loadedTexture.needsUpdate = true;
+				
+				// Dispose old showcase texture
+				if (showcaseTexture) {
+					showcaseTexture.dispose();
+				}
+				showcaseTexture = loadedTexture;
+				
+				// Mark as loaded and valid
+				showcaseTextureLoading = false;
+				showcaseTextureError = false;
+				showcaseTextureValid = true;
+			},
+			undefined,
+			(err) => {
+				console.error('[TemplateCard3D] Showcase texture error:', err);
+				showcaseTextureLoading = false;
+				showcaseTextureError = true;
+				showcaseTextureValid = false;
 			}
 		);
 	}
@@ -449,6 +589,26 @@
 		if (backImageUrl) {
 			loadBackTexture(backImageUrl, widthPixels / heightPixels);
 		}
+		
+		// Load first showcase image if in showcase mode (match to first morph shape orientation)
+		if (!templateId && showcaseImages.length > 0) {
+			const firstShape = MORPH_SHAPES[0];
+			const firstOrientation = firstShape.w >= firstShape.h ? 'landscape' : 'portrait';
+			
+			// Find first image matching the orientation, or fallback to first image
+			// Only load images that STRICTLY match first shape orientation
+			const matchingImages = showcaseImages.filter(img => 
+				img.orientation === firstOrientation
+			);
+			const firstImage = matchingImages[0];
+			
+			if (firstImage?.image_url) {
+				loadShowcaseTexture(firstImage.image_url);
+				currentShowcaseImageOrientation = firstImage.orientation || null;
+				showcaseLastChange = performance.now();
+			}
+		}
+		
 		prevImageUrl = imageUrl;
 		prevBackImageUrl = backImageUrl;
 		prevTemplateId = templateId;
@@ -463,6 +623,9 @@
 		}
 		if (backTexture) {
 			backTexture.dispose();
+		}
+		if (showcaseTexture) {
+			showcaseTexture.dispose();
 		}
 	});
 
@@ -549,16 +712,14 @@
 		const isSlowSpin = !spinAnimation && currentSpeed === ROTATION_SPEED_FACE;
 		onRotationChange?.(rotationY, isSlowSpin);
 
-		// Morphing animation for empty state ONLY (no template selected)
+		// Morphing animation - runs in empty state OR showcase mode (when no specific template selected)
 		// Uses smooth scale interpolation between pre-cached geometry keyframes
-		if (
-			!imageUrl &&
-			!loading &&
-			!error &&
-			!spinAnimation &&
-			morphGeometriesLoaded &&
-			morphGeometries.length > 0
-		) {
+		const isShowcaseMode = !templateId && showcaseImages.length > 0;
+		const shouldMorph = (
+			(!imageUrl && !isShowcaseMode) || isShowcaseMode
+		) && !loading && !error && !spinAnimation && morphGeometriesLoaded && morphGeometries.length > 0;
+
+		if (shouldMorph) {
 			morphTime += MORPH_SPEED;
 
 			const cycleLength = MORPH_SHAPES.length;
@@ -597,6 +758,49 @@
 			// At t=1: scale = toDims/fromDims (stretched/shrunk to match 'to' size)
 			morphScaleX = lerp(1.0, toDims.width / fromDims.width, easeT);
 			morphScaleY = lerp(1.0, toDims.height / fromDims.height, easeT);
+			
+			// When in showcase mode with texture, DON'T apply morph scaling to prevent distortion
+			// Instead, just snap between geometries (texture covers full geometry without stretching)
+			if (showcaseTexture) {
+				morphScaleX = 1.0;
+				morphScaleY = 1.0;
+			}
+		}
+
+		// Showcase image cycling - change image every showcaseCycleMs
+		// Match image orientation to current morph shape orientation
+		if (isShowcaseMode && showcaseImages.length > 0) {
+			const now = performance.now();
+			if (now - showcaseLastChange >= showcaseCycleMs) {
+				showcaseLastChange = now;
+				
+				// Determine current morph shape orientation
+				const currentShape = MORPH_SHAPES[currentMorphIndex] || MORPH_SHAPES[0];
+				const currentMorphOrientation = currentShape.w >= currentShape.h ? 'landscape' : 'portrait';
+				
+				// Filter images by matching orientation STRICTLY
+				const matchingImages = showcaseImages.filter(img => 
+					img.orientation === currentMorphOrientation
+				);
+				
+				// Only show texture if there are matching orientation images
+				if (matchingImages.length > 0) {
+					// Move to next image in the filtered set
+					showcaseIndex = (showcaseIndex + 1) % matchingImages.length;
+					const nextImage = matchingImages[showcaseIndex];
+					if (nextImage?.image_url) {
+						loadShowcaseTexture(nextImage.image_url);
+						currentShowcaseImageOrientation = nextImage.orientation || null;
+					}
+				} else {
+					// No matching images - clear texture so plain card shows
+					if (showcaseTexture) {
+						showcaseTexture.dispose();
+						showcaseTexture = null;
+						currentShowcaseImageOrientation = null;
+					}
+				}
+			}
 		}
 
 		// Text animation - mutate text every ~5 frames (~83ms at 60fps) for fast per-character effect
@@ -621,12 +825,12 @@
 	<T.Group rotation.x={tiltX} rotation.y={rotationY}>
 		{#if loading}
 			<T.Mesh geometry={frontGeometry}>
-				<T.MeshStandardMaterial color="#1e293b" side={THREE.FrontSide} transparent opacity={0.9} />
+				<T.MeshStandardMaterial color="#f8fafc" side={THREE.FrontSide} transparent opacity={0.9} />
 			</T.Mesh>
 			{#if edgeGeometry}
 				<T.Mesh geometry={edgeGeometry}>
 					<T.MeshStandardMaterial
-						color="#0f172a"
+						color="#e2e8f0"
 						side={THREE.DoubleSide}
 						metalness={0.3}
 						roughness={0.7}
@@ -875,11 +1079,34 @@
 				{/each}
 			{/if}
 		{:else}
-			<!-- Morphing empty card - smooth interpolation between pre-cached geometry keyframes -->
-			<T.Group scale.x={morphScaleX} scale.y={morphScaleY}>
+		<!-- Morphing card - smooth interpolation between pre-cached geometry keyframes -->
+		<!-- Shows showcase images if available, otherwise empty card with ID GEN text -->
+		<T.Group scale.x={morphScaleX} scale.y={morphScaleY}>
+		{#if shouldShowShowcaseTexture}
+				<!-- Front face with showcase texture -->
+				<T.Mesh geometry={frontGeometry}>
+					<T.MeshBasicMaterial
+						map={showcaseTexture}
+						side={THREE.FrontSide}
+					/>
+				</T.Mesh>
+				<!-- Shiny overlay for reflections -->
+				<T.Mesh geometry={frontGeometry} position.z={0.001}>
+					<T.MeshPhysicalMaterial
+						transparent={true}
+						opacity={0.08}
+						roughness={0.1}
+						metalness={0.0}
+						clearcoat={1.0}
+						clearcoatRoughness={0.1}
+						side={THREE.FrontSide}
+					/>
+				</T.Mesh>
+			{:else}
+				<!-- Plain front when no showcase texture -->
 				<T.Mesh geometry={frontGeometry}>
 					<T.MeshPhysicalMaterial
-						color="#1e293b"
+						color="#f8fafc"
 						side={THREE.FrontSide}
 						metalness={0.0}
 						roughness={0.15}
@@ -888,55 +1115,69 @@
 						reflectivity={0.9}
 					/>
 				</T.Mesh>
-				{#if backGeometry}
-					<T.Mesh geometry={backGeometry}>
-						<T.MeshPhysicalMaterial
-							color="#0f172a"
-							side={THREE.FrontSide}
-							metalness={0.0}
-							roughness={0.15}
-							clearcoat={0.8}
-							clearcoatRoughness={0.1}
-							reflectivity={0.9}
-						/>
-					</T.Mesh>
-				{/if}
-				{#if edgeGeometry}
-					<T.Mesh geometry={edgeGeometry}>
-						<T.MeshPhysicalMaterial
-							color="#475569"
-							side={THREE.DoubleSide}
-							metalness={0.0}
-							roughness={0.2}
-							clearcoat={0.6}
-							clearcoatRoughness={0.15}
-						/>
-					</T.Mesh>
-				{/if}
-				<!-- Text group with counter-scaling to keep text fixed size -->
+			{/if}
+			{#if backGeometry}
+			{#if shouldShowShowcaseTexture}
+				<!-- Back face with showcase texture -->
+				<T.Mesh geometry={backGeometry}>
+					<T.MeshBasicMaterial
+						map={showcaseTexture}
+						side={THREE.FrontSide}
+					/>
+				</T.Mesh>
+				<!-- Shiny overlay for reflections -->
+				<T.Mesh geometry={backGeometry} position.z={-0.001}>
+					<T.MeshPhysicalMaterial
+						transparent={true}
+						opacity={0.08}
+						roughness={0.1}
+						metalness={0.0}
+						clearcoat={1.0}
+						clearcoatRoughness={0.1}
+						side={THREE.FrontSide}
+					/>
+				</T.Mesh>
+			{:else}
+				<!-- Plain back when no showcase texture -->
+				<T.Mesh geometry={backGeometry}>
+					<T.MeshPhysicalMaterial
+						color="#e2e8f0"
+						side={THREE.FrontSide}
+						metalness={0.0}
+						roughness={0.15}
+						clearcoat={0.8}
+						clearcoatRoughness={0.1}
+						reflectivity={0.9}
+					/>
+				</T.Mesh>
+			{/if}
+		{/if}
+			{#if edgeGeometry}
+				<T.Mesh geometry={edgeGeometry}>
+					<T.MeshPhysicalMaterial
+						color="#475569"
+						side={THREE.DoubleSide}
+						metalness={0.0}
+						roughness={0.2}
+						clearcoat={0.6}
+						clearcoatRoughness={0.15}
+					/>
+				</T.Mesh>
+			{/if}
+			<!-- Loading indicator (only show when actively loading with debounce) -->
+			{#if !shouldShowShowcaseTexture && shouldShowLoadingIndicator}
 				<T.Group scale.x={1 / morphScaleX} scale.y={1 / morphScaleY}>
-					<!-- Front face text: ID GEN -->
 					<Text
-						text="ID GEN"
-						fontSize={0.35}
+						text="⟳"
+						fontSize={0.4}
 						color="#60a5fa"
 						anchorX="center"
 						anchorY="middle"
 						position.z={0.06}
-						fontWeight="bold"
-					/>
-					<!-- Back face text -->
-					<Text
-						text="ID GEN"
-						fontSize={0.25}
-						color="#94a3b8"
-						anchorX="center"
-						anchorY="middle"
-						position.z={-0.06}
-						rotation.y={Math.PI}
 					/>
 				</T.Group>
-			</T.Group>
+			{/if}
+		</T.Group>
 		{/if}
 	</T.Group>
 {/if}

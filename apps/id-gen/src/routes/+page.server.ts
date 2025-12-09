@@ -131,6 +131,17 @@ export const load: PageServerLoad = async ({ locals }) => {
 		.eq('org_id', effectiveOrgId)
 		.gte('created_at', oneWeekAgo.toISOString());
 
+	// Fetch template assets for the 3D card display (include orientation for matching)
+	const { data: templateAssets, error: assetsError } = await supabase
+		.from('template_assets')
+		.select('id, image_url, width_pixels, height_pixels, name, orientation')
+		.eq('is_published', true)
+		.order('created_at', { ascending: false });
+
+	if (assetsError) {
+		console.error('Error fetching template assets:', assetsError);
+	}
+
 	// Enhanced error logging for debugging
 	if (cardsError) {
 		console.error('❌ [SERVER] Error fetching recent cards:', {
@@ -187,6 +198,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		totalCards: totalCards || 0,
 		totalTemplates: totalTemplates || 0,
 		weeklyCards: weeklyCards || 0,
+		templateAssets: templateAssets ?? [],
 		error: cardsError || countError || templatesError || weeklyError
 	};
 };
