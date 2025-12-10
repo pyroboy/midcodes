@@ -3,35 +3,27 @@ import type { CreditPackage, FeatureSKU } from './types';
 // Credit packages with canonical server-side pricing
 export const CREDIT_PACKAGES: readonly CreditPackage[] = [
 	{
-		id: 'credits_100',
-		name: '100 Credits',
-		credits: 100,
-		amountPhp: 50,
-		description: 'Perfect for light usage',
-		isActive: true
-	},
-	{
-		id: 'credits_500',
-		name: '500 Credits',
-		credits: 500,
-		amountPhp: 200,
-		description: 'Great value for regular users',
+		id: 'credits_250',
+		name: 'Starter Pack',
+		credits: 250,
+		amountPhp: 100,
+		description: 'Range: 1 - 250 Cards',
 		isActive: true
 	},
 	{
 		id: 'credits_1000',
-		name: '1000 Credits',
+		name: 'Growth Pack',
 		credits: 1000,
 		amountPhp: 350,
-		description: 'Best value - save 12.5%',
+		description: 'Range: 250 - 1,000 Cards',
 		isActive: true
 	},
 	{
-		id: 'credits_2500',
-		name: '2500 Credits',
-		credits: 2500,
-		amountPhp: 750,
-		description: 'For power users - save 25%',
+		id: 'credits_5000',
+		name: 'Enterprise Pack',
+		credits: 5000,
+		amountPhp: 1200,
+		description: 'Range: 1,000+ Cards',
 		isActive: true
 	}
 ] as const;

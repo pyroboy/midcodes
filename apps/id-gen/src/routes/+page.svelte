@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { fade } from 'svelte/transition';
+	import { fade, fly, scale } from 'svelte/transition';
 	import { goto, invalidate } from '$app/navigation';
 	import { onMount, onDestroy } from 'svelte';
 	import { Card, CardContent } from '$lib/components/ui/card';
@@ -15,6 +15,7 @@
 		MoreVertical,
 		ChevronLeft,
 		ChevronRight,
+		ChevronDown,
 		Settings2
 	} from 'lucide-svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
@@ -106,16 +107,23 @@
 	let beatMs = $state(1500); // Default 1.5 seconds per beat
 	let currentBeatCount = $state(0);
 	let lastBeatAction = $state<'texture' | 'shape' | 'spin' | null>(null);
-
-	// Wobble effect controls
-	let wobbleAmount = $state(0.05); // Amount of wobble (0-0.5)
-	let wobbleVariance = $state(0.10); // Variance in wobble (0-1)
-	let wobbleLinger = $state(0.95); // How long wobble lasts (0.1-1.0)
+	// Animation controls
+	let spinSpeed = $state(0.04);
+	let wobbleStrength = $state(0.05);
+	let wobbleOscillations = $state(3);
+	let wobbleLinger = $state(1.0);
+	let wobbleControlsExpanded = $state(false); // Collapsed by default
 
 	// Handle beat callback from TemplateCard3D
 	function handleBeat(beatCount: number, action: 'texture' | 'shape' | 'spin') {
 		currentBeatCount = beatCount;
 		lastBeatAction = action;
+	}
+
+	// Tap pressure display (reactive)
+	let displayTapPressure = $state(0);
+	function handleTapPressureChange(pressure: number) {
+		displayTapPressure = pressure;
 	}
 
 	// Shadow debug controls
@@ -359,12 +367,46 @@
 	}
 
 	const transformedCards = transformRecentCards(data.recentCards || []);
+
+	const marketingPhrases = [
+		"Only in the Philippines",
+		"Fastest ID Generation",
+		"Cheapest Rates",
+		"Premium Templates",
+		"Secure & Private"
+	];
+	let marketingIndex = $state(0);
+	
+	const targetAudiences = [
+		"Schools",
+		"Companies",
+		"Events",
+		"Startups",
+		"Government",
+		"Small Businesses",
+		"Residences"
+	];
+	let selectedAudience = $state<string | null>(null);
+	const SHOW_AUDIENCE_BADGE = false;
+
+	$effect(() => {
+		const interval = setInterval(() => {
+			marketingIndex = (marketingIndex + 1) % marketingPhrases.length;
+		}, 3000);
+		return () => clearInterval(interval);
+	});
 </script>
+
+<svelte:head>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+	<link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
+</svelte:head>
 
 <div class="h-[calc(100vh-4rem)] overflow-hidden flex flex-col">
 	<div class="container mx-auto px-4 py-2 flex-1 flex flex-col overflow-hidden">
-		<!-- View Toggle Buttons -->
-		<div class="flex flex-col gap-1 w-fit flex-shrink-0">
+		<!-- View Toggle Buttons - Mobile Only -->
+		<div class="flex flex-col gap-1 w-fit flex-shrink-0 lg:hidden">
 			<Button variant="outline" size="sm" onclick={() => (activeView = 'templates')}>Templates</Button
 			>
 			<Button variant="outline" size="sm" onclick={() => (activeView = 'generations')}
@@ -377,8 +419,82 @@
 			<section
 				class="relative flex flex-row gap-2 lg:gap-6 items-center justify-center flex-1 overflow-hidden"
 			>
+				{#if SHOW_AUDIENCE_BADGE}
+					<!-- Floating Target Audience Badge (Moved for Visibility) -->
+					<div class="absolute top-28 left-0 w-full lg:left-8 lg:top-32 lg:w-auto z-50 pointer-events-none flex justify-center lg:justify-start">
+						<div class="transform -rotate-2 flex items-center gap-3 pointer-events-auto">
+						<!-- Brush Text -->
+						<span class="text-xl md:text-2xl text-foreground bg-background/80 backdrop-blur-sm px-2 rounded-sm" style="font-family: 'Permanent Marker', cursive;">
+							Great for
+						</span>
+						
+						<!-- Dropdown Box -->
+						<DropdownMenu.Root>
+							<DropdownMenu.Trigger class="outline-none">
+								<div class="bg-card border border-border shadow-lg rounded-md px-3 py-1.5 flex items-center gap-2 min-w-[140px] md:min-w-[200px] cursor-pointer hover:bg-accent/10 transition-colors">
+									<div class="flex-1 relative h-6 w-full overflow-hidden text-sm md:text-base font-medium text-left text-foreground">
+										{#if selectedAudience}
+											<div class="absolute inset-0 flex items-center whitespace-nowrap" in:fade={{ duration: 200 }}>
+												{selectedAudience}
+											</div>
+										{:else}
+											{#key marketingIndex}
+												<div 
+													class="absolute inset-0 flex items-center whitespace-nowrap"
+													in:fly={{ y: 20, duration: 300 }}
+													out:fly={{ y: -20, duration: 300 }}
+												>
+													{targetAudiences[marketingIndex % targetAudiences.length]}
+												</div>
+											{/key}
+										{/if}
+									</div>
+									<ChevronDown class="w-4 h-4 text-muted-foreground" />
+								</div>
+							</DropdownMenu.Trigger>
+							<DropdownMenu.Content class="w-[220px] max-h-[300px] overflow-y-auto z-[100]">
+								<DropdownMenu.Label>Select Audience</DropdownMenu.Label>
+								<DropdownMenu.Separator />
+								{#each targetAudiences as audience}
+									<DropdownMenu.Item onSelect={() => selectedAudience = audience}>
+										{audience}
+									</DropdownMenu.Item>
+								{/each}
+								<DropdownMenu.Separator />
+								<DropdownMenu.Item onSelect={() => selectedAudience = null}>
+									<span class="text-muted-foreground italic">Auto-cycle</span>
+								</DropdownMenu.Item>
+							</DropdownMenu.Content>
+						</DropdownMenu.Root>
+					</div>
+				</div>
+				{/if}
+
 			<!-- Center: 3D Card Preview -->
 			<div class="flex flex-col items-center justify-center flex-1">
+				<!-- Marketing Header -->
+				<div class="mb-6 text-center z-10 pointer-events-none select-none">
+					<h1 class="text-4xl md:text-7xl font-black tracking-tighter mb-2 drop-shadow-sm flex items-center justify-center gap-3">
+						<span class="text-3xl md:text-6xl text-foreground/80 font-normal">ᜃ</span>
+						<span class="text-foreground">
+							KINATAO
+						</span>
+					</h1>
+					<div class="relative h-8 md:h-12 w-full flex justify-center items-center overflow-hidden">
+						{#key marketingIndex}
+							<p 
+								class="absolute text-lg md:text-3xl font-bold text-muted-foreground whitespace-nowrap"
+								in:fly={{ y: 20, duration: 400, delay: 100 }}
+								out:fly={{ y: -20, duration: 400 }}
+							>
+								{marketingPhrases[marketingIndex]}
+							</p>
+						{/key}
+					</div>
+					
+					<!-- Divider or Spacer -->
+				</div>
+				
 				<!-- 3D Card Container - Responsive, max width on mobile -->
 				<!-- svelte-ignore a11y_click_events_have_key_events -->
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -386,7 +502,8 @@
 					class="w-full max-w-[500px] h-[400px] sm:h-[450px] lg:max-w-[650px] lg:h-[550px] relative cursor-pointer"
 					onclick={() => {
 						if (!selectedTemplateId && templateCard3D) {
-							templateCard3D.advanceShowcaseImage();
+							// Use handleTap for center tap (triggers wobble + advance)
+							templateCard3D.handleTap(0.5, 0.5);
 						}
 					}}
 				>
@@ -488,18 +605,49 @@
 										<span class="font-mono {lastBeatAction === 'spin' ? 'text-pink-400' : lastBeatAction === 'shape' ? 'text-yellow-400' : lastBeatAction === 'texture' ? 'text-blue-400' : 'text-white/40'}">{lastBeatAction || 'none'}</span>
 									</div>
 									<div class="mt-2 pt-2 border-t border-white/10">
-										<div class="text-xs text-white/50 mb-1">Wobble Effect</div>
+										<!-- Collapsible header -->
+										<button 
+											class="w-full flex items-center justify-between text-xs text-white/50 mb-1 hover:text-white/70 transition-colors"
+											onclick={() => wobbleControlsExpanded = !wobbleControlsExpanded}
+										>
+											<span>Animation Controls</span>
+											<span class="transform transition-transform {wobbleControlsExpanded ? 'rotate-180' : ''}">▼</span>
+										</button>
+										{#if wobbleControlsExpanded}
 										<div>
-											<label class="text-xs text-white/70">Amount: {wobbleAmount.toFixed(2)}</label>
-											<input type="range" min="0" max="0.5" step="0.01" bind:value={wobbleAmount} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
+											<label class="text-xs text-white/70">Spin Speed: {spinSpeed.toFixed(2)}</label>
+											<input type="range" min="0.01" max="0.15" step="0.01" bind:value={spinSpeed} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
 										</div>
 										<div>
-											<label class="text-xs text-white/70">Variance: {wobbleVariance.toFixed(2)}</label>
-											<input type="range" min="0" max="1" step="0.05" bind:value={wobbleVariance} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
+											<label class="text-xs text-white/70">Wobble Strength: {wobbleStrength.toFixed(2)}</label>
+											<input type="range" min="0" max="0.3" step="0.01" bind:value={wobbleStrength} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
 										</div>
 										<div>
-											<label class="text-xs text-white/70">Linger: {wobbleLinger.toFixed(2)}</label>
-											<input type="range" min="0.1" max="1" step="0.05" bind:value={wobbleLinger} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
+											<label class="text-xs text-white/70">Wobble Oscillations: {wobbleOscillations}</label>
+											<input type="range" min="1" max="10" step="1" bind:value={wobbleOscillations} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
+										</div>
+										<div>
+											<label class="text-xs text-white/70">Wobble Linger: {wobbleLinger.toFixed(1)}</label>
+											<input type="range" min="0.2" max="3" step="0.1" bind:value={wobbleLinger} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
+										</div>
+										{/if}
+										<!-- Tap Pressure Bar - always visible -->
+								<div class="pt-2 border-t border-white/10">
+									<label class="text-xs text-white/70">Tap Pressure: {displayTapPressure}</label>
+									<div class="flex gap-1 mt-1">
+										{#each [1, 2, 3, 4, 5] as level}
+											<div 
+												class="flex-1 h-3 rounded transition-all duration-150 {displayTapPressure >= level ? 'bg-emerald-500 shadow-lg' : 'bg-white/20'}"
+											></div>
+										{/each}
+									</div>
+											<div class="flex justify-between text-[10px] text-white/50 mt-1">
+												<span>3°</span>
+												<span>6°</span>
+												<span>12°</span>
+												<span>24°</span>
+												<span>48°</span>
+											</div>
 										</div>
 									</div>
 								</div>
@@ -644,10 +792,13 @@
 								showcaseImages={data.templateAssets || []}
 								beatMs={beatMs}
 								onBeat={handleBeat}
-								wobbleAmount={wobbleAmount}
-								wobbleVariance={wobbleVariance}
+								spinSpeed={spinSpeed}
+								wobbleStrength={wobbleStrength}
+								wobbleOscillations={wobbleOscillations}
 								wobbleLinger={wobbleLinger}
 								onLoadingProgress={handleLoadingProgress}
+								onTapPressureChange={handleTapPressureChange}
+
 							/>
 						</Canvas>
 					</ClientOnly>
@@ -700,6 +851,26 @@
 				>
 				{#if data.user}
 					<div class="bg-card border border-border rounded-xl p-3 {templateListCollapsed ? 'lg:block' : ''}">
+						<!-- Desktop View Toggle Buttons -->
+						<div class="hidden lg:flex gap-2 mb-4 w-full">
+							<Button 
+								variant={activeView === 'templates' ? 'default' : 'outline'} 
+								size="sm" 
+								class="flex-1"
+								onclick={() => activeView = 'templates'}
+							>
+								Templates
+							</Button>
+							<Button 
+								variant={activeView === 'generations' ? 'default' : 'outline'} 
+								size="sm" 
+								class="flex-1"
+								onclick={() => activeView = 'generations'}
+							>
+								Generations
+							</Button>
+						</div>
+
 						<h3 class="font-semibold text-foreground mb-2 text-sm">Templates</h3>
 
 						<div class="space-y-1 max-h-[320px] overflow-y-auto">
@@ -805,9 +976,19 @@
 					<h1 class="text-3xl font-bold text-foreground">Your Recent Generations</h1>
 					<p class="text-muted-foreground mt-1">View and manage your generated ID cards</p>
 				</div>
-				{#if transformedCards.length > 0}
-					<RecentViewModeToggle />
-				{/if}
+				<div class="flex items-center gap-3">
+					<Button 
+						variant="outline" 
+						size="sm"
+						class="hidden lg:flex" 
+						onclick={() => activeView = 'templates'}
+					>
+						Back to 3D
+					</Button>
+					{#if transformedCards.length > 0}
+						<RecentViewModeToggle />
+					{/if}
+				</div>
 			</div>
 
 			{#if $recentViewMode === 'grid'}

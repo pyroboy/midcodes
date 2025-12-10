@@ -15,10 +15,10 @@
 		<div class="flex items-center gap-6 flex-1">
 			<!-- Logo -->
 			<a href="/" class="flex items-center gap-3">
-				<div class="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-					<Wallet class="h-6 w-6 text-primary-foreground" />
+				<div class="flex items-center gap-2">
+					<span class="text-2xl font-normal text-foreground/80">ᜃ</span>
+					<span class="text-xl font-black tracking-tight text-foreground">KINATAO</span>
 				</div>
-				<span class="text-xl font-bold text-foreground"> ID Generator </span>
 			</a>
 
 			<!-- Search - Desktop optimized -->

@@ -92,25 +92,17 @@
 			<div class="container mx-auto px-4">
 				<div class="flex justify-between items-center h-16">
 					<a href="/" class="flex items-center gap-2">
-						<div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								class="h-5 w-5 text-white"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke="currentColor"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V4a2 2 0 114 0v2m-4 0a2 2 0 104 0m-4 0V4a2 2 0 014 0v2"
-								/>
-							</svg>
-						</div>
-						<span class="text-xl font-bold text-foreground">ID Generator</span>
+						<span class="text-2xl font-normal text-foreground/80">ᜃ</span>
+						<span class="text-xl font-black tracking-tight text-foreground">KINATAO</span>
 					</a>
 
+					<div class="flex items-center gap-6">
+					<a href="/how-it-works" class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden md:block">
+						How It Works
+					</a>
+					<a href="/pricing" class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden md:block">
+						Rates
+					</a>
 					<a
 						href="/auth"
 						class="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
@@ -118,6 +110,7 @@
 						> Sign In
 					</a>
 				</div>
+			</div>
 			</div>
 		</header>
 

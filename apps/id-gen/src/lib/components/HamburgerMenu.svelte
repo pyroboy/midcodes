@@ -22,7 +22,7 @@
 		},
 		{
 			href: '/pricing',
-			label: 'Pricing',
+			label: 'Rates & Pricing',
 			icon: `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />`,
 			roles: ['all']
 		},
@@ -186,10 +186,7 @@
 			<div class="space-y-1">
 				{#each secondaryNavItems as item}
 					{#if hasPermission(item.roles, user?.role)}
-						{#if item.href === '/pricing' && !$paymentFlags.paymentsEnabled}
-							<!-- Hide pricing link when payments are disabled -->
-						{:else}
-							<a
+						<a
 								href={item.href}
 								class="flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
 								onclick={handleLinkClick}
@@ -205,7 +202,6 @@
 								</svg>
 								{item.label}
 							</a>
-						{/if}
 					{/if}
 				{/each}
 			</div>

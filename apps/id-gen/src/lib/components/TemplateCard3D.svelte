@@ -1,41 +1,46 @@
 <script lang="ts">
 	import { T, useTask } from '@threlte/core';
-	import { Text } from '@threlte/extras';
+	import { Text, interactivity } from '@threlte/extras';
 	import * as THREE from 'three';
 	import { onMount, onDestroy } from 'svelte';
 	import { createRoundedRectCard } from '$lib/utils/cardGeometry';
-	import { FONT_CDN_URLS } from '$lib/config/fonts';
+	import {
+		CARD3D_CONSTANTS,
+		MORPH_SHAPES,
+		getRotationSpeed,
+		getCardDimensions,
+		getShapeOrientation,
+		// Animation controller
+		updateSpinAnimation,
+		initWobble,
+		updateWobble,
+		updateOscillation,
+		triggerTemplateChangeSpin,
+		triggerBeatSpin,
+		// Beat controller
+		checkBeat,
+		getNextShapeIndex,
+		getNextShowcaseIndex,
+		// Overlay helpers
+		elementTo3D,
+		getElementColor,
+		getFontUrl,
+		generateRandomText,
+		mutateText,
+		// Tap controller
+		initTapWobble,
+		updateTapWobble,
+		uvToLocalCoords
+	} from './card3d';
+	import { TextureManager } from './card3d';
+	import type {
+		TemplateElementOverlay,
+		ShowcaseImage,
+		CachedGeometry,
+		WobbleState,
+		TapWobbleState
+	} from './card3d';
 
-	// Template element type for overlays
-	// NOTE: Database stores 'font' and 'size', but newer code uses 'fontFamily' and 'fontSize'
-	// We support both for backwards compatibility
-	interface TemplateElementOverlay {
-		id: string;
-		type: 'text' | 'image' | 'qr' | 'photo' | 'signature' | 'selection';
-		x: number;
-		y: number;
-		width: number;
-		height: number;
-		side: 'front' | 'back';
-		variableName?: string;
-		content?: string;
-		// Font styling - support both old (font/size) and new (fontFamily/fontSize) field names
-		fontSize?: number;
-		size?: number; // Legacy field name
-		fontFamily?: string;
-		font?: string; // Legacy field name
-		fontWeight?: string;
-		fontStyle?: string;
-		color?: string;
-		alignment?: 'left' | 'center' | 'right';
-	}
-
-	interface ShowcaseImage {
-		image_url: string;
-		width_pixels?: number;
-		height_pixels?: number;
-		orientation?: 'landscape' | 'portrait';
-	}
 
 	interface Props {
 		imageUrl?: string | null;
@@ -62,10 +67,13 @@
 		onLoadingProgress?: (progress: number, loaded: number, total: number, isReady: boolean) => void;
 		// Beat callback for parent UI (beat counter, current action)
 		onBeat?: (beatCount: number, action: 'texture' | 'shape' | 'spin') => void;
-		// Wobble effect controls
-		wobbleAmount?: number;
-		wobbleVariance?: number;
-		wobbleLinger?: number; // How long wobble lasts (0.1 = fast decay, 1.0 = slow decay)
+		// Animation controls
+		spinSpeed?: number;
+		wobbleStrength?: number;
+		wobbleOscillations?: number;
+		wobbleLinger?: number;
+		// Tap pressure callback for debug panel
+		onTapPressureChange?: (pressure: number) => void;
 	}
 
 	let {
@@ -88,108 +96,79 @@
 		onCardClick,
 		onLoadingProgress,
 		onBeat,
-		wobbleAmount = 0.05,
-		wobbleVariance = 0.10,
-		wobbleLinger = 0.95
+		spinSpeed = 0.04,
+		wobbleStrength = 0.05,
+		wobbleOscillations = 3,
+		wobbleLinger = 1.0,
+		onTapPressureChange
 	}: Props = $props();
 
-	// Base scale for 3D units
-	const BASE_SCALE = 3.6;
+	// Enable interactivity for mesh click events with UV coordinates
+	interactivity();
 
-	// Geometry state - includes front, back, and edge for full 3D card
+	// TextureManager handles all texture loading/caching
+	let textureManager: TextureManager;
+
+	// Geometry state
 	let frontGeometry = $state<THREE.BufferGeometry | null>(null);
 	let backGeometry = $state<THREE.BufferGeometry | null>(null);
 	let edgeGeometry = $state<THREE.BufferGeometry | null>(null);
 
-	// Texture state - front and back
+	// Texture state
 	let texture = $state<THREE.Texture | null>(null);
 	let backTexture = $state<THREE.Texture | null>(null);
 	let loading = $state(false);
 	let error = $state(false);
 
-	// Rotation state
+	// Rotation/spin state
 	let rotationY = $state(0);
 	let spinAnimation = $state(false);
 	let spinTarget = $state(0);
-	let spinStartRotation = $state(0); // Starting rotation for eased animation
-	let spinProgress = $state(0); // 0 to 1 progress for easing
-	let finalAngle = $state(0); // Target angle after spin
-	const BASE_TILT_X = -0.12;
+	let spinStartRotation = $state(0);
+	let spinProgress = $state(0);
+	let finalAngle = $state(0);
 
-	// Oscillating tilt animation
+	// Oscillating tilt
 	let oscillateTime = $state(0);
-	let tiltX = $state(BASE_TILT_X);
-	const OSCILLATE_SPEED = 0.008; // Slow oscillation
-	const OSCILLATE_AMPLITUDE = (5 * Math.PI) / 180; // 5 degrees in radians
+	let tiltX = $state(CARD3D_CONSTANTS.BASE_TILT_X);
 
-	// Wobble effect after spin - multi-axis (X, Y, Z)
+	// Wobble effect (multi-axis)
 	let wobbleActive = $state(false);
 	let wobbleProgress = $state(0);
-	let wobbleSpinDirection = $state(1); // Direction of the spin that triggered wobble (1 = positive, -1 = negative)
-	let wobbleIntensity = $state(0); // Current wobble intensity (with variance applied)
-	let wobbleEffectiveLinger = $state(0.5); // Effective linger with variance applied
-	// Wobble offsets for each axis
+	let wobbleSpinDirection = $state(1);
+	let wobbleIntensity = $state(0);
+	let wobbleOscillationCount = $state(3);
+	let wobbleEffectiveLinger = $state(1.0);
 	let wobbleOffsetX = $state(0);
 	let wobbleOffsetY = $state(0);
 	let wobbleOffsetZ = $state(0);
-	// Random phase offsets for each axis to create organic movement
 	let wobblePhaseX = $state(0);
 	let wobblePhaseY = $state(0);
 	let wobblePhaseZ = $state(0);
-	const WOBBLE_FREQUENCY = 8; // Oscillation frequency (slightly slower for smoothness)
+	let wobblePreCalculated = $state(false);
+	let wobbleInitialOffsets = $state({ x: 0, y: 0, z: 0 });
 
-	// Rotation speeds - dynamic based on which face is visible
-	const ROTATION_SPEED_FACE = 0.002; // Front & back facing speed (linger longer on faces)
-	const ROTATION_SPEED_EDGE = 0.12; // Edge transition speed (very fast through edges)
-	const SPIN_SPEED = 0.08; // Eased spin speed (progress increment per frame)
+	// Tap wobble state (separate from spin wobble, runs in parallel)
+	let tapWobbleActive = $state(false);
+	let tapWobbleProgress = $state(0);
+	let tapPressure = $state(0);
+	let tapWobbleIntensity = $state(0);
+	let tapWobbleLinger = $state(2.0);
+	let tapX = $state(0);
+	let tapY = $state(0);
+	let tapOffsetX = $state(0);
+	let tapOffsetY = $state(0);
+	let tapOffsetZ = $state(0);
+	let lastTapTime = $state(0); // Track time for succession stacking
 
-	// Thresholds for speed zones (in radians)
-	const FACE_THRESHOLD = (15 * Math.PI) / 180; // 15 degrees - slow zone around front & back
 
-	// Front-facing tolerance for final angle: random within ±30 degrees
-	const FRONT_FACING_TOLERANCE = Math.PI / 6; // 30 degrees
 
-	// Morphing animation - pre-cached geometry with smooth scale interpolation
+	// Morphing animation state
 	let morphTime = $state(0);
-	const MORPH_SPEED = 0.008; // Speed of cycling
-	const HOLD_DURATION = 0.6; // Hold at each shape (0-1 range, 0.6 = 60% of cycle is holding)
-
-	// Pre-defined morph shapes - Real-world card sizes at 300 DPI
-	// Based on standard card dimensions used in printing
-	const MORPH_SHAPES = [
-		// Credit Card / CR80 (3.375" x 2.125" = 1013 x 638 px)
-		{ w: 1013, h: 638 },  // CR80 Landscape
-		{ w: 638, h: 1013 },  // CR80 Portrait
-		
-		// Business Card (3.5" x 2.0" = 1050 x 600 px)
-		{ w: 1050, h: 600 },  // Business Card Landscape
-		{ w: 600, h: 1050 },  // Business Card Portrait
-		
-		// ID Badge (4.0" x 3.0" = 1200 x 900 px)
-		{ w: 1200, h: 900 },  // ID Badge Landscape
-		{ w: 900, h: 1200 },  // ID Badge Portrait
-		
-		// Mini Card (2.5" x 1.5" = 750 x 450 px)
-		{ w: 750, h: 450 },   // Mini Card Landscape
-		{ w: 450, h: 750 },   // Mini Card Portrait
-		
-		// Jumbo Card (4.25" x 2.75" = 1275 x 825 px)
-		{ w: 1275, h: 825 },  // Jumbo Card Landscape
-		{ w: 825, h: 1275 },  // Jumbo Card Portrait
-	];
-
-	// Pre-cached geometries for each morph shape (created once, never recreated)
-	interface CachedGeometry {
-		front: THREE.BufferGeometry;
-		back: THREE.BufferGeometry;
-		edge: THREE.BufferGeometry;
-		// Store the 3D dimensions for scale calculation
-		dims: { width: number; height: number };
-	}
 	let morphGeometries = $state<CachedGeometry[]>([]);
 	let morphGeometriesLoaded = $state(false);
 
-	// Compute available orientations from showcase images - only morph to shapes with textures
+	// Available orientations from showcase images
 	const availableOrientations = $derived(() => {
 		const orientations = new Set<'landscape' | 'portrait'>();
 		showcaseImages.forEach(img => {
@@ -198,8 +177,7 @@
 		return orientations;
 	});
 
-	// Filter MORPH_SHAPES to only include shapes that have matching textures
-	// This ensures we NEVER show a blank card without texture
+	// Valid shapes (only those with matching textures)
 	const validMorphShapeIndices = $derived(() => {
 		const orientations = availableOrientations();
 		if (orientations.size === 0) return [0]; // Fallback to first shape if no textures
@@ -214,14 +192,13 @@
 		return indices.length > 0 ? indices : [0]; // Fallback to first shape
 	});
 
-	// Current morph state - uses geometry from currentIndex, scales toward nextIndex
+	// Morph state
 	let currentMorphIndex = $state(0);
-	let currentValidIndex = $state(0); // Index within validMorphShapeIndices
-	// Smooth scale factors for interpolation between keyframes
+	let currentValidIndex = $state(0);
 	let morphScaleX = $state(1.0);
 	let morphScaleY = $state(1.0);
 
-	// Showcase image cycling state
+	// Showcase cycling state
 	let showcaseIndex = $state(0);
 	let showcaseLastChange = $state(0);
 	let showcaseTexture = $state<THREE.Texture | null>(null);
@@ -232,29 +209,21 @@
 	let showcaseTextureError = $state(false);
 	let showcaseTextureValid = $state(false); // Only true when texture is fully loaded and ready
 	let showcaseLoadingDebounceStart = $state(0); // Time when loading started (for debounced indicator)
-	const LOADING_DEBOUNCE_MS = 200; // Show loading icon only after 200ms delay
-	
-	// Texture cache for preloaded showcase images - eliminates blank card flashes
-	let showcaseTextureCache = $state<Map<string, THREE.Texture>>(new Map());
+
+	// Showcase cache ready flag - actual cache is managed by TextureManager
 	let showcaseCacheReady = $state(false);
-	
-	// Unified beat system - controls all timing (texture swap, shape morph, spin)
+
+	// Beat system state
 	let beatCount = $state(0);
 	let lastBeatTime = $state(0);
-	// Beat actions cycle: texture, texture, texture, shape+texture (every 4th beat changes shape)
-	// This creates a predictable rhythm where shape changes are less frequent than texture changes
-	const BEATS_PER_SHAPE_CHANGE = 4;
-	
-	// Spin beat tracking - detect 180-degree rotation crossings
-	// A "half rotation" is when the card completes 180 degrees, showing front or back
-	let lastHalfRotationCount = $state(0); // Tracks which 180-degree boundary we last crossed
+	let lastHalfRotationCount = $state(0);
 
-	// Loading progress tracking for preloading bar
+	// Preload progress
 	let preloadProgress = $state(0); // 0 to 1
 	let preloadTotal = $state(0);
 	let preloadLoaded = $state(0);
 
-	// Export loading state for parent component to show loading bar
+	// Export loading state for parent
 	export function getLoadingState() {
 		return {
 			isLoading: !showcaseCacheReady && showcaseImages.length > 0,
@@ -264,7 +233,44 @@
 		};
 	}
 
-	// Function to advance to next showcase image immediately (called on click)
+	// Handle tap with position for directional wobble
+	export function handleTap(u: number = 0.5, v: number = 0.5) {
+		const now = performance.now();
+		// Debounce: ignore taps within 50ms to prevent double-triggering (mesh + div bubbling)
+		if (now - lastTapTime < 50) return;
+
+		// Convert UV to local coords (-1 to 1)
+		const localCoords = uvToLocalCoords(u, v);
+		
+		// If card is facing back (cos(rotationY) < 0), invert X direction
+		// to ensure correct "Look At" behavior (Back Face looks at finger)
+		const isBackFacing = Math.cos(rotationY) < 0;
+		tapX = isBackFacing ? -localCoords.x : localCoords.x;
+		tapY = localCoords.y;
+		
+		// Initialize tap wobble - only stacks if tapping quickly in succession
+		const tapState = initTapWobble(tapX, tapY, tapPressure, wobbleStrength * 2, tapWobbleLinger, lastTapTime);
+		tapWobbleActive = tapState.active;
+		tapWobbleProgress = tapState.progress;
+		tapPressure = tapState.pressure;
+		tapWobbleIntensity = tapState.intensity;
+		
+		// Notify parent of pressure change for debug display
+		onTapPressureChange?.(tapPressure);
+		
+		// Update last tap time for succession detection
+		lastTapTime = performance.now();
+		
+		// Also advance showcase image (existing behavior)
+		advanceShowcaseImage();
+	}
+
+	// Get current tap pressure for debug panel
+	export function getTapPressure(): number {
+		return tapPressure;
+	}
+
+	// Advance to next showcase image (called on click)
 	export function advanceShowcaseImage() {
 		if (showcaseImages.length === 0) return;
 
@@ -284,18 +290,19 @@
 			if (nextImage?.image_url) {
 				loadShowcaseTexture(nextImage.image_url);
 				currentShowcaseImageOrientation = nextImage.orientation || null;
-				showcaseLastChange = performance.now(); // Reset timer
+				showcaseLastChange = performance.now();
 			}
 		}
 	}
+
 	
-	// Compute current morph shape orientation for template conditional rendering
+	// Get current morph orientation
 	const getCurrentMorphOrientation = () => {
 		const shape = MORPH_SHAPES[currentMorphIndex] || MORPH_SHAPES[0];
 		return shape.w >= shape.h ? 'landscape' : 'portrait';
 	};
 	
-	// Check if showcase texture should be shown (orientation must match AND texture must be valid)
+	// Should show showcase texture (orientation match + texture valid)
 	const shouldShowShowcaseTexture = $derived(
 		showcaseTexture !== null && 
 		showcaseTextureValid &&
@@ -304,17 +311,15 @@
 		currentShowcaseImageOrientation === getCurrentMorphOrientation()
 	);
 	
-	// Helper: Check if we have a cached texture ready for a given orientation
-	// This prevents shape changes that would cause the card to disappear
+	// Check texture ready for orientation (prevents blank cards)
 	function hasReadyTextureForOrientation(orientation: 'landscape' | 'portrait'): boolean {
-		const matchingImages = showcaseImages.filter(img => img.orientation === orientation);
-		return matchingImages.some(img => showcaseTextureCache.has(img.image_url));
+		return textureManager?.hasReadyTextureForOrientation(showcaseImages, orientation) ?? false;
 	}
 	
 	// Show loading indicator after debounce delay
 	const shouldShowLoadingIndicator = $derived(
-		showcaseTextureLoading && 
-		(performance.now() - showcaseLoadingDebounceStart) >= LOADING_DEBOUNCE_MS
+		showcaseTextureLoading &&
+		(performance.now() - showcaseLoadingDebounceStart) >= CARD3D_CONSTANTS.LOADING_DEBOUNCE_MS
 	);
 
 	// Track previous values
@@ -324,152 +329,9 @@
 	let prevWidthPixels = widthPixels;
 	let prevHeightPixels = heightPixels;
 
-	// Texture loader instance
-	const textureLoader = new THREE.TextureLoader();
-	textureLoader.crossOrigin = 'anonymous';
-
-	// Calculate card dimensions
-	function getCardDimensions(w: number, h: number) {
-		const aspect = w / h;
-		if (aspect >= 1) {
-			return { width: BASE_SCALE, height: BASE_SCALE / aspect };
-		} else {
-			return { width: BASE_SCALE * aspect, height: BASE_SCALE };
-		}
-	}
-
-	// Convert element pixel coordinates to 3D world coordinates
-	// Card center is (0,0,0), top-left in pixels maps to (-width/2, height/2) in 3D
-	function elementTo3D(el: TemplateElementOverlay, cardW: number, cardH: number) {
-		const dims = getCardDimensions(cardW, cardH);
-		// Convert from pixel units to 3D units
-		const scaleX = dims.width / cardW;
-		const scaleY = dims.height / cardH;
-
-		// Element center in pixels (origin top-left)
-		const centerX = el.x + el.width / 2;
-		const centerY = el.y + el.height / 2;
-
-		// Convert to 3D coords (origin center, Y inverted)
-		const x3d = (centerX - cardW / 2) * scaleX;
-		const y3d = (cardH / 2 - centerY) * scaleY;
-		const w3d = el.width * scaleX;
-		const h3d = el.height * scaleY;
-
-		return { x: x3d, y: y3d, width: w3d, height: h3d };
-	}
-
-	// Get element color based on type
-	function getElementColor(type: string): string {
-		switch (type) {
-			case 'photo':
-				return '#3b82f6'; // blue
-			case 'image':
-				return '#8b5cf6'; // purple
-			case 'text':
-				return '#10b981'; // green
-			case 'qr':
-				return '#f59e0b'; // amber
-			case 'signature':
-				return '#ec4899'; // pink
-			case 'selection':
-				return '#06b6d4'; // cyan
-			default:
-				return '#6b7280'; // gray
-		}
-	}
-
-	// Get dynamic rotation speed based on current angle
-	// ONLY slow at faces (front 0° and back 180°), full speed everywhere else
-	function getRotationSpeed(angle: number): number {
-		// Normalize angle to 0-2π range
-		const twoPi = Math.PI * 2;
-		const normalized = ((angle % twoPi) + twoPi) % twoPi;
-
-		// Convert to degrees for easier reasoning (0-360)
-		const degrees = (normalized * 180) / Math.PI;
-
-		// Front face: 0° (or 360°), Back face: 180°
-		// Check if we're within FACE_THRESHOLD of either face
-		const degreesThreshold = (FACE_THRESHOLD * 180) / Math.PI; // 15 degrees
-
-		const nearFront = degrees <= degreesThreshold || degrees >= 360 - degreesThreshold;
-		const nearBack = degrees >= 180 - degreesThreshold && degrees <= 180 + degreesThreshold;
-
-		if (nearFront || nearBack) {
-			return ROTATION_SPEED_FACE;
-		}
-		return ROTATION_SPEED_EDGE;
-	}
-
-	// Font URL map for 3D text rendering - imported from centralized fonts.ts
-	// Using FONT_CDN_URLS from '$lib/config/fonts'
-
-	// Get font URL for a font family (fallback to Roboto Regular)
-	function getFontUrl(
-		fontFamily: string,
-		fontWeight: string = '400',
-		fontStyle: string = 'normal'
-	): string {
-		const defaultFont = FONT_CDN_URLS['Roboto']['400']['normal'];
-
-		if (!fontFamily) return defaultFont;
-
-		// Normalize family (case-insensitive lookup)
-		const normalizedFamily = fontFamily.toLowerCase().trim();
-		const familyKey =
-			Object.keys(FONT_CDN_URLS).find((key) => key.toLowerCase() === normalizedFamily) || 'Roboto';
-
-		// Normalize weight (map 'bold' to '700', default to '400')
-		const weightKey = fontWeight === 'bold' || parseInt(fontWeight) >= 600 ? '700' : '400';
-
-		// Normalize style
-		const styleKey = fontStyle === 'italic' ? 'italic' : 'normal';
-
-		// Traverse map safely with fallbacks
-		try {
-			const familyObj = FONT_CDN_URLS[familyKey];
-			if (!familyObj) return defaultFont;
-
-			const weightObj = familyObj[weightKey] || familyObj['400'];
-			if (!weightObj) return defaultFont;
-
-			return weightObj[styleKey] || weightObj['normal'] || defaultFont;
-		} catch {
-			return defaultFont;
-		}
-	}
-
-	// Random text animation for text overlays - per-character randomizing
-	const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+	// Text animation state (uses imported helper functions)
 	let animatedTexts = $state<Map<number, string>>(new Map());
 	let textAnimationFrame = $state(0);
-
-	// Generate random character
-	function randomChar(): string {
-		return CHARS.charAt(Math.floor(Math.random() * CHARS.length));
-	}
-
-	// Generate initial random string of 8-12 characters
-	function generateRandomText(): string {
-		const length = Math.floor(Math.random() * 5) + 8; // 8 to 12 chars
-		let result = '';
-		for (let i = 0; i < length; i++) {
-			result += randomChar();
-		}
-		return result;
-	}
-
-	// Mutate 1-3 random characters in the string (per-character animation)
-	function mutateText(text: string): string {
-		const chars = text.split('');
-		const mutationCount = Math.floor(Math.random() * 3) + 1; // 1-3 chars
-		for (let i = 0; i < mutationCount; i++) {
-			const pos = Math.floor(Math.random() * chars.length);
-			chars[pos] = randomChar();
-		}
-		return chars.join('');
-	}
 
 	// Get animated text for element (cached per element index)
 	function getAnimatedText(idx: number): string {
@@ -479,10 +341,10 @@
 		return animatedTexts.get(idx) || '';
 	}
 
-	// Load geometry with front, back, and edge for full 3D effect
+
+	// Load geometry (front, back, edge) for card
 	async function loadGeometry(w: number, h: number) {
-		// Dispose of previous dynamic geometries (if they aren't the pre-cached ones)
-		// We check if the current geometry is in the morph cache to avoid disposing shared assets
+		// Dispose previous non-cached geometries
 		const isCached = morphGeometries.some((g) => g.front === frontGeometry);
 		if (!isCached && frontGeometry) {
 			frontGeometry.dispose();
@@ -492,136 +354,64 @@
 
 		const dims = getCardDimensions(w, h);
 		const radius = Math.min(dims.width, dims.height) * 0.04;
-		// Card thickness - thin like a real ID card
 		const cardGeometry = await createRoundedRectCard(dims.width, dims.height, 0.02, radius);
 		frontGeometry = cardGeometry.frontGeometry;
 		backGeometry = cardGeometry.backGeometry;
 		edgeGeometry = cardGeometry.edgeGeometry;
 	}
 
-	// Lerp helper for smooth interpolation
-	function lerp(a: number, b: number, t: number): number {
-		return a + (b - a) * t;
-	}
-
-	// Pre-cache all morph geometries at startup (called once)
+	// Pre-cache all morph geometries at startup
 	async function preCacheMorphGeometries() {
 		const cached: CachedGeometry[] = [];
 		for (const shape of MORPH_SHAPES) {
 			const dims = getCardDimensions(shape.w, shape.h);
 			const radius = Math.min(dims.width, dims.height) * 0.04;
 			const geo = await createRoundedRectCard(dims.width, dims.height, 0.02, radius);
-			cached.push({
-				front: geo.frontGeometry,
-				back: geo.backGeometry,
-				edge: geo.edgeGeometry,
-				dims: dims // Store for scale interpolation
-			});
+			cached.push({ front: geo.frontGeometry, back: geo.backGeometry, edge: geo.edgeGeometry, dims });
 		}
 		morphGeometries = cached;
 		morphGeometriesLoaded = true;
-		// Set initial geometry from first cached shape
 		if (cached.length > 0) {
 			frontGeometry = cached[0].front;
 			backGeometry = cached[0].back;
 			edgeGeometry = cached[0].edge;
 		}
-		console.log('[TemplateCard3D] Pre-cached', cached.length, 'morph geometries with dims');
 	}
 
-	// Load texture
+	// Load texture - delegates to TextureManager
 	function loadTexture(url: string, aspect: number) {
 		loading = true;
 		error = false;
-
-		// Dispose old texture
-		if (texture) {
-			texture.dispose();
-			texture = null;
-		}
-
-		console.log('[TemplateCard3D] Loading front:', url);
-
-		textureLoader.load(
+		textureManager.loadFrontTexture(
 			url,
+			aspect,
 			(loadedTexture) => {
-				// Configure texture
-				loadedTexture.colorSpace = THREE.SRGBColorSpace;
-				loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
-				loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
-
-				// Aspect ratio correction
-				if (loadedTexture.image?.width && loadedTexture.image?.height) {
-					const imageAspect = loadedTexture.image.width / loadedTexture.image.height;
-					if (imageAspect > aspect) {
-						const scale = aspect / imageAspect;
-						loadedTexture.repeat.set(scale, 1);
-						loadedTexture.offset.set((1 - scale) / 2, 0);
-					} else {
-						const scale = imageAspect / aspect;
-						loadedTexture.repeat.set(1, scale);
-						loadedTexture.offset.set(0, (1 - scale) / 2);
-					}
-				}
-				loadedTexture.needsUpdate = true;
-
 				texture = loadedTexture;
 				loading = false;
-				console.log('[TemplateCard3D] Front loaded successfully');
 			},
-			undefined,
-			(err) => {
-				console.error('[TemplateCard3D] Front error:', err);
+			() => {
 				error = true;
 				loading = false;
 			}
 		);
 	}
 
-	// Load back texture
+	// Load back texture - delegates to TextureManager
 	function loadBackTexture(url: string, aspect: number) {
-		// Dispose old back texture
-		if (backTexture) {
-			backTexture.dispose();
-			backTexture = null;
-		}
-
-		console.log('[TemplateCard3D] Loading back:', url);
-
-		textureLoader.load(
+		textureManager.loadBackTexture(
 			url,
+			aspect,
 			(loadedTexture) => {
-				loadedTexture.colorSpace = THREE.SRGBColorSpace;
-				loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
-				loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
-
-				// Aspect ratio correction
-				if (loadedTexture.image?.width && loadedTexture.image?.height) {
-					const imageAspect = loadedTexture.image.width / loadedTexture.image.height;
-					if (imageAspect > aspect) {
-						const scale = aspect / imageAspect;
-						loadedTexture.repeat.set(scale, 1);
-						loadedTexture.offset.set((1 - scale) / 2, 0);
-					} else {
-						const scale = imageAspect / aspect;
-						loadedTexture.repeat.set(1, scale);
-						loadedTexture.offset.set(0, (1 - scale) / 2);
-					}
-				}
-				loadedTexture.needsUpdate = true;
 				backTexture = loadedTexture;
-				// Force a state update to trigger reactivity
-				backTexture = backTexture;
-				console.log('[TemplateCard3D] Back loaded successfully');
 			},
-			undefined,
-				(err) => {
-				console.error('[TemplateCard3D] Back error:', err);
+			() => {
+				console.error('[TemplateCard3D] Back texture error');
 			}
 		);
 	}
 
-	// Load showcase texture (for cycling through images) - uses cache if available
+
+	// Load showcase texture - delegates to TextureManager
 	function loadShowcaseTexture(url: string) {
 		// Don't load if URL is empty or invalid
 		if (!url || url.trim() === '') {
@@ -631,137 +421,46 @@
 			return;
 		}
 		
-		// Check cache first - instant swap if available
-		const cachedTexture = showcaseTextureCache.get(url);
-		if (cachedTexture) {
-			// Dispose old showcase texture if different
-			if (showcaseTexture && showcaseTexture !== cachedTexture) {
-				// Don't dispose - it might be in cache still
-			}
-			showcaseTexture = cachedTexture;
-			showcaseTextureLoading = false;
-			showcaseTextureError = false;
-			showcaseTextureValid = true;
-			return;
-		}
-		
-		// Start loading state with debounce timer (fallback for non-cached images)
-		showcaseTextureLoading = true;
-		showcaseTextureError = false;
-		showcaseTextureValid = false;
-		showcaseLoadingDebounceStart = performance.now();
-		
-		const showcaseLoader = new THREE.TextureLoader();
-		showcaseLoader.crossOrigin = 'anonymous';
-		
-		showcaseLoader.load(
+		textureManager.loadShowcaseTexture(
 			url,
 			(loadedTexture) => {
-				// Validate texture has actual image data
-				if (!loadedTexture.image || loadedTexture.image.width === 0 || loadedTexture.image.height === 0) {
-					console.error('[TemplateCard3D] Showcase texture invalid - no image data');
-					showcaseTextureError = true;
-					showcaseTextureLoading = false;
-					showcaseTextureValid = false;
-					loadedTexture.dispose();
-					return;
-				}
-				
-				loadedTexture.colorSpace = THREE.SRGBColorSpace;
-				loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
-				loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
-				loadedTexture.needsUpdate = true;
-				
-				// Add to cache for future use
-				showcaseTextureCache.set(url, loadedTexture);
-				
 				showcaseTexture = loadedTexture;
-				
-				// Mark as loaded and valid
 				showcaseTextureLoading = false;
 				showcaseTextureError = false;
 				showcaseTextureValid = true;
 			},
-			undefined,
-			(err) => {
-				console.error('[TemplateCard3D] Showcase texture error:', err);
-				showcaseTextureLoading = false;
+			() => {
 				showcaseTextureError = true;
+				showcaseTextureLoading = false;
 				showcaseTextureValid = false;
+			},
+			() => {
+				// onLoadStart callback
+				showcaseTextureLoading = true;
+				showcaseTextureError = false;
+				showcaseTextureValid = false;
+				showcaseLoadingDebounceStart = performance.now();
 			}
 		);
 	}
 	
-	// Preload all showcase textures into cache on mount
+	// Preload all showcase textures - delegates to TextureManager
 	async function preloadShowcaseTextures() {
-		if (showcaseImages.length === 0) {
-			showcaseCacheReady = true;
-			preloadProgress = 1;
-			onLoadingProgress?.(1, 0, 0, true);
-			return;
-		}
-
-		// Filter valid images
-		const validImages = showcaseImages.filter(img => img.image_url && img.image_url.trim() !== '');
-		preloadTotal = validImages.length;
-		preloadLoaded = 0;
-		preloadProgress = 0;
-
-		// Notify parent of initial loading state
-		onLoadingProgress?.(0, 0, preloadTotal, false);
-
-		console.log('[TemplateCard3D] Preloading', preloadTotal, 'showcase textures...');
-
-		const loader = new THREE.TextureLoader();
-		loader.crossOrigin = 'anonymous';
-
-		const loadPromises = validImages.map((img) => {
-			return new Promise<void>((resolve) => {
-				// Skip if already in cache
-				if (showcaseTextureCache.has(img.image_url)) {
-					preloadLoaded++;
-					preloadProgress = preloadTotal > 0 ? preloadLoaded / preloadTotal : 1;
-					onLoadingProgress?.(preloadProgress, preloadLoaded, preloadTotal, false);
-					resolve();
-					return;
-				}
-
-				loader.load(
-					img.image_url,
-					(loadedTexture) => {
-						if (loadedTexture.image && loadedTexture.image.width > 0 && loadedTexture.image.height > 0) {
-							loadedTexture.colorSpace = THREE.SRGBColorSpace;
-							loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
-							loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
-							loadedTexture.needsUpdate = true;
-							showcaseTextureCache.set(img.image_url, loadedTexture);
-						}
-						preloadLoaded++;
-						preloadProgress = preloadTotal > 0 ? preloadLoaded / preloadTotal : 1;
-						onLoadingProgress?.(preloadProgress, preloadLoaded, preloadTotal, false);
-						resolve();
-					},
-					undefined,
-					() => {
-						// Still count failed loads toward progress
-						preloadLoaded++;
-						preloadProgress = preloadTotal > 0 ? preloadLoaded / preloadTotal : 1;
-						onLoadingProgress?.(preloadProgress, preloadLoaded, preloadTotal, false);
-						resolve();
-					}
-				);
-			});
-		});
-
-		await Promise.all(loadPromises);
-		showcaseCacheReady = true;
-		preloadProgress = 1;
-		onLoadingProgress?.(1, preloadLoaded, preloadTotal, true);
-		console.log('[TemplateCard3D] Preloaded', showcaseTextureCache.size, 'showcase textures into cache');
+		await textureManager.preloadShowcaseTextures(showcaseImages);
+		showcaseCacheReady = textureManager.isCacheReady();
 	}
 
 	// Initial load
 	onMount(() => {
+		// Initialize TextureManager with progress callback
+		textureManager = new TextureManager((progress) => {
+			preloadProgress = progress.progress;
+			preloadLoaded = progress.loaded;
+			preloadTotal = progress.total;
+			showcaseCacheReady = progress.isReady;
+			onLoadingProgress?.(progress.progress, progress.loaded, progress.total, progress.isReady);
+		});
+		
 		// Pre-cache morph geometries for empty state
 		preCacheMorphGeometries();
 		
@@ -803,19 +502,10 @@
 
 	// Cleanup
 	onDestroy(() => {
-		if (texture) {
-			texture.dispose();
-		}
-		if (backTexture) {
-			backTexture.dispose();
-		}
-		// Dispose all cached showcase textures
-		showcaseTextureCache.forEach((tex) => {
-			tex.dispose();
-		});
-		showcaseTextureCache.clear();
+		textureManager?.dispose();
 		showcaseTexture = null;
 	});
+
 
 	// Animation loop
 	useTask(() => {
@@ -823,16 +513,15 @@
 		if (templateId !== prevTemplateId && prevTemplateId !== null) {
 			spinAnimation = true;
 			// Generate random angle within ±30° of front-facing (0°)
-			const randomOffset = (Math.random() - 0.5) * 2 * FRONT_FACING_TOLERANCE;
+			const randomOffset = (Math.random() - 0.5) * 2 * CARD3D_CONSTANTS.FRONT_FACING_TOLERANCE;
 			// Single half rotation (180°) - briefly show back, then land on front
 			const halfSpin = Math.PI;
 			finalAngle = randomOffset; // End near front-facing with random offset
 			spinTarget = rotationY + halfSpin; // One spin only
 
-			// Clear animated texts cache to prevent memory leak and ensure fresh animations
+			// Clear animated texts cache
 			animatedTexts.clear();
 			textAnimationFrame = 0;
-			console.log('[TemplateCard3D] Template changed, cleared animated texts cache');
 			
 			// Notify parent of spin beat
 			beatCount++;
@@ -861,14 +550,9 @@
 			prevImageUrl = imageUrl;
 		}
 
-		// Handle back image URL changes - also reload when template changes
+		// Handle back image URL changes
 		const templateChanged = templateId !== prevTemplateId;
 		if (backImageUrl !== prevBackImageUrl || (templateChanged && backImageUrl)) {
-			console.log('[TemplateCard3D] Back image change detected:', {
-				backImageUrl,
-				prevBackImageUrl,
-				templateChanged
-			});
 			if (backImageUrl) {
 				loadBackTexture(backImageUrl, widthPixels / heightPixels);
 			} else {
@@ -888,89 +572,121 @@
 		const inShowcaseWithCache = !templateId && showcaseImages.length > 0 && showcaseCacheReady;
 		
 		if (spinAnimation) {
-			// Eased spin animation using ease-out cubic
-			spinProgress += SPIN_SPEED;
-			if (spinProgress >= 1) {
-				// Spin complete - snap to final angle and start wobble
-				spinProgress = 0;
+			// Use animation controller for spin calculation
+			const spinResult = updateSpinAnimation(spinProgress, spinTarget, spinStartRotation, spinSpeed);
+			spinProgress = spinResult.newProgress;
+			
+			// Pre-calculate wobble state at spin START for seamless multi-axis interpolation
+			if (!wobblePreCalculated && spinResult.newProgress > 0.01) {
+				const preWobble = initWobble(spinTarget, spinStartRotation, spinSpeed, wobbleStrength, wobbleOscillations, wobbleLinger);
+				wobblePreCalculated = true;
+				wobbleSpinDirection = preWobble.spinDirection;
+				wobbleIntensity = preWobble.intensity;
+				wobbleOscillationCount = preWobble.oscillations;
+				wobbleEffectiveLinger = preWobble.effectiveLinger;
+				wobblePhaseX = preWobble.phaseX;
+				wobblePhaseY = preWobble.phaseY;
+				wobblePhaseZ = preWobble.phaseZ;
+				wobbleInitialOffsets = preWobble.initialOffsets;
+			}
+			
+			// Blend wobble offsets throughout ENTIRE spin using easeOut
+			// This makes spin interpolate all axes toward wobble peak, not just Y
+			if (wobblePreCalculated && !spinResult.complete) {
+				const easeOut = 1 - Math.pow(1 - spinResult.newProgress, 3);
+				wobbleOffsetX = wobbleInitialOffsets.x * easeOut;
+				wobbleOffsetY = wobbleInitialOffsets.y * easeOut;
+				wobbleOffsetZ = wobbleInitialOffsets.z * easeOut;
+			}
+			
+			if (spinResult.complete) {
+				// Spin complete - at first wobble peak
 				rotationY = finalAngle;
 				spinAnimation = false;
-				
-				// Start wobble effect - use spin direction as initial influence
 				wobbleActive = true;
+				wobblePreCalculated = false;
 				wobbleProgress = 0;
-				// Capture spin direction for wobble (positive = clockwise, negative = counter-clockwise)
-				wobbleSpinDirection = spinTarget > spinStartRotation ? 1 : -1;
-				
-				// Apply variance as random range to BOTH amount and linger
-				// variance=0: exact value, variance=1: ±100% range centered on base value
-				// Example: amount=0.07, variance=0.5 → range is 0.07 ± (0.07 * 0.5) = 0.035 to 0.105
-				const randomAmount = (Math.random() - 0.5) * 2; // -1 to 1
-				const randomLinger = (Math.random() - 0.5) * 2; // -1 to 1
-				
-				// Calculate effective values with variance applied
-				const amountVariation = wobbleAmount * wobbleVariance * randomAmount;
-				const lingerVariation = wobbleLinger * wobbleVariance * randomLinger;
-				
-				// Clamp to valid ranges
-				wobbleIntensity = Math.max(0, wobbleAmount + amountVariation);
-				wobbleEffectiveLinger = Math.max(0.1, Math.min(1, wobbleLinger + lingerVariation));
-				
-				// Random phase offsets for organic multi-axis movement
-				wobblePhaseX = Math.random() * Math.PI * 2;
-				wobblePhaseY = Math.random() * Math.PI * 2;
-				wobblePhaseZ = Math.random() * Math.PI * 2;
+				wobbleOffsetX = wobbleInitialOffsets.x;
+				wobbleOffsetY = wobbleInitialOffsets.y;
+				wobbleOffsetZ = wobbleInitialOffsets.z;
 			} else {
-				// Ease-out cubic: 1 - (1-t)^3
-				const easeOut = 1 - Math.pow(1 - spinProgress, 3);
-				const rotationDelta = spinTarget - spinStartRotation;
-				rotationY = spinStartRotation + rotationDelta * easeOut;
+				rotationY = spinResult.rotationY;
 			}
+
 		} else if (!inShowcaseWithCache) {
 			// Only do continuous rotation when NOT in showcase mode
-			// In showcase mode, rotation is controlled by spin beats only
 			rotationY += getRotationSpeed(rotationY);
 		}
+
+
+
+
 		// else: In showcase mode without spin animation, card stays still
 		
-		// Wobble effect - multi-axis damped oscillation after spin
-		// Uses ease-out exponential for strong start and slow decay
+		// Wobble effect - use controller for calculations
 		if (wobbleActive) {
-			// wobbleEffectiveLinger has variance applied, controls decay speed
-			const wobbleSpeed = (0.03 + (1 - wobbleEffectiveLinger) * 0.27) / 3;
-			wobbleProgress += wobbleSpeed;
-			if (wobbleProgress >= 1) {
+			const wobbleState: WobbleState = {
+				active: wobbleActive,
+				progress: wobbleProgress,
+				intensity: wobbleIntensity,
+				oscillations: wobbleOscillationCount,
+				effectiveLinger: wobbleEffectiveLinger,
+				spinDirection: wobbleSpinDirection,
+				phaseX: wobblePhaseX,
+				phaseY: wobblePhaseY,
+				phaseZ: wobblePhaseZ
+			};
+			const wobbleResult = updateWobble(wobbleState);
+			wobbleProgress = wobbleResult.newProgress;
+			wobbleOffsetX = wobbleResult.offsets.x;
+			wobbleOffsetY = wobbleResult.offsets.y;
+			wobbleOffsetZ = wobbleResult.offsets.z;
+			if (wobbleResult.complete) {
 				wobbleActive = false;
-				wobbleProgress = 0;
-				wobbleOffsetX = 0;
-				wobbleOffsetY = 0;
-				wobbleOffsetZ = 0;
-			} else {
-				// Ease-out exponential decay: e^(-5*t) for strong start, slow decay
-				const decayFactor = Math.exp(-5 * wobbleProgress);
-				
-				// Multi-axis wobble with different frequencies for organic feel
-				// X-axis (tilt forward/back): main wobble
-				const wobbleX = Math.sin(wobbleProgress * WOBBLE_FREQUENCY * Math.PI + wobblePhaseX);
-				// Y-axis (rotation): subtle, influenced by spin direction
-				const wobbleY = Math.sin(wobbleProgress * (WOBBLE_FREQUENCY * 0.7) * Math.PI + wobblePhaseY) * wobbleSpinDirection;
-				// Z-axis (bank/roll): subtle variation
-				const wobbleZ = Math.sin(wobbleProgress * (WOBBLE_FREQUENCY * 1.3) * Math.PI + wobblePhaseZ);
-				
-				// Apply intensity and decay with axis-specific scaling
-				wobbleOffsetX = wobbleIntensity * wobbleX * decayFactor;
-				wobbleOffsetY = wobbleIntensity * 0.3 * wobbleY * decayFactor; // Y is subtler
-				wobbleOffsetZ = wobbleIntensity * 0.5 * wobbleZ * decayFactor; // Z is medium
 			}
 		}
 
-		// Oscillating tilt animation (up and down by 5 degrees) + wobble on X-axis
-		oscillateTime += OSCILLATE_SPEED;
-		tiltX = BASE_TILT_X + Math.sin(oscillateTime) * OSCILLATE_AMPLITUDE + wobbleOffsetX;
+		// Tap wobble - runs in parallel with spin wobble
+		if (tapWobbleActive) {
+			const tapState: TapWobbleState = {
+				active: tapWobbleActive,
+				progress: tapWobbleProgress,
+				tapX,
+				tapY,
+				pressure: tapPressure,
+				intensity: tapWobbleIntensity,
+				linger: tapWobbleLinger
+			};
+			const tapResult = updateTapWobble(tapState);
+			tapWobbleProgress = tapResult.newProgress;
+			tapOffsetX = tapResult.offsets.x;
+			tapOffsetY = tapResult.offsets.y;
+			tapOffsetZ = tapResult.offsets.z;
+			tapPressure = tapResult.newPressure;
+			
+			// Update debug panel with decaying pressure
+			// Update debug panel with decaying pressure
+			onTapPressureChange?.(tapPressure);
+			
+			if (tapResult.complete) {
+				tapWobbleActive = false;
+			}
+		} else if (tapPressure > 0) {
+			// Decay pressure even when wobble animation is complete (match TapController rate)
+			tapPressure = Math.max(0, tapPressure - 0.05);
+			onTapPressureChange?.(tapPressure);
+		}
+
+		// Oscillating tilt animation - use controller
+		const oscillation = updateOscillation(oscillateTime);
+		oscillateTime = oscillation.newTime;
+		// Combine spin wobble + tap wobble with oscillation
+		tiltX = oscillation.tiltX + wobbleOffsetX + tapOffsetX;
+
 
 		// Notify parent of rotation change for shadow sync
 		const currentSpeed = getRotationSpeed(rotationY);
-		const isSlowSpin = !spinAnimation && currentSpeed === ROTATION_SPEED_FACE;
+		const isSlowSpin = !spinAnimation && currentSpeed === CARD3D_CONSTANTS.ROTATION_SPEED_FACE;
 		onRotationChange?.(rotationY, isSlowSpin);
 		
 		// Define isShowcaseMode for use in beat system and morphing
@@ -984,32 +700,25 @@
 		) && !loading && !error && !spinAnimation && morphGeometriesLoaded && morphGeometries.length > 0;
 
 		// === UNIFIED BEAT SYSTEM ===
-		// All visual changes happen on the beat timer: texture, shape, and spin
-		// Beat cycle pattern example: texture, spin, texture, shape+spin, texture, spin, texture, shape...
+		// Use BeatController for timing and action decisions
 		if (isShowcaseMode && showcaseImages.length > 0 && showcaseCacheReady) {
 			const now = performance.now();
+			const beatResult = checkBeat(now, lastBeatTime, beatMs, beatCount);
 			
-			// Check if it's time for a beat
-			if (now - lastBeatTime >= beatMs) {
-				lastBeatTime = now;
-				beatCount++;
+			if (beatResult.shouldTrigger) {
+				lastBeatTime = beatResult.lastBeatTime;
+				beatCount = beatResult.beatCount;
 				
-				// Determine beat action based on beat count
-				// - Every 4th beat: shape change
-				// - Every 2nd beat: spin (fast 180° rotation)
-				// - Otherwise: texture change
-				const isShapeBeat = beatCount % BEATS_PER_SHAPE_CHANGE === 0;
-				const isSpinBeat = beatCount % 2 === 0; // Every other beat is a spin
-				
-				if (isShapeBeat && shouldMorph) {
+				if (beatResult.action === 'shape' && shouldMorph) {
 					// === SHAPE CHANGE BEAT ===
 					const validIndices = validMorphShapeIndices();
 					const cycleLength = validIndices.length;
 					
 					if (cycleLength > 0) {
-						// Move to next valid shape
-						const nextValidIdx = (currentValidIndex + 1) % cycleLength;
+						// Use controller for next index calculation
+						const nextValidIdx = getNextShapeIndex(currentValidIndex, cycleLength);
 						const actualShapeIndex = validIndices[nextValidIdx];
+
 						const newShape = MORPH_SHAPES[actualShapeIndex];
 						const newOrientation: 'landscape' | 'portrait' = newShape.w >= newShape.h ? 'landscape' : 'portrait';
 						
@@ -1022,40 +731,44 @@
 							edgeGeometry = morphGeometries[actualShapeIndex].edge;
 							
 							// Immediately load a matching texture from cache to prevent any flash
-							const matchingImages = showcaseImages.filter(img => img.orientation === newOrientation);
-							const cachedImage = matchingImages.find(img => showcaseTextureCache.has(img.image_url));
-							if (cachedImage) {
-								const cachedTex = showcaseTextureCache.get(cachedImage.image_url);
-								if (cachedTex) {
-									showcaseTexture = cachedTex;
-									currentShowcaseImageOrientation = newOrientation;
-									showcaseTextureValid = true;
-									showcaseTextureError = false;
-									// Reset showcaseIndex for new orientation
-									showcaseIndex = matchingImages.indexOf(cachedImage);
-								}
+							const cached = textureManager.findCachedImageForOrientation(showcaseImages, newOrientation);
+							if (cached) {
+								showcaseTexture = cached.texture;
+								currentShowcaseImageOrientation = newOrientation;
+								showcaseTextureValid = true;
+								showcaseTextureError = false;
+								// Reset showcaseIndex for new orientation
+								const matchingImages = textureManager.getMatchingImages(showcaseImages, newOrientation);
+								showcaseIndex = matchingImages.indexOf(cached.image);
 							}
 							
 							// Notify parent of shape change beat
 							onBeat?.(beatCount, 'shape');
+
+							// === TRIGGER MIXED SPIN ===
+							// Spin while morphing shape for dynamic effect
+							const spinSetup = triggerBeatSpin(rotationY);
+							spinStartRotation = spinSetup.spinStartRotation;
+							spinProgress = 0;
+							spinAnimation = true;
+							spinTarget = spinSetup.spinTarget;
+							finalAngle = spinSetup.finalAngle;
 						}
 					}
-				} else if (isSpinBeat) {
+				} else if (beatResult.action === 'spin') {
 					// === SPIN BEAT ===
-					// Trigger an eased 180-degree spin with wobble at the end
-					const halfRotation = Math.PI;
-					const targetRotation = Math.ceil(rotationY / halfRotation) * halfRotation + halfRotation;
-					
-					// Set up eased spin animation
-					spinStartRotation = rotationY;
+					// Use controller for spin setup
+					const spinSetup = triggerBeatSpin(rotationY);
+					spinStartRotation = spinSetup.spinStartRotation;
 					spinProgress = 0;
 					spinAnimation = true;
-					spinTarget = targetRotation;
-					finalAngle = targetRotation; // Land exactly at the 180° boundary
+					spinTarget = spinSetup.spinTarget;
+					finalAngle = spinSetup.finalAngle;
 					
 					// Notify parent of spin beat
 					onBeat?.(beatCount, 'spin');
-				} else {
+				} else if (beatResult.action === 'texture') {
+
 					// === TEXTURE CHANGE BEAT ===
 					const currentShape = MORPH_SHAPES[currentMorphIndex] || MORPH_SHAPES[0];
 					const currentMorphOrientation = currentShape.w >= currentShape.h ? 'landscape' : 'portrait';
@@ -1071,7 +784,7 @@
 						const nextImage = matchingImages[showcaseIndex];
 						if (nextImage?.image_url) {
 							// Use cache for instant swap
-							const cachedTex = showcaseTextureCache.get(nextImage.image_url);
+							const cachedTex = textureManager.getCached(nextImage.image_url);
 							if (cachedTex) {
 								showcaseTexture = cachedTex;
 								currentShowcaseImageOrientation = nextImage.orientation || null;
@@ -1116,9 +829,19 @@
 
 {#if frontGeometry}
 	<!-- Card Group -->
-	<T.Group rotation.x={tiltX} rotation.y={rotationY + wobbleOffsetY} rotation.z={wobbleOffsetZ}>
+	<T.Group rotation.x={tiltX} rotation.y={rotationY + wobbleOffsetY + tapOffsetY} rotation.z={wobbleOffsetZ + tapOffsetZ}>
 		{#if loading}
-			<T.Mesh geometry={frontGeometry}>
+			<T.Mesh 
+				geometry={frontGeometry}
+				onclick={(e) => {
+					const uv = e.uv;
+					if (uv) {
+						handleTap(uv.x, uv.y);
+					} else {
+						handleTap(0.5, 0.5);
+					}
+				}}
+			>
 				<T.MeshStandardMaterial color="#f8fafc" side={THREE.FrontSide} transparent opacity={0.9} />
 			</T.Mesh>
 			{#if edgeGeometry}
@@ -1140,7 +863,17 @@
 				position.z={0.06}
 			/>
 		{:else if error}
-			<T.Mesh geometry={frontGeometry}>
+			<T.Mesh 
+				geometry={frontGeometry}
+				onclick={(e) => {
+					const uv = e.uv;
+					if (uv) {
+						handleTap(uv.x, uv.y);
+					} else {
+						handleTap(0.5, 0.5);
+					}
+				}}
+			>
 				<T.MeshStandardMaterial color="#ef4444" side={THREE.FrontSide} transparent opacity={0.9} />
 			</T.Mesh>
 			{#if edgeGeometry}
@@ -1162,11 +895,21 @@
 				position.z={0.06}
 			/>
 		{:else if texture}
-			<!-- Front: Full color texture -->
-			<T.Mesh geometry={frontGeometry}>
+			<!-- Front: Full color texture - clickable for tap wobble -->
+			<T.Mesh 
+				geometry={frontGeometry}
+				onclick={(e) => {
+					const uv = e.uv;
+					if (uv) {
+						handleTap(uv.x, uv.y);
+					} else {
+						handleTap(0.5, 0.5);
+					}
+				}}
+			>
 				<T.MeshBasicMaterial
 					map={texture}
-					side={THREE.FrontSide}
+					side={THREE.DoubleSide}
 				/>
 			</T.Mesh>
 			<!-- Front: Shiny overlay for reflections -->
@@ -1373,17 +1116,33 @@
 				{/each}
 			{/if}
 		{:else}
-		<!-- Morphing card - ONLY render when textures are ready -->
-		<!-- NEVER show gray/plain card - wait for texture to be available -->
-		{#if shouldShowShowcaseTexture}
+		<!-- Morphing card - Persistent Hit Box + Conditional Texture -->
 			<T.Group scale.x={morphScaleX} scale.y={morphScaleY}>
-				<!-- Front face with showcase texture -->
-				<T.Mesh geometry={frontGeometry}>
-					<T.MeshBasicMaterial
-						map={showcaseTexture}
-						side={THREE.FrontSide}
-					/>
+				<!-- Invisible Hit Box - always captures taps even if texture is loading/swapping -->
+				<T.Mesh 
+					geometry={frontGeometry}
+					visible={false}
+					onclick={(e) => {
+						const uv = e.uv;
+						if (uv) {
+							handleTap(uv.x, uv.y);
+						} else {
+							handleTap(0.5, 0.5);
+						}
+					}}
+				>
+					<T.MeshBasicMaterial side={THREE.DoubleSide} />
 				</T.Mesh>
+
+				<!-- Visible Content -->
+				{#if shouldShowShowcaseTexture}
+					<!-- Front face with showcase texture -->
+					<T.Mesh geometry={frontGeometry}>
+						<T.MeshBasicMaterial
+							map={showcaseTexture}
+							side={THREE.FrontSide}
+						/>
+					</T.Mesh>
 				<!-- Shiny overlay for reflections -->
 				<T.Mesh geometry={frontGeometry} position.z={0.001}>
 					<T.MeshPhysicalMaterial
@@ -1429,8 +1188,8 @@
 						/>
 					</T.Mesh>
 				{/if}
+				{/if}
 			</T.Group>
-		{/if}
 		<!-- No else block - we NEVER show a gray/plain card. Loading overlay in parent handles waiting state -->
 		{/if}
 	</T.Group>
