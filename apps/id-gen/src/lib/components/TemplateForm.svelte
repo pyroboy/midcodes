@@ -675,8 +675,8 @@
 	let elementStyle = $derived((element: TemplateElement) => {
 		const currentCoordSystem = coordSystem();
 
-		// Get position from coordinate system - no offset needed with accurate background positioning
-		const positionStyle = currentCoordSystem.createPositionStyle(
+		// Use percentage positioning for responsive layouts
+		const positionStyle = currentCoordSystem.createPercentagePositionStyle(
 			element.x || 0,
 			element.y || 0,
 			element.width || 0,
@@ -688,19 +688,24 @@
 
 	let textStyle = $derived((element: TemplateElement) => {
 		const currentCoordSystem = coordSystem();
-		const scale = currentCoordSystem.scale;
+		const storageDims = currentCoordSystem.storageDimensions;
+		// Calculate font-size as percentage of container width using cqw units
+		// This ensures text scales proportionally with the container
+		const fontSizeCqw = ((element.size || 16) / storageDims.width) * 100;
+		const letterSpacingCqw = element.letterSpacing
+			? (element.letterSpacing / storageDims.width) * 100
+			: null;
+
 		return {
 			'font-family': `"${element.font || 'Arial'}", sans-serif`,
 			'font-weight': element.fontWeight || '400',
 			'font-style': element.fontStyle || 'normal',
-			'font-size': `${Math.round((element.size || 16) * scale)}px`,
+			'font-size': `${fontSizeCqw.toFixed(3)}cqw`,
 			color: element.color || '#000000',
 			'text-align': element.alignment || 'left',
 			'text-transform': element.textTransform || 'none',
 			'text-decoration-line': element.textDecoration || 'none',
-			'letter-spacing': element.letterSpacing
-				? `${Math.round(element.letterSpacing * scale)}px`
-				: 'normal',
+			'letter-spacing': letterSpacingCqw ? `${letterSpacingCqw.toFixed(3)}cqw` : 'normal',
 			'line-height': element.lineHeight || '1.2',
 			opacity: typeof element.opacity === 'number' ? element.opacity : 1,
 			display: 'block',
@@ -903,7 +908,6 @@
 		margin-bottom: 2.5rem;
 		width: 100%;
 		padding: 1rem;
-		padding-right: 120px; /* Add space for background controls */
 		overflow: visible;
 	}
 
@@ -915,7 +919,25 @@
 		overflow: visible; /* Allow controls to extend outside */
 	}
 
+	@media (max-width: 1023px) {
+		.template-section {
+			padding: 1rem;
+		}
+
+		.preview-container {
+			margin: 0 auto;
+		}
+
+		.template-layout {
+			align-items: center;
+		}
+	}
+
 	@media (min-width: 1024px) {
+		.template-section {
+			padding-right: 120px; /* Add space for background controls on desktop */
+		}
+
 		.template-layout {
 			flex-direction: row;
 			align-items: flex-start;
@@ -944,6 +966,7 @@
 		overflow: hidden;
 		border-radius: 2px;
 		box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+		container-type: inline-size; /* Enable container queries for responsive font sizing */
 	}
 
 	.background-canvas {

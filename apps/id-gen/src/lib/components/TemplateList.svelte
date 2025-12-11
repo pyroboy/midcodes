@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { fade } from 'svelte/transition';
 	import { Button } from '$lib/components/ui/button';
-	import { Copy, Trash2, Edit, Plus, FileText, Image as ImageIcon, Type } from '@lucide/svelte';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import { Copy, Trash2, Edit, Plus, FileText, Image as ImageIcon, Type, MoreVertical } from '@lucide/svelte';
 	import type { TemplateData, TemplateElement } from '../stores/templateStore';
 	import { goto } from '$app/navigation';
 	import { invalidate } from '$app/navigation';
@@ -286,41 +287,47 @@
 						</p>
 					</div>
 
-					<!-- Action Buttons (Floating) -->
-					<div
-						class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-20"
-					>
-						<div
-							class="bg-background/90 backdrop-blur-sm border border-border rounded-md shadow-sm flex gap-1 p-1"
-						>
-							<Button
-								variant="ghost"
-								size="sm"
-								class="h-7 w-7 p-0 hover:bg-accent"
-								onclick={(e) => handleActionClick(e, template, 'edit')}
-								title="Edit Template"
-							>
-								<Edit class="h-3.5 w-3.5" />
-							</Button>
-							<Button
-								variant="ghost"
-								size="sm"
-								class="h-7 w-7 p-0 hover:bg-accent"
-								onclick={(e) => handleActionClick(e, template, 'duplicate')}
-								title="Duplicate"
-							>
-								<Copy class="h-3.5 w-3.5" />
-							</Button>
-							<Button
-								variant="ghost"
-								size="sm"
-								class="h-7 w-7 p-0 hover:bg-destructive/10 hover:text-destructive"
-								onclick={(e) => handleActionClick(e, template, 'delete')}
-								title="Delete"
-							>
-								<Trash2 class="h-3.5 w-3.5" />
-							</Button>
-						</div>
+					<!-- Action Dropdown Menu (Persistent) -->
+					<div class="absolute top-2 right-2 z-20">
+						<DropdownMenu.Root>
+							<DropdownMenu.Trigger>
+								{#snippet child({ props })}
+									<Button
+										{...props}
+										variant="ghost"
+										size="sm"
+										class="h-8 w-8 p-0 bg-background/80 backdrop-blur-sm border border-border shadow-sm hover:bg-accent"
+									>
+										<MoreVertical class="h-4 w-4" />
+										<span class="sr-only">Template actions</span>
+									</Button>
+								{/snippet}
+							</DropdownMenu.Trigger>
+							<DropdownMenu.Content align="end" class="w-40">
+								<DropdownMenu.Item
+									onclick={(e) => handleActionClick(e, template, 'edit')}
+									class="flex items-center gap-2 cursor-pointer"
+								>
+									<Edit class="h-4 w-4" />
+									<span>Edit</span>
+								</DropdownMenu.Item>
+								<DropdownMenu.Item
+									onclick={(e) => handleActionClick(e, template, 'duplicate')}
+									class="flex items-center gap-2 cursor-pointer"
+								>
+									<Copy class="h-4 w-4" />
+									<span>Duplicate</span>
+								</DropdownMenu.Item>
+								<DropdownMenu.Separator />
+								<DropdownMenu.Item
+									onclick={(e) => handleActionClick(e, template, 'delete')}
+									class="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive"
+								>
+									<Trash2 class="h-4 w-4" />
+									<span>Delete</span>
+								</DropdownMenu.Item>
+							</DropdownMenu.Content>
+						</DropdownMenu.Root>
 					</div>
 				</div>
 			{/each}

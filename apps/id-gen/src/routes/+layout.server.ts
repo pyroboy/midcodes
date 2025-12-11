@@ -7,7 +7,11 @@ interface ProfileData {
 	email: string | null;
 }
 
-export const load: LayoutServerLoad = async ({ locals }) => {
+export const load: LayoutServerLoad = async ({ locals, depends }) => {
+	// Register dependencies for selective invalidation
+	depends('app:user-profile');
+	depends('app:credits');
+
 	// Destructure all the auth-related data from locals
 	const { session, user, org_id, permissions, supabase } = locals;
 

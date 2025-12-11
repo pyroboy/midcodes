@@ -41,16 +41,31 @@ interface IDCardResponse {
 	idcards: IDCard[];
 }
 
-export const load = (async ({ locals }) => {
+export const load = (async ({ locals, url, depends, setHeaders }) => {
+	// Cache for 1 minute (ID cards change more frequently)
+	setHeaders({
+		'cache-control': 'private, max-age=60'
+	});
+
+	// Register dependency for selective invalidation
+	depends('app:idcards');
+
 	const { session, supabase, org_id } = locals;
 	if (!session) throw error(401, 'Unauthorized');
 	if (!org_id) throw error(403, 'No organization context found');
 
-	// Fetch ID cards with LEFT JOIN to include unassigned cards
-	const { data: cards, error: fetchError } = await supabase
-		.from('idcards')
-		.select(
-			`
+	// Pagination parameters with mobile-aware defaults
+	const page = Math.max(1, parseInt(url.searchParams.get('page') || '1'));
+	const limit = Math.min(50, Math.max(5, parseInt(url.searchParams.get('limit') || '20')));
+	const offset = (page - 1) * limit;
+
+	// Run queries in parallel for better performance
+	const [cardsResult, countResult] = await Promise.all([
+		// Fetch paginated ID cards
+		supabase
+			.from('idcards')
+			.select(
+				`
 			id,
 			template_id,
 			front_image,
@@ -61,9 +76,16 @@ export const load = (async ({ locals }) => {
 				name
 			)
 		`
-		)
-		.eq('org_id', org_id)
-		.order('created_at', { ascending: false });
+			)
+			.eq('org_id', org_id)
+			.order('created_at', { ascending: false })
+			.range(offset, offset + limit - 1),
+		// Get total count for pagination
+		supabase.from('idcards').select('id', { count: 'exact', head: true }).eq('org_id', org_id)
+	]);
+
+	const { data: cards, error: fetchError } = cardsResult;
+	const totalCount = countResult.count || 0;
 
 	if (fetchError) throw error(500, fetchError.message);
 	if (!cards) throw error(404, 'No ID cards found');
@@ -79,7 +101,7 @@ export const load = (async ({ locals }) => {
 			if (typeof value === 'string' || value === null) {
 				fields[key] = {
 					value: value as string | null,
-					side: 'front' // Default to front, adjust if you have side info
+					side: 'front'
 				};
 			}
 		});
@@ -94,69 +116,73 @@ export const load = (async ({ locals }) => {
 		};
 	});
 
-	// Build metadata
+	// Get unique template names from the current page's cards
 	const templateNames = Array.from(
 		new Set(idCards.map((card) => card.template_name).filter(Boolean))
 	);
 
-	// Fetch template info for metadata
-	const { data: templates } = await supabase
-		.from('templates')
-		.select('name, template_elements')
-		.eq('org_id', org_id)
-		.in('name', templateNames);
+	// Only fetch template metadata if there are templates to query
+	let templateFields: { [templateName: string]: TemplateVariable[] } = {};
+	let templateDimensions: Record<string, { width: number; height: number; unit: string }> = {};
 
-	const templateFields: { [templateName: string]: TemplateVariable[] } = {};
-	if (templates) {
-		templates.forEach((template: any) => {
-			const elements = template.template_elements || [];
-			templateFields[template.name] = elements
-				.filter((el: any) => el.type === 'text' || el.type === 'selection')
-				.map((el: any) => ({
-					variableName: el.variableName,
-					side: el.side
-				}));
-		});
+	if (templateNames.length > 0) {
+		// Fetch template info in parallel
+		const [templatesResult, dimsResult] = await Promise.all([
+			supabase
+				.from('templates')
+				.select('name, template_elements')
+				.eq('org_id', org_id)
+				.in('name', templateNames),
+			supabase
+				.from('templates')
+				.select('name, width_pixels, height_pixels')
+				.eq('org_id', org_id)
+				.in('name', templateNames)
+		]);
+
+		if (templatesResult.data) {
+			templatesResult.data.forEach((template: any) => {
+				const elements = template.template_elements || [];
+				templateFields[template.name] = elements
+					.filter((el: any) => el.type === 'text' || el.type === 'selection')
+					.map((el: any) => ({
+						variableName: el.variableName,
+						side: el.side
+					}));
+			});
+		}
+
+		if (dimsResult.data) {
+			dimsResult.data.forEach((template: any) => {
+				templateDimensions[template.name] = {
+					width: template.width_pixels || 1013,
+					height: template.height_pixels || 638,
+					unit: 'pixels'
+				};
+			});
+		}
 	}
 
 	const metadata: Metadata = {
-		organization_name: 'Organization', // You might want to fetch this
+		organization_name: 'Organization',
 		templates: templateFields,
 		pagination: {
-			total_records: idCards.length,
-			current_offset: 0,
-			limit: null
+			total_records: totalCount,
+			current_offset: offset,
+			limit: limit
 		}
 	};
-
-	// Fetch template dimensions for 3D geometry preparation
-	const { data: templateDims, error: templatesError } = await supabase
-		.from('templates')
-		.select('name, width_pixels, height_pixels')
-		.eq('org_id', org_id)
-		.in('name', templateNames);
-
-	if (templatesError) {
-		console.warn('Could not fetch template dimensions:', templatesError);
-	}
-
-	// Create template dimensions map
-	const templateDimensions: Record<string, { width: number; height: number; unit: string }> = {};
-
-	if (templateDims) {
-		templateDims.forEach((template: any) => {
-			templateDimensions[template.name] = {
-				width: template.width_pixels || 1013,
-				height: template.height_pixels || 638,
-				unit: 'pixels'
-			};
-		});
-	}
 
 	return {
 		idCards,
 		metadata,
-		templateDimensions
+		templateDimensions,
+		pagination: {
+			page,
+			limit,
+			total: totalCount,
+			totalPages: Math.ceil(totalCount / limit)
+		}
 	};
 }) satisfies PageServerLoad;
 

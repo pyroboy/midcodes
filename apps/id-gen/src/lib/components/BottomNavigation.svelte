@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/stores';
+	import { onMount } from 'svelte';
 	import { Button } from '$lib/components/ui/button';
+	import { preloadStates, initPreloadService, type RoutePreloadState } from '$lib/services/preloadService';
 
 	interface Props {
 		user?: any;
@@ -8,6 +10,28 @@
 	}
 
 	let { user, class: className = '' }: Props = $props();
+
+	// Reactive preload states
+	let states = $state<Map<string, RoutePreloadState>>(new Map());
+	
+	// Subscribe to preload states
+	$effect(() => {
+		const unsubscribe = preloadStates.subscribe((value) => {
+			states = value;
+		});
+		return unsubscribe;
+	});
+
+	// Initialize preload service on mount
+	onMount(() => {
+		const cleanup = initPreloadService();
+		return cleanup;
+	});
+
+	// Get preload state for a route
+	function getPreloadState(href: string): RoutePreloadState | undefined {
+		return states.get(href);
+	}
 
 	// Navigation items
 	const navItems = [
@@ -62,9 +86,10 @@
 	<nav class="lg:hidden fixed bottom-0 left-0 right-0 bg-background border-t border-border z-40">
 		<div class="grid grid-cols-5 h-16">
 			{#each navItems as item}
+				{@const preloadState = getPreloadState(item.href)}
 				<a
 					href={item.href}
-					class="flex flex-col items-center justify-center gap-1 px-2 py-2 transition-colors
+					class="relative flex flex-col items-center justify-center gap-1 px-2 py-2 transition-colors
 						{isActive(item.href, $page.url.pathname)
 						? 'text-primary bg-primary/10'
 						: 'text-muted-foreground hover:text-foreground hover:bg-muted'}"
@@ -81,6 +106,17 @@
 					<span class="text-xs font-medium leading-none">
 						{item.mobileLabel}
 					</span>
+					<!-- Mini loading bar -->
+					{#if preloadState?.skeleton === 'loading' || preloadState?.assets === 'loading'}
+						<div class="absolute bottom-1 left-2 right-2 h-0.5 bg-muted rounded-full overflow-hidden">
+							<div 
+								class="h-full bg-primary/60 transition-all duration-100 ease-out" 
+								style="width: {preloadState.progress}%"
+							></div>
+						</div>
+					{:else if preloadState?.skeleton === 'ready' && preloadState?.assets === 'ready'}
+						<div class="absolute bottom-1 left-2 right-2 h-0.5 bg-primary/30 rounded-full"></div>
+					{/if}
 				</a>
 			{/each}
 		</div>
@@ -96,9 +132,10 @@
 			</div>
 
 			{#each navItems as item}
+				{@const preloadState = getPreloadState(item.href)}
 				<a
 					href={item.href}
-					class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+					class="relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors
 						{isActive(item.href, $page.url.pathname)
 						? 'bg-primary text-primary-foreground'
 						: 'text-muted-foreground hover:bg-muted hover:text-foreground'}"
@@ -112,7 +149,18 @@
 					>
 						{@html item.icon}
 					</svg>
-					{item.label}
+					<span class="flex-1">{item.label}</span>
+					<!-- Preload indicator -->
+					{#if preloadState?.skeleton === 'loading' || preloadState?.assets === 'loading'}
+						<div class="w-12 h-1 bg-muted rounded-full overflow-hidden">
+							<div 
+								class="h-full bg-primary/60 transition-all duration-100 ease-out" 
+								style="width: {preloadState.progress}%"
+							></div>
+						</div>
+					{:else if preloadState?.skeleton === 'ready' && preloadState?.assets === 'ready'}
+						<div class="w-2 h-2 bg-green-500/50 rounded-full"></div>
+					{/if}
 				</a>
 			{/each}
 

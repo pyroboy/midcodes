@@ -1,6 +1,11 @@
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, setHeaders }) => {
+	// Cache for 5 minutes (org settings rarely change)
+	setHeaders({
+		'cache-control': 'private, max-age=300'
+	});
+
 	const { supabase, org_id, user } = locals;
 	let paymentsEnabled = true;
 

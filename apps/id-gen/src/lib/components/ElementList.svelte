@@ -338,8 +338,8 @@
 <style>
 	.element-list {
 		width: 400px;
-		background-color: #1e1e1e;
-		color: #000;
+		background-color: var(--color-card);
+		color: var(--color-foreground);
 		padding: 0.75rem;
 		border-radius: 0.5rem;
 		max-height: calc(100vh - 2rem);
@@ -347,14 +347,14 @@
 	}
 
 	.element-item {
-		background-color: #2d2d2d;
+		background-color: var(--color-muted);
 		border-radius: 0.375rem;
 		margin-bottom: 0.25rem;
 		overflow: hidden;
 	}
 
 	.element-item.highlighted .element-header {
-		background-color: #4a4a4a;
+		background-color: var(--color-accent);
 		box-shadow:
 			0 0 0 1px rgba(0, 255, 255, 0.4) inset,
 			0 0 8px rgba(0, 255, 255, 0.35);
@@ -365,14 +365,14 @@
 		justify-content: space-between;
 		align-items: center;
 		padding: 0.4rem 0.75rem;
-		background-color: #363636;
+		background-color: var(--color-secondary);
 		cursor: pointer;
 		user-select: none;
 		min-height: 2rem;
 	}
 
 	.element-header:hover {
-		background-color: #404040;
+		background-color: var(--color-border);
 	}
 
 	.header-content {
@@ -384,17 +384,17 @@
 	.chevron {
 		display: flex;
 		align-items: center;
-		color: #a0a0a0;
+		color: var(--color-muted-foreground);
 	}
 
 	.element-type {
 		font-weight: 500;
-		color: #e0e0e0;
+		color: var(--color-foreground);
 		font-size: 0.875rem;
 	}
 
 	.element-name {
-		color: #a0a0a0;
+		color: var(--color-muted-foreground);
 		font-size: 0.75rem;
 	}
 
@@ -405,7 +405,7 @@
 
 	.element-inputs {
 		padding: 0.75rem;
-		border-top: 1px solid #404040;
+		border-top: 1px solid var(--color-border);
 	}
 
 	.input-group {
@@ -415,14 +415,14 @@
 	.input-group label {
 		display: block;
 		margin-bottom: 0.375rem;
-		color: #e0e0e0;
+		color: var(--color-foreground);
 		font-size: 0.875rem;
 	}
 
 	.remove-element {
 		background: none;
 		border: none;
-		color: #a0a0a0;
+		color: var(--color-muted-foreground);
 		font-size: 1.25rem;
 		cursor: pointer;
 		padding: 0.25rem;
@@ -438,9 +438,9 @@
 	.options-textarea {
 		width: 100%;
 		min-height: 80px;
-		background-color: #2d2d2d;
-		color: #ffffff;
-		border: 1px solid #404040;
+		background-color: var(--color-muted);
+		color: var(--color-foreground);
+		border: 1px solid var(--color-border);
 		border-radius: 0.375rem;
 		padding: 0.5rem;
 		font-family: inherit;
@@ -449,7 +449,7 @@
 
 	.options-textarea:focus {
 		outline: none;
-		border-color: #606060;
+		border-color: var(--color-ring);
 	}
 
 	.add-elements {
@@ -460,9 +460,9 @@
 	}
 
 	.add-elements button {
-		background-color: #4d4d4d;
+		background-color: var(--color-secondary);
 		border: none;
-		color: #ffffff;
+		color: var(--color-foreground);
 		padding: 8px;
 		cursor: pointer;
 		border-radius: 3px;
@@ -471,7 +471,7 @@
 	}
 
 	.add-elements button:hover {
-		background-color: #5d5d5d;
+		background-color: var(--color-accent);
 	}
 
 	.error-message {
@@ -482,22 +482,22 @@
 
 	/* Background Section */
 	.background-section .element-header {
-		background-color: #4a3a2a;
+		background-color: var(--color-accent);
 	}
 
 	.background-section .element-header:hover {
-		background-color: #5f4f2f;
+		background-color: var(--color-accent-foreground);
 	}
 
 	/* Loading placeholder for background controls */
 	.loading-placeholder {
 		padding: 2rem;
 		text-align: center;
-		color: #a0a0a0;
+		color: var(--color-muted-foreground);
 		font-style: italic;
-		background: #2a2a2a;
+		background: var(--color-muted);
 		border-radius: 4px;
-		border: 1px dashed #5a5a5a;
+		border: 1px dashed var(--color-border);
 	}
 
 	/* Background controls container */

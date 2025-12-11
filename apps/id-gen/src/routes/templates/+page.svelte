@@ -1,6 +1,8 @@
 <script lang="ts">
-	import { goto, invalidate } from '$app/navigation';
 	import { onMount, tick } from 'svelte';
+	import { invalidate, goto } from '$app/navigation';
+	import TemplatesPageSkeleton from '$lib/components/skeletons/TemplatesPageSkeleton.svelte';
+	import { getPreloadState } from '$lib/services/preloadService';
 	import TemplateList from '$lib/components/TemplateList.svelte';
 	import TemplateEdit from '$lib/components/TemplateEdit.svelte';
 	import CroppingConfirmationDialog from '$lib/components/CroppingConfirmationDialog.svelte';
@@ -15,6 +17,15 @@
 		COMMON_CARD_SIZES,
 		findClosestCardSize
 	} from '$lib/utils/sizeConversion';
+
+	// Smart Loading State
+	const preloadState = getPreloadState('/templates');
+	let isStructureReady = $derived($preloadState?.skeleton === 'ready');
+	let isLoading = $state(true);
+
+	onMount(() => {
+		isLoading = false;
+	});
 
 	// Type that matches the actual database schema
 	type DatabaseTemplate = {
@@ -95,8 +106,7 @@
 	let currentCardSize: CardSize | null = $state(null);
 	let requiredPixelDimensions: { width: number; height: number } | null = $state(null);
 
-	// Add view mode state
-	let isLoading = $state(false);
+	// Edit mode state
 	let isEditMode = $state(false);
 
 	// Preload 3D card geometries for templates
@@ -1292,7 +1302,12 @@
 
 	function handleBack() {
 		isEditMode = false;
+		currentTemplate = null;
 		clearForm();
+		// Clear the URL ?id= parameter to prevent re-triggering edit mode on navigation
+		if (browser && window.location.search) {
+			goto('/templates', { replaceState: true });
+		}
 	}
 
 	function clearForm() {

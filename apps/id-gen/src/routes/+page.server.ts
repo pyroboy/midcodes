@@ -1,7 +1,17 @@
 import type { PageServerLoad, Actions } from './$types';
 import { error, redirect, fail } from '@sveltejs/kit';
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, depends, setHeaders }) => {
+	// Cache for 2 minutes - data doesn't change that frequently
+	setHeaders({
+		'cache-control': 'private, max-age=120'
+	});
+
+	// Register dependencies for selective invalidation
+	depends('app:templates');
+	depends('app:recent-cards');
+	depends('app:template-assets');
+
 	const { supabase, session, user, org_id, permissions } = locals;
 
 	// Check if user has admin role and redirect to admin dashboard

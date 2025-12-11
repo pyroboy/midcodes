@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
+	import { fade } from 'svelte/transition';
 	import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
@@ -7,12 +9,23 @@
 	import { createCreditPayment } from '$lib/remote/payments.remote';
 	import { paymentFlags } from '$lib/stores/featureFlags';
 	import { Check, Zap, CreditCard, Camera, Database, MapPin } from 'lucide-svelte';
+	import { getPreloadState } from '$lib/services/preloadService';
+	import PricingPageSkeleton from '$lib/components/skeletons/PricingPageSkeleton.svelte';
 
 	interface Props {
 		data?: any;
 	}
 
 	let { data }: Props = $props();
+
+	// Smart Loading State
+	const preloadState = getPreloadState('/pricing');
+	let isStructureReady = $derived($preloadState?.skeleton === 'ready');
+	let isPageLoading = $state(true);
+
+	onMount(() => {
+		isPageLoading = false;
+	});
 
 	// State for purchase actions
 	let isLoading = $state(false);

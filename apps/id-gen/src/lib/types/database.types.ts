@@ -1,3 +1,4 @@
+// @ts-nocheck - Generated Supabase types with complex helper utilities
 export type Json =
   | string
   | number

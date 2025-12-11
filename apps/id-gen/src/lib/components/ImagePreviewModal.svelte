@@ -110,6 +110,7 @@
 	let resolvedBackUrl = $state<string | null>(null);
 	let resolvedCardGeometry = $state<CardGeometry | null>(null);
 	let resolvedTemplateDimensions = $state<TemplateDimensions>(null);
+	let effectiveTemplateDimensions = $state<TemplateDimensions>(null);
 
 	// Effect 1: Resolve incoming props, which may be functions or promises
 	$effect(() => {
@@ -141,19 +142,19 @@
 			canvasError = null;
 			try {
 				let geometry: CardGeometry | null = null;
-				console.log('🔄 Geometry Path Debug:', {
-					resolvedCardGeometry: !!resolvedCardGeometry,
-					resolvedTemplateDimensions: resolvedTemplateDimensions
-				});
+				// console.log('🔄 Geometry Path Debug:', {
+				// 	resolvedCardGeometry: !!resolvedCardGeometry,
+				// 	resolvedTemplateDimensions: resolvedTemplateDimensions
+				// });
 
 				if (resolvedCardGeometry) {
-					console.log('📍 Taking Custom Geometry Path');
+					// console.log('📍 Taking Custom Geometry Path');
 					geometry = resolvedCardGeometry;
 
 					// FIXED: Use template dimensions to calculate correct geometry dimensions
 					// even when we have custom geometry
 					if (resolvedTemplateDimensions) {
-						console.log('🔧 Using template dimensions for custom geometry scaling');
+						// console.log('🔧 Using template dimensions for custom geometry scaling');
 						const { width, height, unit } = resolvedTemplateDimensions;
 						const isInches = ['in', 'inch', 'inches'].includes(unit?.toLowerCase() ?? '');
 
@@ -168,18 +169,26 @@
 
 						// Store the actual 3D world dimensions for texture transform
 						geometryDimensions = { width: worldWidth, height: worldHeight };
+						
+						// Store effective dimensions for texture transform
+						effectiveTemplateDimensions = {
+							width: widthInches,
+							height: heightInches,
+							unit: 'inches'
+						};
 
-						console.log('📐 Custom Geometry Dimensions:', {
-							template: { width, height, unit },
-							inches: { width: widthInches, height: heightInches },
-							worldUnits: { width: worldWidth, height: worldHeight }
-						});
+						// console.log('📐 Custom Geometry Dimensions:', {
+						// 	template: { width, height, unit },
+						// 	inches: { width: widthInches, height: heightInches },
+						// 	worldUnits: { width: worldWidth, height: worldHeight }
+						// });
 					} else {
-						console.log('⚠️ No template dimensions available, using default geometry dimensions');
+						// console.log('⚠️ No template dimensions available, using default geometry dimensions');
 						geometryDimensions = { width: 2, height: 1.25 };
+						effectiveTemplateDimensions = null;
 					}
 				} else if (resolvedTemplateDimensions) {
-					console.log('📍 Taking Template Dimensions Path');
+					// console.log('📍 Taking Template Dimensions Path');
 					const { width, height, unit } = resolvedTemplateDimensions;
 					const isInches = ['in', 'inch', 'inches'].includes(unit?.toLowerCase() ?? '');
 
@@ -195,9 +204,8 @@
 					// Store the actual 3D world dimensions for texture transform
 					geometryDimensions = { width: worldWidth, height: worldHeight };
 
-					// Also update resolved template dimensions to use the actual card size in inches
-					// This ensures texture transformation uses the correct aspect ratio
-					resolvedTemplateDimensions = {
+					// Store effective dimensions for texture transform without triggering loop
+					effectiveTemplateDimensions = {
 						width: widthInches,
 						height: heightInches,
 						unit: 'inches'
@@ -206,15 +214,16 @@
 					// Create geometry with the calculated dimensions
 					geometry = await createCardFromInches(widthInches, heightInches);
 
-					console.log('📐 Geometry Dimensions:', {
-						template: { width, height, unit },
-						inches: { width: widthInches, height: heightInches },
-						worldUnits: { width: worldWidth, height: worldHeight }
-					});
+					// console.log('📐 Geometry Dimensions:', {
+					// 	template: { width, height, unit },
+					// 	inches: { width: widthInches, height: heightInches },
+					// 	worldUnits: { width: worldWidth, height: worldHeight }
+					// });
 				} else {
-					console.log('📍 Taking Default Geometry Path (no template dimensions)');
+					// console.log('📍 Taking Default Geometry Path (no template dimensions)');
 					geometry = await createRoundedRectCard();
 					geometryDimensions = { width: 2, height: 1.25 };
+					effectiveTemplateDimensions = null;
 				}
 				currentGeometry = geometry;
 			} catch (error: any) {
@@ -378,7 +387,7 @@
 											transform: (texture) =>
 												transformTextureToFit(
 													texture,
-													resolvedTemplateDimensions,
+													effectiveTemplateDimensions,
 													geometryDimensions
 												)
 										})}
@@ -457,7 +466,7 @@
 											transform: (texture) =>
 												transformTextureToFit(
 													texture,
-													resolvedTemplateDimensions,
+													effectiveTemplateDimensions,
 													geometryDimensions
 												)
 										})}

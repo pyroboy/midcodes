@@ -47,27 +47,6 @@
 </script>
 
 <div class="template-form-container active">
-	<div class="back-button-container">
-		<button
-			onclick={onBack}
-			class="back-button inline-flex items-center text-lg text-muted-foreground hover:text-primary transition-colors"
-		>
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				class="w-6 h-6 mr-2"
-				stroke-width="2.5"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-			>
-				<path d="M19 12H5M12 19l-7-7 7-7" />
-			</svg>
-			Back
-		</button>
-	</div>
-
 	<div class="template-content">
 		<h1 class="text-2xl font-bold mb-2">Edit Template</h1>
 

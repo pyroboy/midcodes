@@ -15,7 +15,11 @@
 	import DesktopHeader from '$lib/components/DesktopHeader.svelte';
 	import BottomNavigation from '$lib/components/BottomNavigation.svelte';
 	import HamburgerMenu from '$lib/components/HamburgerMenu.svelte';
+	import { initPreloadService, updateCurrentPath } from '$lib/services/preloadService';
+	import PreloadDebug from '$lib/components/PreloadDebug.svelte';
 	import { Toaster } from '$lib/components/ui/sonner';
+	import { browser } from '$app/environment';
+	import { page } from '$app/stores';
 
 	let { data, children }: LayoutProps = $props();
 
@@ -29,6 +33,28 @@
 	function closeMenu() {
 		isMenuOpen = false;
 	}
+
+	// Initialize services
+	$effect(() => {
+		if (browser) {
+			// initAnalytics(); // Not in original, not adding
+			// initLogging(); // Not in original, not adding
+			
+			// Initialize smart preloading
+			const cleanupPreload = initPreloadService();
+			
+			return () => {
+				cleanupPreload?.();
+			};
+		}
+	});
+	
+	// Track current path for preload service
+	$effect(() => {
+		if (browser) {
+			updateCurrentPath($page.url.pathname);
+		}
+	});
 
 	// Initialize theme on mount
 	onMount(async () => {
@@ -65,6 +91,9 @@
 
 		<!-- Hamburger Menu -->
 		<HamburgerMenu isOpen={isMenuOpen} user={data.user} onClose={closeMenu} />
+
+		<!-- Preload Debug Panel -->
+		<PreloadDebug />
 
 		<!-- Main Content with proper spacing -->
 		<main class="lg:ml-64 lg:pt-16">

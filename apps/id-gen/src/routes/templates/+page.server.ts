@@ -1,6 +1,16 @@
 import { error, fail } from '@sveltejs/kit';
+import type { PageServerLoad, Actions } from './$types';
 
-export const load = async ({ locals: { supabase, session, org_id, user }, url }) => {
+export const load: PageServerLoad = async ({ locals, url, depends, setHeaders }) => {
+	// Cache for 2 minutes
+	setHeaders({
+		'cache-control': 'private, max-age=120'
+	});
+
+	// Register dependency for selective invalidation
+	depends('app:templates');
+
+	const { supabase, session, org_id, user } = locals;
 	if (!session) {
 		throw error(401, 'Unauthorized');
 	}
@@ -74,7 +84,7 @@ export const load = async ({ locals: { supabase, session, org_id, user }, url })
 	};
 };
 
-export const actions = {
+export const actions: Actions = {
 	create: async ({ request, locals }) => {
 		const { supabase, session, org_id } = locals;
 
@@ -162,7 +172,8 @@ export const actions = {
 		}
 	},
 
-	delete: async ({ request, locals: { supabase, session } }) => {
+	delete: async ({ request, locals }) => {
+		const { supabase, session } = locals;
 		if (!session) {
 			throw error(401, 'Unauthorized');
 		}
@@ -261,7 +272,8 @@ export const actions = {
 			);
 		}
 	},
-	select: async ({ request, locals: { supabase, session } }) => {
+	select: async ({ request, locals }) => {
+		const { supabase, session } = locals;
 		if (!session) {
 			return fail(401, { message: 'Unauthorized' });
 		}

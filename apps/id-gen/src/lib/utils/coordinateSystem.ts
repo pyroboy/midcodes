@@ -167,6 +167,26 @@ export class CoordinateSystem {
 		};
 	}
 
+	/** Create CSS style for positioning using percentages (for responsive layouts) */
+	createPercentagePositionStyle(
+		storageX: number,
+		storageY: number,
+		storageWidth: number,
+		storageHeight: number
+	): Record<string, string> {
+		const leftPercent = (storageX / this._storageWidth) * 100;
+		const topPercent = (storageY / this._storageHeight) * 100;
+		const widthPercent = (storageWidth / this._storageWidth) * 100;
+		const heightPercent = (storageHeight / this._storageHeight) * 100;
+
+		return {
+			left: `${leftPercent}%`,
+			top: `${topPercent}%`,
+			width: `${widthPercent}%`,
+			height: `${heightPercent}%`
+		};
+	}
+
 	/** Create CSS style for text elements (font size scaling) */
 	createTextStyle(fontSize: number): Record<string, string> {
 		const scaledFontSize = fontSize * this._previewScale;

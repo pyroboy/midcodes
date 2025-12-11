@@ -634,7 +634,8 @@
 				spinDirection: wobbleSpinDirection,
 				phaseX: wobblePhaseX,
 				phaseY: wobblePhaseY,
-				phaseZ: wobblePhaseZ
+				phaseZ: wobblePhaseZ,
+				initialOffsets: wobbleInitialOffsets
 			};
 			const wobbleResult = updateWobble(wobbleState);
 			wobbleProgress = wobbleResult.newProgress;
@@ -833,7 +834,7 @@
 		{#if loading}
 			<T.Mesh 
 				geometry={frontGeometry}
-				onclick={(e) => {
+				onclick={(e: { uv?: { x: number; y: number } }) => {
 					const uv = e.uv;
 					if (uv) {
 						handleTap(uv.x, uv.y);
@@ -865,7 +866,7 @@
 		{:else if error}
 			<T.Mesh 
 				geometry={frontGeometry}
-				onclick={(e) => {
+				onclick={(e: { uv?: { x: number; y: number } }) => {
 					const uv = e.uv;
 					if (uv) {
 						handleTap(uv.x, uv.y);
@@ -898,7 +899,7 @@
 			<!-- Front: Full color texture - clickable for tap wobble -->
 			<T.Mesh 
 				geometry={frontGeometry}
-				onclick={(e) => {
+				onclick={(e: { uv?: { x: number; y: number } }) => {
 					const uv = e.uv;
 					if (uv) {
 						handleTap(uv.x, uv.y);
@@ -1122,7 +1123,7 @@
 				<T.Mesh 
 					geometry={frontGeometry}
 					visible={false}
-					onclick={(e) => {
+					onclick={(e: { uv?: { x: number; y: number } }) => {
 						const uv = e.uv;
 						if (uv) {
 							handleTap(uv.x, uv.y);

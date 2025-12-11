@@ -24,6 +24,8 @@
 	import SizeSelectionDialog from '$lib/components/SizeSelectionDialog.svelte';
 	import DeleteConfirmationDialog from '$lib/components/DeleteConfirmationDialog.svelte';
 	import DuplicateTemplateDialog from '$lib/components/DuplicateTemplateDialog.svelte';
+	import { getPreloadState } from '$lib/services/preloadService';
+	import HomePageSkeleton from '$lib/components/skeletons/HomePageSkeleton.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import { getSupabaseStorageUrl } from '$lib/utils/supabase';
 	import type { CardSize } from '$lib/utils/sizeConversion';
@@ -42,6 +44,23 @@
 	}
 
 	let { data }: Props = $props();
+
+	// Smart Loading State
+	const preloadState = getPreloadState('/');
+	let isStructureReady = $derived($preloadState?.skeleton === 'ready');
+	let areAssetsReady = $derived($preloadState?.assets === 'ready');
+	
+	// Fallback loading if preload state isn't initialized yet
+	let isLoading = $state(true);
+
+	onMount(() => {
+		// If we're already here, we can show content immediately
+		isLoading = false;
+	});
+
+	// Canvas resize handling
+	let innerWidth = $state(0);
+	let innerHeight = $state(0);
 
 	// Template state - filter out default templates
 	let templates = $state(
@@ -404,6 +423,9 @@
 </svelte:head>
 
 <div class="h-[calc(100vh-4rem)] overflow-hidden flex flex-col">
+	{#if isLoading && !isStructureReady}
+		<HomePageSkeleton />
+	{:else}
 	<div class="container mx-auto px-4 py-2 flex-1 flex flex-col overflow-hidden">
 		<!-- View Toggle Buttons - Mobile Only -->
 		<div class="flex flex-col gap-1 w-fit flex-shrink-0 lg:hidden">
@@ -862,7 +884,7 @@
 								Templates
 							</Button>
 							<Button 
-								variant={activeView === 'generations' ? 'default' : 'outline'} 
+								variant={(activeView as string) === 'generations' ? 'default' : 'outline'} 
 								size="sm" 
 								class="flex-1"
 								onclick={() => activeView = 'generations'}
@@ -1124,6 +1146,7 @@
 		</section>
 	{/if}
 	</div>
+	{/if}
 </div>
 
 <!-- Dialogs -->

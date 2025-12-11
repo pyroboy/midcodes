@@ -3,50 +3,87 @@
 	import ImagePreviewModal from '$lib/components/ImagePreviewModal.svelte';
 	import ClientOnly from '$lib/components/ClientOnly.svelte';
 	import { browser } from '$app/environment';
+	import { onMount, tick } from 'svelte';
+	import { fly, fade } from 'svelte/transition';
+	import { toast } from 'svelte-sonner';
+	import JSZip from 'jszip';
 	import { getSupabaseStorageUrl } from '$lib/utils/supabase';
 	import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeometry';
-	import JSZip from 'jszip';
 	import ViewModeToggle from '$lib/components/ViewModeToggle.svelte';
 	import { viewMode } from '$lib/stores/viewMode';
 	import SimpleIDCard from '$lib/components/SimpleIDCard.svelte';
 	import EmptyIDs from '$lib/components/empty-states/EmptyIDs.svelte';
+	import IDCardSkeleton from '$lib/components/IDCardSkeleton.svelte';
+	import AllIdsPageSkeleton from '$lib/components/skeletons/AllIdsPageSkeleton.svelte';
+	import { Button } from '$lib/components/ui/button';
+	import { Input } from '$lib/components/ui/input';
+	import { Checkbox } from '$lib/components/ui/checkbox';
+	import { goto, invalidateAll } from '$app/navigation';
+	import DeleteConfirmationDialog from '$lib/components/DeleteConfirmationDialog.svelte';
+	import { Loader2, Search, Filter, ArrowUpDown, ChevronLeft, ChevronRight, Grid, List as ListIcon, Trash2, Download } from 'lucide-svelte';
+	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { getPreloadState } from '$lib/services/preloadService';
 
 	import type { PageData } from './$types';
 	import type { IDCard } from './+page.server';
 
-	let { data }: { data: PageData } = $props();
+	let { data } = $props();
 	const { idCards, metadata, templateDimensions } = data;
+
+	// Smart Loading State
+	const preloadState = getPreloadState('/all-ids');
+	let isStructureReady = $derived($preloadState?.skeleton === 'ready');
+	
+	let isLoading = $state(true);
+	let isNavigating = $state(false);
+
+	// Reset loading state when data changes (navigation complete)
+	$effect(() => {
+		if (data) {
+			isLoading = false;
+			isNavigating = false;
+		}
+	});
+	
+	onMount(() => {
+		// Small delay to ensure smooth transition from skeleton to content
+		requestAnimationFrame(() => {
+			isLoading = false;
+		});
+	});
 
 	console.log('Id cards', idCards);
 
-	// Preload 3D card geometries for each template based on their dimensions
+	// 3D card geometries - loaded on-demand when preview is opened (not on page load)
 	const templateGeometries = $state<Record<string, any>>({});
 
-	// Load geometries asynchronously on client
-	$effect(() => {
-		if (browser) {
-			Object.entries(templateDimensions).forEach(async ([templateName, dimensions]) => {
-				console.log(`Creating 3D geometry for template "${templateName}":`, dimensions);
-
-				try {
-					let geometry;
-					if (dimensions.unit === 'inches') {
-						// Use inch-based creation for inch units
-						geometry = await createCardFromInches(dimensions.width, dimensions.height);
-					} else {
-						// Convert pixels to approximate inches (assuming 300 DPI) then create geometry
-						const widthInches = dimensions.width / 300;
-						const heightInches = dimensions.height / 300;
-						geometry = await createCardFromInches(widthInches, heightInches);
-					}
-					templateGeometries[templateName] = geometry;
-					console.log(`Loaded geometry for template "${templateName}"`);
-				} catch (error) {
-					console.error(`Failed to load geometry for template "${templateName}":`, error);
-				}
-			});
+	// Lazy load geometry only when needed (when opening preview modal)
+	async function loadGeometryForTemplate(templateName: string) {
+		// Skip if already loaded or no dimensions available
+		if (templateGeometries[templateName] || !templateDimensions[templateName]) {
+			return templateGeometries[templateName];
 		}
-	});
+
+		const dimensions = templateDimensions[templateName];
+		console.log(`Lazy loading 3D geometry for template "${templateName}":`, dimensions);
+
+		try {
+			let geometry;
+			if (dimensions.unit === 'inches') {
+				geometry = await createCardFromInches(dimensions.width, dimensions.height);
+			} else {
+				const widthInches = dimensions.width / 300;
+				const heightInches = dimensions.height / 300;
+				geometry = await createCardFromInches(widthInches, heightInches);
+			}
+			templateGeometries[templateName] = geometry;
+			console.log(`Loaded geometry for template "${templateName}"`);
+			return geometry;
+		} catch (error) {
+			console.error(`Failed to load geometry for template "${templateName}":`, error);
+			return null;
+		}
+	}
 
 	let searchQuery = $state('');
 	let dataRows = $state(idCards);
@@ -199,9 +236,12 @@
 		selectedFrontImage = card.front_image ?? null;
 		selectedBackImage = card.back_image ?? null;
 
-		// Get template dimensions and preloaded geometry for 3D preview
+		// Get template dimensions
 		selectedTemplateDimensions = templateDimensions[card.template_name] || null;
-		selectedCardGeometry = templateGeometries[card.template_name] || null;
+		
+		// Lazy load 3D geometry only when preview is opened (not on page load)
+		selectedCardGeometry = await loadGeometryForTemplate(card.template_name);
+		
 		console.log('Template preview data for', card.template_name, ':', {
 			dimensions: selectedTemplateDimensions,
 			hasGeometry: !!selectedCardGeometry
@@ -637,7 +677,12 @@
 	}
 </script>
 
-<div class="container mx-auto px-4 py-6 min-h-screen flex flex-col gap-6">
+{#if isLoading && !isStructureReady}
+	<AllIdsPageSkeleton />
+{:else}
+	<div class="h-full flex flex-col overflow-hidden" in:fade={{ duration: 200 }}>
+		<div class="container mx-auto px-4 py-4 flex-1 flex flex-col min-h-0 max-w-7xl">
+
 	<!-- Controls Header -->
 	<div
 		class="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center bg-card border border-border p-4 rounded-xl shadow-sm"
@@ -728,7 +773,17 @@
 	</div>
 
 	<!-- Content Area -->
-	{#if dataRows.length === 0}
+	{#if isLoading}
+		<!-- Skeleton Loading State -->
+		<div class="space-y-6">
+			<div class="flex items-center gap-2">
+				<div class="h-6 w-1 bg-muted rounded-full animate-pulse"></div>
+				<div class="h-5 w-32 bg-muted rounded animate-pulse"></div>
+				<div class="h-5 w-16 bg-muted rounded-full animate-pulse ml-auto"></div>
+			</div>
+			<IDCardSkeleton count={8} minWidth={cardMinWidth} />
+		</div>
+	{:else if dataRows.length === 0}
 		<EmptyIDs />
 	{:else if $viewMode === 'table'}
 		<!-- Table View -->
@@ -898,7 +953,9 @@
 			{/each}
 		</div>
 	{/if}
+	</div>
 </div>
+{/if}
 
 <!-- Keep modals same as before -->
 {#if selectedFrontImage || selectedBackImage}

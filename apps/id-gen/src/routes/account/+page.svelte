@@ -6,6 +6,10 @@
 	import { paymentFlags } from '$lib/stores/featureFlags';
 	import PurchaseButton from '$lib/components/ui/PurchaseButton.svelte';
 	import DashboardStatsCard from '$lib/components/DashboardStatsCard.svelte';
+	import AccountPageSkeleton from '$lib/components/skeletons/AccountPageSkeleton.svelte';
+	import { getPreloadState } from '$lib/services/preloadService';
+	import { onMount } from 'svelte';
+	
 	import type { PageData } from './$types';
 
 	interface Props {
@@ -20,6 +24,15 @@
 	}
 
 	let { data }: Props = $props();
+
+	// Smart Loading State
+	const preloadState = getPreloadState('/account');
+	let isStructureReady = $derived($preloadState?.skeleton === 'ready');
+	let isLoading = $state(true);
+
+	onMount(() => {
+		isLoading = false;
+	});
 
 	function formatPrice(price: number): string {
 		return new Intl.NumberFormat('en-PH', {
@@ -66,11 +79,15 @@
 	<title>My Account - ID Generator</title>
 	<meta
 		name="description"
-		content="Manage your account, view credits balance, and track your transaction history."
+		content="Manage your accounts, view credits balance, and track your transaction history."
 	/>
 </svelte:head>
 
-<div class="container mx-auto px-4 py-8 max-w-6xl">
+{#if isLoading && !isStructureReady}
+	<AccountPageSkeleton />
+{:else}
+	<div class="container mx-auto px-4 py-8 max-w-6xl">
+
 	<!-- Account Overview -->
 	<div class="mb-8">
 		<h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">My Account</h1>
@@ -629,3 +646,4 @@
 		</CardContent>
 	</Card>
 </div>
+{/if}
