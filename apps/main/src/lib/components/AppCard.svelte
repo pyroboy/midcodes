@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Badge } from './Badge.svelte';
+	import Badge from './Badge.svelte';
 	import type { App } from '$lib/data/apps.js';
 	
 	interface Props {

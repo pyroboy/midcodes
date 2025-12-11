@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { apps } from '$lib/data/apps.js';
 	import AppCard from '$lib/components/AppCard.svelte';
-	import { Badge } from '$lib/components/Badge.svelte';
+	import Badge from '$lib/components/Badge.svelte';
 	import { Search, Layers, Zap, FileText, Wrench, TrendingUp } from 'lucide-svelte';
 	
 	// Group apps by category
