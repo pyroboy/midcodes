@@ -1,0 +1,7 @@
+{
+  "framework": "sveltekit",
+  "version": 2,
+  "outputDirectory": ".svelte-kit/output",
+  "regions": ["sin1"],
+  "ignoreCommand": "git diff HEAD^ HEAD --quiet ."
+}
