@@ -322,12 +322,12 @@
 		(performance.now() - showcaseLoadingDebounceStart) >= CARD3D_CONSTANTS.LOADING_DEBOUNCE_MS
 	);
 
-	// Track previous values
+	// Track previous values - initialize with defaults, sync in onMount
 	let prevTemplateId: string | null = null;
 	let prevImageUrl: string | null = null;
 	let prevBackImageUrl: string | null = null;
-	let prevWidthPixels = widthPixels;
-	let prevHeightPixels = heightPixels;
+	let prevWidthPixels = 1013; // Default value, synced in onMount
+	let prevHeightPixels = 638; // Default value, synced in onMount
 
 	// Text animation state (uses imported helper functions)
 	let animatedTexts = $state<Map<number, string>>(new Map());

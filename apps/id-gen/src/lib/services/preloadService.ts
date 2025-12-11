@@ -19,6 +19,56 @@ import { preloadData } from '$app/navigation';
 import { page } from '$app/stores';
 import { preloadImages, getRouteAssets } from './assetPreloader';
 
+// ============================================
+// Remote Data Cache (for warming remote functions)
+// ============================================
+
+interface CacheEntry<T> {
+	data: T;
+	timestamp: number;
+}
+
+// Remote function cache for pre-warmed data
+export const remoteDataCache = writable<Map<string, CacheEntry<any>>>(new Map());
+
+// Cache TTL in milliseconds (2 minutes)
+const CACHE_TTL = 2 * 60 * 1000;
+
+// Check if cached data is still valid
+export function isCacheValid(key: string): boolean {
+	const cache = get(remoteDataCache);
+	const entry = cache.get(key);
+	if (!entry) return false;
+	return Date.now() - entry.timestamp < CACHE_TTL;
+}
+
+// Get cached data if valid
+export function getCachedData<T>(key: string): T | null {
+	if (!isCacheValid(key)) return null;
+	const cache = get(remoteDataCache);
+	return cache.get(key)?.data as T;
+}
+
+// Set cached data
+export function setCachedData(key: string, data: any): void {
+	remoteDataCache.update(cache => {
+		cache.set(key, { data, timestamp: Date.now() });
+		return new Map(cache);
+	});
+}
+
+// Clear cache entries (can be called after mutations)
+export function clearCacheEntry(key: string): void {
+	remoteDataCache.update(cache => {
+		cache.delete(key);
+		return new Map(cache);
+	});
+}
+
+// ============================================
+// Route Preload State
+// ============================================
+
 // Route preload state - Three-tier system
 export interface RoutePreloadState {
 	href: string;
@@ -149,6 +199,50 @@ function updateRouteState(href: string, updates: Partial<RoutePreloadState>) {
 	persistState();
 }
 
+// ============================================
+// Remote Function Warming
+// ============================================
+
+// Warm up remote functions for specific routes
+async function warmRemoteFunctions(href: string): Promise<void> {
+	switch (href) {
+		case '/all-ids':
+			await warmAllIdsData();
+			break;
+		// Add other routes as needed
+	}
+}
+
+// Warm up all-ids remote functions
+async function warmAllIdsData(): Promise<void> {
+	// Skip if already cached
+	if (isCacheValid('all-ids:cards') && isCacheValid('all-ids:count')) {
+		console.log('[Preload] All-IDs data already cached, skipping warmup');
+		return;
+	}
+	
+	try {
+		// Dynamic import to avoid circular dependencies
+		const { getIDCards, getCardCount } = await import('../../routes/all-ids/data.remote');
+		
+		const [cardsResult, count] = await Promise.all([
+			getIDCards({ offset: 0, limit: 20 }),
+			getCardCount()
+		]);
+		
+		setCachedData('all-ids:cards', cardsResult);
+		setCachedData('all-ids:count', count);
+		
+		console.log('[Preload] Warmed up all-ids remote functions');
+	} catch (error) {
+		console.warn('[Preload] Failed to warm all-ids data:', error);
+	}
+}
+
+// ============================================
+// Tier Functions
+// ============================================
+
 // Preload structure (Tier 1) - just marks as ready since SvelteKit bundles are automatic
 async function preloadStructure(href: string): Promise<boolean> {
 	const state = get(preloadStates).get(href);
@@ -163,7 +257,7 @@ async function preloadStructure(href: string): Promise<boolean> {
 	return true;
 }
 
-// Preload server data (Tier 2) - triggers server load functions
+// Preload server data (Tier 2) - triggers server load functions + warms remote functions
 async function preloadServerData(href: string): Promise<boolean> {
 	const state = get(preloadStates).get(href);
 	if (state?.serverData === 'ready') return true;
@@ -176,6 +270,9 @@ async function preloadServerData(href: string): Promise<boolean> {
 	try {
 		// Preload SvelteKit data (triggers load function and caches result)
 		await preloadData(href);
+		
+		// Warm up remote functions for routes that use them
+		await warmRemoteFunctions(href);
 		
 		// Record timestamp when server data was cached
 		updateRouteState(href, { serverData: 'ready', serverDataLoadedAt: Date.now() });

@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import type { User, Session } from '@supabase/supabase-js';
+import type { CookieSerializeOptions } from 'cookie';
 import { sequence } from '@sveltejs/kit/hooks';
 import { redirect, error as throwError } from '@sveltejs/kit';
 import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
@@ -21,8 +22,8 @@ export interface GetSessionResult {
 const initializeSupabase: Handle = async ({ event, resolve }) => {
 	event.locals.supabase = createServerClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, {
 		cookies: {
-			get: (key) => event.cookies.get(key),
-			set: (key, value, options) => {
+			get: (key: string) => event.cookies.get(key),
+			set: (key: string, value: string, options: Record<string, any>) => {
 				try {
 					event.cookies.set(key, value, {
 						...options,
@@ -34,7 +35,7 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
 					console.error('Cookie could not be set:', error);
 				}
 			},
-			remove: (key, options) => {
+			remove: (key: string, options: Record<string, any>) => {
 				try {
 					event.cookies.delete(key, { path: '/', ...options });
 				} catch (error) {

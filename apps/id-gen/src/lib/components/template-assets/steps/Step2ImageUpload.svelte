@@ -6,7 +6,7 @@
 	import { cn } from '$lib/utils';
 
 	let isDragging = $state(false);
-	let fileInput: HTMLInputElement;
+	let fileInput = $state<HTMLInputElement | undefined>(undefined);
 
 	const sampleTypes: { value: SampleType; label: string; description: string }[] = [
 		{
@@ -189,15 +189,17 @@
 			</p>
 		</div>
 
-		<!-- Sample Type Selection -->
+	<!-- Sample Type Selection -->
 		<div class="space-y-3">
-			<label class="text-sm font-medium text-foreground">Sample Type</label>
-			<div class="grid grid-cols-1 gap-3">
+			<span id="sample-type-label" class="text-sm font-medium text-foreground">Sample Type</span>
+			<div class="grid grid-cols-1 gap-3" role="radiogroup" aria-labelledby="sample-type-label">
 				{#each sampleTypes as type (type.value)}
 					{@const isSelected = $assetUploadStore.sampleType === type.value}
 					<button
 						type="button"
 						onclick={() => handleSampleTypeChange(type.value)}
+						role="radio"
+						aria-checked={isSelected}
 						class={cn(
 							'flex flex-col rounded-lg border-2 p-4 text-left transition-all',
 							isSelected ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30'

@@ -32,16 +32,25 @@
 
 	let canvas = $state<HTMLCanvasElement | undefined>(undefined);
 	let ctx = $state<CanvasRenderingContext2D | null>(null);
-	let imageScale = $state(initialScale);
-	let imageX = $state(initialX);
-	let imageY = $state(initialY);
+	// Initialize mutable state with defaults, sync with props via $effect
+	let imageScale = $state(1);
+	let imageX = $state(0);
+	let imageY = $state(0);
 	let isDragging = $state(false);
 
+	// Use $derived for computed static values
 	const MAX_HEIGHT = 100;
-	const aspectRatio = width / height;
-	const thumbnailHeight = Math.min(MAX_HEIGHT, height);
-	const thumbnailWidth = thumbnailHeight * aspectRatio;
-	const scale = thumbnailHeight / height;
+	let aspectRatio = $derived(width / height);
+	let thumbnailHeight = $derived(Math.min(MAX_HEIGHT, height));
+	let thumbnailWidth = $derived(thumbnailHeight * aspectRatio);
+	let scale = $derived(thumbnailHeight / height);
+
+	// Sync initial values from props
+	$effect(() => {
+		imageScale = initialScale;
+		imageX = initialX;
+		imageY = initialY;
+	});
 
 	onMount(() => {
 		if (canvas) {

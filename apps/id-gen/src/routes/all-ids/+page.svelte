@@ -16,6 +16,9 @@
 	// Import remote functions
 	import { getIDCards, getCardCount, getTemplateDimensions, getTemplateMetadata } from './data.remote';
 	import type { IDCard } from './data.remote';
+	
+	// Import cache helpers from preload service
+	import { getCachedData, clearCacheEntry } from '$lib/services/preloadService';
 
 	// Constants
 	const INITIAL_LOAD = 10;
@@ -65,6 +68,20 @@
 
 	// Load initial cards
 	async function loadInitialCards() {
+		// Check for pre-cached data from preload service
+		const cachedCards = getCachedData<{ cards: IDCard[]; hasMore: boolean }>('all-ids:cards');
+		const cachedCount = getCachedData<number>('all-ids:count');
+		
+		if (cachedCards && cachedCount !== null) {
+			dataRows = cachedCards.cards;
+			totalCount = cachedCount;
+			hasMore = cachedCards.hasMore;
+			initialLoading = false;
+			console.log('[AllIDs] Using pre-cached data');
+			await loadTemplateDimensionsForCards(cachedCards.cards);
+			return;
+		}
+		
 		try {
 			const [result, count] = await Promise.all([
 				getIDCards({ offset: 0, limit: INITIAL_LOAD }),
@@ -706,11 +723,27 @@
 
 			<!-- Load More Trigger -->
 			{#if hasMore}
-				<div bind:this={loadMoreTrigger} class="py-4">
+				<div bind:this={loadMoreTrigger} class="py-6">
 					{#if loadingMore}
-						<div class="text-center text-muted-foreground text-sm">Loading more...</div>
+						<div class="flex flex-col items-center gap-2">
+							<div class="flex items-center gap-2 text-muted-foreground text-sm">
+								<svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+									<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+									<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+								</svg>
+								Loading more...
+							</div>
+							<span class="text-xs text-muted-foreground/70">
+								{Math.max(0, totalCount - dataRows.length)} more to load
+							</span>
+						</div>
 					{:else}
-						<div class="h-1"></div>
+						<div class="flex flex-col items-center gap-1 text-muted-foreground/50 py-2">
+							<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+							</svg>
+							<span class="text-xs">{Math.max(0, totalCount - dataRows.length)} more cards</span>
+						</div>
 					{/if}
 				</div>
 			{/if}
@@ -748,9 +781,23 @@
 			{#if hasMore}
 				<div bind:this={loadMoreTrigger} class="py-4">
 					{#if loadingMore}
-						<IDCardSkeleton count={3} minWidth={cardMinWidth} />
+						<div class="space-y-4">
+							<IDCardSkeleton count={3} minWidth={cardMinWidth} />
+							<div class="flex items-center justify-center gap-2 text-muted-foreground text-sm py-2">
+								<svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+									<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+									<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+								</svg>
+								<span>{Math.max(0, totalCount - dataRows.length)} more to load</span>
+							</div>
+						</div>
 					{:else}
-						<div class="h-1"></div>
+						<div class="flex flex-col items-center gap-1 text-muted-foreground/50 py-4">
+							<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+							</svg>
+							<span class="text-sm">{Math.max(0, totalCount - dataRows.length)} more cards</span>
+						</div>
 					{/if}
 				</div>
 			{/if}

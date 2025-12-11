@@ -1,7 +1,34 @@
 import { query, getRequestEvent } from '$app/server';
 
+// Types for account data
+export interface UserCredits {
+	credits_balance: number;
+	card_generation_count: number;
+	template_count: number;
+	unlimited_templates: boolean;
+	remove_watermarks: boolean;
+}
+
+export interface DashboardStats {
+	totalCards: number;
+	totalTemplates: number;
+	weeklyCards: number;
+	recentCardsCount: number;
+}
+
+export interface CreditTransaction {
+	id: string;
+	user_id: string;
+	transaction_type: string;
+	amount: number;
+	credits_after: number;
+	description: string | null;
+	reference_id: string | null;
+	created_at: string;
+}
+
 // Query for user credits (balance, counts, features)
-export const getUserCredits = query(async () => {
+export const getUserCredits = query(async (): Promise<UserCredits | null> => {
 	const { locals } = getRequestEvent();
 	const { supabase, user } = locals;
 	
@@ -18,11 +45,11 @@ export const getUserCredits = query(async () => {
 		return null;
 	}
 
-	return data;
+	return data as UserCredits;
 });
 
 // Query for dashboard stats
-export const getDashboardStats = query(async () => {
+export const getDashboardStats = query(async (): Promise<DashboardStats> => {
 	const { locals } = getRequestEvent();
 	const { supabase, org_id } = locals;
 	
@@ -54,7 +81,7 @@ export const getDashboardStats = query(async () => {
 });
 
 // Query for credit history
-export const getCreditHistory = query(async () => {
+export const getCreditHistory = query(async (): Promise<CreditTransaction[]> => {
 	const { locals } = getRequestEvent();
 	const { supabase, user } = locals;
 	
@@ -72,5 +99,5 @@ export const getCreditHistory = query(async () => {
 		return [];
 	}
 
-	return data || [];
+	return (data || []) as CreditTransaction[];
 });

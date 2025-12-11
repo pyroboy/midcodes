@@ -33,19 +33,22 @@
 			'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'
 	};
 
-	const iconPath = iconMap[icon] || iconMap['chart-bar'];
+	// Use $derived for computed values that depend on props
+	let iconPath = $derived(iconMap[icon] || iconMap['chart-bar']);
 
-	// Format value for display
-	const formattedValue =
-		typeof value === 'number' && value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value;
+	// Format value for display - use $derived for reactive computation
+	let formattedValue = $derived(
+		typeof value === 'number' && value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value
+	);
 
-	// Change color classes
-	const changeColorClass =
+	// Change color classes - use $derived for reactive computation
+	let changeColorClass = $derived(
 		changeType === 'positive'
 			? 'text-green-600 dark:text-green-400'
 			: changeType === 'negative'
 				? 'text-red-600 dark:text-red-400'
-				: 'text-gray-500 dark:text-gray-400';
+				: 'text-gray-500 dark:text-gray-400'
+	);
 </script>
 
 {#if href}

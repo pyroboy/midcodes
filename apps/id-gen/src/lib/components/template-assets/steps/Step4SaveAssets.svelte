@@ -173,13 +173,14 @@
 					<div>
 						<label for="tags-{region.id}" class="text-xs font-medium text-muted-foreground">Tags</label>
 						<div class="mt-1 flex flex-wrap gap-1 rounded-md border border-border bg-background p-2 min-h-[42px]">
-							{#each metadata.tags as tag}
+								{#each metadata.tags as tag}
 								<span class="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
 									{tag}
 									<button
 										type="button"
 										onclick={() => removeTag(region.id, tag)}
 										class="hover:text-destructive"
+										aria-label="Remove tag {tag}"
 									>
 										<svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 											<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />

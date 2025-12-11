@@ -17,7 +17,7 @@ npx svelte-kit sync
 
 3. Run svelte-check to find errors:
 ```bash
-npx svelte-check --threshold error
+npx svelte-check --threshold error 2>&1 | head -100
 ```
 
 **Note:** Always use `npx` instead of `pnpm` for running svelte-check commands.
