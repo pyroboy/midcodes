@@ -29,11 +29,19 @@
     "tailwindcss": "^3.4.17",
     "autoprefixer": "^10.4.20"
   },
+  "pnpm": {
+    "overrides": {
+      "esbuild": ">=0.25.0",
+      "cookie": ">=0.7.0",
+      "valibot": ">=1.2.0",
+      "cross-spawn": ">=6.0.6"
+    }
+  },
   "dependencies": {
     "@manypkg/cli": "^0.21.4",
     "autoprefixer": "^10.4.20",
     "clsx": "^2.1.1",
-    "esbuild": "^0.24.2",
+    "esbuild": "^0.27.1",
     "eslint": "^8.56.0",
     "knip": "^5.37.1",
     "only-allow": "^1.2.1",
