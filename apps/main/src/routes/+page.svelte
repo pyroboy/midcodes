@@ -5,23 +5,23 @@
 	import { Search, Layers, Zap, FileText, Wrench, TrendingUp } from 'lucide-svelte';
 	
 	// Group apps by category
-	$: coreApps = apps.filter(app => app.category === 'core');
-	$: documentApps = apps.filter(app => app.category === 'document');
-	$: utilityApps = apps.filter(app => app.category === 'utility');
+	let coreApps = $derived(apps.filter(app => app.category === 'core'));
+	let documentApps = $derived(apps.filter(app => app.category === 'document'));
+	let utilityApps = $derived(apps.filter(app => app.category === 'utility'));
 	
 	// Stats
-	$: totalApps = apps.length;
-	$: activeApps = apps.filter(app => app.status === 'active').length;
-	$: techStackCount = new Set(apps.flatMap(app => app.techStack)).size;
-	$: totalFeatures = apps.reduce((sum, app) => sum + app.features.length, 0);
+	let totalApps = $derived(apps.length);
+	let activeApps = $derived(apps.filter(app => app.status === 'active').length);
+	let techStackCount = $derived(new Set(apps.flatMap(app => app.techStack)).size);
+	let totalFeatures = $derived(apps.reduce((sum, app) => sum + app.features.length, 0));
 	
 	let searchQuery = $state('');
-	$: filteredApps = apps.filter(app => 
+	let filteredApps = $derived(apps.filter(app => 
 		app.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
 		app.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
 		app.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
 		app.techStack.some(tech => tech.toLowerCase().includes(searchQuery.toLowerCase()))
-	);
+	));
 </script>
 
 <svelte:head>
