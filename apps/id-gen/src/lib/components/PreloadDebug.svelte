@@ -34,6 +34,22 @@
 	function isCurrent(route: string): boolean {
 		return $page.url.pathname === route;
 	}
+	
+	function formatCacheAge(loadedAt: number | undefined): string {
+		if (!loadedAt) return '';
+		const age = Math.round((Date.now() - loadedAt) / 1000);
+		if (age < 60) return `${age}s ago`;
+		if (age < 3600) return `${Math.round(age / 60)}m ago`;
+		return `${Math.round(age / 3600)}h ago`;
+	}
+	
+	function getCacheStatus(state: any): { text: string; color: string } | null {
+		if (!state?.lastNavigatedAt) return null;
+		if (state.wasCached) {
+			return { text: 'CACHED', color: 'bg-green-500/20 text-green-400 border-green-500/30' };
+		}
+		return { text: 'FRESH', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' };
+	}
 </script>
 
 <div class="fixed top-24 right-4 z-50 bg-background/95 backdrop-blur-sm border border-border rounded-lg shadow-lg text-xs w-64 shadow-xl">
@@ -66,12 +82,26 @@
 					{@const state = states.get(route)}
 					<div class="grid grid-cols-[1fr_auto_auto] gap-2 items-center p-1.5 rounded-md {isCurrent(route) ? 'bg-primary/5 ring-1 ring-primary/20' : 'hover:bg-muted/50'} transition-colors">
 						
-						<!-- Route Name -->
-						<div class="flex items-center gap-1.5 min-w-0">
-							{#if isCurrent(route)}
-								<div class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+						<!-- Route Name + Cache Status -->
+						<div class="flex flex-col gap-0.5 min-w-0">
+							<div class="flex items-center gap-1.5">
+								{#if isCurrent(route)}
+									<div class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+								{/if}
+								<span class="font-mono truncate {isCurrent(route) ? 'text-primary font-bold' : ''}">{route}</span>
+							</div>
+							<!-- Cache status badge -->
+							{#if getCacheStatus(state)}
+								{@const cacheStatus = getCacheStatus(state)}
+								<div class="flex items-center gap-1">
+									<span class="px-1 py-0.5 rounded text-[8px] font-bold border {cacheStatus?.color}">
+										{cacheStatus?.text}
+									</span>
+									{#if state?.serverDataLoadedAt}
+										<span class="text-[8px] text-muted-foreground">{formatCacheAge(state.serverDataLoadedAt)}</span>
+									{/if}
+								</div>
 							{/if}
-							<span class="font-mono truncate {isCurrent(route) ? 'text-primary font-bold' : ''}">{route}</span>
 						</div>
 						
 						<!-- Data/Skeleton Status -->

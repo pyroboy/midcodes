@@ -2,7 +2,7 @@
  * Preload Service - Smart Navigation Preloading
  * 
  * Features:
- * - Two-tier loading: Skeleton (high priority) -> Assets (lazy priority)
+ * - Three-tier loading: Structure -> Server Data -> Assets
  * - Persistent state across page reloads via sessionStorage
  * - Current page awareness to skip redundant work
  * - Sequential priority queue
@@ -14,13 +14,16 @@ import { preloadData } from '$app/navigation';
 import { page } from '$app/stores';
 import { preloadImages, getRouteAssets } from './assetPreloader';
 
-// Route preload state
+// Route preload state - Three-tier system
 export interface RoutePreloadState {
 	href: string;
-	skeleton: 'idle' | 'loading' | 'ready';
-	assets: 'idle' | 'loading' | 'ready';
+	structure: 'idle' | 'loading' | 'ready';   // Tier 1: HTML/JS bundle
+	serverData: 'idle' | 'loading' | 'ready';  // Tier 2: Server load data
+	assets: 'idle' | 'loading' | 'ready';      // Tier 3: Images/media
 	progress: number; // 0-100 (visual combined progress)
 	serverDataLoadedAt?: number; // Timestamp when server data was cached
+	lastNavigatedAt?: number; // Timestamp when user last navigated to this route
+	wasCached?: boolean; // Whether the last navigation was served from cache
 }
 
 // Dependency keys registered by each route's load function
@@ -47,7 +50,8 @@ const createInitialState = (): Map<string, RoutePreloadState> => {
 	PRELOAD_ROUTES.forEach(href => {
 		map.set(href, { 
 			href, 
-			skeleton: 'idle', 
+			structure: 'idle',
+			serverData: 'idle', 
 			assets: 'idle', 
 			progress: 0 
 		});
@@ -66,7 +70,7 @@ export const getPreloadState = (href: string) => {
 // Configuration
 const IDLE_TIMEOUT_MS = 2000;
 const PRELOAD_DELAY_MS = 300;
-const SESSION_KEY = 'idgen_preload_state';
+const SESSION_KEY = 'idgen_preload_state_v2'; // Bumped version for new structure
 
 // Runtime state
 let idleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -89,12 +93,13 @@ function restoreState() {
 				const savedState = parsed.find((s: any) => s.href === href);
 				if (savedState) {
 					// Don't restore 'loading' states, reset them to idle
-					const skeleton = savedState.skeleton === 'loading' ? 'idle' : savedState.skeleton;
-					const assets = savedState.assets === 'loading' ? 'idle' : savedState.assets;
+					const structure = savedState.structure === 'loading' ? 'idle' : (savedState.structure || 'idle');
+					const serverData = savedState.serverData === 'loading' ? 'idle' : (savedState.serverData || 'idle');
+					const assets = savedState.assets === 'loading' ? 'idle' : (savedState.assets || 'idle');
 					
-					restoredMap.set(href, { ...savedState, skeleton, assets });
+					restoredMap.set(href, { ...savedState, structure, serverData, assets });
 				} else {
-					restoredMap.set(href, { href, skeleton: 'idle', assets: 'idle', progress: 0 });
+					restoredMap.set(href, { href, structure: 'idle', serverData: 'idle', assets: 'idle', progress: 0 });
 				}
 			});
 			
@@ -120,16 +125,17 @@ function updateRouteState(href: string, updates: Partial<RoutePreloadState>) {
 		const current = states.get(href);
 		if (!current) return states;
 
-		// Calculate visual progress
-		// Skeleton = 0-50%, Assets = 51-100%
+		// Calculate visual progress - Three tiers: 0-33%, 34-66%, 67-100%
 		let progress = current.progress;
 		
-		const nextSkeleton = updates.skeleton || current.skeleton;
+		const nextStructure = updates.structure || current.structure;
+		const nextServerData = updates.serverData || current.serverData;
 		const nextAssets = updates.assets || current.assets;
 		
-		if (nextSkeleton === 'ready') progress = Math.max(progress, 50);
+		if (nextStructure === 'ready') progress = Math.max(progress, 33);
+		if (nextServerData === 'ready') progress = Math.max(progress, 66);
 		if (nextAssets === 'ready') progress = 100;
-		if (nextSkeleton === 'idle' && nextAssets === 'idle') progress = 0;
+		if (nextStructure === 'idle' && nextServerData === 'idle' && nextAssets === 'idle') progress = 0;
 
 		states.set(href, { ...current, ...updates, progress });
 		return new Map(states);
@@ -138,36 +144,53 @@ function updateRouteState(href: string, updates: Partial<RoutePreloadState>) {
 	persistState();
 }
 
-// Preload just the skeleton/data (Tier 1)
-async function preloadSkeleton(href: string): Promise<boolean> {
-	// Skip if already ready
+// Preload structure (Tier 1) - just marks as ready since SvelteKit bundles are automatic
+async function preloadStructure(href: string): Promise<boolean> {
 	const state = get(preloadStates).get(href);
-	if (state?.skeleton === 'ready') return true;
+	if (state?.structure === 'ready') return true;
 
-	updateRouteState(href, { skeleton: 'loading' });
+	updateRouteState(href, { structure: 'loading' });
+	
+	// Structure is essentially instant - SvelteKit handles JS bundle caching
+	// We just mark it as ready to show in the debug panel
+	await new Promise(r => setTimeout(r, 50)); // Small delay for visual feedback
+	updateRouteState(href, { structure: 'ready' });
+	return true;
+}
+
+// Preload server data (Tier 2) - triggers server load functions
+async function preloadServerData(href: string): Promise<boolean> {
+	const state = get(preloadStates).get(href);
+	if (state?.serverData === 'ready') return true;
+	
+	// Can't load server data if structure isn't ready
+	if (state?.structure !== 'ready') return false;
+
+	updateRouteState(href, { serverData: 'loading' });
 	
 	try {
 		// Preload SvelteKit data (triggers load function and caches result)
 		await preloadData(href);
 		
 		// Record timestamp when server data was cached
-		updateRouteState(href, { skeleton: 'ready', serverDataLoadedAt: Date.now() });
+		updateRouteState(href, { serverData: 'ready', serverDataLoadedAt: Date.now() });
+		console.log(`[Preload] Server data cached for ${href}`);
 		return true;
 	} catch (error) {
-		console.warn(`Failed to preload skeleton for ${href}:`, error);
-		updateRouteState(href, { skeleton: 'idle' }); // Reset on error so we can try again
+		console.warn(`Failed to preload server data for ${href}:`, error);
+		updateRouteState(href, { serverData: 'idle' }); // Reset on error so we can try again
 		return false;
 	}
 }
 
-// Preload heavy assets (Tier 2)
+// Preload heavy assets (Tier 3)
 async function preloadAssets(href: string): Promise<boolean> {
 	// Skip if already ready
 	const state = get(preloadStates).get(href);
 	if (state?.assets === 'ready') return true;
 	
-	// Can't load assets if skeleton isn't ready (data not fetched yet)
-	if (state?.skeleton !== 'ready') return false;
+	// Can't load assets if server data isn't ready
+	if (state?.serverData !== 'ready') return false;
 
 	updateRouteState(href, { assets: 'loading' });
 	
@@ -190,31 +213,34 @@ async function preloadAssets(href: string): Promise<boolean> {
 	}
 }
 
-// Main sequential preload loop
+// Main sequential preload loop - Three-tier progressive loading
 async function preloadSequentially(startIndex: number = 0) {
 	if (!browser || isPreloading) return;
 	
 	isPreloading = true;
 	currentRouteIndex = startIndex;
 
-	// Loop 1: Vital Skeletons & Data (High Priority)
+	// Loop 1: Structure (High Priority - instant)
 	for (let i = 0; i < PRELOAD_ROUTES.length; i++) {
 		const href = PRELOAD_ROUTES[i];
-		
-		// Skip current page - already loading/loaded by browser
 		if (href === currentPath) continue;
-		
-		await preloadSkeleton(href);
-		
-		// Small breather
-		await new Promise(r => setTimeout(r, 50));
+		await preloadStructure(href);
 	}
 
-	// Loop 2: Heavy Assets (Lazy Priority)
+	// Loop 2: Server Data (Medium Priority - background fetch)
 	for (let i = 0; i < PRELOAD_ROUTES.length; i++) {
 		const href = PRELOAD_ROUTES[i];
+		if (href === currentPath) continue;
 		
-		// Skip current page
+		await preloadServerData(href);
+		
+		// Small breather between server requests
+		await new Promise(r => setTimeout(r, 100));
+	}
+
+	// Loop 3: Heavy Assets (Lazy Priority)
+	for (let i = 0; i < PRELOAD_ROUTES.length; i++) {
+		const href = PRELOAD_ROUTES[i];
 		if (href === currentPath) continue;
 		
 		// Use requestIdleCallback for asset loading to not block main thread
@@ -278,8 +304,25 @@ export function initPreloadService() {
 export function updateCurrentPath(path: string) {
 	currentPath = path;
 	
+	// Check if this navigation was served from cache (serverData was already fetched)
+	const state = get(preloadStates).get(path);
+	const wasCached = state?.serverData === 'ready' && state?.serverDataLoadedAt !== undefined;
+	const now = Date.now();
+	
 	// Mark current path as fully loaded since user is there
-	updateRouteState(path, { skeleton: 'ready', assets: 'ready' });
+	updateRouteState(path, { 
+		structure: 'ready',
+		serverData: 'ready', 
+		assets: 'ready',
+		lastNavigatedAt: now,
+		wasCached,
+		// If wasn't cached before, set serverDataLoadedAt now
+		serverDataLoadedAt: state?.serverDataLoadedAt || now
+	});
+	
+	if (browser) {
+		console.log(`[Preload] Navigate to ${path}: ${wasCached ? '✅ CACHED (no server fetch needed)' : '🔄 Fresh fetch'}`);
+	}
 }
 
 // Check if running on mobile
