@@ -62,15 +62,18 @@
 	let innerWidth = $state(0);
 	let innerHeight = $state(0);
 
-	// Template state - filter out default templates
-	let templates = $state(
-		(data.templates || []).filter(
+	// Template state - filter out default templates, sync via $effect
+	let templates = $state<any[]>([]);
+	
+	// Sync templates from data prop
+	$effect(() => {
+		templates = (data.templates || []).filter(
 			(t: any) =>
 				!t.name?.toLowerCase().includes('default') &&
 				!t.name?.toLowerCase().includes('sample') &&
 				t.name?.trim() !== ''
-		)
-	);
+		);
+	});
 	let notification: string | null = $state(null);
 	let hoveredTemplate: string | null = $state(null);
 
@@ -385,7 +388,7 @@
 		window.location.href = `/templates?edit=${card.id}`;
 	}
 
-	const transformedCards = transformRecentCards(data.recentCards || []);
+	let transformedCards = $derived(transformRecentCards(data.recentCards || []));
 
 	const marketingPhrases = [
 		"Only in the Philippines",
@@ -580,30 +583,37 @@
 								{#if showShadowControls}
 								<div class="ml-4 mt-1 space-y-2 border-l border-white/20 pl-2">
 									<div>
+										<!-- svelte-ignore a11y_label_has_associated_control -->
 										<label class="text-xs text-white/70">Slow Opacity: {shadowSlowOpacity.toFixed(2)}</label>
 										<input type="range" min="0" max="0.5" step="0.01" bind:value={shadowSlowOpacity} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
 									</div>
 									<div>
+										<!-- svelte-ignore a11y_label_has_associated_control -->
 										<label class="text-xs text-white/70">Fast Opacity: {shadowFastOpacity.toFixed(2)}</label>
 										<input type="range" min="0" max="0.2" step="0.005" bind:value={shadowFastOpacity} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
 									</div>
 									<div>
+										<!-- svelte-ignore a11y_label_has_associated_control -->
 										<label class="text-xs text-white/70">Slow Oblong: {shadowSlowOblong.toFixed(2)}</label>
 										<input type="range" min="0" max="1" step="0.05" bind:value={shadowSlowOblong} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
 									</div>
 									<div>
+										<!-- svelte-ignore a11y_label_has_associated_control -->
 										<label class="text-xs text-white/70">Fast Oblong: {shadowFastOblong.toFixed(2)}</label>
 										<input type="range" min="0" max="1" step="0.05" bind:value={shadowFastOblong} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
 									</div>
 									<div>
+										<!-- svelte-ignore a11y_label_has_associated_control -->
 										<label class="text-xs text-white/70">Slow Size: {shadowSlowSize.toFixed(2)}</label>
 										<input type="range" min="0.2" max="1.5" step="0.05" bind:value={shadowSlowSize} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
 									</div>
 									<div>
+										<!-- svelte-ignore a11y_label_has_associated_control -->
 										<label class="text-xs text-white/70">Fast Size: {shadowFastSize.toFixed(2)}</label>
 										<input type="range" min="0.2" max="1.5" step="0.05" bind:value={shadowFastSize} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
 									</div>
 									<div>
+										<!-- svelte-ignore a11y_label_has_associated_control -->
 										<label class="text-xs text-white/70">Lerp Speed: {shadowLerpSpeed.toFixed(2)}</label>
 										<input type="range" min="0.05" max="0.5" step="0.01" bind:value={shadowLerpSpeed} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
 									</div>
@@ -615,6 +625,7 @@
 								<div class="font-medium mb-2 text-xs uppercase tracking-wide text-white/60">Beat Timing</div>
 								<div class="space-y-2">
 									<div>
+										<!-- svelte-ignore a11y_label_has_associated_control -->
 										<label class="text-xs text-white/70">Beat: {beatMs}ms</label>
 										<input type="range" min="50" max="3000" step="50" bind:value={beatMs} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
 									</div>
@@ -637,24 +648,29 @@
 										</button>
 										{#if wobbleControlsExpanded}
 										<div>
+											<!-- svelte-ignore a11y_label_has_associated_control -->
 											<label class="text-xs text-white/70">Spin Speed: {spinSpeed.toFixed(2)}</label>
 											<input type="range" min="0.01" max="0.15" step="0.01" bind:value={spinSpeed} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
 										</div>
 										<div>
+											<!-- svelte-ignore a11y_label_has_associated_control -->
 											<label class="text-xs text-white/70">Wobble Strength: {wobbleStrength.toFixed(2)}</label>
 											<input type="range" min="0" max="0.3" step="0.01" bind:value={wobbleStrength} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
 										</div>
 										<div>
+											<!-- svelte-ignore a11y_label_has_associated_control -->
 											<label class="text-xs text-white/70">Wobble Oscillations: {wobbleOscillations}</label>
 											<input type="range" min="1" max="10" step="1" bind:value={wobbleOscillations} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
 										</div>
 										<div>
+											<!-- svelte-ignore a11y_label_has_associated_control -->
 											<label class="text-xs text-white/70">Wobble Linger: {wobbleLinger.toFixed(1)}</label>
 											<input type="range" min="0.2" max="3" step="0.1" bind:value={wobbleLinger} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
 										</div>
 										{/if}
 										<!-- Tap Pressure Bar - always visible -->
 								<div class="pt-2 border-t border-white/10">
+									<!-- svelte-ignore a11y_label_has_associated_control -->
 									<label class="text-xs text-white/70">Tap Pressure: {displayTapPressure}</label>
 									<div class="flex gap-1 mt-1">
 										{#each [1, 2, 3, 4, 5] as level}

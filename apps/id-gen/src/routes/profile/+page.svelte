@@ -24,7 +24,9 @@
 	let { data, form }: Props = $props();
 
 	// Reactive state using Svelte 5 runes
+	// svelte-ignore state_referenced_locally
 	let profile = $state({ ...data.profile });
+	// svelte-ignore state_referenced_locally
 	let preferences = $state({ ...data.preferences });
 	let loading = $state(false);
 	let successMessage = $state('');

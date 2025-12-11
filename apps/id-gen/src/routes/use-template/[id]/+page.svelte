@@ -70,14 +70,14 @@
 
 	// State management using Svelte's reactive stores
 	let templateId = $page.params.id;
-	let template: Template = {
+	let template: Template = $derived({
 		...data.template,
 		template_elements: data.template.template_elements.map((element) => ({
 			...element,
 			width: element.width ?? 100,
 			height: element.height ?? 100
 		}))
-	};
+	});
 
 	// Component state declarations with $state
 	let loading = $state(false);

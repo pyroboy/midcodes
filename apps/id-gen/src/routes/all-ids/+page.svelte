@@ -50,7 +50,7 @@
 	let errorMessage = '';
 
 	// Infinite scroll ref
-	let loadMoreTrigger: HTMLDivElement;
+	let loadMoreTrigger = $state<HTMLDivElement | undefined>(undefined);
 	let observer: IntersectionObserver | null = null;
 
 	// Card zoom control

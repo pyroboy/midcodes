@@ -83,10 +83,11 @@
 		};
 	} = $props();
 
+	// svelte-ignore state_referenced_locally
 	let templates = $state<DatabaseTemplate[]>(data.templates);
 
-	let user = $state(data.user);
-	let org_id = $state(data.org_id);
+	let user = $derived(data.user);
+	let org_id = $derived(data.org_id);
 
 	let frontBackground: File | null = null;
 	let backBackground: File | null = null;
