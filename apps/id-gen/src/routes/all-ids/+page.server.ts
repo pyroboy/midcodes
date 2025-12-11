@@ -1,191 +1,19 @@
 import { error, fail } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 
-interface IDCardField {
-	value: string | null;
-	side: 'front' | 'back';
-}
-
-interface TemplateVariable {
-	variableName: string;
-	side: 'front' | 'back';
-}
-
-interface PaginationInfo {
-	total_records: number;
-	current_offset: number;
-	limit: number | null;
-}
-
-interface Metadata {
-	organization_name: string;
-	templates: {
-		[templateName: string]: TemplateVariable[];
-	};
-	pagination: PaginationInfo;
-}
-
-export interface IDCard {
-	idcard_id: string;
-	template_name: string;
-	front_image: string | null;
-	back_image: string | null;
-	created_at: string;
-	fields: {
-		[fieldName: string]: IDCardField;
-	};
-}
-
-interface IDCardResponse {
-	metadata: Metadata;
-	idcards: IDCard[];
-}
-
-export const load = (async ({ locals, url, depends, setHeaders }) => {
-	// Cache for 1 minute (ID cards change more frequently)
-	setHeaders({
-		'cache-control': 'private, max-age=60'
-	});
-
-	// Register dependency for selective invalidation
-	depends('app:idcards');
-
-	const { session, supabase, org_id } = locals;
+// Minimal server load - auth check only
+// Card data is fetched client-side via remote functions
+export const load = (async ({ locals }) => {
+	const { session, org_id } = locals;
 	if (!session) throw error(401, 'Unauthorized');
 	if (!org_id) throw error(403, 'No organization context found');
 
-	// Pagination parameters with mobile-aware defaults
-	const page = Math.max(1, parseInt(url.searchParams.get('page') || '1'));
-	const limit = Math.min(50, Math.max(5, parseInt(url.searchParams.get('limit') || '20')));
-	const offset = (page - 1) * limit;
-
-	// Run queries in parallel for better performance
-	const [cardsResult, countResult] = await Promise.all([
-		// Fetch paginated ID cards
-		supabase
-			.from('idcards')
-			.select(
-				`
-			id,
-			template_id,
-			front_image,
-			back_image,
-			created_at,
-			data,
-			templates (
-				name
-			)
-		`
-			)
-			.eq('org_id', org_id)
-			.order('created_at', { ascending: false })
-			.range(offset, offset + limit - 1),
-		// Get total count for pagination
-		supabase.from('idcards').select('id', { count: 'exact', head: true }).eq('org_id', org_id)
-	]);
-
-	const { data: cards, error: fetchError } = cardsResult;
-	const totalCount = countResult.count || 0;
-
-	if (fetchError) throw error(500, fetchError.message);
-	if (!cards) throw error(404, 'No ID cards found');
-
-	// Transform the data to match the expected format
-	const idCards: IDCard[] = cards.map((card: any) => {
-		const templateName = card.templates?.name || null;
-		const cardData = card.data || {};
-
-		// Convert data fields to the expected format
-		const fields: { [fieldName: string]: IDCardField } = {};
-		Object.entries(cardData).forEach(([key, value]) => {
-			if (typeof value === 'string' || value === null) {
-				fields[key] = {
-					value: value as string | null,
-					side: 'front'
-				};
-			}
-		});
-
-		return {
-			idcard_id: card.id,
-			template_name: templateName,
-			front_image: card.front_image,
-			back_image: card.back_image,
-			created_at: card.created_at,
-			fields
-		};
-	});
-
-	// Get unique template names from the current page's cards
-	const templateNames = Array.from(
-		new Set(idCards.map((card) => card.template_name).filter(Boolean))
-	);
-
-	// Only fetch template metadata if there are templates to query
-	let templateFields: { [templateName: string]: TemplateVariable[] } = {};
-	let templateDimensions: Record<string, { width: number; height: number; unit: string }> = {};
-
-	if (templateNames.length > 0) {
-		// Fetch template info in parallel
-		const [templatesResult, dimsResult] = await Promise.all([
-			supabase
-				.from('templates')
-				.select('name, template_elements')
-				.eq('org_id', org_id)
-				.in('name', templateNames),
-			supabase
-				.from('templates')
-				.select('name, width_pixels, height_pixels')
-				.eq('org_id', org_id)
-				.in('name', templateNames)
-		]);
-
-		if (templatesResult.data) {
-			templatesResult.data.forEach((template: any) => {
-				const elements = template.template_elements || [];
-				templateFields[template.name] = elements
-					.filter((el: any) => el.type === 'text' || el.type === 'selection')
-					.map((el: any) => ({
-						variableName: el.variableName,
-						side: el.side
-					}));
-			});
-		}
-
-		if (dimsResult.data) {
-			dimsResult.data.forEach((template: any) => {
-				templateDimensions[template.name] = {
-					width: template.width_pixels || 1013,
-					height: template.height_pixels || 638,
-					unit: 'pixels'
-				};
-			});
-		}
-	}
-
-	const metadata: Metadata = {
-		organization_name: 'Organization',
-		templates: templateFields,
-		pagination: {
-			total_records: totalCount,
-			current_offset: offset,
-			limit: limit
-		}
-	};
-
 	return {
-		idCards,
-		metadata,
-		templateDimensions,
-		pagination: {
-			page,
-			limit,
-			total: totalCount,
-			totalPages: Math.ceil(totalCount / limit)
-		}
+		org_id
 	};
 }) satisfies PageServerLoad;
 
+// Keep form actions for delete/update operations
 export const actions: Actions = {
 	deleteCard: async ({ request, locals: { supabase } }) => {
 		const formData = await request.formData();
