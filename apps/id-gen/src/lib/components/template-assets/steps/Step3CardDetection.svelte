@@ -487,7 +487,9 @@
 	</div>
 </div>
 
-<script module>
+<script lang="ts" module>
+	// Svelte action to render cropped region preview
+	// Note: DetectedRegion type is imported in the main script block
 	// Svelte action to render cropped region preview
 	function cropCanvas(
 		canvas: HTMLCanvasElement,
