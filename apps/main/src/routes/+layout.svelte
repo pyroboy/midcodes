@@ -1,7 +1,7 @@
 <script>
 	import '../app.css';
 	import { onMount } from 'svelte';
-	import { theme } from '$lib/stores/theme.js';
+	import { theme } from '$lib/stores/theme';
 	
 	onMount(() => {
 		theme.init();

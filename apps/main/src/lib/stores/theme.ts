@@ -1,12 +1,14 @@
 import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
 
+export type Theme = 'light' | 'dark' | 'auto';
+
 function createThemeStore() {
-	const { subscribe, set, update } = writable('auto');
+	const { subscribe, set, update } = writable<Theme>('auto');
 
 	return {
 		subscribe,
-		set: (theme) => {
+		set: (theme: Theme) => {
 			if (browser) {
 				localStorage.setItem('theme', theme);
 				updateDOM(theme);
@@ -15,7 +17,7 @@ function createThemeStore() {
 		},
 		init: () => {
 			if (browser) {
-				const stored = localStorage.getItem('theme');
+				const stored = localStorage.getItem('theme') as Theme;
 				const theme = stored || 'auto';
 				updateDOM(theme);
 				set(theme);
@@ -24,7 +26,7 @@ function createThemeStore() {
 	};
 }
 
-function updateDOM(theme) {
+function updateDOM(theme: Theme) {
 	if (!browser) return;
 
 	const root = document.documentElement;

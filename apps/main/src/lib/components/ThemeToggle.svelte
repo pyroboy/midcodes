@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Sun, Moon, Monitor } from 'lucide-svelte';
-	import { theme, type Theme } from '$lib/stores/theme.js';
+	import { theme, type Theme } from '$lib/stores/theme';
 	
 	let showDropdown = $state(false);
 	
