@@ -52,7 +52,7 @@
 	}
 </script>
 
-<div class="fixed top-24 right-4 z-50 bg-background/95 backdrop-blur-sm border border-border rounded-lg shadow-lg text-xs w-64 shadow-xl">
+<div class="fixed top-24 right-4 z-50 bg-background/95 backdrop-blur-sm border border-border rounded-lg shadow-lg text-xs w-72 shadow-xl">
 	<button
 		onclick={() => isMinimized = !isMinimized}
 		class="w-full flex items-center justify-between gap-2 px-3 py-2 text-left hover:bg-muted/50 rounded-t-lg transition-colors"
@@ -60,7 +60,7 @@
 		<span class="font-semibold flex items-center gap-2">
 			🚀 Preload System
 			{#if !isMinimized}
-				<span class="px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-500 text-[9px] border border-blue-500/20">Two-Tier</span>
+				<span class="px-1.5 py-0.5 rounded-full bg-purple-500/10 text-purple-500 text-[9px] border border-purple-500/20">Three-Tier</span>
 			{/if}
 		</span>
 		<span class="text-muted-foreground">{isMinimized ? '▼' : '▲'}</span>
@@ -70,17 +70,18 @@
 		<div class="px-3 pb-3 pt-2 border-t border-border">
 			
 			<!-- Header -->
-			<div class="grid grid-cols-[1fr_auto_auto] gap-2 mb-2 text-[10px] text-muted-foreground uppercase font-bold tracking-wider px-1">
+			<div class="grid grid-cols-[1fr_auto_auto_auto] gap-1 mb-2 text-[10px] text-muted-foreground uppercase font-bold tracking-wider px-1">
 				<span>Route</span>
-				<span class="w-12 text-center">Data</span>
-				<span class="w-12 text-center">Assets</span>
+				<span class="w-8 text-center" title="Structure (HTML/JS)">Str</span>
+				<span class="w-8 text-center" title="Server Data">Srv</span>
+				<span class="w-8 text-center" title="Assets (Images)">Ast</span>
 			</div>
 
 			<!-- Rows -->
 			<div class="space-y-1">
 				{#each PRELOAD_ROUTES as route}
 					{@const state = states.get(route)}
-					<div class="grid grid-cols-[1fr_auto_auto] gap-2 items-center p-1.5 rounded-md {isCurrent(route) ? 'bg-primary/5 ring-1 ring-primary/20' : 'hover:bg-muted/50'} transition-colors">
+					<div class="grid grid-cols-[1fr_auto_auto_auto] gap-1 items-center p-1.5 rounded-md {isCurrent(route) ? 'bg-primary/5 ring-1 ring-primary/20' : 'hover:bg-muted/50'} transition-colors">
 						
 						<!-- Route Name + Cache Status -->
 						<div class="flex flex-col gap-0.5 min-w-0">
@@ -104,15 +105,22 @@
 							{/if}
 						</div>
 						
-						<!-- Data/Skeleton Status -->
-						<div class="w-12 flex justify-center">
-							<span class="{getStatusColor(state?.skeleton || 'idle')} text-xs" title="Skeleton: {state?.skeleton}">
-								{getStatusIcon(state?.skeleton || 'idle')}
+						<!-- Tier 1: Structure Status -->
+						<div class="w-8 flex justify-center">
+							<span class="{getStatusColor(state?.structure || 'idle')} text-xs" title="Structure: {state?.structure}">
+								{getStatusIcon(state?.structure || 'idle')}
 							</span>
 						</div>
 						
-						<!-- Assets Status -->
-						<div class="w-12 flex justify-center">
+						<!-- Tier 2: Server Data Status -->
+						<div class="w-8 flex justify-center">
+							<span class="{getStatusColor(state?.serverData || 'idle')} text-xs" title="Server: {state?.serverData}">
+								{getStatusIcon(state?.serverData || 'idle')}
+							</span>
+						</div>
+						
+						<!-- Tier 3: Assets Status -->
+						<div class="w-8 flex justify-center">
 							<span class="{getStatusColor(state?.assets || 'idle')} text-xs" title="Assets: {state?.assets}">
 								{getStatusIcon(state?.assets || 'idle')}
 							</span>
@@ -125,13 +133,13 @@
 			<div class="mt-3 pt-2 border-t border-border flex justify-between items-center text-[10px] text-muted-foreground">
 				<span class="flex items-center gap-1">
 					Storage: 
-					{#if browser && sessionStorage.getItem('idgen_preload_state')}
+					{#if browser && sessionStorage.getItem('idgen_preload_state_v2')}
 						<span class="text-green-500">Persistent</span>
 					{:else}
 						<span class="text-yellow-500">New Session</span>
 					{/if}
 				</span>
-				<span>{PRELOAD_ROUTES.filter(r => states.get(r)?.skeleton === 'ready').length}/{PRELOAD_ROUTES.length} Ready</span>
+				<span>{PRELOAD_ROUTES.filter(r => states.get(r)?.serverData === 'ready').length}/{PRELOAD_ROUTES.length} Ready</span>
 			</div>
 		</div>
 	{/if}

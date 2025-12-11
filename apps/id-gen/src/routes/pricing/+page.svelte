@@ -20,7 +20,7 @@
 
 	// Smart Loading State
 	const preloadState = getPreloadState('/pricing');
-	let isStructureReady = $derived($preloadState?.skeleton === 'ready');
+	let isStructureReady = $derived($preloadState?.serverData === 'ready');
 	let isPageLoading = $state(true);
 
 	onMount(() => {

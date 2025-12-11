@@ -47,7 +47,7 @@
 
 	// Smart Loading State
 	const preloadState = getPreloadState('/');
-	let isStructureReady = $derived($preloadState?.skeleton === 'ready');
+	let isStructureReady = $derived($preloadState?.serverData === 'ready');
 	let areAssetsReady = $derived($preloadState?.assets === 'ready');
 	
 	// Fallback loading if preload state isn't initialized yet

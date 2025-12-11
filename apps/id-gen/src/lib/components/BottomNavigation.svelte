@@ -107,14 +107,14 @@
 						{item.mobileLabel}
 					</span>
 					<!-- Mini loading bar -->
-					{#if preloadState?.skeleton === 'loading' || preloadState?.assets === 'loading'}
+					{#if preloadState?.serverData === 'loading' || preloadState?.assets === 'loading'}
 						<div class="absolute bottom-1 left-2 right-2 h-0.5 bg-muted rounded-full overflow-hidden">
 							<div 
 								class="h-full bg-primary/60 transition-all duration-100 ease-out" 
 								style="width: {preloadState.progress}%"
 							></div>
 						</div>
-					{:else if preloadState?.skeleton === 'ready' && preloadState?.assets === 'ready'}
+					{:else if preloadState?.serverData === 'ready' && preloadState?.assets === 'ready'}
 						<div class="absolute bottom-1 left-2 right-2 h-0.5 bg-primary/30 rounded-full"></div>
 					{/if}
 				</a>
@@ -151,14 +151,14 @@
 					</svg>
 					<span class="flex-1">{item.label}</span>
 					<!-- Preload indicator -->
-					{#if preloadState?.skeleton === 'loading' || preloadState?.assets === 'loading'}
+					{#if preloadState?.serverData === 'loading' || preloadState?.assets === 'loading'}
 						<div class="w-12 h-1 bg-muted rounded-full overflow-hidden">
 							<div 
 								class="h-full bg-primary/60 transition-all duration-100 ease-out" 
 								style="width: {preloadState.progress}%"
 							></div>
 						</div>
-					{:else if preloadState?.skeleton === 'ready' && preloadState?.assets === 'ready'}
+					{:else if preloadState?.serverData === 'ready' && preloadState?.assets === 'ready'}
 						<div class="w-2 h-2 bg-green-500/50 rounded-full"></div>
 					{/if}
 				</a>

@@ -32,7 +32,7 @@
 
 	// Smart Loading State
 	const preloadState = getPreloadState('/all-ids');
-	let isStructureReady = $derived($preloadState?.skeleton === 'ready');
+	let isStructureReady = $derived($preloadState?.serverData === 'ready');
 	
 	let isLoading = $state(true);
 	let isNavigating = $state(false);

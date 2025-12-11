@@ -17,6 +17,7 @@
 	import HamburgerMenu from '$lib/components/HamburgerMenu.svelte';
 	import { initPreloadService, updateCurrentPath } from '$lib/services/preloadService';
 	import PreloadDebug from '$lib/components/PreloadDebug.svelte';
+	import NavigationLoader from '$lib/components/NavigationLoader.svelte';
 	import { Toaster } from '$lib/components/ui/sonner';
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
@@ -82,6 +83,9 @@
 </svelte:head>
 
 <div class="min-h-screen bg-background text-foreground theme-transition">
+	<!-- Navigation Loading Overlay -->
+	<NavigationLoader />
+	
 	{#if data.user}
 		<!-- Mobile Header -->
 		<MobileHeader user={data.user} onMenuToggle={toggleMenu} class="lg:hidden" />
