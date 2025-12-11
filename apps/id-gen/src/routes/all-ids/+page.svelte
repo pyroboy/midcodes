@@ -14,7 +14,7 @@
 	import IDCardSkeleton from '$lib/components/IDCardSkeleton.svelte';
 	
 	// Import remote functions
-	import { getIDCards, getCardCount, getTemplateDimensions } from './data.remote';
+	import { getIDCards, getCardCount, getTemplateDimensions, getTemplateMetadata } from './data.remote';
 	import type { IDCard } from './data.remote';
 
 	// Constants
@@ -30,6 +30,7 @@
 	// Data states
 	let dataRows = $state<IDCard[]>([]);
 	let templateDimensions = $state<Record<string, { width: number; height: number; unit: string }>>({});
+	let templateFields = $state<Record<string, { variableName: string; side: string }[]>>({});
 	
 	// UI states
 	let searchQuery = $state('');
@@ -104,14 +105,19 @@
 		}
 	}
 
-	// Load template dimensions for a set of cards
+	// Load template dimensions and metadata for a set of cards
 	async function loadTemplateDimensionsForCards(cards: IDCard[]) {
 		const newTemplateNames = [...new Set(cards.map(c => c.template_name).filter(Boolean))]
 			.filter(name => !templateDimensions[name]);
 		
 		if (newTemplateNames.length > 0) {
-			const dims = await getTemplateDimensions(newTemplateNames);
+			// Load both dimensions and metadata in parallel
+			const [dims, fields] = await Promise.all([
+				getTemplateDimensions(newTemplateNames),
+				getTemplateMetadata(newTemplateNames)
+			]);
 			templateDimensions = { ...templateDimensions, ...dims };
+			templateFields = { ...templateFields, ...fields };
 		}
 	}
 
@@ -166,10 +172,29 @@
 		}
 	}
 
-	// Group cards by template
+	// Filter cards based on search query
+	let filteredCards = $derived((() => {
+		if (!searchQuery.trim()) return dataRows;
+		
+		const query = searchQuery.toLowerCase().trim();
+		return dataRows.filter(card => {
+			// Search in template name
+			if (card.template_name?.toLowerCase().includes(query)) return true;
+			// Search in field values
+			if (card.fields) {
+				for (const key of Object.keys(card.fields)) {
+					const value = card.fields[key]?.value;
+					if (value?.toLowerCase().includes(query)) return true;
+				}
+			}
+			return false;
+		});
+	})());
+
+	// Group filtered cards by template
 	let groupedCards = $derived((() => {
 		const groups: Record<string, IDCard[]> = {};
-		dataRows.forEach((card) => {
+		filteredCards.forEach((card) => {
 			const templateName = card.template_name || 'Unassigned';
 			if (!groups[templateName]) {
 				groups[templateName] = [];
@@ -178,6 +203,70 @@
 		});
 		return groups;
 	})());
+
+	// Editing state for inline field editing
+	let editingCell = $state<{ cardId: string; fieldName: string } | null>(null);
+	let editValue = $state('');
+	let savingCell = $state(false);
+
+	// Start editing a cell
+	function startEditing(cardId: string, fieldName: string, currentValue: string) {
+		editingCell = { cardId, fieldName };
+		editValue = currentValue;
+		// Focus input after DOM updates
+		setTimeout(() => {
+			const input = document.getElementById(`edit-${cardId}-${fieldName}`);
+			if (input instanceof HTMLInputElement) {
+				input.focus();
+				input.select();
+			}
+		}, 0);
+	}
+
+	// Save edit
+	async function saveEdit() {
+		if (!editingCell || savingCell) return;
+		
+		savingCell = true;
+		try {
+			const formData = new FormData();
+			formData.append('cardId', editingCell.cardId);
+			formData.append('fieldName', editingCell.fieldName);
+			formData.append('fieldValue', editValue);
+
+			const response = await fetch('?/updateField', {
+				method: 'POST',
+				body: formData
+			});
+
+			if (response.ok) {
+				// Update local data
+				const cardIndex = dataRows.findIndex(c => getCardId(c) === editingCell?.cardId);
+				if (cardIndex !== -1 && editingCell) {
+					const card = dataRows[cardIndex];
+					if (!card.fields) card.fields = {};
+					card.fields[editingCell.fieldName] = { value: editValue, side: 'front' };
+					dataRows = [...dataRows];
+				}
+			}
+		} catch (error) {
+			console.error('Error saving field:', error);
+		} finally {
+			editingCell = null;
+			editValue = '';
+			savingCell = false;
+		}
+	}
+
+	// Handle keyboard in edit mode
+	function handleEditKeydown(event: KeyboardEvent) {
+		if (event.key === 'Enter') {
+			saveEdit();
+		} else if (event.key === 'Escape') {
+			editingCell = null;
+			editValue = '';
+		}
+	}
 
 	// Selection helpers
 	function getCardId(card: IDCard): string {
@@ -490,6 +579,142 @@
 		</div>
 	{:else if dataRows.length === 0}
 		<EmptyIDs />
+	{:else if $viewMode === 'table'}
+		<!-- Table View -->
+		<div class="space-y-8 overflow-auto flex-1">
+			{#each Object.entries(groupedCards) as [templateName, cards]}
+				<div class="space-y-3">
+					<div class="flex items-center justify-between">
+						<h3 class="text-lg font-semibold text-foreground flex items-center gap-2">
+							<div class="h-6 w-1 bg-primary rounded-full"></div>
+							{templateName}
+						</h3>
+						<span class="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">{cards.length} items</span>
+					</div>
+
+					<div class="relative w-full overflow-x-auto rounded-lg border border-border bg-card shadow-sm">
+						<table class="w-full text-sm text-left">
+							<thead class="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-border">
+								<tr>
+									<th class="w-10 px-4 py-3">
+										<input
+											type="checkbox"
+											class="rounded border-muted-foreground"
+											checked={cards.every(c => selectionManager.isSelected(getCardId(c)))}
+											onchange={() => {
+												const allSelected = cards.every(c => selectionManager.isSelected(getCardId(c)));
+												cards.forEach(c => {
+													const cardId = getCardId(c);
+													if (allSelected) {
+														selectedCards.delete(cardId);
+													} else {
+														selectedCards.add(cardId);
+													}
+												});
+												selectedCards = new Set(selectedCards);
+											}}
+										/>
+									</th>
+									<th class="px-4 py-3 font-medium">Preview</th>
+									{#if templateFields[templateName]}
+										{#each templateFields[templateName] || [] as field}
+											<th class="px-4 py-3 font-medium whitespace-nowrap">{field.variableName}</th>
+										{/each}
+									{/if}
+									<th class="px-4 py-3 font-medium text-right">Actions</th>
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-border">
+								{#each cards as card}
+									<tr class="hover:bg-muted/30 transition-colors group">
+										<td class="px-4 py-3">
+											<input
+												type="checkbox"
+												class="rounded border-muted-foreground"
+												checked={selectionManager.isSelected(getCardId(card))}
+												onchange={() => selectionManager.toggleSelection(getCardId(card))}
+											/>
+										</td>
+										<td class="px-4 py-2 w-24" onclick={(e) => openPreview(e, card)}>
+											<div class="h-10 w-16 bg-muted rounded overflow-hidden cursor-pointer border border-border hover:border-primary transition-colors">
+												{#if card.front_image}
+													<img
+														src={getSupabaseStorageUrl(card.front_image, 'rendered-id-cards')}
+														alt="Thumb"
+														class="w-full h-full object-cover"
+														loading="lazy"
+													/>
+												{/if}
+											</div>
+										</td>
+										{#if templateFields[templateName]}
+											{#each templateFields[templateName] || [] as field}
+												<td
+													class="px-4 py-3 whitespace-nowrap text-foreground cursor-pointer hover:bg-muted/50"
+													ondblclick={() => startEditing(
+														getCardId(card),
+														field.variableName,
+														card.fields?.[field.variableName]?.value || ''
+													)}
+													title="Double-click to edit"
+												>
+													{#if editingCell?.cardId === getCardId(card) && editingCell?.fieldName === field.variableName}
+														<input
+															id="edit-{getCardId(card)}-{field.variableName}"
+															type="text"
+															bind:value={editValue}
+															onkeydown={handleEditKeydown}
+															onblur={saveEdit}
+															class="w-full px-2 py-1 text-sm border border-primary rounded bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+															disabled={savingCell}
+														/>
+													{:else}
+														{card.fields?.[field.variableName]?.value || '-'}
+													{/if}
+												</td>
+											{/each}
+										{/if}
+										<td class="px-4 py-3 text-right">
+											<div class="flex justify-end gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+												<button
+													class="p-1.5 hover:bg-muted rounded text-blue-500"
+													onclick={() => downloadCard(card)}
+													title="Download"
+												>
+													<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+														<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+													</svg>
+												</button>
+												<button
+													class="p-1.5 hover:bg-muted rounded text-red-500"
+													onclick={() => handleDelete(card)}
+													title="Delete"
+												>
+													<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+														<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+													</svg>
+												</button>
+											</div>
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				</div>
+			{/each}
+
+			<!-- Load More Trigger -->
+			{#if hasMore}
+				<div bind:this={loadMoreTrigger} class="py-4">
+					{#if loadingMore}
+						<div class="text-center text-muted-foreground text-sm">Loading more...</div>
+					{:else}
+						<div class="h-1"></div>
+					{/if}
+				</div>
+			{/if}
+		</div>
 	{:else}
 		<!-- Grid View -->
 		<div class="space-y-10 overflow-auto flex-1" style="--card-min-width: {cardMinWidth}px;">
