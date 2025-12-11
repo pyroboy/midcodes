@@ -10,6 +10,8 @@
 		<Skeleton class="h-5 w-96 rounded-md" />
 	</div>
 
+	
+
 	<!-- Stats Grid -->
 	<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
 		{#each Array(3) as _}
