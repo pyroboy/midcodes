@@ -45,32 +45,10 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
 	}) as any;
 
 	event.locals.safeGetSession = async () => {
-		// Parallel fetch of user and session data
-		const [userResponse, sessionResponse] = await Promise.all([
-			event.locals.supabase.auth.getUser(),
-			event.locals.supabase.auth.getSession()
-		]);
+		// Get session first - this is cached and fast
+		const { data: { session }, error: sessionError } = await event.locals.supabase.auth.getSession();
 
-		const {
-			data: { user },
-			error: userError
-		} = userResponse;
-		const {
-			data: { session: initialSession },
-			error: sessionError
-		} = sessionResponse;
-
-		if (userError || !user) {
-			return {
-				session: null,
-				error: userError || new Error('User not found'),
-				user: null,
-				org_id: null,
-				permissions: []
-			};
-		}
-
-		if (sessionError || !initialSession) {
+		if (sessionError || !session) {
 			return {
 				session: null,
 				error: sessionError || new Error('Session not found'),
@@ -80,7 +58,11 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
 			};
 		}
 
-		let currentSession = initialSession;
+		// Session includes user data - no need for separate getUser() call on every request
+		// getUser() makes a network call to Supabase to validate the JWT
+		// We only need to validate if the session is expired or about to expire
+		let user = session.user;
+		let currentSession = session;
 		if (currentSession.expires_at) {
 			const expiresAt = Math.floor(new Date(currentSession.expires_at).getTime() / 1000);
 			const now = Math.floor(Date.now() / 1000);
@@ -97,6 +79,7 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
 
 					if (!error && refreshedSession) {
 						currentSession = refreshedSession;
+						user = refreshedSession.user; // Update user from refreshed session
 					}
 				} catch (err) {
 					console.warn('Session refresh failed:', err);

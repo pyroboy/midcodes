@@ -30,7 +30,6 @@
 	// Import remote functions
 	import {
 		getIDCards,
-		getCardIDs,
 		getCardDetails,
 		getCardCount,
 		getTemplateDimensions,
@@ -42,6 +41,7 @@
 	const INITIAL_LOAD = 20;
 	const LOAD_MORE_COUNT = 15;
 	const VISIBLE_LIMIT = 15; // Max cards to render at once for performance
+	const MAX_CACHED_CARDS = 200; // Cap cache to prevent SessionStorage overflow (~5MB limit)
 
 	// Logging helpers
 	const LOG_PREFIX = '[AllIds]';
@@ -175,10 +175,10 @@
 			const [result, count] = await Promise.all([
 				cachedRemoteFunctionCall({
 					scopeKey,
-					keyBase: 'all-ids:getCardIDs',
+					keyBase: 'all-ids:getIDCards',
 					args: { offset: 0, limit: INITIAL_LOAD },
 					forceRefresh,
-					fetcher: (args) => getCardIDs(args),
+					fetcher: (args) => getIDCards(args),
 					options: { ttlMs: ALL_IDS_CACHE_TTL_MS, staleWhileRevalidate: true, debug: true }
 				}),
 				cachedRemoteFunctionCall({
@@ -191,17 +191,8 @@
 				})
 			]);
 
-            // Map light IDs to partial IDCards
-            const partialCards: IDCard[] = result.cards.map((c: any) => ({
-                idcard_id: c.idcard_id,
-                template_name: c.template_name,
-                front_image: null,
-                back_image: null,
-                created_at: '',
-                fields: {}
-            } as unknown as IDCard));
-
-            const finalResult = { ...result, cards: partialCards };
+			// Cards now come with full data (front_image, back_image, fields, etc.)
+			const finalResult = result;
 
 			const elapsed = (performance.now() - startTime).toFixed(2);
 			console.log(`%c├─ ✅ Remote functions completed in ${elapsed}ms`, logStyles.cache);
@@ -256,23 +247,15 @@
 			console.log(`%c├─ ⏳ Fetching next ${LOAD_MORE_COUNT} cards...`, logStyles.info);
 			const result = await cachedRemoteFunctionCall({
 				scopeKey,
-				keyBase: 'all-ids:getCardIDs',
+				keyBase: 'all-ids:getIDCards',
 				args: { offset: dataRows.length, limit: LOAD_MORE_COUNT },
 				forceRefresh,
-				fetcher: (args) => getCardIDs(args),
+				fetcher: (args) => getIDCards(args),
 				options: { ttlMs: ALL_IDS_CACHE_TTL_MS, staleWhileRevalidate: true, debug: true }
 			});
 
-            const partialCards: IDCard[] = result.cards.map((c: any) => ({
-                idcard_id: c.idcard_id,
-                template_name: c.template_name,
-                front_image: null,
-                back_image: null,
-                created_at: '',
-                fields: {}
-            } as unknown as IDCard));
-
-            const finalResult = { ...result, cards: partialCards };
+			// Cards now come with full data
+			const finalResult = result;
 
 			const elapsed = (performance.now() - startTime).toFixed(2);
 			console.log(`%c├─ ✅ Completed in ${elapsed}ms`, logStyles.cache);
@@ -493,13 +476,18 @@
 		if (!browser) return;
 		if (initialLoading) return;
 
+		// Cap cached cards to prevent SessionStorage overflow
+		// Only cache the most recent cards - older cards will be re-fetched if needed
+		const cardsToCache = dataRows.slice(0, MAX_CACHED_CARDS);
+		const cacheHasMore = hasMore || dataRows.length > MAX_CACHED_CARDS;
+
 		const snapshot: AllIdsCacheSnapshot = {
 			version: 1,
 			cachedAt: dataCachedAt || Date.now(),
-			cards: dataRows,
+			cards: cardsToCache,
 			totalCount,
-			hasMore,
-			nextOffset: dataRows.length,
+			hasMore: cacheHasMore,
+			nextOffset: cardsToCache.length,
 			templateDimensions,
 			templateFields,
 			ui: {
@@ -1216,7 +1204,7 @@
 								<div class="card-wrapper">
 									<SmartIDCard
 										id={getCardId(card)}
-										initialData={card.fields ? card : null}
+										initialData={card}
 										minWidth={cardMinWidth}
 										onDataLoaded={updateCardData}
 										isSelected={selectionManager.isSelected(getCardId(card))}

@@ -19,12 +19,14 @@
 	export let minWidth: number = 250;
 
 	let cardData: IDCard | null = initialData;
-	// Treat as loading if no data OR if data is partial (missing fields)
-	let loading = !initialData || !initialData.fields;
+	// Treat as loading if no data OR if data is partial (missing front_image means it's a stub)
+	// Note: partial cards from getCardIDs have front_image=null and empty fields object
+	let loading = !initialData || initialData.front_image === null;
 	let error = false;
 
 	onMount(async () => {
-		if (!cardData || !cardData.fields) {
+		// Fetch full details if this is a stub (front_image is null)
+		if (!cardData || cardData.front_image === null) {
 			try {
 				cardData = await getCardDetails(id);
 				if (cardData) {

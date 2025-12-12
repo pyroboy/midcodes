@@ -16,7 +16,7 @@
 	import BottomNavigation from '$lib/components/BottomNavigation.svelte';
 	import HamburgerMenu from '$lib/components/HamburgerMenu.svelte';
 	import { initPreloadService, updateCurrentPath } from '$lib/services/preloadService';
-	import PreloadDebug from '$lib/components/PreloadDebug.svelte';
+
 	import NavigationLoader from '$lib/components/NavigationLoader.svelte';
 	import { Toaster } from '$lib/components/ui/sonner';
 	import { browser } from '$app/environment';
@@ -123,8 +123,7 @@
 		<!-- Hamburger Menu -->
 		<HamburgerMenu isOpen={isMenuOpen} user={data.user} onClose={closeMenu} />
 
-		<!-- Preload Debug Panel -->
-		<PreloadDebug />
+
 
 		<!-- Main Content with proper spacing -->
 		<main class="lg:ml-64 lg:pt-16">
