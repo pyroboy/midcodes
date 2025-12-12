@@ -13,12 +13,7 @@ compatibility_flags = ["nodejs_compat"]
 # Output directory produced by @sveltejs/adapter-cloudflare.
 pages_build_output_dir = ".svelte-kit/cloudflare"
 
-[vars]
-NODE_ENV = "production"
-
-[env.preview.vars]
-NODE_ENV = "development"
-
-[env.production.vars]
-NODE_ENV = "production"
-
+# IMPORTANT:
+# Do not set NODE_ENV via Wrangler vars.
+# Cloudflare Pages uses these vars during the build step, and setting NODE_ENV=production
+# makes package managers skip devDependencies (breaking `svelte-kit`/`vite` during builds).
