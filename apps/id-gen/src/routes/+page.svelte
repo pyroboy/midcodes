@@ -25,7 +25,6 @@
 	import DeleteConfirmationDialog from '$lib/components/DeleteConfirmationDialog.svelte';
 	import DuplicateTemplateDialog from '$lib/components/DuplicateTemplateDialog.svelte';
 	import { getPreloadState } from '$lib/services/preloadService';
-	import HomePageSkeleton from '$lib/components/skeletons/HomePageSkeleton.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import { getSupabaseStorageUrl } from '$lib/utils/supabase';
 	import type { CardSize } from '$lib/utils/sizeConversion';
@@ -423,9 +422,6 @@
 </svelte:head>
 
 <div class="h-[calc(100vh-4rem)] overflow-hidden flex flex-col">
-	{#if isLoading && !isStructureReady}
-		<HomePageSkeleton />
-	{:else}
 	<div class="container mx-auto px-4 py-2 flex-1 flex flex-col overflow-hidden">
 		<!-- View Toggle Buttons - Mobile Only -->
 		<div class="flex flex-col gap-1 w-fit flex-shrink-0 lg:hidden">
@@ -1146,7 +1142,6 @@
 		</section>
 	{/if}
 	</div>
-	{/if}
 </div>
 
 <!-- Dialogs -->
