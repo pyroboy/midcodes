@@ -1,0 +1,64 @@
+{
+    // Wrangler configuration for Cloudflare Pages deployment
+    // Documentation: https://developers.cloudflare.com/workers/wrangler/configuration/
+    "$schema": "node_modules/wrangler/config-schema.json",
+    // Project name - used as the Workers/Pages project identifier
+    "name": "id-gen",
+    // Compatibility date for Workers runtime features
+    "compatibility_date": "2024-12-01",
+    // Compatibility flags for specific runtime behaviors
+    "compatibility_flags": [
+        "nodejs_compat"
+    ],
+    // Pages-specific configuration
+    "pages_build_output_dir": ".svelte-kit/cloudflare",
+    // Environment variables (non-sensitive)
+    // Sensitive variables should be set via Cloudflare dashboard or wrangler secret
+    "vars": {
+        "NODE_ENV": "production"
+    },
+    // KV Namespaces (uncomment and configure if needed)
+    // "kv_namespaces": [
+    // 	{
+    // 		"binding": "KV_NAMESPACE",
+    // 		"id": "your-kv-namespace-id"
+    // 	}
+    // ],
+    // D1 Databases (uncomment and configure if needed)
+    // "d1_databases": [
+    // 	{
+    // 		"binding": "DB",
+    // 		"database_name": "id-gen-db",
+    // 		"database_id": "your-database-id"
+    // 	}
+    // ],
+    // R2 Buckets (uncomment and configure if needed)
+    // "r2_buckets": [
+    // 	{
+    // 		"binding": "BUCKET",
+    // 		"bucket_name": "id-gen-assets"
+    // 	}
+    // ],
+    // Durable Objects (uncomment and configure if needed)
+    // "durable_objects": {
+    // 	"bindings": [
+    // 		{
+    // 			"name": "MY_DURABLE_OBJECT",
+    // 			"class_name": "MyDurableObject"
+    // 		}
+    // 	]
+    // },
+    // Preview environment configuration
+    "env": {
+        "preview": {
+            "vars": {
+                "NODE_ENV": "development"
+            }
+        },
+        "production": {
+            "vars": {
+                "NODE_ENV": "production"
+            }
+        }
+    }
+}
