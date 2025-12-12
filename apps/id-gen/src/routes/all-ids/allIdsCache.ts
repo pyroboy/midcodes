@@ -28,7 +28,7 @@ export interface AllIdsCacheSnapshot {
 	scrollTop: number;
 }
 
-export const ALL_IDS_CACHE_TTL_MS = 60_000;
+export const ALL_IDS_CACHE_TTL_MS = 600_000; // 10 minutes
 
 const STORAGE_KEY_BASE = 'idgen:all-ids:cache:v1';
 
