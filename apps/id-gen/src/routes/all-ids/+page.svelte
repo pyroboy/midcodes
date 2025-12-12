@@ -23,10 +23,18 @@
 		writeAllIdsCache
 	} from './allIdsCache';
 
-	import { cachedRemoteFunctionCall, clearRemoteFunctionCacheByPrefix } from '$lib/remote/remoteFunctionCache';
-	
+	import {
+		cachedRemoteFunctionCall,
+		clearRemoteFunctionCacheByPrefix
+	} from '$lib/remote/remoteFunctionCache';
+
 	// Import remote functions
-	import { getIDCards, getCardCount, getTemplateDimensions, getTemplateMetadata } from './data.remote';
+	import {
+		getIDCards,
+		getCardCount,
+		getTemplateDimensions,
+		getTemplateMetadata
+	} from './data.remote';
 	import type { IDCard } from './data.remote';
 
 	// Constants
@@ -34,7 +42,7 @@
 	const LOAD_MORE_COUNT = 15;
 	const VISIBLE_LIMIT = 15; // Max cards to render at once for performance
 
-	const scopeKey = $derived(() => {
+	const scopeKey = $derived.by(() => {
 		const d = $page.data as any;
 		const userId = d?.user?.id ?? 'anon';
 		const orgId = d?.org_id ?? 'no-org';
@@ -60,14 +68,17 @@
 
 	// Data states
 	let dataRows = $state<IDCard[]>([]);
-	let templateDimensions = $state<Record<string, { width: number; height: number; unit: string }>>({});
+	let templateDimensions = $state<Record<string, { width: number; height: number; unit: string }>>(
+		{}
+	);
 	let templateFields = $state<Record<string, { variableName: string; side: string }[]>>({});
-	
+
 	// UI states
 	let searchQuery = $state('');
 	let selectedFrontImage: string | null = $state(null);
 	let selectedBackImage: string | null = $state(null);
-	let selectedTemplateDimensions: { width: number; height: number; unit?: string } | null = $state(null);
+	let selectedTemplateDimensions: { width: number; height: number; unit?: string } | null =
+		$state(null);
 	let selectedCardGeometry: any = $state(null);
 	let downloadingCards = $state(new Set<string>());
 	let deletingCards = $state(new Set<string>());
@@ -77,10 +88,26 @@
 	let bulkDownloadProgress = $state({ current: 0, total: 0 });
 	let errorMessage = '';
 
-	// Infinite scroll ref
-	let loadMoreTrigger = $state<HTMLDivElement | null>(null);
-	let observer: IntersectionObserver | null = null;
-	
+	// IntersectionObserver action for infinite scroll
+	function intersectionObserver(node: HTMLElement) {
+		const observer = new IntersectionObserver(
+			(entries) => {
+				entries.forEach((entry) => {
+					if (entry.isIntersecting) {
+						checkAndLoadMore();
+					}
+				});
+			},
+			{ threshold: 0.1, rootMargin: '200px' }
+		);
+		observer.observe(node);
+		return {
+			destroy() {
+				observer.disconnect();
+			}
+		};
+	}
+
 	// Visible card window for performance
 	let visibleStartIndex = $state(0);
 
@@ -148,7 +175,7 @@
 	// Load more cards (infinite scroll)
 	async function loadMoreCards(opts: { forceRefresh?: boolean } = {}) {
 		if (loadingMore || !hasMore) return;
-		
+
 		// Don't load more if we already have all cards
 		if (dataRows.length >= totalCount && totalCount > 0) {
 			hasMore = false;
@@ -171,7 +198,7 @@
 			if (result.cards.length > 0) {
 				dataRows = [...dataRows, ...result.cards];
 			}
-			
+
 			// More accurate hasMore check based on total count
 			hasMore = result.hasMore && dataRows.length < totalCount;
 			dataCachedAt = Date.now();
@@ -186,10 +213,17 @@
 			loadingMore = false;
 		}
 	}
-	
+
 	// Show more cached cards (when we have more in cache than visible)
 	function showMoreCachedCards() {
-		visibleStartIndex += VISIBLE_LIMIT;
+		// Ensure we don't exceed bounds
+		const remaining = allFilteredCards.length - (visibleStartIndex + VISIBLE_LIMIT);
+		if (remaining > 0) {
+			visibleStartIndex += VISIBLE_LIMIT;
+		} else {
+			// Show all remaining cards
+			visibleStartIndex = Math.max(0, allFilteredCards.length - VISIBLE_LIMIT);
+		}
 	}
 
 	// Load template dimensions and metadata for a set of cards
@@ -223,73 +257,26 @@
 		}
 	}
 
-	// Setup infinite scroll via scroll event listener
-	let scrollCleanup: (() => void) | null = null;
-	
-	function setupScrollListener() {
-		if (!browser) return;
-		
-		// Cleanup previous listener
-		scrollCleanup?.();
-		
-		// Find the scroll container
-		const scrollContainer = document.querySelector('.all-ids-scroll') as HTMLElement | null;
-		if (!scrollContainer) return;
-		
-		const handleScroll = () => {
-			scrollTop = scrollContainer.scrollTop;
-		};
-		
-		scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
-		scrollCleanup = () => scrollContainer.removeEventListener('scroll', handleScroll);
-	}
-	
-	// Debounce timer for scroll check
-	let scrollCheckTimeout: ReturnType<typeof setTimeout> | null = null;
-	let isShowingMoreCards = false; // Guard to prevent recursive triggers
-	
-	// Check if we need to load more based on scroll position
-	function checkAndLoadMore() {
-		if (initialLoading || !browser || isShowingMoreCards) return;
-		
-		const scrollContainer = document.querySelector('.all-ids-scroll') as HTMLElement | null;
-		if (!scrollContainer) return;
-		
-		const { scrollHeight, clientHeight, scrollTop: currentScrollTop } = scrollContainer;
-		const distanceFromBottom = scrollHeight - currentScrollTop - clientHeight;
-		
-		// Load more when within 600px of bottom (generous threshold for smoother UX)
-		if (distanceFromBottom < 600) {
-			// 1) First: Show more cached cards if available
-			if (hasMoreCachedCards) {
-				isShowingMoreCards = true;
-				showMoreCachedCards();
-				// Wait for DOM to settle, then check if we need to load even more
-				setTimeout(() => {
-					isShowingMoreCards = false;
-					// Re-check after DOM update - this creates a chain of loads when at bottom
-					checkAndLoadMore();
-				}, 50);
-				return; // Don't proceed to server fetch yet
-			}
-			
-			// 2) Then: Fetch more from server if no more cached cards
-			// or if we're running low on cached cards
-			const cachedRemaining = allFilteredCards.length - filteredCards.length;
-			if (hasMore && !loadingMore && cachedRemaining < LOAD_MORE_COUNT) {
-				loadMoreCards();
-			}
+	// Load lock to prevent concurrent fetches
+	let loadLock = false;
+
+	// Check if we need to load more (called by IntersectionObserver)
+	async function checkAndLoadMore() {
+		if (initialLoading || !browser || loadLock) return;
+
+		// 1) First: Show more cached cards if available
+		if (hasMoreCachedCards) {
+			loadLock = true;
+			showMoreCachedCards();
+			await tick();
+			loadLock = false;
+			return;
 		}
-	}
-	
-	// Debounced scroll check - only triggered by actual user scrolling
-	function debouncedScrollCheck() {
-		if (scrollCheckTimeout) {
-			clearTimeout(scrollCheckTimeout);
+
+		// 2) Then: Fetch more from server if no more cached cards
+		if (hasMore && !loadingMore) {
+			await loadMoreCards();
 		}
-		scrollCheckTimeout = setTimeout(() => {
-			checkAndLoadMore();
-		}, 100); // 100ms debounce
 	}
 
 	onMount(() => {
@@ -325,38 +312,17 @@
 			// First visit (no cache): do normal initial load (shows skeleton)
 			loadInitialCards();
 		}
-
-		return () => {
-			scrollCleanup?.();
-			if (scrollCheckTimeout) clearTimeout(scrollCheckTimeout);
-		};
 	});
 
-	// Setup scroll listener after initial load and when view mode changes
+	// Track scroll position for cache persistence
 	$effect(() => {
-		const _ = $viewMode; // Subscribe to viewMode changes
-		if (!initialLoading) {
-			// Small delay to ensure DOM is updated after view mode change
-			setTimeout(() => {
-				setupScrollListener();
-				// Also check if we need to load more initially (e.g., content doesn't fill viewport)
-				checkAndLoadMore();
-			}, 100);
-		}
-	});
-
-	// Direct scroll event handler - triggers debounced load check
-	$effect(() => {
-		if (!browser) return;
-		if (initialLoading) return;
+		if (!browser || initialLoading) return;
 
 		const el = document.querySelector('.all-ids-scroll') as HTMLElement | null;
 		if (!el) return;
 
 		const onScroll = () => {
 			scrollTop = el.scrollTop;
-			// Use debounced check instead of direct checkAndLoadMore
-			debouncedScrollCheck();
 		};
 
 		el.addEventListener('scroll', onScroll, { passive: true });
@@ -410,42 +376,46 @@
 	}
 
 	// Filter cards based on search query
-	let allFilteredCards = $derived((() => {
-		if (!searchQuery.trim()) return dataRows;
-		
-		const query = searchQuery.toLowerCase().trim();
-		return dataRows.filter(card => {
-			// Search in template name
-			if (card.template_name?.toLowerCase().includes(query)) return true;
-			// Search in field values
-			if (card.fields) {
-				for (const key of Object.keys(card.fields)) {
-					const value = card.fields[key]?.value;
-					if (value?.toLowerCase().includes(query)) return true;
+	let allFilteredCards = $derived(
+		(() => {
+			if (!searchQuery.trim()) return dataRows;
+
+			const query = searchQuery.toLowerCase().trim();
+			return dataRows.filter((card) => {
+				// Search in template name
+				if (card.template_name?.toLowerCase().includes(query)) return true;
+				// Search in field values
+				if (card.fields) {
+					for (const key of Object.keys(card.fields)) {
+						const value = card.fields[key]?.value;
+						if (value?.toLowerCase().includes(query)) return true;
+					}
 				}
-			}
-			return false;
-		});
-	})());
-	
+				return false;
+			});
+		})()
+	);
+
 	// Visible cards - limited for performance, but cache stores all
 	let filteredCards = $derived(allFilteredCards.slice(0, visibleStartIndex + VISIBLE_LIMIT));
-	
+
 	// Show "load more UI" button when there are more cached cards to show
 	let hasMoreCachedCards = $derived(filteredCards.length < allFilteredCards.length);
 
 	// Group filtered cards by template
-	let groupedCards = $derived((() => {
-		const groups: Record<string, IDCard[]> = {};
-		filteredCards.forEach((card) => {
-			const templateName = card.template_name || 'Unassigned';
-			if (!groups[templateName]) {
-				groups[templateName] = [];
-			}
-			groups[templateName].push(card);
-		});
-		return groups;
-	})());
+	let groupedCards = $derived(
+		(() => {
+			const groups: Record<string, IDCard[]> = {};
+			filteredCards.forEach((card) => {
+				const templateName = card.template_name || 'Unassigned';
+				if (!groups[templateName]) {
+					groups[templateName] = [];
+				}
+				groups[templateName].push(card);
+			});
+			return groups;
+		})()
+	);
 
 	// Editing state for inline field editing
 	let editingCell = $state<{ cardId: string; fieldName: string } | null>(null);
@@ -469,7 +439,7 @@
 	// Save edit
 	async function saveEdit() {
 		if (!editingCell || savingCell) return;
-		
+
 		savingCell = true;
 		try {
 			const formData = new FormData();
@@ -484,7 +454,7 @@
 
 			if (response.ok) {
 				// Update local data
-				const cardIndex = dataRows.findIndex(c => getCardId(c) === editingCell?.cardId);
+				const cardIndex = dataRows.findIndex((c) => getCardId(c) === editingCell?.cardId);
 				if (cardIndex !== -1 && editingCell) {
 					const card = dataRows[cardIndex];
 					if (!card.fields) card.fields = {};
@@ -575,7 +545,8 @@
 
 		try {
 			const zip = new JSZip();
-			const nameField = card.fields?.['Name']?.value || card.fields?.['name']?.value || `id-${cardId}`;
+			const nameField =
+				card.fields?.['Name']?.value || card.fields?.['name']?.value || `id-${cardId}`;
 			const folder = zip.folder(nameField);
 			if (!folder) throw new Error('Failed to create folder');
 
@@ -633,7 +604,7 @@
 				const cardId = getCardId(card);
 				const nameField = card.fields?.['Name']?.value || `id-${cardId}`;
 				const folder = zip.folder(nameField);
-				
+
 				if (folder) {
 					if (card.front_image) {
 						const frontImageUrl = getSupabaseStorageUrl(card.front_image, 'rendered-id-cards');
@@ -656,7 +627,7 @@
 						}
 					}
 				}
-				
+
 				bulkDownloadProgress.current++;
 				bulkDownloadProgress = bulkDownloadProgress;
 			}
@@ -721,7 +692,11 @@
 		const selectedRows = dataRows.filter((card) => selectionManager.isSelected(getCardId(card)));
 		if (selectedRows.length === 0) return;
 
-		if (!confirm(`Are you sure you want to delete ${selectedRows.length} ID card${selectedRows.length > 1 ? 's' : ''}?`)) {
+		if (
+			!confirm(
+				`Are you sure you want to delete ${selectedRows.length} ID card${selectedRows.length > 1 ? 's' : ''}?`
+			)
+		) {
 			return;
 		}
 
@@ -757,290 +732,366 @@
 
 <div class="h-full flex flex-col overflow-hidden" in:fade={{ duration: 200 }}>
 	<div class="container mx-auto px-4 py-4 flex-1 flex flex-col min-h-0 max-w-7xl">
-
-	<!-- Controls Header -->
-	<div class="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center bg-card border border-border p-4 rounded-xl shadow-sm mb-4">
-		<!-- Search & Count -->
-		<div class="flex items-center gap-4">
-			<div class="relative w-full md:w-64">
-				<input
-					type="text"
-					placeholder="Search cards..."
-					class="w-full pl-10 pr-4 py-2 bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm"
-					bind:value={searchQuery}
-				/>
-				<svg class="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-				</svg>
-			</div>
-			<span class="text-sm text-muted-foreground whitespace-nowrap">
-				{dataRows.length} of {totalCount} cards
-			</span>
-		</div>
-
-		<!-- Actions & Toggles -->
-		<div class="flex flex-wrap items-center gap-3 w-full md:w-auto justify-between md:justify-end">
-			{#if selectedCount > 0}
-				<div class="flex gap-2">
-					<button
-						class="px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium rounded-md hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-						onclick={downloadSelectedCards}
-						disabled={isBulkDownloading}
+		<!-- Controls Header -->
+		<div
+			class="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center bg-card border border-border p-4 rounded-xl shadow-sm mb-4"
+		>
+			<!-- Search & Count -->
+			<div class="flex items-center gap-4">
+				<div class="relative w-full md:w-64">
+					<input
+						type="text"
+						placeholder="Search cards..."
+						class="w-full pl-10 pr-4 py-2 bg-background border border-input rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm"
+						bind:value={searchQuery}
+					/>
+					<svg
+						class="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground"
+						fill="none"
+						stroke="currentColor"
+						viewBox="0 0 24 24"
 					>
-						{#if isBulkDownloading}
-							<svg class="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-								<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-								<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-							</svg>
-							{bulkDownloadProgress.current}/{bulkDownloadProgress.total}
-						{:else}
-							Download ({selectedCount})
-						{/if}
-					</button>
-					<button
-						class="px-3 py-1.5 bg-destructive text-destructive-foreground text-xs font-medium rounded-md hover:bg-destructive/90 transition-colors shadow-sm"
-						onclick={deleteSelectedCards}
-					>
-						Delete ({selectedCount})
-					</button>
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+						/>
+					</svg>
 				</div>
-			{/if}
+				<span class="text-sm text-muted-foreground whitespace-nowrap">
+					{dataRows.length} of {totalCount} cards
+				</span>
+			</div>
 
-			<div class="flex items-center gap-2 ml-auto border-l border-border pl-3">
-				<button
-					class="px-2 py-1 text-xs rounded-md border border-border bg-background hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-					disabled={isRefreshing || initialLoading}
-					onclick={async () => {
-						// Keep old content visible while revalidating
-						isRefreshing = true;
-						clearAllIdsRemoteCache();
-						clearAllIdsCache(scopeKey);
-						await loadInitialCards({ forceRefresh: true, background: true });
-
-						// Optionally scroll to top after refresh
-						await tick();
-						const el = document.querySelector('.all-ids-scroll') as HTMLElement | null;
-						if (el) el.scrollTop = 0;
-						isRefreshing = false;
-					}}
-				>
-					{isRefreshing ? 'Refreshing…' : 'Refresh'}
-				</button>
-
-				{#if $viewMode !== 'table'}
-					<div class="flex items-center bg-muted rounded-lg p-0.5">
-						<button class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-background text-muted-foreground" onclick={zoomOut}>−</button>
-						<button class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-background text-muted-foreground" onclick={zoomIn}>+</button>
+			<!-- Actions & Toggles -->
+			<div
+				class="flex flex-wrap items-center gap-3 w-full md:w-auto justify-between md:justify-end"
+			>
+				{#if selectedCount > 0}
+					<div class="flex gap-2">
+						<button
+							class="px-3 py-1.5 bg-primary text-primary-foreground text-xs font-medium rounded-md hover:bg-primary/90 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+							onclick={downloadSelectedCards}
+							disabled={isBulkDownloading}
+						>
+							{#if isBulkDownloading}
+								<svg
+									class="animate-spin h-3 w-3"
+									xmlns="http://www.w3.org/2000/svg"
+									fill="none"
+									viewBox="0 0 24 24"
+								>
+									<circle
+										class="opacity-25"
+										cx="12"
+										cy="12"
+										r="10"
+										stroke="currentColor"
+										stroke-width="4"
+									></circle>
+									<path
+										class="opacity-75"
+										fill="currentColor"
+										d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+									></path>
+								</svg>
+								{bulkDownloadProgress.current}/{bulkDownloadProgress.total}
+							{:else}
+								Download ({selectedCount})
+							{/if}
+						</button>
+						<button
+							class="px-3 py-1.5 bg-destructive text-destructive-foreground text-xs font-medium rounded-md hover:bg-destructive/90 transition-colors shadow-sm"
+							onclick={deleteSelectedCards}
+						>
+							Delete ({selectedCount})
+						</button>
 					</div>
 				{/if}
-				<ViewModeToggle />
+
+				<div class="flex items-center gap-2 ml-auto border-l border-border pl-3">
+					<button
+						class="px-2 py-1 text-xs rounded-md border border-border bg-background hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+						disabled={isRefreshing || initialLoading}
+						onclick={async () => {
+							// Keep old content visible while revalidating
+							isRefreshing = true;
+							clearAllIdsRemoteCache();
+							clearAllIdsCache(scopeKey);
+							await loadInitialCards({ forceRefresh: true, background: true });
+
+							// Optionally scroll to top after refresh
+							await tick();
+							const el = document.querySelector('.all-ids-scroll') as HTMLElement | null;
+							if (el) el.scrollTop = 0;
+							isRefreshing = false;
+						}}
+					>
+						{isRefreshing ? 'Refreshing…' : 'Refresh'}
+					</button>
+
+					{#if $viewMode !== 'table'}
+						<div class="flex items-center bg-muted rounded-lg p-0.5">
+							<button
+								class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-background text-muted-foreground"
+								onclick={zoomOut}>−</button
+							>
+							<button
+								class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-background text-muted-foreground"
+								onclick={zoomIn}>+</button
+							>
+						</div>
+					{/if}
+					<ViewModeToggle />
+				</div>
 			</div>
 		</div>
-	</div>
 
-	<!-- Content Area -->
-	{#if initialLoading}
-		<!-- Initial Skeleton Loading State -->
-		<div class="space-y-6">
-			<div class="flex items-center gap-2">
-				<div class="h-6 w-1 bg-muted rounded-full animate-pulse"></div>
-				<div class="h-5 w-32 bg-muted rounded animate-pulse"></div>
-				<div class="h-5 w-16 bg-muted rounded-full animate-pulse ml-auto"></div>
+		<!-- Content Area -->
+		{#if initialLoading}
+			<!-- Initial Skeleton Loading State -->
+			<div class="space-y-6">
+				<div class="flex items-center gap-2">
+					<div class="h-6 w-1 bg-muted rounded-full animate-pulse"></div>
+					<div class="h-5 w-32 bg-muted rounded animate-pulse"></div>
+					<div class="h-5 w-16 bg-muted rounded-full animate-pulse ml-auto"></div>
+				</div>
+				<IDCardSkeleton count={INITIAL_LOAD} minWidth={cardMinWidth} />
 			</div>
-			<IDCardSkeleton count={INITIAL_LOAD} minWidth={cardMinWidth} />
-		</div>
-	{:else if dataRows.length === 0}
-		<EmptyIDs />
-	{:else if $viewMode === 'table'}
-		<!-- Table View -->
-		<div class="space-y-8 overflow-auto flex-1 all-ids-scroll">
-			{#each Object.entries(groupedCards) as [templateName, cards]}
-				<div class="space-y-3">
-					<div class="flex items-center justify-between">
-						<h3 class="text-lg font-semibold text-foreground flex items-center gap-2">
-							<div class="h-6 w-1 bg-primary rounded-full"></div>
-							{templateName}
-						</h3>
-						<span class="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">{cards.length} items</span>
-					</div>
+		{:else if dataRows.length === 0}
+			<EmptyIDs />
+		{:else if $viewMode === 'table'}
+			<!-- Table View -->
+			<div class="space-y-8 overflow-auto flex-1 all-ids-scroll">
+				{#each Object.entries(groupedCards) as [templateName, cards]}
+					<div class="space-y-3">
+						<div class="flex items-center justify-between">
+							<h3 class="text-lg font-semibold text-foreground flex items-center gap-2">
+								<div class="h-6 w-1 bg-primary rounded-full"></div>
+								{templateName}
+							</h3>
+							<span class="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full"
+								>{cards.length} items</span
+							>
+						</div>
 
-					<div class="relative w-full overflow-x-auto rounded-lg border border-border bg-card shadow-sm">
-						<table class="w-full text-sm text-left">
-							<thead class="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-border">
-								<tr>
-									<th class="w-10 px-4 py-3">
-										<input
-											type="checkbox"
-											class="rounded border-muted-foreground"
-											checked={cards.every(c => selectionManager.isSelected(getCardId(c)))}
-											onchange={() => {
-												const allSelected = cards.every(c => selectionManager.isSelected(getCardId(c)));
-												cards.forEach(c => {
-													const cardId = getCardId(c);
-													if (allSelected) {
-														selectedCards.delete(cardId);
-													} else {
-														selectedCards.add(cardId);
-													}
-												});
-												selectedCards = new Set(selectedCards);
-											}}
-										/>
-									</th>
-									<th class="px-4 py-3 font-medium">Preview</th>
-									{#if templateFields[templateName]}
-										{#each templateFields[templateName] || [] as field}
-											<th class="px-4 py-3 font-medium whitespace-nowrap">{field.variableName}</th>
-										{/each}
-									{/if}
-									<th class="px-4 py-3 font-medium text-right">Actions</th>
-								</tr>
-							</thead>
-							<tbody class="divide-y divide-border">
-								{#each cards as card}
-									<tr class="hover:bg-muted/30 transition-colors group">
-										<td class="px-4 py-3">
+						<div
+							class="relative w-full overflow-x-auto rounded-lg border border-border bg-card shadow-sm"
+						>
+							<table class="w-full text-sm text-left">
+								<thead
+									class="text-xs text-muted-foreground uppercase bg-muted/50 border-b border-border"
+								>
+									<tr>
+										<th class="w-10 px-4 py-3">
 											<input
 												type="checkbox"
 												class="rounded border-muted-foreground"
-												checked={selectionManager.isSelected(getCardId(card))}
-												onchange={() => selectionManager.toggleSelection(getCardId(card))}
+												checked={cards.every((c) => selectionManager.isSelected(getCardId(c)))}
+												onchange={() => {
+													const allSelected = cards.every((c) =>
+														selectionManager.isSelected(getCardId(c))
+													);
+													cards.forEach((c) => {
+														const cardId = getCardId(c);
+														if (allSelected) {
+															selectedCards.delete(cardId);
+														} else {
+															selectedCards.add(cardId);
+														}
+													});
+													selectedCards = new Set(selectedCards);
+												}}
 											/>
-										</td>
-										<td class="px-4 py-2 w-24" onclick={(e) => openPreview(e, card)}>
-											<div class="h-10 w-16 bg-muted rounded overflow-hidden cursor-pointer border border-border hover:border-primary transition-colors">
-												{#if card.front_image}
-													<img
-														src={getSupabaseStorageUrl(card.front_image, 'rendered-id-cards')}
-														alt="Thumb"
-														class="w-full h-full object-cover"
-														loading="lazy"
-													/>
-												{/if}
-											</div>
-										</td>
+										</th>
+										<th class="px-4 py-3 font-medium">Preview</th>
 										{#if templateFields[templateName]}
 											{#each templateFields[templateName] || [] as field}
-												<td
-													class="px-4 py-3 whitespace-nowrap text-foreground cursor-pointer hover:bg-muted/50"
-													ondblclick={() => startEditing(
-														getCardId(card),
-														field.variableName,
-														card.fields?.[field.variableName]?.value || ''
-													)}
-													title="Double-click to edit"
+												<th class="px-4 py-3 font-medium whitespace-nowrap">{field.variableName}</th
 												>
-													{#if editingCell?.cardId === getCardId(card) && editingCell?.fieldName === field.variableName}
-														<input
-															id="edit-{getCardId(card)}-{field.variableName}"
-															type="text"
-															bind:value={editValue}
-															onkeydown={handleEditKeydown}
-															onblur={saveEdit}
-															class="w-full px-2 py-1 text-sm border border-primary rounded bg-background focus:outline-none focus:ring-2 focus:ring-primary"
-															disabled={savingCell}
-														/>
-													{:else}
-														{card.fields?.[field.variableName]?.value || '-'}
-													{/if}
-												</td>
 											{/each}
 										{/if}
-										<td class="px-4 py-3 text-right">
-											<div class="flex justify-end gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-												<button
-													class="p-1.5 hover:bg-muted rounded text-blue-500"
-													onclick={() => downloadCard(card)}
-													title="Download"
-												>
-													<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-														<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-													</svg>
-												</button>
-												<button
-													class="p-1.5 hover:bg-muted rounded text-red-500"
-													onclick={() => handleDelete(card)}
-													title="Delete"
-												>
-													<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-														<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-													</svg>
-												</button>
-											</div>
-										</td>
+										<th class="px-4 py-3 font-medium text-right">Actions</th>
 									</tr>
-								{/each}
-							</tbody>
-						</table>
-					</div>
-				</div>
-			{/each}
-			
-			<!-- Load More Trigger -->
-			{#if hasMore || hasMoreCachedCards}
-				<div class="py-4">
-					{#if loadingMore}
-						<div class="text-center text-muted-foreground text-sm">
-							Loading more… {dataRows.length} of {totalCount}
+								</thead>
+								<tbody class="divide-y divide-border">
+									{#each cards as card}
+										<tr class="hover:bg-muted/30 transition-colors group">
+											<td class="px-4 py-3">
+												<input
+													type="checkbox"
+													class="rounded border-muted-foreground"
+													checked={selectionManager.isSelected(getCardId(card))}
+													onchange={() => selectionManager.toggleSelection(getCardId(card))}
+												/>
+											</td>
+											<td class="px-4 py-2 w-24" onclick={(e) => openPreview(e, card)}>
+												<div
+													class="h-10 w-16 bg-muted rounded overflow-hidden cursor-pointer border border-border hover:border-primary transition-colors"
+												>
+													{#if card.front_image}
+														<img
+															src={getSupabaseStorageUrl(card.front_image, 'rendered-id-cards')}
+															alt="Thumb"
+															class="w-full h-full object-cover"
+															loading="lazy"
+														/>
+													{/if}
+												</div>
+											</td>
+											{#if templateFields[templateName]}
+												{#each templateFields[templateName] || [] as field}
+													<td
+														class="px-4 py-3 whitespace-nowrap text-foreground cursor-pointer hover:bg-muted/50"
+														ondblclick={() =>
+															startEditing(
+																getCardId(card),
+																field.variableName,
+																card.fields?.[field.variableName]?.value || ''
+															)}
+														title="Double-click to edit"
+													>
+														{#if editingCell?.cardId === getCardId(card) && editingCell?.fieldName === field.variableName}
+															<input
+																id="edit-{getCardId(card)}-{field.variableName}"
+																type="text"
+																bind:value={editValue}
+																onkeydown={handleEditKeydown}
+																onblur={saveEdit}
+																class="w-full px-2 py-1 text-sm border border-primary rounded bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+																disabled={savingCell}
+															/>
+														{:else}
+															{card.fields?.[field.variableName]?.value || '-'}
+														{/if}
+													</td>
+												{/each}
+											{/if}
+											<td class="px-4 py-3 text-right">
+												<div
+													class="flex justify-end gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity"
+												>
+													<button
+														class="p-1.5 hover:bg-muted rounded text-blue-500"
+														onclick={() => downloadCard(card)}
+														title="Download"
+													>
+														<svg
+															class="w-4 h-4"
+															fill="none"
+															stroke="currentColor"
+															viewBox="0 0 24 24"
+														>
+															<path
+																stroke-linecap="round"
+																stroke-linejoin="round"
+																stroke-width="2"
+																d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+															/>
+														</svg>
+													</button>
+													<button
+														class="p-1.5 hover:bg-muted rounded text-red-500"
+														onclick={() => handleDelete(card)}
+														title="Delete"
+													>
+														<svg
+															class="w-4 h-4"
+															fill="none"
+															stroke="currentColor"
+															viewBox="0 0 24 24"
+														>
+															<path
+																stroke-linecap="round"
+																stroke-linejoin="round"
+																stroke-width="2"
+																d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+															/>
+														</svg>
+													</button>
+												</div>
+											</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
 						</div>
-					{:else if hasMoreCachedCards}
-						<div class="text-center text-muted-foreground text-xs">
-							Showing {filteredCards.length} of {allFilteredCards.length} loaded • {dataRows.length} of {totalCount} total
-						</div>
-					{:else}
-						<div class="h-1"></div>
-					{/if}
-				</div>
-			{/if}
-		</div>
-	{:else}
-		<!-- Grid View -->
-		<div class="space-y-10 overflow-auto flex-1 all-ids-scroll" style="--card-min-width: {cardMinWidth}px;">
-			{#each Object.entries(groupedCards) as [templateName, cards]}
-				<div class="space-y-4">
-					<div class="flex items-center gap-3 border-b border-border pb-2">
-						<h3 class="text-lg font-semibold text-foreground">{templateName}</h3>
-						<span class="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{cards.length}</span>
 					</div>
+				{/each}
 
-					<div class="responsive-grid">
-						{#each cards as card}
-							<div class="card-wrapper">
-								<SimpleIDCard
-									{card}
-									isSelected={selectionManager.isSelected(getCardId(card))}
-									onToggleSelect={() => selectionManager.toggleSelection(getCardId(card))}
-									onDownload={downloadCard}
-									onDelete={handleDelete}
-									onOpenPreview={openPreview}
-									deleting={deletingCards.has(getCardId(card))}
-									downloading={downloadingCards.has(getCardId(card))}
-								/>
+				<!-- Load More Trigger (IntersectionObserver sentinel) -->
+				{#if hasMore || hasMoreCachedCards}
+					<div class="py-4" use:intersectionObserver>
+						{#if loadingMore}
+							<div class="text-center text-muted-foreground text-sm">
+								Loading more… {dataRows.length} of {totalCount}
 							</div>
-						{/each}
+						{:else if hasMoreCachedCards}
+							<div class="text-center text-muted-foreground text-xs">
+								Showing {filteredCards.length} of {allFilteredCards.length} loaded • {dataRows.length}
+								of {totalCount} total
+							</div>
+						{:else}
+							<div class="h-1"></div>
+						{/if}
 					</div>
+				{/if}
 			</div>
-		{/each}
-			
-			<!-- Load More Trigger -->
-			{#if hasMore || hasMoreCachedCards}
-				<div class="py-4">
-					{#if loadingMore}
-						<div class="text-center text-muted-foreground text-sm mb-3">
-							Loading more… {dataRows.length} of {totalCount}
+		{:else}
+			<!-- Grid View -->
+			<div
+				class="space-y-10 overflow-auto flex-1 all-ids-scroll"
+				style="--card-min-width: {cardMinWidth}px;"
+			>
+				{#each Object.entries(groupedCards) as [templateName, cards]}
+					<div class="space-y-4">
+						<div class="flex items-center gap-3 border-b border-border pb-2">
+							<h3 class="text-lg font-semibold text-foreground">{templateName}</h3>
+							<span class="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full"
+								>{cards.length}</span
+							>
 						</div>
-						<IDCardSkeleton count={3} minWidth={cardMinWidth} />
-					{:else if hasMoreCachedCards}
-						<div class="text-center text-muted-foreground text-xs">
-							Showing {filteredCards.length} of {allFilteredCards.length} loaded • {dataRows.length} of {totalCount} total
+
+						<div class="responsive-grid">
+							{#each cards as card}
+								<div class="card-wrapper">
+									<SimpleIDCard
+										{card}
+										isSelected={selectionManager.isSelected(getCardId(card))}
+										onToggleSelect={() => selectionManager.toggleSelection(getCardId(card))}
+										onDownload={downloadCard}
+										onDelete={handleDelete}
+										onOpenPreview={openPreview}
+										deleting={deletingCards.has(getCardId(card))}
+										downloading={downloadingCards.has(getCardId(card))}
+									/>
+								</div>
+							{/each}
 						</div>
-					{:else}
-						<div class="h-1"></div>
-					{/if}
-				</div>
-			{/if}
-		</div>
-	{/if}
+					</div>
+				{/each}
+
+				<!-- Load More Trigger (IntersectionObserver sentinel) -->
+				{#if hasMore || hasMoreCachedCards}
+					<div class="py-4" use:intersectionObserver>
+						{#if loadingMore}
+							<div class="text-center text-muted-foreground text-sm mb-3">
+								Loading more… {dataRows.length} of {totalCount}
+							</div>
+							<IDCardSkeleton count={3} minWidth={cardMinWidth} />
+						{:else if hasMoreCachedCards}
+							<div class="text-center text-muted-foreground text-xs">
+								Showing {filteredCards.length} of {allFilteredCards.length} loaded • {dataRows.length}
+								of {totalCount} total
+							</div>
+						{:else}
+							<div class="h-1"></div>
+						{/if}
+					</div>
+				{/if}
+			</div>
+		{/if}
 	</div>
 </div>
 
@@ -1048,8 +1099,12 @@
 {#if selectedFrontImage || selectedBackImage}
 	<ClientOnly>
 		<ImagePreviewModal
-			frontImageUrl={selectedFrontImage ? getSupabaseStorageUrl(selectedFrontImage, 'rendered-id-cards') : null}
-			backImageUrl={selectedBackImage ? getSupabaseStorageUrl(selectedBackImage, 'rendered-id-cards') : null}
+			frontImageUrl={selectedFrontImage
+				? getSupabaseStorageUrl(selectedFrontImage, 'rendered-id-cards')
+				: null}
+			backImageUrl={selectedBackImage
+				? getSupabaseStorageUrl(selectedBackImage, 'rendered-id-cards')
+				: null}
 			cardGeometry={selectedCardGeometry}
 			templateDimensions={selectedTemplateDimensions}
 			onClose={closePreview}
