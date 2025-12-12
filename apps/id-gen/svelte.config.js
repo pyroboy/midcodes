@@ -7,7 +7,7 @@ const config = {
 	kit: {
 		adapter: adapter({
 			runtime: 'nodejs20.x',
-			split: false
+			split: true  // Enable per-route code splitting for faster page loads
 		}),
 		experimental: {
 			remoteFunctions: true

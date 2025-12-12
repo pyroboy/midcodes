@@ -1,16 +1,18 @@
-import { error, fail } from '@sveltejs/kit';
+import { fail } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 
-// Minimal server load - auth check only
+// Minimal server load - just register dependency for smart invalidation
+// Auth is already handled by hooks.server.ts, org_id comes from root layout
 // Card data is fetched client-side via remote functions
-export const load = (async ({ locals }) => {
-	const { session, org_id } = locals;
-	if (!session) throw error(401, 'Unauthorized');
-	if (!org_id) throw error(403, 'No organization context found');
+export const load = (async ({ depends, setHeaders }) => {
+	// Register dependency for smart invalidation
+	// Use invalidate('app:idcards') to re-run this load without full page refresh
+	depends('app:idcards');
 
-	return {
-		org_id
-	};
+	// Cache this minimal response for 5 minutes - it has no dynamic data
+	setHeaders({ 'cache-control': 'private, max-age=300' });
+
+	return {};
 }) satisfies PageServerLoad;
 
 // Keep form actions for delete/update operations

@@ -4,12 +4,11 @@
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
 	import { onMount, tick } from 'svelte';
-	import { fade } from 'svelte/transition';
 	import JSZip from 'jszip';
 	import { getSupabaseStorageUrl } from '$lib/utils/supabase';
 	import { createCardFromInches } from '$lib/utils/cardGeometry';
 	import ViewModeToggle from '$lib/components/ViewModeToggle.svelte';
-	import { viewMode } from '$lib/stores/viewMode';
+	import { viewMode, detectViewportDefault } from '$lib/stores/viewMode';
 	import SimpleIDCard from '$lib/components/SimpleIDCard.svelte';
 	import EmptyIDs from '$lib/components/empty-states/EmptyIDs.svelte';
 	import IDCardSkeleton from '$lib/components/IDCardSkeleton.svelte';
@@ -41,6 +40,23 @@
 	const INITIAL_LOAD = 20;
 	const LOAD_MORE_COUNT = 15;
 	const VISIBLE_LIMIT = 15; // Max cards to render at once for performance
+
+	// Logging helpers
+	const LOG_PREFIX = '[AllIds]';
+	const logStyles = {
+		header: 'color: #6366f1; font-weight: bold; font-size: 14px;',
+		cache: 'color: #22c55e; font-weight: bold;',
+		fetch: 'color: #f59e0b; font-weight: bold;',
+		stale: 'color: #ef4444; font-weight: bold;',
+		info: 'color: #64748b;',
+		data: 'color: #0ea5e9;'
+	};
+
+	function logSection(title: string, style: string = logStyles.header) {
+		console.log(`%c${LOG_PREFIX} ═══════════════════════════════════════`, style);
+		console.log(`%c${LOG_PREFIX} ${title}`, style);
+		console.log(`%c${LOG_PREFIX} ═══════════════════════════════════════`, style);
+	}
 
 	const scopeKey = $derived.by(() => {
 		const d = $page.data as any;
@@ -128,15 +144,24 @@
 	async function loadInitialCards(opts: { forceRefresh?: boolean; background?: boolean } = {}) {
 		const forceRefresh = opts.forceRefresh ?? false;
 		const background = opts.background ?? false;
+		const startTime = performance.now();
+
+		console.group(`%c${LOG_PREFIX} 📥 loadInitialCards()`, logStyles.fetch);
+		console.log(`%c├─ forceRefresh: ${forceRefresh}`, forceRefresh ? logStyles.stale : logStyles.info);
+		console.log(`%c├─ background: ${background}`, logStyles.info);
+		console.log(`%c├─ current dataRows.length: ${dataRows.length}`, logStyles.info);
 
 		// Only show skeleton on first load (no data yet and not background refresh)
 		if (!background && dataRows.length === 0) {
+			console.log(`%c├─ 🔄 Showing skeleton (first load)`, logStyles.fetch);
 			initialLoading = true;
 		} else {
+			console.log(`%c├─ 🔄 Showing refresh indicator (has existing data)`, logStyles.cache);
 			isRefreshing = true;
 		}
 
 		try {
+			console.log(`%c├─ ⏳ Calling remote functions...`, logStyles.info);
 			const [result, count] = await Promise.all([
 				cachedRemoteFunctionCall({
 					scopeKey,
@@ -144,7 +169,7 @@
 					args: { offset: 0, limit: INITIAL_LOAD },
 					forceRefresh,
 					fetcher: (args) => getIDCards(args),
-					options: { ttlMs: ALL_IDS_CACHE_TTL_MS, staleWhileRevalidate: true }
+					options: { ttlMs: ALL_IDS_CACHE_TTL_MS, staleWhileRevalidate: true, debug: true }
 				}),
 				cachedRemoteFunctionCall({
 					scopeKey,
@@ -152,9 +177,16 @@
 					args: null as any,
 					forceRefresh,
 					fetcher: async (_args) => getCardCount(),
-					options: { ttlMs: ALL_IDS_CACHE_TTL_MS, staleWhileRevalidate: true }
+					options: { ttlMs: ALL_IDS_CACHE_TTL_MS, staleWhileRevalidate: true, debug: true }
 				})
 			]);
+
+			const elapsed = (performance.now() - startTime).toFixed(2);
+			console.log(`%c├─ ✅ Remote functions completed in ${elapsed}ms`, logStyles.cache);
+			console.log(`%c├─ 📊 Results:`, logStyles.data);
+			console.log(`%c│  ├─ cards received: ${result.cards.length}`, logStyles.data);
+			console.log(`%c│  ├─ total count: ${count}`, logStyles.data);
+			console.log(`%c│  └─ hasMore: ${result.hasMore}`, logStyles.data);
 
 			dataRows = result.cards;
 			totalCount = count;
@@ -162,55 +194,80 @@
 			dataCachedAt = Date.now();
 
 			// Load template dimensions for current cards
+			console.log(`%c├─ 📐 Loading template dimensions...`, logStyles.info);
 			await loadTemplateDimensionsForCards(result.cards, forceRefresh);
+			console.log(`%c└─ ✅ Template dimensions loaded`, logStyles.cache);
 		} catch (err) {
 			console.error('Error loading initial cards:', err);
 			errorMessage = 'Failed to load ID cards';
 		} finally {
 			initialLoading = false;
 			isRefreshing = false;
+			console.groupEnd();
 		}
 	}
 
 	// Load more cards (infinite scroll)
 	async function loadMoreCards(opts: { forceRefresh?: boolean } = {}) {
-		if (loadingMore || !hasMore) return;
+		if (loadingMore || !hasMore) {
+			console.log(`%c${LOG_PREFIX} ⏸️ loadMoreCards() skipped - loadingMore: ${loadingMore}, hasMore: ${hasMore}`, logStyles.info);
+			return;
+		}
 
 		// Don't load more if we already have all cards
 		if (dataRows.length >= totalCount && totalCount > 0) {
+			console.log(`%c${LOG_PREFIX} ✅ loadMoreCards() - All cards loaded (${dataRows.length}/${totalCount})`, logStyles.cache);
 			hasMore = false;
 			return;
 		}
 
 		const forceRefresh = opts.forceRefresh ?? false;
+		const startTime = performance.now();
+		const currentOffset = dataRows.length;
+
+		console.group(`%c${LOG_PREFIX} 📥 loadMoreCards() [offset: ${currentOffset}]`, logStyles.fetch);
+		console.log(`%c├─ forceRefresh: ${forceRefresh}`, logStyles.info);
+		console.log(`%c├─ current cards: ${dataRows.length}/${totalCount}`, logStyles.info);
 
 		loadingMore = true;
 		try {
+			console.log(`%c├─ ⏳ Fetching next ${LOAD_MORE_COUNT} cards...`, logStyles.info);
 			const result = await cachedRemoteFunctionCall({
 				scopeKey,
 				keyBase: 'all-ids:getIDCards',
 				args: { offset: dataRows.length, limit: LOAD_MORE_COUNT },
 				forceRefresh,
 				fetcher: (args) => getIDCards(args),
-				options: { ttlMs: ALL_IDS_CACHE_TTL_MS, staleWhileRevalidate: true }
+				options: { ttlMs: ALL_IDS_CACHE_TTL_MS, staleWhileRevalidate: true, debug: true }
 			});
+
+			const elapsed = (performance.now() - startTime).toFixed(2);
+			console.log(`%c├─ ✅ Completed in ${elapsed}ms`, logStyles.cache);
+			console.log(`%c├─ 📊 Results:`, logStyles.data);
+			console.log(`%c│  ├─ new cards: ${result.cards.length}`, logStyles.data);
+			console.log(`%c│  └─ hasMore from server: ${result.hasMore}`, logStyles.data);
 
 			if (result.cards.length > 0) {
 				dataRows = [...dataRows, ...result.cards];
+				console.log(`%c├─ 📦 Total cards now: ${dataRows.length}`, logStyles.data);
 			}
 
 			// More accurate hasMore check based on total count
 			hasMore = result.hasMore && dataRows.length < totalCount;
 			dataCachedAt = Date.now();
+			console.log(`%c├─ 🔄 hasMore updated: ${hasMore}`, logStyles.info);
 
 			// Load template dimensions for new cards
 			if (result.cards.length > 0) {
+				console.log(`%c├─ 📐 Loading template dimensions for new cards...`, logStyles.info);
 				await loadTemplateDimensionsForCards(result.cards, forceRefresh);
 			}
+			console.log(`%c└─ ✅ loadMoreCards complete`, logStyles.cache);
 		} catch (err) {
 			console.error('Error loading more cards:', err);
 		} finally {
 			loadingMore = false;
+			console.groupEnd();
 		}
 	}
 
@@ -233,6 +290,8 @@
 		);
 
 		if (newTemplateNames.length > 0) {
+			console.log(`%c${LOG_PREFIX} │  📐 Loading ${newTemplateNames.length} template(s): ${newTemplateNames.join(', ')}`, logStyles.info);
+			
 			// Load both dimensions and metadata in parallel
 			const [dims, fields] = await Promise.all([
 				cachedRemoteFunctionCall({
@@ -241,7 +300,7 @@
 					args: newTemplateNames,
 					forceRefresh,
 					fetcher: (args) => getTemplateDimensions(args),
-					options: { ttlMs: ALL_IDS_CACHE_TTL_MS, staleWhileRevalidate: true }
+					options: { ttlMs: ALL_IDS_CACHE_TTL_MS, staleWhileRevalidate: true, debug: true }
 				}),
 				cachedRemoteFunctionCall({
 					scopeKey,
@@ -249,11 +308,14 @@
 					args: newTemplateNames,
 					forceRefresh,
 					fetcher: (args) => getTemplateMetadata(args),
-					options: { ttlMs: ALL_IDS_CACHE_TTL_MS, staleWhileRevalidate: true }
+					options: { ttlMs: ALL_IDS_CACHE_TTL_MS, staleWhileRevalidate: true, debug: true }
 				})
 			]);
 			templateDimensions = { ...templateDimensions, ...dims };
 			templateFields = { ...templateFields, ...fields };
+			console.log(`%c${LOG_PREFIX} │  ✅ Template data loaded for: ${newTemplateNames.join(', ')}`, logStyles.cache);
+		} else {
+			console.log(`%c${LOG_PREFIX} │  ✅ All template dimensions already cached`, logStyles.cache);
 		}
 	}
 
@@ -262,10 +324,13 @@
 
 	// Check if we need to load more (called by IntersectionObserver)
 	async function checkAndLoadMore() {
-		if (initialLoading || !browser || loadLock) return;
+		if (initialLoading || !browser || loadLock) {
+			return;
+		}
 
 		// 1) First: Show more cached cards if available
 		if (hasMoreCachedCards) {
+			console.log(`%c${LOG_PREFIX} 📜 checkAndLoadMore() - Showing more cached cards (${filteredCards.length}/${allFilteredCards.length} visible)`, logStyles.cache);
 			loadLock = true;
 			showMoreCachedCards();
 			await tick();
@@ -275,42 +340,103 @@
 
 		// 2) Then: Fetch more from server if no more cached cards
 		if (hasMore && !loadingMore) {
+			console.log(`%c${LOG_PREFIX} 🌐 checkAndLoadMore() - Fetching more from server...`, logStyles.fetch);
 			await loadMoreCards();
 		}
 	}
 
 	onMount(() => {
-		// 1) Hydrate immediately from route snapshot cache (no skeleton on back)
-		const cached = readAllIdsCache(scopeKey);
-		if (cached) {
-			dataRows = cached.cards;
-			totalCount = cached.totalCount;
-			hasMore = cached.hasMore;
-			templateDimensions = cached.templateDimensions;
-			templateFields = cached.templateFields;
+		const mountStartTime = performance.now();
+		logSection('🚀 ALL-IDS PAGE MOUNT');
+		console.log(`%c${LOG_PREFIX} scopeKey: ${scopeKey}`, logStyles.info);
+		console.log(`%c${LOG_PREFIX} timestamp: ${new Date().toISOString()}`, logStyles.info);
 
-			searchQuery = cached.ui.searchQuery;
-			cardMinWidth = cached.ui.cardMinWidth;
-			viewMode.set(cached.ui.viewMode);
-
-			scrollTop = cached.scrollTop;
-			dataCachedAt = cached.cachedAt;
-
-			initialLoading = false;
-
-			// Restore scroll position after DOM paint
-			void tick().then(() => {
-				const el = document.querySelector('.all-ids-scroll') as HTMLElement | null;
-				if (el) el.scrollTop = cached.scrollTop || 0;
-			});
-
-			// 2) If stale, refresh in background (keep current list rendered)
-			if (!isAllIdsCacheFresh(cached, ALL_IDS_CACHE_TTL_MS)) {
-				void loadInitialCards({ forceRefresh: true, background: true });
+		// Apply viewport-based view mode AFTER hydration (prevents SSR mismatch)
+		// Only if user hasn't explicitly set a preference in localStorage
+		const storedViewMode = localStorage.getItem('id-gen-view-mode');
+		if (!storedViewMode) {
+			const optimalMode = detectViewportDefault();
+			if (optimalMode !== $viewMode) {
+				console.log(`%c${LOG_PREFIX} 📱 Applying viewport-based view mode: ${optimalMode}`, logStyles.info);
+				viewMode.set(optimalMode);
 			}
+		}
+
+		// 1) Check for cached data
+		const cached = readAllIdsCache(scopeKey);
+
+		if (cached) {
+			const cacheAge = Date.now() - cached.cachedAt;
+			const cacheAgeSeconds = (cacheAge / 1000).toFixed(1);
+			const isFresh = isAllIdsCacheFresh(cached, ALL_IDS_CACHE_TTL_MS);
+			const cachedAtDate = new Date(cached.cachedAt).toISOString();
+
+			console.group(`%c${LOG_PREFIX} 💾 PAGE SNAPSHOT CACHE FOUND`, logStyles.cache);
+			console.log(`%c├─ 📦 Cache age: ${cacheAgeSeconds}s`, logStyles.info);
+			console.log(`%c├─ 📅 Cached at: ${cachedAtDate}`, logStyles.info);
+			console.log(`%c├─ ${isFresh ? '✅ FRESH' : '⚠️ STALE'} (TTL: ${ALL_IDS_CACHE_TTL_MS / 1000}s)`, isFresh ? logStyles.cache : logStyles.stale);
+			console.log(`%c├─ 📊 Cached data:`, logStyles.data);
+			console.log(`%c│  ├─ cards: ${cached.cards.length}`, logStyles.data);
+			console.log(`%c│  ├─ totalCount: ${cached.totalCount}`, logStyles.data);
+			console.log(`%c│  ├─ hasMore: ${cached.hasMore}`, logStyles.data);
+			console.log(`%c│  ├─ scrollTop: ${cached.scrollTop}`, logStyles.data);
+			console.log(`%c│  └─ viewMode: ${cached.ui.viewMode}`, logStyles.data);
+			console.log(`%c├─ 🔄 Deferring hydration to next frame...`, logStyles.cache);
+			console.groupEnd();
+
+			// DEFERRED HYDRATION: Let the skeleton render first, then hydrate data
+			// setTimeout(0) truly yields to the event loop, allowing link clicks during load
+			setTimeout(() => {
+				const hydrateStart = performance.now();
+
+				// Hydrate metadata first (small, fast)
+				templateDimensions = cached.templateDimensions;
+				templateFields = cached.templateFields;
+				searchQuery = cached.ui.searchQuery;
+				cardMinWidth = cached.ui.cardMinWidth;
+				viewMode.set(cached.ui.viewMode);
+				scrollTop = cached.scrollTop;
+				dataCachedAt = cached.cachedAt;
+				totalCount = cached.totalCount;
+				hasMore = cached.hasMore;
+
+				// Then hydrate card data
+				dataRows = cached.cards;
+				initialLoading = false;
+
+				const hydrateTime = (performance.now() - hydrateStart).toFixed(2);
+				const totalTime = (performance.now() - mountStartTime).toFixed(2);
+				console.log(`%c${LOG_PREFIX} ✅ UI hydrated in ${hydrateTime}ms (total: ${totalTime}ms)`, logStyles.cache);
+
+				// Restore scroll position after DOM paint
+				void tick().then(() => {
+					const el = document.querySelector('.all-ids-scroll') as HTMLElement | null;
+					if (el) {
+						el.scrollTop = cached.scrollTop || 0;
+					}
+				});
+
+				// If stale, refresh in background
+				if (!isFresh) {
+					logSection(`✅ PAGE LOAD COMPLETE (from STALE CACHE + background refresh)`, logStyles.stale);
+					void loadInitialCards({ forceRefresh: true, background: true });
+				} else {
+					logSection(`✅ PAGE LOAD COMPLETE (from FRESH CACHE)`, logStyles.cache);
+					console.log(`%c${LOG_PREFIX} 🚀 No network requests needed!`, logStyles.cache);
+				}
+			});
 		} else {
+			console.group(`%c${LOG_PREFIX} ❌ NO PAGE SNAPSHOT CACHE`, logStyles.fetch);
+			console.log(`%c├─ 🔄 First visit or cache expired`, logStyles.info);
+			console.log(`%c└─ 📥 Starting initial data fetch (showing skeleton)...`, logStyles.fetch);
+			console.groupEnd();
+
 			// First visit (no cache): do normal initial load (shows skeleton)
-			loadInitialCards();
+			loadInitialCards().then(() => {
+				const totalTime = (performance.now() - mountStartTime).toFixed(2);
+				logSection(`✅ PAGE LOAD COMPLETE (from NETWORK FETCH)`, logStyles.fetch);
+				console.log(`%c${LOG_PREFIX} ⏱️ Total load time: ${totalTime}ms`, logStyles.fetch);
+			});
 		}
 	});
 
@@ -730,7 +856,7 @@
 	}
 </script>
 
-<div class="h-full flex flex-col overflow-hidden" in:fade={{ duration: 200 }}>
+<div class="h-full flex flex-col overflow-hidden">
 	<div class="container mx-auto px-4 py-4 flex-1 flex flex-col min-h-0 max-w-7xl">
 		<!-- Controls Header -->
 		<div
@@ -850,14 +976,9 @@
 
 		<!-- Content Area -->
 		{#if initialLoading}
-			<!-- Initial Skeleton Loading State -->
-			<div class="space-y-6">
-				<div class="flex items-center gap-2">
-					<div class="h-6 w-1 bg-muted rounded-full animate-pulse"></div>
-					<div class="h-5 w-32 bg-muted rounded animate-pulse"></div>
-					<div class="h-5 w-16 bg-muted rounded-full animate-pulse ml-auto"></div>
-				</div>
-				<IDCardSkeleton count={INITIAL_LOAD} minWidth={cardMinWidth} />
+			<!-- Card skeletons only - page structure already visible -->
+			<div class="flex-1 overflow-auto all-ids-scroll">
+				<IDCardSkeleton count={8} minWidth={cardMinWidth} />
 			</div>
 		{:else if dataRows.length === 0}
 			<EmptyIDs />

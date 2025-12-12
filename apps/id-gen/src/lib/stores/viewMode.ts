@@ -5,7 +5,11 @@ export type ViewMode = 'table' | 'card';
 
 const STORAGE_KEY = 'id-gen-view-mode';
 
-function detectDefault(): ViewMode {
+/**
+ * Detects optimal view mode based on viewport width.
+ * Only call this AFTER hydration (in onMount) to avoid SSR mismatch.
+ */
+export function detectViewportDefault(): ViewMode {
 	if (!browser) return 'table';
 	try {
 		const w = window.innerWidth;
@@ -17,14 +21,20 @@ function detectDefault(): ViewMode {
 	}
 }
 
+/**
+ * Get initial view mode - always returns 'table' for SSR consistency.
+ * Viewport detection should happen in onMount to avoid hydration mismatch.
+ */
 function getInitial(): ViewMode {
-	if (!browser) return detectDefault();
+	if (!browser) return 'table'; // SSR: always 'table'
 	try {
 		const raw = window.localStorage.getItem(STORAGE_KEY);
 		if (raw === 'table' || raw === 'card') return raw;
-		return detectDefault();
+		// No stored preference - return 'table' for consistent hydration
+		// Components can call detectViewportDefault() in onMount if needed
+		return 'table';
 	} catch {
-		return detectDefault();
+		return 'table';
 	}
 }
 

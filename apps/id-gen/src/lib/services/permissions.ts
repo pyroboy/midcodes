@@ -11,7 +11,7 @@ interface PermissionCache {
 }
 
 let permissionCache: PermissionCache = {};
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL = 30 * 60 * 1000; // 30 minutes (extended for better performance)
 
 export async function getUserPermissions(
 	roles: string[] | undefined,
