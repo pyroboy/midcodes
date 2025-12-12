@@ -30,8 +30,9 @@
 	import type { IDCard } from './data.remote';
 
 	// Constants
-	const INITIAL_LOAD = 10;
-	const LOAD_MORE_COUNT = 10;
+	const INITIAL_LOAD = 20;
+	const LOAD_MORE_COUNT = 15;
+	const VISIBLE_LIMIT = 15; // Max cards to render at once for performance
 
 	const scopeKey = $derived(() => {
 		const d = $page.data as any;
@@ -77,8 +78,11 @@
 	let errorMessage = '';
 
 	// Infinite scroll ref
-	let loadMoreTrigger: HTMLDivElement;
+	let loadMoreTrigger: HTMLDivElement | null = null;
 	let observer: IntersectionObserver | null = null;
+	
+	// Visible card window for performance
+	let visibleStartIndex = $state(0);
 
 	// Card zoom control
 	let cardMinWidth = $state(250);
@@ -144,6 +148,12 @@
 	// Load more cards (infinite scroll)
 	async function loadMoreCards(opts: { forceRefresh?: boolean } = {}) {
 		if (loadingMore || !hasMore) return;
+		
+		// Don't load more if we already have all cards
+		if (dataRows.length >= totalCount && totalCount > 0) {
+			hasMore = false;
+			return;
+		}
 
 		const forceRefresh = opts.forceRefresh ?? false;
 
@@ -158,12 +168,18 @@
 				options: { ttlMs: ALL_IDS_CACHE_TTL_MS, staleWhileRevalidate: true }
 			});
 
-			dataRows = [...dataRows, ...result.cards];
-			hasMore = result.hasMore;
+			if (result.cards.length > 0) {
+				dataRows = [...dataRows, ...result.cards];
+			}
+			
+			// More accurate hasMore check based on total count
+			hasMore = result.hasMore && dataRows.length < totalCount;
 			dataCachedAt = Date.now();
 
 			// Load template dimensions for new cards
-			await loadTemplateDimensionsForCards(result.cards, forceRefresh);
+			if (result.cards.length > 0) {
+				await loadTemplateDimensionsForCards(result.cards, forceRefresh);
+			}
 		} catch (err) {
 			console.error('Error loading more cards:', err);
 		} finally {
@@ -206,13 +222,22 @@
 	function setupObserver() {
 		if (!browser || !loadMoreTrigger) return;
 		
+		// Disconnect existing observer
+		observer?.disconnect();
+		
+		// Find the scroll container
+		const scrollContainer = document.querySelector('.all-ids-scroll') as HTMLElement | null;
+		
 		observer = new IntersectionObserver(
 			(entries) => {
-				if (entries[0].isIntersecting && hasMore && !loadingMore) {
+				if (entries[0].isIntersecting && hasMore && !loadingMore && !initialLoading) {
 					loadMoreCards();
 				}
 			},
-			{ rootMargin: '200px' }
+			{ 
+				root: scrollContainer,
+				rootMargin: '400px' 
+			}
 		);
 		
 		observer.observe(loadMoreTrigger);
@@ -257,10 +282,21 @@
 		};
 	});
 
-	// Setup observer after initial load
+	// Setup observer after initial load and when view mode changes
 	$effect(() => {
 		if (!initialLoading && loadMoreTrigger) {
+			// Re-setup observer when view mode changes or trigger ref updates
 			setupObserver();
+		}
+	});
+	
+	// Re-setup observer when view mode changes
+	$effect(() => {
+		// Subscribe to viewMode to trigger re-setup
+		const _ = $viewMode;
+		if (!initialLoading && loadMoreTrigger) {
+			// Small delay to ensure DOM is updated
+			setTimeout(() => setupObserver(), 100);
 		}
 	});
 
@@ -327,7 +363,7 @@
 	}
 
 	// Filter cards based on search query
-	let filteredCards = $derived((() => {
+	let allFilteredCards = $derived((() => {
 		if (!searchQuery.trim()) return dataRows;
 		
 		const query = searchQuery.toLowerCase().trim();
@@ -344,6 +380,12 @@
 			return false;
 		});
 	})());
+	
+	// Visible cards - limited for performance, but cache stores all
+	let filteredCards = $derived(allFilteredCards.slice(0, visibleStartIndex + VISIBLE_LIMIT));
+	
+	// Show "load more UI" button when there are more cached cards to show
+	let hasMoreCachedCards = $derived(filteredCards.length < allFilteredCards.length);
 
 	// Group filtered cards by template
 	let groupedCards = $derived((() => {
