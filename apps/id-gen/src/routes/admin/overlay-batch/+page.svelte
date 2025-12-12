@@ -4,7 +4,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
-	import { PUBLIC_SUPABASE_URL } from '$env/static/public';
+	import { env } from '$env/dynamic/public';
 	import { deserialize } from '$app/forms';
 
 	interface Props {
@@ -55,12 +55,16 @@
 
 	function getStorageUrl(path: string): string {
 		if (path.startsWith('http')) return path;
-		return `${PUBLIC_SUPABASE_URL}/storage/v1/object/public/rendered-id-cards/${path}`;
+		const supabaseUrl = env.PUBLIC_SUPABASE_URL;
+		if (!supabaseUrl) return 'about:blank';
+		return `${supabaseUrl}/storage/v1/object/public/rendered-id-cards/${path}`;
 	}
 
 	function getTemplateStorageUrl(path: string): string {
 		if (path.startsWith('http')) return path;
-		return `${PUBLIC_SUPABASE_URL}/storage/v1/object/public/templates/${path}`;
+		const supabaseUrl = env.PUBLIC_SUPABASE_URL;
+		if (!supabaseUrl) return 'about:blank';
+		return `${supabaseUrl}/storage/v1/object/public/templates/${path}`;
 	}
 
 	function handleFrontOverlay(event: Event) {
@@ -700,3 +704,4 @@
 		</Card>
 	</div>
 </div>
+

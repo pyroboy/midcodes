@@ -1,10 +1,20 @@
 import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_SUPABASE_URL } from '$env/static/public';
-import { PRIVATE_SERVICE_ROLE } from '$env/static/private';
+import { env } from '$env/dynamic/public';
+import { env as privateEnv } from '$env/dynamic/private';
 import type { Database } from '$lib/types/database.types';
 
 // Create a server-side client with service role key for backend operations
-export const supabaseAdmin = createClient<Database>(PUBLIC_SUPABASE_URL, PRIVATE_SERVICE_ROLE, {
+
+const supabaseUrl = env.PUBLIC_SUPABASE_URL;
+const serviceRole = privateEnv.PRIVATE_SERVICE_ROLE;
+
+if (!supabaseUrl || !serviceRole) {
+	throw new Error(
+		'Missing PUBLIC_SUPABASE_URL and/or PRIVATE_SERVICE_ROLE. Configure them as Cloudflare Pages environment variables (and locally via .env)'
+	);
+}
+
+export const supabaseAdmin = createClient<Database>(supabaseUrl, serviceRole, {
 	auth: {
 		autoRefreshToken: false,
 		persistSession: false

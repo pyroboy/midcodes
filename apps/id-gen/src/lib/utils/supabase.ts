@@ -1,9 +1,11 @@
 import { supabase } from '$lib/supabaseClient';
-import { PUBLIC_SUPABASE_URL } from '$env/static/public';
+import { env } from '$env/dynamic/public';
 
 export function getSupabaseStorageUrl(path: string, bucket: string = 'templates'): string {
 	if (!path) return '';
-	return `${PUBLIC_SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`;
+	const supabaseUrl = env.PUBLIC_SUPABASE_URL;
+	if (!supabaseUrl) return '';
+	return `${supabaseUrl}/storage/v1/object/public/${bucket}/${path}`;
 }
 
 export async function uploadFile(bucket: string, path: string, file: File) {
