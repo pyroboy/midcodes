@@ -3,7 +3,7 @@
     // Documentation: https://developers.cloudflare.com/workers/wrangler/configuration/
     "$schema": "node_modules/wrangler/config-schema.json",
     // Project name - used as the Workers/Pages project identifier
-    "name": "id-gen",
+    "name": "midcodes",
     // Compatibility date for Workers runtime features
     "compatibility_date": "2024-12-01",
     // Compatibility flags for specific runtime behaviors
