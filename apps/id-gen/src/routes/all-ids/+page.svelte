@@ -186,6 +186,11 @@
 			loadingMore = false;
 		}
 	}
+	
+	// Show more cached cards (when we have more in cache than visible)
+	function showMoreCachedCards() {
+		visibleStartIndex += VISIBLE_LIMIT;
+	}
 
 	// Load template dimensions and metadata for a set of cards
 	async function loadTemplateDimensionsForCards(cards: IDCard[], forceRefresh: boolean = false) {
@@ -218,29 +223,69 @@
 		}
 	}
 
-	// Setup infinite scroll observer
-	function setupObserver() {
-		if (!browser || !loadMoreTrigger) return;
+	// Setup infinite scroll via scroll event listener
+	let scrollCleanup: (() => void) | null = null;
+	
+	function setupScrollListener() {
+		if (!browser) return;
 		
-		// Disconnect existing observer
-		observer?.disconnect();
+		// Cleanup previous listener
+		scrollCleanup?.();
 		
 		// Find the scroll container
 		const scrollContainer = document.querySelector('.all-ids-scroll') as HTMLElement | null;
+		if (!scrollContainer) return;
 		
-		observer = new IntersectionObserver(
-			(entries) => {
-				if (entries[0].isIntersecting && hasMore && !loadingMore && !initialLoading) {
-					loadMoreCards();
-				}
-			},
-			{ 
-				root: scrollContainer,
-				rootMargin: '400px' 
+		const handleScroll = () => {
+			scrollTop = scrollContainer.scrollTop;
+		};
+		
+		scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+		scrollCleanup = () => scrollContainer.removeEventListener('scroll', handleScroll);
+	}
+	
+	// Debounce timer for scroll check
+	let scrollCheckTimeout: ReturnType<typeof setTimeout> | null = null;
+	let isShowingMoreCards = false; // Guard to prevent recursive triggers
+	
+	// Check if we need to load more based on scroll position
+	function checkAndLoadMore() {
+		if (initialLoading || !browser || isShowingMoreCards) return;
+		
+		const scrollContainer = document.querySelector('.all-ids-scroll') as HTMLElement | null;
+		if (!scrollContainer) return;
+		
+		const { scrollHeight, clientHeight, scrollTop: currentScrollTop } = scrollContainer;
+		const distanceFromBottom = scrollHeight - currentScrollTop - clientHeight;
+		
+		// Load more when within 400px of bottom
+		if (distanceFromBottom < 400) {
+			// Show more cached cards if available (with guard)
+			if (hasMoreCachedCards) {
+				isShowingMoreCards = true;
+				showMoreCachedCards();
+				// Reset guard after DOM settles
+				requestAnimationFrame(() => {
+					isShowingMoreCards = false;
+				});
 			}
-		);
-		
-		observer.observe(loadMoreTrigger);
+			
+			// Also fetch more from server if we're running low on cached cards
+			const cachedRemaining = allFilteredCards.length - filteredCards.length;
+			if (hasMore && !loadingMore && cachedRemaining < LOAD_MORE_COUNT) {
+				loadMoreCards();
+			}
+		}
+	}
+	
+	// Debounced scroll check - only triggered by actual user scrolling
+	function debouncedScrollCheck() {
+		if (scrollCheckTimeout) {
+			clearTimeout(scrollCheckTimeout);
+		}
+		scrollCheckTimeout = setTimeout(() => {
+			checkAndLoadMore();
+		}, 100); // 100ms debounce
 	}
 
 	onMount(() => {
@@ -278,29 +323,21 @@
 		}
 
 		return () => {
-			observer?.disconnect();
+			scrollCleanup?.();
+			if (scrollCheckTimeout) clearTimeout(scrollCheckTimeout);
 		};
 	});
 
-	// Setup observer after initial load and when view mode changes
+	// Setup scroll listener after initial load and when view mode changes
 	$effect(() => {
-		if (!initialLoading && loadMoreTrigger) {
-			// Re-setup observer when view mode changes or trigger ref updates
-			setupObserver();
-		}
-	});
-	
-	// Re-setup observer when view mode changes
-	$effect(() => {
-		// Subscribe to viewMode to trigger re-setup
-		const _ = $viewMode;
-		if (!initialLoading && loadMoreTrigger) {
-			// Small delay to ensure DOM is updated
-			setTimeout(() => setupObserver(), 100);
+		const _ = $viewMode; // Subscribe to viewMode changes
+		if (!initialLoading) {
+			// Small delay to ensure DOM is updated after view mode change
+			setTimeout(() => setupScrollListener(), 100);
 		}
 	});
 
-	// Track internal scroll position (for restoring when returning via navigation)
+	// Direct scroll event handler - triggers debounced load check
 	$effect(() => {
 		if (!browser) return;
 		if (initialLoading) return;
@@ -310,6 +347,8 @@
 
 		const onScroll = () => {
 			scrollTop = el.scrollTop;
+			// Use debounced check instead of direct checkAndLoadMore
+			debouncedScrollCheck();
 		};
 
 		el.addEventListener('scroll', onScroll, { passive: true });
@@ -928,13 +967,17 @@
 					</div>
 				</div>
 			{/each}
-
+			
 			<!-- Load More Trigger -->
-			{#if hasMore}
+			{#if hasMore || hasMoreCachedCards}
 				<div bind:this={loadMoreTrigger} class="py-4">
 					{#if loadingMore}
 						<div class="text-center text-muted-foreground text-sm">
-							Loading more… {dataRows.length} out of {totalCount}
+							Loading more… {dataRows.length} of {totalCount}
+						</div>
+					{:else if hasMoreCachedCards}
+						<div class="text-center text-muted-foreground text-xs">
+							Showing {filteredCards.length} of {allFilteredCards.length} loaded • {dataRows.length} of {totalCount} total
 						</div>
 					{:else}
 						<div class="h-1"></div>
@@ -968,17 +1011,21 @@
 							</div>
 						{/each}
 					</div>
-				</div>
-			{/each}
-
-			<!-- Load More Trigger / Loading More Skeleton -->
-			{#if hasMore}
+			</div>
+		{/each}
+			
+			<!-- Load More Trigger -->
+			{#if hasMore || hasMoreCachedCards}
 				<div bind:this={loadMoreTrigger} class="py-4">
 					{#if loadingMore}
 						<div class="text-center text-muted-foreground text-sm mb-3">
-							Loading more… {dataRows.length} out of {totalCount}
+							Loading more… {dataRows.length} of {totalCount}
 						</div>
 						<IDCardSkeleton count={3} minWidth={cardMinWidth} />
+					{:else if hasMoreCachedCards}
+						<div class="text-center text-muted-foreground text-xs">
+							Showing {filteredCards.length} of {allFilteredCards.length} loaded • {dataRows.length} of {totalCount} total
+						</div>
 					{:else}
 						<div class="h-1"></div>
 					{/if}
