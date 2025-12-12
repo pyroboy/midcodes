@@ -510,9 +510,9 @@
 			</div>
 		</Card>
 	</div>
-	<div class="w-full md:w-1/2">
-		<Card class="h-full">
-			<div class="p-6">
+	<div class="w-full md:w-1/2 overflow-hidden">
+		<Card class="h-full overflow-auto">
+			<div class="p-6 overflow-hidden">
 				<div class="flex justify-between items-center mb-4">
 					<h2 class="text-2xl font-bold">ID Card Form</h2>
 				</div>
@@ -540,7 +540,7 @@
 								<div
 									role="button"
 									tabindex="-1"
-									class="grid grid-cols-[auto_1fr] gap-4 items-center mb-4"
+									class="grid grid-cols-[auto_1fr] gap-4 items-center mb-4 min-w-0"
 									onmousedown={handleMouseDown}
 									onmouseup={handleMouseUp}
 								>
@@ -615,7 +615,7 @@
 								<div
 									role="button"
 									tabindex="-1"
-									class="grid grid-cols-[auto_1fr] gap-4 items-center mb-4"
+									class="grid grid-cols-[auto_1fr] gap-4 items-center mb-4 min-w-0"
 									onmousedown={handleMouseDown}
 									onmouseup={handleMouseUp}
 								>

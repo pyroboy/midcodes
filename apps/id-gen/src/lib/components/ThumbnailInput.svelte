@@ -37,7 +37,7 @@
 	let imageY = $state(initialY);
 	let isDragging = $state(false);
 
-	const MAX_HEIGHT = 100;
+	const MAX_HEIGHT = 150;
 	const aspectRatio = width / height;
 	const thumbnailHeight = Math.min(MAX_HEIGHT, height);
 	const thumbnailWidth = thumbnailHeight * aspectRatio;
