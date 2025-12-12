@@ -1,5 +1,5 @@
 // Crypto utilities for PayMongo client
-import { randomBytes, createHmac, timingSafeEqual } from 'crypto';
+import { randomBytes, createHmac, timingSafeEqual } from 'node:crypto';
 
 /**
  * Generate a unique idempotency key for PayMongo API calls

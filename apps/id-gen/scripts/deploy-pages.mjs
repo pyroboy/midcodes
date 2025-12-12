@@ -43,6 +43,15 @@ async function resolveProjectName() {
     if (fromEnv && fromEnv.trim()) return fromEnv.trim();
 
     try {
+        // Prefer plain JSON first (Cloudflare Pages build expects `wrangler.json`).
+        const json = await readFile(new URL('../wrangler.json', import.meta.url), 'utf8');
+        const parsed = JSON.parse(json);
+        if (typeof parsed?.name === 'string' && parsed.name.trim()) return parsed.name.trim();
+    } catch {
+        // ignore
+    }
+
+    try {
         const jsonc = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
         const parsed = JSON.parse(stripJsonc(jsonc));
         if (typeof parsed?.name === 'string' && parsed.name.trim()) return parsed.name.trim();
@@ -72,4 +81,3 @@ const deployExit = await run('npx', [
 ]);
 
 process.exit(deployExit);
-
