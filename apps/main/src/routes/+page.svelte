@@ -1,224 +1,195 @@
 <script lang="ts">
 	import { apps } from '$lib/data/apps.js';
-	import AppCard from '$lib/components/AppCard.svelte';
 	import Badge from '$lib/components/Badge.svelte';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
-	import { Search, Layers, Zap, FileText, Wrench, TrendingUp } from 'lucide-svelte';
-	
-	// Group apps by category
-	const coreApps = $derived(apps.filter(app => app.category === 'core'));
-	const documentApps = $derived(apps.filter(app => app.category === 'document'));
-	const utilityApps = $derived(apps.filter(app => app.category === 'utility'));
+	import AboutSection from '$lib/components/AboutSection.svelte';
+	import ContactSection from '$lib/components/ContactSection.svelte';
+	import Hero3D from '$lib/components/Hero3D.svelte';
+	import AppCarousel from '$lib/components/AppCarousel.svelte';
+	import AppCardLarge from '$lib/components/AppCardLarge.svelte';
+	import { ArrowDown, Sparkles, Code2, Layers } from 'lucide-svelte';
 	
 	// Stats
 	const totalApps = $derived(apps.length);
-	const activeApps = $derived(apps.filter(app => app.status === 'active').length);
 	const techStackCount = $derived(new Set(apps.flatMap(app => app.techStack)).size);
-	const totalFeatures = $derived(apps.reduce((sum, app) => sum + app.features.length, 0));
 	
-	let searchQuery = $state('');
-	const filteredApps = $derived(apps.filter(app => 
-		app.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-		app.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-		app.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-		app.techStack.some(tech => tech.toLowerCase().includes(searchQuery.toLowerCase()))
-	));
+	// All unique technologies
+	const allTechnologies = $derived(Array.from(new Set(apps.flatMap(app => app.techStack))));
+	
+	// Selected app for featured display
+	let selectedAppIndex = $state(0);
+	const selectedApp = $derived(apps[selectedAppIndex]);
+	const secondApp = $derived(apps[(selectedAppIndex + 1) % apps.length]);
+	
+	function selectApp(app: typeof apps[0]) {
+		const index = apps.findIndex(a => a.id === app.id);
+		if (index !== -1) {
+			selectedAppIndex = index;
+		}
+	}
+	
+	// Mobile snap scroll
+	let mobileScrollContainer: HTMLDivElement;
 </script>
 
 <svelte:head>
-	<title>Midcodes Apps Directory | Complete Overview</title>
-	<meta name="description" content="Comprehensive directory of all applications in the Midcodes monorepo - from dormitory management to data visualization platforms." />
+	<title>Arjo Magno | Software Developer • Artist • Tattoo Artist</title>
+	<meta name="description" content="Portfolio of Arjo Magno - A multidisciplinary creative bridging code and art. Software Developer, Artist, and Tattoo Artist." />
 </svelte:head>
 
-<!-- Header -->
-<header class="border-b border-border bg-card/80 backdrop-blur-lg sticky top-0 z-50 transition-colors duration-300">
-	<div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+<!-- Navigation -->
+<nav class="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border/50">
+	<div class="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
 		<div class="flex items-center justify-between">
-			<div class="animate-fade-in">
-				<h1 class="text-3xl font-bold tracking-tight gradient-text">
-					Midcodes Apps Directory
-				</h1>
-				<p class="mt-2 text-muted-foreground">
-					A comprehensive overview of all applications in our monorepo ecosystem
-				</p>
-			</div>
-			<div class="flex items-center gap-4 animate-fade-in animate-delay-200">
+			<a href="/" class="text-xl font-bold gradient-text">AM</a>
+			<div class="flex items-center gap-6">
+				<div class="hidden md:flex items-center gap-6">
+					<a href="#about" class="text-muted-foreground hover:text-foreground transition-colors">About</a>
+					<a href="#projects" class="text-muted-foreground hover:text-foreground transition-colors">Projects</a>
+					<a href="#contact" class="text-muted-foreground hover:text-foreground transition-colors">Contact</a>
+				</div>
 				<ThemeToggle />
-				<Badge class="bg-primary/10 text-primary px-3 py-1 border border-primary/20">
-					{totalApps} Apps
-				</Badge>
-				<Badge class="bg-green-500/10 text-green-600 dark:text-green-400 px-3 py-1 border border-green-500/20">
-					{activeApps} Active
-				</Badge>
 			</div>
 		</div>
 	</div>
-</header>
+</nav>
 
-<!-- Stats Section -->
-<section class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-	<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-		<div class="card-hover rounded-lg border border-border bg-card p-6 animate-scale-in animate-delay-100">
-			<div class="flex items-center gap-3">
-				<div class="rounded-lg bg-primary/10 p-2 border border-primary/20">
-					<Layers class="h-5 w-5 text-primary" />
-				</div>
-				<div>
-					<p class="text-2xl font-semibold text-foreground">{totalApps}</p>
-					<p class="text-sm text-muted-foreground">Total Applications</p>
-				</div>
-			</div>
+<!-- Hero Section -->
+<section class="relative min-h-screen flex items-center justify-center overflow-hidden">
+	<!-- 3D Background -->
+	<Hero3D />
+	
+	<!-- Gradient Overlay -->
+	<div class="absolute inset-0 bg-gradient-to-b from-background/30 via-background/60 to-background z-10"></div>
+	
+	<!-- Content -->
+	<div class="relative z-20 text-center px-4 sm:px-6 lg:px-8 animate-fade-in">
+		<div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-8">
+			<Sparkles class="h-4 w-4 text-primary" />
+			<span class="text-sm text-primary font-medium">Available for freelance</span>
 		</div>
 		
-		<div class="card-hover rounded-lg border border-border bg-card p-6 animate-scale-in animate-delay-200">
-			<div class="flex items-center gap-3">
-				<div class="rounded-lg bg-green-500/10 p-2 border border-green-500/20">
-					<Zap class="h-5 w-5 text-green-600 dark:text-green-400" />
-				</div>
-				<div>
-					<p class="text-2xl font-semibold text-foreground">{activeApps}</p>
-					<p class="text-sm text-muted-foreground">Active Projects</p>
-				</div>
-			</div>
-		</div>
+		<h1 class="text-5xl md:text-7xl lg:text-8xl font-bold mb-6">
+			<span class="gradient-text">Arjo Magno</span>
+		</h1>
 		
-		<div class="card-hover rounded-lg border border-border bg-card p-6 animate-scale-in animate-delay-300">
-			<div class="flex items-center gap-3">
-				<div class="rounded-lg bg-purple-500/10 p-2 border border-purple-500/20">
-					<Wrench class="h-5 w-5 text-purple-600 dark:text-purple-400" />
-				</div>
-				<div>
-					<p class="text-2xl font-semibold text-foreground">{techStackCount}</p>
-					<p class="text-sm text-muted-foreground">Technologies</p>
-				</div>
-			</div>
-		</div>
+		<p class="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto mb-8">
+			Software Developer <span class="text-primary">•</span> Artist <span class="text-primary">•</span> Tattoo Artist
+		</p>
 		
-		<div class="card-hover rounded-lg border border-border bg-card p-6 animate-scale-in animate-delay-400">
-			<div class="flex items-center gap-3">
-				<div class="rounded-lg bg-orange-500/10 p-2 border border-orange-500/20">
-					<TrendingUp class="h-5 w-5 text-orange-600 dark:text-orange-400" />
-				</div>
-				<div>
-					<p class="text-2xl font-semibold text-foreground">{totalFeatures}</p>
-					<p class="text-sm text-muted-foreground">Total Features</p>
-				</div>
-			</div>
+		<p class="text-lg text-muted-foreground/80 max-w-xl mx-auto mb-12">
+			Bridging the gap between code and art — creating digital experiences that inspire.
+		</p>
+		
+		<div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+			<a href="#projects" class="btn-primary inline-flex items-center gap-2">
+				<Code2 class="h-5 w-5" />
+				View My Work
+			</a>
+			<a href="#contact" class="btn-secondary inline-flex items-center gap-2">
+				Get In Touch
+			</a>
 		</div>
+	</div>
+	
+	<!-- Scroll Indicator -->
+	<div class="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 animate-bounce">
+		<a href="#about" class="text-muted-foreground hover:text-foreground transition-colors">
+			<ArrowDown class="h-6 w-6" />
+		</a>
 	</div>
 </section>
 
-<!-- Search -->
-<section class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 animate-fade-in animate-delay-300">
-	<div class="relative">
-		<Search class="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
-		<input
-			bind:value={searchQuery}
-			type="text"
-			placeholder="Search apps, technologies, or features..."
-			class="w-full rounded-lg border border-border bg-card pl-10 pr-4 py-3 text-foreground placeholder-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-all duration-200"
-		/>
-	</div>
-</section>
+<!-- About Section -->
+<AboutSection />
 
-<!-- Apps Grid -->
-{#if searchQuery}
-	<section class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 animate-fade-in">
-		<h2 class="mb-6 text-2xl font-bold text-foreground">
-			Search Results ({filteredApps.length})
-		</h2>
-		<div class="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
-			{#each filteredApps as app}
-				<AppCard {app} />
-			{/each}
-		</div>
-		{#if filteredApps.length === 0}
-			<div class="text-center py-12">
-				<p class="text-muted-foreground">No apps found matching your search.</p>
-			</div>
-		{/if}
-	</section>
-{:else}
-	<!-- Core Applications -->
-	<section class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 animate-slide-up">
-		<div class="mb-6 flex items-center gap-3">
-			<div class="rounded-lg bg-primary/10 p-2 border border-primary/20">
-				<Layers class="h-6 w-6 text-primary" />
-			</div>
-			<h2 class="text-2xl font-bold text-foreground">Core Applications</h2>
-			<Badge class="bg-primary/10 text-primary px-2 py-1 text-sm border border-primary/20">
-				{coreApps.length} apps
-			</Badge>
-		</div>
-		<p class="mb-6 text-muted-foreground">
-			Mission-critical applications that form the backbone of our platform ecosystem.
-		</p>
-		<div class="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
-			{#each coreApps as app}
-				<AppCard {app} />
-			{/each}
-		</div>
-	</section>
-
-	<!-- Document & Content Applications -->
-	<section class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 animate-slide-up">
-		<div class="mb-6 flex items-center gap-3">
-			<div class="rounded-lg bg-purple-500/10 p-2 border border-purple-500/20">
-				<FileText class="h-6 w-6 text-purple-600 dark:text-purple-400" />
-			</div>
-			<h2 class="text-2xl font-bold text-foreground">Document & Content</h2>
-			<Badge class="bg-purple-500/10 text-purple-600 dark:text-purple-400 px-2 py-1 text-sm border border-purple-500/20">
-				{documentApps.length} apps
-			</Badge>
-		</div>
-		<p class="mb-6 text-muted-foreground">
-			Content management and document processing applications for various use cases.
-		</p>
-		<div class="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
-			{#each documentApps as app}
-				<AppCard {app} />
-			{/each}
-		</div>
-	</section>
-
-	<!-- Utility & Tools -->
-	<section class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 animate-slide-up">
-		<div class="mb-6 flex items-center gap-3">
-			<div class="rounded-lg bg-muted p-2 border border-border">
-				<Wrench class="h-6 w-6 text-muted-foreground" />
-			</div>
-			<h2 class="text-2xl font-bold text-foreground">Utility & Tools</h2>
-			<Badge class="bg-muted text-muted-foreground px-2 py-1 text-sm border border-border">
-				{utilityApps.length} apps
-			</Badge>
-		</div>
-		<p class="mb-6 text-muted-foreground">
-			Lightweight tools and utilities that support various workflows and use cases.
-		</p>
-		<div class="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
-			{#each utilityApps as app}
-				<AppCard {app} />
-			{/each}
-		</div>
-	</section>
-{/if}
-
-<!-- Footer -->
-<footer class="border-t border-border bg-card/50 mt-16 transition-colors duration-300">
-	<div class="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-		<div class="text-center animate-fade-in">
-			<h3 class="text-lg font-semibold text-foreground">Technology Stack Overview</h3>
-			<p class="mt-2 text-muted-foreground">
-				Built with modern web technologies for optimal performance and developer experience
+<!-- Projects Section -->
+<section id="projects" class="py-24 px-4 sm:px-6 lg:px-8 min-h-screen">
+	<div class="mx-auto max-w-7xl">
+		<div class="text-center mb-12 animate-fade-in">
+			<h2 class="text-4xl md:text-5xl font-bold gradient-text mb-6">Featured Projects</h2>
+			<p class="text-xl text-muted-foreground max-w-2xl mx-auto">
+				A collection of applications built with modern technologies and thoughtful design.
 			</p>
-			<div class="mt-6 flex flex-wrap justify-center gap-2">
-				{#each Array.from(new Set(apps.flatMap(app => app.techStack))).slice(0, 12) as tech}
-					<Badge class="bg-muted text-muted-foreground px-3 py-1 border border-border hover:bg-accent transition-colors duration-200">{tech}</Badge>
+			<div class="flex items-center justify-center gap-4 mt-6">
+				<Badge class="bg-primary/10 text-primary px-4 py-2 border border-primary/20">
+					<Layers class="h-4 w-4 inline mr-2" />
+					{totalApps} Projects
+				</Badge>
+				<Badge class="bg-accent text-accent-foreground px-4 py-2 border border-border">
+					{techStackCount} Technologies
+				</Badge>
+			</div>
+		</div>
+		
+		<!-- Desktop View: Carousel + 2 Big Rows -->
+		<div class="hidden lg:block">
+			<!-- Carousel at top -->
+			<div class="mb-8">
+				<AppCarousel {apps} onSelect={selectApp} selectedId={selectedApp?.id} />
+			</div>
+			
+			<!-- Two big featured cards -->
+			<div class="grid grid-cols-2 gap-6 h-[600px]">
+				<AppCardLarge app={selectedApp} />
+				<AppCardLarge app={secondApp} />
+			</div>
+		</div>
+		
+		<!-- Mobile View: Snap Scroll -->
+		<div class="lg:hidden">
+			<!-- Full-screen snap scroll container -->
+			<div 
+				bind:this={mobileScrollContainer}
+				class="snap-y snap-mandatory overflow-y-auto h-[70vh] rounded-2xl"
+			>
+				{#each apps as app}
+					<div class="snap-start h-[70vh] p-2">
+						<AppCardLarge {app} />
+					</div>
 				{/each}
 			</div>
-			<p class="mt-8 text-sm text-muted-foreground">
-				Last updated: December 2024 • {totalApps} applications • {techStackCount} technologies
-			</p>
+			
+			<!-- Carousel at bottom for mobile -->
+			<div class="mt-6">
+				<AppCarousel {apps} onSelect={selectApp} selectedId={selectedApp?.id} />
+			</div>
 		</div>
 	</div>
+</section>
+
+<!-- Tech Stack Section -->
+<section class="py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-transparent to-card/30">
+	<div class="mx-auto max-w-5xl text-center">
+		<h2 class="text-3xl md:text-4xl font-bold text-foreground mb-4">Technology Stack</h2>
+		<p class="text-muted-foreground mb-10">Technologies I work with across my projects</p>
+		<div class="flex flex-wrap justify-center gap-3">
+			{#each allTechnologies as tech}
+				<span class="px-4 py-2 rounded-full bg-card border border-border text-foreground text-sm font-medium hover:border-primary/40 hover:bg-primary/5 transition-all duration-200 cursor-default">
+					{tech}
+				</span>
+			{/each}
+		</div>
+	</div>
+</section>
+
+<!-- Contact Section -->
+<ContactSection />
+
+<!-- Footer -->
+<footer class="py-8 px-4 sm:px-6 lg:px-8 border-t border-border">
+	<div class="mx-auto max-w-7xl text-center">
+		<p class="text-muted-foreground text-sm">
+			© {new Date().getFullYear()} Arjo Magno. Built with SvelteKit & Three.js
+		</p>
+	</div>
 </footer>
+
+<style>
+	.snap-y {
+		scroll-snap-type: y mandatory;
+	}
+	.snap-start {
+		scroll-snap-align: start;
+	}
+</style>

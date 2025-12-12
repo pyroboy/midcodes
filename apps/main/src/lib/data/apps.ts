@@ -11,6 +11,9 @@ export interface App {
 	complexity: 'low' | 'medium' | 'high';
 	path: string;
 	packageName: string;
+	thumbnail?: string;
+	liveUrl?: string;
+	githubUrl?: string;
 }
 
 export const apps: App[] = [
