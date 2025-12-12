@@ -2,8 +2,10 @@
 	import { T, useTask } from '@threlte/core';
 	import { Text, interactivity } from '@threlte/extras';
 	import * as THREE from 'three';
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, untrack } from 'svelte';
 	import { createRoundedRectCard } from '$lib/utils/cardGeometry';
+    // ... (rest of imports not needed in replacement if using replace loop strategy or careful targeting)
+
 	import {
 		CARD3D_CONSTANTS,
 		MORPH_SHAPES,
@@ -326,8 +328,8 @@
 	let prevTemplateId: string | null = null;
 	let prevImageUrl: string | null = null;
 	let prevBackImageUrl: string | null = null;
-	let prevWidthPixels = widthPixels;
-	let prevHeightPixels = heightPixels;
+	let prevWidthPixels = $state(untrack(() => widthPixels));
+	let prevHeightPixels = $state(untrack(() => heightPixels));
 
 	// Text animation state (uses imported helper functions)
 	let animatedTexts = $state<Map<number, string>>(new Map());

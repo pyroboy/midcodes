@@ -21,8 +21,8 @@ export interface GetSessionResult {
 const initializeSupabase: Handle = async ({ event, resolve }) => {
 	event.locals.supabase = createServerClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, {
 		cookies: {
-			get: (key) => event.cookies.get(key),
-			set: (key, value, options) => {
+			get: (key: string) => event.cookies.get(key),
+			set: (key: string, value: string, options: { path?: string; sameSite?: boolean | 'lax' | 'strict' | 'none'; secure?: boolean; maxAge?: number; domain?: string }) => {
 				try {
 					event.cookies.set(key, value, {
 						...options,
@@ -34,7 +34,7 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
 					console.error('Cookie could not be set:', error);
 				}
 			},
-			remove: (key, options) => {
+			remove: (key: string, options: { path?: string; sameSite?: boolean | 'lax' | 'strict' | 'none'; secure?: boolean; maxAge?: number; domain?: string }) => {
 				try {
 					event.cookies.delete(key, { path: '/', ...options });
 				} catch (error) {

@@ -1,4 +1,3 @@
-```typescript
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Force browser mode for cache modules (they use `$app/environment`)
@@ -147,7 +146,7 @@ describe('allIdsCache', () => {
 	});
 
 	it('isAllIdsCacheFresh respects ttlMs', async () => {
-		const { isAllIdsCacheFresh } = await importAllIdsCache();
+
 		const nowSpy = vi.spyOn(Date, 'now');
 
 		nowSpy.mockReturnValue(1000);

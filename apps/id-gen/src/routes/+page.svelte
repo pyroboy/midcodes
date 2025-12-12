@@ -2,7 +2,7 @@
 	import type { PageData } from './$types';
 	import { fade, fly, scale } from 'svelte/transition';
 	import { goto, invalidate } from '$app/navigation';
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, untrack } from 'svelte';
 	import { Card, CardContent } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import {
@@ -62,7 +62,7 @@
 	let innerHeight = $state(0);
 
 	// Template state - filter out default templates
-	let templates = $state(data.templates || []);
+	let templates = $state(untrack(() => data.templates || []));
 	
 	$effect(() => {
 		templates = (data.templates || []).filter(
@@ -653,7 +653,7 @@
 										{/if}
 										<!-- Tap Pressure Bar - always visible -->
 								<div class="pt-2 border-t border-white/10">
-									<label id="tapPressureLabel" class="text-xs text-white/70">Tap Pressure: {displayTapPressure}</label>
+									<span id="tapPressureLabel" class="text-xs text-white/70">Tap Pressure: {displayTapPressure}</span>
 									<div class="flex gap-1 mt-1" role="meter" aria-labelledby="tapPressureLabel" aria-valuenow={displayTapPressure} aria-valuemin="1" aria-valuemax="5">
 										{#each [1, 2, 3, 4, 5] as level}
 											<div 

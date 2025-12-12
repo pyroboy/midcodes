@@ -19,7 +19,7 @@
 	}
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();
-	const templates = data.templates as Template[];
+	let templates = $derived(data.templates as Template[]);
 
 	let selectedTemplateId = $state('');
 	let frontImageFile: File | null = $state(null);

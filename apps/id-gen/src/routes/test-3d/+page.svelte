@@ -15,10 +15,10 @@
 	const CARD_HEIGHT = 2; // 3:2 aspect ratio
 
 	// Get all card URLs
-	const cardUrls = data.cards
+	let cardUrls = $derived(data.cards
 		.map((c) => c.front_image)
 		.filter((path): path is string => !!path)
-		.map((path) => getSupabaseStorageUrl(path, 'rendered-id-cards'));
+		.map((path) => getSupabaseStorageUrl(path, 'rendered-id-cards')));
 
 	// Grid layout config
 	const COLUMNS = 4;

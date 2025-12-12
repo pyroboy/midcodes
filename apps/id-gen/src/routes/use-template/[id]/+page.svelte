@@ -69,15 +69,26 @@
 	let { data }: Props = $props();
 
 	// State management using Svelte's reactive stores
-	let templateId = $page.params.id;
-	let template: Template = {
+	let templateId = $derived($page.params.id);
+	let template: Template = $state({
 		...data.template,
 		template_elements: data.template.template_elements.map((element) => ({
 			...element,
 			width: element.width ?? 100,
 			height: element.height ?? 100
 		}))
-	};
+	});
+
+	$effect(() => {
+		template = {
+			...data.template,
+			template_elements: data.template.template_elements.map((element) => ({
+				...element,
+				width: element.width ?? 100,
+				height: element.height ?? 100
+			}))
+		};
+	});
 
 	// Component state declarations with $state
 	let loading = $state(false);

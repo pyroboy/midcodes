@@ -38,7 +38,6 @@
 	let isDragging = $state(false);
 
 	const MAX_HEIGHT = 150;
-	const MAX_HEIGHT = 150;
 	const aspectRatio = $derived(width / height);
 	const thumbnailHeight = $derived(Math.min(MAX_HEIGHT, height));
 	const thumbnailWidth = $derived(thumbnailHeight * aspectRatio);

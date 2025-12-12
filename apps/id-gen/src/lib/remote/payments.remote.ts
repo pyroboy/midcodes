@@ -479,10 +479,11 @@ interface PurchaseCreditsFormData extends FormData {
 	get(name: 'packageId' | 'returnTo'): string | null;
 }
 
-export const purchaseCredits = form(async (formData: any) => {
+export const purchaseCredits = form(async () => {
 	assertServerContext('purchaseCredits');
+	const { locals, request } = getRequestEvent();
+	const formData = await request.formData();
 
-	const { locals } = getRequestEvent();
 
 	// Require authentication
 	if (!locals.user) {
@@ -552,10 +553,10 @@ interface PurchaseFeatureFormData extends FormData {
 	get(name: 'featureId' | 'returnTo'): string | null;
 }
 
-export const purchaseFeature = form(async (formData: any) => {
+export const purchaseFeature = form(async () => {
 	assertServerContext('purchaseFeature');
-
-	const { locals } = getRequestEvent();
+	const { locals, request } = getRequestEvent();
+	const formData = await request.formData();
 
 	// Require authentication
 	if (!locals.user) {

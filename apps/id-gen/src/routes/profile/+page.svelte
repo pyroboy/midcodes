@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { PageData, ActionData } from './$types';
+	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { page } from '$app/stores';
 	import {
@@ -24,8 +25,8 @@
 	let { data, form }: Props = $props();
 
 	// Reactive state using Svelte 5 runes
-	let profile = $state({ ...data.profile });
-	let preferences = $state({ ...data.preferences });
+	let profile = $state(untrack(() => ({ ...data.profile })));
+	let preferences = $state(untrack(() => ({ ...data.preferences })));
 	let loading = $state(false);
 	let successMessage = $state('');
 	let errorMessage = $state('');
