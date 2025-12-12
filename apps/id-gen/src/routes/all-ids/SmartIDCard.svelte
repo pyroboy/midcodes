@@ -1,3 +1,8 @@
+<script context="module" lang="ts">
+	// Global mount counter for debugging
+	let globalMountCount = 0;
+</script>
+
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import SimpleIDCard from '$lib/components/SimpleIDCard.svelte';
@@ -25,8 +30,13 @@
 	let error = false;
 
 	onMount(async () => {
+		globalMountCount++;
+		const hasImage = initialData?.front_image !== null;
+		console.log(`%c[SmartIDCard] #${globalMountCount} mounted (id=${id.slice(0,8)}...) hasImage=${hasImage}`, 'color: #8b5cf6');
+		
 		// Fetch full details if this is a stub (front_image is null)
 		if (!cardData || cardData.front_image === null) {
+			console.log(`%c[SmartIDCard] #${globalMountCount} ⚠️ FETCHING (front_image is null)`, 'color: #ef4444; font-weight: bold');
 			try {
 				cardData = await getCardDetails(id);
 				if (cardData) {
@@ -40,8 +50,13 @@
 			} finally {
 				loading = false;
 			}
+		} else {
+			console.log(`%c[SmartIDCard] #${globalMountCount} ✅ DIRECT RENDER (has front_image)`, 'color: #22c55e');
 		}
 	});
+	
+	// Set to true to use minimal render for performance testing
+	const USE_MINIMAL_RENDER = false;
 </script>
 
 {#if loading}
@@ -75,14 +90,22 @@
 		</div>
 	</div>
 {:else if cardData}
-	<SimpleIDCard
-		card={cardData}
-		{isSelected}
-		{onToggleSelect}
-		{onDownload}
-		{onDelete}
-		{onOpenPreview}
-		{downloading}
-		{deleting}
-	/>
+	{#if USE_MINIMAL_RENDER}
+		<!-- MINIMAL TEST: Just a simple div with text -->
+		<div class="p-4 border rounded-lg bg-card">
+			<div class="font-semibold text-sm">{cardData.fields?.['Name']?.value || 'Card'}</div>
+			<div class="text-xs text-muted-foreground">{cardData.template_name}</div>
+		</div>
+	{:else}
+		<SimpleIDCard
+			card={cardData}
+			{isSelected}
+			{onToggleSelect}
+			{onDownload}
+			{onDelete}
+			{onOpenPreview}
+			{downloading}
+			{deleting}
+		/>
+	{/if}
 {/if}

@@ -1,4 +1,9 @@
 <script lang="ts">
+	// TIMING: Log when script module starts executing (before onMount)
+	const SCRIPT_START_TIME = performance.now();
+	console.log('%c═══════════════════════════════════════════════════════════════', 'color: #a855f7; font-weight: bold');
+	console.log(`%c📜 ALL-IDS SCRIPT START @ ${new Date().toISOString()}`, 'color: #a855f7; font-weight: bold; font-size: 14px');
+	console.log('%c═══════════════════════════════════════════════════════════════', 'color: #a855f7; font-weight: bold');
 	import ImagePreviewModal from '$lib/components/ImagePreviewModal.svelte';
 	import ClientOnly from '$lib/components/ClientOnly.svelte';
 	import { browser } from '$app/environment';
@@ -363,9 +368,13 @@
 
 	onMount(() => {
 		const mountStartTime = performance.now();
-		logSection('🚀 ALL-IDS PAGE MOUNT');
-		console.log(`%c${LOG_PREFIX} scopeKey: ${scopeKey}`, logStyles.info);
-		console.log(`%c${LOG_PREFIX} timestamp: ${new Date().toISOString()}`, logStyles.info);
+		const absoluteTime = Date.now();
+		
+		console.log('%c═══════════════════════════════════════════════════════════════', 'color: #f59e0b; font-weight: bold');
+		console.log(`%c🚀 ALL-IDS PAGE MOUNT @ ${new Date(absoluteTime).toISOString()}`, 'color: #f59e0b; font-weight: bold; font-size: 14px');
+		console.log('%c═══════════════════════════════════════════════════════════════', 'color: #f59e0b; font-weight: bold');
+		console.log(`%c├─ [T+0ms] onMount started`, 'color: #64748b');
+		console.log(`%c├─ scopeKey: ${scopeKey}`, logStyles.info);
 
 		// Apply viewport-based view mode AFTER hydration (prevents SSR mismatch)
 		// Only if user hasn't explicitly set a preference in localStorage
@@ -379,66 +388,75 @@
 		}
 
 		// 1) Check for cached data
+		console.log(`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] Reading cache...`, 'color: #64748b');
+		const cacheReadStart = performance.now();
 		const cached = readAllIdsCache(scopeKey);
+		console.log(`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] Cache read complete (${(performance.now() - cacheReadStart).toFixed(1)}ms)`, 'color: #64748b');
 
 		if (cached) {
 			const cacheAge = Date.now() - cached.cachedAt;
 			const cacheAgeSeconds = (cacheAge / 1000).toFixed(1);
 			const isFresh = isAllIdsCacheFresh(cached, ALL_IDS_CACHE_TTL_MS);
-			const cachedAtDate = new Date(cached.cachedAt).toISOString();
 
-			console.group(`%c${LOG_PREFIX} 💾 PAGE SNAPSHOT CACHE FOUND`, logStyles.cache);
-			console.log(`%c├─ 📦 Cache age: ${cacheAgeSeconds}s`, logStyles.info);
-			console.log(`%c├─ 📅 Cached at: ${cachedAtDate}`, logStyles.info);
-			console.log(`%c├─ ${isFresh ? '✅ FRESH' : '⚠️ STALE'} (TTL: ${ALL_IDS_CACHE_TTL_MS / 1000}s)`, isFresh ? logStyles.cache : logStyles.stale);
-			console.log(`%c├─ 📊 Cached data:`, logStyles.data);
-			console.log(`%c│  ├─ cards: ${cached.cards.length}`, logStyles.data);
-			console.log(`%c│  ├─ totalCount: ${cached.totalCount}`, logStyles.data);
-			console.log(`%c│  ├─ hasMore: ${cached.hasMore}`, logStyles.data);
-			console.log(`%c│  ├─ scrollTop: ${cached.scrollTop}`, logStyles.data);
-			console.log(`%c│  └─ viewMode: ${cached.ui.viewMode}`, logStyles.data);
-			console.log(`%c├─ 🔄 Deferring hydration to next frame...`, logStyles.cache);
-			console.groupEnd();
+			console.log(`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] ✅ Cache HIT`, 'color: #22c55e; font-weight: bold');
+			console.log(`%c│  ├─ cards: ${cached.cards.length}`, 'color: #64748b');
+			console.log(`%c│  ├─ age: ${cacheAgeSeconds}s (${isFresh ? 'FRESH' : 'STALE'})`, 'color: #64748b');
 
-			// DEFERRED HYDRATION: Let the skeleton render first, then hydrate data
-			// setTimeout(0) truly yields to the event loop, allowing link clicks during load
-			setTimeout(() => {
-				const hydrateStart = performance.now();
-
-				// Hydrate metadata first (small, fast)
-				templateDimensions = cached.templateDimensions;
-				templateFields = cached.templateFields;
-				searchQuery = cached.ui.searchQuery;
-				cardMinWidth = cached.ui.cardMinWidth;
-				viewMode.set(cached.ui.viewMode);
-				scrollTop = cached.scrollTop;
-				dataCachedAt = cached.cachedAt;
-				totalCount = cached.totalCount;
-				hasMore = cached.hasMore;
-
-				// Then hydrate card data
+			// Step 1: Hydrate metadata + UI state
+			console.log(`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] Hydrating metadata...`, 'color: #64748b');
+			const metadataStart = performance.now();
+			templateDimensions = cached.templateDimensions;
+			templateFields = cached.templateFields;
+			searchQuery = cached.ui.searchQuery;
+			cardMinWidth = cached.ui.cardMinWidth;
+			viewMode.set(cached.ui.viewMode);
+			dataCachedAt = cached.cachedAt;
+			totalCount = cached.totalCount;
+			hasMore = cached.hasMore;
+			console.log(`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] Metadata hydrated (${(performance.now() - metadataStart).toFixed(1)}ms)`, 'color: #64748b');
+			
+			// Step 2: Schedule card hydration for next frame
+			console.log(`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] Scheduling card hydration (rAF)...`, 'color: #64748b');
+			console.log('%c└─ ════════════════════════════════════════════════════════════', 'color: #f59e0b');
+			
+			requestAnimationFrame(() => {
+				const rafStart = performance.now();
+				console.log(`%c├─ [T+${(rafStart - mountStartTime).toFixed(1)}ms] rAF fired - hydrating ${cached.cards.length} cards...`, 'color: #f59e0b; font-weight: bold');
+				
+				// Hydrate card data
 				dataRows = cached.cards;
 				initialLoading = false;
+				
+				console.log(`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] Cards assigned to state`, 'color: #64748b');
+				
+				// Wait for Svelte to finish rendering all cards to DOM
+				tick().then(() => {
+					console.log(`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] tick() complete - DOM updated`, 'color: #22c55e');
+					console.log('%c═══════════════════════════════════════════════════════════════', 'color: #22c55e; font-weight: bold');
+					console.log(`%c🎉 RENDER COMPLETE @ ${new Date().toISOString()}`, 'color: #22c55e; font-weight: bold; font-size: 14px');
+					console.log(`%c   Total time from script start to render: ${(performance.now() - SCRIPT_START_TIME).toFixed(1)}ms`, 'color: #22c55e; font-weight: bold');
+					console.log(`%c   Total time from mount to render: ${(performance.now() - mountStartTime).toFixed(1)}ms`, 'color: #22c55e; font-weight: bold');
+					console.log('%c═══════════════════════════════════════════════════════════════', 'color: #22c55e; font-weight: bold');
+				});
 
-				const hydrateTime = (performance.now() - hydrateStart).toFixed(2);
-				const totalTime = (performance.now() - mountStartTime).toFixed(2);
-				console.log(`%c${LOG_PREFIX} ✅ UI hydrated in ${hydrateTime}ms (total: ${totalTime}ms)`, logStyles.cache);
-
-				// Restore scroll position after DOM paint
-				void tick().then(() => {
+				// Restore scroll position after cards are rendered
+				requestAnimationFrame(() => {
 					const el = document.querySelector('.all-ids-scroll') as HTMLElement | null;
 					if (el) {
 						el.scrollTop = cached.scrollTop || 0;
+						console.log(`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] Scroll restored to ${cached.scrollTop}`, 'color: #64748b');
 					}
 				});
 
-				// If stale, refresh in background
+				// FIXED: Background refresh must run AFTER render is complete
+				// Using setTimeout to escape the current render cycle
+				// This prevents isRefreshing=true from blocking tick()
 				if (!isFresh) {
-					logSection(`✅ PAGE LOAD COMPLETE (from STALE CACHE + background refresh)`, logStyles.stale);
-					void loadInitialCards({ forceRefresh: true, background: true });
-				} else {
-					logSection(`✅ PAGE LOAD COMPLETE (from FRESH CACHE)`, logStyles.cache);
-					console.log(`%c${LOG_PREFIX} 🚀 No network requests needed!`, logStyles.cache);
+					console.log(`%c├─ 🔄 Cache stale - scheduling background refresh...`, 'color: #f59e0b');
+					setTimeout(() => {
+						console.log(`%c├─ 🔄 Starting background refresh (post-render)`, 'color: #f59e0b');
+						void loadInitialCards({ forceRefresh: true, background: true });
+					}, 0);
 				}
 			});
 		} else {
@@ -544,7 +562,11 @@
 	);
 
 	// Visible cards - limited for performance, but cache stores all
-	let filteredCards = $derived(allFilteredCards.slice(0, visibleStartIndex + VISIBLE_LIMIT));
+	let filteredCards = $derived.by(() => {
+		const sliced = allFilteredCards.slice(0, visibleStartIndex + VISIBLE_LIMIT);
+		console.log(`%c[DEBUG] filteredCards: ${sliced.length} of ${allFilteredCards.length} (visibleStartIndex=${visibleStartIndex}, VISIBLE_LIMIT=${VISIBLE_LIMIT})`, 'color: #ec4899');
+		return sliced;
+	});
 
 	// Show "load more UI" button when there are more cached cards to show
 	let hasMoreCachedCards = $derived(filteredCards.length < allFilteredCards.length);
