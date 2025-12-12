@@ -98,6 +98,8 @@
 
 	// UI states
 	let searchQuery = $state('');
+	let selectedTemplateFilter = $state<string>('all'); // 'all' or template name
+	let selectedColumnFilter = $state<string>('all'); // 'all' or column name
 	let selectedFrontImage: string | null = $state(null);
 	let selectedBackImage: string | null = $state(null);
 	let selectedTemplateDimensions: { width: number; height: number; unit?: string } | null =
@@ -423,11 +425,34 @@
 				const rafStart = performance.now();
 				console.log(`%c├─ [T+${(rafStart - mountStartTime).toFixed(1)}ms] rAF fired - hydrating ${cached.cards.length} cards...`, 'color: #f59e0b; font-weight: bold');
 				
-				// Hydrate card data
-				dataRows = cached.cards;
-				initialLoading = false;
+				// ═══════════════════════════════════════════════════════════
+				// 🧪 STRESS TEST: Multiply cards to simulate 5000 cards
+				// REMOVE THIS BLOCK AFTER TESTING
+				// ═══════════════════════════════════════════════════════════
+				const STRESS_TEST_ENABLED = true;
+				const TARGET_CARD_COUNT = 5000;
+				let stressTestCards = cached.cards;
+				if (STRESS_TEST_ENABLED && cached.cards.length > 0) {
+					const multiplier = Math.ceil(TARGET_CARD_COUNT / cached.cards.length);
+					stressTestCards = [];
+					for (let i = 0; i < multiplier; i++) {
+						stressTestCards.push(...cached.cards.map((card, idx) => ({
+							...card,
+							// Give each copy a unique ID to avoid React key warnings
+							idcard_id: `${card.idcard_id}_copy_${i}_${idx}`
+						})));
+					}
+					stressTestCards = stressTestCards.slice(0, TARGET_CARD_COUNT);
+					console.log(`%c🧪 STRESS TEST: Multiplied ${cached.cards.length} cards → ${stressTestCards.length} cards`, 'color: #f59e0b; font-weight: bold; font-size: 14px');
+				}
+				// ═══════════════════════════════════════════════════════════
 				
-				console.log(`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] Cards assigned to state`, 'color: #64748b');
+				// Hydrate card data
+				dataRows = STRESS_TEST_ENABLED ? stressTestCards : cached.cards;
+				initialLoading = false;
+				totalCount = STRESS_TEST_ENABLED ? stressTestCards.length : cached.totalCount;
+				
+				console.log(`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] Cards assigned to state (${dataRows.length} cards)`, 'color: #64748b');
 				
 				// Wait for Svelte to finish rendering all cards to DOM
 				tick().then(() => {
@@ -564,13 +589,47 @@
 		}
 	}
 
-	// Filter cards based on search query
+	// Get unique template names for filter dropdown
+	let availableTemplates = $derived(
+		[...new Set(dataRows.map(card => card.template_name).filter(Boolean))].sort()
+	);
+
+	// Get unique column names from all cards for filter dropdown
+	let availableColumns = $derived(
+		(() => {
+			const columns = new Set<string>();
+			dataRows.forEach(card => {
+				if (card.fields) {
+					Object.keys(card.fields).forEach(key => columns.add(key));
+				}
+			});
+			return [...columns].sort();
+		})()
+	);
+
+	// Filter cards based on search query, template filter, and column filter
 	let allFilteredCards = $derived(
 		(() => {
-			if (!searchQuery.trim()) return dataRows;
+			let filtered = dataRows;
+
+			// Template filter
+			if (selectedTemplateFilter !== 'all') {
+				filtered = filtered.filter(card => card.template_name === selectedTemplateFilter);
+			}
+
+			// Column filter (only show cards that have a value in the selected column)
+			if (selectedColumnFilter !== 'all') {
+				filtered = filtered.filter(card => {
+					const fieldValue = card.fields?.[selectedColumnFilter]?.value;
+					return fieldValue !== undefined && fieldValue !== '';
+				});
+			}
+
+			// Search query filter
+			if (!searchQuery.trim()) return filtered;
 
 			const query = searchQuery.toLowerCase().trim();
-			return dataRows.filter((card) => {
+			return filtered.filter((card) => {
 				// Search in template name
 				if (card.template_name?.toLowerCase().includes(query)) return true;
 				// Search in field values
@@ -929,9 +988,10 @@
 		<div
 			class="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center bg-card border border-border p-4 rounded-xl shadow-sm mb-4"
 		>
-			<!-- Search & Count -->
-			<div class="flex items-center gap-4">
-				<div class="relative w-full md:w-64">
+			<!-- Search & Filters -->
+			<div class="flex flex-wrap items-center gap-3">
+				<!-- Search Input -->
+				<div class="relative w-full md:w-48">
 					<input
 						type="text"
 						placeholder="Search cards..."
@@ -952,9 +1012,49 @@
 						/>
 					</svg>
 				</div>
-				<span class="text-sm text-muted-foreground whitespace-nowrap">
-					{dataRows.length} of {totalCount} cards
-				</span>
+
+				<!-- Template Filter Dropdown -->
+				<select
+					bind:value={selectedTemplateFilter}
+					class="px-3 py-2 bg-background border border-input rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+				>
+					<option value="all">All Templates ({availableTemplates.length})</option>
+					{#each availableTemplates as template}
+						<option value={template}>{template}</option>
+					{/each}
+				</select>
+
+				<!-- Column Filter Dropdown -->
+				<select
+					bind:value={selectedColumnFilter}
+					class="px-3 py-2 bg-background border border-input rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+				>
+					<option value="all">All Columns ({availableColumns.length})</option>
+					{#each availableColumns as column}
+						<option value={column}>{column}</option>
+					{/each}
+				</select>
+
+				<!-- Clear Filters Button -->
+				{#if searchQuery || selectedTemplateFilter !== 'all' || selectedColumnFilter !== 'all'}
+					<button
+						onclick={() => { searchQuery = ''; selectedTemplateFilter = 'all'; selectedColumnFilter = 'all'; }}
+						class="px-3 py-2 text-xs text-muted-foreground hover:text-foreground bg-muted/50 hover:bg-muted rounded-lg transition-colors"
+					>
+						Clear filters
+					</button>
+				{/if}
+			</div>
+
+			<!-- Card Count -->
+			<div class="flex items-center gap-2 text-sm text-muted-foreground whitespace-nowrap">
+				<span class="font-medium text-foreground">{allFilteredCards.length}</span>
+				<span>of</span>
+				<span>{totalCount}</span>
+				<span>cards</span>
+				{#if allFilteredCards.length !== dataRows.length}
+					<span class="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">filtered</span>
+				{/if}
 			</div>
 
 			<!-- Actions & Toggles -->
@@ -1214,15 +1314,28 @@
 
 				<!-- Load More Trigger (IntersectionObserver sentinel) -->
 				{#if hasMore || hasMoreCachedCards}
-					<div class="py-4" use:intersectionObserver>
+					<div class="py-6" use:intersectionObserver>
 						{#if loadingMore}
-							<div class="text-center text-muted-foreground text-sm">
-								Loading more… {dataRows.length} of {totalCount}
+							<div class="flex flex-col items-center gap-2">
+								<div class="flex items-center gap-3 text-primary">
+									<svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+									</svg>
+									<span class="text-sm font-medium">Fetching more cards...</span>
+								</div>
+								<span class="text-xs text-muted-foreground">{dataRows.length} of {totalCount} loaded</span>
 							</div>
 						{:else if hasMoreCachedCards}
-							<div class="text-center text-muted-foreground text-xs">
-								Showing {filteredCards.length} of {allFilteredCards.length} loaded • {dataRows.length}
-								of {totalCount} total
+							<div class="flex flex-col items-center gap-2">
+								<div class="flex items-center gap-3 text-primary">
+									<svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+									</svg>
+									<span class="text-sm font-medium">Loading more cards...</span>
+								</div>
+								<span class="text-xs text-muted-foreground">{filteredCards.length} of {allFilteredCards.length} displayed</span>
 							</div>
 						{:else}
 							<div class="h-1"></div>
@@ -1269,18 +1382,31 @@
 
 				<!-- Load More Trigger (IntersectionObserver sentinel) -->
 				{#if hasMore || hasMoreCachedCards}
-					<div class="py-4" use:intersectionObserver>
+					<div class="py-6" use:intersectionObserver>
 						{#if loadingMore}
-							<div class="text-center text-muted-foreground text-sm mb-3">
-								Loading more… {dataRows.length} of {totalCount}
+							<div class="flex flex-col items-center gap-2 mb-4">
+								<div class="flex items-center gap-3 text-primary">
+									<svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+									</svg>
+									<span class="text-sm font-medium">Fetching more cards...</span>
+								</div>
+								<span class="text-xs text-muted-foreground">{dataRows.length} of {totalCount} loaded</span>
 							</div>
 							<div class="responsive-grid">
 								<IDCardSkeleton count={3} minWidth={cardMinWidth} />
 							</div>
 						{:else if hasMoreCachedCards}
-							<div class="text-center text-muted-foreground text-xs">
-								Showing {filteredCards.length} of {allFilteredCards.length} loaded • {dataRows.length}
-								of {totalCount} total
+							<div class="flex flex-col items-center gap-2">
+								<div class="flex items-center gap-3 text-primary">
+									<svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+									</svg>
+									<span class="text-sm font-medium">Loading more cards...</span>
+								</div>
+								<span class="text-xs text-muted-foreground">{filteredCards.length} of {allFilteredCards.length} displayed</span>
 							</div>
 						{:else}
 							<div class="h-1"></div>
@@ -1328,5 +1454,22 @@
 		width: 100%;
 		display: flex;
 		flex-direction: column;
+	}
+
+	/* Faux loading bar animation - goes from 0 to 100% over 1.2s then repeats */
+	.loading-bar-animation {
+		animation: loadingBar 1.2s ease-in-out infinite;
+	}
+
+	@keyframes loadingBar {
+		0% {
+			width: 0%;
+		}
+		50% {
+			width: 100%;
+		}
+		100% {
+			width: 0%;
+		}
 	}
 </style>
