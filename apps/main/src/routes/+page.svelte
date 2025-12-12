@@ -5,7 +5,7 @@
 	import AboutSection from '$lib/components/AboutSection.svelte';
 	import ContactSection from '$lib/components/ContactSection.svelte';
 	import Hero3D from '$lib/components/Hero3D.svelte';
-	import AppCarousel from '$lib/components/AppCarousel.svelte';
+	import Carousel3D from '$lib/components/Carousel3D.svelte';
 	import AppCardLarge from '$lib/components/AppCardLarge.svelte';
 	import { ArrowDown, Sparkles, Code2, Layers } from 'lucide-svelte';
 	
@@ -124,9 +124,9 @@
 		
 		<!-- Desktop View: Carousel + 2 Big Rows -->
 		<div class="hidden lg:block">
-			<!-- Carousel at top -->
+			<!-- 3D Carousel -->
 			<div class="mb-8">
-				<AppCarousel {apps} onSelect={selectApp} selectedId={selectedApp?.id} />
+				<Carousel3D {apps} onSelect={selectApp} selectedId={selectedApp?.id} />
 			</div>
 			
 			<!-- Two big featured cards -->
@@ -150,9 +150,9 @@
 				{/each}
 			</div>
 			
-			<!-- Carousel at bottom for mobile -->
+			<!-- 3D Carousel for mobile -->
 			<div class="mt-6">
-				<AppCarousel {apps} onSelect={selectApp} selectedId={selectedApp?.id} />
+				<Carousel3D {apps} onSelect={selectApp} selectedId={selectedApp?.id} />
 			</div>
 		</div>
 	</div>

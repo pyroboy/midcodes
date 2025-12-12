@@ -190,7 +190,7 @@
 	</div>
 </div>
 
-<script module>
+<script module lang="ts">
 	import type { DetectedRegion } from '$lib/schemas/template-assets.schema';
 
 	// Svelte action to render cropped region preview
