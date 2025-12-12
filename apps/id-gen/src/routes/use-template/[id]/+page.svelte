@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { run, preventDefault } from 'svelte/legacy';
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, untrack } from 'svelte';
 	import { page } from '$app/stores';
 	import { auth, session, user } from '$lib/stores/auth';
 	import IdCanvas from '$lib/components/IdCanvas.svelte';
@@ -70,14 +70,14 @@
 
 	// State management using Svelte's reactive stores
 	let templateId = $derived($page.params.id);
-	let template: Template = $state({
+	let template: Template = $state(untrack(() => ({
 		...data.template,
 		template_elements: data.template.template_elements.map((element) => ({
 			...element,
 			width: element.width ?? 100,
 			height: element.height ?? 100
 		}))
-	});
+	})));
 
 	$effect(() => {
 		template = {

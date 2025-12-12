@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, tick } from 'svelte';
+	import { onMount, tick, untrack } from 'svelte';
 	import { invalidate, goto } from '$app/navigation';
 	import TemplatesPageSkeleton from '$lib/components/skeletons/TemplatesPageSkeleton.svelte';
 	import { getPreloadState } from '$lib/services/preloadService';
@@ -83,10 +83,9 @@
 		};
 	} = $props();
 
-	let templates = $state<DatabaseTemplate[]>(data.templates);
-
-	let user = $state(data.user);
-	let org_id = $state(data.org_id);
+	let templates = $state<DatabaseTemplate[]>(untrack(() => data.templates));
+	let user = $state(untrack(() => data.user));
+	let org_id = $state(untrack(() => data.org_id));
 
 	$effect(() => {
 		templates = data.templates;

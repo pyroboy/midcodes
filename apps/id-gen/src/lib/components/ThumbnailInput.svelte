@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { run } from 'svelte/legacy';
-	import { onMount } from 'svelte';
-	import { Move, Scaling } from '@lucide/svelte';
-	import { debounce } from 'lodash-es';
 	import { createEventDispatcher } from 'svelte';
+	import { Maximize2, RotateCw, ZoomIn, ZoomOut, Upload } from 'lucide-svelte';
+	import { untrack } from 'svelte';
+	import { Label } from '$lib/components/ui/label';
 
 	const dispatch = createEventDispatcher<{
 		selectfile: void;
@@ -32,9 +32,10 @@
 
 	let canvas = $state<HTMLCanvasElement | undefined>(undefined);
 	let ctx = $state<CanvasRenderingContext2D | null>(null);
-	let imageScale = $state(initialScale);
-	let imageX = $state(initialX);
-	let imageY = $state(initialY);
+	// Local state for transformations
+	let imageScale = $state(untrack(() => initialScale));
+	let imageX = $state(untrack(() => initialX));
+	let imageY = $state(untrack(() => initialY));
 	let isDragging = $state(false);
 
 	const MAX_HEIGHT = 150;
