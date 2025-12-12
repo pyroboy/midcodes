@@ -489,34 +489,58 @@
 		return () => el.removeEventListener('scroll', onScroll);
 	});
 
-	// Persist snapshot cache (do not update cachedAt here; only update dataCachedAt on fetch/mutations)
+	// Track if cache needs writing (only true after actual data changes)
+	let cacheNeedsWrite = $state(false);
+	let cacheWriteDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+	
+	// Mark cache as needing write when data actually changes
 	$effect(() => {
-		if (!browser) return;
-		if (initialLoading) return;
+		if (!browser || initialLoading) return;
+		// Only mark for write when dataCachedAt changes (meaning new data was fetched)
+		if (dataCachedAt) {
+			cacheNeedsWrite = true;
+		}
+	});
 
-		// Cap cached cards to prevent SessionStorage overflow
-		// Only cache the most recent cards - older cards will be re-fetched if needed
-		const cardsToCache = dataRows.slice(0, MAX_CACHED_CARDS);
-		const cacheHasMore = hasMore || dataRows.length > MAX_CACHED_CARDS;
+	// Persist snapshot cache with debounce (only when data actually changed)
+	$effect(() => {
+		if (!browser || initialLoading || !cacheNeedsWrite) return;
 
-		const snapshot: AllIdsCacheSnapshot = {
-			version: 1,
-			cachedAt: dataCachedAt || Date.now(),
-			cards: cardsToCache,
-			totalCount,
-			hasMore: cacheHasMore,
-			nextOffset: cardsToCache.length,
-			templateDimensions,
-			templateFields,
-			ui: {
-				searchQuery,
-				cardMinWidth,
-				viewMode: $viewMode
-			},
-			scrollTop
-		};
+		// Cancel any pending write
+		if (cacheWriteDebounceTimer) {
+			clearTimeout(cacheWriteDebounceTimer);
+		}
 
-		writeAllIdsCache(snapshot, scopeKey);
+		// Debounce: write cache after settling (e.g., after scroll stops)
+		cacheWriteDebounceTimer = setTimeout(() => {
+			const writeStart = performance.now();
+			console.log(`%c[Cache] Starting cache write (${dataRows.length} cards)...`, 'color: #64748b');
+
+			// Cap cached cards to prevent SessionStorage overflow
+			const cardsToCache = dataRows.slice(0, MAX_CACHED_CARDS);
+			const cacheHasMore = hasMore || dataRows.length > MAX_CACHED_CARDS;
+
+			const snapshot: AllIdsCacheSnapshot = {
+				version: 1,
+				cachedAt: dataCachedAt || Date.now(),
+				cards: cardsToCache,
+				totalCount,
+				hasMore: cacheHasMore,
+				nextOffset: cardsToCache.length,
+				templateDimensions,
+				templateFields,
+				ui: {
+					searchQuery,
+					cardMinWidth,
+					viewMode: $viewMode
+				},
+				scrollTop
+			};
+
+			writeAllIdsCache(snapshot, scopeKey);
+			cacheNeedsWrite = false;
+			console.log(`%c[Cache] Cache write complete (${(performance.now() - writeStart).toFixed(1)}ms)`, 'color: #64748b');
+		}, 500); // 500ms debounce - only write after activity settles
 	});
 
 	// 3D card geometries - loaded on-demand
