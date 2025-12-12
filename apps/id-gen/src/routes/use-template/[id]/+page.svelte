@@ -11,7 +11,7 @@
 	import * as Select from '$lib/components/ui/select';
 	import { darkMode } from '$lib/stores/darkMode';
 	import ThumbnailInput from '$lib/components/ThumbnailInput.svelte';
-	import { Loader, ChevronLeft, ChevronRight } from '@lucide/svelte';
+	import { Loader } from '@lucide/svelte';
 	import { goto } from '$app/navigation';
 	import { enhance } from '$app/forms';
 	import type { TemplateElement } from '$lib/stores/templateStore';
@@ -95,7 +95,7 @@
 	let mouseMoving = $state(false);
 	// Responsive preview state (mobile toggle vs desktop side-by-side)
 	let isMobile = $state(false);
-	let currentView: 'front' | 'back' = $state('front');
+	let isFlipped = $state(false);
 	let formErrors = $state<Record<string, boolean>>({});
 	let fileUrls = $state<Record<string, string>>({});
 
@@ -427,80 +427,85 @@
 						</div>
 					</div>
 				{:else}
-					<!-- Mobile: toggle between front/back with buttons -->
-					<div class="flex flex-col space-y-4 w-full max-w-md mx-auto">
-						<div class="flex items-center justify-between w-full mb-2">
-							<button
-								onclick={() => (currentView = 'front')}
-								class={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl transition-colors duration-200 text-sm font-bold ${currentView === 'front' ? 'bg-emerald-500 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-700'}`}
-							>
-								<ChevronLeft size={16} />
-								<span>Front View</span>
-							</button>
-							<div class="w-4"></div>
-							<button
-								onclick={() => (currentView = 'back')}
-								class={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl transition-colors duration-200 text-sm font-bold ${currentView === 'back' ? 'bg-emerald-500 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-700'}`}
-							>
-								<span>Back View</span>
-								<ChevronRight size={16} />
-							</button>
-						</div>
-
-						{#if currentView === 'front'}
-							{#if template}
-								<div
-									class="w-full"
-									style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels ||
-										638}"
-								>
-									<IdCanvas
-										bind:this={frontCanvasComponent}
-										elements={template.template_elements.filter((el) => el.side === 'front')}
-										backgroundUrl={template.front_background.startsWith('http')
-											? template.front_background
-											: getSupabaseStorageUrl(template.front_background)}
-										{formData}
-										{fileUploads}
-										{imagePositions}
-										{fullResolution}
-										isDragging={mouseMoving}
-										pixelDimensions={template.width_pixels && template.height_pixels
-											? { width: template.width_pixels, height: template.height_pixels }
-											: null}
-										on:ready={() => handleCanvasReady('front')}
-										on:error={({ detail }) =>
-											addDebugMessage(`Front Canvas Error: ${detail.code} - ${detail.message}`)}
-									/>
-								</div>
-							{/if}
-						{:else if template}
+					<!-- Mobile: CSS flip card -->
+					{#if template}
+						<div class="w-full max-w-md mx-auto">
+							<!-- svelte-ignore a11y_no_static_element_interactions -->
 							<div
-								class="w-full"
-								style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels ||
-									638}"
+								class="flip-container relative cursor-pointer group"
+								onclick={() => (isFlipped = !isFlipped)}
+								onkeydown={(e) => e.key === 'Enter' && (isFlipped = !isFlipped)}
+								role="button"
+								tabindex="0"
 							>
-								<IdCanvas
-									bind:this={backCanvasComponent}
-									elements={template.template_elements.filter((el) => el.side === 'back')}
-									backgroundUrl={template.back_background.startsWith('http')
-										? template.back_background
-										: getSupabaseStorageUrl(template.back_background)}
-									{formData}
-									{fileUploads}
-									{imagePositions}
-									{fullResolution}
-									isDragging={mouseMoving}
-									pixelDimensions={template.width_pixels && template.height_pixels
-										? { width: template.width_pixels, height: template.height_pixels }
-										: null}
-									on:ready={() => handleCanvasReady('back')}
-									on:error={({ detail }) =>
-										addDebugMessage(`Back Canvas Error: ${detail.code} - ${detail.message}`)}
-								/>
+								<!-- Tap to flip overlay hint -->
+								<div
+									class="absolute inset-0 z-10 flex items-center justify-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+								>
+									<span
+										class="bg-black/60 text-white px-4 py-2 rounded-full text-sm font-medium backdrop-blur-sm shadow-lg"
+									>
+										Tap to Flip
+									</span>
+								</div>
+
+								<!-- Flip card inner -->
+								<div
+									class="flip-card-inner"
+									class:flipped={isFlipped}
+									style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels || 638}"
+								>
+									<!-- Front face -->
+									<div class="flip-card-face flip-card-front">
+										<IdCanvas
+											bind:this={frontCanvasComponent}
+											elements={template.template_elements.filter((el) => el.side === 'front')}
+											backgroundUrl={template.front_background.startsWith('http')
+												? template.front_background
+												: getSupabaseStorageUrl(template.front_background)}
+											{formData}
+											{fileUploads}
+											{imagePositions}
+											{fullResolution}
+											isDragging={mouseMoving}
+											pixelDimensions={template.width_pixels && template.height_pixels
+												? { width: template.width_pixels, height: template.height_pixels }
+												: null}
+											on:ready={() => handleCanvasReady('front')}
+											on:error={({ detail }) =>
+												addDebugMessage(`Front Canvas Error: ${detail.code} - ${detail.message}`)}
+										/>
+									</div>
+									<!-- Back face -->
+									<div class="flip-card-face flip-card-back">
+										<IdCanvas
+											bind:this={backCanvasComponent}
+											elements={template.template_elements.filter((el) => el.side === 'back')}
+											backgroundUrl={template.back_background.startsWith('http')
+												? template.back_background
+												: getSupabaseStorageUrl(template.back_background)}
+											{formData}
+											{fileUploads}
+											{imagePositions}
+											{fullResolution}
+											isDragging={mouseMoving}
+											pixelDimensions={template.width_pixels && template.height_pixels
+												? { width: template.width_pixels, height: template.height_pixels }
+												: null}
+											on:ready={() => handleCanvasReady('back')}
+											on:error={({ detail }) =>
+												addDebugMessage(`Back Canvas Error: ${detail.code} - ${detail.message}`)}
+										/>
+									</div>
+								</div>
 							</div>
-						{/if}
-					</div>
+
+							<!-- Side indicator -->
+							<p class="text-center text-sm text-muted-foreground mt-3">
+								{isFlipped ? 'Back' : 'Front'} Side
+							</p>
+						</div>
+					{/if}
 				{/if}
 			</div>
 		</Card>
@@ -637,6 +642,37 @@
 
 	.canvas-wrapper.portrait {
 		flex-direction: row;
+	}
+
+	/* CSS 3D Flip Card */
+	.flip-container {
+		perspective: 1000px;
+	}
+
+	.flip-card-inner {
+		position: relative;
+		width: 100%;
+		transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+		transform-style: preserve-3d;
+	}
+
+	.flip-card-inner.flipped {
+		transform: rotateY(180deg);
+	}
+
+	.flip-card-face {
+		backface-visibility: hidden;
+		-webkit-backface-visibility: hidden;
+	}
+
+	.flip-card-front {
+		position: relative;
+	}
+
+	.flip-card-back {
+		position: absolute;
+		inset: 0;
+		transform: rotateY(180deg);
 	}
 
 	:global(.select-error) {
