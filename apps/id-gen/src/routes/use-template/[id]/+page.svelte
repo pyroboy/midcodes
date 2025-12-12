@@ -519,6 +519,8 @@
 				<p class="text-muted-foreground mb-6">Please fill out these details for your ID card.</p>
 
 				{#if template && template.template_elements}
+					{@const frontElements = template.template_elements.filter(el => el.side === 'front' && el.variableName)}
+					{@const backElements = template.template_elements.filter(el => el.side === 'back' && el.variableName)}
 					<form
 						bind:this={formElement}
 						action="?/saveIdCard"
@@ -527,8 +529,14 @@
 						onsubmit={preventDefault(handleSubmit)}
 						use:enhance
 					>
-						{#each template.template_elements as element (element.variableName)}
-							{#if element.variableName}
+						<!-- Front Side Fields -->
+						{#if frontElements.length > 0}
+							<div class="flex items-center gap-3 mb-4">
+								<div class="h-px flex-1 bg-border"></div>
+								<span class="text-sm font-medium text-muted-foreground px-2">Front Side</span>
+								<div class="h-px flex-1 bg-border"></div>
+							</div>
+							{#each frontElements as element (element.variableName)}
 								<div
 									role="button"
 									tabindex="-1"
@@ -593,8 +601,83 @@
 										/>
 									{/if}
 								</div>
-							{/if}
-						{/each}
+							{/each}
+						{/if}
+
+						<!-- Back Side Fields -->
+						{#if backElements.length > 0}
+							<div class="flex items-center gap-3 mb-4 {frontElements.length > 0 ? 'mt-6' : ''}">
+								<div class="h-px flex-1 bg-border"></div>
+								<span class="text-sm font-medium text-muted-foreground px-2">Back Side</span>
+								<div class="h-px flex-1 bg-border"></div>
+							</div>
+							{#each backElements as element (element.variableName)}
+								<div
+									role="button"
+									tabindex="-1"
+									class="grid grid-cols-[auto_1fr] gap-4 items-center mb-4"
+									onmousedown={handleMouseDown}
+									onmouseup={handleMouseUp}
+								>
+									<Label for={element.variableName} class="text-right">
+										{element.variableName}
+										{#if element.type === 'text' || element.type === 'selection'}
+											<span class="text-red-500">*</span>
+										{/if}
+									</Label>
+									{#if element.type === 'text'}
+										<div class="w-full">
+											<Input
+												type="text"
+												id={element.variableName}
+												name={element.variableName}
+												bind:value={formData[element.variableName]}
+												class="w-full"
+												placeholder={`Enter ${element.variableName}`}
+											/>
+											{#if formErrors[element.variableName]}
+												<p class="mt-1 text-sm text-destructive">This field is required</p>
+											{/if}
+										</div>
+									{:else if element.type === 'selection' && element.options}
+										<div class="relative w-full">
+											<Select.Root
+												type="single"
+												value={selectStates[element.variableName]?.value}
+												onValueChange={(value) =>
+													handleSelectionChange(value, element.variableName)}
+											>
+												<Select.Trigger class="w-full">
+													{triggerContent(element.variableName)}
+												</Select.Trigger>
+												<Select.Content>
+													{#each element.options as option}
+														<Select.Item value={option}>
+															{option}
+														</Select.Item>
+													{/each}
+												</Select.Content>
+											</Select.Root>
+											{#if formErrors[element.variableName]}
+												<p class="mt-1 text-sm text-destructive">Please select an option</p>
+											{/if}
+										</div>
+									{:else if element.type === 'photo' || element.type === 'signature'}
+										<ThumbnailInput
+											width={element.width}
+											height={element.height}
+											fileUrl={fileUrls[element.variableName]}
+											initialScale={imagePositions[element.variableName]?.scale ?? 1}
+											initialX={imagePositions[element.variableName]?.x ?? 0}
+											initialY={imagePositions[element.variableName]?.y ?? 0}
+											isSignature={element.type === 'signature'}
+											on:selectfile={() => handleSelectFile(element.variableName)}
+											on:update={(e) => handleImageUpdate(e, element.variableName)}
+										/>
+									{/if}
+								</div>
+							{/each}
+						{/if}
 
 						<div class="mt-6 space-y-4">
 							<Button type="submit" class="w-full" disabled={loading}>
