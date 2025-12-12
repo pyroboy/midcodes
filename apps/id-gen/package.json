@@ -20,6 +20,7 @@
 	},
 	"devDependencies": {
 		"@playwright/test": "^1.49.1",
+		"@sveltejs/adapter-cloudflare": "^7.2.4",
 		"@sveltejs/adapter-vercel": "^5.5.0",
 		"@sveltejs/kit": "^2.27.3",
 		"@sveltejs/vite-plugin-svelte": "^4.0.0",
