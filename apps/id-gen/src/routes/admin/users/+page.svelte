@@ -20,7 +20,7 @@
 	} from '$lib/components/ui/table';
 	import * as Select from '$lib/components/ui/select';
 	import * as Dialog from '$lib/components/ui/dialog';
-	import { getUsersData, addUser, updateUserRole, deleteUser } from '../admin.remote';
+	import { getUsersData, addUser, updateUserRole, deleteUser } from '$lib/remote/admin.remote';
 
 	type UserProfile = {
 		id: string;

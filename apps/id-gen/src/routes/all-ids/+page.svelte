@@ -425,32 +425,10 @@
 				const rafStart = performance.now();
 				console.log(`%c├─ [T+${(rafStart - mountStartTime).toFixed(1)}ms] rAF fired - hydrating ${cached.cards.length} cards...`, 'color: #f59e0b; font-weight: bold');
 				
-				// ═══════════════════════════════════════════════════════════
-				// 🧪 STRESS TEST: Multiply cards to simulate 5000 cards
-				// REMOVE THIS BLOCK AFTER TESTING
-				// ═══════════════════════════════════════════════════════════
-				const STRESS_TEST_ENABLED = true;
-				const TARGET_CARD_COUNT = 5000;
-				let stressTestCards = cached.cards;
-				if (STRESS_TEST_ENABLED && cached.cards.length > 0) {
-					const multiplier = Math.ceil(TARGET_CARD_COUNT / cached.cards.length);
-					stressTestCards = [];
-					for (let i = 0; i < multiplier; i++) {
-						stressTestCards.push(...cached.cards.map((card, idx) => ({
-							...card,
-							// Give each copy a unique ID to avoid React key warnings
-							idcard_id: `${card.idcard_id}_copy_${i}_${idx}`
-						})));
-					}
-					stressTestCards = stressTestCards.slice(0, TARGET_CARD_COUNT);
-					console.log(`%c🧪 STRESS TEST: Multiplied ${cached.cards.length} cards → ${stressTestCards.length} cards`, 'color: #f59e0b; font-weight: bold; font-size: 14px');
-				}
-				// ═══════════════════════════════════════════════════════════
-				
 				// Hydrate card data
-				dataRows = STRESS_TEST_ENABLED ? stressTestCards : cached.cards;
+				dataRows = cached.cards;
 				initialLoading = false;
-				totalCount = STRESS_TEST_ENABLED ? stressTestCards.length : cached.totalCount;
+				totalCount = cached.totalCount;
 				
 				console.log(`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] Cards assigned to state (${dataRows.length} cards)`, 'color: #64748b');
 				
@@ -594,14 +572,13 @@
 		[...new Set(dataRows.map(card => card.template_name).filter(Boolean))].sort()
 	);
 
-	// Get unique column names from all cards for filter dropdown
+	// Get unique column names from template fields metadata for filter dropdown
 	let availableColumns = $derived(
 		(() => {
 			const columns = new Set<string>();
-			dataRows.forEach(card => {
-				if (card.fields) {
-					Object.keys(card.fields).forEach(key => columns.add(key));
-				}
+			// Use templateFields for actual template column data
+			Object.values(templateFields).forEach(fields => {
+				fields.forEach(field => columns.add(field.variableName));
 			});
 			return [...columns].sort();
 		})()
