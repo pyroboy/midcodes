@@ -1,25 +1,54 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { env } from '$env/dynamic/public';
 import { env as privateEnv } from '$env/dynamic/private';
 import type { Database } from '$lib/types/database.types';
 
-// Create a server-side client with service role key for backend operations
+// Lazy-initialized Supabase admin client
+// This prevents the client from being created at build time when env vars aren't available
+let _supabaseAdmin: SupabaseClient<Database> | null = null;
 
-const supabaseUrl = env.PUBLIC_SUPABASE_URL;
-const serviceRole = privateEnv.PRIVATE_SERVICE_ROLE;
+/**
+ * Get the Supabase admin client with service role key.
+ * Lazily initialized on first call to avoid build-time errors.
+ */
+export function getSupabaseAdmin(): SupabaseClient<Database> {
+	if (_supabaseAdmin) {
+		return _supabaseAdmin;
+	}
 
-if (!supabaseUrl || !serviceRole) {
-	throw new Error(
-		'Missing PUBLIC_SUPABASE_URL and/or PRIVATE_SERVICE_ROLE. Configure them as Cloudflare Pages environment variables (and locally via .env)'
-	);
+	const supabaseUrl = env.PUBLIC_SUPABASE_URL;
+	const serviceRole = privateEnv.PRIVATE_SERVICE_ROLE;
+
+	if (!supabaseUrl || !serviceRole) {
+		throw new Error(
+			'Missing PUBLIC_SUPABASE_URL and/or PRIVATE_SERVICE_ROLE. Configure them as Cloudflare Pages environment variables (and locally via .env)'
+		);
+	}
+
+	_supabaseAdmin = createClient<Database>(supabaseUrl, serviceRole, {
+		auth: {
+			autoRefreshToken: false,
+			persistSession: false
+		}
+	});
+
+	return _supabaseAdmin;
 }
 
-export const supabaseAdmin = createClient<Database>(supabaseUrl, serviceRole, {
-	auth: {
-		autoRefreshToken: false,
-		persistSession: false
-	}
-});
+// Legacy export for backwards compatibility - use getSupabaseAdmin() instead
+// This getter allows the module to be imported without immediately throwing
+export const supabaseAdmin = {
+	get storage() { return getSupabaseAdmin().storage; },
+	get auth() { return getSupabaseAdmin().auth; },
+	get from() { return getSupabaseAdmin().from.bind(getSupabaseAdmin()); },
+	get rpc() { return getSupabaseAdmin().rpc.bind(getSupabaseAdmin()); },
+	get channel() { return getSupabaseAdmin().channel.bind(getSupabaseAdmin()); },
+	get removeChannel() { return getSupabaseAdmin().removeChannel.bind(getSupabaseAdmin()); },
+	get removeAllChannels() { return getSupabaseAdmin().removeAllChannels.bind(getSupabaseAdmin()); },
+	get getChannels() { return getSupabaseAdmin().getChannels.bind(getSupabaseAdmin()); },
+	get functions() { return getSupabaseAdmin().functions; },
+	get realtime() { return getSupabaseAdmin().realtime; }
+};
 
 // Use the generated database types for consistency
 export type Json = Database['public']['Tables']['payment_records']['Row']['metadata'];
