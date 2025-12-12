@@ -36,10 +36,13 @@ const TemplateNamesSchema = z.array(z.string());
 export const getIDCards = query(PaginationSchema, async ({ offset, limit }) => {
 	const { locals } = getRequestEvent();
 	const { supabase, org_id } = locals;
-	
+
 	if (!org_id) {
 		return { cards: [], hasMore: false };
 	}
+
+	// Fetch one extra row so we can accurately determine if there's more.
+	const fetchLimit = Math.max(0, limit) + 1;
 
 	const { data: cards, error } = await supabase
 		.from('idcards')
@@ -56,15 +59,19 @@ export const getIDCards = query(PaginationSchema, async ({ offset, limit }) => {
 		`)
 		.eq('org_id', org_id)
 		.order('created_at', { ascending: false })
-		.range(offset, offset + limit - 1);
+		.range(offset, offset + fetchLimit - 1);
 
 	if (error) {
 		console.error('Error fetching ID cards:', error);
 		return { cards: [], hasMore: false };
 	}
 
+	const rows = cards || [];
+	const hasMore = rows.length > limit;
+	const pageRows = hasMore ? rows.slice(0, limit) : rows;
+
 	// Transform to expected format
-	const idCards: IDCard[] = (cards || []).map((card: any) => {
+	const idCards: IDCard[] = pageRows.map((card: any) => {
 		const templateName = card.templates?.name || null;
 		const cardData = card.data || {};
 
@@ -90,7 +97,7 @@ export const getIDCards = query(PaginationSchema, async ({ offset, limit }) => {
 
 	return {
 		cards: idCards,
-		hasMore: idCards.length === limit
+		hasMore
 	};
 });
 

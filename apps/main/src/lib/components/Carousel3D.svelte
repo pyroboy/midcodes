@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { T, Canvas, useTask } from '@threlte/core';
+	import { Float, HTML } from '@threlte/extras';
 	import type { App } from '$lib/data/apps.js';
 	import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-svelte';
 	import { onMount, onDestroy } from 'svelte';
@@ -9,21 +11,24 @@
 		onSelect?: (app: App) => void;
 		selectedId?: string;
 		autoRotate?: boolean;
-		cardWidth?: number;
-		gap?: number;
 	}
 	
-	let { apps, onSelect, selectedId, autoRotate = true, cardWidth = 280, gap = 20 }: Props = $props();
+	let { apps, onSelect, selectedId, autoRotate = true }: Props = $props();
 	
-	// Current card index (center card)
+	// Card dimensions and spacing
+	const cardSpacing = 3.5; // 3D units between cards
+	
+	// Current center position (which card index is at center)
 	let currentIndex = $state(0);
+	let targetX = $state(0);
+	let currentX = $state(0);
 	let isHovered = $state(false);
-	let isDragging = $state(false);
-	let dragStartX = $state(0);
-	let dragStartIndex = $state(0);
+	let mounted = $state(false);
 	
-	// Calculate spacing between cards
-	const cardSpacing = $derived(cardWidth + gap);
+	// Calculate target X position based on current index
+	$effect(() => {
+		targetX = -currentIndex * cardSpacing;
+	});
 	
 	// Get current front card
 	const frontCardIndex = $derived(() => {
@@ -32,13 +37,13 @@
 	
 	const frontApp = $derived(apps[frontCardIndex()]);
 	
-	// Auto-scroll
+	// Auto-scroll timer
 	let autoScrollInterval: ReturnType<typeof setInterval> | null = null;
 	
 	function startAutoScroll() {
 		if (autoScrollInterval) return;
 		autoScrollInterval = setInterval(() => {
-			if (!isHovered && !isDragging && autoRotate) {
+			if (!isHovered && autoRotate) {
 				goToCard((currentIndex + 1) % apps.length);
 			}
 		}, 4000);
@@ -51,19 +56,20 @@
 		}
 	}
 	
-	// Navigation
+	// Navigation functions
 	function scrollLeft() {
-		goToCard(currentIndex - 1);
+		const newIndex = (currentIndex - 1 + apps.length) % apps.length;
+		goToCard(newIndex);
 	}
 	
 	function scrollRight() {
-		goToCard(currentIndex + 1);
+		const newIndex = (currentIndex + 1) % apps.length;
+		goToCard(newIndex);
 	}
 	
 	function goToCard(index: number) {
-		// Handle wrapping
-		currentIndex = ((index % apps.length) + apps.length) % apps.length;
-		onSelect?.(apps[currentIndex]);
+		currentIndex = index;
+		onSelect?.(apps[index]);
 	}
 	
 	// Keyboard navigation
@@ -75,82 +81,50 @@
 		}
 	}
 	
-	// Mouse/touch drag handling
-	function handleDragStart(e: MouseEvent | TouchEvent) {
-		isDragging = true;
-		dragStartX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-		dragStartIndex = currentIndex;
-	}
-	
-	function handleDragMove(e: MouseEvent | TouchEvent) {
-		if (!isDragging) return;
-		// Just track for end handler
-	}
-	
-	function handleDragEnd(e: MouseEvent | TouchEvent) {
-		if (!isDragging) return;
-		isDragging = false;
-		
-		const endX = 'changedTouches' in e ? e.changedTouches[0].clientX : e.clientX;
-		const deltaX = endX - dragStartX;
-		
-		// Swipe threshold
-		if (Math.abs(deltaX) > 50) {
-			if (deltaX > 0) {
-				scrollLeft();
-			} else {
-				scrollRight();
-			}
-		}
-	}
-	
 	// Get card style based on position relative to center
 	function getCardStyle(index: number) {
 		// Calculate position relative to current center
 		let relativePosition = index - currentIndex;
 		
-		// Handle wrapping for a smooth visual (consider cards wrap around)
+		// Handle wrapping
 		if (relativePosition > apps.length / 2) {
 			relativePosition -= apps.length;
 		} else if (relativePosition < -apps.length / 2) {
 			relativePosition += apps.length;
 		}
 		
-		// Calculate X translation
-		const translateX = relativePosition * cardSpacing;
+		// X position in 3D space
+		const x = relativePosition * cardSpacing;
 		
 		// Opacity: center is full, edges fade out
-		// Use absolute distance from center to determine opacity
 		const absDistance = Math.abs(relativePosition);
-		const maxVisibleCards = 2.5; // Cards beyond this are fully transparent
-		const opacity = Math.max(0, 1 - (absDistance / maxVisibleCards));
+		const maxVisible = 2.5;
+		const opacity = Math.max(0, 1 - (absDistance / maxVisible));
 		
-		// Scale: center is full size, edges are smaller
-		const scale = Math.max(0.7, 1 - absDistance * 0.1);
+		// Scale: center is bigger
+		const scale = Math.max(0.7, 1 - absDistance * 0.15);
 		
-		// Z-index: center is on top
-		const zIndex = 100 - Math.abs(relativePosition) * 10;
+		// Z position: push edges back slightly for depth
+		const z = -absDistance * 0.5;
 		
-		// Is this the front/center card?
-		const isFront = relativePosition === 0;
+		// Y position: subtle arc effect
+		const y = -absDistance * absDistance * 0.05;
 		
-		return { 
-			translateX, 
-			opacity, 
-			scale, 
-			zIndex: Math.round(zIndex), 
-			isFront 
-		};
+		// Is center card?
+		const isFront = absDistance < 0.5;
+		
+		return { x, y, z, opacity, scale, isFront, relativePosition };
 	}
 	
-	// Category color gradients
-	const categoryGradients: Record<string, string> = {
-		core: 'from-blue-500/20 to-indigo-600/20',
-		document: 'from-purple-500/20 to-pink-600/20',
-		utility: 'from-slate-400/20 to-slate-600/20'
+	// Category color gradients for fallback
+	const categoryColors: Record<string, string> = {
+		core: '#6366f1',
+		document: '#a855f7',
+		utility: '#64748b'
 	};
 	
 	onMount(() => {
+		mounted = true;
 		startAutoScroll();
 		if (typeof window !== 'undefined') {
 			window.addEventListener('keydown', handleKeydown);
@@ -172,110 +146,143 @@
 	onmouseenter={() => isHovered = true}
 	onmouseleave={() => isHovered = false}
 >
-	<!-- Carousel Container -->
-	<div 
-		class="carousel-container relative mx-auto overflow-hidden"
-		style="height: 320px; max-width: 100%;"
-	>
-		<!-- Edge Fade Overlays -->
-		<div class="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-background to-transparent z-20 pointer-events-none"></div>
-		<div class="absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-background to-transparent z-20 pointer-events-none"></div>
-		
-		<!-- Carousel Track (slides horizontally) -->
-		<div 
-			class="carousel-track absolute left-1/2 top-1/2"
-			style="
-				transform: translateX(-50%) translateY(-50%);
-				transition: {isDragging ? 'none' : 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)'};
-			"
-			onmousedown={handleDragStart}
-			ontouchstart={handleDragStart}
-			onmousemove={handleDragMove}
-			ontouchmove={handleDragMove}
-			onmouseup={handleDragEnd}
-			ontouchend={handleDragEnd}
-			onmouseleave={handleDragEnd}
-		>
-			{#each apps as app, i}
-				{@const style = getCardStyle(i)}
-				<button
-					class="carousel-card absolute cursor-pointer group"
-					style="
-						transform: translateX({style.translateX}px) scale({style.scale});
-						left: -{cardWidth / 2}px;
-						top: -120px;
-						opacity: {style.opacity};
-						z-index: {style.zIndex};
-						transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-					"
-					onclick={(e) => { e.stopPropagation(); goToCard(i); }}
-					aria-label="View {app.displayName}"
-				>
-					<div 
-						class="card-inner relative w-[280px] h-[240px] rounded-2xl overflow-hidden border transition-all duration-300
-							{style.isFront ? 'border-primary/50 shadow-2xl shadow-primary/20 ring-2 ring-primary/30' : 'border-border/50 shadow-lg'}
-						"
-					>
-						<!-- Background -->
-						<div class="absolute inset-0 bg-card/90 backdrop-blur-sm">
-							{#if app.thumbnail}
-								<img 
-									src={app.thumbnail} 
-									alt={app.displayName}
-									class="w-full h-full object-cover opacity-30"
-								/>
-							{:else}
-								<div class="w-full h-full bg-gradient-to-br {categoryGradients[app.category]}"></div>
-							{/if}
-							<div class="absolute inset-0 bg-gradient-to-t from-card via-card/80 to-transparent"></div>
-						</div>
-						
-						<!-- Content -->
-						<div class="relative h-full flex flex-col justify-between p-5">
-							<!-- Top: Category & Tech -->
-							<div class="flex items-start justify-between">
-								<Badge class="bg-primary/20 text-primary px-2 py-1 text-xs capitalize">
-									{app.category}
-								</Badge>
-								<span class="text-xs text-muted-foreground/70 bg-muted/50 px-2 py-1 rounded">
-									{app.status}
-								</span>
-							</div>
-							
-							<!-- Middle: Title & Description -->
-							<div class="flex-1 flex flex-col justify-center text-center py-4">
-								<h3 class="text-xl font-bold text-foreground mb-2 line-clamp-2 group-hover:text-primary transition-colors">
-									{app.displayName}
-								</h3>
-								<p class="text-sm text-muted-foreground line-clamp-2">
-									{app.description}
-								</p>
-							</div>
-							
-							<!-- Bottom: Tech Stack -->
-							<div class="flex flex-wrap justify-center gap-1">
-								{#each app.techStack.slice(0, 3) as tech}
-									<span class="text-xs text-muted-foreground/80 bg-muted/30 px-2 py-0.5 rounded-full">
-										{tech}
-									</span>
-								{/each}
-								{#if app.techStack.length > 3}
-									<span class="text-xs text-muted-foreground/60">
-										+{app.techStack.length - 3}
-									</span>
+	<!-- 3D Canvas -->
+	{#if mounted}
+	<div class="carousel-canvas" style="height: 380px;">
+		<Canvas>
+			<!-- Lighting -->
+			<T.AmbientLight intensity={0.6} />
+			<T.DirectionalLight position={[5, 5, 5]} intensity={0.8} />
+			<T.PointLight position={[-5, 3, 2]} intensity={0.4} color="#6366f1" />
+			<T.PointLight position={[5, 3, 2]} intensity={0.4} color="#ec4899" />
+			
+			<!-- Camera -->
+			<T.PerspectiveCamera makeDefault position={[0, 0, 8]} fov={45} />
+			
+			<!-- Cards group -->
+			<T.Group>
+				{#each apps as app, i}
+					{@const style = getCardStyle(i)}
+					{#if style.opacity > 0.05}
+						<Float 
+							floatIntensity={style.isFront ? 0.3 : 0.1} 
+							rotationIntensity={0.1} 
+							speed={2}
+						>
+							<T.Group 
+								position.x={style.x}
+								position.y={style.y}
+								position.z={style.z}
+								scale={style.scale}
+							>
+								<!-- Card plane -->
+								<T.Mesh
+									onclick={() => goToCard(i)}
+								>
+									<T.PlaneGeometry args={[2.8, 2.2]} />
+									<T.MeshStandardMaterial 
+										color={categoryColors[app.category] || '#6366f1'}
+										transparent
+										opacity={style.opacity * 0.15}
+										metalness={0.3}
+										roughness={0.7}
+									/>
+								</T.Mesh>
+								
+								<!-- Card border/frame -->
+								<T.Mesh position.z={0.01}>
+									<T.PlaneGeometry args={[2.85, 2.25]} />
+									<T.MeshStandardMaterial 
+										color={style.isFront ? '#6366f1' : '#374151'}
+										transparent
+										opacity={style.opacity * (style.isFront ? 0.8 : 0.3)}
+										metalness={0.5}
+										roughness={0.5}
+									/>
+								</T.Mesh>
+								
+								<!-- Inner card content area -->
+								<T.Mesh position.z={0.02}>
+									<T.PlaneGeometry args={[2.7, 2.1]} />
+									<T.MeshStandardMaterial 
+										color="#0f172a"
+										transparent
+										opacity={style.opacity * 0.95}
+										metalness={0.1}
+										roughness={0.9}
+									/>
+								</T.Mesh>
+								
+								<!-- Glow effect for front card -->
+								{#if style.isFront}
+									<T.Mesh position.z={-0.05}>
+										<T.PlaneGeometry args={[3.2, 2.6]} />
+										<T.MeshBasicMaterial 
+											color="#6366f1"
+											transparent
+											opacity={0.2}
+										/>
+									</T.Mesh>
 								{/if}
-							</div>
-						</div>
-						
-						<!-- Hover Glow Effect -->
-						<div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none
-							bg-gradient-to-t from-primary/10 via-transparent to-transparent"></div>
-					</div>
-				</button>
-			{/each}
-		</div>
+								
+								<!-- HTML overlay for card content -->
+								<HTML 
+									transform 
+									position.z={0.05}
+									scale={0.018}
+									pointerEvents="none"
+								>
+									<div 
+										class="card-content w-[280px] h-[220px] flex flex-col justify-between p-4 pointer-events-none"
+										style="opacity: {style.opacity};"
+									>
+										<!-- Top: Category -->
+										<div class="flex items-start justify-between">
+											<span class="text-xs px-2 py-1 rounded bg-primary/30 text-primary font-medium capitalize">
+												{app.category}
+											</span>
+											<span class="text-xs text-muted-foreground/70 bg-muted/50 px-2 py-1 rounded">
+												{app.status}
+											</span>
+										</div>
+										
+										<!-- Middle: Title & Description -->
+										<div class="flex-1 flex flex-col justify-center text-center py-3">
+											<h3 class="text-lg font-bold text-foreground mb-1 line-clamp-2 {style.isFront ? 'text-primary' : ''}">
+												{app.displayName}
+											</h3>
+											<p class="text-xs text-muted-foreground line-clamp-2">
+												{app.description}
+											</p>
+										</div>
+										
+										<!-- Bottom: Tech Stack -->
+										<div class="flex flex-wrap justify-center gap-1">
+											{#each app.techStack.slice(0, 3) as tech}
+												<span class="text-xs text-muted-foreground/80 bg-muted/30 px-2 py-0.5 rounded-full">
+													{tech}
+												</span>
+											{/each}
+											{#if app.techStack.length > 3}
+												<span class="text-xs text-muted-foreground/60">
+													+{app.techStack.length - 3}
+												</span>
+											{/if}
+										</div>
+									</div>
+								</HTML>
+							</T.Group>
+						</Float>
+					{/if}
+				{/each}
+			</T.Group>
+		</Canvas>
 	</div>
+	{/if}
 	
+	<!-- Edge Fade Overlays -->
+	<div class="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-background via-background/80 to-transparent z-10 pointer-events-none"></div>
+	<div class="absolute inset-y-0 right-0 w-32 bg-gradient-to-l from-background via-background/80 to-transparent z-10 pointer-events-none"></div>
 	
 	<!-- Navigation Buttons -->
 	<button
@@ -303,7 +310,7 @@
 	</button>
 	
 	<!-- Dot Indicators -->
-	<div class="flex justify-center gap-2 mt-6">
+	<div class="flex justify-center gap-2 mt-4">
 		{#each apps as app, i}
 			<button
 				onclick={() => goToCard(i)}
@@ -318,7 +325,7 @@
 	</div>
 	
 	<!-- Front Card Info Bar -->
-	<div class="mt-4 text-center">
+	<div class="mt-3 text-center">
 		<a 
 			href={frontApp?.path}
 			class="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-primary/10 border border-primary/20
@@ -331,24 +338,17 @@
 </div>
 
 <style>
-	.carousel-card {
-		user-select: none;
-		-webkit-user-select: none;
+	.carousel-canvas {
+		width: 100%;
+		position: relative;
 	}
 	
-	.carousel-track {
-		cursor: grab;
+	.carousel-canvas :global(canvas) {
+		width: 100% !important;
+		height: 100% !important;
 	}
 	
-	.carousel-track:active {
-		cursor: grabbing;
-	}
-	
-	/* Ensure smooth 3D rendering */
-	.carousel-container,
-	.carousel-track,
-	.carousel-card {
-		-webkit-transform-style: preserve-3d;
-		transform-style: preserve-3d;
+	.card-content {
+		font-family: inherit;
 	}
 </style>

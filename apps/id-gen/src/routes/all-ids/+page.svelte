@@ -708,7 +708,9 @@
 			{#if hasMore}
 				<div bind:this={loadMoreTrigger} class="py-4">
 					{#if loadingMore}
-						<div class="text-center text-muted-foreground text-sm">Loading more...</div>
+						<div class="text-center text-muted-foreground text-sm">
+							Loading more… {dataRows.length} out of {totalCount}
+						</div>
 					{:else}
 						<div class="h-1"></div>
 					{/if}
@@ -748,6 +750,9 @@
 			{#if hasMore}
 				<div bind:this={loadMoreTrigger} class="py-4">
 					{#if loadingMore}
+						<div class="text-center text-muted-foreground text-sm mb-3">
+							Loading more… {dataRows.length} out of {totalCount}
+						</div>
 						<IDCardSkeleton count={3} minWidth={cardMinWidth} />
 					{:else}
 						<div class="h-1"></div>
