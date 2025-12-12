@@ -28,6 +28,15 @@
 			default: return 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1';
 		}
 	}
+
+	interface Transaction {
+		transaction_type: string;
+		description: string;
+		amount: number;
+		credits_after: number;
+		created_at: string;
+		reference_id?: string;
+	}
 </script>
 
 <svelte:head>
@@ -318,7 +327,7 @@
 								</tr>
 							</thead>
 							<tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-								{#each creditHistory as transaction}
+								{#each creditHistory as unknown as Transaction[] as transaction}
 									<tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
 										<td class="px-4 py-4 whitespace-nowrap">
 											<Badge class="{getTransactionTypeColor(transaction.transaction_type)} flex items-center gap-1 w-fit">
@@ -359,7 +368,7 @@
 
 					<!-- Mobile Cards -->
 					<div class="md:hidden space-y-4">
-						{#each creditHistory as transaction}
+						{#each creditHistory as unknown as Transaction[] as transaction}
 							<div class="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
 								<div class="flex items-center justify-between mb-2">
 									<Badge class="{getTransactionTypeColor(transaction.transaction_type)} flex items-center gap-1">

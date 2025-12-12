@@ -9,7 +9,7 @@
 	import { createCardFromInches } from '$lib/utils/cardGeometry';
 	import ViewModeToggle from '$lib/components/ViewModeToggle.svelte';
 	import { viewMode, detectViewportDefault } from '$lib/stores/viewMode';
-	import SimpleIDCard from '$lib/components/SimpleIDCard.svelte';
+	import SmartIDCard from './SmartIDCard.svelte';
 	import EmptyIDs from '$lib/components/empty-states/EmptyIDs.svelte';
 	import IDCardSkeleton from '$lib/components/IDCardSkeleton.svelte';
 
@@ -30,6 +30,8 @@
 	// Import remote functions
 	import {
 		getIDCards,
+		getCardIDs,
+		getCardDetails,
 		getCardCount,
 		getTemplateDimensions,
 		getTemplateMetadata
@@ -83,7 +85,7 @@
 	let scrollTop = $state(0);
 
 	// Data states
-	let dataRows = $state<IDCard[]>([]);
+	let dataRows = $state<any[]>([]);
 	let templateDimensions = $state<Record<string, { width: number; height: number; unit: string }>>(
 		{}
 	);
@@ -140,6 +142,14 @@
 		cardMinWidth = Math.min(MAX_WIDTH, cardMinWidth + STEP);
 	}
 
+	function updateCardData(card: IDCard) {
+		const index = dataRows.findIndex((c) => getCardId(c) === card.idcard_id);
+		if (index !== -1) {
+			// Preserve existing properties if any, but overwrite with new data
+			dataRows[index] = { ...dataRows[index], ...card };
+		}
+	}
+
 	// Load initial cards
 	async function loadInitialCards(opts: { forceRefresh?: boolean; background?: boolean } = {}) {
 		const forceRefresh = opts.forceRefresh ?? false;
@@ -165,10 +175,10 @@
 			const [result, count] = await Promise.all([
 				cachedRemoteFunctionCall({
 					scopeKey,
-					keyBase: 'all-ids:getIDCards',
+					keyBase: 'all-ids:getCardIDs',
 					args: { offset: 0, limit: INITIAL_LOAD },
 					forceRefresh,
-					fetcher: (args) => getIDCards(args),
+					fetcher: (args) => getCardIDs(args),
 					options: { ttlMs: ALL_IDS_CACHE_TTL_MS, staleWhileRevalidate: true, debug: true }
 				}),
 				cachedRemoteFunctionCall({
@@ -181,21 +191,33 @@
 				})
 			]);
 
+            // Map light IDs to partial IDCards
+            const partialCards: IDCard[] = result.cards.map((c: any) => ({
+                idcard_id: c.idcard_id,
+                template_name: c.template_name,
+                front_image: null,
+                back_image: null,
+                created_at: '',
+                fields: {}
+            } as unknown as IDCard));
+
+            const finalResult = { ...result, cards: partialCards };
+
 			const elapsed = (performance.now() - startTime).toFixed(2);
 			console.log(`%c├─ ✅ Remote functions completed in ${elapsed}ms`, logStyles.cache);
 			console.log(`%c├─ 📊 Results:`, logStyles.data);
-			console.log(`%c│  ├─ cards received: ${result.cards.length}`, logStyles.data);
+			console.log(`%c│  ├─ cards received: ${finalResult.cards.length}`, logStyles.data);
 			console.log(`%c│  ├─ total count: ${count}`, logStyles.data);
-			console.log(`%c│  └─ hasMore: ${result.hasMore}`, logStyles.data);
+			console.log(`%c│  └─ hasMore: ${finalResult.hasMore}`, logStyles.data);
 
-			dataRows = result.cards;
+			dataRows = finalResult.cards;
 			totalCount = count;
-			hasMore = result.hasMore;
+			hasMore = finalResult.hasMore;
 			dataCachedAt = Date.now();
 
 			// Load template dimensions for current cards
 			console.log(`%c├─ 📐 Loading template dimensions...`, logStyles.info);
-			await loadTemplateDimensionsForCards(result.cards, forceRefresh);
+			await loadTemplateDimensionsForCards(finalResult.cards, forceRefresh);
 			console.log(`%c└─ ✅ Template dimensions loaded`, logStyles.cache);
 		} catch (err) {
 			console.error('Error loading initial cards:', err);
@@ -234,33 +256,44 @@
 			console.log(`%c├─ ⏳ Fetching next ${LOAD_MORE_COUNT} cards...`, logStyles.info);
 			const result = await cachedRemoteFunctionCall({
 				scopeKey,
-				keyBase: 'all-ids:getIDCards',
+				keyBase: 'all-ids:getCardIDs',
 				args: { offset: dataRows.length, limit: LOAD_MORE_COUNT },
 				forceRefresh,
-				fetcher: (args) => getIDCards(args),
+				fetcher: (args) => getCardIDs(args),
 				options: { ttlMs: ALL_IDS_CACHE_TTL_MS, staleWhileRevalidate: true, debug: true }
 			});
+
+            const partialCards: IDCard[] = result.cards.map((c: any) => ({
+                idcard_id: c.idcard_id,
+                template_name: c.template_name,
+                front_image: null,
+                back_image: null,
+                created_at: '',
+                fields: {}
+            } as unknown as IDCard));
+
+            const finalResult = { ...result, cards: partialCards };
 
 			const elapsed = (performance.now() - startTime).toFixed(2);
 			console.log(`%c├─ ✅ Completed in ${elapsed}ms`, logStyles.cache);
 			console.log(`%c├─ 📊 Results:`, logStyles.data);
-			console.log(`%c│  ├─ new cards: ${result.cards.length}`, logStyles.data);
-			console.log(`%c│  └─ hasMore from server: ${result.hasMore}`, logStyles.data);
+			console.log(`%c│  ├─ new cards: ${finalResult.cards.length}`, logStyles.data);
+			console.log(`%c│  └─ hasMore from server: ${finalResult.hasMore}`, logStyles.data);
 
-			if (result.cards.length > 0) {
-				dataRows = [...dataRows, ...result.cards];
+			if (finalResult.cards.length > 0) {
+				dataRows = [...dataRows, ...finalResult.cards];
 				console.log(`%c├─ 📦 Total cards now: ${dataRows.length}`, logStyles.data);
 			}
 
 			// More accurate hasMore check based on total count
-			hasMore = result.hasMore && dataRows.length < totalCount;
+			hasMore = finalResult.hasMore && dataRows.length < totalCount;
 			dataCachedAt = Date.now();
 			console.log(`%c├─ 🔄 hasMore updated: ${hasMore}`, logStyles.info);
 
 			// Load template dimensions for new cards
 			if (result.cards.length > 0) {
 				console.log(`%c├─ 📐 Loading template dimensions for new cards...`, logStyles.info);
-				await loadTemplateDimensionsForCards(result.cards, forceRefresh);
+				await loadTemplateDimensionsForCards(finalResult.cards, forceRefresh);
 			}
 			console.log(`%c└─ ✅ loadMoreCards complete`, logStyles.cache);
 		} catch (err) {
@@ -978,7 +1011,11 @@
 		{#if initialLoading}
 			<!-- Card skeletons only - page structure already visible -->
 			<div class="flex-1 overflow-auto all-ids-scroll">
-				<IDCardSkeleton count={8} minWidth={cardMinWidth} />
+				<div class="p-4">
+					<div class="responsive-grid">
+						<IDCardSkeleton count={8} minWidth={cardMinWidth} />
+					</div>
+				</div>
 			</div>
 		{:else if dataRows.length === 0}
 			<EmptyIDs />
@@ -1177,8 +1214,11 @@
 						<div class="responsive-grid">
 							{#each cards as card}
 								<div class="card-wrapper">
-									<SimpleIDCard
-										{card}
+									<SmartIDCard
+										id={getCardId(card)}
+										initialData={card.fields ? card : null}
+										minWidth={cardMinWidth}
+										onDataLoaded={updateCardData}
 										isSelected={selectionManager.isSelected(getCardId(card))}
 										onToggleSelect={() => selectionManager.toggleSelection(getCardId(card))}
 										onDownload={downloadCard}
@@ -1200,7 +1240,9 @@
 							<div class="text-center text-muted-foreground text-sm mb-3">
 								Loading more… {dataRows.length} of {totalCount}
 							</div>
-							<IDCardSkeleton count={3} minWidth={cardMinWidth} />
+							<div class="responsive-grid">
+								<IDCardSkeleton count={3} minWidth={cardMinWidth} />
+							</div>
 						{:else if hasMoreCachedCards}
 							<div class="text-center text-muted-foreground text-xs">
 								Showing {filteredCards.length} of {allFilteredCards.length} loaded • {dataRows.length}

@@ -18,7 +18,13 @@ export const getUserCredits = query(async () => {
 		return null;
 	}
 
-	return data;
+	return data as {
+		credits_balance: number;
+		card_generation_count: number;
+		template_count: number;
+		unlimited_templates: boolean;
+		remove_watermarks: boolean;
+	} | null;
 });
 
 // Query for dashboard stats

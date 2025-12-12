@@ -3,9 +3,8 @@ import type { PageServerLoad, Actions } from './$types';
 
 export const load: PageServerLoad = async ({ locals, url, depends, setHeaders }) => {
 	// Cache for 2 minutes
-	setHeaders({
-		'cache-control': 'private, max-age=120'
-	});
+	// Cache control is handled by +layout.server.ts
+
 
 	// Register dependency for selective invalidation
 	depends('app:templates');

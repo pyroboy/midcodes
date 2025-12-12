@@ -1,19 +1,19 @@
 <script lang="ts">
 	interface Props {
 		count?: number;
-		minWidth?: number;
+		minWidth?: number; // Kept for interface compatibility, but effectively unused by CSS if parent handles grid
 	}
 
 	let { count = 8, minWidth = 250 }: Props = $props();
 </script>
 
-<!-- Skeleton Grid for ID Cards - matches SimpleIDCard structure -->
-<div 
-	class="grid gap-4"
-	style="grid-template-columns: repeat(auto-fill, minmax({minWidth}px, 1fr));"
->
+<!-- 
+	Use display: contents so these items become direct children of the parent grid.
+	This solves the nested grid sizing issues.
+-->
+<div style="display: contents;">
 	{#each Array(count) as _, i}
-		<div class="relative h-full w-full">
+		<div class="relative h-full w-full flex flex-col">
 			<!-- Checkbox skeleton (absolute top left like the real card) -->
 			<div class="absolute top-2 left-2 z-10">
 				<div class="h-5 w-5 bg-muted rounded animate-shimmer"></div>

@@ -38,10 +38,11 @@
 	let isDragging = $state(false);
 
 	const MAX_HEIGHT = 150;
-	const aspectRatio = width / height;
-	const thumbnailHeight = Math.min(MAX_HEIGHT, height);
-	const thumbnailWidth = thumbnailHeight * aspectRatio;
-	const scale = thumbnailHeight / height;
+	const MAX_HEIGHT = 150;
+	const aspectRatio = $derived(width / height);
+	const thumbnailHeight = $derived(Math.min(MAX_HEIGHT, height));
+	const thumbnailWidth = $derived(thumbnailHeight * aspectRatio);
+	const scale = $derived(thumbnailHeight / height);
 
 	onMount(() => {
 		if (canvas) {

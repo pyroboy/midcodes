@@ -10,7 +10,7 @@ export const load = (async ({ depends, setHeaders }) => {
 	depends('app:idcards');
 
 	// Cache this minimal response for 5 minutes - it has no dynamic data
-	setHeaders({ 'cache-control': 'private, max-age=300' });
+	// setHeaders({ 'cache-control': 'private, max-age=300' });
 
 	return {};
 }) satisfies PageServerLoad;

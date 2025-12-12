@@ -21,7 +21,7 @@
 		})
 	);
 
-	const categories = [...new Set((data.assets as unknown as TemplateAsset[]).map(a => a.category).filter(Boolean))];
+	let categories = $derived([...new Set((data.assets as unknown as TemplateAsset[]).map(a => a.category).filter(Boolean))]);
 
 	async function togglePublish(assetId: string, currentStatus: boolean) {
 		const { error } = await supabase

@@ -88,6 +88,12 @@
 	let user = $state(data.user);
 	let org_id = $state(data.org_id);
 
+	$effect(() => {
+		templates = data.templates;
+		user = data.user;
+		org_id = data.org_id;
+	});
+
 	let frontBackground: File | null = null;
 	let backBackground: File | null = null;
 	let frontPreview: string | null = $state(null);

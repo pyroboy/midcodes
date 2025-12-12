@@ -30,6 +30,11 @@
 	let successMessage = $state('');
 	let errorMessage = $state('');
 
+	$effect(() => {
+		profile = { ...data.profile };
+		preferences = { ...data.preferences };
+	});
+
 	// Handle form responses
 	$effect(() => {
 		if (form?.success) {

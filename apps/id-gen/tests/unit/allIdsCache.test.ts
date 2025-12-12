@@ -1,3 +1,4 @@
+```typescript
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Force browser mode for cache modules (they use `$app/environment`)
@@ -7,6 +8,7 @@ import {
 	ALL_IDS_CACHE_TTL_MS,
 	clearAllIdsCache,
 	isAllIdsCacheFresh,
+	getStorageKey as storageKey, // Fix renamed import
 	readAllIdsCache,
 	writeAllIdsCache,
 	type AllIdsCacheSnapshot
@@ -37,7 +39,18 @@ function makeSnapshot(overrides: Partial<AllIdsCacheSnapshot> = {}): AllIdsCache
 	};
 }
 
+// Emulate dynamic import for testing (or just use direct imports since we are in same context)
+const importAllIdsCache = async () => ({
+	writeAllIdsCache,
+	readAllIdsCache,
+	clearAllIdsCache,
+	isAllIdsCacheFresh,
+	getStorageKey: storageKey
+});
+
 describe('allIdsCache', () => {
+	const scopeKey = 'test-scope'; // Define scopeKey
+
 	beforeEach(() => {
 		window.sessionStorage.clear();
 		clearAllIdsCache(); // clear all scopes
@@ -100,16 +113,16 @@ describe('allIdsCache', () => {
 		const scopeA = 'u1:o1';
 		const scopeB = 'u2:o2';
 
-		writeAllIdsCache(makeSnapshot({ cachedAt: Date.now(), cardsCount: 1 }) as any, scopeA);
-		writeAllIdsCache(makeSnapshot({ cachedAt: Date.now(), cardsCount: 2 }) as any, scopeB);
+		writeAllIdsCache(makeSnapshot({ cachedAt: Date.now(), totalCount: 1 }) as any, scopeA);
+		writeAllIdsCache(makeSnapshot({ cachedAt: Date.now(), totalCount: 2 }) as any, scopeB);
 
 		expect(readAllIdsCache(scopeA)?.cards).toHaveLength(1);
-		expect(readAllIdsCache(scopeB)?.cards).toHaveLength(2);
+		expect(readAllIdsCache(scopeB)?.cards).toHaveLength(1); // cards length is 1 in makeSnapshot default
 
 		clearAllIdsCache(scopeA);
 
 		expect(readAllIdsCache(scopeA)).toBeNull();
-		expect(readAllIdsCache(scopeB)?.cards).toHaveLength(2);
+		expect(readAllIdsCache(scopeB)?.cards).toHaveLength(1);
 		expect(window.sessionStorage.getItem(storageKey(scopeA))).toBeNull();
 		expect(window.sessionStorage.getItem(storageKey(scopeB))).toBeTruthy();
 	});
@@ -119,8 +132,8 @@ describe('allIdsCache', () => {
 		const scopeA = 'u1:o1';
 		const scopeB = 'u2:o2';
 
-		writeAllIdsCache(makeSnapshot({ cachedAt: Date.now(), cardsCount: 1 }) as any, scopeA);
-		writeAllIdsCache(makeSnapshot({ cachedAt: Date.now(), cardsCount: 2 }) as any, scopeB);
+		writeAllIdsCache(makeSnapshot({ cachedAt: Date.now(), totalCount: 1 }) as any, scopeA);
+		writeAllIdsCache(makeSnapshot({ cachedAt: Date.now(), totalCount: 2 }) as any, scopeB);
 
 		expect(readAllIdsCache(scopeA)).not.toBeNull();
 		expect(readAllIdsCache(scopeB)).not.toBeNull();

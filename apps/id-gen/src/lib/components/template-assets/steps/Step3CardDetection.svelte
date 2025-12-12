@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { assetUploadStore, selectedRegions } from '$lib/stores/assetUploadStore';
-	import { getDetectionConfigForSize, type DetectedRegion } from '$lib/schemas/template-assets.schema';
+	import { getDetectionConfigForSize } from '$lib/schemas/template-assets.schema';
 	import { detectCardsInImage } from '$lib/utils/cardDetection';
 	import { cn } from '$lib/utils';
 

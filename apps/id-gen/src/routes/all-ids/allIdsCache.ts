@@ -36,7 +36,7 @@ const STORAGE_KEY_BASE = 'idgen:all-ids:cache:v1';
  * Optional scope key so caches can be isolated per user+org.
  * Pass something like `${userId}:${orgId}` from the caller.
  */
-function getStorageKey(scopeKey: string): string {
+export function getStorageKey(scopeKey: string): string {
 	return scopeKey ? `${STORAGE_KEY_BASE}:${scopeKey}` : STORAGE_KEY_BASE;
 }
 
