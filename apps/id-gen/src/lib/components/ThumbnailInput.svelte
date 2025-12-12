@@ -1,9 +1,8 @@
 <script lang="ts">
 	import { run } from 'svelte/legacy';
-	import { createEventDispatcher } from 'svelte';
-	import { Maximize2, RotateCw, ZoomIn, ZoomOut, Upload } from 'lucide-svelte';
-	import { untrack } from 'svelte';
-	import { Label } from '$lib/components/ui/label';
+	import { createEventDispatcher, onMount, untrack } from 'svelte';
+	import { Move, Scaling } from '@lucide/svelte';
+	import { debounce } from 'lodash-es';
 
 	const dispatch = createEventDispatcher<{
 		selectfile: void;
@@ -36,6 +35,12 @@
 	let imageScale = $state(untrack(() => initialScale));
 	let imageX = $state(untrack(() => initialX));
 	let imageY = $state(untrack(() => initialY));
+
+	$effect(() => {
+		imageScale = initialScale;
+		imageX = initialX;
+		imageY = initialY;
+	});
 	let isDragging = $state(false);
 
 	const MAX_HEIGHT = 150;
