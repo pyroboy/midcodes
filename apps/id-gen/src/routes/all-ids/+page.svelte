@@ -2,6 +2,7 @@
 	import ImagePreviewModal from '$lib/components/ImagePreviewModal.svelte';
 	import ClientOnly from '$lib/components/ClientOnly.svelte';
 	import { browser } from '$app/environment';
+	import { page } from '$app/stores';
 	import { onMount, tick } from 'svelte';
 	import { fade } from 'svelte/transition';
 	import JSZip from 'jszip';
@@ -12,6 +13,17 @@
 	import SimpleIDCard from '$lib/components/SimpleIDCard.svelte';
 	import EmptyIDs from '$lib/components/empty-states/EmptyIDs.svelte';
 	import IDCardSkeleton from '$lib/components/IDCardSkeleton.svelte';
+
+	import type { AllIdsCacheSnapshot } from './allIdsCache';
+	import {
+		ALL_IDS_CACHE_TTL_MS,
+		clearAllIdsCache,
+		isAllIdsCacheFresh,
+		readAllIdsCache,
+		writeAllIdsCache
+	} from './allIdsCache';
+
+	import { cachedRemoteFunctionCall, clearRemoteFunctionCacheByPrefix } from '$lib/remote/remoteFunctionCache';
 	
 	// Import remote functions
 	import { getIDCards, getCardCount, getTemplateDimensions, getTemplateMetadata } from './data.remote';
@@ -21,11 +33,29 @@
 	const INITIAL_LOAD = 10;
 	const LOAD_MORE_COUNT = 10;
 
+	const scopeKey = $derived(() => {
+		const d = $page.data as any;
+		const userId = d?.user?.id ?? 'anon';
+		const orgId = d?.org_id ?? 'no-org';
+		return `${userId}:${orgId}`;
+	});
+
+	function clearAllIdsRemoteCache() {
+		clearRemoteFunctionCacheByPrefix(`idgen:rf:v1:${scopeKey}:all-ids:`);
+	}
+
 	// Loading states
 	let initialLoading = $state(true);
 	let loadingMore = $state(false);
+	let isRefreshing = $state(false);
 	let hasMore = $state(true);
 	let totalCount = $state(0);
+
+	// Cache timestamps (do NOT update on UI-only changes)
+	let dataCachedAt = $state(0);
+
+	// Scroll restoration (internal scroll container)
+	let scrollTop = $state(0);
 
 	// Data states
 	let dataRows = $state<IDCard[]>([]);
@@ -64,40 +94,76 @@
 	}
 
 	// Load initial cards
-	async function loadInitialCards() {
+	async function loadInitialCards(opts: { forceRefresh?: boolean; background?: boolean } = {}) {
+		const forceRefresh = opts.forceRefresh ?? false;
+		const background = opts.background ?? false;
+
+		// Only show skeleton on first load (no data yet and not background refresh)
+		if (!background && dataRows.length === 0) {
+			initialLoading = true;
+		} else {
+			isRefreshing = true;
+		}
+
 		try {
 			const [result, count] = await Promise.all([
-				getIDCards({ offset: 0, limit: INITIAL_LOAD }),
-				getCardCount()
+				cachedRemoteFunctionCall({
+					scopeKey,
+					keyBase: 'all-ids:getIDCards',
+					args: { offset: 0, limit: INITIAL_LOAD },
+					forceRefresh,
+					fetcher: (args) => getIDCards(args),
+					options: { ttlMs: ALL_IDS_CACHE_TTL_MS, staleWhileRevalidate: true }
+				}),
+				cachedRemoteFunctionCall({
+					scopeKey,
+					keyBase: 'all-ids:getCardCount',
+					args: null as any,
+					forceRefresh,
+					fetcher: async (_args) => getCardCount(),
+					options: { ttlMs: ALL_IDS_CACHE_TTL_MS, staleWhileRevalidate: true }
+				})
 			]);
-			
+
 			dataRows = result.cards;
 			totalCount = count;
 			hasMore = result.hasMore;
-			
+			dataCachedAt = Date.now();
+
 			// Load template dimensions for current cards
-			await loadTemplateDimensionsForCards(result.cards);
+			await loadTemplateDimensionsForCards(result.cards, forceRefresh);
 		} catch (err) {
 			console.error('Error loading initial cards:', err);
 			errorMessage = 'Failed to load ID cards';
 		} finally {
 			initialLoading = false;
+			isRefreshing = false;
 		}
 	}
 
 	// Load more cards (infinite scroll)
-	async function loadMoreCards() {
+	async function loadMoreCards(opts: { forceRefresh?: boolean } = {}) {
 		if (loadingMore || !hasMore) return;
-		
+
+		const forceRefresh = opts.forceRefresh ?? false;
+
 		loadingMore = true;
 		try {
-			const result = await getIDCards({ offset: dataRows.length, limit: LOAD_MORE_COUNT });
-			
+			const result = await cachedRemoteFunctionCall({
+				scopeKey,
+				keyBase: 'all-ids:getIDCards',
+				args: { offset: dataRows.length, limit: LOAD_MORE_COUNT },
+				forceRefresh,
+				fetcher: (args) => getIDCards(args),
+				options: { ttlMs: ALL_IDS_CACHE_TTL_MS, staleWhileRevalidate: true }
+			});
+
 			dataRows = [...dataRows, ...result.cards];
 			hasMore = result.hasMore;
-			
+			dataCachedAt = Date.now();
+
 			// Load template dimensions for new cards
-			await loadTemplateDimensionsForCards(result.cards);
+			await loadTemplateDimensionsForCards(result.cards, forceRefresh);
 		} catch (err) {
 			console.error('Error loading more cards:', err);
 		} finally {
@@ -106,15 +172,30 @@
 	}
 
 	// Load template dimensions and metadata for a set of cards
-	async function loadTemplateDimensionsForCards(cards: IDCard[]) {
-		const newTemplateNames = [...new Set(cards.map(c => c.template_name).filter(Boolean))]
-			.filter(name => !templateDimensions[name]);
-		
+	async function loadTemplateDimensionsForCards(cards: IDCard[], forceRefresh: boolean = false) {
+		const newTemplateNames = [...new Set(cards.map((c) => c.template_name).filter(Boolean))].filter(
+			(name) => !templateDimensions[name]
+		);
+
 		if (newTemplateNames.length > 0) {
 			// Load both dimensions and metadata in parallel
 			const [dims, fields] = await Promise.all([
-				getTemplateDimensions(newTemplateNames),
-				getTemplateMetadata(newTemplateNames)
+				cachedRemoteFunctionCall({
+					scopeKey,
+					keyBase: 'all-ids:getTemplateDimensions',
+					args: newTemplateNames,
+					forceRefresh,
+					fetcher: (args) => getTemplateDimensions(args),
+					options: { ttlMs: ALL_IDS_CACHE_TTL_MS, staleWhileRevalidate: true }
+				}),
+				cachedRemoteFunctionCall({
+					scopeKey,
+					keyBase: 'all-ids:getTemplateMetadata',
+					args: newTemplateNames,
+					forceRefresh,
+					fetcher: (args) => getTemplateMetadata(args),
+					options: { ttlMs: ALL_IDS_CACHE_TTL_MS, staleWhileRevalidate: true }
+				})
 			]);
 			templateDimensions = { ...templateDimensions, ...dims };
 			templateFields = { ...templateFields, ...fields };
@@ -138,7 +219,39 @@
 	}
 
 	onMount(() => {
-		loadInitialCards();
+		// 1) Hydrate immediately from route snapshot cache (no skeleton on back)
+		const cached = readAllIdsCache(scopeKey);
+		if (cached) {
+			dataRows = cached.cards;
+			totalCount = cached.totalCount;
+			hasMore = cached.hasMore;
+			templateDimensions = cached.templateDimensions;
+			templateFields = cached.templateFields;
+
+			searchQuery = cached.ui.searchQuery;
+			cardMinWidth = cached.ui.cardMinWidth;
+			viewMode.set(cached.ui.viewMode);
+
+			scrollTop = cached.scrollTop;
+			dataCachedAt = cached.cachedAt;
+
+			initialLoading = false;
+
+			// Restore scroll position after DOM paint
+			void tick().then(() => {
+				const el = document.querySelector('.all-ids-scroll') as HTMLElement | null;
+				if (el) el.scrollTop = cached.scrollTop || 0;
+			});
+
+			// 2) If stale, refresh in background (keep current list rendered)
+			if (!isAllIdsCacheFresh(cached, ALL_IDS_CACHE_TTL_MS)) {
+				void loadInitialCards({ forceRefresh: true, background: true });
+			}
+		} else {
+			// First visit (no cache): do normal initial load (shows skeleton)
+			loadInitialCards();
+		}
+
 		return () => {
 			observer?.disconnect();
 		};
@@ -149,6 +262,47 @@
 		if (!initialLoading && loadMoreTrigger) {
 			setupObserver();
 		}
+	});
+
+	// Track internal scroll position (for restoring when returning via navigation)
+	$effect(() => {
+		if (!browser) return;
+		if (initialLoading) return;
+
+		const el = document.querySelector('.all-ids-scroll') as HTMLElement | null;
+		if (!el) return;
+
+		const onScroll = () => {
+			scrollTop = el.scrollTop;
+		};
+
+		el.addEventListener('scroll', onScroll, { passive: true });
+		return () => el.removeEventListener('scroll', onScroll);
+	});
+
+	// Persist snapshot cache (do not update cachedAt here; only update dataCachedAt on fetch/mutations)
+	$effect(() => {
+		if (!browser) return;
+		if (initialLoading) return;
+
+		const snapshot: AllIdsCacheSnapshot = {
+			version: 1,
+			cachedAt: dataCachedAt || Date.now(),
+			cards: dataRows,
+			totalCount,
+			hasMore,
+			nextOffset: dataRows.length,
+			templateDimensions,
+			templateFields,
+			ui: {
+				searchQuery,
+				cardMinWidth,
+				viewMode: $viewMode
+			},
+			scrollTop
+		};
+
+		writeAllIdsCache(snapshot, scopeKey);
 	});
 
 	// 3D card geometries - loaded on-demand
@@ -459,6 +613,11 @@
 				selectedCards.delete(cardId);
 				selectedCards = new Set(selectedCards);
 				totalCount--;
+				dataCachedAt = Date.now();
+
+				// Ensure remote-function pages don't remain stale after mutations
+				clearAllIdsRemoteCache();
+				clearAllIdsCache(scopeKey);
 			}
 		} catch (error) {
 			console.error('Error deleting ID card:', error);
@@ -494,6 +653,10 @@
 				dataRows = dataRows.filter((card) => !cardIds.includes(getCardId(card)));
 				selectedCards = new Set();
 				totalCount -= cardIds.length;
+				dataCachedAt = Date.now();
+
+				clearAllIdsRemoteCache();
+				clearAllIdsCache(scopeKey);
 			}
 		} catch (error) {
 			console.error('Error deleting ID cards:', error);
@@ -555,6 +718,26 @@
 			{/if}
 
 			<div class="flex items-center gap-2 ml-auto border-l border-border pl-3">
+				<button
+					class="px-2 py-1 text-xs rounded-md border border-border bg-background hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+					disabled={isRefreshing || initialLoading}
+					onclick={async () => {
+						// Keep old content visible while revalidating
+						isRefreshing = true;
+						clearAllIdsRemoteCache();
+						clearAllIdsCache(scopeKey);
+						await loadInitialCards({ forceRefresh: true, background: true });
+
+						// Optionally scroll to top after refresh
+						await tick();
+						const el = document.querySelector('.all-ids-scroll') as HTMLElement | null;
+						if (el) el.scrollTop = 0;
+						isRefreshing = false;
+					}}
+				>
+					{isRefreshing ? 'Refreshing…' : 'Refresh'}
+				</button>
+
 				{#if $viewMode !== 'table'}
 					<div class="flex items-center bg-muted rounded-lg p-0.5">
 						<button class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-background text-muted-foreground" onclick={zoomOut}>−</button>
@@ -581,7 +764,7 @@
 		<EmptyIDs />
 	{:else if $viewMode === 'table'}
 		<!-- Table View -->
-		<div class="space-y-8 overflow-auto flex-1">
+		<div class="space-y-8 overflow-auto flex-1 all-ids-scroll">
 			{#each Object.entries(groupedCards) as [templateName, cards]}
 				<div class="space-y-3">
 					<div class="flex items-center justify-between">
@@ -719,7 +902,7 @@
 		</div>
 	{:else}
 		<!-- Grid View -->
-		<div class="space-y-10 overflow-auto flex-1" style="--card-min-width: {cardMinWidth}px;">
+		<div class="space-y-10 overflow-auto flex-1 all-ids-scroll" style="--card-min-width: {cardMinWidth}px;">
 			{#each Object.entries(groupedCards) as [templateName, cards]}
 				<div class="space-y-4">
 					<div class="flex items-center gap-3 border-b border-border pb-2">

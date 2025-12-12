@@ -22,6 +22,11 @@
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
 
+	// Remote-function + route snapshot caches should be scoped per (user+org)
+	// and cleared when those change (sign-out / org switch).
+	import { clearRemoteFunctionCacheForScope } from '$lib/remote/remoteFunctionCache';
+	import { clearAllIdsCache } from './all-ids/allIdsCache';
+
 	let { data, children }: LayoutProps = $props();
 
 	// State for mobile menu
@@ -55,6 +60,28 @@
 		if (browser) {
 			updateCurrentPath($page.url.pathname);
 		}
+	});
+
+	// Clear caches on (user+org) change to avoid cross-tenant leakage and stale state.
+	let lastScopeKey: string | null = null;
+
+	$effect(() => {
+		if (!browser) return;
+
+		const d = $page.data as any;
+		const userId = d?.user?.id ?? null;
+		const orgId = d?.org_id ?? null;
+
+		// No scope when unauthenticated or missing org.
+		const scopeKey = userId && orgId ? `${userId}:${orgId}` : null;
+
+		// On any change, clear previous scope's caches.
+		if (lastScopeKey && lastScopeKey !== scopeKey) {
+			clearRemoteFunctionCacheForScope(lastScopeKey);
+			clearAllIdsCache(lastScopeKey);
+		}
+
+		lastScopeKey = scopeKey;
 	});
 
 	// Initialize theme on mount
