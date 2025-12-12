@@ -78,7 +78,7 @@
 	let errorMessage = '';
 
 	// Infinite scroll ref
-	let loadMoreTrigger: HTMLDivElement | null = null;
+	let loadMoreTrigger = $state<HTMLDivElement | null>(null);
 	let observer: IntersectionObserver | null = null;
 	
 	// Visible card window for performance
@@ -258,19 +258,23 @@
 		const { scrollHeight, clientHeight, scrollTop: currentScrollTop } = scrollContainer;
 		const distanceFromBottom = scrollHeight - currentScrollTop - clientHeight;
 		
-		// Load more when within 400px of bottom
-		if (distanceFromBottom < 400) {
-			// Show more cached cards if available (with guard)
+		// Load more when within 600px of bottom (generous threshold for smoother UX)
+		if (distanceFromBottom < 600) {
+			// 1) First: Show more cached cards if available
 			if (hasMoreCachedCards) {
 				isShowingMoreCards = true;
 				showMoreCachedCards();
-				// Reset guard after DOM settles
-				requestAnimationFrame(() => {
+				// Wait for DOM to settle, then check if we need to load even more
+				setTimeout(() => {
 					isShowingMoreCards = false;
-				});
+					// Re-check after DOM update - this creates a chain of loads when at bottom
+					checkAndLoadMore();
+				}, 50);
+				return; // Don't proceed to server fetch yet
 			}
 			
-			// Also fetch more from server if we're running low on cached cards
+			// 2) Then: Fetch more from server if no more cached cards
+			// or if we're running low on cached cards
 			const cachedRemaining = allFilteredCards.length - filteredCards.length;
 			if (hasMore && !loadingMore && cachedRemaining < LOAD_MORE_COUNT) {
 				loadMoreCards();
@@ -333,7 +337,11 @@
 		const _ = $viewMode; // Subscribe to viewMode changes
 		if (!initialLoading) {
 			// Small delay to ensure DOM is updated after view mode change
-			setTimeout(() => setupScrollListener(), 100);
+			setTimeout(() => {
+				setupScrollListener();
+				// Also check if we need to load more initially (e.g., content doesn't fill viewport)
+				checkAndLoadMore();
+			}, 100);
 		}
 	});
 
@@ -970,7 +978,7 @@
 			
 			<!-- Load More Trigger -->
 			{#if hasMore || hasMoreCachedCards}
-				<div bind:this={loadMoreTrigger} class="py-4">
+				<div class="py-4">
 					{#if loadingMore}
 						<div class="text-center text-muted-foreground text-sm">
 							Loading more… {dataRows.length} of {totalCount}
@@ -1016,7 +1024,7 @@
 			
 			<!-- Load More Trigger -->
 			{#if hasMore || hasMoreCachedCards}
-				<div bind:this={loadMoreTrigger} class="py-4">
+				<div class="py-4">
 					{#if loadingMore}
 						<div class="text-center text-muted-foreground text-sm mb-3">
 							Loading more… {dataRows.length} of {totalCount}
