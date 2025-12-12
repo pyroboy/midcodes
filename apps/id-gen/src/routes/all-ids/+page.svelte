@@ -1432,21 +1432,4 @@
 		display: flex;
 		flex-direction: column;
 	}
-
-	/* Faux loading bar animation - goes from 0 to 100% over 1.2s then repeats */
-	.loading-bar-animation {
-		animation: loadingBar 1.2s ease-in-out infinite;
-	}
-
-	@keyframes loadingBar {
-		0% {
-			width: 0%;
-		}
-		50% {
-			width: 100%;
-		}
-		100% {
-			width: 0%;
-		}
-	}
 </style>

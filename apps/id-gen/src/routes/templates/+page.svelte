@@ -17,6 +17,7 @@
 		COMMON_CARD_SIZES,
 		findClosestCardSize
 	} from '$lib/utils/sizeConversion';
+	import { createAdaptiveElements } from '$lib/utils/adaptiveElements';
 
 	// Smart Loading State
 	const preloadState = getPreloadState('/templates');
@@ -1078,9 +1079,6 @@
 
 		if (requiredPixelDimensions && frontElements.length === 0 && backElements.length === 0) {
 			console.log('🔧 Creating default template elements...');
-
-			// Import the element creation utility
-			const { createAdaptiveElements } = await import('$lib/utils/adaptiveElements');
 
 			// Create elements for both sides
 			const frontElems = createAdaptiveElements(
