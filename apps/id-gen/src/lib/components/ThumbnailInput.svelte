@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { run } from 'svelte/legacy';
-	import { createEventDispatcher, onMount, onDestroy, untrack } from 'svelte';
+	import { createEventDispatcher, onMount, onDestroy, untrack, tick } from 'svelte';
 	import { Move, Scaling, Camera, Image, X, SwitchCamera, Circle } from '@lucide/svelte';
 	import { debounce } from 'lodash-es';
 	import { fly, fade } from 'svelte/transition';
@@ -165,6 +165,9 @@
 			// Stop any existing stream
 			stopCamera();
 
+			// Wait for DOM to update (video element to be rendered)
+			await tick();
+
 			const stream = await navigator.mediaDevices.getUserMedia({
 				video: {
 					facingMode: facingMode,
@@ -176,16 +179,36 @@
 
 			cameraStream = stream;
 
-			// Wait for video element to be available
-			await new Promise((resolve) => setTimeout(resolve, 50));
+			// Wait another tick to ensure video element is bound
+			await tick();
+
+			// Try multiple times to bind the stream
+			let attempts = 0;
+			while (!videoElement && attempts < 10) {
+				await new Promise((resolve) => setTimeout(resolve, 50));
+				attempts++;
+			}
 
 			if (videoElement) {
 				videoElement.srcObject = stream;
-				await videoElement.play();
+				try {
+					await videoElement.play();
+				} catch (playErr) {
+					console.warn('Autoplay failed, user interaction may be required:', playErr);
+				}
+			} else {
+				console.error('Video element not found after waiting');
+				cameraError = 'Camera display failed. Please try again.';
 			}
-		} catch (err) {
+		} catch (err: any) {
 			console.error('Camera error:', err);
-			cameraError = 'Could not access camera. Please check permissions.';
+			if (err.name === 'NotAllowedError') {
+				cameraError = 'Camera permission denied. Please allow camera access.';
+			} else if (err.name === 'NotFoundError') {
+				cameraError = 'No camera found on this device.';
+			} else {
+				cameraError = 'Could not access camera. Please check permissions.';
+			}
 		}
 	}
 
