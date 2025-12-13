@@ -756,48 +756,7 @@
 						aria-label="Drag to move crop area"
 						tabindex="0"
 					>
-						<!-- Resize handles -->
-						{#if !disabled}
-							<div
-								class="resize-handle top-left"
-								style="left: {handles.topLeft.x}px; top: {handles.topLeft.y}px; cursor: nw-resize;"
-								onmousedown={(e) => handleResize(e, 'top-left')}
-								ontouchstart={(e) => handleResize(e, 'top-left')}
-								role="button"
-								aria-label="Resize top-left"
-								tabindex="0"
-							></div>
-							<div
-								class="resize-handle top-right"
-								style="left: {handles.topRight.x}px; top: {handles.topRight
-									.y}px; cursor: ne-resize;"
-								onmousedown={(e) => handleResize(e, 'top-right')}
-								ontouchstart={(e) => handleResize(e, 'top-right')}
-								role="button"
-								aria-label="Resize top-right"
-								tabindex="0"
-							></div>
-							<div
-								class="resize-handle bottom-left"
-								style="left: {handles.bottomLeft.x}px; top: {handles.bottomLeft
-									.y}px; cursor: sw-resize;"
-								onmousedown={(e) => handleResize(e, 'bottom-left')}
-								ontouchstart={(e) => handleResize(e, 'bottom-left')}
-								role="button"
-								aria-label="Resize bottom-left"
-								tabindex="0"
-							></div>
-							<div
-								class="resize-handle bottom-right"
-								style="left: {handles.bottomRight.x}px; top: {handles.bottomRight
-									.y}px; cursor: se-resize;"
-								onmousedown={(e) => handleResize(e, 'bottom-right')}
-								ontouchstart={(e) => handleResize(e, 'bottom-right')}
-								role="button"
-								aria-label="Resize bottom-right"
-								tabindex="0"
-							></div>
-						{/if}
+						<!-- Resize handles removed -->
 
 						<!-- Crop preview overlay -->
 						{#if isDragging && debugMode}
@@ -845,16 +804,6 @@
 			<Move size={14} />
 		</button>
 
-		<button
-			class="control-handle scale-handle"
-			class:dragging={isDragging}
-			onmousedown={(e) => handleStart(e, 'resize')}
-			ontouchstart={(e) => handleStart(e, 'resize')}
-			{disabled}
-			title="Drag to scale background"
-		>
-			<Scaling size={14} />
-		</button>
 
 		<button
 			class="control-handle auto-fit-handle"

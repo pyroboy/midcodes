@@ -561,7 +561,13 @@
 			(blob) => {
 				if (blob) {
 					const file = new File([blob], `photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
+					// Reset position to center when new image is captured
+					imageX = 0;
+					imageY = 0;
+					imageScale = 1;
+					borderSize = 0;
 					dispatch('selectfile', { source: 'camera', file });
+					debouncedUpdate(imageScale, imageX, imageY, borderSize);
 					closeCamera();
 				}
 			},
@@ -574,7 +580,14 @@
 		const input = e.target as HTMLInputElement;
 		const file = input.files?.[0];
 		if (file) {
+			// Reset position to center when new image is selected
+			imageX = 0;
+			imageY = 0;
+			imageScale = 1;
+			borderSize = 0;
 			dispatch('selectfile', { source, file });
+			// Also dispatch the reset position
+			debouncedUpdate(imageScale, imageX, imageY, borderSize);
 		}
 		input.value = '';
 	}
@@ -726,44 +739,7 @@
 	</div>
 </div>
 
-<!-- Sliders for Zoom and Border Size -->
-{#if fileUrl}
-	<div class="mt-3 space-y-3" style="width: {thumbnailWidth + 40}px;">
-		<!-- Zoom Slider -->
-		<div class="flex items-center gap-2">
-			<ZoomIn size={14} class="text-gray-500 dark:text-gray-400 flex-shrink-0" />
-			<input
-				type="range"
-				min="0.5"
-				max="3"
-				step="0.05"
-				value={imageScale}
-				oninput={handleZoomSliderChange}
-				class="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
-				aria-label="Zoom"
-			/>
-			<span class="text-xs text-gray-500 dark:text-gray-400 w-10 text-right"
-				>{Math.round(imageScale * 100)}%</span
-			>
-		</div>
 
-		<!-- Border Size Slider -->
-		<div class="flex items-center gap-2">
-			<Square size={14} class="text-gray-500 dark:text-gray-400 flex-shrink-0" />
-			<input
-				type="range"
-				min="0"
-				max="20"
-				step="1"
-				value={borderSize}
-				oninput={handleBorderSliderChange}
-				class="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
-				aria-label="Border size"
-			/>
-			<span class="text-xs text-gray-500 dark:text-gray-400 w-10 text-right">{borderSize}px</span>
-		</div>
-	</div>
-{/if}
 
 <!-- Bottom sheet popup -->
 {#if showPopup}
@@ -1051,21 +1027,6 @@
 					<span class="text-xs text-white/70 w-12 text-right">{Math.round(imageScale * 100)}%</span>
 				</div>
 
-				<!-- Border Size Slider -->
-				<div class="flex items-center gap-3">
-					<Square size={16} class="text-white/70 flex-shrink-0" />
-					<input
-						type="range"
-						min="0"
-						max="20"
-						step="1"
-						value={borderSize}
-						oninput={handleBorderSliderChange}
-						class="flex-1 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer accent-white"
-						aria-label="Border size"
-					/>
-					<span class="text-xs text-white/70 w-12 text-right">{borderSize}px</span>
-				</div>
 			</div>
 
 			<div class="flex items-center justify-between max-w-md mx-auto">
