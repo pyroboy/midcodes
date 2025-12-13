@@ -33,6 +33,20 @@
 	let showPopup = $state(false);
 	let showCamera = $state(false);
 	let galleryInput: HTMLInputElement;
+	let nativeCameraInput: HTMLInputElement;
+
+	// Mobile detection
+	const isMobile = $derived(
+		typeof navigator !== 'undefined' &&
+		(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+		(typeof window !== 'undefined' && window.innerWidth < 768))
+	);
+	const isIOS = $derived(
+		typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent)
+	);
+	const isAndroid = $derived(
+		typeof navigator !== 'undefined' && /Android/.test(navigator.userAgent)
+	);
 
 	// Camera state
 	let videoElement: HTMLVideoElement | undefined = $state(undefined);
@@ -205,103 +219,159 @@
 	// State for permission error only (no loading state)
 	let permissionError = $state<string | null>(null);
 
+	// Use native camera input for mobile - most reliable approach
+	function selectCameraNative() {
+		closePopup();
+		nativeCameraInput?.click();
+	}
+
 	async function selectCamera() {
 		permissionError = null;
 
+		// On mobile, prefer native camera input as it's more reliable
+		// It triggers the native camera app and handles permissions at OS level
+		if (isMobile) {
+			try {
+				// Check if getUserMedia is available for custom camera view
+				if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+					// Fall back to native camera input which is more widely supported
+					console.log('[Camera] Falling back to native camera input on mobile');
+					selectCameraNative();
+					return;
+				}
+				
+				// Try getUserMedia for custom camera view
+				await attemptGetUserMedia();
+			} catch (err: any) {
+				console.warn('[Camera] getUserMedia failed on mobile, using native fallback:', err.message);
+				// On mobile, if getUserMedia fails, use native camera as fallback
+				// This is more reliable especially on iOS Safari
+				selectCameraNative();
+			}
+			return;
+		}
+
+		// Desktop path - use getUserMedia for custom camera view
 		try {
-			// Check if mediaDevices API is available
 			if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
 				permissionError = 'Camera access is not supported in this browser.';
 				return;
 			}
+			await attemptGetUserMedia();
+		} catch (err: any) {
+			handleGetUserMediaError(err);
+		}
+	}
 
-			// Close popup immediately and show camera
-			closePopup();
-			showCamera = true;
+	// Shared getUserMedia logic
+	async function attemptGetUserMedia() {
+		// Close popup immediately and show camera
+		closePopup();
+		showCamera = true;
 
-			// Request camera permission
-			const stream = await navigator.mediaDevices.getUserMedia({
-				video: {
-					facingMode: facingMode,
-					width: { ideal: 1920 },
-					height: { ideal: 1080 }
-				},
+		// Request camera permission
+		const stream = await navigator.mediaDevices.getUserMedia({
+			video: {
+				facingMode: facingMode,
+				width: { ideal: 1920 },
+				height: { ideal: 1080 }
+			},
+			audio: false
+		});
+
+		cameraStream = stream;
+
+		// Wait for DOM to update (video element to be rendered)
+		await tick();
+
+		// Try multiple times to bind the stream
+		let attempts = 0;
+		while (!videoElement && attempts < 20) {
+			await new Promise((resolve) => setTimeout(resolve, 50));
+			attempts++;
+		}
+
+		if (videoElement) {
+			videoElement.srcObject = stream;
+			try {
+				await videoElement.play();
+			} catch (playErr) {
+				console.warn('Autoplay failed:', playErr);
+				// On mobile, autoplay might fail - attempt with user interaction
+				if (isMobile) {
+					console.log('[Camera] Attempting muted play on mobile');
+					videoElement.muted = true;
+					try {
+						await videoElement.play();
+					} catch (e) {
+						console.warn('[Camera] Muted play also failed:', e);
+					}
+				}
+			}
+		} else {
+			cameraError = 'Camera display failed. Please try again.';
+		}
+	}
+
+	// Handle getUserMedia errors
+	function handleGetUserMediaError(err: any) {
+		console.error('Camera error:', err);
+		
+		// Close camera view and go back to popup with error
+		showCamera = false;
+		showPopup = true;
+
+		if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+			if (isIOS) {
+				permissionError = 'Camera denied. Go to Settings > Safari > Camera to allow access, or use Gallery instead.';
+			} else if (isAndroid) {
+				permissionError = 'Camera denied. Tap the lock icon in address bar to enable, or use Gallery instead.';
+			} else {
+				permissionError = 'Camera denied. Click the camera icon in your address bar to allow.';
+			}
+		} else if (err.name === 'NotFoundError') {
+			permissionError = 'No camera found on this device.';
+		} else if (err.name === 'NotReadableError') {
+			permissionError = 'Camera is in use by another app.';
+		} else if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
+			// Try with simpler constraints
+			attemptSimplifiedCamera();
+			return;
+		} else if (err.name === 'SecurityError') {
+			permissionError = 'Camera access blocked. Please ensure you are using HTTPS.';
+		} else if (err.name === 'AbortError') {
+			permissionError = 'Camera access was interrupted. Please try again.';
+		} else {
+			permissionError = 'Could not access camera. Try using Gallery instead.';
+		}
+	}
+
+	// Try with simplified constraints
+	async function attemptSimplifiedCamera() {
+		try {
+			const fallbackStream = await navigator.mediaDevices.getUserMedia({
+				video: true,
 				audio: false
 			});
-
-			cameraStream = stream;
-
-			// Wait for DOM to update (video element to be rendered)
+			cameraStream = fallbackStream;
+			showPopup = false;
+			showCamera = true;
 			await tick();
-
-			// Try multiple times to bind the stream
+			
 			let attempts = 0;
 			while (!videoElement && attempts < 20) {
 				await new Promise((resolve) => setTimeout(resolve, 50));
 				attempts++;
 			}
-
-			if (videoElement) {
-				videoElement.srcObject = stream;
-				try {
-					await videoElement.play();
-				} catch (playErr) {
-					console.warn('Autoplay failed:', playErr);
-				}
-			} else {
-				cameraError = 'Camera display failed. Please try again.';
-			}
-		} catch (err: any) {
-			console.error('Camera error:', err);
 			
-			// Close camera view and go back to popup with error
+			if (videoElement) {
+				videoElement.srcObject = fallbackStream;
+				await videoElement.play();
+			}
+		} catch (e) {
+			permissionError = 'Camera not supported in this browser. Try using Gallery instead.';
 			showCamera = false;
 			showPopup = true;
-
-			const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-			const isAndroid = /Android/.test(navigator.userAgent);
-
-			if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-				if (isIOS) {
-					permissionError = 'Camera denied. Go to Settings > Safari > Camera to allow access.';
-				} else if (isAndroid) {
-					permissionError = 'Camera denied. Tap the lock icon in address bar to enable.';
-				} else {
-					permissionError = 'Camera denied. Click the camera icon in your address bar to allow.';
-				}
-			} else if (err.name === 'NotFoundError') {
-				permissionError = 'No camera found on this device.';
-			} else if (err.name === 'NotReadableError') {
-				permissionError = 'Camera is in use by another app.';
-			} else if (err.name === 'OverconstrainedError') {
-				// Try with simpler constraints
-				try {
-					const fallbackStream = await navigator.mediaDevices.getUserMedia({
-						video: true,
-						audio: false
-					});
-					cameraStream = fallbackStream;
-					showPopup = false;
-					showCamera = true;
-					await tick();
-					
-					let attempts = 0;
-					while (!videoElement && attempts < 20) {
-						await new Promise((resolve) => setTimeout(resolve, 50));
-						attempts++;
-					}
-					
-					if (videoElement) {
-						videoElement.srcObject = fallbackStream;
-						await videoElement.play();
-					}
-					return;
-				} catch {
-					permissionError = 'Camera not supported in this browser.';
-				}
-			} else {
-				permissionError = 'Could not access camera.';
-			}
 		}
 	}
 
@@ -561,6 +631,17 @@
 	onchange={(e) => handleFileChange(e, 'gallery')}
 />
 
+<!-- Native camera input for reliable mobile camera access -->
+<!-- Uses capture attribute to directly trigger device camera -->
+<input
+	bind:this={nativeCameraInput}
+	type="file"
+	accept="image/*"
+	capture="environment"
+	class="hidden"
+	onchange={(e) => handleFileChange(e, 'camera')}
+/>
+
 <div class="flex items-center touch-none">
 	<div class="relative" style="width: {thumbnailWidth}px; height: {thumbnailHeight}px;">
 		<canvas
@@ -705,6 +786,7 @@
 		transition:fade={{ duration: 200 }}
 	>
 		<!-- Video Element - full screen -->
+		<!-- playsinline prevents iOS Safari from going fullscreen when video starts -->
 		<video
 			bind:this={videoElement}
 			autoplay
