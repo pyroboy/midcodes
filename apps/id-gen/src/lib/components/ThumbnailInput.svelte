@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { run } from 'svelte/legacy';
-	import { createEventDispatcher, onMount, untrack } from 'svelte';
-	import { Move, Scaling, Camera, Image, X } from '@lucide/svelte';
+	import { createEventDispatcher, onMount, onDestroy, untrack } from 'svelte';
+	import { Move, Scaling, Camera, Image, X, SwitchCamera, Circle } from '@lucide/svelte';
 	import { debounce } from 'lodash-es';
 	import { fly, fade } from 'svelte/transition';
 
@@ -31,8 +31,14 @@
 	}: Props = $props();
 
 	let showPopup = $state(false);
-	let cameraInput: HTMLInputElement;
+	let showCamera = $state(false);
 	let galleryInput: HTMLInputElement;
+
+	// Camera state
+	let videoElement: HTMLVideoElement;
+	let cameraStream: MediaStream | null = $state(null);
+	let facingMode = $state<'user' | 'environment'>('environment');
+	let cameraError = $state<string | null>(null);
 
 	let canvas = $state<HTMLCanvasElement | undefined>(undefined);
 	let ctx = $state<CanvasRenderingContext2D | null>(null);
@@ -54,6 +60,9 @@
 	const thumbnailWidth = $derived(thumbnailHeight * aspectRatio);
 	const scale = $derived(thumbnailHeight / height);
 
+	// Safe zone is 20% larger than the crop area
+	const SAFE_ZONE_PADDING = 0.15;
+
 	onMount(() => {
 		if (canvas) {
 			ctx = canvas.getContext('2d');
@@ -61,6 +70,10 @@
 				drawPlaceholder();
 			}
 		}
+	});
+
+	onDestroy(() => {
+		stopCamera();
 	});
 
 	function drawPlaceholder() {
@@ -125,14 +138,124 @@
 		}
 	}
 
-	function selectCamera() {
+	async function selectCamera() {
 		closePopup();
-		cameraInput?.click();
+		showCamera = true;
+		await startCamera();
 	}
 
 	function selectGallery() {
 		closePopup();
 		galleryInput?.click();
+	}
+
+	async function startCamera() {
+		cameraError = null;
+		try {
+			// Stop any existing stream
+			stopCamera();
+
+			const stream = await navigator.mediaDevices.getUserMedia({
+				video: {
+					facingMode: facingMode,
+					width: { ideal: 1920 },
+					height: { ideal: 1080 }
+				},
+				audio: false
+			});
+
+			cameraStream = stream;
+
+			// Wait for video element to be available
+			await new Promise((resolve) => setTimeout(resolve, 50));
+
+			if (videoElement) {
+				videoElement.srcObject = stream;
+				await videoElement.play();
+			}
+		} catch (err) {
+			console.error('Camera error:', err);
+			cameraError = 'Could not access camera. Please check permissions.';
+		}
+	}
+
+	function stopCamera() {
+		if (cameraStream) {
+			cameraStream.getTracks().forEach((track) => track.stop());
+			cameraStream = null;
+		}
+	}
+
+	function closeCamera() {
+		stopCamera();
+		showCamera = false;
+	}
+
+	async function switchCamera() {
+		facingMode = facingMode === 'environment' ? 'user' : 'environment';
+		await startCamera();
+	}
+
+	function capturePhoto() {
+		if (!videoElement || !cameraStream) return;
+
+		const videoWidth = videoElement.videoWidth;
+		const videoHeight = videoElement.videoHeight;
+
+		// Calculate the crop area with safe zone
+		const safeZoneMultiplier = 1 + SAFE_ZONE_PADDING * 2;
+
+		// Calculate the frame dimensions that fit within the video
+		let frameWidth: number;
+		let frameHeight: number;
+
+		if (aspectRatio > videoWidth / videoHeight) {
+			// Width-constrained
+			frameWidth = videoWidth * 0.8; // 80% of video width
+			frameHeight = frameWidth / aspectRatio;
+		} else {
+			// Height-constrained
+			frameHeight = videoHeight * 0.8; // 80% of video height
+			frameWidth = frameHeight * aspectRatio;
+		}
+
+		// Safe zone dimensions
+		const safeWidth = frameWidth * safeZoneMultiplier;
+		const safeHeight = frameHeight * safeZoneMultiplier;
+
+		// Center position
+		const x = (videoWidth - safeWidth) / 2;
+		const y = (videoHeight - safeHeight) / 2;
+
+		// Create canvas for capture
+		const captureCanvas = document.createElement('canvas');
+		captureCanvas.width = safeWidth;
+		captureCanvas.height = safeHeight;
+		const captureCtx = captureCanvas.getContext('2d');
+
+		if (!captureCtx) return;
+
+		// Flip horizontally if using front camera
+		if (facingMode === 'user') {
+			captureCtx.translate(safeWidth, 0);
+			captureCtx.scale(-1, 1);
+		}
+
+		// Draw the cropped region
+		captureCtx.drawImage(videoElement, x, y, safeWidth, safeHeight, 0, 0, safeWidth, safeHeight);
+
+		// Convert to blob
+		captureCanvas.toBlob(
+			(blob) => {
+				if (blob) {
+					const file = new File([blob], `photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
+					dispatch('selectfile', { source: 'camera', file });
+					closeCamera();
+				}
+			},
+			'image/jpeg',
+			0.92
+		);
 	}
 
 	function handleFileChange(e: Event, source: 'camera' | 'gallery') {
@@ -219,15 +342,7 @@
 	});
 </script>
 
-<!-- Hidden file inputs -->
-<input
-	bind:this={cameraInput}
-	type="file"
-	accept="image/*"
-	capture="environment"
-	class="hidden"
-	onchange={(e) => handleFileChange(e, 'camera')}
-/>
+<!-- Hidden file input for gallery -->
 <input
 	bind:this={galleryInput}
 	type="file"
@@ -314,7 +429,9 @@
 					onclick={selectCamera}
 					class="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
 				>
-					<div class="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+					<div
+						class="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center"
+					>
 						<Camera size={24} class="text-blue-600 dark:text-blue-400" />
 					</div>
 					<span class="text-sm font-medium text-gray-700 dark:text-gray-200">Camera</span>
@@ -324,10 +441,196 @@
 					onclick={selectGallery}
 					class="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
 				>
-					<div class="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center">
+					<div
+						class="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center"
+					>
 						<Image size={24} class="text-purple-600 dark:text-purple-400" />
 					</div>
 					<span class="text-sm font-medium text-gray-700 dark:text-gray-200">Gallery</span>
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Camera View with Overlay -->
+{#if showCamera}
+	<div
+		class="fixed inset-0 z-[60] bg-black flex flex-col"
+		transition:fade={{ duration: 200 }}
+	>
+		<!-- Camera Preview -->
+		<div class="relative flex-1 overflow-hidden">
+			<!-- Video Element -->
+			<video
+				bind:this={videoElement}
+				autoplay
+				playsinline
+				muted
+				class="absolute inset-0 w-full h-full object-cover"
+				class:scale-x-[-1]={facingMode === 'user'}
+			></video>
+
+			<!-- Overlay -->
+			<div class="absolute inset-0 pointer-events-none">
+				<!-- Dark overlay outside safe zone -->
+				<svg class="w-full h-full" preserveAspectRatio="xMidYMid slice">
+					<defs>
+						<!-- Mask for the dark overlay - reveals the safe zone -->
+						<mask id="overlay-mask">
+							<rect width="100%" height="100%" fill="white" />
+							<!-- Safe zone cutout (slightly larger than crop area) -->
+							<rect
+								x={`${50 - (40 * (1 + SAFE_ZONE_PADDING))}%`}
+								y={`${50 - (40 * (1 + SAFE_ZONE_PADDING)) / aspectRatio}%`}
+								width={`${80 * (1 + SAFE_ZONE_PADDING)}%`}
+								height={`${(80 * (1 + SAFE_ZONE_PADDING)) / aspectRatio}%`}
+								fill="black"
+								rx="4"
+							/>
+						</mask>
+					</defs>
+
+					<!-- Dark overlay -->
+					<rect width="100%" height="100%" fill="rgba(0,0,0,0.6)" mask="url(#overlay-mask)" />
+
+					<!-- Safe zone border (outer dashed) -->
+					<rect
+						x={`${50 - (40 * (1 + SAFE_ZONE_PADDING))}%`}
+						y={`${50 - (40 * (1 + SAFE_ZONE_PADDING)) / aspectRatio}%`}
+						width={`${80 * (1 + SAFE_ZONE_PADDING)}%`}
+						height={`${(80 * (1 + SAFE_ZONE_PADDING)) / aspectRatio}%`}
+						fill="none"
+						stroke="rgba(255,255,255,0.5)"
+						stroke-width="2"
+						stroke-dasharray="8 4"
+						rx="4"
+					/>
+
+					<!-- Crop area border (inner solid) -->
+					<rect
+						x="10%"
+						y={`${50 - 40 / aspectRatio}%`}
+						width="80%"
+						height={`${80 / aspectRatio}%`}
+						fill="none"
+						stroke="white"
+						stroke-width="3"
+						rx="2"
+					/>
+
+					<!-- Corner brackets for crop area -->
+					{@const bracketSize = 20}
+					{@const cropX = 10}
+					{@const cropY = 50 - 40 / aspectRatio}
+					{@const cropW = 80}
+					{@const cropH = 80 / aspectRatio}
+
+					<!-- Top-left corner -->
+					<path
+						d={`M ${cropX}% ${cropY + 5}% L ${cropX}% ${cropY}% L ${cropX + 5}% ${cropY}%`}
+						fill="none"
+						stroke="white"
+						stroke-width="4"
+						stroke-linecap="round"
+					/>
+					<!-- Top-right corner -->
+					<path
+						d={`M ${cropX + cropW - 5}% ${cropY}% L ${cropX + cropW}% ${cropY}% L ${cropX + cropW}% ${cropY + 5}%`}
+						fill="none"
+						stroke="white"
+						stroke-width="4"
+						stroke-linecap="round"
+					/>
+					<!-- Bottom-left corner -->
+					<path
+						d={`M ${cropX}% ${cropY + cropH - 5}% L ${cropX}% ${cropY + cropH}% L ${cropX + 5}% ${cropY + cropH}%`}
+						fill="none"
+						stroke="white"
+						stroke-width="4"
+						stroke-linecap="round"
+					/>
+					<!-- Bottom-right corner -->
+					<path
+						d={`M ${cropX + cropW - 5}% ${cropY + cropH}% L ${cropX + cropW}% ${cropY + cropH}% L ${cropX + cropW}% ${cropY + cropH - 5}%`}
+						fill="none"
+						stroke="white"
+						stroke-width="4"
+						stroke-linecap="round"
+					/>
+
+					<!-- Crosshair -->
+					<g stroke="rgba(255,255,255,0.8)" stroke-width="1">
+						<!-- Horizontal line -->
+						<line x1="45%" y1="50%" x2="48%" y2="50%" />
+						<line x1="52%" y1="50%" x2="55%" y2="50%" />
+						<!-- Vertical line -->
+						<line x1="50%" y1="45%" x2="50%" y2="48%" />
+						<line x1="50%" y1="52%" x2="50%" y2="55%" />
+						<!-- Center dot -->
+						<circle cx="50%" cy="50%" r="3" fill="rgba(255,255,255,0.8)" stroke="none" />
+					</g>
+				</svg>
+
+				<!-- Labels -->
+				<div class="absolute top-4 left-0 right-0 text-center">
+					<span class="text-white text-sm bg-black/50 px-3 py-1 rounded-full">
+						{isSignature ? 'Position signature in frame' : 'Position face in frame'}
+					</span>
+				</div>
+
+				<div class="absolute bottom-32 left-0 right-0 text-center">
+					<span class="text-white/70 text-xs">
+						Dashed line = safe zone for adjustments
+					</span>
+				</div>
+			</div>
+
+			<!-- Error Message -->
+			{#if cameraError}
+				<div class="absolute inset-0 flex items-center justify-center bg-black/80">
+					<div class="text-center p-6">
+						<p class="text-white mb-4">{cameraError}</p>
+						<button
+							onclick={startCamera}
+							class="px-4 py-2 bg-white text-black rounded-lg font-medium"
+						>
+							Retry
+						</button>
+					</div>
+				</div>
+			{/if}
+		</div>
+
+		<!-- Camera Controls -->
+		<div class="bg-black px-6 py-8 safe-bottom">
+			<div class="flex items-center justify-between max-w-md mx-auto">
+				<!-- Close Button -->
+				<button
+					onclick={closeCamera}
+					class="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center"
+					aria-label="Close camera"
+				>
+					<X size={24} class="text-white" />
+				</button>
+
+				<!-- Capture Button -->
+				<button
+					onclick={capturePhoto}
+					disabled={!cameraStream}
+					class="w-20 h-20 rounded-full bg-white flex items-center justify-center disabled:opacity-50 transition-transform active:scale-95"
+					aria-label="Take photo"
+				>
+					<div class="w-16 h-16 rounded-full border-4 border-black/20"></div>
+				</button>
+
+				<!-- Switch Camera Button -->
+				<button
+					onclick={switchCamera}
+					class="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center"
+					aria-label="Switch camera"
+				>
+					<SwitchCamera size={24} class="text-white" />
 				</button>
 			</div>
 		</div>
