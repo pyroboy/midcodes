@@ -35,7 +35,7 @@
 	let galleryInput: HTMLInputElement;
 
 	// Camera state
-	let videoElement: HTMLVideoElement;
+	let videoElement: HTMLVideoElement | undefined = $state(undefined);
 	let cameraStream: MediaStream | null = $state(null);
 	let facingMode = $state<'user' | 'environment'>('environment');
 	let cameraError = $state<string | null>(null);
