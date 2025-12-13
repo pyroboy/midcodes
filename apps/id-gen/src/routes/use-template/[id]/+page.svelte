@@ -47,6 +47,7 @@
 		width: number;
 		height: number;
 		scale: number;
+		borderSize: number;
 	}
 
 	interface FileUploads {
@@ -165,7 +166,8 @@
 					y: 0,
 					width: element.width || 100,
 					height: element.height || 100,
-					scale: 1
+					scale: 1,
+					borderSize: 0
 				};
 			}
 		});
@@ -225,15 +227,16 @@
 	}
 
 	function handleImageUpdate(
-		event: CustomEvent<{ scale: number; x: number; y: number }>,
+		event: CustomEvent<{ scale: number; x: number; y: number; borderSize: number }>,
 		variableName: string
 	) {
-		const { scale, x, y } = event.detail;
+		const { scale, x, y, borderSize } = event.detail;
 		imagePositions[variableName] = {
 			...imagePositions[variableName],
 			scale,
 			x,
-			y
+			y,
+			borderSize
 		};
 	}
 
@@ -648,6 +651,7 @@
 											initialScale={imagePositions[element.variableName]?.scale ?? 1}
 											initialX={imagePositions[element.variableName]?.x ?? 0}
 											initialY={imagePositions[element.variableName]?.y ?? 0}
+											initialBorderSize={imagePositions[element.variableName]?.borderSize ?? 0}
 											isSignature={element.type === 'signature'}
 											on:selectfile={(e) => handleSelectFile(element.variableName, e.detail.file)}
 											on:update={(e) => handleImageUpdate(e, element.variableName)}
@@ -723,6 +727,7 @@
 											initialScale={imagePositions[element.variableName]?.scale ?? 1}
 											initialX={imagePositions[element.variableName]?.x ?? 0}
 											initialY={imagePositions[element.variableName]?.y ?? 0}
+											initialBorderSize={imagePositions[element.variableName]?.borderSize ?? 0}
 											isSignature={element.type === 'signature'}
 											on:selectfile={(e) => handleSelectFile(element.variableName, e.detail.file)}
 											on:update={(e) => handleImageUpdate(e, element.variableName)}

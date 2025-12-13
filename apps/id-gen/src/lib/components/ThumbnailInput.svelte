@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { run } from 'svelte/legacy';
 	import { createEventDispatcher, onMount, onDestroy, untrack, tick } from 'svelte';
-	import { Move, Scaling, Camera, Image as ImageIcon, X, SwitchCamera, Circle } from '@lucide/svelte';
+	import { Move, Scaling, Camera, Image as ImageIcon, X, SwitchCamera, Circle, ZoomIn, Square } from '@lucide/svelte';
 	import { debounce } from 'lodash-es';
 	import { fly, fade } from 'svelte/transition';
 
 	const dispatch = createEventDispatcher<{
 		selectfile: { source: 'camera' | 'gallery'; file: File };
-		update: { scale: number; x: number; y: number };
+		update: { scale: number; x: number; y: number; borderSize: number };
 	}>();
 
 	interface Props {
@@ -17,6 +17,7 @@
 		initialScale?: number;
 		initialX?: number;
 		initialY?: number;
+		initialBorderSize?: number;
 		isSignature?: boolean;
 	}
 
@@ -27,6 +28,7 @@
 		initialScale = 1,
 		initialX = 0,
 		initialY = 0,
+		initialBorderSize = 0,
 		isSignature = false
 	}: Props = $props();
 
@@ -35,11 +37,11 @@
 	let galleryInput: HTMLInputElement;
 	let nativeCameraInput: HTMLInputElement;
 
-	// Mobile detection
+	// Mobile detection - use user agent only, not window width
+	// Window width check was causing false positives on desktop with narrow windows
 	const isMobile = $derived(
 		typeof navigator !== 'undefined' &&
-		(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-		(typeof window !== 'undefined' && window.innerWidth < 768))
+		/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
 	);
 	const isIOS = $derived(
 		typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent)
@@ -60,11 +62,13 @@
 	let imageScale = $state(untrack(() => initialScale));
 	let imageX = $state(untrack(() => initialX));
 	let imageY = $state(untrack(() => initialY));
+	let borderSize = $state(untrack(() => initialBorderSize));
 
 	$effect(() => {
 		imageScale = initialScale;
 		imageX = initialX;
 		imageY = initialY;
+		borderSize = initialBorderSize;
 	});
 	let isDragging = $state(false);
 
@@ -199,6 +203,20 @@
 			drawWidth * scale,
 			drawHeight * scale
 		);
+
+		// Draw inner border if borderSize > 0
+		if (borderSize > 0) {
+			const scaledBorder = borderSize * scale;
+			ctx.strokeStyle = '#ffffff';
+			ctx.lineWidth = scaledBorder;
+			ctx.strokeRect(
+				scaledBorder / 2,
+				scaledBorder / 2,
+				thumbnailWidth - scaledBorder,
+				thumbnailHeight - scaledBorder
+			);
+		}
+
 		ctx.restore();
 	}
 
@@ -265,11 +283,8 @@
 
 	// Shared getUserMedia logic
 	async function attemptGetUserMedia() {
-		// Close popup immediately and show camera
-		closePopup();
-		showCamera = true;
-
-		// Request camera permission
+		// Request camera permission FIRST, before changing UI state
+		// This prevents the camera view from flashing when permission is denied
 		const stream = await navigator.mediaDevices.getUserMedia({
 			video: {
 				facingMode: facingMode,
@@ -279,6 +294,9 @@
 			audio: false
 		});
 
+		// Only close popup and show camera AFTER permission is granted
+		closePopup();
+		showCamera = true;
 		cameraStream = stream;
 
 		// Wait for DOM to update (video element to be rendered)
@@ -317,7 +335,8 @@
 	function handleGetUserMediaError(err: any) {
 		console.error('Camera error:', err);
 		
-		// Close camera view and go back to popup with error
+		// Ensure camera view is closed and popup is shown
+		stopCamera();
 		showCamera = false;
 		showPopup = true;
 
@@ -544,9 +563,24 @@
 		input.value = '';
 	}
 
-	const debouncedUpdate = debounce((scale: number, x: number, y: number) => {
-		dispatch('update', { scale, x, y });
+	const debouncedUpdate = debounce((scale: number, x: number, y: number, border: number) => {
+		dispatch('update', { scale, x, y, borderSize: border });
 	}, 16);
+
+	// Slider change handlers
+	function handleZoomSliderChange(e: Event) {
+		const target = e.target as HTMLInputElement;
+		imageScale = parseFloat(target.value);
+		updateImage();
+		debouncedUpdate(imageScale, imageX, imageY, borderSize);
+	}
+
+	function handleBorderSliderChange(e: Event) {
+		const target = e.target as HTMLInputElement;
+		borderSize = parseFloat(target.value);
+		updateImage();
+		debouncedUpdate(imageScale, imageX, imageY, borderSize);
+	}
 
 	function updateImage() {
 		if (fileUrl) {
@@ -594,7 +628,7 @@
 			}
 
 			requestAnimationFrame(updateImage);
-			debouncedUpdate(imageScale, imageX, imageY);
+			debouncedUpdate(imageScale, imageX, imageY, borderSize);
 		}
 
 		function handleEnd() {
@@ -675,6 +709,43 @@
 		</div>
 	</div>
 </div>
+
+<!-- Sliders for Zoom and Border Size -->
+{#if fileUrl}
+	<div class="mt-3 space-y-3" style="width: {thumbnailWidth + 40}px;">
+		<!-- Zoom Slider -->
+		<div class="flex items-center gap-2">
+			<ZoomIn size={14} class="text-gray-500 dark:text-gray-400 flex-shrink-0" />
+			<input
+				type="range"
+				min="0.5"
+				max="3"
+				step="0.05"
+				value={imageScale}
+				oninput={handleZoomSliderChange}
+				class="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+				aria-label="Zoom"
+			/>
+			<span class="text-xs text-gray-500 dark:text-gray-400 w-10 text-right">{Math.round(imageScale * 100)}%</span>
+		</div>
+
+		<!-- Border Size Slider -->
+		<div class="flex items-center gap-2">
+			<Square size={14} class="text-gray-500 dark:text-gray-400 flex-shrink-0" />
+			<input
+				type="range"
+				min="0"
+				max="20"
+				step="1"
+				value={borderSize}
+				oninput={handleBorderSliderChange}
+				class="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+				aria-label="Border size"
+			/>
+			<span class="text-xs text-gray-500 dark:text-gray-400 w-10 text-right">{borderSize}px</span>
+		</div>
+	</div>
+{/if}
 
 <!-- Bottom sheet popup -->
 {#if showPopup}
