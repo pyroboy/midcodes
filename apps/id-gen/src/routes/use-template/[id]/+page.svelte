@@ -11,7 +11,9 @@
 	import * as Select from '$lib/components/ui/select';
 	import { darkMode } from '$lib/stores/darkMode';
 	import ThumbnailInput from '$lib/components/ThumbnailInput.svelte';
-	import { Loader } from '@lucide/svelte';
+	import { Loader, AlertTriangle, CheckCircle } from '@lucide/svelte';
+	import { goto } from '$app/navigation';
+	import { fade } from 'svelte/transition';
 	// Note: Not using enhance - we use manual fetch for custom handling
 	import type { TemplateElement } from '$lib/stores/templateStore';
 	import { getSupabaseStorageUrl } from '$lib/utils/supabase';
@@ -73,14 +75,16 @@
 
 	// State management using Svelte's reactive stores
 	let templateId = $derived($page.params.id);
-	let template: Template = $state(untrack(() => ({
-		...data.template,
-		template_elements: data.template.template_elements.map((element) => ({
-			...element,
-			width: element.width ?? 100,
-			height: element.height ?? 100
+	let template: Template = $state(
+		untrack(() => ({
+			...data.template,
+			template_elements: data.template.template_elements.map((element) => ({
+				...element,
+				width: element.width ?? 100,
+				height: element.height ?? 100
+			}))
 		}))
-	})));
+	);
 
 	$effect(() => {
 		template = {
@@ -112,6 +116,15 @@
 	let isFlipped = $state(false);
 	let formErrors = $state<Record<string, boolean>>({});
 	let fileUrls = $state<Record<string, string>>({});
+
+	// Overlay states for confirmation and success flows
+	let showConfirmation = $state(false);
+	let showSuccess = $state(false);
+	let redirectCountdown = $state(3);
+	let confirmationShowingFront = $state(true);
+	let renderedFrontUrl = $state<string | null>(null);
+	let renderedBackUrl = $state<string | null>(null);
+	let countdownInterval: ReturnType<typeof setInterval> | null = null;
 
 	// Enhanced Select handling
 	interface SelectState {
@@ -245,11 +258,10 @@
 
 		try {
 			if (!validateForm()) {
-				error = 'Please fill in all required fields';
+				error = 'Please fill in all required fields including photos';
 				return;
 			}
 
-			loading = true;
 			error = null;
 
 			if (!template || !frontCanvasComponent || !backCanvasComponent) {
@@ -257,30 +269,67 @@
 				return;
 			}
 
+			// Render preview images for confirmation overlay
 			const [frontBlob, backBlob] = await Promise.all([
 				frontCanvasComponent.renderFullResolution(),
 				backCanvasComponent.renderFullResolution()
 			]);
 
-			const form = event.target as HTMLFormElement;
-			const formData = new FormData(form);
+			// Create URLs for preview
+			if (renderedFrontUrl) URL.revokeObjectURL(renderedFrontUrl);
+			if (renderedBackUrl) URL.revokeObjectURL(renderedBackUrl);
+			renderedFrontUrl = URL.createObjectURL(frontBlob);
+			renderedBackUrl = URL.createObjectURL(backBlob);
 
-			// Add required data to form
-			formData.append('templateId', $page.params.id);
-			formData.append('frontImage', frontBlob, 'front.png');
-			formData.append('backImage', backBlob, 'back.png');
+			// Show confirmation overlay instead of submitting
+			confirmationShowingFront = true;
+			showConfirmation = true;
+		} catch (err) {
+			console.error('Submit error:', err);
+			error = err instanceof Error ? err.message : 'An unexpected error occurred';
+		}
+	}
+
+	function toggleConfirmationCard() {
+		confirmationShowingFront = !confirmationShowingFront;
+	}
+
+	function cancelConfirmation() {
+		showConfirmation = false;
+	}
+
+	async function confirmAndSubmit() {
+		showConfirmation = false;
+		loading = true;
+		error = null;
+
+		try {
+			if (!template || !frontCanvasComponent || !backCanvasComponent || !formElement) {
+				error = 'Missing required components';
+				loading = false;
+				return;
+			}
+
+			// Re-render at full resolution for submission
+			const [frontBlob, backBlob] = await Promise.all([
+				frontCanvasComponent.renderFullResolution(),
+				backCanvasComponent.renderFullResolution()
+			]);
+
+			const submitFormData = new FormData(formElement);
+			submitFormData.append('templateId', $page.params.id);
+			submitFormData.append('frontImage', frontBlob, 'front.png');
+			submitFormData.append('backImage', backBlob, 'back.png');
 
 			const response = await fetch('?/saveIdCard', {
 				method: 'POST',
-				body: formData
+				body: submitFormData
 			});
 
 			const result = await response.json();
 			console.log('[Save] Full response:', JSON.stringify(result, null, 2));
 
-			// SvelteKit action responses can have different formats
-			// Check for success in various possible locations
-			const isSuccess = 
+			const isSuccess =
 				result.type === 'success' ||
 				result?.data?.[0]?.success === true ||
 				result?.data?.[1]?.type === 'success' ||
@@ -288,18 +337,14 @@
 
 			if (isSuccess) {
 				console.log('[Save] Success! Clearing ALL caches aggressively...');
-				
-				// 1. Clear the all-ids page snapshot cache
+
 				clearAllIdsCache();
-				
-				// 2. Clear remote function cache for our scope
+
 				const userId = $user?.id ?? 'anon';
 				const orgId = $page.data?.org_id ?? 'no-org';
 				const scopeKey = `${userId}:${orgId}`;
-				console.log('[Save] Clearing remote cache for scope:', scopeKey);
 				clearRemoteFunctionCacheByPrefix(`idgen:rf:v1:${scopeKey}:all-ids:`);
-				
-				// 3. AGGRESSIVE: Clear ALL sessionStorage keys related to idgen/all-ids
+
 				try {
 					const keysToRemove: string[] = [];
 					for (let i = 0; i < window.sessionStorage.length; i++) {
@@ -308,32 +353,19 @@
 							keysToRemove.push(key);
 						}
 					}
-					keysToRemove.forEach(k => {
-						console.log('[Save] Removing sessionStorage key:', k);
-						window.sessionStorage.removeItem(k);
-					});
-					console.log('[Save] Removed', keysToRemove.length, 'sessionStorage keys');
+					keysToRemove.forEach((k) => window.sessionStorage.removeItem(k));
 				} catch (e) {
 					console.error('[Save] Error clearing sessionStorage:', e);
 				}
-				
-				// 4. Clear dataCache stores
+
 				idCardsCache.invalidate();
 				recentCardsCache.invalidate();
-				
-				console.log('[Save] All caches cleared. Redirecting with full page load...');
-				
-				// Brief success feedback
-				alert('ID Card saved successfully!');
-				
-				// Full page reload to bypass any remaining caches
-				window.location.href = '/all-ids';
+
+				// Show success overlay with animation
+				showSuccess = true;
+				startSuccessCountdown();
 			} else {
-				// Extract error message from response
-				const errorMsg = 
-					result?.data?.[0]?.error ||
-					result?.error ||
-					'Failed to save ID card';
+				const errorMsg = result?.data?.[0]?.error || result?.error || 'Failed to save ID card';
 				error = errorMsg;
 				console.error('[Save] Error:', errorMsg, 'Full result:', result);
 			}
@@ -343,6 +375,42 @@
 		} finally {
 			loading = false;
 		}
+	}
+
+	function startSuccessCountdown() {
+		redirectCountdown = 3;
+		// Wait for flip animation to complete (1.2s), then start countdown
+		setTimeout(() => {
+			countdownInterval = setInterval(() => {
+				redirectCountdown--;
+				if (redirectCountdown <= 0) {
+					if (countdownInterval) clearInterval(countdownInterval);
+					window.location.href = '/all-ids';
+				}
+			}, 1000);
+		}, 1200);
+	}
+
+	function createAnotherCard() {
+		// Stop countdown if running
+		if (countdownInterval) {
+			clearInterval(countdownInterval);
+			countdownInterval = null;
+		}
+
+		// Reset state
+		showSuccess = false;
+		showConfirmation = false;
+		formData = {};
+		fileUploads = {};
+		fileUrls = {};
+		imagePositions = {};
+		formErrors = {};
+		error = '';
+		redirectCountdown = 3;
+
+		// Re-initialize form data
+		initializeFormData();
 	}
 
 	function handleMouseDown() {
@@ -391,6 +459,14 @@
 					isValid = false;
 				}
 			}
+			// Validate photo and signature fields - prevent blank IDs
+			if (element.type === 'photo' || element.type === 'signature') {
+				if (!fileUploads[element.variableName]) {
+					formErrors[element.variableName] = true;
+					emptyFields.push(element.variableName);
+					isValid = false;
+				}
+			}
 		});
 
 		if (!isValid) {
@@ -407,6 +483,11 @@
 	onDestroy(() => {
 		// Cleanup file URLs
 		Object.values(fileUrls).forEach(URL.revokeObjectURL);
+		// Cleanup rendered URLs
+		if (renderedFrontUrl) URL.revokeObjectURL(renderedFrontUrl);
+		if (renderedBackUrl) URL.revokeObjectURL(renderedBackUrl);
+		// Clear countdown interval
+		if (countdownInterval) clearInterval(countdownInterval);
 	});
 </script>
 
@@ -510,7 +591,8 @@
 								<div
 									class="flip-card-inner"
 									class:flipped={isFlipped}
-									style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels || 638}"
+									style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels ||
+										638}"
 								>
 									<!-- Front face -->
 									<div class="flip-card-face flip-card-front">
@@ -573,11 +655,25 @@
 				<div class="flex justify-between items-center mb-4">
 					<h2 class="text-2xl font-bold">ID Card Form</h2>
 				</div>
-				<p class="text-muted-foreground mb-6">Please fill out these details for your ID card.</p>
+				<p class="text-muted-foreground mb-4">Please fill out these details for your ID card.</p>
+
+				<!-- Warning message -->
+				<div
+					class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 mb-6"
+				>
+					<p class="text-sm text-amber-800 dark:text-amber-200 flex items-center gap-2">
+						<AlertTriangle size={16} class="flex-shrink-0" />
+						All data submitted is final. Please double check before saving.
+					</p>
+				</div>
 
 				{#if template && template.template_elements}
-					{@const frontElements = template.template_elements.filter(el => el.side === 'front' && el.variableName)}
-					{@const backElements = template.template_elements.filter(el => el.side === 'back' && el.variableName)}
+					{@const frontElements = template.template_elements.filter(
+						(el) => el.side === 'front' && el.variableName
+					)}
+					{@const backElements = template.template_elements.filter(
+						(el) => el.side === 'back' && el.variableName
+					)}
 					<form
 						bind:this={formElement}
 						action="?/saveIdCard"
@@ -602,9 +698,7 @@
 								>
 									<Label for={element.variableName} class="text-right">
 										{element.variableName}
-										{#if element.type === 'text' || element.type === 'selection'}
-											<span class="text-red-500">*</span>
-										{/if}
+										<span class="text-red-500">*</span>
 									</Label>
 									{#if element.type === 'text'}
 										<div class="w-full">
@@ -644,18 +738,25 @@
 											{/if}
 										</div>
 									{:else if element.type === 'photo' || element.type === 'signature'}
-										<ThumbnailInput
-											width={element.width}
-											height={element.height}
-											fileUrl={fileUrls[element.variableName]}
-											initialScale={imagePositions[element.variableName]?.scale ?? 1}
-											initialX={imagePositions[element.variableName]?.x ?? 0}
-											initialY={imagePositions[element.variableName]?.y ?? 0}
-											initialBorderSize={imagePositions[element.variableName]?.borderSize ?? 0}
-											isSignature={element.type === 'signature'}
-											on:selectfile={(e) => handleSelectFile(element.variableName, e.detail.file)}
-											on:update={(e) => handleImageUpdate(e, element.variableName)}
-										/>
+										<div class="w-full">
+											<ThumbnailInput
+												width={element.width}
+												height={element.height}
+												fileUrl={fileUrls[element.variableName]}
+												initialScale={imagePositions[element.variableName]?.scale ?? 1}
+												initialX={imagePositions[element.variableName]?.x ?? 0}
+												initialY={imagePositions[element.variableName]?.y ?? 0}
+												initialBorderSize={imagePositions[element.variableName]?.borderSize ?? 0}
+												isSignature={element.type === 'signature'}
+												on:selectfile={(e) => handleSelectFile(element.variableName, e.detail.file)}
+												on:update={(e) => handleImageUpdate(e, element.variableName)}
+											/>
+											{#if formErrors[element.variableName]}
+												<p class="mt-1 text-sm text-destructive">
+													{element.type === 'signature' ? 'Signature' : 'Photo'} is required
+												</p>
+											{/if}
+										</div>
 									{/if}
 								</div>
 							{/each}
@@ -678,9 +779,7 @@
 								>
 									<Label for={element.variableName} class="text-right">
 										{element.variableName}
-										{#if element.type === 'text' || element.type === 'selection'}
-											<span class="text-red-500">*</span>
-										{/if}
+										<span class="text-red-500">*</span>
 									</Label>
 									{#if element.type === 'text'}
 										<div class="w-full">
@@ -720,18 +819,25 @@
 											{/if}
 										</div>
 									{:else if element.type === 'photo' || element.type === 'signature'}
-										<ThumbnailInput
-											width={element.width}
-											height={element.height}
-											fileUrl={fileUrls[element.variableName]}
-											initialScale={imagePositions[element.variableName]?.scale ?? 1}
-											initialX={imagePositions[element.variableName]?.x ?? 0}
-											initialY={imagePositions[element.variableName]?.y ?? 0}
-											initialBorderSize={imagePositions[element.variableName]?.borderSize ?? 0}
-											isSignature={element.type === 'signature'}
-											on:selectfile={(e) => handleSelectFile(element.variableName, e.detail.file)}
-											on:update={(e) => handleImageUpdate(e, element.variableName)}
-										/>
+										<div class="w-full">
+											<ThumbnailInput
+												width={element.width}
+												height={element.height}
+												fileUrl={fileUrls[element.variableName]}
+												initialScale={imagePositions[element.variableName]?.scale ?? 1}
+												initialX={imagePositions[element.variableName]?.x ?? 0}
+												initialY={imagePositions[element.variableName]?.y ?? 0}
+												initialBorderSize={imagePositions[element.variableName]?.borderSize ?? 0}
+												isSignature={element.type === 'signature'}
+												on:selectfile={(e) => handleSelectFile(element.variableName, e.detail.file)}
+												on:update={(e) => handleImageUpdate(e, element.variableName)}
+											/>
+											{#if formErrors[element.variableName]}
+												<p class="mt-1 text-sm text-destructive">
+													{element.type === 'signature' ? 'Signature' : 'Photo'} is required
+												</p>
+											{/if}
+										</div>
 									{/if}
 								</div>
 							{/each}
@@ -766,6 +872,115 @@
 		</Card>
 	</div>
 </div>
+
+<!-- Confirmation Overlay -->
+{#if showConfirmation}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+		transition:fade={{ duration: 200 }}
+	>
+		<div class="bg-white dark:bg-gray-900 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
+			<h2 class="text-xl font-bold text-center mb-4 text-gray-900 dark:text-white">
+				Confirm Your ID Card
+			</h2>
+
+			<!-- Flippable Card Preview -->
+			<div
+				class="confirmation-flip-container mx-auto cursor-pointer mb-3"
+				style="max-width: 300px;"
+				onclick={toggleConfirmationCard}
+				onkeydown={(e) => e.key === 'Enter' && toggleConfirmationCard()}
+				role="button"
+				tabindex="0"
+			>
+				<div
+					class="confirmation-flip-inner"
+					class:flipped={!confirmationShowingFront}
+					style="aspect-ratio: {template?.width_pixels || 1013}/{template?.height_pixels || 638}"
+				>
+					<div class="confirmation-flip-face confirmation-flip-front">
+						{#if renderedFrontUrl}
+							<img
+								src={renderedFrontUrl}
+								alt="ID Card Front"
+								class="w-full h-full object-contain rounded-lg shadow-lg"
+							/>
+						{/if}
+					</div>
+					<div class="confirmation-flip-face confirmation-flip-back">
+						{#if renderedBackUrl}
+							<img
+								src={renderedBackUrl}
+								alt="ID Card Back"
+								class="w-full h-full object-contain rounded-lg shadow-lg"
+							/>
+						{/if}
+					</div>
+				</div>
+			</div>
+
+			<p class="text-center text-sm text-gray-500 dark:text-gray-400 mb-4">
+				Tap card to flip • Showing {confirmationShowingFront ? 'Front' : 'Back'}
+			</p>
+
+			<p class="text-center text-gray-700 dark:text-gray-300 mb-6">
+				Do you approve of all this information?
+			</p>
+
+			<div class="flex gap-3">
+				<Button variant="outline" class="flex-1" onclick={cancelConfirmation}>No, go back</Button>
+				<Button class="flex-1" onclick={confirmAndSubmit} disabled={loading}>
+					{#if loading}
+						<Loader class="mr-2 h-4 w-4 animate-spin" />
+					{/if}
+					Yes, create card
+				</Button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Success Overlay -->
+{#if showSuccess}
+	<div
+		class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80"
+		transition:fade={{ duration: 200 }}
+	>
+		<!-- Flipping Card Animation -->
+		<div class="success-flip-container mb-6" style="max-width: 300px; width: 100%;">
+			<div
+				class="success-flip-animation"
+				style="aspect-ratio: {template?.width_pixels || 1013}/{template?.height_pixels || 638}"
+			>
+				{#if renderedFrontUrl}
+					<img
+						src={renderedFrontUrl}
+						alt="ID Card"
+						class="w-full h-full object-contain rounded-lg shadow-2xl"
+					/>
+				{/if}
+			</div>
+		</div>
+
+		<!-- Success Message -->
+		<div class="text-center px-4">
+			<div class="flex items-center justify-center gap-2 mb-2">
+				<CheckCircle size={28} class="text-green-400" />
+				<h2 class="text-2xl font-bold text-white">
+					"{template?.name}" card created!
+				</h2>
+			</div>
+
+			<p class="text-white/70 mb-6">
+				Redirecting to All IDs in {redirectCountdown}...
+			</p>
+
+			<Button variant="secondary" onclick={createAnotherCard} class="min-w-[200px]">
+				Create Another Card
+			</Button>
+		</div>
+	</div>
+{/if}
 
 <style>
 	:global(.dark) {
@@ -824,5 +1039,61 @@
 	:global(.input-error) {
 		border-color: hsl(var(--destructive));
 		--tw-ring-color: hsl(var(--destructive));
+	}
+
+	/* Confirmation Overlay Flip Card */
+	.confirmation-flip-container {
+		perspective: 1000px;
+	}
+
+	.confirmation-flip-inner {
+		position: relative;
+		width: 100%;
+		transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+		transform-style: preserve-3d;
+	}
+
+	.confirmation-flip-inner.flipped {
+		transform: rotateY(180deg);
+	}
+
+	.confirmation-flip-face {
+		backface-visibility: hidden;
+		-webkit-backface-visibility: hidden;
+	}
+
+	.confirmation-flip-front {
+		position: relative;
+	}
+
+	.confirmation-flip-back {
+		position: absolute;
+		inset: 0;
+		transform: rotateY(180deg);
+	}
+
+	/* Success Overlay 3x Flip Animation */
+	.success-flip-container {
+		perspective: 1000px;
+	}
+
+	.success-flip-animation {
+		animation: flipCard3x 1.2s ease-in-out;
+		transform-style: preserve-3d;
+	}
+
+	@keyframes flipCard3x {
+		0% {
+			transform: rotateY(0deg);
+		}
+		33% {
+			transform: rotateY(180deg);
+		}
+		66% {
+			transform: rotateY(360deg);
+		}
+		100% {
+			transform: rotateY(540deg);
+		}
 	}
 </style>
