@@ -63,6 +63,16 @@
 	// Safe zone is 20% larger than the crop area
 	const SAFE_ZONE_PADDING = 0.15;
 
+	// Overlay calculations for camera view
+	const cropX = 10;
+	const cropW = 80;
+	const cropY = $derived(50 - 40 / aspectRatio);
+	const cropH = $derived(80 / aspectRatio);
+	const safeX = $derived(50 - 40 * (1 + SAFE_ZONE_PADDING));
+	const safeY = $derived(50 - (40 * (1 + SAFE_ZONE_PADDING)) / aspectRatio);
+	const safeW = $derived(80 * (1 + SAFE_ZONE_PADDING));
+	const safeH = $derived((80 * (1 + SAFE_ZONE_PADDING)) / aspectRatio);
+
 	onMount(() => {
 		if (canvas) {
 			ctx = canvas.getContext('2d');
@@ -481,10 +491,10 @@
 							<rect width="100%" height="100%" fill="white" />
 							<!-- Safe zone cutout (slightly larger than crop area) -->
 							<rect
-								x={`${50 - (40 * (1 + SAFE_ZONE_PADDING))}%`}
-								y={`${50 - (40 * (1 + SAFE_ZONE_PADDING)) / aspectRatio}%`}
-								width={`${80 * (1 + SAFE_ZONE_PADDING)}%`}
-								height={`${(80 * (1 + SAFE_ZONE_PADDING)) / aspectRatio}%`}
+								x={`${safeX}%`}
+								y={`${safeY}%`}
+								width={`${safeW}%`}
+								height={`${safeH}%`}
 								fill="black"
 								rx="4"
 							/>
@@ -496,10 +506,10 @@
 
 					<!-- Safe zone border (outer dashed) -->
 					<rect
-						x={`${50 - (40 * (1 + SAFE_ZONE_PADDING))}%`}
-						y={`${50 - (40 * (1 + SAFE_ZONE_PADDING)) / aspectRatio}%`}
-						width={`${80 * (1 + SAFE_ZONE_PADDING)}%`}
-						height={`${(80 * (1 + SAFE_ZONE_PADDING)) / aspectRatio}%`}
+						x={`${safeX}%`}
+						y={`${safeY}%`}
+						width={`${safeW}%`}
+						height={`${safeH}%`}
 						fill="none"
 						stroke="rgba(255,255,255,0.5)"
 						stroke-width="2"
@@ -509,22 +519,15 @@
 
 					<!-- Crop area border (inner solid) -->
 					<rect
-						x="10%"
-						y={`${50 - 40 / aspectRatio}%`}
-						width="80%"
-						height={`${80 / aspectRatio}%`}
+						x={`${cropX}%`}
+						y={`${cropY}%`}
+						width={`${cropW}%`}
+						height={`${cropH}%`}
 						fill="none"
 						stroke="white"
 						stroke-width="3"
 						rx="2"
 					/>
-
-					<!-- Corner brackets for crop area -->
-					{@const bracketSize = 20}
-					{@const cropX = 10}
-					{@const cropY = 50 - 40 / aspectRatio}
-					{@const cropW = 80}
-					{@const cropH = 80 / aspectRatio}
 
 					<!-- Top-left corner -->
 					<path
