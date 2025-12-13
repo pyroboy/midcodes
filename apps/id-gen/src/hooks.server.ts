@@ -1,8 +1,8 @@
 import { createServerClient } from '@supabase/ssr';
 import type { User, Session } from '@supabase/supabase-js';
 import { sequence } from '@sveltejs/kit/hooks';
-import { redirect, error as throwError } from '@sveltejs/kit';
-import { env as publicEnv } from '$env/dynamic/public';
+import { redirect } from '@sveltejs/kit';
+import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
 import type { Handle } from '@sveltejs/kit';
 import { jwtDecode } from 'jwt-decode';
 import { getUserPermissions } from '$lib/services/permissions';
@@ -19,17 +19,7 @@ export interface GetSessionResult {
 }
 
 const initializeSupabase: Handle = async ({ event, resolve }) => {
-	const supabaseUrl = publicEnv.PUBLIC_SUPABASE_URL;
-	const supabaseAnonKey = publicEnv.PUBLIC_SUPABASE_ANON_KEY;
-
-	if (!supabaseUrl || !supabaseAnonKey) {
-		throw throwError(500, {
-			message:
-				'Missing PUBLIC_SUPABASE_URL / PUBLIC_SUPABASE_ANON_KEY. Configure them as Cloudflare Pages environment variables (and locally via .env)'
-		});
-	}
-
-	event.locals.supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+	event.locals.supabase = createServerClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, {
 		cookies: {
 			get: (key: string) => event.cookies.get(key),
 			set: (key: string, value: string, options: { path?: string; sameSite?: boolean | 'lax' | 'strict' | 'none'; secure?: boolean; maxAge?: number; domain?: string }) => {
