@@ -3,6 +3,7 @@ import type { User, Session } from '@supabase/supabase-js';
 import { sequence } from '@sveltejs/kit/hooks';
 import { redirect } from '@sveltejs/kit';
 import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
+import { dev } from '$app/environment';
 import type { Handle } from '@sveltejs/kit';
 import { jwtDecode } from 'jwt-decode';
 import { getUserPermissions } from '$lib/services/permissions';
@@ -28,7 +29,7 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
 						...options,
 						path: '/',
 						sameSite: 'lax',
-						secure: process.env.NODE_ENV === 'production'
+						secure: !dev
 					});
 				} catch (error) {
 					console.error('Cookie could not be set:', error);

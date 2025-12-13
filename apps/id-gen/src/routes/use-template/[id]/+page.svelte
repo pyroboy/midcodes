@@ -305,19 +305,7 @@
 		}
 	}
 
-	function handleSelectFile(variableName: string) {
-		const input = document.createElement('input');
-		input.type = 'file';
-		input.accept = 'image/*';
-		input.onchange = (e) => handleFileUpload(e, variableName);
-		input.click();
-	}
-
-	function handleFileUpload(event: Event, variableName: string) {
-		const input = event.target as HTMLInputElement;
-		if (!input.files?.length) return;
-
-		const file = input.files[0];
+	function handleSelectFile(variableName: string, file: File) {
 		fileUploads[variableName] = file;
 
 		if (fileUrls[variableName]) {
@@ -607,7 +595,7 @@
 											initialX={imagePositions[element.variableName]?.x ?? 0}
 											initialY={imagePositions[element.variableName]?.y ?? 0}
 											isSignature={element.type === 'signature'}
-											on:selectfile={() => handleSelectFile(element.variableName)}
+											on:selectfile={(e) => handleSelectFile(element.variableName, e.detail.file)}
 											on:update={(e) => handleImageUpdate(e, element.variableName)}
 										/>
 									{/if}
@@ -682,7 +670,7 @@
 											initialX={imagePositions[element.variableName]?.x ?? 0}
 											initialY={imagePositions[element.variableName]?.y ?? 0}
 											isSignature={element.type === 'signature'}
-											on:selectfile={() => handleSelectFile(element.variableName)}
+											on:selectfile={(e) => handleSelectFile(element.variableName, e.detail.file)}
 											on:update={(e) => handleImageUpdate(e, element.variableName)}
 										/>
 									{/if}

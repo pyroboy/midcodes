@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { run } from 'svelte/legacy';
 	import { createEventDispatcher, onMount, untrack } from 'svelte';
-	import { Move, Scaling } from '@lucide/svelte';
+	import { Move, Scaling, Camera, Image, X } from '@lucide/svelte';
 	import { debounce } from 'lodash-es';
+	import { fly, fade } from 'svelte/transition';
 
 	const dispatch = createEventDispatcher<{
-		selectfile: void;
+		selectfile: { source: 'camera' | 'gallery'; file: File };
 		update: { scale: number; x: number; y: number };
 	}>();
 
@@ -28,6 +29,10 @@
 		initialY = 0,
 		isSignature = false
 	}: Props = $props();
+
+	let showPopup = $state(false);
+	let cameraInput: HTMLInputElement;
+	let galleryInput: HTMLInputElement;
 
 	let canvas = $state<HTMLCanvasElement | undefined>(undefined);
 	let ctx = $state<CanvasRenderingContext2D | null>(null);
@@ -107,7 +112,36 @@
 	}
 
 	function handleClick() {
-		dispatch('selectfile');
+		showPopup = true;
+	}
+
+	function closePopup() {
+		showPopup = false;
+	}
+
+	function handleBackdropClick(e: MouseEvent) {
+		if (e.target === e.currentTarget) {
+			closePopup();
+		}
+	}
+
+	function selectCamera() {
+		closePopup();
+		cameraInput?.click();
+	}
+
+	function selectGallery() {
+		closePopup();
+		galleryInput?.click();
+	}
+
+	function handleFileChange(e: Event, source: 'camera' | 'gallery') {
+		const input = e.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (file) {
+			dispatch('selectfile', { source, file });
+		}
+		input.value = '';
 	}
 
 	const debouncedUpdate = debounce((scale: number, x: number, y: number) => {
@@ -185,6 +219,23 @@
 	});
 </script>
 
+<!-- Hidden file inputs -->
+<input
+	bind:this={cameraInput}
+	type="file"
+	accept="image/*"
+	capture="environment"
+	class="hidden"
+	onchange={(e) => handleFileChange(e, 'camera')}
+/>
+<input
+	bind:this={galleryInput}
+	type="file"
+	accept="image/*"
+	class="hidden"
+	onchange={(e) => handleFileChange(e, 'gallery')}
+/>
+
 <div class="flex items-center touch-none">
 	<div class="relative" style="width: {thumbnailWidth}px; height: {thumbnailHeight}px;">
 		<canvas
@@ -218,3 +269,67 @@
 		</div>
 	</div>
 </div>
+
+<!-- Bottom sheet popup -->
+{#if showPopup}
+	<div
+		class="fixed inset-0 z-50 flex items-end justify-center"
+		onclick={handleBackdropClick}
+		onkeydown={(e) => e.key === 'Escape' && closePopup()}
+		role="dialog"
+		aria-modal="true"
+		tabindex="-1"
+		transition:fade={{ duration: 200 }}
+	>
+		<!-- Backdrop -->
+		<div class="absolute inset-0 bg-black/50"></div>
+
+		<!-- Bottom sheet -->
+		<div
+			class="relative w-full max-w-md bg-white dark:bg-gray-800 rounded-t-2xl p-4 pb-8 safe-bottom"
+			transition:fly={{ y: 300, duration: 300 }}
+		>
+			<!-- Handle bar -->
+			<div class="flex justify-center mb-4">
+				<div class="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
+			</div>
+
+			<!-- Header -->
+			<div class="flex items-center justify-between mb-4">
+				<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+					{isSignature ? 'Add Signature' : 'Add Photo'}
+				</h3>
+				<button
+					onclick={closePopup}
+					class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+					aria-label="Close"
+				>
+					<X size={20} class="text-gray-500" />
+				</button>
+			</div>
+
+			<!-- Options -->
+			<div class="grid grid-cols-2 gap-3">
+				<button
+					onclick={selectCamera}
+					class="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+				>
+					<div class="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+						<Camera size={24} class="text-blue-600 dark:text-blue-400" />
+					</div>
+					<span class="text-sm font-medium text-gray-700 dark:text-gray-200">Camera</span>
+				</button>
+
+				<button
+					onclick={selectGallery}
+					class="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+				>
+					<div class="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center">
+						<Image size={24} class="text-purple-600 dark:text-purple-400" />
+					</div>
+					<span class="text-sm font-medium text-gray-700 dark:text-gray-200">Gallery</span>
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
