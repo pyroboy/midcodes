@@ -1,7 +1,17 @@
 <script lang="ts">
 	import { run } from 'svelte/legacy';
 	import { createEventDispatcher, onMount, onDestroy, untrack, tick } from 'svelte';
-	import { Move, Scaling, Camera, Image as ImageIcon, X, SwitchCamera, Circle, ZoomIn, Square } from '@lucide/svelte';
+	import {
+		Move,
+		Scaling,
+		Camera,
+		Image as ImageIcon,
+		X,
+		SwitchCamera,
+		Circle,
+		ZoomIn,
+		Square
+	} from '@lucide/svelte';
 	import { debounce } from 'lodash-es';
 	import { fly, fade } from 'svelte/transition';
 
@@ -41,7 +51,7 @@
 	// Window width check was causing false positives on desktop with narrow windows
 	const isMobile = $derived(
 		typeof navigator !== 'undefined' &&
-		/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+			/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
 	);
 	const isIOS = $derived(
 		typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent)
@@ -84,61 +94,64 @@
 	// Dynamic screen dimensions for camera overlay
 	let screenWidth = $state(typeof window !== 'undefined' ? window.innerWidth : 375);
 	let screenHeight = $state(typeof window !== 'undefined' ? window.innerHeight : 667);
-	
+
 	// Padding in pixels for UI elements
-	const topPaddingPx = 60;    // Space for instruction text
-	const bottomPaddingPx = 140; // Space for camera controls
-	const sidePaddingPx = 20;    // Side margins
-	
+	const topPaddingPx = 60; // Space for instruction text
+	const bottomPaddingPx = 200; // Space for sliders + camera controls
+	const sidePaddingPx = 20; // Side margins
+
 	// Calculate available area in pixels
-	const availablePixelWidth = $derived(screenWidth - (sidePaddingPx * 2));
+	const availablePixelWidth = $derived(screenWidth - sidePaddingPx * 2);
 	const availablePixelHeight = $derived(screenHeight - topPaddingPx - bottomPaddingPx);
-	
+
 	// Available area aspect ratio
 	const availableAspectRatio = $derived(availablePixelWidth / availablePixelHeight);
-	
+
 	// Card aspect ratio (from props)
 	// aspectRatio = width / height (already defined above)
-	
+
 	// Calculate crop dimensions in PIXELS to maintain exact card aspect ratio
 	const cropPixelWidth = $derived(
 		aspectRatio >= availableAspectRatio
 			? availablePixelWidth // Card is wider - constrain by width
 			: availablePixelHeight * aspectRatio // Card is taller - calculate width from height
 	);
-	
+
 	const cropPixelHeight = $derived(
 		aspectRatio >= availableAspectRatio
 			? availablePixelWidth / aspectRatio // Card is wider - calculate height from width
 			: availablePixelHeight // Card is taller - constrain by height
 	);
-	
+
 	// Convert to percentages of screen for SVG
 	const cropW = $derived((cropPixelWidth / screenWidth) * 100);
 	const cropH = $derived((cropPixelHeight / screenHeight) * 100);
 	const cropX = $derived((100 - cropW) / 2);
-	const cropY = $derived((topPaddingPx / screenHeight) * 100 + ((availablePixelHeight - cropPixelHeight) / screenHeight) * 100 / 2);
-	
+	const cropY = $derived(
+		(topPaddingPx / screenHeight) * 100 +
+			(((availablePixelHeight - cropPixelHeight) / screenHeight) * 100) / 2
+	);
+
 	// Safe zone is slightly larger (also in pixels first, then percentages)
 	const safePixelWidth = $derived(cropPixelWidth * (1 + SAFE_ZONE_PADDING));
 	const safePixelHeight = $derived(cropPixelHeight * (1 + SAFE_ZONE_PADDING));
 	const safeW = $derived((safePixelWidth / screenWidth) * 100);
 	const safeH = $derived((safePixelHeight / screenHeight) * 100);
 	const safeX = $derived((100 - safeW) / 2);
-	const safeY = $derived(cropY - ((safePixelHeight - cropPixelHeight) / screenHeight) * 100 / 2);
+	const safeY = $derived(cropY - (((safePixelHeight - cropPixelHeight) / screenHeight) * 100) / 2);
 
 	// Update screen dimensions on resize
 	$effect(() => {
 		if (typeof window === 'undefined') return;
-		
+
 		const updateDimensions = () => {
 			screenWidth = window.innerWidth;
 			screenHeight = window.innerHeight;
 		};
-		
+
 		window.addEventListener('resize', updateDimensions);
 		window.addEventListener('orientationchange', updateDimensions);
-		
+
 		return () => {
 			window.removeEventListener('resize', updateDimensions);
 			window.removeEventListener('orientationchange', updateDimensions);
@@ -257,7 +270,7 @@
 					selectCameraNative();
 					return;
 				}
-				
+
 				// Try getUserMedia for custom camera view
 				await attemptGetUserMedia();
 			} catch (err: any) {
@@ -334,7 +347,7 @@
 	// Handle getUserMedia errors
 	function handleGetUserMediaError(err: any) {
 		console.error('Camera error:', err);
-		
+
 		// Ensure camera view is closed and popup is shown
 		stopCamera();
 		showCamera = false;
@@ -342,9 +355,11 @@
 
 		if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
 			if (isIOS) {
-				permissionError = 'Camera denied. Go to Settings > Safari > Camera to allow access, or use Gallery instead.';
+				permissionError =
+					'Camera denied. Go to Settings > Safari > Camera to allow access, or use Gallery instead.';
 			} else if (isAndroid) {
-				permissionError = 'Camera denied. Tap the lock icon in address bar to enable, or use Gallery instead.';
+				permissionError =
+					'Camera denied. Tap the lock icon in address bar to enable, or use Gallery instead.';
 			} else {
 				permissionError = 'Camera denied. Click the camera icon in your address bar to allow.';
 			}
@@ -376,13 +391,13 @@
 			showPopup = false;
 			showCamera = true;
 			await tick();
-			
+
 			let attempts = 0;
 			while (!videoElement && attempts < 20) {
 				await new Promise((resolve) => setTimeout(resolve, 50));
 				attempts++;
 			}
-			
+
 			if (videoElement) {
 				videoElement.srcObject = fallbackStream;
 				await videoElement.play();
@@ -495,16 +510,17 @@
 
 		// Calculate the capture area using the same logic as the overlay
 		// but scaled to the video's native resolution
-		
+
 		// Calculate available area ratio (same proportions as overlay)
-		const videoAvailableWidth = videoWidth - (sidePaddingPx * 2 * (videoWidth / screenWidth));
-		const videoAvailableHeight = videoHeight - ((topPaddingPx + bottomPaddingPx) * (videoHeight / screenHeight));
+		const videoAvailableWidth = videoWidth - sidePaddingPx * 2 * (videoWidth / screenWidth);
+		const videoAvailableHeight =
+			videoHeight - (topPaddingPx + bottomPaddingPx) * (videoHeight / screenHeight);
 		const videoAvailableAR = videoAvailableWidth / videoAvailableHeight;
-		
+
 		// Calculate crop dimensions maintaining the card's aspect ratio
 		let captureWidth: number;
 		let captureHeight: number;
-		
+
 		if (aspectRatio >= videoAvailableAR) {
 			// Card is wider - constrain by width
 			captureWidth = videoAvailableWidth;
@@ -514,7 +530,7 @@
 			captureHeight = videoAvailableHeight;
 			captureWidth = videoAvailableHeight * aspectRatio;
 		}
-		
+
 		// Apply safe zone multiplier to capture the full safe zone area
 		const safeWidth = captureWidth * (1 + SAFE_ZONE_PADDING);
 		const safeHeight = captureHeight * (1 + SAFE_ZONE_PADDING);
@@ -726,7 +742,9 @@
 				class="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
 				aria-label="Zoom"
 			/>
-			<span class="text-xs text-gray-500 dark:text-gray-400 w-10 text-right">{Math.round(imageScale * 100)}%</span>
+			<span class="text-xs text-gray-500 dark:text-gray-400 w-10 text-right"
+				>{Math.round(imageScale * 100)}%</span
+			>
 		</div>
 
 		<!-- Border Size Slider -->
@@ -774,19 +792,21 @@
 			{#if permissionError}
 				<!-- Permission Error State -->
 				<div class="text-center py-6">
-					<div class="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+					<div
+						class="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center"
+					>
 						<Camera size={28} class="text-red-500" />
 					</div>
-					<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-						Camera Error
-					</h3>
+					<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">Camera Error</h3>
 					<p class="text-sm text-gray-600 dark:text-gray-400 mb-6 px-4 leading-relaxed">
 						{permissionError}
 					</p>
 					<div class="flex gap-3 justify-center">
 						<button
 							type="button"
-							onclick={() => { permissionError = null; }}
+							onclick={() => {
+								permissionError = null;
+							}}
 							class="px-6 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
 						>
 							Back
@@ -852,11 +872,8 @@
 
 <!-- Camera View with Overlay -->
 {#if showCamera}
-	<div
-		class="fixed inset-0 z-[60] bg-black"
-		transition:fade={{ duration: 200 }}
-	>
-		<!-- Video Element - full screen -->
+	<div class="fixed inset-0 z-[60] bg-black" transition:fade={{ duration: 200 }}>
+		<!-- Video Element - full screen with zoom transform -->
 		<!-- playsinline prevents iOS Safari from going fullscreen when video starts -->
 		<video
 			bind:this={videoElement}
@@ -864,13 +881,15 @@
 			playsinline
 			muted
 			class="absolute inset-0 w-full h-full object-cover"
-			class:scale-x-[-1]={facingMode === 'user'}
+			style="transform: scale({imageScale}){facingMode === 'user'
+				? ' scaleX(-1)'
+				: ''}; transform-origin: center center;"
 		></video>
 
 		<!-- Overlay - use pixel values for accurate aspect ratio -->
 		<div class="absolute inset-0 pointer-events-none">
-			<svg 
-				class="w-full h-full" 
+			<svg
+				class="w-full h-full"
 				viewBox={`0 0 ${screenWidth} ${screenHeight}`}
 				preserveAspectRatio="none"
 			>
@@ -918,16 +937,56 @@
 					rx="4"
 				/>
 
+				<!-- Border preview (shows what border will look like on captured image) -->
+				{#if borderSize > 0}
+					<rect
+						x={(screenWidth - cropPixelWidth) / 2 + borderSize / 2}
+						y={topPaddingPx + (availablePixelHeight - cropPixelHeight) / 2 + borderSize / 2}
+						width={cropPixelWidth - borderSize}
+						height={cropPixelHeight - borderSize}
+						fill="none"
+						stroke="white"
+						stroke-width={borderSize}
+						rx="2"
+					/>
+				{/if}
+
 				<!-- Crosshair -->
 				<g stroke="rgba(255,255,255,0.8)" stroke-width="1">
 					<!-- Horizontal line -->
-					<line x1={screenWidth/2 - 20} y1={screenHeight/2} x2={screenWidth/2 - 8} y2={screenHeight/2} />
-					<line x1={screenWidth/2 + 8} y1={screenHeight/2} x2={screenWidth/2 + 20} y2={screenHeight/2} />
+					<line
+						x1={screenWidth / 2 - 20}
+						y1={screenHeight / 2}
+						x2={screenWidth / 2 - 8}
+						y2={screenHeight / 2}
+					/>
+					<line
+						x1={screenWidth / 2 + 8}
+						y1={screenHeight / 2}
+						x2={screenWidth / 2 + 20}
+						y2={screenHeight / 2}
+					/>
 					<!-- Vertical line -->
-					<line x1={screenWidth/2} y1={screenHeight/2 - 20} x2={screenWidth/2} y2={screenHeight/2 - 8} />
-					<line x1={screenWidth/2} y1={screenHeight/2 + 8} x2={screenWidth/2} y2={screenHeight/2 + 20} />
+					<line
+						x1={screenWidth / 2}
+						y1={screenHeight / 2 - 20}
+						x2={screenWidth / 2}
+						y2={screenHeight / 2 - 8}
+					/>
+					<line
+						x1={screenWidth / 2}
+						y1={screenHeight / 2 + 8}
+						x2={screenWidth / 2}
+						y2={screenHeight / 2 + 20}
+					/>
 					<!-- Center dot -->
-					<circle cx={screenWidth/2} cy={screenHeight/2} r="3" fill="rgba(255,255,255,0.8)" stroke="none" />
+					<circle
+						cx={screenWidth / 2}
+						cy={screenHeight / 2}
+						r="3"
+						fill="rgba(255,255,255,0.8)"
+						stroke="none"
+					/>
 				</g>
 			</svg>
 
@@ -938,10 +997,8 @@
 				</span>
 			</div>
 
-			<div class="absolute bottom-36 left-0 right-0 text-center">
-				<span class="text-white/70 text-xs">
-					Dashed line = safe zone for adjustments
-				</span>
+			<div class="absolute bottom-52 left-0 right-0 text-center">
+				<span class="text-white/70 text-xs"> Dashed line = safe zone for adjustments </span>
 			</div>
 		</div>
 
@@ -949,7 +1006,9 @@
 		{#if cameraError}
 			<div class="absolute inset-0 flex items-center justify-center bg-black/80 z-10">
 				<div class="text-center p-6 max-w-sm">
-					<div class="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/20 flex items-center justify-center">
+					<div
+						class="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/20 flex items-center justify-center"
+					>
 						<Camera size={32} class="text-red-400" />
 					</div>
 					<p class="text-white mb-4 text-sm leading-relaxed">{cameraError}</p>
@@ -973,7 +1032,42 @@
 		{/if}
 
 		<!-- Camera Controls - fixed at bottom -->
-		<div class="absolute bottom-0 left-0 right-0 bg-black/80 px-6 py-6 safe-bottom">
+		<div class="absolute bottom-0 left-0 right-0 bg-black/80 px-6 pt-4 pb-6 safe-bottom">
+			<!-- Sliders for Zoom and Border Size -->
+			<div class="max-w-md mx-auto mb-4 space-y-3">
+				<!-- Zoom Slider -->
+				<div class="flex items-center gap-3">
+					<ZoomIn size={16} class="text-white/70 flex-shrink-0" />
+					<input
+						type="range"
+						min="1"
+						max="3"
+						step="0.05"
+						value={imageScale}
+						oninput={handleZoomSliderChange}
+						class="flex-1 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer accent-white"
+						aria-label="Zoom"
+					/>
+					<span class="text-xs text-white/70 w-12 text-right">{Math.round(imageScale * 100)}%</span>
+				</div>
+
+				<!-- Border Size Slider -->
+				<div class="flex items-center gap-3">
+					<Square size={16} class="text-white/70 flex-shrink-0" />
+					<input
+						type="range"
+						min="0"
+						max="20"
+						step="1"
+						value={borderSize}
+						oninput={handleBorderSliderChange}
+						class="flex-1 h-2 bg-white/20 rounded-lg appearance-none cursor-pointer accent-white"
+						aria-label="Border size"
+					/>
+					<span class="text-xs text-white/70 w-12 text-right">{borderSize}px</span>
+				</div>
+			</div>
+
 			<div class="flex items-center justify-between max-w-md mx-auto">
 				<!-- Close Button -->
 				<button
