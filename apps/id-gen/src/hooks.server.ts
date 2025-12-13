@@ -47,9 +47,45 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
 
 	event.locals.safeGetSession = async () => {
 		// Get session first - this is cached and fast
-		const { data: { session }, error: sessionError } = await event.locals.supabase.auth.getSession();
+		// Wrap in try-catch to handle invalid refresh tokens gracefully
+		let session = null;
+		let sessionError = null;
+
+		try {
+			const result = await event.locals.supabase.auth.getSession();
+			session = result.data?.session;
+			sessionError = result.error;
+		} catch (err: any) {
+			// Handle AuthApiError for invalid/expired refresh tokens
+			if (err?.code === 'refresh_token_not_found' || err?.__isAuthError) {
+				console.warn('Invalid refresh token detected, clearing session:', err.message);
+				// Clear the invalid session by signing out
+				try {
+					await event.locals.supabase.auth.signOut();
+				} catch {
+					// Ignore signout errors
+				}
+				return {
+					session: null,
+					error: err,
+					user: null,
+					org_id: null,
+					permissions: []
+				};
+			}
+			throw err; // Re-throw unexpected errors
+		}
 
 		if (sessionError || !session) {
+			// Also handle the case where error is returned in the result
+			if ((sessionError as any)?.code === 'refresh_token_not_found') {
+				console.warn('Invalid refresh token in session result, clearing session');
+				try {
+					await event.locals.supabase.auth.signOut();
+				} catch {
+					// Ignore signout errors
+				}
+			}
 			return {
 				session: null,
 				error: sessionError || new Error('Session not found'),
@@ -121,7 +157,7 @@ const authGuard: Handle = async ({ event, resolve }) => {
 		'X-Frame-Options': 'DENY',
 		'X-Content-Type-Options': 'nosniff',
 		'Referrer-Policy': 'strict-origin-when-cross-origin',
-		'Permissions-Policy': 'geolocation=(), microphone=(), camera=()'
+		'Permissions-Policy': 'geolocation=(), microphone=(), camera=(self)'
 	});
 
 	const sessionInfo = await event.locals.safeGetSession();

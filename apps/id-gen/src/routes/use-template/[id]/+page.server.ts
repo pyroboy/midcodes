@@ -53,8 +53,10 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 };
 
 export const actions: Actions = {
-	saveIdCard: async ({ request, locals: { supabase } }) => {
+	saveIdCard: async ({ request, locals }) => {
+		const { supabase, org_id: userOrgId } = locals;
 		console.log('[Save ID Card] Starting save process...');
+		console.log('[Save ID Card] User org_id:', userOrgId);
 
 		try {
 			const formData = await request.formData();
@@ -70,7 +72,7 @@ export const actions: Actions = {
 				return fail(400, { error: 'Template ID is required' });
 			}
 
-			// Verify template access
+			// Verify template exists
 			const { data: templateData, error: templateError } = await supabase
 				.from('templates')
 				.select('org_id, organizations(*), template_elements')
@@ -94,9 +96,15 @@ export const actions: Actions = {
 				return fail(404, { error: 'Template not found' });
 			}
 
-			// Handle image uploads
-			console.log('[Save ID Card] Processing image uploads...');
-			const effectiveOrgId = template.org_id;
+			// Use the USER's org_id, not the template's org_id
+			// This ensures the card appears in the user's all-ids list
+			const effectiveOrgId = userOrgId || template.org_id;
+			
+			console.log('[Save ID Card] Using org_id:', {
+				userOrgId,
+				templateOrgId: template.org_id,
+				effectiveOrgId
+			});
 
 			if (!effectiveOrgId) {
 				console.log('[Save ID Card] No organization ID found');

@@ -12,10 +12,12 @@
 	import { darkMode } from '$lib/stores/darkMode';
 	import ThumbnailInput from '$lib/components/ThumbnailInput.svelte';
 	import { Loader } from '@lucide/svelte';
-	import { goto } from '$app/navigation';
-	import { enhance } from '$app/forms';
+	// Note: Not using enhance - we use manual fetch for custom handling
 	import type { TemplateElement } from '$lib/stores/templateStore';
 	import { getSupabaseStorageUrl } from '$lib/utils/supabase';
+	import { idCardsCache, recentCardsCache } from '$lib/stores/dataCache';
+	import { clearAllIdsCache } from '../../all-ids/allIdsCache';
+	import { clearRemoteFunctionCacheByPrefix } from '$lib/remote/remoteFunctionCache';
 
 	// Enhanced type definitions for better type safety
 	interface SelectOption {
@@ -271,13 +273,66 @@
 			});
 
 			const result = await response.json();
-			console.log('Save response:', result);
+			console.log('[Save] Full response:', JSON.stringify(result, null, 2));
 
-			if (response.ok && (result.type === 'success' || (result.data && result.data[0]?.success))) {
-				goto('/all-ids');
+			// SvelteKit action responses can have different formats
+			// Check for success in various possible locations
+			const isSuccess = 
+				result.type === 'success' ||
+				result?.data?.[0]?.success === true ||
+				result?.data?.[1]?.type === 'success' ||
+				(response.ok && result?.data?.[0]?.idCardId);
+
+			if (isSuccess) {
+				console.log('[Save] Success! Clearing ALL caches aggressively...');
+				
+				// 1. Clear the all-ids page snapshot cache
+				clearAllIdsCache();
+				
+				// 2. Clear remote function cache for our scope
+				const userId = $user?.id ?? 'anon';
+				const orgId = $page.data?.org_id ?? 'no-org';
+				const scopeKey = `${userId}:${orgId}`;
+				console.log('[Save] Clearing remote cache for scope:', scopeKey);
+				clearRemoteFunctionCacheByPrefix(`idgen:rf:v1:${scopeKey}:all-ids:`);
+				
+				// 3. AGGRESSIVE: Clear ALL sessionStorage keys related to idgen/all-ids
+				try {
+					const keysToRemove: string[] = [];
+					for (let i = 0; i < window.sessionStorage.length; i++) {
+						const key = window.sessionStorage.key(i);
+						if (key && (key.includes('idgen') || key.includes('all-ids'))) {
+							keysToRemove.push(key);
+						}
+					}
+					keysToRemove.forEach(k => {
+						console.log('[Save] Removing sessionStorage key:', k);
+						window.sessionStorage.removeItem(k);
+					});
+					console.log('[Save] Removed', keysToRemove.length, 'sessionStorage keys');
+				} catch (e) {
+					console.error('[Save] Error clearing sessionStorage:', e);
+				}
+				
+				// 4. Clear dataCache stores
+				idCardsCache.invalidate();
+				recentCardsCache.invalidate();
+				
+				console.log('[Save] All caches cleared. Redirecting with full page load...');
+				
+				// Brief success feedback
+				alert('ID Card saved successfully!');
+				
+				// Full page reload to bypass any remaining caches
+				window.location.href = '/all-ids';
 			} else {
-				error = (result.data && result.data[0]?.error) || 'Failed to save ID card';
-				console.error('Save error:', error);
+				// Extract error message from response
+				const errorMsg = 
+					result?.data?.[0]?.error ||
+					result?.error ||
+					'Failed to save ID card';
+				error = errorMsg;
+				console.error('[Save] Error:', errorMsg, 'Full result:', result);
 			}
 		} catch (err) {
 			console.error('Submit error:', err);
@@ -526,7 +581,6 @@
 						method="POST"
 						enctype="multipart/form-data"
 						onsubmit={preventDefault(handleSubmit)}
-						use:enhance
 					>
 						<!-- Front Side Fields -->
 						{#if frontElements.length > 0}

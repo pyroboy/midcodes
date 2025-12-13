@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { run } from 'svelte/legacy';
 	import { createEventDispatcher, onMount, onDestroy, untrack, tick } from 'svelte';
-	import { Move, Scaling, Camera, Image, X, SwitchCamera, Circle } from '@lucide/svelte';
+	import { Move, Scaling, Camera, Image as ImageIcon, X, SwitchCamera, Circle } from '@lucide/svelte';
 	import { debounce } from 'lodash-es';
 	import { fly, fade } from 'svelte/transition';
 
@@ -60,18 +60,72 @@
 	const thumbnailWidth = $derived(thumbnailHeight * aspectRatio);
 	const scale = $derived(thumbnailHeight / height);
 
-	// Safe zone is 20% larger than the crop area
+	// Safe zone is 15% larger than the crop area
 	const SAFE_ZONE_PADDING = 0.15;
 
-	// Overlay calculations for camera view
-	const cropX = 10;
-	const cropW = 80;
-	const cropY = $derived(50 - 40 / aspectRatio);
-	const cropH = $derived(80 / aspectRatio);
-	const safeX = $derived(50 - 40 * (1 + SAFE_ZONE_PADDING));
-	const safeY = $derived(50 - (40 * (1 + SAFE_ZONE_PADDING)) / aspectRatio);
-	const safeW = $derived(80 * (1 + SAFE_ZONE_PADDING));
-	const safeH = $derived((80 * (1 + SAFE_ZONE_PADDING)) / aspectRatio);
+	// Dynamic screen dimensions for camera overlay
+	let screenWidth = $state(typeof window !== 'undefined' ? window.innerWidth : 375);
+	let screenHeight = $state(typeof window !== 'undefined' ? window.innerHeight : 667);
+	
+	// Padding in pixels for UI elements
+	const topPaddingPx = 60;    // Space for instruction text
+	const bottomPaddingPx = 140; // Space for camera controls
+	const sidePaddingPx = 20;    // Side margins
+	
+	// Calculate available area in pixels
+	const availablePixelWidth = $derived(screenWidth - (sidePaddingPx * 2));
+	const availablePixelHeight = $derived(screenHeight - topPaddingPx - bottomPaddingPx);
+	
+	// Available area aspect ratio
+	const availableAspectRatio = $derived(availablePixelWidth / availablePixelHeight);
+	
+	// Card aspect ratio (from props)
+	// aspectRatio = width / height (already defined above)
+	
+	// Calculate crop dimensions in PIXELS to maintain exact card aspect ratio
+	const cropPixelWidth = $derived(
+		aspectRatio >= availableAspectRatio
+			? availablePixelWidth // Card is wider - constrain by width
+			: availablePixelHeight * aspectRatio // Card is taller - calculate width from height
+	);
+	
+	const cropPixelHeight = $derived(
+		aspectRatio >= availableAspectRatio
+			? availablePixelWidth / aspectRatio // Card is wider - calculate height from width
+			: availablePixelHeight // Card is taller - constrain by height
+	);
+	
+	// Convert to percentages of screen for SVG
+	const cropW = $derived((cropPixelWidth / screenWidth) * 100);
+	const cropH = $derived((cropPixelHeight / screenHeight) * 100);
+	const cropX = $derived((100 - cropW) / 2);
+	const cropY = $derived((topPaddingPx / screenHeight) * 100 + ((availablePixelHeight - cropPixelHeight) / screenHeight) * 100 / 2);
+	
+	// Safe zone is slightly larger (also in pixels first, then percentages)
+	const safePixelWidth = $derived(cropPixelWidth * (1 + SAFE_ZONE_PADDING));
+	const safePixelHeight = $derived(cropPixelHeight * (1 + SAFE_ZONE_PADDING));
+	const safeW = $derived((safePixelWidth / screenWidth) * 100);
+	const safeH = $derived((safePixelHeight / screenHeight) * 100);
+	const safeX = $derived((100 - safeW) / 2);
+	const safeY = $derived(cropY - ((safePixelHeight - cropPixelHeight) / screenHeight) * 100 / 2);
+
+	// Update screen dimensions on resize
+	$effect(() => {
+		if (typeof window === 'undefined') return;
+		
+		const updateDimensions = () => {
+			screenWidth = window.innerWidth;
+			screenHeight = window.innerHeight;
+		};
+		
+		window.addEventListener('resize', updateDimensions);
+		window.addEventListener('orientationchange', updateDimensions);
+		
+		return () => {
+			window.removeEventListener('resize', updateDimensions);
+			window.removeEventListener('orientationchange', updateDimensions);
+		};
+	});
 
 	onMount(() => {
 		if (canvas) {
@@ -148,26 +202,24 @@
 		}
 	}
 
+	// State for permission error only (no loading state)
+	let permissionError = $state<string | null>(null);
+
 	async function selectCamera() {
-		closePopup();
-		showCamera = true;
-		await startCamera();
-	}
+		permissionError = null;
 
-	function selectGallery() {
-		closePopup();
-		galleryInput?.click();
-	}
-
-	async function startCamera() {
-		cameraError = null;
 		try {
-			// Stop any existing stream
-			stopCamera();
+			// Check if mediaDevices API is available
+			if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+				permissionError = 'Camera access is not supported in this browser.';
+				return;
+			}
 
-			// Wait for DOM to update (video element to be rendered)
-			await tick();
+			// Close popup immediately and show camera
+			closePopup();
+			showCamera = true;
 
+			// Request camera permission
 			const stream = await navigator.mediaDevices.getUserMedia({
 				video: {
 					facingMode: facingMode,
@@ -179,12 +231,12 @@
 
 			cameraStream = stream;
 
-			// Wait another tick to ensure video element is bound
+			// Wait for DOM to update (video element to be rendered)
 			await tick();
 
 			// Try multiple times to bind the stream
 			let attempts = 0;
-			while (!videoElement && attempts < 10) {
+			while (!videoElement && attempts < 20) {
 				await new Promise((resolve) => setTimeout(resolve, 50));
 				attempts++;
 			}
@@ -194,20 +246,137 @@
 				try {
 					await videoElement.play();
 				} catch (playErr) {
-					console.warn('Autoplay failed, user interaction may be required:', playErr);
+					console.warn('Autoplay failed:', playErr);
 				}
 			} else {
-				console.error('Video element not found after waiting');
 				cameraError = 'Camera display failed. Please try again.';
 			}
 		} catch (err: any) {
 			console.error('Camera error:', err);
-			if (err.name === 'NotAllowedError') {
-				cameraError = 'Camera permission denied. Please allow camera access.';
+			
+			// Close camera view and go back to popup with error
+			showCamera = false;
+			showPopup = true;
+
+			const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+			const isAndroid = /Android/.test(navigator.userAgent);
+
+			if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+				if (isIOS) {
+					permissionError = 'Camera denied. Go to Settings > Safari > Camera to allow access.';
+				} else if (isAndroid) {
+					permissionError = 'Camera denied. Tap the lock icon in address bar to enable.';
+				} else {
+					permissionError = 'Camera denied. Click the camera icon in your address bar to allow.';
+				}
+			} else if (err.name === 'NotFoundError') {
+				permissionError = 'No camera found on this device.';
+			} else if (err.name === 'NotReadableError') {
+				permissionError = 'Camera is in use by another app.';
+			} else if (err.name === 'OverconstrainedError') {
+				// Try with simpler constraints
+				try {
+					const fallbackStream = await navigator.mediaDevices.getUserMedia({
+						video: true,
+						audio: false
+					});
+					cameraStream = fallbackStream;
+					showPopup = false;
+					showCamera = true;
+					await tick();
+					
+					let attempts = 0;
+					while (!videoElement && attempts < 20) {
+						await new Promise((resolve) => setTimeout(resolve, 50));
+						attempts++;
+					}
+					
+					if (videoElement) {
+						videoElement.srcObject = fallbackStream;
+						await videoElement.play();
+					}
+					return;
+				} catch {
+					permissionError = 'Camera not supported in this browser.';
+				}
+			} else {
+				permissionError = 'Could not access camera.';
+			}
+		}
+	}
+
+	function selectGallery() {
+		closePopup();
+		galleryInput?.click();
+	}
+
+	// Used for switching camera or retrying when already in camera view
+	async function startCamera() {
+		cameraError = null;
+
+		try {
+			// Stop any existing stream
+			stopCamera();
+
+			// Request camera access with current facing mode
+			const stream = await navigator.mediaDevices.getUserMedia({
+				video: {
+					facingMode: facingMode,
+					width: { ideal: 1920 },
+					height: { ideal: 1080 }
+				},
+				audio: false
+			});
+
+			cameraStream = stream;
+
+			// Wait for video element to be ready
+			await tick();
+
+			let attempts = 0;
+			while (!videoElement && attempts < 20) {
+				await new Promise((resolve) => setTimeout(resolve, 50));
+				attempts++;
+			}
+
+			if (videoElement) {
+				videoElement.srcObject = stream;
+				try {
+					await videoElement.play();
+				} catch (playErr) {
+					console.warn('Autoplay failed:', playErr);
+				}
+			} else {
+				cameraError = 'Camera display failed. Please try again.';
+			}
+		} catch (err: any) {
+			console.error('Camera error:', err);
+
+			if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+				cameraError = 'Camera permission denied. Please check your browser settings.';
 			} else if (err.name === 'NotFoundError') {
 				cameraError = 'No camera found on this device.';
+			} else if (err.name === 'NotReadableError') {
+				cameraError = 'Camera is in use by another application.';
+			} else if (err.name === 'OverconstrainedError') {
+				// Try with basic constraints
+				try {
+					const fallbackStream = await navigator.mediaDevices.getUserMedia({
+						video: true,
+						audio: false
+					});
+					cameraStream = fallbackStream;
+					await tick();
+					if (videoElement) {
+						videoElement.srcObject = fallbackStream;
+						await videoElement.play();
+					}
+					return;
+				} catch {
+					cameraError = 'Camera not supported.';
+				}
 			} else {
-				cameraError = 'Could not access camera. Please check permissions.';
+				cameraError = 'Could not access camera.';
 			}
 		}
 	}
@@ -235,28 +404,33 @@
 		const videoWidth = videoElement.videoWidth;
 		const videoHeight = videoElement.videoHeight;
 
-		// Calculate the crop area with safe zone
-		const safeZoneMultiplier = 1 + SAFE_ZONE_PADDING * 2;
-
-		// Calculate the frame dimensions that fit within the video
-		let frameWidth: number;
-		let frameHeight: number;
-
-		if (aspectRatio > videoWidth / videoHeight) {
-			// Width-constrained
-			frameWidth = videoWidth * 0.8; // 80% of video width
-			frameHeight = frameWidth / aspectRatio;
+		// Calculate the capture area using the same logic as the overlay
+		// but scaled to the video's native resolution
+		
+		// Calculate available area ratio (same proportions as overlay)
+		const videoAvailableWidth = videoWidth - (sidePaddingPx * 2 * (videoWidth / screenWidth));
+		const videoAvailableHeight = videoHeight - ((topPaddingPx + bottomPaddingPx) * (videoHeight / screenHeight));
+		const videoAvailableAR = videoAvailableWidth / videoAvailableHeight;
+		
+		// Calculate crop dimensions maintaining the card's aspect ratio
+		let captureWidth: number;
+		let captureHeight: number;
+		
+		if (aspectRatio >= videoAvailableAR) {
+			// Card is wider - constrain by width
+			captureWidth = videoAvailableWidth;
+			captureHeight = videoAvailableWidth / aspectRatio;
 		} else {
-			// Height-constrained
-			frameHeight = videoHeight * 0.8; // 80% of video height
-			frameWidth = frameHeight * aspectRatio;
+			// Card is taller - constrain by height
+			captureHeight = videoAvailableHeight;
+			captureWidth = videoAvailableHeight * aspectRatio;
 		}
+		
+		// Apply safe zone multiplier to capture the full safe zone area
+		const safeWidth = captureWidth * (1 + SAFE_ZONE_PADDING);
+		const safeHeight = captureHeight * (1 + SAFE_ZONE_PADDING);
 
-		// Safe zone dimensions
-		const safeWidth = frameWidth * safeZoneMultiplier;
-		const safeHeight = frameHeight * safeZoneMultiplier;
-
-		// Center position
+		// Center position in video
 		const x = (videoWidth - safeWidth) / 2;
 		const y = (videoHeight - safeHeight) / 2;
 
@@ -274,7 +448,7 @@
 			captureCtx.scale(-1, 1);
 		}
 
-		// Draw the cropped region
+		// Draw the cropped region from the video
 		captureCtx.drawImage(videoElement, x, y, safeWidth, safeHeight, 0, 0, safeWidth, safeHeight);
 
 		// Convert to blob
@@ -313,7 +487,10 @@
 	}
 
 	function handleStart(event: MouseEvent | TouchEvent, mode: 'move' | 'resize') {
-		event.preventDefault();
+		// Only prevent default for mouse events (touch events are passive by default)
+		if (!('touches' in event)) {
+			event.preventDefault();
+		}
 		isDragging = true;
 
 		const startPoint =
@@ -442,46 +619,81 @@
 				<div class="w-10 h-1 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
 			</div>
 
-			<!-- Header -->
-			<div class="flex items-center justify-between mb-4">
-				<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-					{isSignature ? 'Add Signature' : 'Add Photo'}
-				</h3>
-				<button
-					onclick={closePopup}
-					class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-					aria-label="Close"
-				>
-					<X size={20} class="text-gray-500" />
-				</button>
-			</div>
-
-			<!-- Options -->
-			<div class="grid grid-cols-2 gap-3">
-				<button
-					onclick={selectCamera}
-					class="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-				>
-					<div
-						class="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center"
-					>
-						<Camera size={24} class="text-blue-600 dark:text-blue-400" />
+			{#if permissionError}
+				<!-- Permission Error State -->
+				<div class="text-center py-6">
+					<div class="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+						<Camera size={28} class="text-red-500" />
 					</div>
-					<span class="text-sm font-medium text-gray-700 dark:text-gray-200">Camera</span>
-				</button>
-
-				<button
-					onclick={selectGallery}
-					class="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-				>
-					<div
-						class="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center"
-					>
-						<Image size={24} class="text-purple-600 dark:text-purple-400" />
+					<h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+						Camera Error
+					</h3>
+					<p class="text-sm text-gray-600 dark:text-gray-400 mb-6 px-4 leading-relaxed">
+						{permissionError}
+					</p>
+					<div class="flex gap-3 justify-center">
+						<button
+							type="button"
+							onclick={() => { permissionError = null; }}
+							class="px-6 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+						>
+							Back
+						</button>
+						<button
+							type="button"
+							onclick={selectCamera}
+							class="px-6 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors"
+						>
+							Try Again
+						</button>
 					</div>
-					<span class="text-sm font-medium text-gray-700 dark:text-gray-200">Gallery</span>
-				</button>
-			</div>
+				</div>
+			{:else}
+				<!-- Normal State - Camera/Gallery Options -->
+				<!-- Header -->
+				<div class="flex items-center justify-between mb-4">
+					<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+						{isSignature ? 'Add Signature' : 'Add Photo'}
+					</h3>
+					<button
+						type="button"
+						onclick={closePopup}
+						class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+						aria-label="Close"
+					>
+						<X size={20} class="text-gray-500" />
+					</button>
+				</div>
+
+				<!-- Options -->
+				<div class="grid grid-cols-2 gap-3">
+					<button
+						type="button"
+						onclick={selectCamera}
+						class="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+					>
+						<div
+							class="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center"
+						>
+							<Camera size={24} class="text-blue-600 dark:text-blue-400" />
+						</div>
+						<span class="text-sm font-medium text-gray-700 dark:text-gray-200">Camera</span>
+					</button>
+
+					<button
+						type="button"
+						onclick={selectGallery}
+						class="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+					>
+						<div
+							class="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900 flex items-center justify-center"
+						>
+							<ImageIcon size={24} class="text-purple-600 dark:text-purple-400" />
+						</div>
+						<span class="text-sm font-medium text-gray-700 dark:text-gray-200">Gallery</span>
+					</button>
+				</div>
+			{/if}
 		</div>
 	</div>
 {/if}
@@ -489,150 +701,130 @@
 <!-- Camera View with Overlay -->
 {#if showCamera}
 	<div
-		class="fixed inset-0 z-[60] bg-black flex flex-col"
+		class="fixed inset-0 z-[60] bg-black"
 		transition:fade={{ duration: 200 }}
 	>
-		<!-- Camera Preview -->
-		<div class="relative flex-1 overflow-hidden">
-			<!-- Video Element -->
-			<video
-				bind:this={videoElement}
-				autoplay
-				playsinline
-				muted
-				class="absolute inset-0 w-full h-full object-cover"
-				class:scale-x-[-1]={facingMode === 'user'}
-			></video>
+		<!-- Video Element - full screen -->
+		<video
+			bind:this={videoElement}
+			autoplay
+			playsinline
+			muted
+			class="absolute inset-0 w-full h-full object-cover"
+			class:scale-x-[-1]={facingMode === 'user'}
+		></video>
 
-			<!-- Overlay -->
-			<div class="absolute inset-0 pointer-events-none">
-				<!-- Dark overlay outside safe zone -->
-				<svg class="w-full h-full" preserveAspectRatio="xMidYMid slice">
-					<defs>
-						<!-- Mask for the dark overlay - reveals the safe zone -->
-						<mask id="overlay-mask">
-							<rect width="100%" height="100%" fill="white" />
-							<!-- Safe zone cutout (slightly larger than crop area) -->
-							<rect
-								x={`${safeX}%`}
-								y={`${safeY}%`}
-								width={`${safeW}%`}
-								height={`${safeH}%`}
-								fill="black"
-								rx="4"
-							/>
-						</mask>
-					</defs>
+		<!-- Overlay - use pixel values for accurate aspect ratio -->
+		<div class="absolute inset-0 pointer-events-none">
+			<svg 
+				class="w-full h-full" 
+				viewBox={`0 0 ${screenWidth} ${screenHeight}`}
+				preserveAspectRatio="none"
+			>
+				<defs>
+					<!-- Mask for the dark overlay - reveals the safe zone -->
+					<mask id="overlay-mask">
+						<rect width="100%" height="100%" fill="white" />
+						<!-- Safe zone cutout in PIXELS -->
+						<rect
+							x={(screenWidth - safePixelWidth) / 2}
+							y={topPaddingPx + (availablePixelHeight - safePixelHeight) / 2}
+							width={safePixelWidth}
+							height={safePixelHeight}
+							fill="black"
+							rx="8"
+						/>
+					</mask>
+				</defs>
 
-					<!-- Dark overlay -->
-					<rect width="100%" height="100%" fill="rgba(0,0,0,0.6)" mask="url(#overlay-mask)" />
+				<!-- Dark overlay -->
+				<rect width="100%" height="100%" fill="rgba(0,0,0,0.6)" mask="url(#overlay-mask)" />
 
-					<!-- Safe zone border (outer dashed) -->
-					<rect
-						x={`${safeX}%`}
-						y={`${safeY}%`}
-						width={`${safeW}%`}
-						height={`${safeH}%`}
-						fill="none"
-						stroke="rgba(255,255,255,0.5)"
-						stroke-width="2"
-						stroke-dasharray="8 4"
-						rx="4"
-					/>
+				<!-- Safe zone border (outer dashed) in PIXELS -->
+				<rect
+					x={(screenWidth - safePixelWidth) / 2}
+					y={topPaddingPx + (availablePixelHeight - safePixelHeight) / 2}
+					width={safePixelWidth}
+					height={safePixelHeight}
+					fill="none"
+					stroke="rgba(255,255,255,0.5)"
+					stroke-width="2"
+					stroke-dasharray="8 4"
+					rx="8"
+				/>
 
-					<!-- Crop area border (inner solid) -->
-					<rect
-						x={`${cropX}%`}
-						y={`${cropY}%`}
-						width={`${cropW}%`}
-						height={`${cropH}%`}
-						fill="none"
-						stroke="white"
-						stroke-width="3"
-						rx="2"
-					/>
+				<!-- Crop area border (inner solid) in PIXELS -->
+				<rect
+					x={(screenWidth - cropPixelWidth) / 2}
+					y={topPaddingPx + (availablePixelHeight - cropPixelHeight) / 2}
+					width={cropPixelWidth}
+					height={cropPixelHeight}
+					fill="none"
+					stroke="white"
+					stroke-width="3"
+					rx="4"
+				/>
 
-					<!-- Top-left corner -->
-					<path
-						d={`M ${cropX}% ${cropY + 5}% L ${cropX}% ${cropY}% L ${cropX + 5}% ${cropY}%`}
-						fill="none"
-						stroke="white"
-						stroke-width="4"
-						stroke-linecap="round"
-					/>
-					<!-- Top-right corner -->
-					<path
-						d={`M ${cropX + cropW - 5}% ${cropY}% L ${cropX + cropW}% ${cropY}% L ${cropX + cropW}% ${cropY + 5}%`}
-						fill="none"
-						stroke="white"
-						stroke-width="4"
-						stroke-linecap="round"
-					/>
-					<!-- Bottom-left corner -->
-					<path
-						d={`M ${cropX}% ${cropY + cropH - 5}% L ${cropX}% ${cropY + cropH}% L ${cropX + 5}% ${cropY + cropH}%`}
-						fill="none"
-						stroke="white"
-						stroke-width="4"
-						stroke-linecap="round"
-					/>
-					<!-- Bottom-right corner -->
-					<path
-						d={`M ${cropX + cropW - 5}% ${cropY + cropH}% L ${cropX + cropW}% ${cropY + cropH}% L ${cropX + cropW}% ${cropY + cropH - 5}%`}
-						fill="none"
-						stroke="white"
-						stroke-width="4"
-						stroke-linecap="round"
-					/>
+				<!-- Crosshair -->
+				<g stroke="rgba(255,255,255,0.8)" stroke-width="1">
+					<!-- Horizontal line -->
+					<line x1={screenWidth/2 - 20} y1={screenHeight/2} x2={screenWidth/2 - 8} y2={screenHeight/2} />
+					<line x1={screenWidth/2 + 8} y1={screenHeight/2} x2={screenWidth/2 + 20} y2={screenHeight/2} />
+					<!-- Vertical line -->
+					<line x1={screenWidth/2} y1={screenHeight/2 - 20} x2={screenWidth/2} y2={screenHeight/2 - 8} />
+					<line x1={screenWidth/2} y1={screenHeight/2 + 8} x2={screenWidth/2} y2={screenHeight/2 + 20} />
+					<!-- Center dot -->
+					<circle cx={screenWidth/2} cy={screenHeight/2} r="3" fill="rgba(255,255,255,0.8)" stroke="none" />
+				</g>
+			</svg>
 
-					<!-- Crosshair -->
-					<g stroke="rgba(255,255,255,0.8)" stroke-width="1">
-						<!-- Horizontal line -->
-						<line x1="45%" y1="50%" x2="48%" y2="50%" />
-						<line x1="52%" y1="50%" x2="55%" y2="50%" />
-						<!-- Vertical line -->
-						<line x1="50%" y1="45%" x2="50%" y2="48%" />
-						<line x1="50%" y1="52%" x2="50%" y2="55%" />
-						<!-- Center dot -->
-						<circle cx="50%" cy="50%" r="3" fill="rgba(255,255,255,0.8)" stroke="none" />
-					</g>
-				</svg>
-
-				<!-- Labels -->
-				<div class="absolute top-4 left-0 right-0 text-center">
-					<span class="text-white text-sm bg-black/50 px-3 py-1 rounded-full">
-						{isSignature ? 'Position signature in frame' : 'Position face in frame'}
-					</span>
-				</div>
-
-				<div class="absolute bottom-32 left-0 right-0 text-center">
-					<span class="text-white/70 text-xs">
-						Dashed line = safe zone for adjustments
-					</span>
-				</div>
+			<!-- Labels -->
+			<div class="absolute top-4 left-0 right-0 text-center">
+				<span class="text-white text-sm bg-black/50 px-3 py-1 rounded-full">
+					{isSignature ? 'Position signature in frame' : 'Position face in frame'}
+				</span>
 			</div>
 
-			<!-- Error Message -->
-			{#if cameraError}
-				<div class="absolute inset-0 flex items-center justify-center bg-black/80">
-					<div class="text-center p-6">
-						<p class="text-white mb-4">{cameraError}</p>
+			<div class="absolute bottom-36 left-0 right-0 text-center">
+				<span class="text-white/70 text-xs">
+					Dashed line = safe zone for adjustments
+				</span>
+			</div>
+		</div>
+
+		<!-- Error Message -->
+		{#if cameraError}
+			<div class="absolute inset-0 flex items-center justify-center bg-black/80 z-10">
+				<div class="text-center p-6 max-w-sm">
+					<div class="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/20 flex items-center justify-center">
+						<Camera size={32} class="text-red-400" />
+					</div>
+					<p class="text-white mb-4 text-sm leading-relaxed">{cameraError}</p>
+					<div class="flex gap-3 justify-center">
 						<button
+							onclick={closeCamera}
+							class="px-4 py-2 bg-white/10 text-white rounded-lg font-medium hover:bg-white/20 transition-colors"
+						>
+							Cancel
+						</button>
+						<button
+							type="button"
 							onclick={startCamera}
-							class="px-4 py-2 bg-white text-black rounded-lg font-medium"
+							class="px-4 py-2 bg-white text-black rounded-lg font-medium hover:bg-gray-100 transition-colors"
 						>
 							Retry
 						</button>
 					</div>
 				</div>
-			{/if}
-		</div>
+			</div>
+		{/if}
 
-		<!-- Camera Controls -->
-		<div class="bg-black px-6 py-8 safe-bottom">
+		<!-- Camera Controls - fixed at bottom -->
+		<div class="absolute bottom-0 left-0 right-0 bg-black/80 px-6 py-6 safe-bottom">
 			<div class="flex items-center justify-between max-w-md mx-auto">
 				<!-- Close Button -->
 				<button
+					type="button"
 					onclick={closeCamera}
 					class="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center"
 					aria-label="Close camera"
@@ -642,6 +834,7 @@
 
 				<!-- Capture Button -->
 				<button
+					type="button"
 					onclick={capturePhoto}
 					disabled={!cameraStream}
 					class="w-20 h-20 rounded-full bg-white flex items-center justify-center disabled:opacity-50 transition-transform active:scale-95"
@@ -652,6 +845,7 @@
 
 				<!-- Switch Camera Button -->
 				<button
+					type="button"
 					onclick={switchCamera}
 					class="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center"
 					aria-label="Switch camera"
