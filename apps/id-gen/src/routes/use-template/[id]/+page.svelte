@@ -120,6 +120,7 @@
 	let cardScalingWrapperRef = $state<HTMLDivElement | null>(null);
 	let formContainerRef = $state<HTMLDivElement | null>(null);
 	let cardOriginalHeight = $state(0);
+	let cardOriginalWidth = $state(0);
 	const NAVBAR_HEIGHT = 64; // h-16 = 64px
 	const MIN_SCALE = 0.5;
 	const GAP = 16; // gap-4 = 16px
@@ -195,6 +196,70 @@
 	let focusedVariableName = $state<string | null>(null);
 	let highlightState = $state<'off' | 'idle' | 'active'>('off');
 	let highlightTimeout: ReturnType<typeof setTimeout> | null = null;
+	
+	// Zoom state
+	let zoomState = $state<'idle' | 'zoomed'>('idle');
+	
+	// Dynamic zoom transform calculation (derived from state + scroll position)
+	let zoomTransform = $derived.by(() => {
+		if (!focusedVariableName || !template?.template_elements || !cardOriginalWidth || !cardOriginalHeight) {
+			return { x: 0, y: 0, scale: 1 };
+		}
+
+		// 1. Find the element
+		const element = template.template_elements.find(el => el.variableName === focusedVariableName && el.side === (isFlipped ? 'back' : 'front'));
+		if (!element) return { x: 0, y: 0, scale: 1 };
+
+		// 2. Get Card Dimensions (Template vs Rendered)
+		const tmplWidth = template.width_pixels || 1013;
+		const tmplHeight = template.height_pixels || 638;
+		
+		// Conversion ratio (Template Pixels -> Rendered DOM Pixels)
+		const widthRatio = cardOriginalWidth / tmplWidth;
+		const heightRatio = cardOriginalHeight / tmplHeight;
+		// Use width ratio as primary if aspect ratio is preserved (it is)
+		const pxScale = widthRatio; 
+
+		// 3. Get Element Dimensions & Position (Converted to DOM Pixels)
+		const elX = (element.x || 0) * pxScale;
+		const elY = (element.y || 0) * pxScale;
+		const elW = (element.width || 100) * pxScale;
+		const elH = (element.height || 100) * pxScale;
+
+		// 4. Calculate Center of Element (in DOM Pixels)
+		const elCenterX = elX + (elW / 2);
+		const elCenterY = elY + (elH / 2);
+
+		// 5. Determine Zoom Scale
+		// Aim for element filling ~40-60% of container
+		// We use the rendered dimensions for this calculation
+		const wRatioScale = cardOriginalWidth / elW;
+		const hRatioScale = cardOriginalHeight / elH;
+		
+		let rawScale = Math.min(wRatioScale, hRatioScale) * 0.5;
+		rawScale = Math.min(Math.max(rawScale, 1.0), 3.0); // Allow slightly deeper zoom (3.0x) since we are accurate now
+
+		// 6. Calculate Translation to Center
+		// Visible viewport logic matches our previous mask fix
+		const VISIBLE_HEIGHT = cardOriginalHeight * previewScale; 
+		const VIEWPORT_CENTER_X = 0; 
+		const VIEWPORT_CENTER_Y = VISIBLE_HEIGHT / 2;
+
+		// Relative position from Transform Origin (Top-Center of rendered card)
+		const relX = elCenterX - (cardOriginalWidth / 2);
+		const relY = elCenterY;
+
+		// Formula: translate(tx, ty) scale(s)
+		const tx = VIEWPORT_CENTER_X - (rawScale * relX);
+		const ty = VIEWPORT_CENTER_Y - (rawScale * relY);
+
+		return {
+			x: tx,
+			y: ty,
+			scale: rawScale
+		};
+	});
+	
 	let fileUrls = $state<Record<string, string>>({});
 
 	// Overlay states for confirmation and success flows
@@ -294,6 +359,7 @@
 		await new Promise(resolve => setTimeout(resolve, 100));
 		if (cardScalingWrapperRef) {
 			cardOriginalHeight = cardScalingWrapperRef.offsetHeight;
+			cardOriginalWidth = cardScalingWrapperRef.offsetWidth;
 		}
 	});
 
@@ -541,13 +607,17 @@
 				clearTimeout(highlightTimeout);
 				highlightTimeout = null;
 			}
+			
+			// Reset zoom on fresh focus change (wait for type to zoom)
+			zoomState = 'idle';
 		}
 	}
 	
-	// Handle input blur - fade out highlight
+	// Handle input blur - fade out highlight and reset zoom
 	function handleInputBlur() {
 		// Start fade-out animation
 		highlightState = 'off';
+		zoomState = 'idle';
 		
 		// Clear the focused variable after fade animation completes
 		if (highlightTimeout) clearTimeout(highlightTimeout);
@@ -561,6 +631,9 @@
 		if (focusedVariableName) {
 			// Boost the highlight briefly
 			highlightState = 'active';
+
+			// Activate Zoom (calculation is now derived)
+			zoomState = 'zoomed';
 
 			// Clear existing timeout
 			if (highlightTimeout) clearTimeout(highlightTimeout);
@@ -652,12 +725,27 @@
 				>ID Card Preview</h2>
 
 				{#if template}
-					<div class="w-full max-w-md mx-auto">
+					<!-- Masking Container with Border -->
+					<div 
+						class="w-full mx-auto relative overflow-hidden rounded-lg transition-all duration-300 {zoomState === 'zoomed' ? 'max-w-full' : 'max-w-md'}"
+						style="
+							height: {cardOriginalHeight ? `${cardOriginalHeight * previewScale}px` : 'auto'};
+						"
+					>
 						<!-- Scaling wrapper - only the card scales -->
 						<div 
 							bind:this={cardScalingWrapperRef}
-							class="origin-top"
-							style="transform: scale({previewScale}); margin-bottom: -{cardMarginCompensation}px; transition: transform 200ms ease-out, margin-bottom 200ms ease-out; will-change: transform;"
+							class="origin-top w-full max-w-md mx-auto"
+							style="
+								transform: {zoomState === 'zoomed' 
+									? `translate(${zoomTransform.x}px, ${zoomTransform.y}px) scale(${zoomTransform.scale})` 
+									: `scale(${previewScale})`};
+								margin-bottom: -{cardMarginCompensation}px;
+								transition: transform 300ms cubic-bezier(0.2, 0, 0.2, 1), margin-bottom 300ms ease-out;
+								will-change: transform;
+								z-index: 10;
+								position: relative;
+							"
 						>
 							<!-- svelte-ignore a11y_no_static_element_interactions -->
 							<div
@@ -1256,7 +1344,6 @@
 		z-index: 5;
 		pointer-events: none;
 		box-sizing: border-box;
-		border-radius: 10px;
 		border: 2px solid rgba(59, 130, 246, 0.9);
 		opacity: 0;
 		transform: scale(1);
