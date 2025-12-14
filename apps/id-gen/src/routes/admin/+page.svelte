@@ -356,7 +356,15 @@
 				<Button href="/admin/users" variant="outline" class="justify-start h-auto py-3 px-4">
 					<div class="flex flex-col items-start text-left">
 						<span class="font-semibold">Manage Users</span>
-						<span class="text-xs text-muted-foreground font-normal">View and edit user accounts</span>
+						<span class="text-xs text-muted-foreground font-normal"
+							>View and edit user accounts</span
+						>
+					</div>
+				</Button>
+				<Button href="/admin/roles" variant="outline" class="justify-start h-auto py-3 px-4">
+					<div class="flex flex-col items-start text-left">
+						<span class="font-semibold">Roles & Permissions</span>
+						<span class="text-xs text-muted-foreground font-normal">Manage access control</span>
 					</div>
 				</Button>
 				<Button href="/admin/organization" variant="outline" class="justify-start h-auto py-3 px-4">
@@ -416,9 +424,7 @@
 				>
 					<div class="flex flex-col items-start text-left">
 						<span class="font-semibold">Manage Assets</span>
-						<span class="text-xs text-muted-foreground font-normal"
-							>Organize uploaded assets</span
-						>
+						<span class="text-xs text-muted-foreground font-normal">Organize uploaded assets</span>
 					</div>
 				</Button>
 				<Button
@@ -492,9 +498,7 @@
 				<Button href="/debug-user" variant="outline" class="justify-start h-auto py-3 px-4">
 					<div class="flex flex-col items-start text-left">
 						<span class="font-semibold">User Debugger</span>
-						<span class="text-xs text-muted-foreground font-normal"
-							>Inspect user permissions</span
-						>
+						<span class="text-xs text-muted-foreground font-normal">Inspect user permissions</span>
 					</div>
 				</Button>
 			</CardContent>
@@ -516,9 +520,7 @@
 							<div class="flex items-center space-x-3">
 								<div class="flex-shrink-0">
 									{#if activity.type === 'card_generated'}
-										<div
-											class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center"
-										>
+										<div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
 											<svg
 												class="w-4 h-4 text-green-600"
 												fill="none"
@@ -534,9 +536,7 @@
 											</svg>
 										</div>
 									{:else if activity.type === 'user_added'}
-										<div
-											class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center"
-										>
+										<div class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
 											<svg
 												class="w-4 h-4 text-blue-600"
 												fill="none"
@@ -552,9 +552,7 @@
 											</svg>
 										</div>
 									{:else}
-										<div
-											class="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center"
-										>
+										<div class="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
 											<svg
 												class="w-4 h-4 text-gray-600"
 												fill="none"

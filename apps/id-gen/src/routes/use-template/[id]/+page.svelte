@@ -928,7 +928,8 @@
 													{element.variableName}
 													<span class="text-red-500">*</span>
 												</Label>
-													<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center" onclick={() => handleInputFocus('front', element.variableName)}>
+													<!-- svelte-ignore a11y_no_static_element_interactions -->
+								<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center" onclick={() => handleInputFocus('front', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('front', element.variableName)} role="button" tabindex="0">
 													<div class="flex-shrink-0">
 														<ThumbnailInput
 															width={element.width}
@@ -952,7 +953,8 @@
 												{element.variableName}
 												<span class="text-red-500">*</span>
 											</Label>
-											<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center" onclick={() => handleInputFocus('front', element.variableName)}>
+											<!-- svelte-ignore a11y_no_static_element_interactions -->
+								<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center" onclick={() => handleInputFocus('front', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('front', element.variableName)} role="button" tabindex="0">
 												<div class="flex-shrink-0">
 													<ThumbnailInput
 														width={element.width}
@@ -1057,7 +1059,8 @@
 													{element.variableName}
 													<span class="text-red-500">*</span>
 												</Label>
-													<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center" onclick={() => handleInputFocus('back', element.variableName)}>
+													<!-- svelte-ignore a11y_no_static_element_interactions -->
+									<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center" onclick={() => handleInputFocus('back', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('back', element.variableName)} role="button" tabindex="0">
 													<div class="flex-shrink-0">
 														<ThumbnailInput
 															width={element.width}
@@ -1081,7 +1084,8 @@
 												{element.variableName}
 												<span class="text-red-500">*</span>
 											</Label>
-											<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center" onclick={() => handleInputFocus('back', element.variableName)}>
+											<!-- svelte-ignore a11y_no_static_element_interactions -->
+								<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center" onclick={() => handleInputFocus('back', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('back', element.variableName)} role="button" tabindex="0">
 												<div class="flex-shrink-0">
 													<ThumbnailInput
 														width={element.width}

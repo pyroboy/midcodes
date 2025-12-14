@@ -1,5 +1,90 @@
 import { z } from 'zod';
 
+// ============================================================
+// ROLE SCHEMAS
+// ============================================================
+
+export const roleSchema = z.object({
+	id: z.string().uuid(),
+	name: z.string(),
+	display_name: z.string().nullable(),
+	description: z.string().nullable(),
+	is_system: z.boolean(),
+	org_id: z.string().uuid().nullable(),
+	created_at: z.string(),
+	updated_at: z.string().nullable()
+});
+
+export const rolePermissionSchema = z.object({
+	id: z.number(),
+	role: z.string(),
+	permission: z.string(),
+	role_id: z.string().uuid().nullable()
+});
+
+// Input schemas for roles
+export const createRoleSchema = z.object({
+	name: z.string().min(1).max(50),
+	display_name: z.string().min(1).max(100),
+	description: z.string().max(500).optional()
+});
+
+export const updateRoleSchema = z.object({
+	roleId: z.string().uuid(),
+	display_name: z.string().min(1).max(100).optional(),
+	description: z.string().max(500).optional()
+});
+
+export const deleteRoleSchema = z.object({
+	roleId: z.string().uuid()
+});
+
+// Input schemas for permissions
+export const assignPermissionSchema = z.object({
+	role: z.string(),
+	permission: z.string(),
+	roleId: z.string().uuid().optional()
+});
+
+export const revokePermissionSchema = z.object({
+	role: z.string(),
+	permission: z.string()
+});
+
+export const bulkAssignPermissionsSchema = z.object({
+	role: z.string(),
+	permissions: z.array(z.string()),
+	roleId: z.string().uuid().optional()
+});
+
+// Output schemas for roles
+export const rolesDataSchema = z.object({
+	roles: z.array(roleSchema),
+	permissions: z.array(rolePermissionSchema),
+	availablePermissions: z.array(z.string()),
+	currentUserRole: z.string().optional()
+});
+
+// ============================================================
+// USER SCHEMAS
+// ============================================================
+
+// Extended role enum with new roles
+export const extendedUserRoleSchema = z.enum([
+	'super_admin',
+	'org_admin',
+	'id_gen_super_admin',
+	'id_gen_org_admin',
+	'id_gen_admin',
+	'id_gen_user',
+	'id_gen_accountant',
+	'id_gen_encoder',
+	'id_gen_printer',
+	'id_gen_viewer',
+	'id_gen_template_designer',
+	'id_gen_auditor'
+]);
+
 // Input schemas
 export const addUserSchema = z.object({
 	email: z.string().email(),
@@ -89,7 +174,7 @@ export const adminActionResultSchema = z.object({
 	message: z.string().optional()
 });
 
-// TypeScript types
+// TypeScript types - Users
 export type AddUser = z.infer<typeof addUserSchema>;
 export type UpdateUserRole = z.infer<typeof updateUserRoleSchema>;
 export type DeleteUser = z.infer<typeof deleteUserSchema>;
@@ -102,3 +187,15 @@ export type AdminDashboardOutput = z.infer<typeof adminDashboardOutputSchema>;
 export type AdminDashboardData = z.infer<typeof adminDashboardDataSchema>;
 export type UsersData = z.infer<typeof usersDataSchema>;
 export type AdminActionResult = z.infer<typeof adminActionResultSchema>;
+
+// TypeScript types - Roles & Permissions
+export type Role = z.infer<typeof roleSchema>;
+export type RolePermission = z.infer<typeof rolePermissionSchema>;
+export type CreateRole = z.infer<typeof createRoleSchema>;
+export type UpdateRole = z.infer<typeof updateRoleSchema>;
+export type DeleteRole = z.infer<typeof deleteRoleSchema>;
+export type AssignPermission = z.infer<typeof assignPermissionSchema>;
+export type RevokePermission = z.infer<typeof revokePermissionSchema>;
+export type BulkAssignPermissions = z.infer<typeof bulkAssignPermissionsSchema>;
+export type RolesData = z.infer<typeof rolesDataSchema>;
+export type ExtendedUserRole = z.infer<typeof extendedUserRoleSchema>;

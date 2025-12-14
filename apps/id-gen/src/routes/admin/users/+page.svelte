@@ -51,18 +51,92 @@
 	let newUserRole = $state('id_gen_user');
 
 	// Define the role type
-	type UserRole = 'id_gen_user' | 'id_gen_admin' | 'org_admin' | 'super_admin';
+	type UserRole =
+		| 'id_gen_user'
+		| 'id_gen_admin'
+		| 'org_admin'
+		| 'super_admin'
+		| 'id_gen_super_admin'
+		| 'id_gen_org_admin'
+		| 'id_gen_accountant'
+		| 'id_gen_encoder'
+		| 'id_gen_printer'
+		| 'id_gen_viewer'
+		| 'id_gen_template_designer'
+		| 'id_gen_auditor';
 
-	// Role options
+	// Role options - organized by category
 	const roleOptions = [
-		{ value: 'super_admin', label: 'Super Admin', description: 'Full system access' },
-		{ value: 'org_admin', label: 'Organization Admin', description: 'Organization management' },
+		// Admin roles
+		{
+			value: 'super_admin',
+			label: 'Super Admin',
+			description: 'Full system access',
+			category: 'Admin'
+		},
+		{
+			value: 'org_admin',
+			label: 'Organization Admin',
+			description: 'Organization management',
+			category: 'Admin'
+		},
+		{
+			value: 'id_gen_super_admin',
+			label: 'ID Gen Super Admin',
+			description: 'Full ID Generator access',
+			category: 'Admin'
+		},
+		{
+			value: 'id_gen_org_admin',
+			label: 'ID Gen Org Admin',
+			description: 'ID Generator org management',
+			category: 'Admin'
+		},
 		{
 			value: 'id_gen_admin',
 			label: 'ID Generator Admin',
-			description: 'Template and user management'
+			description: 'Template and user management',
+			category: 'Admin'
 		},
-		{ value: 'id_gen_user', label: 'ID Generator User', description: 'Generate ID cards only' }
+		// Specialized roles
+		{
+			value: 'id_gen_template_designer',
+			label: 'Template Designer',
+			description: 'Create and manage templates',
+			category: 'Specialized'
+		},
+		{
+			value: 'id_gen_accountant',
+			label: 'Accountant',
+			description: 'Manage invoices and credits',
+			category: 'Specialized'
+		},
+		{
+			value: 'id_gen_encoder',
+			label: 'Encoder',
+			description: 'Create ID cards from templates',
+			category: 'Specialized'
+		},
+		// Basic roles
+		{
+			value: 'id_gen_user',
+			label: 'ID Generator User',
+			description: 'Generate ID cards only',
+			category: 'Basic'
+		},
+		{
+			value: 'id_gen_printer',
+			label: 'Printer',
+			description: 'Print and view ID cards only',
+			category: 'Basic'
+		},
+		{ value: 'id_gen_viewer', label: 'Viewer', description: 'Read-only access', category: 'Basic' },
+		{
+			value: 'id_gen_auditor',
+			label: 'Auditor',
+			description: 'Read-only access for audit',
+			category: 'Basic'
+		}
 	];
 
 	// Functions to handle user management actions
@@ -141,11 +215,20 @@
 	function getRoleBadgeVariant(role: string) {
 		switch (role) {
 			case 'super_admin':
+			case 'id_gen_super_admin':
 				return 'destructive';
 			case 'org_admin':
+			case 'id_gen_org_admin':
 				return 'default';
 			case 'id_gen_admin':
+			case 'id_gen_accountant':
+			case 'id_gen_template_designer':
 				return 'secondary';
+			case 'id_gen_encoder':
+			case 'id_gen_printer':
+			case 'id_gen_auditor':
+			case 'id_gen_viewer':
+				return 'outline';
 			default:
 				return 'outline';
 		}

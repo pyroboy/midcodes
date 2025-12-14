@@ -18,7 +18,8 @@
       "mcp__supabase__generate_typescript_types",
       "Bash(git checkout:*)",
       "mcp__supabase__list_migrations",
-      "mcp__supabase__apply_migration"
+      "mcp__supabase__apply_migration",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []
