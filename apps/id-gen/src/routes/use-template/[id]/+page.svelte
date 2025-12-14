@@ -399,12 +399,16 @@
 		variableName: string
 	) {
 		const { scale, x, y, borderSize } = event.detail;
-		imagePositions[variableName] = {
-			...imagePositions[variableName],
-			scale,
-			x,
-			y,
-			borderSize
+		// Use immutable assignment to ensure reactivity during drag/resize
+		imagePositions = {
+			...imagePositions,
+			[variableName]: {
+				...imagePositions[variableName],
+				scale,
+				x,
+				y,
+				borderSize
+			}
 		};
 	}
 
@@ -454,7 +458,7 @@
 	}
 
 	async function confirmAndSubmit() {
-		showConfirmation = false;
+		// Keep the overlay OPEN while loading so we can see the loading state
 		loading = true;
 		error = null;
 
@@ -515,18 +519,21 @@
 
 				idCardsCache.invalidate();
 				recentCardsCache.invalidate();
-
-				// Show success overlay with animation
+				
+				// Hide confirmation overlay and show success overlay
+				showConfirmation = false;
 				showSuccess = true;
 				startSuccessCountdown();
 			} else {
 				const errorMsg = result?.data?.[0]?.error || result?.error || 'Failed to save ID card';
 				error = errorMsg;
+				showConfirmation = false; // Return to form on error
 				console.error('[Save] Error:', errorMsg, 'Full result:', result);
 			}
 		} catch (err) {
 			console.error('Submit error:', err);
 			error = err instanceof Error ? err.message : 'An unexpected error occurred';
+			showConfirmation = false; // Return to form on error
 		} finally {
 			loading = false;
 		}
@@ -647,7 +654,11 @@
 	}
 
 	function handleSelectFile(variableName: string, file: File) {
-		fileUploads[variableName] = file;
+		// Use immutable assignment to ensure Svelte reactivity triggers for IdCanvas
+		fileUploads = {
+			...fileUploads,
+			[variableName]: file
+		};
 
 		if (fileUrls[variableName]) {
 			URL.revokeObjectURL(fileUrls[variableName]);
@@ -930,6 +941,8 @@
 															isSignature={element.type === 'signature'}
 															on:selectfile={(e) => handleSelectFile(element.variableName, e.detail.file)}
 															on:update={(e) => handleImageUpdate(e, element.variableName)}
+															on:dragstart={() => (mouseMoving = true)}
+															on:dragend={() => (mouseMoving = false)}
 														/>
 													</div>
 												</div>
@@ -952,6 +965,8 @@
 														isSignature={element.type === 'signature'}
 														on:selectfile={(e) => handleSelectFile(element.variableName, e.detail.file)}
 														on:update={(e) => handleImageUpdate(e, element.variableName)}
+														on:dragstart={() => (mouseMoving = true)}
+														on:dragend={() => (mouseMoving = false)}
 													/>
 												</div>
 											</div>
@@ -1055,6 +1070,8 @@
 															isSignature={element.type === 'signature'}
 															on:selectfile={(e) => handleSelectFile(element.variableName, e.detail.file)}
 															on:update={(e) => handleImageUpdate(e, element.variableName)}
+															on:dragstart={() => (mouseMoving = true)}
+															on:dragend={() => (mouseMoving = false)}
 														/>
 													</div>
 												</div>
@@ -1077,6 +1094,8 @@
 														isSignature={element.type === 'signature'}
 														on:selectfile={(e) => handleSelectFile(element.variableName, e.detail.file)}
 														on:update={(e) => handleImageUpdate(e, element.variableName)}
+														on:dragstart={() => (mouseMoving = true)}
+														on:dragend={() => (mouseMoving = false)}
 													/>
 												</div>
 											</div>
@@ -1181,68 +1200,86 @@
 </div>
 
 <!-- Confirmation Overlay -->
+<!-- Confirmation Overlay -->
 {#if showConfirmation}
 	<div
-		class="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+		class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm"
 		transition:fade={{ duration: 200 }}
 	>
-		<div class="bg-white dark:bg-gray-900 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
-			<h2 class="text-xl font-bold text-center mb-4 text-gray-900 dark:text-white">
-				Confirm Your ID Card
-			</h2>
+		<!-- Heading -->
+		<h2 class="text-2xl font-bold text-center mb-8 text-white">
+			Confirm Your ID Card
+		</h2>
 
-			<!-- Flippable Card Preview -->
+		<!-- Flippable Card Preview Container -->
+		<div
+			class="confirmation-flip-container mx-auto cursor-pointer mb-8 relative"
+			style="max-width: 300px; width: 100%;"
+			onclick={toggleConfirmationCard}
+			onkeydown={(e) => e.key === 'Enter' && toggleConfirmationCard()}
+			role="button"
+			tabindex="0"
+		>
+			<!-- Card Flipping Content -->
 			<div
-				class="confirmation-flip-container mx-auto cursor-pointer mb-3"
-				style="max-width: 300px;"
-				onclick={toggleConfirmationCard}
-				onkeydown={(e) => e.key === 'Enter' && toggleConfirmationCard()}
-				role="button"
-				tabindex="0"
+				class="confirmation-flip-inner"
+				class:flipped={!confirmationShowingFront}
+				style="aspect-ratio: {template?.width_pixels || 1013}/{template?.height_pixels || 638}"
 			>
-				<div
-					class="confirmation-flip-inner"
-					class:flipped={!confirmationShowingFront}
-					style="aspect-ratio: {template?.width_pixels || 1013}/{template?.height_pixels || 638}"
-				>
-					<div class="confirmation-flip-face confirmation-flip-front">
-						{#if renderedFrontUrl}
-							<img
-								src={renderedFrontUrl}
-								alt="ID Card Front"
-								class="w-full h-full object-contain rounded-lg shadow-lg"
-							/>
-						{/if}
-					</div>
-					<div class="confirmation-flip-face confirmation-flip-back">
-						{#if renderedBackUrl}
-							<img
-								src={renderedBackUrl}
-								alt="ID Card Back"
-								class="w-full h-full object-contain rounded-lg shadow-lg"
-							/>
-						{/if}
-					</div>
+				<div class="confirmation-flip-face confirmation-flip-front">
+					{#if renderedFrontUrl}
+						<img
+							src={renderedFrontUrl}
+							alt="ID Card Front"
+							class="w-full h-full object-contain rounded-lg shadow-2xl"
+						/>
+					{/if}
+				</div>
+				<div class="confirmation-flip-face confirmation-flip-back">
+					{#if renderedBackUrl}
+						<img
+							src={renderedBackUrl}
+							alt="ID Card Back"
+							class="w-full h-full object-contain rounded-lg shadow-2xl"
+						/>
+					{/if}
 				</div>
 			</div>
 
-			<p class="text-center text-sm text-gray-500 dark:text-gray-400 mb-4">
-				Tap card to flip • Showing {confirmationShowingFront ? 'Front' : 'Back'}
-			</p>
+			<!-- Loading Overlay ON TOP of the card (seamless transition to success) -->
+			{#if loading}
+				<div 
+					class="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/40 rounded-lg backdrop-blur-[2px]"
+					transition:fade={{ duration: 200 }}
+				>
+					<Loader class="w-12 h-12 text-white animate-spin drop-shadow-lg" />
+					<p class="text-white font-medium mt-2 drop-shadow-md">Saving...</p>
+				</div>
+			{/if}
+		</div>
 
-			<p class="text-center text-gray-700 dark:text-gray-300 mb-6">
-				Do you approve of all this information?
-			</p>
+		<p class="text-center text-sm text-white/50 mb-8">
+			Tap card to flip • Showing {confirmationShowingFront ? 'Front' : 'Back'}
+		</p>
 
-			<div class="flex gap-3">
-				<Button variant="outline" class="flex-1" onclick={cancelConfirmation}>No, go back</Button>
-				<Button class="flex-1" onclick={confirmAndSubmit} disabled={loading}>
-					{#if loading}
-						<Loader class="mr-2 h-4 w-4 animate-spin" />
-					{/if}
-					Yes, create card
-				</Button>
-			</div>
+		<!-- Action Buttons -->
+		<div class="flex flex-col gap-3 w-full max-w-xs px-4">
+			<Button 
+				size="lg" 
+				class="w-full bg-white text-black hover:bg-gray-200 font-semibold" 
+				onclick={confirmAndSubmit} 
+				disabled={loading}
+			>
+				Yes, create card
+			</Button>
+			<Button 
+				variant="ghost" 
+				class="w-full text-white hover:bg-white/10" 
+				onclick={cancelConfirmation}
+				disabled={loading}
+			>
+				No, go back
+			</Button>
 		</div>
 	</div>
 {/if}

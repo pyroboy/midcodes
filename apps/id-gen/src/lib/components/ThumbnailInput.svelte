@@ -18,6 +18,8 @@
 	const dispatch = createEventDispatcher<{
 		selectfile: { source: 'camera' | 'gallery'; file: File };
 		update: { scale: number; x: number; y: number; borderSize: number };
+		dragstart: void;
+		dragend: void;
 	}>();
 
 	interface Props {
@@ -625,6 +627,7 @@
 			event.preventDefault();
 		}
 		isDragging = true;
+		dispatch('dragstart'); // Notify parent of drag start
 
 		const startPoint =
 			'touches' in event
@@ -662,6 +665,7 @@
 
 		function handleEnd() {
 			isDragging = false;
+			dispatch('dragend'); // Notify parent of drag end
 			window.removeEventListener('mousemove', handleMove);
 			window.removeEventListener('mouseup', handleEnd);
 			window.removeEventListener('touchmove', handleMove);
