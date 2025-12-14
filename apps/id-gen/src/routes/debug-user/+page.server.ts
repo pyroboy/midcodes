@@ -1,5 +1,6 @@
 import type { PageServerLoad } from './$types';
 import { redirect, error } from '@sveltejs/kit';
+import { checkSuperAdmin } from '$lib/utils/adminPermissions';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const { user, session, org_id, permissions } = locals;
@@ -9,11 +10,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 		throw redirect(302, '/auth');
 	}
 
-	// Only allow super_admin role
-	const roles = (user.app_metadata?.roles as string[] | undefined) || [];
-	const singleRole = (user.app_metadata?.role as string | undefined) || undefined;
-	const hasSuperAdmin = roles.includes('super_admin') || singleRole === 'super_admin';
-	if (!hasSuperAdmin) {
+	// Use robust super admin check
+	if (!checkSuperAdmin(locals)) {
 		throw error(403, 'Admin access required');
 	}
 

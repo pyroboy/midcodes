@@ -1,11 +1,25 @@
 // src/routes/+layout.server.ts
 import type { LayoutServerLoad } from './$types';
+import { checkSuperAdmin } from '$lib/utils/adminPermissions';
 
 interface ProfileData {
 	credits_balance: number;
 	role: string | null;
 	email: string | null;
 }
+
+// Available roles for emulation (only shown to super admins)
+const EMULATION_ROLES = [
+	{ value: 'org_admin', label: 'Org Admin' },
+	{ value: 'id_gen_admin', label: 'ID Gen Admin' },
+	{ value: 'id_gen_encoder', label: 'Encoder' },
+	{ value: 'id_gen_printer', label: 'Printer' },
+	{ value: 'id_gen_viewer', label: 'Viewer' },
+	{ value: 'id_gen_template_designer', label: 'Template Designer' },
+	{ value: 'id_gen_auditor', label: 'Auditor' },
+	{ value: 'id_gen_accountant', label: 'Accountant' },
+	{ value: 'id_gen_user', label: 'User' }
+];
 
 export const load: LayoutServerLoad = async ({ locals, depends, setHeaders }) => {
 	// Register dependencies for selective invalidation
@@ -38,10 +52,16 @@ export const load: LayoutServerLoad = async ({ locals, depends, setHeaders }) =>
 		}
 	}
 
+	// Check if user is super admin for emulation feature
+	const isSuperAdmin = checkSuperAdmin(locals);
+
 	return {
 		session,
 		user: userWithProfile,
 		org_id,
-		permissions
+		permissions,
+		roleEmulation: locals.roleEmulation,
+		isSuperAdmin,
+		availableRolesForEmulation: isSuperAdmin ? EMULATION_ROLES : []
 	};
 };

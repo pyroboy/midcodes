@@ -1,5 +1,6 @@
 import type { LayoutServerLoad } from './$types';
 import { error, redirect } from '@sveltejs/kit';
+import { checkSuperAdmin, checkAdmin } from '$lib/utils/adminPermissions';
 
 export const load: LayoutServerLoad = async ({ locals, url, setHeaders }) => {
 	// Prevent caching of admin pages
@@ -15,41 +16,36 @@ export const load: LayoutServerLoad = async ({ locals, url, setHeaders }) => {
 		throw redirect(303, `/auth?returnTo=${encodeURIComponent(url.pathname)}`);
 	}
 
-	// Check if user has admin permissions using effective roles
-	const adminRoles = ['super_admin', 'org_admin', 'id_gen_admin', 'property_admin'];
-	const hasAdminRole = effectiveRoles?.some((role: string) => adminRoles.includes(role));
+	// Use robust admin check that considers ALL role sources
+	const hasAdminAccess = checkAdmin(locals);
+	const isSuperAdmin = checkSuperAdmin(locals);
 
-	if (!hasAdminRole) {
+	if (!hasAdminAccess) {
 		// If user is actively emulating but originally has admin rights, we allow them in
-		// but flag it so the UI can show a warning
-
-		if (roleEmulation?.active && roleEmulation?.originalRole) {
-			const originalIsAdmin = adminRoles.includes(roleEmulation.originalRole);
-			if (originalIsAdmin) {
-				console.log('Admin emulation bypass active. Original role:', roleEmulation.originalRole);
-				// Continue loading, but maybe return a warning flag
-				// We don't return early here, we fall through to normal loading
-			} else {
-				// Block non-admins who are emulating
-				console.log('Admin access blocked by emulation:', roleEmulation);
-				return {
-					user: {
-						id: user.id,
-						email: user.email,
-						role: user.role
-					},
-					organization: null,
-					org_id,
-					permissions,
-					roleEmulation,
-					blockedByEmulation: true
-				};
-			}
-		} else {
-			// No emulation or original role is not admin
-			console.log('Access denied. Effective roles:', effectiveRoles, 'Required:', adminRoles);
-			throw error(403, 'Access denied. Admin privileges required.');
+		// but flag it so the UI can show a warning (checkAdmin already handles this)
+		
+		// If still no access after robust check, they truly don't have permission
+		console.log('Admin access denied. User:', user?.email, 'Effective roles:', effectiveRoles);
+		
+		if (roleEmulation?.active) {
+			// Show blocked by emulation UI instead of error
+			return {
+				user: {
+					id: user.id,
+					email: user.email,
+					role: user.role
+				},
+				organization: null,
+				org_id,
+				permissions,
+				roleEmulation,
+				blockedByEmulation: true,
+				isSuperAdmin: false,
+				availableRolesForEmulation: []
+			};
 		}
+		
+		throw error(403, 'Access denied. Admin privileges required.');
 	}
 
 	// Get organization information
@@ -68,6 +64,21 @@ export const load: LayoutServerLoad = async ({ locals, url, setHeaders }) => {
 		}
 	}
 
+	// Available roles for emulation (only shown to super admins)
+	// isSuperAdmin is already defined above using the robust check
+	
+	const availableRolesForEmulation = isSuperAdmin ? [
+		{ value: 'org_admin', label: 'Org Admin' },
+		{ value: 'id_gen_admin', label: 'ID Gen Admin' },
+		{ value: 'id_gen_encoder', label: 'Encoder' },
+		{ value: 'id_gen_printer', label: 'Printer' },
+		{ value: 'id_gen_viewer', label: 'Viewer' },
+		{ value: 'id_gen_template_designer', label: 'Template Designer' },
+		{ value: 'id_gen_auditor', label: 'Auditor' },
+		{ value: 'id_gen_accountant', label: 'Accountant' },
+		{ value: 'id_gen_user', label: 'User' }
+	] : [];
+
 	return {
 		user: {
 			id: user.id,
@@ -79,6 +90,8 @@ export const load: LayoutServerLoad = async ({ locals, url, setHeaders }) => {
 		permissions,
 		roleEmulation,
 		blockedByEmulation: false,
-		warningEmulationIgnored: !hasAdminRole && roleEmulation?.active && adminRoles.includes(roleEmulation.originalRole || '')
+		warningEmulationIgnored: !hasAdminAccess && roleEmulation?.active,
+		isSuperAdmin,
+		availableRolesForEmulation
 	};
 };

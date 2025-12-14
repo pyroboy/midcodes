@@ -40,6 +40,29 @@
 		isMenuOpen = false;
 	}
 
+	// Stop role emulation
+	async function stopEmulation() {
+		try {
+			const res = await fetch('/api/admin/stop-emulation', { method: 'POST' });
+			if (res.ok) {
+				window.location.reload();
+			} else {
+				console.error('Failed to stop emulation');
+				alert('Failed to stop emulation. Please try again.');
+			}
+		} catch (e) {
+			console.error('Error stopping emulation:', e);
+			alert('Error stopping emulation.');
+		}
+	}
+
+	function formatRoleName(role: string) {
+		return role
+			.split('_')
+			.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+			.join(' ');
+	}
+
 	// Initialize services
 	$effect(() => {
 		if (browser) {
@@ -122,6 +145,34 @@
 
 		<!-- Hamburger Menu -->
 		<HamburgerMenu isOpen={isMenuOpen} user={data.user} onClose={closeMenu} />
+
+		<!-- Role Emulation Banner (Global) -->
+		{#if data.roleEmulation?.active}
+			<div class="fixed top-16 left-0 right-0 z-40 bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg lg:ml-64">
+				<div class="px-4 py-2 flex items-center justify-between">
+					<div class="flex items-center gap-2">
+						<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+						</svg>
+						<span class="text-sm font-medium">
+							<span class="opacity-75">{formatRoleName(data.roleEmulation.originalRole || 'Admin')}</span>
+							<span class="mx-2">→</span>
+							<span class="font-bold">{formatRoleName(data.roleEmulation.emulatedRole || '')}</span>
+						</span>
+					</div>
+					<button
+						onclick={stopEmulation}
+						class="flex items-center gap-1 px-3 py-1 text-xs font-medium bg-white/20 hover:bg-white/30 rounded-full transition-colors"
+					>
+						<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+						</svg>
+						Stop Emulating
+					</button>
+				</div>
+			</div>
+		{/if}
 
 
 

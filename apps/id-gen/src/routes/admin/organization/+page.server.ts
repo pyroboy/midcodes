@@ -1,18 +1,19 @@
 import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
+import { checkSuperAdmin, checkAdmin, hasRole } from '$lib/utils/adminPermissions';
 
 export const load: PageServerLoad = async ({ parent, locals }) => {
 	// Get data from parent layout (authentication check happens there)
 	const parentData = await parent();
-	const { supabase, user, org_id, permissions } = locals;
+	const { supabase, user, org_id } = locals;
 
 	if (!user || !org_id) {
 		throw error(403, 'Access denied');
 	}
 
-	// Determine user capabilities based on role
-	const isSuperAdmin = ['super_admin', 'id_gen_super_admin'].includes(user.role || '');
-	const isOrgAdmin = ['org_admin', 'id_gen_org_admin'].includes(user.role || '') || isSuperAdmin;
+	// Use robust permission checks that consider all role sources
+	const isSuperAdmin = checkSuperAdmin(locals);
+	const isOrgAdmin = hasRole(locals, ['org_admin', 'id_gen_org_admin']) || isSuperAdmin;
 
 	if (!isOrgAdmin) {
 		throw error(403, 'Organization admin privileges required');
