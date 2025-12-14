@@ -116,7 +116,77 @@
 	let isFlipped = $state(false);
 	// Sticky preview scroll state
 	let scrollY = $state(0);
-	let previewScale = $derived(Math.max(0.5, 1 - scrollY / 400)); // Scale from 1 to 0.5 based on scroll
+	let previewContainerRef = $state<HTMLDivElement | null>(null);
+	let cardScalingWrapperRef = $state<HTMLDivElement | null>(null);
+	let formContainerRef = $state<HTMLDivElement | null>(null);
+	let cardOriginalHeight = $state(0);
+	const NAVBAR_HEIGHT = 64; // h-16 = 64px
+	const MIN_SCALE = 0.5;
+	const GAP = 16; // gap-4 = 16px
+	const FIXED_ELEMENTS_HEIGHT = 100; // title (~50px) + face label (~30px) + margins (~20px)
+	
+	// Calculate the scale based on scroll position
+	// Simple approach: scale from 1 to MIN_SCALE based on scroll amount
+	let previewScale = $derived.by(() => {
+		// At scroll 0, scale is 1. As you scroll, scale decreases.
+		// Scale reaches MIN_SCALE after scrolling ~300px
+		const scrollThreshold = 300;
+		
+		if (scrollY <= 0) return 1;
+		if (scrollY >= scrollThreshold) return MIN_SCALE;
+		
+		// Linear interpolation between 1 and MIN_SCALE
+		const progress = scrollY / scrollThreshold;
+		return 1 - (progress * (1 - MIN_SCALE));
+	});
+	
+	// Calculate the margin compensation in pixels (not percentage - CSS % margins are relative to width, not height!)
+	let cardMarginCompensation = $derived((1 - previewScale) * cardOriginalHeight);
+	
+	// Calculate opacity and height for title and face label (fade out as card scales down)
+	// At scale 1.0 -> opacity 1, full height | At MIN_SCALE (0.5) -> opacity 0, height 0
+	let labelOpacity = $derived(Math.max(0, (previewScale - MIN_SCALE) / (1 - MIN_SCALE)));
+	
+	// Combined Backlash + Hysteresis algorithm for anti-jitter
+	// Backlash: larger dead zone window around stable scroll position
+	let stableScrollY = $state(0);
+	const BACKLASH_WINDOW = 50; // Dead zone: ±50px from stable position
+	
+	$effect(() => {
+		// Only update stable scroll if we've moved outside the backlash window
+		const diff = Math.abs(scrollY - stableScrollY);
+		if (diff > BACKLASH_WINDOW) {
+			stableScrollY = scrollY;
+		}
+	});
+	
+	// Calculate stable scale from the filtered stable scroll position
+	const scrollThreshold = 300;
+	let stableScale = $derived.by(() => {
+		if (stableScrollY <= 0) return 1;
+		if (stableScrollY >= scrollThreshold) return MIN_SCALE;
+		return 1 - ((stableScrollY / scrollThreshold) * (1 - MIN_SCALE));
+	});
+	
+	// Hysteresis: different thresholds for collapse vs expand
+	// Collapse at scale < 0.75 (scrollY ~150), expand at scale > 0.95 (scrollY ~30)
+	let labelsCollapsed = $state(false);
+	$effect(() => {
+		if (!labelsCollapsed && stableScale < 0.75) {
+			labelsCollapsed = true;
+		}
+		if (labelsCollapsed && stableScale > 0.95) {
+			labelsCollapsed = false;
+		}
+	});
+	
+	// Height snaps based on collapsed state
+	let titleHeight = $derived(labelsCollapsed ? 0 : 50);
+	let faceLabelHeight = $derived(labelsCollapsed ? 0 : 30);
+	let labelMargins = $derived(labelsCollapsed ? 0 : 1);
+	
+	// Calculate the minimum container height: padding + scaled card (title/label collapse to 0)
+	let containerMinHeight = $derived((cardOriginalHeight * MIN_SCALE) + 32); // 32px for padding
 	// Smart auto-flip based on focused input
 	let currentInputSide = $state<'front' | 'back'>('front');
 	let formErrors = $state<Record<string, boolean>>({});
@@ -214,6 +284,12 @@
 		});
 
 		initializeFormData();
+		
+		// Measure card scaling wrapper height after a tick to ensure it's rendered
+		await new Promise(resolve => setTimeout(resolve, 100));
+		if (cardScalingWrapperRef) {
+			cardOriginalHeight = cardScalingWrapperRef.offsetHeight;
+		}
 	});
 
 	// Event handlers
@@ -511,86 +587,103 @@
 <svelte:window on:resize={handleResize} on:scroll={handleScroll} />
 <div class="container mx-auto p-4 flex flex-col gap-4 max-w-2xl">
 	<!-- Sticky Preview Container -->
-	<div class="sticky top-4 z-10">
-		<Card class="transition-transform duration-200 origin-top" style="transform: scale({previewScale})">
+	<div 
+		class="sticky top-[68px] z-10" 
+		bind:this={previewContainerRef}
+		style="min-height: {containerMinHeight}px;"
+	>
+		<Card>
 			<div class="p-4">
-				<h2 class="text-2xl font-bold mb-4">ID Card Preview</h2>
+				<h2 
+					class="text-2xl font-bold overflow-hidden"
+					style="opacity: {labelOpacity}; height: {titleHeight}px; margin-bottom: {labelMargins * 16}px; transition: opacity 200ms ease-out, height 200ms ease-out, margin-bottom 200ms ease-out; will-change: opacity, height;"
+				>ID Card Preview</h2>
 
 				{#if template}
 					<div class="w-full max-w-md mx-auto">
-						<!-- svelte-ignore a11y_no_static_element_interactions -->
-						<div
-							class="flip-container relative cursor-pointer group"
-							onclick={() => (isFlipped = !isFlipped)}
-							onkeydown={(e) => e.key === 'Enter' && (isFlipped = !isFlipped)}
-							role="button"
-							tabindex="0"
+						<!-- Scaling wrapper - only the card scales -->
+						<div 
+							bind:this={cardScalingWrapperRef}
+							class="origin-top"
+							style="transform: scale({previewScale}); margin-bottom: -{cardMarginCompensation}px; transition: transform 200ms ease-out, margin-bottom 200ms ease-out; will-change: transform;"
 						>
-							<!-- Tap to flip overlay hint -->
+							<!-- svelte-ignore a11y_no_static_element_interactions -->
 							<div
-								class="absolute inset-0 z-10 flex items-center justify-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+								class="flip-container relative cursor-pointer group"
+								onclick={() => (isFlipped = !isFlipped)}
+								onkeydown={(e) => e.key === 'Enter' && (isFlipped = !isFlipped)}
+								role="button"
+								tabindex="0"
 							>
-								<span
-									class="bg-black/60 text-white px-4 py-2 rounded-full text-sm font-medium backdrop-blur-sm shadow-lg"
+								<!-- Tap to flip overlay hint -->
+								<div
+									class="absolute inset-0 z-10 flex items-center justify-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300"
 								>
-									Tap to Flip
-								</span>
-							</div>
-
-							<!-- Flip card inner -->
-							<div
-								class="flip-card-inner"
-								class:flipped={isFlipped}
-								style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels ||
-									638}"
-							>
-								<!-- Front face -->
-								<div class="flip-card-face flip-card-front">
-									<IdCanvas
-										bind:this={frontCanvasComponent}
-										elements={template.template_elements.filter((el) => el.side === 'front')}
-										backgroundUrl={template.front_background.startsWith('http')
-											? template.front_background
-											: getSupabaseStorageUrl(template.front_background)}
-										{formData}
-										{fileUploads}
-										{imagePositions}
-										{fullResolution}
-										isDragging={mouseMoving}
-										pixelDimensions={template.width_pixels && template.height_pixels
-											? { width: template.width_pixels, height: template.height_pixels }
-											: null}
-										on:ready={() => handleCanvasReady('front')}
-										on:error={({ detail }) =>
-											addDebugMessage(`Front Canvas Error: ${detail.code} - ${detail.message}`)}
-									/>
+									<span
+										class="bg-black/60 text-white px-4 py-2 rounded-full text-sm font-medium backdrop-blur-sm shadow-lg"
+									>
+										Tap to Flip
+									</span>
 								</div>
-								<!-- Back face -->
-								<div class="flip-card-face flip-card-back">
-									<IdCanvas
-										bind:this={backCanvasComponent}
-										elements={template.template_elements.filter((el) => el.side === 'back')}
-										backgroundUrl={template.back_background.startsWith('http')
-											? template.back_background
-											: getSupabaseStorageUrl(template.back_background)}
-										{formData}
-										{fileUploads}
-										{imagePositions}
-										{fullResolution}
-										isDragging={mouseMoving}
-										pixelDimensions={template.width_pixels && template.height_pixels
-											? { width: template.width_pixels, height: template.height_pixels }
-											: null}
-										on:ready={() => handleCanvasReady('back')}
-										on:error={({ detail }) =>
-											addDebugMessage(`Back Canvas Error: ${detail.code} - ${detail.message}`)}
-									/>
+
+								<!-- Flip card inner -->
+								<div
+									class="flip-card-inner"
+									class:flipped={isFlipped}
+									style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels ||
+										638}"
+								>
+									<!-- Front face -->
+									<div class="flip-card-face flip-card-front">
+										<IdCanvas
+											bind:this={frontCanvasComponent}
+											elements={template.template_elements.filter((el) => el.side === 'front')}
+											backgroundUrl={template.front_background.startsWith('http')
+												? template.front_background
+												: getSupabaseStorageUrl(template.front_background)}
+											{formData}
+											{fileUploads}
+											{imagePositions}
+											{fullResolution}
+											isDragging={mouseMoving}
+											pixelDimensions={template.width_pixels && template.height_pixels
+												? { width: template.width_pixels, height: template.height_pixels }
+												: null}
+											on:ready={() => handleCanvasReady('front')}
+											on:error={({ detail }) =>
+												addDebugMessage(`Front Canvas Error: ${detail.code} - ${detail.message}`)}
+										/>
+									</div>
+									<!-- Back face -->
+									<div class="flip-card-face flip-card-back">
+										<IdCanvas
+											bind:this={backCanvasComponent}
+											elements={template.template_elements.filter((el) => el.side === 'back')}
+											backgroundUrl={template.back_background.startsWith('http')
+												? template.back_background
+												: getSupabaseStorageUrl(template.back_background)}
+											{formData}
+											{fileUploads}
+											{imagePositions}
+											{fullResolution}
+											isDragging={mouseMoving}
+											pixelDimensions={template.width_pixels && template.height_pixels
+												? { width: template.width_pixels, height: template.height_pixels }
+												: null}
+											on:ready={() => handleCanvasReady('back')}
+											on:error={({ detail }) =>
+												addDebugMessage(`Back Canvas Error: ${detail.code} - ${detail.message}`)}
+										/>
+									</div>
 								</div>
 							</div>
 						</div>
 
-						<!-- Side indicator -->
-						<p class="text-center text-sm text-muted-foreground mt-3">
+						<!-- Side indicator - fades out with collapse -->
+						<p 
+							class="text-center text-sm text-muted-foreground overflow-hidden"
+							style="opacity: {labelOpacity}; height: {faceLabelHeight}px; margin-top: {labelMargins * 12}px; transition: opacity 200ms ease-out, height 200ms ease-out, margin-top 200ms ease-out; will-change: opacity, height;"
+						>
 							{isFlipped ? 'Back' : 'Front'} Side
 						</p>
 					</div>
@@ -598,7 +691,7 @@
 			</div>
 		</Card>
 	</div>
-	<div class="w-full overflow-hidden">
+	<div class="w-full overflow-hidden" bind:this={formContainerRef}>
 		<Card class="h-full overflow-auto">
 			<div class="p-6 overflow-hidden">
 				<div class="flex justify-between items-center mb-4">
