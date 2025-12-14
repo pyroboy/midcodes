@@ -190,6 +190,11 @@
 	// Smart auto-flip based on focused input
 	let currentInputSide = $state<'front' | 'back'>('front');
 	let formErrors = $state<Record<string, boolean>>({});
+	
+	// Highlight glow state for focused input elements (form -> preview mapping)
+	let focusedVariableName = $state<string | null>(null);
+	let highlightState = $state<'off' | 'idle' | 'active'>('off');
+	let highlightTimeout: ReturnType<typeof setTimeout> | null = null;
 	let fileUrls = $state<Record<string, string>>({});
 
 	// Overlay states for confirmation and success flows
@@ -318,6 +323,9 @@
 		if (formErrors[variableName]) {
 			formErrors[variableName] = false;
 		}
+
+		// Pulse highlight to show where the change applied
+		handleInputChange();
 	}
 
 	function handleImageUpdate(
@@ -519,9 +527,50 @@
 	}
 
 	// Smart auto-flip: detect which side the focused input belongs to
-	function handleInputFocus(side: 'front' | 'back') {
+	function handleInputFocus(side: 'front' | 'back', variableName?: string) {
 		currentInputSide = side;
 		isFlipped = side === 'back';
+		
+		// Show highlight for this element
+		if (variableName) {
+			focusedVariableName = variableName;
+			highlightState = 'idle';
+			
+			// Clear any existing highlight timer
+			if (highlightTimeout) {
+				clearTimeout(highlightTimeout);
+				highlightTimeout = null;
+			}
+		}
+	}
+	
+	// Handle input blur - fade out highlight
+	function handleInputBlur() {
+		// Start fade-out animation
+		highlightState = 'off';
+		
+		// Clear the focused variable after fade animation completes
+		if (highlightTimeout) clearTimeout(highlightTimeout);
+		highlightTimeout = setTimeout(() => {
+			focusedVariableName = null;
+		}, 250); // Match the CSS transition duration
+	}
+	
+	// Trigger highlight pulse on value change (pulse, then minimize)
+	function handleInputChange() {
+		if (focusedVariableName) {
+			// Boost the highlight briefly
+			highlightState = 'active';
+
+			// Clear existing timeout
+			if (highlightTimeout) clearTimeout(highlightTimeout);
+
+			// Return to a subtle idle highlight after a brief moment
+			highlightTimeout = setTimeout(() => {
+				// Only minimize if we're still highlighting something
+				if (focusedVariableName) highlightState = 'idle';
+			}, 500);
+		}
 	}
 
 	function handleSelectFile(variableName: string, file: File) {
@@ -533,6 +582,9 @@
 
 		const url = URL.createObjectURL(file);
 		fileUrls[variableName] = url;
+
+		// Pulse highlight to show where the change applied
+		handleInputChange();
 	}
 
 	function validateForm(): boolean {
@@ -653,6 +705,25 @@
 											on:error={({ detail }) =>
 												addDebugMessage(`Front Canvas Error: ${detail.code} - ${detail.message}`)}
 										/>
+										<!-- Highlight overlay for front elements -->
+										{#if focusedVariableName}
+											{@const focusedElement = template.template_elements.find(
+												(el) => el.variableName === focusedVariableName && el.side === 'front'
+											)}
+											{#if focusedElement}
+												{@const cardWidth = template.width_pixels || 1013}
+												{@const cardHeight = template.height_pixels || 638}
+										<div 
+											class="element-highlight-overlay state-{highlightState}"
+											style="
+												left: {((focusedElement.x || 0) / cardWidth) * 100}%;
+												top: {((focusedElement.y || 0) / cardHeight) * 100}%;
+												width: {((focusedElement.width || 100) / cardWidth) * 100}%;
+												height: {((focusedElement.height || 100) / cardHeight) * 100}%;
+											"
+										></div>
+											{/if}
+										{/if}
 									</div>
 									<!-- Back face -->
 									<div class="flip-card-face flip-card-back">
@@ -674,6 +745,25 @@
 											on:error={({ detail }) =>
 												addDebugMessage(`Back Canvas Error: ${detail.code} - ${detail.message}`)}
 										/>
+										<!-- Highlight overlay for back elements -->
+										{#if focusedVariableName}
+											{@const focusedElement = template.template_elements.find(
+												(el) => el.variableName === focusedVariableName && el.side === 'back'
+											)}
+											{#if focusedElement}
+												{@const cardWidth = template.width_pixels || 1013}
+												{@const cardHeight = template.height_pixels || 638}
+										<div 
+											class="element-highlight-overlay state-{highlightState}"
+											style="
+												left: {((focusedElement.x || 0) / cardWidth) * 100}%;
+												top: {((focusedElement.y || 0) / cardHeight) * 100}%;
+												width: {((focusedElement.width || 100) / cardWidth) * 100}%;
+												height: {((focusedElement.height || 100) / cardHeight) * 100}%;
+											"
+										></div>
+											{/if}
+										{/if}
 									</div>
 								</div>
 							</div>
@@ -739,7 +829,7 @@
 													{element.variableName}
 													<span class="text-red-500">*</span>
 												</Label>
-												<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center" onclick={() => handleInputFocus('front')}>
+													<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center" onclick={() => handleInputFocus('front', element.variableName)}>
 													<div class="flex-shrink-0">
 														<ThumbnailInput
 															width={element.width}
@@ -761,7 +851,7 @@
 												{element.variableName}
 												<span class="text-red-500">*</span>
 											</Label>
-											<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center" onclick={() => handleInputFocus('front')}>
+											<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center" onclick={() => handleInputFocus('front', element.variableName)}>
 												<div class="flex-shrink-0">
 													<ThumbnailInput
 														width={element.width}
@@ -799,24 +889,30 @@
 										</Label>
 										{#if element.type === 'text'}
 											<div class="w-full">
-												<Input
-													type="text"
-													id={element.variableName}
-													name={element.variableName}
-													bind:value={formData[element.variableName]}
-													class="w-full"
-													placeholder={`Enter ${element.variableName}`}
-													onfocus={() => handleInputFocus('front')}
-												/>
+													<Input
+														type="text"
+														id={element.variableName}
+														name={element.variableName}
+														bind:value={formData[element.variableName]}
+														class="w-full"
+														placeholder={`Enter ${element.variableName}`}
+														onfocus={() => handleInputFocus('front', element.variableName)}
+														onblur={handleInputBlur}
+														oninput={handleInputChange}
+													/>
 												{#if formErrors[element.variableName]}
 													<p class="mt-1 text-sm text-destructive">This field is required</p>
 												{/if}
 											</div>
 										{:else if element.type === 'selection' && element.options}
-											<div class="w-full">
-												<Select.Root
-													type="single"
-													value={selectStates[element.variableName]?.value}
+														<div
+															class="w-full"
+															onfocusin={() => handleInputFocus('front', element.variableName)}
+															onfocusout={handleInputBlur}
+														>
+															<Select.Root
+																type="single"
+																value={selectStates[element.variableName]?.value}
 													onValueChange={(value) =>
 														handleSelectionChange(value, element.variableName)}
 												>
@@ -834,7 +930,7 @@
 												{#if formErrors[element.variableName]}
 													<p class="mt-1 text-sm text-destructive">Please select an option</p>
 												{/if}
-											</div>
+														</div>
 										{/if}
 									</div>
 								{/if}
@@ -858,7 +954,7 @@
 													{element.variableName}
 													<span class="text-red-500">*</span>
 												</Label>
-												<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center" onclick={() => handleInputFocus('back')}>
+													<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center" onclick={() => handleInputFocus('back', element.variableName)}>
 													<div class="flex-shrink-0">
 														<ThumbnailInput
 															width={element.width}
@@ -880,7 +976,7 @@
 												{element.variableName}
 												<span class="text-red-500">*</span>
 											</Label>
-											<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center" onclick={() => handleInputFocus('back')}>
+											<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center" onclick={() => handleInputFocus('back', element.variableName)}>
 												<div class="flex-shrink-0">
 													<ThumbnailInput
 														width={element.width}
@@ -918,24 +1014,30 @@
 										</Label>
 										{#if element.type === 'text'}
 											<div class="w-full">
-												<Input
-													type="text"
-													id={element.variableName}
-													name={element.variableName}
-													bind:value={formData[element.variableName]}
-													class="w-full"
-													placeholder={`Enter ${element.variableName}`}
-													onfocus={() => handleInputFocus('back')}
-												/>
+													<Input
+														type="text"
+														id={element.variableName}
+														name={element.variableName}
+														bind:value={formData[element.variableName]}
+														class="w-full"
+														placeholder={`Enter ${element.variableName}`}
+														onfocus={() => handleInputFocus('back', element.variableName)}
+														onblur={handleInputBlur}
+														oninput={handleInputChange}
+													/>
 												{#if formErrors[element.variableName]}
 													<p class="mt-1 text-sm text-destructive">This field is required</p>
 												{/if}
 											</div>
 										{:else if element.type === 'selection' && element.options}
-											<div class="w-full">
-												<Select.Root
-													type="single"
-													value={selectStates[element.variableName]?.value}
+														<div
+															class="w-full"
+															onfocusin={() => handleInputFocus('back', element.variableName)}
+															onfocusout={handleInputBlur}
+														>
+															<Select.Root
+																type="single"
+																value={selectStates[element.variableName]?.value}
 													onValueChange={(value) =>
 														handleSelectionChange(value, element.variableName)}
 												>
@@ -953,7 +1055,7 @@
 												{#if formErrors[element.variableName]}
 													<p class="mt-1 text-sm text-destructive">Please select an option</p>
 												{/if}
-											</div>
+														</div>
 										{/if}
 									</div>
 								{/if}
@@ -1146,6 +1248,67 @@
 		position: absolute;
 		inset: 0;
 		transform: rotateY(180deg);
+	}
+
+	/* Form -> Preview highlight overlay */
+	.element-highlight-overlay {
+		position: absolute;
+		z-index: 5;
+		pointer-events: none;
+		box-sizing: border-box;
+		border-radius: 10px;
+		border: 2px solid rgba(59, 130, 246, 0.9);
+		opacity: 0;
+		transform: scale(1);
+		transition:
+			opacity 250ms ease,
+			box-shadow 250ms ease,
+			transform 250ms ease;
+	}
+
+	.element-highlight-overlay.state-idle {
+		opacity: 0.35;
+		box-shadow:
+			0 0 0 2px rgba(59, 130, 246, 0.12),
+			0 0 14px rgba(59, 130, 246, 0.22);
+	}
+
+	.element-highlight-overlay.state-active {
+		opacity: 0.95;
+		animation: elementGlowPulse 900ms ease-out;
+		box-shadow:
+			0 0 0 2px rgba(59, 130, 246, 0.45),
+			0 0 18px rgba(59, 130, 246, 0.6),
+			0 0 48px rgba(59, 130, 246, 0.25);
+		transform: scale(1.01);
+	}
+
+	.element-highlight-overlay.state-off {
+		opacity: 0;
+		box-shadow: none;
+		transform: scale(1);
+	}
+
+	@keyframes elementGlowPulse {
+		0% {
+			box-shadow:
+				0 0 0 2px rgba(59, 130, 246, 0.65),
+				0 0 22px rgba(59, 130, 246, 0.65),
+				0 0 60px rgba(59, 130, 246, 0.3);
+			transform: scale(1.02);
+		}
+		100% {
+			box-shadow:
+				0 0 0 2px rgba(59, 130, 246, 0.12),
+				0 0 14px rgba(59, 130, 246, 0.22);
+			transform: scale(1);
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.element-highlight-overlay.state-active {
+			animation: none;
+		}
 	}
 
 	:global(.select-error) {
