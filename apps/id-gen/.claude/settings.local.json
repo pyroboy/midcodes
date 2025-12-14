@@ -16,7 +16,9 @@
       "Bash(timeout 15 pnpm run dev:*)",
       "mcp__supabase__list_projects",
       "mcp__supabase__generate_typescript_types",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "mcp__supabase__list_migrations",
+      "mcp__supabase__apply_migration"
     ],
     "deny": [],
     "ask": []

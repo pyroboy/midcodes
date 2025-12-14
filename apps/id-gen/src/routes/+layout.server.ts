@@ -12,9 +12,8 @@ export const load: LayoutServerLoad = async ({ locals, depends, setHeaders }) =>
 	depends('app:user-profile');
 	depends('app:credits');
 
-	// Cache layout data for 60s - profile rarely changes
-	// This reduces redundant DB fetches on navigation
-	setHeaders({ 'cache-control': 'private, max-age=60' });
+	// Cache-control removed to prevent 500 errors and ensuring fresh credit data
+	// setHeaders({ 'cache-control': 'private, max-age=60' });
 
 	// Destructure all the auth-related data from locals
 	const { session, user, org_id, permissions, supabase } = locals;

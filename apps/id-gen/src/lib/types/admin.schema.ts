@@ -38,8 +38,16 @@ export const userOutputSchema = z.object({
 export const adminStatsOutputSchema = z.object({
 	totalCards: z.number(),
 	newCardsThisMonth: z.number(),
+	newCardsToday: z.number().default(0),
 	totalUsers: z.number(),
-	totalTemplates: z.number()
+	totalTemplates: z.number(),
+	totalCredits: z.number().default(0),
+	creditsUsedToday: z.number().default(0),
+	totalRevenue: z.number().default(0),
+	paidInvoicesCount: z.number().default(0),
+	totalTemplateAssets: z.number().default(0),
+	publishedTemplateAssets: z.number().default(0),
+	totalOrgs: z.number().default(0)
 });
 
 export const adminDashboardOutputSchema = z.object({

@@ -1,5 +1,8 @@
 import { error } from '@sveltejs/kit';
 import { query, command, getRequestEvent } from '$app/server';
+import { PRIVATE_SERVICE_ROLE } from '$env/static/private';
+import { PUBLIC_SUPABASE_URL } from '$env/static/public';
+import { createClient } from '@supabase/supabase-js';
 
 // Import schemas following AZPOS pattern
 import {
@@ -19,59 +22,112 @@ import {
 } from '$lib/types/admin.schema';
 
 // Helper function to check admin permissions
+// IMPORTANT: Check original role FIRST (for admins emulating non-admin roles)
 async function requireAdminPermissions() {
 	const { locals } = getRequestEvent();
-	const { user } = locals;
+	const { user, effectiveRoles, roleEmulation, org_id } = locals;
 
-	if (!user?.role || !['super_admin', 'org_admin', 'id_gen_admin'].includes(user.role)) {
+	const allowedRoles = ['super_admin', 'org_admin', 'id_gen_admin'];
+	
+	// Check original role first (if emulating, the admin should still have access)
+	const originalRole = roleEmulation?.originalRole;
+	const originalIsAdmin = originalRole && allowedRoles.includes(originalRole);
+	
+	// Then check effective roles
+	const hasEffectiveRole = effectiveRoles?.some((r) => allowedRoles.includes(r));
+
+	if (!originalIsAdmin && !hasEffectiveRole) {
 		throw error(403, 'Access denied. Admin privileges required.');
 	}
 
-	return { user, supabase: locals.supabase, org_id: locals.org_id };
+	// Use original role if admin, otherwise use effective role
+	const userRole = originalIsAdmin ? originalRole : effectiveRoles?.[0];
+	return { user: { ...user, role: userRole } as typeof user & { role: string }, org_id };
 }
 
 // Helper function to check specific admin permissions for user management
+// IMPORTANT: Check original role FIRST
 async function requireUserManagementPermissions() {
 	const { locals } = getRequestEvent();
-	const { user } = locals;
+	const { user, effectiveRoles, roleEmulation, org_id } = locals;
 
-	if (!user?.role || !['super_admin', 'org_admin'].includes(user.role)) {
+	const allowedRoles = ['super_admin', 'org_admin'];
+	
+	// Check original role first
+	const originalRole = roleEmulation?.originalRole;
+	const originalIsAdmin = originalRole && allowedRoles.includes(originalRole);
+	
+	// Then check effective roles
+	const hasEffectiveRole = effectiveRoles?.some((r) => allowedRoles.includes(r));
+
+	if (!originalIsAdmin && !hasEffectiveRole) {
 		throw error(403, 'Insufficient permissions for user management.');
 	}
 
-	return { user, supabase: locals.supabase, org_id: locals.org_id };
+	const userRole = originalIsAdmin ? originalRole : effectiveRoles?.[0];
+	return { user: { ...user, role: userRole } as typeof user & { role: string }, org_id };
 }
 
 // Helper function to check super admin permissions
+// IMPORTANT: Check original role FIRST
 async function requireSuperAdminPermissions() {
 	const { locals } = getRequestEvent();
-	const { user } = locals;
+	const { user, effectiveRoles, roleEmulation, org_id } = locals;
 
-	if (user?.role !== 'super_admin') {
+	// Check original role first
+	const originalIsSuperAdmin = roleEmulation?.originalRole === 'super_admin';
+	
+	// Then check effective roles
+	const hasEffectiveRole = effectiveRoles?.includes('super_admin');
+
+	if (!originalIsSuperAdmin && !hasEffectiveRole) {
 		throw error(403, 'Super admin privileges required.');
 	}
 
-	return { user, supabase: locals.supabase, org_id: locals.org_id };
+	return { user: { ...user, role: 'super_admin' } as typeof user & { role: string }, org_id };
+}
+
+function getAdminClient() {
+	return createClient(PUBLIC_SUPABASE_URL, PRIVATE_SERVICE_ROLE);
 }
 
 // Query functions
 export const getAdminDashboardData = query(async (): Promise<AdminDashboardData> => {
-	const { user, supabase, org_id } = await requireAdminPermissions();
+	const { user, org_id } = await requireAdminPermissions();
+	const supabase = getAdminClient();
 
 	if (!org_id) {
 		throw error(500, 'Organization ID not found');
 	}
 
 	try {
+		// Date ranges
+		const now = new Date();
+		const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+
 		// Get organization stats
 		const [
 			{ count: totalCards },
+			{ count: cardsToday },
 			{ data: usersData, error: usersError },
 			{ data: templatesData, error: templatesError },
-			{ data: recentCardsData, error: recentCardsError }
+			{ data: recentCardsData, error: recentCardsError },
+			{ data: creditStats, error: creditStatsError }, // Get all profiles to sum credits
+			{ data: creditTransactions, error: transactionsError }, // Get today's transactions
+			{ data: paidInvoices, error: invoicesError }, // Get paid invoices
+			{ count: totalTemplateAssets }, // Total template assets
+			{ count: publishedTemplateAssets }, // Published template assets
+			{ count: totalOrgs } // Total organizations
 		] = await Promise.all([
 			// Total cards count
 			supabase.from('idcards').select('*', { count: 'exact', head: true }).eq('org_id', org_id),
+
+			// Cards generated today
+			supabase
+				.from('idcards')
+				.select('*', { count: 'exact', head: true })
+				.eq('org_id', org_id)
+				.gte('created_at', startOfToday),
 
 			// All users in organization
 			supabase
@@ -93,24 +149,58 @@ export const getAdminDashboardData = query(async (): Promise<AdminDashboardData>
 				.select('id, template_id, created_at, data')
 				.eq('org_id', org_id)
 				.order('created_at', { ascending: false })
-				.limit(10)
+				.limit(10),
+
+			// Credit stats (sum of all profiles' balances)
+			supabase.from('profiles').select('credits_balance').eq('org_id', org_id),
+
+			// Today's credit usage (negative transactions)
+			supabase
+				.from('credit_transactions')
+				.select('amount')
+				.eq('org_id', org_id)
+				.lt('amount', 0)
+				.gte('created_at', startOfToday),
+
+			// Revenue (Paid invoices)
+			supabase
+				.from('invoices')
+				.select('total_amount')
+				.eq('org_id', org_id)
+				.eq('status', 'paid'),
+
+			// Total template assets (global, not org-specific)
+			supabase.from('template_assets').select('*', { count: 'exact', head: true }),
+
+			// Published template assets
+			supabase.from('template_assets').select('*', { count: 'exact', head: true }).eq('is_published', true),
+
+			// Total organizations
+			supabase.from('organizations').select('*', { count: 'exact', head: true })
 		]);
 
 		// Handle any errors
-		if (usersError) {
-			console.error('Error fetching users:', usersError);
-		}
-		if (templatesError) {
-			console.error('Error fetching templates:', templatesError);
-		}
-		if (recentCardsError) {
-			console.error('Error fetching recent cards:', recentCardsError);
-		}
+		if (usersError) console.error('Error fetching users:', usersError);
+		if (templatesError) console.error('Error fetching templates:', templatesError);
+		if (recentCardsError) console.error('Error fetching recent cards:', recentCardsError);
+		if (creditStatsError) console.error('Error fetching credit stats:', creditStatsError);
+		if (transactionsError) console.error('Error fetching transactions:', transactionsError);
+		if (invoicesError) console.error('Error fetching invoices:', invoicesError);
 
 		// Cast results to flexible arrays for dashboard computations
 		const users = (usersData as any[]) || [];
 		const templates = (templatesData as any[]) || [];
 		const recentCards = (recentCardsData as any[]) || [];
+
+		// Calculate stats
+		const totalCredits =
+			(creditStats as any[])?.reduce((sum, p) => sum + (p.credits_balance || 0), 0) || 0;
+		const creditsUsedToday = Math.abs(
+			(creditTransactions as any[])?.reduce((sum, t) => sum + (t.amount || 0), 0) || 0
+		);
+		const totalRevenue =
+			(paidInvoices as any[])?.reduce((sum, inv) => sum + (inv.total_amount || 0), 0) || 0;
+		const paidInvoicesCount = (paidInvoices as any[])?.length || 0;
 
 		// Calculate new cards this month
 		const thisMonth = new Date();
@@ -158,8 +248,16 @@ export const getAdminDashboardData = query(async (): Promise<AdminDashboardData>
 			stats: {
 				totalCards: totalCards || 0,
 				newCardsThisMonth,
+				newCardsToday: cardsToday || 0,
 				totalUsers: users?.length || 0,
-				totalTemplates: templates?.length || 0
+				totalTemplates: templates?.length || 0,
+				totalCredits,
+				creditsUsedToday,
+				totalRevenue,
+				paidInvoicesCount,
+				totalTemplateAssets: totalTemplateAssets || 0,
+				publishedTemplateAssets: publishedTemplateAssets || 0,
+				totalOrgs: totalOrgs || 0
 			},
 			users: users || [],
 			templates: templates || [],
@@ -182,7 +280,8 @@ export const getAdminDashboardData = query(async (): Promise<AdminDashboardData>
 });
 
 export const getUsersData = query(async (): Promise<UsersData> => {
-	const { user, supabase, org_id } = await requireAdminPermissions();
+	const { user, org_id } = await requireAdminPermissions();
+	const supabase = getAdminClient();
 
 	if (!org_id) {
 		throw error(500, 'Organization ID not found');
@@ -213,8 +312,10 @@ export const getUsersData = query(async (): Promise<UsersData> => {
 });
 
 // Command functions
+// Command functions
 export const addUser = command('unchecked', async ({ email, role }: any) => {
-	const { user, supabase, org_id } = await requireUserManagementPermissions();
+	const { user, org_id } = await requireUserManagementPermissions();
+	const supabase = getAdminClient();
 
 	try {
 		// Validate role
@@ -241,7 +342,7 @@ export const addUser = command('unchecked', async ({ email, role }: any) => {
 			throw error(400, 'User with this email already exists in your organization');
 		}
 
-		// Create user in auth (they'll need to set their password via invite)
+		// Create user in auth (requires service role for admin.createUser)
 		const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
 			email,
 			email_confirm: true, // Skip email confirmation for admin-created users
@@ -299,7 +400,8 @@ export const addUser = command('unchecked', async ({ email, role }: any) => {
 });
 
 export const updateUserRole = command('unchecked', async ({ userId, role }: any) => {
-	const { user, supabase, org_id } = await requireUserManagementPermissions();
+	const { user, org_id } = await requireUserManagementPermissions();
+	const supabase = getAdminClient();
 
 	// Ensure org_id is defined
 	if (!org_id) {
@@ -374,7 +476,8 @@ export const updateUserRole = command('unchecked', async ({ userId, role }: any)
 });
 
 export const deleteUser = command('unchecked', async ({ userId }: any) => {
-	const { user, supabase, org_id } = await requireUserManagementPermissions();
+	const { user, org_id } = await requireUserManagementPermissions();
+	const supabase = getAdminClient();
 
 	// Ensure org_id is defined
 	if (!org_id) {
@@ -428,7 +531,7 @@ export const deleteUser = command('unchecked', async ({ userId }: any) => {
 			throw error(500, 'Failed to delete user profile');
 		}
 
-		// Delete from auth (optional - you might want to keep the auth user)
+		// Delete from auth (requires service role)
 		const { error: authDeleteError } = await supabase.auth.admin.deleteUser(userId);
 		if (authDeleteError) {
 			console.warn('Failed to delete auth user:', authDeleteError);

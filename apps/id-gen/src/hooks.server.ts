@@ -130,13 +130,62 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
 			? jwtDecode<UserJWTPayload>(currentSession.access_token)
 			: null;
 
-		const permissions = decodedToken
-			? await getUserPermissions(decodedToken.user_roles, event.locals.supabase)
+		let roles: string[] = [];
+
+		if (decodedToken?.app_metadata) {
+			// Extract roles from app_metadata (Supabase standard)
+			if (decodedToken.app_metadata.role) {
+				roles.push(decodedToken.app_metadata.role);
+			}
+			if (decodedToken.app_metadata.roles) {
+				roles.push(...decodedToken.app_metadata.roles);
+			}
+			// Fallback to custom claim if present
+			if (decodedToken.user_roles) {
+				roles.push(...decodedToken.user_roles);
+			}
+
+			// Handle Role Emulation
+			const emulation = decodedToken.app_metadata.role_emulation;
+			if (emulation && emulation.active) {
+				const now = new Date();
+				const expiresAt = emulation.expires_at ? new Date(emulation.expires_at) : null;
+				
+				// Check if emulation is expired
+				if (expiresAt && now > expiresAt) {
+					logger.warn('Role emulation expired, ignoring emulated role', {
+						userId: user.id,
+						emulatedRole: emulation.emulated_role,
+						expiresAt: emulation.expires_at
+					});
+					// User falls back to their original roles (already extracted above)
+				} else if (emulation.emulated_role) {
+					// Emulation is active and valid: OVERRIDE roles with the emulated role
+					logger.info('Role emulation active', {
+						userId: user.id,
+						emulating: emulation.emulated_role
+					});
+					roles = [emulation.emulated_role];
+				}
+			}
+		} else if (decodedToken?.user_roles) {
+			// Fallback for legacy JWTs without app_metadata
+			roles = decodedToken.user_roles;
+		}
+
+		// Deduplicate roles
+		roles = [...new Set(roles)];
+
+		const permissions = roles.length > 0
+			? await getUserPermissions(roles, event.locals.supabase)
 			: [];
+		
 		// Sanitized logging only; never log raw roles or metadata in production
 		logger.info('User authenticated', {
 			userId: user.id,
-			hasRoles: Boolean(decodedToken?.user_roles?.length)
+			hasRoles: roles.length > 0,
+			roleCount: roles.length,
+			emulationActive: Boolean(decodedToken?.app_metadata?.role_emulation?.active)
 		});
 		return {
 			session: currentSession,
@@ -170,6 +219,49 @@ const authGuard: Handle = async ({ event, resolve }) => {
 		permissions: sessionInfo.permissions,
 		org_id: sessionInfo.org_id ?? undefined
 	};
+
+	// Manually re-extract roles for locals global access (since safeGetSession returns structured data but we need to pass it to locals)
+	// Ideally successful safeGetSession should return everything, but for now we re-derive or extract from the logic above.
+	// Actually, safeGetSession handles the logic but doesn't return the "role array" explicitly in the interface.
+	// Let's patch safeGetSession to return the roles too, OR just re-read them from the decoded token which is in sessionInfo.
+	
+	if (sessionInfo.decodedToken) {
+		const dt = sessionInfo.decodedToken;
+		let roles: string[] = [];
+		let emulationState = { active: false, originalRole: undefined as string | undefined, emulatedRole: undefined as string | undefined };
+		
+		// 1. Basic Extraction
+		if (dt.app_metadata?.role) roles.push(dt.app_metadata.role);
+		if (dt.app_metadata?.roles) roles.push(...dt.app_metadata.roles);
+		if (dt.user_roles) roles.push(...dt.user_roles);
+		
+		const originalRoles = [...new Set(roles)]; // Keep a copy of original roles
+		
+		// 2. Emulation Logic (Duplicate of safeGetSession logic, but needed for locals state)
+		const emulation = dt.app_metadata?.role_emulation;
+		if (emulation && emulation.active) {
+			const now = new Date();
+			const expiresAt = emulation.expires_at ? new Date(emulation.expires_at) : null;
+			
+			if (expiresAt && now > expiresAt) {
+				// Expired - ignore
+			} else if (emulation.emulated_role) {
+				// Active
+				roles = [emulation.emulated_role];
+				emulationState = {
+					active: true,
+					originalRole: originalRoles[0], // Simplified: assuming primary role is first
+					emulatedRole: emulation.emulated_role
+				};
+			}
+		}
+		
+		event.locals.effectiveRoles = [...new Set(roles)];
+		event.locals.roleEmulation = emulationState;
+	} else {
+		event.locals.effectiveRoles = [];
+		event.locals.roleEmulation = { active: false };
+	}
 
 	const path = event.url.pathname;
 
