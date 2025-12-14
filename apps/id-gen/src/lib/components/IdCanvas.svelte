@@ -299,6 +299,34 @@
 		}
 	});
 
+	async function waitForFonts() {
+		if (!document.fonts) return;
+
+		const fontsToLoad = new Set<string>();
+		elements.forEach((element) => {
+			// Check specific fonts for text/selection elements
+			if ((element.type === 'text' || element.type === 'selection') && element.font) {
+				const weight = element.fontWeight || 400;
+				const style = element.fontStyle || 'normal';
+				fontsToLoad.add(`${style} ${weight} 16px "${element.font}"`);
+			}
+		});
+
+		const promises = [];
+		for (const font of fontsToLoad) {
+			// document.fonts.load returns a Promise that resolves to a generic list of loaded fonts
+			promises.push(document.fonts.load(font));
+		}
+
+		try {
+			await Promise.all(promises);
+			await document.fonts.ready;
+		} catch (e) {
+			console.warn('Font loading warning:', e);
+			// Proceed anyway if font loading fails, to avoid blocking render forever
+		}
+	}
+
 	async function initializeCanvases() {
 		if (!browser || !displayCanvas) {
 			dispatch('error', {
@@ -330,6 +358,9 @@
 			offscreenCanvas = new OffscreenCanvas(dims.width, dims.height);
 
 			await new Promise((resolve) => requestAnimationFrame(resolve));
+
+			// Wait for fonts to ensure robustness of initial render
+			await waitForFonts();
 
 			isReady = true;
 			await renderIdCard();
@@ -788,16 +819,29 @@
 			const roundedWidth = Math.round(width);
 			const roundedHeight = Math.round(height);
 
-			ctx.fillStyle = '#f0f0f0';
-			ctx.fillRect(roundedX, roundedY, roundedWidth, roundedHeight);
-			ctx.strokeStyle = '#999';
+			// Transparent background (don't fill)
+			
+			// Dashed border
+			ctx.save();
+			ctx.strokeStyle = '#aaaaaa';
+			ctx.lineWidth = 2;
+			ctx.setLineDash([6 * scale, 4 * scale]); // Scale the dashes
 			ctx.strokeRect(roundedX, roundedY, roundedWidth, roundedHeight);
-			ctx.fillStyle = '#999';
-			ctx.font = `${Math.round(12 * scale)}px Arial`;
+			ctx.restore();
+
+			// Uniform text size based on card scale (standardized)
+			ctx.fillStyle = '#aaaaaa';
+			const fontSize = Math.round(24 * scale);
+			
+			ctx.font = `${fontSize}px Arial`;
 			ctx.textAlign = 'center';
 			ctx.textBaseline = 'middle';
+			
+			// Format type string (e.g. "photo" -> "Photo")
+			const label = type.charAt(0).toUpperCase() + type.slice(1);
+			
 			ctx.fillText(
-				type,
+				label,
 				Math.round(roundedX + roundedWidth / 2),
 				Math.round(roundedY + roundedHeight / 2)
 			);
