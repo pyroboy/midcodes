@@ -1,9 +1,10 @@
 <script lang="ts">
-	import { User, Settings, Shield, LogOut, CreditCard } from 'lucide-svelte';
+	import { User, Settings, Shield, LogOut, CreditCard, Eye, X } from 'lucide-svelte';
 	import { Avatar, AvatarImage, AvatarFallback } from '$lib/components/ui/avatar';
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 
 	interface Props {
 		user?: {
@@ -16,6 +17,13 @@
 	}
 
 	let { user }: Props = $props();
+
+	// Get emulation data from page store
+	const isSuperAdmin = $derived($page.data.isSuperAdmin);
+	const availableRoles = $derived($page.data.availableRolesForEmulation || []);
+	const roleEmulation = $derived($page.data.roleEmulation);
+
+	let emulationLoading = $state(false);
 
 	function getUserInitials(user: Props['user']): string {
 		if (!user?.email) return 'U';
@@ -36,6 +44,42 @@
 
 	function navigateTo(href: string) {
 		goto(href);
+	}
+
+	async function startEmulation(role: string) {
+		emulationLoading = true;
+		try {
+			const res = await fetch('/api/admin/start-emulation', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ role })
+			});
+			if (res.ok) {
+				window.location.reload();
+			} else {
+				const data = await res.json();
+				alert(data.error || 'Failed to start emulation');
+			}
+		} catch (e) {
+			console.error('Error starting emulation:', e);
+			alert('Error starting emulation.');
+		} finally {
+			emulationLoading = false;
+		}
+	}
+
+	async function stopEmulation() {
+		try {
+			const res = await fetch('/api/admin/stop-emulation', { method: 'POST' });
+			if (res.ok) {
+				window.location.reload();
+			} else {
+				alert('Failed to stop emulation');
+			}
+		} catch (e) {
+			console.error('Error stopping emulation:', e);
+			alert('Error stopping emulation.');
+		}
 	}
 </script>
 
@@ -69,12 +113,39 @@
 					<p class="text-sm font-medium text-foreground truncate">
 						{user?.email || 'Unknown User'}
 					</p>
-					<p class="text-xs text-muted-foreground">
-						{formatRoleName(user?.role)}
-					</p>
+					{#if roleEmulation?.active}
+						<p class="text-xs text-primary font-medium">
+							{formatRoleName(roleEmulation.originalRole)}
+						</p>
+						<p class="text-xs text-blue-500 font-medium">
+							Viewing as: {formatRoleName(roleEmulation.emulatedRole)}
+						</p>
+					{:else}
+						<p class="text-xs text-muted-foreground">
+							{formatRoleName(user?.role)}
+						</p>
+					{/if}
 				</div>
 			</div>
 		</div>
+
+		<!-- Emulation Status Banner -->
+		{#if roleEmulation?.active}
+			<div class="px-3 py-2 bg-purple-500/10 border-b border-purple-500/20">
+				<div class="flex items-center justify-between">
+					<span class="text-xs text-purple-600 dark:text-purple-400 font-medium">
+						Emulating Role
+					</span>
+					<button
+						onclick={stopEmulation}
+						class="text-xs text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200 font-bold flex items-center gap-1"
+					>
+						<X class="h-3 w-3" />
+						Stop
+					</button>
+				</div>
+			</div>
+		{/if}
 
 		<!-- Menu Items -->
 		<DropdownMenu.Group>
@@ -93,7 +164,7 @@
 				<span>Settings</span>
 			</DropdownMenu.Item>
 
-			{#if isAdmin(user)}
+			{#if isAdmin(user) || isSuperAdmin}
 				<DropdownMenu.Separator />
 				<DropdownMenu.Item onSelect={() => navigateTo('/admin')}>
 					<Shield class="mr-2 h-4 w-4" />
@@ -101,6 +172,27 @@
 				</DropdownMenu.Item>
 			{/if}
 		</DropdownMenu.Group>
+
+		<!-- Role Emulation Section (Super Admin Only) -->
+		{#if isSuperAdmin && availableRoles.length > 0 && !roleEmulation?.active}
+			<DropdownMenu.Separator />
+			<DropdownMenu.Sub>
+				<DropdownMenu.SubTrigger>
+					<Eye class="mr-2 h-4 w-4" />
+					<span>Emulate Role</span>
+				</DropdownMenu.SubTrigger>
+				<DropdownMenu.SubContent class="w-48">
+					{#each availableRoles as role}
+						<DropdownMenu.Item 
+							onSelect={() => startEmulation(role.value)}
+							disabled={emulationLoading}
+						>
+							{role.label}
+						</DropdownMenu.Item>
+					{/each}
+				</DropdownMenu.SubContent>
+			</DropdownMenu.Sub>
+		{/if}
 
 		<DropdownMenu.Separator />
 

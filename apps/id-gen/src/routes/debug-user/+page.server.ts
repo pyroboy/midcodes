@@ -3,7 +3,7 @@ import { redirect, error } from '@sveltejs/kit';
 import { checkSuperAdmin } from '$lib/utils/adminPermissions';
 
 export const load: PageServerLoad = async ({ locals }) => {
-	const { user, session, org_id, permissions } = locals;
+	const { user, session, org_id, permissions, effectiveRoles } = locals;
 
 	// Require authentication
 	if (!session || !user) {
@@ -24,7 +24,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			// Avoid returning sensitive metadata
 			orgId: org_id,
 			permissions: permissions,
-			userRoles: roles.length ? roles : singleRole ? [singleRole] : []
+			userRoles: effectiveRoles || [user.role].filter(Boolean)
 		}
 	};
 };

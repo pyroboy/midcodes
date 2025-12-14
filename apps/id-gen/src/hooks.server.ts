@@ -17,6 +17,15 @@ export interface GetSessionResult {
 	user: User | null;
 	org_id: string | null;
 	permissions?: string[];
+	effectiveRoles?: string[];
+	roleEmulation?: {
+		active: boolean;
+		emulatedRole: string | null;
+		originalRole: string | null;
+		expiresAt: string | null;
+		startedAt: string | null;
+	} | null;
+	decodedToken?: any;
 }
 
 const initializeSupabase: Handle = async ({ event, resolve }) => {
@@ -125,52 +134,83 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
 			}
 		}
 
-		// Decode JWT and get permissions
+		// Decode JWT for basic role extraction (but NOT for emulation)
 		const decodedToken = currentSession.access_token
 			? jwtDecode<UserJWTPayload>(currentSession.access_token)
 			: null;
 
+		// Extract base roles from app_metadata (prefer user.app_metadata over JWT)
 		let roles: string[] = [];
+		let emulationState: {
+			active: boolean;
+			emulatedRole: string | null;
+			originalRole: string | null;
+			expiresAt: string | null;
+			startedAt: string | null;
+		} | null = null;
 
-		if (decodedToken?.app_metadata) {
-			// Extract roles from app_metadata (Supabase standard)
-			if (decodedToken.app_metadata.role) {
+		// Get role from user.app_metadata (this is always fresh, unlike JWT)
+		const appMetadata = user.app_metadata || {};
+		if (appMetadata.role) {
+			roles.push(appMetadata.role);
+		}
+		if (appMetadata.roles) {
+			roles.push(...appMetadata.roles);
+		}
+		
+		// Fallback to JWT if no roles in app_metadata
+		if (roles.length === 0 && decodedToken) {
+			if (decodedToken.app_metadata?.role) {
 				roles.push(decodedToken.app_metadata.role);
 			}
-			if (decodedToken.app_metadata.roles) {
+			if (decodedToken.app_metadata?.roles) {
 				roles.push(...decodedToken.app_metadata.roles);
 			}
-			// Fallback to custom claim if present
 			if (decodedToken.user_roles) {
 				roles.push(...decodedToken.user_roles);
 			}
+		}
 
-			// Handle Role Emulation
-			const emulation = decodedToken.app_metadata.role_emulation;
-			if (emulation && emulation.active) {
-				const now = new Date();
-				const expiresAt = emulation.expires_at ? new Date(emulation.expires_at) : null;
+		// Handle Role Emulation - ONLY from user.app_metadata (fresh, not stale JWT)
+		const emulation = appMetadata.role_emulation;
+		
+		if (emulation && emulation.active) {
+			const now = new Date();
+			const expiresAt = emulation.expires_at ? new Date(emulation.expires_at) : null;
+			
+			// Check if emulation is expired
+			if (expiresAt && now > expiresAt) {
+				logger.warn('Role emulation expired, ignoring emulated role', {
+					userId: user.id,
+					emulatedRole: emulation.emulated_role,
+					expiresAt: emulation.expires_at
+				});
+				// User falls back to their original roles (already extracted above)
+				emulationState = {
+					active: false,
+					emulatedRole: null,
+					originalRole: emulation.original_role,
+					expiresAt: emulation.expires_at,
+					startedAt: emulation.started_at
+				};
+			} else if (emulation.emulated_role) {
+				// Emulation is active and valid: OVERRIDE roles with the emulated role
+				logger.info('Role emulation active', {
+					userId: user.id,
+					emulating: emulation.emulated_role,
+					originalRole: emulation.original_role
+				});
+				roles = [emulation.emulated_role];
 				
-				// Check if emulation is expired
-				if (expiresAt && now > expiresAt) {
-					logger.warn('Role emulation expired, ignoring emulated role', {
-						userId: user.id,
-						emulatedRole: emulation.emulated_role,
-						expiresAt: emulation.expires_at
-					});
-					// User falls back to their original roles (already extracted above)
-				} else if (emulation.emulated_role) {
-					// Emulation is active and valid: OVERRIDE roles with the emulated role
-					logger.info('Role emulation active', {
-						userId: user.id,
-						emulating: emulation.emulated_role
-					});
-					roles = [emulation.emulated_role];
-				}
+				// Set emulation state for UI
+				emulationState = {
+					active: true,
+					emulatedRole: emulation.emulated_role,
+					originalRole: emulation.original_role,
+					expiresAt: emulation.expires_at,
+					startedAt: emulation.started_at
+				};
 			}
-		} else if (decodedToken?.user_roles) {
-			// Fallback for legacy JWTs without app_metadata
-			roles = decodedToken.user_roles;
 		}
 
 		// Deduplicate roles
@@ -185,15 +225,18 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
 			userId: user.id,
 			hasRoles: roles.length > 0,
 			roleCount: roles.length,
-			emulationActive: Boolean(decodedToken?.app_metadata?.role_emulation?.active)
+			emulationActive: emulationState?.active ?? false
 		});
+		
 		return {
 			session: currentSession,
 			error: null,
 			user,
 			org_id: user.user_metadata.org_id,
 			decodedToken: decodedToken || null,
-			permissions
+			permissions,
+			effectiveRoles: roles,
+			roleEmulation: emulationState
 		};
 	};
 
@@ -211,57 +254,17 @@ const authGuard: Handle = async ({ event, resolve }) => {
 
 	const sessionInfo = await event.locals.safeGetSession();
 
-	// Set all info in locals
+	// Set all info in locals - now using the fresh data from safeGetSession
 	event.locals = {
 		...event.locals,
 		session: sessionInfo.session,
 		user: sessionInfo.user,
 		permissions: sessionInfo.permissions,
-		org_id: sessionInfo.org_id ?? undefined
+		org_id: sessionInfo.org_id ?? undefined,
+		// Use the roles and emulation state computed in safeGetSession (from fresh app_metadata)
+		effectiveRoles: sessionInfo.effectiveRoles || [],
+		roleEmulation: sessionInfo.roleEmulation || { active: false }
 	};
-
-	// Manually re-extract roles for locals global access (since safeGetSession returns structured data but we need to pass it to locals)
-	// Ideally successful safeGetSession should return everything, but for now we re-derive or extract from the logic above.
-	// Actually, safeGetSession handles the logic but doesn't return the "role array" explicitly in the interface.
-	// Let's patch safeGetSession to return the roles too, OR just re-read them from the decoded token which is in sessionInfo.
-	
-	if (sessionInfo.decodedToken) {
-		const dt = sessionInfo.decodedToken;
-		let roles: string[] = [];
-		let emulationState = { active: false, originalRole: undefined as string | undefined, emulatedRole: undefined as string | undefined };
-		
-		// 1. Basic Extraction
-		if (dt.app_metadata?.role) roles.push(dt.app_metadata.role);
-		if (dt.app_metadata?.roles) roles.push(...dt.app_metadata.roles);
-		if (dt.user_roles) roles.push(...dt.user_roles);
-		
-		const originalRoles = [...new Set(roles)]; // Keep a copy of original roles
-		
-		// 2. Emulation Logic (Duplicate of safeGetSession logic, but needed for locals state)
-		const emulation = dt.app_metadata?.role_emulation;
-		if (emulation && emulation.active) {
-			const now = new Date();
-			const expiresAt = emulation.expires_at ? new Date(emulation.expires_at) : null;
-			
-			if (expiresAt && now > expiresAt) {
-				// Expired - ignore
-			} else if (emulation.emulated_role) {
-				// Active
-				roles = [emulation.emulated_role];
-				emulationState = {
-					active: true,
-					originalRole: originalRoles[0], // Simplified: assuming primary role is first
-					emulatedRole: emulation.emulated_role
-				};
-			}
-		}
-		
-		event.locals.effectiveRoles = [...new Set(roles)];
-		event.locals.roleEmulation = emulationState;
-	} else {
-		event.locals.effectiveRoles = [];
-		event.locals.roleEmulation = { active: false };
-	}
 
 	const path = event.url.pathname;
 
