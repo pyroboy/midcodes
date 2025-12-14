@@ -964,52 +964,7 @@
 		cursor: move;
 	}
 
-	.scale-handle:not(:disabled) {
-		cursor: se-resize;
-	}
 
-	/* Resize Handles */
-	.resize-handle {
-		position: absolute;
-		width: 8px;
-		height: 8px;
-		background-color: #3b82f6;
-		border: 1px solid white;
-		border-radius: 50%;
-		cursor: pointer;
-		z-index: 15; /* Higher than crop-frame to show resize cursors */
-		pointer-events: auto;
-		transition: all 0.15s ease;
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-	}
-
-	.resize-handle:hover {
-		background-color: #2563eb;
-		transform: scale(1.2);
-		box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-	}
-
-	.resize-handle:active {
-		background-color: #1d4ed8;
-		transform: scale(1.1);
-	}
-
-	/* Cursor styles for different resize directions */
-	.resize-handle.top-left {
-		cursor: nw-resize;
-	}
-
-	.resize-handle.top-right {
-		cursor: ne-resize;
-	}
-
-	.resize-handle.bottom-left {
-		cursor: sw-resize;
-	}
-
-	.resize-handle.bottom-right {
-		cursor: se-resize;
-	}
 
 	/* Crop Preview Overlay */
 	.crop-preview {
@@ -1045,21 +1000,8 @@
 		pointer-events: none; /* Allow handles to receive events */
 	}
 
-	.crop-frame.invalid .resize-handle {
-		background-color: #ef4444;
-		border-color: white;
-	}
-
-	.crop-frame.invalid .resize-handle:hover {
-		background-color: #dc2626;
-	}
-
 	/* Improved transitions when dragging */
 	.background-thumbnail.dragging .crop-frame {
-		transition: none;
-	}
-
-	.background-thumbnail.dragging .resize-handle {
 		transition: none;
 	}
 

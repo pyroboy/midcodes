@@ -11,7 +11,7 @@
 	import * as Select from '$lib/components/ui/select';
 	import { darkMode } from '$lib/stores/darkMode';
 	import ThumbnailInput from '$lib/components/ThumbnailInput.svelte';
-	import { Loader, AlertTriangle, CheckCircle } from '@lucide/svelte';
+	import { Loader, CheckCircle } from '@lucide/svelte';
 	import { goto } from '$app/navigation';
 	import { fade } from 'svelte/transition';
 	// Note: Not using enhance - we use manual fetch for custom handling
@@ -114,6 +114,11 @@
 	// Responsive preview state (mobile toggle vs desktop side-by-side)
 	let isMobile = $state(false);
 	let isFlipped = $state(false);
+	// Sticky preview scroll state
+	let scrollY = $state(0);
+	let previewScale = $derived(Math.max(0.5, 1 - scrollY / 400)); // Scale from 1 to 0.5 based on scroll
+	// Smart auto-flip based on focused input
+	let currentInputSide = $state<'front' | 'back'>('front');
 	let formErrors = $state<Record<string, boolean>>({});
 	let fileUrls = $state<Record<string, string>>({});
 
@@ -431,6 +436,18 @@
 		}
 	}
 
+	function handleScroll() {
+		if (typeof window !== 'undefined') {
+			scrollY = window.scrollY;
+		}
+	}
+
+	// Smart auto-flip: detect which side the focused input belongs to
+	function handleInputFocus(side: 'front' | 'back') {
+		currentInputSide = side;
+		isFlipped = side === 'back';
+	}
+
 	function handleSelectFile(variableName: string, file: File) {
 		fileUploads[variableName] = file;
 
@@ -491,28 +508,44 @@
 	});
 </script>
 
-<svelte:window on:resize={handleResize} />
-<div class="container mx-auto p-4 flex flex-col md:flex-row gap-4">
-	<div class="w-full md:w-1/2">
-		<Card class="h-full">
+<svelte:window on:resize={handleResize} on:scroll={handleScroll} />
+<div class="container mx-auto p-4 flex flex-col gap-4 max-w-2xl">
+	<!-- Sticky Preview Container -->
+	<div class="sticky top-4 z-10">
+		<Card class="transition-transform duration-200 origin-top" style="transform: scale({previewScale})">
 			<div class="p-4">
 				<h2 class="text-2xl font-bold mb-4">ID Card Preview</h2>
 
-				{#if !isMobile}
-					<!-- Desktop: show both front and back side-by-side/stacked by orientation -->
-					<div
-						class="canvas-wrapper"
-						class:landscape={template?.orientation === 'landscape'}
-						class:portrait={template?.orientation === 'portrait'}
-					>
-						<div class="flex-1">
-							<h3 class="text-lg font-semibold mb-2 text-center">Front View</h3>
-							{#if template}
-								<div
-									class="w-full"
-									style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels ||
-										638}"
+				{#if template}
+					<div class="w-full max-w-md mx-auto">
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
+						<div
+							class="flip-container relative cursor-pointer group"
+							onclick={() => (isFlipped = !isFlipped)}
+							onkeydown={(e) => e.key === 'Enter' && (isFlipped = !isFlipped)}
+							role="button"
+							tabindex="0"
+						>
+							<!-- Tap to flip overlay hint -->
+							<div
+								class="absolute inset-0 z-10 flex items-center justify-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+							>
+								<span
+									class="bg-black/60 text-white px-4 py-2 rounded-full text-sm font-medium backdrop-blur-sm shadow-lg"
 								>
+									Tap to Flip
+								</span>
+							</div>
+
+							<!-- Flip card inner -->
+							<div
+								class="flip-card-inner"
+								class:flipped={isFlipped}
+								style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels ||
+									638}"
+							>
+								<!-- Front face -->
+								<div class="flip-card-face flip-card-front">
 									<IdCanvas
 										bind:this={frontCanvasComponent}
 										elements={template.template_elements.filter((el) => el.side === 'front')}
@@ -532,16 +565,8 @@
 											addDebugMessage(`Front Canvas Error: ${detail.code} - ${detail.message}`)}
 									/>
 								</div>
-							{/if}
-						</div>
-						<div class="flex-1">
-							<h3 class="text-lg font-semibold mb-2 text-center">Back View</h3>
-							{#if template}
-								<div
-									class="w-full"
-									style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels ||
-										638}"
-								>
+								<!-- Back face -->
+								<div class="flip-card-face flip-card-back">
 									<IdCanvas
 										bind:this={backCanvasComponent}
 										elements={template.template_elements.filter((el) => el.side === 'back')}
@@ -561,110 +586,33 @@
 											addDebugMessage(`Back Canvas Error: ${detail.code} - ${detail.message}`)}
 									/>
 								</div>
-							{/if}
-						</div>
-					</div>
-				{:else}
-					<!-- Mobile: CSS flip card -->
-					{#if template}
-						<div class="w-full max-w-md mx-auto">
-							<!-- svelte-ignore a11y_no_static_element_interactions -->
-							<div
-								class="flip-container relative cursor-pointer group"
-								onclick={() => (isFlipped = !isFlipped)}
-								onkeydown={(e) => e.key === 'Enter' && (isFlipped = !isFlipped)}
-								role="button"
-								tabindex="0"
-							>
-								<!-- Tap to flip overlay hint -->
-								<div
-									class="absolute inset-0 z-10 flex items-center justify-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-								>
-									<span
-										class="bg-black/60 text-white px-4 py-2 rounded-full text-sm font-medium backdrop-blur-sm shadow-lg"
-									>
-										Tap to Flip
-									</span>
-								</div>
-
-								<!-- Flip card inner -->
-								<div
-									class="flip-card-inner"
-									class:flipped={isFlipped}
-									style="aspect-ratio: {template.width_pixels || 1013}/{template.height_pixels ||
-										638}"
-								>
-									<!-- Front face -->
-									<div class="flip-card-face flip-card-front">
-										<IdCanvas
-											bind:this={frontCanvasComponent}
-											elements={template.template_elements.filter((el) => el.side === 'front')}
-											backgroundUrl={template.front_background.startsWith('http')
-												? template.front_background
-												: getSupabaseStorageUrl(template.front_background)}
-											{formData}
-											{fileUploads}
-											{imagePositions}
-											{fullResolution}
-											isDragging={mouseMoving}
-											pixelDimensions={template.width_pixels && template.height_pixels
-												? { width: template.width_pixels, height: template.height_pixels }
-												: null}
-											on:ready={() => handleCanvasReady('front')}
-											on:error={({ detail }) =>
-												addDebugMessage(`Front Canvas Error: ${detail.code} - ${detail.message}`)}
-										/>
-									</div>
-									<!-- Back face -->
-									<div class="flip-card-face flip-card-back">
-										<IdCanvas
-											bind:this={backCanvasComponent}
-											elements={template.template_elements.filter((el) => el.side === 'back')}
-											backgroundUrl={template.back_background.startsWith('http')
-												? template.back_background
-												: getSupabaseStorageUrl(template.back_background)}
-											{formData}
-											{fileUploads}
-											{imagePositions}
-											{fullResolution}
-											isDragging={mouseMoving}
-											pixelDimensions={template.width_pixels && template.height_pixels
-												? { width: template.width_pixels, height: template.height_pixels }
-												: null}
-											on:ready={() => handleCanvasReady('back')}
-											on:error={({ detail }) =>
-												addDebugMessage(`Back Canvas Error: ${detail.code} - ${detail.message}`)}
-										/>
-									</div>
-								</div>
 							</div>
-
-							<!-- Side indicator -->
-							<p class="text-center text-sm text-muted-foreground mt-3">
-								{isFlipped ? 'Back' : 'Front'} Side
-							</p>
 						</div>
-					{/if}
+
+						<!-- Side indicator -->
+						<p class="text-center text-sm text-muted-foreground mt-3">
+							{isFlipped ? 'Back' : 'Front'} Side
+						</p>
+					</div>
 				{/if}
 			</div>
 		</Card>
 	</div>
-	<div class="w-full md:w-1/2 overflow-hidden">
+	<div class="w-full overflow-hidden">
 		<Card class="h-full overflow-auto">
 			<div class="p-6 overflow-hidden">
 				<div class="flex justify-between items-center mb-4">
 					<h2 class="text-2xl font-bold">ID Card Form</h2>
 				</div>
-				<p class="text-muted-foreground mb-4">Please fill out these details for your ID card.</p>
 
-				<!-- Warning message -->
-				<div
-					class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 mb-6"
-				>
-					<p class="text-sm text-amber-800 dark:text-amber-200 flex items-center gap-2">
-						<AlertTriangle size={16} class="flex-shrink-0" />
-						All data submitted is final. Please double check before saving.
-					</p>
+				<!-- Warning marquee -->
+				<div class="overflow-hidden mb-6">
+					<div class="marquee-track">
+						<span class="marquee-content">All data submitted is final. Please double check before saving.&nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp;</span>
+						<span class="marquee-content">All data submitted is final. Please double check before saving.&nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp;</span>
+						<span class="marquee-content">All data submitted is final. Please double check before saving.&nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp;</span>
+						<span class="marquee-content">All data submitted is final. Please double check before saving.&nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp;</span>
+					</div>
 				</div>
 
 				{#if template && template.template_elements}
@@ -689,76 +637,114 @@
 								<div class="h-px flex-1 bg-border"></div>
 							</div>
 							{#each frontElements as element (element.variableName)}
-								<div
-									role="button"
-									tabindex="-1"
-									class="grid grid-cols-[auto_1fr] gap-4 items-center mb-4 min-w-0"
-									onmousedown={handleMouseDown}
-									onmouseup={handleMouseUp}
-								>
-									<Label for={element.variableName} class="text-right">
-										{element.variableName}
-										<span class="text-red-500">*</span>
-									</Label>
-									{#if element.type === 'text'}
-										<div class="w-full">
-											<Input
-												type="text"
-												id={element.variableName}
-												name={element.variableName}
-												bind:value={formData[element.variableName]}
-												class="w-full"
-												placeholder={`Enter ${element.variableName}`}
-											/>
-											{#if formErrors[element.variableName]}
-												<p class="mt-1 text-sm text-destructive">This field is required</p>
-											{/if}
-										</div>
-									{:else if element.type === 'selection' && element.options}
-										<div class="relative w-full">
-											<Select.Root
-												type="single"
-												value={selectStates[element.variableName]?.value}
-												onValueChange={(value) =>
-													handleSelectionChange(value, element.variableName)}
-											>
-												<Select.Trigger class="w-full">
-													{triggerContent(element.variableName)}
-												</Select.Trigger>
-												<Select.Content>
-													{#each element.options as option}
-														<Select.Item value={option}>
-															{option}
-														</Select.Item>
-													{/each}
-												</Select.Content>
-											</Select.Root>
-											{#if formErrors[element.variableName]}
-												<p class="mt-1 text-sm text-destructive">Please select an option</p>
-											{/if}
-										</div>
-									{:else if element.type === 'photo' || element.type === 'signature'}
-										<div class="w-full">
-											<ThumbnailInput
-												width={element.width}
-												height={element.height}
-												fileUrl={fileUrls[element.variableName]}
-												initialScale={imagePositions[element.variableName]?.scale ?? 1}
-												initialX={imagePositions[element.variableName]?.x ?? 0}
-												initialY={imagePositions[element.variableName]?.y ?? 0}
-												initialBorderSize={imagePositions[element.variableName]?.borderSize ?? 0}
-												isSignature={element.type === 'signature'}
-												on:selectfile={(e) => handleSelectFile(element.variableName, e.detail.file)}
-												on:update={(e) => handleImageUpdate(e, element.variableName)}
-											/>
-											{#if formErrors[element.variableName]}
-												<p class="mt-1 text-sm text-destructive">
-													{element.type === 'signature' ? 'Signature' : 'Photo'} is required
-												</p>
-											{/if}
-										</div>
-									{/if}
-								</div>
+								{#if element.type === 'photo' || element.type === 'signature'}
+									<!-- Photo/Signature with dedicated container -->
+									<div class="mb-6">
+										{#if !isMobile}
+											<div class="grid grid-cols-[7rem_1fr] gap-4 items-start">
+												<Label for={element.variableName} class="text-right pt-2 text-sm font-medium">
+													{element.variableName}
+													<span class="text-red-500">*</span>
+												</Label>
+												<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center" onclick={() => handleInputFocus('front')}>
+													<div class="flex-shrink-0">
+														<ThumbnailInput
+															width={element.width}
+															height={element.height}
+															fileUrl={fileUrls[element.variableName]}
+															initialScale={imagePositions[element.variableName]?.scale ?? 1}
+															initialX={imagePositions[element.variableName]?.x ?? 0}
+															initialY={imagePositions[element.variableName]?.y ?? 0}
+															initialBorderSize={imagePositions[element.variableName]?.borderSize ?? 0}
+															isSignature={element.type === 'signature'}
+															on:selectfile={(e) => handleSelectFile(element.variableName, e.detail.file)}
+															on:update={(e) => handleImageUpdate(e, element.variableName)}
+														/>
+													</div>
+												</div>
+											</div>
+										{:else}
+											<Label for={element.variableName} class="block mb-2 text-sm font-medium">
+												{element.variableName}
+												<span class="text-red-500">*</span>
+											</Label>
+											<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center" onclick={() => handleInputFocus('front')}>
+												<div class="flex-shrink-0">
+													<ThumbnailInput
+														width={element.width}
+														height={element.height}
+														fileUrl={fileUrls[element.variableName]}
+														initialScale={imagePositions[element.variableName]?.scale ?? 1}
+														initialX={imagePositions[element.variableName]?.x ?? 0}
+														initialY={imagePositions[element.variableName]?.y ?? 0}
+														initialBorderSize={imagePositions[element.variableName]?.borderSize ?? 0}
+														isSignature={element.type === 'signature'}
+														on:selectfile={(e) => handleSelectFile(element.variableName, e.detail.file)}
+														on:update={(e) => handleImageUpdate(e, element.variableName)}
+													/>
+												</div>
+											</div>
+										{/if}
+										{#if formErrors[element.variableName]}
+											<p class="mt-2 text-sm text-destructive {!isMobile ? 'ml-[7.5rem]' : ''}">
+												{element.type === 'signature' ? 'Signature' : 'Photo'} is required
+											</p>
+										{/if}
+									</div>
+								{:else}
+									<!-- Text/Selection inputs -->
+									<div
+										role="button"
+										tabindex="-1"
+										class="{!isMobile ? 'grid grid-cols-[7rem_1fr] gap-4 items-center' : ''} mb-4"
+										onmousedown={handleMouseDown}
+										onmouseup={handleMouseUp}
+									>
+										<Label for={element.variableName} class="{!isMobile ? 'text-right' : 'block mb-2'} text-sm font-medium">
+											{element.variableName}
+											<span class="text-red-500">*</span>
+										</Label>
+										{#if element.type === 'text'}
+											<div class="w-full">
+												<Input
+													type="text"
+													id={element.variableName}
+													name={element.variableName}
+													bind:value={formData[element.variableName]}
+													class="w-full"
+													placeholder={`Enter ${element.variableName}`}
+													onfocus={() => handleInputFocus('front')}
+												/>
+												{#if formErrors[element.variableName]}
+													<p class="mt-1 text-sm text-destructive">This field is required</p>
+												{/if}
+											</div>
+										{:else if element.type === 'selection' && element.options}
+											<div class="w-full">
+												<Select.Root
+													type="single"
+													value={selectStates[element.variableName]?.value}
+													onValueChange={(value) =>
+														handleSelectionChange(value, element.variableName)}
+												>
+													<Select.Trigger class="w-full">
+														{triggerContent(element.variableName)}
+													</Select.Trigger>
+													<Select.Content>
+														{#each element.options as option}
+															<Select.Item value={option}>
+																{option}
+															</Select.Item>
+														{/each}
+													</Select.Content>
+												</Select.Root>
+												{#if formErrors[element.variableName]}
+													<p class="mt-1 text-sm text-destructive">Please select an option</p>
+												{/if}
+											</div>
+										{/if}
+									</div>
+								{/if}
 							{/each}
 						{/if}
 
@@ -770,76 +756,114 @@
 								<div class="h-px flex-1 bg-border"></div>
 							</div>
 							{#each backElements as element (element.variableName)}
-								<div
-									role="button"
-									tabindex="-1"
-									class="grid grid-cols-[auto_1fr] gap-4 items-center mb-4 min-w-0"
-									onmousedown={handleMouseDown}
-									onmouseup={handleMouseUp}
-								>
-									<Label for={element.variableName} class="text-right">
-										{element.variableName}
-										<span class="text-red-500">*</span>
-									</Label>
-									{#if element.type === 'text'}
-										<div class="w-full">
-											<Input
-												type="text"
-												id={element.variableName}
-												name={element.variableName}
-												bind:value={formData[element.variableName]}
-												class="w-full"
-												placeholder={`Enter ${element.variableName}`}
-											/>
-											{#if formErrors[element.variableName]}
-												<p class="mt-1 text-sm text-destructive">This field is required</p>
-											{/if}
-										</div>
-									{:else if element.type === 'selection' && element.options}
-										<div class="relative w-full">
-											<Select.Root
-												type="single"
-												value={selectStates[element.variableName]?.value}
-												onValueChange={(value) =>
-													handleSelectionChange(value, element.variableName)}
-											>
-												<Select.Trigger class="w-full">
-													{triggerContent(element.variableName)}
-												</Select.Trigger>
-												<Select.Content>
-													{#each element.options as option}
-														<Select.Item value={option}>
-															{option}
-														</Select.Item>
-													{/each}
-												</Select.Content>
-											</Select.Root>
-											{#if formErrors[element.variableName]}
-												<p class="mt-1 text-sm text-destructive">Please select an option</p>
-											{/if}
-										</div>
-									{:else if element.type === 'photo' || element.type === 'signature'}
-										<div class="w-full">
-											<ThumbnailInput
-												width={element.width}
-												height={element.height}
-												fileUrl={fileUrls[element.variableName]}
-												initialScale={imagePositions[element.variableName]?.scale ?? 1}
-												initialX={imagePositions[element.variableName]?.x ?? 0}
-												initialY={imagePositions[element.variableName]?.y ?? 0}
-												initialBorderSize={imagePositions[element.variableName]?.borderSize ?? 0}
-												isSignature={element.type === 'signature'}
-												on:selectfile={(e) => handleSelectFile(element.variableName, e.detail.file)}
-												on:update={(e) => handleImageUpdate(e, element.variableName)}
-											/>
-											{#if formErrors[element.variableName]}
-												<p class="mt-1 text-sm text-destructive">
-													{element.type === 'signature' ? 'Signature' : 'Photo'} is required
-												</p>
-											{/if}
-										</div>
-									{/if}
-								</div>
+								{#if element.type === 'photo' || element.type === 'signature'}
+									<!-- Photo/Signature with dedicated container -->
+									<div class="mb-6">
+										{#if !isMobile}
+											<div class="grid grid-cols-[7rem_1fr] gap-4 items-start">
+												<Label for={element.variableName} class="text-right pt-2 text-sm font-medium">
+													{element.variableName}
+													<span class="text-red-500">*</span>
+												</Label>
+												<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center" onclick={() => handleInputFocus('back')}>
+													<div class="flex-shrink-0">
+														<ThumbnailInput
+															width={element.width}
+															height={element.height}
+															fileUrl={fileUrls[element.variableName]}
+															initialScale={imagePositions[element.variableName]?.scale ?? 1}
+															initialX={imagePositions[element.variableName]?.x ?? 0}
+															initialY={imagePositions[element.variableName]?.y ?? 0}
+															initialBorderSize={imagePositions[element.variableName]?.borderSize ?? 0}
+															isSignature={element.type === 'signature'}
+															on:selectfile={(e) => handleSelectFile(element.variableName, e.detail.file)}
+															on:update={(e) => handleImageUpdate(e, element.variableName)}
+														/>
+													</div>
+												</div>
+											</div>
+										{:else}
+											<Label for={element.variableName} class="block mb-2 text-sm font-medium">
+												{element.variableName}
+												<span class="text-red-500">*</span>
+											</Label>
+											<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center" onclick={() => handleInputFocus('back')}>
+												<div class="flex-shrink-0">
+													<ThumbnailInput
+														width={element.width}
+														height={element.height}
+														fileUrl={fileUrls[element.variableName]}
+														initialScale={imagePositions[element.variableName]?.scale ?? 1}
+														initialX={imagePositions[element.variableName]?.x ?? 0}
+														initialY={imagePositions[element.variableName]?.y ?? 0}
+														initialBorderSize={imagePositions[element.variableName]?.borderSize ?? 0}
+														isSignature={element.type === 'signature'}
+														on:selectfile={(e) => handleSelectFile(element.variableName, e.detail.file)}
+														on:update={(e) => handleImageUpdate(e, element.variableName)}
+													/>
+												</div>
+											</div>
+										{/if}
+										{#if formErrors[element.variableName]}
+											<p class="mt-2 text-sm text-destructive {!isMobile ? 'ml-[7.5rem]' : ''}">
+												{element.type === 'signature' ? 'Signature' : 'Photo'} is required
+											</p>
+										{/if}
+									</div>
+								{:else}
+									<!-- Text/Selection inputs -->
+									<div
+										role="button"
+										tabindex="-1"
+										class="{!isMobile ? 'grid grid-cols-[7rem_1fr] gap-4 items-center' : ''} mb-4"
+										onmousedown={handleMouseDown}
+										onmouseup={handleMouseUp}
+									>
+										<Label for={element.variableName} class="{!isMobile ? 'text-right' : 'block mb-2'} text-sm font-medium">
+											{element.variableName}
+											<span class="text-red-500">*</span>
+										</Label>
+										{#if element.type === 'text'}
+											<div class="w-full">
+												<Input
+													type="text"
+													id={element.variableName}
+													name={element.variableName}
+													bind:value={formData[element.variableName]}
+													class="w-full"
+													placeholder={`Enter ${element.variableName}`}
+													onfocus={() => handleInputFocus('back')}
+												/>
+												{#if formErrors[element.variableName]}
+													<p class="mt-1 text-sm text-destructive">This field is required</p>
+												{/if}
+											</div>
+										{:else if element.type === 'selection' && element.options}
+											<div class="w-full">
+												<Select.Root
+													type="single"
+													value={selectStates[element.variableName]?.value}
+													onValueChange={(value) =>
+														handleSelectionChange(value, element.variableName)}
+												>
+													<Select.Trigger class="w-full">
+														{triggerContent(element.variableName)}
+													</Select.Trigger>
+													<Select.Content>
+														{#each element.options as option}
+															<Select.Item value={option}>
+																{option}
+															</Select.Item>
+														{/each}
+													</Select.Content>
+												</Select.Root>
+												{#if formErrors[element.variableName]}
+													<p class="mt-1 text-sm text-destructive">Please select an option</p>
+												{/if}
+											</div>
+										{/if}
+									</div>
+								{/if}
 							{/each}
 						{/if}
 
@@ -1094,6 +1118,30 @@
 		}
 		100% {
 			transform: rotateY(540deg);
+		}
+	}
+
+	/* Marquee animation - continuous loop */
+	.marquee-track {
+		display: flex;
+		width: max-content;
+		animation: marquee 30s linear infinite;
+	}
+
+	.marquee-content {
+		flex-shrink: 0;
+		font-size: 0.875rem;
+		font-style: italic;
+		color: hsl(var(--muted-foreground));
+		white-space: nowrap;
+	}
+
+	@keyframes marquee {
+		0% {
+			transform: translateX(0);
+		}
+		100% {
+			transform: translateX(-50%);
 		}
 	}
 </style>
