@@ -15,13 +15,18 @@
 	export let downloading: boolean = false;
 	export let deleting: boolean = false;
 	// Template dimensions for correct aspect ratio (portrait vs landscape)
-	export let templateDimensions: { width: number; height: number } | null = null;
+	export let templateDimensions: { width: number; height: number; orientation: 'landscape' | 'portrait' } | null = null;
 
 	// Calculate aspect ratio from template dimensions
-	// Default is landscape (1013/638 ≈ 1.588), but use actual dimensions if provided
+	// Use actual dimensions if provided, otherwise derive from orientation or default to landscape
 	$: aspectRatio = templateDimensions
 		? `${templateDimensions.width}/${templateDimensions.height}`
 		: '1013/638';
+
+	// Debug logging for orientation issues
+	$: if (templateDimensions) {
+		console.log(`[SimpleIDCard] ${card?.template_name}: ${templateDimensions.width}x${templateDimensions.height} (${templateDimensions.orientation})`);
+	}
 
 	function handleClick(e: MouseEvent) {
 		// Prevent triggering if clicking buttons/checkbox

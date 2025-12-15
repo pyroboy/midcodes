@@ -224,14 +224,14 @@ export const getCardCount = query(async () => {
 export const getTemplateDimensions = query(TemplateNamesSchema, async (templateNames) => {
 	const { locals } = getRequestEvent();
 	const { supabase, org_id } = locals;
-	
+
 	if (!org_id || templateNames.length === 0) {
 		return {};
 	}
 
 	const { data, error } = await supabase
 		.from('templates')
-		.select('name, width_pixels, height_pixels')
+		.select('name, width_pixels, height_pixels, orientation')
 		.eq('org_id', org_id)
 		.in('name', templateNames);
 
@@ -240,11 +240,17 @@ export const getTemplateDimensions = query(TemplateNamesSchema, async (templateN
 		return {};
 	}
 
-	const dimensions: Record<string, { width: number; height: number; unit: string }> = {};
+	const dimensions: Record<string, { width: number; height: number; orientation: 'landscape' | 'portrait'; unit: string }> = {};
 	(data || []).forEach((template: any) => {
+		const orientation = template.orientation || 'landscape';
+		// Default dimensions based on orientation
+		const defaultWidth = orientation === 'portrait' ? 638 : 1013;
+		const defaultHeight = orientation === 'portrait' ? 1013 : 638;
+
 		dimensions[template.name] = {
-			width: template.width_pixels || 1013,
-			height: template.height_pixels || 638,
+			width: template.width_pixels || defaultWidth,
+			height: template.height_pixels || defaultHeight,
+			orientation,
 			unit: 'pixels'
 		};
 	});

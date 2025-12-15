@@ -2,7 +2,7 @@ import { browser } from '$app/environment';
 import type { ViewMode } from '$lib/stores/viewMode';
 import type { IDCard } from './data.remote';
 
-export type TemplateDimensionsMap = Record<string, { width: number; height: number; unit: string }>;
+export type TemplateDimensionsMap = Record<string, { width: number; height: number; orientation: 'landscape' | 'portrait'; unit: string }>;
 export type TemplateFieldsMap = Record<string, { variableName: string; side: string }[]>;
 
 export interface AllIdsCacheSnapshot {

@@ -91,7 +91,7 @@
 
 	// Data states
 	let dataRows = $state<any[]>([]);
-	let templateDimensions = $state<Record<string, { width: number; height: number; unit: string }>>(
+	let templateDimensions = $state<Record<string, { width: number; height: number; orientation: 'landscape' | 'portrait'; unit: string }>>(
 		{}
 	);
 	let templateFields = $state<Record<string, { variableName: string; side: string }[]>>({});
