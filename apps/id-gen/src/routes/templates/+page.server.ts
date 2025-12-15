@@ -30,6 +30,20 @@ export const load: PageServerLoad = async ({ locals, url, depends, setHeaders })
 			}
 		: null;
 
+	// Debug: Log the newTemplateParams if present
+	if (newTemplateParams) {
+		console.log('📥 [Server] newTemplateParams parsed from URL:', {
+			name: newTemplateParams.name,
+			width: newTemplateParams.width,
+			height: newTemplateParams.height,
+			unit: newTemplateParams.unit,
+			orientation: newTemplateParams.orientation,
+			front_background: newTemplateParams.front_background,
+			front_background_length: newTemplateParams.front_background?.length || 0,
+			raw_front_background_param: url.searchParams.get('front_background')
+		});
+	}
+
 	if (templateId) {
 		const { data: template, error: templateError } = await supabase
 			.from('templates')

@@ -11,8 +11,15 @@
 	import type { CardSize } from '$lib/utils/sizeConversion';
 	import { getSupabaseStorageUrl } from '$lib/utils/supabase';
 	import DeleteConfirmationDialog from '$lib/components/DeleteConfirmationDialog.svelte';
+	import type { TemplateAsset } from '$lib/schemas/template-assets.schema';
 
-	let { templates = $bindable([]), onSelect, onCreateNew, units = 'in', dpi = 300 } = $props();
+	let { templates = $bindable([]), onSelect, onCreateNew, units = 'in', dpi = 300 }: {
+		templates: any[];
+		onSelect: (id: string) => void;
+		onCreateNew?: (cardSize: CardSize, templateName: string, orientation?: 'landscape' | 'portrait', frontBackgroundUrl?: string, selectedTemplateAsset?: TemplateAsset) => void;
+		units?: string;
+		dpi?: number;
+	} = $props();
 	type Units = 'px' | 'in' | 'mm' | 'cm';
 
 	// Compute pixel dimensions
@@ -154,10 +161,23 @@
 	function handleCreateNew() {
 		showSizeDialog = true;
 	}
-	function handleSizeSelected(event: CustomEvent<{ cardSize: CardSize; templateName: string }>) {
-		const { cardSize, templateName } = event.detail;
+	function handleSizeSelected(event: CustomEvent<{ cardSize: CardSize; templateName: string; selectedTemplateAsset?: TemplateAsset }>) {
+		const { cardSize, templateName, selectedTemplateAsset } = event.detail;
 		showSizeDialog = false;
-		onCreateNew?.(cardSize, templateName);
+		
+		// Debug: Log the event details
+		console.log('📤 [TemplateList] handleSizeSelected:', {
+			cardSize,
+			templateName,
+			selectedTemplateAsset,
+			selectedTemplateAsset_image_url: selectedTemplateAsset?.image_url
+		});
+		
+		// Determine orientation from card dimensions
+		const orientation = cardSize.width < cardSize.height ? 'portrait' : 'landscape';
+		
+		// Pass all parameters including the front background URL
+		onCreateNew?.(cardSize, templateName, orientation, selectedTemplateAsset?.image_url);
 	}
 	function handleSizeSelectionCancel() {
 		showSizeDialog = false;

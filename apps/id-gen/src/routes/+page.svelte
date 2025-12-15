@@ -328,6 +328,15 @@
 		const { cardSize, templateName, selectedTemplateAsset } = event.detail;
 		showSizeDialog = false;
 		
+		// Debug: Log event details
+		console.log('📤 [Home Page] handleSizeSelected called:', {
+			cardSize: cardSize,
+			templateName: templateName,
+			selectedTemplateAsset: selectedTemplateAsset,
+			selectedTemplateAsset_image_url: selectedTemplateAsset?.image_url,
+			selectedTemplateAsset_image_url_length: selectedTemplateAsset?.image_url?.length || 0
+		});
+		
 		// Determine orientation from card dimensions
 		const orientation = cardSize.width < cardSize.height ? 'portrait' : 'landscape';
 		
@@ -344,9 +353,16 @@
 		// Add front background if template asset was selected
 		if (selectedTemplateAsset?.image_url) {
 			params.set('front_background', selectedTemplateAsset.image_url);
+			console.log('📤 [Home Page] Setting front_background URL param:', {
+				image_url: selectedTemplateAsset.image_url,
+				encoded_in_params: params.get('front_background')
+			});
 		}
 		
-		goto(`/templates?${params.toString()}`);
+		const finalUrl = `/templates?${params.toString()}`;
+		console.log('📤 [Home Page] Navigating to:', finalUrl);
+		
+		goto(finalUrl);
 	}
 
 	// ID Card preview functions

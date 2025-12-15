@@ -161,6 +161,19 @@
 	$effect(() => {
 		if (data.newTemplateParams && !hasHandledNewTemplate) {
 			hasHandledNewTemplate = true;
+			
+			// Debug: Log the incoming newTemplateParams
+			console.log('📥 [Templates Page] Received newTemplateParams from server:', {
+				name: data.newTemplateParams.name,
+				width: data.newTemplateParams.width,
+				height: data.newTemplateParams.height,
+				unit: data.newTemplateParams.unit,
+				orientation: data.newTemplateParams.orientation,
+				front_background: data.newTemplateParams.front_background,
+				front_background_length: data.newTemplateParams.front_background?.length || 0,
+				front_background_type: typeof data.newTemplateParams.front_background
+			});
+			
 			// Create CardSize from params
 			const cardSize: CardSize = {
 				name: data.newTemplateParams.name,
@@ -1343,6 +1356,17 @@
 		orientation?: 'landscape' | 'portrait',
 		frontBackgroundUrl?: string
 	) {
+		// Debug: Log incoming parameters
+		console.log('🔧 [handleCreateNewTemplate] Called with:', {
+			cardSize: cardSize,
+			templateName: templateName,
+			orientation: orientation,
+			frontBackgroundUrl: frontBackgroundUrl,
+			frontBackgroundUrl_length: frontBackgroundUrl?.length || 0,
+			frontBackgroundUrl_type: typeof frontBackgroundUrl,
+			frontBackgroundUrl_truthy: !!frontBackgroundUrl
+		});
+		
 		// Set up new template creation
 		currentCardSize = cardSize;
 		requiredPixelDimensions = cardSizeToPixels(cardSize, 300); // Use hardcoded DPI
@@ -1378,12 +1402,18 @@
 		// Fresh mount for new template
 		editorVersion++;
 
-		console.log('✅ New template created:', {
+		console.log('✅ [handleCreateNewTemplate] New template created:', {
+			templateId: currentTemplate.id,
 			name: templateName,
 			cardSize: cardSize,
 			pixelDimensions: requiredPixelDimensions,
 			orientation: finalOrientation,
-			frontBackground: frontBackgroundUrl ? 'set from template asset' : 'none'
+			front_background: currentTemplate.front_background,
+			front_background_set: !!currentTemplate.front_background,
+			frontPreview: frontPreview,
+			frontPreview_set: !!frontPreview,
+			isEditMode: isEditMode,
+			editorVersion: editorVersion
 		});
 	}
 
