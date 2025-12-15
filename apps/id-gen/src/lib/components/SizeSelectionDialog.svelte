@@ -143,14 +143,15 @@
 
 	function goNext() {
 		if (currentStep === 'size') {
-			if (!templateName.trim()) {
-				error = 'Template name is required';
-				return;
-			}
 			// Load template assets for this size
 			loadTemplatesForSize();
 			currentStep = 'template';
 		} else if (currentStep === 'template') {
+			// Validate template name before proceeding
+			if (!templateName.trim()) {
+				error = 'Template name is required';
+				return;
+			}
 			if (selectedTemplateAsset) {
 				// User selected a template, go to final confirmation
 				handleConfirm();
