@@ -391,7 +391,7 @@
 										type="button"
 										class={cn(
 											'flex-shrink-0 w-24 p-2 rounded-lg border transition-all hover:shadow-md active:scale-[0.98]',
-											selectedCommonSize === size
+											selectedCommonSize.name === size.name
 												? 'border-primary bg-primary/5 ring-1 ring-primary'
 												: 'border-border hover:border-primary/50 bg-card'
 										)}

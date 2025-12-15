@@ -180,7 +180,7 @@
 	function findBestDefaultSize(): CardSize {
 		// If no templates exist, use the standard credit card size
 		if (!templates || templates.length === 0) {
-			return COMMON_CARD_SIZES.find((size) => size.name === 'Credit Card') || LEGACY_CARD_SIZE;
+			return COMMON_CARD_SIZES.find((size) => size.name === 'CR80 (ATM Size)') || LEGACY_CARD_SIZE;
 		}
 
 		// Try to find templates with size information to analyze patterns
@@ -244,7 +244,7 @@
 		}
 
 		// If no patterns found or analysis failed, use Credit Card as the most common standard
-		return COMMON_CARD_SIZES.find((size) => size.name === 'Credit Card') || LEGACY_CARD_SIZE;
+		return COMMON_CARD_SIZES.find((size) => size.name === 'CR80 (ATM Size)') || LEGACY_CARD_SIZE;
 	}
 
 	async function validateBackgrounds(): Promise<boolean> {

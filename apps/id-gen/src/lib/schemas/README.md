@@ -182,7 +182,7 @@ export const DEFAULT_DPI = 300;
 export const MIN_DIMENSION_PX = 100;
 export const MAX_DIMENSION_PX = 7200;
 export const COMMON_CARD_SIZES = {
-	creditCard: { width: 1013, height: 638 },
+	cr80: { width: 1013, height: 638 },
 	businessCard: { width: 1050, height: 600 }
 };
 ```

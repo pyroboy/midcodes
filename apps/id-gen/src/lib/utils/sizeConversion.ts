@@ -37,39 +37,39 @@ export function switchOrientation(cardSize: CardSize): CardSize {
 // Common card sizes with flexible units
 export const COMMON_CARD_SIZES: CardSize[] = [
 	{
-		name: 'Credit Card',
+		name: 'CR80 (ATM Size)',
 		width: 3.375,
 		height: 2.125,
 		unit: 'inches',
-		description: 'Standard credit card size (85.6mm x 53.98mm)'
+		description: 'Standard Employee ID (54mm × 86mm)'
 	},
 	{
 		name: 'Business Card',
 		width: 3.5,
 		height: 2.0,
 		unit: 'inches',
-		description: 'Standard business card size (89mm x 51mm)'
+		description: 'Networking (50mm × 90mm)'
 	},
 	{
-		name: 'ID Badge',
+		name: 'Event Badge (Std)',
 		width: 4.0,
 		height: 3.0,
 		unit: 'inches',
-		description: 'Standard ID badge size (102mm x 76mm)'
+		description: 'Seminar / Conference (76mm × 102mm)'
 	},
 	{
-		name: 'Mini Card',
-		width: 2.5,
-		height: 1.5,
+		name: 'Event Badge (Lg)',
+		width: 6.0,
+		height: 4.0,
 		unit: 'inches',
-		description: 'Compact card size (64mm x 38mm)'
+		description: 'VIP / Concert / Media (102mm × 152mm)'
 	},
 	{
-		name: 'Jumbo Card',
-		width: 4.25,
-		height: 2.75,
+		name: 'Name Tag (Pin)',
+		width: 3.0,
+		height: 1.0,
 		unit: 'inches',
-		description: 'Large card size (108mm x 70mm)'
+		description: 'Uniform Name Plate (25mm × 76mm)'
 	}
 ];
 

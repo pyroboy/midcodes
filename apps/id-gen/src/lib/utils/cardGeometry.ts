@@ -4,7 +4,32 @@ export interface CardGeometry {
 	edgeGeometry: any;
 }
 
-let cachedGeometry: CardGeometry | null = null;
+// LRU cache for geometry - avoids expensive recreation
+const geometryCache = new Map<string, CardGeometry>();
+const MAX_CACHE_SIZE = 10;
+
+function getCacheKey(width: number, height: number, depth: number, radius: number): string {
+	// Round to 2 decimal places for cache key to handle floating point precision
+	return `${width.toFixed(2)}-${height.toFixed(2)}-${depth.toFixed(3)}-${radius.toFixed(3)}`;
+}
+
+function addToCache(key: string, geometry: CardGeometry) {
+	// LRU eviction - remove oldest entry if cache is full
+	if (geometryCache.size >= MAX_CACHE_SIZE) {
+		const firstKey = geometryCache.keys().next().value;
+		if (firstKey) {
+			const oldGeom = geometryCache.get(firstKey);
+			if (oldGeom) {
+				// Dispose old geometries to free GPU memory
+				oldGeom.frontGeometry?.dispose?.();
+				oldGeom.backGeometry?.dispose?.();
+				oldGeom.edgeGeometry?.dispose?.();
+			}
+			geometryCache.delete(firstKey);
+		}
+	}
+	geometryCache.set(key, geometry);
+}
 
 export async function createRoundedRectCard(
 	width = 2,
@@ -12,18 +37,18 @@ export async function createRoundedRectCard(
 	depth = 0.007,
 	radius = 0.08
 ): Promise<CardGeometry> {
+	const cacheKey = getCacheKey(width, height, depth, radius);
+
+	// Check cache first
+	const cached = geometryCache.get(cacheKey);
+	if (cached) {
+		// Move to end (mark as recently used)
+		geometryCache.delete(cacheKey);
+		geometryCache.set(cacheKey, cached);
+		return cached;
+	}
+
 	const THREE = await import('three');
-	// Create a unique cache key based on dimensions
-	const cacheKey = `${width}-${height}-${depth}-${radius}`;
-
-	// For now, disable caching to support dynamic sizing
-	// TODO: Implement proper cache with dimension-based keys
-	// if (cachedGeometry) {
-	//     console.log('[CardGeometry] Using cached geometry');
-	//     return cachedGeometry;
-	// }
-
-	console.log('[CardGeometry] Creating new card geometry');
 	const roundedRectShape = new THREE.Shape();
 
 	const x = -width / 2;
@@ -43,14 +68,15 @@ export async function createRoundedRectCard(
 	roundedRectShape.bezierCurveTo(x, y + r / 2, x + r / 2, y, x + r, y);
 	roundedRectShape.closePath();
 
+	// Reduced segments for better mobile performance
 	const extrudeSettings = {
 		depth: depth,
 		bevelEnabled: true,
 		bevelThickness: 0.002,
 		bevelSize: 0.002,
-		bevelSegments: 2,
+		bevelSegments: 1, // Reduced from 2
 		steps: 1,
-		curveSegments: 32
+		curveSegments: 12 // Reduced from 32
 	};
 
 	const extrudeGeometry = new THREE.ExtrudeGeometry(roundedRectShape, extrudeSettings);
@@ -62,14 +88,14 @@ export async function createRoundedRectCard(
 	const position = extrudeGeometry.getAttribute('position');
 	const normal = extrudeGeometry.getAttribute('normal');
 
-	const frontPositions = [];
-	const frontNormals = [];
-	const frontUvs = [];
-	const backPositions = [];
-	const backNormals = [];
-	const backUvs = [];
-	const edgePositions = [];
-	const edgeNormals = [];
+	const frontPositions: number[] = [];
+	const frontNormals: number[] = [];
+	const frontUvs: number[] = [];
+	const backPositions: number[] = [];
+	const backNormals: number[] = [];
+	const backUvs: number[] = [];
+	const edgePositions: number[] = [];
+	const edgeNormals: number[] = [];
 
 	for (let i = 0; i < position.count; i++) {
 		const normalZ = normal.getZ(i);
@@ -105,24 +131,29 @@ export async function createRoundedRectCard(
 	edgeGeometry.setAttribute('position', new THREE.Float32BufferAttribute(edgePositions, 3));
 	edgeGeometry.setAttribute('normal', new THREE.Float32BufferAttribute(edgeNormals, 3));
 
-	// Create the geometry object (caching disabled for dynamic sizing)
+	// Dispose the source geometry
+	extrudeGeometry.dispose();
+
 	const cardGeometry = {
 		frontGeometry,
 		backGeometry,
 		edgeGeometry
 	};
 
-	console.log('[CardGeometry] Card geometry created successfully', {
-		width,
-		height,
-		depth,
-		radius
-	});
+	// Add to cache
+	addToCache(cacheKey, cardGeometry);
+
 	return cardGeometry;
 }
 
 export function getCardGeometry(): CardGeometry | null {
-	return cachedGeometry;
+	// Legacy function - cache is now internal LRU cache
+	// Return the most recently added geometry if any
+	if (geometryCache.size > 0) {
+		const entries = Array.from(geometryCache.entries());
+		return entries[entries.length - 1][1];
+	}
+	return null;
 }
 
 export async function preloadCardGeometry(): Promise<CardGeometry> {

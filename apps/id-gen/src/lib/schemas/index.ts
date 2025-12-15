@@ -322,15 +322,16 @@ export type ValidationResult<T> = {
 // Common dimension presets (exported as const for tree-shaking)
 export const COMMON_DPI_VALUES = [72, 150, 300, 600] as const;
 export const COMMON_CARD_SIZES = {
-	creditCard: { width: 1013, height: 638 },
-	businessCard: { width: 1050, height: 600 },
-	idBadge: { width: 900, height: 1200 },
-	lanyardCard: { width: 780, height: 1170 }
+	cr80: { width: 1013, height: 638 }, // 3.375" × 2.125"
+	businessCard: { width: 1050, height: 600 }, // 3.5" × 2.0"
+	eventBadgeStd: { width: 1200, height: 900 }, // 4" × 3"
+	eventBadgeLg: { width: 1800, height: 1200 }, // 6" × 4"
+	nameTag: { width: 900, height: 300 } // 3" × 1"
 } as const;
 
 // Default values
 export const DEFAULT_DPI = 300;
-export const DEFAULT_TEMPLATE_SIZE = COMMON_CARD_SIZES.creditCard;
+export const DEFAULT_TEMPLATE_SIZE = COMMON_CARD_SIZES.cr80;
 export const MIN_DIMENSION_PX = 100;
 export const MAX_DIMENSION_PX = 7200;
 export const MIN_DPI = 72;

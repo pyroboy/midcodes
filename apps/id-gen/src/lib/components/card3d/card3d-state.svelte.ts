@@ -49,25 +49,25 @@ export const CARD3D_CONSTANTS = {
  * Based on standard card dimensions used in printing
  */
 export const MORPH_SHAPES: readonly MorphShape[] = [
-	// Credit Card / CR80 (3.375" x 2.125" = 1013 x 638 px)
-	{ w: 1013, h: 638 }, // CR80 Landscape
-	{ w: 675, h: 1013 }, // CR80 Portrait (Adjusted to ~2:3 for better visual fit)
+	// CR80 (ATM Size) - 3.375" × 2.125" = 1013 × 638 px
+	{ w: 1013, h: 638 }, // Landscape
+	{ w: 638, h: 1013 }, // Portrait
 
-	// Business Card (3.5" x 2.0" = 1050 x 600 px)
-	{ w: 1050, h: 600 }, // Business Card Landscape
-	{ w: 600, h: 1050 }, // Business Card Portrait
+	// Business Card - 3.5" × 2.0" = 1050 × 600 px
+	{ w: 1050, h: 600 }, // Landscape
+	{ w: 600, h: 1050 }, // Portrait
 
-	// ID Badge (4.0" x 3.0" = 1200 x 900 px)
-	{ w: 1200, h: 900 }, // ID Badge Landscape
-	{ w: 900, h: 1200 }, // ID Badge Portrait
+	// Event Badge (Std) - 4" × 3" = 1200 × 900 px
+	{ w: 1200, h: 900 }, // Landscape
+	{ w: 900, h: 1200 }, // Portrait
 
-	// Mini Card (2.5" x 1.5" = 750 x 450 px)
-	{ w: 750, h: 450 }, // Mini Card Landscape
-	{ w: 450, h: 750 }, // Mini Card Portrait
+	// Event Badge (Lg) - 6" × 4" = 1800 × 1200 px
+	{ w: 1800, h: 1200 }, // Landscape
+	{ w: 1200, h: 1800 }, // Portrait
 
-	// Jumbo Card (4.25" x 2.75" = 1275 x 825 px)
-	{ w: 1275, h: 825 }, // Jumbo Card Landscape
-	{ w: 825, h: 1275 } // Jumbo Card Portrait
+	// Name Tag (Pin) - 3" × 1" = 900 × 300 px
+	{ w: 900, h: 300 }, // Landscape
+	{ w: 300, h: 900 } // Portrait
 ] as const;
 
 /**
@@ -99,6 +99,11 @@ export function getRotationSpeed(angle: number): number {
  * Calculate card dimensions in 3D space from pixel dimensions
  */
 export function getCardDimensions(w: number, h: number): CardDimensions {
+	// Guard against zero dimensions
+	if (w <= 0 || h <= 0) {
+		console.warn('[getCardDimensions] Invalid dimensions:', { w, h });
+		return { width: CARD3D_CONSTANTS.BASE_SCALE, height: CARD3D_CONSTANTS.BASE_SCALE };
+	}
 	const aspect = w / h;
 	if (aspect >= 1) {
 		return { width: CARD3D_CONSTANTS.BASE_SCALE, height: CARD3D_CONSTANTS.BASE_SCALE / aspect };
