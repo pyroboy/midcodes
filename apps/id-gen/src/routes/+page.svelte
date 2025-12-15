@@ -28,6 +28,7 @@
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import { getSupabaseStorageUrl } from '$lib/utils/supabase';
 	import type { CardSize } from '$lib/utils/sizeConversion';
+	import type { TemplateAsset } from '$lib/schemas/template-assets.schema';
 	import { recentViewMode } from '$lib/stores/recentViewMode';
 	import RecentViewModeToggle from '$lib/components/RecentViewModeToggle.svelte';
 	import IDCarousel3D from '$lib/components/IDCarousel3D.svelte';
@@ -323,17 +324,28 @@
 		showSizeDialog = true;
 	}
 
-	function handleSizeSelected(event: CustomEvent<{ cardSize: CardSize; templateName: string }>) {
-		const { cardSize, templateName } = event.detail;
+	function handleSizeSelected(event: CustomEvent<{ cardSize: CardSize; templateName: string; selectedTemplateAsset?: TemplateAsset }>) {
+		const { cardSize, templateName, selectedTemplateAsset } = event.detail;
 		showSizeDialog = false;
+		
+		// Determine orientation from card dimensions
+		const orientation = cardSize.width < cardSize.height ? 'portrait' : 'landscape';
+		
 		// Navigate to templates page with the new template params
 		const params = new URLSearchParams({
 			new: 'true',
 			name: templateName,
 			width: cardSize.width.toString(),
 			height: cardSize.height.toString(),
-			unit: cardSize.unit
+			unit: cardSize.unit,
+			orientation
 		});
+		
+		// Add front background if template asset was selected
+		if (selectedTemplateAsset?.image_url) {
+			params.set('front_background', selectedTemplateAsset.image_url);
+		}
+		
 		goto(`/templates?${params.toString()}`);
 	}
 

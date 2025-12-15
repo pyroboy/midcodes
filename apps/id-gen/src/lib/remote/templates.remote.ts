@@ -29,23 +29,46 @@ async function getAuthenticatedUser() {
 }
 
 /**
- * Get template assets filtered by size preset ID
- * Returns published template assets matching the given size
+ * Get template assets filtered by size preset slug and orientation
+ * Returns published template assets matching the given size and orientation
  */
 export const getTemplateAssetsBySize = command(
 	'unchecked',
-	async ({ sizePresetId }: { sizePresetId: string | null }): Promise<TemplateAsset[]> => {
+	async ({
+		sizePresetSlug,
+		orientation
+	}: {
+		sizePresetSlug: string | null;
+		orientation: 'landscape' | 'portrait';
+	}): Promise<TemplateAsset[]> => {
 		const { user } = await getAuthenticatedUser();
 		const supabase = getAdminClient();
 
 		try {
+			// First, get the size preset ID from the slug
+			let sizePresetId: string | null = null;
+			if (sizePresetSlug) {
+				const { data: sizePreset, error: sizeError } = await supabase
+					.from('template_size_presets')
+					.select('id')
+					.eq('slug', sizePresetSlug)
+					.eq('is_active', true)
+					.single();
+
+				if (sizeError && sizeError.code !== 'PGRST116') {
+					console.error('Error fetching size preset:', sizeError);
+				}
+				sizePresetId = sizePreset?.id || null;
+			}
+
 			let queryBuilder = supabase
 				.from('template_assets')
 				.select('*')
 				.eq('is_published', true)
+				.eq('orientation', orientation)
 				.order('created_at', { ascending: false });
 
-			// Filter by size preset if provided
+			// Filter by size preset if found
 			if (sizePresetId) {
 				queryBuilder = queryBuilder.eq('size_preset_id', sizePresetId);
 			}
@@ -66,18 +89,18 @@ export const getTemplateAssetsBySize = command(
 );
 
 /**
- * Get count of published template assets per size preset
- * Returns a map of sizePresetId -> count
+ * Get count of published template assets per size preset and orientation
+ * Returns a map of "slug:orientation" -> count (e.g., { "cr80:portrait": 10, "cr80:landscape": 10 })
  */
 export const getTemplateAssetCounts = query(async (): Promise<Record<string, number>> => {
 	const { user } = await getAuthenticatedUser();
 	const supabase = getAdminClient();
 
 	try {
-		// Get all published assets with their size_preset_id
-		const { data, error: fetchError } = await supabase
+		// Get all published assets with their size_preset_id and orientation
+		const { data: assets, error: fetchError } = await supabase
 			.from('template_assets')
-			.select('size_preset_id')
+			.select('size_preset_id, orientation')
 			.eq('is_published', true);
 
 		if (fetchError) {
@@ -85,11 +108,32 @@ export const getTemplateAssetCounts = query(async (): Promise<Record<string, num
 			throw error(500, 'Failed to fetch template asset counts');
 		}
 
-		// Count assets per size preset
+		// Get all size presets to map IDs to slugs
+		const { data: presets, error: presetsError } = await supabase
+			.from('template_size_presets')
+			.select('id, slug')
+			.eq('is_active', true);
+
+		if (presetsError) {
+			console.error('Error fetching size presets:', presetsError);
+			throw error(500, 'Failed to fetch size presets');
+		}
+
+		// Create a map of preset ID to slug
+		const idToSlug: Record<string, string> = {};
+		for (const preset of presets || []) {
+			idToSlug[preset.id] = preset.slug;
+		}
+
+		// Count assets per size preset slug and orientation
 		const counts: Record<string, number> = {};
-		for (const asset of data || []) {
-			if (asset.size_preset_id) {
-				counts[asset.size_preset_id] = (counts[asset.size_preset_id] || 0) + 1;
+		for (const asset of assets || []) {
+			if (asset.size_preset_id && asset.orientation) {
+				const slug = idToSlug[asset.size_preset_id];
+				if (slug) {
+					const key = `${slug}:${asset.orientation}`;
+					counts[key] = (counts[key] || 0) + 1;
+				}
 			}
 		}
 

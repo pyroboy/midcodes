@@ -15,6 +15,7 @@
 	import DesktopHeader from '$lib/components/DesktopHeader.svelte';
 	import BottomNavigation from '$lib/components/BottomNavigation.svelte';
 	import HamburgerMenu from '$lib/components/HamburgerMenu.svelte';
+	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 	import { initPreloadService, updateCurrentPath } from '$lib/services/preloadService';
 
 	import NavigationLoader from '$lib/components/NavigationLoader.svelte';
@@ -538,6 +539,7 @@
 					<a href="/pricing" class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden md:block">
 						Rates
 					</a>
+					<ThemeToggle variant="ghost" />
 					<a
 						href="/auth"
 						class="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"

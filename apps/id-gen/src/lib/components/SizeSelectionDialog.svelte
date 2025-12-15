@@ -36,20 +36,35 @@
 	// Import remote functions
 	import {
 		getTemplateAssetsBySize,
+		getTemplateAssetCounts,
 		createCustomDesignRequest,
 		uploadCustomDesignAsset
 	} from '$lib/remote/templates.remote';
 
 	// Types
-	type WizardStep = 'size' | 'template' | 'custom' | 'background';
+	type WizardStep = 'size' | 'template' | 'custom' | 'material' | 'addons' | 'naming';
+
+	// Material types
+	type MaterialType = 'standard_laminated' | 'premium_direct' | 'techsmart_rfid' | 'techsmart_nfc';
+
+	// Add-on types
+	interface AddOnSelection {
+		uvOverlay: boolean;
+		holographic: boolean;
+		lanyard: 'none' | '3/4' | '1';
+		caseType: 'none' | 'soft' | 'hard';
+		retractor: boolean;
+	}
 
 	interface Props {
 		open?: boolean;
-		// Data from parent (template assets counts, etc.)
-		templateAssetCounts?: Record<string, number>;
 	}
 
-	let { open = $bindable(false), templateAssetCounts = {} }: Props = $props();
+	let { open = $bindable(false) }: Props = $props();
+
+	// Template asset counts loaded from server (keyed by "slug:orientation")
+	let templateAssetCounts = $state<Record<string, number>>({});
+	let countsLoaded = $state(false);
 
 	const dispatch = createEventDispatcher<{
 		sizeSelected: { cardSize: CardSize; templateName: string; selectedTemplateAsset?: TemplateAsset };
@@ -75,6 +90,24 @@
 	let templateAssets = $state<TemplateAsset[]>([]);
 	let loadingAssets = $state(false);
 	let selectedTemplateAsset = $state<TemplateAsset | null>(null);
+
+	// Material selection state
+	let selectedMaterial = $state<MaterialType>('standard_laminated');
+
+	// Add-ons selection state
+	let addOns = $state<AddOnSelection>({
+		uvOverlay: false,
+		holographic: false,
+		lanyard: 'none',
+		caseType: 'none',
+		retractor: false
+	});
+
+	// Check if CR80 size (Premium materials only available for CR80)
+	let isCR80 = $derived(() => {
+		const size = baseCardSize();
+		return size.slug === 'cr80' || size.name?.toLowerCase().includes('cr80') || size.name?.toLowerCase().includes('atm');
+	});
 
 	// Compute the base card size (always landscape orientation for 3D preview)
 	let baseCardSize = $derived(() => {
@@ -106,18 +139,32 @@
 		size: 'Choose Card Size',
 		template: 'Select Template',
 		custom: 'Request Custom Design',
-		background: 'Select Background'
+		material: 'Choose Material',
+		addons: 'Add-ons & Accessories',
+		naming: 'Name Your Template'
 	};
 
-	// Progress indicator
-	const steps: WizardStep[] = ['size', 'template', 'background'];
+	// Progress indicator (main steps, excluding custom which is a branch)
+	const steps: WizardStep[] = ['size', 'template', 'material', 'addons', 'naming'];
 	let currentStepIndex = $derived(steps.indexOf(currentStep === 'custom' ? 'template' : currentStep));
 
-	// Get template count for a size
-	function getTemplateCount(sizeName: string): number {
-		// For now, return from prop or simulate counts
-		// In real app, this would be fetched via remote function
-		return templateAssetCounts[sizeName] || Math.floor(Math.random() * 5);
+	// Get template count for a size and current orientation
+	function getTemplateCount(size: CardSize): number {
+		if (!size.slug) return 0;
+		const orientation = isPortrait ? 'portrait' : 'landscape';
+		const key = `${size.slug}:${orientation}`;
+		return templateAssetCounts[key] || 0;
+	}
+
+	// Load template asset counts from server
+	async function loadTemplateAssetCounts() {
+		if (countsLoaded) return;
+		try {
+			templateAssetCounts = await getTemplateAssetCounts();
+			countsLoaded = true;
+		} catch (e) {
+			console.error('Error loading template asset counts:', e);
+		}
 	}
 
 	// Size selection handlers
@@ -147,19 +194,20 @@
 			loadTemplatesForSize();
 			currentStep = 'template';
 		} else if (currentStep === 'template') {
-			// Validate template name before proceeding
-			if (!templateName.trim()) {
-				error = 'Template name is required';
-				return;
+			// Go to material selection
+			currentStep = 'material';
+			// Reset material to standard if not CR80
+			if (!isCR80()) {
+				selectedMaterial = 'standard_laminated';
 			}
-			if (selectedTemplateAsset) {
-				// User selected a template, go to final confirmation
-				handleConfirm();
-			} else {
-				// Go to background selection for blank templates
-				currentStep = 'background';
-			}
-		} else if (currentStep === 'background') {
+		} else if (currentStep === 'material') {
+			// Go to add-ons
+			currentStep = 'addons';
+		} else if (currentStep === 'addons') {
+			// Go to naming
+			currentStep = 'naming';
+		} else if (currentStep === 'naming') {
+			// Validate and submit
 			handleConfirm();
 		}
 	}
@@ -169,19 +217,22 @@
 			currentStep = 'size';
 		} else if (currentStep === 'custom') {
 			currentStep = 'template';
-		} else if (currentStep === 'background') {
+		} else if (currentStep === 'material') {
 			currentStep = 'template';
+		} else if (currentStep === 'addons') {
+			currentStep = 'material';
+		} else if (currentStep === 'naming') {
+			currentStep = 'addons';
 		}
 	}
 
-	// Load templates for current size
+	// Load templates for current size and orientation
 	async function loadTemplatesForSize() {
 		loadingAssets = true;
 		try {
-			// Call remote function to get template assets
-			// We pass null for sizePresetId since we're using client-side size definitions
-			// In a full implementation, you'd match the selected size to a size preset in the database
-			const assets = await getTemplateAssetsBySize({ sizePresetId: null });
+			const orientation = isPortrait ? 'portrait' : 'landscape';
+			const sizePresetSlug = baseCardSize().slug || null;
+			const assets = await getTemplateAssetsBySize({ sizePresetSlug, orientation });
 			templateAssets = assets || [];
 		} catch (e) {
 			console.error('Error loading templates:', e);
@@ -287,7 +338,23 @@
 		error = '';
 		templateAssets = [];
 		selectedTemplateAsset = null;
+		// Reset material and add-ons
+		selectedMaterial = 'standard_laminated';
+		addOns = {
+			uvOverlay: false,
+			holographic: false,
+			lanyard: 'none',
+			caseType: 'none',
+			retractor: false
+		};
 	}
+
+	// Load template counts when dialog opens
+	$effect(() => {
+		if (open) {
+			loadTemplateAssetCounts();
+		}
+	});
 
 	// Reset when dialog closes
 	$effect(() => {
@@ -349,6 +416,12 @@
 						Select an existing template or request a custom design.
 					{:else if currentStep === 'custom'}
 						Describe your desired design and upload reference images.
+					{:else if currentStep === 'material'}
+						Select the card material for your ID cards.
+					{:else if currentStep === 'addons'}
+						Enhance your cards with security features and accessories.
+					{:else if currentStep === 'naming'}
+						Give your template a memorable name.
 					{:else}
 						Choose a background for your template.
 					{/if}
@@ -386,7 +459,7 @@
 								{#each COMMON_CARD_SIZES as size}
 									{@const currentSize = isPortrait ? switchOrientation(size) : size}
 									{@const aspectRatio = currentSize.width / currentSize.height}
-									{@const templateCount = getTemplateCount(size.name)}
+									{@const templateCount = getTemplateCount(size)}
 									<button
 										type="button"
 										class={cn(
@@ -483,17 +556,6 @@
 			<!-- STEP 2: Template Selection -->
 			{:else if currentStep === 'template'}
 				<div class="space-y-4">
-					<!-- Template Name Input -->
-					<div class="space-y-2">
-						<Label for="templateName">Template Name *</Label>
-						<Input
-							id="templateName"
-							bind:value={templateName}
-							placeholder="Enter a name for your template"
-							class="w-full bg-background"
-						/>
-					</div>
-
 					<!-- Template Browser -->
 					<TemplateBrowser
 						assets={templateAssets}
@@ -515,12 +577,199 @@
 					onCancel={() => (currentStep = 'template')}
 				/>
 
-			<!-- STEP 3: Background Selection -->
-			{:else if currentStep === 'background'}
+			<!-- STEP 3: Material Selection -->
+			{:else if currentStep === 'material'}
 				<div class="space-y-4">
-					<p class="text-sm text-muted-foreground text-center">
-						Background selection coming soon. For now, create a blank template and add backgrounds in the editor.
-					</p>
+					<RadioGroup bind:value={selectedMaterial} class="space-y-3">
+						<!-- Standard Laminated - Available for all sizes -->
+						<label 
+							class="flex items-start gap-3 p-4 rounded-lg border cursor-pointer transition-all hover:border-primary/50 {selectedMaterial === 'standard_laminated' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border'}"
+						>
+							<RadioGroupItem value="standard_laminated" id="mat-standard" class="mt-1" />
+							<div class="flex-1">
+								<div class="flex items-center justify-between">
+									<span class="font-medium">Standard Laminated (PVC)</span>
+									<span class="text-sm text-muted-foreground">₱23-50/card</span>
+								</div>
+								<p class="text-sm text-muted-foreground mt-1">Durable PVC with protective lamination. Available for all sizes.</p>
+							</div>
+						</label>
+
+						<!-- Premium Direct Print - CR80 only -->
+						<label 
+							class="flex items-start gap-3 p-4 rounded-lg border transition-all {!isCR80() ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-primary/50'} {selectedMaterial === 'premium_direct' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border'}"
+						>
+							<RadioGroupItem value="premium_direct" id="mat-premium" class="mt-1" disabled={!isCR80()} />
+							<div class="flex-1">
+								<div class="flex items-center justify-between">
+									<span class="font-medium">Premium Direct Print</span>
+									<span class="text-sm text-muted-foreground">₱120-180/card</span>
+								</div>
+								<p class="text-sm text-muted-foreground mt-1">Professional edge-to-edge printing. {!isCR80() ? 'Only available for CR80 size.' : 'Premium quality finish.'}</p>
+							</div>
+						</label>
+
+						<!-- TechSmart NFC - CR80 only -->
+						<label 
+							class="flex items-start gap-3 p-4 rounded-lg border transition-all {!isCR80() ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-primary/50'} {selectedMaterial === 'techsmart_nfc' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border'}"
+						>
+							<RadioGroupItem value="techsmart_nfc" id="mat-nfc" class="mt-1" disabled={!isCR80()} />
+							<div class="flex-1">
+								<div class="flex items-center justify-between">
+									<span class="font-medium">TechSmart NFC</span>
+									<span class="text-sm text-muted-foreground">₱180-220/card</span>
+								</div>
+								<p class="text-sm text-muted-foreground mt-1">Embedded NFC chip for digital ID linking. {!isCR80() ? 'Only available for CR80 size.' : 'Tap to verify.'}</p>
+							</div>
+						</label>
+
+						<!-- TechSmart RFID - CR80 only -->
+						<label 
+							class="flex items-start gap-3 p-4 rounded-lg border transition-all {!isCR80() ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-primary/50'} {selectedMaterial === 'techsmart_rfid' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border'}"
+						>
+							<RadioGroupItem value="techsmart_rfid" id="mat-rfid" class="mt-1" disabled={!isCR80()} />
+							<div class="flex-1">
+								<div class="flex items-center justify-between">
+									<span class="font-medium">TechSmart RFID</span>
+									<span class="text-sm text-muted-foreground">₱220-280/card</span>
+								</div>
+								<p class="text-sm text-muted-foreground mt-1">Embedded RFID chip for access control. {!isCR80() ? 'Only available for CR80 size.' : 'Door & gate access.'}</p>
+							</div>
+						</label>
+					</RadioGroup>
+				</div>
+
+			<!-- STEP 4: Add-ons & Accessories -->
+			{:else if currentStep === 'addons'}
+				<div class="space-y-6">
+					<!-- Security Features -->
+					<div class="space-y-3">
+						<h4 class="text-sm font-medium">Security Features</h4>
+						<div class="space-y-2">
+							<label class="flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:border-primary/50 transition-all {addOns.uvOverlay ? 'border-primary bg-primary/5' : 'border-border'}">
+								<div>
+									<span class="font-medium">UV Overlay</span>
+									<p class="text-xs text-muted-foreground">Hidden security pattern visible under UV light</p>
+								</div>
+								<div class="flex items-center gap-2">
+									<span class="text-sm text-muted-foreground">+₱25/card</span>
+									<Switch bind:checked={addOns.uvOverlay} />
+								</div>
+							</label>
+							<label class="flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:border-primary/50 transition-all {addOns.holographic ? 'border-primary bg-primary/5' : 'border-border'}">
+								<div>
+									<span class="font-medium">Holographic Overlay</span>
+									<p class="text-xs text-muted-foreground">Tamper-evident holographic security layer</p>
+								</div>
+								<div class="flex items-center gap-2">
+									<span class="text-sm text-muted-foreground">+₱35/card</span>
+									<Switch bind:checked={addOns.holographic} />
+								</div>
+							</label>
+						</div>
+					</div>
+
+					<!-- Lanyard -->
+					<div class="space-y-3">
+						<h4 class="text-sm font-medium">Lanyard</h4>
+						<div class="grid grid-cols-3 gap-2">
+							<button
+								type="button"
+								class="p-3 rounded-lg border text-center transition-all {addOns.lanyard === 'none' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border hover:border-primary/50'}"
+								onclick={() => addOns.lanyard = 'none'}
+							>
+								<span class="text-sm font-medium">None</span>
+							</button>
+							<button
+								type="button"
+								class="p-3 rounded-lg border text-center transition-all {addOns.lanyard === '3/4' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border hover:border-primary/50'}"
+								onclick={() => addOns.lanyard = '3/4'}
+							>
+								<span class="text-sm font-medium">3/4"</span>
+								<p class="text-xs text-muted-foreground">₱40-50</p>
+							</button>
+							<button
+								type="button"
+								class="p-3 rounded-lg border text-center transition-all {addOns.lanyard === '1' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border hover:border-primary/50'}"
+								onclick={() => addOns.lanyard = '1'}
+							>
+								<span class="text-sm font-medium">1"</span>
+								<p class="text-xs text-muted-foreground">₱55-70</p>
+							</button>
+						</div>
+					</div>
+
+					<!-- Card Case -->
+					<div class="space-y-3">
+						<h4 class="text-sm font-medium">Card Case</h4>
+						<div class="grid grid-cols-3 gap-2">
+							<button
+								type="button"
+								class="p-3 rounded-lg border text-center transition-all {addOns.caseType === 'none' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border hover:border-primary/50'}"
+								onclick={() => addOns.caseType = 'none'}
+							>
+								<span class="text-sm font-medium">None</span>
+							</button>
+							<button
+								type="button"
+								class="p-3 rounded-lg border text-center transition-all {addOns.caseType === 'soft' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border hover:border-primary/50'}"
+								onclick={() => addOns.caseType = 'soft'}
+							>
+								<span class="text-sm font-medium">Soft</span>
+								<p class="text-xs text-muted-foreground">₱10</p>
+							</button>
+							<button
+								type="button"
+								class="p-3 rounded-lg border text-center transition-all {addOns.caseType === 'hard' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border hover:border-primary/50'}"
+								onclick={() => addOns.caseType = 'hard'}
+							>
+								<span class="text-sm font-medium">Hard</span>
+								<p class="text-xs text-muted-foreground">₱25</p>
+							</button>
+						</div>
+					</div>
+
+					<!-- Retractor -->
+					<label class="flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:border-primary/50 transition-all {addOns.retractor ? 'border-primary bg-primary/5' : 'border-border'}">
+						<div>
+							<span class="font-medium">Badge Retractor</span>
+							<p class="text-xs text-muted-foreground">Retractable reel for easy badge access</p>
+						</div>
+						<div class="flex items-center gap-2">
+							<span class="text-sm text-muted-foreground">₱35</span>
+							<Switch bind:checked={addOns.retractor} />
+						</div>
+					</label>
+				</div>
+
+			<!-- STEP 5: Naming -->
+			{:else if currentStep === 'naming'}
+				<div class="space-y-4 py-4">
+					<div class="space-y-2">
+						<Label for="templateName">Template Name *</Label>
+						<Input
+							id="templateName"
+							bind:value={templateName}
+							placeholder="e.g., Company Employee ID, Student Card"
+							class="w-full bg-background text-lg"
+						/>
+						<p class="text-xs text-muted-foreground">This name will help you identify this template in your library.</p>
+					</div>
+
+					<!-- Summary of selections -->
+					<div class="mt-6 p-4 rounded-lg bg-muted/50 border border-border space-y-2">
+						<h4 class="text-sm font-medium">Summary</h4>
+						<div class="text-sm text-muted-foreground space-y-1">
+							<p><span class="text-foreground">Size:</span> {finalCardSize().name} ({isPortrait ? 'Portrait' : 'Landscape'})</p>
+							<p><span class="text-foreground">Template:</span> {selectedTemplateAsset?.name || 'Blank'}</p>
+							<p><span class="text-foreground">Material:</span> {selectedMaterial === 'standard_laminated' ? 'Standard Laminated' : selectedMaterial === 'premium_direct' ? 'Premium Direct Print' : selectedMaterial === 'techsmart_nfc' ? 'TechSmart NFC' : 'TechSmart RFID'}</p>
+							{#if addOns.uvOverlay || addOns.holographic || addOns.lanyard !== 'none' || addOns.caseType !== 'none' || addOns.retractor}
+								<p><span class="text-foreground">Add-ons:</span> 
+									{[addOns.uvOverlay && 'UV Overlay', addOns.holographic && 'Holographic', addOns.lanyard !== 'none' && `${addOns.lanyard}" Lanyard`, addOns.caseType !== 'none' && `${addOns.caseType === 'soft' ? 'Soft' : 'Hard'} Case`, addOns.retractor && 'Retractor'].filter(Boolean).join(', ')}
+								</p>
+							{/if}
+						</div>
+					</div>
 				</div>
 			{/if}
 
@@ -548,8 +797,13 @@
 						Back
 					</Button>
 					<Button onclick={goNext}>
-						{currentStep === 'background' ? 'Create Template' : selectedTemplateAsset ? 'Use Template' : 'Skip & Create Blank'}
-						{#if currentStep !== 'background'}
+						{#if currentStep === 'naming'}
+							Create Template
+						{:else if currentStep === 'template'}
+							{selectedTemplateAsset ? 'Continue' : 'Skip Template'}
+							<ChevronRight class="h-4 w-4 ml-1" />
+						{:else}
+							Next
 							<ChevronRight class="h-4 w-4 ml-1" />
 						{/if}
 					</Button>

@@ -24,7 +24,9 @@ export const load: PageServerLoad = async ({ locals, url, depends, setHeaders })
 				name: url.searchParams.get('name') || 'New Template',
 				width: parseFloat(url.searchParams.get('width') || '3.375'),
 				height: parseFloat(url.searchParams.get('height') || '2.125'),
-				unit: url.searchParams.get('unit') || 'inches'
+				unit: url.searchParams.get('unit') || 'inches',
+				orientation: (url.searchParams.get('orientation') || 'landscape') as 'landscape' | 'portrait',
+				front_background: url.searchParams.get('front_background') || ''
 			}
 		: null;
 

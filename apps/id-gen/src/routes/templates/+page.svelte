@@ -80,7 +80,7 @@
 			selectedTemplate?: any;
 			user: any;
 			org_id: string;
-			newTemplateParams?: { name: string; width: number; height: number; unit: string } | null;
+			newTemplateParams?: { name: string; width: number; height: number; unit: string; orientation?: 'landscape' | 'portrait'; front_background?: string } | null;
 		};
 	} = $props();
 
@@ -168,8 +168,13 @@
 				height: data.newTemplateParams.height,
 				unit: data.newTemplateParams.unit as 'inches' | 'mm' | 'cm' | 'pixels'
 			};
-			// Trigger new template creation
-			handleCreateNewTemplate(cardSize, data.newTemplateParams.name);
+			// Trigger new template creation with optional front_background
+			handleCreateNewTemplate(
+				cardSize, 
+				data.newTemplateParams.name,
+				data.newTemplateParams.orientation,
+				data.newTemplateParams.front_background
+			);
 		}
 	});
 
@@ -1332,19 +1337,27 @@
 		console.log('✅ EditTemplate: Form cleared');
 	}
 
-	function handleCreateNewTemplate(cardSize: CardSize, templateName: string) {
+	function handleCreateNewTemplate(
+		cardSize: CardSize, 
+		templateName: string,
+		orientation?: 'landscape' | 'portrait',
+		frontBackgroundUrl?: string
+	) {
 		// Set up new template creation
 		currentCardSize = cardSize;
 		requiredPixelDimensions = cardSizeToPixels(cardSize, 300); // Use hardcoded DPI
+
+		// Determine orientation from params or calculate from dimensions
+		const finalOrientation = orientation || (cardSize.width >= cardSize.height ? 'landscape' : 'portrait');
 
 		// Create new template with only database-compatible properties
 		currentTemplate = {
 			id: crypto.randomUUID(),
 			user_id: user?.id ?? '',
 			name: templateName,
-			front_background: '',
+			front_background: frontBackgroundUrl || '',
 			back_background: '',
-			orientation: cardSize.width >= cardSize.height ? 'landscape' : 'portrait',
+			orientation: finalOrientation,
 			template_elements: [],
 			created_at: new Date().toISOString(),
 			org_id: org_id ?? ''
@@ -1353,7 +1366,8 @@
 		// Clear existing data
 		frontBackground = null;
 		backBackground = null;
-		frontPreview = null;
+		// Set front preview if a template asset was selected
+		frontPreview = frontBackgroundUrl || null;
 		backPreview = null;
 		frontElements = [];
 		backElements = [];
@@ -1367,7 +1381,9 @@
 		console.log('✅ New template created:', {
 			name: templateName,
 			cardSize: cardSize,
-			pixelDimensions: requiredPixelDimensions
+			pixelDimensions: requiredPixelDimensions,
+			orientation: finalOrientation,
+			frontBackground: frontBackgroundUrl ? 'set from template asset' : 'none'
 		});
 	}
 

@@ -2,6 +2,7 @@ export type UnitType = 'inches' | 'mm' | 'cm' | 'pixels';
 
 export interface CardSize {
 	name: string;
+	slug?: string; // For matching with database size presets
 	width: number;
 	height: number;
 	unit: UnitType;
@@ -38,6 +39,7 @@ export function switchOrientation(cardSize: CardSize): CardSize {
 export const COMMON_CARD_SIZES: CardSize[] = [
 	{
 		name: 'CR80 (ATM Size)',
+		slug: 'cr80',
 		width: 3.375,
 		height: 2.125,
 		unit: 'inches',
@@ -45,6 +47,7 @@ export const COMMON_CARD_SIZES: CardSize[] = [
 	},
 	{
 		name: 'Business Card',
+		slug: 'business_card',
 		width: 3.5,
 		height: 2.0,
 		unit: 'inches',
@@ -52,6 +55,7 @@ export const COMMON_CARD_SIZES: CardSize[] = [
 	},
 	{
 		name: 'Event Badge (Std)',
+		slug: 'event_badge_std',
 		width: 4.0,
 		height: 3.0,
 		unit: 'inches',
@@ -59,6 +63,7 @@ export const COMMON_CARD_SIZES: CardSize[] = [
 	},
 	{
 		name: 'Event Badge (Lg)',
+		slug: 'event_badge_lg',
 		width: 6.0,
 		height: 4.0,
 		unit: 'inches',
@@ -66,6 +71,7 @@ export const COMMON_CARD_SIZES: CardSize[] = [
 	},
 	{
 		name: 'Name Tag (Pin)',
+		slug: 'name_tag',
 		width: 3.0,
 		height: 1.0,
 		unit: 'inches',

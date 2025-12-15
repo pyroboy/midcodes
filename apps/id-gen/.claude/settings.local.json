@@ -20,7 +20,8 @@
       "mcp__supabase__list_migrations",
       "mcp__supabase__apply_migration",
       "Bash(cat:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []

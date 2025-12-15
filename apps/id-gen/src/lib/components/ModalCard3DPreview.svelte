@@ -3,6 +3,7 @@
 	import { OrbitControls } from '@threlte/extras';
 	import type { OrbitControls as OrbitControlsImpl } from 'three/examples/jsm/controls/OrbitControls.js';
 	import * as THREE from 'three';
+import { NoToneMapping } from 'three';
 	import { onMount, onDestroy } from 'svelte';
 	import { createRoundedRectCard } from '$lib/utils/cardGeometry';
 	import { getCardDimensions, lerp } from '$lib/components/card3d/card3d-state.svelte';
@@ -45,6 +46,7 @@
 
 	// Texture state - infoTexture needs to be reactive for re-renders
 	let texture = $state<THREE.Texture | null>(null);
+	let textureLoading = $state(false); // Track loading state to trigger reactivity
 	let infoTexture = $state<THREE.CanvasTexture | null>(null);
 	let textureLoader: THREE.TextureLoader | null = null;
 
@@ -549,6 +551,9 @@
 
 	// Load texture from URL
 	function loadTexture(url: string) {
+		console.log('[3D Preview] loadTexture called with URL:', url, 'isPortrait:', isPortrait);
+		textureLoading = true; // Start loading
+		
 		if (!textureLoader) {
 			textureLoader = new THREE.TextureLoader();
 			textureLoader.crossOrigin = 'anonymous';
@@ -557,15 +562,92 @@
 		textureLoader.load(
 			url,
 			(loadedTexture) => {
+				console.log('[3D Preview] Texture loaded successfully!', {
+					url,
+					width: loadedTexture.image?.width,
+					height: loadedTexture.image?.height,
+					format: loadedTexture.format,
+					isPortrait
+				});
 				loadedTexture.colorSpace = THREE.SRGBColorSpace;
 				loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
 				loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
+				
+				// Get image dimensions
+				const imgWidth = loadedTexture.image?.width || 1;
+				const imgHeight = loadedTexture.image?.height || 1;
+				const imgAspect = imgWidth / imgHeight;
+				
+				// Card geometry aspect ratio (always landscape internally, width > height)
+				const cardAspect = widthPixels / heightPixels;
+				
+				// When in portrait mode:
+				// - The card mesh is rotated 90° clockwise (rotationZ = PI/2)
+				// - The texture needs to be counter-rotated to appear upright
+				// - AND the aspect ratio needs to match the visual portrait dimensions
+				if (isPortrait) {
+					// Rotate texture 90° counter-clockwise to compensate for card rotation
+					loadedTexture.center.set(0.5, 0.5); // Rotate around center
+					loadedTexture.rotation = -Math.PI / 2;
+					
+					// In portrait mode, the visual aspect is height/width (inverted)
+					// The image should fill the portrait view
+					const visualAspect = heightPixels / widthPixels; // Visual card aspect when rotated
+					
+					// Adjust repeat to fit the rotated view
+					if (imgAspect > visualAspect) {
+						// Image is wider than portrait card view - scale down width
+						const scale = visualAspect / imgAspect;
+						loadedTexture.repeat.set(1, scale);
+						loadedTexture.offset.set(0, (1 - scale) / 2);
+					} else {
+						// Image is taller than portrait card view - scale down height
+						const scale = imgAspect / visualAspect;
+						loadedTexture.repeat.set(scale, 1);
+						loadedTexture.offset.set((1 - scale) / 2, 0);
+					}
+					console.log('[3D Preview] Applied PORTRAIT texture transform', {
+						rotation: -Math.PI / 2,
+						imgAspect,
+						visualAspect,
+						repeat: loadedTexture.repeat.toArray(),
+						offset: loadedTexture.offset.toArray()
+					});
+				} else {
+					// Landscape mode - standard aspect ratio correction
+					loadedTexture.rotation = 0;
+					loadedTexture.center.set(0.5, 0.5);
+					
+					if (imgAspect > cardAspect) {
+						// Image is wider than card - crop width
+						const scale = cardAspect / imgAspect;
+						loadedTexture.repeat.set(scale, 1);
+						loadedTexture.offset.set((1 - scale) / 2, 0);
+					} else {
+						// Image is taller than card - crop height
+						const scale = imgAspect / cardAspect;
+						loadedTexture.repeat.set(1, scale);
+						loadedTexture.offset.set(0, (1 - scale) / 2);
+					}
+					console.log('[3D Preview] Applied LANDSCAPE texture transform', {
+						imgAspect,
+						cardAspect,
+						repeat: loadedTexture.repeat.toArray(),
+						offset: loadedTexture.offset.toArray()
+					});
+				}
+				
 				loadedTexture.needsUpdate = true;
 				texture = loadedTexture;
+				textureLoading = false; // Done loading - triggers reactivity!
+				console.log('[3D Preview] texture state updated, texture is now:', texture ? 'SET' : 'NULL', 'loading:', textureLoading);
 			},
-			undefined,
+			(progress) => {
+				console.log('[3D Preview] Texture loading progress:', progress);
+			},
 			(err) => {
-				console.error('[ModalCard3DPreview] Texture load error:', err);
+				console.error('[ModalCard3DPreview] Texture load error:', err, 'URL was:', url);
+				textureLoading = false; // Done loading (with error)
 			}
 		);
 	}
@@ -736,14 +818,36 @@
 		animState.prevIsPortrait = isPortrait;
 		animState.prevSizeName = sizeName;
 
+		// Apply initial portrait rotation if starting in portrait mode
+		// This is critical - without this, the card would start in landscape even if isPortrait=true
+		if (isPortrait) {
+			animState.rotationZ = Math.PI / 2;
+			animState.targetRotationZ = Math.PI / 2;
+			animState.textureRotation = Math.PI / 2;
+			animState.targetTextureRotation = Math.PI / 2;
+			renderRotationZ = Math.PI / 2;
+			currentRulerRotation = Math.PI / 2;
+			targetRulerRotation = Math.PI / 2;
+			console.log('[3D Preview] Initialized with PORTRAIT orientation');
+		} else {
+			animState.rotationZ = 0;
+			animState.targetRotationZ = 0;
+			animState.textureRotation = 0;
+			animState.targetTextureRotation = 0;
+			renderRotationZ = 0;
+			currentRulerRotation = 0;
+			targetRulerRotation = 0;
+			console.log('[3D Preview] Initialized with LANDSCAPE orientation');
+		}
+
 		// Sync reactive state (no warning since this is in onMount callback)
 		currentWidth = widthPixels;
 		currentHeight = heightPixels;
-		console.log('[3D Preview] Initial state:', { currentWidth, currentHeight, renderScaleX, renderScaleY });
+		console.log('[3D Preview] Initial state:', { currentWidth, currentHeight, renderScaleX, renderScaleY, isPortrait, renderRotationZ });
 
 		loadGeometry(widthPixels, heightPixels);
 		// Use high-resolution texture for initial render (crisp first impression)
-		updateInfoTextureHighRes();
+		updateInfoTextureHighRes(animState.textureRotation);
 		if (imageUrl) {
 			loadTexture(imageUrl);
 		}
@@ -815,12 +919,30 @@
 	});
 
 	// Watch for image URL changes
+	let prevImageUrl: string | null = null;
 	$effect(() => {
-		if (imageUrl) {
-			loadTexture(imageUrl);
-		} else if (texture) {
-			texture.dispose();
-			texture = null;
+		// Access imageUrl to register the dependency
+		const currentUrl = imageUrl;
+		console.log('[3D Preview] imageUrl $effect triggered, currentUrl:', currentUrl, 'prevUrl:', prevImageUrl);
+		
+		if (currentUrl !== prevImageUrl) {
+			console.log('[3D Preview] URL changed! Disposing old texture and loading new one');
+			// Dispose old texture if exists
+			if (texture) {
+				console.log('[3D Preview] Disposing old texture');
+				texture.dispose();
+				texture = null;
+			}
+			
+			// Load new texture if URL provided
+			if (currentUrl) {
+				console.log('[3D Preview] Calling loadTexture with:', currentUrl);
+				loadTexture(currentUrl);
+			}
+			
+			prevImageUrl = currentUrl;
+		} else {
+			console.log('[3D Preview] URL unchanged, skipping');
 		}
 	});
 
@@ -855,7 +977,7 @@
 </script>
 
 <div class="modal-3d-preview" style="height: {height};">
-	<Canvas>
+	<Canvas toneMapping={NoToneMapping}>
 		<!-- Camera with dynamic distance based on card size -->
 		<T.PerspectiveCamera makeDefault position={[0, 0, cameraDistance()]} fov={cameraFOV}>
 			{#if showControls}
@@ -882,9 +1004,19 @@
 		<!-- Card mesh with scale-based animation -->
 		{#if frontGeometry && backGeometry && edgeGeometry}
 			<T.Group rotation.y={renderRotationY} rotation.x={-0.1} rotation.z={renderRotationZ} scale.x={renderScaleX} scale.y={renderScaleY}>
-				<!-- Front face -->
+				<!-- Front face - key block forces re-render when texture changes -->
+				{#key texture}
 				<T.Mesh geometry={frontGeometry}>
-					{#if texture}
+					{#if textureLoading}
+						<!-- Show loading state while texture loads -->
+						<T.MeshStandardMaterial
+							color="#e2e8f0"
+							side={THREE.FrontSide}
+							metalness={0.05}
+							roughness={0.6}
+						/>
+					{:else if texture}
+						<!-- Loaded texture from URL -->
 						<T.MeshStandardMaterial
 							map={texture}
 							side={THREE.FrontSide}
@@ -892,6 +1024,7 @@
 							roughness={0.6}
 						/>
 					{:else if infoTexture}
+						<!-- Default info texture -->
 						<T.MeshStandardMaterial
 							map={infoTexture}
 							side={THREE.FrontSide}
@@ -899,6 +1032,7 @@
 							roughness={0.6}
 						/>
 					{:else}
+						<!-- Fallback solid color -->
 						<T.MeshStandardMaterial
 							color="#f1f5f9"
 							side={THREE.FrontSide}
@@ -907,6 +1041,7 @@
 						/>
 					{/if}
 				</T.Mesh>
+				{/key}
 
 				<!-- Back face -->
 				<T.Mesh geometry={backGeometry}>

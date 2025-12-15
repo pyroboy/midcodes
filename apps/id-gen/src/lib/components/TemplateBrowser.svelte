@@ -48,6 +48,21 @@
 		</div>
 	{:else}
 		<div class="template-grid">
+			<!-- Custom Design Card (First Position) -->
+			{#if onCustomDesign}
+				<button
+					type="button"
+					class="template-card custom-design-card"
+					onclick={onCustomDesign}
+				>
+					<div class="custom-design-content">
+						<Wand2 class="h-8 w-8 text-primary" />
+						<span class="custom-design-label">Custom Design</span>
+						<span class="custom-design-hint">Request a unique template</span>
+					</div>
+				</button>
+			{/if}
+
 			{#each assets as asset (asset.id)}
 				{@const isSelected = selectedAssetId === asset.id}
 				<button
@@ -80,21 +95,6 @@
 					</div>
 				</button>
 			{/each}
-
-			<!-- Custom Design Card -->
-			{#if onCustomDesign}
-				<button
-					type="button"
-					class="template-card custom-design-card"
-					onclick={onCustomDesign}
-				>
-					<div class="custom-design-content">
-						<Wand2 class="h-8 w-8 text-primary" />
-						<span class="custom-design-label">Custom Design</span>
-						<span class="custom-design-hint">Request a unique template</span>
-					</div>
-				</button>
-			{/if}
 		</div>
 	{/if}
 </div>

@@ -1,8 +1,10 @@
 @import 'tailwindcss';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
 	/* Light theme (default) - Base colors */
-	--color-background: hsl(210 20% 98%);
+	--color-background: hsl(0 0% 100%);
 	--color-foreground: hsl(222.2 84% 4.9%);
 
 	/* Improved Muted/Card colors for better contrast */
