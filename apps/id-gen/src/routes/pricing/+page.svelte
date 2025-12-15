@@ -8,7 +8,7 @@
 	import { CREDIT_PACKAGES } from '$lib/payments/catalog';
 	import { createCreditPayment } from '$lib/remote/payments.remote';
 	import { paymentFlags } from '$lib/stores/featureFlags';
-	import { Check, Zap, CreditCard, Camera, Database, MapPin } from 'lucide-svelte';
+	import { Check, Zap, CreditCard, Smartphone, Key, Tag, ShieldCheck, Cpu, Wrench, AlertTriangle } from 'lucide-svelte';
 	import { getPreloadState } from '$lib/services/preloadService';
 	import PricingPageSkeleton from '$lib/components/skeletons/PricingPageSkeleton.svelte';
 
@@ -132,10 +132,10 @@
 </script>
 
 <svelte:head>
-	<title>Rates & Pricing - KINATAO</title>
+	<title>Rates & Pricing - KINATAO ID</title>
 	<meta
 		name="description"
-		content="Simple pricing for ID generation, printing, and professional services."
+		content="Professional ID Card Production, Smart Tech, and Security Solutions in Bohol. Transparent pricing for laminated IDs, PVC cards, RFID credentials, and more."
 	/>
 </svelte:head>
 
@@ -143,232 +143,404 @@
 	
 	<!-- Header -->
 	<section class="py-16 md:py-24 text-center px-4">
+		<Badge variant="outline" class="mb-4 text-primary border-primary">KINATAO ID & SOLUTIONS</Badge>
 		<h1 class="text-4xl md:text-6xl font-black tracking-tight mb-6">
-			Rates & <span class="text-primary">Pricing</span>
+			Official <span class="text-primary">Service Menu</span>
 		</h1>
 		<p class="text-xl text-muted-foreground max-w-2xl mx-auto">
-			Start for free, upgrade for volume. Transparent rates for physical printing and digital generation.
+			Professional Identity, Smart Tech, & Security Solutions in Bohol
 		</p>
 	</section>
 
-	<!-- Section 1: Physical Printing & Professional Services -->
+	<!-- Section I: ID Card Production -->
 	<section class="py-16 bg-slate-50 dark:bg-slate-900/50 px-4 border-b border-border">
 		<div class="container max-w-6xl mx-auto">
-			<div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+			<div class="text-center mb-12">
+				<Badge variant="secondary" class="mb-4">I. ID CARD PRODUCTION</Badge>
+				<h2 class="text-3xl font-bold mb-2">Corporate & School IDs</h2>
+				<p class="text-muted-foreground">Choose the right card type for your needs</p>
+			</div>
+
+			<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
 				
-				<!-- Column 1: Descriptions -->
-				<div class="space-y-8">
-					<!-- Printing Description Card -->
-					<Card class="bg-card/50 backdrop-blur-sm border-2">
-						<CardHeader>
-							<div class="mb-2">
-								<Badge variant="outline" class="text-orange-500 border-orange-500">Most Popular Service</Badge>
-							</div>
-							<CardTitle class="text-2xl">We Print & Ship</CardTitle>
-							<CardDescription>
-								Need physical cards? We offer professional PVC printing with industrial-grade retransfer printers. Durable, waterproof, and fadeproof.
-							</CardDescription>
-						</CardHeader>
-						<CardContent class="grid gap-6">
-							<div class="flex gap-4">
-								<div class="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center shrink-0">
-									<CreditCard class="w-5 h-5 text-orange-600" />
-								</div>
-								<div>
-									<h3 class="font-bold text-base">Premium PVC Material</h3>
-									<p class="text-sm text-muted-foreground">Standard CR80 size (credit card). Glossy finish with edge-to-edge printing.</p>
-								</div>
-							</div>
-							<div class="flex gap-4">
-								<div class="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
-									<Zap class="w-5 h-5 text-blue-600" />
-								</div>
-								<div>
-									<h3 class="font-bold text-base">Fast Turnaround</h3>
-									<p class="text-sm text-muted-foreground">Most orders process within 24-48 hours. Nationwide shipping.</p>
-								</div>
-							</div>
-						</CardContent>
-					</Card>
-
-					<!-- Professional Services Description Card -->
-					<Card class="bg-card/50 backdrop-blur-sm border-2">
-						<CardHeader>
-							<div class="mb-2">
-								<Badge variant="outline" class="text-purple-500 border-purple-500">Professional Solutions</Badge>
-							</div>
-							<CardTitle class="text-2xl">On-Site & Data Services</CardTitle>
-							<CardDescription>
-								For schools, companies, and events, we provide end-to-end solutions.
-							</CardDescription>
-						</CardHeader>
-						<CardContent class="grid gap-6">
-							<div class="flex gap-4">
-								<div class="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center shrink-0">
-									<Camera class="w-5 h-5 text-purple-600" />
-								</div>
-								<div>
-									<h3 class="font-bold text-base">On-Site Capture Team</h3>
-									<p class="text-sm text-muted-foreground">We deploy a professional team with proper lighting and backdrops to your location for standardized photo capture.</p>
-								</div>
-							</div>
-							<div class="flex gap-4">
-								<div class="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center shrink-0">
-									<Database class="w-5 h-5 text-purple-600" />
-								</div>
-								<div>
-									<h3 class="font-bold text-base">Batch Data Processing</h3>
-									<p class="text-sm text-muted-foreground">Cleaning, formatting, and encoding of large datasets from Excel/CSV files.</p>
-								</div>
-							</div>
-						</CardContent>
-					</Card>
-				</div>
-
-				<!-- Column 2: Rate Cards -->
-				<div class="space-y-6">
-					
-					<!-- Printing Rates Card -->
-					<Card class="border-2 border-muted shadow-lg bg-background">
-						<CardHeader>
-							<CardTitle>Printing Rates</CardTitle>
-							<CardDescription>Price per printed card (excluding credits)</CardDescription>
-						</CardHeader>
-						<CardContent>
-							<div class="rounded-lg border overflow-hidden">
-								<table class="w-full text-sm">
-									<thead class="bg-muted/50">
-										<tr>
-											<th class="py-3 px-4 text-left font-medium">Quantity</th>
-											<th class="py-3 px-4 text-right font-medium">Rate</th>
-										</tr>
-									</thead>
-									<tbody class="divide-y">
+				<!-- Option A: Standard Laminated -->
+				<Card class="border-2 hover:shadow-lg transition-shadow">
+					<CardHeader>
+						<Badge variant="outline" class="w-fit mb-2 text-blue-600 border-blue-600">OPTION A</Badge>
+						<CardTitle class="text-xl">Standard Laminated</CardTitle>
+						<CardDescription>
+							The "School" Standard. Sandwich-type heat press with glossy finish. Print is inside the plastic (anti-scratch).
+						</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<p class="text-xs text-muted-foreground mb-4">Best for: Student IDs, Fan Clubs, Bulk Employee IDs</p>
+						<div class="rounded-lg border overflow-hidden">
+							<table class="w-full text-sm">
+								<thead class="bg-blue-50 dark:bg-blue-900/20">
 									<tr>
-										<td class="py-3 px-4">
-											1 - 10 Cards
-											<Badge variant="secondary" class="ml-2 bg-red-100 text-red-700 border-red-200">PROMO</Badge>
-										</td>
-										<td class="py-3 px-4 text-right font-bold">
-											<span class="line-through text-muted-foreground font-normal text-xs mr-2">₱75.00</span>
-											<span class="text-red-600">₱40.00 each</span>
-										</td>
+										<th class="py-2 px-3 text-left font-medium">Quantity</th>
+										<th class="py-2 px-3 text-right font-medium">Price/ID</th>
 									</tr>
-									<tr>
-										<td class="py-3 px-4">
-											11 - 50 Cards
-											<Badge variant="secondary" class="ml-2 bg-red-100 text-red-700 border-red-200">PROMO</Badge>
-										</td>
-										<td class="py-3 px-4 text-right font-bold">
-											<span class="line-through text-muted-foreground font-normal text-xs mr-2">₱60.00</span>
-											<span class="text-red-600">₱40.00 each</span>
-										</td>
-									</tr>
-									<tr>
-										<td class="py-3 px-4">
-											51 - 499 Cards
-											<Badge variant="secondary" class="ml-2 bg-red-100 text-red-700 border-red-200">PROMO</Badge>
-										</td>
-										<td class="py-3 px-4 text-right font-bold">
-											<span class="line-through text-muted-foreground font-normal text-xs mr-2">₱50.00</span>
-											<span class="text-red-600">₱40.00 each</span>
-										</td>
-									</tr>
-									<tr class="bg-primary/5">
-										<td class="py-3 px-4 text-primary font-bold">500+ Cards (Bulk)</td>
-										<td class="py-3 px-4 text-right font-bold text-primary">₱30.00 each</td>
-									</tr>
+								</thead>
+								<tbody class="divide-y">
+									<tr><td class="py-2 px-3">5 - 19 pcs</td><td class="py-2 px-3 text-right font-bold">₱50.00</td></tr>
+									<tr><td class="py-2 px-3">20 - 49 pcs</td><td class="py-2 px-3 text-right font-bold">₱45.00</td></tr>
+									<tr><td class="py-2 px-3">50 - 99 pcs</td><td class="py-2 px-3 text-right font-bold">₱40.00</td></tr>
+									<tr><td class="py-2 px-3">100 - 199 pcs</td><td class="py-2 px-3 text-right font-bold">₱35.00</td></tr>
+									<tr><td class="py-2 px-3">200 - 499 pcs</td><td class="py-2 px-3 text-right font-bold">₱30.00</td></tr>
+									<tr><td class="py-2 px-3">500 - 999 pcs</td><td class="py-2 px-3 text-right font-bold">₱25.00</td></tr>
+									<tr class="bg-blue-50 dark:bg-blue-900/30"><td class="py-2 px-3 font-bold text-blue-700 dark:text-blue-400">1,000+ pcs</td><td class="py-2 px-3 text-right font-bold text-blue-700 dark:text-blue-400">₱15.00</td></tr>
 								</tbody>
 							</table>
 						</div>
-						<p class="text-xs text-center mt-4 text-muted-foreground space-y-1">
-							<span class="block">* Free shipping for orders above ₱2,000.</span>
-							<span class="block text-orange-600/80">Lost/Single ID Replacement: ₱250.00</span>
-						</p>
 					</CardContent>
 					<CardFooter>
-						<Button variant="outline" class="w-full" href="/contact?subject=Printing+Order">Request Printing Quote</Button>
+						<Button variant="outline" class="w-full" href="/contact?subject=Standard+Laminated+ID+Order">Request Quote</Button>
 					</CardFooter>
 				</Card>
 
-				<!-- Service Rates Card -->
-				<Card class="border-2 border-purple-100 dark:border-purple-900 shadow-md bg-background relative overflow-hidden">
-					<div class="absolute top-0 right-0 p-2 opacity-10 pointer-events-none">
-						<MapPin class="w-32 h-32" />
+				<!-- Option B: Premium Direct -->
+				<Card class="border-2 border-orange-200 dark:border-orange-800 hover:shadow-lg transition-shadow relative">
+					<div class="absolute -top-3 left-1/2 transform -translate-x-1/2">
+						<Badge class="bg-orange-500 text-white px-3 py-1 text-xs shadow-md">Executive</Badge>
 					</div>
 					<CardHeader>
-						<CardTitle class="text-purple-700 dark:text-purple-400">Service Rates</CardTitle>
-						<CardDescription>Professional fees for on-site execution</CardDescription>
+						<Badge variant="outline" class="w-fit mb-2 text-orange-600 border-orange-600">OPTION B</Badge>
+						<CardTitle class="text-xl">Premium Direct</CardTitle>
+						<CardDescription>
+							The "Executive" Standard. Solid PVC (ATM-style) with thermal transfer print. High durability.
+						</CardDescription>
 					</CardHeader>
 					<CardContent>
-						<!-- Bohol Promo -->
-						<div class="mb-6 p-4 bg-purple-100 dark:bg-purple-900/40 rounded-lg border border-purple-200 dark:border-purple-800">
-							<div class="flex items-center gap-2 mb-3">
-								<Badge class="bg-purple-600 hover:bg-purple-700">BOHOL PROMO</Badge>
-								<span class="text-xs font-bold uppercase tracking-wide text-purple-700 dark:text-purple-300">Limited Time</span>
-							</div>
-							
-							<div class="space-y-2">
-								<div class="flex justify-between items-center">
-									<span class="font-bold text-lg text-foreground">On-Site Data Entry</span>
-									<span class="bg-white dark:bg-black/20 px-2 py-0.5 rounded text-sm whitespace-nowrap">
-										<span class="line-through text-muted-foreground mr-1">₱4,000</span>
-										<span class="text-green-600 dark:text-green-400 font-black">FREE</span>
-									</span>
-								</div>
-								<div class="flex justify-between items-center">
-									<span class="font-bold text-lg text-foreground">Data Processing</span>
-									<span class="bg-white dark:bg-black/20 px-2 py-0.5 rounded text-sm whitespace-nowrap">
-										<span class="line-through text-muted-foreground mr-1">₱2,500</span>
-										<span class="text-green-600 dark:text-green-400 font-black">FREE</span>
-									</span>
-								</div>
-							</div>
-
-							<p class="text-sm text-muted-foreground mt-3 pt-3 border-t border-purple-200 dark:border-purple-800">
-								Anywhere in Bohol • Min. 300 Cards
-							</p>
+						<p class="text-xs text-muted-foreground mb-4">Best for: Government IDs, Corporate Executives, VIPs</p>
+						<div class="rounded-lg border overflow-hidden">
+							<table class="w-full text-sm">
+								<thead class="bg-orange-50 dark:bg-orange-900/20">
+									<tr>
+										<th class="py-2 px-3 text-left font-medium">Quantity</th>
+										<th class="py-2 px-3 text-right font-medium">Price/ID</th>
+									</tr>
+								</thead>
+								<tbody class="divide-y">
+									<tr><td class="py-2 px-3">1 - 9 pcs</td><td class="py-2 px-3 text-right font-bold">₱180.00</td></tr>
+									<tr><td class="py-2 px-3">10 - 49 pcs</td><td class="py-2 px-3 text-right font-bold">₱150.00</td></tr>
+									<tr class="bg-orange-50 dark:bg-orange-900/30"><td class="py-2 px-3 font-bold text-orange-700 dark:text-orange-400">50+ pcs</td><td class="py-2 px-3 text-right font-bold text-orange-700 dark:text-orange-400">₱120.00</td></tr>
+								</tbody>
+							</table>
 						</div>
+					</CardContent>
+					<CardFooter>
+						<Button variant="default" class="w-full bg-orange-500 hover:bg-orange-600" href="/contact?subject=Premium+Direct+ID+Order">Request Quote</Button>
+					</CardFooter>
+				</Card>
 
+				<!-- Option C: TechSmart Credentials -->
+				<Card class="border-2 border-purple-200 dark:border-purple-800 hover:shadow-lg transition-shadow">
+					<CardHeader>
+						<Badge variant="outline" class="w-fit mb-2 text-purple-600 border-purple-600">OPTION C</Badge>
+						<CardTitle class="text-xl flex items-center gap-2">
+							<Cpu class="w-5 h-5" />
+							TechSmart Credentials
+						</CardTitle>
+						<CardDescription>
+							Premium Direct Printing + Embedded Microchip. No battery required.
+						</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<p class="text-xs text-muted-foreground mb-4">Best for: Office Door Access, Time Attendance, Hotel Keys</p>
 						<div class="rounded-lg border overflow-hidden">
 							<table class="w-full text-sm">
 								<thead class="bg-purple-50 dark:bg-purple-900/20">
 									<tr>
-										<th class="py-3 px-4 text-left font-medium">Service / Location</th>
-										<th class="py-3 px-4 text-right font-medium">Rate</th>
+										<th class="py-2 px-3 text-left font-medium">Tech Type</th>
+										<th class="py-1.5 px-2 text-right font-medium text-xs">1-9</th>
+										<th class="py-1.5 px-2 text-right font-medium text-xs">10-49</th>
+										<th class="py-1.5 px-2 text-right font-medium text-xs">50+</th>
 									</tr>
 								</thead>
 								<tbody class="divide-y">
 									<tr>
-										<td class="py-3 px-4 font-medium" colspan="2">On-Site Capture Team</td>
+										<td class="py-2 px-3 text-xs">RFID Proximity<br/><span class="text-muted-foreground">(125kHz)</span></td>
+										<td class="py-2 px-2 text-right font-bold text-xs">₱250</td>
+										<td class="py-2 px-2 text-right font-bold text-xs">₱220</td>
+										<td class="py-2 px-2 text-right font-bold text-xs text-purple-600">₱180</td>
 									</tr>
 									<tr>
-										<td class="py-2 px-4 pl-8 text-muted-foreground">Standardized Photo & Data Collection</td>
-										<td class="py-2 px-4 text-right text-purple-600 font-bold">Contact Us</td>
-									</tr>
-									<tr class="bg-muted/30">
-										<td class="py-3 px-4 font-medium" colspan="2">Data Processing</td>
-									</tr>
-									<tr>
-										<td class="py-2 px-4 pl-8 text-muted-foreground">Batch Cleaning</td>
-										<td class="py-2 px-4 text-right text-xs">Starts at ₱2,500</td>
+										<td class="py-2 px-3 text-xs">Mifare / NFC<br/><span class="text-muted-foreground">(13.56MHz)</span></td>
+										<td class="py-2 px-2 text-right font-bold text-xs">₱280</td>
+										<td class="py-2 px-2 text-right font-bold text-xs">₱250</td>
+										<td class="py-2 px-2 text-right font-bold text-xs text-purple-600">₱200</td>
 									</tr>
 								</tbody>
 							</table>
 						</div>
 					</CardContent>
-						<CardFooter>
-							<Button variant="link" class="w-full text-purple-600" href="/contact?subject=Professional+Services">Book a Team &rarr;</Button>
-						</CardFooter>
-					</Card>
+					<CardFooter>
+						<Button variant="outline" class="w-full border-purple-300 text-purple-700 hover:bg-purple-50" href="/contact?subject=TechSmart+Credential+Order">Request Quote</Button>
+					</CardFooter>
+				</Card>
 
-				</div>
 			</div>
 		</div>
 	</section>
 
-	<!-- Section 2: Digital Credits (Generation) -->
-	<section class="py-16 bg-white dark:bg-background px-4">
+	<!-- Section II: Kinatao Smart Series -->
+	<section class="py-16 bg-gradient-to-br from-slate-900 to-slate-800 text-white px-4 border-b border-border">
+		<div class="container max-w-6xl mx-auto">
+			<div class="text-center mb-12">
+				<Badge class="mb-4 bg-cyan-500 text-white">II. KINATAO SMART SERIES</Badge>
+				<h2 class="text-3xl font-bold mb-2">Lifestyle Tech</h2>
+				<p class="text-slate-300">Next-Gen Networking Tools. One-time payment. No monthly fees.</p>
+				<p class="text-sm text-cyan-400 mt-2">Tap to share: Contact Info, Social Media, Website, or Payment Apps.</p>
+			</div>
+
+			<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+				<!-- Smart Business Card -->
+				<Card class="bg-white/10 backdrop-blur-sm border-white/20 text-white hover:bg-white/20 transition-all">
+					<CardHeader class="text-center">
+						<div class="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center">
+							<CreditCard class="w-8 h-8 text-white" />
+						</div>
+						<CardTitle class="text-white">Smart Business Card</CardTitle>
+						<CardDescription class="text-slate-300">
+							Custom printed PVC + NFC. The last business card you'll ever buy.
+						</CardDescription>
+					</CardHeader>
+					<CardContent class="text-center">
+						<span class="text-4xl font-black text-cyan-400">₱1,000</span>
+					</CardContent>
+					<CardFooter>
+						<Button variant="outline" class="w-full border-white/30 text-white hover:bg-white/20" href="/contact?subject=Smart+Business+Card">Order Now</Button>
+					</CardFooter>
+				</Card>
+
+				<!-- Smart Key Fob -->
+				<Card class="bg-white/10 backdrop-blur-sm border-white/20 text-white hover:bg-white/20 transition-all">
+					<CardHeader class="text-center">
+						<div class="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center">
+							<Key class="w-8 h-8 text-white" />
+						</div>
+						<CardTitle class="text-white">Smart Key Fob</CardTitle>
+						<CardDescription class="text-slate-300">
+							Premium epoxy/leather finish. Great for "Lost & Found" or digital profile.
+						</CardDescription>
+					</CardHeader>
+					<CardContent class="text-center">
+						<span class="text-4xl font-black text-amber-400">₱1,000</span>
+					</CardContent>
+					<CardFooter>
+						<Button variant="outline" class="w-full border-white/30 text-white hover:bg-white/20" href="/contact?subject=Smart+Key+Fob">Order Now</Button>
+					</CardFooter>
+				</Card>
+
+				<!-- Smart Sticker Coin -->
+				<Card class="bg-white/10 backdrop-blur-sm border-white/20 text-white hover:bg-white/20 transition-all">
+					<CardHeader class="text-center">
+						<div class="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center">
+							<Smartphone class="w-8 h-8 text-white" />
+						</div>
+						<CardTitle class="text-white">Smart Sticker Coin</CardTitle>
+						<CardDescription class="text-slate-300">
+							Adhesive NFC tag. Turns any smartphone case into a business card.
+						</CardDescription>
+					</CardHeader>
+					<CardContent class="text-center">
+						<span class="text-4xl font-black text-green-400">₱1,000</span>
+					</CardContent>
+					<CardFooter>
+						<Button variant="outline" class="w-full border-white/30 text-white hover:bg-white/20" href="/contact?subject=Smart+Sticker+Coin">Order Now</Button>
+					</CardFooter>
+				</Card>
+			</div>
+		</div>
+	</section>
+
+	<!-- Section III: Lanyards & Add-Ons -->
+	<section class="py-16 bg-white dark:bg-background px-4 border-b border-border">
+		<div class="container max-w-6xl mx-auto">
+			<div class="text-center mb-12">
+				<Badge variant="secondary" class="mb-4">III. LANYARDS & ADD-ONS</Badge>
+				<h2 class="text-3xl font-bold mb-2">Accessories</h2>
+			</div>
+
+			<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+				<!-- Premium Sublimation Lanyards -->
+				<Card class="border-2">
+					<CardHeader>
+						<CardTitle class="flex items-center gap-2">
+							<Tag class="w-5 h-5 text-primary" />
+							Premium Sublimation Lanyards
+						</CardTitle>
+						<CardDescription>
+							Full-color print. Soft, high-quality polyester. <strong>Free layout included.</strong>
+						</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<div class="rounded-lg border overflow-hidden">
+							<table class="w-full text-sm">
+								<thead class="bg-muted/50">
+									<tr>
+										<th class="py-2 px-3 text-left font-medium">Width</th>
+										<th class="py-2 px-3 text-right font-medium">1-49 pcs</th>
+										<th class="py-2 px-3 text-right font-medium">50-99 pcs</th>
+										<th class="py-2 px-3 text-right font-medium">100+ pcs</th>
+									</tr>
+								</thead>
+								<tbody class="divide-y">
+									<tr>
+										<td class="py-2 px-3">¾ Inch (Standard)</td>
+										<td class="py-2 px-3 text-right font-bold">₱60.00</td>
+										<td class="py-2 px-3 text-right font-bold">₱50.00</td>
+										<td class="py-2 px-3 text-right font-bold text-primary">₱40.00</td>
+									</tr>
+									<tr>
+										<td class="py-2 px-3">1 Inch (Wide)</td>
+										<td class="py-2 px-3 text-right font-bold">₱70.00</td>
+										<td class="py-2 px-3 text-right font-bold">₱60.00</td>
+										<td class="py-2 px-3 text-right font-bold text-primary">₱50.00</td>
+									</tr>
+								</tbody>
+							</table>
+						</div>
+					</CardContent>
+				</Card>
+
+				<!-- Accessories -->
+				<Card class="border-2">
+					<CardHeader>
+						<CardTitle>Accessories</CardTitle>
+						<CardDescription>Complete your ID package</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<ul class="space-y-3 text-sm">
+							<li class="flex justify-between items-center py-2 border-b">
+								<span>Side Release Buckle (Add-on)</span>
+								<span class="font-bold">+₱10.00</span>
+							</li>
+							<li class="flex justify-between items-center py-2 border-b">
+								<span>ID Soft Case (Zip-Lock/Resealable)</span>
+								<span class="font-bold">₱10.00</span>
+							</li>
+							<li class="flex justify-between items-center py-2 border-b">
+								<span>ID Hard Case (Acrylic)</span>
+								<span class="font-bold">₱25.00</span>
+							</li>
+							<li class="flex justify-between items-center py-2 border-b">
+								<span>ID Retractor / Yoyo (Plain)</span>
+								<span class="font-bold">₱35.00</span>
+							</li>
+							<li class="flex justify-between items-center py-2">
+								<div>
+									<span>Rubber Logo Loop (Custom Brand)</span>
+									<span class="text-xs text-muted-foreground block">Min. order 50 pcs</span>
+								</div>
+								<span class="font-bold">₱50.00</span>
+							</li>
+						</ul>
+					</CardContent>
+					<CardFooter>
+						<Button variant="outline" class="w-full" href="/contact?subject=Lanyard+Accessories+Order">Request Quote</Button>
+					</CardFooter>
+				</Card>
+			</div>
+		</div>
+	</section>
+
+	<!-- Section IV: Event & Specialty Solutions -->
+	<section class="py-16 bg-slate-50 dark:bg-slate-900/50 px-4 border-b border-border">
+		<div class="container max-w-6xl mx-auto">
+			<div class="text-center mb-12">
+				<Badge variant="secondary" class="mb-4">IV. EVENT & SPECIALTY SOLUTIONS</Badge>
+				<h2 class="text-3xl font-bold mb-2">Conferences, Concerts & Expos</h2>
+				<p class="text-muted-foreground">Alternatives to wristbands for events</p>
+			</div>
+
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+				<Card class="border-2 hover:shadow-lg transition-shadow">
+					<CardHeader>
+						<CardTitle class="text-lg">Oversized VIP Badge</CardTitle>
+						<CardDescription>4"x6" Laminated. Perfect for "All Access" / Media / Staff.</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<span class="text-3xl font-black text-primary">₱150.00</span>
+					</CardContent>
+					<CardFooter>
+						<Button variant="outline" class="w-full" href="/contact?subject=VIP+Badge+Order">Request Quote</Button>
+					</CardFooter>
+				</Card>
+
+				<Card class="border-2 hover:shadow-lg transition-shadow">
+					<CardHeader>
+						<CardTitle class="text-lg">RFID "Lite" Card</CardTitle>
+						<CardDescription>Paper/Eco-Plastic. Disposable smart cards for 1-day events/concerts.</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<span class="text-xl font-bold text-muted-foreground">Call for Bulk Quote</span>
+					</CardContent>
+					<CardFooter>
+						<Button variant="outline" class="w-full" href="/contact?subject=RFID+Lite+Event+Cards">Contact Us</Button>
+					</CardFooter>
+				</Card>
+			</div>
+		</div>
+	</section>
+
+	<!-- Section V: Systems Integration -->
+	<section class="py-16 bg-white dark:bg-background px-4 border-b border-border">
+		<div class="container max-w-6xl mx-auto">
+			<div class="text-center mb-12">
+				<Badge variant="secondary" class="mb-4">V. SYSTEMS INTEGRATION</Badge>
+				<h2 class="text-3xl font-bold mb-2 flex items-center justify-center gap-2">
+					<Wrench class="w-8 h-8" />
+					Security & Attendance
+				</h2>
+				<p class="text-muted-foreground">We install the hardware that makes the cards work.</p>
+				<p class="text-xs text-muted-foreground mt-2">Note: Prices are estimates. Final quote requires site inspection.</p>
+			</div>
+
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+				<Card class="border-2 border-blue-200 dark:border-blue-800 hover:shadow-lg transition-shadow">
+					<CardHeader>
+						<div class="w-12 h-12 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-4">
+							<ShieldCheck class="w-6 h-6 text-blue-600" />
+						</div>
+						<CardTitle>RFID Time Keeping System</CardTitle>
+						<CardDescription>
+							Package includes: Biometric/RFID Terminal + Time Attendance Software + Installation.
+						</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<p class="text-sm text-muted-foreground mb-2">Starts at</p>
+						<span class="text-3xl font-black text-blue-600">₱55,000.00</span>
+					</CardContent>
+					<CardFooter>
+						<Button variant="outline" class="w-full border-blue-300" href="/contact?subject=RFID+Time+Keeping+System">Request Site Inspection</Button>
+					</CardFooter>
+				</Card>
+
+				<Card class="border-2 border-purple-200 dark:border-purple-800 hover:shadow-lg transition-shadow">
+					<CardHeader>
+						<div class="w-12 h-12 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mb-4">
+							<Key class="w-6 h-6 text-purple-600" />
+						</div>
+						<CardTitle>Door Access Control</CardTitle>
+						<CardDescription>
+							Includes: Maglock, Keypad/Scanner, Exit Button, Power Supply, & Cabling.
+						</CardDescription>
+					</CardHeader>
+					<CardContent>
+						<span class="text-xl font-bold text-purple-600">Request for Quotation</span>
+					</CardContent>
+					<CardFooter>
+						<Button variant="outline" class="w-full border-purple-300" href="/contact?subject=Door+Access+Control+System">Request Site Inspection</Button>
+					</CardFooter>
+				</Card>
+			</div>
+		</div>
+	</section>
+
+	<!-- Section: Digital Credits (Subscription) -->
+	<section class="py-16 bg-slate-50 dark:bg-slate-900/50 px-4 border-b border-border">
 		<div class="container max-w-[90rem] mx-auto">
 			<div class="text-center mb-12">
 				<Badge variant="outline" class="mb-4 text-primary border-primary">Self-Service</Badge>
@@ -458,10 +630,70 @@
 		</div>
 	</section>
 
+	<!-- Important Policies -->
+	<section class="py-16 bg-white dark:bg-background px-4">
+		<div class="container max-w-4xl mx-auto">
+			<div class="text-center mb-12">
+				<Badge variant="destructive" class="mb-4">IMPORTANT POLICIES</Badge>
+				<h2 class="text-2xl font-bold">Before You Order</h2>
+			</div>
+
+			<div class="space-y-6">
+				<Card class="border-l-4 border-l-green-500">
+					<CardContent class="pt-6">
+						<div class="flex items-start gap-4">
+							<Check class="w-6 h-6 text-green-500 shrink-0 mt-0.5" />
+							<div>
+								<h3 class="font-bold mb-1">FREE LAYOUT</h3>
+								<p class="text-sm text-muted-foreground">We design for free (Front & Back). Just send your logo and color scheme.</p>
+							</div>
+						</div>
+					</CardContent>
+				</Card>
+
+				<Card class="border-l-4 border-l-blue-500">
+					<CardContent class="pt-6">
+						<div class="flex items-start gap-4">
+							<CreditCard class="w-6 h-6 text-blue-500 shrink-0 mt-0.5" />
+							<div>
+								<h3 class="font-bold mb-1">PAYMENT</h3>
+								<p class="text-sm text-muted-foreground">Downpayment is required before we start the layout process.</p>
+							</div>
+						</div>
+					</CardContent>
+				</Card>
+
+				<Card class="border-l-4 border-l-purple-500">
+					<CardContent class="pt-6">
+						<div class="flex items-start gap-4">
+							<ShieldCheck class="w-6 h-6 text-purple-500 shrink-0 mt-0.5" />
+							<div>
+								<h3 class="font-bold mb-1">DATA PRIVACY</h3>
+								<p class="text-sm text-muted-foreground">Your data is secure with us. Digital ID copies available upon request.</p>
+							</div>
+						</div>
+					</CardContent>
+				</Card>
+
+				<Card class="border-l-4 border-l-red-500 bg-red-50/50 dark:bg-red-900/10">
+					<CardContent class="pt-6">
+						<div class="flex items-start gap-4">
+							<AlertTriangle class="w-6 h-6 text-red-500 shrink-0 mt-0.5" />
+							<div>
+								<h3 class="font-bold mb-1 text-red-700 dark:text-red-400">SECURITY NOTICE</h3>
+								<p class="text-sm text-muted-foreground"><strong>STRICTLY NO TO FAKE IDs.</strong> We require a Company P.O., School Certification, or valid proof of authority for all ID orders. We do not print government IDs.</p>
+							</div>
+						</div>
+					</CardContent>
+				</Card>
+			</div>
+		</div>
+	</section>
+
 	<!-- FAQ Footer -->
-	<section class="py-16 bg-white dark:bg-background px-4 text-center">
+	<section class="py-16 bg-slate-50 dark:bg-slate-900/50 px-4 text-center">
 		<h2 class="text-2xl font-bold mb-6">Still have questions?</h2>
-		<p class="text-muted-foreground mb-8">Our support team is ready to help you specific needs.</p>
+		<p class="text-muted-foreground mb-8">Our support team is ready to help with your specific needs.</p>
 		<Button size="lg" href="/contact">Contact Support</Button>
 	</section>
 

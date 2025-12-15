@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { T, Canvas } from '@threlte/core';
+	import { T, Canvas, useTask } from '@threlte/core';
 	import { OrbitControls } from '@threlte/extras';
+	import type { OrbitControls as OrbitControlsImpl } from 'three/examples/jsm/controls/OrbitControls.js';
 	import * as THREE from 'three';
 	import { onMount, onDestroy } from 'svelte';
 	import { createRoundedRectCard } from '$lib/utils/cardGeometry';
@@ -91,6 +92,9 @@
 	// Initialized with defaults, actual values set in onMount
 	let currentWidth = $state(0);
 	let currentHeight = $state(0);
+
+	// OrbitControls reference for programmatic reset
+	let orbitControlsRef = $state<OrbitControlsImpl | undefined>(undefined);
 
 	// Cached background canvas for performance
 	let cachedBackgroundCanvas: HTMLCanvasElement | null = null;
@@ -773,6 +777,13 @@
 			animState.prevWidthPixels = widthPixels;
 			animState.prevHeightPixels = heightPixels;
 			startAnimationLoop();
+			
+			// Reset OrbitControls to center when dimensions change
+			// This ensures camera always looks at origin regardless of user interactions
+			if (orbitControlsRef) {
+				orbitControlsRef.target.set(0, 0, 0);
+				orbitControlsRef.update();
+			}
 		}
 	});
 
@@ -849,9 +860,12 @@
 		<T.PerspectiveCamera makeDefault position={[0, 0, cameraDistance()]} fov={cameraFOV}>
 			{#if showControls}
 				<OrbitControls
+					bind:ref={orbitControlsRef}
 					enableZoom={true}
 					enablePan={false}
 					target={[0, 0, 0]}
+					enableDamping={true}
+					dampingFactor={0.1}
 					minDistance={cameraDistance() * 0.6}
 					maxDistance={cameraDistance() * 2}
 					maxPolarAngle={Math.PI / 2 + 0.5}
