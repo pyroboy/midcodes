@@ -14,7 +14,14 @@
 	export let onOpenPreview: (e: MouseEvent, card: any) => void;
 	export let downloading: boolean = false;
 	export let deleting: boolean = false;
-	// Note: 'width' prop is removed; we control size via CSS Grid in the parent
+	// Template dimensions for correct aspect ratio (portrait vs landscape)
+	export let templateDimensions: { width: number; height: number } | null = null;
+
+	// Calculate aspect ratio from template dimensions
+	// Default is landscape (1013/638 ≈ 1.588), but use actual dimensions if provided
+	$: aspectRatio = templateDimensions
+		? `${templateDimensions.width}/${templateDimensions.height}`
+		: '1013/638';
 
 	function handleClick(e: MouseEvent) {
 		// Prevent triggering if clicking buttons/checkbox
@@ -54,9 +61,10 @@
 	<Card
 		class="h-full flex flex-col overflow-hidden border-border bg-card hover:shadow-md transition-all duration-200 hover:border-primary/50"
 	>
-		<!-- Image Area -->
+		<!-- Image Area - dynamic aspect ratio based on template dimensions -->
 		<div
-			class="relative w-full aspect-[1.58/1] bg-muted/50 flex items-center justify-center overflow-hidden border-b border-border"
+			class="relative w-full bg-muted/50 flex items-center justify-center overflow-hidden border-b border-border"
+			style="aspect-ratio: {aspectRatio};"
 		>
 			{#if frontUrl}
 				<img

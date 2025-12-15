@@ -22,6 +22,8 @@
 	export let onDataLoaded: ((card: IDCard) => void) | undefined = undefined;
 	// Pass minWidth to skeleton to match grid
 	export let minWidth: number = 250;
+	// Template dimensions for correct aspect ratio (portrait vs landscape)
+	export let templateDimensions: { width: number; height: number } | null = null;
 
 	let cardData: IDCard | null = initialData;
 	// Treat as loading if no data OR if data is partial (missing front_image means it's a stub)
@@ -106,6 +108,7 @@
 			{onOpenPreview}
 			{downloading}
 			{deleting}
+			{templateDimensions}
 		/>
 	{/if}
 {/if}

@@ -1197,13 +1197,13 @@
 											</td>
 											<td class="px-4 py-2 w-24" onclick={(e) => openPreview(e, card)}>
 												<div
-													class="h-10 w-16 bg-muted rounded overflow-hidden cursor-pointer border border-border hover:border-primary transition-colors"
+													class="h-10 w-16 bg-muted rounded overflow-hidden cursor-pointer border border-border hover:border-primary transition-colors flex items-center justify-center"
 												>
 													{#if card.front_image}
 														<img
 															src={getSupabaseStorageUrl(card.front_image, 'rendered-id-cards')}
 															alt="Thumb"
-															class="w-full h-full object-cover"
+															class="max-w-full max-h-full object-contain"
 															loading="lazy"
 														/>
 													{/if}
@@ -1350,6 +1350,7 @@
 										onOpenPreview={openPreview}
 										deleting={deletingCards.has(getCardId(card))}
 										downloading={downloadingCards.has(getCardId(card))}
+										templateDimensions={templateDimensions[card.template_name] || null}
 									/>
 								</div>
 							{/each}
