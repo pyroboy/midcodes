@@ -32,8 +32,9 @@ async function getAuthenticatedUser() {
  * Get template assets filtered by size preset ID
  * Returns published template assets matching the given size
  */
-export const getTemplateAssetsBySize = query(
-	async (sizePresetId: string | null): Promise<TemplateAsset[]> => {
+export const getTemplateAssetsBySize = command(
+	'unchecked',
+	async ({ sizePresetId }: { sizePresetId: string | null }): Promise<TemplateAsset[]> => {
 		const { user } = await getAuthenticatedUser();
 		const supabase = getAdminClient();
 
@@ -68,67 +69,63 @@ export const getTemplateAssetsBySize = query(
  * Get count of published template assets per size preset
  * Returns a map of sizePresetId -> count
  */
-export const getTemplateAssetCounts = query(
-	async (): Promise<Record<string, number>> => {
-		const { user } = await getAuthenticatedUser();
-		const supabase = getAdminClient();
+export const getTemplateAssetCounts = query(async (): Promise<Record<string, number>> => {
+	const { user } = await getAuthenticatedUser();
+	const supabase = getAdminClient();
 
-		try {
-			// Get all published assets with their size_preset_id
-			const { data, error: fetchError } = await supabase
-				.from('template_assets')
-				.select('size_preset_id')
-				.eq('is_published', true);
+	try {
+		// Get all published assets with their size_preset_id
+		const { data, error: fetchError } = await supabase
+			.from('template_assets')
+			.select('size_preset_id')
+			.eq('is_published', true);
 
-			if (fetchError) {
-				console.error('Error fetching template asset counts:', fetchError);
-				throw error(500, 'Failed to fetch template asset counts');
-			}
-
-			// Count assets per size preset
-			const counts: Record<string, number> = {};
-			for (const asset of data || []) {
-				if (asset.size_preset_id) {
-					counts[asset.size_preset_id] = (counts[asset.size_preset_id] || 0) + 1;
-				}
-			}
-
-			return counts;
-		} catch (err) {
-			console.error('Error in getTemplateAssetCounts:', err);
+		if (fetchError) {
+			console.error('Error fetching template asset counts:', fetchError);
 			throw error(500, 'Failed to fetch template asset counts');
 		}
+
+		// Count assets per size preset
+		const counts: Record<string, number> = {};
+		for (const asset of data || []) {
+			if (asset.size_preset_id) {
+				counts[asset.size_preset_id] = (counts[asset.size_preset_id] || 0) + 1;
+			}
+		}
+
+		return counts;
+	} catch (err) {
+		console.error('Error in getTemplateAssetCounts:', err);
+		throw error(500, 'Failed to fetch template asset counts');
 	}
-);
+});
 
 /**
  * Get all active size presets
  * Returns the list of available size options for template creation
  */
-export const getSizePresets = query(
-	async (): Promise<SizePreset[]> => {
-		const { user } = await getAuthenticatedUser();
-		const supabase = getAdminClient();
+export const getSizePresets = query(async (): Promise<SizePreset[]> => {
+	const { user } = await getAuthenticatedUser();
+	const supabase = getAdminClient();
 
-		try {
-			const { data, error: fetchError } = await supabase
-				.from('template_size_presets')
-				.select('*')
-				.eq('is_active', true)
-				.order('sort_order', { ascending: true });
+	try {
+		const { data, error: fetchError } = await supabase
+			.from('template_size_presets')
+			.select('*')
+			.eq('is_active', true)
+			.order('sort_order', { ascending: true });
 
-			if (fetchError) {
-				console.error('Error fetching size presets:', fetchError);
-				throw error(500, 'Failed to fetch size presets');
-			}
-
-			return (data as SizePreset[]) || [];
-		} catch (err) {
-			console.error('Error in getSizePresets:', err);
+		if (fetchError) {
+			console.error('Error fetching size presets:', fetchError);
 			throw error(500, 'Failed to fetch size presets');
 		}
+
+		return (data as SizePreset[]) || [];
+	} catch (err) {
+		console.error('Error in getSizePresets:', err);
+		throw error(500, 'Failed to fetch size presets');
 	}
-);
+});
 
 /**
  * Create a new custom design request
@@ -143,7 +140,7 @@ export const createCustomDesignRequest = command(
 		// Validate input
 		const validationResult = customDesignRequestInputSchema.safeParse(input);
 		if (!validationResult.success) {
-			throw error(400, validationResult.error.errors[0].message);
+			throw error(400, validationResult.error.issues[0].message);
 		}
 
 		const validatedInput = validationResult.data;
@@ -217,27 +214,25 @@ export const uploadCustomDesignAsset = command(
  * Get user's custom design requests
  * Returns list of requests made by the current user
  */
-export const getUserCustomDesignRequests = query(
-	async (): Promise<CustomDesignRequest[]> => {
-		const { user } = await getAuthenticatedUser();
-		const supabase = getAdminClient();
+export const getUserCustomDesignRequests = query(async (): Promise<CustomDesignRequest[]> => {
+	const { user } = await getAuthenticatedUser();
+	const supabase = getAdminClient();
 
-		try {
-			const { data, error: fetchError } = await supabase
-				.from('custom_design_requests')
-				.select('*')
-				.eq('user_id', user.id)
-				.order('created_at', { ascending: false });
+	try {
+		const { data, error: fetchError } = await supabase
+			.from('custom_design_requests')
+			.select('*')
+			.eq('user_id', user.id)
+			.order('created_at', { ascending: false });
 
-			if (fetchError) {
-				console.error('Error fetching user custom design requests:', fetchError);
-				throw error(500, 'Failed to fetch custom design requests');
-			}
-
-			return (data as CustomDesignRequest[]) || [];
-		} catch (err) {
-			console.error('Error in getUserCustomDesignRequests:', err);
+		if (fetchError) {
+			console.error('Error fetching user custom design requests:', fetchError);
 			throw error(500, 'Failed to fetch custom design requests');
 		}
+
+		return (data as CustomDesignRequest[]) || [];
+	} catch (err) {
+		console.error('Error in getUserCustomDesignRequests:', err);
+		throw error(500, 'Failed to fetch custom design requests');
 	}
-);
+});
