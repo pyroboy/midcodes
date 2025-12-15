@@ -212,18 +212,19 @@
 					onmouseleave={() => (hoveredTemplate = null)}
 				>
 					<!-- Aspect Ratio Container -->
+					{@const isPortrait = dims.h > dims.w}
 					<div
 						class="relative w-full pt-4 px-4 flex-1 flex items-center justify-center bg-muted/30"
 					>
 						<a
 							href="/use-template/{template.id}"
-							class="relative w-full flex items-center justify-center"
-							style="height: 200px;"
+							class="relative flex items-center justify-center"
+							style="height: {isPortrait ? '220px' : '160px'}; width: 100%;"
 							data-sveltekit-reload="off"
 						>
 							<div
 								class="relative shadow-md rounded-lg overflow-hidden bg-white transition-transform duration-300 group-hover:scale-105"
-								style="aspect-ratio: {dims.w} / {dims.h}; width: 100%; max-height: 100%; container-type: size;"
+								style="aspect-ratio: {dims.w} / {dims.h}; height: 100%; max-width: 100%; container-type: size;"
 							>
 								<!-- 1. Background Image -->
 								{#if template.front_background}
