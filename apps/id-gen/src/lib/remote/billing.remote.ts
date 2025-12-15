@@ -1,6 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { query, command, getRequestEvent } from '$app/server';
 import { getUsersData } from '$lib/remote/admin.remote'; // for refreshing users after credit changes
+import { checkSuperAdmin } from '$lib/utils/adminPermissions';
 
 // Import schemas following AZPOS pattern
 import {
@@ -20,11 +21,11 @@ import {
 	type UserCredits
 } from '$lib/types/billing.schema';
 
-// Reuse or import from admin.remote.ts
+// Use checkSuperAdmin which properly handles role emulation
 async function requireSuperAdminPermissions() {
 	const { locals } = getRequestEvent();
 	const { user } = locals;
-	if (user?.role !== 'super_admin') throw error(403, 'Super admin privileges required.');
+	if (!checkSuperAdmin(locals)) throw error(403, 'Super admin privileges required.');
 	return { user, supabase: locals.supabase, org_id: locals.org_id };
 }
 
@@ -91,7 +92,7 @@ export const setPaymentsBypass = command('unchecked', async ({ bypass }: any) =>
 	const { error: updateError } = await (supabase.from('org_settings') as any)
 		.update({
 			payments_bypass: bypass,
-			updated_by: user.id,
+			updated_by: user!.id,
 			updated_at: new Date().toISOString()
 		} as any)
 		.eq('org_id', org_id);

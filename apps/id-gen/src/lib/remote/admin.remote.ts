@@ -1001,7 +1001,7 @@ export const updateOrganizationName = command('unchecked', async ({ orgId, name 
 	const supabase = getAdminClient();
 
 	// Org admins can only update their own org
-	const isSuperAdmin = user.role === 'super_admin' || user.role === 'id_gen_super_admin';
+	const isSuperAdmin = user.role === 'super_admin';
 	const targetOrgId = isSuperAdmin ? orgId : org_id;
 
 	if (!isSuperAdmin && orgId !== org_id) {
@@ -1047,7 +1047,7 @@ export const updateOrganizationMember = command('unchecked', async ({ memberId, 
 	try {
 		// Get valid ID-gen roles
 		const validRoles = [
-			'org_admin', 'id_gen_org_admin', 'id_gen_admin', 'id_gen_user',
+			'org_admin', 'id_gen_admin', 'id_gen_user',
 			'id_gen_accountant', 'id_gen_encoder', 'id_gen_printer',
 			'id_gen_viewer', 'id_gen_template_designer', 'id_gen_auditor'
 		];
@@ -1069,8 +1069,8 @@ export const updateOrganizationMember = command('unchecked', async ({ memberId, 
 		}
 
 		// Prevent self-demotion from admin
-		if (memberId === user.id && ['org_admin', 'id_gen_org_admin', 'super_admin'].includes(user.role)) {
-			const isNewRoleAdmin = ['org_admin', 'id_gen_org_admin', 'super_admin', 'id_gen_super_admin'].includes(role);
+		if (memberId === user.id && ['org_admin', 'super_admin'].includes(user.role)) {
+			const isNewRoleAdmin = ['org_admin', 'super_admin'].includes(role);
 			if (!isNewRoleAdmin) {
 				throw error(400, 'Cannot demote yourself from admin role');
 			}
@@ -1132,12 +1132,12 @@ export const removeOrganizationMember = command('unchecked', async ({ memberId }
 
 		// Check if this is the last admin
 		const memberAny = member as any;
-		if (['super_admin', 'org_admin', 'id_gen_org_admin'].includes(memberAny.role)) {
+		if (['super_admin', 'org_admin'].includes(memberAny.role)) {
 			const { count: adminCount } = await supabase
 				.from('profiles')
 				.select('*', { count: 'exact', head: true })
 				.eq('org_id', org_id)
-				.in('role', ['super_admin', 'org_admin', 'id_gen_org_admin'])
+				.in('role', ['super_admin', 'org_admin'])
 				.neq('id', memberId);
 
 			if ((adminCount || 0) === 0) {

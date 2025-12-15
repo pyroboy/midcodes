@@ -1,5 +1,6 @@
 import type { PageServerLoad, Actions } from './$types';
 import { error, fail } from '@sveltejs/kit';
+import { checkSuperAdmin, checkAdmin, hasRole } from '$lib/utils/adminPermissions';
 
 export const load: PageServerLoad = async ({ locals, parent }) => {
 	const { supabase, user, org_id } = locals;
@@ -40,7 +41,8 @@ export const actions: Actions = {
 	addUser: async ({ request, locals }) => {
 		const { supabase, user, org_id } = locals;
 
-		if (!user?.role || !['super_admin', 'org_admin'].includes(user.role)) {
+		// Use robust permission check that respects role emulation
+		if (!hasRole(locals, ['super_admin', 'org_admin'])) {
 			return fail(403, { error: 'Insufficient permissions to add users' });
 		}
 
@@ -90,7 +92,7 @@ export const actions: Actions = {
 				user_metadata: {
 					role,
 					org_id,
-					invited_by: user.id
+					invited_by: user?.id
 				}
 			});
 
@@ -149,7 +151,8 @@ export const actions: Actions = {
 	updateUserRole: async ({ request, locals }) => {
 		const { supabase, user, org_id } = locals;
 
-		if (!user?.role || !['super_admin', 'org_admin'].includes(user.role)) {
+		// Use robust permission check that respects role emulation
+		if (!hasRole(locals, ['super_admin', 'org_admin'])) {
 			return fail(403, { error: 'Insufficient permissions to update user roles' });
 		}
 
@@ -169,7 +172,12 @@ export const actions: Actions = {
 			}
 
 			// Prevent self role changes to lower privilege (safety check)
-			if (userId === user.id && user.role === 'super_admin' && newRole !== 'super_admin') {
+			const isSuperAdmin = checkSuperAdmin(locals);
+			if (
+				userId === user?.id &&
+				isSuperAdmin &&
+				!['super_admin'].includes(newRole)
+			) {
 				return fail(400, { error: 'Cannot downgrade your own super admin role' });
 			}
 
@@ -189,12 +197,12 @@ export const actions: Actions = {
 			const targetUser = targetUserData as any;
 
 			// Only super_admin can modify super_admin roles
-			if (targetUser.role === 'super_admin' && user.role !== 'super_admin') {
+			if (['super_admin'].includes(targetUser.role) && !isSuperAdmin) {
 				return fail(403, { error: 'Only super administrators can modify super admin roles' });
 			}
 
 			// Only super_admin can create super_admin roles
-			if (newRole === 'super_admin' && user.role !== 'super_admin') {
+			if (['super_admin'].includes(newRole) && !isSuperAdmin) {
 				return fail(403, { error: 'Only super administrators can assign super admin roles' });
 			}
 
@@ -238,7 +246,8 @@ export const actions: Actions = {
 	deleteUser: async ({ request, locals }) => {
 		const { supabase, user, org_id } = locals;
 
-		if (!user?.role || !['super_admin', 'org_admin'].includes(user.role)) {
+		// Use robust permission check that respects role emulation
+		if (!hasRole(locals, ['super_admin', 'org_admin'])) {
 			return fail(403, { error: 'Insufficient permissions to delete users' });
 		}
 
@@ -251,7 +260,7 @@ export const actions: Actions = {
 			}
 
 			// Prevent self-deletion
-			if (userId === user.id) {
+			if (userId === user?.id) {
 				return fail(400, { error: 'Cannot delete your own account' });
 			}
 
@@ -271,12 +280,13 @@ export const actions: Actions = {
 			}
 
 			// Check if this is the last admin
-			if (['super_admin', 'org_admin'].includes(targetUser.role)) {
+			const adminRoles = ['super_admin', 'org_admin'];
+			if (adminRoles.includes(targetUser.role)) {
 				const { count: adminCount } = await supabase
 					.from('profiles')
 					.select('*', { count: 'exact', head: true })
 					.eq('org_id', org_id!)
-					.in('role', ['super_admin', 'org_admin'])
+					.in('role', adminRoles)
 					.neq('id', userId);
 
 				if ((adminCount || 0) === 0) {

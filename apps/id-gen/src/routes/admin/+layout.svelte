@@ -28,6 +28,22 @@
 	let emulationDropdownOpen = $state(false);
 	let emulationLoading = $state(false);
 
+	/**
+	 * Force a session refresh to get updated app_metadata after emulation changes.
+	 * The JWT contains stale data until explicitly refreshed.
+	 */
+	async function refreshSession() {
+		try {
+			// Force session refresh to get new JWT with updated app_metadata
+			const refreshRes = await fetch('/api/auth/refresh-session', { method: 'POST' });
+			if (!refreshRes.ok) {
+				console.warn('Session refresh failed');
+			}
+		} catch (e) {
+			console.warn('Session refresh error:', e);
+		}
+	}
+
 	async function startEmulation(role: string) {
 		emulationLoading = true;
 		try {
@@ -37,7 +53,9 @@
 				body: JSON.stringify({ role })
 			});
 			if (res.ok) {
-				window.location.reload();
+				// Refresh session then redirect to home to experience app as emulated role
+				await refreshSession();
+				window.location.href = '/';
 			} else {
 				const data = await res.json();
 				alert(data.error || 'Failed to start emulation');
@@ -55,6 +73,8 @@
 		try {
 			const res = await fetch('/api/admin/stop-emulation', { method: 'POST' });
 			if (res.ok) {
+				// Refresh session then reload to restore super admin access
+				await refreshSession();
 				window.location.reload();
 			} else {
 				console.error('Failed to stop emulation');
@@ -370,8 +390,8 @@
 								d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
 							/>
 						</svg>
-						<span class="hidden sm:inline">Organization</span>
-						<span class="sm:hidden">Org</span>
+						<span class="hidden sm:inline">Organizations</span>
+						<span class="sm:hidden">Orgs</span>
 					</a>
 					<a
 						href="/admin/analytics"
@@ -433,6 +453,27 @@
 							/>
 						</svg>
 						Credits
+					</a>
+					<a
+						href="/admin/ai-generation"
+						class="flex items-center px-2 sm:px-3 py-4 text-xs sm:text-sm font-medium hover:text-blue-300 border-b-2 border-transparent hover:border-blue-300 whitespace-nowrap"
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-4 w-4 mr-1 sm:mr-2"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+							/>
+						</svg>
+						<span class="hidden sm:inline">AI Generation</span>
+						<span class="sm:hidden">AI</span>
 					</a>
 				</div>
 			</div>

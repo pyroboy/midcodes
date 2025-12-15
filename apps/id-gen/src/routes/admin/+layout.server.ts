@@ -40,7 +40,7 @@ export const load: LayoutServerLoad = async ({ locals, url, setHeaders }) => {
 				permissions,
 				roleEmulation,
 				blockedByEmulation: true,
-				isSuperAdmin: false,
+				isSuperAdmin, // Use the actual check so super admins can see bypass option
 				availableRolesForEmulation: []
 			};
 		}

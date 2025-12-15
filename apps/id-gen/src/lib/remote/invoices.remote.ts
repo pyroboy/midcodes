@@ -2,6 +2,7 @@ import { error } from '@sveltejs/kit';
 import { query, command, getRequestEvent } from '$app/server';
 import { z } from 'zod';
 import { addCredits, refundCredits, grantUnlimitedTemplates, grantWatermarkRemoval } from '$lib/utils/credits';
+import { checkAdmin } from '$lib/utils/adminPermissions';
 import {
 	invoiceCreateInputSchema,
 	invoiceMarkPaidInputSchema,
@@ -12,11 +13,11 @@ import {
 } from '$lib/schemas/billing.schema';
 
 // Helper to require admin permissions
+// Uses checkAdmin which properly handles role emulation
 async function requireAdminPermissions() {
 	const { locals } = getRequestEvent();
 	const { user } = locals;
-	const adminRoles = ['super_admin', 'org_admin', 'id_gen_admin'];
-	if (!user || !adminRoles.includes(user.role || '')) {
+	if (!checkAdmin(locals)) {
 		throw error(403, 'Admin privileges required.');
 	}
 	// Cast supabase to any to work around missing invoices table in generated types
@@ -139,7 +140,7 @@ export const createInvoice = command('unchecked', async (input: InvoiceCreateInp
 			notes,
 			internal_notes,
 			due_date,
-			created_by: user.id
+			created_by: user!.id
 		})
 		.select()
 		.single();
@@ -280,7 +281,7 @@ export const markInvoicePaid = command('unchecked', async (input: InvoiceMarkPai
 		.update({
 			status: 'paid',
 			paid_at: new Date().toISOString(),
-			paid_by: user.id,
+			paid_by: user!.id,
 			payment_method: payment_method || 'manual',
 			payment_reference,
 			amount_paid: invoice.total_amount,
@@ -401,7 +402,7 @@ export const voidInvoice = command('unchecked', async (input: InvoiceVoidInput) 
 		.update({
 			status: 'void',
 			voided_at: new Date().toISOString(),
-			voided_by: user.id,
+			voided_by: user!.id,
 			internal_notes: `${invoice.internal_notes || ''}\nVoided: ${reason}`.trim()
 		})
 		.eq('id', invoice_id);

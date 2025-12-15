@@ -16,11 +16,13 @@ declare global {
 			permissions?: string[];
 			effectiveRoles?: string[];
 			roleEmulation?: {
-				active: boolean;
-				originalRole?: string;
-				emulatedRole?: string;
-			};
-		}
+			active: boolean;
+			originalRole?: string | null;
+			emulatedRole?: string | null;
+			expiresAt?: string | null;
+			startedAt?: string | null;
+		} | null;
+	}
 
 		interface PageData {
 			user?: User | null;

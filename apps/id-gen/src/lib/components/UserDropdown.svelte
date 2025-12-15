@@ -46,6 +46,21 @@
 		goto(href);
 	}
 
+	/**
+	 * Force a session refresh to get updated app_metadata after emulation changes.
+	 * The JWT contains stale data until explicitly refreshed.
+	 */
+	async function refreshSession() {
+		try {
+			const refreshRes = await fetch('/api/auth/refresh-session', { method: 'POST' });
+			if (!refreshRes.ok) {
+				console.warn('Session refresh failed');
+			}
+		} catch (e) {
+			console.warn('Session refresh error:', e);
+		}
+	}
+
 	async function startEmulation(role: string) {
 		emulationLoading = true;
 		try {
@@ -55,7 +70,9 @@
 				body: JSON.stringify({ role })
 			});
 			if (res.ok) {
-				window.location.reload();
+				// Refresh session then redirect to home to experience app as emulated role
+				await refreshSession();
+				window.location.href = '/';
 			} else {
 				const data = await res.json();
 				alert(data.error || 'Failed to start emulation');
@@ -72,6 +89,8 @@
 		try {
 			const res = await fetch('/api/admin/stop-emulation', { method: 'POST' });
 			if (res.ok) {
+				// Refresh session then reload to restore original role
+				await refreshSession();
 				window.location.reload();
 			} else {
 				alert('Failed to stop emulation');

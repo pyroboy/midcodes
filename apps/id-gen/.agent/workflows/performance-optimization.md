@@ -11,6 +11,7 @@ This document captures performance optimization strategies, common pitfalls, and
 ## 🐛 Critical Bug: Background Refresh Blocking Render
 
 ### Root Cause
+
 When calling async functions inside `requestAnimationFrame` or `onMount`, even with `void` (fire-and-forget), immediate state changes can block Svelte's `tick()`:
 
 ```javascript
@@ -24,6 +25,7 @@ requestAnimationFrame(() => {
 ```
 
 ### Solution
+
 Use `setTimeout(fn, 0)` to escape the current render cycle:
 
 ```javascript
@@ -32,7 +34,7 @@ requestAnimationFrame(() => {
   dataRows = cached.cards;
   initialLoading = false;
   tick().then(...);  // ← Completes in ~30ms
-  
+
   if (needsRefresh) {
     setTimeout(() => {
       void loadData();  // ← Runs AFTER render
@@ -48,23 +50,25 @@ requestAnimationFrame(() => {
 ## 🐛 Critical Bug #2: Synchronous Cache Writes Blocking Render
 
 ### Root Cause
+
 `$effect` blocks that write to SessionStorage run during render. `JSON.stringify` on large data (72 cards with images/fields) takes 4.5 seconds!
 
 ```javascript
 // ❌ BAD - Runs on EVERY state change, blocks render
 $effect(() => {
-  if (!browser || initialLoading) return;
-  
-  const snapshot = {
-    cards: dataRows,  // 72 cards! 
-    // ...
-  };
-  
-  writeAllIdsCache(snapshot);  // JSON.stringify takes 4.5 seconds!
+	if (!browser || initialLoading) return;
+
+	const snapshot = {
+		cards: dataRows // 72 cards!
+		// ...
+	};
+
+	writeAllIdsCache(snapshot); // JSON.stringify takes 4.5 seconds!
 });
 ```
 
 ### Solution
+
 1. **Only write when data actually changes** (not on every navigation)
 2. **Debounce writes** - wait for activity to settle
 3. **Use setTimeout** to escape the render cycle
@@ -83,9 +87,9 @@ $effect(() => {
 // Debounced write
 $effect(() => {
   if (!browser || initialLoading || !cacheNeedsWrite) return;
-  
+
   if (debounceTimer) clearTimeout(debounceTimer);
-  
+
   debounceTimer = setTimeout(() => {
     writeAllIdsCache(snapshot);
     cacheNeedsWrite = false;
@@ -99,12 +103,12 @@ $effect(() => {
 
 ## 📋 Summary of Critical Performance Bugs
 
-| Bug | Symptom | Root Cause | Solution |
-|-----|---------|------------|----------|
-| Background Refresh Blocking | Page freezes 4-5s on stale cache | `void asyncFn()` sets state before `tick()` resolves | Use `setTimeout(fn, 0)` to escape render cycle |
-| Cache Write Blocking | Page freezes 4-5s even with fresh cache | `JSON.stringify(big data)` in `$effect` | Debounce + only write when data changes |
-| Individual Card Fetches | N cards = N API calls | `SmartIDCard` fetches on mount | Use `getIDCards()` to batch fetch full data |
-| Auth Redundancy | 2 API calls per request | Calling both `getUser()` and `getSession()` | Use only `getSession()`, extract user from session |
+| Bug                         | Symptom                                 | Root Cause                                           | Solution                                           |
+| --------------------------- | --------------------------------------- | ---------------------------------------------------- | -------------------------------------------------- |
+| Background Refresh Blocking | Page freezes 4-5s on stale cache        | `void asyncFn()` sets state before `tick()` resolves | Use `setTimeout(fn, 0)` to escape render cycle     |
+| Cache Write Blocking        | Page freezes 4-5s even with fresh cache | `JSON.stringify(big data)` in `$effect`              | Debounce + only write when data changes            |
+| Individual Card Fetches     | N cards = N API calls                   | `SmartIDCard` fetches on mount                       | Use `getIDCards()` to batch fetch full data        |
+| Auth Redundancy             | 2 API calls per request                 | Calling both `getUser()` and `getSession()`          | Use only `getSession()`, extract user from session |
 
 ---
 
@@ -117,23 +121,23 @@ const SCRIPT_START = performance.now();
 console.log(`📜 SCRIPT START @ ${new Date().toISOString()}`);
 
 onMount(() => {
-  const mountStart = performance.now();
-  console.log(`[T+0ms] onMount started`);
-  
-  // Track each phase
-  console.log(`[T+${(performance.now() - mountStart).toFixed(1)}ms] Cache read...`);
-  const cached = readCache();
-  console.log(`[T+${(performance.now() - mountStart).toFixed(1)}ms] Cache complete`);
-  
-  // After data assignment
-  dataRows = cached.cards;
-  console.log(`[T+${(performance.now() - mountStart).toFixed(1)}ms] Data assigned`);
-  
-  // Wait for DOM update
-  tick().then(() => {
-    console.log(`[T+${(performance.now() - mountStart).toFixed(1)}ms] tick() complete`);
-    console.log(`🎉 RENDER COMPLETE: ${(performance.now() - SCRIPT_START).toFixed(1)}ms`);
-  });
+	const mountStart = performance.now();
+	console.log(`[T+0ms] onMount started`);
+
+	// Track each phase
+	console.log(`[T+${(performance.now() - mountStart).toFixed(1)}ms] Cache read...`);
+	const cached = readCache();
+	console.log(`[T+${(performance.now() - mountStart).toFixed(1)}ms] Cache complete`);
+
+	// After data assignment
+	dataRows = cached.cards;
+	console.log(`[T+${(performance.now() - mountStart).toFixed(1)}ms] Data assigned`);
+
+	// Wait for DOM update
+	tick().then(() => {
+		console.log(`[T+${(performance.now() - mountStart).toFixed(1)}ms] tick() complete`);
+		console.log(`🎉 RENDER COMPLETE: ${(performance.now() - SCRIPT_START).toFixed(1)}ms`);
+	});
 });
 ```
 
@@ -145,8 +149,8 @@ let globalMountCount = 0;
 
 // In component
 onMount(() => {
-  globalMountCount++;
-  console.log(`[Component] #${globalMountCount} mounted`);
+	globalMountCount++;
+	console.log(`[Component] #${globalMountCount} mounted`);
 });
 ```
 
@@ -154,9 +158,9 @@ onMount(() => {
 
 ```javascript
 let filteredData = $derived.by(() => {
-  const sliced = allData.slice(0, limit);
-  console.log(`[DEBUG] filteredData: ${sliced.length} of ${allData.length}`);
-  return sliced;
+	const sliced = allData.slice(0, limit);
+	console.log(`[DEBUG] filteredData: ${sliced.length} of ${allData.length}`);
+	return sliced;
 });
 ```
 
@@ -168,11 +172,11 @@ let filteredData = $derived.by(() => {
 
 ```javascript
 // ❌ SLOW - Each component makes individual API call
-const cardIDs = await getCardIDs();  // Returns just IDs
+const cardIDs = await getCardIDs(); // Returns just IDs
 // Then each SmartIDCard calls getCardDetails(id) on mount
 
 // ✅ FAST - One batch request with complete data
-const cards = await getIDCards();  // Returns full card data
+const cards = await getIDCards(); // Returns full card data
 // Components render directly, no additional fetches
 ```
 
@@ -185,11 +189,7 @@ const count = await getCount();
 const templates = await getTemplates();
 
 // ✅ FAST - Parallel
-const [cards, count, templates] = await Promise.all([
-  getCards(),
-  getCount(),
-  getTemplates()
-]);
+const [cards, count, templates] = await Promise.all([getCards(), getCount(), getTemplates()]);
 ```
 
 ### 3. Cache Remote Function Results
@@ -198,15 +198,15 @@ const [cards, count, templates] = await Promise.all([
 import { cachedRemoteFunctionCall } from '$lib/remote/remoteFunctionCache';
 
 const data = await cachedRemoteFunctionCall({
-  scopeKey: `${userId}:${orgId}`,
-  keyBase: 'all-ids:getCards',
-  args: { offset: 0, limit: 20 },
-  forceRefresh: false,
-  fetcher: (args) => getCards(args),
-  options: { 
-    ttlMs: 600_000,  // 10 minutes
-    staleWhileRevalidate: true 
-  }
+	scopeKey: `${userId}:${orgId}`,
+	keyBase: 'all-ids:getCards',
+	args: { offset: 0, limit: 20 },
+	forceRefresh: false,
+	fetcher: (args) => getCards(args),
+	options: {
+		ttlMs: 600_000, // 10 minutes
+		staleWhileRevalidate: true
+	}
 });
 ```
 
@@ -215,13 +215,15 @@ const data = await cachedRemoteFunctionCall({
 ```javascript
 // ❌ SLOW - Two API calls per request
 const [userResponse, sessionResponse] = await Promise.all([
-  supabase.auth.getUser(),   // Network call
-  supabase.auth.getSession() // Network call
+	supabase.auth.getUser(), // Network call
+	supabase.auth.getSession() // Network call
 ]);
 
 // ✅ FAST - One API call, use session.user
-const { data: { session } } = await supabase.auth.getSession();
-const user = session?.user;  // Already included in session
+const {
+	data: { session }
+} = await supabase.auth.getSession();
+const user = session?.user; // Already included in session
 ```
 
 ---
@@ -231,14 +233,14 @@ const user = session?.user;  // Already included in session
 ### 1. Cap Cache Size for SessionStorage
 
 ```javascript
-const MAX_CACHED_CARDS = 200;  // Prevent ~5MB limit overflow
+const MAX_CACHED_CARDS = 200; // Prevent ~5MB limit overflow
 
 // When writing cache
 const cardsToCache = dataRows.slice(0, MAX_CACHED_CARDS);
 const snapshot = {
-  cards: cardsToCache,
-  hasMore: dataRows.length > MAX_CACHED_CARDS || hasMore,
-  // ...
+	cards: cardsToCache,
+	hasMore: dataRows.length > MAX_CACHED_CARDS || hasMore
+	// ...
 };
 ```
 
@@ -250,10 +252,10 @@ const STORAGE_KEY = `idgen:cache:v1:${scopeKey}`;
 
 // Clear on auth change
 $effect(() => {
-  if (lastScopeKey && lastScopeKey !== scopeKey) {
-    clearCache(lastScopeKey);
-  }
-  lastScopeKey = scopeKey;
+	if (lastScopeKey && lastScopeKey !== scopeKey) {
+		clearCache(lastScopeKey);
+	}
+	lastScopeKey = scopeKey;
 });
 ```
 
@@ -261,22 +263,22 @@ $effect(() => {
 
 ```javascript
 onMount(() => {
-  const cached = readCache();
-  if (cached) {
-    // Hydrate immediately
-    dataRows = cached.cards;
-    initialLoading = false;
-    
-    const isFresh = Date.now() - cached.cachedAt < TTL_MS;
-    if (!isFresh) {
-      // Refresh in background AFTER render
-      setTimeout(() => {
-        void loadFreshData({ background: true });
-      }, 0);
-    }
-  } else {
-    void loadFreshData();
-  }
+	const cached = readCache();
+	if (cached) {
+		// Hydrate immediately
+		dataRows = cached.cards;
+		initialLoading = false;
+
+		const isFresh = Date.now() - cached.cachedAt < TTL_MS;
+		if (!isFresh) {
+			// Refresh in background AFTER render
+			setTimeout(() => {
+				void loadFreshData({ background: true });
+			}, 0);
+		}
+	} else {
+		void loadFreshData();
+	}
 });
 ```
 
@@ -290,9 +292,7 @@ onMount(() => {
 const VISIBLE_LIMIT = 15;
 let visibleStartIndex = $state(0);
 
-let visibleCards = $derived(
-  allCards.slice(0, visibleStartIndex + VISIBLE_LIMIT)
-);
+let visibleCards = $derived(allCards.slice(0, visibleStartIndex + VISIBLE_LIMIT));
 ```
 
 ### 2. Progressive Loading with IntersectionObserver
@@ -325,8 +325,8 @@ function intersectionObserver(node: HTMLElement) {
 
 ```javascript
 requestAnimationFrame(() => {
-  data = cached;        // Sync
-  void fetchNew();      // Async but triggers sync state change
+	data = cached; // Sync
+	void fetchNew(); // Async but triggers sync state change
 });
 ```
 
@@ -343,10 +343,16 @@ requestAnimationFrame(() => {
 
 ```css
 /* Expensive - forces recalculation of all properties */
-.card { transition: all 0.2s; }
+.card {
+	transition: all 0.2s;
+}
 
 /* Better - only transition what you need */
-.card { transition: transform 0.2s, box-shadow 0.2s; }
+.card {
+	transition:
+		transform 0.2s,
+		box-shadow 0.2s;
+}
 ```
 
 ### ❌ Don't: Forget to close console.group()
@@ -362,15 +368,15 @@ console.groupEnd();
 ```javascript
 // This runs on EVERY state change and blocks render
 $effect(() => {
-  sessionStorage.setItem(key, JSON.stringify(largeData));
+	sessionStorage.setItem(key, JSON.stringify(largeData));
 });
 
 // Better: Debounce and only write when needed
 $effect(() => {
-  if (debounceTimer) clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => {
-    sessionStorage.setItem(key, JSON.stringify(largeData));
-  }, 500);
+	if (debounceTimer) clearTimeout(debounceTimer);
+	debounceTimer = setTimeout(() => {
+		sessionStorage.setItem(key, JSON.stringify(largeData));
+	}, 500);
 });
 ```
 
@@ -378,7 +384,7 @@ $effect(() => {
 
 ```javascript
 // If cache has 72 cards from scrolling, ALL get hydrated
-dataRows = cached.cards;  // 72 cards!
+dataRows = cached.cards; // 72 cards!
 
 // Better: Cap what's used for initial render
 const INITIAL_HYDRATE_LIMIT = 30;
@@ -403,13 +409,13 @@ When page is slow:
 
 ## 📈 Performance Targets
 
-| Metric | Target | Alert Threshold |
-|--------|--------|-----------------|
-| Cache read | < 5ms | > 50ms |
-| Metadata hydration | < 1ms | > 10ms |
-| tick() (with cache) | < 50ms | > 200ms |
-| Full page load (cached) | < 100ms | > 500ms |
-| Background refresh | Non-blocking | Blocks render |
+| Metric                  | Target       | Alert Threshold |
+| ----------------------- | ------------ | --------------- |
+| Cache read              | < 5ms        | > 50ms          |
+| Metadata hydration      | < 1ms        | > 10ms          |
+| tick() (with cache)     | < 50ms       | > 200ms         |
+| Full page load (cached) | < 100ms      | > 500ms         |
+| Background refresh      | Non-blocking | Blocks render   |
 
 ---
 

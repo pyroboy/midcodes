@@ -26,5 +26,13 @@ export interface GetSessionResult {
 	user: User | null;
 	org_id: string | null;
 	permissions?: string[];
+	effectiveRoles?: string[];
+	roleEmulation?: {
+		active: boolean;
+		emulatedRole: string | null;
+		originalRole: string | null;
+		expiresAt: string | null;
+		startedAt: string | null;
+	} | null;
 	decodedToken?: UserJWTPayload | null;
 }

@@ -56,8 +56,6 @@
 		| 'id_gen_admin'
 		| 'org_admin'
 		| 'super_admin'
-		| 'id_gen_super_admin'
-		| 'id_gen_org_admin'
 		| 'id_gen_accountant'
 		| 'id_gen_encoder'
 		| 'id_gen_printer'
@@ -78,18 +76,6 @@
 			value: 'org_admin',
 			label: 'Organization Admin',
 			description: 'Organization management',
-			category: 'Admin'
-		},
-		{
-			value: 'id_gen_super_admin',
-			label: 'ID Gen Super Admin',
-			description: 'Full ID Generator access',
-			category: 'Admin'
-		},
-		{
-			value: 'id_gen_org_admin',
-			label: 'ID Gen Org Admin',
-			description: 'ID Generator org management',
 			category: 'Admin'
 		},
 		{
@@ -215,10 +201,8 @@
 	function getRoleBadgeVariant(role: string) {
 		switch (role) {
 			case 'super_admin':
-			case 'id_gen_super_admin':
 				return 'destructive';
 			case 'org_admin':
-			case 'id_gen_org_admin':
 				return 'default';
 			case 'id_gen_admin':
 			case 'id_gen_accountant':
