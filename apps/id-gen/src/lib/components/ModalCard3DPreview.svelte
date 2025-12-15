@@ -130,10 +130,12 @@
 			ctx.stroke();
 		}
 
-		// Border
+		// Border - scale proportionally to canvas size for seamless low-res/high-res transition
+		const sizeScale = width / 256; // 256 is base size
 		ctx.strokeStyle = 'rgba(100, 116, 139, 0.3)';
-		ctx.lineWidth = 4;
-		ctx.strokeRect(8, 8, width - 16, height - 16);
+		ctx.lineWidth = 4 * sizeScale;
+		const borderOffset = 8 * sizeScale;
+		ctx.strokeRect(borderOffset, borderOffset, width - borderOffset * 2, height - borderOffset * 2);
 
 		cachedBackgroundCanvas = canvas;
 		cachedBackgroundSize = { w: width, h: height };
@@ -142,12 +144,13 @@
 
 	// Create info texture with card details - OPTIMIZED
 	// contentRotation: rotation angle in radians for the text content (to counter card rotation)
-	function createInfoTexture(w: number, h: number, sName: string, contentRotation: number = 0): THREE.CanvasTexture {
+	// highRes: use higher resolution for final/static rendering
+	function createInfoTexture(w: number, h: number, sName: string, contentRotation: number = 0, highRes: boolean = false): THREE.CanvasTexture {
 		const canvas = document.createElement('canvas');
 		const ctx = canvas.getContext('2d')!;
 
-		// Reduced size for mobile performance (256 instead of 512)
-		const baseSize = 256;
+		// Use 256 for animation (performance), 512 for final render (quality)
+		const baseSize = highRes ? 512 : 256;
 		canvas.width = baseSize;
 		canvas.height = Math.round(baseSize * (h / w));
 
@@ -172,24 +175,29 @@
 
 		const isInPortrait = Math.abs(contentRotation) > Math.PI / 4;
 
+		// Font size scaling for high-res texture
+		// Scale fonts proportionally to canvas size (512/256 = 2x) for seamless low-res to high-res transition
+		// This ensures text appears the same visual size on the 3D card, just with higher pixel quality
+		const fontScale = highRes ? 2 : 1;
+
 		// Size name
 		if (sName) {
 			ctx.fillStyle = '#1e293b';
-			ctx.font = 'bold 18px system-ui, -apple-system, sans-serif';
-			ctx.fillText(sName, centerX, centerY - 12);
+			ctx.font = `bold ${Math.round(18 * fontScale)}px system-ui, -apple-system, sans-serif`;
+			ctx.fillText(sName, centerX, centerY - 12 * fontScale);
 		}
 
 		// Dimensions
 		ctx.fillStyle = '#64748b';
-		ctx.font = '12px monospace';
+		ctx.font = `${Math.round(12 * fontScale)}px monospace`;
 		const displayW = isInPortrait ? h : w;
 		const displayH = isInPortrait ? w : h;
-		ctx.fillText(`${Math.round(displayW)} × ${Math.round(displayH)} px`, centerX, centerY + 10);
+		ctx.fillText(`${Math.round(displayW)} × ${Math.round(displayH)} px`, centerX, centerY + 10 * fontScale);
 
 		// Orientation
 		ctx.fillStyle = 'rgba(100, 116, 139, 0.5)';
-		ctx.font = '10px system-ui, -apple-system, sans-serif';
-		ctx.fillText(isInPortrait ? 'PORTRAIT' : 'LANDSCAPE', centerX, centerY + 28);
+		ctx.font = `${Math.round(10 * fontScale)}px system-ui, -apple-system, sans-serif`;
+		ctx.fillText(isInPortrait ? 'PORTRAIT' : 'LANDSCAPE', centerX, centerY + 28 * fontScale);
 
 		ctx.restore();
 
@@ -558,12 +566,20 @@
 		);
 	}
 
-	// Update info texture with current rotation
+	// Update info texture with current rotation (low-res for animation)
 	function updateInfoTexture(rotation: number = animState.textureRotation) {
 		if (infoTexture) {
 			infoTexture.dispose();
 		}
-		infoTexture = createInfoTexture(animState.currentWidth, animState.currentHeight, sizeName, rotation);
+		infoTexture = createInfoTexture(animState.currentWidth, animState.currentHeight, sizeName, rotation, false);
+	}
+
+	// Update info texture with high resolution (for final frame after animation)
+	function updateInfoTextureHighRes(rotation: number = animState.textureRotation) {
+		if (infoTexture) {
+			infoTexture.dispose();
+		}
+		infoTexture = createInfoTexture(animState.currentWidth, animState.currentHeight, sizeName, rotation, true);
 	}
 
 	// Animation loop using requestAnimationFrame
@@ -605,7 +621,8 @@
 				// Update texture with current dimensions to prevent distortion during morphing
 				updateInfoTexture(animState.textureRotation);
 			}
-			if (animState.frameCount % 5 === 0) {
+			// Update ruler labels more frequently for smoother measurement display
+			if (animState.frameCount % 2 === 0) {
 				updateRulerLabels(animState.currentWidth, animState.currentHeight, currentRulerRotation);
 			}
 
@@ -630,7 +647,8 @@
 				renderTextureScaleX = 1;
 				renderTextureScaleY = 1;
 				loadGeometry(animState.targetWidth, animState.targetHeight);
-				updateInfoTexture();
+				// Final high-resolution texture for crisp static display
+				updateInfoTextureHighRes();
 				// Final ruler update with exact values
 				updateRulersForRotation(animState.currentWidth, animState.currentHeight, currentRulerRotation);
 			} else {
@@ -657,8 +675,8 @@
 			// Update texture EVERY FRAME for perfect sync with card rotation
 			updateInfoTexture(animState.textureRotation);
 
-			// Update ruler labels less frequently (every 5 frames - labels are less noticeable)
-			if (animState.frameCount % 5 === 0) {
+			// Update ruler labels more frequently for smoother measurement display
+			if (animState.frameCount % 2 === 0) {
 				updateRulerLabels(animState.currentWidth, animState.currentHeight, currentRulerRotation);
 			}
 
@@ -670,8 +688,8 @@
 				animState.textureRotation = animState.targetTextureRotation;
 				currentRulerRotation = targetRulerRotation;
 				animState.isRotating = false;
-				// Final updates with exact values
-				updateInfoTexture(animState.textureRotation);
+				// Final high-resolution texture for crisp static display
+				updateInfoTextureHighRes(animState.textureRotation);
 				updateRulersForRotation(animState.currentWidth, animState.currentHeight, currentRulerRotation);
 			} else {
 				needsContinue = true;
@@ -720,7 +738,8 @@
 		console.log('[3D Preview] Initial state:', { currentWidth, currentHeight, renderScaleX, renderScaleY });
 
 		loadGeometry(widthPixels, heightPixels);
-		updateInfoTexture();
+		// Use high-resolution texture for initial render (crisp first impression)
+		updateInfoTextureHighRes();
 		if (imageUrl) {
 			loadTexture(imageUrl);
 		}
@@ -832,6 +851,7 @@
 				<OrbitControls
 					enableZoom={true}
 					enablePan={false}
+					target={[0, 0, 0]}
 					minDistance={cameraDistance() * 0.6}
 					maxDistance={cameraDistance() * 2}
 					maxPolarAngle={Math.PI / 2 + 0.5}
