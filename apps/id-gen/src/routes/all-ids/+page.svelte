@@ -1195,9 +1195,12 @@
 													onchange={() => selectionManager.toggleSelection(getCardId(card))}
 												/>
 											</td>
-											<td class="px-4 py-2 w-24" onclick={(e) => openPreview(e, card)}>
+											{@const dims = templateDimensions[card.template_name]}
+											{@const isPortrait = dims ? dims.height > dims.width : false}
+											<td class="px-4 py-2" onclick={(e) => openPreview(e, card)}>
 												<div
-													class="h-10 w-16 bg-muted rounded overflow-hidden cursor-pointer border border-border hover:border-primary transition-colors flex items-center justify-center"
+													class="bg-muted rounded overflow-hidden cursor-pointer border border-border hover:border-primary transition-colors flex items-center justify-center"
+													style="width: {isPortrait ? '28px' : '48px'}; height: {isPortrait ? '44px' : '30px'};"
 												>
 													{#if card.front_image}
 														<img
