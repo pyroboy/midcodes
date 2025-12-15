@@ -15,66 +15,26 @@
 	type GeometryDimensions = { width: number; height: number } | null;
 
 	/**
-	 * 🔧 DEBUG VERSION: Simple texture transform for testing
+	 * Transform texture to fit the 3D card geometry.
+	 * Since rendered ID cards already have the correct dimensions matching the template,
+	 * we use simple 1:1 mapping. The geometry UVs are already set up correctly.
 	 */
 	function transformTextureToFit(
 		texture: THREE.Texture,
-		templateDims: TemplateDimensions,
-		geoDims: GeometryDimensions | null
+		_templateDims: TemplateDimensions,
+		_geoDims: GeometryDimensions | null
 	): THREE.Texture {
-		console.log('🔍 DEBUG - Input parameters:', {
-			templateDims,
-			geoDims,
-			textureSize: { width: texture.image?.width, height: texture.image?.height }
-		});
-
-		// Basic texture setup
+		// Basic texture setup - flipY is needed because WebGL texture coords have Y going up
+		// while image data has Y going down
 		texture.flipY = true;
 		texture.wrapS = THREE.ClampToEdgeWrapping;
 		texture.wrapT = THREE.ClampToEdgeWrapping;
+		texture.colorSpace = THREE.SRGBColorSpace;
 
-		// DEBUG: Try different approaches
-		if (!templateDims || !geoDims) {
-			console.log('🚨 Missing dimensions - using 1:1 mapping');
-			texture.repeat.set(1, 1);
-			texture.offset.set(0, 0);
-			return texture;
-		}
-
-		const templateAspect = templateDims.width / templateDims.height;
-		const geometryAspect = geoDims.width / geoDims.height;
-		const imageAspect = texture.image ? texture.image.width / texture.image.height : templateAspect;
-
-		console.log('📊 Aspect Ratios:', {
-			template: templateAspect.toFixed(3),
-			geometry: geometryAspect.toFixed(3),
-			image: imageAspect.toFixed(3)
-		});
-
-		// For debugging, try using image aspect ratio directly
-		const actualAspect = imageAspect;
-		let scaleX = 1;
-		let scaleY = 1;
-
-		if (actualAspect > geometryAspect) {
-			// Image is wider than geometry - fit by height
-			scaleX = geometryAspect / actualAspect;
-			scaleY = 1;
-		} else {
-			// Image is taller than geometry - fit by width
-			scaleX = 1;
-			scaleY = actualAspect / geometryAspect;
-		}
-
-		// Apply scaling and centering
-		texture.repeat.set(scaleX, scaleY);
-		texture.offset.set((1 - scaleX) / 2, (1 - scaleY) / 2);
-
-		console.log('✅ Final Transform:', {
-			scale: { x: scaleX.toFixed(3), y: scaleY.toFixed(3) },
-			repeat: { x: texture.repeat.x.toFixed(3), y: texture.repeat.y.toFixed(3) },
-			offset: { x: texture.offset.x.toFixed(3), y: texture.offset.y.toFixed(3) }
-		});
+		// Use 1:1 mapping - the rendered ID card image should already match the geometry aspect ratio
+		// No scaling or offset needed since the image dimensions match the template dimensions
+		texture.repeat.set(1, 1);
+		texture.offset.set(0, 0);
 
 		texture.needsUpdate = true;
 		return texture;
