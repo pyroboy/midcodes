@@ -205,6 +205,9 @@
 			{#each templates as template (template.id)}
 				{@const dims = getPixelDims(template)}
 				{@const isPortrait = dims.h > dims.w}
+				{@const longEdge = Math.max(dims.w, dims.h)}
+				{@const shortEdge = Math.min(dims.w, dims.h)}
+				{@const cardWidthPercent = isPortrait ? (shortEdge / longEdge) * 100 : 100}
 				<div
 					class="group relative flex flex-col bg-card border border-border rounded-xl shadow-sm transition-all duration-300 hover:shadow-md hover:border-primary/50 overflow-hidden h-full"
 					role="article"
@@ -212,19 +215,19 @@
 					onmouseenter={() => (hoveredTemplate = template.id)}
 					onmouseleave={() => (hoveredTemplate = null)}
 				>
-					<!-- Aspect Ratio Container -->
+					<!-- Aspect Ratio Container - uniform sizing: both orientations constrain the long edge equally -->
 					<div
 						class="relative w-full pt-4 px-4 flex-1 flex items-center justify-center bg-muted/30"
 					>
 						<a
 							href="/use-template/{template.id}"
-							class="relative flex items-center justify-center"
-							style="height: {isPortrait ? '220px' : '160px'}; width: 100%;"
+							class="relative flex items-center justify-center w-full"
+							style="height: 220px;"
 							data-sveltekit-reload="off"
 						>
 							<div
 								class="relative shadow-md rounded-lg overflow-hidden bg-white transition-transform duration-300 group-hover:scale-105"
-								style="aspect-ratio: {dims.w} / {dims.h}; height: 100%; max-width: 100%; container-type: size;"
+								style="aspect-ratio: {dims.w} / {dims.h}; width: {cardWidthPercent}%; max-height: 100%; container-type: size;"
 							>
 								<!-- 1. Background Image -->
 								{#if template.front_background}
