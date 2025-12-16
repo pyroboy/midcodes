@@ -52,11 +52,23 @@ export async function removeBackground(
 	try {
 		const blob = await imglyRemoveBackground(imageSource, {
 			progress: (key: string, current: number, total: number) => {
+				// Calculate progress for this specific item (file/step)
 				const pct = Math.round((current / total) * 100);
+				
+				// Heuristic to determine what's happening
+				// The library downloads model files first (onnx, wasm, etc.)
+				let message = `Processing: ${pct}%`;
+				let stage: 'loading' | 'processing' = 'processing';
+
+				if (key.includes('fetch') || key.includes('model') || key.includes('onnx') || key.includes('wasm')) {
+					message = `Loading AI model: ${pct}%`;
+					stage = 'loading';
+				}
+
 				onProgress?.({
-					stage: 'processing',
+					stage,
 					progress: pct,
-					message: `Processing: ${pct}%`
+					message
 				});
 			}
 		});

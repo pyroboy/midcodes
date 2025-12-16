@@ -1096,7 +1096,8 @@
 															initialY={imagePositions[element.variableName]?.y ?? 0}
 															initialBorderSize={imagePositions[element.variableName]?.borderSize ?? 0}
 															isSignature={element.type === 'signature'}
-															on:selectfile={(e) => handleSelectFile(element.variableName, e.detail.file)}
+															showAiToggle={element.type === 'photo'}
+															on:selectfile={(e) => handleSelectFile(element.variableName, e.detail)}
 															on:update={(e) => handleImageUpdate(e, element.variableName)}
 															on:dragstart={() => (mouseMoving = true)}
 															on:dragend={() => (mouseMoving = false)}
@@ -1134,7 +1135,8 @@
 														initialY={imagePositions[element.variableName]?.y ?? 0}
 														initialBorderSize={imagePositions[element.variableName]?.borderSize ?? 0}
 														isSignature={element.type === 'signature'}
-														on:selectfile={(e) => handleSelectFile(element.variableName, e.detail.file)}
+														showAiToggle={element.type === 'photo'}
+														on:selectfile={(e) => handleSelectFile(element.variableName, e.detail)}
 														on:update={(e) => handleImageUpdate(e, element.variableName)}
 														on:dragstart={() => (mouseMoving = true)}
 														on:dragend={() => (mouseMoving = false)}
@@ -1253,7 +1255,8 @@
 															initialY={imagePositions[element.variableName]?.y ?? 0}
 															initialBorderSize={imagePositions[element.variableName]?.borderSize ?? 0}
 															isSignature={element.type === 'signature'}
-															on:selectfile={(e) => handleSelectFile(element.variableName, e.detail.file)}
+															showAiToggle={element.type === 'photo'}
+															on:selectfile={(e) => handleSelectFile(element.variableName, e.detail)}
 															on:update={(e) => handleImageUpdate(e, element.variableName)}
 															on:dragstart={() => (mouseMoving = true)}
 															on:dragend={() => (mouseMoving = false)}
@@ -1291,7 +1294,8 @@
 														initialY={imagePositions[element.variableName]?.y ?? 0}
 														initialBorderSize={imagePositions[element.variableName]?.borderSize ?? 0}
 														isSignature={element.type === 'signature'}
-														on:selectfile={(e) => handleSelectFile(element.variableName, e.detail.file)}
+														showAiToggle={element.type === 'photo'}
+														on:selectfile={(e) => handleSelectFile(element.variableName, e.detail)}
 														on:update={(e) => handleImageUpdate(e, element.variableName)}
 														on:dragstart={() => (mouseMoving = true)}
 														on:dragend={() => (mouseMoving = false)}
