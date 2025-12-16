@@ -32,6 +32,7 @@
 		initialBorderSize?: number;
 		isSignature?: boolean;
 		showAiToggle?: boolean;
+		isProcessing?: boolean;
 	}
 
 	let {
@@ -43,7 +44,8 @@
 		initialY = 0,
 		initialBorderSize = 0,
 		isSignature = false,
-		showAiToggle = false
+		showAiToggle = false,
+		isProcessing = false
 	}: Props = $props();
 
 	let showPopup = $state(false);
@@ -718,7 +720,7 @@
 			width={thumbnailWidth}
 			height={thumbnailHeight}
 			onclick={handleClick}
-			class="cursor-pointer"
+			class="cursor-pointer transition-all duration-500 {isProcessing ? 'processing-glow' : ''}"
 		></canvas>
 	</div>
 	<div class="ml-2 flex flex-col gap-2">
@@ -1070,3 +1072,13 @@
 		</div>
 	</div>
 {/if}
+
+<style>
+	@keyframes pulse-brightness {
+		0%, 100% { filter: brightness(1); }
+		50% { filter: brightness(1.3); }
+	}
+	.processing-glow {
+		animation: pulse-brightness 1.5s infinite ease-in-out;
+	}
+</style>

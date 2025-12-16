@@ -1115,7 +1115,7 @@
 													<span class="text-red-500">*</span>
 												</Label>
 													<!-- svelte-ignore a11y_no_static_element_interactions -->
-								<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center relative transition-all duration-500 {processingStatus[element.variableName] ? 'processing-glow border-blue-400 dark:border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]' : ''}" onclick={() => handleInputFocus('front', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('front', element.variableName)} role="button" tabindex="0">
+								<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center relative transition-all duration-500" onclick={() => handleInputFocus('front', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('front', element.variableName)} role="button" tabindex="0">
 
 													<div class="flex-shrink-0">
 														<ThumbnailInput
@@ -1128,6 +1128,7 @@
 															initialBorderSize={imagePositions[element.variableName]?.borderSize ?? 0}
 															isSignature={element.type === 'signature'}
 															showAiToggle={element.type === 'photo'}
+															isProcessing={!!processingStatus[element.variableName]}
 															on:selectfile={(e) => handleSelectFile(element.variableName, e.detail)}
 															on:update={(e) => handleImageUpdate(e, element.variableName)}
 															on:dragstart={() => (mouseMoving = true)}
@@ -1142,7 +1143,7 @@
 												<span class="text-red-500">*</span>
 											</Label>
 											<!-- svelte-ignore a11y_no_static_element_interactions -->
-								<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center relative transition-all duration-500 {processingStatus[element.variableName] ? 'processing-glow border-blue-400 dark:border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]' : ''}" onclick={() => handleInputFocus('front', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('front', element.variableName)} role="button" tabindex="0">
+								<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center relative transition-all duration-500" onclick={() => handleInputFocus('front', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('front', element.variableName)} role="button" tabindex="0">
 
 												<div class="flex-shrink-0">
 													<ThumbnailInput
@@ -1155,6 +1156,7 @@
 														initialBorderSize={imagePositions[element.variableName]?.borderSize ?? 0}
 														isSignature={element.type === 'signature'}
 														showAiToggle={element.type === 'photo'}
+														isProcessing={!!processingStatus[element.variableName]}
 														on:selectfile={(e) => handleSelectFile(element.variableName, e.detail)}
 														on:update={(e) => handleImageUpdate(e, element.variableName)}
 														on:dragstart={() => (mouseMoving = true)}
@@ -1250,7 +1252,7 @@
 													<span class="text-red-500">*</span>
 												</Label>
 													<!-- svelte-ignore a11y_no_static_element_interactions -->
-									<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center relative transition-all duration-500 {processingStatus[element.variableName] ? 'processing-glow border-blue-400 dark:border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]' : ''}" onclick={() => handleInputFocus('back', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('back', element.variableName)} role="button" tabindex="0">
+									<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center relative transition-all duration-500" onclick={() => handleInputFocus('back', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('back', element.variableName)} role="button" tabindex="0">
 
 													<div class="flex-shrink-0">
 														<ThumbnailInput
@@ -1263,6 +1265,7 @@
 															initialBorderSize={imagePositions[element.variableName]?.borderSize ?? 0}
 															isSignature={element.type === 'signature'}
 															showAiToggle={element.type === 'photo'}
+															isProcessing={!!processingStatus[element.variableName]}
 															on:selectfile={(e) => handleSelectFile(element.variableName, e.detail)}
 															on:update={(e) => handleImageUpdate(e, element.variableName)}
 															on:dragstart={() => (mouseMoving = true)}
@@ -1277,7 +1280,7 @@
 												<span class="text-red-500">*</span>
 											</Label>
 											<!-- svelte-ignore a11y_no_static_element_interactions -->
-								<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center relative transition-all duration-500 {processingStatus[element.variableName] ? 'processing-glow border-blue-400 dark:border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]' : ''}" onclick={() => handleInputFocus('back', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('back', element.variableName)} role="button" tabindex="0">
+								<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center relative transition-all duration-500" onclick={() => handleInputFocus('back', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('back', element.variableName)} role="button" tabindex="0">
 
 												<div class="flex-shrink-0">
 													<ThumbnailInput
@@ -1290,6 +1293,7 @@
 														initialBorderSize={imagePositions[element.variableName]?.borderSize ?? 0}
 														isSignature={element.type === 'signature'}
 														showAiToggle={element.type === 'photo'}
+														isProcessing={!!processingStatus[element.variableName]}
 														on:selectfile={(e) => handleSelectFile(element.variableName, e.detail)}
 														on:update={(e) => handleImageUpdate(e, element.variableName)}
 														on:dragstart={() => (mouseMoving = true)}
@@ -1525,13 +1529,6 @@
 {/if}
 
 <style>
-	@keyframes pulse-brightness {
-		0%, 100% { filter: brightness(1) drop-shadow(0 0 0px transparent); }
-		50% { filter: brightness(1.1) drop-shadow(0 0 10px rgba(59, 130, 246, 0.4)); border-color: rgba(59, 130, 246, 0.5); }
-	}
-	:global(.processing-glow) {
-		animation: pulse-brightness 2s infinite ease-in-out;
-	}
 
 	:global(.dark) {
 		color-scheme: dark;

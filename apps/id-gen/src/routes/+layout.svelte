@@ -16,7 +16,8 @@
 	import BottomNavigation from '$lib/components/BottomNavigation.svelte';
 	import HamburgerMenu from '$lib/components/HamburgerMenu.svelte';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
-	import { initPreloadService, updateCurrentPath } from '$lib/services/preloadService';
+	import { updateCurrentPath, initPreloadService } from '$lib/services/preloadService';
+	import { preloadModel } from '$lib/utils/imageProcessing';
 
 	import NavigationLoader from '$lib/components/NavigationLoader.svelte';
 	import { Toaster } from '$lib/components/ui/sonner';
@@ -225,6 +226,10 @@
 			// The theme store already handles DOM application in its initialization
 			const currentTheme = theme.getCurrentTheme();
 			console.log('Theme initialized:', currentTheme);
+			console.log('Theme initialized:', currentTheme);
+			
+			// Preload AI Model
+			preloadModel();
 		} catch (error) {
 			console.error('Failed to initialize app:', error);
 		}
