@@ -214,6 +214,42 @@
 	// Zoom state
 	let zoomState = $state<'idle' | 'zoomed'>('idle');
 	
+	// Helper function to get element dimensions with type-aware fallbacks
+	// Uses the actual stored dimensions, with sensible defaults when missing
+	function getElementDimensions(element: TemplateElement | undefined, cardWidth: number, cardHeight: number): { width: number; height: number } {
+		if (!element) return { width: 0, height: 0 };
+		
+		// Use stored dimensions - template elements should have width/height from the editor
+		let width = element.width ?? 0;
+		let height = element.height ?? 0;
+		
+		// If dimensions are missing or zero, use type-specific defaults
+		if (width === 0 || height === 0) {
+			const type = element.type;
+			
+			if (type === 'photo') {
+				// Default photo placeholder: reasonable square
+				width = width || cardWidth * 0.2;
+				height = height || cardHeight * 0.25;
+			} else if (type === 'signature') {
+				// Default signature: wider than tall
+				width = width || cardWidth * 0.25;
+				height = height || cardHeight * 0.1;
+			} else if (type === 'text' || type === 'selection') {
+				// Text elements: use a reasonable text box size based on font size
+				const fontSize = element.size || 12;
+				width = width || cardWidth * 0.4; // Wider text area
+				height = height || fontSize * 2; // Height based on font size (2 lines)
+			} else {
+				// Generic fallback
+				width = width || 100;
+				height = height || 50;
+			}
+		}
+		
+		return { width, height };
+	}
+
 	// Dynamic zoom transform calculation (derived from state + scroll position)
 	let zoomTransform = $derived.by(() => {
 		if (!focusedVariableName || !template?.template_elements || !cardOriginalWidth || !cardOriginalHeight) {
@@ -235,10 +271,11 @@
 		const pxScale = widthRatio; 
 
 		// 3. Get Element Dimensions & Position (Converted to DOM Pixels)
+		const { width: elemWidth, height: elemHeight } = getElementDimensions(element, tmplWidth, tmplHeight);
 		const elX = (element.x || 0) * pxScale;
 		const elY = (element.y || 0) * pxScale;
-		const elW = (element.width || 100) * pxScale;
-		const elH = (element.height || 100) * pxScale;
+		const elW = elemWidth * pxScale;
+		const elH = elemHeight * pxScale;
 
 		// 4. Calculate Center of Element (in DOM Pixels)
 		const elCenterX = elX + (elW / 2);
@@ -852,13 +889,14 @@
 											{#if focusedElement}
 												{@const cardWidth = template.width_pixels || 1013}
 												{@const cardHeight = template.height_pixels || 638}
+												{@const dims = getElementDimensions(focusedElement, cardWidth, cardHeight)}
 										<div 
 											class="element-highlight-overlay state-{highlightState}"
 											style="
 												left: {((focusedElement.x || 0) / cardWidth) * 100}%;
 												top: {((focusedElement.y || 0) / cardHeight) * 100}%;
-												width: {((focusedElement.width || 100) / cardWidth) * 100}%;
-												height: {((focusedElement.height || 100) / cardHeight) * 100}%;
+												width: {(dims.width / cardWidth) * 100}%;
+												height: {(dims.height / cardHeight) * 100}%;
 											"
 										></div>
 											{/if}
@@ -892,19 +930,20 @@
 												(el) => el.variableName === focusedVariableName && el.side === 'back'
 											)}
 											{#if focusedElement}
-												{@const cardWidth = template.width_pixels || 1013}
-												{@const cardHeight = template.height_pixels || 638}
-										<div 
-											class="element-highlight-overlay state-{highlightState}"
-											style="
-												left: {((focusedElement.x || 0) / cardWidth) * 100}%;
-												top: {((focusedElement.y || 0) / cardHeight) * 100}%;
-												width: {((focusedElement.width || 100) / cardWidth) * 100}%;
-												height: {((focusedElement.height || 100) / cardHeight) * 100}%;
-											"
-										></div>
-											{/if}
-										{/if}
+									{@const cardWidth = template.width_pixels || 1013}
+									{@const cardHeight = template.height_pixels || 638}
+									{@const dims = getElementDimensions(focusedElement, cardWidth, cardHeight)}
+								<div 
+									class="element-highlight-overlay state-{highlightState}"
+									style="
+										left: {((focusedElement.x || 0) / cardWidth) * 100}%;
+										top: {((focusedElement.y || 0) / cardHeight) * 100}%;
+										width: {(dims.width / cardWidth) * 100}%;
+										height: {(dims.height / cardHeight) * 100}%;
+									"
+								></div>
+									{/if}
+								{/if}
 									</div>
 								</div>
 							</div>

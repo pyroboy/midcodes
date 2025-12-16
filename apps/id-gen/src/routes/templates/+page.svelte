@@ -15,9 +15,43 @@
 		cardSizeToPixels,
 		LEGACY_CARD_SIZE,
 		COMMON_CARD_SIZES,
-		findClosestCardSize
+		findClosestCardSize,
+		switchOrientation
 	} from '$lib/utils/sizeConversion';
 	import { createAdaptiveElements } from '$lib/utils/adaptiveElements';
+
+	/**
+	 * Robustly detect orientation from pixel dimensions
+	 * @returns 'portrait' if height > width, 'landscape' otherwise
+	 */
+	function detectOrientationFromDimensions(width: number, height: number): 'landscape' | 'portrait' {
+		return height > width ? 'portrait' : 'landscape';
+	}
+
+	/**
+	 * Ensure pixel dimensions are correctly oriented for the given orientation.
+	 * If the current dimensions don't match the expected orientation, swap them.
+	 * @param dims Current pixel dimensions
+	 * @param expectedOrientation The orientation the dimensions should represent
+	 * @returns Correctly oriented dimensions
+	 */
+	function getOrientationAwarePixelDimensions(
+		dims: { width: number; height: number },
+		expectedOrientation: 'landscape' | 'portrait'
+	): { width: number; height: number } {
+		const currentOrientation = detectOrientationFromDimensions(dims.width, dims.height);
+		
+		if (currentOrientation !== expectedOrientation) {
+			// Swap width and height to match expected orientation
+			console.log('🔄 Swapping dimensions to match orientation:', {
+				from: { width: dims.width, height: dims.height, orientation: currentOrientation },
+				to: { width: dims.height, height: dims.width, orientation: expectedOrientation }
+			});
+			return { width: dims.height, height: dims.width };
+		}
+		
+		return dims;
+	}
 
 	// Smart Loading State
 	const preloadState = getPreloadState('/templates');
@@ -1262,24 +1296,56 @@
 			.filter((el) => el.side === 'back')
 			.map(sanitizeElement);
 
-		// D. Set Dimensions
+		// D. Set Dimensions with robust orientation handling
 		const td = templateData as any;
+		const storedOrientation = templateData.orientation || 'landscape';
+		
 		if (td.width_pixels && td.height_pixels) {
+			// Validate that stored dimensions match the orientation field
+			const detectedOrientation = detectOrientationFromDimensions(td.width_pixels, td.height_pixels);
+			
+			// Ensure dimensions match the expected orientation
+			const correctedDimensions = getOrientationAwarePixelDimensions(
+				{ width: td.width_pixels, height: td.height_pixels },
+				storedOrientation
+			);
+			
+			console.log('📐 Template dimensions check:', {
+				storedOrientation,
+				detectedOrientation,
+				originalDims: { width: td.width_pixels, height: td.height_pixels },
+				correctedDims: correctedDimensions,
+				dimensionsWereSwapped: detectedOrientation !== storedOrientation
+			});
+			
 			currentCardSize = {
 				name: templateData.name,
-				width: td.width_pixels,
-				height: td.height_pixels,
+				width: correctedDimensions.width,
+				height: correctedDimensions.height,
 				unit: 'pixels'
 			};
-			requiredPixelDimensions = {
-				width: td.width_pixels,
-				height: td.height_pixels
-			};
+			requiredPixelDimensions = correctedDimensions;
 		} else {
-			// Legacy fallback
-			const defaultSize = findBestDefaultSize();
+			// Legacy fallback - apply orientation to the default size
+			let defaultSize = findBestDefaultSize();
+			let defaultPixels = cardSizeToPixels(defaultSize, 300);
+			
+			// Ensure the default dimensions match the template's stored orientation
+			const correctedPixels = getOrientationAwarePixelDimensions(defaultPixels, storedOrientation);
+			
+			// If dimensions were swapped, update the card size too
+			if (correctedPixels.width !== defaultPixels.width) {
+				defaultSize = switchOrientation(defaultSize);
+			}
+			
+			console.log('📐 Legacy template orientation fix:', {
+				storedOrientation,
+				originalDefaultDims: defaultPixels,
+				correctedDims: correctedPixels
+			});
+			
 			currentCardSize = defaultSize;
-			requiredPixelDimensions = cardSizeToPixels(defaultSize, 300);
+			requiredPixelDimensions = correctedPixels;
 		}
 
 		// E. Force Editor Refresh
@@ -1287,7 +1353,9 @@
 
 		console.log('✅ Editor Initialized. Elements:', {
 			front: frontElements.length,
-			back: backElements.length
+			back: backElements.length,
+			orientation: storedOrientation,
+			dimensions: requiredPixelDimensions
 		});
 	}
 
