@@ -196,7 +196,7 @@
 			<div>
 				<h2 class="text-lg font-semibold text-foreground">Batch Optimization Tool</h2>
 				<p class="text-sm text-muted-foreground">
-					Automatically generate and upload low-resolution thumbnails (300px) for all items (Templates and ID Cards) that are missing them.
+					Automatically generate and upload low-resolution thumbnails (500px) for all items (Templates and ID Cards) that are missing them.
 				</p>
 			</div>
 			

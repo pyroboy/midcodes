@@ -399,7 +399,7 @@ export function getImageDimensions(file: File): Promise<ImageDimensions> {
  */
 export async function createLowResVersion(
 	imageFile: File,
-	maxDimension: number = 300,
+	maxDimension: number = 500,
 	quality: number = 0.8
 ): Promise<File> {
 	return new Promise((resolve, reject) => {
