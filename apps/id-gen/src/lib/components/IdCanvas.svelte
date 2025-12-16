@@ -305,10 +305,12 @@
 		const fontsToLoad = new Set<string>();
 		elements.forEach((element) => {
 			// Check specific fonts for text/selection elements
-			if ((element.type === 'text' || element.type === 'selection') && element.font) {
+			// Use fontFamily (new) with fallback to font (legacy)
+			const fontName = element.fontFamily || element.font;
+			if ((element.type === 'text' || element.type === 'selection') && fontName) {
 				const weight = element.fontWeight || 400;
 				const style = element.fontStyle || 'normal';
-				fontsToLoad.add(`${style} ${weight} 16px "${element.font}"`);
+				fontsToLoad.add(`${style} ${weight} 16px "${fontName}"`);
 			}
 		});
 
@@ -604,9 +606,11 @@
 		if (element.type !== 'text' && element.type !== 'selection') return;
 
 		try {
-			const fontSize = Math.round((element.size || 12) * renderCoordSystem.scale);
+			// Use fontSize (new) with fallback to size (legacy) for backwards compatibility
+			const fontSize = Math.round((element.fontSize || element.size || 12) * renderCoordSystem.scale);
 			const fontOptions = {
-				family: element.font,
+				// Use fontFamily (new) with fallback to font (legacy)
+				family: element.fontFamily || element.font,
 				size: fontSize,
 				weight: element.fontWeight,
 				style: element.fontStyle

@@ -51,6 +51,16 @@
 
 	let openSectionIndex: number | null = $state(null);
 
+	// Debug: Log fontOptions when they change
+	$effect(() => {
+		console.log('🔤 [ElementList] fontOptions received:', {
+			side,
+			count: fontOptions?.length || 0,
+			fonts: fontOptions || [],
+			hasElements: elements?.length || 0
+		});
+	});
+
 	// Effect to auto-open section when an element is selected (or re-clicked)
 	$effect(() => {
 		// Depend on selectionVersion to trigger re-open even if ID is same

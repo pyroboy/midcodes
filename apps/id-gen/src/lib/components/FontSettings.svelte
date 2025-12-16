@@ -24,6 +24,24 @@
 		side: 'front' | 'back';
 	}>();
 
+	// Debug logging - comprehensive font inspection
+	$effect(() => {
+		console.log('🎨 [FontSettings] Debug:', {
+			elementId: element.id,
+			elementType: element.type,
+			elementFontFamily: element.fontFamily,
+			elementFontSize: element.fontSize,
+			fontOptionsReceived: fontOptions?.length || 0,
+			allFonts: fontOptions || '(none)',
+			side
+		});
+		
+		// Additional warning if no fonts
+		if (!fontOptions || fontOptions.length === 0) {
+			console.warn('⚠️ [FontSettings] No font options received! Font dropdown will be empty.');
+		}
+	});
+
 	const fontWeightOptions = [
 		'normal',
 		'bold',
@@ -56,7 +74,7 @@
 	}
 
 	function adjustFontSize(delta: number) {
-		const currentSize = element.fontSize || 16;
+		const currentSize = element.fontSize || element.size || 16;
 		const newSize = Math.max(1, currentSize + delta); // Minimum size of 1
 		updateElement({ fontSize: newSize });
 	}
@@ -113,7 +131,7 @@
 		<label class="font-size-label">Size:</label>
 		<button class="size-button" onclick={() => adjustFontSize(-5)} title="Decrease by 5">-5</button>
 		<button class="size-button" onclick={() => adjustFontSize(-1)} title="Decrease by 1">-1</button>
-		<input type="number" value={element.fontSize} onchange={handleFontSizeChange} class="font-size-input" />
+		<input type="number" value={element.fontSize || element.size || 16} onchange={handleFontSizeChange} class="font-size-input" />
 		<button class="size-button" onclick={() => adjustFontSize(1)} title="Increase by 1">+1</button>
 		<button class="size-button" onclick={() => adjustFontSize(5)} title="Increase by 5">+5</button>
 	</div>
@@ -195,13 +213,39 @@
 		margin-right: 4px;
 	}
 	
+	
 	select,
 	input[type='number'] {
 		background-color: #3d3d3d;
 		color: #ffffff;
 		border: 1px solid #4d4d4d;
-		padding: 4px;
+		padding: 4px 8px;
 		border-radius: 2px;
+		font-size: 13px;
+		min-height: 28px;
+		cursor: pointer;
+	}
+
+	select {
+		appearance: none;
+		-webkit-appearance: none;
+		-moz-appearance: none;
+		background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3e%3cpath fill='%23ffffff' d='M6 9L1 4h10z'/%3e%3c/svg%3e");
+		background-repeat: no-repeat;
+		background-position: right 8px center;
+		background-size: 12px;
+		padding-right: 28px;
+	}
+	
+	select:hover {
+		border-color: #6d6d6d;
+		background-color: #4d4d4d;
+	}
+	
+	select:focus {
+		outline: none;
+		border-color: #8b5cf6;
+		box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
 	}
 
 	/* Font select shows each font in its own font family */
@@ -212,6 +256,8 @@
 	
 	.font-select option {
 		padding: 4px 8px;
+		background-color: #2d2d2d;
+		color: #ffffff;
 	}
 
 	input[type='number'] {

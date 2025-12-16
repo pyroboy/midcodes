@@ -146,7 +146,9 @@ export const FONT_CDN_URLS: Record<string, Record<string, Record<string, string>
 };
 
 export function getAllFontFamilies(): string[] {
-	return fonts.map((font) => font.family);
+	const families = fonts.map((font) => font.family);
+	console.log('🔤 [fonts.ts] getAllFontFamilies() called, returning:', families);
+	return families;
 }
 
 export function isFontLoaded(fontFamily: string): boolean {

@@ -82,6 +82,11 @@
 	let startX: number, startY: number;
 	let currentElementIndex: number | null = $state(null);
 	let resizeHandle: string | null = $state(null);
+	
+	// Original dimensions at resize start (for proportional font scaling)
+	let originalWidth: number = 0;
+	let originalHeight: number = 0;
+	let originalFontSize: number = 0;
 
 	// Rotation state
 	let isRotating = $state(false);
@@ -101,6 +106,16 @@
 	let loadedImageSize = $state<{ width: number; height: number } | null>(null);
 	let fontOptions: string[] = $state([]);
 	let fontsLoaded = false;
+
+	// Debug: Log whenever fontOptions changes
+	$effect(() => {
+		console.log('🔤 [TemplateForm] fontOptions updated:', {
+			side,
+			count: fontOptions.length,
+			fonts: fontOptions,
+			fontsLoaded
+		});
+	});
 	let previewDimensions = $state({
 		width: 0,
 		height: 0,
@@ -220,14 +235,28 @@
 			}
 		}
 
+		console.log('🔤 [TemplateForm] Starting font load...', { side });
+		
+		// Debug: Check what getAllFontFamilies returns BEFORE loading
+		const preLoadFonts = getAllFontFamilies();
+		console.log('🔤 [TemplateForm] Pre-load available fonts:', preLoadFonts);
+		
 		loadGoogleFonts()
 			.then(() => {
-				fontOptions = getAllFontFamilies();
+				const loadedFonts = getAllFontFamilies();
+				console.log('✅ [TemplateForm] Google Fonts loaded successfully:', {
+					side,
+					count: loadedFonts.length,
+					fonts: loadedFonts
+				});
+				fontOptions = loadedFonts;
 				fontsLoaded = true;
 			})
 			.catch((error) => {
-				console.error('Error loading some Google Fonts:', error);
-				fontOptions = getAllFontFamilies();
+				console.error('❌ [TemplateForm] Error loading Google Fonts:', error);
+				const fallbackFonts = getAllFontFamilies();
+				console.log('⚠️ [TemplateForm] Using fallback fonts:', fallbackFonts);
+				fontOptions = fallbackFonts;
 				fontsLoaded = true;
 			});
 
@@ -483,6 +512,10 @@
 		if (handle) {
 			isResizing = true;
 			resizeHandle = handle;
+			// Store original dimensions for proportional font scaling
+			originalWidth = element.width || 100;
+			originalHeight = element.height || 100;
+			originalFontSize = element.fontSize || element.size || 16;
 		} else {
 			isDragging = true;
 		}
@@ -661,6 +694,10 @@
 			let newHeight = updatedElement.height;
 			let newX = updatedElement.x || 0;
 			let newY = updatedElement.y || 0;
+			
+			// Determine if this is a side handle (width-only) or corner handle (proportional)
+			const isSideHandle = resizeHandle === 'middle-left' || resizeHandle === 'middle-right';
+			const isCornerHandle = ['top-left', 'top-right', 'bottom-left', 'bottom-right'].includes(resizeHandle || '');
 
 			switch (resizeHandle) {
 				case 'top-left':
@@ -683,6 +720,14 @@
 					newWidth += storageDelta.x;
 					newHeight += storageDelta.y;
 					break;
+				// Side handles - change width only
+				case 'middle-left':
+					newWidth -= storageDelta.x;
+					newX += storageDelta.x;
+					break;
+				case 'middle-right':
+					newWidth += storageDelta.x;
+					break;
 			}
 
 			// Constrain to bounds using coordinate system
@@ -696,6 +741,18 @@
 			updatedElement.y = Number(constrainedPos.y.toFixed(2));
 			updatedElement.width = Math.max(20, Number(newWidth.toFixed(2)));
 			updatedElement.height = Math.max(20, Number(newHeight.toFixed(2)));
+			
+			// Proportional font scaling for text/selection elements when using CORNER handles
+			const isTextElement = updatedElement.type === 'text' || updatedElement.type === 'selection';
+			if (isTextElement && isCornerHandle && originalWidth > 0 && originalHeight > 0) {
+				// Use geometric mean (sqrt of area ratio) for balanced scaling
+				const areaRatio = (updatedElement.width * updatedElement.height) / (originalWidth * originalHeight);
+				const scaleFactor = Math.sqrt(areaRatio);
+				// Calculate new font size with minimum of 8px
+				const newFontSize = Math.max(8, Math.round(originalFontSize * scaleFactor));
+				updatedElement.fontSize = newFontSize;
+			}
+			// Side handles: fontSize remains unchanged (width-only resize)
 		} else {
 			// Just update position during dragging, maintain original size
 			const newPos = {
@@ -712,9 +769,21 @@
 			updatedElement.y = Number(constrainedPos.y.toFixed(2));
 		}
 
-		// Update local state only - DO NOT call updateElements() here
+		// Update local state
 		activeDragElement = updatedElement;
 		hasModified = true;
+		
+		// Live update for text elements during resize - push to elements array immediately
+		// This allows sidebar to show live font size changes
+		if (isResizing && currentElementIndex !== null) {
+			const isTextElement = updatedElement.type === 'text' || updatedElement.type === 'selection';
+			if (isTextElement) {
+				const updatedElements = [...elements];
+				updatedElements[currentElementIndex] = updatedElement;
+				// Use debounced update to avoid too many updates
+				debouncedUpdateElements(updatedElements);
+			}
+		}
 
 		startX = event.clientX;
 		startY = event.clientY;
@@ -945,13 +1014,15 @@
 		const storageDims = currentCoordSystem.storageDimensions;
 		// Calculate font-size as percentage of container width using cqw units
 		// This ensures text scales proportionally with the container
-		const fontSizeCqw = ((element.size || 16) / storageDims.width) * 100;
+		// Use fontSize (new) with fallback to size (legacy) for backwards compatibility
+		const fontSizeCqw = ((element.fontSize || element.size || 16) / storageDims.width) * 100;
 		const letterSpacingCqw = element.letterSpacing
 			? (element.letterSpacing / storageDims.width) * 100
 			: null;
 
 		return {
-			'font-family': `"${element.font || 'Arial'}", sans-serif`,
+			// Use fontFamily (new) with fallback to font (legacy)
+			'font-family': `"${element.fontFamily || element.font || 'Arial'}", sans-serif`,
 			'font-weight': element.fontWeight || '400',
 			'font-style': element.fontStyle || 'normal',
 			'font-size': `${fontSizeCqw.toFixed(3)}cqw`,
@@ -1175,6 +1246,27 @@
 										tabindex="0"
 										aria-label="Resize bottom right"
 									></div>
+								<!-- Side handles for width-only resize (text elements only) -->
+								{#if element.type === 'text' || element.type === 'selection'}
+									<div
+										class="resize-handle side-handle middle-left"
+										class:active={resizeHandle === 'middle-left' && currentElementIndex === i}
+										onmousedown={stopPropagation((e) => onMouseDown(e, i, 'middle-left'))}
+										use:nonPassiveTouch={stopPropagation((e) => onTouchStart(e, i, 'middle-left'))}
+										role="button"
+										tabindex="0"
+										aria-label="Resize width left"
+									></div>
+									<div
+										class="resize-handle side-handle middle-right"
+										class:active={resizeHandle === 'middle-right' && currentElementIndex === i}
+										onmousedown={stopPropagation((e) => onMouseDown(e, i, 'middle-right'))}
+										use:nonPassiveTouch={stopPropagation((e) => onTouchStart(e, i, 'middle-right'))}
+										role="button"
+										tabindex="0"
+										aria-label="Resize width right"
+									></div>
+								{/if}
 									<!-- Rotation handle - positioned 40px below element bottom center -->
 									<div
 										class="rotation-handle"
@@ -1553,6 +1645,29 @@
 		bottom: -22px;
 		right: -22px;
 		cursor: nwse-resize;
+	}
+	/* Side handles for width-only resize - bar shaped */
+	.resize-handle.side-handle {
+		width: 6px;
+		height: 32px;
+		border-radius: 3px;
+	}
+	.resize-handle.side-handle::after {
+		width: 6px;
+		height: 32px;
+		border-radius: 3px;
+	}
+	.resize-handle.middle-left {
+		top: 50%;
+		left: -16px;
+		transform: translateY(-50%);
+		cursor: ew-resize;
+	}
+	.resize-handle.middle-right {
+		top: 50%;
+		right: -16px;
+		transform: translateY(-50%);
+		cursor: ew-resize;
 	}
 
 	/* Rotation handle styles */
