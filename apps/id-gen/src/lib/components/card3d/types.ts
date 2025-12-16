@@ -16,6 +16,7 @@ export interface TemplateElementOverlay {
 	y: number;
 	width: number;
 	height: number;
+	rotation?: number; // degrees -180 to +180
 	side: 'front' | 'back';
 	variableName?: string;
 	content?: string;
@@ -92,4 +93,5 @@ export interface Element3DPosition {
 	y: number;
 	width: number;
 	height: number;
+	rotation: number; // radians for Three.js
 }

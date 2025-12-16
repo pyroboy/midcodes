@@ -1709,6 +1709,7 @@
 		<div 
 			class="fixed inset-0 z-50 flex items-center justify-center p-4"
 			role="dialog"
+			tabindex="-1"
 			aria-modal="true"
 			onclick={(e) => { if(e.target === e.currentTarget && !isClosingReview) cancelReview() }}
 		>
@@ -1830,16 +1831,6 @@
 		backface-visibility: hidden;
 	}
 
-	.edit-template-container {
-		display: flex;
-		width: 100%;
-		height: 100%;
-		transition: all 0.3s ease;
-	}
-
-	.edit-template-container.edit-mode {
-		justify-content: center;
-	}
 
 	:global(.animate-pulse) {
 		animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;

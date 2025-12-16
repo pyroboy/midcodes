@@ -46,6 +46,13 @@ export const opacitySchema = z
 	.max(1, 'Opacity cannot be greater than 1')
 	.default(1);
 
+// Rotation schema (degrees -180 to +180)
+export const rotationSchema = z
+	.number()
+	.min(-180, 'Rotation cannot be less than -180 degrees')
+	.max(180, 'Rotation cannot exceed 180 degrees')
+	.default(0);
+
 // Side schema
 export const sideSchema = z.enum(['front', 'back']);
 
@@ -67,6 +74,7 @@ export const baseTemplateElementSchema = z.object({
 	y: positionSchema,
 	width: dimensionSchema,
 	height: dimensionSchema,
+	rotation: rotationSchema,
 	side: sideSchema,
 	variableName: variableNameSchema,
 	visible: z.boolean().default(true),

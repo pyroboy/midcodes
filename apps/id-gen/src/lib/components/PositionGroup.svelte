@@ -1,5 +1,5 @@
 <script lang="ts">
-	let { x, y, width, height, onUpdate } = $props();
+	let { x, y, width, height, rotation = 0, onUpdate } = $props();
 
 	function handleXChange(event: Event) {
 		const value = Number((event.target as HTMLInputElement).value);
@@ -19,6 +19,18 @@
 	function handleHeightChange(event: Event) {
 		const value = Number((event.target as HTMLInputElement).value);
 		onUpdate({ height: value });
+	}
+
+	function handleRotationChange(event: Event) {
+		let value = Number((event.target as HTMLInputElement).value);
+		// Normalize to -180 to +180 range
+		value = value % 360;
+		if (value > 180) {
+			value -= 360;
+		} else if (value < -180) {
+			value += 360;
+		}
+		onUpdate({ rotation: value });
 	}
 </script>
 
@@ -41,6 +53,20 @@
 		<label>
 			<span>H</span>
 			<input type="number" value={height} oninput={handleHeightChange} />
+		</label>
+	</div>
+	<div class="input-group position-group rotation-group">
+		<label>
+			<span title="Rotation in degrees">R</span>
+			<input
+				type="number"
+				value={rotation}
+				oninput={handleRotationChange}
+				min="-180"
+				max="180"
+				step="1"
+			/>
+			<span class="unit">deg</span>
 		</label>
 	</div>
 </div>
@@ -87,5 +113,18 @@
 	.position-group input[type='number']::-webkit-outer-spin-button {
 		-webkit-appearance: none;
 		margin: 0;
+	}
+
+	.rotation-group label {
+		flex: 1;
+		justify-content: space-between;
+	}
+
+	.rotation-group .unit {
+		font-size: 10px;
+		color: #666;
+		margin-left: 4px;
+		width: auto;
+		flex-shrink: 0;
 	}
 </style>

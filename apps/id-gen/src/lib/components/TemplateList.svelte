@@ -54,18 +54,21 @@
 		return `${uw.toFixed(precision)}${units} × ${uh.toFixed(precision)}${units}`;
 	}
 
-	// Helper to calculate percentage positions
+	// Helper to calculate percentage positions with rotation
 	function getElementStyle(el: TemplateElement, templateW: number, templateH: number) {
 		const left = (el.x / templateW) * 100;
 		const top = (el.y / templateH) * 100;
 		const width = (el.width / templateW) * 100;
 		const height = (el.height / templateH) * 100;
+		const rotation = el.rotation || 0;
 
 		return `
-			left: ${left}%; 
-			top: ${top}%; 
-			width: ${width}%; 
+			left: ${left}%;
+			top: ${top}%;
+			width: ${width}%;
 			height: ${height}%;
+			transform: rotate(${rotation}deg);
+			transform-origin: center center;
 		`;
 	}
 

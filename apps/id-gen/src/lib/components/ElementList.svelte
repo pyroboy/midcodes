@@ -26,7 +26,10 @@
 		cardSize = null,
 		pixelDimensions = null,
 		hoveredElementId = null as string | null,
-		onHoverElement = null as ((id: string | null) => void) | null
+		onHoverElement = null as ((id: string | null) => void) | null,
+		selectedElementId = null as string | null,
+		selectionVersion = 0,
+		onSelect = null as ((id: string | null) => void) | null
 	} = $props<{
 		elements: TemplateElement[];
 		onUpdateElements: (elements: TemplateElement[], side: 'front' | 'back') => void;
@@ -41,7 +44,25 @@
 		pixelDimensions?: { width: number; height: number } | null;
 		hoveredElementId?: string | null;
 		onHoverElement?: (id: string | null) => void | null;
+		selectedElementId?: string | null;
+		selectionVersion?: number;
+		onSelect?: (id: string | null) => void;
 	}>();
+
+	let openSectionIndex: number | null = $state(null);
+
+	// Effect to auto-open section when an element is selected (or re-clicked)
+	$effect(() => {
+		// Depend on selectionVersion to trigger re-open even if ID is same
+		if (selectionVersion !== undefined && selectedElementId) {
+			const index = elements.findIndex((el: TemplateElement) => el.id === selectedElementId);
+			if (index !== -1) {
+				openSectionIndex = index;
+			}
+		} else if (selectedElementId === null) {
+			openSectionIndex = null;
+		}
+	});
 
 	let variableNameErrors: { [key: number]: string } = $state({});
 
@@ -126,7 +147,7 @@
 
 	function handlePositionChange(
 		index: number,
-		position: { x?: number; y?: number; width?: number; height?: number }
+		position: { x?: number; y?: number; width?: number; height?: number; rotation?: number }
 	) {
 		updateElementAtIndex(index, position);
 	}
@@ -135,12 +156,17 @@
 		updateElementAtIndex(index, { content: value });
 	}
 
-	let expandedElementIndex: number | null = $state(null);
-	let backgroundExpanded = $state(false);
-
-	function toggleElement(index: number) {
-		expandedElementIndex = expandedElementIndex === index ? null : index;
+	function toggleSection(index: number) {
+		if (openSectionIndex === index) {
+			openSectionIndex = null;
+			onSelect?.(null);
+		} else {
+			openSectionIndex = index;
+			onSelect?.(elements[index].id);
+		}
 	}
+
+	let backgroundExpanded = $state(false);
 
 	function toggleBackground() {
 		backgroundExpanded = !backgroundExpanded;
@@ -223,24 +249,23 @@
 
 	<!-- Elements List -->
 	{#each elements ?? [] as element, i}
-		<div class="element-item" class:highlighted={hoveredElementId === element.id}>
+		<div 
+			class="element-item" 
+			class:highlighted={hoveredElementId === element.id || selectedElementId === element.id}
+			id={`element-item-${i}`}
+		>
 			<div
 				class="element-header"
 				role="button"
 				tabindex="0"
+				onclick={() => toggleSection(i)}
+				onkeydown={(e) => e.key === 'Enter' && toggleSection(i)}
 				onmouseenter={() => onHoverElement?.(element.id)}
 				onmouseleave={() => onHoverElement?.(null)}
-				onclick={() => toggleElement(i)}
-				onkeydown={(e) => {
-					if (e.key === 'Enter' || e.key === ' ') {
-						e.preventDefault();
-						toggleElement(i);
-					}
-				}}
 			>
 				<div class="header-content">
 					<span class="chevron">
-						{#if expandedElementIndex === i}
+						{#if openSectionIndex === i}
 							<ChevronUp size={16} />
 						{:else}
 							<ChevronDown size={16} />
@@ -256,7 +281,8 @@
 				<button class="remove-element" onclick={stopPropagation(() => removeElement(i))}>×</button>
 			</div>
 
-			{#if expandedElementIndex === i}
+
+			{#if openSectionIndex === i}
 				<div class="element-inputs" transition:slide={{ duration: 200 }}>
 					<div class="input-group">
 						<label for="variable-name-{i}">Variable Name</label>
@@ -319,7 +345,8 @@
 						y={element.y}
 						width={element.width}
 						height={element.height}
-						onUpdate={(updates: Record<'x' | 'y' | 'width' | 'height', number | undefined>) =>
+						rotation={element.rotation || 0}
+						onUpdate={(updates: Record<'x' | 'y' | 'width' | 'height' | 'rotation', number | undefined>) =>
 							handlePositionChange(i, updates)}
 					/>
 				</div>

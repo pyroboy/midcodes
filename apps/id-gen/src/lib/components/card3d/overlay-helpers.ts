@@ -36,7 +36,10 @@ export function elementTo3D(
 	const w3d = el.width * scaleX;
 	const h3d = el.height * scaleY;
 
-	return { x: x3d, y: y3d, width: w3d, height: h3d };
+	// Convert rotation from degrees to radians for Three.js
+	const rotationRad = ((el.rotation || 0) * Math.PI) / 180;
+
+	return { x: x3d, y: y3d, width: w3d, height: h3d, rotation: rotationRad };
 }
 
 /**

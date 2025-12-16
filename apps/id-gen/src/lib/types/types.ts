@@ -18,6 +18,7 @@ export interface TemplateElement {
 	y: number;
 	width: number;
 	height: number;
+	rotation?: number; // degrees 0-360, default 0
 	content?: string;
 	variableName: string;
 	fontSize?: number;

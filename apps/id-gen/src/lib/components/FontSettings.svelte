@@ -47,12 +47,18 @@
 
 	function handleFontChange(e: Event) {
 		const target = e.target as HTMLSelectElement;
-		updateElement({ font: target.value });
+		updateElement({ fontFamily: target.value });
 	}
 
 	function handleFontSizeChange(e: Event) {
 		const target = e.target as HTMLInputElement;
-		updateElement({ size: Number(target.value) });
+		updateElement({ fontSize: Number(target.value) });
+	}
+
+	function adjustFontSize(delta: number) {
+		const currentSize = element.fontSize || 16;
+		const newSize = Math.max(1, currentSize + delta); // Minimum size of 1
+		updateElement({ fontSize: newSize });
 	}
 
 	function handleFontWeightChange(e: Event) {
@@ -87,17 +93,29 @@
 
 <div class="font-settings">
 	<div class="settings-row">
-		<select value={element.font} onchange={handleFontChange}>
+		<select 
+			value={element.fontFamily} 
+			onchange={handleFontChange} 
+			class="font-select"
+			style="font-family: '{element.fontFamily || 'Roboto'}', sans-serif;"
+		>
 			{#each fontOptions as font}
-				<option value={font}>{font}</option>
+				<option value={font} style="font-family: '{font}', sans-serif;">{font}</option>
 			{/each}
 		</select>
-		<input type="number" value={element.size} onchange={handleFontSizeChange} />
 		<select value={element.fontWeight} onchange={handleFontWeightChange}>
 			{#each fontWeightOptions as weight}
 				<option value={weight}>{weight}</option>
 			{/each}
 		</select>
+	</div>
+	<div class="settings-row font-size-row">
+		<label class="font-size-label">Size:</label>
+		<button class="size-button" onclick={() => adjustFontSize(-5)} title="Decrease by 5">-5</button>
+		<button class="size-button" onclick={() => adjustFontSize(-1)} title="Decrease by 1">-1</button>
+		<input type="number" value={element.fontSize} onchange={handleFontSizeChange} class="font-size-input" />
+		<button class="size-button" onclick={() => adjustFontSize(1)} title="Increase by 1">+1</button>
+		<button class="size-button" onclick={() => adjustFontSize(5)} title="Increase by 5">+5</button>
 	</div>
 	<div class="settings-row">
 		<button class="icon-button" onclick={() => updateElement({ alignment: 'left' })}>
@@ -166,6 +184,17 @@
 		gap: 4px;
 		align-items: center;
 	}
+	
+	.font-size-row {
+		gap: 6px;
+	}
+	
+	.font-size-label {
+		font-size: 13px;
+		color: #cccccc;
+		margin-right: 4px;
+	}
+	
 	select,
 	input[type='number'] {
 		background-color: #3d3d3d;
@@ -175,9 +204,47 @@
 		border-radius: 2px;
 	}
 
+	/* Font select shows each font in its own font family */
+	.font-select {
+		flex: 1;
+		min-width: 120px;
+	}
+	
+	.font-select option {
+		padding: 4px 8px;
+	}
+
 	input[type='number'] {
 		width: 60px;
 	}
+	
+	.font-size-input {
+		width: 55px;
+		text-align: center;
+	}
+	
+	.size-button {
+		background-color: #3d3d3d;
+		color: #ffffff;
+		border: 1px solid #4d4d4d;
+		padding: 4px 8px;
+		border-radius: 2px;
+		cursor: pointer;
+		font-size: 12px;
+		min-width: 32px;
+		transition: all 0.15s;
+	}
+	
+	.size-button:hover {
+		background-color: #4d4d4d;
+		border-color: #5d5d5d;
+	}
+	
+	.size-button:active {
+		background-color: #5d5d5d;
+		transform: scale(0.95);
+	}
+	
 	.icon-button {
 		background-color: transparent;
 		border: none;

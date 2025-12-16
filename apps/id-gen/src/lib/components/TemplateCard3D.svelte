@@ -971,7 +971,7 @@
 					{@const isTextType = el.type === 'text' || el.type === 'selection'}
 					<!-- Colored background overlay -->
 					{#if showColors}
-						<T.Mesh position.x={pos3d.x} position.y={pos3d.y} position.z={0.025}>
+						<T.Mesh position.x={pos3d.x} position.y={pos3d.y} position.z={0.025} rotation.z={pos3d.rotation}>
 							<T.PlaneGeometry args={[pos3d.width, pos3d.height]} />
 							<T.MeshBasicMaterial
 								color={getElementColor(el.type)}
@@ -1008,12 +1008,13 @@
 									: pos3d.x}
 							position.y={pos3d.y}
 							position.z={0.027}
+							rotation.z={pos3d.rotation}
 							maxWidth={pos3d.width * 0.95}
 						/>
 					{/if}
 					<!-- Element border -->
 					{#if showBorders}
-						<T.LineLoop position.x={pos3d.x} position.y={pos3d.y} position.z={0.026}>
+						<T.LineLoop position.x={pos3d.x} position.y={pos3d.y} position.z={0.026} rotation.z={pos3d.rotation}>
 							<T.BufferGeometry>
 								<T.Float32BufferAttribute
 									attach="attributes-position"
@@ -1047,7 +1048,7 @@
 					{@const backIdx = idx + 1000}
 					<!-- Colored background overlay -->
 					{#if showColors}
-						<T.Mesh position.x={-pos3d.x} position.y={pos3d.y} position.z={-0.025}>
+						<T.Mesh position.x={-pos3d.x} position.y={pos3d.y} position.z={-0.025} rotation.z={-pos3d.rotation}>
 							<T.PlaneGeometry args={[pos3d.width, pos3d.height]} />
 							<T.MeshBasicMaterial
 								color={getElementColor(el.type)}
@@ -1086,11 +1087,12 @@
 							position.z={-0.027}
 							maxWidth={pos3d.width * 0.95}
 							rotation.y={Math.PI}
+							rotation.z={-pos3d.rotation}
 						/>
 					{/if}
 					<!-- Element border -->
 					{#if showBorders}
-						<T.LineLoop position.x={-pos3d.x} position.y={pos3d.y} position.z={-0.026}>
+						<T.LineLoop position.x={-pos3d.x} position.y={pos3d.y} position.z={-0.026} rotation.z={-pos3d.rotation}>
 							<T.BufferGeometry>
 								<T.Float32BufferAttribute
 									attach="attributes-position"

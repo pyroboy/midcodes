@@ -650,6 +650,19 @@
 			const elementWidth = Math.round(dimensions.width);
 			const elementHeight = Math.round(dimensions.height);
 
+			// Calculate center point for rotation
+			const centerX = elementX + elementWidth / 2;
+			const centerY = elementY + elementHeight / 2;
+
+			// Apply rotation if present
+			const rotation = element.rotation || 0;
+			if (rotation !== 0) {
+				ctx.save();
+				ctx.translate(centerX, centerY);
+				ctx.rotate((rotation * Math.PI) / 180);
+				ctx.translate(-centerX, -centerY);
+			}
+
 			// Draw red bounding box if enabled
 			if (showBoundingBoxes) {
 				ctx.strokeStyle = 'red';
@@ -684,6 +697,11 @@
 
 			ctx.fillText(text, x, y);
 			ctx.globalAlpha = 1;
+
+			// Restore context if rotation was applied
+			if (rotation !== 0) {
+				ctx.restore();
+			}
 		} catch (error: any) {
 			throw new CanvasOperationError(
 				`Failed to render text element: ${element.variableName}`,
@@ -719,6 +737,22 @@
 			const elementWidth = Math.round(dimensions.width);
 			const elementHeight = Math.round(dimensions.height);
 
+			// Calculate center point for rotation
+			const centerX = elementX + elementWidth / 2;
+			const centerY = elementY + elementHeight / 2;
+
+			// Apply rotation if present
+			const rotation = element.rotation || 0;
+
+			ctx.save();
+
+			// Apply rotation transform before clipping
+			if (rotation !== 0) {
+				ctx.translate(centerX, centerY);
+				ctx.rotate((rotation * Math.PI) / 180);
+				ctx.translate(-centerX, -centerY);
+			}
+
 			// Draw red bounding box if enabled
 			if (showBoundingBoxes) {
 				ctx.strokeStyle = 'red';
@@ -726,7 +760,6 @@
 				ctx.strokeRect(elementX, elementY, elementWidth, elementHeight);
 			}
 
-			ctx.save();
 			ctx.beginPath();
 			ctx.rect(elementX, elementY, elementWidth, elementHeight);
 			ctx.clip();

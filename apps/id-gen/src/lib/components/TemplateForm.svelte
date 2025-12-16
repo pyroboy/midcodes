@@ -24,6 +24,11 @@
 		PerformanceMonitor
 	} from '$lib/utils/canvasPerformance';
 
+	// Local state for optimization
+	let activeDragElement: TemplateElement | null = $state(null);
+	let activeDragIndex: number | null = $state(null);
+	let hasModified = false; // Track if we actually changed anything
+
 	let {
 		side,
 		preview,
@@ -73,9 +78,17 @@
 	// Shared hover state between canvas and element list
 	let hoveredElementId: string | null = $state(null);
 	let selectedElementId: string | null = $state(null);
+	let selectionVersion = $state(0); // Track repeated selections of same element
 	let startX: number, startY: number;
-	let currentElementIndex: number | null = null;
-	let resizeHandle: string | null = null;
+	let currentElementIndex: number | null = $state(null);
+	let resizeHandle: string | null = $state(null);
+
+	// Rotation state
+	let isRotating = $state(false);
+	let rotateStartAngle: number = 0;
+	let rotateElementStartRotation: number = 0;
+	let rotationCursorPos = $state({ x: 0, y: 0 });
+	let currentRotationValue = $state(0);
 
 	// Background manipulation state
 	let isDraggingBackground = false;
@@ -448,11 +461,24 @@
 		updateElements(newElements);
 	}
 
+
+
+	function handleSidebarSelect(id: string | null) {
+		selectedElementId = id;
+		selectionVersion++;
+	}
+
 	function onMouseDown(event: MouseEvent, index: number, handle: string | null = null) {
 		const element = elements[index];
 		selectedElementId = element.id; // Select on interaction
-		
+		selectionVersion++; // Force update even if ID is same
+
 		console.log('🔴 Handle Tapped:', handle || 'element-body', 'on side:', $state.snapshot(side));
+
+		// Initialize local drag state
+		activeDragElement = { ...element };
+		activeDragIndex = index;
+		hasModified = false;
 
 		if (handle) {
 			isResizing = true;
@@ -473,6 +499,8 @@
 	
 	function onTouchStart(event: TouchEvent, index: number, handle: string | null = null) {
 		if (event.touches.length > 0) {
+			// Prevent default to stop scrolling interaction immediately on touch start
+			event.preventDefault();
 			const touch = event.touches[0];
 			// Create a synthetic MouseEvent for compatibility
 			const mouseEvent = new MouseEvent('mousedown', {
@@ -505,14 +533,111 @@
 		onMouseUp();
 	}
 
+	function onRotationStart(event: MouseEvent, index: number) {
+		const element = elements[index];
+		selectedElementId = element.id;
+		selectionVersion++;
+
+		activeDragElement = { ...element };
+		activeDragIndex = index;
+		hasModified = false;
+
+		isRotating = true;
+		currentElementIndex = index;
+
+		// Calculate element center in screen coordinates
+		const rect = templateContainer?.getBoundingClientRect();
+		if (!rect) return;
+
+		const currentCoordSystem = coordSystem();
+		const previewPos = currentCoordSystem.storageToPreview({
+			x: (element.x || 0) + (element.width || 0) / 2,
+			y: (element.y || 0) + (element.height || 0) / 2
+		});
+
+		const centerX = rect.left + previewPos.x;
+		const centerY = rect.top + previewPos.y;
+
+		// Calculate starting angle from center to mouse position
+		rotateStartAngle = Math.atan2(event.clientY - centerY, event.clientX - centerX) * (180 / Math.PI);
+		rotateElementStartRotation = element.rotation || 0;
+
+		event.preventDefault();
+		event.stopPropagation();
+	}
+
+	function onTouchRotationStart(event: TouchEvent, index: number) {
+		if (event.touches.length > 0) {
+			event.preventDefault();
+			const touch = event.touches[0];
+			const mouseEvent = new MouseEvent('mousedown', {
+				clientX: touch.clientX,
+				clientY: touch.clientY,
+				bubbles: true,
+				cancelable: true
+			});
+			onRotationStart(mouseEvent, index);
+		}
+	}
+
 	function onBackgroundClick() {
-		if (!isDragging && !isResizing) {
+		if (!isDragging && !isResizing && !isRotating) {
 			selectedElementId = null;
 		}
 	}
 
 	function onMouseMove(event: MouseEvent) {
-		if ((!isDragging && !isResizing) || currentElementIndex === null) return;
+		if ((!isDragging && !isResizing && !isRotating) || currentElementIndex === null || !activeDragElement) return;
+
+		// Handle rotation
+		if (isRotating) {
+			const rect = templateContainer?.getBoundingClientRect();
+			if (!rect) return;
+
+			const currentCoordSystem = coordSystem();
+			const previewPos = currentCoordSystem.storageToPreview({
+				x: (activeDragElement.x || 0) + (activeDragElement.width || 0) / 2,
+				y: (activeDragElement.y || 0) + (activeDragElement.height || 0) / 2
+			});
+
+			const centerX = rect.left + previewPos.x;
+			const centerY = rect.top + previewPos.y;
+
+			// Calculate current angle from center to mouse position
+			const currentAngle =
+				Math.atan2(event.clientY - centerY, event.clientX - centerX) * (180 / Math.PI);
+
+			// Calculate rotation delta
+			const deltaAngle = currentAngle - rotateStartAngle;
+
+			// Calculate new rotation (keep raw value for display, can be negative)
+			let rawRotation = rotateElementStartRotation + deltaAngle;
+
+			// Snap to 15-degree increments when Shift is held
+			if (event.shiftKey) {
+				rawRotation = Math.round(rawRotation / 15) * 15;
+			}
+
+			// Normalize to -180 to +180 range for display and storage
+			let normalizedRotation = rawRotation % 360;
+			if (normalizedRotation > 180) {
+				normalizedRotation -= 360;
+			} else if (normalizedRotation < -180) {
+				normalizedRotation += 360;
+			}
+
+			// Store display value
+			currentRotationValue = Math.round(normalizedRotation);
+
+			// Track cursor position for tooltip
+			rotationCursorPos = { x: event.clientX, y: event.clientY };
+
+			// Update local state
+			activeDragElement = { ...activeDragElement, rotation: Number(normalizedRotation.toFixed(2)) };
+			hasModified = true;
+
+			return; // Don't process drag/resize when rotating
+		}
 
 		if (isResizing) {
 			console.log('⚪ Dragging White Circle:', $state.snapshot({ 
@@ -528,18 +653,14 @@
 		// Use coordinate system for mouse movement conversion
 		const storageDelta = coordSystem().scaleMouseDelta(dx, dy);
 
-		const element = elements?.[currentElementIndex];
-		if (!element) return;
-
-		const updatedElements = [...elements];
-		const updatedElement = { ...element };
-		const bounds = coordSystem().getStorageBounds();
-
-		if (isResizing && element.width !== undefined && element.height !== undefined) {
-			let newWidth = element.width;
-			let newHeight = element.height;
-			let newX = element.x || 0;
-			let newY = element.y || 0;
+		// Operate on local state activeDragElement instead of elements array
+		const updatedElement = { ...activeDragElement }; // Start from current local state
+		
+		if (isResizing && updatedElement.width !== undefined && updatedElement.height !== undefined) {
+			let newWidth = updatedElement.width;
+			let newHeight = updatedElement.height;
+			let newX = updatedElement.x || 0;
+			let newY = updatedElement.y || 0;
 
 			switch (resizeHandle) {
 				case 'top-left':
@@ -578,32 +699,47 @@
 		} else {
 			// Just update position during dragging, maintain original size
 			const newPos = {
-				x: (element.x || 0) + storageDelta.x,
-				y: (element.y || 0) + storageDelta.y
+				x: (updatedElement.x || 0) + storageDelta.x,
+				y: (updatedElement.y || 0) + storageDelta.y
 			};
 
 			const constrainedPos = coordSystem().constrainToStorage(newPos, {
-				width: element.width || 0,
-				height: element.height || 0
+				width: updatedElement.width || 0,
+				height: updatedElement.height || 0
 			});
 
 			updatedElement.x = Number(constrainedPos.x.toFixed(2));
 			updatedElement.y = Number(constrainedPos.y.toFixed(2));
 		}
 
-		updatedElements[currentElementIndex] = updatedElement;
-		// Use the centralized update function to ensure logging
-		updateElements(updatedElements);
+		// Update local state only - DO NOT call updateElements() here
+		activeDragElement = updatedElement;
+		hasModified = true;
 
 		startX = event.clientX;
 		startY = event.clientY;
 	}
 
 	function onMouseUp() {
+		// Commit changes ONLY if we actually modified the element
+		if (hasModified && (isDragging || isResizing || isRotating) && currentElementIndex !== null && activeDragElement) {
+			const updatedElements = [...elements];
+			updatedElements[currentElementIndex] = activeDragElement;
+			updateElements(updatedElements);
+		}
+
 		isDragging = false;
 		isResizing = false;
+		isRotating = false;
 		currentElementIndex = null;
+		activeDragElement = null; // Clear local state
+		activeDragIndex = null;
+		hasModified = false;
 		resizeHandle = null;
+
+		// Reset rotation tracking
+		rotateStartAngle = 0;
+		rotateElementStartRotation = 0;
 
 		// Background manipulation cleanup
 		isDraggingBackground = false;
@@ -794,6 +930,13 @@
 			element.height || 0
 		);
 
+		// Add rotation transform if element has rotation
+		const rotation = element.rotation || 0;
+		if (rotation !== 0) {
+			positionStyle['transform'] = `rotate(${rotation}deg)`;
+			positionStyle['transform-origin'] = 'center center';
+		}
+
 		return positionStyle;
 	});
 
@@ -826,12 +969,32 @@
 		};
 	});
 
-	function stopPropagation(fn: (e: MouseEvent) => void) {
-		return (e: MouseEvent) => {
+	function stopPropagation<E extends Event>(fn: (e: E) => void) {
+		return (e: E) => {
 			e.stopPropagation();
 			fn(e);
 		};
 	}
+	// Custom action to add non-passive touch listeners
+	function nonPassiveTouch(node: HTMLElement, handler: (e: TouchEvent) => void) {
+		let currentHandler = handler;
+		
+		const eventHandler = (e: TouchEvent) => {
+			currentHandler(e);
+		};
+		
+		node.addEventListener('touchstart', eventHandler, { passive: false });
+		
+		return {
+			update(newHandler: (e: TouchEvent) => void) {
+				currentHandler = newHandler;
+			},
+			destroy() {
+				node.removeEventListener('touchstart', eventHandler);
+			}
+		};
+	}
+
 	onMount(() => {
 		// Add non-passive touch listeners to window to support preventing default (scrolling)
 		// This fixes the "Unable to preventDefault inside passive event listener" error
@@ -945,13 +1108,13 @@
 								class="template-element {element.type}"
 								class:highlighted={hoveredElementId === element.id}
 								class:selected={selectedElementId === element.id}
-								style={Object.entries(elementStyle(element))
+								style={Object.entries(elementStyle(activeDragIndex === i && activeDragElement ? activeDragElement : element))
 									.map(([key, value]) => `${key}: ${value}`)
 									.join(';')}
 								onmouseenter={() => (hoveredElementId = element.id)}
 								onmouseleave={() => (hoveredElementId = null)}
 								onmousedown={(e) => onMouseDown(e, i)}
-								ontouchstart={(e) => onTouchStart(e, i)}
+								use:nonPassiveTouch={(e) => onTouchStart(e, i)}
 								role="button"
 								tabindex="0"
 								aria-label="{element.type} element"
@@ -980,7 +1143,7 @@
 										class="resize-handle top-left"
 										class:active={resizeHandle === 'top-left' && currentElementIndex === i}
 										onmousedown={stopPropagation((e) => onMouseDown(e, i, 'top-left'))}
-										ontouchstart={stopPropagation((e) => onTouchStart(e, i, 'top-left'))}
+										use:nonPassiveTouch={stopPropagation((e) => onTouchStart(e, i, 'top-left'))}
 										role="button"
 										tabindex="0"
 										aria-label="Resize top left"
@@ -989,7 +1152,7 @@
 										class="resize-handle top-right"
 										class:active={resizeHandle === 'top-right' && currentElementIndex === i}
 										onmousedown={stopPropagation((e) => onMouseDown(e, i, 'top-right'))}
-										ontouchstart={stopPropagation((e) => onTouchStart(e, i, 'top-right'))}
+										use:nonPassiveTouch={stopPropagation((e) => onTouchStart(e, i, 'top-right'))}
 										role="button"
 										tabindex="0"
 										aria-label="Resize top right"
@@ -998,7 +1161,7 @@
 										class="resize-handle bottom-left"
 										class:active={resizeHandle === 'bottom-left' && currentElementIndex === i}
 										onmousedown={stopPropagation((e) => onMouseDown(e, i, 'bottom-left'))}
-										ontouchstart={stopPropagation((e) => onTouchStart(e, i, 'bottom-left'))}
+										use:nonPassiveTouch={stopPropagation((e) => onTouchStart(e, i, 'bottom-left'))}
 										role="button"
 										tabindex="0"
 										aria-label="Resize bottom left"
@@ -1007,11 +1170,33 @@
 										class="resize-handle bottom-right"
 										class:active={resizeHandle === 'bottom-right' && currentElementIndex === i}
 										onmousedown={stopPropagation((e) => onMouseDown(e, i, 'bottom-right'))}
-										ontouchstart={stopPropagation((e) => onTouchStart(e, i, 'bottom-right'))}
+										use:nonPassiveTouch={stopPropagation((e) => onTouchStart(e, i, 'bottom-right'))}
 										role="button"
 										tabindex="0"
 										aria-label="Resize bottom right"
 									></div>
+									<!-- Rotation handle - positioned 40px below element bottom center -->
+									<div
+										class="rotation-handle"
+										class:active={isRotating && currentElementIndex === i}
+										onmousedown={stopPropagation((e) => onRotationStart(e, i))}
+										use:nonPassiveTouch={stopPropagation((e) => onTouchRotationStart(e, i))}
+										role="button"
+										tabindex="0"
+										aria-label="Rotate element"
+									>
+										<svg
+											width="14"
+											height="14"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+										>
+											<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+											<path d="M21 3v5h-5" />
+										</svg>
+									</div>
 								</div>
 							</div>
 						{/each}
@@ -1039,12 +1224,25 @@
 			{cardSize}
 			{pixelDimensions}
 			{hoveredElementId}
+			{selectedElementId}
+			{selectionVersion}
+			onSelect={handleSidebarSelect}
 			onHoverElement={(id) => {
 				hoveredElementId = id;
 			}}
 		/>
 	</div>
 </div>
+
+<!-- Rotation value tooltip (positioned near cursor) -->
+{#if isRotating}
+	<div
+		class="rotation-tooltip"
+		style="left: {rotationCursorPos.x + 16}px; top: {rotationCursorPos.y + 16}px;"
+	>
+		{currentRotationValue}°
+	</div>
+{/if}
 
 <style>
 	.template-section {
@@ -1106,7 +1304,7 @@
 		height: 100%;
 		position: relative;
 		background-color: white;
-		overflow: hidden;
+		overflow: visible; /* Allow rotation handle to extend outside */
 		border-radius: 2px;
 		box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
 		container-type: inline-size; /* Enable container queries for responsive font sizing */
@@ -1130,6 +1328,7 @@
 		height: 100%;
 		z-index: 10; /* Explicitly higher than canvas (1) and other potential layers */
 		pointer-events: none; /* Allow clicks to pass through empty areas */
+		overflow: visible; /* Allow rotation handle to extend outside */
 	}
 
 	.placeholder-design {
@@ -1198,14 +1397,13 @@
 		/* Default: hidden or very subtle unless selected/hovered? 
 		   User said "I want the borders to be thick and more opaque". 
 		   Usually unselected elements show content only. 
-		   But if they want to see the bounding box always:
-		*/
-		outline: none; /* Only show when selected/hovered to avoid clutter? Or always?
 		              Ref: "I want the borders to be violet... thicker and more opaque"
 		              If I make it outline always, it might look messy. 
 		              Let's make it visible on hover/selection. 
 		              If user meant "always visible", I can change. 
 		              Standard UI: visible on hover/select. */
+		outline: none; /* Only show when selected/hovered to avoid clutter? Or always? */
+		touch-action: none; /* Prevent browser scrolling/zooming while interacting */
 		box-shadow: none;
 		box-sizing: border-box;
 		opacity: 1; /* Fully opaque content */
@@ -1242,6 +1440,7 @@
 		border-radius: 50%;
 		display: none;
 		align-items: center;
+		justify-content: center;
 		justify-content: center;
 		z-index: 30; /* Above element */
 		touch-action: none; /* Prevent scrolling while dragging handle */
@@ -1354,6 +1553,62 @@
 		bottom: -22px;
 		right: -22px;
 		cursor: nwse-resize;
+	}
+
+	/* Rotation handle styles */
+	.rotation-handle {
+		position: absolute;
+		left: 50%;
+		bottom: -50px; /* 40px gap + handle radius */
+		transform: translateX(-50%);
+		width: 24px;
+		height: 24px;
+		background-color: white;
+		border: 2px solid #8b5cf6;
+		border-radius: 50%;
+		display: none;
+		align-items: center;
+		justify-content: center;
+		cursor: grab;
+		z-index: 35;
+		touch-action: none;
+		color: #8b5cf6;
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+	}
+
+	/* Only show rotation handle when element is selected (not on hover) */
+	.template-element.selected .rotation-handle,
+	.rotation-handle.active {
+		display: flex;
+	}
+
+	.rotation-handle:hover {
+		background-color: #f3e8ff;
+		transform: translateX(-50%) scale(1.1);
+	}
+
+	.rotation-handle.active {
+		cursor: grabbing;
+		background-color: #8b5cf6;
+		color: white;
+	}
+
+
+	/* Rotation tooltip - positioned fixed to follow cursor */
+	:global(.rotation-tooltip) {
+		position: fixed;
+		background-color: rgba(0, 0, 0, 0.85);
+		color: white;
+		padding: 4px 10px;
+		border-radius: 4px;
+		font-size: 13px;
+		font-weight: 500;
+		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+		pointer-events: none;
+		z-index: 9999;
+		white-space: nowrap;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+		letter-spacing: 0.5px;
 	}
 
 	/* Background manipulation controls removed - use thumbnail controls only */
