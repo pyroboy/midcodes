@@ -1,5 +1,10 @@
 import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
+import { checkRateLimit, createRateLimitResponse, RateLimitConfigs } from '$lib/utils/rate-limiter';
+import { validateImageUploadServer, sanitizeFilename } from '$lib/utils/fileValidation';
+
+// SECURITY: Maximum file size for uploads (10MB)
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const { supabase, org_id } = locals;
@@ -31,7 +36,19 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 export const actions: Actions = {
 	upload: async ({ request, locals }) => {
-		const { supabase, org_id } = locals;
+		const { supabase, org_id, user } = locals;
+
+		// SECURITY: Rate limiting for file uploads
+		const rateLimitResult = checkRateLimit(
+			request,
+			RateLimitConfigs.UPLOAD,
+			'admin:upload-custom-id',
+			user?.id
+		);
+
+		if (rateLimitResult.limited) {
+			return fail(429, { error: 'Too many uploads. Please try again later.' });
+		}
 
 		if (!org_id) {
 			return fail(403, { error: 'No organization context found' });
@@ -47,12 +64,37 @@ export const actions: Actions = {
 				return fail(400, { error: 'Template and both images are required' });
 			}
 
-			// Upload front image
-			const frontPath = `front_custom_${Date.now()}_${frontImage.name}`;
+			// SECURITY: Server-side file size validation
+			if (frontImage.size > MAX_FILE_SIZE) {
+				return fail(400, { error: 'Front image too large (max 10MB)' });
+			}
+			if (backImage.size > MAX_FILE_SIZE) {
+				return fail(400, { error: 'Back image too large (max 10MB)' });
+			}
+
+			// SECURITY: Server-side file type validation with magic bytes
+			const frontBuffer = await frontImage.arrayBuffer();
+			const frontValidation = await validateImageUploadServer(frontBuffer, frontImage.name);
+			if (!frontValidation.valid) {
+				return fail(400, { error: `Front image: ${frontValidation.error}` });
+			}
+
+			const backBuffer = await backImage.arrayBuffer();
+			const backValidation = await validateImageUploadServer(backBuffer, backImage.name);
+			if (!backValidation.valid) {
+				return fail(400, { error: `Back image: ${backValidation.error}` });
+			}
+
+			// SECURITY: Sanitize filenames to prevent path traversal
+			const safeFrontName = sanitizeFilename(frontImage.name);
+			const safeBackName = sanitizeFilename(backImage.name);
+
+			// Upload front image with sanitized name
+			const frontPath = `front_custom_${Date.now()}_${safeFrontName}`;
 			const { error: frontUploadError } = await supabase.storage
 				.from('rendered-id-cards')
-				.upload(frontPath, frontImage, {
-					contentType: frontImage.type,
+				.upload(frontPath, new Blob([frontBuffer], { type: frontValidation.detectedMime }), {
+					contentType: frontValidation.detectedMime,
 					upsert: false
 				});
 
@@ -61,12 +103,12 @@ export const actions: Actions = {
 				return fail(500, { error: 'Failed to upload front image' });
 			}
 
-			// Upload back image
-			const backPath = `back_custom_${Date.now()}_${backImage.name}`;
+			// Upload back image with sanitized name
+			const backPath = `back_custom_${Date.now()}_${safeBackName}`;
 			const { error: backUploadError } = await supabase.storage
 				.from('rendered-id-cards')
-				.upload(backPath, backImage, {
-					contentType: backImage.type,
+				.upload(backPath, new Blob([backBuffer], { type: backValidation.detectedMime }), {
+					contentType: backValidation.detectedMime,
 					upsert: false
 				});
 
@@ -100,3 +142,4 @@ export const actions: Actions = {
 		}
 	}
 };
+

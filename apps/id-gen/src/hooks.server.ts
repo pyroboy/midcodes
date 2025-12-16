@@ -294,6 +294,30 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
 };
 
 const authGuard: Handle = async ({ event, resolve }) => {
+	// SECURITY: Build Content Security Policy
+	// Note: 'unsafe-inline' and 'unsafe-eval' are needed for Svelte/SvelteKit
+	const cspDirectives = [
+		"default-src 'self'",
+		// Scripts: self + inline for Svelte, wasm for background removal
+		"script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net",
+		// Styles: self + inline for Svelte component styles
+		"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+		// Images: self + data URIs + Supabase storage
+		"img-src 'self' data: blob: https://*.supabase.co",
+		// Fonts: self + Google Fonts
+		"font-src 'self' https://fonts.gstatic.com",
+		// Connect: self + Supabase APIs + PayMongo
+		"connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.paymongo.com",
+		// Workers: allow blob for WASM workers (background removal)
+		"worker-src 'self' blob:",
+		// Frame ancestors: prevent clickjacking
+		"frame-ancestors 'none'",
+		// Base URI: prevent base tag hijacking
+		"base-uri 'self'",
+		// Form action: only allow forms to our origin
+		"form-action 'self'"
+	].join('; ');
+
 	// Set baseline security headers on all responses
 	// COEP/COOP enable cross-origin isolation for WebAssembly multi-threading (background removal AI)
 	event.setHeaders({
@@ -302,7 +326,14 @@ const authGuard: Handle = async ({ event, resolve }) => {
 		'Referrer-Policy': 'strict-origin-when-cross-origin',
 		'Permissions-Policy': 'geolocation=(), microphone=(), camera=(self)',
 		'Cross-Origin-Embedder-Policy': 'credentialless',
-		'Cross-Origin-Opener-Policy': 'same-origin'
+		'Cross-Origin-Opener-Policy': 'same-origin',
+		// SECURITY: Content Security Policy
+		'Content-Security-Policy': cspDirectives,
+		// SECURITY: HTTP Strict Transport Security - prevents HTTP downgrade attacks
+		// Note: Only set in production to avoid issues with localhost development
+		...(dev ? {} : {
+			'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload'
+		})
 	});
 
 	const sessionInfo = await event.locals.safeGetSession();

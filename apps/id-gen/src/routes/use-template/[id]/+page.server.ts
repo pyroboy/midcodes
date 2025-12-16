@@ -5,7 +5,7 @@ import type { PageServerLoad, Actions } from './$types';
 export const load: PageServerLoad = async ({ params, locals }) => {
 	console.log('[Use Template Load] Starting with params:', params);
 
-	const { supabase, safeGetSession } = locals;
+	const { supabase, safeGetSession, org_id } = locals;
 
 	// const authResult = await checkAuth({ safeGetSession, action: 'Use Template Load' });
 	// if (!authResult.success) {
@@ -45,6 +45,16 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 			templateId
 		});
 		throw error(404, 'Template not found');
+	}
+
+	// SECURITY: Defense-in-depth IDOR check
+	// Ensure the template belongs to the user's organization
+	if (org_id && template.org_id !== org_id) {
+		console.error('[Use Template] Security violation: Cross-organization template access attempt', {
+			userOrgId: org_id,
+			templateOrgId: template.org_id
+		});
+		throw error(403, 'Unauthorized access to template');
 	}
 
 	return {
@@ -96,8 +106,16 @@ export const actions: Actions = {
 				return fail(404, { error: 'Template not found' });
 			}
 
-			// Use the USER's org_id, not the template's org_id
-			// This ensures the card appears in the user's all-ids list
+			// SECURITY: Enforce organization isolation
+			if (userOrgId && template.org_id !== userOrgId) {
+				console.error('[Save ID Card] Security violation: Cross-organization template usage attempt', {
+					userOrgId,
+					templateOrgId: template.org_id
+				});
+				return fail(403, { error: 'Unauthorized: Template does not belong to your organization' });
+			}
+
+			// Use the USER's org_id (which we now know matches template.org_id or is the only context)
 			const effectiveOrgId = userOrgId || template.org_id;
 			
 			console.log('[Save ID Card] Using org_id:', {
@@ -146,18 +164,23 @@ export const actions: Actions = {
 
 			console.log('[Save ID Card] Form fields:', formFields);
 
-			const { data: idCard, error: saveError } = await saveIdCardData(supabase, {
+			const createDigitalCard = formData.get('createDigitalCard') === 'true';
+
+			const { data: idCard, digitalCard, claimCode, error: saveError } = await saveIdCardData(supabase, {
 				templateId,
 				orgId: effectiveOrgId,
 				frontPath: uploadResult.frontPath,
 				backPath: uploadResult.backPath,
-				formFields
+				formFields,
+				createDigitalCard,
+				userId: locals.session?.user?.id
 			});
 
 			console.log('[Save ID Card] Save result:', {
 				success: !!idCard,
 				error: saveError,
-				idCardId: idCard?.id
+				idCardId: idCard?.id,
+				digitalCardSlug: digitalCard?.slug
 			});
 
 			if (saveError) {
@@ -168,7 +191,8 @@ export const actions: Actions = {
 			console.log('[Save ID Card] Successfully saved ID card:', {
 				idCardId: idCard?.id,
 				frontPath: uploadResult.frontPath,
-				backPath: uploadResult.backPath
+				backPath: uploadResult.backPath,
+				hasDigitalCard: !!digitalCard
 			});
 
 			// Return success response
@@ -177,7 +201,12 @@ export const actions: Actions = {
 				data: [
 					{
 						success: true,
-						idCardId: idCard?.id
+						idCardId: idCard?.id,
+						digitalCard: digitalCard ? {
+							slug: digitalCard.slug,
+							claimCode: claimCode,
+							status: digitalCard.status
+						} : null
 					}
 				]
 			};

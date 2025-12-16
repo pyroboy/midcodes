@@ -95,12 +95,14 @@ export function validateEnvironment(): EnvValidationResult {
 }
 
 /**
- * Validates environment and logs results
+ * SECURITY: Validates environment and logs results safely
+ * Never logs actual secret values - only configuration status
  * Throws error if critical validation fails
  */
 export function validateAndLogEnvironment(): void {
 	const result = validateEnvironment();
 
+	// SECURITY: Log only configuration status, never actual values
 	if (result.warnings.length > 0) {
 		console.warn('⚠️  Environment validation warnings:');
 		result.warnings.forEach((warning) => console.warn(`  - ${warning}`));
@@ -114,5 +116,12 @@ export function validateAndLogEnvironment(): void {
 		);
 	}
 
-	console.log('✅ Environment validation passed');
+	// SECURITY: Log only that validation passed, with boolean status indicators
+	// Never log actual values or lengths that could hint at secrets
+	console.log('✅ Environment validation passed', {
+		supabaseConfigured: true,
+		paymongoConfigured: !!PAYMONGO_SECRET_KEY,
+		webhookConfigured: !!PAYMONGO_WEBHOOK_SECRET,
+		mode: dev ? 'development' : 'production'
+	});
 }

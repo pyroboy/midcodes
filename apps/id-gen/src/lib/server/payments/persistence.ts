@@ -291,9 +291,56 @@ export async function listPaymentsByUser({
 }
 
 /**
+ * SECURITY: Atomically checks and marks a webhook event as processed
+ * Uses INSERT ... ON CONFLICT to prevent race conditions in the check-then-insert pattern
+ * 
+ * @returns Object with alreadyProcessed flag and the webhook event record
+ */
+export async function processWebhookEventAtomically(
+	eventId: string,
+	eventType: string,
+	rawPayload: Record<string, any>,
+	provider: string = 'paymongo'
+): Promise<{ alreadyProcessed: boolean; event: WebhookEvent | null }> {
+	const insertData: WebhookEventInsert = {
+		event_id: eventId,
+		event_type: eventType,
+		provider,
+		raw_payload: rawPayload as Json
+	};
+
+	// Try to insert - if conflict, it was already processed
+	const { data, error } = await supabaseAdmin
+		.from('webhook_events')
+		.insert(insertData)
+		.select()
+		.single();
+
+	if (error) {
+		// Unique constraint violation means event was already processed
+		if (error.code === '23505') {
+			// Get the existing record for reference
+			const { data: existing } = await supabaseAdmin
+				.from('webhook_events')
+				.select('*')
+				.eq('event_id', eventId)
+				.single();
+
+			return { alreadyProcessed: true, event: existing };
+		}
+		throw new Error(`Failed to process webhook event: ${error.message}`);
+	}
+
+	return { alreadyProcessed: false, event: data };
+}
+
+/**
+ * @deprecated Use processWebhookEventAtomically instead to prevent race conditions
  * Checks if a webhook event has already been processed (idempotency check)
  */
 export async function hasProcessedWebhookEvent(eventId: string): Promise<boolean> {
+	console.warn('[Persistence] hasProcessedWebhookEvent is deprecated. Use processWebhookEventAtomically instead.');
+	
 	const { data, error } = await supabaseAdmin
 		.from('webhook_events')
 		.select('id')
@@ -312,6 +359,7 @@ export async function hasProcessedWebhookEvent(eventId: string): Promise<boolean
 }
 
 /**
+ * @deprecated Use processWebhookEventAtomically instead to prevent race conditions
  * Marks a webhook event as processed for idempotency
  */
 export async function markWebhookEventProcessed(
@@ -320,37 +368,15 @@ export async function markWebhookEventProcessed(
 	rawPayload: Record<string, any>,
 	provider: string = 'paymongo'
 ): Promise<WebhookEvent> {
-	const insertData: WebhookEventInsert = {
-		event_id: eventId,
-		event_type: eventType,
-		provider,
-		raw_payload: rawPayload as Json
-	};
-
-	const { data, error } = await supabaseAdmin
-		.from('webhook_events')
-		.insert(insertData)
-		.select()
-		.single();
-
-	if (error) {
-		// If it's a unique constraint violation, the event was already processed
-		if (error.code === '23505') {
-			// Get the existing record
-			const { data: existing } = await supabaseAdmin
-				.from('webhook_events')
-				.select('*')
-				.eq('event_id', eventId)
-				.single();
-
-			if (existing) {
-				return existing;
-			}
-		}
-		throw new Error(`Failed to mark webhook event as processed: ${error.message}`);
+	console.warn('[Persistence] markWebhookEventProcessed is deprecated. Use processWebhookEventAtomically instead.');
+	
+	const result = await processWebhookEventAtomically(eventId, eventType, rawPayload, provider);
+	
+	if (!result.event) {
+		throw new Error('Failed to mark webhook event as processed');
 	}
-
-	return data;
+	
+	return result.event;
 }
 
 /**

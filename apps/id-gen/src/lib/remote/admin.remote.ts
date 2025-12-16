@@ -1189,7 +1189,15 @@ export const updateOrganizationSettings = command('unchecked', async ({ payments
 		};
 
 		if (paymentsEnabled !== undefined) updateData.payments_enabled = paymentsEnabled;
-		if (paymentsBypass !== undefined) updateData.payments_bypass = paymentsBypass;
+		
+		// SECURITY: Only super_admin can modify payments_bypass
+		if (paymentsBypass !== undefined) {
+			const isSuperAdmin = user.role === 'super_admin';
+			if (!isSuperAdmin) {
+				throw error(403, 'Only super administrators can modify payment bypass settings');
+			}
+			updateData.payments_bypass = paymentsBypass;
+		}
 
 		const { error: updateError } = await supabase
 			.from('org_settings')

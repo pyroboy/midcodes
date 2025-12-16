@@ -11,7 +11,8 @@
 	import * as Select from '$lib/components/ui/select';
 	import { darkMode } from '$lib/stores/darkMode';
 	import ThumbnailInput from '$lib/components/ThumbnailInput.svelte';
-	import { Loader, CheckCircle } from '@lucide/svelte';
+	import { Loader, CheckCircle, Link } from '@lucide/svelte';
+	import * as Icons from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { fade } from 'svelte/transition';
 	// Note: Not using enhance - we use manual fetch for custom handling
@@ -131,7 +132,8 @@
 	const NAVBAR_HEIGHT = 64; // h-16 = 64px
 	const MIN_SCALE = 0.5;
 	const GAP = 16; // gap-4 = 16px
-	const FIXED_ELEMENTS_HEIGHT = 100; // title (~50px) + face label (~30px) + margins (~20px)
+	let createDigitalCard = $state(false);
+	let createdDigitalCard = $state<{ slug: string; claimCode: string; status: string } | null>(null);
 	
 	// Calculate the scale based on scroll position
 	// Simple approach: scale from 1 to MIN_SCALE based on scroll amount
@@ -555,6 +557,7 @@
 			submitFormData.append('templateId', $page.params.id);
 			submitFormData.append('frontImage', frontBlob, 'front.png');
 			submitFormData.append('backImage', backBlob, 'back.png');
+			submitFormData.append('createDigitalCard', createDigitalCard.toString());
 
 			const response = await fetch('?/saveIdCard', {
 				method: 'POST',
@@ -597,6 +600,10 @@
 				recentCardsCache.invalidate();
 				
 				// Hide confirmation overlay and show success overlay
+				// Hide confirmation overlay and show success overlay
+				if (result.type === 'success' && result.data && result.data[0] && result.data[0].digitalCard) {
+					createdDigitalCard = result.data[0].digitalCard;
+				}
 				showConfirmation = false;
 				showSuccess = true;
 				startSuccessCountdown();
@@ -1460,9 +1467,21 @@
 			{/if}
 		</div>
 
-		<p class="text-center text-sm text-white/50 mb-8">
+		<p class="text-center text-sm text-white/50 mb-4">
 			Tap card to flip • Showing {confirmationShowingFront ? 'Front' : 'Back'}
 		</p>
+		
+		<div class="mb-6 flex items-center justify-center gap-2">
+			<input 
+				type="checkbox" 
+				id="createDigitalCard" 
+				bind:checked={createDigitalCard}
+				class="w-5 h-5 rounded border-white/20 bg-white/10 text-primary focus:ring-primary"
+			/>
+			<label for="createDigitalCard" class="text-white text-sm select-none cursor-pointer">
+				Create Digital Profile
+			</label>
+		</div>
 
 		<!-- Action Buttons -->
 		<div class="flex flex-col gap-3 w-full max-w-xs px-4">
@@ -1520,6 +1539,21 @@
 			<p class="text-white/70 mb-6">
 				Redirecting to All IDs in {redirectCountdown}...
 			</p>
+
+			{#if createdDigitalCard}
+				<div class="bg-white/10 p-4 rounded-lg mb-6 max-w-sm mx-auto backdrop-blur-md border border-white/10 text-left">
+					<h3 class="font-bold text-white mb-2 flex items-center gap-2">
+						<Icons.Link size={16} /> Digital Card Created
+					</h3>
+					<div class="text-xs text-white/70 space-y-1 font-mono">
+						<p><span class="opacity-50">URL:</span> /id/{createdDigitalCard.slug}</p>
+						<p><span class="opacity-50">Claim Code:</span> {createdDigitalCard.claimCode}</p>
+					</div>
+					<Button variant="secondary" size="sm" class="w-full mt-3" href="/id/{createdDigitalCard.slug}" target="_blank">
+						View Profile
+					</Button>
+				</div>
+			{/if}
 
 			<Button variant="secondary" onclick={createAnotherCard} class="min-w-[200px]">
 				Create Another Card
