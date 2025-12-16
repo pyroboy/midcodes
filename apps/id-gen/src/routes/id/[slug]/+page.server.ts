@@ -23,6 +23,8 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		console.error('Digital card not found:', cardError);
 		throw error(404, 'Card not found');
 	}
+	
+	const cardData = card as any;
 
 	// 2. Check Status & Privacy
 	// Note: RLS policies might already handle this if we were using a client with limited permissions,
@@ -36,7 +38,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	// So if we got data, it means we are allowed to see it (Public OR Owner).
 	
 	// However, we should double check status logic for 'unclaimed'.
-	if (card.status === 'unclaimed') {
+	if (cardData.status === 'unclaimed') {
 		// If it's unclaimed, we don't show the profile.
 		// We might show a "Not Activated" page or redirect.
 		// For now, let's just show a generic message or allow the user to claim if they have the code?
@@ -46,7 +48,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 
 	// 3. Generate Signed URLs for images
 	// Only if we have images.
-	const idCard = card.idcards;
+	const idCard = cardData.idcards;
 	let frontUrl = null;
 	let backUrl = null;
 
@@ -67,14 +69,14 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 
 	return {
 		profile: {
-			...card.profile_content,
-			status: card.status
+			...cardData.profile_content,
+			status: cardData.status
 		},
 		cardImages: {
 			front: frontUrl,
 			back: backUrl
 		},
-		theme: card.theme_config,
-		isOwner: locals.session?.user?.id === card.owner_id
+		theme: cardData.theme_config,
+		isOwner: locals.session?.user?.id === cardData.owner_id
 	};
 };

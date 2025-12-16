@@ -88,7 +88,9 @@ export async function saveIdCardData(
 		orgId,
 		frontPath,
 		backPath,
-		formFields
+		formFields,
+		createDigitalCard,
+		userId
 	}: {
 		templateId: string;
 		orgId: string;

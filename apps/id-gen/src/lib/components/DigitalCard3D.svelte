@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { T, useFrame } from '@threlte/core';
+  import { T, useTask } from '@threlte/core';
   import * as THREE from 'three';
   import { onMount, onDestroy } from 'svelte';
   import { cubicOut } from 'svelte/easing';
@@ -70,9 +70,9 @@
   });
 
   let time = $state(0);
-  useFrame((ctx) => {
+  useTask((delta) => {
     if (stage === 'intro') {
-      time += ctx.delta;
+      time += delta;
     }
   });
   
