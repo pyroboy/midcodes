@@ -23,10 +23,22 @@
 		? `${templateDimensions.width}/${templateDimensions.height}`
 		: '1013/638';
 
-	// Debug logging for orientation issues
-	$: if (templateDimensions) {
-		console.log(`[SimpleIDCard] ${card?.template_name}: ${templateDimensions.width}x${templateDimensions.height} (${templateDimensions.orientation})`);
-	}
+	// Calculate the "long edge" - this is the max dimension of the card
+	// We use this to ensure uniform visual sizing across different orientations
+	$: longEdge = templateDimensions 
+		? Math.max(templateDimensions.width, templateDimensions.height)
+		: 1013;
+	
+	$: shortEdge = templateDimensions
+		? Math.min(templateDimensions.width, templateDimensions.height)
+		: 638;
+
+	// Calculate container width that ensures uniform visual footprint:
+	// - For landscape (width > height): use 100% of available width
+	// - For portrait (width < height): width should be (shortEdge/longEdge) of container
+	// This makes the "long edge" visually consistent across both orientations
+	$: isPortrait = templateDimensions ? templateDimensions.width < templateDimensions.height : false;
+	$: containerWidthPercent = isPortrait ? (shortEdge / longEdge) * 100 : 100;
 
 	function handleClick(e: MouseEvent) {
 		// Prevent triggering if clicking buttons/checkbox
@@ -66,27 +78,29 @@
 	<Card
 		class="h-full flex flex-col overflow-hidden border-border bg-card hover:shadow-md transition-all duration-200 hover:border-primary/50"
 	>
-		<!-- Image Area - dynamic aspect ratio based on template dimensions -->
-		<div
-			class="relative w-full bg-muted/50 flex items-center justify-center overflow-hidden border-b border-border"
-			style="aspect-ratio: {aspectRatio};"
-		>
-			{#if frontUrl}
-				<img
-					src={frontUrl}
-					alt="Card preview"
-					class="w-full h-full object-contain p-2 transition-transform duration-300 group-hover:scale-105"
-					loading="lazy"
-				/>
-			{:else}
-				<div class="flex flex-col items-center text-muted-foreground">
-					<Eye class="w-8 h-8 mb-1 opacity-50" />
-					<span class="text-xs">No Preview</span>
-				</div>
-			{/if}
+		<!-- Image Area - uniform sizing: portrait cards are narrower to match landscape visual footprint -->
+		<div class="w-full bg-muted/50 flex items-center justify-center overflow-hidden border-b border-border py-2">
+			<div
+				class="relative"
+				style="width: {containerWidthPercent}%; aspect-ratio: {aspectRatio};"
+			>
+				{#if frontUrl}
+					<img
+						src={frontUrl}
+						alt="Card preview"
+						class="w-full h-full transition-transform duration-300 group-hover:scale-105"
+						loading="lazy"
+					/>
+				{:else}
+					<div class="flex flex-col items-center justify-center w-full h-full text-muted-foreground">
+						<Eye class="w-8 h-8 mb-1 opacity-50" />
+						<span class="text-xs">No Preview</span>
+					</div>
+				{/if}
 
-			<!-- Mobile overlay hint -->
-			<div class="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors"></div>
+				<!-- Mobile overlay hint -->
+				<div class="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors"></div>
+			</div>
 		</div>
 
 		<CardContent class="flex-1 p-3 flex flex-col justify-between gap-3">

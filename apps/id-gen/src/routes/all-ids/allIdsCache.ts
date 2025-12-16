@@ -30,8 +30,8 @@ export interface AllIdsCacheSnapshot {
 
 export const ALL_IDS_CACHE_TTL_MS = 600_000; // 10 minutes
 
-// Bumped to v2 to invalidate caches without orientation field
-const STORAGE_KEY_BASE = 'idgen:all-ids:cache:v2';
+// Bumped to v3 to invalidate caches after orientation derivation fix
+const STORAGE_KEY_BASE = 'idgen:all-ids:cache:v3';
 
 /**
  * Optional scope key so caches can be isolated per user+org.

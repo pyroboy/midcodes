@@ -1186,6 +1186,8 @@
 								</thead>
 								<tbody class="divide-y divide-border">
 									{#each cards as card}
+										{@const dims = templateDimensions[card.template_name]}
+										{@const isPortrait = dims ? dims.height > dims.width : false}
 										<tr class="hover:bg-muted/30 transition-colors group">
 											<td class="px-4 py-3">
 												<input
@@ -1195,8 +1197,6 @@
 													onchange={() => selectionManager.toggleSelection(getCardId(card))}
 												/>
 											</td>
-											{@const dims = templateDimensions[card.template_name]}
-											{@const isPortrait = dims ? dims.height > dims.width : false}
 											<td class="px-4 py-2" onclick={(e) => openPreview(e, card)}>
 												<div
 													class="bg-muted rounded overflow-hidden cursor-pointer border border-border hover:border-primary transition-colors flex items-center justify-center"
@@ -1206,7 +1206,7 @@
 														<img
 															src={getSupabaseStorageUrl(card.front_image, 'rendered-id-cards')}
 															alt="Thumb"
-															class="max-w-full max-h-full object-contain"
+															class="w-full h-full"
 															loading="lazy"
 														/>
 													{/if}

@@ -204,6 +204,7 @@
 		<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
 			{#each templates as template (template.id)}
 				{@const dims = getPixelDims(template)}
+				{@const isPortrait = dims.h > dims.w}
 				<div
 					class="group relative flex flex-col bg-card border border-border rounded-xl shadow-sm transition-all duration-300 hover:shadow-md hover:border-primary/50 overflow-hidden h-full"
 					role="article"
@@ -212,7 +213,6 @@
 					onmouseleave={() => (hoveredTemplate = null)}
 				>
 					<!-- Aspect Ratio Container -->
-					{@const isPortrait = dims.h > dims.w}
 					<div
 						class="relative w-full pt-4 px-4 flex-1 flex items-center justify-center bg-muted/30"
 					>

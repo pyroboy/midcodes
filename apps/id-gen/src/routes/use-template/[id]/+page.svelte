@@ -799,7 +799,9 @@
 											isDragging={mouseMoving}
 											pixelDimensions={template.width_pixels && template.height_pixels
 												? { width: template.width_pixels, height: template.height_pixels }
-												: null}
+												: template.orientation === 'portrait'
+													? { width: 638, height: 1013 }
+													: { width: 1013, height: 638 }}
 											on:ready={() => handleCanvasReady('front')}
 											on:error={({ detail }) =>
 												addDebugMessage(`Front Canvas Error: ${detail.code} - ${detail.message}`)}
@@ -839,7 +841,9 @@
 											isDragging={mouseMoving}
 											pixelDimensions={template.width_pixels && template.height_pixels
 												? { width: template.width_pixels, height: template.height_pixels }
-												: null}
+												: template.orientation === 'portrait'
+													? { width: 638, height: 1013 }
+													: { width: 1013, height: 638 }}
 											on:ready={() => handleCanvasReady('back')}
 											on:error={({ detail }) =>
 												addDebugMessage(`Back Canvas Error: ${detail.code} - ${detail.message}`)}

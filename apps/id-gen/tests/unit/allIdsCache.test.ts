@@ -30,7 +30,7 @@ function makeSnapshot(overrides: Partial<AllIdsCacheSnapshot> = {}): AllIdsCache
 		totalCount: 1,
 		hasMore: false,
 		nextOffset: 1,
-		templateDimensions: { T1: { width: 1013, height: 638, unit: 'pixels' } },
+		templateDimensions: { T1: { width: 1013, height: 638, orientation: 'landscape' as const, unit: 'pixels' } },
 		templateFields: { T1: [{ variableName: 'Name', side: 'front' }] },
 		ui: { searchQuery: '', cardMinWidth: 250, viewMode: 'card' },
 		scrollTop: 0,

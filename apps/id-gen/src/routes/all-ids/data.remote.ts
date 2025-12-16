@@ -242,14 +242,27 @@ export const getTemplateDimensions = query(TemplateNamesSchema, async (templateN
 
 	const dimensions: Record<string, { width: number; height: number; orientation: 'landscape' | 'portrait'; unit: string }> = {};
 	(data || []).forEach((template: any) => {
-		const orientation = template.orientation || 'landscape';
-		// Default dimensions based on orientation
+		// Use actual dimensions from database - these should always be set for proper cards
+		const width = template.width_pixels;
+		const height = template.height_pixels;
+		
+		// Derive orientation from actual dimensions if available, otherwise use database orientation
+		let orientation: 'landscape' | 'portrait';
+		if (width && height) {
+			// Derive from actual dimensions - more reliable than stored orientation
+			orientation = width < height ? 'portrait' : 'landscape';
+		} else {
+			// Fallback to stored orientation if dimensions are missing
+			orientation = template.orientation || 'landscape';
+		}
+		
+		// Only use defaults if dimensions are truly missing (which shouldn't happen for properly created templates)
 		const defaultWidth = orientation === 'portrait' ? 638 : 1013;
 		const defaultHeight = orientation === 'portrait' ? 1013 : 638;
 
 		dimensions[template.name] = {
-			width: template.width_pixels || defaultWidth,
-			height: template.height_pixels || defaultHeight,
+			width: width || defaultWidth,
+			height: height || defaultHeight,
 			orientation,
 			unit: 'pixels'
 		};
