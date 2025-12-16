@@ -1076,9 +1076,9 @@
 <style>
 	@keyframes pulse-brightness {
 		0%, 100% { filter: brightness(1); }
-		50% { filter: brightness(1.3); }
+		50% { filter: brightness(1.75); }
 	}
 	.processing-glow {
-		animation: pulse-brightness 1.5s infinite ease-in-out;
+		animation: pulse-brightness 1.2s infinite ease-in-out;
 	}
 </style>
