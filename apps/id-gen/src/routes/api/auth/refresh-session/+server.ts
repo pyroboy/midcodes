@@ -1,14 +1,31 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
+import {
+	checkRateLimit,
+	createRateLimitResponse,
+	RateLimitConfigs
+} from '$lib/utils/rate-limiter';
 
 /**
  * Forces a session refresh to get fresh app_metadata from the database.
  * This is needed after role emulation changes since the JWT contains stale data.
  */
-export const POST: RequestHandler = async ({ locals }) => {
+export const POST: RequestHandler = async ({ locals, request }) => {
 	const session = await locals.safeGetSession();
 
 	if (!session.session) {
 		return json({ error: 'No session found' }, { status: 401 });
+	}
+
+	// SECURITY FIX: Apply rate limiting to prevent abuse
+	const rateLimitResult = checkRateLimit(
+		request,
+		RateLimitConfigs.AUTH,
+		'auth:refresh',
+		session.user?.id
+	);
+
+	if (rateLimitResult.limited) {
+		return createRateLimitResponse(rateLimitResult.resetTime);
 	}
 
 	try {

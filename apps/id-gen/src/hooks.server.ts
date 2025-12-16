@@ -10,6 +10,10 @@ import { getUserPermissions } from '$lib/services/permissions';
 import type { UserJWTPayload } from '$lib/types/auth';
 import '$lib/utils/setup-logging';
 import { logger } from '$lib/utils/logger';
+import { validateAndLogEnvironment } from '$lib/utils/env-validation';
+
+// SECURITY: Validate environment variables at startup
+validateAndLogEnvironment();
 
 export interface GetSessionResult {
 	session: Session | null;
@@ -38,7 +42,9 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
 						...options,
 						path: '/',
 						sameSite: 'lax',
-						secure: !dev
+						secure: !dev,
+						// SECURITY FIX: Add httpOnly flag to prevent XSS attacks from accessing cookies
+						httpOnly: true
 					});
 				} catch (error) {
 					console.error('Cookie could not be set:', error);
@@ -109,27 +115,68 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
 		// We only need to validate if the session is expired or about to expire
 		let user = session.user;
 		let currentSession = session;
+
+		// SECURITY FIX: Strengthen session refresh logic with better validation
 		if (currentSession.expires_at) {
 			const expiresAt = Math.floor(new Date(currentSession.expires_at).getTime() / 1000);
 			const now = Math.floor(Date.now() / 1000);
+			// Refresh 5 minutes before expiration for better UX
+			const refreshThreshold = 300; // 5 minutes in seconds
 
-			if (now > expiresAt) {
+			if (now > expiresAt - refreshThreshold) {
 				try {
 					const {
 						data: { session: refreshedSession },
 						error
-					} = await event.locals.supabase.auth.setSession({
-						access_token: currentSession.access_token,
+					} = await event.locals.supabase.auth.refreshSession({
 						refresh_token: currentSession.refresh_token
 					});
 
-					if (!error && refreshedSession) {
+					if (error) {
+						logger.warn('Session refresh failed, forcing re-authentication', {
+							error: error.message,
+							userId: user.id
+						});
+						// Clear invalid session
+						await event.locals.supabase.auth.signOut();
+						return {
+							session: null,
+							error: new Error('Session expired'),
+							user: null,
+							org_id: null,
+							permissions: []
+						};
+					}
+
+					if (refreshedSession) {
+						// Validate the refreshed session
+						if (!refreshedSession.user || !refreshedSession.access_token) {
+							logger.error('Refreshed session is invalid', { userId: user.id });
+							await event.locals.supabase.auth.signOut();
+							return {
+								session: null,
+								error: new Error('Invalid session'),
+								user: null,
+								org_id: null,
+								permissions: []
+							};
+						}
+
 						currentSession = refreshedSession;
-						user = refreshedSession.user; // Update user from refreshed session
+						user = refreshedSession.user;
+						logger.info('Session refreshed successfully', { userId: user.id });
 					}
 				} catch (err) {
-					console.warn('Session refresh failed:', err);
-					// Continue with existing session
+					logger.error('Session refresh error:', err);
+					// Force re-authentication on unexpected errors
+					await event.locals.supabase.auth.signOut();
+					return {
+						session: null,
+						error: err instanceof Error ? err : new Error('Session refresh failed'),
+						user: null,
+						org_id: null,
+						permissions: []
+					};
 				}
 			}
 		}
