@@ -12,6 +12,8 @@ export interface IDCard {
 	template_name: string;
 	front_image: string | null;
 	back_image: string | null;
+	front_image_low_res?: string | null;
+	back_image_low_res?: string | null;
 	created_at: string;
 	fields: {
 		[fieldName: string]: IDCardField;
@@ -51,6 +53,8 @@ export const getIDCards = query(PaginationSchema, async ({ offset, limit }) => {
 			template_id,
 			front_image,
 			back_image,
+			front_image_low_res,
+			back_image_low_res,
 			created_at,
 			data,
 			templates (
@@ -90,6 +94,8 @@ export const getIDCards = query(PaginationSchema, async ({ offset, limit }) => {
 			template_name: templateName,
 			front_image: card.front_image,
 			back_image: card.back_image,
+			front_image_low_res: card.front_image_low_res,
+			back_image_low_res: card.back_image_low_res,
 			created_at: card.created_at,
 			fields
 		};
@@ -159,6 +165,8 @@ export const getCardDetails = query(z.string(), async (id) => {
 			template_id,
 			front_image,
 			back_image,
+			front_image_low_res,
+			back_image_low_res,
 			created_at,
 			data,
 			templates (
@@ -195,6 +203,8 @@ export const getCardDetails = query(z.string(), async (id) => {
 		template_name: templateName,
 		front_image: cardAny.front_image,
 		back_image: cardAny.back_image,
+		front_image_low_res: cardAny.front_image_low_res,
+		back_image_low_res: cardAny.back_image_low_res,
 		created_at: cardAny.created_at,
 		fields
 	} as IDCard;

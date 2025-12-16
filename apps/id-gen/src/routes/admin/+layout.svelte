@@ -475,6 +475,27 @@
 						<span class="hidden sm:inline">AI Generation</span>
 						<span class="sm:hidden">AI</span>
 					</a>
+					<a
+						href="/admin/optimization"
+						class="flex items-center px-2 sm:px-3 py-4 text-xs sm:text-sm font-medium hover:text-blue-300 border-b-2 border-transparent hover:border-blue-300 whitespace-nowrap"
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-4 w-4 mr-1 sm:mr-2"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M13 10V3L4 14h7v7l9-11h-7z"
+							/>
+						</svg>
+						<span class="hidden sm:inline">Optimization</span>
+						<span class="sm:hidden">Opt</span>
+					</a>
 				</div>
 			</div>
 		</nav>

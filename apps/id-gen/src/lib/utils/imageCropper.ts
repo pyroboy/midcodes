@@ -388,6 +388,73 @@ export function getImageDimensions(file: File): Promise<ImageDimensions> {
 			reject(new Error('Failed to load image'));
 		};
 
+
 		img.src = URL.createObjectURL(file);
+	});
+}
+
+/**
+ * Creates a low-resolution version of an image for thumbnail display.
+ * Max dimension set to 300px (standard thumbnail size).
+ */
+export async function createLowResVersion(
+	imageFile: File,
+	maxDimension: number = 300,
+	quality: number = 0.8
+): Promise<File> {
+	return new Promise((resolve, reject) => {
+		const img = new Image();
+		img.onload = () => {
+			URL.revokeObjectURL(img.src);
+			try {
+				let { width, height } = img;
+				
+				// Calculate new dimensions maintaining aspect ratio
+				if (width > height) {
+					if (width > maxDimension) {
+						height = Math.round((height * maxDimension) / width);
+						width = maxDimension;
+					}
+				} else {
+					if (height > maxDimension) {
+						width = Math.round((width * maxDimension) / height);
+						height = maxDimension;
+					}
+				}
+
+				const canvas = document.createElement('canvas');
+				canvas.width = width;
+				canvas.height = height;
+				
+				const ctx = canvas.getContext('2d');
+				if (!ctx) throw new Error('Failed to get canvas context');
+				
+				// Use better interpolation for downscaling
+				ctx.imageSmoothingEnabled = true;
+				ctx.imageSmoothingQuality = 'high';
+				
+				ctx.drawImage(img, 0, 0, width, height);
+				
+				canvas.toBlob(
+					(blob) => {
+						if (!blob) {
+							reject(new Error('Failed to create low-res blob'));
+							return;
+						}
+						const filename = imageFile.name.replace(/\.[^/.]+$/, '_low$&');
+						resolve(new File([blob], filename, { type: 'image/jpeg' }));
+					},
+					'image/jpeg',
+					quality
+				);
+			} catch (e) {
+				reject(e);
+			}
+		};
+		img.onerror = () => {
+			URL.revokeObjectURL(img.src);
+			reject(new Error('Failed to load image for resizing'));
+		};
+		img.src = URL.createObjectURL(imageFile);
 	});
 }

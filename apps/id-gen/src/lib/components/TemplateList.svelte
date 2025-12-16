@@ -270,9 +270,14 @@
 								<!-- 1. Background Image -->
 								{#if template.front_background}
 									<img
-										src={template.front_background.startsWith('http') || template.front_background.startsWith('data:') || template.front_background.startsWith('blob:')
-											? template.front_background
-											: getSupabaseStorageUrl(template.front_background)}
+										src={(() => {
+                                            // Prefer low-res if available
+                                            const url = template.front_background_low_res || template.front_background;
+                                            if (!url) return '';
+                                            return (url.startsWith('http') || url.startsWith('data:') || url.startsWith('blob:'))
+												? url
+												: getSupabaseStorageUrl(url);
+                                        })()}
 										alt={template.name}
 										class="w-full h-full object-cover"
 										loading="lazy"

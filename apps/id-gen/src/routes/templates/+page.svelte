@@ -71,6 +71,8 @@
 		org_id: string;
 		front_background: string;
 		back_background: string;
+		front_background_low_res?: string | null;
+		back_background_low_res?: string | null;
 		orientation: 'landscape' | 'portrait';
 		template_elements: TemplateElement[];
 		width_pixels?: number;
@@ -91,6 +93,7 @@
 		cropBackgroundImage,
 		getImageDimensions,
 		generateCropPreviewUrl,
+		createLowResVersion,
 		type BackgroundPosition
 	} from '$lib/utils/imageCropper';
 	import { browser } from '$app/environment';
@@ -405,6 +408,8 @@
 
 			let frontUrl = frontPreview;
 			let backUrl = backPreview;
+			let frontLowResUrl: string | null = (currentTemplate as any)?.front_background_low_res || null;
+			let backLowResUrl: string | null = (currentTemplate as any)?.back_background_low_res || null;
 
 			// Update progress: Processing images
 			toast.loading('Processing background images...', { id: toastId });
@@ -449,6 +454,19 @@
 
 					if (!frontUrl || typeof frontUrl !== 'string') {
 						throw new Error('Upload succeeded but returned invalid URL');
+					}
+
+					// Generate and upload low-res version
+					try {
+						console.log('🖼️ Generating front low-res version...');
+						const frontLowRes = await createLowResVersion(frontResult.croppedFile);
+						console.log('📄 Uploading front low-res image...');
+						frontLowResUrl = await uploadImage(frontLowRes, `front_low_${Date.now()}`, user?.id);
+						console.log('✅ Front low-res uploaded:', frontLowResUrl);
+					} catch (lowResError) {
+						console.warn('⚠️ Failed to generate/upload front low-res (non-fatal):', lowResError);
+						// Fallback to high-res if low-res fails
+						frontLowResUrl = frontUrl; 
 					}
 
 					console.log('✅ Front background uploaded successfully:', frontUrl);
@@ -501,6 +519,19 @@
 
 					if (!backUrl || typeof backUrl !== 'string') {
 						throw new Error('Upload succeeded but returned invalid URL');
+					}
+
+					// Generate and upload low-res version
+					try {
+						console.log('🖼️ Generating back low-res version...');
+						const backLowRes = await createLowResVersion(backResult.croppedFile);
+						console.log('📄 Uploading back low-res image...');
+						backLowResUrl = await uploadImage(backLowRes, `back_low_${Date.now()}`, user?.id);
+						console.log('✅ Back low-res uploaded:', backLowResUrl);
+					} catch (lowResError) {
+						console.warn('⚠️ Failed to generate/upload back low-res (non-fatal):', lowResError);
+						// Fallback to high-res if low-res fails
+						backLowResUrl = backUrl;
 					}
 
 					console.log('✅ Back background uploaded successfully:', backUrl);
@@ -563,6 +594,8 @@
 				name: currentTemplate?.name || 'Untitled Template',
 				front_background: frontUrl || '',
 				back_background: backUrl || '',
+				front_background_low_res: frontLowResUrl,
+				back_background_low_res: backLowResUrl,
 				orientation: orientationToSave, // Use detected orientation for consistency
 				width_pixels: widthToSave, // explicitly save dimensions
 				height_pixels: heightToSave,

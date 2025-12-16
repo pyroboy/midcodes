@@ -75,6 +75,8 @@ export const load: PageServerLoad = async ({ locals, url, depends, setHeaders })
                 created_at,
                 front_background,
                 back_background,
+                front_background_low_res,
+                back_background_low_res,
                 template_elements
             `
 		)
@@ -129,6 +131,8 @@ export const actions: Actions = {
 				dpi: templateData.dpi,
 				front_background: templateData.front_background,
 				back_background: templateData.back_background,
+				front_background_low_res: templateData.front_background_low_res,
+				back_background_low_res: templateData.back_background_low_res,
 				orientation: templateData.orientation,
 				template_elements: templateData.template_elements,
 				created_at: templateData.created_at ?? now,
@@ -330,6 +334,8 @@ export const actions: Actions = {
 					dpi: t.dpi,
 					front_background: t.front_background,
 					back_background: t.back_background,
+					front_background_low_res: t.front_background_low_res,
+					back_background_low_res: t.back_background_low_res,
 					orientation: t.orientation,
 					created_at: t.created_at,
 					updated_at: t.updated_at,

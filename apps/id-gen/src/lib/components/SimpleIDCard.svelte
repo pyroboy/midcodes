@@ -47,9 +47,11 @@
 		onOpenPreview?.(e, card);
 	}
 
-	const frontUrl = card.front_image
-		? getSupabaseStorageUrl(card.front_image, 'rendered-id-cards')
-		: null;
+	const frontUrl = card.front_image_low_res
+		? getSupabaseStorageUrl(card.front_image_low_res, 'rendered-id-cards')
+		: card.front_image
+			? getSupabaseStorageUrl(card.front_image, 'rendered-id-cards')
+			: null;
 </script>
 
 <div
