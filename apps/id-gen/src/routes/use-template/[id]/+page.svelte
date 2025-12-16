@@ -190,18 +190,17 @@
 	let containerMinHeight = $derived((cardOriginalHeight * MIN_SCALE) + 32); // 32px for padding
 	
 	// Uniform sizing for portrait cards - constrain width proportionally so longEdge matches landscape
-	// On desktop: use proportional width (shortEdge/longEdge) for portrait
-	// On mobile: use max-height constraint to keep portrait cards from being too tall
+	// Apply on both mobile and desktop to keep portrait cards smaller and prevent clipping
 	let templateWidth = $derived(template?.width_pixels || (template?.orientation === 'portrait' ? 638 : 1013));
 	let templateHeight = $derived(template?.height_pixels || (template?.orientation === 'portrait' ? 1013 : 638));
 	let isPortraitCard = $derived(templateHeight > templateWidth);
 	let longEdge = $derived(Math.max(templateWidth, templateHeight));
 	let shortEdge = $derived(Math.min(templateWidth, templateHeight));
-	// For portrait on desktop: use (shortEdge/longEdge) width; on mobile: always 100%
-	let cardWidthPercent = $derived(isPortraitCard && !isMobile ? (shortEdge / longEdge) * 100 : 100);
-	// For portrait on mobile: limit max-height to ~60vh so the card doesn't overflow the viewport
-	// This scales the card proportionally to fit within a reasonable height
-	let mobileMaxHeight = $derived(isPortraitCard && isMobile ? '60vh' : 'none');
+	// For portrait: use (shortEdge/longEdge) width on both mobile and desktop
+	let cardWidthPercent = $derived(isPortraitCard ? (shortEdge / longEdge) * 100 : 100);
+	// Adjusted card height: when width is constrained, height scales proportionally
+	// This ensures the masking container height matches the actual visible card height
+	let adjustedCardHeight = $derived(cardOriginalHeight * (cardWidthPercent / 100));
 
 	// Smart auto-flip based on focused input
 	let currentInputSide = $state<'front' | 'back'>('front');
@@ -370,12 +369,30 @@
 
 		initializeFormData();
 		
-		// Measure card scaling wrapper height after a tick to ensure it's rendered
-		await new Promise(resolve => setTimeout(resolve, 100));
-		if (cardScalingWrapperRef) {
-			cardOriginalHeight = cardScalingWrapperRef.offsetHeight;
-			cardOriginalWidth = cardScalingWrapperRef.offsetWidth;
-		}
+		// Robust measurement: wait for layout, then measure using requestAnimationFrame
+		// This ensures CSS has been applied before measuring
+		const measureCard = () => {
+			if (cardScalingWrapperRef) {
+				const newHeight = cardScalingWrapperRef.offsetHeight;
+				const newWidth = cardScalingWrapperRef.offsetWidth;
+				// Only update if we got valid measurements
+				if (newHeight > 0 && newWidth > 0) {
+					cardOriginalHeight = newHeight;
+					cardOriginalWidth = newWidth;
+					console.log('[Card Measure] Updated dimensions:', { cardOriginalHeight: newHeight, cardOriginalWidth: newWidth });
+				}
+			}
+		};
+		
+		// Initial measurement after a short delay for CSS to apply
+		await new Promise(resolve => setTimeout(resolve, 50));
+		requestAnimationFrame(() => {
+			measureCard();
+			// Second measurement after potential image loads
+			setTimeout(() => {
+				requestAnimationFrame(measureCard);
+			}, 200);
+		});
 	});
 
 	// Event handlers
@@ -605,6 +622,11 @@
 	function handleResize() {
 		if (typeof window !== 'undefined') {
 			isMobile = window.innerWidth < 768;
+			// Remeasure card dimensions on resize for responsive sizing
+			if (cardScalingWrapperRef) {
+				cardOriginalHeight = cardScalingWrapperRef.offsetHeight;
+				cardOriginalWidth = cardScalingWrapperRef.offsetWidth;
+			}
 		}
 	}
 
