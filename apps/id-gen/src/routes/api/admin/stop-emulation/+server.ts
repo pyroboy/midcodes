@@ -8,10 +8,18 @@ import {
 	createRateLimitResponse,
 	RateLimitConfigs
 } from '$lib/utils/rate-limiter';
+import { validateCSRFFromRequest, csrfErrorResponse } from '$lib/server/csrf';
+import { invalidateUserPermissionCache } from '$lib/services/permissions';
 
 const supabaseAdmin = createClient(PUBLIC_SUPABASE_URL, PRIVATE_SERVICE_ROLE);
 
-export const POST: RequestHandler = async ({ locals, request }) => {
+export const POST: RequestHandler = async ({ locals, request, cookies }) => {
+	// SECURITY: Validate CSRF token
+	const csrfCheck = validateCSRFFromRequest(request, (name) => cookies.get(name));
+	if (!csrfCheck.valid) {
+		return csrfErrorResponse(csrfCheck.error || 'CSRF validation failed');
+	}
+
 	const session = await locals.safeGetSession();
 	if (!session.user) {
 		return json({ error: 'Unauthorized' }, { status: 401 });
@@ -59,6 +67,9 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 		console.error('Failed to clear role emulation:', updateError);
 		return json({ error: 'Failed to update user' }, { status: 500 });
 	}
+
+	// SECURITY: Invalidate permission cache when role changes
+	invalidateUserPermissionCache(userId);
 
 	return json({ success: true });
 };

@@ -103,19 +103,22 @@
 </script>
 
 <DropdownMenu.Root>
-	<DropdownMenu.Trigger asChild>
-		<Button
-			variant="ghost"
-			class="relative h-10 w-10 rounded-full p-0"
-			aria-label="User account menu"
-		>
-			<Avatar class="h-8 w-8 border border-border">
-				<AvatarImage src={user?.avatar_url} alt={user?.email || 'User avatar'} />
-				<AvatarFallback class="bg-primary text-primary-foreground text-sm font-medium">
-					{getUserInitials(user)}
-				</AvatarFallback>
-			</Avatar>
-		</Button>
+	<DropdownMenu.Trigger>
+		{#snippet child({ props })}
+			<Button
+				{...props}
+				variant="ghost"
+				class="relative h-10 w-10 rounded-full p-0"
+				aria-label="User account menu"
+			>
+				<Avatar class="h-8 w-8 border border-border">
+					<AvatarImage src={user?.avatar_url} alt={user?.email || 'User avatar'} />
+					<AvatarFallback class="bg-primary text-primary-foreground text-sm font-medium">
+						{getUserInitials(user)}
+					</AvatarFallback>
+				</Avatar>
+			</Button>
+		{/snippet}
 	</DropdownMenu.Trigger>
 
 	<DropdownMenu.Content class="w-64" align="end">

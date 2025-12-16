@@ -11,6 +11,7 @@ import type { UserJWTPayload } from '$lib/types/auth';
 import '$lib/utils/setup-logging';
 import { logger } from '$lib/utils/logger';
 import { validateAndLogEnvironment } from '$lib/utils/env-validation';
+import { generateCSRFTokens } from '$lib/server/csrf';
 
 // SECURITY: Validate environment variables at startup
 validateAndLogEnvironment();
@@ -307,6 +308,16 @@ const authGuard: Handle = async ({ event, resolve }) => {
 	const sessionInfo = await event.locals.safeGetSession();
 
 	// Set all info in locals - now using the fresh data from safeGetSession
+	// SECURITY: Generate and set CSRF token
+	const csrfTokens = generateCSRFTokens();
+	event.cookies.set('csrf-token', csrfTokens.cookieToken, {
+		path: '/',
+		sameSite: 'strict',
+		secure: !dev,
+		httpOnly: true,
+		maxAge: 60 * 60 // 1 hour
+	});
+
 	event.locals = {
 		...event.locals,
 		session: sessionInfo.session,
@@ -315,7 +326,9 @@ const authGuard: Handle = async ({ event, resolve }) => {
 		org_id: sessionInfo.org_id ?? undefined,
 		// Use the roles and emulation state computed in safeGetSession (from fresh app_metadata)
 		effectiveRoles: sessionInfo.effectiveRoles || [],
-		roleEmulation: sessionInfo.roleEmulation || { active: false }
+		roleEmulation: sessionInfo.roleEmulation || { active: false },
+		// SECURITY: Provide CSRF token to client via locals
+		csrfToken: csrfTokens.headerToken
 	};
 
 	const path = event.url.pathname;

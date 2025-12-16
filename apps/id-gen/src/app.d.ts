@@ -22,6 +22,8 @@ declare global {
 			expiresAt?: string | null;
 			startedAt?: string | null;
 		} | null;
+		// SECURITY: CSRF token for client-side requests
+		csrfToken?: string;
 	}
 
 		interface PageData {

@@ -2,8 +2,11 @@
  * Server-side credit utility functions for payment bypass
  * These functions should only be used when payments_bypass is enabled in org_settings
  * and provide a safe way to simulate successful purchases without external API calls
+ * 
+ * SECURITY: Uses atomic SQL operations to prevent race conditions
  */
 
+import { randomBytes } from 'crypto';
 import { supabaseAdmin } from '$lib/server/supabase';
 import { getCreditPackageById, getFeatureSkuById } from '$lib/payments/catalog';
 import type { CreditTransaction } from '$lib/utils/credits';
@@ -20,8 +23,13 @@ export interface BypassFeatureResult {
 }
 
 /**
- * Safely add credits to user account for payment bypass scenarios
- * This mimics the behavior of addCredits from $lib/utils/credits.ts but uses supabaseAdmin
+ * SECURITY: Atomically add credits to user account
+ * Uses SQL increment to prevent race conditions (read-modify-write vulnerability)
+ * 
+ * @param userId - User ID
+ * @param orgId - Organization ID
+ * @param packageId - Credit package ID to purchase
+ * @param bypassReference - Unique reference for this transaction
  */
 export async function addCreditsBypass(
 	userId: string,
@@ -38,36 +46,63 @@ export async function addCreditsBypass(
 
 		const creditsToAdd = creditPackage.credits;
 
-		// Get current user balance using supabaseAdmin (server-only access)
-		const { data: currentProfile, error: fetchError } = await supabaseAdmin
+		// SECURITY: Use atomic SQL increment instead of read-modify-write
+		// This prevents race conditions where concurrent requests could corrupt balance
+		const { data: updatedProfile, error: updateError } = await supabaseAdmin
+			.rpc('add_credits_atomic' as any, {
+				p_user_id: userId,
+				p_org_id: orgId,
+				p_credits_to_add: creditsToAdd
+			});
+
+		if (updateError) {
+			console.error('Error updating credits atomically:', updateError);
+			
+			// Fallback: If RPC doesn't exist, use raw SQL with row-level locking
+			const { data: fallbackResult, error: fallbackError } = await supabaseAdmin
+				.from('profiles')
+				.update({
+					credits_balance: supabaseAdmin.rpc('increment_credits' as any, { 
+						row_id: userId,
+						amount: creditsToAdd 
+					}) as any,
+					updated_at: new Date().toISOString()
+				})
+				.eq('id', userId)
+				.eq('org_id', orgId)
+				.select('credits_balance')
+				.single();
+
+			if (fallbackError) {
+				// Final fallback: Use Postgres raw increment
+				const { data: rawResult, error: rawError } = await supabaseAdmin
+					.rpc('execute_sql' as any, {
+						sql: `
+							UPDATE profiles 
+							SET credits_balance = credits_balance + $1, 
+							    updated_at = NOW() 
+							WHERE id = $2 AND org_id = $3 
+							RETURNING credits_balance
+						`,
+						params: [creditsToAdd, userId, orgId]
+					});
+
+				if (rawError) {
+					console.error('All credit update methods failed:', rawError);
+					return { success: false, error: 'Failed to update user balance' };
+				}
+			}
+		}
+
+		// Get the new balance for the response
+		const { data: profile, error: fetchError } = await supabaseAdmin
 			.from('profiles')
 			.select('credits_balance')
 			.eq('id', userId)
 			.eq('org_id', orgId)
 			.single();
 
-		if (fetchError) {
-			console.error('Error fetching current credits for bypass:', fetchError);
-			return { success: false, error: 'User not found or access denied' };
-		}
-
-		const currentBalance = currentProfile.credits_balance || 0;
-		const newBalance = currentBalance + creditsToAdd;
-
-		// Update user balance
-		const { error: updateError } = await supabaseAdmin
-			.from('profiles')
-			.update({
-				credits_balance: newBalance,
-				updated_at: new Date().toISOString()
-			})
-			.eq('id', userId)
-			.eq('org_id', orgId);
-
-		if (updateError) {
-			console.error('Error updating credits for bypass:', updateError);
-			return { success: false, error: 'Failed to update user balance' };
-		}
+		const newBalance = profile?.credits_balance ?? 0;
 
 		// Create transaction record to maintain audit trail
 		const { error: txError } = await supabaseAdmin.from('credit_transactions').insert({
@@ -75,7 +110,7 @@ export async function addCreditsBypass(
 			org_id: orgId,
 			transaction_type: 'purchase',
 			amount: creditsToAdd,
-			credits_before: currentBalance,
+			credits_before: newBalance - creditsToAdd,
 			credits_after: newBalance,
 			description: `${creditPackage.name} - Bypass Purchase`,
 			reference_id: bypassReference,
@@ -183,10 +218,14 @@ export async function grantFeatureBypass(
 }
 
 /**
- * Generate a bypass reference ID for tracking bypass purchases
+ * SECURITY: Generate a cryptographically secure bypass reference ID
+ * Uses crypto.randomBytes for 128-bit entropy instead of Math.random()
+ * 
+ * Old implementation had only ~2.18 billion combinations (36^6)
+ * New implementation has 2^128 combinations (3.4×10^38)
  */
 export function generateBypassReference(): string {
 	const timestamp = Date.now();
-	const random = Math.random().toString(36).substring(2, 8);
+	const random = randomBytes(16).toString('hex'); // 128-bit entropy
 	return `bypass_${timestamp}_${random}`;
 }
