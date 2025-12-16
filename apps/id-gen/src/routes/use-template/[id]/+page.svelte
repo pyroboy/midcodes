@@ -729,12 +729,55 @@
 			// Return to a subtle idle highlight after a brief moment
 			highlightTimeout = setTimeout(() => {
 				// Only minimize if we're still highlighting something
+
 				if (focusedVariableName) highlightState = 'idle';
 			}, 500);
 		}
 	}
 
-	async function handleSelectFile(variableName: string, file: File) {
+	async function handleSelectFile(variableName: string, eventDetails: { file: File, source: string, aiEnabled?: boolean }) {
+		console.log('[handleSelectFile] Called with:', { variableName, eventDetails });
+		
+		// Safety check for eventDetails
+		if (!eventDetails || !eventDetails.file) {
+			console.error('[handleSelectFile] Invalid event details:', eventDetails);
+			return;
+		}
+
+		console.log('[handleSelectFile] Setting initial file for display');
+		const { file } = eventDetails;
+		const aiEnabled = eventDetails.aiEnabled ?? true;
+
+		// Validation: Ensure file is a valid File or Blob
+		// Cast to any to avoid TS error: "The left-hand side of an 'instanceof' expression must be of type 'any', an object type or a type parameter"
+		if (!((file as any) instanceof File) && !((file as any) instanceof Blob)) {
+			console.error('[handleSelectFile] Invalid file object received:', file);
+			addDebugMessage(`Error: Invalid file format received (${typeof file})`);
+			return;
+		}
+
+		// IMMEDIATE: Show original file first
+		try {
+			const initialUrl = URL.createObjectURL(file);
+			if (fileUrls[variableName]) URL.revokeObjectURL(fileUrls[variableName]);
+			fileUrls[variableName] = initialUrl;
+			// Also update fileUploads immediately with raw file so it works in canvas
+			fileUploads = { ...fileUploads, [variableName]: file };
+			
+			// Indicate loading state immediately
+			const element = template?.template_elements?.find((el) => el.variableName === variableName);
+			if (element?.type === 'photo' || element?.type === 'signature') {
+				processingStatus = {
+					...processingStatus,
+					[variableName]: { stage: 'loading', progress: 0, message: 'Processing...' }
+				};
+			}
+
+			handleInputChange();
+		} catch (err) {
+			console.error('Failed to create initial URL', err);
+		}
+
 		// Find the element to determine its type
 		const element = template?.template_elements?.find((el) => el.variableName === variableName);
 		
@@ -744,34 +787,35 @@
 		if (element?.type === 'photo') {
 			// Remove background from photos using AI
 			try {
-				processingStatus = {
-					...processingStatus,
-					[variableName]: { stage: 'loading', progress: 0, message: 'Loading AI model...' }
-				};
-				
 				const blob = await removeBackground(file, (progress) => {
-					processingStatus = { ...processingStatus, [variableName]: progress };
+					// We keep the status object but we don't need to update the UI with text anymore
+					// processingStatus = { ...processingStatus, [variableName]: progress };
 				});
 				
 				processedFile = new File([blob], file.name.replace(/\.[^.]+$/, '.png'), {
 					type: 'image/png'
 				});
 				
+				// SUCCESS: Update with processed file
+				const processedUrl = URL.createObjectURL(processedFile);
+				if (fileUrls[variableName]) URL.revokeObjectURL(fileUrls[variableName]);
+				fileUrls[variableName] = processedUrl;
+				
+				// Update fileUploads with processed file
+				fileUploads = {
+					...fileUploads,
+					[variableName]: processedFile
+				};
+
 				processingStatus = { ...processingStatus, [variableName]: null };
 			} catch (err) {
 				console.error('[handleSelectFile] Background removal failed:', err);
-				// Fall back to original file if processing fails
+				// Fall back to original file if processing fails - clear status
 				processingStatus = { ...processingStatus, [variableName]: null };
-				// Still use the original file
 			}
 		} else if (element?.type === 'signature') {
 			// Clean signature with thresholding and auto-crop
 			try {
-				processingStatus = {
-					...processingStatus,
-					[variableName]: { stage: 'processing', progress: 50, message: 'Cleaning signature...' }
-				};
-				
 				const blob = await cleanSignature(file, {
 					threshold: 160,
 					autoCrop: true,
@@ -782,29 +826,25 @@
 					type: 'image/png'
 				});
 				
+				// Update URL and file
+				const processedUrl = URL.createObjectURL(processedFile);
+				if (fileUrls[variableName]) URL.revokeObjectURL(fileUrls[variableName]);
+				fileUrls[variableName] = processedUrl;
+
+				fileUploads = {
+					...fileUploads,
+					[variableName]: processedFile
+				};
+				
 				processingStatus = { ...processingStatus, [variableName]: null };
 			} catch (err) {
 				console.error('[handleSelectFile] Signature cleaning failed:', err);
-				// Fall back to original file if processing fails
 				processingStatus = { ...processingStatus, [variableName]: null };
 			}
+		} else {
+			// For non-processed files, clear status (should be null anyway)
+			processingStatus = { ...processingStatus, [variableName]: null };
 		}
-		
-		// Use immutable assignment to ensure Svelte reactivity triggers for IdCanvas
-		fileUploads = {
-			...fileUploads,
-			[variableName]: processedFile
-		};
-
-		if (fileUrls[variableName]) {
-			URL.revokeObjectURL(fileUrls[variableName]);
-		}
-
-		const url = URL.createObjectURL(processedFile);
-		fileUrls[variableName] = url;
-
-		// Pulse highlight to show where the change applied
-		handleInputChange();
 	}
 
 	function validateForm(): boolean {
@@ -855,6 +895,9 @@
 		if (countdownInterval) clearInterval(countdownInterval);
 	});
 </script>
+
+
+
 
 <svelte:window on:resize={handleResize} on:scroll={handleScroll} />
 <div class="container mx-auto p-4 flex flex-col gap-4 max-w-2xl">
@@ -1072,20 +1115,8 @@
 													<span class="text-red-500">*</span>
 												</Label>
 													<!-- svelte-ignore a11y_no_static_element_interactions -->
-								<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center relative" onclick={() => handleInputFocus('front', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('front', element.variableName)} role="button" tabindex="0">
-													{#if processingStatus[element.variableName]}
-														<div class="absolute inset-0 bg-white/80 dark:bg-gray-900/80 flex flex-col items-center justify-center rounded-xl z-10" transition:fade={{ duration: 200 }}>
-															<Loader class="w-8 h-8 animate-spin text-primary mb-2" />
-															<p class="text-sm font-medium text-gray-700 dark:text-gray-300">
-																{processingStatus[element.variableName]?.message ?? 'Processing...'}
-															</p>
-															{#if processingStatus[element.variableName]?.progress}
-																<div class="w-24 h-1 bg-gray-200 dark:bg-gray-700 rounded-full mt-2 overflow-hidden">
-																	<div class="h-full bg-primary transition-all duration-300" style="width: {processingStatus[element.variableName]?.progress ?? 0}%"></div>
-																</div>
-															{/if}
-														</div>
-													{/if}
+								<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center relative transition-all duration-500 {processingStatus[element.variableName] ? 'processing-glow border-blue-400 dark:border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]' : ''}" onclick={() => handleInputFocus('front', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('front', element.variableName)} role="button" tabindex="0">
+
 													<div class="flex-shrink-0">
 														<ThumbnailInput
 															width={element.width}
@@ -1111,20 +1142,8 @@
 												<span class="text-red-500">*</span>
 											</Label>
 											<!-- svelte-ignore a11y_no_static_element_interactions -->
-								<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center relative" onclick={() => handleInputFocus('front', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('front', element.variableName)} role="button" tabindex="0">
-												{#if processingStatus[element.variableName]}
-													<div class="absolute inset-0 bg-white/80 dark:bg-gray-900/80 flex flex-col items-center justify-center rounded-xl z-10" transition:fade={{ duration: 200 }}>
-														<Loader class="w-8 h-8 animate-spin text-primary mb-2" />
-														<p class="text-sm font-medium text-gray-700 dark:text-gray-300">
-															{processingStatus[element.variableName]?.message ?? 'Processing...'}
-														</p>
-														{#if processingStatus[element.variableName]?.progress}
-															<div class="w-24 h-1 bg-gray-200 dark:bg-gray-700 rounded-full mt-2 overflow-hidden">
-																<div class="h-full bg-primary transition-all duration-300" style="width: {processingStatus[element.variableName]?.progress ?? 0}%"></div>
-															</div>
-														{/if}
-													</div>
-												{/if}
+								<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center relative transition-all duration-500 {processingStatus[element.variableName] ? 'processing-glow border-blue-400 dark:border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]' : ''}" onclick={() => handleInputFocus('front', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('front', element.variableName)} role="button" tabindex="0">
+
 												<div class="flex-shrink-0">
 													<ThumbnailInput
 														width={element.width}
@@ -1231,20 +1250,8 @@
 													<span class="text-red-500">*</span>
 												</Label>
 													<!-- svelte-ignore a11y_no_static_element_interactions -->
-									<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center relative" onclick={() => handleInputFocus('back', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('back', element.variableName)} role="button" tabindex="0">
-													{#if processingStatus[element.variableName]}
-														<div class="absolute inset-0 bg-white/80 dark:bg-gray-900/80 flex flex-col items-center justify-center rounded-xl z-10" transition:fade={{ duration: 200 }}>
-															<Loader class="w-8 h-8 animate-spin text-primary mb-2" />
-															<p class="text-sm font-medium text-gray-700 dark:text-gray-300">
-																{processingStatus[element.variableName]?.message ?? 'Processing...'}
-															</p>
-															{#if processingStatus[element.variableName]?.progress}
-																<div class="w-24 h-1 bg-gray-200 dark:bg-gray-700 rounded-full mt-2 overflow-hidden">
-																	<div class="h-full bg-primary transition-all duration-300" style="width: {processingStatus[element.variableName]?.progress ?? 0}%"></div>
-																</div>
-															{/if}
-														</div>
-													{/if}
+									<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center relative transition-all duration-500 {processingStatus[element.variableName] ? 'processing-glow border-blue-400 dark:border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]' : ''}" onclick={() => handleInputFocus('back', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('back', element.variableName)} role="button" tabindex="0">
+
 													<div class="flex-shrink-0">
 														<ThumbnailInput
 															width={element.width}
@@ -1270,20 +1277,8 @@
 												<span class="text-red-500">*</span>
 											</Label>
 											<!-- svelte-ignore a11y_no_static_element_interactions -->
-								<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center relative" onclick={() => handleInputFocus('back', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('back', element.variableName)} role="button" tabindex="0">
-									{#if processingStatus[element.variableName]}
-										<div class="absolute inset-0 bg-white/80 dark:bg-gray-900/80 flex flex-col items-center justify-center rounded-xl z-10" transition:fade={{ duration: 200 }}>
-											<Loader class="w-8 h-8 animate-spin text-primary mb-2" />
-											<p class="text-sm font-medium text-gray-700 dark:text-gray-300">
-												{processingStatus[element.variableName]?.message ?? 'Processing...'}
-											</p>
-											{#if processingStatus[element.variableName]?.progress}
-												<div class="w-24 h-1 bg-gray-200 dark:bg-gray-700 rounded-full mt-2 overflow-hidden">
-													<div class="h-full bg-primary transition-all duration-300" style="width: {processingStatus[element.variableName]?.progress ?? 0}%"></div>
-												</div>
-											{/if}
-										</div>
-									{/if}
+								<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center relative transition-all duration-500 {processingStatus[element.variableName] ? 'processing-glow border-blue-400 dark:border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.5)]' : ''}" onclick={() => handleInputFocus('back', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('back', element.variableName)} role="button" tabindex="0">
+
 												<div class="flex-shrink-0">
 													<ThumbnailInput
 														width={element.width}
@@ -1530,6 +1525,14 @@
 {/if}
 
 <style>
+	@keyframes pulse-brightness {
+		0%, 100% { filter: brightness(1) drop-shadow(0 0 0px transparent); }
+		50% { filter: brightness(1.1) drop-shadow(0 0 10px rgba(59, 130, 246, 0.4)); border-color: rgba(59, 130, 246, 0.5); }
+	}
+	:global(.processing-glow) {
+		animation: pulse-brightness 2s infinite ease-in-out;
+	}
+
 	:global(.dark) {
 		color-scheme: dark;
 	}

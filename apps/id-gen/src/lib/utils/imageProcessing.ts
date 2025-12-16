@@ -247,8 +247,11 @@ async function loadImage(source: File | Blob | string): Promise<HTMLImageElement
 
 		if (source instanceof File || source instanceof Blob) {
 			img.src = URL.createObjectURL(source);
-		} else {
+		} else if (typeof source === 'string') {
 			img.src = source;
+		} else {
+			reject(new Error(`Invalid image source type: ${typeof source}`));
+			return;
 		}
 	});
 }

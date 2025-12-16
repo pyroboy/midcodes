@@ -31,6 +31,7 @@
 		initialY?: number;
 		initialBorderSize?: number;
 		isSignature?: boolean;
+		showAiToggle?: boolean;
 	}
 
 	let {
@@ -41,7 +42,8 @@
 		initialX = 0,
 		initialY = 0,
 		initialBorderSize = 0,
-		isSignature = false
+		isSignature = false,
+		showAiToggle = false
 	}: Props = $props();
 
 	let showPopup = $state(false);

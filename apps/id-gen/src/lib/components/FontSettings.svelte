@@ -128,10 +128,16 @@
 		</select>
 	</div>
 	<div class="settings-row font-size-row">
-		<label class="font-size-label">Size:</label>
+		<label class="font-size-label" for="font-size-{element.id}">Size:</label>
 		<button class="size-button" onclick={() => adjustFontSize(-5)} title="Decrease by 5">-5</button>
 		<button class="size-button" onclick={() => adjustFontSize(-1)} title="Decrease by 1">-1</button>
-		<input type="number" value={element.fontSize || element.size || 16} onchange={handleFontSizeChange} class="font-size-input" />
+		<input 
+			type="number" 
+			id="font-size-{element.id}"
+			value={element.fontSize || element.size || 16} 
+			onchange={handleFontSizeChange} 
+			class="font-size-input" 
+		/>
 		<button class="size-button" onclick={() => adjustFontSize(1)} title="Increase by 1">+1</button>
 		<button class="size-button" onclick={() => adjustFontSize(5)} title="Increase by 5">+5</button>
 	</div>
