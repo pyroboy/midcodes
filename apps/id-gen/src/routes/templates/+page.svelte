@@ -73,6 +73,9 @@
 		back_background: string;
 		orientation: 'landscape' | 'portrait';
 		template_elements: TemplateElement[];
+		width_pixels?: number;
+		height_pixels?: number;
+		dpi?: number;
 		created_at: string;
 		updated_at?: string | null;
 	};
@@ -510,13 +513,23 @@
 				willGenerateNewId: !currentTemplate?.id
 			});
 
+			// Ensure we are saving the exact dimensions used in the editor
+			const widthToSave = requiredPixelDimensions?.width || (currentTemplate as any)?.width_pixels || LEGACY_CARD_SIZE.width;
+			const heightToSave = requiredPixelDimensions?.height || (currentTemplate as any)?.height_pixels || LEGACY_CARD_SIZE.height;
+			
+			// Robustly detect orientation from the dimensions we are about to save
+			const orientationToSave = detectOrientationFromDimensions(widthToSave, heightToSave);
+
 			const templateDataToSave = {
 				id: currentTemplate?.id || crypto.randomUUID(),
 				user_id: user?.id ?? '',
 				name: currentTemplate?.name || 'Untitled Template',
 				front_background: frontUrl || '',
 				back_background: backUrl || '',
-				orientation: currentTemplate?.orientation ?? 'landscape',
+				orientation: orientationToSave, // Use detected orientation for consistency
+				width_pixels: widthToSave, // explicitly save dimensions
+				height_pixels: heightToSave,
+				dpi: 300, // Standardize on 300 DPI
 				template_elements: allElements,
 				created_at: currentTemplate?.created_at || new Date().toISOString(),
 				org_id: org_id ?? ''
@@ -848,20 +861,21 @@
 			// Bump version to remount the editor and purge any internal caches
 			editorVersion++;
 
-			// Update local templates array instead of full page reload
-			await refreshTemplatesList(normalizedForList as any);
-
-			// Invalidate server data to fetch fresh rows without hard reload
+			// Update local templates array and caches safely
 			try {
+				// Update local templates array instead of full page reload
+				await refreshTemplatesList(normalizedForList as any);
+
+				// Invalidate server data to fetch fresh rows without hard reload
 				await Promise.all([
 					invalidate((url) => url.pathname === '/templates'),
 					invalidate(`/templates?id=${savedTemplate.id}`)
 				]);
 			} catch (e) {
-				console.warn('invalidate failed (non-fatal):', e);
+				console.warn('⚠️ Non-fatal error updating list/cache:', e);
 			}
 
-			// Go back to templates list if we were creating/editing
+			// ALWAYS go back to templates list if we were creating/editing and save was successful
 			if (isEditMode) {
 				handleBack();
 			}
@@ -1440,7 +1454,7 @@
 		requiredPixelDimensions = cardSizeToPixels(cardSize, 300); // Use hardcoded DPI
 
 		// Determine orientation from params or calculate from dimensions
-		const finalOrientation = orientation || (cardSize.width >= cardSize.height ? 'landscape' : 'portrait');
+		const finalOrientation = orientation || detectOrientationFromDimensions(requiredPixelDimensions.width, requiredPixelDimensions.height);
 
 		// Create new template with only database-compatible properties
 		currentTemplate = {
@@ -1450,6 +1464,9 @@
 			front_background: frontBackgroundUrl || '',
 			back_background: '',
 			orientation: finalOrientation,
+			width_pixels: requiredPixelDimensions.width,
+			height_pixels: requiredPixelDimensions.height,
+			dpi: 300,
 			template_elements: [],
 			created_at: new Date().toISOString(),
 			org_id: org_id ?? ''
@@ -1471,13 +1488,13 @@
 		editorVersion++;
 
 		console.log('✅ [handleCreateNewTemplate] New template created:', {
-			templateId: currentTemplate.id,
+			templateId: currentTemplate!.id,
 			name: templateName,
 			cardSize: cardSize,
 			pixelDimensions: requiredPixelDimensions,
 			orientation: finalOrientation,
-			front_background: currentTemplate.front_background,
-			front_background_set: !!currentTemplate.front_background,
+			front_background: currentTemplate!.front_background,
+			front_background_set: !!currentTemplate!.front_background,
 			frontPreview: frontPreview,
 			frontPreview_set: !!frontPreview,
 			isEditMode: isEditMode,

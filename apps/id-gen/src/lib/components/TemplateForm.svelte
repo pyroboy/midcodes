@@ -357,12 +357,59 @@
 		}
 	});
 
-	function updateElements() {
+	function updateElements(elementList: TemplateElement[] = elements) {
+		// Log element updates with position details for debugging robustness
+		const debugInfo = elementList.map((el: TemplateElement) => ({
+			type: el.type,
+			id: el.id,
+			pos: `(${Math.round(el.x || 0)}, ${Math.round(el.y || 0)})`,
+			size: `(${Math.round(el.width || 0)}x${Math.round(el.height || 0)})`,
+			side
+		}));
+		
+		console.log(`📏 [TemplateForm:${side}] Updating ${elementList.length} elements:`, debugInfo);
+		
 		onUpdateElements?.(
-			elements.map((el: TemplateElement) => ({ ...el, side })),
+			elementList.map((el: TemplateElement) => ({ ...el, side })),
 			side
 		);
 	}
+
+	// 🛡️ SECURITY: Auto-clamp elements when dimensions change (e.g. orientation flip)
+	// This ensures elements don't get lost off-screen if the card size shrinks or rotates
+	$effect(() => {
+		const dim = baseDimensions();
+		if (dim.actualWidth > 0 && dim.actualHeight > 0 && elements.length > 0) {
+			let changed = false;
+			const newElements = elements.map((el: TemplateElement) => {
+				const maxX = Math.max(0, dim.actualWidth - (el.width || 0));
+				const maxY = Math.max(0, dim.actualHeight - (el.height || 0));
+				
+				const currentX = el.x || 0;
+				const currentY = el.y || 0;
+				
+				// Clamp to new bounds
+				const newX = Math.min(Math.max(currentX, 0), maxX);
+				const newY = Math.min(Math.max(currentY, 0), maxY);
+				
+				if (newX !== currentX || newY !== currentY) {
+					console.log(`⚠️ [TemplateForm:${side}] Clamping element ${el.id} (${el.type}) to fit new bounds:`, {
+						from: { x: currentX, y: currentY },
+						to: { x: newX, y: newY },
+						bounds: { w: dim.actualWidth, h: dim.actualHeight }
+					});
+					changed = true;
+					return { ...el, x: newX, y: newY };
+				}
+				return el;
+			});
+			
+			if (changed) {
+				elements = newElements;
+				updateElements();
+			}
+		}
+	});
 
 	function limitDragBounds(
 		index: number,
@@ -372,7 +419,7 @@
 		height?: number,
 		metrics?: TextMetrics
 	) {
-		elements = elements.map((el: TemplateElement, i: number) => {
+		const newElements = elements.map((el: TemplateElement, i: number) => {
 			if (i === index) {
 				let newEl = { ...el, side };
 				if (templateContainer) {
@@ -394,7 +441,8 @@
 			}
 			return el;
 		});
-		updateElements();
+		// Pass the new list directly to updateElements
+		updateElements(newElements);
 	}
 
 	function onMouseDown(event: MouseEvent, index: number, handle: string | null = null) {
@@ -482,7 +530,8 @@
 		}
 
 		updatedElements[currentElementIndex] = updatedElement;
-		onUpdateElements(updatedElements, side);
+		// Use the centralized update function to ensure logging
+		updateElements(updatedElements);
 
 		startX = event.clientX;
 		startY = event.clientY;
@@ -1051,17 +1100,19 @@
 	.template-element {
 		position: absolute;
 		cursor: move;
-		border: 1px solid cyan;
+		/* Use outline instead of border to ensure pinpoint accuracy of dimensions 
+		   without affecting the content box size */
+		outline: 1px solid cyan; 
 		box-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
 		box-sizing: border-box;
 		opacity: 0.5;
 		transition:
 			opacity 0.15s ease,
 			box-shadow 0.15s ease,
-			border-color 0.15s ease;
+			outline-color 0.15s ease;
 		pointer-events: auto; /* Re-enable clicks on actual elements */
 		z-index: 20; /* Ensure individual elements are clickable */
-		/* Add a default border to ensure visibility even if content is empty */
+		/* Add a default size to ensure visibility even if content is empty */
 		min-width: 20px;
 		min-height: 20px;
 	}
@@ -1070,7 +1121,7 @@
 	.template-element:hover {
 		opacity: 1;
 		box-shadow: 0 0 10px rgba(0, 255, 255, 0.9);
-		border-color: #0ff;
+		outline-color: #0ff;
 	}
 
 	.template-element:hover {
