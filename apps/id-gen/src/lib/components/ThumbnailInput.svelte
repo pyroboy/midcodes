@@ -514,36 +514,65 @@
 		const videoWidth = videoElement.videoWidth;
 		const videoHeight = videoElement.videoHeight;
 
-		// Calculate the capture area using the same logic as the overlay
-		// but scaled to the video's native resolution
 
-		// Calculate available area ratio (same proportions as overlay)
-		const videoAvailableWidth = videoWidth - sidePaddingPx * 2 * (videoWidth / screenWidth);
-		const videoAvailableHeight =
-			videoHeight - (topPaddingPx + bottomPaddingPx) * (videoHeight / screenHeight);
-		const videoAvailableAR = videoAvailableWidth / videoAvailableHeight;
+		// Accurate mapping from Screen Overlay -> Video Source
+		// considering object-fit: cover and transform: scale(imageScale)
 
-		// Calculate crop dimensions maintaining the card's aspect ratio
-		let captureWidth: number;
-		let captureHeight: number;
+		const screenAR = screenWidth / screenHeight;
+		const videoAR = videoWidth / videoHeight;
 
-		if (aspectRatio >= videoAvailableAR) {
-			// Card is wider - constrain by width
-			captureWidth = videoAvailableWidth;
-			captureHeight = videoAvailableWidth / aspectRatio;
+		// 1. Determine "Visible Video Source Area" at scale=1
+		// This is the dimensions of the video source crop that exactly fills the screen
+		let visibleVideoWidth: number;
+		let visibleVideoHeight: number;
+
+		if (videoAR > screenAR) {
+			// Video is wider than screen: Height fits perfectly, Width is cropped
+			visibleVideoHeight = videoHeight;
+			visibleVideoWidth = videoHeight * screenAR;
 		} else {
-			// Card is taller - constrain by height
-			captureHeight = videoAvailableHeight;
-			captureWidth = videoAvailableHeight * aspectRatio;
+			// Video is taller than screen: Width fits perfectly, Height is cropped
+			visibleVideoWidth = videoWidth;
+			visibleVideoHeight = videoWidth / screenAR;
 		}
 
-		// Apply safe zone multiplier to capture the full safe zone area
-		const safeWidth = captureWidth * (1 + SAFE_ZONE_PADDING);
-		const safeHeight = captureHeight * (1 + SAFE_ZONE_PADDING);
+		// 2. Define the Overlay Rect in Screen Coordinates (The "Safe Zone" we want to capture)
+		// Matches the <rect> definitions in the SVG overlay
+		const screenOverlayWidth = safePixelWidth;
+		const screenOverlayHeight = safePixelHeight;
+		const screenOverlayX = (screenWidth - safePixelWidth) / 2;
+		const screenOverlayY = topPaddingPx + (availablePixelHeight - safePixelHeight) / 2;
+		
+		const screenCenterX = screenWidth / 2;
+		const screenCenterY = screenHeight / 2;
+		const overlayCenterX = screenOverlayX + screenOverlayWidth / 2;
+		const overlayCenterY = screenOverlayY + screenOverlayHeight / 2;
 
-		// Center position in video
-		const x = (videoWidth - safeWidth) / 2;
-		const y = (videoHeight - safeHeight) / 2;
+		// 3. Map to Video Source Coordinates
+		// At scale=S, the screen sees 1/S of the visible source.
+		// So the ratio from ScreenPixels to SourcePixels is:
+		const scaleFactor = 1 / imageScale;
+		const ratio = (visibleVideoWidth / screenWidth) * scaleFactor;
+
+		// Calculate offsets from center in source pixels
+		// If using front camera (user facing), the video is mirrored.
+		// A point on the RIGHT of the screen corresponds to the LEFT of the sensor.
+		// So we must invert the X offset.
+		const deltaX = (facingMode === 'user' ? -1 : 1) * (overlayCenterX - screenCenterX) * ratio;
+		const deltaY = (overlayCenterY - screenCenterY) * ratio;
+
+		// Calculate Source Rect
+		const sourceWidth = screenOverlayWidth * ratio;
+		const sourceHeight = screenOverlayHeight * ratio;
+		const sourceCenterX = (videoWidth / 2) + deltaX;
+		const sourceCenterY = (videoHeight / 2) + deltaY;
+
+		const x = sourceCenterX - sourceWidth / 2;
+		const y = sourceCenterY - sourceHeight / 2;
+
+		// Use source dimensions for the capture canvas to maintain full resolution quality
+		const safeWidth = sourceWidth;
+		const safeHeight = sourceHeight;
 
 		// Create canvas for capture
 		const captureCanvas = document.createElement('canvas');
@@ -566,6 +595,7 @@
 		captureCanvas.toBlob(
 			(blob) => {
 				if (blob) {
+					console.log('[capturePhoto] Blob size:', blob.size);
 					const file = new File([blob], `photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
 					// Reset position to center when new image is captured
 					imageX = 0;
