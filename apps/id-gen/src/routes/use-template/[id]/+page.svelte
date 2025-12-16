@@ -188,6 +188,21 @@
 	
 	// Calculate the minimum container height: padding + scaled card (title/label collapse to 0)
 	let containerMinHeight = $derived((cardOriginalHeight * MIN_SCALE) + 32); // 32px for padding
+	
+	// Uniform sizing for portrait cards - constrain width proportionally so longEdge matches landscape
+	// On desktop: use proportional width (shortEdge/longEdge) for portrait
+	// On mobile: use max-height constraint to keep portrait cards from being too tall
+	let templateWidth = $derived(template?.width_pixels || (template?.orientation === 'portrait' ? 638 : 1013));
+	let templateHeight = $derived(template?.height_pixels || (template?.orientation === 'portrait' ? 1013 : 638));
+	let isPortraitCard = $derived(templateHeight > templateWidth);
+	let longEdge = $derived(Math.max(templateWidth, templateHeight));
+	let shortEdge = $derived(Math.min(templateWidth, templateHeight));
+	// For portrait on desktop: use (shortEdge/longEdge) width; on mobile: always 100%
+	let cardWidthPercent = $derived(isPortraitCard && !isMobile ? (shortEdge / longEdge) * 100 : 100);
+	// For portrait on mobile: limit max-height to ~60vh so the card doesn't overflow the viewport
+	// This scales the card proportionally to fit within a reasonable height
+	let mobileMaxHeight = $derived(isPortraitCard && isMobile ? '60vh' : 'none');
+
 	// Smart auto-flip based on focused input
 	let currentInputSide = $state<'front' | 'back'>('front');
 	let formErrors = $state<Record<string, boolean>>({});
@@ -743,21 +758,22 @@
 							height: {cardOriginalHeight ? `${cardOriginalHeight * previewScale}px` : 'auto'};
 						"
 					>
-						<!-- Scaling wrapper - only the card scales -->
-						<div 
-							bind:this={cardScalingWrapperRef}
-							class="origin-top w-full max-w-md mx-auto"
-							style="
-								transform: {zoomState === 'zoomed' 
-									? `translate(${zoomTransform.x}px, ${zoomTransform.y}px) scale(${zoomTransform.scale})` 
-									: `scale(${previewScale})`};
-								margin-bottom: -{cardMarginCompensation}px;
-								transition: transform 300ms cubic-bezier(0.2, 0, 0.2, 1), margin-bottom 300ms ease-out;
-								will-change: transform;
-								z-index: 10;
-								position: relative;
-							"
-						>
+						<!-- Scaling wrapper - only the card scales, with uniform sizing for portrait -->
+					<div 
+						bind:this={cardScalingWrapperRef}
+						class="origin-top w-full max-w-md mx-auto"
+						style="
+							width: {cardWidthPercent}%;
+							transform: {zoomState === 'zoomed' 
+								? `translate(${zoomTransform.x}px, ${zoomTransform.y}px) scale(${zoomTransform.scale})` 
+								: `scale(${previewScale})`};
+							margin-bottom: -{cardMarginCompensation}px;
+							transition: transform 300ms cubic-bezier(0.2, 0, 0.2, 1), margin-bottom 300ms ease-out;
+							will-change: transform;
+							z-index: 10;
+							position: relative;
+						"
+					>	
 							<!-- svelte-ignore a11y_no_static_element_interactions -->
 							<div
 								class="flip-container relative cursor-pointer group"
