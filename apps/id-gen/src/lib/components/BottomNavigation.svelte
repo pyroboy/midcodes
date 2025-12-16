@@ -34,6 +34,9 @@
 	}
 
 	// Navigation items
+	// SECURITY NOTE: {@html} is used for SVG icon paths below.
+	// This is SAFE because icons are hardcoded constants, NOT user input.
+	// If icons are ever sourced from database/user input, sanitize with DOMPurify.
 	const navItems = [
 		{
 			href: '/',

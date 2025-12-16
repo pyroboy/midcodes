@@ -354,19 +354,131 @@ export async function markWebhookEventProcessed(
 }
 
 /**
- * Transaction helper for credit/feature granting
- * Executes a function within a database transaction
+ * SECURITY: Transaction helper for database operations
+ * 
+ * NOTE: Supabase JS client doesn't support native PostgreSQL transactions.
+ * For critical operations like payment processing, use the SQL functions:
+ * - process_payment_add_credits() for atomic payment + credit operations
+ * - mark_payment_failed_atomic() for atomic payment failure marking
+ * 
+ * This function provides best-effort sequential execution with error handling.
+ * For true ACID transactions, use the SQL RPC functions instead.
  */
 export async function executeInTransaction<T>(operation: () => Promise<T>): Promise<T> {
-	// Note: Supabase doesn't expose native PostgreSQL transactions in the client
-	// For now, we'll use the operation directly, but this can be enhanced
-	// with proper transaction support when needed
+	// Note: This is NOT a true database transaction.
+	// For critical operations, use the SQL RPC functions directly.
+	console.warn('[Persistence] executeInTransaction does not provide true ACID guarantees. Use SQL RPC functions for critical operations.');
+	
 	try {
 		return await operation();
 	} catch (error) {
-		// In a real transaction, we would rollback here
+		// Log the error for debugging
+		console.error('[Persistence] Transaction-like operation failed:', error);
 		throw error;
 	}
+}
+
+/**
+ * SECURITY: Process payment and add credits atomically using SQL transaction
+ * This ensures both operations succeed or both fail, preventing:
+ * - Money lost (payment marked paid but credits not added)
+ * - Double-crediting (credits added but payment not marked)
+ */
+export async function processPaymentAndAddCreditsAtomic(params: {
+	sessionId: string;
+	providerPaymentId: string | null;
+	method: string;
+	paidAt: Date;
+	rawEvent: Record<string, any>;
+	userId: string;
+	orgId: string;
+	creditsToAdd: number;
+	packageName: string;
+	packageId: string;
+	amountPhp: number;
+}): Promise<{
+	success: boolean;
+	newBalance?: number;
+	oldBalance?: number;
+	error?: string;
+}> {
+	const { data, error } = await supabaseAdmin.rpc('process_payment_add_credits' as any, {
+		p_session_id: params.sessionId,
+		p_provider_payment_id: params.providerPaymentId,
+		p_method: params.method,
+		p_paid_at: params.paidAt.toISOString(),
+		p_raw_event: params.rawEvent,
+		p_user_id: params.userId,
+		p_org_id: params.orgId,
+		p_credits_to_add: params.creditsToAdd,
+		p_package_name: params.packageName,
+		p_package_id: params.packageId,
+		p_amount_php: params.amountPhp
+	});
+
+	if (error) {
+		console.error('[Persistence] processPaymentAndAddCreditsAtomic failed:', error);
+		return { success: false, error: error.message };
+	}
+
+	const result = Array.isArray(data) ? data[0] : data;
+	
+	if (!result?.payment_updated || !result?.credits_added) {
+		return { 
+			success: false, 
+			error: result?.error_message || 'Transaction failed' 
+		};
+	}
+
+	return {
+		success: true,
+		newBalance: result.new_balance,
+		oldBalance: result.old_balance
+	};
+}
+
+/**
+ * SECURITY: Mark payment as failed atomically using SQL transaction
+ */
+export async function markPaymentFailedAtomic(params: {
+	sessionId?: string;
+	providerPaymentId?: string;
+	reason: string;
+	rawEvent?: Record<string, any>;
+}): Promise<{
+	success: boolean;
+	paymentId?: string;
+	error?: string;
+}> {
+	if (!params.sessionId && !params.providerPaymentId) {
+		return { success: false, error: 'Either sessionId or providerPaymentId must be provided' };
+	}
+
+	const { data, error } = await supabaseAdmin.rpc('mark_payment_failed_atomic' as any, {
+		p_session_id: params.sessionId || null,
+		p_provider_payment_id: params.providerPaymentId || null,
+		p_reason: params.reason,
+		p_raw_event: params.rawEvent || {}
+	});
+
+	if (error) {
+		console.error('[Persistence] markPaymentFailedAtomic failed:', error);
+		return { success: false, error: error.message };
+	}
+
+	const result = Array.isArray(data) ? data[0] : data;
+	
+	if (!result?.success) {
+		return { 
+			success: false, 
+			error: result?.error_message || 'Transaction failed' 
+		};
+	}
+
+	return {
+		success: true,
+		paymentId: result.payment_id
+	};
 }
 
 /**

@@ -10,6 +10,7 @@ import {
 } from '$lib/utils/rate-limiter';
 import { validateCSRFFromRequest, csrfErrorResponse } from '$lib/server/csrf';
 import { invalidateUserPermissionCache } from '$lib/services/permissions';
+import { logRoleEmulationStop } from '$lib/server/audit';
 
 const supabaseAdmin = createClient(PUBLIC_SUPABASE_URL, PRIVATE_SERVICE_ROLE);
 
@@ -71,5 +72,15 @@ export const POST: RequestHandler = async ({ locals, request, cookies }) => {
 	// SECURITY: Invalidate permission cache when role changes
 	invalidateUserPermissionCache(userId);
 
-	return json({ success: true });
+	// SECURITY: Force session refresh to rotate session token after privilege change
+	try {
+		await locals.supabase.auth.refreshSession();
+	} catch (refreshError) {
+		console.warn('Session refresh after emulation stop failed (non-critical):', refreshError);
+	}
+
+	// SECURITY: Log admin action to audit trail
+	await logRoleEmulationStop(userId, request, appMetadata.org_id);
+
+	return json({ success: true, message: 'Session refreshed - reload the page for changes to take effect' });
 };
