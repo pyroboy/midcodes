@@ -352,7 +352,7 @@
 					<!-- Action Dropdown Menu (Persistent) -->
 					<div class="absolute top-2 right-2 z-20">
 						<DropdownMenu.Root>
-							<DropdownMenu.Trigger>
+							<DropdownMenu.Trigger asChild>
 								{#snippet child({ props })}
 									<Button
 										{...props}

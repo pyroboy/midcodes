@@ -5,6 +5,8 @@
  */
 
 import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
+import { dev } from '$app/environment';
+// @ts-ignore
 import {
 	PRIVATE_SERVICE_ROLE,
 	PAYMONGO_SECRET_KEY,
@@ -74,9 +76,13 @@ export function validateEnvironment(): EnvValidationResult {
 
 	// PayMongo Webhook Secret (Critical for security)
 	if (!PAYMONGO_WEBHOOK_SECRET) {
-		errors.push(
-			'PAYMONGO_WEBHOOK_SECRET is not set - webhook verification will fail (SECURITY RISK)'
-		);
+		if (dev) {
+			warnings.push('PAYMONGO_WEBHOOK_SECRET is not set - webhook verification will fail (SECURITY RISK - DEV MODE)');
+		} else {
+			errors.push(
+				'PAYMONGO_WEBHOOK_SECRET is not set - webhook verification will fail (SECURITY RISK)'
+			);
+		}
 	} else if (!isValidSecret(PAYMONGO_WEBHOOK_SECRET, 10)) {
 		warnings.push('PAYMONGO_WEBHOOK_SECRET appears to be too short');
 	}

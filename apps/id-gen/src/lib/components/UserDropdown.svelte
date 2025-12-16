@@ -103,7 +103,7 @@
 </script>
 
 <DropdownMenu.Root>
-	<DropdownMenu.Trigger>
+	<DropdownMenu.Trigger asChild>
 		<Button
 			variant="ghost"
 			class="relative h-10 w-10 rounded-full p-0"

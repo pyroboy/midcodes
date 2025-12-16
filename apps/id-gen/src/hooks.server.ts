@@ -72,8 +72,9 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
 			sessionError = result.error;
 		} catch (err: any) {
 			// Handle AuthApiError for invalid/expired refresh tokens
-			if (err?.code === 'refresh_token_not_found' || err?.__isAuthError) {
-				console.warn('Invalid refresh token detected, clearing session:', err.message);
+			const errorCode = err?.code;
+			if (errorCode === 'refresh_token_not_found' || errorCode === 'refresh_token_already_used' || err?.__isAuthError) {
+				console.warn(`Invalid refresh token detected (${errorCode || 'AuthApiError'}), clearing session:`, err.message);
 				// Clear the invalid session by signing out
 				try {
 					await event.locals.supabase.auth.signOut();
@@ -93,8 +94,9 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
 
 		if (sessionError || !session) {
 			// Also handle the case where error is returned in the result
-			if ((sessionError as any)?.code === 'refresh_token_not_found') {
-				console.warn('Invalid refresh token in session result, clearing session');
+			const errorCode = (sessionError as any)?.code;
+			if (errorCode === 'refresh_token_not_found' || errorCode === 'refresh_token_already_used') {
+				console.warn(`Invalid refresh token (${errorCode}) in session result, clearing session`);
 				try {
 					await event.locals.supabase.auth.signOut();
 				} catch {
