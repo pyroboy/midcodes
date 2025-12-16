@@ -3,16 +3,33 @@ import { json, type RequestHandler } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
 import { PUBLIC_SUPABASE_URL } from '$env/static/public';
 import { PRIVATE_SERVICE_ROLE } from '$env/static/private';
+import {
+	checkRateLimit,
+	createRateLimitResponse,
+	RateLimitConfigs
+} from '$lib/utils/rate-limiter';
 
 const supabaseAdmin = createClient(PUBLIC_SUPABASE_URL, PRIVATE_SERVICE_ROLE);
 
-export const POST: RequestHandler = async ({ locals }) => {
+export const POST: RequestHandler = async ({ locals, request }) => {
 	const session = await locals.safeGetSession();
 	if (!session.user) {
 		return json({ error: 'Unauthorized' }, { status: 401 });
 	}
 
 	const userId = session.user.id;
+
+	// SECURITY FIX: Apply rate limiting to admin endpoints
+	const rateLimitResult = checkRateLimit(
+		request,
+		RateLimitConfigs.ADMIN,
+		'admin:stop-emulation',
+		userId
+	);
+
+	if (rateLimitResult.limited) {
+		return createRateLimitResponse(rateLimitResult.resetTime);
+	}
 	
 	// Double check if the user is actually emulating
 	// We trust the locals.roleEmulation causing the UI to show the button, 

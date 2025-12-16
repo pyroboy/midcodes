@@ -2,6 +2,11 @@ import { json, type RequestHandler } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
 import { PUBLIC_SUPABASE_URL } from '$env/static/public';
 import { PRIVATE_SERVICE_ROLE } from '$env/static/private';
+import {
+	checkRateLimit,
+	createRateLimitResponse,
+	RateLimitConfigs
+} from '$lib/utils/rate-limiter';
 
 const supabaseAdmin = createClient(PUBLIC_SUPABASE_URL, PRIVATE_SERVICE_ROLE);
 
@@ -25,6 +30,18 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	}
 
 	const userId = session.user.id;
+
+	// SECURITY FIX: Apply rate limiting to admin endpoints
+	const rateLimitResult = checkRateLimit(
+		request,
+		RateLimitConfigs.ADMIN,
+		'admin:start-emulation',
+		userId
+	);
+
+	if (rateLimitResult.limited) {
+		return createRateLimitResponse(rateLimitResult.resetTime);
+	}
 
 	// Get current user's actual role to verify they're super_admin
 	const { data: userData, error: fetchError } = await supabaseAdmin.auth.admin.getUserById(userId);
@@ -93,13 +110,23 @@ export const GET: RequestHandler = async ({ locals }) => {
 		return json({ error: 'Unauthorized' }, { status: 401 });
 	}
 
-	// Get user's role from locals (already decoded from JWT)
-	const roleEmulation = locals.roleEmulation;
-	const effectiveRoles = locals.effectiveRoles || [];
+	const userId = session.user.id;
 
-	// Check if user's original role is super_admin
-	const originalRole = roleEmulation?.originalRole || effectiveRoles[0];
-	const isSuperAdmin = originalRole === 'super_admin' || effectiveRoles.includes('super_admin');
+	// SECURITY FIX: Verify role from database, not from JWT/locals
+	// Fetch actual user metadata from Supabase Admin to prevent tampering
+	const { data: userData, error: fetchError } = await supabaseAdmin.auth.admin.getUserById(userId);
+
+	if (fetchError || !userData || !userData.user) {
+		return json({ error: 'User not found' }, { status: 404 });
+	}
+
+	const appMetadata = userData.user.app_metadata || {};
+	const currentRole = appMetadata.role || userData.user.user_metadata?.role;
+	const roleEmulation = appMetadata.role_emulation;
+
+	// Only super_admin can access emulation features
+	// Use the role from database, not from JWT
+	const isSuperAdmin = currentRole === 'super_admin';
 
 	if (!isSuperAdmin) {
 		return json({ error: 'Only super administrators can emulate roles' }, { status: 403 });
@@ -115,8 +142,8 @@ export const GET: RequestHandler = async ({ locals }) => {
 		})),
 		currentEmulation: roleEmulation?.active
 			? {
-					emulatedRole: roleEmulation.emulatedRole,
-					originalRole: roleEmulation.originalRole
+					emulatedRole: roleEmulation.emulated_role,
+					originalRole: roleEmulation.original_role
 				}
 			: null
 	});
