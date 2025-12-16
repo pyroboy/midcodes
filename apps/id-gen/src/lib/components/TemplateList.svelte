@@ -13,12 +13,13 @@
 	import DeleteConfirmationDialog from '$lib/components/DeleteConfirmationDialog.svelte';
 	import type { TemplateAsset } from '$lib/schemas/template-assets.schema';
 
-	let { templates = $bindable([]), onSelect, onCreateNew, units = 'in', dpi = 300 }: {
+	let { templates = $bindable([]), onSelect, onCreateNew, units = 'in', dpi = 300, savingTemplateId = null }: {
 		templates: any[];
 		onSelect: (id: string) => void;
 		onCreateNew?: (cardSize: CardSize, templateName: string, orientation?: 'landscape' | 'portrait', frontBackgroundUrl?: string, selectedTemplateAsset?: TemplateAsset) => void;
 		units?: string;
 		dpi?: number;
+		savingTemplateId?: string | null;
 	} = $props();
 	type Units = 'px' | 'in' | 'mm' | 'cm';
 
@@ -209,6 +210,7 @@
 				{@const shortEdge = Math.min(dims.w, dims.h)}
 				{@const cardWidthPercent = isPortrait ? (shortEdge / longEdge) * 100 : 100}
 				<div
+					id="template-card-{template.id}"
 					class="group relative flex flex-col bg-card border border-border rounded-xl shadow-sm transition-all duration-300 hover:shadow-md hover:border-primary/50 overflow-hidden h-full"
 					role="article"
 					aria-label={`Template card for ${template.name}`}
@@ -232,7 +234,7 @@
 								<!-- 1. Background Image -->
 								{#if template.front_background}
 									<img
-										src={template.front_background.startsWith('http')
+										src={template.front_background.startsWith('http') || template.front_background.startsWith('data:') || template.front_background.startsWith('blob:')
 											? template.front_background
 											: getSupabaseStorageUrl(template.front_background)}
 										alt={template.name}
@@ -297,6 +299,13 @@
 								<div
 									class="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-200"
 								></div>
+								
+								<!-- Loading Overlay -->
+								{#if savingTemplateId === template.id}
+									<div class="absolute inset-0 bg-white/50 backdrop-blur-sm flex items-center justify-center z-20 transition-all duration-300">
+										<div class="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+									</div>
+								{/if}
 							</div>
 						</a>
 					</div>

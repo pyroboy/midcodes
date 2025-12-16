@@ -97,6 +97,8 @@
 	import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeometry';
 	import { toast } from 'svelte-sonner';
 	import { imageCache } from '$lib/utils/imageCache';
+	import IdCanvas from '$lib/components/IdCanvas.svelte';
+	import { FlipHorizontal, FlipVertical, Save, X, Edit, RotateCcw } from 'lucide-svelte';
 
 	// Convert a Blob/File to a base64 data URL for stable, in-memory previews
 	async function blobToDataUrl(fileOrBlob: Blob): Promise<string> {
@@ -151,6 +153,41 @@
 
 	// Edit mode state
 	let isEditMode = $state(false);
+	let isSaving = $state(false);
+
+	// Review & Animation State
+	let isReviewing = $state(false);
+	let reviewSide = $state<'front' | 'back'>('front');
+	let reviewRotation = $state(0);
+	
+	// Fly Animation State
+	let isClosingReview = $state(false);
+	let flyTarget = $state<{ top: number; left: number; width: number; height: number } | null>(null);
+	let savingTemplateId = $state<string | null>(null);
+
+	function startReview() {
+		console.log('👀 Starting Template Review');
+		if (!currentTemplate?.name) {
+			toast.error('Please enter a template name first');
+			return;
+		}
+		if (!frontPreview || !backPreview) {
+			toast.error('Both front and back designs are required');
+			return;
+		}
+		isReviewing = true;
+		reviewSide = 'front';
+		reviewRotation = 0;
+	}
+
+	function cancelReview() {
+		isReviewing = false;
+	}
+
+	function flipReview() {
+		reviewSide = reviewSide === 'front' ? 'back' : 'front';
+		reviewRotation += 180;
+	}
 
 	// Preload 3D card geometries for templates
 	const templateGeometries = $state<Record<string, any>>({});
@@ -812,14 +849,17 @@
 
 			// Normalize data we pass to list — prefer the preview URLs we just set
 			// Prefer the known uploaded URLs for the list as well
-			const listFront =
-				typeof frontUrl === 'string' && frontUrl.startsWith('http')
+			// Prefer the already-loaded preview (Blob/Data URL) for instant display
+			// This avoids "skeleton" loading states by using the image we already have in memory
+			const listFront = frontPreview || 
+				(typeof frontUrl === 'string' && frontUrl.startsWith('http')
 					? `${frontUrl}?t=${Date.now()}`
-					: (frontPreview ?? makePublicUrl(savedTemplate.front_background));
-			const listBack =
-				typeof backUrl === 'string' && backUrl.startsWith('http')
+					: makePublicUrl(savedTemplate.front_background));
+
+			const listBack = backPreview ||
+				(typeof backUrl === 'string' && backUrl.startsWith('http')
 					? `${backUrl}?t=${Date.now()}`
-					: (backPreview ?? makePublicUrl(savedTemplate.back_background));
+					: makePublicUrl(savedTemplate.back_background));
 
 			// --- FIX START: Force dimensions into list object ---
 			const currentWidth =
@@ -866,17 +906,67 @@
 				// Update local templates array instead of full page reload
 				await refreshTemplatesList(normalizedForList as any);
 
-				// Invalidate server data to fetch fresh rows without hard reload
-				await Promise.all([
-					invalidate((url) => url.pathname === '/templates'),
-					invalidate(`/templates?id=${savedTemplate.id}`)
-				]);
+				// Optimization: Removed explicit invalidation to prevent UI flash
+				// The local update is sufficient for user feedback
+				console.log('⚡️ Optimized: Skipped full invalidation');
 			} catch (e) {
 				console.warn('⚠️ Non-fatal error updating list/cache:', e);
 			}
 
-			// ALWAYS go back to templates list if we were creating/editing and save was successful
-			if (isEditMode) {
+			// Smooth Transition Logic
+			if (isReviewing && savedTemplate?.id) {
+				// 1. Reveal List behind the modal
+				savingTemplateId = savedTemplate.id; // Set loading state on list item
+				isEditMode = false;
+				await tick();
+				
+				// Small delay to ensure list rendering (TemplateList component mount)
+				// With persistent list, this is mostly for the 'invisible' class removal to take effect
+				await new Promise((r) => setTimeout(r, 50));
+
+				// 2. Find Target Card in the list - assume it's the one we just saved
+				const targetEl = document.getElementById(`template-card-${savedTemplate.id}`);
+				if (targetEl) {
+					console.log('🎯 Found fly target:', targetEl);
+					
+					// Scroll to it if needed (optional but good for seamless)
+					targetEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+					
+					const rect = targetEl.getBoundingClientRect();
+					
+					// Capture target coordinates
+					flyTarget = { 
+						top: rect.top, 
+						left: rect.left, 
+						width: rect.width, 
+						height: rect.height 
+					};
+					
+					// 3. Trigger Animation State
+					// This will transform the card to 'fixed' at the target rect
+					isClosingReview = true; 
+					
+					// Reset rotation to flat for landing if needed, or keep it. 
+					// Ideally we want front face?
+					if (reviewSide === 'back') {
+						// Optional: quickly flip back to front or just land as is
+						reviewRotation = 0; 
+					}
+					
+					// 4. Wait for CSS transition (600ms matching the style)
+					await new Promise((r) => setTimeout(r, 600));
+				} else {
+					console.warn('⚠️ Could not find target card element for animation');
+				}
+				
+				// 5. Final Cleanup
+				isReviewing = false;
+				isClosingReview = false;
+				flyTarget = null;
+				savingTemplateId = null; // Clear loading state
+				handleBack(); // Updates URL and clears form
+			} else if (isEditMode) {
+				// Fallback for non-review save
 				handleBack();
 			}
 		} catch (error) {
@@ -950,20 +1040,8 @@
 				console.log('➕ Added new template to local list:', normalized.name);
 			}
 
-			// Optional: Fetch fresh data from server to ensure consistency
-			// This is a fallback in case the local update doesn't work perfectly
-			setTimeout(async () => {
-				try {
-					const response = await fetch('/templates');
-					if (response.ok) {
-						const html = await response.text();
-						// We could parse the HTML to extract fresh template data if needed
-						console.log('🔄 Background refresh completed');
-					}
-				} catch (error) {
-					console.warn('⚠️ Background refresh failed:', error);
-				}
-			}, 2000); // Refresh in background after 2 seconds
+			// Optimization: Skipped background fetch to keep UI stable
+			// Rely purely on the local update above
 		} catch (error) {
 			console.error('❌ Error refreshing templates list:', error);
 			// Fallback: reload the page if local update fails
@@ -1403,14 +1481,16 @@
 		}
 	}
 
-	function handleBack() {
+	async function handleBack() {
 		isEditMode = false;
+		// Clear the URL ?id= parameter to prevent re-triggering edit mode on navigation
+		// derived from data.selectedTemplate effect
+		if (browser && window.location.search) {
+			await goto('/templates', { replaceState: true });
+		}
+		
 		currentTemplate = null;
 		clearForm();
-		// Clear the URL ?id= parameter to prevent re-triggering edit mode on navigation
-		if (browser && window.location.search) {
-			goto('/templates', { replaceState: true });
-		}
 	}
 
 	function clearForm() {
@@ -1564,39 +1644,49 @@
 </script>
 
 <main class="h-full">
-	<div class="edit-template-container {isEditMode ? 'edit-mode' : ''}">
-		{#if !isEditMode}
+	<!-- Layout Container -->
+	<!-- Layout Container: Use Grid for robust stacking -->
+	<div class="grid grid-cols-1 grid-rows-1 w-full h-full overflow-hidden bg-background">
+		<!-- Template List (Always mounted, Base Layer) -->
+		<!-- Using col-start-1 row-start-1 to place it in the same cell as editor -->
+		<div class="col-start-1 row-start-1 w-full h-full overflow-hidden {isEditMode ? 'invisible pointer-events-none' : 'visible'}">
 			<TemplateList
 				templates={templates ?? []}
 				onSelect={(id: string) => handleTemplateSelect(id)}
 				onCreateNew={handleCreateNewTemplate}
+				savingTemplateId={savingTemplateId}
 			/>
-		{:else}
-			{#key editorVersion}
-				<TemplateEdit
-					version={editorVersion}
-					{isLoading}
-					{frontElements}
-					{backElements}
-					{frontPreview}
-					{backPreview}
-					{errorMessage}
-					cardSize={currentCardSize}
-					pixelDimensions={requiredPixelDimensions}
-					onBack={handleBack}
-					onSave={saveTemplate}
-					onClear={clearForm}
-					onUpdateElements={(elements, side) => updateElements(elements, side)}
-					onImageUpload={(files, side) => handleImageUpload(files, side)}
-					onRemoveImage={(side) => handleRemoveImage(side)}
-					onUpdateBackgroundPosition={async (position, side) => {
-						$state.snapshot(`Background side updated for ${side}:`);
-						$state.snapshot(`Background position updated for ${position}`);
-						// Use optimized background position handler with drag performance
-						await handleBackgroundPositionUpdate(position, side);
-					}}
-				/>
-			{/key}
+		</div>
+
+		<!-- Edit View Overlay (Top Layer) -->
+		{#if isEditMode}
+			<div class="col-start-1 row-start-1 z-10 w-full h-full bg-background animate-in fade-in slide-in-from-bottom-4 duration-300">
+				{#key editorVersion}
+					<TemplateEdit
+						version={editorVersion}
+						{isLoading}
+						{frontElements}
+						{backElements}
+						{frontPreview}
+						{backPreview}
+						{errorMessage}
+						cardSize={currentCardSize}
+						pixelDimensions={requiredPixelDimensions}
+						onBack={handleBack}
+						onSave={startReview}
+						onClear={clearForm}
+						onUpdateElements={(elements, side) => updateElements(elements, side)}
+						onImageUpload={(files, side) => handleImageUpload(files, side)}
+						onRemoveImage={(side) => handleRemoveImage(side)}
+						onUpdateBackgroundPosition={async (position, side) => {
+							$state.snapshot(`Background side updated for ${side}:`);
+							$state.snapshot(`Background position updated for ${position}`);
+							// Use optimized background position handler with drag performance
+							await handleBackgroundPositionUpdate(position, side);
+						}}
+					/>
+				{/key}
+			</div>
 		{/if}
 	</div>
 
@@ -1612,9 +1702,134 @@
 		onConfirm={handleCroppingConfirm}
 		onCancel={handleCroppingCancel}
 	/>
+	<!-- Robust Review Overlay -->
+	{#if isReviewing && requiredPixelDimensions}
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+		<div 
+			class="fixed inset-0 z-50 flex items-center justify-center p-4"
+			role="dialog"
+			aria-modal="true"
+			onclick={(e) => { if(e.target === e.currentTarget && !isClosingReview) cancelReview() }}
+		>
+			<!-- Backdrop with fade out -->
+			<div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity duration-600" class:opacity-0={isClosingReview}></div>
+
+			<div class="relative w-full max-w-4xl flex flex-col items-center animate-in fade-in zoom-in duration-200">
+				
+				<!-- Header -->
+				<div class="w-full flex items-center justify-center mb-8 relative transition-opacity duration-300" class:opacity-0={isClosingReview}>
+					<h2 class="text-2xl font-bold text-white">Review Template</h2>
+					<button 
+						onclick={cancelReview}
+						class="absolute right-0 p-2 text-white/50 hover:text-white transition-colors"
+					>
+						<X size={24} />
+					</button>
+				</div>
+
+				<!-- 3D Flip Preview Area -->
+				<!-- Scale down large cards to fit screen -->
+				<div 
+					class="relative perspective-1000 mb-8 select-none" 
+					style="
+						width: {isClosingReview && flyTarget ? flyTarget.width : requiredPixelDimensions.width * 0.6}px; 
+						height: {isClosingReview && flyTarget ? flyTarget.height : requiredPixelDimensions.height * 0.6}px;
+						position: {isClosingReview ? 'fixed' : 'relative'};
+						top: {isClosingReview && flyTarget ? flyTarget.top : ''}px;
+						left: {isClosingReview && flyTarget ? flyTarget.left : ''}px;
+						transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+						z-index: 100;
+						pointer-events: {isClosingReview ? 'none' : 'auto'};
+					"
+				>
+					<!-- Flip Container -->
+					<div 
+						class="w-full h-full relative transition-transform duration-700 ease-in-out transform-style-3d cursor-pointer"
+						style="transform: rotateY({isClosingReview ? 0 : reviewRotation}deg);"
+						onclick={flipReview}
+						role="button"
+						tabindex="0"
+					>
+						<!-- Front Face -->
+						<div class="absolute inset-0 backface-hidden shadow-2xl rounded-lg overflow-hidden bg-white">
+							<IdCanvas
+								pixelDimensions={requiredPixelDimensions}
+								backgroundUrl={frontPreview || ''}
+								elements={frontElements}
+								showBoundingBoxes={false}
+								formData={{}}
+								fileUploads={{}}
+								imagePositions={{}}
+							/>
+							<div class="absolute top-4 left-4 px-3 py-1 bg-black/50 text-white text-xs font-bold rounded-full backdrop-blur-md z-10">FRONT</div>
+						</div>
+
+						<!-- Back Face -->
+						<div 
+							class="absolute inset-0 backface-hidden shadow-2xl rounded-lg overflow-hidden bg-white"
+							style="transform: rotateY(180deg);"
+						>
+							<IdCanvas
+								pixelDimensions={requiredPixelDimensions}
+								backgroundUrl={backPreview || ''}
+								elements={backElements}
+								showBoundingBoxes={false}
+								formData={{}}
+								fileUploads={{}}
+								imagePositions={{}}
+							/>
+							<div class="absolute top-4 left-4 px-3 py-1 bg-black/50 text-white text-xs font-bold rounded-full backdrop-blur-md z-10">BACK</div>
+						</div>
+					</div>
+					
+						<div class="absolute -bottom-12 left-1/2 -translate-x-1/2 text-white/60 text-sm flex items-center gap-2 pointer-events-none whitespace-nowrap transition-opacity duration-300" class:opacity-0={isClosingReview}>
+						<RotateCcw size={14} />
+						Click card to flip • Verify your design before saving
+					</div>
+				</div>
+
+				<!-- Actions -->
+				<div class="flex gap-4 items-center mt-4 transition-opacity duration-300" class:opacity-0={isClosingReview}>
+					<button
+						onclick={cancelReview}
+						class="px-6 py-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-all font-medium flex items-center gap-2 border border-white/10"
+					>
+						<Edit size={18} />
+						Back to Edit
+					</button>
+					
+					<button
+						onclick={() => saveTemplate()}
+						class="px-8 py-3 rounded-full bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-500/20 hover:shadow-green-500/40 transition-all font-bold flex items-center gap-2 transform hover:scale-105 active:scale-95"
+					>
+						<Save size={18} />
+						Save Template
+					</button>
+				</div>
+
+				<!-- Metadata -->
+				<div class="mt-8 text-center text-white/40 text-sm transition-opacity duration-300" class:opacity-0={isClosingReview}>
+					<p class="font-medium">{currentTemplate?.name || 'Untitled Template'}</p>
+					<p>{requiredPixelDimensions.width}px × {requiredPixelDimensions.height}px • {frontElements.length + backElements.length} Elements</p>
+				</div>
+
+			</div>
+		</div>
+	{/if}
 </main>
 
 <style>
+	.perspective-1000 {
+		perspective: 1000px;
+	}
+	.transform-style-3d {
+		transform-style: preserve-3d;
+	}
+	.backface-hidden {
+		backface-visibility: hidden;
+	}
+
 	.edit-template-container {
 		display: flex;
 		width: 100%;

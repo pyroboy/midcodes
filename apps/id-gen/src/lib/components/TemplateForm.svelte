@@ -72,6 +72,7 @@
 	let isResizing = false;
 	// Shared hover state between canvas and element list
 	let hoveredElementId: string | null = $state(null);
+	let selectedElementId: string | null = $state(null);
 	let startX: number, startY: number;
 	let currentElementIndex: number | null = null;
 	let resizeHandle: string | null = null;
@@ -362,8 +363,9 @@
 		const debugInfo = elementList.map((el: TemplateElement) => ({
 			type: el.type,
 			id: el.id,
-			pos: `(${Math.round(el.x || 0)}, ${Math.round(el.y || 0)})`,
-			size: `(${Math.round(el.width || 0)}x${Math.round(el.height || 0)})`,
+			// Log with sub-pixel precision
+			pos: `(${Number((el.x || 0).toFixed(2))}, ${Number((el.y || 0).toFixed(2))})`,
+			size: `(${Number((el.width || 0).toFixed(2))}x${Number((el.height || 0).toFixed(2))})`,
 			side
 		}));
 		
@@ -427,14 +429,15 @@
 					const maxX = bounds.width - (newEl.width || 0);
 					const maxY = bounds.height - (newEl.height || 0);
 
-					newEl.x = Math.round(Math.min(Math.max(x, 0), maxX));
-					newEl.y = Math.round(Math.min(Math.max(y, 0), maxY));
+					// Use sub-pixel precision (2 decimal places) instead of rounding
+					newEl.x = Number(Math.min(Math.max(x, 0), maxX).toFixed(2));
+					newEl.y = Number(Math.min(Math.max(y, 0), maxY).toFixed(2));
 
 					if ((el.type === 'photo' || el.type === 'signature') && width && height) {
-						newEl.width = Math.max(20, Math.round(width));
-						newEl.height = Math.max(20, Math.round(height));
+						newEl.width = Math.max(20, Number(width.toFixed(2)));
+						newEl.height = Math.max(20, Number(height.toFixed(2)));
 					} else if (el.type === 'text' && metrics) {
-						newEl.width = Math.max(20, Math.round(metrics.width / previewDimensions.scale));
+						newEl.width = Math.max(20, Number((metrics.width / previewDimensions.scale).toFixed(2)));
 					}
 				}
 				return newEl;
@@ -446,6 +449,11 @@
 	}
 
 	function onMouseDown(event: MouseEvent, index: number, handle: string | null = null) {
+		const element = elements[index];
+		selectedElementId = element.id; // Select on interaction
+		
+		console.log('🔴 Handle Tapped:', handle || 'element-body', 'on side:', $state.snapshot(side));
+
 		if (handle) {
 			isResizing = true;
 			resizeHandle = handle;
@@ -455,11 +463,64 @@
 		currentElementIndex = index;
 		startX = event.clientX;
 		startY = event.clientY;
-		event.preventDefault();
+		// Don't prevent default immediately if we want to allow some events, 
+		// but for dragging we usually do.
+		// However, for simple selection (click), we might not want to prevent everything.
+		// But since we are starting a drag/resize, preventDefault is standard to stop text selection/scrolling.
+		event.preventDefault(); 
+		event.stopPropagation(); // Prevent clearing selection via background click
+	}
+	
+	function onTouchStart(event: TouchEvent, index: number, handle: string | null = null) {
+		if (event.touches.length > 0) {
+			const touch = event.touches[0];
+			// Create a synthetic MouseEvent for compatibility
+			const mouseEvent = new MouseEvent('mousedown', {
+				clientX: touch.clientX,
+				clientY: touch.clientY,
+				bubbles: true,
+				cancelable: true
+			});
+			onMouseDown(mouseEvent, index, handle);
+		}
+	}
+
+	function onTouchMove(event: TouchEvent) {
+		if (event.touches.length > 0 && (isDragging || isResizing)) {
+			// Prevent scrolling while dragging
+			event.preventDefault(); 
+			
+			const touch = event.touches[0];
+			const mouseEvent = new MouseEvent('mousemove', {
+				clientX: touch.clientX,
+				clientY: touch.clientY,
+				bubbles: true,
+				cancelable: true
+			});
+			onMouseMove(mouseEvent);
+		}
+	}
+	
+	function onTouchEnd(event: TouchEvent) {
+		onMouseUp();
+	}
+
+	function onBackgroundClick() {
+		if (!isDragging && !isResizing) {
+			selectedElementId = null;
+		}
 	}
 
 	function onMouseMove(event: MouseEvent) {
 		if ((!isDragging && !isResizing) || currentElementIndex === null) return;
+
+		if (isResizing) {
+			console.log('⚪ Dragging White Circle:', $state.snapshot({ 
+				handle: resizeHandle, 
+				mouseX: event.clientX, 
+				mouseY: event.clientY 
+			}));
+		}
 
 		const dx = event.clientX - startX;
 		const dy = event.clientY - startY;
@@ -509,10 +570,11 @@
 				{ width: Math.max(20, newWidth), height: Math.max(20, newHeight) }
 			);
 
-			updatedElement.x = Math.round(constrainedPos.x);
-			updatedElement.y = Math.round(constrainedPos.y);
-			updatedElement.width = Math.max(20, Math.round(newWidth));
-			updatedElement.height = Math.max(20, Math.round(newHeight));
+			// Use sub-pixel precision
+			updatedElement.x = Number(constrainedPos.x.toFixed(2));
+			updatedElement.y = Number(constrainedPos.y.toFixed(2));
+			updatedElement.width = Math.max(20, Number(newWidth.toFixed(2)));
+			updatedElement.height = Math.max(20, Number(newHeight.toFixed(2)));
 		} else {
 			// Just update position during dragging, maintain original size
 			const newPos = {
@@ -525,8 +587,8 @@
 				height: element.height || 0
 			});
 
-			updatedElement.x = Math.round(constrainedPos.x);
-			updatedElement.y = Math.round(constrainedPos.y);
+			updatedElement.x = Number(constrainedPos.x.toFixed(2));
+			updatedElement.y = Number(constrainedPos.y.toFixed(2));
 		}
 
 		updatedElements[currentElementIndex] = updatedElement;
@@ -770,9 +832,22 @@
 			fn(e);
 		};
 	}
+	onMount(() => {
+		// Add non-passive touch listeners to window to support preventing default (scrolling)
+		// This fixes the "Unable to preventDefault inside passive event listener" error
+		window.addEventListener('touchmove', onTouchMove, { passive: false });
+		window.addEventListener('touchend', onTouchEnd);
+		return () => {
+			window.removeEventListener('touchmove', onTouchMove);
+			window.removeEventListener('touchend', onTouchEnd);
+		};
+	});
 </script>
 
-<svelte:window onmousemove={onMouseMove} onmouseup={onMouseUp} />
+<svelte:window 
+	onmousemove={onMouseMove} 
+	onmouseup={onMouseUp} 
+/>
 
 <div class="template-section">
 	<h2 class="text-2xl font-semibold mb-4 text-foreground">
@@ -797,9 +872,18 @@
 						bind:this={mainCanvas}
 						width={previewDimensions.width}
 						height={previewDimensions.height}
-						class="background-canvas"
 						style="display: block;"
 					></canvas>
+					<!-- Click listener for background to clear selection -->
+					<div 
+						class="selection-clear-layer"
+						role="button"
+						tabindex="0"
+						onclick={onBackgroundClick}
+						onkeydown={(e) => e.key === 'Enter' && onBackgroundClick()}
+						style="position:absolute; inset:0; z-index: 2;"
+						aria-label="Clear selection"
+					></div>
 				{/if}
 
 				<!-- Elements overlay layer -->
@@ -860,12 +944,14 @@
 							<div
 								class="template-element {element.type}"
 								class:highlighted={hoveredElementId === element.id}
+								class:selected={selectedElementId === element.id}
 								style={Object.entries(elementStyle(element))
 									.map(([key, value]) => `${key}: ${value}`)
 									.join(';')}
 								onmouseenter={() => (hoveredElementId = element.id)}
 								onmouseleave={() => (hoveredElementId = null)}
 								onmousedown={(e) => onMouseDown(e, i)}
+								ontouchstart={(e) => onTouchStart(e, i)}
 								role="button"
 								tabindex="0"
 								aria-label="{element.type} element"
@@ -892,28 +978,36 @@
 								<div class="resize-handles">
 									<div
 										class="resize-handle top-left"
+										class:active={resizeHandle === 'top-left' && currentElementIndex === i}
 										onmousedown={stopPropagation((e) => onMouseDown(e, i, 'top-left'))}
+										ontouchstart={stopPropagation((e) => onTouchStart(e, i, 'top-left'))}
 										role="button"
 										tabindex="0"
 										aria-label="Resize top left"
 									></div>
 									<div
 										class="resize-handle top-right"
+										class:active={resizeHandle === 'top-right' && currentElementIndex === i}
 										onmousedown={stopPropagation((e) => onMouseDown(e, i, 'top-right'))}
+										ontouchstart={stopPropagation((e) => onTouchStart(e, i, 'top-right'))}
 										role="button"
 										tabindex="0"
 										aria-label="Resize top right"
 									></div>
 									<div
 										class="resize-handle bottom-left"
+										class:active={resizeHandle === 'bottom-left' && currentElementIndex === i}
 										onmousedown={stopPropagation((e) => onMouseDown(e, i, 'bottom-left'))}
+										ontouchstart={stopPropagation((e) => onTouchStart(e, i, 'bottom-left'))}
 										role="button"
 										tabindex="0"
 										aria-label="Resize bottom left"
 									></div>
 									<div
 										class="resize-handle bottom-right"
+										class:active={resizeHandle === 'bottom-right' && currentElementIndex === i}
 										onmousedown={stopPropagation((e) => onMouseDown(e, i, 'bottom-right'))}
+										ontouchstart={stopPropagation((e) => onTouchStart(e, i, 'bottom-right'))}
 										role="button"
 										tabindex="0"
 										aria-label="Resize bottom right"
@@ -1100,14 +1194,22 @@
 	.template-element {
 		position: absolute;
 		cursor: move;
-		/* Use outline instead of border to ensure pinpoint accuracy of dimensions 
-		   without affecting the content box size */
-		outline: 1px solid cyan; 
-		box-shadow: 0 0 5px rgba(0, 255, 255, 0.5);
+		/* Violet border (Canva style) */
+		/* Default: hidden or very subtle unless selected/hovered? 
+		   User said "I want the borders to be thick and more opaque". 
+		   Usually unselected elements show content only. 
+		   But if they want to see the bounding box always:
+		*/
+		outline: none; /* Only show when selected/hovered to avoid clutter? Or always?
+		              Ref: "I want the borders to be violet... thicker and more opaque"
+		              If I make it outline always, it might look messy. 
+		              Let's make it visible on hover/selection. 
+		              If user meant "always visible", I can change. 
+		              Standard UI: visible on hover/select. */
+		box-shadow: none;
 		box-sizing: border-box;
-		opacity: 0.5;
+		opacity: 1; /* Fully opaque content */
 		transition:
-			opacity 0.15s ease,
 			box-shadow 0.15s ease,
 			outline-color 0.15s ease;
 		pointer-events: auto; /* Re-enable clicks on actual elements */
@@ -1118,28 +1220,68 @@
 	}
 
 	.template-element.highlighted,
-	.template-element:hover {
-		opacity: 1;
-		box-shadow: 0 0 10px rgba(0, 255, 255, 0.9);
-		outline-color: #0ff;
+	.template-element:hover,
+	.template-element.selected {
+		/* Show border when highlighted, hovered, OR selected */
+		outline: 3px solid #8b5cf6; 
 	}
-
-	.template-element:hover {
-		opacity: 1;
+	
+	/* Add a specific style for selected to be very clear */
+	.template-element.selected {
+		z-index: 25; /* Bring selected to front */
+		outline: 3px solid #8b5cf6;
 	}
 
 	.resize-handle {
 		position: absolute;
-		width: 8px;
-		height: 8px;
-		background-color: white;
-		border: 1px solid #000;
+		/* Big invisible hitbox (44px standard touch target) */
+		width: 44px;
+		height: 44px;
+		background-color: transparent;
+		border: none;
 		border-radius: 50%;
 		display: none;
+		align-items: center;
+		justify-content: center;
+		z-index: 30; /* Above element */
+		touch-action: none; /* Prevent scrolling while dragging handle */
 	}
 
-	.template-element:hover .resize-handle {
-		display: block;
+	.template-element:hover .resize-handle,
+	.template-element.selected .resize-handle, 
+	.resize-handle.active {
+		display: flex;
+	}
+	
+	/* The Visual White Circle (Visual Indicator) */
+	.resize-handle::after {
+		content: '';
+		width: 12px; /* Slightly larger visual dot */
+		height: 12px;
+		background-color: white;
+		border: 1px solid #8b5cf6; /* Violet border */
+		border-radius: 50%;
+		box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+		transition: transform 0.1s;
+	}
+	
+	/* Hover effect on the handle itself */
+	.resize-handle:hover::after {
+		transform: scale(1.2);
+	}
+
+	/* The Big White Transparent Circle when Holding/Dragging */
+	.resize-handle.active::before {
+		content: '';
+		position: absolute;
+		width: 60px; /* Even bigger glow when active */
+		height: 60px;
+		left: 50%;
+		top: 50%;
+		transform: translate(-50%, -50%);
+		background-color: rgba(255, 255, 255, 0.3);
+		border-radius: 50%;
+		pointer-events: none;
 	}
 
 	.template-element.text span {
@@ -1194,23 +1336,23 @@
 	}
 
 	.resize-handle.top-left {
-		top: -4px;
-		left: -4px;
+		top: -22px;
+		left: -22px;
 		cursor: nwse-resize;
 	}
 	.resize-handle.top-right {
-		top: -4px;
-		right: -4px;
+		top: -22px;
+		right: -22px;
 		cursor: nesw-resize;
 	}
 	.resize-handle.bottom-left {
-		bottom: -4px;
-		left: -4px;
+		bottom: -22px;
+		left: -22px;
 		cursor: nesw-resize;
 	}
 	.resize-handle.bottom-right {
-		bottom: -4px;
-		right: -4px;
+		bottom: -22px;
+		right: -22px;
 		cursor: nwse-resize;
 	}
 

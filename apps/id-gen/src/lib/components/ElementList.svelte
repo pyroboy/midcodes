@@ -356,8 +356,8 @@
 	.element-item.highlighted .element-header {
 		background-color: var(--color-accent);
 		box-shadow:
-			0 0 0 1px rgba(0, 255, 255, 0.4) inset,
-			0 0 8px rgba(0, 255, 255, 0.35);
+			0 0 0 1px rgba(139, 92, 246, 0.4) inset,
+			0 0 8px rgba(139, 92, 246, 0.35);
 	}
 
 	.element-header {
