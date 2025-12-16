@@ -55,22 +55,55 @@
 	}
 
 	// Helper to calculate percentage positions with rotation
+	// Uses higher precision to ensure pixel-perfect positioning
 	function getElementStyle(el: TemplateElement, templateW: number, templateH: number) {
-		const left = (el.x / templateW) * 100;
-		const top = (el.y / templateH) * 100;
-		const width = (el.width / templateW) * 100;
-		const height = (el.height / templateH) * 100;
+		// Use high precision percentages to avoid sub-pixel rounding issues
+		const left = ((el.x / templateW) * 100);
+		const top = ((el.y / templateH) * 100);
+		const width = ((el.width / templateW) * 100);
+		const height = ((el.height / templateH) * 100);
 		const rotation = el.rotation || 0;
 
 		return `
-			left: ${left}%;
-			top: ${top}%;
-			width: ${width}%;
-			height: ${height}%;
+			left: ${left.toFixed(6)}%;
+			top: ${top.toFixed(6)}%;
+			width: ${width.toFixed(6)}%;
+			height: ${height.toFixed(6)}%;
 			transform: rotate(${rotation}deg);
 			transform-origin: center center;
 		`;
 	}
+
+	// Helper to create text styling that matches TemplateForm exactly
+	// Uses container query width (cqw) units for accurate scaling
+	function getTextStyle(el: TemplateElement, templateW: number) {
+		// Calculate font-size as percentage of container width using cqw units
+		// This ensures text scales proportionally with the container
+		// Use fontSize (new) with fallback to size (legacy) for backwards compatibility
+		const fontSizeCqw = ((el.fontSize || el.size || 16) / templateW) * 100;
+		const letterSpacingCqw = el.letterSpacing
+			? (el.letterSpacing / templateW) * 100
+			: null;
+
+		return `
+			font-family: "${el.fontFamily || el.font || 'Arial'}", sans-serif;
+			font-weight: ${el.fontWeight || '400'};
+			font-style: ${el.fontStyle || 'normal'};
+			font-size: ${fontSizeCqw.toFixed(3)}cqw;
+			color: ${el.color || '#000000'};
+			text-align: ${el.alignment || 'left'};
+			text-transform: ${el.textTransform || 'none'};
+			text-decoration: ${el.textDecoration || 'none'};
+			letter-spacing: ${letterSpacingCqw ? `${letterSpacingCqw.toFixed(3)}cqw` : 'normal'};
+			line-height: ${el.lineHeight || '1.2'};
+			opacity: ${typeof el.opacity === 'number' ? el.opacity : 1};
+			display: block;
+			width: 100%;
+			white-space: pre-wrap;
+			word-break: break-word;
+		`;
+	}
+
 
 	let selectedTemplate: TemplateData | null = null;
 	let notification: string | null = $state(null);
@@ -262,28 +295,21 @@
 												class:justify-start={el.alignment === 'left'}
 												class:justify-end={el.alignment === 'right'}
 												style="{getElementStyle(el, dims.w, dims.h)}; 
+													box-sizing: border-box;
 													background-color: {el.type === 'photo' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(0,0,0,0)'};
 													border-color: rgba(0,0,0,0.1);"
 											>
 												{#if el.type === 'photo'}
 													<ImageIcon class="w-3 h-3 text-blue-500/50" />
 												{:else if el.type === 'text' || el.type === 'selection'}
-													<span
-														class="truncate px-0.5 block"
-														style="
-														width: 100%;
-														color: {el.color ?? '#000000'}; 
-														font-family: {el.fontFamily ?? 'Arial'}, sans-serif;
-														font-weight: {el.fontWeight ?? 'normal'};
-														font-style: {el.fontStyle ?? 'normal'};
-														text-decoration: {el.textDecoration ?? 'none'};
-														text-align: {el.alignment ?? 'left'};
-														line-height: {el.lineHeight ?? '1.2'};
-														font-size: {((el.size ?? 16) / dims.w) * 100}cqw;
-													"
-													>
-														{el.content || el.variableName || 'Text'}
-													</span>
+									<span
+										class="truncate px-0.5"
+										style="{getTextStyle(el, dims.w)}"
+									>
+										{el.type === 'selection' 
+											? (el.content || el.options?.[0] || '')
+											: (el.content || '')}
+									</span>
 												{:else if el.type === 'qr'}
 													<div class="w-full h-full bg-black/10 flex items-center justify-center">
 														<div class="w-1/2 h-1/2 bg-black/20"></div>

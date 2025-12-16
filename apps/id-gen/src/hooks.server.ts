@@ -245,11 +245,14 @@ const initializeSupabase: Handle = async ({ event, resolve }) => {
 
 const authGuard: Handle = async ({ event, resolve }) => {
 	// Set baseline security headers on all responses
+	// COEP/COOP enable cross-origin isolation for WebAssembly multi-threading (background removal AI)
 	event.setHeaders({
 		'X-Frame-Options': 'DENY',
 		'X-Content-Type-Options': 'nosniff',
 		'Referrer-Policy': 'strict-origin-when-cross-origin',
-		'Permissions-Policy': 'geolocation=(), microphone=(), camera=(self)'
+		'Permissions-Policy': 'geolocation=(), microphone=(), camera=(self)',
+		'Cross-Origin-Embedder-Policy': 'credentialless',
+		'Cross-Origin-Opener-Policy': 'same-origin'
 	});
 
 	const sessionInfo = await event.locals.safeGetSession();

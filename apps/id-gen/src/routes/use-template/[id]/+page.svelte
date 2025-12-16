@@ -20,6 +20,11 @@
 	import { idCardsCache, recentCardsCache } from '$lib/stores/dataCache';
 	import { clearAllIdsCache } from '../../all-ids/allIdsCache';
 	import { clearRemoteFunctionCacheByPrefix } from '$lib/remote/remoteFunctionCache';
+	import {
+		removeBackground,
+		cleanSignature,
+		type ProcessingProgress
+	} from '$lib/utils/imageProcessing';
 
 	// Enhanced type definitions for better type safety
 	interface SelectOption {
@@ -114,6 +119,8 @@
 	// Responsive preview state (mobile toggle vs desktop side-by-side)
 	let isMobile = $state(false);
 	let isFlipped = $state(false);
+	// Image processing state - tracks which elements are being processed
+	let processingStatus = $state<Record<string, ProcessingProgress | null>>({});
 	// Sticky preview scroll state
 	let scrollY = $state(0);
 	let previewContainerRef = $state<HTMLDivElement | null>(null);
@@ -727,18 +734,73 @@
 		}
 	}
 
-	function handleSelectFile(variableName: string, file: File) {
+	async function handleSelectFile(variableName: string, file: File) {
+		// Find the element to determine its type
+		const element = template?.template_elements?.find((el) => el.variableName === variableName);
+		
+		let processedFile = file;
+		
+		// Apply image processing based on element type
+		if (element?.type === 'photo') {
+			// Remove background from photos using AI
+			try {
+				processingStatus = {
+					...processingStatus,
+					[variableName]: { stage: 'loading', progress: 0, message: 'Loading AI model...' }
+				};
+				
+				const blob = await removeBackground(file, (progress) => {
+					processingStatus = { ...processingStatus, [variableName]: progress };
+				});
+				
+				processedFile = new File([blob], file.name.replace(/\.[^.]+$/, '.png'), {
+					type: 'image/png'
+				});
+				
+				processingStatus = { ...processingStatus, [variableName]: null };
+			} catch (err) {
+				console.error('[handleSelectFile] Background removal failed:', err);
+				// Fall back to original file if processing fails
+				processingStatus = { ...processingStatus, [variableName]: null };
+				// Still use the original file
+			}
+		} else if (element?.type === 'signature') {
+			// Clean signature with thresholding and auto-crop
+			try {
+				processingStatus = {
+					...processingStatus,
+					[variableName]: { stage: 'processing', progress: 50, message: 'Cleaning signature...' }
+				};
+				
+				const blob = await cleanSignature(file, {
+					threshold: 160,
+					autoCrop: true,
+					cropPadding: 10
+				});
+				
+				processedFile = new File([blob], file.name.replace(/\.[^.]+$/, '.png'), {
+					type: 'image/png'
+				});
+				
+				processingStatus = { ...processingStatus, [variableName]: null };
+			} catch (err) {
+				console.error('[handleSelectFile] Signature cleaning failed:', err);
+				// Fall back to original file if processing fails
+				processingStatus = { ...processingStatus, [variableName]: null };
+			}
+		}
+		
 		// Use immutable assignment to ensure Svelte reactivity triggers for IdCanvas
 		fileUploads = {
 			...fileUploads,
-			[variableName]: file
+			[variableName]: processedFile
 		};
 
 		if (fileUrls[variableName]) {
 			URL.revokeObjectURL(fileUrls[variableName]);
 		}
 
-		const url = URL.createObjectURL(file);
+		const url = URL.createObjectURL(processedFile);
 		fileUrls[variableName] = url;
 
 		// Pulse highlight to show where the change applied
@@ -1010,7 +1072,20 @@
 													<span class="text-red-500">*</span>
 												</Label>
 													<!-- svelte-ignore a11y_no_static_element_interactions -->
-								<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center" onclick={() => handleInputFocus('front', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('front', element.variableName)} role="button" tabindex="0">
+								<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center relative" onclick={() => handleInputFocus('front', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('front', element.variableName)} role="button" tabindex="0">
+													{#if processingStatus[element.variableName]}
+														<div class="absolute inset-0 bg-white/80 dark:bg-gray-900/80 flex flex-col items-center justify-center rounded-xl z-10" transition:fade={{ duration: 200 }}>
+															<Loader class="w-8 h-8 animate-spin text-primary mb-2" />
+															<p class="text-sm font-medium text-gray-700 dark:text-gray-300">
+																{processingStatus[element.variableName]?.message ?? 'Processing...'}
+															</p>
+															{#if processingStatus[element.variableName]?.progress}
+																<div class="w-24 h-1 bg-gray-200 dark:bg-gray-700 rounded-full mt-2 overflow-hidden">
+																	<div class="h-full bg-primary transition-all duration-300" style="width: {processingStatus[element.variableName]?.progress ?? 0}%"></div>
+																</div>
+															{/if}
+														</div>
+													{/if}
 													<div class="flex-shrink-0">
 														<ThumbnailInput
 															width={element.width}
@@ -1035,7 +1110,20 @@
 												<span class="text-red-500">*</span>
 											</Label>
 											<!-- svelte-ignore a11y_no_static_element_interactions -->
-								<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center" onclick={() => handleInputFocus('front', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('front', element.variableName)} role="button" tabindex="0">
+								<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center relative" onclick={() => handleInputFocus('front', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('front', element.variableName)} role="button" tabindex="0">
+												{#if processingStatus[element.variableName]}
+													<div class="absolute inset-0 bg-white/80 dark:bg-gray-900/80 flex flex-col items-center justify-center rounded-xl z-10" transition:fade={{ duration: 200 }}>
+														<Loader class="w-8 h-8 animate-spin text-primary mb-2" />
+														<p class="text-sm font-medium text-gray-700 dark:text-gray-300">
+															{processingStatus[element.variableName]?.message ?? 'Processing...'}
+														</p>
+														{#if processingStatus[element.variableName]?.progress}
+															<div class="w-24 h-1 bg-gray-200 dark:bg-gray-700 rounded-full mt-2 overflow-hidden">
+																<div class="h-full bg-primary transition-all duration-300" style="width: {processingStatus[element.variableName]?.progress ?? 0}%"></div>
+															</div>
+														{/if}
+													</div>
+												{/if}
 												<div class="flex-shrink-0">
 													<ThumbnailInput
 														width={element.width}
@@ -1141,7 +1229,20 @@
 													<span class="text-red-500">*</span>
 												</Label>
 													<!-- svelte-ignore a11y_no_static_element_interactions -->
-									<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center" onclick={() => handleInputFocus('back', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('back', element.variableName)} role="button" tabindex="0">
+									<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center relative" onclick={() => handleInputFocus('back', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('back', element.variableName)} role="button" tabindex="0">
+													{#if processingStatus[element.variableName]}
+														<div class="absolute inset-0 bg-white/80 dark:bg-gray-900/80 flex flex-col items-center justify-center rounded-xl z-10" transition:fade={{ duration: 200 }}>
+															<Loader class="w-8 h-8 animate-spin text-primary mb-2" />
+															<p class="text-sm font-medium text-gray-700 dark:text-gray-300">
+																{processingStatus[element.variableName]?.message ?? 'Processing...'}
+															</p>
+															{#if processingStatus[element.variableName]?.progress}
+																<div class="w-24 h-1 bg-gray-200 dark:bg-gray-700 rounded-full mt-2 overflow-hidden">
+																	<div class="h-full bg-primary transition-all duration-300" style="width: {processingStatus[element.variableName]?.progress ?? 0}%"></div>
+																</div>
+															{/if}
+														</div>
+													{/if}
 													<div class="flex-shrink-0">
 														<ThumbnailInput
 															width={element.width}
@@ -1166,7 +1267,20 @@
 												<span class="text-red-500">*</span>
 											</Label>
 											<!-- svelte-ignore a11y_no_static_element_interactions -->
-								<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center" onclick={() => handleInputFocus('back', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('back', element.variableName)} role="button" tabindex="0">
+								<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center relative" onclick={() => handleInputFocus('back', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('back', element.variableName)} role="button" tabindex="0">
+									{#if processingStatus[element.variableName]}
+										<div class="absolute inset-0 bg-white/80 dark:bg-gray-900/80 flex flex-col items-center justify-center rounded-xl z-10" transition:fade={{ duration: 200 }}>
+											<Loader class="w-8 h-8 animate-spin text-primary mb-2" />
+											<p class="text-sm font-medium text-gray-700 dark:text-gray-300">
+												{processingStatus[element.variableName]?.message ?? 'Processing...'}
+											</p>
+											{#if processingStatus[element.variableName]?.progress}
+												<div class="w-24 h-1 bg-gray-200 dark:bg-gray-700 rounded-full mt-2 overflow-hidden">
+													<div class="h-full bg-primary transition-all duration-300" style="width: {processingStatus[element.variableName]?.progress ?? 0}%"></div>
+												</div>
+											{/if}
+										</div>
+									{/if}
 												<div class="flex-shrink-0">
 													<ThumbnailInput
 														width={element.width}

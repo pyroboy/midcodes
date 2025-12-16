@@ -86,7 +86,12 @@
 	// Original dimensions at resize start (for proportional font scaling)
 	let originalWidth: number = 0;
 	let originalHeight: number = 0;
+	let originalX: number = 0;
+	let originalY: number = 0;
 	let originalFontSize: number = 0;
+	// Original mouse position at resize start (for cumulative delta calculation)
+	let resizeStartMouseX: number = 0;
+	let resizeStartMouseY: number = 0;
 
 	// Rotation state
 	let isRotating = $state(false);
@@ -418,6 +423,186 @@
 			side
 		);
 	}
+	
+	/**
+	 * Measure the true bounding box height for a text element based on text wrapping.
+	 * Returns the height needed to fit all text at the given width and font size.
+	 * All dimensions are in storage coordinates (actual pixels).
+	 * 
+	 * Handles:
+	 * - Word wrapping (split on spaces)
+	 * - Character-level breaking for long words that exceed container width
+	 * - Hyphen breaking for ID-like content (e.g., "75-005-24")
+	 * - Explicit newlines
+	 */
+	function measureTextBoundingBox(element: TemplateElement, newWidth: number): number {
+		const text = element.content || 'Sample Text';
+		const fontSize = element.fontSize || element.size || 16;
+		const fontFamily = element.fontFamily || element.font || 'Arial';
+		const fontWeight = element.fontWeight || '400';
+		const lineHeight = 1.3; // Slightly more generous line height for readability
+		
+		// Handle empty or whitespace-only text
+		if (!text.trim()) {
+			const defaultHeight = fontSize * lineHeight + 10;
+			console.log('📐 [measureTextBoundingBox] Empty text, using default height:', defaultHeight);
+			return defaultHeight;
+		}
+		
+		// Create a temporary canvas for measurement
+		const canvas = document.createElement('canvas');
+		const ctx = canvas.getContext('2d');
+		if (!ctx) {
+			console.warn('📐 [measureTextBoundingBox] Could not get canvas context');
+			return element.height || 50;
+		}
+		
+		// Set up font for measurement
+		ctx.font = `${fontWeight} ${fontSize}px "${fontFamily}"`;
+		
+		/**
+		 * Break a word into chunks that fit within maxWidth.
+		 * Uses character-level breaking to ensure every chunk fits.
+		 */
+		function breakWord(word: string, maxWidth: number): string[] {
+			const result: string[] = [];
+			
+			/**
+			 * Break a single segment into character-sized chunks that fit within maxWidth
+			 */
+			function breakToCharacters(segment: string): string[] {
+				const charChunks: string[] = [];
+				let currentChunk = '';
+				
+				for (let i = 0; i < segment.length; i++) {
+					const char = segment[i];
+					const testChunk = currentChunk + char;
+					
+					if (ctx!.measureText(testChunk).width <= maxWidth) {
+						currentChunk = testChunk;
+					} else {
+						if (currentChunk) {
+							charChunks.push(currentChunk);
+						}
+						currentChunk = char;
+					}
+				}
+				if (currentChunk) {
+					charChunks.push(currentChunk);
+				}
+				
+				return charChunks.length > 0 ? charChunks : [segment];
+			}
+			
+			// First, try breaking on hyphens (for ID-like content)
+			if (word.includes('-')) {
+				const hyphenParts = word.split('-');
+				
+				for (let i = 0; i < hyphenParts.length; i++) {
+					const part = hyphenParts[i];
+					// Add hyphen back except for last part
+					const segment = i < hyphenParts.length - 1 ? part + '-' : part;
+					
+					// Check if this segment fits
+					if (ctx!.measureText(segment).width <= maxWidth) {
+						result.push(segment);
+					} else {
+						// Break segment into smaller chunks
+						const brokenChunks = breakToCharacters(segment);
+						result.push(...brokenChunks);
+					}
+				}
+				
+				return result;
+			}
+			
+			// No hyphens - do character-level breaking
+			return breakToCharacters(word);
+		}
+		
+		// Split text into lines (handle explicit newlines)
+		const paragraphs = text.split('\n');
+		let totalLineCount = 0;
+		
+		for (const paragraph of paragraphs) {
+			if (paragraph.trim() === '') {
+				// Empty paragraph still counts as one line
+				totalLineCount++;
+				continue;
+			}
+			
+			// Word wrap the paragraph to calculate how many lines we need
+			const words = paragraph.split(/\s+/).filter(w => w.length > 0);
+			if (words.length === 0) {
+				totalLineCount++;
+				continue;
+			}
+			
+			let line = '';
+			let paragraphLineCount = 0;
+			
+			for (let i = 0; i < words.length; i++) {
+				const word = words[i];
+				const wordWidth = ctx.measureText(word).width;
+				
+				// If word itself is wider than the container, break it
+				if (wordWidth > newWidth) {
+					// Finish current line if there's content
+					if (line.trim()) {
+						paragraphLineCount++;
+						line = '';
+					}
+					
+					// Break the word into smaller chunks
+					const wordChunks = breakWord(word, newWidth);
+					for (const chunk of wordChunks) {
+						paragraphLineCount++;
+					}
+					continue;
+				}
+				
+				const testLine = line + (line ? ' ' : '') + word;
+				const metrics = ctx.measureText(testLine);
+				
+				if (metrics.width > newWidth && line !== '') {
+					// Current line would exceed width, wrap to new line
+					paragraphLineCount++;
+					line = word;
+				} else {
+					line = testLine;
+				}
+			}
+			
+			// Don't forget the last line
+			if (line) {
+				paragraphLineCount++;
+			}
+			
+			totalLineCount += Math.max(1, paragraphLineCount);
+		}
+		
+		// Ensure at least 1 line
+		totalLineCount = Math.max(1, totalLineCount);
+		
+		// Calculate height based on line count and line height
+		// Add some padding for better visual appearance
+		const textHeight = totalLineCount * fontSize * lineHeight;
+		const padding = 8; // Small padding top/bottom
+		const calculatedHeight = Math.ceil(textHeight + padding);
+		
+		console.log('📐 [measureTextBoundingBox] Calculated:', {
+			text: text.substring(0, 30) + (text.length > 30 ? '...' : ''),
+			fontSize,
+			fontFamily,
+			newWidth,
+			totalLineCount,
+			textHeight,
+			calculatedHeight
+		});
+		
+		// Ensure minimum height (at least one line of text)
+		return Math.max(calculatedHeight, fontSize * lineHeight + padding);
+	}
 
 	// 🛡️ SECURITY: Auto-clamp elements when dimensions change (e.g. orientation flip)
 	// This ensures elements don't get lost off-screen if the card size shrinks or rotates
@@ -512,10 +697,15 @@
 		if (handle) {
 			isResizing = true;
 			resizeHandle = handle;
-			// Store original dimensions for proportional font scaling
+			// Store original dimensions and position for uniform scaling
 			originalWidth = element.width || 100;
 			originalHeight = element.height || 100;
+			originalX = element.x || 0;
+			originalY = element.y || 0;
 			originalFontSize = element.fontSize || element.size || 16;
+			// Store original mouse position for cumulative delta calculation
+			resizeStartMouseX = event.clientX;
+			resizeStartMouseY = event.clientY;
 		} else {
 			isDragging = true;
 		}
@@ -533,7 +723,10 @@
 	function onTouchStart(event: TouchEvent, index: number, handle: string | null = null) {
 		if (event.touches.length > 0) {
 			// Prevent default to stop scrolling interaction immediately on touch start
-			event.preventDefault();
+			// Only call preventDefault if the event is cancelable (not from a passive listener)
+			if (event.cancelable) {
+				event.preventDefault();
+			}
 			const touch = event.touches[0];
 			// Create a synthetic MouseEvent for compatibility
 			const mouseEvent = new MouseEvent('mousedown', {
@@ -549,7 +742,10 @@
 	function onTouchMove(event: TouchEvent) {
 		if (event.touches.length > 0 && (isDragging || isResizing)) {
 			// Prevent scrolling while dragging
-			event.preventDefault(); 
+			// Only call preventDefault if the event is cancelable (not from a passive listener)
+			if (event.cancelable) {
+				event.preventDefault();
+			} 
 			
 			const touch = event.touches[0];
 			const mouseEvent = new MouseEvent('mousemove', {
@@ -601,7 +797,10 @@
 
 	function onTouchRotationStart(event: TouchEvent, index: number) {
 		if (event.touches.length > 0) {
-			event.preventDefault();
+			// Only call preventDefault if the event is cancelable (not from a passive listener)
+			if (event.cancelable) {
+				event.preventDefault();
+			}
 			const touch = event.touches[0];
 			const mouseEvent = new MouseEvent('mousedown', {
 				clientX: touch.clientX,
@@ -700,27 +899,68 @@
 			const isCornerHandle = ['top-left', 'top-right', 'bottom-left', 'bottom-right'].includes(resizeHandle || '');
 
 			switch (resizeHandle) {
+				// CORNER HANDLES
 				case 'top-left':
-					newWidth -= storageDelta.x;
-					newHeight -= storageDelta.y;
-					newX += storageDelta.x;
-					newY += storageDelta.y;
-					break;
 				case 'top-right':
-					newWidth += storageDelta.x;
-					newHeight -= storageDelta.y;
-					newY += storageDelta.y;
-					break;
 				case 'bottom-left':
-					newWidth -= storageDelta.x;
-					newHeight += storageDelta.y;
-					newX += storageDelta.x;
+				case 'bottom-right': {
+					// Check if this is a text element (uniform scaling) or photo/signature (freeform)
+					const isTextElement = updatedElement.type === 'text' || updatedElement.type === 'selection';
+					
+					if (isTextElement) {
+						// TEXT ELEMENTS: Uniform scaling (maintain aspect ratio like Canva)
+						// Use CUMULATIVE delta from resize start for stable uniform scaling
+						const cumulativeDx = event.clientX - resizeStartMouseX;
+						const cumulativeDy = event.clientY - resizeStartMouseY;
+						const cumulativeStorageDelta = coordSystem().scaleMouseDelta(cumulativeDx, cumulativeDy);
+						
+						const aspectRatio = originalWidth / originalHeight;
+						let scaleDelta: number;
+						
+						if (resizeHandle === 'bottom-right') {
+							scaleDelta = (cumulativeStorageDelta.x + cumulativeStorageDelta.y) / 2;
+							newWidth = originalWidth + scaleDelta;
+							newHeight = newWidth / aspectRatio;
+						} else if (resizeHandle === 'top-left') {
+							scaleDelta = (-cumulativeStorageDelta.x - cumulativeStorageDelta.y) / 2;
+							newWidth = originalWidth + scaleDelta;
+							newHeight = newWidth / aspectRatio;
+							newX = originalX - scaleDelta;
+							newY = originalY - scaleDelta / aspectRatio;
+						} else if (resizeHandle === 'top-right') {
+							scaleDelta = (cumulativeStorageDelta.x - cumulativeStorageDelta.y) / 2;
+							newWidth = originalWidth + scaleDelta;
+							newHeight = newWidth / aspectRatio;
+							newY = originalY - scaleDelta / aspectRatio;
+						} else if (resizeHandle === 'bottom-left') {
+							scaleDelta = (-cumulativeStorageDelta.x + cumulativeStorageDelta.y) / 2;
+							newWidth = originalWidth + scaleDelta;
+							newHeight = newWidth / aspectRatio;
+							newX = originalX - scaleDelta;
+						}
+					} else {
+						// PHOTO/SIGNATURE: Freeform scaling (width and height independent)
+						if (resizeHandle === 'bottom-right') {
+							newWidth += storageDelta.x;
+							newHeight += storageDelta.y;
+						} else if (resizeHandle === 'top-left') {
+							newWidth -= storageDelta.x;
+							newHeight -= storageDelta.y;
+							newX += storageDelta.x;
+							newY += storageDelta.y;
+						} else if (resizeHandle === 'top-right') {
+							newWidth += storageDelta.x;
+							newHeight -= storageDelta.y;
+							newY += storageDelta.y;
+						} else if (resizeHandle === 'bottom-left') {
+							newWidth -= storageDelta.x;
+							newHeight += storageDelta.y;
+							newX += storageDelta.x;
+						}
+					}
 					break;
-				case 'bottom-right':
-					newWidth += storageDelta.x;
-					newHeight += storageDelta.y;
-					break;
-				// Side handles - change width only
+				}
+				// Side handles - change width only (use incremental delta)
 				case 'middle-left':
 					newWidth -= storageDelta.x;
 					newX += storageDelta.x;
@@ -729,6 +969,7 @@
 					newWidth += storageDelta.x;
 					break;
 			}
+
 
 			// Constrain to bounds using coordinate system
 			const constrainedPos = coordSystem().constrainToStorage(
@@ -752,7 +993,39 @@
 				const newFontSize = Math.max(8, Math.round(originalFontSize * scaleFactor));
 				updatedElement.fontSize = newFontSize;
 			}
-			// Side handles: fontSize remains unchanged (width-only resize)
+			
+			// Side handles: auto-calculate height based on text wrapping (fontSize remains unchanged)
+			// (isTextElement already defined above)
+			
+			console.log('🔍 [Resize Debug] Checking side handle auto-height:', {
+				elementType: updatedElement.type,
+				isTextElement,
+				isSideHandle,
+				resizeHandle,
+				width: updatedElement.width,
+				height: updatedElement.height,
+				fontSize: updatedElement.fontSize || updatedElement.size,
+				content: (updatedElement.content || '').substring(0, 30)
+			});
+			
+			if (isTextElement && isSideHandle) {
+				console.log('📏 [Side Handle Resize] TRIGGERED - Before auto-height:', {
+					elementType: updatedElement.type,
+					width: updatedElement.width,
+					currentHeight: updatedElement.height,
+					fontSize: updatedElement.fontSize || updatedElement.size || 16,
+					content: updatedElement.content
+				});
+				const autoHeight = measureTextBoundingBox(updatedElement, updatedElement.width);
+				const oldHeight = updatedElement.height;
+				updatedElement.height = Math.max(20, Number(autoHeight.toFixed(2)));
+				console.log('📏 [Side Handle Resize] After auto-height:', {
+					autoHeight,
+					oldHeight,
+					newHeight: updatedElement.height,
+					heightChanged: oldHeight !== updatedElement.height
+				});
+			}
 		} else {
 			// Just update position during dragging, maintain original size
 			const newPos = {
@@ -774,14 +1047,14 @@
 		hasModified = true;
 		
 		// Live update for text elements during resize - push to elements array immediately
-		// This allows sidebar to show live font size changes
+		// This allows sidebar to show live font size changes (no throttling)
 		if (isResizing && currentElementIndex !== null) {
 			const isTextElement = updatedElement.type === 'text' || updatedElement.type === 'selection';
 			if (isTextElement) {
 				const updatedElements = [...elements];
 				updatedElements[currentElementIndex] = updatedElement;
-				// Use debounced update to avoid too many updates
-				debouncedUpdateElements(updatedElements);
+				// Direct update for immediate feedback
+				updateElements(updatedElements);
 			}
 		}
 
@@ -1646,7 +1919,7 @@
 		right: -22px;
 		cursor: nwse-resize;
 	}
-	/* Side handles for width-only resize - bar shaped */
+	/* Side handles for width-only resize - bar shaped, positioned on edge */
 	.resize-handle.side-handle {
 		width: 6px;
 		height: 32px;
@@ -1659,13 +1932,13 @@
 	}
 	.resize-handle.middle-left {
 		top: 50%;
-		left: -16px;
+		left: -3px; /* Half of width (6px/2) to center on the edge */
 		transform: translateY(-50%);
 		cursor: ew-resize;
 	}
 	.resize-handle.middle-right {
 		top: 50%;
-		right: -16px;
+		right: -3px; /* Half of width (6px/2) to center on the edge */
 		transform: translateY(-50%);
 		cursor: ew-resize;
 	}
