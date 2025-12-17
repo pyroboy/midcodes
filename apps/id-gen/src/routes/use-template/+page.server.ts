@@ -1,26 +1,35 @@
-import { error, redirect } from '@sveltejs/kit';
-import type { SupabaseClient, User } from '@supabase/supabase-js';
-import type { ProfileData, EmulatedProfile } from '$lib/types/roleEmulation';
+import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
+import { db } from '$lib/server/db';
+import { templates } from '$lib/server/schema';
+import { desc } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ locals }) => {
-	const { supabase, safeGetSession } = locals;
-	const { session } = await safeGetSession();
+	const { session } = locals;
 	if (!session) {
 		throw error(401, 'Unauthorized');
 	}
 
-	// Fetch templates based on role and organization
-	let query = supabase.from('templates').select('*').order('created_at', { ascending: false });
+	try {
+		const templatesData = await db
+			.select()
+			.from(templates)
+			.orderBy(desc(templates.createdAt));
 
-	const { data: templates, error: err } = await query;
-
-	if (err) {
+		return {
+			templates: templatesData.map(t => ({
+				...t,
+				user_id: t.userId,
+				org_id: t.orgId,
+				width_pixels: t.widthPixels,
+				height_pixels: t.heightPixels,
+				front_background: t.frontBackground,
+				back_background: t.backBackground,
+				template_elements: t.templateElements
+			}))
+		};
+	} catch (err) {
 		console.error('Error fetching templates:', err);
 		throw error(500, 'Error fetching templates');
 	}
-
-	return {
-		templates
-	};
 };

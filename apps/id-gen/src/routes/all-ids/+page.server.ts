@@ -1,23 +1,19 @@
 import { fail } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
+import { db } from '$lib/server/db';
+import { idcards } from '$lib/server/schema';
+import { eq, inArray } from 'drizzle-orm';
 
 // Minimal server load - just register dependency for smart invalidation
-// Auth is already handled by hooks.server.ts, org_id comes from root layout
-// Card data is fetched client-side via remote functions
-export const load = (async ({ depends, setHeaders }) => {
+export const load = (async ({ depends }) => {
 	// Register dependency for smart invalidation
-	// Use invalidate('app:idcards') to re-run this load without full page refresh
 	depends('app:idcards');
-
-	// Cache this minimal response for 5 minutes - it has no dynamic data
-	// setHeaders({ 'cache-control': 'private, max-age=300' });
-
 	return {};
 }) satisfies PageServerLoad;
 
 // Keep form actions for delete/update operations
 export const actions: Actions = {
-	deleteCard: async ({ request, locals: { supabase } }) => {
+	deleteCard: async ({ request }) => {
 		const formData = await request.formData();
 		const cardId = formData.get('cardId')?.toString();
 
@@ -27,26 +23,28 @@ export const actions: Actions = {
 
 		try {
 			// First get the card details to get the image paths
-			const { data: cardData, error: fetchError } = await supabase
-				.from('idcards')
-				.select('front_image, back_image')
-				.eq('id', cardId)
-				.single();
+			const [card] = await db
+				.select({
+					frontImage: idcards.frontImage,
+					backImage: idcards.backImage
+				})
+				.from(idcards)
+				.where(eq(idcards.id, cardId))
+				.limit(1);
 
-			if (fetchError) {
-				console.error('Error fetching card:', fetchError);
-				return fail(500, { error: 'Failed to fetch card details' });
+			if (!card) {
+				return fail(404, { error: 'Card not found' });
 			}
 
-			const card = cardData as any;
+			const supabaseAdmin = (await import('$lib/server/supabase')).getSupabaseAdmin();
 
 			// Delete images from storage if they exist
 			const imagesToDelete = [];
-			if (card.front_image) imagesToDelete.push(card.front_image);
-			if (card.back_image) imagesToDelete.push(card.back_image);
+			if (card.frontImage) imagesToDelete.push(card.frontImage);
+			if (card.backImage) imagesToDelete.push(card.backImage);
 
 			if (imagesToDelete.length > 0) {
-				const { error: storageError } = await supabase.storage
+				const { error: storageError } = await supabaseAdmin.storage
 					.from('rendered-id-cards')
 					.remove(imagesToDelete);
 
@@ -57,12 +55,7 @@ export const actions: Actions = {
 			}
 
 			// Delete the card record
-			const { error: deleteError } = await supabase.from('idcards').delete().eq('id', cardId);
-
-			if (deleteError) {
-				console.error('Error deleting card:', deleteError);
-				return fail(500, { error: 'Failed to delete card' });
-			}
+			await db.delete(idcards).where(eq(idcards.id, cardId));
 
 			return { success: true };
 		} catch (error) {
@@ -71,7 +64,7 @@ export const actions: Actions = {
 		}
 	},
 
-	deleteMultiple: async ({ request, locals: { supabase } }) => {
+	deleteMultiple: async ({ request }) => {
 		const formData = await request.formData();
 		const cardIds = formData.get('cardIds')?.toString();
 
@@ -86,28 +79,27 @@ export const actions: Actions = {
 			}
 
 			// First get all cards to get their image paths
-			const { data: cardsData, error: fetchError } = await supabase
-				.from('idcards')
-				.select('id, front_image, back_image')
-				.in('id', ids);
+			const cards = await db
+				.select({
+					id: idcards.id,
+					frontImage: idcards.frontImage,
+					backImage: idcards.backImage
+				})
+				.from(idcards)
+				.where(inArray(idcards.id, ids));
 
-			if (fetchError) {
-				console.error('Error fetching cards:', fetchError);
-				return fail(500, { error: 'Failed to fetch card details' });
-			}
-
-			const cards = cardsData as any[] | null;
+			const supabaseAdmin = (await import('$lib/server/supabase')).getSupabaseAdmin();
 
 			// Collect all image paths to delete
 			const imagesToDelete = [];
-			for (const card of cards || []) {
-				if (card.front_image) imagesToDelete.push(card.front_image);
-				if (card.back_image) imagesToDelete.push(card.back_image);
+			for (const card of cards) {
+				if (card.frontImage) imagesToDelete.push(card.frontImage);
+				if (card.backImage) imagesToDelete.push(card.backImage);
 			}
 
 			// Delete all images from storage in one batch
 			if (imagesToDelete.length > 0) {
-				const { error: storageError } = await supabase.storage
+				const { error: storageError } = await supabaseAdmin.storage
 					.from('rendered-id-cards')
 					.remove(imagesToDelete);
 
@@ -118,12 +110,7 @@ export const actions: Actions = {
 			}
 
 			// Delete all card records
-			const { error: deleteError } = await supabase.from('idcards').delete().in('id', ids);
-
-			if (deleteError) {
-				console.error('Error deleting cards:', deleteError);
-				return fail(500, { error: 'Failed to delete cards' });
-			}
+			await db.delete(idcards).where(inArray(idcards.id, ids));
 
 			return { success: true };
 		} catch (error) {
@@ -132,7 +119,7 @@ export const actions: Actions = {
 		}
 	},
 
-	updateField: async ({ request, locals: { supabase } }) => {
+	updateField: async ({ request }) => {
 		const formData = await request.formData();
 		const cardId = formData.get('cardId')?.toString();
 		const fieldName = formData.get('fieldName')?.toString();
@@ -144,34 +131,25 @@ export const actions: Actions = {
 
 		try {
 			// First get the current data
-			const { data: cardData, error: fetchError } = await supabase
-				.from('idcards')
-				.select('data')
-				.eq('id', cardId)
-				.single();
+			const [card] = await db
+				.select({ data: idcards.data })
+				.from(idcards)
+				.where(eq(idcards.id, cardId))
+				.limit(1);
 
-			if (fetchError) {
-				console.error('Error fetching card:', fetchError);
-				return fail(500, { error: 'Failed to fetch card' });
+			if (!card) {
+				return fail(404, { error: 'Card not found' });
 			}
 
 			// Merge the new field value with existing data
-			const currentData = (cardData as any)?.data || {};
+			const currentData = (card.data as any) || {};
 			const updatedData = {
 				...currentData,
 				[fieldName]: fieldValue
 			};
 
 			// Update the card
-			const { error: updateError } = await (supabase as any)
-				.from('idcards')
-				.update({ data: updatedData })
-				.eq('id', cardId);
-
-			if (updateError) {
-				console.error('Error updating card:', updateError);
-				return fail(500, { error: 'Failed to update card' });
-			}
+			await db.update(idcards).set({ data: updatedData }).where(eq(idcards.id, cardId));
 
 			return { success: true, cardId, fieldName, fieldValue };
 		} catch (error) {

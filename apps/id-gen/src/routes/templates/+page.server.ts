@@ -1,15 +1,14 @@
 import { error, fail } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
+import { db } from '$lib/server/db';
+import { templates as templatesSchema, idcards } from '$lib/server/schema';
+import { eq, and, desc } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ locals, url, depends, setHeaders }) => {
-	// Cache for 2 minutes
-	// Cache control is handled by +layout.server.ts
-
-
 	// Register dependency for selective invalidation
 	depends('app:templates');
 
-	const { supabase, session, org_id, user } = locals;
+	const { session, org_id, user } = locals;
 	if (!session) {
 		throw error(401, 'Unauthorized');
 	}
@@ -30,70 +29,53 @@ export const load: PageServerLoad = async ({ locals, url, depends, setHeaders })
 			}
 		: null;
 
-	// Debug: Log the newTemplateParams if present
-	if (newTemplateParams) {
-		console.log('📥 [Server] newTemplateParams parsed from URL:', {
-			name: newTemplateParams.name,
-			width: newTemplateParams.width,
-			height: newTemplateParams.height,
-			unit: newTemplateParams.unit,
-			orientation: newTemplateParams.orientation,
-			front_background: newTemplateParams.front_background,
-			front_background_length: newTemplateParams.front_background?.length || 0,
-			raw_front_background_param: url.searchParams.get('front_background')
-		});
-	}
-
 	if (templateId) {
-		const { data: template, error: templateError } = await supabase
-			.from('templates')
-			.select('*')
-			.eq('id', templateId)
-			.single();
+		const [template] = await db
+			.select()
+			.from(templatesSchema)
+			.where(eq(templatesSchema.id, templateId))
+			.limit(1);
 
-		if (templateError) {
-			console.error('Error fetching template:', templateError);
-			throw error(500, 'Failed to fetch template');
+		if (!template) {
+			console.error(`Template not found: ${templateId}`);
+		} else {
+			selectedTemplate = {
+				...template,
+				user_id: template.userId,
+				org_id: template.orgId,
+				width_pixels: template.widthPixels,
+				height_pixels: template.heightPixels,
+				front_background: template.frontBackground,
+				back_background: template.backBackground,
+				front_background_low_res: template.frontBackgroundLowRes,
+				back_background_low_res: template.backBackgroundLowRes,
+				template_elements: template.templateElements
+			};
 		}
-
-		selectedTemplate = template;
 	}
 
 	// Fetch all templates for the list
-	const templates = await supabase
-		.from('templates')
-		.select(
-			`
-                id,
-                name,
-                user_id,
-                org_id,
-                width_pixels,
-                height_pixels,
-                dpi,
-                orientation,
-                created_at,
-                front_background,
-                back_background,
-                front_background_low_res,
-                back_background_low_res,
-                template_elements
-            `
-		)
-		.eq('org_id', org_id!)
-		.order('created_at', { ascending: false });
+	const templatesList = await db
+		.select()
+		.from(templatesSchema)
+		.where(eq(templatesSchema.orgId, org_id!))
+		.orderBy(desc(templatesSchema.createdAt));
 
-	const templatesData = (templates.data as any[]) || [];
-
-	if (templates.error) {
-		console.error('Error fetching templates:', templates.error);
-		throw error(500, 'Failed to fetch templates');
-	}
-
-	// console.log('Templates:', templates.data);
+	const transformedTemplates = templatesList.map(t => ({
+		...t,
+		user_id: t.userId,
+		org_id: t.orgId,
+		width_pixels: t.widthPixels,
+		height_pixels: t.heightPixels,
+		front_background: t.frontBackground,
+		back_background: t.backBackground,
+		front_background_low_res: t.frontBackgroundLowRes,
+		back_background_low_res: t.backBackgroundLowRes,
+		template_elements: t.templateElements
+	}));
 
 	return {
-		templates: templatesData,
+		templates: transformedTemplates,
 		selectedTemplate,
 		user,
 		org_id,
@@ -103,7 +85,7 @@ export const load: PageServerLoad = async ({ locals, url, depends, setHeaders })
 
 export const actions: Actions = {
 	create: async ({ request, locals }) => {
-		const { supabase, session, org_id } = locals;
+		const { session, org_id } = locals;
 
 		try {
 			const formData = await request.formData();
@@ -115,84 +97,78 @@ export const actions: Actions = {
 
 			const templateData = JSON.parse(templateDataStr);
 
-			// Set the org_id and user_id from the session
-			templateData.user_id = session?.user?.id;
-			templateData.org_id = org_id;
-
-			// Build a strict payload to avoid accidental schema drift
-			const now = new Date().toISOString();
+			// Build a strict payload for Drizzle
 			const payload = {
-				id: templateData.id,
-				user_id: templateData.user_id,
-				org_id: templateData.org_id,
+				id: templateData.id, // Better Auth IDs are text/uuid
+				userId: session?.user?.id as string,
+				orgId: org_id as string,
 				name: templateData.name,
-				width_pixels: templateData.width_pixels,
-				height_pixels: templateData.height_pixels,
+				widthPixels: templateData.width_pixels,
+				heightPixels: templateData.height_pixels,
 				dpi: templateData.dpi,
-				front_background: templateData.front_background,
-				back_background: templateData.back_background,
-				front_background_low_res: templateData.front_background_low_res,
-				back_background_low_res: templateData.back_background_low_res,
+				frontBackground: templateData.front_background,
+				backBackground: templateData.back_background,
+				frontBackgroundLowRes: templateData.front_background_low_res,
+				backBackgroundLowRes: templateData.back_background_low_res,
 				orientation: templateData.orientation,
-				template_elements: templateData.template_elements,
-				created_at: templateData.created_at ?? now,
-				updated_at: now
+				templateElements: templateData.template_elements,
+				updatedAt: new Date()
 			};
 
 			console.log('🎨 Server: Processing template save:', {
 				id: payload.id,
 				name: payload.name,
-				org_id: payload.org_id,
-				elementsCount: Array.isArray(payload.template_elements)
-					? payload.template_elements.length
-					: 0
+				org_id: payload.orgId
 			});
 
-			// Use upsert so client-generated IDs work for new templates and updates
-			let data, dbError;
-			({ data, error: dbError } = await supabase
-				.from('templates')
-				.upsert(payload as any, { onConflict: 'id' })
-				.select('*')
-				.single());
-
-			if (dbError) {
-				console.error('❌ Server: Database error:', dbError);
-				throw error(500, 'Error saving template');
-			}
+			const [data] = await db
+				.insert(templatesSchema)
+				.values({
+					...payload,
+					createdAt: templateData.created_at ? new Date(templateData.created_at) : new Date()
+				})
+				.onConflictDoUpdate({
+					target: templatesSchema.id,
+					set: payload
+				})
+				.returning();
 
 			if (!data) {
 				throw error(500, 'No data returned from database');
 			}
 
-			const dataAny = data as any;
-
 			console.log('✅ Server: Template saved successfully:', {
-				id: dataAny.id,
-				name: dataAny.name,
-				org_id: dataAny.org_id,
-				elementsCount: Array.isArray(dataAny.template_elements)
-					? dataAny.template_elements.length
-					: 0,
-				action: payload.id ? 'updated' : 'created'
+				id: data.id,
+				name: data.name,
+				org_id: data.orgId
 			});
+
+			const transformedData = {
+				...data,
+				user_id: data.userId,
+				org_id: data.orgId,
+				width_pixels: data.widthPixels,
+				height_pixels: data.heightPixels,
+				front_background: data.frontBackground,
+				back_background: data.backBackground,
+				front_background_low_res: data.frontBackgroundLowRes,
+				back_background_low_res: data.backBackgroundLowRes,
+				template_elements: data.templateElements
+			};
 
 			return {
 				success: true,
-				data,
+				data: transformedData,
 				message: `Template ${payload.id ? 'updated' : 'created'} successfully`
 			};
 		} catch (err) {
 			console.error('❌ Server: Error in create action:', err);
-			throw error(
-				err instanceof Error && err.message.includes('400') ? 400 : 500,
-				err instanceof Error ? err.message : 'Error processing template save'
-			);
+			throw error(500, err instanceof Error ? err.message : 'Error processing template save');
 		}
 	},
 
 	delete: async ({ request, locals }) => {
-		const { supabase, session } = locals;
+		const { session } = locals;
 		if (!session) {
 			throw error(401, 'Unauthorized');
 		}
@@ -209,28 +185,29 @@ export const actions: Actions = {
 
 			console.log('🗑️ Server: Processing template delete:', { templateId, deleteIds });
 
+			const supabaseAdmin = (await import('$lib/server/supabase')).getSupabaseAdmin();
+
 			if (deleteIds) {
 				// 1. Fetch associated IDs to get image paths
-				const { data: cards, error: fetchError } = await supabase
-					.from('idcards')
-					.select('id, front_image, back_image')
-					.eq('template_id', templateId);
-
-				if (fetchError) {
-					console.error('❌ Server: Error fetching associated cards:', fetchError);
-					throw error(500, 'Error fetching associated cards');
-				}
+				const cards = await db
+					.select({
+						id: idcards.id,
+						frontImage: idcards.frontImage,
+						backImage: idcards.backImage
+					})
+					.from(idcards)
+					.where(eq(idcards.templateId, templateId));
 
 				if (cards && cards.length > 0) {
 					// 2. Delete images from storage
 					const imagesToDelete: string[] = [];
-					for (const card of cards as any[]) {
-						if (card.front_image) imagesToDelete.push(card.front_image);
-						if (card.back_image) imagesToDelete.push(card.back_image);
+					for (const card of cards) {
+						if (card.frontImage) imagesToDelete.push(card.frontImage);
+						if (card.backImage) imagesToDelete.push(card.backImage);
 					}
 
 					if (imagesToDelete.length > 0) {
-						const { error: storageError } = await supabase.storage
+						const { error: storageError } = await supabaseAdmin.storage
 							.from('rendered-id-cards')
 							.remove(imagesToDelete);
 
@@ -240,42 +217,22 @@ export const actions: Actions = {
 					}
 
 					// 3. Delete ID records
-					const { error: deleteCardsError } = await supabase
-						.from('idcards')
-						.delete()
-						.eq('template_id', templateId);
-
-					if (deleteCardsError) {
-						console.error('❌ Server: Error deleting associated cards:', deleteCardsError);
-						throw error(500, 'Error deleting associated cards');
-					}
+					await db.delete(idcards).where(eq(idcards.templateId, templateId));
 					console.log(`✅ Server: Deleted ${cards.length} associated ID cards`);
 				}
 			} else {
-				// Default behavior: Unlink IDs (keep them but remove template association)
-				const { error: updateError } = await (supabase as any)
-					.from('idcards')
-					.update({ template_id: null })
-					.eq('template_id', templateId);
-
-				if (updateError) {
-					console.error('❌ Server: Error updating ID cards:', updateError);
-					throw error(500, 'Error updating ID cards');
-				}
+				// Default behavior: Unlink IDs
+				await db.update(idcards).set({ templateId: null }).where(eq(idcards.templateId, templateId));
 				console.log('✅ Server: Unlinked associated ID cards');
 			}
 
-			// Then delete the template, ensuring it belongs to the user
-			const { error: deleteError } = await (supabase as any)
-				.from('templates')
-				.delete()
-				.match({ id: templateId })
-				.eq('user_id', session.user.id);
-
-			if (deleteError) {
-				console.error('❌ Server: Database error:', deleteError);
-				throw error(500, 'Error deleting template');
-			}
+			// Then delete the template
+			await db.delete(templatesSchema).where(
+				and(
+					eq(templatesSchema.id, templateId),
+					eq(templatesSchema.userId, session.user.id)
+				)
+			);
 
 			console.log('✅ Server: Template deleted successfully:', { templateId });
 
@@ -285,62 +242,52 @@ export const actions: Actions = {
 			};
 		} catch (err) {
 			console.error('❌ Server: Error in delete action:', err);
-			throw error(
-				err instanceof Error && err.message.includes('400') ? 400 : 500,
-				err instanceof Error ? err.message : 'Error deleting template'
-			);
+			throw error(500, err instanceof Error ? err.message : 'Error deleting template');
 		}
 	},
 	select: async ({ request, locals }) => {
-		const { supabase, session } = locals;
+		const { session } = locals;
 		if (!session) {
 			return fail(401, { message: 'Unauthorized' });
 		}
 
 		const formData = await request.formData();
-		const templateId = formData.get('id');
+		const templateId = formData.get('id') as string;
 
 		if (!templateId) {
 			return fail(400, { message: 'Template ID is required' });
 		}
 
 		try {
-			const { data: templateData, error: templateError } = await supabase
-				.from('templates')
-				.select('*')
-				.eq('id', templateId)
-				.single();
+			const [template] = await db
+				.select()
+				.from(templatesSchema)
+				.where(eq(templatesSchema.id, templateId))
+				.limit(1);
 
-			if (templateError) {
-				console.error('Error fetching template:', templateError);
-				return fail(500, { message: 'Failed to fetch template' });
-			}
-
-			if (!templateData) {
+			if (!template) {
 				return fail(404, { message: 'Template not found' });
 			}
 
-			const t = templateData as any;
-
-			// Return a properly structured form action response
+			// Return properly mapped data
 			return {
 				type: 'success',
 				data: {
-					id: t.id,
-					user_id: t.user_id,
-					name: t.name,
-					width_pixels: t.width_pixels,
-					height_pixels: t.height_pixels,
-					dpi: t.dpi,
-					front_background: t.front_background,
-					back_background: t.back_background,
-					front_background_low_res: t.front_background_low_res,
-					back_background_low_res: t.back_background_low_res,
-					orientation: t.orientation,
-					created_at: t.created_at,
-					updated_at: t.updated_at,
-					template_elements: t.template_elements,
-					org_id: t.org_id
+					...template,
+					id: template.id,
+					user_id: template.userId,
+					org_id: template.orgId,
+					width_pixels: template.widthPixels,
+					height_pixels: template.heightPixels,
+					dpi: template.dpi,
+					front_background: template.frontBackground,
+					back_background: template.backBackground,
+					front_background_low_res: template.frontBackgroundLowRes,
+					back_background_low_res: template.backBackgroundLowRes,
+					orientation: template.orientation,
+					created_at: template.createdAt,
+					updated_at: template.updatedAt,
+					template_elements: template.templateElements
 				}
 			};
 		} catch (err) {

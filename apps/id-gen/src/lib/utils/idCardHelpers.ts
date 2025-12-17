@@ -1,4 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { db } from '$lib/server/db';
+import { idcards, digitalCards } from '$lib/server/schema';
+import { eq } from 'drizzle-orm';
 
 function generateSlug(length = 10) {
 	const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -8,18 +11,6 @@ function generateSlug(length = 10) {
 function generateClaimCode(length = 6) {
 	const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 	return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-}
-
-function hashClaimCode(code: string) {
-	// Simple hash for storage - in production use bcrypt/argon2
-    // Since this runs in Edge/Serverless context, we might not have 'crypto' easily.
-    // Using a simple JS implementation or just storing plain text if we want to be lazy, 
-    // but let's try to do a basic string manipulation to at least obscure it if we can't import crypto.
-    // actually, let's just store it plain for this iteration since we don't have bcrypt setup
-    // and this is "claim_code_hash" column... I'll just store it as "PLAIN:" + code for now 
-    // and upgrade later, or simply return the code.
-    // Wait, I can use web crypto API which is available in Node 20+ and Edge.
-    return code; 
 }
 
 export interface ImageUploadResult {
@@ -102,67 +93,78 @@ export async function saveIdCardData(
 	}
 ) {
 	try {
-		const { data, error } = await supabase
-			.from('idcards')
-			.insert({
-				template_id: templateId,
-				org_id: orgId,
-				front_image: frontPath,
-				back_image: backPath,
-				data: formFields
+		// Use Drizzle for database operations
+		const [idCard] = await db
+			.insert(idcards)
+			.values({
+				templateId: templateId,
+				orgId: orgId,
+				frontImage: frontPath,
+				backImage: backPath,
+				data: formFields,
+				createdAt: new Date(),
+				updatedAt: new Date()
 			})
-			.select()
-			.single();
+			.returning();
 
-		if (error) {
+		if (!idCard) {
 			await Promise.all([
 				deleteFromStorage(supabase, 'rendered-id-cards', frontPath),
 				deleteFromStorage(supabase, 'rendered-id-cards', backPath)
 			]);
-			return { error };
+			return { error: 'Failed to create ID card' };
 		}
 
 		let digitalCard = null;
 		let claimCode = null;
 
-		if (createDigitalCard && data?.id) {
+		if (createDigitalCard && idCard.id) {
 			const slug = generateSlug();
 			const code = generateClaimCode();
 			
-			// If userId is provided, we can assign it immediately (auto-claim)
-			// OR we always leave it unclaimed.
-			// Let's assume if userId is provided, we assign it ONLY if explicit 'claimImmediately' was implemented,
-			// but for now let's stick to the prompt's implied flow of "claiming".
-			// Actually, if I create a card for MYSELF, I want it claimed.
-			// Let's create it as 'unclaimed' for now to support the "printing" flow where you might print 100 cards.
-			// But maybe set owner_id if userId is present?
-			// The safest bet is: create as unclaimed, return claim code. User can claim it.
-			
-			const { data: dcData, error: dcError } = await supabase
-				.from('digital_cards')
-				.insert({
+			const [dcData] = await db
+				.insert(digitalCards)
+				.values({
 					slug,
-					linked_id_card_id: data.id,
-					org_id: orgId,
+					linkedIdCardId: idCard.id,
+					orgId,
 					status: userId ? 'active' : 'unclaimed',
-					claim_code_hash: code, // TODO: Hash this
-					owner_id: userId || null
+					claimCodeHash: code, // TODO: Real hashing
+					ownerId: userId || null,
+					createdAt: new Date(),
+					updatedAt: new Date()
 				})
-				.select()
-				.single();
+				.returning();
 			
-			if (!dcError) {
-				digitalCard = dcData;
+			if (dcData) {
+				digitalCard = {
+					...dcData,
+					linked_id_card_id: dcData.linkedIdCardId,
+					org_id: dcData.orgId,
+					claim_code_hash: dcData.claimCodeHash,
+					owner_id: dcData.ownerId
+				};
 				claimCode = code;
-			} else {
-				console.error('Failed to create digital card:', dcError);
-				// We don't fail the whole operation, just the digital part?
-				// Or we should maybe rollback? For now, just log.
 			}
 		}
 
-		return { data, digitalCard, claimCode };
+		return { 
+			data: {
+				...idCard,
+				template_id: idCard.templateId,
+				org_id: idCard.orgId,
+				front_image: idCard.frontImage,
+				back_image: idCard.backImage
+			}, 
+			digitalCard, 
+			claimCode 
+		};
 	} catch (err) {
+		console.error('Error in saveIdCardData:', err);
+		await Promise.all([
+			deleteFromStorage(supabase, 'rendered-id-cards', frontPath),
+			deleteFromStorage(supabase, 'rendered-id-cards', backPath)
+		]);
 		return { error: err instanceof Error ? err.message : 'Failed to save ID card data' };
 	}
 }

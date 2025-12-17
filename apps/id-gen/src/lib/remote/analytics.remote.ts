@@ -1,16 +1,18 @@
 import { error } from '@sveltejs/kit';
 import { query, getRequestEvent } from '$app/server';
 import { checkAdmin } from '$lib/utils/adminPermissions';
+import { db } from '$lib/server/db';
+import { idcards, profiles, invoices, creditTransactions, templates } from '$lib/server/schema';
+import { eq, and, gte, sql, desc, inArray } from 'drizzle-orm';
 
 // Helper to require admin permissions
 // Uses checkAdmin which properly handles role emulation
 async function requireAdminPermissions() {
 	const { locals } = getRequestEvent();
-	const { user } = locals;
 	if (!checkAdmin(locals)) {
 		throw error(403, 'Admin privileges required.');
 	}
-	return { user, supabase: locals.supabase as any, org_id: locals.org_id };
+	return { user: locals.user, org_id: locals.org_id };
 }
 
 // Helper to check if user is super admin
@@ -81,7 +83,7 @@ interface OverviewStats {
 // ==================== OVERVIEW ANALYTICS ====================
 
 export const getOverviewAnalytics = query(async (): Promise<OverviewStats> => {
-	const { supabase, org_id, user } = await requireAdminPermissions();
+	const { org_id } = await requireAdminPermissions();
 	if (!org_id) throw error(500, 'Org ID missing');
 
 	const thisMonth = new Date();
@@ -89,40 +91,38 @@ export const getOverviewAnalytics = query(async (): Promise<OverviewStats> => {
 	thisMonth.setHours(0, 0, 0, 0);
 
 	const [
-		{ count: totalCards },
-		{ count: cardsThisMonth },
-		{ data: usersData },
-		{ data: invoicesData }
+		totalCardsResult,
+		cardsThisMonthResult,
+		users,
+		paidInvoices
 	] = await Promise.all([
 		// Total cards
-		supabase.from('idcards').select('*', { count: 'exact', head: true }).eq('org_id', org_id),
+		db.select({ count: sql`count(*)` }).from(idcards).where(eq(idcards.orgId, org_id)),
 		// Cards this month
-		supabase.from('idcards').select('*', { count: 'exact', head: true })
-			.eq('org_id', org_id)
-			.gte('created_at', thisMonth.toISOString()),
+		db.select({ count: sql`count(*)` }).from(idcards).where(and(eq(idcards.orgId, org_id), gte(idcards.createdAt, thisMonth))),
 		// Users with credit balances
-		supabase.from('profiles').select('credits_balance').eq('org_id', org_id),
+		db.select({ creditsBalance: profiles.creditsBalance }).from(profiles).where(eq(profiles.orgId, org_id)),
 		// Paid invoices
-		supabase.from('invoices').select('total_amount, paid_at')
-			.eq('org_id', org_id)
-			.eq('status', 'paid')
+		db.select({ totalAmount: invoices.totalAmount, paidAt: invoices.paidAt })
+			.from(invoices)
+			.where(and(eq(invoices.orgId, org_id), eq(invoices.status, 'paid')))
 	]);
 
-	const users = usersData as { credits_balance: number }[] | null;
-	const invoices = invoicesData as { total_amount: number; paid_at: string }[] | null;
+	const totalCards = Number(totalCardsResult[0]?.count || 0);
+	const cardsThisMonth = Number(cardsThisMonthResult[0]?.count || 0);
 
-	const totalCreditsBalance = users?.reduce((sum, u) => sum + (u.credits_balance || 0), 0) || 0;
-	const totalRevenue = invoices?.reduce((sum, inv) => sum + (inv.total_amount || 0), 0) || 0;
-	const revenueThisMonth = invoices
-		?.filter(inv => inv.paid_at && new Date(inv.paid_at) >= thisMonth)
-		.reduce((sum, inv) => sum + (inv.total_amount || 0), 0) || 0;
+	const totalCreditsBalance = users.reduce((sum, u) => sum + (u.creditsBalance || 0), 0);
+	const totalRevenue = paidInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+	const revenueThisMonth = paidInvoices
+		.filter(inv => inv.paidAt && inv.paidAt >= thisMonth)
+		.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
 
 	return {
 		totalRevenue: totalRevenue / 100, // Convert centavos to PHP
-		totalCards: totalCards || 0,
+		totalCards,
 		totalCreditsBalance,
-		totalUsers: users?.length || 0,
-		cardsThisMonth: cardsThisMonth || 0,
+		totalUsers: users.length,
+		cardsThisMonth,
 		revenueThisMonth: revenueThisMonth / 100
 	};
 });
@@ -130,32 +130,28 @@ export const getOverviewAnalytics = query(async (): Promise<OverviewStats> => {
 // ==================== REVENUE ANALYTICS ====================
 
 export const getRevenueAnalytics = query('unchecked', async ({ days = 30 }: { days?: number }): Promise<RevenueAnalytics> => {
-	const { supabase, org_id } = await requireAdminPermissions();
+	const { org_id } = await requireAdminPermissions();
 	if (!org_id) throw error(500, 'Org ID missing');
 
 	const { start } = getDateRange(days);
 
-	const { data: invoices, error: invError } = await supabase
-		.from('invoices')
-		.select('id, status, total_amount, paid_at, created_at')
-		.eq('org_id', org_id);
-
-	if (invError) throw error(500, 'Failed to fetch invoices');
-
-	const invoicesList = (invoices || []) as { 
-		id: string; 
-		status: string; 
-		total_amount: number; 
-		paid_at: string | null;
-		created_at: string;
-	}[];
+	const invoicesList = await db
+		.select({ 
+			id: invoices.id, 
+			status: invoices.status, 
+			totalAmount: invoices.totalAmount, 
+			paidAt: invoices.paidAt, 
+			createdAt: invoices.createdAt 
+		})
+		.from(invoices)
+		.where(eq(invoices.orgId, org_id));
 
 	// Calculate totals
 	const paidInvoices = invoicesList.filter(inv => inv.status === 'paid');
 	const pendingInvoices = invoicesList.filter(inv => inv.status === 'sent');
 
-	const totalRevenue = paidInvoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
-	const pendingRevenue = pendingInvoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0);
+	const totalRevenue = paidInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+	const pendingRevenue = pendingInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
 	const averageInvoiceValue = paidInvoices.length > 0 ? totalRevenue / paidInvoices.length : 0;
 
 	// Revenue by day (last N days, paid invoices only)
@@ -163,10 +159,10 @@ export const getRevenueAnalytics = query('unchecked', async ({ days = 30 }: { da
 	const dayMap = new Map<string, number>();
 
 	paidInvoices
-		.filter(inv => inv.paid_at && new Date(inv.paid_at) >= start)
+		.filter(inv => inv.paidAt && inv.paidAt >= start)
 		.forEach(inv => {
-			const date = new Date(inv.paid_at!).toISOString().split('T')[0];
-			dayMap.set(date, (dayMap.get(date) || 0) + inv.total_amount);
+			const date = inv.paidAt!.toISOString().split('T')[0];
+			dayMap.set(date, (dayMap.get(date) || 0) + (inv.totalAmount || 0));
 		});
 
 	// Fill in all days in range
@@ -181,7 +177,7 @@ export const getRevenueAnalytics = query('unchecked', async ({ days = 30 }: { da
 		const current = statusCounts.get(inv.status) || { count: 0, amount: 0 };
 		statusCounts.set(inv.status, {
 			count: current.count + 1,
-			amount: current.amount + inv.total_amount
+			amount: current.amount + (inv.totalAmount || 0)
 		});
 	});
 
@@ -204,38 +200,28 @@ export const getRevenueAnalytics = query('unchecked', async ({ days = 30 }: { da
 // ==================== CREDITS ANALYTICS ====================
 
 export const getCreditAnalytics = query('unchecked', async ({ days = 30 }: { days?: number }): Promise<CreditAnalytics> => {
-	const { supabase, org_id } = await requireAdminPermissions();
+	const { org_id } = await requireAdminPermissions();
 	if (!org_id) throw error(500, 'Org ID missing');
 
 	const { start } = getDateRange(days);
 
 	const [
-		{ data: transactions },
-		{ data: users }
+		txList,
+		usersList
 	] = await Promise.all([
-		supabase.from('credit_transactions').select('*').eq('org_id', org_id),
-		supabase.from('profiles').select('id, email, credits_balance, card_generation_count').eq('org_id', org_id)
+		db.select().from(creditTransactions).where(eq(creditTransactions.orgId, org_id)),
+		db.select({
+			id: profiles.id,
+			email: profiles.email,
+			creditsBalance: profiles.creditsBalance,
+			cardGenerationCount: profiles.cardGenerationCount
+		}).from(profiles).where(eq(profiles.orgId, org_id))
 	]);
-
-	const txList = (transactions || []) as {
-		id: string;
-		transaction_type: string;
-		amount: number;
-		created_at: string;
-		user_id: string;
-	}[];
-
-	const usersList = (users || []) as {
-		id: string;
-		email: string;
-		credits_balance: number;
-		card_generation_count: number;
-	}[];
 
 	// Calculate totals by type
 	let totalPurchased = 0, totalUsed = 0, totalRefunded = 0, totalBonus = 0;
 	txList.forEach(tx => {
-		switch (tx.transaction_type) {
+		switch (tx.transactionType) {
 			case 'purchase': totalPurchased += tx.amount; break;
 			case 'usage': totalUsed += Math.abs(tx.amount); break;
 			case 'refund': totalRefunded += Math.abs(tx.amount); break;
@@ -248,12 +234,12 @@ export const getCreditAnalytics = query('unchecked', async ({ days = 30 }: { day
 	const dayUsed = new Map<string, number>();
 
 	txList
-		.filter(tx => new Date(tx.created_at) >= start)
+		.filter(tx => tx.createdAt && tx.createdAt >= start)
 		.forEach(tx => {
-			const date = new Date(tx.created_at).toISOString().split('T')[0];
-			if (tx.transaction_type === 'purchase' || tx.transaction_type === 'bonus') {
+			const date = tx.createdAt!.toISOString().split('T')[0];
+			if (tx.transactionType === 'purchase' || tx.transactionType === 'bonus') {
 				dayPurchased.set(date, (dayPurchased.get(date) || 0) + tx.amount);
-			} else if (tx.transaction_type === 'usage') {
+			} else if (tx.transactionType === 'usage') {
 				dayUsed.set(date, (dayUsed.get(date) || 0) + Math.abs(tx.amount));
 			}
 		});
@@ -270,20 +256,20 @@ export const getCreditAnalytics = query('unchecked', async ({ days = 30 }: { day
 
 	// Top credit consumers (by card generation count as proxy for usage)
 	const topConsumers = usersList
-		.filter(u => u.card_generation_count > 0)
-		.sort((a, b) => b.card_generation_count - a.card_generation_count)
+		.filter(u => u.cardGenerationCount > 0)
+		.sort((a, b) => b.cardGenerationCount - a.cardGenerationCount)
 		.slice(0, 10)
 		.map(u => ({
 			email: u.email || 'Unknown',
-			used: u.card_generation_count,
-			balance: u.credits_balance
+			used: u.cardGenerationCount,
+			balance: u.creditsBalance
 		}));
 
 	// Transaction type breakdown
 	const typeCounts = new Map<string, { count: number; amount: number }>();
 	txList.forEach(tx => {
-		const current = typeCounts.get(tx.transaction_type) || { count: 0, amount: 0 };
-		typeCounts.set(tx.transaction_type, {
+		const current = typeCounts.get(tx.transactionType) || { count: 0, amount: 0 };
+		typeCounts.set(tx.transactionType, {
 			count: current.count + 1,
 			amount: current.amount + Math.abs(tx.amount)
 		});
@@ -310,7 +296,7 @@ export const getCreditAnalytics = query('unchecked', async ({ days = 30 }: { day
 // ==================== CARD ANALYTICS ====================
 
 export const getCardAnalytics = query('unchecked', async ({ days = 30 }: { days?: number }): Promise<CardAnalytics> => {
-	const { supabase, org_id } = await requireAdminPermissions();
+	const { org_id } = await requireAdminPermissions();
 	if (!org_id) throw error(500, 'Org ID missing');
 
 	const { start } = getDateRange(days);
@@ -319,32 +305,30 @@ export const getCardAnalytics = query('unchecked', async ({ days = 30 }: { days?
 	thisMonth.setHours(0, 0, 0, 0);
 
 	const [
-		{ count: totalCards },
-		{ count: cardsThisMonth },
-		{ data: recentCards },
-		{ data: templates },
-		{ data: users }
+		totalCardsResult,
+		cardsThisMonthResult,
+		recentCards,
+		templatesList,
+		usersList
 	] = await Promise.all([
-		supabase.from('idcards').select('*', { count: 'exact', head: true }).eq('org_id', org_id),
-		supabase.from('idcards').select('*', { count: 'exact', head: true })
-			.eq('org_id', org_id)
-			.gte('created_at', thisMonth.toISOString()),
-		supabase.from('idcards').select('id, template_id, user_id, created_at')
-			.eq('org_id', org_id)
-			.gte('created_at', start.toISOString())
-			.order('created_at', { ascending: false }),
-		supabase.from('templates').select('id, name').eq('org_id', org_id),
-		supabase.from('profiles').select('id, email, card_generation_count').eq('org_id', org_id)
+		db.select({ count: sql`count(*)` }).from(idcards).where(eq(idcards.orgId, org_id)),
+		db.select({ count: sql`count(*)` }).from(idcards).where(and(eq(idcards.orgId, org_id), gte(idcards.createdAt, thisMonth))),
+		db.select({ id: idcards.id, templateId: idcards.templateId, createdAt: idcards.createdAt })
+			.from(idcards)
+			.where(and(eq(idcards.orgId, org_id), gte(idcards.createdAt, start)))
+			.orderBy(desc(idcards.createdAt)),
+		db.select({ id: templates.id, name: templates.name }).from(templates).where(eq(templates.orgId, org_id)),
+		db.select({ id: profiles.id, email: profiles.email, cardGenerationCount: profiles.cardGenerationCount })
+			.from(profiles).where(eq(profiles.orgId, org_id))
 	]);
 
-	const cardsList = (recentCards || []) as { id: string; template_id: string; user_id: string; created_at: string }[];
-	const templatesList = (templates || []) as { id: string; name: string }[];
-	const usersList = (users || []) as { id: string; email: string; card_generation_count: number }[];
+	const totalCards = Number(totalCardsResult[0]?.count || 0);
+	const cardsThisMonth = Number(cardsThisMonthResult[0]?.count || 0);
 
 	// Cards by day
 	const dayMap = new Map<string, number>();
-	cardsList.forEach(card => {
-		const date = new Date(card.created_at).toISOString().split('T')[0];
+	recentCards.forEach(card => {
+		const date = card.createdAt!.toISOString().split('T')[0];
 		dayMap.set(date, (dayMap.get(date) || 0) + 1);
 	});
 
@@ -356,9 +340,9 @@ export const getCardAnalytics = query('unchecked', async ({ days = 30 }: { days?
 
 	// Cards by template
 	const templateMap = new Map<string, number>();
-	cardsList.forEach(card => {
-		if (card.template_id) {
-			templateMap.set(card.template_id, (templateMap.get(card.template_id) || 0) + 1);
+	recentCards.forEach(card => {
+		if (card.templateId) {
+			templateMap.set(card.templateId, (templateMap.get(card.templateId) || 0) + 1);
 		}
 	});
 
@@ -373,17 +357,17 @@ export const getCardAnalytics = query('unchecked', async ({ days = 30 }: { days?
 
 	// Top generators
 	const topGenerators = usersList
-		.filter(u => u.card_generation_count > 0)
-		.sort((a, b) => b.card_generation_count - a.card_generation_count)
+		.filter(u => u.cardGenerationCount > 0)
+		.sort((a, b) => b.cardGenerationCount - a.cardGenerationCount)
 		.slice(0, 10)
 		.map(u => ({
 			email: u.email || 'Unknown',
-			count: u.card_generation_count
+			count: u.cardGenerationCount
 		}));
 
 	return {
-		totalCards: totalCards || 0,
-		cardsThisMonth: cardsThisMonth || 0,
+		totalCards,
+		cardsThisMonth,
 		cardsByDay,
 		cardsByTemplate,
 		topGenerators
@@ -393,7 +377,7 @@ export const getCardAnalytics = query('unchecked', async ({ days = 30 }: { days?
 // ==================== USER ANALYTICS ====================
 
 export const getUserAnalytics = query('unchecked', async ({ days = 30 }: { days?: number }): Promise<UserAnalytics> => {
-	const { supabase, org_id } = await requireAdminPermissions();
+	const { org_id } = await requireAdminPermissions();
 	if (!org_id) throw error(500, 'Org ID missing');
 
 	const { start } = getDateRange(days);
@@ -403,29 +387,25 @@ export const getUserAnalytics = query('unchecked', async ({ days = 30 }: { days?
 	thisMonth.setDate(1);
 	thisMonth.setHours(0, 0, 0, 0);
 
-	const { data: users, error: usersError } = await supabase
-		.from('profiles')
-		.select('id, email, role, created_at, updated_at')
-		.eq('org_id', org_id);
-
-	if (usersError) throw error(500, 'Failed to fetch users');
-
-	const usersList = (users || []) as {
-		id: string;
-		email: string;
-		role: string;
-		created_at: string;
-		updated_at: string;
-	}[];
+	const usersList = await db
+		.select({
+			id: profiles.id,
+			email: profiles.email,
+			role: profiles.role,
+			createdAt: profiles.createdAt,
+			updatedAt: profiles.updatedAt
+		})
+		.from(profiles)
+		.where(eq(profiles.orgId, org_id));
 
 	// Active users (updated in last 30 days)
 	const activeUsers = usersList.filter(u => 
-		u.updated_at && new Date(u.updated_at) >= thirtyDaysAgo
+		u.updatedAt && u.updatedAt >= thirtyDaysAgo
 	).length;
 
 	// New users this month
 	const newUsersThisMonth = usersList.filter(u => 
-		new Date(u.created_at) >= thisMonth
+		u.createdAt && u.createdAt >= thisMonth
 	).length;
 
 	// Users by role
@@ -442,9 +422,9 @@ export const getUserAnalytics = query('unchecked', async ({ days = 30 }: { days?
 	// Registrations by day
 	const dayMap = new Map<string, number>();
 	usersList
-		.filter(u => new Date(u.created_at) >= start)
+		.filter(u => u.createdAt && u.createdAt >= start)
 		.forEach(u => {
-			const date = new Date(u.created_at).toISOString().split('T')[0];
+			const date = u.createdAt!.toISOString().split('T')[0];
 			dayMap.set(date, (dayMap.get(date) || 0) + 1);
 		});
 

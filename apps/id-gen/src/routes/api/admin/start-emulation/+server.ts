@@ -1,17 +1,11 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
-import { createClient } from '@supabase/supabase-js';
-import { PUBLIC_SUPABASE_URL } from '$env/static/public';
-import { PRIVATE_SERVICE_ROLE } from '$env/static/private';
 import {
 	checkRateLimit,
 	createRateLimitResponse,
 	RateLimitConfigs
 } from '$lib/utils/rate-limiter';
 import { validateCSRFFromRequest, csrfErrorResponse } from '$lib/server/csrf';
-import { invalidateUserPermissionCache } from '$lib/services/permissions';
 import { logRoleEmulationStart } from '$lib/server/audit';
-
-const supabaseAdmin = createClient(PUBLIC_SUPABASE_URL, PRIVATE_SERVICE_ROLE);
 
 // Available roles that can be emulated
 const EMULATABLE_ROLES = [
@@ -33,12 +27,12 @@ export const POST: RequestHandler = async ({ locals, request, cookies }) => {
 		return csrfErrorResponse(csrfCheck.error || 'CSRF validation failed');
 	}
 
-	const session = await locals.safeGetSession();
-	if (!session.user) {
+	const { session, user } = locals;
+	if (!session || !user) {
 		return json({ error: 'Unauthorized' }, { status: 401 });
 	}
 
-	const userId = session.user.id;
+	const userId = user.id;
 
 	// SECURITY FIX: Apply rate limiting to admin endpoints
 	const rateLimitResult = checkRateLimit(
@@ -52,18 +46,8 @@ export const POST: RequestHandler = async ({ locals, request, cookies }) => {
 		return createRateLimitResponse(rateLimitResult.resetTime);
 	}
 
-	// Get current user's actual role to verify they're super_admin
-	const { data: userData, error: fetchError } = await supabaseAdmin.auth.admin.getUserById(userId);
-
-	if (fetchError || !userData || !userData.user) {
-		return json({ error: 'User not found' }, { status: 404 });
-	}
-
-	const appMetadata = userData.user.app_metadata || {};
-	const currentRole = appMetadata.role || userData.user.user_metadata?.role;
-
-	// Only super_admin can start emulation
-	if (currentRole !== 'super_admin') {
+	// Only super_admin can start emulation (check actual role)
+	if (user.role !== 'super_admin') {
 		return json({ error: 'Only super administrators can emulate roles' }, { status: 403 });
 	}
 
@@ -83,77 +67,64 @@ export const POST: RequestHandler = async ({ locals, request, cookies }) => {
 		);
 	}
 
-	// Set emulation in app_metadata
+	// Set emulation cookie
 	const expiresAt = new Date();
 	expiresAt.setHours(expiresAt.getHours() + 24); // Emulation expires in 24 hours
 
-	const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-		app_metadata: {
-			...appMetadata,
-			role_emulation: {
-				active: true,
-				emulated_role: targetRole,
-				original_role: currentRole,
-				expires_at: expiresAt.toISOString(),
-				started_at: new Date().toISOString()
-			}
-		}
+	const emulationData = {
+		active: true,
+		emulated_role: targetRole,
+		original_role: user.role,
+		expires_at: expiresAt.toISOString(),
+		started_at: new Date().toISOString()
+	};
+
+	cookies.set('role_emulation', JSON.stringify(emulationData), {
+		path: '/',
+		httpOnly: true,
+		secure: true,
+		sameSite: 'lax',
+		expires: expiresAt
 	});
 
-	if (updateError) {
-		console.error('Failed to start role emulation:', updateError);
-		return json({ error: 'Failed to start emulation' }, { status: 500 });
-	}
-
-	// SECURITY: Invalidate permission cache when role changes
-	invalidateUserPermissionCache(userId);
-
-	// SECURITY: Force session refresh to rotate session token after privilege change
-	// This helps prevent session fixation attacks
-	try {
-		await locals.supabase.auth.refreshSession();
-	} catch (refreshError) {
-		console.warn('Session refresh after emulation failed (non-critical):', refreshError);
-	}
-
 	// SECURITY: Log admin action to audit trail
-	await logRoleEmulationStart(userId, userId, targetRole, currentRole, request, appMetadata.org_id);
+	await logRoleEmulationStart(userId, userId, targetRole, user.role, request, locals.org_id);
 
 	return json({
 		success: true,
 		emulating: targetRole,
 		expiresAt: expiresAt.toISOString(),
-		message: 'Session refreshed - reload the page for changes to take effect'
+		message: 'Role emulation started - reload the page for changes to take effect'
 	});
 };
 
 // GET endpoint to retrieve available roles for emulation
-export const GET: RequestHandler = async ({ locals }) => {
-	const session = await locals.safeGetSession();
-	if (!session.user) {
+export const GET: RequestHandler = async ({ locals, cookies }) => {
+	const { user } = locals;
+	if (!user) {
 		return json({ error: 'Unauthorized' }, { status: 401 });
 	}
 
-	const userId = session.user.id;
-
-	// SECURITY FIX: Verify role from database, not from JWT/locals
-	// Fetch actual user metadata from Supabase Admin to prevent tampering
-	const { data: userData, error: fetchError } = await supabaseAdmin.auth.admin.getUserById(userId);
-
-	if (fetchError || !userData || !userData.user) {
-		return json({ error: 'User not found' }, { status: 404 });
+	// Only super_admin can access emulation features
+	// We check the ACTUAL role from locals (which should be super_admin even if emulating)
+	if (user.role !== 'super_admin') {
+		return json({ error: 'Only super administrators can emulate roles' }, { status: 403 });
 	}
 
-	const appMetadata = userData.user.app_metadata || {};
-	const currentRole = appMetadata.role || userData.user.user_metadata?.role;
-	const roleEmulation = appMetadata.role_emulation;
-
-	// Only super_admin can access emulation features
-	// Use the role from database, not from JWT
-	const isSuperAdmin = currentRole === 'super_admin';
-
-	if (!isSuperAdmin) {
-		return json({ error: 'Only super administrators can emulate roles' }, { status: 403 });
+	const emulatedRoleData = cookies.get('role_emulation');
+	let currentEmulation = null;
+	if (emulatedRoleData) {
+		try {
+			const emulation = JSON.parse(emulatedRoleData);
+			if (emulation.active && new Date(emulation.expires_at) > new Date()) {
+				currentEmulation = {
+					emulatedRole: emulation.emulated_role,
+					originalRole: emulation.original_role
+				};
+			}
+		} catch (e) {
+			console.error('Failed to parse role emulation cookie');
+		}
 	}
 
 	return json({
@@ -164,11 +135,6 @@ export const GET: RequestHandler = async ({ locals }) => {
 				.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
 				.join(' ')
 		})),
-		currentEmulation: roleEmulation?.active
-			? {
-					emulatedRole: roleEmulation.emulated_role,
-					originalRole: roleEmulation.original_role
-				}
-			: null
+		currentEmulation
 	});
 };

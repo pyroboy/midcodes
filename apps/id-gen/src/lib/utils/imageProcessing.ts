@@ -1,14 +1,10 @@
 /**
  * Image Processing Utilities for ID Generator
  *
- * Provides client-side image processing for:
- * 1. Background removal (photos) - AI-powered using @imgly/background-removal
+ * Provides image processing for:
+ * 1. Background removal (photos) - Cloud-based using Runware AI API
  * 2. Signature cleaning - Canvas-based thresholding with auto-crop
  */
-
-import { removeBackground as imglyRemoveBackground } from '@imgly/background-removal';
-import { aiModelStore } from '$lib/stores/aiModel';
-import { get } from 'svelte/store';
 
 // ============================================================================
 // TYPES
@@ -30,113 +26,9 @@ export interface SignatureCleanOptions {
 }
 
 // ============================================================================
-// BACKGROUND REMOVAL (for Photos)
-// ============================================================================
-
-/**
- * Remove background from an image using AI (client-side).
- * Downloads ~40MB model on first use, then cached by browser.
- *
- * @param imageSource - Image source (File, Blob, or data URL string)
- * @param onProgress - Optional progress callback
- * @returns Blob with transparent background (PNG)
- */
-export async function removeBackground(
-	imageSource: File | Blob | string,
-	onProgress?: (progress: ProcessingProgress) => void
-): Promise<Blob> {
-	onProgress?.({
-		stage: 'loading',
-		progress: 0,
-		message: 'Loading AI model...'
-	});
-
-	// Update global store if not already ready
-	const currentStatus = get(aiModelStore).status;
-	if (currentStatus !== 'ready') {
-		aiModelStore.set({ status: 'loading', progress: 0 });
-	}
-
-	try {
-		const blob = await imglyRemoveBackground(imageSource, {
-			progress: (key: string, current: number, total: number) => {
-				// Calculate progress for this specific item (file/step)
-				const pct = Math.round((current / total) * 100);
-				
-				// Heuristic to determine what's happening
-				// The library downloads model files first (onnx, wasm, etc.)
-				let message = `Processing: ${pct}%`;
-				let stage: 'loading' | 'processing' = 'processing';
-
-				if (key.includes('fetch') || key.includes('model') || key.includes('onnx') || key.includes('wasm')) {
-					message = `Loading AI model: ${pct}%`;
-					stage = 'loading';
-				}
-
-				onProgress?.({
-					stage,
-					progress: pct,
-					message
-				});
-
-				// Update global store
-				if (stage === 'loading') {
-					aiModelStore.set({ status: 'loading', progress: pct });
-				}
-			}
-		});
-
-		onProgress?.({
-			stage: 'complete',
-			progress: 100,
-			message: 'Background removed!'
-		});
-		
-		aiModelStore.set({ status: 'ready', progress: 100 });
-
-		return blob;
-	} catch (error) {
-		console.error('[removeBackground] Error:', error);
-		throw new Error('Failed to remove background. Please try again.');
-	}
-}
-
-/**
- * Preload the AI model without processing a user image.
- * This can be called at app startup to warm up the cache.
- */
-export async function preloadModel() {
-	const current = get(aiModelStore);
-	if (current.status === 'ready' || current.status === 'loading') return;
-
-	console.log('[AI] Preloading model...');
-	aiModelStore.set({ status: 'loading', progress: 0 });
-
-	try {
-		// Use a tiny 1x1 transparent pixel to trigger the download/init
-		const pixel = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==';
-		
-		await imglyRemoveBackground(pixel, {
-			progress: (key: string, current: number, total: number) => {
-				const pct = Math.round((current / total) * 100);
-				// We only care about model loading part here
-				if (key.includes('fetch') || key.includes('model') || key.includes('onnx')) {
-					aiModelStore.set({ status: 'loading', progress: pct });
-				}
-			}
-		});
-		
-		console.log('[AI] Model preloaded successfully');
-		aiModelStore.set({ status: 'ready', progress: 100 });
-	} catch (err) {
-		console.error('[AI] Preload failed:', err);
-		aiModelStore.set({ status: 'error', progress: 0 });
-	}
-}
-
-// ============================================================================
 // CLOUD BACKGROUND REMOVAL (using Runware AI API)
 // ============================================================================
+
 
 /**
  * Remove background from an image using Runware AI API (server-side).

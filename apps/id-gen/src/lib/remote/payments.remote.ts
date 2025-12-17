@@ -1,28 +1,16 @@
 /**
  * Server-only remote functions for payment processing
  * These functions can be called from the client but execute on the server
- *
- * Features:
- * - Type-safe payment processing with Zod validation
- * - Idempotency for safe retries
- * - Structured logging with PII redaction
- * - Server-side catalog validation (never trust client amounts)
  */
 
-import { query, command, form } from '$app/server';
-import { redirect } from '@sveltejs/kit';
-import { getRequestEvent } from '$app/server';
+import { query, command, form, getRequestEvent } from '$app/server';
+import { redirect, error } from '@sveltejs/kit';
+import { db } from '$lib/server/db';
+import * as schema from '$lib/server/schema';
+import { eq, and } from 'drizzle-orm';
 
 // Schema imports
 import {
-	paymentHistoryQuerySchema,
-	createCreditPaymentInputSchema,
-	createFeaturePaymentInputSchema,
-	checkoutInitResultSchema,
-	paymentHistorySchema,
-	type PaymentHistoryQuery,
-	type CreateCreditPaymentInput,
-	type CreateFeaturePaymentInput,
 	type CheckoutInitResult,
 	type PaymentHistory
 } from '$lib/payments/schemas';
@@ -41,8 +29,6 @@ import { recordCheckoutInit, listPaymentsByUser } from '$lib/server/payments/per
 /**
  * Gets payment history for the current user
  * - Requires authentication (locals.user)
- * - Returns only records belonging to the current user
- * - Supports cursor-based pagination
  */
 export const getPaymentHistory = query('unchecked', async ({ cursor, limit }: any) => {
 	assertServerContext('getPaymentHistory');
@@ -51,7 +37,7 @@ export const getPaymentHistory = query('unchecked', async ({ cursor, limit }: an
 
 	// Require authentication
 	if (!locals.user) {
-		throw new Error('Authentication required');
+		throw error(401, 'Authentication required');
 	}
 
 	try {
@@ -68,27 +54,10 @@ export const getPaymentHistory = query('unchecked', async ({ cursor, limit }: an
 			nextCursor: nextCursor || null
 		};
 
-		// Emit structured log (redact PII)
-		console.info('[Payment Query]', {
-			action: 'payment_history_retrieved',
-			userId: locals.user.id,
-			count: items.length,
-			hasCursor: !!cursor,
-			hasMore: !!nextCursor,
-			timestamp: new Date().toISOString()
-		});
-
 		return result;
-	} catch (error) {
-		// Log error without exposing sensitive details
-		console.error('[Payment Query Error]', {
-			action: 'payment_history_failed',
-			userId: locals.user.id,
-			error: error instanceof Error ? error.message : 'Unknown error',
-			timestamp: new Date().toISOString()
-		});
-
-		throw new Error('Failed to retrieve payment history');
+	} catch (err) {
+		console.error('[Payment Query Error]', err);
+		throw error(500, 'Failed to retrieve payment history');
 	}
 }) as any;
 
@@ -98,97 +67,56 @@ export const getPaymentHistory = query('unchecked', async ({ cursor, limit }: an
 
 /**
  * Creates a credit payment checkout session
- * - Validates packageId against server-side catalog
- * - Never trusts client-provided amounts
- * - Creates PayMongo checkout with proper metadata
- * - Supports bypass mode for testing and development
  */
 export const createCreditPayment = command('unchecked', async (input: any) => {
 	assertServerContext('createCreditPayment');
 
 	const { locals } = getRequestEvent();
-	const { supabase, org_id, user } = locals;
+	const { org_id, user } = locals;
 
-	// Ensure org_id is defined
-	if (!org_id) {
-		throw new Error('Organization ID is required');
-	}
+	if (!org_id) throw error(400, 'Organization ID is required');
+	if (!user) throw error(401, 'Authentication required');
 
-	// Require authentication
-	if (!user) {
-		throw new Error('Authentication required');
-	}
+	// Check organization settings
+	const orgSettings = await db.query.orgSettings.findFirst({
+		where: eq(schema.orgSettings.orgId, org_id)
+	});
 
-	// Check organization settings for payments_enabled and payments_bypass flags
-	const { data: orgSettings, error: settingsError } = await supabase
-		.from('org_settings')
-		.select('payments_enabled, payments_bypass')
-		.eq('org_id', org_id)
-		.single();
-
-	// Relax typing for org settings
-	const settings = orgSettings as any;
-
-	if (settingsError) {
-		console.error('[Payment Command Error]', {
-			action: 'org_settings_fetch_failed',
-			error: settingsError.message,
-			userId: user.id,
-			timestamp: new Date().toISOString()
-		});
-		throw new Error('Failed to check payment settings');
-	}
+	if (!orgSettings) throw error(404, 'Organization settings not found');
 
 	// Ensure payments are enabled or in bypass mode
-	if (!settings.payments_enabled && !settings.payments_bypass) {
-		throw new Error('Payments are disabled for this organization');
+	if (!orgSettings.paymentsEnabled && !orgSettings.paymentsBypass) {
+		throw error(403, 'Payments are disabled for this organization');
 	}
 
 	try {
-		// Resolve packageId to server-side catalog (NEVER trust client amounts)
 		const creditPackage = getCreditPackageById(input.packageId);
 		if (!creditPackage || !creditPackage.isActive) {
-			throw new Error('Invalid or inactive credit package');
+			throw error(400, 'Invalid or inactive credit package');
 		}
 
-		// Calculate server-side amount and description
 		const amountPhp = creditPackage.amountPhp;
 		const description = `${creditPackage.name} - ${creditPackage.description}`;
 
 		// CHECK FOR BYPASS MODE
-		if (settings.payments_bypass) {
-			// Import bypass helpers only when needed (for better tree-shaking)
+		if (orgSettings.paymentsBypass) {
 			const { addCreditsBypass, generateBypassReference } = await import(
 				'$lib/server/credits/bypass-helpers'
 			);
 
-			// Generate a reference ID for the bypass transaction
 			const bypassReference = generateBypassReference();
 
-			// Apply credits immediately (server-side)
 			const bypassResult = await addCreditsBypass(
 				user.id,
-				org_id!,
+				org_id,
 				input.packageId,
 				bypassReference
 			);
 
 			if (!bypassResult.success) {
-				throw new Error(bypassResult.error || 'Failed to process bypass payment');
+				throw error(500, bypassResult.error || 'Failed to process bypass payment');
 			}
 
-			// Emit structured log for bypass
-			console.info('[Payment Command]', {
-				action: 'credit_payment_bypassed',
-				userId: user.id,
-				packageId: input.packageId,
-				amountPhp,
-				credits: creditPackage.credits,
-				bypassReference,
-				timestamp: new Date().toISOString()
-			});
-
-			// Return success response with bypass flag
 			return {
 				checkoutUrl: input.returnTo || getCheckoutUrls().success,
 				sessionId: bypassReference,
@@ -198,19 +126,12 @@ export const createCreditPayment = command('unchecked', async (input: any) => {
 			};
 		}
 
-		// STANDARD PAYMENT FLOW (when bypass is off)
-		// Generate idempotency key for safe retries
+		// STANDARD PAYMENT FLOW
 		const idempotencyKey = generateIdempotencyKey();
-
-		// Create PayMongo client
 		const payMongo = new PayMongoClient();
-
-		// Get checkout URLs
 		const checkoutUrls = getCheckoutUrls();
 		const successUrl = input.returnTo || checkoutUrls.success;
-		const cancelUrl = checkoutUrls.cancel;
 
-		// Create checkout session with structured metadata
 		const checkoutSession = await payMongo.createCheckoutSession({
 			line_items: [
 				{
@@ -222,7 +143,7 @@ export const createCreditPayment = command('unchecked', async (input: any) => {
 			],
 			payment_method_types: input.method ? [input.method] : ['gcash', 'paymaya', 'card'],
 			success_url: successUrl,
-			cancel_url: cancelUrl,
+			cancel_url: checkoutUrls.cancel,
 			description,
 			metadata: {
 				userId: user.id,
@@ -232,7 +153,7 @@ export const createCreditPayment = command('unchecked', async (input: any) => {
 			}
 		});
 
-		// Persist pending payment record with idempotency key
+		// Persist pending payment record
 		await recordCheckoutInit({
 			userId: user.id,
 			sessionId: checkoutSession.id,
@@ -254,125 +175,64 @@ export const createCreditPayment = command('unchecked', async (input: any) => {
 			provider: 'paymongo'
 		};
 
-		// Emit structured log (redact PII)
-		console.info('[Payment Command]', {
-			action: 'credit_payment_initiated',
-			userId: user.id,
-			packageId: input.packageId,
-			amountPhp,
-			credits: creditPackage.credits,
-			sessionId: checkoutSession.id,
-			timestamp: new Date().toISOString()
-		});
-
 		return result;
-	} catch (error) {
-		// Log error without exposing sensitive details
-		console.error('[Payment Command Error]', {
-			action: 'credit_payment_failed',
-			userId: locals.user?.id,
-			packageId: input.packageId,
-			error: error instanceof Error ? error.message : 'Unknown error',
-			timestamp: new Date().toISOString()
-		});
-
-		throw new Error('Failed to create credit payment');
+	} catch (err) {
+		console.error('[Payment Command Error]', err);
+		if (err instanceof Error && 'status' in err) throw err;
+		throw error(500, 'Failed to create credit payment');
 	}
 });
 
 /**
  * Creates a feature payment checkout session
- * - Validates featureId against server-side catalog
- * - Never trusts client-provided amounts
- * - Creates PayMongo checkout with proper metadata
- * - Supports bypass mode for testing and development
  */
 export const createFeaturePayment = command('unchecked', async (input: any) => {
 	assertServerContext('createFeaturePayment');
 
 	const { locals } = getRequestEvent();
-	const { supabase, org_id, user } = locals;
+	const { org_id, user } = locals;
 
-	// Ensure org_id is defined
-	if (!org_id) {
-		throw new Error('Organization ID is required');
-	}
+	if (!org_id) throw error(400, 'Organization ID is required');
+	if (!user) throw error(401, 'Authentication required');
 
-	// Require authentication
-	if (!user) {
-		throw new Error('Authentication required');
-	}
+	const orgSettings = await db.query.orgSettings.findFirst({
+		where: eq(schema.orgSettings.orgId, org_id)
+	});
 
-	// Check organization settings for payments_enabled and payments_bypass flags
-	const { data: orgSettings, error: settingsError } = await supabase
-		.from('org_settings')
-		.select('payments_enabled, payments_bypass')
-		.eq('org_id', org_id)
-		.single();
+	if (!orgSettings) throw error(404, 'Organization settings not found');
 
-	// Type assertion for org settings (relaxed to any for Supabase types)
-	const settings = orgSettings as unknown as any;
-
-	if (settingsError) {
-		console.error('[Payment Command Error]', {
-			action: 'org_settings_fetch_failed',
-			error: settingsError.message,
-			userId: user.id,
-			timestamp: new Date().toISOString()
-		});
-		throw new Error('Failed to check payment settings');
-	}
-
-	// Ensure payments are enabled or in bypass mode
-	if (!settings.payments_enabled && !settings.payments_bypass) {
-		throw new Error('Payments are disabled for this organization');
+	if (!orgSettings.paymentsEnabled && !orgSettings.paymentsBypass) {
+		throw error(403, 'Payments are disabled for this organization');
 	}
 
 	try {
-		// Resolve featureId to server-side catalog (NEVER trust client amounts)
 		const featureSku = getFeatureSkuById(input.featureId);
 		if (!featureSku || !featureSku.isActive) {
-			throw new Error('Invalid or inactive feature SKU');
+			throw error(400, 'Invalid or inactive feature SKU');
 		}
 
-		// Calculate server-side amount and description
 		const amountPhp = featureSku.amountPhp;
 		const description = `${featureSku.name} - ${featureSku.description}`;
 
 		// CHECK FOR BYPASS MODE
-		if (settings.payments_bypass) {
-			// Import bypass helpers only when needed (for better tree-shaking)
+		if (orgSettings.paymentsBypass) {
 			const { grantFeatureBypass, generateBypassReference } = await import(
 				'$lib/server/credits/bypass-helpers'
 			);
 
-			// Generate a reference ID for the bypass transaction
 			const bypassReference = generateBypassReference();
 
-			// Grant feature immediately (server-side)
 			const bypassResult = await grantFeatureBypass(
 				user.id,
-				org_id!,
+				org_id,
 				input.featureId,
 				bypassReference
 			);
 
 			if (!bypassResult.success) {
-				throw new Error(bypassResult.error || 'Failed to process bypass feature purchase');
+				throw error(500, bypassResult.error || 'Failed to process bypass feature purchase');
 			}
 
-			// Emit structured log for bypass
-			console.info('[Payment Command]', {
-				action: 'feature_payment_bypassed',
-				userId: user.id,
-				featureId: input.featureId,
-				featureFlag: featureSku.featureFlag,
-				amountPhp,
-				bypassReference,
-				timestamp: new Date().toISOString()
-			});
-
-			// Return success response with bypass flag
 			return {
 				checkoutUrl: input.returnTo || getCheckoutUrls().success,
 				sessionId: bypassReference,
@@ -382,19 +242,12 @@ export const createFeaturePayment = command('unchecked', async (input: any) => {
 			};
 		}
 
-		// STANDARD PAYMENT FLOW (when bypass is off)
-		// Generate idempotency key for safe retries
+		// STANDARD PAYMENT FLOW
 		const idempotencyKey = generateIdempotencyKey();
-
-		// Create PayMongo client
 		const payMongo = new PayMongoClient();
-
-		// Get checkout URLs
 		const checkoutUrls = getCheckoutUrls();
 		const successUrl = input.returnTo || checkoutUrls.success;
-		const cancelUrl = checkoutUrls.cancel;
 
-		// Create checkout session with structured metadata
 		const checkoutSession = await payMongo.createCheckoutSession({
 			line_items: [
 				{
@@ -406,7 +259,7 @@ export const createFeaturePayment = command('unchecked', async (input: any) => {
 			],
 			payment_method_types: input.method ? [input.method] : ['gcash', 'paymaya', 'card'],
 			success_url: successUrl,
-			cancel_url: cancelUrl,
+			cancel_url: checkoutUrls.cancel,
 			description,
 			metadata: {
 				userId: user.id,
@@ -416,7 +269,6 @@ export const createFeaturePayment = command('unchecked', async (input: any) => {
 			}
 		});
 
-		// Persist pending payment record with idempotency key
 		await recordCheckoutInit({
 			userId: user.id,
 			sessionId: checkoutSession.id,
@@ -438,29 +290,11 @@ export const createFeaturePayment = command('unchecked', async (input: any) => {
 			provider: 'paymongo'
 		};
 
-		// Emit structured log (redact PII)
-		console.info('[Payment Command]', {
-			action: 'feature_payment_initiated',
-			userId: user.id,
-			featureId: input.featureId,
-			featureFlag: featureSku.featureFlag,
-			amountPhp,
-			sessionId: checkoutSession.id,
-			timestamp: new Date().toISOString()
-		});
-
 		return result;
-	} catch (error) {
-		// Log error without exposing sensitive details
-		console.error('[Payment Command Error]', {
-			action: 'feature_payment_failed',
-			userId: locals.user?.id,
-			featureId: input.featureId,
-			error: error instanceof Error ? error.message : 'Unknown error',
-			timestamp: new Date().toISOString()
-		});
-
-		throw new Error('Failed to create feature payment');
+	} catch (err) {
+		console.error('[Payment Command Error]', err);
+		if (err instanceof Error && 'status' in err) throw err;
+		throw error(500, 'Failed to create feature payment');
 	}
 });
 
@@ -470,147 +304,84 @@ export const createFeaturePayment = command('unchecked', async (input: any) => {
 
 /**
  * Form action for purchasing credits
- * - Accepts packageId and optional returnTo from form data
- * - Calls createCreditPayment command
- * - Returns redirect to checkout URL on success
  */
-// Define the expected form data type for purchaseCredits
-interface PurchaseCreditsFormData extends FormData {
-	get(name: 'packageId' | 'returnTo'): string | null;
-}
-
 export const purchaseCredits = form(async () => {
 	assertServerContext('purchaseCredits');
 	const { locals, request } = getRequestEvent();
 	const formData = await request.formData();
 
+	if (!locals.user) throw error(401, 'Authentication required');
 
-	// Require authentication
-	if (!locals.user) {
-		throw new Error('Authentication required');
-	}
-
-	// Extract form data - TypeScript now knows these are strings or null
 	const packageId = formData.get('packageId');
 	const returnTo = formData.get('returnTo');
 
 	if (!packageId || typeof packageId !== 'string') {
-		throw new Error('Package ID is required');
+		throw error(400, 'Package ID is required');
 	}
 
-	// Validate returnTo if provided
 	let validReturnTo: string | undefined;
 	if (returnTo && typeof returnTo === 'string') {
 		try {
-			new URL(returnTo); // Validate URL format
+			new URL(returnTo);
 			validReturnTo = returnTo;
 		} catch {
-			throw new Error('Invalid return URL');
+			throw error(400, 'Invalid return URL');
 		}
 	}
 
 	try {
-		// Call the createCreditPayment command
 		const result = await createCreditPayment({
 			packageId,
-			method: undefined, // Let PayMongo show all available methods
+			method: undefined,
 			returnTo: validReturnTo
 		});
 
-		// Emit structured log
-		console.info('[Payment Form]', {
-			action: 'credit_purchase_form_submitted',
-			userId: locals.user.id,
-			packageId,
-			hasReturnTo: !!validReturnTo,
-			timestamp: new Date().toISOString()
-		});
-
-		// Redirect to checkout URL
 		redirect(303, result.checkoutUrl);
-	} catch (error) {
-		// Log error without exposing sensitive details
-		console.error('[Payment Form Error]', {
-			action: 'credit_purchase_form_failed',
-			userId: locals.user.id,
-			packageId,
-			error: error instanceof Error ? error.message : 'Unknown error',
-			timestamp: new Date().toISOString()
-		});
-
-		throw new Error('Failed to initiate credit purchase');
+	} catch (err) {
+		console.error('[Payment Form Error]', err);
+		if (err instanceof Error && 'status' in err) throw err;
+		throw error(500, 'Failed to initiate credit purchase');
 	}
 });
 
 /**
  * Form action for purchasing features
- * - Accepts featureId and optional returnTo from form data
- * - Calls createFeaturePayment command
- * - Returns redirect to checkout URL on success
  */
-// Define the expected form data type for purchaseFeature
-interface PurchaseFeatureFormData extends FormData {
-	get(name: 'featureId' | 'returnTo'): string | null;
-}
-
 export const purchaseFeature = form(async () => {
 	assertServerContext('purchaseFeature');
 	const { locals, request } = getRequestEvent();
 	const formData = await request.formData();
 
-	// Require authentication
-	if (!locals.user) {
-		throw new Error('Authentication required');
-	}
+	if (!locals.user) throw error(401, 'Authentication required');
 
-	// Extract form data - TypeScript now knows these are strings or null
 	const featureId = formData.get('featureId');
 	const returnTo = formData.get('returnTo');
 
 	if (!featureId || typeof featureId !== 'string') {
-		throw new Error('Feature ID is required');
+		throw error(400, 'Feature ID is required');
 	}
 
-	// Validate returnTo if provided
 	let validReturnTo: string | undefined;
 	if (returnTo && typeof returnTo === 'string') {
 		try {
-			new URL(returnTo); // Validate URL format
+			new URL(returnTo);
 			validReturnTo = returnTo;
 		} catch {
-			throw new Error('Invalid return URL');
+			throw error(400, 'Invalid return URL');
 		}
 	}
 
 	try {
-		// Call the createFeaturePayment command
 		const result = await createFeaturePayment({
 			featureId,
-			method: undefined, // Let PayMongo show all available methods
+			method: undefined,
 			returnTo: validReturnTo
 		});
 
-		// Emit structured log
-		console.info('[Payment Form]', {
-			action: 'feature_purchase_form_submitted',
-			userId: locals.user.id,
-			featureId,
-			hasReturnTo: !!validReturnTo,
-			timestamp: new Date().toISOString()
-		});
-
-		// Redirect to checkout URL
 		redirect(303, result.checkoutUrl);
-	} catch (error) {
-		// Log error without exposing sensitive details
-		console.error('[Payment Form Error]', {
-			action: 'feature_purchase_form_failed',
-			userId: locals.user.id,
-			featureId,
-			error: error instanceof Error ? error.message : 'Unknown error',
-			timestamp: new Date().toISOString()
-		});
-
-		throw new Error('Failed to initiate feature purchase');
+	} catch (err) {
+		console.error('[Payment Form Error]', err);
+		if (err instanceof Error && 'status' in err) throw err;
+		throw error(500, 'Failed to initiate feature purchase');
 	}
 });

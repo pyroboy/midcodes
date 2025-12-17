@@ -1,26 +1,20 @@
 /**
  * Admin Audit Logging
  * SECURITY: Tracks all admin actions for compliance and security monitoring
- * 
- * This module provides comprehensive audit logging for:
- * - Role emulation start/stop
- * - User role modifications
- * - Credit adjustments
- * - Organization settings changes
- * - Template modifications by admins
  */
 
-import { supabaseAdmin } from '$lib/server/supabase';
+import { db } from '$lib/server/db';
+import { adminAudit } from '$lib/server/schema';
 
 export interface AuditLogEntry {
-	admin_id: string;
+	adminId: string;
 	action: string;
-	target_type: 'user' | 'organization' | 'template' | 'credit' | 'role' | 'settings' | 'system';
-	target_id: string | null;
+	targetType: 'user' | 'organization' | 'template' | 'credit' | 'role' | 'settings' | 'system';
+	targetId: string | null;
 	metadata: Record<string, any>;
-	ip_address?: string | null;
-	user_agent?: string | null;
-	org_id?: string | null;
+	ipAddress?: string | null;
+	userAgent?: string | null;
+	orgId?: string | null;
 }
 
 export type AuditAction =
@@ -54,43 +48,36 @@ export type AuditAction =
  */
 export async function logAdminAction(entry: AuditLogEntry): Promise<{ success: boolean; error?: string }> {
 	try {
-		// Note: admin_audit table will be created by migration 20241217_admin_audit_table.sql
-		// TypeScript may show error until types are regenerated with `supabase gen types`
-		const { error } = await supabaseAdmin.from('admin_audit' as any).insert({
-			admin_id: entry.admin_id,
+		await db.insert(adminAudit).values({
+			adminId: entry.adminId,
 			action: entry.action,
-			target_type: entry.target_type,
-			target_id: entry.target_id,
+			targetType: entry.targetType,
+			targetId: entry.targetId ?? null,
 			metadata: entry.metadata,
-			ip_address: entry.ip_address || null,
-			user_agent: entry.user_agent || null,
-			org_id: entry.org_id || null,
-			created_at: new Date().toISOString()
-		} as any);
+			ipAddress: entry.ipAddress ?? null,
+			userAgent: entry.userAgent ?? null,
+			orgId: entry.orgId ?? null as any, // Cast for potential type mismatch if orgId is null but marked notNull in schema temporarily
+			createdAt: new Date()
+		});
 
-		if (error) {
-			console.error('[AuditLog] Failed to log admin action:', error);
-			return { success: false, error: error.message };
-		}
-
-		console.log(`[AuditLog] ${entry.action} by ${entry.admin_id} on ${entry.target_type}:${entry.target_id}`);
+		console.log(`[AuditLog] ${entry.action} by ${entry.adminId} on ${entry.targetType}:${entry.targetId}`);
 		return { success: true };
-	} catch (err) {
+	} catch (err: any) {
 		console.error('[AuditLog] Exception logging admin action:', err);
-		return { success: false, error: 'Internal error' };
+		return { success: false, error: err.message || 'Internal error' };
 	}
 }
 
 /**
  * Helper to extract request metadata for audit logging
  */
-export function extractRequestMetadata(request: Request): { ip_address: string | null; user_agent: string | null } {
+export function extractRequestMetadata(request: Request): { ipAddress: string | null; userAgent: string | null } {
 	return {
-		ip_address: request.headers.get('x-real-ip') || 
+		ipAddress: request.headers.get('x-real-ip') || 
 			request.headers.get('cf-connecting-ip') || 
 			request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
 			null,
-		user_agent: request.headers.get('user-agent')
+		userAgent: request.headers.get('user-agent')
 	};
 }
 
@@ -105,21 +92,21 @@ export async function logRoleEmulationStart(
 	request: Request,
 	orgId?: string
 ): Promise<void> {
-	const { ip_address, user_agent } = extractRequestMetadata(request);
+	const { ipAddress, userAgent } = extractRequestMetadata(request);
 	
 	await logAdminAction({
-		admin_id: adminId,
+		adminId,
 		action: 'role_emulation_start',
-		target_type: 'user',
-		target_id: targetUserId,
+		targetType: 'user',
+		targetId: targetUserId,
 		metadata: {
 			emulated_role: emulatedRole,
 			original_role: originalRole,
 			started_at: new Date().toISOString()
 		},
-		ip_address,
-		user_agent,
-		org_id: orgId
+		ipAddress,
+		userAgent,
+		orgId
 	});
 }
 
@@ -131,19 +118,19 @@ export async function logRoleEmulationStop(
 	request: Request,
 	orgId?: string
 ): Promise<void> {
-	const { ip_address, user_agent } = extractRequestMetadata(request);
+	const { ipAddress, userAgent } = extractRequestMetadata(request);
 	
 	await logAdminAction({
-		admin_id: adminId,
+		adminId,
 		action: 'role_emulation_stop',
-		target_type: 'user',
-		target_id: adminId,
+		targetType: 'user',
+		targetId: adminId,
 		metadata: {
 			stopped_at: new Date().toISOString()
 		},
-		ip_address,
-		user_agent,
-		org_id: orgId
+		ipAddress,
+		userAgent,
+		orgId
 	});
 }
 
@@ -158,21 +145,21 @@ export async function logCreditAdjustment(
 	request: Request,
 	orgId?: string
 ): Promise<void> {
-	const { ip_address, user_agent } = extractRequestMetadata(request);
+	const { ipAddress, userAgent } = extractRequestMetadata(request);
 	
 	await logAdminAction({
-		admin_id: adminId,
+		adminId,
 		action: 'credit_adjustment',
-		target_type: 'credit',
-		target_id: targetUserId,
+		targetType: 'credit',
+		targetId: targetUserId,
 		metadata: {
 			amount,
 			reason,
 			adjusted_at: new Date().toISOString()
 		},
-		ip_address,
-		user_agent,
-		org_id: orgId
+		ipAddress,
+		userAgent,
+		orgId
 	});
 }
 
@@ -187,21 +174,21 @@ export async function logUserRoleChange(
 	request: Request,
 	orgId?: string
 ): Promise<void> {
-	const { ip_address, user_agent } = extractRequestMetadata(request);
+	const { ipAddress, userAgent } = extractRequestMetadata(request);
 	
 	await logAdminAction({
-		admin_id: adminId,
+		adminId,
 		action: 'user_role_change',
-		target_type: 'role',
-		target_id: targetUserId,
+		targetType: 'role',
+		targetId: targetUserId,
 		metadata: {
 			old_role: oldRole,
 			new_role: newRole,
 			changed_at: new Date().toISOString()
 		},
-		ip_address,
-		user_agent,
-		org_id: orgId
+		ipAddress,
+		userAgent,
+		orgId
 	});
 }
 
@@ -214,20 +201,20 @@ export async function logOrgSettingsChange(
 	changes: Record<string, { old: any; new: any }>,
 	request: Request
 ): Promise<void> {
-	const { ip_address, user_agent } = extractRequestMetadata(request);
+	const { ipAddress, userAgent } = extractRequestMetadata(request);
 	
 	await logAdminAction({
-		admin_id: adminId,
+		adminId,
 		action: 'org_settings_changed',
-		target_type: 'organization',
-		target_id: orgId,
+		targetType: 'organization',
+		targetId: orgId,
 		metadata: {
 			changes,
 			changed_at: new Date().toISOString()
 		},
-		ip_address,
-		user_agent,
-		org_id: orgId
+		ipAddress,
+		userAgent,
+		orgId
 	});
 }
 
@@ -241,19 +228,19 @@ export async function logSensitiveDataAccess(
 	request: Request,
 	orgId?: string
 ): Promise<void> {
-	const { ip_address, user_agent } = extractRequestMetadata(request);
+	const { ipAddress, userAgent } = extractRequestMetadata(request);
 	
 	await logAdminAction({
-		admin_id: adminId,
+		adminId,
 		action: 'sensitive_data_accessed',
-		target_type: 'system',
-		target_id: recordId,
+		targetType: 'system',
+		targetId: recordId,
 		metadata: {
 			data_type: dataType,
 			accessed_at: new Date().toISOString()
 		},
-		ip_address,
-		user_agent,
-		org_id: orgId
+		ipAddress,
+		userAgent,
+		orgId
 	});
 }

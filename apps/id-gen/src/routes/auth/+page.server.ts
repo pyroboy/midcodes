@@ -1,13 +1,12 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { AuthApiError } from '@supabase/supabase-js';
+import { auth } from '$lib/server/auth';
 
-export const load: PageServerLoad = async ({ locals: { safeGetSession }, url }) => {
-	const { session } = await safeGetSession();
+export const load: PageServerLoad = async ({ locals, url }) => {
+	const { session } = locals;
 
 	if (session) {
 		const returnTo = url.searchParams.get('returnTo');
-		// If returnTo parameter exists, redirect there, otherwise go to home
 		if (returnTo) {
 			throw redirect(303, returnTo);
 		}
@@ -20,43 +19,46 @@ export const load: PageServerLoad = async ({ locals: { safeGetSession }, url }) 
 	};
 };
 
-export interface AuthActionData {
-	success: boolean;
-	error?: string;
-	email?: string;
-	message?: string;
-	[key: string]: unknown;
-}
-
 export const actions: Actions = {
-	signin: async ({ request, locals: { supabase } }) => {
+	signin: async ({ request, url }) => {
 		const formData = await request.formData();
 		const email = formData.get('email') as string;
 		const password = formData.get('password') as string;
 
-		const { data, error } = await supabase.auth.signInWithPassword({
-			email,
-			password
-		});
+		try {
+			const result = await auth.api.signInEmail({
+				body: {
+					email,
+					password
+				}
+			});
 
-		if (error) {
-			if (error instanceof AuthApiError && error.status === 400) {
+			if (result) {
+				const returnTo = url.searchParams.get('returnTo');
+				throw redirect(303, returnTo || '/');
+			}
+		} catch (error: any) {
+			console.error('Sign in error:', error);
+			if (error.status === 400 || error.code === 'INVALID_CREDENTIALS') {
 				return fail(400, {
 					error: 'Invalid credentials',
 					success: false,
 					email
 				});
 			}
+			if (error instanceof Response && error.status === 302) {
+				// Success redirect from Better Auth
+				const returnTo = url.searchParams.get('returnTo');
+				throw redirect(303, returnTo || '/');
+			}
 			return fail(500, {
-				error: 'Server error. Please try again later.',
+				error: error.message || 'Server error. Please try again later.',
 				success: false
 			});
 		}
-
-		throw redirect(303, '/');
 	},
 
-	signup: async ({ request, url, locals: { supabase } }) => {
+	signup: async ({ request, url }) => {
 		const formData = await request.formData();
 		const email = formData.get('email') as string;
 		const password = formData.get('password') as string;
@@ -70,38 +72,35 @@ export const actions: Actions = {
 			});
 		}
 
-		const returnTo = url.searchParams.get('returnTo');
-		const emailRedirectTo = returnTo
-			? `${url.origin}/auth/callback?returnTo=${encodeURIComponent(returnTo)}`
-			: `${url.origin}/auth/callback`;
+		try {
+			const result = await auth.api.signUpEmail({
+				body: {
+					email,
+					password,
+					name: email.split('@')[0] // Default name
+				}
+			});
 
-		const { data, error: err } = await supabase.auth.signUp({
-			email,
-			password,
-			options: {
-				emailRedirectTo
+			if (result) {
+				return {
+					success: true,
+					email,
+					message: 'Account created successfully. You can now sign in.'
+				};
 			}
-		});
-
-		if (err) {
-			if (err instanceof AuthApiError && err.status === 400) {
+		} catch (error: any) {
+			console.error('Sign up error:', error);
+			if (error.status === 400) {
 				return fail(400, {
-					error: 'Invalid credentials',
+					error: error.message || 'Invalid registration details',
 					success: false,
 					email
 				});
 			}
-
 			return fail(500, {
-				error: 'Server error. Please try again later.',
+				error: error.message || 'Server error. Please try again later.',
 				success: false
 			});
 		}
-
-		return {
-			success: true,
-			email,
-			message: 'Please check your email for a confirmation link.'
-		};
 	}
 };

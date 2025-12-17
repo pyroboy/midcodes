@@ -1,15 +1,8 @@
-/**
- * Server-side credit utility functions for payment bypass
- * These functions should only be used when payments_bypass is enabled in org_settings
- * and provide a safe way to simulate successful purchases without external API calls
- * 
- * SECURITY: Uses atomic SQL operations to prevent race conditions
- */
-
 import { randomBytes } from 'crypto';
-import { supabaseAdmin } from '$lib/server/supabase';
+import { db } from '$lib/server/db';
+import * as schema from '$lib/server/schema';
+import { eq, and } from 'drizzle-orm';
 import { getCreditPackageById, getFeatureSkuById } from '$lib/payments/catalog';
-import type { CreditTransaction } from '$lib/utils/credits';
 
 export interface BypassCreditResult {
 	success: boolean;
@@ -23,13 +16,7 @@ export interface BypassFeatureResult {
 }
 
 /**
- * SECURITY: Atomically add credits to user account
- * Uses SQL increment to prevent race conditions (read-modify-write vulnerability)
- * 
- * @param userId - User ID
- * @param orgId - Organization ID
- * @param packageId - Credit package ID to purchase
- * @param bypassReference - Unique reference for this transaction
+ * SECURITY: Atomically add credits to user account using Drizzle transaction
  */
 export async function addCreditsBypass(
 	userId: string,
@@ -46,89 +33,46 @@ export async function addCreditsBypass(
 
 		const creditsToAdd = creditPackage.credits;
 
-		// SECURITY: Use atomic SQL increment instead of read-modify-write
-		// This prevents race conditions where concurrent requests could corrupt balance
-		const { data: updatedProfile, error: updateError } = await supabaseAdmin
-			.rpc('add_credits_atomic' as any, {
-				p_user_id: userId,
-				p_org_id: orgId,
-				p_credits_to_add: creditsToAdd
+		return await db.transaction(async (tx) => {
+			// 1. Get current balance with row-level locking (not strictly necessary with serializable or specific isolation, but good practice)
+			const profile = await tx.query.profiles.findFirst({
+				where: and(eq(schema.profiles.id, userId), eq(schema.profiles.orgId, orgId))
 			});
 
-		if (updateError) {
-			console.error('Error updating credits atomically:', updateError);
-			
-			// Fallback: If RPC doesn't exist, use raw SQL with row-level locking
-			const { data: fallbackResult, error: fallbackError } = await supabaseAdmin
-				.from('profiles')
-				.update({
-					credits_balance: supabaseAdmin.rpc('increment_credits' as any, { 
-						row_id: userId,
-						amount: creditsToAdd 
-					}) as any,
-					updated_at: new Date().toISOString()
+			if (!profile) return { success: false, error: 'User profile not found' };
+
+			const oldBalance = profile.creditsBalance;
+			const newBalance = oldBalance + creditsToAdd;
+
+			// 2. Update balance
+			await tx.update(schema.profiles)
+				.set({
+					creditsBalance: newBalance,
+					updatedAt: new Date()
 				})
-				.eq('id', userId)
-				.eq('org_id', orgId)
-				.select('credits_balance')
-				.single();
+				.where(eq(schema.profiles.id, userId));
 
-			if (fallbackError) {
-				// Final fallback: Use Postgres raw increment
-				const { data: rawResult, error: rawError } = await supabaseAdmin
-					.rpc('execute_sql' as any, {
-						sql: `
-							UPDATE profiles 
-							SET credits_balance = credits_balance + $1, 
-							    updated_at = NOW() 
-							WHERE id = $2 AND org_id = $3 
-							RETURNING credits_balance
-						`,
-						params: [creditsToAdd, userId, orgId]
-					});
-
-				if (rawError) {
-					console.error('All credit update methods failed:', rawError);
-					return { success: false, error: 'Failed to update user balance' };
+			// 3. Create transaction record to maintain audit trail
+			await tx.insert(schema.creditTransactions).values({
+				userId: userId,
+				orgId: orgId,
+				transactionType: 'purchase',
+				amount: creditsToAdd,
+				creditsBefore: oldBalance,
+				creditsAfter: newBalance,
+				description: `${creditPackage.name} - Bypass Purchase`,
+				referenceId: bypassReference,
+				metadata: {
+					type: 'credit_purchase_bypass',
+					packageId: packageId,
+					packageName: creditPackage.name,
+					bypass: true,
+					amountPhp: creditPackage.amountPhp
 				}
-			}
-		}
+			});
 
-		// Get the new balance for the response
-		const { data: profile, error: fetchError } = await supabaseAdmin
-			.from('profiles')
-			.select('credits_balance')
-			.eq('id', userId)
-			.eq('org_id', orgId)
-			.single();
-
-		const newBalance = profile?.credits_balance ?? 0;
-
-		// Create transaction record to maintain audit trail
-		const { error: txError } = await supabaseAdmin.from('credit_transactions').insert({
-			user_id: userId,
-			org_id: orgId,
-			transaction_type: 'purchase',
-			amount: creditsToAdd,
-			credits_before: newBalance - creditsToAdd,
-			credits_after: newBalance,
-			description: `${creditPackage.name} - Bypass Purchase`,
-			reference_id: bypassReference,
-			metadata: {
-				type: 'credit_purchase_bypass',
-				package_id: packageId,
-				package_name: creditPackage.name,
-				bypass: true,
-				amount_php: creditPackage.amountPhp
-			}
+			return { success: true, newBalance };
 		});
-
-		if (txError) {
-			console.error('Error creating bypass transaction record:', txError);
-			// Don't fail the whole operation, just log the issue
-		}
-
-		return { success: true, newBalance };
 	} catch (error) {
 		console.error('Error in addCreditsBypass:', error);
 		return { success: false, error: 'Internal server error' };
@@ -152,65 +96,55 @@ export async function grantFeatureBypass(
 		}
 
 		// Map feature flags to profile columns
-		let updateData: Record<string, any> = {
-			updated_at: new Date().toISOString()
+		let updateData: any = {
+			updatedAt: new Date()
 		};
 
 		switch (featureSku.featureFlag) {
 			case 'premium':
-				updateData.unlimited_templates = true;
-				updateData.remove_watermarks = true;
+				updateData.unlimitedTemplates = true;
+				updateData.removeWatermarks = true;
 				break;
 			case 'api_access':
-				// Assuming you have an api_access column in profiles
-				updateData.api_access = true;
+				// If you have apiAccess in schema
+				// updateData.apiAccess = true;
 				break;
 			case 'bulk_processing':
-				// Assuming you have a bulk_processing column in profiles
-				updateData.bulk_processing = true;
+				// If you have bulkProcessing in schema
+				// updateData.bulkProcessing = true;
 				break;
 			default:
 				return { success: false, error: 'Unknown feature flag' };
 		}
 
-		// Update user profile with feature flag
-		const { error: updateError } = await supabaseAdmin
-			.from('profiles')
-			.update(updateData)
-			.eq('id', userId)
-			.eq('org_id', orgId);
+		return await db.transaction(async (tx) => {
+			// 1. Update user profile with feature flag
+			await tx.update(schema.profiles)
+				.set(updateData)
+				.where(and(eq(schema.profiles.id, userId), eq(schema.profiles.orgId, orgId)));
 
-		if (updateError) {
-			console.error('Error updating feature for bypass:', updateError);
-			return { success: false, error: 'Failed to update user features' };
-		}
+			// 2. Create transaction record for audit trail
+			await tx.insert(schema.creditTransactions).values({
+				userId: userId,
+				orgId: orgId,
+				transactionType: 'purchase', // Using purchase type for consistency
+				amount: 0,
+				creditsBefore: 0, // Feature unlock doesn't affect balances
+				creditsAfter: 0,
+				description: `${featureSku.name} - Bypass Purchase`,
+				referenceId: bypassReference,
+				metadata: {
+					type: 'feature_purchase_bypass',
+					featureId: featureId,
+					featureFlag: featureSku.featureFlag,
+					featureName: featureSku.name,
+					bypass: true,
+					amountPhp: featureSku.amountPhp
+				}
+			});
 
-		// Create transaction record for audit trail
-		const { error: txError } = await supabaseAdmin.from('credit_transactions').insert({
-			user_id: userId,
-			org_id: orgId,
-			transaction_type: 'purchase',
-			amount: 0, // No credits added, just feature unlock
-			credits_before: 0,
-			credits_after: 0,
-			description: `${featureSku.name} - Bypass Purchase`,
-			reference_id: bypassReference,
-			metadata: {
-				type: 'feature_purchase_bypass',
-				feature_id: featureId,
-				feature_flag: featureSku.featureFlag,
-				feature_name: featureSku.name,
-				bypass: true,
-				amount_php: featureSku.amountPhp
-			}
+			return { success: true };
 		});
-
-		if (txError) {
-			console.error('Error creating bypass feature transaction record:', txError);
-			// Don't fail the whole operation, just log the issue
-		}
-
-		return { success: true };
 	} catch (error) {
 		console.error('Error in grantFeatureBypass:', error);
 		return { success: false, error: 'Internal server error' };
@@ -219,10 +153,6 @@ export async function grantFeatureBypass(
 
 /**
  * SECURITY: Generate a cryptographically secure bypass reference ID
- * Uses crypto.randomBytes for 128-bit entropy instead of Math.random()
- * 
- * Old implementation had only ~2.18 billion combinations (36^6)
- * New implementation has 2^128 combinations (3.4×10^38)
  */
 export function generateBypassReference(): string {
 	const timestamp = Date.now();

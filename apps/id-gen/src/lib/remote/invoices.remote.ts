@@ -2,7 +2,9 @@ import { error } from '@sveltejs/kit';
 import { query, command, getRequestEvent } from '$app/server';
 import { z } from 'zod';
 import { addCredits, refundCredits, grantUnlimitedTemplates, grantWatermarkRemoval } from '$lib/utils/credits';
-import { checkAdmin } from '$lib/utils/adminPermissions';
+import { db } from '$lib/server/db';
+import * as schema from '$lib/server/schema';
+import { eq, and, desc, sql, lt, gte } from 'drizzle-orm';
 import {
 	invoiceCreateInputSchema,
 	invoiceMarkPaidInputSchema,
@@ -13,82 +15,109 @@ import {
 } from '$lib/schemas/billing.schema';
 
 // Helper to require admin permissions
-// Uses checkAdmin which properly handles role emulation
 async function requireAdminPermissions() {
 	const { locals } = getRequestEvent();
-	const { user } = locals;
-	if (!checkAdmin(locals)) {
+	const user = locals.user;
+	
+	if (!user || !['super_admin', 'org_admin', 'id_gen_admin'].includes(user.role)) {
 		throw error(403, 'Admin privileges required.');
 	}
-	// Cast supabase to any to work around missing invoices table in generated types
-	// TODO: Regenerate database types to include invoices and invoice_items tables
-	return { user, supabase: locals.supabase as any, org_id: locals.org_id };
+	
+	return { user, org_id: locals.org_id };
 }
 
 // Get all invoices for the organization
 export const getInvoices = query(async (params?: { status?: string; userId?: string; limit?: number }) => {
-	const { supabase, org_id } = await requireAdminPermissions();
+	const { org_id } = await requireAdminPermissions();
 	if (!org_id) throw error(500, 'Org ID missing');
 
-	let queryBuilder = supabase
-		.from('invoices')
-		.select(`
-			*,
-			invoice_items (*),
-			user:profiles!invoices_user_id_fkey (id, email, credits_balance)
-		`)
-		.eq('org_id', org_id)
-		.order('created_at', { ascending: false });
+	try {
+		let conditions = [eq(schema.invoices.orgId, org_id)];
+		
+		if (params?.status) {
+			conditions.push(eq(schema.invoices.status, params.status));
+		}
+		
+		if (params?.userId) {
+			conditions.push(eq(schema.invoices.userId, params.userId));
+		}
 
-	if (params?.status) {
-		queryBuilder = queryBuilder.eq('status', params.status);
-	}
+		const results = await db.select({
+				invoice: schema.invoices,
+				user: {
+					id: schema.profiles.id,
+					email: schema.profiles.email,
+					credits_balance: schema.profiles.creditsBalance
+				}
+			})
+			.from(schema.invoices)
+			.leftJoin(schema.profiles, eq(schema.invoices.userId, schema.profiles.id))
+			.where(and(...conditions))
+			.orderBy(desc(schema.invoices.createdAt))
+			.limit(params?.limit || 100);
 
-	if (params?.userId) {
-		queryBuilder = queryBuilder.eq('user_id', params.userId);
-	}
+		// Fetch invoice items for each invoice (could be optimized with a join or separate query)
+		const invoiceIds = results.map(r => r.invoice.id);
+		let allItems: any[] = [];
+		if (invoiceIds.length > 0) {
+			allItems = await db.select()
+				.from(schema.invoiceItems)
+				.where(sql`${schema.invoiceItems.invoiceId} IN ${invoiceIds}`);
+		}
 
-	if (params?.limit) {
-		queryBuilder = queryBuilder.limit(params.limit);
-	}
-
-	const { data, error: fetchError } = await queryBuilder;
-
-	if (fetchError) {
-		console.error('Error fetching invoices:', fetchError);
+		return results.map(r => ({
+			...r.invoice,
+			user: r.user,
+			invoice_items: allItems.filter(item => item.invoiceId === r.invoice.id)
+		}));
+	} catch (err) {
+		console.error('Error fetching invoices:', err);
 		throw error(500, 'Failed to load invoices');
 	}
-
-	return data || [];
 });
 
 // Get a single invoice by ID
 export const getInvoiceById = query('unchecked', async ({ invoiceId }: { invoiceId: string }) => {
-	const { supabase, org_id } = await requireAdminPermissions();
+	const { org_id } = await requireAdminPermissions();
 	if (!org_id) throw error(500, 'Org ID missing');
 
-	const { data, error: fetchError } = await supabase
-		.from('invoices')
-		.select(`
-			*,
-			invoice_items (*),
-			user:profiles!invoices_user_id_fkey (id, email, credits_balance, unlimited_templates, remove_watermarks)
-		`)
-		.eq('id', invoiceId)
-		.eq('org_id', org_id)
-		.single();
+	try {
+        const result = await db.select({
+                invoice: schema.invoices,
+                user: {
+                    id: schema.profiles.id,
+                    email: schema.profiles.email,
+                    credits_balance: schema.profiles.creditsBalance,
+                    unlimited_templates: schema.profiles.unlimitedTemplates,
+                    remove_watermarks: schema.profiles.removeWatermarks
+                }
+            })
+            .from(schema.invoices)
+            .leftJoin(schema.profiles, eq(schema.invoices.userId, schema.profiles.id))
+            .where(and(eq(schema.invoices.id, invoiceId), eq(schema.invoices.orgId, org_id)))
+            .limit(1);
 
-	if (fetchError) {
-		console.error('Error fetching invoice:', fetchError);
-		throw error(404, 'Invoice not found');
+        if (result.length === 0) throw error(404, 'Invoice not found');
+
+        const items = await db.select()
+            .from(schema.invoiceItems)
+            .where(eq(schema.invoiceItems.invoiceId, invoiceId));
+
+        return {
+            ...result[0].invoice,
+            user: result[0].user,
+            invoice_items: items
+        };
+	} catch (err) {
+		console.error('Error fetching invoice:', err);
+		if (err instanceof Error && 'status' in err) throw err;
+		throw error(500, 'Failed to load invoice');
 	}
-
-	return data;
 }) as any;
 
 // Create a new invoice
 export const createInvoice = command('unchecked', async (input: InvoiceCreateInput) => {
-	const { user, supabase, org_id } = await requireAdminPermissions();
+	const { user, org_id } = await requireAdminPermissions();
 	if (!org_id) throw error(500, 'Org ID missing');
 
 	// Validate input
@@ -99,130 +128,116 @@ export const createInvoice = command('unchecked', async (input: InvoiceCreateInp
 
 	const { user_id, invoice_type, notes, internal_notes, due_date, items } = parsed.data;
 
-	// Verify user exists in org
-	const { data: targetUser, error: userError } = await supabase
-		.from('profiles')
-		.select('id, email')
-		.eq('id', user_id)
-		.eq('org_id', org_id)
-		.single();
+	try {
+        return await db.transaction(async (tx) => {
+            // Verify user exists in org
+            const targetUser = await tx.query.profiles.findFirst({
+                where: and(eq(schema.profiles.id, user_id), eq(schema.profiles.orgId, org_id)),
+                columns: { id: true, email: true }
+            });
 
-	if (userError || !targetUser) {
-		throw error(404, 'Target user not found in organization');
-	}
+            if (!targetUser) {
+                throw error(404, 'Target user not found in organization');
+            }
 
-	// Calculate totals
-	let subtotal = 0;
-	let totalCredits = 0;
-	const processedItems = items.map((item) => {
-		const total = item.quantity * item.unit_price;
-		subtotal += total;
-		totalCredits += item.credits_granted || 0;
-		return {
-			...item,
-			total_price: total
-		};
-	});
+            // Calculate totals
+            let subtotal = 0;
+            let totalCredits = 0;
+            const processedItems = items.map((item) => {
+                const total = item.quantity * item.unit_price;
+                subtotal += total;
+                totalCredits += item.credits_granted || 0;
+                return {
+                    ...item,
+                    total_price: total
+                };
+            });
 
-	// Create invoice (invoice_number is auto-generated by trigger)
-	const { data: invoice, error: insertError } = await supabase
-		.from('invoices')
-		.insert({
-			user_id,
-			org_id,
-			invoice_type,
-			status: 'draft',
-			subtotal,
-			tax_amount: 0,
-			discount_amount: 0,
-			total_amount: subtotal,
-			amount_paid: 0,
-			notes,
-			internal_notes,
-			due_date,
-			created_by: user!.id
-		})
-		.select()
-		.single();
+            // Create invoice (invoice_number might need a custom generator if trigger fails on Neon)
+            // For now assume trigger handles it or we'll need to generate it
+            const [invoice] = await tx.insert(schema.invoices)
+                .values({
+                    userId: user_id,
+                    orgId,
+                    invoiceType: invoice_type,
+                    status: 'draft',
+                    subtotal,
+                    taxAmount: 0,
+                    discountAmount: 0,
+                    totalAmount: subtotal,
+                    amountPaid: 0,
+                    notes,
+                    internalNotes: internal_notes,
+                    dueDate: due_date ? new Date(due_date) : null,
+                    createdBy: user!.id
+                })
+                .returning();
 
-	if (insertError) {
-		console.error('Error creating invoice:', insertError);
+            // Insert invoice items
+            const itemsToInsert = processedItems.map((item) => ({
+                invoiceId: invoice.id,
+                itemType: item.item_type,
+                skuId: item.sku_id,
+                description: item.description,
+                quantity: item.quantity,
+                unitPrice: item.unit_price,
+                totalPrice: item.total_price,
+                creditsGranted: item.credits_granted,
+                metadata: item.metadata
+            }));
+
+            await tx.insert(schema.invoiceItems).values(itemsToInsert);
+
+            await getInvoices().refresh();
+
+            return {
+                success: true,
+                invoice: {
+                    ...invoice,
+                    invoice_items: itemsToInsert,
+                    total_credits: totalCredits
+                }
+            };
+        });
+	} catch (err) {
+		console.error('Error creating invoice:', err);
+		if (err instanceof Error && 'status' in err) throw err;
 		throw error(500, 'Failed to create invoice');
 	}
-
-	// Insert invoice items
-	const itemsToInsert = processedItems.map((item) => ({
-		invoice_id: invoice.id,
-		item_type: item.item_type,
-		sku_id: item.sku_id,
-		description: item.description,
-		quantity: item.quantity,
-		unit_price: item.unit_price,
-		total_price: item.total_price,
-		credits_granted: item.credits_granted,
-		metadata: item.metadata
-	}));
-
-	const { error: itemsError } = await supabase.from('invoice_items').insert(itemsToInsert);
-
-	if (itemsError) {
-		console.error('Error creating invoice items:', itemsError);
-		// Rollback: delete the invoice
-		await supabase.from('invoices').delete().eq('id', invoice.id);
-		throw error(500, 'Failed to create invoice items');
-	}
-
-	await getInvoices().refresh();
-
-	return {
-		success: true,
-		invoice: {
-			...invoice,
-			invoice_items: itemsToInsert,
-			total_credits: totalCredits
-		}
-	};
 });
 
 // Send invoice (change status from draft to sent)
 export const sendInvoice = command('unchecked', async (invoiceId: string) => {
-	const { supabase, org_id } = await requireAdminPermissions();
+	const { org_id } = await requireAdminPermissions();
 	if (!org_id) throw error(500, 'Org ID missing');
 
-	const { data: invoice, error: fetchError } = await supabase
-		.from('invoices')
-		.select('*')
-		.eq('id', invoiceId)
-		.eq('org_id', org_id)
-		.single();
+	try {
+        const [invoice] = await db.select()
+            .from(schema.invoices)
+            .where(and(eq(schema.invoices.id, invoiceId), eq(schema.invoices.orgId, org_id)));
 
-	if (fetchError || !invoice) {
-		throw error(404, 'Invoice not found');
-	}
+        if (!invoice) throw error(404, 'Invoice not found');
+        if (invoice.status !== 'draft') throw error(400, 'Only draft invoices can be sent');
 
-	if (invoice.status !== 'draft') {
-		throw error(400, 'Only draft invoices can be sent');
-	}
+        await db.update(schema.invoices)
+            .set({
+                status: 'sent',
+                issueDate: new Date()
+            })
+            .where(eq(schema.invoices.id, invoiceId));
 
-	const { error: updateError } = await supabase
-		.from('invoices')
-		.update({
-			status: 'sent',
-			issue_date: new Date().toISOString()
-		})
-		.eq('id', invoiceId);
-
-	if (updateError) {
+        await getInvoices().refresh();
+        return { success: true };
+	} catch (err) {
+		console.error('Error sending invoice:', err);
+		if (err instanceof Error && 'status' in err) throw err;
 		throw error(500, 'Failed to send invoice');
 	}
-
-	await getInvoices().refresh();
-	return { success: true };
 });
 
 // Mark invoice as paid (adds credits to user)
 export const markInvoicePaid = command('unchecked', async (input: InvoiceMarkPaidInput) => {
-	const { user, supabase, org_id } = await requireAdminPermissions();
+	const { user, org_id } = await requireAdminPermissions();
 	if (!org_id) throw error(500, 'Org ID missing');
 
 	const parsed = invoiceMarkPaidInputSchema.safeParse(input);
@@ -232,113 +247,103 @@ export const markInvoicePaid = command('unchecked', async (input: InvoiceMarkPai
 
 	const { invoice_id, payment_method, payment_reference, notes } = parsed.data;
 
-	// Get invoice with items
-	const { data: invoice, error: fetchError } = await supabase
-		.from('invoices')
-		.select(`
-			*,
-			invoice_items (*)
-		`)
-		.eq('id', invoice_id)
-		.eq('org_id', org_id)
-		.single() as { data: { id: string; status: string; user_id: string; invoice_number: string; total_amount: number; notes?: string; invoice_items?: Array<{ credits_granted: number; sku_id?: string; item_type: string; description?: string }> } | null; error: any };
+	try {
+        return await db.transaction(async (tx) => {
+            // Get invoice with items
+            const result = await tx.select({
+                    invoice: schema.invoices,
+                })
+                .from(schema.invoices)
+                .where(and(eq(schema.invoices.id, invoice_id), eq(schema.invoices.orgId, org_id)))
+                .limit(1);
 
-	if (fetchError || !invoice) {
-		throw error(404, 'Invoice not found');
-	}
+            if (result.length === 0) throw error(404, 'Invoice not found');
+            const invoice = result[0].invoice;
 
-	if (invoice.status === 'paid') {
-		throw error(400, 'Invoice is already paid');
-	}
+            if (invoice.status === 'paid') throw error(400, 'Invoice is already paid');
+            if (invoice.status === 'void') throw error(400, 'Cannot pay a voided invoice');
 
-	if (invoice.status === 'void') {
-		throw error(400, 'Cannot pay a voided invoice');
-	}
+            const items = await tx.select()
+                .from(schema.invoiceItems)
+                .where(eq(schema.invoiceItems.invoiceId, invoice_id));
 
-	// Calculate total credits to add
-	let totalCredits = 0;
-	let hasUnlimitedTemplates = false;
-	let hasRemoveWatermarks = false;
+            // Calculate totals
+            let totalCredits = 0;
+            let hasUnlimitedTemplates = false;
+            let hasRemoveWatermarks = false;
 
-	for (const item of invoice.invoice_items || []) {
-		if (item.credits_granted > 0) {
-			totalCredits += item.credits_granted;
-		}
-		// Check for feature purchases
-		if (item.sku_id === 'unlimited_templates' || item.item_type === 'feature') {
-			if (item.description?.toLowerCase().includes('unlimited template')) {
-				hasUnlimitedTemplates = true;
-			}
-			if (item.description?.toLowerCase().includes('watermark')) {
-				hasRemoveWatermarks = true;
-			}
-		}
-	}
+            for (const item of items) {
+                if (item.creditsGranted && item.creditsGranted > 0) {
+                    totalCredits += item.creditsGranted;
+                }
+                if (item.skuId === 'unlimited_templates' || item.itemType === 'feature') {
+                    if (item.description?.toLowerCase().includes('unlimited template')) {
+                        hasUnlimitedTemplates = true;
+                    }
+                    if (item.description?.toLowerCase().includes('watermark')) {
+                        hasRemoveWatermarks = true;
+                    }
+                }
+            }
 
-	// Update invoice status
-	const { error: updateError } = await supabase
-		.from('invoices')
-		.update({
-			status: 'paid',
-			paid_at: new Date().toISOString(),
-			paid_by: user!.id,
-			payment_method: payment_method || 'manual',
-			payment_reference,
-			amount_paid: invoice.total_amount,
-			notes: notes ? `${invoice.notes || ''}\n${notes}`.trim() : invoice.notes
-		})
-		.eq('id', invoice_id);
+            // Update invoice status
+            await tx.update(schema.invoices)
+                .set({
+                    status: 'paid',
+                    paidAt: new Date(),
+                    paidBy: user!.id,
+                    paymentMethod: payment_method || 'manual',
+                    paymentReference: payment_reference,
+                    amountPaid: invoice.totalAmount,
+                    notes: notes ? `${invoice.notes || ''}\n${notes}`.trim() : invoice.notes,
+                    updatedAt: new Date()
+                })
+                .where(eq(schema.invoices.id, invoice_id));
 
-	if (updateError) {
+            // Add credits to user
+            if (totalCredits > 0) {
+                const creditResult = await addCredits(
+                    invoice.userId,
+                    org_id,
+                    totalCredits,
+                    invoice_id,
+                    `Invoice ${invoice.invoiceNumber}`
+                );
+
+                if (!creditResult.success) {
+                    throw error(500, 'Failed to add credits to user');
+                }
+            }
+
+            // Grant features
+            if (hasUnlimitedTemplates) {
+                await grantUnlimitedTemplates(invoice.userId, org_id, invoice_id);
+            }
+            if (hasRemoveWatermarks) {
+                await grantWatermarkRemoval(invoice.userId, org_id, invoice_id);
+            }
+
+            await getInvoices().refresh();
+
+            return {
+                success: true,
+                creditsAdded: totalCredits,
+                featuresGranted: {
+                    unlimitedTemplates: hasUnlimitedTemplates,
+                    removeWatermarks: hasRemoveWatermarks
+                }
+            };
+        });
+	} catch (err) {
+		console.error('Error marking invoice as paid:', err);
+		if (err instanceof Error && 'status' in err) throw err;
 		throw error(500, 'Failed to update invoice status');
 	}
-
-	// Add credits to user
-	if (totalCredits > 0) {
-		const creditResult = await addCredits(
-			supabase,
-			invoice.user_id,
-			org_id,
-			totalCredits,
-			invoice_id,
-			`Invoice ${invoice.invoice_number}`
-		);
-
-		if (!creditResult.success) {
-			console.error('Failed to add credits:', creditResult.error);
-			// Revert invoice status
-			await supabase
-				.from('invoices')
-				.update({ status: 'sent', paid_at: null, paid_by: null })
-				.eq('id', invoice_id);
-			throw error(500, 'Failed to add credits to user');
-		}
-	}
-
-	// Grant features if applicable
-	if (hasUnlimitedTemplates) {
-		await grantUnlimitedTemplates(supabase, invoice.user_id, org_id, invoice_id);
-	}
-
-	if (hasRemoveWatermarks) {
-		await grantWatermarkRemoval(supabase, invoice.user_id, org_id, invoice_id);
-	}
-
-	await getInvoices().refresh();
-
-	return {
-		success: true,
-		creditsAdded: totalCredits,
-		featuresGranted: {
-			unlimitedTemplates: hasUnlimitedTemplates,
-			removeWatermarks: hasRemoveWatermarks
-		}
-	};
 });
 
 // Void an invoice
 export const voidInvoice = command('unchecked', async (input: InvoiceVoidInput) => {
-	const { user, supabase, org_id } = await requireAdminPermissions();
+	const { user, org_id } = await requireAdminPermissions();
 	if (!org_id) throw error(500, 'Org ID missing');
 
 	const parsed = invoiceVoidInputSchema.safeParse(input);
@@ -348,174 +353,122 @@ export const voidInvoice = command('unchecked', async (input: InvoiceVoidInput) 
 
 	const { invoice_id, reason } = parsed.data;
 
-	// Get invoice
-	const { data: invoice, error: fetchError } = await supabase
-		.from('invoices')
-		.select(`
-			*,
-			invoice_items (*)
-		`)
-		.eq('id', invoice_id)
-		.eq('org_id', org_id)
-		.single() as { data: { id: string; status: string; user_id: string; invoice_number: string; internal_notes?: string; invoice_items?: Array<{ credits_granted: number }> } | null; error: any };
+	try {
+        return await db.transaction(async (tx) => {
+            const result = await tx.select().from(schema.invoices).where(and(eq(schema.invoices.id, invoice_id), eq(schema.invoices.orgId, org_id))).limit(1);
+            if (result.length === 0) throw error(404, 'Invoice not found');
+            const invoice = result[0];
 
-	if (fetchError || !invoice) {
-		throw error(404, 'Invoice not found');
-	}
+            if (invoice.status === 'void') throw error(400, 'Invoice is already voided');
 
-	if (invoice.status === 'void') {
-		throw error(400, 'Invoice is already voided');
-	}
+            // Handle credit reversal if paid
+            let creditsReversed = 0;
+            if (invoice.status === 'paid') {
+                const items = await tx.select().from(schema.invoiceItems).where(eq(schema.invoiceItems.invoiceId, invoice_id));
+                for (const item of items) {
+                    if (item.creditsGranted && item.creditsGranted > 0) {
+                        creditsReversed += item.creditsGranted;
+                    }
+                }
 
-	// If invoice was paid, we need to reverse the credits
-	let creditsReversed = 0;
-	if (invoice.status === 'paid') {
-		// Calculate credits that were granted
-		for (const item of invoice.invoice_items || []) {
-			if (item.credits_granted > 0) {
-				creditsReversed += item.credits_granted;
-			}
-		}
+                if (creditsReversed > 0) {
+                    const refundResult = await refundCredits(
+                        invoice.userId,
+                        org_id,
+                        -creditsReversed,
+                        invoice_id,
+                        `Voided invoice ${invoice.invoiceNumber}: ${reason}`
+                    );
+                    if (!refundResult.success) throw error(500, 'Failed to reverse credits');
+                }
+            }
 
-		// Reverse credits if any were granted
-		if (creditsReversed > 0) {
-			// Create a negative refund transaction
-			const refundResult = await refundCredits(
-				supabase,
-				invoice.user_id,
-				org_id,
-				-creditsReversed, // Negative to deduct
-				invoice_id,
-				`Voided invoice ${invoice.invoice_number}: ${reason}`
-			);
+            await tx.update(schema.invoices)
+                .set({
+                    status: 'void',
+                    voidedAt: new Date(),
+                    voidedBy: user!.id,
+                    internalNotes: `${invoice.internalNotes || ''}\nVoided: ${reason}`.trim(),
+                    updatedAt: new Date()
+                })
+                .where(eq(schema.invoices.id, invoice_id));
 
-			if (!refundResult.success) {
-				console.error('Failed to reverse credits:', refundResult.error);
-				throw error(500, 'Failed to reverse credits');
-			}
-		}
-	}
-
-	// Update invoice status
-	const { error: updateError } = await supabase
-		.from('invoices')
-		.update({
-			status: 'void',
-			voided_at: new Date().toISOString(),
-			voided_by: user!.id,
-			internal_notes: `${invoice.internal_notes || ''}\nVoided: ${reason}`.trim()
-		})
-		.eq('id', invoice_id);
-
-	if (updateError) {
+            await getInvoices().refresh();
+            return { success: true, creditsReversed };
+        });
+	} catch (err) {
+		console.error('Error voiding invoice:', err);
+		if (err instanceof Error && 'status' in err) throw err;
 		throw error(500, 'Failed to void invoice');
 	}
-
-	await getInvoices().refresh();
-
-	return {
-		success: true,
-		creditsReversed
-	};
 });
 
 // Get admin audit log (recent invoice actions)
 export const getAdminAuditLog = query(async (limit: number = 20) => {
-	const { supabase, org_id } = await requireAdminPermissions();
+	const { org_id } = await requireAdminPermissions();
 	if (!org_id) throw error(500, 'Org ID missing');
 
-	// Get recent invoices with status changes
-	type InvoiceAuditRow = {
-		id: string;
-		invoice_number: string;
-		status: string;
-		invoice_type: string;
-		total_amount: number;
-		created_at: string;
-		paid_at: string | null;
-		voided_at: string | null;
-		user: { email: string } | null;
-		created_by_user: { email: string } | null;
-		paid_by_user: { email: string } | null;
-		voided_by_user: { email: string } | null;
-	};
-	const { data: recentInvoices, error: invoicesError } = await supabase
-		.from('invoices')
-		.select(`
-			id,
-			invoice_number,
-			status,
-			invoice_type,
-			total_amount,
-			created_at,
-			paid_at,
-			voided_at,
-			user:profiles!invoices_user_id_fkey (email),
-			created_by_user:profiles!invoices_created_by_fkey (email),
-			paid_by_user:profiles!invoices_paid_by_fkey (email),
-			voided_by_user:profiles!invoices_voided_by_fkey (email)
-		`)
-		.eq('org_id', org_id)
-		.order('updated_at', { ascending: false })
-		.limit(limit) as { data: InvoiceAuditRow[] | null; error: any };
+	try {
+        const recentInvoices = await db.select({
+                id: schema.invoices.id,
+                invoice_number: schema.invoices.invoiceNumber,
+                status: schema.invoices.status,
+                invoice_type: schema.invoices.invoiceType,
+                total_amount: schema.invoices.totalAmount,
+                created_at: schema.invoices.createdAt,
+                paid_at: schema.invoices.paidAt,
+                voided_at: schema.invoices.voidedAt,
+                user_email: schema.profiles.email,
+                creator_email: sql<string>`(SELECT email FROM ${schema.profiles} WHERE id = ${schema.invoices.createdBy})`,
+                payer_email: sql<string>`(SELECT email FROM ${schema.profiles} WHERE id = ${schema.invoices.paidBy})`,
+                voider_email: sql<string>`(SELECT email FROM ${schema.profiles} WHERE id = ${schema.invoices.voidedBy})`
+            })
+            .from(schema.invoices)
+            .leftJoin(schema.profiles, eq(schema.invoices.userId, schema.profiles.id))
+            .where(eq(schema.invoices.orgId, org_id))
+            .orderBy(desc(schema.invoices.updatedAt))
+            .limit(limit);
 
-	if (invoicesError) {
-		console.error('Error fetching audit log:', invoicesError);
+        const events: any[] = [];
+        for (const inv of recentInvoices) {
+            events.push({
+                type: 'invoice_created',
+                description: `Created invoice ${inv.invoice_number}`,
+                actor_email: inv.creator_email || 'System',
+                target_email: inv.user_email || 'Unknown',
+                timestamp: inv.created_at?.toISOString(),
+                invoice_number: inv.invoice_number,
+                amount: inv.total_amount
+            });
+
+            if (inv.paid_at) {
+                events.push({
+                    type: 'invoice_paid',
+                    description: `Marked invoice ${inv.invoice_number} as paid`,
+                    actor_email: inv.payer_email || 'System',
+                    target_email: inv.user_email || 'Unknown',
+                    timestamp: inv.paid_at.toISOString(),
+                    invoice_number: inv.invoice_number,
+                    amount: inv.total_amount
+                });
+            }
+
+            if (inv.voided_at) {
+                events.push({
+                    type: 'invoice_voided',
+                    description: `Voided invoice ${inv.invoice_number}`,
+                    actor_email: inv.voider_email || 'System',
+                    target_email: inv.user_email || 'Unknown',
+                    timestamp: inv.voided_at.toISOString(),
+                    invoice_number: inv.invoice_number,
+                    amount: inv.total_amount
+                });
+            }
+        }
+
+        return events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, limit);
+	} catch (err) {
+		console.error('Error fetching audit log:', err);
 		return [];
 	}
-
-	// Transform into audit events
-	const events: Array<{
-		type: string;
-		description: string;
-		actor_email: string;
-		target_email: string;
-		timestamp: string;
-		invoice_number: string;
-		amount: number;
-	}> = [];
-
-	for (const inv of recentInvoices || []) {
-		// Created event
-		events.push({
-			type: 'invoice_created',
-			description: `Created invoice ${inv.invoice_number}`,
-			actor_email: (inv.created_by_user as any)?.email || 'System',
-			target_email: (inv.user as any)?.email || 'Unknown',
-			timestamp: inv.created_at,
-			invoice_number: inv.invoice_number,
-			amount: inv.total_amount
-		});
-
-		// Paid event
-		if (inv.paid_at) {
-			events.push({
-				type: 'invoice_paid',
-				description: `Marked invoice ${inv.invoice_number} as paid`,
-				actor_email: (inv.paid_by_user as any)?.email || 'System',
-				target_email: (inv.user as any)?.email || 'Unknown',
-				timestamp: inv.paid_at,
-				invoice_number: inv.invoice_number,
-				amount: inv.total_amount
-			});
-		}
-
-		// Voided event
-		if (inv.voided_at) {
-			events.push({
-				type: 'invoice_voided',
-				description: `Voided invoice ${inv.invoice_number}`,
-				actor_email: (inv.voided_by_user as any)?.email || 'System',
-				target_email: (inv.user as any)?.email || 'Unknown',
-				timestamp: inv.voided_at,
-				invoice_number: inv.invoice_number,
-				amount: inv.total_amount
-			});
-		}
-	}
-
-	// Sort by timestamp descending
-	events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-
-	return events.slice(0, limit);
 });

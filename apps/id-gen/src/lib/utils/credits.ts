@@ -1,4 +1,6 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { db } from '$lib/server/db';
+import * as schema from '$lib/server/schema';
+import { eq, sql, and, desc } from 'drizzle-orm';
 import {
 	CREDIT_COSTS,
 	FREE_TIER,
@@ -9,75 +11,76 @@ import {
 
 export interface CreditTransaction {
 	id: string;
-	user_id: string;
-	org_id: string;
-	transaction_type: 'purchase' | 'usage' | 'refund' | 'bonus';
+	userId: string;
+	orgId: string;
+	transactionType: string;
 	amount: number;
-	credits_before: number;
-	credits_after: number;
+	creditsBefore: number;
+	creditsAfter: number;
 	description: string | null;
-	reference_id: string | null;
-	usage_type: UsageType | null;
-	invoice_id: string | null;
-	metadata: Record<string, unknown>;
-	created_at: string;
-	updated_at: string;
+	referenceId: string | null;
+	usageType: string | null;
+	invoiceId: string | null;
+	metadata: Record<string, unknown> | null;
+	createdAt: Date | null;
 }
 
 export interface UserCredits {
-	credits_balance: number;
-	card_generation_count: number;
-	template_count: number;
-	unlimited_templates: boolean;
-	remove_watermarks: boolean;
+	creditsBalance: number;
+	cardGenerationCount: number;
+	templateCount: number;
+	unlimitedTemplates: boolean;
+	removeWatermarks: boolean;
 }
 
 /**
  * Get current user credit information
  */
 export async function getUserCredits(
-	supabase: SupabaseClient,
 	userId: string
 ): Promise<UserCredits | null> {
-	const { data, error } = await supabase
-		.from('profiles')
-		.select(
-			'credits_balance, card_generation_count, template_count, unlimited_templates, remove_watermarks'
-		)
-		.eq('id', userId)
-		.single();
+    try {
+        const profile = await db.query.profiles.findFirst({
+            where: eq(schema.profiles.id, userId),
+            columns: {
+                creditsBalance: true,
+                cardGenerationCount: true,
+                templateCount: true,
+                unlimitedTemplates: true,
+                removeWatermarks: true
+            }
+        });
 
-	if (error) {
-		console.error('Error fetching user credits:', error);
-		return null;
-	}
-
-	return data;
+        if (!profile) return null;
+        return profile;
+    } catch (err) {
+        console.error('Error fetching user credits:', err);
+        return null;
+    }
 }
 
 /**
  * Check if user can create a new template (within free tier or has credits)
  */
 export async function canCreateTemplate(
-	supabase: SupabaseClient,
 	userId: string
 ): Promise<{ canCreate: boolean; needsCredits: boolean; cost: number }> {
-	const credits = await getUserCredits(supabase, userId);
+	const credits = await getUserCredits(userId);
 	if (!credits) return { canCreate: false, needsCredits: false, cost: 0 };
 
 	// Unlimited templates feature
-	if (credits.unlimited_templates) {
+	if (credits.unlimitedTemplates) {
 		return { canCreate: true, needsCredits: false, cost: 0 };
 	}
 
 	// Within free tier
-	if (credits.template_count < FREE_TIER.TEMPLATES) {
+	if (credits.templateCount < FREE_TIER.TEMPLATES) {
 		return { canCreate: true, needsCredits: false, cost: 0 };
 	}
 
 	// Beyond free tier - needs credits
 	const cost = CREDIT_COSTS.TEMPLATE_CREATION;
-	if (credits.credits_balance >= cost) {
+	if (credits.creditsBalance >= cost) {
 		return { canCreate: true, needsCredits: true, cost };
 	}
 
@@ -88,20 +91,19 @@ export async function canCreateTemplate(
  * Check if user can generate a card (has free generations left or has credits)
  */
 export async function canGenerateCard(
-	supabase: SupabaseClient,
 	userId: string
 ): Promise<{ canGenerate: boolean; needsCredits: boolean; cost: number }> {
-	const credits = await getUserCredits(supabase, userId);
+	const credits = await getUserCredits(userId);
 	if (!credits) return { canGenerate: false, needsCredits: false, cost: 0 };
 
 	// Check if user has free generations left
-	if (credits.card_generation_count < FREE_TIER.CARD_GENERATIONS) {
+	if (credits.cardGenerationCount < FREE_TIER.CARD_GENERATIONS) {
 		return { canGenerate: true, needsCredits: false, cost: 0 };
 	}
 
 	// Check if user has credits
 	const cost = CREDIT_COSTS.CARD_GENERATION;
-	if (credits.credits_balance >= cost) {
+	if (credits.creditsBalance >= cost) {
 		return { canGenerate: true, needsCredits: true, cost };
 	}
 
@@ -112,81 +114,76 @@ export async function canGenerateCard(
  * Deduct credits for template creation (beyond free tier)
  */
 export async function deductTemplateCreationCredit(
-	supabase: SupabaseClient,
 	userId: string,
 	orgId: string,
 	templateId?: string
 ): Promise<{ success: boolean; newBalance: number; usedFreeTier: boolean; error?: string }> {
 	try {
-		const credits = await getUserCredits(supabase, userId);
-		if (!credits) {
-			return { success: false, newBalance: 0, usedFreeTier: false, error: 'User not found' };
-		}
+        return await db.transaction(async (tx) => {
+            const profile = await tx.query.profiles.findFirst({
+                where: eq(schema.profiles.id, userId),
+            });
 
-		// Check if user has unlimited templates
-		if (credits.unlimited_templates) {
-			// Just increment template count, no credit deduction
-			const { error: updateError } = await supabase
-				.from('profiles')
-				.update({ template_count: credits.template_count + 1 })
-				.eq('id', userId);
+            if (!profile) {
+                return { success: false, newBalance: 0, usedFreeTier: false, error: 'User not found' };
+            }
 
-			if (updateError) throw updateError;
-			return { success: true, newBalance: credits.credits_balance, usedFreeTier: false };
-		}
+            // Check if user has unlimited templates
+            if (profile.unlimitedTemplates) {
+                await tx.update(schema.profiles)
+                    .set({ templateCount: profile.templateCount + 1 })
+                    .where(eq(schema.profiles.id, userId));
+                
+                return { success: true, newBalance: profile.creditsBalance, usedFreeTier: false };
+            }
 
-		// Check if within free tier
-		if (credits.template_count < FREE_TIER.TEMPLATES) {
-			// Use free tier slot
-			const { error: updateError } = await supabase
-				.from('profiles')
-				.update({ template_count: credits.template_count + 1 })
-				.eq('id', userId);
+            // Check if within free tier
+            if (profile.templateCount < FREE_TIER.TEMPLATES) {
+                await tx.update(schema.profiles)
+                    .set({ templateCount: profile.templateCount + 1 })
+                    .where(eq(schema.profiles.id, userId));
+                
+                return { success: true, newBalance: profile.creditsBalance, usedFreeTier: true };
+            }
 
-			if (updateError) throw updateError;
-			return { success: true, newBalance: credits.credits_balance, usedFreeTier: true };
-		}
+            // Beyond free tier - deduct credits
+            const cost = CREDIT_COSTS.TEMPLATE_CREATION;
+            if (profile.creditsBalance < cost) {
+                return {
+                    success: false,
+                    newBalance: profile.creditsBalance,
+                    usedFreeTier: false,
+                    error: `Insufficient credits. Need ${cost} credits, have ${profile.creditsBalance}.`
+                };
+            }
 
-		// Beyond free tier - deduct credits
-		const cost = CREDIT_COSTS.TEMPLATE_CREATION;
-		if (credits.credits_balance < cost) {
-			return {
-				success: false,
-				newBalance: credits.credits_balance,
-				usedFreeTier: false,
-				error: `Insufficient credits. Need ${cost} credits, have ${credits.credits_balance}.`
-			};
-		}
+            const newBalance = profile.creditsBalance - cost;
 
-		const newBalance = credits.credits_balance - cost;
+            // Update balance and template count
+            await tx.update(schema.profiles)
+                .set({
+                    creditsBalance: newBalance,
+                    templateCount: profile.templateCount + 1,
+                    updatedAt: new Date()
+                })
+                .where(eq(schema.profiles.id, userId));
 
-		// Update balance and template count
-		const { error: updateError } = await supabase
-			.from('profiles')
-			.update({
-				credits_balance: newBalance,
-				template_count: credits.template_count + 1
-			})
-			.eq('id', userId);
+            // Create transaction record
+            await tx.insert(schema.creditTransactions).values({
+                userId,
+                orgId,
+                transactionType: TRANSACTION_TYPES.USAGE,
+                amount: -cost,
+                creditsBefore: profile.creditsBalance,
+                creditsAfter: newBalance,
+                description: 'Template creation',
+                referenceId: templateId || null,
+                usageType: USAGE_TYPES.TEMPLATE_CREATION,
+                metadata: { type: 'template_creation' }
+            });
 
-		if (updateError) throw updateError;
-
-		// Create transaction record
-		await createCreditTransaction(supabase, {
-			user_id: userId,
-			org_id: orgId,
-			transaction_type: TRANSACTION_TYPES.USAGE,
-			amount: -cost,
-			credits_before: credits.credits_balance,
-			credits_after: newBalance,
-			description: 'Template creation',
-			reference_id: templateId || null,
-			usage_type: USAGE_TYPES.TEMPLATE_CREATION,
-			invoice_id: null,
-			metadata: { type: 'template_creation' }
-		});
-
-		return { success: true, newBalance, usedFreeTier: false };
+            return { success: true, newBalance, usedFreeTier: false };
+        });
 	} catch (error) {
 		console.error('Error deducting template creation credit:', error);
 		return {
@@ -202,66 +199,67 @@ export async function deductTemplateCreationCredit(
  * Deduct credits for card generation
  */
 export async function deductCardGenerationCredit(
-	supabase: SupabaseClient,
 	userId: string,
 	orgId: string,
 	cardId?: string
 ): Promise<{ success: boolean; newBalance: number; usedFreeTier: boolean; error?: string }> {
 	try {
-		const credits = await getUserCredits(supabase, userId);
-		if (!credits) {
-			return { success: false, newBalance: 0, usedFreeTier: false, error: 'User not found' };
-		}
+        return await db.transaction(async (tx) => {
+            const profile = await tx.query.profiles.findFirst({
+                where: eq(schema.profiles.id, userId),
+            });
 
-		let newCardCount = credits.card_generation_count;
-		let newBalance = credits.credits_balance;
-		let usedFreeTier = false;
+            if (!profile) {
+                return { success: false, newBalance: 0, usedFreeTier: false, error: 'User not found' };
+            }
 
-		// If user has free generations left, use those first
-		if (credits.card_generation_count < FREE_TIER.CARD_GENERATIONS) {
-			newCardCount = credits.card_generation_count + 1;
-			usedFreeTier = true;
-		} else if (credits.credits_balance >= CREDIT_COSTS.CARD_GENERATION) {
-			// Use paid credits
-			newBalance = credits.credits_balance - CREDIT_COSTS.CARD_GENERATION;
-		} else {
-			return {
-				success: false,
-				newBalance: credits.credits_balance,
-				usedFreeTier: false,
-				error: 'Insufficient credits'
-			};
-		}
+            let newCardCount = profile.cardGenerationCount;
+            let newBalance = profile.creditsBalance;
+            let usedFreeTier = false;
 
-		// Update user profile
-		const { error: updateError } = await supabase
-			.from('profiles')
-			.update({
-				card_generation_count: newCardCount,
-				credits_balance: newBalance
-			})
-			.eq('id', userId);
+            // If user has free generations left, use those first
+            if (profile.cardGenerationCount < FREE_TIER.CARD_GENERATIONS) {
+                newCardCount = profile.cardGenerationCount + 1;
+                usedFreeTier = true;
+            } else if (profile.creditsBalance >= CREDIT_COSTS.CARD_GENERATION) {
+                // Use paid credits
+                newBalance = profile.creditsBalance - CREDIT_COSTS.CARD_GENERATION;
+            } else {
+                return {
+                    success: false,
+                    newBalance: profile.creditsBalance,
+                    usedFreeTier: false,
+                    error: 'Insufficient credits'
+                };
+            }
 
-		if (updateError) throw updateError;
+            // Update user profile
+            await tx.update(schema.profiles)
+                .set({
+                    cardGenerationCount: newCardCount,
+                    creditsBalance: newBalance,
+                    updatedAt: new Date()
+                })
+                .where(eq(schema.profiles.id, userId));
 
-		// Create transaction record if credits were used
-		if (!usedFreeTier) {
-			await createCreditTransaction(supabase, {
-				user_id: userId,
-				org_id: orgId,
-				transaction_type: TRANSACTION_TYPES.USAGE,
-				amount: -CREDIT_COSTS.CARD_GENERATION,
-				credits_before: credits.credits_balance,
-				credits_after: newBalance,
-				description: 'Card generation',
-				reference_id: cardId || null,
-				usage_type: USAGE_TYPES.CARD_GENERATION,
-				invoice_id: null,
-				metadata: { type: 'card_generation' }
-			});
-		}
+            // Create transaction record if credits were used
+            if (!usedFreeTier) {
+                await tx.insert(schema.creditTransactions).values({
+                    userId,
+                    orgId,
+                    transactionType: TRANSACTION_TYPES.USAGE,
+                    amount: -CREDIT_COSTS.CARD_GENERATION,
+                    creditsBefore: profile.creditsBalance,
+                    creditsAfter: newBalance,
+                    description: 'Card generation',
+                    referenceId: cardId || null,
+                    usageType: USAGE_TYPES.CARD_GENERATION,
+                    metadata: { type: 'card_generation' }
+                });
+            }
 
-		return { success: true, newBalance, usedFreeTier };
+            return { success: true, newBalance, usedFreeTier };
+        });
 	} catch (error) {
 		console.error('Error deducting card generation credit:', error);
 		return {
@@ -277,7 +275,6 @@ export async function deductCardGenerationCredit(
  * Add credits to user account (from invoice payment)
  */
 export async function addCredits(
-	supabase: SupabaseClient,
 	userId: string,
 	orgId: string,
 	amount: number,
@@ -285,37 +282,40 @@ export async function addCredits(
 	description?: string
 ): Promise<{ success: boolean; newBalance: number; error?: string }> {
 	try {
-		const credits = await getUserCredits(supabase, userId);
-		if (!credits) {
-			return { success: false, newBalance: 0, error: 'User not found' };
-		}
+        return await db.transaction(async (tx) => {
+            const profile = await tx.query.profiles.findFirst({
+                where: eq(schema.profiles.id, userId),
+            });
 
-		const newBalance = credits.credits_balance + amount;
+            if (!profile) {
+                return { success: false, newBalance: 0, error: 'User not found' };
+            }
 
-		// Update user balance
-		const { error: updateError } = await supabase
-			.from('profiles')
-			.update({ credits_balance: newBalance })
-			.eq('id', userId);
+            const newBalance = profile.creditsBalance + amount;
 
-		if (updateError) throw updateError;
+            // Update user balance
+            await tx.update(schema.profiles)
+                .set({ 
+                    creditsBalance: newBalance,
+                    updatedAt: new Date()
+                })
+                .where(eq(schema.profiles.id, userId));
 
-		// Create transaction record
-		await createCreditTransaction(supabase, {
-			user_id: userId,
-			org_id: orgId,
-			transaction_type: TRANSACTION_TYPES.PURCHASE,
-			amount: amount,
-			credits_before: credits.credits_balance,
-			credits_after: newBalance,
-			description: description || 'Credit purchase',
-			reference_id: null,
-			usage_type: null,
-			invoice_id: invoiceId,
-			metadata: { type: 'credit_purchase' }
-		});
+            // Create transaction record
+            await tx.insert(schema.creditTransactions).values({
+                userId,
+                orgId,
+                transactionType: TRANSACTION_TYPES.PURCHASE,
+                amount: amount,
+                creditsBefore: profile.creditsBalance,
+                creditsAfter: newBalance,
+                description: description || 'Credit purchase',
+                invoiceId,
+                metadata: { type: 'credit_purchase' }
+            });
 
-		return { success: true, newBalance };
+            return { success: true, newBalance };
+        });
 	} catch (error) {
 		console.error('Error adding credits:', error);
 		return {
@@ -330,7 +330,6 @@ export async function addCredits(
  * Refund credits to user account
  */
 export async function refundCredits(
-	supabase: SupabaseClient,
 	userId: string,
 	orgId: string,
 	amount: number,
@@ -338,37 +337,40 @@ export async function refundCredits(
 	description?: string
 ): Promise<{ success: boolean; newBalance: number; error?: string }> {
 	try {
-		const credits = await getUserCredits(supabase, userId);
-		if (!credits) {
-			return { success: false, newBalance: 0, error: 'User not found' };
-		}
+        return await db.transaction(async (tx) => {
+            const profile = await tx.query.profiles.findFirst({
+                where: eq(schema.profiles.id, userId),
+            });
 
-		const newBalance = credits.credits_balance + amount;
+            if (!profile) {
+                return { success: false, newBalance: 0, error: 'User not found' };
+            }
 
-		// Update user balance
-		const { error: updateError } = await supabase
-			.from('profiles')
-			.update({ credits_balance: newBalance })
-			.eq('id', userId);
+            const newBalance = profile.creditsBalance + amount;
 
-		if (updateError) throw updateError;
+            // Update user balance
+            await tx.update(schema.profiles)
+                .set({ 
+                    creditsBalance: newBalance,
+                    updatedAt: new Date()
+                })
+                .where(eq(schema.profiles.id, userId));
 
-		// Create transaction record
-		await createCreditTransaction(supabase, {
-			user_id: userId,
-			org_id: orgId,
-			transaction_type: TRANSACTION_TYPES.REFUND,
-			amount: amount,
-			credits_before: credits.credits_balance,
-			credits_after: newBalance,
-			description: description || 'Credit refund',
-			reference_id: null,
-			usage_type: null,
-			invoice_id: invoiceId,
-			metadata: { type: 'credit_refund' }
-		});
+            // Create transaction record
+            await tx.insert(schema.creditTransactions).values({
+                userId,
+                orgId,
+                transactionType: TRANSACTION_TYPES.REFUND,
+                amount: amount,
+                creditsBefore: profile.creditsBalance,
+                creditsAfter: newBalance,
+                description: description || 'Credit refund',
+                invoiceId,
+                metadata: { type: 'credit_refund' }
+            });
 
-		return { success: true, newBalance };
+            return { success: true, newBalance };
+        });
 	} catch (error) {
 		console.error('Error refunding credits:', error);
 		return {
@@ -383,33 +385,36 @@ export async function refundCredits(
  * Grant unlimited templates feature
  */
 export async function grantUnlimitedTemplates(
-	supabase: SupabaseClient,
 	userId: string,
 	orgId: string,
 	invoiceId: string
 ): Promise<{ success: boolean; error?: string }> {
 	try {
-		const { error: updateError } = await supabase
-			.from('profiles')
-			.update({ unlimited_templates: true })
-			.eq('id', userId);
+        await db.transaction(async (tx) => {
+            const profile = await tx.query.profiles.findFirst({
+                where: eq(schema.profiles.id, userId)
+            });
 
-		if (updateError) throw updateError;
+            await tx.update(schema.profiles)
+                .set({ 
+                    unlimitedTemplates: true,
+                    updatedAt: new Date()
+                })
+                .where(eq(schema.profiles.id, userId));
 
-		// Create transaction record
-		await createCreditTransaction(supabase, {
-			user_id: userId,
-			org_id: orgId,
-			transaction_type: TRANSACTION_TYPES.PURCHASE,
-			amount: 0,
-			credits_before: 0,
-			credits_after: 0,
-			description: 'Unlimited templates upgrade',
-			reference_id: null,
-			usage_type: null,
-			invoice_id: invoiceId,
-			metadata: { type: 'unlimited_templates_purchase' }
-		});
+            // Create transaction record
+            await tx.insert(schema.creditTransactions).values({
+                userId,
+                orgId,
+                transactionType: TRANSACTION_TYPES.PURCHASE,
+                amount: 0,
+                creditsBefore: profile?.creditsBalance || 0,
+                creditsAfter: profile?.creditsBalance || 0,
+                description: 'Unlimited templates upgrade',
+                invoiceId,
+                metadata: { type: 'unlimited_templates_purchase' }
+            });
+        });
 
 		return { success: true };
 	} catch (error) {
@@ -422,33 +427,36 @@ export async function grantUnlimitedTemplates(
  * Grant watermark removal feature
  */
 export async function grantWatermarkRemoval(
-	supabase: SupabaseClient,
 	userId: string,
 	orgId: string,
 	invoiceId: string
 ): Promise<{ success: boolean; error?: string }> {
 	try {
-		const { error: updateError } = await supabase
-			.from('profiles')
-			.update({ remove_watermarks: true })
-			.eq('id', userId);
+        await db.transaction(async (tx) => {
+            const profile = await tx.query.profiles.findFirst({
+                where: eq(schema.profiles.id, userId)
+            });
 
-		if (updateError) throw updateError;
+            await tx.update(schema.profiles)
+                .set({ 
+                    removeWatermarks: true,
+                    updatedAt: new Date()
+                })
+                .where(eq(schema.profiles.id, userId));
 
-		// Create transaction record
-		await createCreditTransaction(supabase, {
-			user_id: userId,
-			org_id: orgId,
-			transaction_type: TRANSACTION_TYPES.PURCHASE,
-			amount: 0,
-			credits_before: 0,
-			credits_after: 0,
-			description: 'Remove watermarks upgrade',
-			reference_id: null,
-			usage_type: null,
-			invoice_id: invoiceId,
-			metadata: { type: 'watermark_removal_purchase' }
-		});
+            // Create transaction record
+            await tx.insert(schema.creditTransactions).values({
+                userId,
+                orgId,
+                transactionType: TRANSACTION_TYPES.PURCHASE,
+                amount: 0,
+                creditsBefore: profile?.creditsBalance || 0,
+                creditsAfter: profile?.creditsBalance || 0,
+                description: 'Remove watermarks upgrade',
+                invoiceId,
+                metadata: { type: 'watermark_removal_purchase' }
+            });
+        });
 
 		return { success: true };
 	} catch (error) {
@@ -461,42 +469,19 @@ export async function grantWatermarkRemoval(
  * Get user's credit transaction history
  */
 export async function getCreditHistory(
-	supabase: SupabaseClient,
 	userId: string,
 	limit = 50
-): Promise<CreditTransaction[]> {
-	const { data, error } = await supabase
-		.from('credit_transactions')
-		.select('*')
-		.eq('user_id', userId)
-		.order('created_at', { ascending: false })
-		.limit(limit);
+): Promise<any[]> {
+    try {
+        const history = await db.select()
+            .from(schema.creditTransactions)
+            .where(eq(schema.creditTransactions.userId, userId))
+            .orderBy(desc(schema.creditTransactions.createdAt))
+            .limit(limit);
 
-	if (error) {
-		console.error('Error fetching credit history:', error);
-		return [];
-	}
-
-	return data || [];
-}
-
-/**
- * Create a credit transaction record
- */
-async function createCreditTransaction(
-	supabase: SupabaseClient,
-	transaction: Omit<CreditTransaction, 'id' | 'created_at' | 'updated_at'>
-): Promise<CreditTransaction | null> {
-	const { data, error } = await supabase
-		.from('credit_transactions')
-		.insert(transaction)
-		.select()
-		.single();
-
-	if (error) {
-		console.error('Error creating credit transaction:', error);
-		return null;
-	}
-
-	return data;
+        return history;
+    } catch (err) {
+        console.error('Error fetching credit history:', err);
+        return [];
+    }
 }

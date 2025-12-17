@@ -47,3 +47,22 @@ export {
 	uploadCustomDesignAsset,
 	getUserCustomDesignRequests
 } from './templates.remote';
+
+// AI settings functions
+export {
+	getAISettings,
+	getAIUsageStats,
+	updateAISettings,
+	addAICredits,
+	rotateAPIKey,
+	deleteAPIKey
+} from './ai-settings.remote';
+
+// Analytics functions
+export {
+	getOverviewAnalytics,
+	getRevenueAnalytics,
+	getCreditAnalytics,
+	getCardAnalytics,
+	getUserAnalytics
+} from './analytics.remote';

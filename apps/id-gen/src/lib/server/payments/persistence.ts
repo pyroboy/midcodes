@@ -1,17 +1,6 @@
-/**
- * Server-only payment persistence layer
- * Handles database operations for payment records with idempotency guards
- */
-
-import {
-	supabaseAdmin,
-	type PaymentRecord,
-	type PaymentRecordInsert,
-	type PaymentRecordUpdate,
-	type WebhookEvent,
-	type WebhookEventInsert,
-	type Json
-} from '$lib/server/supabase';
+import { db } from '$lib/server/db';
+import * as schema from '$lib/server/schema';
+import { eq, and, lt, desc, sql } from 'drizzle-orm';
 import type { PurchaseKind, PaymentStatus, PaymentMethod } from '$lib/payments/types';
 
 // Interface definitions for better type safety
@@ -51,7 +40,6 @@ interface ListPaymentsByUserParams {
 
 /**
  * Records a new checkout initialization with idempotency
- * This is the first step when a user initiates a payment
  */
 export async function recordCheckoutInit({
 	userId,
@@ -64,51 +52,45 @@ export async function recordCheckoutInit({
 	status = 'pending',
 	idempotencyKey,
 	metadata = {}
-}: RecordCheckoutInitParams): Promise<PaymentRecord> {
-	// First check if a record with this idempotency key already exists
-	const { data: existingRecord } = await supabaseAdmin
-		.from('payment_records')
-		.select('*')
-		.eq('idempotency_key', idempotencyKey)
-		.single();
+}: RecordCheckoutInitParams) {
+	try {
+		// First check if a record with this idempotency key already exists
+		const existingRecord = await db.query.paymentRecords.findFirst({
+			where: eq(schema.paymentRecords.idempotencyKey, idempotencyKey)
+		});
 
-	if (existingRecord) {
-		return existingRecord;
+		if (existingRecord) {
+			return existingRecord;
+		}
+
+		// Create new payment record
+		const [data] = await db.insert(schema.paymentRecords)
+			.values({
+				userId,
+				sessionId,
+				providerPaymentId: providerPaymentId || null,
+				kind,
+				skuId,
+				amountPhp: amountPhp.toString(), // Drizzle decimal is string
+				currency: 'PHP',
+				status: status === 'expired' ? 'failed' : status,
+				method: null,
+				methodAllowed: methodAllowed,
+				idempotencyKey,
+				metadata: metadata,
+				reason: null
+			})
+			.returning();
+
+		return data;
+	} catch (err) {
+		console.error('Error recording checkout init:', err);
+		throw new Error('Failed to record checkout init');
 	}
-
-	// Create new payment record
-	const insertData: PaymentRecordInsert = {
-		user_id: userId,
-		session_id: sessionId,
-		provider_payment_id: providerPaymentId || null,
-		kind,
-		sku_id: skuId,
-		amount_php: amountPhp,
-		currency: 'PHP',
-		status: status === 'expired' ? 'failed' : status, // Map expired to failed for database
-		method: null, // Will be set when payment is completed
-		method_allowed: methodAllowed,
-		idempotency_key: idempotencyKey,
-		metadata: metadata as Json,
-		reason: null // Will be set if payment fails
-	};
-
-	const { data, error } = await supabaseAdmin
-		.from('payment_records')
-		.insert(insertData)
-		.select()
-		.single();
-
-	if (error) {
-		throw new Error(`Failed to record checkout init: ${error.message}`);
-	}
-
-	return data;
 }
 
 /**
- * Marks a payment as paid using either sessionId or providerPaymentId
- * Used when webhook confirms successful payment
+ * Marks a payment as paid
  */
 export async function markPaymentPaid({
 	sessionId,
@@ -116,39 +98,30 @@ export async function markPaymentPaid({
 	method,
 	paidAt,
 	rawEvent
-}: MarkPaymentPaidParams): Promise<PaymentRecord> {
+}: MarkPaymentPaidParams) {
 	if (!sessionId && !providerPaymentId) {
 		throw new Error('Either sessionId or providerPaymentId must be provided');
 	}
 
-	// Build the update query with the appropriate filter
 	const baseUpdate = {
-		status: 'paid' as const,
+		status: 'paid',
 		method,
-		paid_at: paidAt.toISOString(),
-		raw_event: rawEvent as Json
+		paidAt,
+		rawEvent,
+		updatedAt: new Date()
 	};
 
-	let updateQuery;
+	let whereClause;
 	if (sessionId) {
-		updateQuery = supabaseAdmin
-			.from('payment_records')
-			.update(baseUpdate)
-			.eq('session_id', sessionId);
-	} else if (providerPaymentId) {
-		updateQuery = supabaseAdmin
-			.from('payment_records')
-			.update(baseUpdate)
-			.eq('provider_payment_id', providerPaymentId);
+		whereClause = eq(schema.paymentRecords.sessionId, sessionId);
 	} else {
-		throw new Error('Either sessionId or providerPaymentId must be provided');
+		whereClause = eq(schema.paymentRecords.providerPaymentId, providerPaymentId!);
 	}
 
-	const { data, error } = await updateQuery.select().single();
-
-	if (error) {
-		throw new Error(`Failed to mark payment as paid: ${error.message}`);
-	}
+	const [data] = await db.update(schema.paymentRecords)
+		.set(baseUpdate as any)
+		.where(whereClause)
+		.returning();
 
 	if (!data) {
 		throw new Error('Payment record not found');
@@ -158,46 +131,36 @@ export async function markPaymentPaid({
 }
 
 /**
- * Marks a payment as failed using either sessionId or providerPaymentId
- * Used when webhook indicates payment failure
+ * Marks a payment as failed
  */
 export async function markPaymentFailed({
 	sessionId,
 	providerPaymentId,
 	reason,
 	rawEvent
-}: MarkPaymentFailedParams): Promise<PaymentRecord> {
+}: MarkPaymentFailedParams) {
 	if (!sessionId && !providerPaymentId) {
 		throw new Error('Either sessionId or providerPaymentId must be provided');
 	}
 
-	// Build the where clause based on what identifier we have
 	const baseUpdate = {
-		status: 'failed' as const,
+		status: 'failed',
 		reason,
-		raw_event: rawEvent as Json
+		rawEvent,
+		updatedAt: new Date()
 	};
 
-	let failedQuery;
+	let whereClause;
 	if (sessionId) {
-		failedQuery = supabaseAdmin
-			.from('payment_records')
-			.update(baseUpdate)
-			.eq('session_id', sessionId);
-	} else if (providerPaymentId) {
-		failedQuery = supabaseAdmin
-			.from('payment_records')
-			.update(baseUpdate)
-			.eq('provider_payment_id', providerPaymentId);
+		whereClause = eq(schema.paymentRecords.sessionId, sessionId);
 	} else {
-		throw new Error('Either sessionId or providerPaymentId must be provided');
+		whereClause = eq(schema.paymentRecords.providerPaymentId, providerPaymentId!);
 	}
 
-	const { data, error } = await failedQuery.select().single();
-
-	if (error) {
-		throw new Error(`Failed to mark payment as failed: ${error.message}`);
-	}
+	const [data] = await db.update(schema.paymentRecords)
+		.set(baseUpdate as any)
+		.where(whereClause)
+		.returning();
 
 	if (!data) {
 		throw new Error('Payment record not found');
@@ -209,45 +172,19 @@ export async function markPaymentFailed({
 /**
  * Retrieves a payment record by session ID
  */
-export async function getPaymentBySessionId(sessionId: string): Promise<PaymentRecord | null> {
-	const { data, error } = await supabaseAdmin
-		.from('payment_records')
-		.select('*')
-		.eq('session_id', sessionId)
-		.single();
-
-	if (error) {
-		if (error.code === 'PGRST116') {
-			// No rows returned
-			return null;
-		}
-		throw new Error(`Failed to get payment by session ID: ${error.message}`);
-	}
-
-	return data;
+export async function getPaymentBySessionId(sessionId: string) {
+	return await db.query.paymentRecords.findFirst({
+		where: eq(schema.paymentRecords.sessionId, sessionId)
+	}) || null;
 }
 
 /**
  * Retrieves a payment record by provider payment ID
  */
-export async function getPaymentByProviderId(
-	providerPaymentId: string
-): Promise<PaymentRecord | null> {
-	const { data, error } = await supabaseAdmin
-		.from('payment_records')
-		.select('*')
-		.eq('provider_payment_id', providerPaymentId)
-		.single();
-
-	if (error) {
-		if (error.code === 'PGRST116') {
-			// No rows returned
-			return null;
-		}
-		throw new Error(`Failed to get payment by provider ID: ${error.message}`);
-	}
-
-	return data;
+export async function getPaymentByProviderId(providerPaymentId: string) {
+	return await db.query.paymentRecords.findFirst({
+		where: eq(schema.paymentRecords.providerPaymentId, providerPaymentId)
+	}) || null;
 }
 
 /**
@@ -257,34 +194,24 @@ export async function listPaymentsByUser({
 	userId,
 	limit = 50,
 	cursor
-}: ListPaymentsByUserParams): Promise<{
-	data: PaymentRecord[];
-	hasMore: boolean;
-	nextCursor?: string;
-}> {
-	let query = supabaseAdmin
-		.from('payment_records')
-		.select('*')
-		.eq('user_id', userId)
-		.order('created_at', { ascending: false })
-		.limit(limit + 1); // Get one extra to check if there are more
+}: ListPaymentsByUserParams) {
+	const results = await db.select()
+		.from(schema.paymentRecords)
+		.where(
+			and(
+				eq(schema.paymentRecords.userId, userId),
+				cursor ? lt(schema.paymentRecords.createdAt, new Date(cursor)) : undefined
+			)
+		)
+		.orderBy(desc(schema.paymentRecords.createdAt))
+		.limit(limit + 1);
 
-	if (cursor) {
-		query = query.lt('created_at', cursor);
-	}
-
-	const { data, error } = await query;
-
-	if (error) {
-		throw new Error(`Failed to list payments by user: ${error.message}`);
-	}
-
-	const hasMore = data.length > limit;
-	const results = hasMore ? data.slice(0, limit) : data;
-	const nextCursor = hasMore ? results[results.length - 1].created_at : undefined;
+	const hasMore = results.length > limit;
+	const data = hasMore ? results.slice(0, limit) : results;
+	const nextCursor = hasMore ? data[data.length - 1].createdAt?.toISOString() : undefined;
 
 	return {
-		data: results,
+		data: data as any[],
 		hasMore,
 		nextCursor
 	};
@@ -292,123 +219,40 @@ export async function listPaymentsByUser({
 
 /**
  * SECURITY: Atomically checks and marks a webhook event as processed
- * Uses INSERT ... ON CONFLICT to prevent race conditions in the check-then-insert pattern
- * 
- * @returns Object with alreadyProcessed flag and the webhook event record
  */
 export async function processWebhookEventAtomically(
 	eventId: string,
 	eventType: string,
 	rawPayload: Record<string, any>,
 	provider: string = 'paymongo'
-): Promise<{ alreadyProcessed: boolean; event: WebhookEvent | null }> {
-	const insertData: WebhookEventInsert = {
-		event_id: eventId,
-		event_type: eventType,
-		provider,
-		raw_payload: rawPayload as Json
-	};
-
-	// Try to insert - if conflict, it was already processed
-	const { data, error } = await supabaseAdmin
-		.from('webhook_events')
-		.insert(insertData)
-		.select()
-		.single();
-
-	if (error) {
-		// Unique constraint violation means event was already processed
-		if (error.code === '23505') {
-			// Get the existing record for reference
-			const { data: existing } = await supabaseAdmin
-				.from('webhook_events')
-				.select('*')
-				.eq('event_id', eventId)
-				.single();
-
-			return { alreadyProcessed: true, event: existing };
-		}
-		throw new Error(`Failed to process webhook event: ${error.message}`);
-	}
-
-	return { alreadyProcessed: false, event: data };
-}
-
-/**
- * @deprecated Use processWebhookEventAtomically instead to prevent race conditions
- * Checks if a webhook event has already been processed (idempotency check)
- */
-export async function hasProcessedWebhookEvent(eventId: string): Promise<boolean> {
-	console.warn('[Persistence] hasProcessedWebhookEvent is deprecated. Use processWebhookEventAtomically instead.');
-	
-	const { data, error } = await supabaseAdmin
-		.from('webhook_events')
-		.select('id')
-		.eq('event_id', eventId)
-		.single();
-
-	if (error) {
-		if (error.code === 'PGRST116') {
-			// No rows returned - event hasn't been processed
-			return false;
-		}
-		throw new Error(`Failed to check webhook event: ${error.message}`);
-	}
-
-	return !!data;
-}
-
-/**
- * @deprecated Use processWebhookEventAtomically instead to prevent race conditions
- * Marks a webhook event as processed for idempotency
- */
-export async function markWebhookEventProcessed(
-	eventId: string,
-	eventType: string,
-	rawPayload: Record<string, any>,
-	provider: string = 'paymongo'
-): Promise<WebhookEvent> {
-	console.warn('[Persistence] markWebhookEventProcessed is deprecated. Use processWebhookEventAtomically instead.');
-	
-	const result = await processWebhookEventAtomically(eventId, eventType, rawPayload, provider);
-	
-	if (!result.event) {
-		throw new Error('Failed to mark webhook event as processed');
-	}
-	
-	return result.event;
-}
-
-/**
- * SECURITY: Transaction helper for database operations
- * 
- * NOTE: Supabase JS client doesn't support native PostgreSQL transactions.
- * For critical operations like payment processing, use the SQL functions:
- * - process_payment_add_credits() for atomic payment + credit operations
- * - mark_payment_failed_atomic() for atomic payment failure marking
- * 
- * This function provides best-effort sequential execution with error handling.
- * For true ACID transactions, use the SQL RPC functions instead.
- */
-export async function executeInTransaction<T>(operation: () => Promise<T>): Promise<T> {
-	// Note: This is NOT a true database transaction.
-	// For critical operations, use the SQL RPC functions directly.
-	console.warn('[Persistence] executeInTransaction does not provide true ACID guarantees. Use SQL RPC functions for critical operations.');
-	
+) {
 	try {
-		return await operation();
-	} catch (error) {
-		// Log the error for debugging
-		console.error('[Persistence] Transaction-like operation failed:', error);
-		throw error;
+		const [event] = await db.insert(schema.webhookEvents)
+			.values({
+				eventId,
+				eventType,
+				provider,
+				rawPayload
+			})
+			.onConflictDoNothing({ target: schema.webhookEvents.eventId })
+			.returning();
+
+		if (!event) {
+			const existing = await db.query.webhookEvents.findFirst({
+				where: eq(schema.webhookEvents.eventId, eventId)
+			});
+			return { alreadyProcessed: true, event: existing || null };
+		}
+
+		return { alreadyProcessed: false, event };
+	} catch (err) {
+		console.error('Error processing webhook event:', err);
+		throw new Error('Failed to process webhook event');
 	}
 }
 
 /**
- * SECURITY: Process payment and add credits atomically using SQL transaction
- * This ensures both operations succeed or both fail, preventing:
- * - Money lost (payment marked paid but credits not added)
- * - Double-crediting (credits added but payment not marked)
+ * SECURITY: Process payment and add credits atomically using Drizzle transaction
  */
 export async function processPaymentAndAddCreditsAtomic(params: {
 	sessionId: string;
@@ -422,109 +266,102 @@ export async function processPaymentAndAddCreditsAtomic(params: {
 	packageName: string;
 	packageId: string;
 	amountPhp: number;
-}): Promise<{
-	success: boolean;
-	newBalance?: number;
-	oldBalance?: number;
-	error?: string;
-}> {
-	const { data, error } = await supabaseAdmin.rpc('process_payment_add_credits' as any, {
-		p_session_id: params.sessionId,
-		p_provider_payment_id: params.providerPaymentId,
-		p_method: params.method,
-		p_paid_at: params.paidAt.toISOString(),
-		p_raw_event: params.rawEvent,
-		p_user_id: params.userId,
-		p_org_id: params.orgId,
-		p_credits_to_add: params.creditsToAdd,
-		p_package_name: params.packageName,
-		p_package_id: params.packageId,
-		p_amount_php: params.amountPhp
-	});
+}) {
+	try {
+		return await db.transaction(async (tx) => {
+			// 1. Update Payment Record
+			const [payment] = await tx.update(schema.paymentRecords)
+				.set({
+					status: 'paid',
+					method: params.method,
+					paidAt: params.paidAt,
+					rawEvent: params.rawEvent,
+					providerPaymentId: params.providerPaymentId,
+					updatedAt: new Date()
+				})
+				.where(eq(schema.paymentRecords.sessionId, params.sessionId))
+				.returning();
 
-	if (error) {
-		console.error('[Persistence] processPaymentAndAddCreditsAtomic failed:', error);
-		return { success: false, error: error.message };
+			if (!payment) throw new Error('Payment record not found');
+			if (payment.status !== 'paid') throw new Error('Failed to update payment status');
+
+			// 2. Get Profile & Update Credits
+			const profile = await tx.query.profiles.findFirst({
+				where: and(eq(schema.profiles.id, params.userId), eq(schema.profiles.orgId, params.orgId))
+			});
+
+			if (!profile) throw new Error('User profile not found');
+
+			const oldBalance = profile.creditsBalance;
+			const newBalance = oldBalance + params.creditsToAdd;
+
+			await tx.update(schema.profiles)
+				.set({
+					creditsBalance: newBalance,
+					updatedAt: new Date()
+				})
+				.where(eq(schema.profiles.id, params.userId));
+
+			// 3. Record Credit Transaction
+			await tx.insert(schema.creditTransactions)
+				.values({
+					userId: params.userId,
+					orgId: params.orgId,
+					transactionType: 'purchase',
+					amount: params.creditsToAdd,
+					creditsBefore: oldBalance,
+					creditsAfter: newBalance,
+					description: `Purchase: ${params.packageName}`,
+					metadata: {
+						packageId: params.packageId,
+						amountPhp: params.amountPhp,
+						sessionId: params.sessionId
+					}
+				});
+
+			return {
+				success: true,
+				newBalance,
+				oldBalance
+			};
+		});
+	} catch (err) {
+		console.error('Atomic payment processing failed:', err);
+		return { success: false, error: err instanceof Error ? err.message : 'Transaction failed' };
 	}
-
-	const result = Array.isArray(data) ? data[0] : data;
-	
-	if (!result?.payment_updated || !result?.credits_added) {
-		return { 
-			success: false, 
-			error: result?.error_message || 'Transaction failed' 
-		};
-	}
-
-	return {
-		success: true,
-		newBalance: result.new_balance,
-		oldBalance: result.old_balance
-	};
 }
 
 /**
- * SECURITY: Mark payment as failed atomically using SQL transaction
+ * SECURITY: Mark payment as failed atomically
  */
 export async function markPaymentFailedAtomic(params: {
 	sessionId?: string;
 	providerPaymentId?: string;
 	reason: string;
 	rawEvent?: Record<string, any>;
-}): Promise<{
-	success: boolean;
-	paymentId?: string;
-	error?: string;
-}> {
-	if (!params.sessionId && !params.providerPaymentId) {
-		return { success: false, error: 'Either sessionId or providerPaymentId must be provided' };
-	}
-
-	const { data, error } = await supabaseAdmin.rpc('mark_payment_failed_atomic' as any, {
-		p_session_id: params.sessionId || null,
-		p_provider_payment_id: params.providerPaymentId || null,
-		p_reason: params.reason,
-		p_raw_event: params.rawEvent || {}
-	});
-
-	if (error) {
-		console.error('[Persistence] markPaymentFailedAtomic failed:', error);
-		return { success: false, error: error.message };
-	}
-
-	const result = Array.isArray(data) ? data[0] : data;
-	
-	if (!result?.success) {
-		return { 
-			success: false, 
-			error: result?.error_message || 'Transaction failed' 
+}) {
+	try {
+		const result = await markPaymentFailed(params);
+		return {
+			success: true,
+			paymentId: result.id
 		};
+	} catch (err) {
+		return { success: false, error: err instanceof Error ? err.message : 'Update failed' };
 	}
-
-	return {
-		success: true,
-		paymentId: result.payment_id
-	};
 }
 
 /**
  * Updates a payment record with provider payment ID
- * Used when we get the provider payment ID after initial checkout creation
  */
 export async function updatePaymentWithProviderId(
 	sessionId: string,
 	providerPaymentId: string
-): Promise<PaymentRecord> {
-	const { data, error } = await supabaseAdmin
-		.from('payment_records')
-		.update({ provider_payment_id: providerPaymentId })
-		.eq('session_id', sessionId)
-		.select()
-		.single();
-
-	if (error) {
-		throw new Error(`Failed to update payment with provider ID: ${error.message}`);
-	}
+) {
+	const [data] = await db.update(schema.paymentRecords)
+		.set({ providerPaymentId, updatedAt: new Date() })
+		.where(eq(schema.paymentRecords.sessionId, sessionId))
+		.returning();
 
 	if (!data) {
 		throw new Error('Payment record not found');
@@ -536,26 +373,17 @@ export async function updatePaymentWithProviderId(
 /**
  * Gets payment statistics for a user
  */
-export async function getPaymentStats(userId: string): Promise<{
-	totalPaid: number;
-	totalAmount: number;
-	successfulPayments: number;
-	failedPayments: number;
-}> {
-	const { data, error } = await supabaseAdmin
-		.from('payment_records')
-		.select('status, amount_php')
-		.eq('user_id', userId);
+export async function getPaymentStats(userId: string) {
+	const records = await db.select()
+		.from(schema.paymentRecords)
+		.where(eq(schema.paymentRecords.userId, userId));
 
-	if (error) {
-		throw new Error(`Failed to get payment stats: ${error.message}`);
-	}
-
-	const stats = data.reduce(
+	return records.reduce(
 		(acc, payment) => {
-			acc.totalAmount += payment.amount_php;
+			const amount = parseFloat(payment.amountPhp);
+			acc.totalAmount += amount;
 			if (payment.status === 'paid') {
-				acc.totalPaid += payment.amount_php;
+				acc.totalPaid += amount;
 				acc.successfulPayments++;
 			} else if (payment.status === 'failed') {
 				acc.failedPayments++;
@@ -569,6 +397,4 @@ export async function getPaymentStats(userId: string): Promise<{
 			failedPayments: 0
 		}
 	);
-
-	return stats;
 }

@@ -1,6 +1,9 @@
 // src/routes/+layout.server.ts
 import type { LayoutServerLoad } from './$types';
 import { checkSuperAdmin } from '$lib/utils/adminPermissions';
+import { db } from '$lib/server/db';
+import { profiles } from '$lib/server/schema';
+import { eq } from 'drizzle-orm';
 
 interface ProfileData {
 	credits_balance: number;
@@ -30,22 +33,25 @@ export const load: LayoutServerLoad = async ({ locals, depends, setHeaders }) =>
 	// setHeaders({ 'cache-control': 'private, max-age=60' });
 
 	// Destructure all the auth-related data from locals
-	const { session, user, org_id, permissions, supabase } = locals;
+	const { session, user, org_id, permissions } = locals;
 
 	// If user is authenticated, fetch their profile with credits
-	let userWithProfile: Record<string, unknown> | null = user ? { ...user } : null;
-	if (user && supabase) {
-		const { data } = await supabase
-			.from('profiles')
-			.select('credits_balance, role, email')
-			.eq('id', user.id)
-			.single();
+	let userWithProfile: any = user ? { ...user } : null;
+	if (user) {
+		const [profile] = await db
+			.select({
+				creditsBalance: profiles.creditsBalance,
+				role: profiles.role,
+				email: profiles.email
+			})
+			.from(profiles)
+			.where(eq(profiles.id, user.id))
+			.limit(1);
 
-		const profile = data as ProfileData | null;
 		if (profile) {
 			userWithProfile = {
 				...user,
-				credits_balance: profile.credits_balance,
+				credits_balance: profile.creditsBalance,
 				role: profile.role,
 				email: profile.email || user.email
 			};

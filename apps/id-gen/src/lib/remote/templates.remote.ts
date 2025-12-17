@@ -3,6 +3,9 @@ import { query, command, getRequestEvent } from '$app/server';
 import { PRIVATE_SERVICE_ROLE } from '$env/static/private';
 import { PUBLIC_SUPABASE_URL } from '$env/static/public';
 import { createClient } from '@supabase/supabase-js';
+import { db } from '$lib/server/db';
+import * as schema from '$lib/server/schema';
+import { eq, and, desc, count } from 'drizzle-orm';
 import type { TemplateAsset, SizePreset } from '$lib/schemas/template-assets.schema';
 import {
 	customDesignRequestInputSchema,
@@ -10,8 +13,8 @@ import {
 	type CustomDesignRequest
 } from '$lib/schemas/custom-design.schema';
 
-// Helper to get admin client with service role
-function getAdminClient() {
+// Helper to get admin client (Keep for Storage only)
+function getStorageClient() {
 	return createClient(PUBLIC_SUPABASE_URL, PRIVATE_SERVICE_ROLE);
 }
 
@@ -41,46 +44,44 @@ export const getTemplateAssetsBySize = command(
 		sizePresetSlug: string | null;
 		orientation: 'landscape' | 'portrait';
 	}): Promise<TemplateAsset[]> => {
-		const { user } = await getAuthenticatedUser();
-		const supabase = getAdminClient();
+		await getAuthenticatedUser();
 
 		try {
-			// First, get the size preset ID from the slug
+			// First, get the size preset ID from the slug if provided
 			let sizePresetId: string | null = null;
 			if (sizePresetSlug) {
-				const { data: sizePreset, error: sizeError } = await supabase
-					.from('template_size_presets')
-					.select('id')
-					.eq('slug', sizePresetSlug)
-					.eq('is_active', true)
-					.single();
+				const [sizePreset] = await db
+					.select({ id: schema.templateSizePresets.id })
+					.from(schema.templateSizePresets)
+					.where(
+						and(
+							eq(schema.templateSizePresets.slug, sizePresetSlug),
+							eq(schema.templateSizePresets.isActive, true)
+						)
+					)
+					.limit(1);
 
-				if (sizeError && sizeError.code !== 'PGRST116') {
-					console.error('Error fetching size preset:', sizeError);
-				}
 				sizePresetId = sizePreset?.id || null;
 			}
 
-			let queryBuilder = supabase
-				.from('template_assets')
-				.select('*')
-				.eq('is_published', true)
-				.eq('orientation', orientation)
-				.order('created_at', { ascending: false });
+			// Build query
+			let conditions = [
+                eq(schema.templateAssets.isPublished, true),
+                eq(schema.templateAssets.orientation, orientation as any)
+            ];
 
-			// Filter by size preset if found
 			if (sizePresetId) {
-				queryBuilder = queryBuilder.eq('size_preset_id', sizePresetId);
+				conditions.push(eq(schema.templateAssets.sizePresetId, sizePresetId));
 			}
 
-			const { data, error: fetchError } = await queryBuilder.limit(50);
+			const data = await db
+				.select()
+				.from(schema.templateAssets)
+				.where(and(...conditions))
+				.orderBy(desc(schema.templateAssets.createdAt))
+				.limit(50);
 
-			if (fetchError) {
-				console.error('Error fetching template assets by size:', fetchError);
-				throw error(500, 'Failed to fetch template assets');
-			}
-
-			return (data as TemplateAsset[]) || [];
+			return (data as unknown as TemplateAsset[]) || [];
 		} catch (err) {
 			console.error('Error in getTemplateAssetsBySize:', err);
 			throw error(500, 'Failed to fetch template assets');
@@ -93,43 +94,38 @@ export const getTemplateAssetsBySize = command(
  * Returns a map of "slug:orientation" -> count (e.g., { "cr80:portrait": 10, "cr80:landscape": 10 })
  */
 export const getTemplateAssetCounts = query(async (): Promise<Record<string, number>> => {
-	const { user } = await getAuthenticatedUser();
-	const supabase = getAdminClient();
+	await getAuthenticatedUser();
 
 	try {
-		// Get all published assets with their size_preset_id and orientation
-		const { data: assets, error: fetchError } = await supabase
-			.from('template_assets')
-			.select('size_preset_id, orientation')
-			.eq('is_published', true);
-
-		if (fetchError) {
-			console.error('Error fetching template asset counts:', fetchError);
-			throw error(500, 'Failed to fetch template asset counts');
-		}
+		// Get all published assets with their sizePresetId and orientation
+		const assets = await db
+			.select({
+				sizePresetId: schema.templateAssets.sizePresetId,
+				orientation: schema.templateAssets.orientation
+			})
+			.from(schema.templateAssets)
+			.where(eq(schema.templateAssets.isPublished, true));
 
 		// Get all size presets to map IDs to slugs
-		const { data: presets, error: presetsError } = await supabase
-			.from('template_size_presets')
-			.select('id, slug')
-			.eq('is_active', true);
-
-		if (presetsError) {
-			console.error('Error fetching size presets:', presetsError);
-			throw error(500, 'Failed to fetch size presets');
-		}
+		const presets = await db
+			.select({
+				id: schema.templateSizePresets.id,
+				slug: schema.templateSizePresets.slug
+			})
+			.from(schema.templateSizePresets)
+			.where(eq(schema.templateSizePresets.isActive, true));
 
 		// Create a map of preset ID to slug
 		const idToSlug: Record<string, string> = {};
-		for (const preset of presets || []) {
+		for (const preset of presets) {
 			idToSlug[preset.id] = preset.slug;
 		}
 
 		// Count assets per size preset slug and orientation
 		const counts: Record<string, number> = {};
-		for (const asset of assets || []) {
-			if (asset.size_preset_id && asset.orientation) {
-				const slug = idToSlug[asset.size_preset_id];
+		for (const asset of assets) {
+			if (asset.sizePresetId && asset.orientation) {
+				const slug = idToSlug[asset.sizePresetId];
 				if (slug) {
 					const key = `${slug}:${asset.orientation}`;
 					counts[key] = (counts[key] || 0) + 1;
@@ -149,22 +145,16 @@ export const getTemplateAssetCounts = query(async (): Promise<Record<string, num
  * Returns the list of available size options for template creation
  */
 export const getSizePresets = query(async (): Promise<SizePreset[]> => {
-	const { user } = await getAuthenticatedUser();
-	const supabase = getAdminClient();
+	await getAuthenticatedUser();
 
 	try {
-		const { data, error: fetchError } = await supabase
-			.from('template_size_presets')
-			.select('*')
-			.eq('is_active', true)
-			.order('sort_order', { ascending: true });
+		const data = await db
+			.select()
+			.from(schema.templateSizePresets)
+			.where(eq(schema.templateSizePresets.isActive, true))
+			.orderBy(schema.templateSizePresets.sortOrder);
 
-		if (fetchError) {
-			console.error('Error fetching size presets:', fetchError);
-			throw error(500, 'Failed to fetch size presets');
-		}
-
-		return (data as SizePreset[]) || [];
+		return (data as unknown as SizePreset[]) || [];
 	} catch (err) {
 		console.error('Error in getSizePresets:', err);
 		throw error(500, 'Failed to fetch size presets');
@@ -179,7 +169,6 @@ export const createCustomDesignRequest = command(
 	'unchecked',
 	async (input: CustomDesignRequestInput): Promise<{ id: string }> => {
 		const { user, org_id } = await getAuthenticatedUser();
-		const supabase = getAdminClient();
 
 		// Validate input
 		const validationResult = customDesignRequestInputSchema.safeParse(input);
@@ -190,28 +179,25 @@ export const createCustomDesignRequest = command(
 		const validatedInput = validationResult.data;
 
 		try {
-			const { data, error: insertError } = await supabase
-				.from('custom_design_requests')
-				.insert({
-					user_id: user.id,
-					org_id: org_id || null,
-					size_preset_id: validatedInput.size_preset_id,
-					width_pixels: validatedInput.width_pixels,
-					height_pixels: validatedInput.height_pixels,
-					size_name: validatedInput.size_name,
-					design_instructions: validatedInput.design_instructions,
-					reference_assets: validatedInput.reference_assets,
+			const [inserted] = await db.insert(schema.customDesignRequests)
+				.values({
+					userId: user.id,
+					orgId: org_id || null,
+					sizePresetId: validatedInput.size_preset_id,
+					widthPixels: validatedInput.width_pixels,
+					heightPixels: validatedInput.height_pixels,
+					sizeName: validatedInput.size_name,
+					designInstructions: validatedInput.design_instructions,
+					referenceAssets: validatedInput.reference_assets,
 					status: 'pending'
 				})
-				.select('id')
-				.single();
+				.returning({ id: schema.customDesignRequests.id });
 
-			if (insertError) {
-				console.error('Error creating custom design request:', insertError);
+			if (!inserted) {
 				throw error(500, 'Failed to create custom design request');
 			}
 
-			return { id: data.id };
+			return { id: inserted.id };
 		} catch (err) {
 			console.error('Error in createCustomDesignRequest:', err);
 			throw error(500, 'Failed to create custom design request');
@@ -227,7 +213,8 @@ export const uploadCustomDesignAsset = command(
 	'unchecked',
 	async ({ file, fileName }: { file: Buffer; fileName: string }): Promise<{ path: string }> => {
 		const { user } = await getAuthenticatedUser();
-		const supabase = getAdminClient();
+        // Storage still uses Supabase
+		const supabase = getStorageClient();
 
 		try {
 			const timestamp = Date.now();
@@ -260,21 +247,15 @@ export const uploadCustomDesignAsset = command(
  */
 export const getUserCustomDesignRequests = query(async (): Promise<CustomDesignRequest[]> => {
 	const { user } = await getAuthenticatedUser();
-	const supabase = getAdminClient();
 
 	try {
-		const { data, error: fetchError } = await supabase
-			.from('custom_design_requests')
-			.select('*')
-			.eq('user_id', user.id)
-			.order('created_at', { ascending: false });
+		const data = await db
+			.select()
+			.from(schema.customDesignRequests)
+			.where(eq(schema.customDesignRequests.userId, user.id))
+			.orderBy(desc(schema.customDesignRequests.createdAt));
 
-		if (fetchError) {
-			console.error('Error fetching user custom design requests:', fetchError);
-			throw error(500, 'Failed to fetch custom design requests');
-		}
-
-		return (data as CustomDesignRequest[]) || [];
+		return (data as unknown as CustomDesignRequest[]) || [];
 	} catch (err) {
 		console.error('Error in getUserCustomDesignRequests:', err);
 		throw error(500, 'Failed to fetch custom design requests');

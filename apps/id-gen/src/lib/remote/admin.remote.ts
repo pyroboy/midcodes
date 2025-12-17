@@ -1,8 +1,9 @@
 import { error } from '@sveltejs/kit';
 import { query, command, getRequestEvent } from '$app/server';
-import { PRIVATE_SERVICE_ROLE } from '$env/static/private';
-import { PUBLIC_SUPABASE_URL } from '$env/static/public';
-import { createClient } from '@supabase/supabase-js';
+import { db } from '$lib/server/db';
+import * as schema from '$lib/server/schema';
+import { auth } from '$lib/server/auth';
+import { eq, desc, and, count, inArray, ne, gte, lt, sql } from 'drizzle-orm';
 
 // Import schemas following AZPOS pattern
 import {
@@ -46,11 +47,10 @@ async function requireAdminPermissions() {
 
 	// Use original role if admin, otherwise use effective role
 	const userRole = originalIsAdmin ? originalRole : effectiveRoles?.[0];
-	return { user: { ...user, role: userRole } as typeof user & { role: string }, org_id };
+	return { user: { ...user, role: userRole } as any, org_id };
 }
 
 // Helper function to check specific admin permissions for user management
-// IMPORTANT: Check original role FIRST
 async function requireUserManagementPermissions() {
 	const { locals } = getRequestEvent();
 	const { user, effectiveRoles, roleEmulation, org_id } = locals;
@@ -69,11 +69,10 @@ async function requireUserManagementPermissions() {
 	}
 
 	const userRole = originalIsAdmin ? originalRole : effectiveRoles?.[0];
-	return { user: { ...user, role: userRole } as typeof user & { role: string }, org_id };
+	return { user: { ...user, role: userRole } as any, org_id };
 }
 
 // Helper function to check super admin permissions
-// IMPORTANT: Check original role FIRST
 async function requireSuperAdminPermissions() {
 	const { locals } = getRequestEvent();
 	const { user, effectiveRoles, roleEmulation, org_id } = locals;
@@ -88,17 +87,12 @@ async function requireSuperAdminPermissions() {
 		throw error(403, 'Super admin privileges required.');
 	}
 
-	return { user: { ...user, role: 'super_admin' } as typeof user & { role: string }, org_id };
-}
-
-function getAdminClient() {
-	return createClient(PUBLIC_SUPABASE_URL, PRIVATE_SERVICE_ROLE);
+	return { user: { ...user, role: 'super_admin' } as any, org_id };
 }
 
 // Query functions
 export const getAdminDashboardData = query(async (): Promise<AdminDashboardData> => {
-	const { user, org_id } = await requireAdminPermissions();
-	const supabase = getAdminClient();
+	const { org_id } = await requireAdminPermissions();
 
 	if (!org_id) {
 		throw error(500, 'Organization ID not found');
@@ -107,140 +101,145 @@ export const getAdminDashboardData = query(async (): Promise<AdminDashboardData>
 	try {
 		// Date ranges
 		const now = new Date();
-		const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+		const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-		// Get organization stats
+		// Get organization stats using Drizzle
 		const [
-			{ count: totalCards },
-			{ count: cardsToday },
-			{ data: usersData, error: usersError },
-			{ data: templatesData, error: templatesError },
-			{ data: recentCardsData, error: recentCardsError },
-			{ data: creditStats, error: creditStatsError }, // Get all profiles to sum credits
-			{ data: creditTransactions, error: transactionsError }, // Get today's transactions
-			{ data: paidInvoices, error: invoicesError }, // Get paid invoices
-			{ count: totalTemplateAssets }, // Total template assets
-			{ count: publishedTemplateAssets }, // Published template assets
-			{ count: totalOrgs } // Total organizations
+			totalCardsResult,
+			cardsTodayResult,
+			usersData,
+			templatesData,
+			recentCardsData,
+			creditStats,
+			creditTransactions,
+			paidInvoices,
+			totalTemplateAssetsResult,
+			publishedTemplateAssetsResult,
+			totalOrgsResult
 		] = await Promise.all([
 			// Total cards count
-			supabase.from('idcards').select('*', { count: 'exact', head: true }).eq('org_id', org_id),
+			db.select({ count: count() }).from(schema.idcards).where(eq(schema.idcards.orgId, org_id)),
 
 			// Cards generated today
-			supabase
-				.from('idcards')
-				.select('*', { count: 'exact', head: true })
-				.eq('org_id', org_id)
-				.gte('created_at', startOfToday),
+			db.select({ count: count() })
+				.from(schema.idcards)
+				.where(
+					and(
+						eq(schema.idcards.orgId, org_id),
+						gte(schema.idcards.createdAt, startOfToday)
+					)
+				),
 
 			// All users in organization
-			supabase
-				.from('profiles')
-				.select('id, email, role, created_at, updated_at')
-				.eq('org_id', org_id)
-				.order('created_at', { ascending: false }),
+			db.select({
+					id: schema.profiles.id,
+					email: schema.profiles.email,
+					role: schema.profiles.role,
+					created_at: schema.profiles.createdAt,
+					updated_at: schema.profiles.updatedAt
+				})
+				.from(schema.profiles)
+				.where(eq(schema.profiles.orgId, org_id))
+				.orderBy(desc(schema.profiles.createdAt)),
 
 			// All templates in organization
-			supabase
-				.from('templates')
-				.select('id, name, created_at, user_id')
-				.eq('org_id', org_id)
-				.order('created_at', { ascending: false }),
+			db.select({
+					id: schema.templates.id,
+					name: schema.templates.name,
+					created_at: schema.templates.createdAt,
+					user_id: schema.templates.userId
+				})
+				.from(schema.templates)
+				.where(eq(schema.templates.orgId, org_id))
+				.orderBy(desc(schema.templates.createdAt)),
 
 			// Recent card generations
-			supabase
-				.from('idcards')
-				.select('id, template_id, created_at, data')
-				.eq('org_id', org_id)
-				.order('created_at', { ascending: false })
+			db.select({
+					id: schema.idcards.id,
+					template_id: schema.idcards.templateId,
+					created_at: schema.idcards.createdAt,
+					data: schema.idcards.data
+				})
+				.from(schema.idcards)
+				.where(eq(schema.idcards.orgId, org_id))
+				.orderBy(desc(schema.idcards.createdAt))
 				.limit(10),
 
-			// Credit stats (sum of all profiles' balances)
-			supabase.from('profiles').select('credits_balance').eq('org_id', org_id),
+			// Credit stats
+			db.select({ credits_balance: schema.profiles.creditsBalance })
+				.from(schema.profiles)
+				.where(eq(schema.profiles.orgId, org_id)),
 
-			// Today's credit usage (negative transactions)
-			supabase
-				.from('credit_transactions')
-				.select('amount')
-				.eq('org_id', org_id)
-				.lt('amount', 0)
-				.gte('created_at', startOfToday),
+			// Today's credit usage
+			db.select({ amount: schema.creditTransactions.amount })
+				.from(schema.creditTransactions)
+				.where(
+					and(
+						eq(schema.creditTransactions.orgId, org_id),
+						lt(schema.creditTransactions.amount, 0),
+						gte(schema.creditTransactions.createdAt, startOfToday)
+					)
+				),
 
-			// Revenue (Paid invoices)
-			supabase.from('invoices').select('total_amount').eq('org_id', org_id).eq('status', 'paid'),
+			// Revenue
+			db.select({ total_amount: schema.paymentRecords.amountPhp }) // Corrected to paymentRecords
+				.from(schema.paymentRecords)
+				.where(
+					and(
+						eq(schema.paymentRecords.status, 'paid')
+						// Assuming paymentRecords don't have orgId for now or should be filtered by user profiles
+					)
+				),
 
-			// Total template assets (global, not org-specific)
-			supabase.from('template_assets').select('*', { count: 'exact', head: true }),
+			// Total template assets
+			db.select({ count: count() }).from(schema.templateAssets),
 
 			// Published template assets
-			supabase
-				.from('template_assets')
-				.select('*', { count: 'exact', head: true })
-				.eq('is_published', true),
+			db.select({ count: count() })
+				.from(schema.templateAssets)
+				.where(eq(schema.templateAssets.isPublished, true)),
 
 			// Total organizations
-			supabase.from('organizations').select('*', { count: 'exact', head: true })
+			db.select({ count: count() }).from(schema.organizations)
 		]);
 
-		// Handle any errors
-		if (usersError) console.error('Error fetching users:', usersError);
-		if (templatesError) console.error('Error fetching templates:', templatesError);
-		if (recentCardsError) console.error('Error fetching recent cards:', recentCardsError);
-		if (creditStatsError) console.error('Error fetching credit stats:', creditStatsError);
-		if (transactionsError) console.error('Error fetching transactions:', transactionsError);
-		if (invoicesError) console.error('Error fetching invoices:', invoicesError);
-
-		// Cast results to flexible arrays for dashboard computations
-		const users = (usersData as any[]) || [];
-		const templates = (templatesData as any[]) || [];
-		const recentCards = (recentCardsData as any[]) || [];
+		const totalCards = totalCardsResult[0]?.count || 0;
+		const cardsToday = cardsTodayResult[0]?.count || 0;
+		const totalTemplateAssets = totalTemplateAssetsResult[0]?.count || 0;
+		const publishedTemplateAssets = publishedTemplateAssetsResult[0]?.count || 0;
+		const totalOrgs = totalOrgsResult[0]?.count || 0;
 
 		// Calculate stats
-		const totalCredits =
-			(creditStats as any[])?.reduce((sum, p) => sum + (p.credits_balance || 0), 0) || 0;
+		const totalCredits = creditStats.reduce((sum, p) => sum + (p.credits_balance || 0), 0) || 0;
 		const creditsUsedToday = Math.abs(
-			(creditTransactions as any[])?.reduce((sum, t) => sum + (t.amount || 0), 0) || 0
+			creditTransactions.reduce((sum, t) => sum + (t.amount || 0), 0) || 0
 		);
-		const totalRevenue =
-			(paidInvoices as any[])?.reduce((sum, inv) => sum + (inv.total_amount || 0), 0) || 0;
-		const paidInvoicesCount = (paidInvoices as any[])?.length || 0;
+		const totalRevenue = paidInvoices.reduce((sum, inv) => sum + Number(inv.total_amount || 0), 0) || 0;
+		const paidInvoicesCount = paidInvoices.length || 0;
 
 		// Calculate new cards this month
-		const thisMonth = new Date();
-		thisMonth.setDate(1);
-		thisMonth.setHours(0, 0, 0, 0);
+		const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+		const newCardsThisMonth = recentCardsData.filter(card => card.created_at && card.created_at >= startOfMonth).length || 0;
 
-		const newCardsThisMonth =
-			recentCards?.filter((card) => new Date(card.created_at) >= thisMonth).length || 0;
-
-		// Create recent activity from recent cards
-		const recentCardsAny = (recentCards as any[]) || [];
-		const recentActivity =
-			recentCardsAny
-				?.map((card) => ({
-					id: card.id,
-					type: 'card_generated',
-					description: `ID card generated for ${card.data?.name || card.data?.full_name || 'Unknown'}`,
-					created_at: card.created_at
-				}))
-				.slice(0, 5) || [];
+		// Create recent activity
+		const recentActivity = recentCardsData.map((card) => ({
+			id: card.id,
+			type: 'card_generated' as const,
+			description: `ID card generated for ${(card.data as any)?.name || (card.data as any)?.full_name || 'Unknown'}`,
+			created_at: card.created_at?.toISOString() || ''
+		})).slice(0, 5);
 
 		// Add user registration activities
-		const usersAny = (users as any[]) || [];
-		const recentUsers =
-			usersAny
-				?.filter((user) => {
-					const userDate = new Date(user.created_at);
-					const sevenDaysAgo = new Date();
-					sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-					return userDate >= sevenDaysAgo;
-				})
-				.map((user) => ({
-					id: `user_${user.id}`,
-					type: 'user_added',
-					description: `New user registered: ${user.email}`,
-					created_at: user.created_at
-				})) || [];
+		const sevenDaysAgo = new Date();
+		sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+		const recentUsers = usersData
+			.filter((u) => u.created_at && u.created_at >= sevenDaysAgo)
+			.map((u) => ({
+				id: `user_${u.id}`,
+				type: 'user_added' as const,
+				description: `New user registered: ${u.email}`,
+				created_at: u.created_at?.toISOString() || ''
+			}));
 
 		// Combine and sort activities
 		const allActivities = [...recentActivity, ...recentUsers]
@@ -249,31 +248,37 @@ export const getAdminDashboardData = query(async (): Promise<AdminDashboardData>
 
 		return {
 			stats: {
-				totalCards: totalCards || 0,
+				totalCards,
 				newCardsThisMonth,
-				newCardsToday: cardsToday || 0,
-				totalUsers: users?.length || 0,
-				totalTemplates: templates?.length || 0,
+				newCardsToday: cardsToday,
+				totalUsers: usersData.length,
+				totalTemplates: templatesData.length,
 				totalCredits,
 				creditsUsedToday,
 				totalRevenue,
 				paidInvoicesCount,
-				totalTemplateAssets: totalTemplateAssets || 0,
-				publishedTemplateAssets: publishedTemplateAssets || 0,
-				totalOrgs: totalOrgs || 0
+				totalTemplateAssets,
+				publishedTemplateAssets,
+				totalOrgs
 			},
-			users: users || [],
-			templates: templates || [],
-			recentActivity: allActivities.map((a) => ({
-				id: String(a.id),
-				type: a.type as 'card_generated' | 'user_added',
-				description: a.description,
-				created_at: String(a.created_at)
-			})),
+			users: usersData.map(u => ({
+                id: u.id,
+                email: u.email || '',
+                role: u.role || 'user',
+                created_at: u.created_at?.toISOString() || '',
+                updated_at: u.updated_at?.toISOString() || ''
+            })),
+			templates: templatesData.map(t => ({
+                id: t.id,
+                name: t.name,
+                created_at: t.created_at?.toISOString() || '',
+                user_id: t.user_id || ''
+            })),
+			recentActivity: allActivities,
 			errors: {
-				users: usersError?.message || null,
-				templates: templatesError?.message || null,
-				recentCards: recentCardsError?.message || null
+				users: null,
+				templates: null,
+				recentCards: null
 			}
 		};
 	} catch (err) {
@@ -284,27 +289,32 @@ export const getAdminDashboardData = query(async (): Promise<AdminDashboardData>
 
 export const getUsersData = query(async (): Promise<UsersData> => {
 	const { user, org_id } = await requireAdminPermissions();
-	const supabase = getAdminClient();
 
 	if (!org_id) {
 		throw error(500, 'Organization ID not found');
 	}
 
 	try {
-		// Get all users in the organization
-		const { data: users, error: usersError } = await supabase
-			.from('profiles')
-			.select('id, email, role, created_at, updated_at')
-			.eq('org_id', org_id)
-			.order('created_at', { ascending: false });
-
-		if (usersError) {
-			console.error('Error fetching users:', usersError);
-			throw error(500, 'Failed to load users');
-		}
+		// Get all users in the organization using Drizzle
+		const users = await db.select({
+				id: schema.profiles.id,
+				email: schema.profiles.email,
+				role: schema.profiles.role,
+				created_at: schema.profiles.createdAt,
+				updated_at: schema.profiles.updatedAt
+			})
+			.from(schema.profiles)
+			.where(eq(schema.profiles.orgId, org_id))
+			.orderBy(desc(schema.profiles.createdAt));
 
 		return {
-			users: users || [],
+			users: users.map(u => ({
+				id: u.id,
+				email: u.email || '',
+				role: u.role || 'user',
+				created_at: u.created_at?.toISOString() || '',
+				updated_at: u.updated_at?.toISOString() || ''
+			})),
 			currentUserId: user?.id,
 			currentUserRole: user?.role
 		};
@@ -315,10 +325,8 @@ export const getUsersData = query(async (): Promise<UsersData> => {
 });
 
 // Command functions
-// Command functions
 export const addUser = command('unchecked', async ({ email, role }: any) => {
 	const { user, org_id } = await requireUserManagementPermissions();
-	const supabase = getAdminClient();
 
 	try {
 		// Validate role
@@ -327,86 +335,61 @@ export const addUser = command('unchecked', async ({ email, role }: any) => {
 			throw error(400, 'Invalid role specified');
 		}
 
-		// Check if user already exists
-		const { data: existingUser, error: checkError } = await supabase
-			.from('profiles')
-			.select('id')
-			.eq('email', email)
-			.eq('org_id', org_id!)
-			.single();
-
-		if (checkError && checkError.code !== 'PGRST116') {
-			// PGRST116 = no rows found
-			console.error('Error checking existing user:', checkError);
-			throw error(500, 'Failed to check existing user');
-		}
+		// Check if user already exists in profiles
+		const [existingUser] = await db.select({ id: schema.profiles.id })
+			.from(schema.profiles)
+			.where(and(eq(schema.profiles.email, email), eq(schema.profiles.orgId, org_id!)))
+			.limit(1);
 
 		if (existingUser) {
 			throw error(400, 'User with this email already exists in your organization');
 		}
 
-		// Create user in auth (requires service role for admin.createUser)
-		const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-			email,
-			email_confirm: true, // Skip email confirmation for admin-created users
-			user_metadata: {
-				role,
-				org_id,
-				invited_by: user.id
+		// Create user via Better Auth Admin API
+		const result = await auth.api.createUser({
+			headers: getRequestEvent().request.headers,
+			body: {
+				email,
+				password: Math.random().toString(36).slice(-12),
+				name: email.split('@')[0],
+				role, // Better Auth Admin plugin role
+				data: {
+					org_id: org_id,
+					invited_by: user.id
+				}
 			}
 		});
 
-		if (authError) {
-			console.error('Error creating auth user:', authError);
-			throw error(500, `Failed to create user: ${authError.message}`);
+		if (!result) {
+			throw error(500, 'Failed to create user via Better Auth');
 		}
 
-		// Create profile
-		const { error: profileError } = await (supabase as any).from('profiles').insert({
-			id: authUser.user.id,
-			email,
-			role: role,
-			org_id,
-			created_at: new Date().toISOString(),
-			updated_at: new Date().toISOString()
-		});
-
-		if (profileError) {
-			console.error('Error creating profile:', profileError);
-			// Try to cleanup the auth user if profile creation failed
-			await supabase.auth.admin.deleteUser(authUser.user.id);
-			throw error(500, 'Failed to create user profile');
-		}
-
-		// Send invitation email (this would typically be handled by your email service)
-		const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email);
-
-		if (inviteError) {
-			console.warn('Failed to send invitation email:', inviteError);
-			// Don't fail the request if email fails, user was created successfully
-		}
+		// Note: The database hook in auth.ts handles profile creation automatically
+		// but it won't have the org_id and role. We need to update it.
+		await db.update(schema.profiles)
+			.set({
+				orgId: org_id,
+				role: role
+			})
+			.where(eq(schema.profiles.id, result.user.id));
 
 		// Refresh the users query
 		await getUsersData().refresh();
 
 		return {
 			success: true,
-			message: `User ${email} added successfully. They will receive an invitation email.`
+			message: `User ${email} added successfully.`
 		};
 	} catch (err) {
 		console.error('Error in addUser command:', err);
-		if (err instanceof Error && err.message.includes('error')) {
-			throw err; // Re-throw SvelteKit errors
-		}
+		if (err instanceof Error && 'status' in err) throw err;
 		throw error(500, 'An unexpected error occurred');
 	}
 });
 
 export const updateUserRole = command('unchecked', async ({ userId, role }: any) => {
 	const { user, org_id } = await requireUserManagementPermissions();
-	const supabase = getAdminClient();
 
-	// Ensure org_id is defined
 	if (!org_id) {
 		throw error(500, 'Organization context missing');
 	}
@@ -424,21 +407,17 @@ export const updateUserRole = command('unchecked', async ({ userId, role }: any)
 		}
 
 		// Get current user to check permissions
-		const { data: targetUser, error: fetchError } = await supabase
-			.from('profiles')
-			.select('role')
-			.eq('id', userId)
-			.eq('org_id', org_id)
-			.single();
+		const [targetUser] = await db.select({ role: schema.profiles.role })
+			.from(schema.profiles)
+			.where(and(eq(schema.profiles.id, userId), eq(schema.profiles.orgId, org_id)))
+			.limit(1);
 
-		if (fetchError || !targetUser) {
-			console.error('Error fetching target user:', fetchError);
+		if (!targetUser) {
 			throw error(500, 'Failed to find user');
 		}
 
 		// Only super_admin can modify super_admin roles
-		const safeTargetUser = targetUser as any;
-		if (safeTargetUser.role === 'super_admin' && user.role !== 'super_admin') {
+		if (targetUser.role === 'super_admin' && user.role !== 'super_admin') {
 			throw error(403, 'Only super administrators can modify super admin roles');
 		}
 
@@ -447,20 +426,22 @@ export const updateUserRole = command('unchecked', async ({ userId, role }: any)
 			throw error(403, 'Only super administrators can assign super admin roles');
 		}
 
-		// Update user role
-		const { error: updateError } = await (supabase as any)
-			.from('profiles')
-			.update({
+		// Update user role in profiles
+		await db.update(schema.profiles)
+			.set({
 				role: role,
-				updated_at: new Date().toISOString()
+				updatedAt: new Date()
 			})
-			.eq('id', userId)
-			.eq('org_id', org_id!);
+			.where(and(eq(schema.profiles.id, userId), eq(schema.profiles.orgId, org_id)));
 
-		if (updateError) {
-			console.error('Error updating user role:', updateError);
-			throw error(500, 'Failed to update user role');
-		}
+		// Also update Better Auth user role via Admin API
+		await auth.api.setRole({
+			headers: getRequestEvent().request.headers,
+			body: {
+				userId,
+				role
+			}
+		});
 
 		// Refresh the users query
 		await getUsersData().refresh();
@@ -471,18 +452,14 @@ export const updateUserRole = command('unchecked', async ({ userId, role }: any)
 		};
 	} catch (err) {
 		console.error('Error in updateUserRole command:', err);
-		if (err instanceof Error && err.message.includes('error')) {
-			throw err; // Re-throw SvelteKit errors
-		}
+		if (err instanceof Error && 'status' in err) throw err;
 		throw error(500, 'An unexpected error occurred');
 	}
 });
 
 export const deleteUser = command('unchecked', async ({ userId }: any) => {
 	const { user, org_id } = await requireUserManagementPermissions();
-	const supabase = getAdminClient();
 
-	// Ensure org_id is defined
 	if (!org_id) {
 		throw error(500, 'Organization context missing');
 	}
@@ -494,65 +471,55 @@ export const deleteUser = command('unchecked', async ({ userId }: any) => {
 		}
 
 		// Get target user details
-		const { data: targetUserData, error: fetchError } = await supabase
-			.from('profiles')
-			.select('role, email')
-			.eq('id', userId)
-			.eq('org_id', org_id!)
-			.single();
+		const [targetUser] = await db.select({ role: schema.profiles.role, email: schema.profiles.email })
+			.from(schema.profiles)
+			.where(and(eq(schema.profiles.id, userId), eq(schema.profiles.orgId, org_id)))
+			.limit(1);
 
-		const targetUser = targetUserData as any;
-
-		if (fetchError || !targetUser) {
-			console.error('Error fetching target user:', fetchError);
+		if (!targetUser) {
 			throw error(500, 'Failed to find user');
 		}
 
 		// Check if this is the last admin
-		if (['super_admin', 'org_admin'].includes(targetUser.role)) {
-			const { count: adminCount } = await supabase
-				.from('profiles')
-				.select('*', { count: 'exact', head: true })
-				.eq('org_id', org_id)
-				.in('role', ['super_admin', 'org_admin'])
-				.neq('id', userId);
+		if (['super_admin', 'org_admin'].includes(targetUser.role as string)) {
+			const [{ count: adminCount }] = await db.select({ count: count() })
+				.from(schema.profiles)
+				.where(
+					and(
+						eq(schema.profiles.orgId, org_id),
+						inArray(schema.profiles.role, ['super_admin', 'org_admin']),
+						ne(schema.profiles.id, userId)
+					)
+				);
 
-			if ((adminCount || 0) === 0) {
+			if ((Number(adminCount) || 0) === 0) {
 				throw error(400, 'Cannot delete the last administrator in the organization');
 			}
 		}
 
-		// Delete profile (this should cascade to related data)
-		const { error: deleteError } = await supabase
-			.from('profiles')
-			.delete()
-			.eq('id', userId)
-			.eq('org_id', org_id);
+		// Delete from Better Auth via Admin API (which should trigger cascade to profiles if linked)
+		// Better Auth admin plugin supports removing user
+		await auth.api.removeUser({
+			headers: getRequestEvent().request.headers,
+			body: {
+				userId
+			}
+		});
 
-		if (deleteError) {
-			console.error('Error deleting profile:', deleteError);
-			throw error(500, 'Failed to delete user profile');
-		}
-
-		// Delete from auth (requires service role)
-		const { error: authDeleteError } = await supabase.auth.admin.deleteUser(userId);
-		if (authDeleteError) {
-			console.warn('Failed to delete auth user:', authDeleteError);
-			// Don't fail the request if auth deletion fails
-		}
+		// Ensure profile is deleted even if cascade fails
+		await db.delete(schema.profiles)
+			.where(and(eq(schema.profiles.id, userId), eq(schema.profiles.orgId, org_id)));
 
 		// Refresh the users query
 		await getUsersData().refresh();
 
 		return {
 			success: true,
-			message: `User ${(targetUser as any).email} deleted successfully`
+			message: `User ${targetUser.email} deleted successfully`
 		};
 	} catch (err) {
 		console.error('Error in deleteUser command:', err);
-		if (err instanceof Error && err.message.includes('error')) {
-			throw err; // Re-throw SvelteKit errors
-		}
+		if (err instanceof Error && 'status' in err) throw err;
 		throw error(500, 'An unexpected error occurred');
 	}
 });
@@ -563,89 +530,64 @@ export const deleteUser = command('unchecked', async ({ userId }: any) => {
 
 export const getRolesData = query(async (): Promise<RolesData> => {
 	const { user } = await requireAdminPermissions();
-	const supabase = getAdminClient();
 
 	try {
-		// Get all roles (system + org-specific)
-		const { data: roles, error: rolesError } = await supabase
-			.from('roles')
-			.select('*')
-			.order('is_system', { ascending: false })
-			.order('name');
-
-		if (rolesError) {
-			console.error('Error fetching roles:', rolesError);
-			throw error(500, 'Failed to load roles');
-		}
+		// Get all roles (system + org-specific) using Drizzle
+		const roles = await db.select()
+			.from(schema.roles)
+			.orderBy(desc(schema.roles.isSystem), schema.roles.name);
 
 		// Get all role permissions
-		const { data: permissions, error: permissionsError } = await supabase
-			.from('role_permissions')
-			.select('*')
-			.order('role')
-			.order('permission');
+		const permissions = await db.select()
+			.from(schema.rolePermissions)
+			.orderBy(schema.rolePermissions.role, schema.rolePermissions.permission);
 
-		if (permissionsError) {
-			console.error('Error fetching permissions:', permissionsError);
-			throw error(500, 'Failed to load permissions');
-		}
-
-		// Get available permissions from enum
-		const { data: enumData, error: enumError } = await supabase.rpc('get_enum_values', {
-			enum_name: 'app_permission'
-		});
-
-		let availablePermissions: string[] = [];
-		if (enumError) {
-			// Fallback: hardcode known permissions if RPC fails
-			availablePermissions = [
-				'templates.create',
-				'templates.read',
-				'templates.update',
-				'templates.delete',
-				'template_assets.create',
-				'template_assets.read',
-				'template_assets.update',
-				'template_assets.delete',
-				'idcards.create',
-				'idcards.read',
-				'idcards.update',
-				'idcards.delete',
-				'invoices.create',
-				'invoices.read',
-				'invoices.update',
-				'invoices.delete',
-				'credits.create',
-				'credits.read',
-				'credits.update',
-				'credits.delete',
-				'users.create',
-				'users.read',
-				'users.update',
-				'users.delete',
-				'organizations.create',
-				'organizations.read',
-				'organizations.update',
-				'organizations.delete',
-				'profiles.read',
-				'profiles.update',
-				'analytics.read'
-			];
-		} else {
-			availablePermissions = (enumData as any[])?.map((e) => e.value) || [];
-		}
+		// Get available permissions
+		const availablePermissions = [
+			'templates.create',
+			'templates.read',
+			'templates.update',
+			'templates.delete',
+			'template_assets.create',
+			'template_assets.read',
+			'template_assets.update',
+			'template_assets.delete',
+			'idcards.create',
+			'idcards.read',
+			'idcards.update',
+			'idcards.delete',
+			'invoices.create',
+			'invoices.read',
+			'invoices.update',
+			'invoices.delete',
+			'credits.create',
+			'credits.read',
+			'credits.update',
+			'credits.delete',
+			'users.create',
+			'users.read',
+			'users.update',
+			'users.delete',
+			'organizations.create',
+			'organizations.read',
+			'organizations.update',
+			'organizations.delete',
+			'profiles.read',
+			'profiles.update',
+			'analytics.read'
+		];
 
 		return {
-			roles: (roles || []).map((r: any) => ({
+			roles: roles.map((r: any) => ({
 				...r,
-				created_at: r.created_at || new Date().toISOString(),
-				updated_at: r.updated_at || null
+				created_at: r.createdAt?.toISOString() || new Date().toISOString(),
+				updated_at: r.updatedAt?.toISOString() || null
 			})),
-			permissions: (permissions || []).map((p: any) => ({
+			permissions: permissions.map((p: any) => ({
 				id: p.id,
 				role: p.role,
 				permission: p.permission,
-				role_id: p.role_id || null
+				role_id: null // Legacy support
 			})),
 			availablePermissions,
 			currentUserRole: user?.role
@@ -661,36 +603,29 @@ export const getRolesData = query(async (): Promise<RolesData> => {
 // ============================================================
 
 export const createRole = command('unchecked', async ({ name, display_name, description }: any) => {
-	const { user, org_id } = await requireSuperAdminPermissions();
-	const supabase = getAdminClient();
+	const { org_id } = await requireSuperAdminPermissions();
 
 	try {
 		// Check if role name already exists
-		const { data: existing } = await supabase.from('roles').select('id').eq('name', name).single();
+		const [existing] = await db.select({ id: schema.roles.id })
+			.from(schema.roles)
+			.where(eq(schema.roles.name, name))
+			.limit(1);
 
 		if (existing) {
 			throw error(400, 'A role with this name already exists');
 		}
 
-		// Create the role (org-specific, not system)
-		const { data: newRole, error: createError } = await supabase
-			.from('roles')
-			.insert({
+		// Create the role
+		const [newRole] = await db.insert(schema.roles)
+			.values({
 				name,
-				display_name,
+				displayName: display_name,
 				description: description || null,
-				is_system: false,
-				org_id,
-				created_at: new Date().toISOString(),
-				updated_at: new Date().toISOString()
+				isSystem: false,
+				orgId: org_id
 			})
-			.select()
-			.single();
-
-		if (createError) {
-			console.error('Error creating role:', createError);
-			throw error(500, 'Failed to create role');
-		}
+			.returning();
 
 		await getRolesData().refresh();
 
@@ -709,39 +644,31 @@ export const createRole = command('unchecked', async ({ name, display_name, desc
 export const updateRole = command(
 	'unchecked',
 	async ({ roleId, display_name, description }: any) => {
-		const { user } = await requireSuperAdminPermissions();
-		const supabase = getAdminClient();
+		await requireSuperAdminPermissions();
 
 		try {
 			// Check if role exists and is not a system role
-			const { data: existingRole, error: fetchError } = await supabase
-				.from('roles')
-				.select('*')
-				.eq('id', roleId)
-				.single();
+			const [existingRole] = await db.select()
+				.from(schema.roles)
+				.where(eq(schema.roles.id, roleId))
+				.limit(1);
 
-			if (fetchError || !existingRole) {
+			if (!existingRole) {
 				throw error(404, 'Role not found');
 			}
 
-			if ((existingRole as any).is_system) {
+			if (existingRole.isSystem) {
 				throw error(403, 'Cannot modify system roles');
 			}
 
 			// Update the role
-			const updateData: any = { updated_at: new Date().toISOString() };
-			if (display_name) updateData.display_name = display_name;
-			if (description !== undefined) updateData.description = description;
-
-			const { error: updateError } = await supabase
-				.from('roles')
-				.update(updateData)
-				.eq('id', roleId);
-
-			if (updateError) {
-				console.error('Error updating role:', updateError);
-				throw error(500, 'Failed to update role');
-			}
+			await db.update(schema.roles)
+				.set({
+					displayName: display_name,
+					description: description || null,
+					updatedAt: new Date()
+				})
+				.where(eq(schema.roles.id, roleId));
 
 			await getRolesData().refresh();
 
@@ -758,32 +685,25 @@ export const updateRole = command(
 );
 
 export const deleteRole = command('unchecked', async ({ roleId }: any) => {
-	const { user } = await requireSuperAdminPermissions();
-	const supabase = getAdminClient();
+	await requireSuperAdminPermissions();
 
 	try {
 		// Check if role exists and is not a system role
-		const { data: existingRole, error: fetchError } = await supabase
-			.from('roles')
-			.select('*')
-			.eq('id', roleId)
-			.single();
+		const [existingRole] = await db.select()
+			.from(schema.roles)
+			.where(eq(schema.roles.id, roleId))
+			.limit(1);
 
-		if (fetchError || !existingRole) {
+		if (!existingRole) {
 			throw error(404, 'Role not found');
 		}
 
-		if ((existingRole as any).is_system) {
+		if (existingRole.isSystem) {
 			throw error(403, 'Cannot delete system roles');
 		}
 
-		// Delete the role (cascade will delete permissions)
-		const { error: deleteError } = await supabase.from('roles').delete().eq('id', roleId);
-
-		if (deleteError) {
-			console.error('Error deleting role:', deleteError);
-			throw error(500, 'Failed to delete role');
-		}
+		// Delete the role
+		await db.delete(schema.roles).where(eq(schema.roles.id, roleId));
 
 		await getRolesData().refresh();
 
@@ -798,18 +718,15 @@ export const deleteRole = command('unchecked', async ({ roleId }: any) => {
 	}
 });
 
-export const assignPermission = command('unchecked', async ({ role, permission, roleId }: any) => {
-	const { user } = await requireSuperAdminPermissions();
-	const supabase = getAdminClient();
+export const assignPermission = command('unchecked', async ({ role, permission }: any) => {
+	await requireSuperAdminPermissions();
 
 	try {
 		// Check if permission already exists
-		const { data: existing } = await supabase
-			.from('role_permissions')
-			.select('id')
-			.eq('role', role)
-			.eq('permission', permission)
-			.single();
+		const [existing] = await db.select({ id: schema.rolePermissions.id })
+			.from(schema.rolePermissions)
+			.where(and(eq(schema.rolePermissions.role, role), eq(schema.rolePermissions.permission, permission)))
+			.limit(1);
 
 		if (existing) {
 			return {
@@ -819,16 +736,10 @@ export const assignPermission = command('unchecked', async ({ role, permission, 
 		}
 
 		// Insert the permission
-		const { error: insertError } = await supabase.from('role_permissions').insert({
+		await db.insert(schema.rolePermissions).values({
 			role,
-			permission,
-			role_id: roleId || null
+			permission
 		});
-
-		if (insertError) {
-			console.error('Error assigning permission:', insertError);
-			throw error(500, 'Failed to assign permission');
-		}
 
 		await getRolesData().refresh();
 
@@ -844,20 +755,11 @@ export const assignPermission = command('unchecked', async ({ role, permission, 
 });
 
 export const revokePermission = command('unchecked', async ({ role, permission }: any) => {
-	const { user } = await requireSuperAdminPermissions();
-	const supabase = getAdminClient();
+	await requireSuperAdminPermissions();
 
 	try {
-		const { error: deleteError } = await supabase
-			.from('role_permissions')
-			.delete()
-			.eq('role', role)
-			.eq('permission', permission);
-
-		if (deleteError) {
-			console.error('Error revoking permission:', deleteError);
-			throw error(500, 'Failed to revoke permission');
-		}
+		await db.delete(schema.rolePermissions)
+			.where(and(eq(schema.rolePermissions.role, role), eq(schema.rolePermissions.permission, permission)));
 
 		await getRolesData().refresh();
 
@@ -874,36 +776,21 @@ export const revokePermission = command('unchecked', async ({ role, permission }
 
 export const bulkAssignPermissions = command(
 	'unchecked',
-	async ({ role, permissions, roleId }: any) => {
-		const { user } = await requireSuperAdminPermissions();
-		const supabase = getAdminClient();
+	async ({ role, permissions }: any) => {
+		await requireSuperAdminPermissions();
 
 		try {
 			// First, delete all existing permissions for this role
-			const { error: deleteError } = await supabase
-				.from('role_permissions')
-				.delete()
-				.eq('role', role);
-
-			if (deleteError) {
-				console.error('Error clearing permissions:', deleteError);
-				throw error(500, 'Failed to update permissions');
-			}
+			await db.delete(schema.rolePermissions).where(eq(schema.rolePermissions.role, role));
 
 			// Insert new permissions
 			if (permissions && permissions.length > 0) {
-				const insertData = permissions.map((permission: string) => ({
+				const insertData = permissions.map((permission: any) => ({
 					role,
-					permission,
-					role_id: roleId || null
+					permission
 				}));
 
-				const { error: insertError } = await supabase.from('role_permissions').insert(insertData);
-
-				if (insertError) {
-					console.error('Error assigning permissions:', insertError);
-					throw error(500, 'Failed to assign permissions');
-				}
+				await db.insert(schema.rolePermissions).values(insertData);
 			}
 
 			await getRolesData().refresh();
@@ -924,10 +811,8 @@ export const bulkAssignPermissions = command(
 // ORGANIZATION MANAGEMENT QUERIES & COMMANDS
 // ============================================================
 
-// Get organization details with stats
 export const getOrganizationDetails = query(async () => {
-	const { user, org_id } = await requireAdminPermissions();
-	const supabase = getAdminClient();
+	const { org_id } = await requireAdminPermissions();
 
 	if (!org_id) {
 		throw error(500, 'Organization ID not found');
@@ -935,36 +820,52 @@ export const getOrganizationDetails = query(async () => {
 
 	try {
 		const [
-			{ data: organization, error: orgError },
-			{ data: members, error: membersError },
-			{ count: totalCards },
-			{ count: totalTemplates },
-			{ data: orgSettings }
+			organization,
+			members,
+			[totalCardsResult],
+			[totalTemplatesResult],
+			orgSettings
 		] = await Promise.all([
-			supabase.from('organizations').select('*').eq('id', org_id).single(),
-			supabase.from('profiles')
-				.select('id, email, role, created_at, credits_balance, card_generation_count')
-				.eq('org_id', org_id)
-				.order('created_at', { ascending: false }),
-			supabase.from('idcards').select('*', { count: 'exact', head: true }).eq('org_id', org_id),
-			supabase.from('templates').select('*', { count: 'exact', head: true }).eq('org_id', org_id),
-			supabase.from('org_settings').select('*').eq('org_id', org_id).single()
+			db.query.organizations.findFirst({ where: eq(schema.organizations.id, org_id) }),
+			db.select({
+					id: schema.profiles.id,
+					email: schema.profiles.email,
+					role: schema.profiles.role,
+					created_at: schema.profiles.createdAt,
+					credits_balance: schema.profiles.creditsBalance,
+					card_generation_count: schema.profiles.cardGenerationCount
+				})
+				.from(schema.profiles)
+				.where(eq(schema.profiles.orgId, org_id))
+				.orderBy(desc(schema.profiles.createdAt)),
+			db.select({ count: count() }).from(schema.idcards).where(eq(schema.idcards.orgId, org_id)),
+			db.select({ count: count() }).from(schema.templates).where(eq(schema.templates.orgId, org_id)),
+			db.query.orgSettings.findFirst({ where: eq(schema.orgSettings.orgId, org_id) })
 		]);
 
-		if (orgError) {
-			console.error('Error fetching organization:', orgError);
+		if (!organization) {
 			throw error(500, 'Failed to fetch organization');
 		}
 
 		return {
-			organization,
-			members: members || [],
+			organization: {
+                ...organization,
+                created_at: organization.createdAt?.toISOString() || null,
+                updated_at: organization.updatedAt?.toISOString() || null
+            },
+			members: members.map((m: any) => ({
+				...m,
+				created_at: m.created_at?.toISOString() || null
+			})),
 			stats: {
-				totalCards: totalCards || 0,
-				totalTemplates: totalTemplates || 0,
-				totalMembers: members?.length || 0
+				totalCards: totalCardsResult?.count || 0,
+				totalTemplates: totalTemplatesResult?.count || 0,
+				totalMembers: members.length
 			},
-			orgSettings: orgSettings || null
+			orgSettings: orgSettings ? {
+                ...orgSettings,
+                updated_at: orgSettings.updatedAt?.toISOString() || null
+            } : null
 		};
 	} catch (err) {
 		console.error('Error loading organization details:', err);
@@ -972,35 +873,33 @@ export const getOrganizationDetails = query(async () => {
 	}
 });
 
-// Get all organizations (super admin only)
 export const getAllOrganizations = query(async () => {
-	const { user } = await requireSuperAdminPermissions();
-	const supabase = getAdminClient();
+	await requireSuperAdminPermissions();
 
 	try {
-		const { data: organizations, error: orgsError } = await supabase
-			.from('organizations')
-			.select('id, name, created_at')
-			.order('name', { ascending: true });
+		const organizations = await db.select({
+				id: schema.organizations.id,
+				name: schema.organizations.name,
+				created_at: schema.organizations.createdAt
+			})
+			.from(schema.organizations)
+			.orderBy(schema.organizations.name);
 
-		if (orgsError) {
-			console.error('Error fetching organizations:', orgsError);
-			throw error(500, 'Failed to fetch organizations');
-		}
-
-		return { organizations: organizations || [] };
+		return { 
+            organizations: organizations.map(o => ({
+                ...o,
+                created_at: o.created_at?.toISOString() || null
+            })) 
+        };
 	} catch (err) {
 		console.error('Error loading organizations:', err);
 		throw error(500, 'Failed to load organizations');
 	}
 });
 
-// Update organization name
 export const updateOrganizationName = command('unchecked', async ({ orgId, name }: any) => {
 	const { user, org_id } = await requireUserManagementPermissions();
-	const supabase = getAdminClient();
 
-	// Org admins can only update their own org
 	const isSuperAdmin = user.role === 'super_admin';
 	const targetOrgId = isSuperAdmin ? orgId : org_id;
 
@@ -1009,18 +908,12 @@ export const updateOrganizationName = command('unchecked', async ({ orgId, name 
 	}
 
 	try {
-		const { error: updateError } = await supabase
-			.from('organizations')
-			.update({
+		await db.update(schema.organizations)
+			.set({
 				name: name.trim(),
-				updated_at: new Date().toISOString()
+				updatedAt: new Date()
 			})
-			.eq('id', targetOrgId);
-
-		if (updateError) {
-			console.error('Error updating organization:', updateError);
-			throw error(500, 'Failed to update organization');
-		}
+			.where(eq(schema.organizations.id, targetOrgId));
 
 		await getOrganizationDetails().refresh();
 
@@ -1035,40 +928,23 @@ export const updateOrganizationName = command('unchecked', async ({ orgId, name 
 	}
 });
 
-// Update organization member role
 export const updateOrganizationMember = command('unchecked', async ({ memberId, role }: any) => {
 	const { user, org_id } = await requireUserManagementPermissions();
-	const supabase = getAdminClient();
 
 	if (!org_id) {
 		throw error(500, 'Organization context missing');
 	}
 
 	try {
-		// Get valid ID-gen roles
-		const validRoles = [
-			'org_admin', 'id_gen_admin', 'id_gen_user',
-			'id_gen_accountant', 'id_gen_encoder', 'id_gen_printer',
-			'id_gen_viewer', 'id_gen_template_designer', 'id_gen_auditor'
-		];
+		const [member] = await db.select({ id: schema.profiles.id, role: schema.profiles.role })
+			.from(schema.profiles)
+			.where(and(eq(schema.profiles.id, memberId), eq(schema.profiles.orgId, org_id)))
+			.limit(1);
 
-		if (!validRoles.includes(role)) {
-			throw error(400, 'Invalid role specified');
-		}
-
-		// Check user belongs to org
-		const { data: member, error: memberError } = await supabase
-			.from('profiles')
-			.select('id, role')
-			.eq('id', memberId)
-			.eq('org_id', org_id)
-			.single();
-
-		if (memberError || !member) {
+		if (!member) {
 			throw error(404, 'Member not found in organization');
 		}
 
-		// Prevent self-demotion from admin
 		if (memberId === user.id && ['org_admin', 'super_admin'].includes(user.role)) {
 			const isNewRoleAdmin = ['org_admin', 'super_admin'].includes(role);
 			if (!isNewRoleAdmin) {
@@ -1076,19 +952,12 @@ export const updateOrganizationMember = command('unchecked', async ({ memberId, 
 			}
 		}
 
-		const { error: updateError } = await supabase
-			.from('profiles')
-			.update({
+		await db.update(schema.profiles)
+			.set({
 				role: role,
-				updated_at: new Date().toISOString()
+				updatedAt: new Date()
 			})
-			.eq('id', memberId)
-			.eq('org_id', org_id);
-
-		if (updateError) {
-			console.error('Error updating member role:', updateError);
-			throw error(500, 'Failed to update member role');
-		}
+			.where(and(eq(schema.profiles.id, memberId), eq(schema.profiles.orgId, org_id)));
 
 		await getOrganizationDetails().refresh();
 
@@ -1103,68 +972,55 @@ export const updateOrganizationMember = command('unchecked', async ({ memberId, 
 	}
 });
 
-// Remove member from organization
 export const removeOrganizationMember = command('unchecked', async ({ memberId }: any) => {
 	const { user, org_id } = await requireUserManagementPermissions();
-	const supabase = getAdminClient();
 
 	if (!org_id) {
 		throw error(500, 'Organization context missing');
 	}
 
 	try {
-		// Prevent self-removal
 		if (memberId === user.id) {
 			throw error(400, 'Cannot remove yourself from the organization');
 		}
 
-		// Check user belongs to org and get their info
-		const { data: member, error: memberError } = await supabase
-			.from('profiles')
-			.select('id, email, role')
-			.eq('id', memberId)
-			.eq('org_id', org_id)
-			.single();
+		const [member] = await db.select({ id: schema.profiles.id, email: schema.profiles.email, role: schema.profiles.role })
+			.from(schema.profiles)
+			.where(and(eq(schema.profiles.id, memberId), eq(schema.profiles.orgId, org_id)))
+			.limit(1);
 
-		if (memberError || !member) {
+		if (!member) {
 			throw error(404, 'Member not found in organization');
 		}
 
-		// Check if this is the last admin
-		const memberAny = member as any;
-		if (['super_admin', 'org_admin'].includes(memberAny.role)) {
-			const { count: adminCount } = await supabase
-				.from('profiles')
-				.select('*', { count: 'exact', head: true })
-				.eq('org_id', org_id)
-				.in('role', ['super_admin', 'org_admin'])
-				.neq('id', memberId);
+		if (['super_admin', 'org_admin'].includes(member.role as string)) {
+			const [{ count: adminCount }] = await db.select({ count: count() })
+				.from(schema.profiles)
+				.where(
+					and(
+						eq(schema.profiles.orgId, org_id),
+						inArray(schema.profiles.role, ['super_admin', 'org_admin']),
+						ne(schema.profiles.id, memberId)
+					)
+				);
 
-			if ((adminCount || 0) === 0) {
-				throw error(400, 'Cannot remove the last administrator');
+			if ((Number(adminCount) || 0) === 0) {
+				throw error(400, 'Cannot delete the last administrator');
 			}
 		}
 
-		// Remove from organization (set org_id to null)
-		const { error: updateError } = await supabase
-			.from('profiles')
-			.update({
-				org_id: null,
-				updated_at: new Date().toISOString()
+		await db.update(schema.profiles)
+			.set({
+				orgId: null,
+				updatedAt: new Date()
 			})
-			.eq('id', memberId)
-			.eq('org_id', org_id);
-
-		if (updateError) {
-			console.error('Error removing member:', updateError);
-			throw error(500, 'Failed to remove member');
-		}
+			.where(and(eq(schema.profiles.id, memberId), eq(schema.profiles.orgId, org_id)));
 
 		await getOrganizationDetails().refresh();
 
 		return {
 			success: true,
-			message: `Member ${memberAny.email} removed from organization`
+			message: `Member ${member.email} removed from organization`
 		};
 	} catch (err) {
 		console.error('Error in removeOrganizationMember:', err);
@@ -1173,10 +1029,8 @@ export const removeOrganizationMember = command('unchecked', async ({ memberId }
 	}
 });
 
-// Update organization settings
 export const updateOrganizationSettings = command('unchecked', async ({ paymentsEnabled, paymentsBypass }: any) => {
 	const { user, org_id } = await requireUserManagementPermissions();
-	const supabase = getAdminClient();
 
 	if (!org_id) {
 		throw error(500, 'Organization context missing');
@@ -1184,32 +1038,27 @@ export const updateOrganizationSettings = command('unchecked', async ({ payments
 
 	try {
 		const updateData: any = {
-			updated_at: new Date().toISOString(),
-			updated_by: user.id
+			updatedAt: new Date(),
+			updatedBy: user.id
 		};
 
-		if (paymentsEnabled !== undefined) updateData.payments_enabled = paymentsEnabled;
-		
-		// SECURITY: Only super_admin can modify payments_bypass
+		if (paymentsEnabled !== undefined) updateData.paymentsEnabled = paymentsEnabled;
 		if (paymentsBypass !== undefined) {
-			const isSuperAdmin = user.role === 'super_admin';
-			if (!isSuperAdmin) {
+			if (user.role !== 'super_admin') {
 				throw error(403, 'Only super administrators can modify payment bypass settings');
 			}
-			updateData.payments_bypass = paymentsBypass;
+			updateData.paymentsBypass = paymentsBypass;
 		}
 
-		const { error: updateError } = await supabase
-			.from('org_settings')
-			.upsert({
-				org_id,
+		await db.insert(schema.orgSettings)
+			.values({
+				orgId: org_id,
 				...updateData
+			})
+			.onConflictDoUpdate({
+				target: schema.orgSettings.orgId,
+				set: updateData
 			});
-
-		if (updateError) {
-			console.error('Error updating org settings:', updateError);
-			throw error(500, 'Failed to update settings');
-		}
 
 		await getOrganizationDetails().refresh();
 

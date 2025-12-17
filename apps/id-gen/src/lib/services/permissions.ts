@@ -3,61 +3,50 @@
  * Permission caching and management service
  * SECURITY: Implements cache invalidation to prevent stale permissions
  */
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { db } from '$lib/server/db';
+import { rolePermissions } from '$lib/server/schema';
+import { inArray } from 'drizzle-orm';
 
 interface CacheEntry {
 	permissions: string[];
 	timestamp: number;
-	userId?: string; // Track which user this cache entry belongs to
+	userId?: string; 
 }
 
 interface PermissionCache {
 	[roleKey: string]: CacheEntry;
 }
 
-// SECURITY: User-specific cache to allow targeted invalidation
 interface UserCacheIndex {
-	[userId: string]: Set<string>; // Maps userId to their cache keys (role combinations)
+	[userId: string]: Set<string>; 
 }
 
 let permissionCache: PermissionCache = {};
 let userCacheIndex: UserCacheIndex = {};
 
-// SECURITY: Reduced TTL from 30 minutes to 5 minutes for better security
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL = 5 * 60 * 1000; 
 
 export async function getUserPermissions(
 	roles: string[] | undefined,
-	supabase: SupabaseClient,
 	userId?: string
 ): Promise<string[]> {
-	// Return empty array if roles is undefined or empty
 	if (!roles || roles.length === 0) {
 		return [];
 	}
 
-	// Create cache key from sorted roles
 	const cacheKey = roles.sort().join(',');
 	const now = Date.now();
 
-	// Check cache
 	if (permissionCache[cacheKey] && now - permissionCache[cacheKey].timestamp < CACHE_TTL) {
 		return permissionCache[cacheKey].permissions;
 	}
 
-	// Fetch permissions for the specified roles
-	const { data, error } = await supabase
-		.from('role_permissions')
-		.select('permission')
-		.in('role', roles);
+	const data = await db
+		.select({ permission: rolePermissions.permission })
+		.from(rolePermissions)
+		.where(inArray(rolePermissions.role, roles as any));
 
-	if (error) {
-		console.error('Error fetching permissions:', error);
-		return [];
-	}
-
-	// Extract unique permissions
-	const permissions = [...new Set(data.map((rp) => rp.permission))];
+	const permissions = [...new Set(data.map((rp) => rp.permission as string))];
 
 	// Update cache
 	permissionCache[cacheKey] = {
