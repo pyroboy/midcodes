@@ -306,8 +306,8 @@ const authGuard: Handle = async ({ event, resolve }) => {
 		"img-src 'self' data: blob: https://*.supabase.co",
 		// Fonts: self + Google Fonts
 		"font-src 'self' https://fonts.gstatic.com",
-		// Connect: self + Supabase APIs + PayMongo + imgly background-removal CDN
-		"connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.paymongo.com https://staticimgly.com https://*.staticimgly.com",
+		// Connect: self + Supabase APIs + PayMongo + Runware AI API + imgly background-removal CDN
+		"connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.paymongo.com https://api.runware.ai https://*.runware.ai https://staticimgly.com https://*.staticimgly.com",
 		// Workers: allow blob for WASM workers (background removal)
 		"worker-src 'self' blob:",
 		// Frame ancestors: prevent clickjacking

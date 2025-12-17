@@ -135,6 +135,110 @@ export async function preloadModel() {
 }
 
 // ============================================================================
+// CLOUD BACKGROUND REMOVAL (using Runware AI API)
+// ============================================================================
+
+/**
+ * Remove background from an image using Runware AI API (server-side).
+ * This is faster and more reliable than the client-side library.
+ *
+ * @param imageSource - Image source (File, Blob, or data URL string)
+ * @param onProgress - Optional progress callback
+ * @returns Blob with transparent background (PNG)
+ */
+export async function removeBackgroundCloud(
+	imageSource: File | Blob | string,
+	onProgress?: (progress: ProcessingProgress) => void
+): Promise<Blob> {
+	onProgress?.({
+		stage: 'loading',
+		progress: 0,
+		message: 'Preparing image...'
+	});
+
+	// Resize image to reduce payload size (max 1024px on longest side)
+	let optimizedSource = imageSource;
+	if (imageSource instanceof File || imageSource instanceof Blob) {
+		optimizedSource = await resizeImageForApi(imageSource, 1024);
+	}
+
+	// Convert to base64 for API
+	let base64Image: string;
+	if (typeof optimizedSource === 'string') {
+		base64Image = optimizedSource;
+	} else {
+		base64Image = await fileToDataUrl(optimizedSource);
+	}
+
+	onProgress?.({
+		stage: 'processing',
+		progress: 30,
+		message: 'Removing background...'
+	});
+
+	try {
+		const response = await fetch('/api/remove-background', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({ imageBase64: base64Image })
+		});
+
+		if (!response.ok) {
+			const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+			throw new Error(errorData.error || `HTTP ${response.status}`);
+		}
+
+		const result = await response.json();
+
+		if (!result.success) {
+			throw new Error(result.error || 'Background removal failed');
+		}
+
+		onProgress?.({
+			stage: 'processing',
+			progress: 80,
+			message: 'Downloading result...'
+		});
+
+		// Fetch the processed image from the URL
+		let processedBlob: Blob;
+		if (result.imageUrl) {
+			const imageResponse = await fetch(result.imageUrl);
+			if (!imageResponse.ok) {
+				throw new Error('Failed to download processed image');
+			}
+			processedBlob = await imageResponse.blob();
+		} else if (result.imageBase64) {
+			// Convert base64 to blob
+			const byteCharacters = atob(result.imageBase64);
+			const byteNumbers = new Array(byteCharacters.length);
+			for (let i = 0; i < byteCharacters.length; i++) {
+				byteNumbers[i] = byteCharacters.charCodeAt(i);
+			}
+			const byteArray = new Uint8Array(byteNumbers);
+			processedBlob = new Blob([byteArray], { type: 'image/png' });
+		} else {
+			throw new Error('No image data in response');
+		}
+
+		onProgress?.({
+			stage: 'complete',
+			progress: 100,
+			message: 'Background removed!'
+		});
+
+		return processedBlob;
+	} catch (error) {
+		console.error('[removeBackgroundCloud] Error:', error);
+		throw new Error(
+			error instanceof Error ? error.message : 'Failed to remove background. Please try again.'
+		);
+	}
+}
+
+// ============================================================================
 // SIGNATURE CLEANING (for Signatures)
 // ============================================================================
 
@@ -267,6 +371,62 @@ function cropTransparentPixels(canvas: HTMLCanvasElement, padding: number): HTML
 	}
 
 	return croppedCanvas;
+}
+
+// ============================================================================
+// IMAGE OPTIMIZATION FOR API
+// ============================================================================
+
+/**
+ * Resize an image to a maximum dimension while maintaining aspect ratio.
+ * Also compresses as JPEG to reduce file size for faster API uploads.
+ *
+ * @param source - Image source (File or Blob)
+ * @param maxDimension - Maximum width or height in pixels (default: 1024)
+ * @returns Compressed Blob (JPEG format)
+ */
+async function resizeImageForApi(source: File | Blob, maxDimension: number = 1024): Promise<Blob> {
+	const img = await loadImage(source);
+	
+	let { width, height } = img;
+	
+	// Only resize if larger than maxDimension
+	if (width > maxDimension || height > maxDimension) {
+		if (width > height) {
+			height = Math.round((height / width) * maxDimension);
+			width = maxDimension;
+		} else {
+			width = Math.round((width / height) * maxDimension);
+			height = maxDimension;
+		}
+	}
+	
+	const canvas = document.createElement('canvas');
+	canvas.width = width;
+	canvas.height = height;
+	
+	const ctx = canvas.getContext('2d');
+	if (!ctx) {
+		throw new Error('Failed to get canvas context');
+	}
+	
+	ctx.drawImage(img, 0, 0, width, height);
+	
+	// Convert to JPEG with 85% quality for good balance of size/quality
+	return new Promise((resolve, reject) => {
+		canvas.toBlob(
+			(blob) => {
+				if (blob) {
+					console.log(`[resizeImageForApi] Resized: ${img.width}x${img.height} → ${width}x${height}, size: ${(blob.size / 1024).toFixed(1)}KB`);
+					resolve(blob);
+				} else {
+					reject(new Error('Failed to convert canvas to blob'));
+				}
+			},
+			'image/jpeg',
+			0.85
+		);
+	});
 }
 
 // ============================================================================

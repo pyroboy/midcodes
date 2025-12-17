@@ -22,7 +22,7 @@
 	import { clearAllIdsCache } from '../../all-ids/allIdsCache';
 	import { clearRemoteFunctionCacheByPrefix } from '$lib/remote/remoteFunctionCache';
 	import {
-		removeBackground,
+		removeBackgroundCloud,
 		cleanSignature,
 		type ProcessingProgress
 	} from '$lib/utils/imageProcessing';
@@ -791,12 +791,11 @@
 		let processedFile = file;
 		
 		// Apply image processing based on element type
-		if (element?.type === 'photo') {
-			// Remove background from photos using AI
+		if (element?.type === 'photo' && aiEnabled) {
+			// Remove background from photos using Runware AI API (cloud-based)
 			try {
-				const blob = await removeBackground(file, (progress) => {
-					// We keep the status object but we don't need to update the UI with text anymore
-					// processingStatus = { ...processingStatus, [variableName]: progress };
+				const blob = await removeBackgroundCloud(file, (progress) => {
+					processingStatus = { ...processingStatus, [variableName]: progress };
 				});
 				
 				processedFile = new File([blob], file.name.replace(/\.[^.]+$/, '.png'), {
