@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { createLowResVersion } from '$lib/utils/imageCropper';
-	import { uploadFile, getSupabaseStorageUrl } from '$lib/utils/supabase';
+	import { getSupabaseStorageUrl } from '$lib/utils/supabase';
 	import { toast } from 'svelte-sonner';
 
 	let { data } = $props();
@@ -39,8 +39,46 @@
 	}
 
 	async function uploadResizedImage(file: File, path: string, bucket: string): Promise<string> {
-		const result = await uploadFile(bucket, path, file);
-		return getSupabaseStorageUrl(result.path, bucket);
+		// Upload via server action (uses authenticated server-side Supabase client)
+		const formData = new FormData();
+		formData.append('file', file);
+		formData.append('path', path);
+		formData.append('bucket', bucket);
+		
+		const response = await fetch('?/uploadThumbnail', {
+			method: 'POST',
+			body: formData
+		});
+		
+		const result = await response.json();
+		console.log('Upload result:', result);
+		
+		// SvelteKit uses devalue serialization for form action responses
+		// The response format is: {type: 'success', status: 200, data: '[{...refs...}, value1, value2, ...]'}
+		if (result.type === 'success' && result.status === 200 && result.data) {
+			try {
+				// Parse the devalue-encoded data array
+				const dataArray = JSON.parse(result.data);
+				// Format: [{success: refIndex, path: refIndex}, successValue, pathValue]
+				// The actual path is typically the last element
+				const pathValue = dataArray[dataArray.length - 1];
+				if (typeof pathValue === 'string' && pathValue.length > 0) {
+					console.log('Upload success, path:', pathValue);
+					return getSupabaseStorageUrl(pathValue, bucket);
+				}
+			} catch (e) {
+				console.error('Failed to parse response:', e);
+			}
+		}
+		
+		// Fallback: check standard format
+		if (result.data?.success && result.data?.path) {
+			return getSupabaseStorageUrl(result.data.path, bucket);
+		}
+		
+		const errorMsg = result.data?.message || result.error?.message || 'Upload failed';
+		console.error('Upload failed:', errorMsg, result);
+		throw new Error(errorMsg);
 	}
 
 	async function processBatch() {
@@ -79,15 +117,24 @@
 					const lowResFile = await createLowResVersion(file);
 					
 					addLog(`Uploading front thumbnail...`);
-					const path = isTemplate 
-						? `front_low_${item.id}_${Date.now()}` // templates usually flat or handled by helper
-						: `thumbnails/front_low_${item.id}_${Date.now()}.jpg`; // ID cards structure
-						
-					// For templates, use the same convention as manual upload if possible
-					// But simplified: bucket/path
-					// Note: uploadImage helper used 'system_batch/${path}' sort of
-					// We'll use a clean path.
-					const uploadPath = isTemplate ? `system_batch/${path}` : path;
+					// Derive path from original to keep in same folder (handles RLS scoping better)
+					let uploadPath;
+					if (isTemplate) {
+						uploadPath = `system_batch/front_low_${item.id}_${Date.now()}.jpg`;
+					} else {
+						// For ID cards, try to put in same folder as original
+						// Original path usually: ORG_ID/TEMPLATE_ID/filename.png
+						if (frontSrc && !frontSrc.startsWith('http')) {
+							const dir = frontSrc.substring(0, frontSrc.lastIndexOf('/'));
+							const name = frontSrc.substring(frontSrc.lastIndexOf('/') + 1);
+							// Create new filename: original_low.jpg
+							const newName = name.replace(/\.[^/.]+$/, '') + '_low.jpg';
+							uploadPath = dir ? `${dir}/${newName}` : `thumbnails/${newName}`;
+						} else {
+							// Fallback if full URL or weird path
+							uploadPath = `thumbnails/front_low_${item.id}_${Date.now()}.jpg`;
+						}
+					}
 
 					frontLowResUrl = await uploadResizedImage(lowResFile, uploadPath, bucket);
 					updated = true;
@@ -102,11 +149,20 @@
 					const lowResFile = await createLowResVersion(file);
 					
 					addLog(`Uploading back thumbnail...`);
-					const path = isTemplate 
-						? `back_low_${item.id}_${Date.now()}`
-						: `thumbnails/back_low_${item.id}_${Date.now()}.jpg`;
-
-					const uploadPath = isTemplate ? `system_batch/${path}` : path;
+					
+					let uploadPath;
+					if (isTemplate) {
+						uploadPath = `system_batch/back_low_${item.id}_${Date.now()}.jpg`;
+					} else {
+						if (backSrc && !backSrc.startsWith('http')) {
+							const dir = backSrc.substring(0, backSrc.lastIndexOf('/'));
+							const name = backSrc.substring(backSrc.lastIndexOf('/') + 1);
+							const newName = name.replace(/\.[^/.]+$/, '') + '_low.jpg';
+							uploadPath = dir ? `${dir}/${newName}` : `thumbnails/${newName}`;
+						} else {
+							uploadPath = `thumbnails/back_low_${item.id}_${Date.now()}.jpg`;
+						}
+					}
 
 					backLowResUrl = await uploadResizedImage(lowResFile, uploadPath, bucket);
 					updated = true;
@@ -196,7 +252,7 @@
 			<div>
 				<h2 class="text-lg font-semibold text-foreground">Batch Optimization Tool</h2>
 				<p class="text-sm text-muted-foreground">
-					Automatically generate and upload low-resolution thumbnails (500px) for all items (Templates and ID Cards) that are missing them.
+					Automatically generate and upload low-resolution thumbnails (300px) for all items (Templates and ID Cards) that are missing them.
 				</p>
 			</div>
 			

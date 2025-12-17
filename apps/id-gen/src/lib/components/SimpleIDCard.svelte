@@ -5,40 +5,53 @@
 	import { Download, Trash2, Eye } from 'lucide-svelte';
 	import { getSupabaseStorageUrl } from '$lib/utils/supabase';
 
-	// Remove rigid type constraints to allow flexibility
-	export let card: any;
-	export let isSelected: boolean = false;
-	export let onToggleSelect: (card: any) => void;
-	export let onDownload: (card: any) => void;
-	export let onDelete: (card: any) => void;
-	export let onOpenPreview: (e: MouseEvent, card: any) => void;
-	export let downloading: boolean = false;
-	export let deleting: boolean = false;
-	// Template dimensions for correct aspect ratio (portrait vs landscape)
-	export let templateDimensions: { width: number; height: number; orientation: 'landscape' | 'portrait' } | null = null;
+	// Props using Svelte 5 $props() rune
+	interface Props {
+		card: any;
+		isSelected?: boolean;
+		onToggleSelect: (card: any) => void;
+		onDownload: (card: any) => void;
+		onDelete: (card: any) => void;
+		onOpenPreview: (e: MouseEvent, card: any) => void;
+		downloading?: boolean;
+		deleting?: boolean;
+		templateDimensions?: { width: number; height: number; orientation: 'landscape' | 'portrait' } | null;
+	}
+
+	let {
+		card,
+		isSelected = false,
+		onToggleSelect,
+		onDownload,
+		onDelete,
+		onOpenPreview,
+		downloading = false,
+		deleting = false,
+		templateDimensions = null
+	}: Props = $props();
 
 	// Calculate aspect ratio from template dimensions
 	// Use actual dimensions if provided, otherwise derive from orientation or default to landscape
-	$: aspectRatio = templateDimensions
+	let aspectRatio = $derived(templateDimensions
 		? `${templateDimensions.width}/${templateDimensions.height}`
-		: '1013/638';
+		: '1013/638');
 
 	// Calculate the "long edge" - this is the max dimension of the card
 	// We use this to ensure uniform visual sizing across different orientations
-	$: longEdge = templateDimensions 
+	let longEdge = $derived(templateDimensions 
 		? Math.max(templateDimensions.width, templateDimensions.height)
-		: 1013;
+		: 1013);
 	
-	$: shortEdge = templateDimensions
+	let shortEdge = $derived(templateDimensions
 		? Math.min(templateDimensions.width, templateDimensions.height)
-		: 638;
+		: 638);
 
 	// Calculate container width that ensures uniform visual footprint:
 	// - For landscape (width > height): use 100% of available width
 	// - For portrait (width < height): width should be (shortEdge/longEdge) of container
 	// This makes the "long edge" visually consistent across both orientations
-	$: isPortrait = templateDimensions ? templateDimensions.width < templateDimensions.height : false;
-	$: containerWidthPercent = isPortrait ? (shortEdge / longEdge) * 100 : 100;
+	let isPortrait = $derived(templateDimensions ? templateDimensions.width < templateDimensions.height : false);
+	let containerWidthPercent = $derived(isPortrait ? (shortEdge / longEdge) * 100 : 100);
 
 	function handleClick(e: MouseEvent) {
 		// Prevent triggering if clicking buttons/checkbox
@@ -47,12 +60,14 @@
 		onOpenPreview?.(e, card);
 	}
 
-	const frontUrl = card.front_image_low_res
+	// Use low-res version if available, fallback to full resolution
+	let frontUrl = $derived(card.front_image_low_res
 		? getSupabaseStorageUrl(card.front_image_low_res, 'rendered-id-cards')
 		: card.front_image
 			? getSupabaseStorageUrl(card.front_image, 'rendered-id-cards')
-			: null;
+			: null);
 </script>
+
 
 <div
 	class="group relative h-full w-full"

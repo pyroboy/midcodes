@@ -1,5 +1,5 @@
-import { error } from '@sveltejs/kit';
-import type { PageServerLoad } from './$types';
+import { error, json } from '@sveltejs/kit';
+import type { PageServerLoad, Actions } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const { supabase, session, org_id } = locals;
@@ -44,7 +44,44 @@ export const load: PageServerLoad = async ({ locals }) => {
 	};
 };
 
-export const actions = {
+export const actions: Actions = {
+	// Upload thumbnail server-side (bypasses browser client auth issues)
+	uploadThumbnail: async ({ request, locals }) => {
+		const { supabase, session } = locals;
+		
+		if (!session) {
+			return { success: false, message: 'Unauthorized' };
+		}
+		
+		const formData = await request.formData();
+		const file = formData.get('file') as File;
+		const path = formData.get('path') as string;
+		const bucket = formData.get('bucket') as string;
+		
+		if (!file || !path || !bucket) {
+			return { success: false, message: 'Missing file, path, or bucket' };
+		}
+		
+		// Convert File to ArrayBuffer for server-side upload
+		const arrayBuffer = await file.arrayBuffer();
+		const uint8Array = new Uint8Array(arrayBuffer);
+		
+		const { data, error: uploadError } = await supabase.storage
+			.from(bucket)
+			.upload(path, uint8Array, {
+				contentType: file.type || 'image/jpeg',
+				cacheControl: '3600',
+				upsert: true
+			});
+		
+		if (uploadError) {
+			console.error('Upload error:', uploadError);
+			return { success: false, message: uploadError.message };
+		}
+		
+		return { success: true, path: data.path };
+	},
+
 	updateLowRes: async ({ request, locals }) => {
 		const { supabase } = locals;
 		const formData = await request.formData();
@@ -64,17 +101,15 @@ export const actions = {
 			if (front_low) updates.front_image_low_res = front_low;
 			if (back_low) updates.back_image_low_res = back_low;
 		}
-		
-		// updates.updated_at = new Date().toISOString(); // idcards might not have updated_at or handle it differently
 
 		const table = type === 'template' ? 'templates' : 'idcards';
 		
-		const { error } = await supabase
+		const { error: dbError } = await supabase
 			.from(table)
 			.update(updates)
 			.eq('id', id);
 
-		if (error) return { success: false, message: error.message };
+		if (dbError) return { success: false, message: dbError.message };
 		
 		return { success: true };
 	}
