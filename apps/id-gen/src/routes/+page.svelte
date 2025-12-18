@@ -28,11 +28,12 @@
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import { getSupabaseStorageUrl } from '$lib/utils/storage';
 	import type { CardSize } from '$lib/utils/sizeConversion';
-	import type { TemplateAsset, ShowcaseImage } from '$lib/schemas/template-assets.schema';
+	import type { TemplateAsset } from '$lib/schemas/template-assets.schema';
 	import { recentViewMode } from '$lib/stores/recentViewMode';
 	import RecentViewModeToggle from '$lib/components/RecentViewModeToggle.svelte';
 	import IDCarousel3D from '$lib/components/IDCarousel3D.svelte';
 	import TemplateCard3D from '$lib/components/TemplateCard3D.svelte';
+	import type { ShowcaseImage } from '$lib/components/card3d';
 	import ClientOnly from '$lib/components/ClientOnly.svelte';
 	import { Slider } from '$lib/components/ui/slider';
 	import { T, Canvas } from '@threlte/core';
