@@ -12,10 +12,17 @@ import { logger } from '$lib/utils/logger';
 import { validateAndLogEnvironment } from '$lib/utils/env-validation';
 import { generateCSRFTokens } from '$lib/server/csrf';
 
-// SECURITY: Validate environment variables at startup
-validateAndLogEnvironment();
+// Flag to track if environment has been validated (runs once on first request)
+let _envValidated = false;
 
 const betterAuthHandle: Handle = async ({ event, resolve }) => {
+	// SECURITY: Validate environment variables on first request
+	// (Cloudflare Workers don't allow this at module scope)
+	if (!_envValidated) {
+		validateAndLogEnvironment();
+		_envValidated = true;
+	}
+
 	// Better Auth session management
 	const result = await auth.api.getSession({
 		headers: event.request.headers
