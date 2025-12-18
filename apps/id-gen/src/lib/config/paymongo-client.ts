@@ -7,7 +7,7 @@
  * IMPORTANT: Only public variables are exposed here!
  */
 
-import { publicConfig } from './environment';
+import { publicConfig } from './public-env';
 import { browser } from '$app/environment';
 
 export const paymongoClientConfig = {

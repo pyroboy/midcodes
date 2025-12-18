@@ -28,7 +28,7 @@
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import { getSupabaseStorageUrl } from '$lib/utils/storage';
 	import type { CardSize } from '$lib/utils/sizeConversion';
-	import type { TemplateAsset } from '$lib/schemas/template-assets.schema';
+	import type { TemplateAsset, ShowcaseImage } from '$lib/schemas/template-assets.schema';
 	import { recentViewMode } from '$lib/stores/recentViewMode';
 	import RecentViewModeToggle from '$lib/components/RecentViewModeToggle.svelte';
 	import IDCarousel3D from '$lib/components/IDCarousel3D.svelte';
@@ -99,13 +99,11 @@
 	let showAnimateText = $state(true);
 	let showShadowControls = $state(false); // Collapsed by default
 
-	const fallbackAssets = [
+	const fallbackAssets: ShowcaseImage[] = [
 		{
-			id: 'fallback-error',
 			image_url: '/placeholder_error_card.png',
 			width_pixels: 1024,
 			height_pixels: 1024,
-			name: 'Database Empty',
 			orientation: 'landscape'
 		}
 	];
