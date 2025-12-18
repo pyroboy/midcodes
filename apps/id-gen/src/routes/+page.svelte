@@ -99,6 +99,17 @@
 	let showAnimateText = $state(true);
 	let showShadowControls = $state(false); // Collapsed by default
 
+	const fallbackAssets = [
+		{
+			id: 'fallback-error',
+			image_url: '/placeholder_error_card.png',
+			width_pixels: 1024,
+			height_pixels: 1024,
+			name: 'Database Empty',
+			orientation: 'landscape'
+		}
+	];
+
 	// Card rotation and opacity for shadow sync
 	let cardRotationY = $state(0);
 	let shadowOpacity = $state(0.35);
@@ -754,7 +765,7 @@
 								animateText={showAnimateText}
 								rotating={false}
 								onRotationChange={handleRotationChange}
-								showcaseImages={data.templateAssets || []}
+								showcaseImages={(data.templateAssets && data.templateAssets.length > 0) ? data.templateAssets : fallbackAssets}
 								beatMs={beatMs}
 								onBeat={handleBeat}
 								spinSpeed={spinSpeed}
