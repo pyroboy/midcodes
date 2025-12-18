@@ -1,6 +1,9 @@
 import type { LayoutServerLoad } from './$types';
 import { error, redirect } from '@sveltejs/kit';
 import { checkSuperAdmin, checkAdmin } from '$lib/utils/adminPermissions';
+import { db } from '$lib/server/db';
+import { organizations } from '$lib/server/schema';
+import { eq } from 'drizzle-orm';
 
 export const load: LayoutServerLoad = async ({ locals, url, setHeaders }) => {
 	// Prevent caching of admin pages
@@ -9,7 +12,7 @@ export const load: LayoutServerLoad = async ({ locals, url, setHeaders }) => {
 		'Pragma': 'no-cache',
 		'Expires': '0'
 	});
-	const { supabase, session, user, org_id, permissions, effectiveRoles, roleEmulation } = locals;
+	const { session, user, org_id, permissions, effectiveRoles, roleEmulation } = locals;
 
 	// Check if user is authenticated
 	if (!session || !user) {
@@ -33,7 +36,7 @@ export const load: LayoutServerLoad = async ({ locals, url, setHeaders }) => {
 				user: {
 					id: user.id,
 					email: user.email,
-					role: user.role
+					role: (user as any).role
 				},
 				organization: null,
 				org_id,
@@ -48,18 +51,19 @@ export const load: LayoutServerLoad = async ({ locals, url, setHeaders }) => {
 		throw error(403, 'Access denied. Admin privileges required.');
 	}
 
-	// Get organization information
+	// Get organization information using Drizzle
 	let organization = null;
 	if (org_id) {
-		const { data: orgData, error: orgError } = await supabase
-			.from('organizations')
-			.select('id, name, created_at')
-			.eq('id', org_id)
-			.single();
+		const [orgData] = await db.select({
+			id: organizations.id,
+			name: organizations.name,
+			created_at: organizations.createdAt
+		})
+			.from(organizations)
+			.where(eq(organizations.id, org_id))
+			.limit(1);
 
-		if (orgError) {
-			console.error('Error fetching organization:', orgError);
-		} else {
+		if (orgData) {
 			organization = orgData;
 		}
 	}
@@ -83,7 +87,7 @@ export const load: LayoutServerLoad = async ({ locals, url, setHeaders }) => {
 		user: {
 			id: user.id,
 			email: user.email,
-			role: user.role
+			role: (user as any).role
 		},
 		organization,
 		org_id,

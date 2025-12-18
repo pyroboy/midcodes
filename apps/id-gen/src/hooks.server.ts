@@ -25,6 +25,7 @@ const betterAuthHandle: Handle = async ({ event, resolve }) => {
 	event.locals.session = result?.session ?? null;
 	event.locals.user = result?.user ?? null;
 
+
 	if (result?.user) {
 		// Fetch profile data from Neon via Drizzle
 		const [userProfile] = await db

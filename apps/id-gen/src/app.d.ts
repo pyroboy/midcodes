@@ -22,6 +22,8 @@ declare global {
 			csrfToken?: string;
 		}
 
+
+
 		interface PageData {
 			user?: User | null;
 			org_id?: string;

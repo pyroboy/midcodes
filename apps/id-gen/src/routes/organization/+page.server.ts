@@ -1,11 +1,14 @@
 import type { PageServerLoad } from './$types';
 import { error, redirect } from '@sveltejs/kit';
 import { hasRole, checkSuperAdmin } from '$lib/utils/adminPermissions';
+import { db } from '$lib/server/db';
+import { organizations, profiles, idcards, templates, orgSettings, roles } from '$lib/server/schema';
+import { eq, desc, sql, or, isNull } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ parent, locals }) => {
 	// Get data from parent layout (authentication check happens there)
 	const parentData = await parent();
-	const { supabase, user, org_id } = locals;
+	const { user, org_id } = locals;
 
 	if (!user) {
 		throw redirect(303, '/auth');
@@ -25,60 +28,62 @@ export const load: PageServerLoad = async ({ parent, locals }) => {
 
 	try {
 		// Fetch current organization details
-		const { data: organization, error: orgError } = await supabase
-			.from('organizations')
-			.select('*')
-			.eq('id', org_id)
-			.single();
+		const [organization] = await db.select()
+			.from(organizations)
+			.where(eq(organizations.id, org_id))
+			.limit(1);
 
-		if (orgError) {
-			console.error('Error fetching organization:', orgError);
+		if (!organization) {
 			throw error(500, 'Failed to fetch organization');
 		}
 
 		// Fetch organization members with their profiles
-		const { data: members, error: membersError } = await supabase
-			.from('profiles')
-			.select('id, email, role, created_at, updated_at, credits_balance, card_generation_count')
-			.eq('org_id', org_id)
-			.order('created_at', { ascending: false });
-
-		if (membersError) {
-			console.error('Error fetching members:', membersError);
-		}
+		const members = await db.select({
+			id: profiles.id,
+			email: profiles.email,
+			role: profiles.role,
+			created_at: profiles.createdAt,
+			updated_at: profiles.updatedAt,
+			credits_balance: profiles.creditsBalance,
+			card_generation_count: profiles.cardGenerationCount
+		})
+			.from(profiles)
+			.where(eq(profiles.orgId, org_id))
+			.orderBy(desc(profiles.createdAt));
 
 		// Fetch org statistics
-		const [
-			{ count: totalCards },
-			{ count: totalTemplates },
-			{ data: orgSettings }
-		] = await Promise.all([
-			supabase.from('idcards').select('*', { count: 'exact', head: true }).eq('org_id', org_id),
-			supabase.from('templates').select('*', { count: 'exact', head: true }).eq('org_id', org_id),
-			supabase.from('org_settings').select('*').eq('org_id', org_id).single()
+		const [totalCardsResult, totalTemplatesResult, orgSettingsData] = await Promise.all([
+			db.select({ count: sql<number>`count(*)` }).from(idcards).where(eq(idcards.orgId, org_id)),
+			db.select({ count: sql<number>`count(*)` }).from(templates).where(eq(templates.orgId, org_id)),
+			db.select().from(orgSettings).where(eq(orgSettings.orgId, org_id)).limit(1)
 		]);
 
-		// Fetch available roles (system roles + org-specific roles)
-		const { data: availableRoles, error: rolesError } = await supabase
-			.from('roles')
-			.select('id, name, display_name, description, is_system, org_id')
-			.or(`org_id.is.null,org_id.eq.${org_id}`)
-			.order('name', { ascending: true });
+		const totalCards = Number(totalCardsResult[0]?.count || 0);
+		const totalTemplates = Number(totalTemplatesResult[0]?.count || 0);
 
-		if (rolesError) {
-			console.error('Error fetching roles:', rolesError);
-		}
+		// Fetch available roles (system roles + org-specific roles)
+		const availableRoles = await db.select({
+			id: roles.id,
+			name: roles.name,
+			display_name: roles.displayName,
+			description: roles.description,
+			is_system: roles.isSystem,
+			org_id: roles.orgId
+		})
+			.from(roles)
+			.where(or(isNull(roles.orgId), eq(roles.orgId, org_id)))
+			.orderBy(roles.name);
 
 		return {
 			...parentData,
 			organization,
 			members: members || [],
 			stats: {
-				totalCards: totalCards || 0,
-				totalTemplates: totalTemplates || 0,
+				totalCards,
+				totalTemplates,
 				totalMembers: members?.length || 0
 			},
-			orgSettings: orgSettings || null,
+			orgSettings: orgSettingsData[0] || null,
 			availableRoles: availableRoles || [],
 			capabilities: {
 				isSuperAdmin,

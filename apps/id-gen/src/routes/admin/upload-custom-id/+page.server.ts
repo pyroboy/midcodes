@@ -1,13 +1,17 @@
 import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { checkRateLimit, createRateLimitResponse, RateLimitConfigs } from '$lib/utils/rate-limiter';
+import { checkRateLimit, RateLimitConfigs } from '$lib/utils/rate-limiter';
 import { validateImageUploadServer, sanitizeFilename } from '$lib/utils/fileValidation';
+import { db } from '$lib/server/db';
+import { templates, idcards } from '$lib/server/schema';
+import { eq } from 'drizzle-orm';
+import { getSupabaseAdmin } from '$lib/server/supabase';
 
 // SECURITY: Maximum file size for uploads (10MB)
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 export const load: PageServerLoad = async ({ locals }) => {
-	const { supabase, org_id } = locals;
+	const { org_id } = locals;
 
 	if (!org_id) {
 		return {
@@ -15,28 +19,23 @@ export const load: PageServerLoad = async ({ locals }) => {
 		};
 	}
 
-	// Fetch templates for the dropdown
-	const { data: templates, error: templatesError } = await supabase
-		.from('templates')
-		.select('id, name')
-		.eq('org_id', org_id)
-		.order('name', { ascending: true });
-
-	if (templatesError) {
-		console.error('Error fetching templates:', templatesError);
-		return {
-			templates: []
-		};
-	}
+	// Fetch templates for the dropdown with Drizzle
+	const templatesData = await db.select({
+		id: templates.id,
+		name: templates.name
+	})
+		.from(templates)
+		.where(eq(templates.orgId, org_id))
+		.orderBy(templates.name);
 
 	return {
-		templates: templates || []
+		templates: templatesData || []
 	};
 };
 
 export const actions: Actions = {
 	upload: async ({ request, locals }) => {
-		const { supabase, org_id, user } = locals;
+		const { org_id, user } = locals;
 
 		// SECURITY: Rate limiting for file uploads
 		const rateLimitResult = checkRateLimit(
@@ -89,9 +88,12 @@ export const actions: Actions = {
 			const safeFrontName = sanitizeFilename(frontImage.name);
 			const safeBackName = sanitizeFilename(backImage.name);
 
+			// Get supabaseAdmin for storage operations (hybrid approach)
+			const supabaseAdmin = getSupabaseAdmin();
+
 			// Upload front image with sanitized name
 			const frontPath = `front_custom_${Date.now()}_${safeFrontName}`;
-			const { error: frontUploadError } = await supabase.storage
+			const { error: frontUploadError } = await supabaseAdmin.storage
 				.from('rendered-id-cards')
 				.upload(frontPath, new Blob([frontBuffer], { type: frontValidation.detectedMime }), {
 					contentType: frontValidation.detectedMime,
@@ -105,7 +107,7 @@ export const actions: Actions = {
 
 			// Upload back image with sanitized name
 			const backPath = `back_custom_${Date.now()}_${safeBackName}`;
-			const { error: backUploadError } = await supabase.storage
+			const { error: backUploadError } = await supabaseAdmin.storage
 				.from('rendered-id-cards')
 				.upload(backPath, new Blob([backBuffer], { type: backValidation.detectedMime }), {
 					contentType: backValidation.detectedMime,
@@ -115,23 +117,23 @@ export const actions: Actions = {
 			if (backUploadError) {
 				console.error('Error uploading back image:', backUploadError);
 				// Cleanup front image
-				await supabase.storage.from('rendered-id-cards').remove([frontPath]);
+				await supabaseAdmin.storage.from('rendered-id-cards').remove([frontPath]);
 				return fail(500, { error: 'Failed to upload back image' });
 			}
 
-			// Insert ID card record
-			const { error: insertError } = await supabase.from('idcards').insert({
-				template_id: templateId,
-				org_id: org_id,
-				front_image: frontPath,
-				back_image: backPath,
-				data: {}
-			} as any);
-
-			if (insertError) {
+			// Insert ID card record with Drizzle
+			try {
+				await db.insert(idcards).values({
+					templateId: templateId,
+					orgId: org_id,
+					frontImage: frontPath,
+					backImage: backPath,
+					data: {}
+				});
+			} catch (insertError: any) {
 				console.error('Error inserting ID card:', insertError);
 				// Cleanup uploaded images
-				await supabase.storage.from('rendered-id-cards').remove([frontPath, backPath]);
+				await supabaseAdmin.storage.from('rendered-id-cards').remove([frontPath, backPath]);
 				return fail(500, { error: 'Failed to save ID card' });
 			}
 
@@ -142,4 +144,3 @@ export const actions: Actions = {
 		}
 	}
 };
-

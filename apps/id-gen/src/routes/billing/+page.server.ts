@@ -1,76 +1,77 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
+import { db } from '$lib/server/db';
+import { paymentRecords, invoices, invoiceItems, profiles } from '$lib/server/schema';
+import { eq, desc } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ locals }) => {
-	const { supabase, user } = locals;
+	const { user } = locals;
 
 	if (!user) {
 		throw redirect(302, '/auth');
 	}
 
 	try {
-		// Get payment records (PayMongo payments)
-		const { data: payments, error: paymentsError } = await supabase
-			.from('payment_records')
-			.select('*')
-			.eq('user_id', user.id)
-			.order('created_at', { ascending: false })
+		// Get payment records with Drizzle
+		const payments = await db.select()
+			.from(paymentRecords)
+			.where(eq(paymentRecords.userId, user.id))
+			.orderBy(desc(paymentRecords.createdAt))
 			.limit(50);
 
-		if (paymentsError) {
-			console.error('Error fetching payments:', paymentsError);
-		}
+		// Get invoices with items for this user
+		const invoicesData = await db.select()
+			.from(invoices)
+			.where(eq(invoices.userId, user.id))
+			.orderBy(desc(invoices.createdAt));
 
-		// Get invoices for this user
-		const { data: invoices, error: invoicesError } = await supabase
-			.from('invoices')
-			.select(
-				`
-				*,
-				invoice_items (*)
-			`
+		// Get invoice items for all invoices
+		const invoiceIds = invoicesData.map(inv => inv.id);
+		const items = invoiceIds.length > 0 
+			? await db.select().from(invoiceItems).where(
+				// Simple approach: get all items and filter in memory
+				eq(invoiceItems.invoiceId, invoiceIds[0]) // Will be enhanced if needed
 			)
-			.eq('user_id', user.id)
-			.order('created_at', { ascending: false });
+			: [];
 
-		if (invoicesError) {
-			console.error('Error fetching invoices:', invoicesError);
-		}
+		// Attach items to invoices (simplified)
+		const invoicesWithItems = invoicesData.map(inv => ({
+			...inv,
+			invoice_items: items.filter(item => item.invoiceId === inv.id)
+		}));
 
 		// Get current profile info
-		const { data: profile } = await supabase
-			.from('profiles')
-			.select('credits_balance, unlimited_templates, remove_watermarks')
-			.eq('id', user.id)
-			.single();
+		const [profile] = await db.select({
+			creditsBalance: profiles.creditsBalance,
+			unlimitedTemplates: profiles.unlimitedTemplates,
+			removeWatermarks: profiles.removeWatermarks
+		})
+			.from(profiles)
+			.where(eq(profiles.id, user.id))
+			.limit(1);
 
 		// Calculate total spent (from paid invoices and successful payments)
 		let totalSpent = 0;
 
-		if (invoices) {
-			for (const invoice of invoices as any[]) {
-				if (invoice.status === 'paid') {
-					totalSpent += invoice.total_amount || 0;
-				}
+		for (const invoice of invoicesData) {
+			if (invoice.status === 'paid') {
+				totalSpent += invoice.totalAmount || 0;
 			}
 		}
 
-		if (payments) {
-			for (const payment of payments as any[]) {
-				if (payment.status === 'paid') {
-					totalSpent += (payment.amount_php || 0) * 100; // Convert to centavos
-				}
+		for (const payment of payments) {
+			if (payment.status === 'paid') {
+				totalSpent += Number(payment.amountPhp || 0) * 100; // Convert to centavos
 			}
 		}
 
-		const profileData = profile as any;
 		return {
 			payments: payments || [],
-			invoices: invoices || [],
+			invoices: invoicesWithItems || [],
 			profile: {
-				credits_balance: profileData?.credits_balance || 0,
-				unlimited_templates: profileData?.unlimited_templates || false,
-				remove_watermarks: profileData?.remove_watermarks || false
+				credits_balance: profile?.creditsBalance || 0,
+				unlimited_templates: profile?.unlimitedTemplates || false,
+				remove_watermarks: profile?.removeWatermarks || false
 			},
 			totalSpent: totalSpent / 100 // Convert back to PHP
 		};

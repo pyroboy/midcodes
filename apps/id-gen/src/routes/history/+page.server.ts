@@ -1,9 +1,12 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import type { CreditTransaction } from '$lib/schemas/billing.schema';
+import { db } from '$lib/server/db';
+import { creditTransactions, profiles, idcards, templates } from '$lib/server/schema';
+import { eq, desc, gte, sql, and } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
-	const { supabase, user, org_id } = locals;
+	const { user, org_id } = locals;
 
 	if (!user) {
 		throw redirect(302, '/auth');
@@ -16,85 +19,93 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	try {
 		// Build query for credit transactions
-		let query = supabase
-			.from('credit_transactions')
-			.select('*', { count: 'exact' })
-			.eq('user_id', user.id)
-			.order('created_at', { ascending: false })
-			.range(offset, offset + limit - 1);
+		const whereConditions = type && type !== 'all'
+			? and(eq(creditTransactions.userId, user.id), eq(creditTransactions.transactionType, type))
+			: eq(creditTransactions.userId, user.id);
 
-		// Filter by transaction type
-		if (type && type !== 'all') {
-			query = query.eq('transaction_type', type);
-		}
+		const transactions = await db.select()
+			.from(creditTransactions)
+			.where(whereConditions)
+			.orderBy(desc(creditTransactions.createdAt))
+			.limit(limit)
+			.offset(offset);
 
-		const { data: transactions, count, error } = await query;
-
-		if (error) {
-			console.error('Error fetching transactions:', error);
-		}
+		// Get total count
+		const countResult = await db.select({ count: sql<number>`count(*)` })
+			.from(creditTransactions)
+			.where(whereConditions);
+		const count = Number(countResult[0]?.count || 0);
 
 		// Get user's current credit info
-		const { data: profile } = await supabase
-			.from('profiles')
-			.select('credits_balance, card_generation_count, template_count, unlimited_templates')
-			.eq('id', user.id)
-			.single();
+		const [profile] = await db.select({
+			creditsBalance: profiles.creditsBalance,
+			cardGenerationCount: profiles.cardGenerationCount,
+			templateCount: profiles.templateCount,
+			unlimitedTemplates: profiles.unlimitedTemplates
+		})
+			.from(profiles)
+			.where(eq(profiles.id, user.id))
+			.limit(1);
 
 		// Get usage summary for current month
 		const startOfMonth = new Date();
 		startOfMonth.setDate(1);
 		startOfMonth.setHours(0, 0, 0, 0);
 
-		const { data: monthlyTransactions } = await supabase
-			.from('credit_transactions')
-			.select('amount, transaction_type')
-			.eq('user_id', user.id)
-			.gte('created_at', startOfMonth.toISOString());
+		const monthlyTransactions = await db.select({
+			amount: creditTransactions.amount,
+			transactionType: creditTransactions.transactionType
+		})
+			.from(creditTransactions)
+			.where(and(
+				eq(creditTransactions.userId, user.id),
+				gte(creditTransactions.createdAt, startOfMonth)
+			));
 
 		// Calculate monthly usage
 		let creditsUsedThisMonth = 0;
 		let creditsPurchasedThisMonth = 0;
 
-		if (monthlyTransactions) {
-			for (const tx of monthlyTransactions as any[]) {
-				if (tx.transaction_type === 'usage' && tx.amount < 0) {
-					creditsUsedThisMonth += Math.abs(tx.amount);
-				} else if (tx.transaction_type === 'purchase' && tx.amount > 0) {
-					creditsPurchasedThisMonth += tx.amount;
-				}
+		for (const tx of monthlyTransactions) {
+			if (tx.transactionType === 'usage' && tx.amount < 0) {
+				creditsUsedThisMonth += Math.abs(tx.amount);
+			} else if (tx.transactionType === 'purchase' && tx.amount > 0) {
+				creditsPurchasedThisMonth += tx.amount;
 			}
 		}
 
 		// Get ID cards and templates created this month
-		const { count: cardsThisMonth } = await supabase
-			.from('idcards')
-			.select('*', { count: 'exact', head: true })
-			.eq('org_id', org_id!)
-			.gte('created_at', startOfMonth.toISOString());
+		const cardsThisMonthResult = await db.select({ count: sql<number>`count(*)` })
+			.from(idcards)
+			.where(and(
+				eq(idcards.orgId, org_id!),
+				gte(idcards.createdAt, startOfMonth)
+			));
+		const cardsThisMonth = Number(cardsThisMonthResult[0]?.count || 0);
 
-		const { count: templatesThisMonth } = await supabase
-			.from('templates')
-			.select('*', { count: 'exact', head: true })
-			.eq('org_id', org_id!)
-			.gte('created_at', startOfMonth.toISOString());
+		const templatesThisMonthResult = await db.select({ count: sql<number>`count(*)` })
+			.from(templates)
+			.where(and(
+				eq(templates.orgId, org_id!),
+				gte(templates.createdAt, startOfMonth)
+			));
+		const templatesThisMonth = Number(templatesThisMonthResult[0]?.count || 0);
 
-		const profileData = profile as any;
 		return {
-			transactions: (transactions || []) as CreditTransaction[],
-			totalCount: count || 0,
+			transactions: (transactions || []) as unknown as CreditTransaction[],
+			totalCount: count,
 			currentPage: page,
-			totalPages: Math.ceil((count || 0) / limit),
+			totalPages: Math.ceil(count / limit),
 			filterType: type,
 			summary: {
-				currentBalance: profileData?.credits_balance || 0,
-				cardGenerationCount: profileData?.card_generation_count || 0,
-				templateCount: profileData?.template_count || 0,
-				unlimitedTemplates: profileData?.unlimited_templates || false,
+				currentBalance: profile?.creditsBalance || 0,
+				cardGenerationCount: profile?.cardGenerationCount || 0,
+				templateCount: profile?.templateCount || 0,
+				unlimitedTemplates: profile?.unlimitedTemplates || false,
 				creditsUsedThisMonth,
 				creditsPurchasedThisMonth,
-				cardsThisMonth: cardsThisMonth || 0,
-				templatesThisMonth: templatesThisMonth || 0
+				cardsThisMonth,
+				templatesThisMonth
 			}
 		};
 	} catch (error) {

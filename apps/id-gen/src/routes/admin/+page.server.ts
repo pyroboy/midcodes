@@ -1,8 +1,11 @@
 import type { PageServerLoad, Actions } from './$types';
 import { error, fail } from '@sveltejs/kit';
+import { db } from '$lib/server/db';
+import { idcards, profiles, templates } from '$lib/server/schema';
+import { eq, desc, sql, and, gte } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ locals, parent }) => {
-	const { supabase, user, org_id } = locals;
+	const { user, org_id } = locals;
 
 	// Ensure we have parent data (user auth and permissions)
 	await parent();
@@ -12,54 +15,57 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 	}
 
 	try {
-		// Get organization stats
+		// Get organization stats with Drizzle
 		const [
-			{ count: totalCards },
-			{ data: usersData, error: usersError },
-			{ data: templatesData, error: templatesError },
-			{ data: recentCardsData, error: recentCardsError }
+			totalCardsResult,
+			usersData,
+			templatesData,
+			recentCardsData
 		] = await Promise.all([
 			// Total cards count
-			supabase.from('idcards').select('*', { count: 'exact', head: true }).eq('org_id', org_id),
+			db.select({ count: sql<number>`count(*)` })
+				.from(idcards)
+				.where(eq(idcards.orgId, org_id)),
 
 			// All users in organization
-			supabase
-				.from('profiles')
-				.select('id, email, role, created_at, updated_at')
-				.eq('org_id', org_id)
-				.order('created_at', { ascending: false }),
+			db.select({
+				id: profiles.id,
+				email: profiles.email,
+				role: profiles.role,
+				created_at: profiles.createdAt,
+				updated_at: profiles.updatedAt
+			})
+				.from(profiles)
+				.where(eq(profiles.orgId, org_id))
+				.orderBy(desc(profiles.createdAt)),
 
 			// All templates in organization
-			supabase
-				.from('templates')
-				.select('id, name, created_at, user_id')
-				.eq('org_id', org_id)
-				.order('created_at', { ascending: false }),
+			db.select({
+				id: templates.id,
+				name: templates.name,
+				created_at: templates.createdAt,
+				user_id: templates.userId
+			})
+				.from(templates)
+				.where(eq(templates.orgId, org_id))
+				.orderBy(desc(templates.createdAt)),
 
 			// Recent card generations
-			supabase
-				.from('idcards')
-				.select('id, template_id, created_at, data')
-				.eq('org_id', org_id)
-				.order('created_at', { ascending: false })
+			db.select({
+				id: idcards.id,
+				template_id: idcards.templateId,
+				created_at: idcards.createdAt,
+				data: idcards.data
+			})
+				.from(idcards)
+				.where(eq(idcards.orgId, org_id))
+				.orderBy(desc(idcards.createdAt))
 				.limit(10)
 		]);
 
-		// Handle any errors
-		if (usersError) {
-			console.error('Error fetching users:', usersError);
-		}
-		if (templatesError) {
-			console.error('Error fetching templates:', templatesError);
-		}
-		if (recentCardsError) {
-			console.error('Error fetching recent cards:', recentCardsError);
-		}
-
-		// Cast query results to flexible types for dashboard computations
-		const users = usersData as any[] | null;
-		const templates = templatesData as any[] | null;
-		const recentCards = recentCardsData as any[] | null;
+		const totalCards = Number(totalCardsResult[0]?.count || 0);
+		const users = usersData as any[];
+		const recentCards = recentCardsData as any[];
 
 		// Calculate new cards this month
 		const thisMonth = new Date();
@@ -107,12 +113,12 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 				newCardsThisMonth
 			},
 			users: users || [],
-			templates: templates || [],
+			templates: templatesData || [],
 			recentActivity: allActivities,
 			errors: {
-				users: usersError?.message || null,
-				templates: templatesError?.message || null,
-				recentCards: recentCardsError?.message || null
+				users: null,
+				templates: null,
+				recentCards: null
 			}
 		};
 	} catch (err) {
@@ -124,12 +130,10 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 export const actions: Actions = {
 	// Action for quick user role updates or other admin actions
 	updateUserRole: async ({ request, locals }) => {
-		const { supabase, user, org_id } = locals;
+		const { user, org_id } = locals;
 
-		// Check user roles from app_metadata
-		const userRoles = user?.app_metadata?.role
-			? [user.app_metadata.role]
-			: user?.app_metadata?.roles || [];
+		// Check user permissions via effectiveRoles
+		const userRoles = locals.effectiveRoles || [];
 		const hasAdminPermission = userRoles.some((role: string) =>
 			['super_admin', 'org_admin', 'property_admin'].includes(role)
 		);
@@ -153,16 +157,16 @@ export const actions: Actions = {
 				return fail(400, { error: 'Invalid role specified' });
 			}
 
-			// Update user role
-			const { error: updateError } = await (supabase.from('profiles') as any)
-				.update({ role: newRole, updated_at: new Date().toISOString() } as any)
-				.eq('id', userId)
-				.eq('org_id', org_id!); // Ensure user belongs to same org
-
-			if (updateError) {
-				console.error('Error updating user role:', updateError);
-				return fail(500, { error: 'Failed to update user role' });
-			}
+			// Update user role with Drizzle
+			await db.update(profiles)
+				.set({ 
+					role: newRole as any, 
+					updatedAt: new Date() 
+				})
+				.where(and(
+					eq(profiles.id, userId),
+					eq(profiles.orgId, org_id!)
+				));
 
 			return { success: true, message: 'User role updated successfully' };
 		} catch (err) {
@@ -172,12 +176,10 @@ export const actions: Actions = {
 	},
 
 	deleteUser: async ({ request, locals }) => {
-		const { supabase, user, org_id } = locals;
+		const { user, org_id } = locals;
 
-		// Check user roles from app_metadata
-		const userRoles = user?.app_metadata?.role
-			? [user.app_metadata.role]
-			: user?.app_metadata?.roles || [];
+		// Check user permissions via effectiveRoles
+		const userRoles = locals.effectiveRoles || [];
 		const hasDeletePermission = userRoles.some((role: string) =>
 			['super_admin', 'org_admin', 'property_admin'].includes(role)
 		);
@@ -199,16 +201,12 @@ export const actions: Actions = {
 				return fail(400, { error: 'Cannot delete your own account' });
 			}
 
-			// Delete user profile (this should cascade to related data)
-			const { error: deleteError } = await (supabase.from('profiles') as any)
-				.delete()
-				.eq('id', userId)
-				.eq('org_id', org_id!); // Ensure user belongs to same org
-
-			if (deleteError) {
-				console.error('Error deleting user:', deleteError);
-				return fail(500, { error: 'Failed to delete user' });
-			}
+			// Delete user profile with Drizzle
+			await db.delete(profiles)
+				.where(and(
+					eq(profiles.id, userId),
+					eq(profiles.orgId, org_id!)
+				));
 
 			return { success: true, message: 'User deleted successfully' };
 		} catch (err) {
@@ -217,3 +215,4 @@ export const actions: Actions = {
 		}
 	}
 };
+

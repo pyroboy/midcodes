@@ -1,4 +1,7 @@
 import type { PageServerLoad } from './$types';
+import { db } from '$lib/server/db';
+import { orgSettings } from '$lib/server/schema';
+import { eq } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ locals, setHeaders }) => {
 	// Cache for 5 minutes (org settings rarely change)
@@ -6,19 +9,19 @@ export const load: PageServerLoad = async ({ locals, setHeaders }) => {
 		'cache-control': 'private, max-age=300'
 	});
 
-	const { supabase, org_id, user } = locals;
+	const { org_id, user } = locals;
 	let paymentsEnabled = true;
 
-	// Check if payments are enabled for this organization
+	// Check if payments are enabled for this organization using Drizzle
 	if (org_id) {
-		const { data: settingsData } = await supabase
-			.from('org_settings')
-			.select('payments_enabled')
-			.eq('org_id', org_id)
-			.single();
+		const [settings] = await db.select({
+			paymentsEnabled: orgSettings.paymentsEnabled
+		})
+			.from(orgSettings)
+			.where(eq(orgSettings.orgId, org_id))
+			.limit(1);
 
-		const settings = settingsData as any;
-		paymentsEnabled = settings?.payments_enabled ?? true;
+		paymentsEnabled = settings?.paymentsEnabled ?? true;
 	}
 
 	return {

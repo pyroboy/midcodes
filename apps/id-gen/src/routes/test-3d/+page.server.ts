@@ -1,15 +1,18 @@
 import type { PageServerLoad } from './$types';
+import { db } from '$lib/server/db';
+import { idcards } from '$lib/server/schema';
+import { eq, desc } from 'drizzle-orm';
 
 interface CardData {
-    id: number;
-    template_id: number;
+    id: string;
+    template_id: string | null;
     front_image: string | null;
     back_image: string | null;
-    created_at: string;
+    created_at: Date | null;
 }
 
 export const load: PageServerLoad = async ({ locals }) => {
-    const { supabase, org_id } = locals;
+    const { org_id } = locals;
 
     if (!org_id) {
         return {
@@ -17,25 +20,27 @@ export const load: PageServerLoad = async ({ locals }) => {
         };
     }
 
-    // Fetch recent ID cards for textures
-    const { data: cardsData, error: cardsError } = await supabase
-        .from('idcards')
-        .select(`
-			id, 
-			template_id, 
-			front_image, 
-			back_image, 
-			created_at
-		`)
-        .eq('org_id', org_id)
-        .order('created_at', { ascending: false })
-        .limit(12);
+    try {
+        // Fetch recent ID cards for textures using Drizzle
+        const cardsData = await db.select({
+            id: idcards.id,
+            template_id: idcards.templateId,
+            front_image: idcards.frontImage,
+            back_image: idcards.backImage,
+            created_at: idcards.createdAt
+        })
+            .from(idcards)
+            .where(eq(idcards.orgId, org_id))
+            .orderBy(desc(idcards.createdAt))
+            .limit(12);
 
-    if (cardsError) {
-        console.error('❌ [test-3d] Error fetching cards:', cardsError);
+        return {
+            cards: cardsData || []
+        };
+    } catch (error) {
+        console.error('❌ [test-3d] Error fetching cards:', error);
+        return {
+            cards: []
+        };
     }
-
-    return {
-        cards: cardsData || []
-    };
 };

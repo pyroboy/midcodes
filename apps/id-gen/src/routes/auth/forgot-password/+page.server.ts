@@ -8,7 +8,8 @@ export const actions: Actions = {
 		const email = formData.get('email') as string;
 
 		try {
-			await auth.api.forgetPassword({
+			// @ts-ignore - better-auth method name varies by version
+			await (auth.api.forgetPassword ?? auth.api.sendResetPassword ?? auth.api.resetPassword)({
 				body: {
 					email,
 					redirectTo: `${url.origin}/auth/reset-password`

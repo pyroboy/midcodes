@@ -1,43 +1,58 @@
-import { error, json } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
+import { db } from '$lib/server/db';
+import { templates, idcards } from '$lib/server/schema';
+import { eq } from 'drizzle-orm';
+import { getSupabaseAdmin } from '$lib/server/supabase';
 
 export const load: PageServerLoad = async ({ locals }) => {
-	const { supabase, session, org_id } = locals;
+	const { session, org_id } = locals;
 
 	if (!session) {
 		throw error(401, 'Unauthorized');
 	}
 
-	// Fetch all templates
-	const { data: templates } = await supabase
-		.from('templates')
-		.select('id, name, front_background, back_background, front_background_low_res, back_background_low_res')
-		.eq('org_id', org_id);
+	// Fetch all templates with Drizzle
+	const templatesData = await db.select({
+		id: templates.id,
+		name: templates.name,
+		front_background: templates.frontBackground,
+		back_background: templates.backBackground,
+		front_background_low_res: templates.frontBackgroundLowRes,
+		back_background_low_res: templates.backBackgroundLowRes
+	})
+		.from(templates)
+		.where(eq(templates.orgId, org_id!));
 
-	// Fetch all idcards
-	const { data: idcards } = await supabase
-		.from('idcards')
-		.select('id, front_image, back_image, front_image_low_res, back_image_low_res')
-		.eq('org_id', org_id);
+	// Fetch all idcards with Drizzle
+	const idcardsData = await db.select({
+		id: idcards.id,
+		front_image: idcards.frontImage,
+		back_image: idcards.backImage,
+		front_image_low_res: idcards.frontImageLowRes,
+		back_image_low_res: idcards.backImageLowRes
+	})
+		.from(idcards)
+		.where(eq(idcards.orgId, org_id!));
 
-	const templatesToOptimize = (templates || []).filter(t => 
+	const templatesToOptimize = (templatesData || []).filter((t: any) => 
 		(t.front_background && !t.front_background_low_res) || 
 		(t.back_background && !t.back_background_low_res)
-	).map(t => ({ ...t, type: 'template' }));
+	).map((t: any) => ({ ...t, type: 'template' }));
 
-	const idcardsToOptimize = (idcards || []).filter(c => 
+	const idcardsToOptimize = (idcardsData || []).filter((c: any) => 
 		(c.front_image && !c.front_image_low_res) || 
 		(c.back_image && !c.back_image_low_res)
-	).map(c => ({ ...c, type: 'idcard', name: `ID Card ${c.id.slice(0,8)}` }));
+	).map((c: any) => ({ ...c, type: 'idcard', name: `ID Card ${c.id.slice(0,8)}` }));
 
 	const allToOptimize = [...templatesToOptimize, ...idcardsToOptimize];
 
 	return {
 		stats: {
-			totalTemplates: templates?.length || 0,
-			totalCards: idcards?.length || 0,
-			optimizedTemplates: (templates?.length || 0) - templatesToOptimize.length,
-			optimizedCards: (idcards?.length || 0) - idcardsToOptimize.length,
+			totalTemplates: templatesData?.length || 0,
+			totalCards: idcardsData?.length || 0,
+			optimizedTemplates: (templatesData?.length || 0) - templatesToOptimize.length,
+			optimizedCards: (idcardsData?.length || 0) - idcardsToOptimize.length,
 			needsOptimization: allToOptimize.length
 		},
 		itemsToOptimize: allToOptimize
@@ -45,9 +60,9 @@ export const load: PageServerLoad = async ({ locals }) => {
 };
 
 export const actions: Actions = {
-	// Upload thumbnail server-side (bypasses browser client auth issues)
+	// Upload thumbnail server-side using supabaseAdmin for storage
 	uploadThumbnail: async ({ request, locals }) => {
-		const { supabase, session } = locals;
+		const { session } = locals;
 		
 		if (!session) {
 			return { success: false, message: 'Unauthorized' };
@@ -66,7 +81,9 @@ export const actions: Actions = {
 		const arrayBuffer = await file.arrayBuffer();
 		const uint8Array = new Uint8Array(arrayBuffer);
 		
-		const { data, error: uploadError } = await supabase.storage
+		// Use supabaseAdmin for storage operations (hybrid approach)
+		const supabaseAdmin = getSupabaseAdmin();
+		const { data, error: uploadError } = await supabaseAdmin.storage
 			.from(bucket)
 			.upload(path, uint8Array, {
 				contentType: file.type || 'image/jpeg',
@@ -83,7 +100,6 @@ export const actions: Actions = {
 	},
 
 	updateLowRes: async ({ request, locals }) => {
-		const { supabase } = locals;
 		const formData = await request.formData();
 		
 		const id = formData.get('id') as string;
@@ -93,24 +109,28 @@ export const actions: Actions = {
 
 		if (!id || !type) return { success: false, message: 'Missing ID or Type' };
 
-		const updates: any = {};
-		if (type === 'template') {
-			if (front_low) updates.front_background_low_res = front_low;
-			if (back_low) updates.back_background_low_res = back_low;
-		} else {
-			if (front_low) updates.front_image_low_res = front_low;
-			if (back_low) updates.back_image_low_res = back_low;
+		try {
+			if (type === 'template') {
+				const updates: any = {};
+				if (front_low) updates.frontBackgroundLowRes = front_low;
+				if (back_low) updates.backBackgroundLowRes = back_low;
+				
+				await db.update(templates)
+					.set(updates)
+					.where(eq(templates.id, id));
+			} else {
+				const updates: any = {};
+				if (front_low) updates.frontImageLowRes = front_low;
+				if (back_low) updates.backImageLowRes = back_low;
+				
+				await db.update(idcards)
+					.set(updates)
+					.where(eq(idcards.id, id));
+			}
+			
+			return { success: true };
+		} catch (dbError: any) {
+			return { success: false, message: dbError.message };
 		}
-
-		const table = type === 'template' ? 'templates' : 'idcards';
-		
-		const { error: dbError } = await supabase
-			.from(table)
-			.update(updates)
-			.eq('id', id);
-
-		if (dbError) return { success: false, message: dbError.message };
-		
-		return { success: true };
 	}
 };

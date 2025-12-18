@@ -1,8 +1,11 @@
 import type { PageServerLoad, Actions } from './$types';
 import { error, fail, redirect } from '@sveltejs/kit';
+import { db } from '$lib/server/db';
+import { profiles, organizations, templates, idcards } from '$lib/server/schema';
+import { eq, count, and } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ locals }) => {
-	const { supabase, session, user, org_id } = locals;
+	const { session, user, org_id } = locals;
 
 	// Check if user is authenticated
 	if (!session || !user) {
@@ -11,49 +14,35 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	try {
 		// Get user profile with preferences
-		const { data: profile, error: profileError } = await supabase
-			.from('profiles')
-			.select('id, email, role, created_at, updated_at, context')
-			.eq('id', user.id)
-			.single();
+		const profile = await db.query.profiles.findFirst({
+			where: eq(profiles.id, user.id)
+		});
 
-		if (profileError) {
-			console.error('Error fetching profile:', profileError);
-			throw error(500, 'Failed to load profile data');
+		if (!profile) {
+			throw error(404, 'Profile not found');
 		}
 
 		// Get organization information
 		let organization = null;
 		if (org_id) {
-			const { data: orgData, error: orgError } = await supabase
-				.from('organizations')
-				.select('id, name, created_at')
-				.eq('id', org_id)
-				.single();
+			const orgData = await db.query.organizations.findFirst({
+				where: eq(organizations.id, org_id)
+			});
 
-			if (orgError) {
-				console.error('Error fetching organization:', orgError);
-			} else {
+			if (orgData) {
 				organization = orgData;
 			}
 		}
 
 		// Get available templates for default template selection
-		const { data: templates, error: templatesError } = await supabase
-			.from('templates')
-			.select('id, name')
-			.eq('org_id', org_id || '')
-			.order('name');
-
-		if (templatesError) {
-			console.error('Error fetching templates:', templatesError);
-		}
+		const templatesList = await db.query.templates.findMany({
+			where: eq(templates.orgId, org_id || ''),
+			orderBy: (templates, { asc }) => [asc(templates.name)]
+		});
 
 		// Get user statistics
-		const { count: cardsCreated } = await supabase
-			.from('idcards')
-			.select('*', { count: 'exact', head: true })
-			.eq('user_id', user.id);
+		// Note: profiles table has card_generation_count which we can use
+		const cardsCreated = profile.cardGenerationCount || 0;
 
 		// Extract preferences from context
 		const profileData = profile as any;
@@ -66,15 +55,15 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 		return {
 			profile: {
-				id: profileData.id,
-				email: profileData.email,
-				role: profileData.role,
-				created_at: profileData.created_at,
-				updated_at: profileData.updated_at
+				id: profile.id,
+				email: profile.email,
+				role: profile.role,
+				created_at: profile.createdAt,
+				updated_at: profile.updatedAt
 			},
 			organization,
 			preferences,
-			templates: templates || [],
+			templates: templatesList || [],
 			userStats: {
 				cardsCreated: cardsCreated || 0
 			}
@@ -100,17 +89,11 @@ export const actions: Actions = {
 			// Email updates should go through proper email verification flow
 
 			// Update timestamp
-			const { error: updateError } = await (supabase as any)
-				.from('profiles')
-				.update({
-					updated_at: new Date().toISOString()
+			await db.update(profiles)
+				.set({
+					updatedAt: new Date()
 				})
-				.eq('id', user.id);
-
-			if (updateError) {
-				console.error('Error updating profile:', updateError);
-				return fail(500, { error: 'Failed to update profile' });
-			}
+				.where(eq(profiles.id, user.id));
 
 			return {
 				success: true,

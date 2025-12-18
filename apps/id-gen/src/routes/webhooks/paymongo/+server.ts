@@ -167,7 +167,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			}
 
 			// Extract metadata from our safe local record
-			const { user_id, metadata, kind, amount_php } = localRecord;
+			const { userId: user_id, metadata, kind, amountPhp: amount_php } = localRecord;
 			// We need org_id, but payment_records might not have it directly if it's on the user profile
 			// However `processPaymentAndAddCreditsAtomic` asks for `orgId`.
 			// Let's assume we can get it from the user profile or metadata if stored.
@@ -180,14 +180,15 @@ export const POST: RequestHandler = async ({ request }) => {
 			// It doesn't seem to store `orgId`.
 			// We should fetch the user's profile to get the org_id.
 			
-			const { supabaseAdmin } = await import('$lib/server/supabase');
-			const { data: userProfile } = await supabaseAdmin
-				.from('profiles')
-				.select('org_id')
-				.eq('id', user_id)
-				.single();
+			const { db } = await import('$lib/server/db');
+			const { profiles } = await import('$lib/server/schema');
+			const { eq } = await import('drizzle-orm');
+			const userProfile = await db.query.profiles.findFirst({
+				where: eq(profiles.id, user_id),
+				columns: { orgId: true }
+			});
 				
-			if (!userProfile?.org_id) {
+			if (!userProfile?.orgId) {
 				console.error('User has no organization:', user_id);
 				return new Response(JSON.stringify({ received: true, error: 'no_org' }));
 			}
@@ -209,7 +210,7 @@ export const POST: RequestHandler = async ({ request }) => {
 					paidAt: new Date(),
 					rawEvent: event,
 					userId: user_id,
-					orgId: userProfile.org_id,
+					orgId: userProfile.orgId,
 					creditsToAdd: creditPackage.credits,
 					packageName: creditPackage.name,
 					packageId: packageId,
@@ -217,7 +218,7 @@ export const POST: RequestHandler = async ({ request }) => {
 				});
 
 				if (!result.success) {
-					console.error('Failed to process credit payment:', result.error);
+					console.error('Failed to process credit payment:', ('error' in result) ? result.error : 'Unknown error');
 					return new Response(JSON.stringify({ error: 'Processing failed' }), { status: 500 });
 				}
 			} else if (kind === 'feature') {

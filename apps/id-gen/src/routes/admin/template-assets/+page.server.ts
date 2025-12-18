@@ -1,19 +1,16 @@
 import { fail, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
+import { db } from '$lib/server/db';
+import { templateSizePresets, templateAssets } from '$lib/server/schema';
+import { eq } from 'drizzle-orm';
+import { getSupabaseAdmin } from '$lib/server/supabase';
 
 export const load: PageServerLoad = async ({ locals }) => {
-	const { supabase } = locals;
-
-	// Fetch size presets from database
-	const { data: sizePresets, error: presetsError } = await supabase
-		.from('template_size_presets')
-		.select('*')
-		.eq('is_active', true)
-		.order('sort_order');
-
-	if (presetsError) {
-		console.error('Error fetching size presets:', presetsError);
-	}
+	// Fetch size presets from database with Drizzle
+	const sizePresets = await db.select()
+		.from(templateSizePresets)
+		.where(eq(templateSizePresets.isActive, true))
+		.orderBy(templateSizePresets.sortOrder);
 
 	return {
 		sizePresets: sizePresets ?? []
@@ -22,7 +19,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 export const actions: Actions = {
 	saveAsset: async ({ request, locals }) => {
-		const { supabase, user } = locals;
+		const { user } = locals;
 
 		if (!user) {
 			return fail(401, { error: 'You must be logged in to save assets' });
@@ -49,8 +46,11 @@ export const actions: Actions = {
 
 			const tags = tagsJson ? JSON.parse(tagsJson) : [];
 
+			// Get supabaseAdmin for storage operations (hybrid approach)
+			const supabaseAdmin = getSupabaseAdmin();
+
 			// 1. Upload to Supabase Storage
-			const { error: uploadError } = await supabase.storage
+			const { error: uploadError } = await supabaseAdmin.storage
 				.from('template-assets')
 				.upload(filename, imageBlob, {
 					contentType: 'image/png',
@@ -63,40 +63,35 @@ export const actions: Actions = {
 			}
 
 			// 2. Get Public URL
-			const { data: { publicUrl } } = supabase.storage
+			const { data: { publicUrl } } = supabaseAdmin.storage
 				.from('template-assets')
 				.getPublicUrl(filename);
 
-			// 3. Insert into Database
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const { error: dbError, data: asset } = await supabase
-				.from('template_assets')
-				.insert({
+			// 3. Insert into Database with Drizzle
+			try {
+				const [asset] = await db.insert(templateAssets).values({
 					name,
-					description,
-					category,
-					tags,
-					size_preset_id: sizePresetId,
-					sample_type: sampleType,
-					orientation,
-					image_path: filename,
-					image_url: publicUrl,
-					width_pixels: widthPixels,
-					height_pixels: heightPixels,
-					uploaded_by: user.id,
-					is_published: true
-				} as any)
-				.select()
-				.single();
+					description: description || undefined,
+					category: category || undefined,
+					tags: tags,
+					sizePresetId: sizePresetId || undefined,
+					sampleType: sampleType as any,
+					orientation: orientation as any,
+					imagePath: filename,
+					imageUrl: publicUrl,
+					widthPixels,
+					heightPixels,
+					uploadedBy: user.id,
+					isPublished: true
+				}).returning();
 
-			if (dbError) {
+				return { success: true, asset };
+			} catch (dbError: any) {
 				// Rollback storage upload
-				await supabase.storage.from('template-assets').remove([filename]);
+				await supabaseAdmin.storage.from('template-assets').remove([filename]);
 				console.error('Database insert error:', dbError);
 				return fail(500, { error: `Failed to save asset record: ${dbError.message}` });
 			}
-
-			return { success: true, asset };
 		} catch (e) {
 			console.error('Unexpected error in saveAsset:', e);
 			return fail(500, { error: e instanceof Error ? e.message : 'Unexpected error' });

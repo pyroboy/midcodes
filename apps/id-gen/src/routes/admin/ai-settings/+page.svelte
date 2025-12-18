@@ -53,8 +53,8 @@
 			if (s) {
 				provider = s.provider || 'nano_banana';
 				model = s.model || 'default';
-				isEnabled = s.is_enabled ?? true;
-				rateLimit = s.rate_limit_per_minute || 60;
+				isEnabled = s.isEnabled ?? true;
+				rateLimit = s.rateLimitPerMinute || 60;
 			}
 		});
 	});
@@ -195,7 +195,7 @@
 						API Status
 					</CardDescription>
 					<CardTitle class="text-2xl">
-						{#if settingsData?.api_key_last_four}
+						{#if settingsData?.apiKeyLastFour}
 							<span class="text-green-600">Connected</span>
 						{:else}
 							<span class="text-amber-600">Not Configured</span>
@@ -204,8 +204,8 @@
 				</CardHeader>
 				<CardContent>
 					<p class="text-xs text-muted-foreground">
-						{#if settingsData?.api_key_last_four}
-							Key ending in ...{settingsData.api_key_last_four}
+						{#if settingsData?.apiKeyLastFour}
+							Key ending in ...{settingsData.apiKeyLastFour}
 						{:else}
 							Add an API key to enable AI features
 						{/if}
@@ -219,11 +219,11 @@
 						<Sparkles class="w-4 h-4" />
 						AI Credits Balance
 					</CardDescription>
-					<CardTitle class="text-2xl">{formatNumber(settingsData?.credits_balance || 0)}</CardTitle>
+					<CardTitle class="text-2xl">{formatNumber(settingsData?.creditsBalance || 0)}</CardTitle>
 				</CardHeader>
 				<CardContent>
 					<p class="text-xs text-muted-foreground">
-						{formatNumber(settingsData?.credits_used || 0)} used total
+						{formatNumber(settingsData?.creditsUsed || 0)} used total
 					</p>
 				</CardContent>
 			</Card>
@@ -250,7 +250,7 @@
 						Status
 					</CardDescription>
 					<CardTitle class="text-2xl">
-						{#if settingsData?.is_enabled}
+						{#if settingsData?.isEnabled}
 							<span class="text-green-600">Enabled</span>
 						{:else}
 							<span class="text-red-600">Disabled</span>
@@ -259,7 +259,7 @@
 				</CardHeader>
 				<CardContent>
 					<p class="text-xs text-muted-foreground">
-						Rate limit: {settingsData?.rate_limit_per_minute || 60}/min
+						Rate limit: {settingsData?.rateLimitPerMinute || 60}/min
 					</p>
 				</CardContent>
 			</Card>
@@ -355,12 +355,12 @@
 				</CardHeader>
 				<CardContent class="space-y-6">
 					{#await settings then settingsData}
-						{#if settingsData?.api_key_masked}
+						{#if settingsData?.apiKeyMasked}
 							<div class="space-y-2">
 								<span class="text-sm font-medium">Current API Key</span>
 								<div class="flex items-center gap-2">
 									<div class="flex-1 font-mono text-sm bg-muted px-3 py-2 rounded">
-										{showApiKey ? settingsData.api_key_masked : '••••••••••••••••••••••••••••••••' + settingsData.api_key_last_four}
+										{showApiKey ? settingsData.apiKeyMasked : '••••••••••••••••••••••••••••••••' + settingsData.apiKeyLastFour}
 									</div>
 									<Button variant="outline" size="sm" onclick={() => showApiKey = !showApiKey}>
 										{#if showApiKey}
@@ -392,7 +392,7 @@
 							{isUpdating ? 'Saving...' : 'Save API Key'}
 						</Button>
 						{#await settings then settingsData}
-							{#if settingsData?.api_key_last_four}
+							{#if settingsData?.apiKeyLastFour}
 								<Button variant="destructive" onclick={handleDeleteKey} disabled={isUpdating}>
 									<Trash2 class="w-4 h-4 mr-2" />
 									Delete Key
@@ -420,11 +420,11 @@
 					<CardContent>
 						{#await settings then settingsData}
 							<div class="text-center py-4">
-								<p class="text-5xl font-bold text-primary">{formatNumber(settingsData?.credits_balance || 0)}</p>
+								<p class="text-5xl font-bold text-primary">{formatNumber(settingsData?.creditsBalance || 0)}</p>
 								<p class="text-sm text-muted-foreground mt-2">credits available</p>
 							</div>
 							<div class="text-sm text-muted-foreground text-center">
-								Total used: {formatNumber(settingsData?.credits_used || 0)}
+								Total used: {formatNumber(settingsData?.creditsUsed || 0)}
 							</div>
 						{/await}
 					</CardContent>
