@@ -9,7 +9,7 @@ import type { Handle } from '@sveltejs/kit';
 import { getUserPermissions } from '$lib/services/permissions';
 import '$lib/utils/setup-logging';
 import { logger } from '$lib/utils/logger';
-import { validateAndLogEnvironment } from '$lib/utils/env-validation';
+import { initializeEnv } from '$lib/server/env';
 import { generateCSRFTokens } from '$lib/server/csrf';
 
 // Flag to track if environment has been validated (runs once on first request)
@@ -18,8 +18,10 @@ let _envValidated = false;
 const betterAuthHandle: Handle = async ({ event, resolve }) => {
 	// SECURITY: Validate environment variables on first request
 	// (Cloudflare Workers don't allow this at module scope)
+	// SECURITY: Validate environment variables on first request
+	// This ensures $env/dynamic/private is hydrated
 	if (!_envValidated) {
-		validateAndLogEnvironment();
+		initializeEnv();
 		_envValidated = true;
 	}
 

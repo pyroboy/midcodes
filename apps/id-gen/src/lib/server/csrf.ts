@@ -6,6 +6,7 @@
  */
 
 import { randomBytes, createHmac, timingSafeEqual } from 'crypto';
+import { env } from './env';
 
 // Secret key for HMAC signing (should be from environment in production)
 // Use lazy initialization to avoid calling randomBytes() at module load time
@@ -14,7 +15,7 @@ let _csrfSecret: string | null = null;
 
 function getCSRFSecret(): string {
 	if (_csrfSecret === null) {
-		_csrfSecret = process.env.CSRF_SECRET || randomBytes(32).toString('hex');
+		_csrfSecret = env.CSRF_SECRET || randomBytes(32).toString('hex');
 	}
 	return _csrfSecret;
 }

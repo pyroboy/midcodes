@@ -38,6 +38,7 @@
 	import { T, Canvas } from '@threlte/core';
 	import { OrbitControls } from '@threlte/extras';
 	import { NoToneMapping } from 'three';
+	import { Pane, Folder, Slider as TweakSlider, Checkbox, Button as TweakButton, Separator as TweakSeparator, Monitor } from 'svelte-tweakpane-ui';
 
 	interface Props {
 		data: PageData & { user?: any; templates?: any[] };
@@ -565,142 +566,58 @@
 						<Settings2 class="w-4 h-4" />
 					</button>
 					
-					<!-- Debug panel -->
+					<!-- Debug panel (modern Tweakpane UI) -->
 					{#if showDebugPanel}
-						<div class="absolute top-12 right-2 z-10 bg-black/80 backdrop-blur-sm rounded-lg p-3 text-white text-sm min-w-[180px]" transition:fade={{ duration: 150 }}>
-							<div class="font-medium mb-2 text-xs uppercase tracking-wide text-white/60">Debug Options</div>
-							<label class="flex items-center gap-2 cursor-pointer hover:bg-white/10 rounded p-1 -mx-1">
-								<input type="checkbox" bind:checked={showElementOverlays} class="w-4 h-4 rounded" />
-								<span>Element Overlays</span>
-							</label>
-							{#if showElementOverlays}
-								<div class="ml-4 mt-1 space-y-1 border-l border-white/20 pl-2">
-									<label class="flex items-center gap-2 cursor-pointer hover:bg-white/10 rounded p-1 -mx-1 text-xs">
-										<input type="checkbox" bind:checked={showOverlayColors} class="w-3 h-3 rounded" />
-										<span>Colors</span>
-									</label>
-									<label class="flex items-center gap-2 cursor-pointer hover:bg-white/10 rounded p-1 -mx-1 text-xs">
-										<input type="checkbox" bind:checked={showOverlayBorders} class="w-3 h-3 rounded" />
-										<span>Borders</span>
-									</label>
-									<label class="flex items-center gap-2 cursor-pointer hover:bg-white/10 rounded p-1 -mx-1 text-xs">
-										<input type="checkbox" bind:checked={showOverlayText} class="w-3 h-3 rounded" />
-										<span>Text</span>
-									</label>
-									<label class="flex items-center gap-2 cursor-pointer hover:bg-white/10 rounded p-1 -mx-1 text-xs">
-										<input type="checkbox" bind:checked={showOverlayIcons} class="w-3 h-3 rounded" />
-										<span>Icons</span>
-									</label>
-									<label class="flex items-center gap-2 cursor-pointer hover:bg-white/10 rounded p-1 -mx-1 text-xs">
-										<input type="checkbox" bind:checked={showAnimateText} class="w-3 h-3 rounded" />
-										<span>Animate Text</span>
-									</label>
-								</div>
-							{/if}
-
-							<div class="mt-3 pt-3 border-t border-white/20">
-								<label class="flex items-center gap-2 cursor-pointer hover:bg-white/10 rounded p-1 -mx-1">
-									<input type="checkbox" bind:checked={showShadowControls} class="w-4 h-4 rounded" />
-									<span class="font-medium text-xs uppercase tracking-wide text-white/60">Shadow Controls</span>
-								</label>
-								{#if showShadowControls}
-								<div class="ml-4 mt-1 space-y-2 border-l border-white/20 pl-2">
-									<div>
-										<label for="shadowSlowOpacity" class="text-xs text-white/70">Slow Opacity: {shadowSlowOpacity.toFixed(2)}</label>
-										<input id="shadowSlowOpacity" type="range" min="0" max="0.5" step="0.01" bind:value={shadowSlowOpacity} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
-									</div>
-									<div>
-										<label for="shadowFastOpacity" class="text-xs text-white/70">Fast Opacity: {shadowFastOpacity.toFixed(2)}</label>
-										<input id="shadowFastOpacity" type="range" min="0" max="0.2" step="0.005" bind:value={shadowFastOpacity} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
-									</div>
-									<div>
-										<label for="shadowSlowOblong" class="text-xs text-white/70">Slow Oblong: {shadowSlowOblong.toFixed(2)}</label>
-										<input id="shadowSlowOblong" type="range" min="0" max="1" step="0.05" bind:value={shadowSlowOblong} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
-									</div>
-									<div>
-										<label for="shadowFastOblong" class="text-xs text-white/70">Fast Oblong: {shadowFastOblong.toFixed(2)}</label>
-										<input id="shadowFastOblong" type="range" min="0" max="1" step="0.05" bind:value={shadowFastOblong} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
-									</div>
-									<div>
-										<label for="shadowSlowSize" class="text-xs text-white/70">Slow Size: {shadowSlowSize.toFixed(2)}</label>
-										<input id="shadowSlowSize" type="range" min="0.2" max="1.5" step="0.05" bind:value={shadowSlowSize} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
-									</div>
-									<div>
-										<label for="shadowFastSize" class="text-xs text-white/70">Fast Size: {shadowFastSize.toFixed(2)}</label>
-										<input id="shadowFastSize" type="range" min="0.2" max="1.5" step="0.05" bind:value={shadowFastSize} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
-									</div>
-									<div>
-										<label for="shadowLerpSpeed" class="text-xs text-white/70">Lerp Speed: {shadowLerpSpeed.toFixed(2)}</label>
-										<input id="shadowLerpSpeed" type="range" min="0.05" max="0.5" step="0.01" bind:value={shadowLerpSpeed} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
-									</div>
-								</div>
+						<Pane title="KINATAO Debug" position="fixed" width={320}>
+							<Folder title="Element Overlays">
+								<Checkbox bind:value={showElementOverlays} label="Enable Overlays" />
+								{#if showElementOverlays}
+									<Checkbox bind:value={showOverlayColors} label="Layer Colors" />
+									<Checkbox bind:value={showOverlayBorders} label="Borders" />
+									<Checkbox bind:value={showOverlayText} label="Text Content" />
+									<Checkbox bind:value={showOverlayIcons} label="Icons" />
+									<Checkbox bind:value={showAnimateText} label="Animate Text" />
 								{/if}
-							</div>
+							</Folder>
 
-							<div class="mt-3 pt-3 border-t border-white/20">
-								<div class="font-medium mb-2 text-xs uppercase tracking-wide text-white/60">Beat Timing</div>
-								<div class="space-y-2">
-									<div>
-										<label for="beatMs" class="text-xs text-white/70">Beat: {beatMs}ms</label>
-										<input id="beatMs" type="range" min="50" max="3000" step="50" bind:value={beatMs} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
-									</div>
-									<div class="flex items-center justify-between text-xs">
-										<span class="text-white/70">Count:</span>
-										<span class="font-mono text-green-400">{currentBeatCount}</span>
-									</div>
-									<div class="flex items-center justify-between text-xs">
-										<span class="text-white/70">Last:</span>
-										<span class="font-mono {lastBeatAction === 'spin' ? 'text-pink-400' : lastBeatAction === 'shape' ? 'text-yellow-400' : lastBeatAction === 'texture' ? 'text-blue-400' : 'text-white/40'}">{lastBeatAction || 'none'}</span>
-									</div>
-									<div class="mt-2 pt-2 border-t border-white/10">
-										<!-- Collapsible header -->
-										<button 
-											class="w-full flex items-center justify-between text-xs text-white/50 mb-1 hover:text-white/70 transition-colors"
-											onclick={() => wobbleControlsExpanded = !wobbleControlsExpanded}
-										>
-											<span>Animation Controls</span>
-											<span class="transform transition-transform {wobbleControlsExpanded ? 'rotate-180' : ''}">▼</span>
-										</button>
-										{#if wobbleControlsExpanded}
-										<div>
-											<label for="spinSpeed" class="text-xs text-white/70">Spin Speed: {spinSpeed.toFixed(2)}</label>
-											<input id="spinSpeed" type="range" min="0.01" max="0.15" step="0.01" bind:value={spinSpeed} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
-										</div>
-										<div>
-											<label for="wobbleStrength" class="text-xs text-white/70">Wobble Strength: {wobbleStrength.toFixed(2)}</label>
-											<input id="wobbleStrength" type="range" min="0" max="0.3" step="0.01" bind:value={wobbleStrength} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
-										</div>
-										<div>
-											<label for="wobbleOscillations" class="text-xs text-white/70">Wobble Oscillations: {wobbleOscillations}</label>
-											<input id="wobbleOscillations" type="range" min="1" max="10" step="1" bind:value={wobbleOscillations} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
-										</div>
-										<div>
-											<label for="wobbleLinger" class="text-xs text-white/70">Wobble Linger: {wobbleLinger.toFixed(1)}</label>
-											<input id="wobbleLinger" type="range" min="0.2" max="3" step="0.1" bind:value={wobbleLinger} class="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer" />
-										</div>
-										{/if}
-										<!-- Tap Pressure Bar - always visible -->
-								<div class="pt-2 border-t border-white/10">
-									<span id="tapPressureLabel" class="text-xs text-white/70">Tap Pressure: {displayTapPressure}</span>
-									<div class="flex gap-1 mt-1" role="meter" aria-labelledby="tapPressureLabel" aria-valuenow={displayTapPressure} aria-valuemin="1" aria-valuemax="5">
+							<Folder title="Shadow Dynamics" expanded={showShadowControls}>
+								<TweakSlider bind:value={shadowSlowOpacity} min={0} max={0.5} step={0.01} label="Slow Opacity" />
+								<TweakSlider bind:value={shadowFastOpacity} min={0} max={0.2} step={0.005} label="Fast Opacity" />
+								<TweakSlider bind:value={shadowSlowOblong} min={0} max={1} step={0.05} label="Slow Oblong" />
+								<TweakSlider bind:value={shadowFastOblong} min={0} max={1} step={0.05} label="Fast Oblong" />
+								<TweakSlider bind:value={shadowSlowSize} min={0.2} max={1.5} step={0.05} label="Slow Size" />
+								<TweakSlider bind:value={shadowFastSize} min={0.2} max={1.5} step={0.05} label="Fast Size" />
+								<TweakSlider bind:value={shadowLerpSpeed} min={0.05} max={0.5} step={0.01} label="Lerp Speed" />
+							</Folder>
+
+							<Folder title="Animation & Beats" expanded={wobbleControlsExpanded}>
+								<TweakSlider bind:value={beatMs} min={50} max={3000} step={50} label="Beat (ms)" />
+								<Monitor value={currentBeatCount} label="Beat Count" />
+								<Monitor value={lastBeatAction || 'none'} label="Last Action" />
+								
+								<TweakSeparator />
+								
+								<TweakSlider bind:value={spinSpeed} min={0.01} max={0.15} step={0.01} label="Spin Speed" />
+								<TweakSlider bind:value={wobbleStrength} min={0} max={0.3} step={0.01} label="Wobble Strength" />
+								<TweakSlider bind:value={wobbleOscillations} min={1} max={10} step={1} label="Oscillations" />
+								<TweakSlider bind:value={wobbleLinger} min={0.2} max={3} step={0.1} label="Linger" />
+								
+								<TweakSeparator />
+								
+								<div class="flex flex-col gap-1 p-1">
+									<span class="text-[10px] text-white/50 mb-1">Tap Pressure: {displayTapPressure}</span>
+									<div class="flex gap-1 h-2" role="meter" aria-label="Tap Pressure" aria-valuenow={displayTapPressure} aria-valuemin={0} aria-valuemax={5}>
 										{#each [1, 2, 3, 4, 5] as level}
 											<div 
-												class="flex-1 h-3 rounded transition-all duration-150 {displayTapPressure >= level ? 'bg-emerald-500 shadow-lg' : 'bg-white/20'}"
+												class="flex-1 rounded transition-all duration-150 {displayTapPressure >= level ? 'bg-emerald-500 shadow-lg' : 'bg-white/10'}"
 											></div>
 										{/each}
 									</div>
-											<div class="flex justify-between text-[10px] text-white/50 mt-1">
-												<span>3°</span>
-												<span>6°</span>
-												<span>12°</span>
-												<span>24°</span>
-												<span>48°</span>
-											</div>
-										</div>
-									</div>
 								</div>
-							</div>
-						</div>
+							</Folder>
+							
+							<TweakButton title="Close Debug" on:click={() => showDebugPanel = false} />
+						</Pane>
 					{/if}
 
 					<!-- Loading overlay with progress bar -->

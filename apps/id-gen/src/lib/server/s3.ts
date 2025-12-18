@@ -1,6 +1,6 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { env } from '$env/dynamic/private';
+import { env } from './env';
 
 // Validate R2 credentials (optional - client handles null gracefully but setup page should warn)
 const R2_ACCOUNT_ID = env.R2_ACCOUNT_ID;

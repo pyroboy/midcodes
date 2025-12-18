@@ -1,7 +1,8 @@
 import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
 import { drizzle, type NeonHttpDatabase } from 'drizzle-orm/neon-http';
-import { env as privateEnv } from '$env/dynamic/private';
+import { env } from './env';
 import * as schema from './schema';
+
 
 // Lazy-initialized database connection
 // This prevents the connection from being created at build time when env vars aren't available
@@ -9,23 +10,24 @@ let _sql: NeonQueryFunction<false, false> | null = null;
 let _db: NeonHttpDatabase<typeof schema> | null = null;
 
 function getConnectionString(): string {
-    // Try multiple sources for the env variable
-    // process.env works in Node.js/Vite dev, privateEnv works in SvelteKit runtime
-    const url = process.env.NEON_DATABASE_URL || privateEnv.NEON_DATABASE_URL;
-    console.log('[db.ts DEBUG] Checking Env Vars:', {
-        process_env_exists: !!process.env.NEON_DATABASE_URL,
-        private_env_exists: !!privateEnv.NEON_DATABASE_URL,
-        node_env: process.env.NODE_ENV
-    });
+    const url = env.NEON_DATABASE_URL;
+    
+    // SECURITY: Use a safe version for logging (mask passwords)
+    const logUrl = (u: string | undefined) => {
+        if (!u) return 'missing';
+        try {
+            const parsed = new URL(u);
+            return `${parsed.protocol}//${parsed.username}:****@${parsed.host}${parsed.pathname}`;
+        } catch {
+            return 'invalid-format';
+        }
+    };
+
+    console.debug('[db.ts] Safe connection check:', logUrl(url));
 
     if (!url) {
-        if (process.env.NODE_ENV === 'development') {
-            console.warn('⚠️ NEON_DATABASE_URL is missing in dev. Using dummy URL.');
-            return 'postgres://dummy:dummy@localhost:5432/dummy';
-        }
-        throw new Error(
-            'Missing NEON_DATABASE_URL environment variable. Configure it in Cloudflare Pages environment variables (and locally via .env).'
-        );
+        // This should technically be caught by env validation, but as a fallback:
+        throw new Error('NEON_DATABASE_URL is missing.');
     }
     return url;
 }

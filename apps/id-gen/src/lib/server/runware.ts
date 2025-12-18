@@ -3,7 +3,7 @@
  * Server-side service for background removal using Runware's AI API.
  */
 
-import { env } from '$env/dynamic/private';
+import { env } from './env';
 
 const RUNWARE_API_URL = 'https://api.runware.ai/v1';
 

@@ -16,7 +16,7 @@ import {
 } from '$lib/payments/schemas';
 
 // Server-only imports
-import { assertServerContext, getCheckoutUrls } from '$lib/config/environment';
+import { assertServerContext, getCheckoutUrls } from '$lib/server/env';
 import { PayMongoClient } from '$lib/server/paymongo/client';
 import { generateIdempotencyKey } from '$lib/server/utils/crypto';
 import { getCreditPackageById, getFeatureSkuById } from '$lib/payments/catalog';

@@ -3,6 +3,20 @@ import { error, redirect, fail } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { idcards, templates, templateAssets as schemaTemplateAssets } from '$lib/server/schema';
 import { eq, and, gte, sql, desc, inArray } from 'drizzle-orm';
+import { logger } from '$lib/utils/logger';
+
+/**
+ * Format database errors for cleaner logging
+ */
+function formatDbError(err: any): string {
+	if (err?.cause?.message) {
+		return `${err.message} (Cause: ${err.cause.message})`;
+	}
+	if (err?.message) {
+		return err.message;
+	}
+	return 'Unknown database error';
+}
 
 export const load: PageServerLoad = async ({ locals, depends }) => {
 	// Register dependencies for selective invalidation
@@ -12,118 +26,138 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 
 	const { session, user, org_id } = locals;
 
-	// Fetch template assets for the 3D card display (public - available to all users including non-signed-in)
-	const templateAssets = await db
-		.select({
-			id: schemaTemplateAssets.id,
-			imageUrl: schemaTemplateAssets.imageUrl,
-			widthPixels: schemaTemplateAssets.widthPixels,
-			heightPixels: schemaTemplateAssets.heightPixels,
-			name: schemaTemplateAssets.name,
-			orientation: schemaTemplateAssets.orientation
-		})
-		.from(schemaTemplateAssets)
-		.where(eq(schemaTemplateAssets.isPublished, true))
-		.orderBy(desc(schemaTemplateAssets.createdAt));
+	try {
+		// Fetch template assets for the 3D card display (public - available to all users including non-signed-in)
+		const templateAssetsData = await db
+			.select({
+				id: schemaTemplateAssets.id,
+				imageUrl: schemaTemplateAssets.imageUrl,
+				widthPixels: schemaTemplateAssets.widthPixels,
+				heightPixels: schemaTemplateAssets.heightPixels,
+				name: schemaTemplateAssets.name,
+				orientation: schemaTemplateAssets.orientation
+			})
+			.from(schemaTemplateAssets)
+			.where(eq(schemaTemplateAssets.isPublished, true))
+			.orderBy(desc(schemaTemplateAssets.createdAt))
+			.catch(err => {
+				logger.warn('⚠️ Template assets fetch failed:', formatDbError(err));
+				return [];
+			});
 
-	if (!org_id) {
+		const templateAssets = templateAssetsData.map(a => ({
+			...a,
+			image_url: a.imageUrl,
+			width_pixels: a.widthPixels,
+			height_pixels: a.heightPixels
+		}));
+
+		if (!org_id) {
+			return {
+				templates: [],
+				recentCards: [],
+				totalCards: 0,
+				totalTemplates: 0,
+				weeklyCards: 0,
+				templateAssets,
+				error: null
+			};
+		}
+
+		const effectiveOrgId = org_id;
+
+		const [
+			templatesData,
+			recentCardsData,
+			totalCardsResult,
+			totalTemplatesResult,
+			weeklyCardsResult
+		] = await (Promise.all([
+			// Fetch templates for the hero section
+			db.select().from(templates).where(eq(templates.orgId, effectiveOrgId)).orderBy(desc(templates.createdAt)),
+			// Get recent cards
+			db.select({
+				id: idcards.id,
+				templateId: idcards.templateId,
+				frontImage: idcards.frontImage,
+				backImage: idcards.backImage,
+				createdAt: idcards.createdAt,
+				data: idcards.data
+			}).from(idcards).where(eq(idcards.orgId, effectiveOrgId)).orderBy(desc(idcards.createdAt)).limit(12),
+			// Total cards
+			db.select({ count: sql`count(*)` }).from(idcards).where(eq(idcards.orgId, effectiveOrgId)),
+			// Total templates
+			db.select({ count: sql`count(*)` }).from(templates).where(eq(templates.orgId, effectiveOrgId)),
+			// This week's cards count
+			db.select({ count: sql`count(*)` }).from(idcards).where(
+				and(
+					eq(idcards.orgId, effectiveOrgId),
+					gte(idcards.createdAt, new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))
+				)
+			)
+		]) as Promise<[any[], any[], any[], any[], any[]]>).catch(err => {
+			logger.error('❌ Dashboard data fetch error:', formatDbError(err));
+			return [[], [], [{count: 0}], [{count: 0}], [{count: 0}]];
+		});
+
+		// Fetch template names for recent cards
+		let templateNames: Record<string, string> = {};
+		const templateIds = [...new Set(recentCardsData.map(c => c.templateId).filter(Boolean))] as string[];
+		if (templateIds.length > 0) {
+			const templateNamesData = await db
+				.select({ id: templates.id, name: templates.name })
+				.from(templates)
+				.where(inArray(templates.id, templateIds))
+				.catch(() => []);
+			
+			templateNames = templateNamesData.reduce((acc, t) => {
+				acc[t.id] = t.name;
+				return acc;
+			}, {} as Record<string, string>);
+		}
+
+		const enhancedRecentCards = recentCardsData.map(card => ({
+			...card,
+			front_image: card.frontImage,
+			back_image: card.backImage,
+			created_at: card.createdAt?.toISOString(),
+			template_id: card.templateId,
+			template_name: (card.templateId && templateNames[card.templateId]) || 'Unknown Template'
+		}));
+
+		return {
+			templates: templatesData.map(t => ({
+				...t,
+				user_id: t.userId,
+				org_id: t.orgId,
+				width_pixels: t.widthPixels,
+				height_pixels: t.heightPixels,
+				front_background: t.frontBackground,
+				back_background: t.backBackground,
+				template_elements: t.templateElements,
+				created_at: t.createdAt?.toISOString()
+			})),
+			recentCards: enhancedRecentCards,
+			totalCards: Number(totalCardsResult[0]?.count || 0),
+			totalTemplates: Number(totalTemplatesResult[0]?.count || 0),
+			weeklyCards: Number(weeklyCardsResult[0]?.count || 0),
+			templateAssets,
+			error: null
+		};
+	} catch (err: any) {
+		const dbMessage = formatDbError(err);
+		logger.error('❌ Server: Critical error in homepage load:', dbMessage);
+		
 		return {
 			templates: [],
 			recentCards: [],
 			totalCards: 0,
 			totalTemplates: 0,
 			weeklyCards: 0,
-			templateAssets: templateAssets.map(a => ({
-				...a,
-				image_url: a.imageUrl,
-				width_pixels: a.widthPixels,
-				height_pixels: a.heightPixels
-			})),
-			error: null
+			templateAssets: [],
+			error: `Database connection issue: ${dbMessage.includes('relation') ? 'Database tables missing' : 'Connection failed'}.`
 		};
 	}
-
-	const effectiveOrgId = org_id;
-
-	const [
-		templatesData,
-		recentCardsData,
-		totalCardsResult,
-		totalTemplatesResult,
-		weeklyCardsResult
-	] = await Promise.all([
-		// Fetch templates for the hero section
-		db.select().from(templates).where(eq(templates.orgId, effectiveOrgId)).orderBy(desc(templates.createdAt)),
-		// Get recent cards
-		db.select({
-			id: idcards.id,
-			templateId: idcards.templateId,
-			frontImage: idcards.frontImage,
-			backImage: idcards.backImage,
-			createdAt: idcards.createdAt,
-			data: idcards.data
-		}).from(idcards).where(eq(idcards.orgId, effectiveOrgId)).orderBy(desc(idcards.createdAt)).limit(12),
-		// Total cards
-		db.select({ count: sql`count(*)` }).from(idcards).where(eq(idcards.orgId, effectiveOrgId)),
-		// Total templates
-		db.select({ count: sql`count(*)` }).from(templates).where(eq(templates.orgId, effectiveOrgId)),
-		// This week's cards count
-		db.select({ count: sql`count(*)` }).from(idcards).where(
-			and(
-				eq(idcards.orgId, effectiveOrgId),
-				gte(idcards.createdAt, new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))
-			)
-		)
-	]);
-
-	// Fetch template names for recent cards
-	let templateNames: Record<string, string> = {};
-	const templateIds = [...new Set(recentCardsData.map(c => c.templateId).filter(Boolean))] as string[];
-	if (templateIds.length > 0) {
-		const templateNamesData = await db
-			.select({ id: templates.id, name: templates.name })
-			.from(templates)
-			.where(inArray(templates.id, templateIds));
-		
-		templateNames = templateNamesData.reduce((acc, t) => {
-			acc[t.id] = t.name;
-			return acc;
-		}, {} as Record<string, string>);
-	}
-
-	const enhancedRecentCards = recentCardsData.map(card => ({
-		...card,
-		front_image: card.frontImage,
-		back_image: card.backImage,
-		created_at: card.createdAt?.toISOString(),
-		template_id: card.templateId,
-		template_name: (card.templateId && templateNames[card.templateId]) || 'Unknown Template'
-	}));
-
-	return {
-		templates: templatesData.map(t => ({
-			...t,
-			user_id: t.userId,
-			org_id: t.orgId,
-			width_pixels: t.widthPixels,
-			height_pixels: t.heightPixels,
-			front_background: t.frontBackground,
-			back_background: t.backBackground,
-			template_elements: t.templateElements,
-			created_at: t.createdAt?.toISOString()
-		})),
-		recentCards: enhancedRecentCards,
-		totalCards: Number(totalCardsResult[0]?.count || 0),
-		totalTemplates: Number(totalTemplatesResult[0]?.count || 0),
-		weeklyCards: Number(weeklyCardsResult[0]?.count || 0),
-		templateAssets: templateAssets.map(a => ({
-			...a,
-			image_url: a.imageUrl,
-			width_pixels: a.widthPixels,
-			height_pixels: a.heightPixels
-		})),
-		error: null
-	};
 };
 
 export const actions: Actions = {

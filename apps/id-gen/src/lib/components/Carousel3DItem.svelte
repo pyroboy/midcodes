@@ -3,6 +3,7 @@
 	import { Text } from '@threlte/extras';
 	import * as THREE from 'three';
 	import { onMount } from 'svelte';
+	import { logger } from '$lib/utils/logger';
 
 	// Props
 	let { url, geometry, borderGeometry, transform, onCardClick, card, isDragging } = $props<{
@@ -67,11 +68,11 @@
 
 				texture = loadedTexture;
 				loading = false;
-				console.log('[Carousel3DItem] Loaded:', url?.substring(0, 50));
+				logger.debug('[Carousel3DItem] Loaded texture:', url?.substring(0, 50));
 			},
 			undefined,
 			(err) => {
-				console.error('[Carousel3DItem] Error loading:', url, err);
+				logger.warn('[Carousel3DItem] Image load failed:', url);
 				error = true;
 				loading = false;
 			}
@@ -93,7 +94,6 @@
 	rotation.y={transform.rotY}
 	scale={[transform.scale, transform.scale, 1]}
 >
-	<!-- Card mesh -->
 	<T.Mesh onclick={() => !isDragging && onCardClick(card)}>
 		{#if loading}
 			<T.Mesh {geometry}>
@@ -105,29 +105,39 @@
 				/>
 				<Text
 					text="Loading..."
-					fontSize={0.25}
-					color="white"
+					fontSize={0.2}
+					color="rgba(255,255,255,0.5)"
 					anchorX="center"
 					anchorY="middle"
 					position.z={0.01}
 				/>
 			</T.Mesh>
-		{:else if error}
+		{:else if error || !url}
 			<T.Mesh {geometry}>
 				<T.MeshBasicMaterial
-					color="#ef4444"
+					color="#334155"
 					side={THREE.DoubleSide}
 					transparent
-					opacity={transform.opacity * 0.8}
+					opacity={transform.opacity * 0.9}
 				/>
-				<Text
-					text="Error"
-					fontSize={0.25}
-					color="white"
-					anchorX="center"
-					anchorY="middle"
-					position.z={0.01}
-				/>
+				<T.Group position.z={0.01}>
+					<Text
+						text={card?.template_name || 'ID Card'}
+						fontSize={0.25}
+						color="white"
+						anchorX="center"
+						anchorY="0.1"
+						position.y={0.2}
+					/>
+					<Text
+						text={error ? "Error Loading Image" : "Preview Unavailable"}
+						fontSize={0.15}
+						color="#94a3b8"
+						anchorX="center"
+						anchorY="middle"
+						position.y={-0.3}
+					/>
+				</T.Group>
 			</T.Mesh>
 		{:else if texture}
 			<T.Mesh {geometry}>
@@ -136,15 +146,6 @@
 					side={THREE.DoubleSide}
 					transparent={false}
 					opacity={1}
-				/>
-			</T.Mesh>
-		{:else}
-			<T.Mesh {geometry}>
-				<T.MeshBasicMaterial
-					color="#1e293b"
-					side={THREE.DoubleSide}
-					transparent
-					opacity={transform.opacity * 0.8}
 				/>
 			</T.Mesh>
 		{/if}

@@ -1,7 +1,7 @@
 // Server-only PayMongo API client wrapper
 // This module handles direct communication with PayMongo API using checkout sessions
 
-import { serverEnv, assertServerContext } from '../../config/environment';
+import { env as serverEnv, assertServerContext } from '../env';
 import { generateIdempotencyKey } from '../utils/crypto';
 
 // PayMongo API Types
@@ -83,12 +83,12 @@ export class PayMongoClient {
 		// Ensure this is only used on the server
 		assertServerContext('PayMongoClient');
 
-		if (!serverEnv.paymongo.secretKey) {
+		if (!serverEnv.PAYMONGO_SECRET_KEY) {
 			throw new PayMongoConfigurationError(
 				'PAYMONGO_SECRET_KEY environment variable is not configured'
 			);
 		}
-		this.secretKey = serverEnv.paymongo.secretKey;
+		this.secretKey = serverEnv.PAYMONGO_SECRET_KEY;
 	}
 
 	private get authHeaders() {
