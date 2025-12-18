@@ -36,21 +36,18 @@ export const actions: Actions = {
 				return fail(404, { error: 'Card not found' });
 			}
 
-			const supabaseAdmin = (await import('$lib/server/supabase')).getSupabaseAdmin();
-
-			// Delete images from storage if they exist
-			const imagesToDelete = [];
+			// Delete images from R2 storage if they exist
+			const imagesToDelete: string[] = [];
 			if (card.frontImage) imagesToDelete.push(card.frontImage);
 			if (card.backImage) imagesToDelete.push(card.backImage);
 
 			if (imagesToDelete.length > 0) {
-				const { error: storageError } = await supabaseAdmin.storage
-					.from('rendered-id-cards')
-					.remove(imagesToDelete);
-
-				if (storageError) {
-					console.error('Error deleting images:', storageError);
-					return fail(500, { error: 'Failed to delete images' });
+				try {
+					const { deleteFromR2 } = await import('$lib/server/s3');
+					await Promise.allSettled(imagesToDelete.map(key => deleteFromR2(key)));
+				} catch (storageError) {
+					console.error('Error deleting images from R2:', storageError);
+					// Non-fatal - continue with database deletion
 				}
 			}
 
@@ -88,24 +85,21 @@ export const actions: Actions = {
 				.from(idcards)
 				.where(inArray(idcards.id, ids));
 
-			const supabaseAdmin = (await import('$lib/server/supabase')).getSupabaseAdmin();
-
-			// Collect all image paths to delete
-			const imagesToDelete = [];
+			// Collect all image paths to delete from R2
+			const imagesToDelete: string[] = [];
 			for (const card of cards) {
 				if (card.frontImage) imagesToDelete.push(card.frontImage);
 				if (card.backImage) imagesToDelete.push(card.backImage);
 			}
 
-			// Delete all images from storage in one batch
+			// Delete all images from R2 storage
 			if (imagesToDelete.length > 0) {
-				const { error: storageError } = await supabaseAdmin.storage
-					.from('rendered-id-cards')
-					.remove(imagesToDelete);
-
-				if (storageError) {
-					console.error('Error deleting images:', storageError);
-					return fail(500, { error: 'Failed to delete images' });
+				try {
+					const { deleteFromR2 } = await import('$lib/server/s3');
+					await Promise.allSettled(imagesToDelete.map(key => deleteFromR2(key)));
+				} catch (storageError) {
+					console.error('Error deleting images from R2:', storageError);
+					// Non-fatal - continue with database deletion
 				}
 			}
 

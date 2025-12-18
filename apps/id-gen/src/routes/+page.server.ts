@@ -219,8 +219,6 @@ export const actions: Actions = {
 
 			console.log('🗑️ Server: Processing template delete:', { templateId, deleteIds });
 
-			const supabaseAdmin = (await import('$lib/server/supabase')).getSupabaseAdmin();
-
 			if (deleteIds) {
 				// Fetch associated IDs to get image paths
 				const cards = await db
@@ -233,7 +231,8 @@ export const actions: Actions = {
 					.where(eq(idcards.templateId, templateId));
 
 				if (cards && cards.length > 0) {
-					// Delete images from storage
+					// Delete images from R2 storage
+					const { deleteFromR2 } = await import('$lib/server/s3');
 					const imagesToDelete: string[] = [];
 					for (const card of cards) {
 						if (card.frontImage) imagesToDelete.push(card.frontImage);
@@ -241,13 +240,13 @@ export const actions: Actions = {
 					}
 
 					if (imagesToDelete.length > 0) {
-						const { error: storageError } = await supabaseAdmin.storage
-							.from('rendered-id-cards')
-							.remove(imagesToDelete);
-
-						if (storageError) {
-							console.warn('⚠️ Server: Error deleting card images (non-fatal):', storageError);
-						}
+						// Delete from R2 - use Promise.allSettled to handle partial failures
+						const deleteResults = await Promise.allSettled(
+							imagesToDelete.map(key => deleteFromR2(key).catch(err => {
+								console.warn(`⚠️ Failed to delete ${key}:`, err);
+							}))
+						);
+						console.log(`✅ Attempted to delete ${imagesToDelete.length} images from R2`);
 					}
 
 					// Delete ID records

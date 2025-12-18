@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { createLowResVersion } from '$lib/utils/imageCropper';
-	import { getSupabaseStorageUrl } from '$lib/utils/supabase';
+	import { getSupabaseStorageUrl } from '$lib/utils/storage';
 	import { toast } from 'svelte-sonner';
 
 	let { data } = $props();

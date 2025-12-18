@@ -84,6 +84,38 @@ export const load: PageServerLoad = async ({ locals, url, depends, setHeaders })
 };
 
 export const actions: Actions = {
+	// Upload image to R2 storage
+	uploadImage: async ({ request, locals }) => {
+		const { session } = locals;
+		
+		if (!session) {
+			return { success: false, error: 'Unauthorized' };
+		}
+
+		try {
+			const formData = await request.formData();
+			const file = formData.get('file') as File;
+			const path = formData.get('path') as string;
+			const userId = formData.get('userId') as string | null;
+
+			if (!file || !path) {
+				return { success: false, error: 'Missing file or path' };
+			}
+
+			const finalPath = userId ? `${userId}/${path}` : path;
+			
+			const { uploadToR2, getPublicUrl } = await import('$lib/server/s3');
+			const arrayBuffer = await file.arrayBuffer();
+			await uploadToR2(finalPath, Buffer.from(arrayBuffer), file.type || 'image/png');
+			const publicUrl = getPublicUrl(finalPath);
+
+			return { success: true, url: publicUrl };
+		} catch (err) {
+			console.error('Upload error:', err);
+			return { success: false, error: err instanceof Error ? err.message : 'Upload failed' };
+		}
+	},
+
 	create: async ({ request, locals }) => {
 		const { session, org_id } = locals;
 
@@ -185,8 +217,6 @@ export const actions: Actions = {
 
 			console.log('🗑️ Server: Processing template delete:', { templateId, deleteIds });
 
-			const supabaseAdmin = (await import('$lib/server/supabase')).getSupabaseAdmin();
-
 			if (deleteIds) {
 				// 1. Fetch associated IDs to get image paths
 				const cards = await db
@@ -199,7 +229,7 @@ export const actions: Actions = {
 					.where(eq(idcards.templateId, templateId));
 
 				if (cards && cards.length > 0) {
-					// 2. Delete images from storage
+					// 2. Delete images from R2 storage
 					const imagesToDelete: string[] = [];
 					for (const card of cards) {
 						if (card.frontImage) imagesToDelete.push(card.frontImage);
@@ -207,11 +237,11 @@ export const actions: Actions = {
 					}
 
 					if (imagesToDelete.length > 0) {
-						const { error: storageError } = await supabaseAdmin.storage
-							.from('rendered-id-cards')
-							.remove(imagesToDelete);
-
-						if (storageError) {
+						try {
+							const { deleteFromR2 } = await import('$lib/server/s3');
+							await Promise.allSettled(imagesToDelete.map(key => deleteFromR2(key)));
+							console.log(`✅ Deleted ${imagesToDelete.length} images from R2`);
+						} catch (storageError) {
 							console.warn('⚠️ Server: Error deleting card images (non-fatal):', storageError);
 						}
 					}

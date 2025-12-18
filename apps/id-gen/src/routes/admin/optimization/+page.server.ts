@@ -3,7 +3,6 @@ import type { PageServerLoad, Actions } from './$types';
 import { db } from '$lib/server/db';
 import { templates, idcards } from '$lib/server/schema';
 import { eq } from 'drizzle-orm';
-import { getSupabaseAdmin } from '$lib/server/supabase';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const { session, org_id } = locals;

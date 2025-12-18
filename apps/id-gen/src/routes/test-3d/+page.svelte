@@ -2,7 +2,7 @@
 	import { Canvas, T } from '@threlte/core';
 	import { NoToneMapping } from 'three';
 	import SimpleTexturePlane from '$lib/components/SimpleTexturePlane.svelte';
-	import { getSupabaseStorageUrl } from '$lib/utils/supabase';
+	import { getSupabaseStorageUrl } from '$lib/utils/storage';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();

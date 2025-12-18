@@ -3,7 +3,7 @@
 	import CardContent from '$lib/components/ui/card/card-content.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Download, Trash2, Eye } from 'lucide-svelte';
-	import { getSupabaseStorageUrl } from '$lib/utils/supabase';
+	import { getSupabaseStorageUrl } from '$lib/utils/storage';
 
 	// Props using Svelte 5 $props() rune
 	interface Props {

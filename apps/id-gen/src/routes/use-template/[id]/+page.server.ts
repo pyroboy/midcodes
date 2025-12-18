@@ -92,10 +92,8 @@ export const actions: Actions = {
 				return fail(400, { error: 'Organization ID is required' });
 			}
 
-			const supabaseAdmin = (await import('$lib/server/supabase')).getSupabaseAdmin();
-
-			// Handle uploads via admin client
-			const uploadResult = await handleImageUploads(supabaseAdmin, formData, effectiveOrgId, templateId);
+			// Handle uploads via R2
+			const uploadResult = await handleImageUploads(formData, effectiveOrgId, templateId);
 
 			if ('error' in uploadResult) {
 				console.error('[Save ID Card] Upload error:', uploadResult.error);
@@ -113,8 +111,8 @@ export const actions: Actions = {
 
 			const createDigitalCard = formData.get('createDigitalCard') === 'true';
 
-			// Save data via admin client (for storage fallback) and Drizzle
-			const saveResult = await saveIdCardData(supabaseAdmin, {
+			// Save data via Drizzle
+			const saveResult = await saveIdCardData({
 				templateId,
 				orgId: effectiveOrgId,
 				frontPath: uploadResult.frontPath,

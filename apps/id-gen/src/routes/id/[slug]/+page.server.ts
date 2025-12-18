@@ -3,14 +3,11 @@ import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
 import { digitalCards, idcards } from '$lib/server/schema';
 import { eq } from 'drizzle-orm';
-// import { getSupabaseAdmin } from '$lib/server/supabase'; // Removed
 
 export const load: PageServerLoad = async ({ params, locals }) => {
 	const { slug } = params;
 
 	// 1. Fetch Digital Card using Drizzle
-    // Drizzle doesn't automatically join nested relations like Supabase unless using db.query and relations are defined
-    // We'll fetch explicitly
 	const cards = await db.select()
 		.from(digitalCards)
 		.where(eq(digitalCards.slug, slug))

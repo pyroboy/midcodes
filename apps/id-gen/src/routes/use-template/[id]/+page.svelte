@@ -17,7 +17,7 @@
 	import { fade } from 'svelte/transition';
 	// Note: Not using enhance - we use manual fetch for custom handling
 	import type { TemplateElement } from '$lib/stores/templateStore';
-	import { getSupabaseStorageUrl } from '$lib/utils/supabase';
+	import { getStorageUrl } from '$lib/utils/storage';
 	import { idCardsCache, recentCardsCache } from '$lib/stores/dataCache';
 	import { clearAllIdsCache } from '../../all-ids/allIdsCache';
 	import { clearRemoteFunctionCacheByPrefix } from '$lib/remote/remoteFunctionCache';
@@ -977,7 +977,7 @@
 											elements={template.template_elements.filter((el) => el.side === 'front')}
 											backgroundUrl={template.front_background.startsWith('http')
 												? template.front_background
-												: getSupabaseStorageUrl(template.front_background)}
+												: getStorageUrl(template.front_background)}
 											{formData}
 											{fileUploads}
 											{imagePositions}
@@ -1020,7 +1020,7 @@
 											elements={template.template_elements.filter((el) => el.side === 'back')}
 											backgroundUrl={template.back_background.startsWith('http')
 												? template.back_background
-												: getSupabaseStorageUrl(template.back_background)}
+												: getStorageUrl(template.back_background)}
 											{formData}
 											{fileUploads}
 											{imagePositions}

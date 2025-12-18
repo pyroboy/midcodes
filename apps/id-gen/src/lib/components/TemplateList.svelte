@@ -9,7 +9,7 @@
 	import SizeSelectionDialog from './SizeSelectionDialog.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import type { CardSize } from '$lib/utils/sizeConversion';
-	import { getSupabaseStorageUrl } from '$lib/utils/supabase';
+	import { getSupabaseStorageUrl } from '$lib/utils/storage';
 	import DeleteConfirmationDialog from '$lib/components/DeleteConfirmationDialog.svelte';
 	import type { TemplateAsset } from '$lib/schemas/template-assets.schema';
 

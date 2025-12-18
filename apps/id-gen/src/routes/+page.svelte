@@ -26,7 +26,7 @@
 	import DuplicateTemplateDialog from '$lib/components/DuplicateTemplateDialog.svelte';
 	import { getPreloadState } from '$lib/services/preloadService';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
-	import { getSupabaseStorageUrl } from '$lib/utils/supabase';
+	import { getSupabaseStorageUrl } from '$lib/utils/storage';
 	import type { CardSize } from '$lib/utils/sizeConversion';
 	import type { TemplateAsset } from '$lib/schemas/template-assets.schema';
 	import { recentViewMode } from '$lib/stores/recentViewMode';

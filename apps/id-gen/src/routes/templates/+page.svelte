@@ -6,8 +6,31 @@
 	import TemplateList from '$lib/components/TemplateList.svelte';
 	import TemplateEdit from '$lib/components/TemplateEdit.svelte';
 	import CroppingConfirmationDialog from '$lib/components/CroppingConfirmationDialog.svelte';
-	import { uploadImage } from '$lib/database';
-	import { getSupabaseStorageUrl } from '$lib/utils/supabase';
+	import { getStorageUrl } from '$lib/utils/storage';
+	
+	// Upload image via server action to R2
+	async function uploadImage(file: File, path: string, userId?: string): Promise<string> {
+		const formData = new FormData();
+		formData.append('file', file);
+		formData.append('path', path);
+		if (userId) formData.append('userId', userId);
+
+		const response = await fetch('?/uploadImage', {
+			method: 'POST',
+			body: formData
+		});
+
+		const result = await response.json();
+		
+		// Handle SvelteKit form action response format
+		if (result.type === 'success' && result.data?.url) {
+			return result.data.url;
+		}
+		if (result.type === 'failure' || !result.data?.success) {
+			throw new Error(result.data?.error || 'Upload failed');
+		}
+		return result.data.url;
+	}
 	import { pushState } from '$app/navigation';
 	import type { TemplateElement, TemplateData } from '$lib/stores/templateStore';
 	import type { CardSize } from '$lib/utils/sizeConversion';
@@ -769,7 +792,7 @@
 					// Full URL — append cache-buster
 					if (value.startsWith('http')) return `${value}?t=${Date.now()}`;
 					// Storage path — convert to public URL and append cache-buster
-					const url = getSupabaseStorageUrl(value, 'templates');
+					const url = getStorageUrl(value, 'templates');
 					return `${url}?t=${Date.now()}`;
 				}
 				// Handle possible objects like { publicUrl } or { path }
@@ -782,7 +805,7 @@
 						if (fromObj.startsWith('blob:') || fromObj.startsWith('data:')) return fromObj;
 						const url = fromObj.startsWith('http')
 							? fromObj
-							: getSupabaseStorageUrl(fromObj, 'templates');
+							: getStorageUrl(fromObj, 'templates');
 						return `${url}?t=${Date.now()}`;
 					}
 				} catch {}
@@ -1032,14 +1055,14 @@
 				if (typeof v === 'string') {
 					if (v.startsWith('blob:') || v.startsWith('data:')) return v; // leave blob/data untouched
 					if (v.startsWith('http')) return v;
-					return getSupabaseStorageUrl(v, 'templates');
+					return getStorageUrl(v, 'templates');
 				}
 				try {
 					const obj = v as any;
 					const s = (obj?.publicUrl || obj?.url || obj?.path) as string | undefined;
 					if (s && typeof s === 'string') {
 						if (s.startsWith('blob:') || s.startsWith('data:')) return s;
-						return s.startsWith('http') ? s : getSupabaseStorageUrl(s, 'templates');
+						return s.startsWith('http') ? s : getStorageUrl(s, 'templates');
 					}
 				} catch {}
 				return '';
@@ -1393,7 +1416,7 @@
 		const resolveUrl = (pathOrUrl: string | null) => {
 			if (!pathOrUrl) return null;
 			if (pathOrUrl.startsWith('http') || pathOrUrl.startsWith('blob:')) return pathOrUrl;
-			return getSupabaseStorageUrl(pathOrUrl, 'templates');
+			return getStorageUrl(pathOrUrl, 'templates');
 		};
 
 		frontPreview = resolveUrl(templateData.front_background);

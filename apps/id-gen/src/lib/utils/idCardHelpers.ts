@@ -1,7 +1,6 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
 import { db } from '$lib/server/db';
 import { idcards, digitalCards } from '$lib/server/schema';
-import { eq } from 'drizzle-orm';
+import { uploadToR2, deleteFromR2 } from '$lib/server/s3';
 
 function generateSlug(length = 10) {
 	const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -25,8 +24,10 @@ export interface ImageUploadError {
 	backPath?: never;
 }
 
+/**
+ * Handle image uploads using R2 storage
+ */
 export async function handleImageUploads(
-	supabase: SupabaseClient,
 	formData: FormData,
 	orgId: string,
 	templateId: string
@@ -43,24 +44,19 @@ export async function handleImageUploads(
 		const frontPath = `${orgId}/${templateId}/${timestamp}_front.png`;
 		const backPath = `${orgId}/${templateId}/${timestamp}_back.png`;
 
-		const frontUpload = await uploadToStorage(supabase, {
-			bucket: 'rendered-id-cards',
-			file: frontImage,
-			path: frontPath
-		});
-
-		if (frontUpload.error) {
+		try {
+			await uploadToR2(frontPath, frontImage, 'image/png');
+		} catch (err) {
+			console.error('Front image upload failed:', err);
 			return { error: 'Front image upload failed' };
 		}
 
-		const backUpload = await uploadToStorage(supabase, {
-			bucket: 'rendered-id-cards',
-			file: backImage,
-			path: backPath
-		});
-
-		if (backUpload.error) {
-			await deleteFromStorage(supabase, 'rendered-id-cards', frontPath);
+		try {
+			await uploadToR2(backPath, backImage, 'image/png');
+		} catch (err) {
+			// Clean up front image on back image failure
+			await deleteFromR2(frontPath).catch(() => {});
+			console.error('Back image upload failed:', err);
 			return { error: 'Back image upload failed' };
 		}
 
@@ -72,26 +68,26 @@ export async function handleImageUploads(
 	}
 }
 
-export async function saveIdCardData(
-	supabase: SupabaseClient,
-	{
-		templateId,
-		orgId,
-		frontPath,
-		backPath,
-		formFields,
-		createDigitalCard,
-		userId
-	}: {
-		templateId: string;
-		orgId: string;
-		frontPath: string;
-		backPath: string;
-		formFields: Record<string, string>;
-		createDigitalCard?: boolean;
-		userId?: string;
-	}
-) {
+/**
+ * Save ID card data to database using Drizzle
+ */
+export async function saveIdCardData({
+	templateId,
+	orgId,
+	frontPath,
+	backPath,
+	formFields,
+	createDigitalCard,
+	userId
+}: {
+	templateId: string;
+	orgId: string;
+	frontPath: string;
+	backPath: string;
+	formFields: Record<string, string>;
+	createDigitalCard?: boolean;
+	userId?: string;
+}) {
 	try {
 		// Use Drizzle for database operations
 		const [idCard] = await db
@@ -108,9 +104,10 @@ export async function saveIdCardData(
 			.returning();
 
 		if (!idCard) {
-			await Promise.all([
-				deleteFromStorage(supabase, 'rendered-id-cards', frontPath),
-				deleteFromStorage(supabase, 'rendered-id-cards', backPath)
+			// Clean up uploaded images on failure
+			await Promise.allSettled([
+				deleteFromR2(frontPath),
+				deleteFromR2(backPath)
 			]);
 			return { error: 'Failed to create ID card' };
 		}
@@ -161,52 +158,11 @@ export async function saveIdCardData(
 		};
 	} catch (err) {
 		console.error('Error in saveIdCardData:', err);
-		await Promise.all([
-			deleteFromStorage(supabase, 'rendered-id-cards', frontPath),
-			deleteFromStorage(supabase, 'rendered-id-cards', backPath)
+		// Clean up on error
+		await Promise.allSettled([
+			deleteFromR2(frontPath),
+			deleteFromR2(backPath)
 		]);
 		return { error: err instanceof Error ? err.message : 'Failed to save ID card data' };
 	}
-}
-
-export async function deleteFromStorage(
-	supabase: SupabaseClient,
-	bucket: string,
-	path: string
-): Promise<{ error?: string }> {
-	try {
-		const { error } = await supabase.storage.from(bucket).remove([path]);
-		if (error) {
-			return { error: error.message };
-		}
-		return {};
-	} catch (err) {
-		return { error: err instanceof Error ? err.message : 'Failed to delete from storage' };
-	}
-}
-
-async function uploadToStorage(
-	supabase: SupabaseClient,
-	{
-		bucket,
-		file,
-		path,
-		options = {}
-	}: {
-		bucket: string;
-		file: Blob;
-		path: string;
-		options?: {
-			cacheControl?: string;
-			contentType?: string;
-			upsert?: boolean;
-		};
-	}
-) {
-	return await supabase.storage.from(bucket).upload(path, file, {
-		cacheControl: '3600',
-		contentType: 'image/png',
-		upsert: true,
-		...options
-	});
 }

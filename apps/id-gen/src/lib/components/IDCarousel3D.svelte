@@ -4,7 +4,7 @@
 	import * as THREE from 'three';
 	import { NoToneMapping } from 'three';
 	import { onDestroy } from 'svelte';
-	import { getSupabaseStorageUrl } from '$lib/utils/supabase';
+	import { getSupabaseStorageUrl } from '$lib/utils/storage';
 	import Carousel3DItem from './Carousel3DItem.svelte';
 
 	// Types

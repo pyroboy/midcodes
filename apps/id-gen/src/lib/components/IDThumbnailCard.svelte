@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getSupabaseStorageUrl } from '$lib/utils/supabase';
+	import { getSupabaseStorageUrl } from '$lib/utils/storage';
 
 	// Types
 	interface IDCard {

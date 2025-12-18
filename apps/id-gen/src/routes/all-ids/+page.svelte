@@ -10,7 +10,7 @@
 	import { page } from '$app/stores';
 	import { onMount, tick } from 'svelte';
 	import JSZip from 'jszip';
-	import { getSupabaseStorageUrl } from '$lib/utils/supabase';
+	import { getSupabaseStorageUrl } from '$lib/utils/storage';
 	import { createCardFromInches } from '$lib/utils/cardGeometry';
 	import ViewModeToggle from '$lib/components/ViewModeToggle.svelte';
 	import { viewMode, detectViewportDefault } from '$lib/stores/viewMode';
