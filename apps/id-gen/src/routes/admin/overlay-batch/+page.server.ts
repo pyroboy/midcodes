@@ -3,7 +3,7 @@ import { fail } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { templates, idcards } from '$lib/server/schema';
 import { eq, inArray, sql } from 'drizzle-orm';
-import { getSupabaseAdmin } from '$lib/server/supabase';
+import { uploadToR2, deleteFromR2 } from '$lib/server/s3';
 
 interface TemplateListItem {
 	id: string;
@@ -96,60 +96,45 @@ export const actions: Actions = {
 
 		const sourceTemplate = sourceTemplates[0];
 
-		const templateFront = formData.get('templateFront') as Blob;
-		const templateBack = formData.get('templateBack') as Blob;
+		const templateFront = formData.get('templateFront') as File;
+		const templateBack = formData.get('templateBack') as File;
 
 		let frontPath = null;
 		let backPath = null;
 
-		// Use supabaseAdmin for storage operations
-		const supabaseAdmin = getSupabaseAdmin();
-
-		// Upload new template backgrounds if provided
-		if (templateFront) {
+		// Upload new template backgrounds if provided (to R2)
+		if (templateFront && templateFront.size > 0) {
 			const timestamp = Date.now();
 			const frontFilename = `${org_id}/${timestamp}_front.png`;
-
-			const { error: frontUploadError } = await supabaseAdmin.storage
-				.from('templates')
-				.upload(frontFilename, templateFront, {
-					cacheControl: '3600',
-					contentType: 'image/png',
-					upsert: true
-				});
-
-			if (frontUploadError) {
-				console.error('Template front upload error:', frontUploadError);
+            // Upload to R2
+            try {
+			    await uploadToR2(frontFilename, templateFront, 'image/png');
+                frontPath = frontFilename;
+            } catch (err: any) {
+				console.error('Template front upload error:', err);
 				return fail(500, {
-					error: `Failed to upload template front background: ${frontUploadError.message}`
+					error: `Failed to upload template front background: ${err.message}`
 				});
-			}
-			frontPath = frontFilename;
+            }
 		}
 
-		if (templateBack) {
+		if (templateBack && templateBack.size > 0) {
 			const timestamp = Date.now();
 			const backFilename = `${org_id}/${timestamp}_back.png`;
 
-			const { error: backUploadError } = await supabaseAdmin.storage
-				.from('templates')
-				.upload(backFilename, templateBack, {
-					cacheControl: '3600',
-					contentType: 'image/png',
-					upsert: true
-				});
-
-			if (backUploadError) {
-				console.error('Template back upload error:', backUploadError);
+            try {
+			    await uploadToR2(backFilename, templateBack, 'image/png');
+                backPath = backFilename;
+            } catch (err: any) {
+				console.error('Template back upload error:', err);
 				// Try to cleanup front image if it was uploaded
 				if (frontPath) {
-					await supabaseAdmin.storage.from('templates').remove([frontPath]);
+					await deleteFromR2(frontPath);
 				}
 				return fail(500, {
-					error: `Failed to upload template back background: ${backUploadError.message}`
+					error: `Failed to upload template back background: ${err.message}`
 				});
-			}
-			backPath = backFilename;
+            }
 		}
 
 		try {
@@ -213,8 +198,8 @@ export const actions: Actions = {
 		const formData = await request.formData();
 		const newTemplateId = formData.get('newTemplateId') as string;
 		const cardData = formData.get('cardData') as string;
-		const frontImage = formData.get('frontImage') as Blob;
-		const backImage = formData.get('backImage') as Blob;
+		const frontImage = formData.get('frontImage') as File;
+		const backImage = formData.get('backImage') as File;
 		const bulkKey = formData.get('bulkKey') as string;
 		const bulkValue = formData.get('bulkValue') as string;
 
@@ -223,41 +208,27 @@ export const actions: Actions = {
 			return fail(400, { error: 'Missing required fields' });
 		}
 
-		// Use supabaseAdmin for storage operations
-		const supabaseAdmin = getSupabaseAdmin();
-
-		// Upload images
+		// Upload images to R2
 		const timestamp = Date.now();
+        // Using same path structure? R2 handles it.
 		const frontPath = `${org_id}/${newTemplateId}/${timestamp}_front.png`;
 		const backPath = `${org_id}/${newTemplateId}/${timestamp}_back.png`;
 
-		const { error: frontUploadError } = await supabaseAdmin.storage
-			.from('rendered-id-cards')
-			.upload(frontPath, frontImage, {
-				cacheControl: '3600',
-				contentType: 'image/png',
-				upsert: true
-			});
+        try {
+		    await uploadToR2(frontPath, frontImage, 'image/png');
+        } catch (err: any) {
+			console.error('Front upload error:', err);
+			return fail(500, { error: `Front image upload failed: ${err.message}` });
+        }
 
-		if (frontUploadError) {
-			console.error('Front upload error:', frontUploadError);
-			return fail(500, { error: `Front image upload failed: ${frontUploadError.message}` });
-		}
-
-		const { error: backUploadError } = await supabaseAdmin.storage
-			.from('rendered-id-cards')
-			.upload(backPath, backImage, {
-				cacheControl: '3600',
-				contentType: 'image/png',
-				upsert: true
-			});
-
-		if (backUploadError) {
+        try {
+		    await uploadToR2(backPath, backImage, 'image/png');
+        } catch (err: any) {
 			// Rollback front image
-			await supabaseAdmin.storage.from('rendered-id-cards').remove([frontPath]);
-			console.error('Back upload error:', backUploadError);
-			return fail(500, { error: `Back image upload failed: ${backUploadError.message}` });
-		}
+			await deleteFromR2(frontPath);
+			console.error('Back upload error:', err);
+			return fail(500, { error: `Back image upload failed: ${err.message}` });
+        }
 
 		// Parse card data
 		let parsedData = null;
@@ -283,7 +254,8 @@ export const actions: Actions = {
 			return { success: true, cardId: newCard.id, newCard };
 		} catch (insertError: any) {
 			// Rollback uploads
-			await supabaseAdmin.storage.from('rendered-id-cards').remove([frontPath, backPath]);
+			await deleteFromR2(frontPath);
+            await deleteFromR2(backPath);
 			console.error('Insert error:', insertError);
 			return fail(500, { error: `Database insert failed: ${insertError.message}` });
 		}

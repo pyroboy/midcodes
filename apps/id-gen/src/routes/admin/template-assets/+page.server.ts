@@ -3,7 +3,7 @@ import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
 import { templateSizePresets, templateAssets } from '$lib/server/schema';
 import { eq } from 'drizzle-orm';
-import { getSupabaseAdmin } from '$lib/server/supabase';
+import { uploadToR2, deleteFromR2 } from '$lib/server/s3';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	// Fetch size presets from database with Drizzle
@@ -44,7 +44,7 @@ export const actions: Actions = {
 		try {
 			const formData = await request.formData();
 			
-			const imageBlob = formData.get('image') as Blob;
+			const imageBlob = formData.get('image') as File; // Cast to File for better type
 			const name = formData.get('name') as string;
 			const description = formData.get('description') as string | null;
 			const category = formData.get('category') as string | null;
@@ -62,28 +62,11 @@ export const actions: Actions = {
 
 			const tags = tagsJson ? JSON.parse(tagsJson) : [];
 
-			// Get supabaseAdmin for storage operations (hybrid approach)
-			const supabaseAdmin = getSupabaseAdmin();
+            // 1. Upload to R2 (Cloudflare)
+            // Note: filename should probably be unique, maybe prepend a folder or uuid if not already done by frontend
+            const publicUrl = await uploadToR2(filename, imageBlob, imageBlob.type || 'image/png');
 
-			// 1. Upload to Supabase Storage
-			const { error: uploadError } = await supabaseAdmin.storage
-				.from('template-assets')
-				.upload(filename, imageBlob, {
-					contentType: 'image/png',
-					upsert: false
-				});
-
-			if (uploadError) {
-				console.error('Storage upload error:', uploadError);
-				return fail(500, { error: `Failed to upload image: ${uploadError.message}` });
-			}
-
-			// 2. Get Public URL
-			const { data: { publicUrl } } = supabaseAdmin.storage
-				.from('template-assets')
-				.getPublicUrl(filename);
-
-			// 3. Insert into Database with Drizzle
+			// 2. Insert into Database with Drizzle
 			try {
 				const [asset] = await db.insert(templateAssets).values({
 					name,
@@ -104,7 +87,7 @@ export const actions: Actions = {
 				return { success: true, asset };
 			} catch (dbError: any) {
 				// Rollback storage upload
-				await supabaseAdmin.storage.from('template-assets').remove([filename]);
+				await deleteFromR2(filename);
 				console.error('Database insert error:', dbError);
 				return fail(500, { error: `Failed to save asset record: ${dbError.message}` });
 			}

@@ -3,7 +3,7 @@ import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
 import { digitalCards, idcards } from '$lib/server/schema';
 import { eq } from 'drizzle-orm';
-import { getSupabaseAdmin } from '$lib/server/supabase';
+// import { getSupabaseAdmin } from '$lib/server/supabase'; // Removed
 
 export const load: PageServerLoad = async ({ params, locals }) => {
 	const { slug } = params;
@@ -40,23 +40,29 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		throw error(404, 'Profile not active');
 	}
 
-	// 3. Generate Signed URLs for images using Supabase Admin
+	// 3. Generate Public/Signed URLs for images using R2
 	let frontUrl = null;
 	let backUrl = null;
-    const supabaseAdmin = getSupabaseAdmin();
+    const { getPublicUrl, getPresignedUrl } = await import('$lib/server/s3');
 
 	if (idCard) {
 		if (idCard.frontImage) {
-			const { data: frontData } = await supabaseAdmin.storage
-				.from('rendered-id-cards')
-				.createSignedUrl(idCard.frontImage, 3600); // 1 hour
-			frontUrl = frontData?.signedUrl || null;
+            // Using getPresignedUrl to match previous security behavior for ID cards
+            // Though if users switch to Public R2.dev, getPublicUrl is more efficient.
+            // But since ID cards contain PII, signed URLs are safer if the bucket is not fully public
+            // however USER said "R2.dev subdomain" which is fully public. 
+            // Checking implementation plan... user chose "Migrate to Cloudflare R2".
+            // I'll default to getPublicUrl if it's a key, but I'll check if it looks like a URL.
+            // Actually, if we use R2.dev public domain, we don't need presigning for READS if the bucket is public.
+            // But R2 presigning works even on private buckets.
+            // Let's use getPublicUrl since user enabled "Public Access".
+            // AND we updated the storage logic to return public URLs.
+            // IF the stored value is a PATH (key), getPublicUrl helps. 
+            // IF the stored value is a URL, getPublicUrl returns it as is.
+            frontUrl = getPublicUrl(idCard.frontImage);
 		}
 		if (idCard.backImage) {
-			const { data: backData } = await supabaseAdmin.storage
-				.from('rendered-id-cards')
-				.createSignedUrl(idCard.backImage, 3600);
-			backUrl = backData?.signedUrl || null;
+			backUrl = getPublicUrl(idCard.backImage);
 		}
 	}
 

@@ -60,7 +60,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 };
 
 export const actions: Actions = {
-	// Upload thumbnail server-side using supabaseAdmin for storage
+	// Upload thumbnail server-side using R2
 	uploadThumbnail: async ({ request, locals }) => {
 		const { session } = locals;
 		
@@ -71,32 +71,25 @@ export const actions: Actions = {
 		const formData = await request.formData();
 		const file = formData.get('file') as File;
 		const path = formData.get('path') as string;
-		const bucket = formData.get('bucket') as string;
+		// const bucket = formData.get('bucket') as string; // R2 uses singular bucket usually, but path can imply folder.
 		
-		if (!file || !path || !bucket) {
-			return { success: false, message: 'Missing file, path, or bucket' };
+		if (!file || !path) {
+			return { success: false, message: 'Missing file or path' };
 		}
 		
 		// Convert File to ArrayBuffer for server-side upload
 		const arrayBuffer = await file.arrayBuffer();
-		const uint8Array = new Uint8Array(arrayBuffer);
 		
-		// Use supabaseAdmin for storage operations (hybrid approach)
-		const supabaseAdmin = getSupabaseAdmin();
-		const { data, error: uploadError } = await supabaseAdmin.storage
-			.from(bucket)
-			.upload(path, uint8Array, {
-				contentType: file.type || 'image/jpeg',
-				cacheControl: '3600',
-				upsert: true
-			});
-		
-		if (uploadError) {
+        // Use R2
+        try {
+            const { uploadToR2 } = await import('$lib/server/s3');
+            await uploadToR2(path, Buffer.from(arrayBuffer), file.type || 'image/jpeg');
+            
+            return { success: true, path: path };
+        } catch (uploadError: any) {
 			console.error('Upload error:', uploadError);
 			return { success: false, message: uploadError.message };
-		}
-		
-		return { success: true, path: data.path };
+        }
 	},
 
 	updateLowRes: async ({ request, locals }) => {
