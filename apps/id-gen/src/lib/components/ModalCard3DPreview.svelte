@@ -549,6 +549,14 @@ import { NoToneMapping } from 'three';
 		updateRulerLabels(wPixels, hPixels, rotation);
 	}
 
+	// Route R2 URLs through proxy to avoid CORS issues
+	function getProxiedUrl(url: string): string {
+		if (url.includes('.r2.dev') || url.includes('r2.cloudflarestorage.com')) {
+			return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+		}
+		return url;
+	}
+
 	// Load texture from URL
 	function loadTexture(url: string) {
 		console.log('[3D Preview] loadTexture called with URL:', url, 'isPortrait:', isPortrait);
@@ -560,7 +568,7 @@ import { NoToneMapping } from 'three';
 		}
 
 		textureLoader.load(
-			url,
+			getProxiedUrl(url),
 			(loadedTexture) => {
 				console.log('[3D Preview] Texture loaded successfully!', {
 					url,

@@ -10,11 +10,19 @@
 	let error = $state(false);
 
 	onMount(() => {
+		// Route R2 URLs through proxy to avoid CORS issues
+		function getProxiedUrl(u: string): string {
+			if (u.includes('.r2.dev') || u.includes('r2.cloudflarestorage.com')) {
+				return `/api/image-proxy?url=${encodeURIComponent(u)}`;
+			}
+			return u;
+		}
+
 		const loader = new THREE.TextureLoader();
 		loader.crossOrigin = 'anonymous';
 
 		loader.load(
-			url,
+			getProxiedUrl(url),
 			(loadedTexture) => {
 				loadedTexture.colorSpace = THREE.SRGBColorSpace;
 				texture = loadedTexture;

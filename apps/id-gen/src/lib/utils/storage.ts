@@ -12,7 +12,7 @@ export function getStorageUrl(path: string, _bucket: string = 'templates'): stri
     if (path.startsWith('http')) return path;
 
     // Use R2 Public Domain from environment
-    const domain = (env as any).PUBLIC_R2_PUBLIC_DOMAIN;
+    const domain = (env as any).PUBLIC_R2_PUBLIC_DOMAIN || 'pub-cc60c97dd7214d569a15030136899501.r2.dev';
     
     if (domain) {
         const baseUrl = domain.startsWith('http') ? domain : `https://${domain}`;

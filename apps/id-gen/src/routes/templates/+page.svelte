@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount, tick, untrack } from 'svelte';
 	import { invalidate, goto } from '$app/navigation';
+	import { deserialize } from '$app/forms';
 	import TemplatesPageSkeleton from '$lib/components/skeletons/TemplatesPageSkeleton.svelte';
 	import { getPreloadState } from '$lib/services/preloadService';
 	import TemplateList from '$lib/components/TemplateList.svelte';
@@ -15,21 +16,34 @@
 		formData.append('path', path);
 		if (userId) formData.append('userId', userId);
 
-		const response = await fetch('?/uploadImage', {
-			method: 'POST',
-			body: formData
-		});
+		try {
+			const response = await fetch('?/uploadImage', {
+				method: 'POST',
+				body: formData
+			});
 
-		const result = await response.json();
+			const result = deserialize(await response.text());
+			console.log('[uploadImage] Server response (deserialized):', result);
 		
-		// Handle SvelteKit form action response format
-		if (result.type === 'success' && result.data?.url) {
-			return result.data.url;
+			if (result.type === 'success') {
+				const data = result.data as any;
+				if (data?.url) return data.url;
+			}
+			
+			if (result.type === 'failure') {
+				const data = result.data as any;
+				throw new Error(data?.error || 'Upload failed');
+			}
+
+			if (result.type === 'error') {
+				throw new Error(result.error?.message || 'Upload error');
+			}
+			
+			throw new Error('Invalid response from upload server: ' + JSON.stringify(result));
+		} catch (e) {
+			console.error('[uploadImage] Error:', e);
+			throw e;
 		}
-		if (result.type === 'failure' || !result.data?.success) {
-			throw new Error(result.data?.error || 'Upload failed');
-		}
-		return result.data.url;
 	}
 	import { pushState } from '$app/navigation';
 	import type { TemplateElement, TemplateData } from '$lib/stores/templateStore';
@@ -664,109 +678,29 @@
 				body: formData
 			});
 
-			if (!response.ok) {
-				const errorText = await response.text();
-				console.error('❌ Server error:', errorText);
-				throw new Error(`Server error: ${errorText}`);
-			}
+			const result = deserialize(await response.text());
+			console.log('[saveTemplate] Action result:', result);
 
-			// 🚨 DEBUG: Parse response as raw text first to see what we're actually getting
-			const responseText = await response.text();
-			console.log('🔍 RAW server response text:', responseText);
-			console.log('🔍 RAW response text length:', responseText.length);
-
-			// Try to parse as JSON
-			let result;
-			try {
-				result = JSON.parse(responseText);
-				console.log('🔍 Parsed JSON result:', {
-					result: result,
-					type: typeof result,
-					isArray: Array.isArray(result),
-					keys: result && typeof result === 'object' ? Object.keys(result) : 'N/A'
-				});
-			} catch (jsonError) {
-				console.error('❌ Failed to parse JSON response:', jsonError);
-				throw new Error(`Server returned invalid JSON: ${responseText.substring(0, 200)}...`);
-			}
-
-			// Handle server response based on actual format
-			if (result && typeof result === 'object') {
-				// Check for SvelteKit form action format: { type: 'success', data: {...} }
-				if (result.type === 'success' && result.data) {
-					console.log('✅ SvelteKit form action success format detected');
-					result.success = true; // Normalize to our expected format
-				} else if (result.type === 'failure') {
-					console.error('❌ SvelteKit form action failed:', result);
-					throw new Error(result.message || 'Server form action failed');
-				}
-
-				// Check for our custom format: { success: true, data: {...} }
-				if (result.success === false) {
-					const errorMsg = result.message || 'Server action failed';
-					console.error('❌ Server action failed:', errorMsg);
-					throw new Error(errorMsg);
-				}
-
-				// Ensure we have data
-				if (!('data' in result)) {
-					console.error('❌ No template data in server response. Full result:', result);
-					throw new Error('No template data received from server');
-				}
-			} else {
-				console.error('❌ Unexpected response format:', typeof result, result);
-				throw new Error('Server returned unexpected response format');
-			}
-
-			// Robustly extract the saved template from various server shapes
 			let savedTemplate: any = null;
-			try {
-				if (result.data && typeof result.data === 'string') {
-					// Server returned stringified JSON
-					const parsed = JSON.parse(result.data);
-					if (Array.isArray(parsed)) {
-						// Prefer an object that looks like a template; ignore primitives (numbers/strings)
-						const candidates = parsed.filter(
-							(item: any) =>
-								item &&
-								typeof item === 'object' &&
-								('front_background' in item ||
-									'back_background' in item ||
-									'template_elements' in item ||
-									('id' in item && 'name' in item))
-						);
-						savedTemplate = candidates.length ? candidates[candidates.length - 1] : undefined;
-					} else {
-						savedTemplate = parsed;
-					}
-				} else if (result.data && typeof result.data === 'object' && 'template' in result.data) {
-					// Some APIs return { template: {...} }
-					savedTemplate = (result.data as any).template;
+
+			if (result.type === 'success') {
+				const actionResult = result.data as any;
+				if (actionResult.success) {
+					savedTemplate = actionResult.data;
 				} else {
-					savedTemplate = result.data;
+					throw new Error(actionResult.message || 'Save failed');
 				}
-			} catch (e) {
-				console.error('❌ Failed to parse nested template data:', e);
-				throw new Error('Failed to parse template data from server response');
+			} else if (result.type === 'failure') {
+				const data = result.data as any;
+				throw new Error(data?.message || 'Save failed');
+			} else if (result.type === 'error') {
+				throw new Error(result.error.message);
+			} else {
+				throw new Error(`Unexpected action result type: ${result.type}`);
 			}
 
-			if (!savedTemplate || typeof savedTemplate !== 'object') {
-				throw new Error('Template was not saved properly - invalid data returned');
-			}
-
-			// Ensure the saved template has a stable string id (fallback to the one we sent)
-			if (typeof savedTemplate.id !== 'string' || !savedTemplate.id) {
-				console.warn('⚠️ Server returned non-string or missing id; falling back to client id', {
-					serverId: savedTemplate.id,
-					clientId: templateDataToSave.id
-				});
-				savedTemplate.id = templateDataToSave.id;
-			}
-
-			// If extraction failed, throw early with diagnostics
 			if (!savedTemplate) {
-				console.error('❌ Could not extract a template object from server response:', result.data);
-				throw new Error('Failed to extract saved template from server response');
+				throw new Error('Template data missing from success response');
 			}
 
 			// Revoke any previous blob: previews to avoid stale object URLs

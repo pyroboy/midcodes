@@ -387,12 +387,21 @@
 		}
 
 		return new Promise((resolve, reject) => {
+			let src = url;
+            // Check if it's an R2 URL that needs proxying
+            if (url.includes('.r2.dev') || url.includes('.r2.cloudflarestorage.com')) {
+                 src = `/api/image-proxy?url=${encodeURIComponent(url)}`;
+				 console.log(`[IdCanvas] Proxying image: ${url} -> ${src}`);
+            } else {
+				console.log(`[IdCanvas] Loading image directly: ${url}`);
+			}
+
 			const img = new Image();
 			img.crossOrigin = 'anonymous';
 			img.onload = () => resolve(img);
 			img.onerror = () =>
 				reject(new CanvasOperationError(`Failed to load image: ${url}`, 'IMAGE_LOAD_ERROR'));
-			img.src = url;
+			img.src = src;
 		});
 	}
 

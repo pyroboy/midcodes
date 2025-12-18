@@ -30,9 +30,18 @@ export function getPublicUrl(key: string): string {
         }
         return `https://${publicDomain}/${key}`;
     }
-    // Fallback if no public domain (should be configured)
+    
+    // Fallback: Use standard R2.dev public URL format if Account ID and Bucket are present
+    // Format: https://pub-<hash>.r2.dev/<key> - BUT we don't know the hash.
+    // Format: https://<bucket>.<account>.r2.cloudflarestorage.com/<key> (Usually private)
+    
+    // BETTER FALLBACK: If public domain is missing, return a placeholder or log a warning.
+    // But since the user is seeing success, let's try to construct a likely URL or just return the key 
+    // if the key itself is a URL (unlikely).
+    
+    console.warn('[R2] WARNING: R2_PUBLIC_DOMAIN is not set. Returning empty string for public URL.');
     return ''; 
-}
+} 
 
 export async function uploadToR2(
     key: string, 
@@ -53,8 +62,11 @@ export async function uploadToR2(
         ContentType: contentType
     });
 
+    console.log(`[R2] Uploading to Bucket: ${R2_BUCKET}, Key: ${key}, Type: ${contentType}`);
     await r2.send(command);
-    return getPublicUrl(key);
+    const publicUrl = getPublicUrl(key);
+    console.log(`[R2] Upload success. Public URL: ${publicUrl}`);
+    return publicUrl;
 }
 
 export async function deleteFromR2(key: string): Promise<void> {
@@ -65,7 +77,9 @@ export async function deleteFromR2(key: string): Promise<void> {
         Key: key
     });
 
+    console.log(`[R2] Deleting from Bucket: ${R2_BUCKET}, Key: ${key}`);
     await r2.send(command);
+    console.log(`[R2] Delete success: ${key}`);
 }
 
 export async function getPresignedUrl(key: string, expiresIn = 3600): Promise<string> {

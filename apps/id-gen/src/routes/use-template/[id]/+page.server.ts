@@ -54,9 +54,9 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 
 export const actions: Actions = {
 	saveIdCard: async ({ request, locals }) => {
-		const { org_id: userOrgId, session } = locals;
+		const { org_id: userOrgId, session, user } = locals;
 		
-		if (!session) {
+		if (!session || !user) {
 			return fail(401, { error: 'Unauthorized' });
 		}
 
@@ -119,7 +119,7 @@ export const actions: Actions = {
 				backPath: uploadResult.backPath,
 				formFields,
 				createDigitalCard,
-				userId: session.user.id
+				userId: user.id
 			});
 
 			if ('error' in saveResult) {

@@ -1,7 +1,7 @@
 <!-- src/routes/auth/+page.svelte -->
 <script lang="ts">
-	import { enhance } from '$app/forms';
-	import type { ActionData } from './$types';
+	import { goto } from '$app/navigation';
+	import { authClient } from '$lib/auth-client';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
@@ -14,19 +14,66 @@
 		CardTitle
 	} from '$lib/components/ui/card';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
-	import { page } from '$app/stores';
+	import { toast } from 'svelte-sonner';
 
-	interface Props {
-		form: ActionData;
+	let loading = $state(false);
+	let email = $state('');
+	let password = $state('');
+	let confirmPassword = $state('');
+
+	async function handleSignIn(e: Event) {
+		e.preventDefault();
+		loading = true;
+		
+		try {
+			const { data, error } = await authClient.signIn.email({
+				email,
+				password
+			});
+
+			if (error) {
+				toast.error(error.message || 'Invalid credentials');
+			} else {
+				toast.success('Signed in successfully');
+				window.location.href = '/';
+			}
+		} catch (e: any) {
+			toast.error(e.message || 'An unexpected error occurred');
+		} finally {
+			loading = false;
+		}
 	}
 
-	let { form }: Props = $props();
-	let loading = $state(false);
+	async function handleSignUp(e: Event) {
+		e.preventDefault();
+		loading = true;
 
-	let error = $derived(form?.error);
-	let message = $derived(form?.message);
-	let success = $derived(form?.success);
-	let email = $derived(form?.email || '');
+		if (password !== confirmPassword) {
+			toast.error('Passwords do not match');
+			loading = false;
+			return;
+		}
+
+		try {
+			const { data, error } = await authClient.signUp.email({
+				email,
+				password,
+				name: email.split('@')[0],
+			});
+
+			if (error) {
+				toast.error(error.message || 'Registration failed');
+			} else {
+				toast.success('Account created! Signing you in...');
+				window.location.href = '/';
+			}
+		} catch (e: any) {
+			console.error(e);
+			toast.error(e.message || 'An unexpected error occurred during signup');
+		} finally {
+			loading = false;
+		}
+	}
 </script>
 
 <div class="container mx-auto flex h-screen w-screen flex-col items-center justify-center">
@@ -43,17 +90,7 @@
 				</TabsList>
 
 				<TabsContent value="signin">
-					<form
-						method="POST"
-						action="?/signin"
-						use:enhance={() => {
-							loading = true;
-							return async ({ update }) => {
-								loading = false;
-								await update();
-							};
-						}}
-					>
+					<form onsubmit={handleSignIn}>
 						<div class="grid gap-4">
 							<div class="grid gap-2">
 								<Label for="email">Email</Label>
@@ -62,17 +99,22 @@
 									name="email"
 									type="email"
 									placeholder="name@example.com"
-									value={email}
+									bind:value={email}
 									required
+									disabled={loading}
 								/>
 							</div>
 							<div class="grid gap-2">
 								<Label for="password">Password</Label>
-								<Input id="password" name="password" type="password" required />
+								<Input 
+									id="password" 
+									name="password" 
+									type="password" 
+									bind:value={password}
+									required 
+									disabled={loading}
+								/>
 							</div>
-							{#if error}
-								<div class="text-sm text-red-500">{error}</div>
-							{/if}
 							<Button type="submit" class="w-full" disabled={loading}>
 								{#if loading}
 									Signing in...
@@ -85,17 +127,7 @@
 				</TabsContent>
 
 				<TabsContent value="signup">
-					<form
-						method="POST"
-						action="?/signup"
-						use:enhance={() => {
-							loading = true;
-							return async ({ update }) => {
-								loading = false;
-								await update();
-							};
-						}}
-					>
+					<form onsubmit={handleSignUp}>
 						<div class="grid gap-4">
 							<div class="grid gap-2">
 								<Label for="signup-email">Email</Label>
@@ -104,24 +136,33 @@
 									name="email"
 									type="email"
 									placeholder="name@example.com"
-									value={email}
+									bind:value={email}
 									required
+									disabled={loading}
 								/>
 							</div>
 							<div class="grid gap-2">
 								<Label for="signup-password">Password</Label>
-								<Input id="signup-password" name="password" type="password" required />
+								<Input 
+									id="signup-password" 
+									name="password" 
+									type="password" 
+									bind:value={password}
+									required 
+									disabled={loading}
+								/>
 							</div>
 							<div class="grid gap-2">
 								<Label for="confirm-password">Confirm Password</Label>
-								<Input id="confirm-password" name="confirmPassword" type="password" required />
+								<Input 
+									id="confirm-password" 
+									name="confirmPassword" 
+									type="password" 
+									bind:value={confirmPassword}
+									required 
+									disabled={loading}
+								/>
 							</div>
-							{#if error}
-								<div class="text-sm text-red-500">{error}</div>
-							{/if}
-							{#if message}
-								<div class="text-sm text-green-500">{message}</div>
-							{/if}
 							<Button type="submit" class="w-full" disabled={loading}>
 								{#if loading}
 									Creating account...

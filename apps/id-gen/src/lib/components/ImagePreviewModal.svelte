@@ -30,13 +30,17 @@
 		texture.wrapS = THREE.ClampToEdgeWrapping;
 		texture.wrapT = THREE.ClampToEdgeWrapping;
 		texture.colorSpace = THREE.SRGBColorSpace;
+		
+		// Ensure image has finished loading before updating
+		if (texture.image) {
+			texture.needsUpdate = true;
+		}
 
 		// Use 1:1 mapping - the rendered ID card image should already match the geometry aspect ratio
 		// No scaling or offset needed since the image dimensions match the template dimensions
 		texture.repeat.set(1, 1);
 		texture.offset.set(0, 0);
 
-		texture.needsUpdate = true;
 		return texture;
 	}
 
@@ -72,6 +76,16 @@
 	let resolvedTemplateDimensions = $state<TemplateDimensions>(null);
 	let effectiveTemplateDimensions = $state<TemplateDimensions>(null);
 
+	// Helper: Route R2 URLs through our proxy to avoid CORS issues
+	function getProxiedUrl(url: string | null): string | null {
+		if (!url) return null;
+		// Check if this is an R2 URL that needs proxying
+		if (url.includes('.r2.dev') || url.includes('r2.cloudflarestorage.com')) {
+			return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+		}
+		return url;
+	}
+
 	// Effect 1: Resolve incoming props, which may be functions or promises
 	$effect(() => {
 		const resolveProp = async (prop: any) => (typeof prop === 'function' ? await prop() : prop);
@@ -84,8 +98,9 @@
 					resolveProp(cardGeometryProp),
 					resolveProp(templateDimensionsProp)
 				]);
-				resolvedFrontUrl = front;
-				resolvedBackUrl = back;
+				// Proxy R2 URLs to avoid CORS issues with Three.js texture loading
+				resolvedFrontUrl = getProxiedUrl(front);
+				resolvedBackUrl = getProxiedUrl(back);
 				resolvedCardGeometry = geo;
 				resolvedTemplateDimensions = dims;
 			} catch (error) {
@@ -481,8 +496,13 @@
 													/>
 												</T.Mesh>
 											</T.Group>
-										{:then map}
+										{:then rawMap}
 											<!-- Back texture loaded -->
+											{@const map = transformTextureToFit(
+												rawMap,
+												effectiveTemplateDimensions,
+												geometryDimensions
+											)}
 											<T.Mesh geometry={currentGeometry.backGeometry}>
 												<T.MeshStandardMaterial {map} roughness={0.4} />
 											</T.Mesh>

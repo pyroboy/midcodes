@@ -22,6 +22,16 @@ export class TextureManager {
 	}
 
 	/**
+	 * Route R2 URLs through proxy to avoid CORS issues
+	 */
+	private getProxiedUrl(url: string): string {
+		if (url.includes('.r2.dev') || url.includes('r2.cloudflarestorage.com')) {
+			return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+		}
+		return url;
+	}
+
+	/**
 	 * Configure texture with standard settings
 	 */
 	private configureTexture(texture: THREE.Texture): void {
@@ -68,7 +78,7 @@ export class TextureManager {
 		console.log('[TextureManager] Loading front:', url);
 
 		this.textureLoader.load(
-			url,
+			this.getProxiedUrl(url),
 			(loadedTexture) => {
 				this.configureTexture(loadedTexture);
 				this.applyAspectCorrection(loadedTexture, aspect);
@@ -102,7 +112,7 @@ export class TextureManager {
 		console.log('[TextureManager] Loading back:', url);
 
 		this.textureLoader.load(
-			url,
+			this.getProxiedUrl(url),
 			(loadedTexture) => {
 				this.configureTexture(loadedTexture);
 				this.applyAspectCorrection(loadedTexture, aspect);
@@ -148,7 +158,7 @@ export class TextureManager {
 		showcaseLoader.crossOrigin = 'anonymous';
 
 		showcaseLoader.load(
-			url,
+			this.getProxiedUrl(url),
 			(loadedTexture) => {
 				// Validate texture has actual image data
 				if (
@@ -255,7 +265,7 @@ export class TextureManager {
 				}
 
 				loader.load(
-					img.image_url,
+					this.getProxiedUrl(img.image_url),
 					(loadedTexture) => {
 						if (
 							loadedTexture.image &&

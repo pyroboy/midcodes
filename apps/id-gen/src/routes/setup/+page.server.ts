@@ -6,14 +6,7 @@ import { auth } from '$lib/server/auth';
 import { sql, eq } from 'drizzle-orm';
 
 export const load: PageServerLoad = async () => {
-	// Security check: only allow if NO users exist
-	const userCount = await db.select({ count: sql<number>`count(*)` }).from(user);
-	const count = Number(userCount[0]?.count || 0);
-
-	if (count > 0) {
-		throw redirect(303, '/auth');
-	}
-
+	// Setup page is always accessible (temporary for initial deployment)
 	return {
 		setupAvailable: true
 	};

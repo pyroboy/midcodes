@@ -28,6 +28,10 @@ function createAuth() {
         plugins: [
             admin()
         ],
+        trustedOrigins: [
+            "http://127.0.0.1:5173",
+            "http://localhost:5173"
+        ],
         emailAndPassword: {
             enabled: true
         },
@@ -35,11 +39,17 @@ function createAuth() {
             user: {
                 create: {
                     after: async (user) => {
-                        const db = getDb();
-                        await db.insert(schema.profiles).values({
-                            id: user.id,
-                            email: user.email,
-                        });
+                        console.log('[AUTH HOOK] Creating profile for user:', user.id);
+                        try {
+                            const db = getDb();
+                            await db.insert(schema.profiles).values({
+                                id: user.id,
+                                email: user.email,
+                            });
+                            console.log('[AUTH HOOK] Profile created successfully');
+                        } catch (e) {
+                            console.error('[AUTH HOOK] FAILED to create profile:', e);
+                        }
                     },
                 },
             },

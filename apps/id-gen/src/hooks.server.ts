@@ -124,9 +124,9 @@ const securityHeadersHandle: Handle = async ({ event, resolve }) => {
 		"default-src 'self'",
 		"script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net",
 		"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-		"img-src 'self' data: blob: https://*.supabase.co https://*.neon.tech", // Added Neon
+		"img-src 'self' data: blob: https://*.neon.tech https://*.r2.dev", // Added Neon and R2
 		"font-src 'self' https://fonts.gstatic.com",
-		"connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.paymongo.com https://api.runware.ai https://*.runware.ai https://*.neon.tech", // Added Neon
+		"connect-src 'self' https://api.paymongo.com https://api.runware.ai https://*.runware.ai https://*.neon.tech https://*.r2.dev https://cdn.jsdelivr.net http://localhost:* ws://localhost:*", // Added Neon, R2, jsdelivr & localhost
 		"worker-src 'self' blob:",
 		"frame-ancestors 'none'",
 		"base-uri 'self'",
@@ -166,7 +166,7 @@ const authGuard: Handle = async ({ event, resolve }) => {
 	const isUserLoggedIn = !!event.locals.user;
 
 	// 1. Handle API routes
-	if (path.startsWith('/api') && !path.startsWith('/api/auth')) {
+	if (path.startsWith('/api') && !path.startsWith('/api/auth') && !path.startsWith('/api/debug')) {
 		if (!isUserLoggedIn) {
 			return new Response(JSON.stringify({ error: 'Unauthorized' }), {
 				status: 401,

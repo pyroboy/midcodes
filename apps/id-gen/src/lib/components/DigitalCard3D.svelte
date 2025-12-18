@@ -25,13 +25,21 @@
   const rotation = tweened<[number, number, number]>([0, 0, 0], { duration: 1500, easing: cubicOut });
   const scale = tweened(1, { duration: 1500, easing: cubicOut });
 
+  // Route R2 URLs through proxy to avoid CORS issues
+  function getProxiedUrl(url: string): string {
+    if (url.includes('.r2.dev') || url.includes('r2.cloudflarestorage.com')) {
+      return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+    }
+    return url;
+  }
+
   // Load textures helper
   function loadTexture(url: string): Promise<THREE.Texture> {
     return new Promise((resolve, reject) => {
       const loader = new THREE.TextureLoader();
       loader.crossOrigin = 'anonymous';
       loader.load(
-        url,
+        getProxiedUrl(url),
         (tex) => {
           tex.colorSpace = THREE.SRGBColorSpace;
           resolve(tex);
