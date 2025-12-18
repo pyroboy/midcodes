@@ -4,19 +4,8 @@
  * to prevent runtime errors and security misconfigurations
  */
 
-import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
 import { dev } from '$app/environment';
-import {
-	PRIVATE_SERVICE_ROLE
-} from '$env/static/private';
-
-// PayMongo env vars are optional - accessed via process.env to avoid build errors
-// @ts-ignore
-const PAYMONGO_SECRET_KEY = (typeof process !== 'undefined' && process.env?.PAYMONGO_SECRET_KEY) || '';
-// @ts-ignore  
-const PAYMONGO_WEBHOOK_SECRET = (typeof process !== 'undefined' && process.env?.PAYMONGO_WEBHOOK_SECRET) || '';
-
-
+import { env as privateEnv } from '$env/dynamic/private';
 
 interface EnvValidationResult {
 	isValid: boolean;
@@ -30,17 +19,10 @@ interface EnvValidationResult {
 function isValidUrl(url: string): boolean {
 	try {
 		const parsed = new URL(url);
-		return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+		return parsed.protocol === 'http:' || parsed.protocol === 'https:' || parsed.protocol === 'postgres:' || parsed.protocol === 'postgresql:';
 	} catch {
 		return false;
 	}
-}
-
-/**
- * Validates that a value is not empty and meets minimum length requirements
- */
-function isValidSecret(value: string, minLength = 20): boolean {
-	return value.length >= minLength;
 }
 
 /**
@@ -51,45 +33,39 @@ export function validateEnvironment(): EnvValidationResult {
 	const errors: string[] = [];
 	const warnings: string[] = [];
 
-	// Public Supabase URL
-	if (!PUBLIC_SUPABASE_URL) {
-		errors.push('PUBLIC_SUPABASE_URL is not set');
-	} else if (!isValidUrl(PUBLIC_SUPABASE_URL)) {
-		errors.push('PUBLIC_SUPABASE_URL is not a valid URL');
+	// Neon Database URL (Critical)
+	// Try both process.env (Node.js/Vite) and privateEnv (SvelteKit runtime)
+	const neonUrl = process.env.NEON_DATABASE_URL || privateEnv.NEON_DATABASE_URL;
+	if (!neonUrl) {
+		errors.push('NEON_DATABASE_URL is not set - database operations will fail');
+	} else if (!isValidUrl(neonUrl)) {
+		errors.push('NEON_DATABASE_URL is not a valid URL');
 	}
 
-	// Public Supabase Anon Key
-	if (!PUBLIC_SUPABASE_ANON_KEY) {
-		errors.push('PUBLIC_SUPABASE_ANON_KEY is not set');
-	} else if (!isValidSecret(PUBLIC_SUPABASE_ANON_KEY, 30)) {
-		errors.push('PUBLIC_SUPABASE_ANON_KEY appears to be invalid (too short)');
+	// R2 Storage (Optional but recommended)
+	const r2AccountId = privateEnv.R2_ACCOUNT_ID;
+	const r2AccessKeyId = privateEnv.R2_ACCESS_KEY_ID;
+	const r2SecretAccessKey = privateEnv.R2_SECRET_ACCESS_KEY;
+	const r2BucketName = privateEnv.R2_BUCKET_NAME;
+
+	if (!r2AccountId || !r2AccessKeyId || !r2SecretAccessKey || !r2BucketName) {
+		warnings.push('R2 storage not fully configured - file uploads may fail');
 	}
 
-	// Private Service Role Key (Critical)
-	if (!PRIVATE_SERVICE_ROLE) {
-		errors.push('PRIVATE_SERVICE_ROLE is not set - admin operations will fail');
-	} else if (!isValidSecret(PRIVATE_SERVICE_ROLE, 30)) {
-		errors.push('PRIVATE_SERVICE_ROLE appears to be invalid (too short)');
-	}
-
-	// PayMongo Secret Key (Critical for payments)
-	if (!PAYMONGO_SECRET_KEY) {
-		warnings.push('PAYMONGO_SECRET_KEY is not set - payment processing will fail');
-	} else if (!PAYMONGO_SECRET_KEY.startsWith('sk_')) {
-		warnings.push('PAYMONGO_SECRET_KEY does not start with sk_ - might be invalid');
-	}
-
-	// PayMongo Webhook Secret (Critical for security)
-	if (!PAYMONGO_WEBHOOK_SECRET) {
+	// Better Auth Secret (Critical for auth)
+	const betterAuthSecret = privateEnv.BETTER_AUTH_SECRET;
+	if (!betterAuthSecret) {
 		if (dev) {
-			warnings.push('PAYMONGO_WEBHOOK_SECRET is not set - webhook verification will fail (SECURITY RISK - DEV MODE)');
+			warnings.push('BETTER_AUTH_SECRET is not set - using default for development');
 		} else {
-			errors.push(
-				'PAYMONGO_WEBHOOK_SECRET is not set - webhook verification will fail (SECURITY RISK)'
-			);
+			errors.push('BETTER_AUTH_SECRET is not set - authentication will fail');
 		}
-	} else if (!isValidSecret(PAYMONGO_WEBHOOK_SECRET, 10)) {
-		warnings.push('PAYMONGO_WEBHOOK_SECRET appears to be too short');
+	}
+
+	// CSRF Secret (Optional - will generate random if not set)
+	const csrfSecret = privateEnv.CSRF_SECRET;
+	if (!csrfSecret && !dev) {
+		warnings.push('CSRF_SECRET is not set - a random secret will be generated (not persistent across instances)');
 	}
 
 	return {
@@ -102,7 +78,7 @@ export function validateEnvironment(): EnvValidationResult {
 /**
  * SECURITY: Validates environment and logs results safely
  * Never logs actual secret values - only configuration status
- * Throws error if critical validation fails
+ * In dev mode, only warns but doesn't throw (actual code will provide clearer errors)
  */
 export function validateAndLogEnvironment(): void {
 	const result = validateEnvironment();
@@ -114,19 +90,26 @@ export function validateAndLogEnvironment(): void {
 	}
 
 	if (!result.isValid) {
-		console.error('❌ Environment validation failed:');
+		console.error('❌ Environment validation issues:');
 		result.errors.forEach((error) => console.error(`  - ${error}`));
-		throw new Error(
-			'Environment validation failed. Please check your .env file and ensure all required variables are set.'
-		);
+		
+		// In dev mode, don't throw - the actual code will provide clearer errors
+		// This helps when $env/dynamic/private hasn't loaded yet
+		if (!dev) {
+			throw new Error(
+				'Environment validation failed. Please check your .env file and ensure all required variables are set.'
+			);
+		} else {
+			console.warn('⚠️  Continuing in dev mode despite validation issues...');
+		}
+	} else {
+		// SECURITY: Log only that validation passed, with boolean status indicators
+		// Never log actual values or lengths that could hint at secrets
+		console.log('✅ Environment validation passed', {
+			neonConfigured: !!privateEnv.NEON_DATABASE_URL,
+			r2Configured: !!(privateEnv.R2_ACCOUNT_ID && privateEnv.R2_ACCESS_KEY_ID),
+			authConfigured: !!privateEnv.BETTER_AUTH_SECRET || dev,
+			mode: dev ? 'development' : 'production'
+		});
 	}
-
-	// SECURITY: Log only that validation passed, with boolean status indicators
-	// Never log actual values or lengths that could hint at secrets
-	console.log('✅ Environment validation passed', {
-		supabaseConfigured: true,
-		paymongoConfigured: !!PAYMONGO_SECRET_KEY,
-		webhookConfigured: !!PAYMONGO_WEBHOOK_SECRET,
-		mode: dev ? 'development' : 'production'
-	});
 }

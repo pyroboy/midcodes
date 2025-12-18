@@ -9,7 +9,9 @@ let _sql: NeonQueryFunction<false, false> | null = null;
 let _db: NeonHttpDatabase<typeof schema> | null = null;
 
 function getConnectionString(): string {
-    const url = privateEnv.NEON_DATABASE_URL;
+    // Try multiple sources for the env variable
+    // process.env works in Node.js/Vite dev, privateEnv works in SvelteKit runtime
+    const url = process.env.NEON_DATABASE_URL || privateEnv.NEON_DATABASE_URL;
     if (!url) {
         throw new Error(
             'Missing NEON_DATABASE_URL environment variable. Configure it in Cloudflare Pages environment variables (and locally via .env).'

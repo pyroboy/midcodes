@@ -1,4 +1,4 @@
-import { betterAuth, type BetterAuthOptions } from "better-auth";
+import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { admin } from "better-auth/plugins/admin";
 import { getDb } from "./db";
@@ -7,11 +7,15 @@ import * as schema from "./schema";
 // Lazy-initialized auth instance
 // Cloudflare Workers require database connections to be created within request handlers,
 // not at module initialization time
-let _auth: ReturnType<typeof betterAuth> | null = null;
+let _auth: ReturnType<typeof createAuth> | null = null;
 
-function getAuthConfig(): BetterAuthOptions {
+/**
+ * Create the Better Auth instance with proper configuration.
+ * Called lazily on first access.
+ */
+function createAuth() {
     const db = getDb();
-    return {
+    return betterAuth({
         database: drizzleAdapter(db, {
             provider: "pg",
             schema: {
@@ -40,7 +44,7 @@ function getAuthConfig(): BetterAuthOptions {
                 },
             },
         },
-    };
+    });
 }
 
 /**
@@ -49,19 +53,23 @@ function getAuthConfig(): BetterAuthOptions {
  */
 export function getAuth() {
     if (!_auth) {
-        _auth = betterAuth(getAuthConfig());
+        _auth = createAuth();
     }
     return _auth;
 }
 
-// Export as a proxy for backwards compatibility with existing code
+// Type of the lazy-initialized auth instance
+export type Auth = ReturnType<typeof createAuth>;
+
+// Export a getter object for backwards compatibility with existing code
 // This allows `auth.api.getSession()...` to work without changing all call sites
-export const auth = new Proxy({} as ReturnType<typeof betterAuth>, {
+// The proxy ensures lazy initialization happens on first property access
+export const auth: Auth = new Proxy({} as Auth, {
     get(_target, prop) {
         const realAuth = getAuth();
-        const value = (realAuth as any)[prop];
+        const value = realAuth[prop as keyof typeof realAuth];
         if (typeof value === 'function') {
-            return value.bind(realAuth);
+            return (value as Function).bind(realAuth);
         }
         return value;
     }
