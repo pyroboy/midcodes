@@ -828,7 +828,7 @@
 								widthPixels={selectedTemplate?.width_pixels || 1013}
 								heightPixels={selectedTemplate?.height_pixels || 638}
 								templateId={selectedTemplateId}
-								templateElements={selectedTemplate?.template_elements || []}
+								templateElements={(selectedTemplate?.template_elements || []) as any}
 								showOverlays={showElementOverlays}
 								showColors={showOverlayColors}
 								showBorders={showOverlayBorders}

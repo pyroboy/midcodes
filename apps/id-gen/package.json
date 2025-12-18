@@ -61,6 +61,8 @@
 		"zod": "^4.0.17"
 	},
 	"dependencies": {
+		"@aws-sdk/client-s3": "^3.954.0",
+		"@aws-sdk/s3-request-presigner": "^3.954.0",
 		"@faker-js/faker": "^9.3.0",
 		"@fontsource/lato": "^5.2.7",
 		"@fontsource/montserrat": "^5.2.8",
