@@ -8,7 +8,16 @@
 import { randomBytes, createHmac, timingSafeEqual } from 'crypto';
 
 // Secret key for HMAC signing (should be from environment in production)
-const CSRF_SECRET = process.env.CSRF_SECRET || randomBytes(32).toString('hex');
+// Use lazy initialization to avoid calling randomBytes() at module load time
+// (Cloudflare Workers disallow random value generation in global scope)
+let _csrfSecret: string | null = null;
+
+function getCSRFSecret(): string {
+	if (_csrfSecret === null) {
+		_csrfSecret = process.env.CSRF_SECRET || randomBytes(32).toString('hex');
+	}
+	return _csrfSecret;
+}
 
 // Token expiration time (1 hour)
 const TOKEN_EXPIRATION_MS = 60 * 60 * 1000;
@@ -28,7 +37,7 @@ export function generateCSRFTokens(): CSRFTokenPair {
 	const cookieToken = `${timestamp}.${random}`;
 	
 	// Create HMAC signature of the cookie token
-	const signature = createHmac('sha256', CSRF_SECRET)
+	const signature = createHmac('sha256', getCSRFSecret())
 		.update(cookieToken)
 		.digest('hex');
 	
@@ -67,7 +76,7 @@ export function verifyCSRFToken(headerToken: string | null, cookieToken: string 
 		}
 		
 		// Verify the signature
-		const expectedSignature = createHmac('sha256', CSRF_SECRET)
+		const expectedSignature = createHmac('sha256', getCSRFSecret())
 			.update(tokenPart)
 			.digest('hex');
 		
