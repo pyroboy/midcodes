@@ -16,32 +16,56 @@ import { generateCSRFTokens } from '$lib/server/csrf';
 let _envValidated = false;
 
 const betterAuthHandle: Handle = async ({ event, resolve }) => {
+	console.log('[AUTH DEBUG] betterAuthHandle started for:', event.url.pathname);
+	
 	// SECURITY: Validate environment variables on first request
 	// (Cloudflare Workers don't allow this at module scope)
-	// SECURITY: Validate environment variables on first request
 	// This ensures $env/dynamic/private is hydrated
 	if (!_envValidated) {
-		initializeEnv();
+		console.log('[AUTH DEBUG] Initializing environment...');
+		try {
+			initializeEnv();
+			console.log('[AUTH DEBUG] Environment initialized successfully');
+		} catch (e) {
+			console.error('[AUTH DEBUG] Environment init FAILED:', e);
+			throw e;
+		}
 		_envValidated = true;
 	}
 
 	// Better Auth session management
-	const result = await auth.api.getSession({
-		headers: event.request.headers
-	}) as any; // Cast to any to handle type mismatch from Better Auth SDK in this environment
+	console.log('[AUTH DEBUG] Getting session from headers...');
+	let result: any = null;
+	try {
+		result = await auth.api.getSession({
+			headers: event.request.headers
+		});
+		console.log('[AUTH DEBUG] Session result:', result ? 'Session found' : 'No session', result?.user?.email ?? 'no email');
+	} catch (e) {
+		console.error('[AUTH DEBUG] getSession FAILED:', e);
+	}
 
 	event.locals.auth = auth;
 	event.locals.session = result?.session ?? null;
 	event.locals.user = result?.user ?? null;
+	console.log('[AUTH DEBUG] locals.user set to:', event.locals.user?.email ?? 'null');
 
 
 	if (result?.user) {
+		console.log('[AUTH DEBUG] Fetching profile for user:', result.user.id);
 		// Fetch profile data from Neon via Drizzle
-		const [userProfile] = await db
-			.select()
-			.from(profiles)
-			.where(eq(profiles.id, result.user.id))
-			.limit(1);
+		let userProfile: any = null;
+		try {
+			const [profile] = await db
+				.select()
+				.from(profiles)
+				.where(eq(profiles.id, result.user.id))
+				.limit(1);
+			userProfile = profile;
+			console.log('[AUTH DEBUG] Profile found:', userProfile ? 'yes' : 'no');
+		} catch (e) {
+			console.error('[AUTH DEBUG] Profile fetch FAILED:', e);
+		}
 
 		if (userProfile) {
 			const roles = userProfile.role ? [userProfile.role] : [];
@@ -90,6 +114,7 @@ const betterAuthHandle: Handle = async ({ event, resolve }) => {
 		}
 	}
 
+	console.log('[AUTH DEBUG] betterAuthHandle completed successfully');
 	return resolve(event);
 };
 

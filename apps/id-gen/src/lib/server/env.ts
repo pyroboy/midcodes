@@ -110,7 +110,9 @@ export function initializeEnv() {
 		PAYMONGO_CHECKOUT_CANCEL_PATH: (staticPrivate as any).PAYMONGO_CHECKOUT_CANCEL_PATH || privateEnv.PAYMONGO_CHECKOUT_CANCEL_PATH || dotEnvParsed.PAYMONGO_CHECKOUT_CANCEL_PATH || process?.env?.PAYMONGO_CHECKOUT_CANCEL_PATH,
 		RUNWARE_API_KEY: (staticPrivate as any).RUNWARE_API_KEY || privateEnv.RUNWARE_API_KEY || dotEnvParsed.RUNWARE_API_KEY || process?.env?.RUNWARE_API_KEY,
 		CSRF_SECRET: (staticPrivate as any).CSRF_SECRET || privateEnv.CSRF_SECRET || dotEnvParsed.CSRF_SECRET || process?.env?.CSRF_SECRET,
-		NODE_ENV: process?.env?.NODE_ENV || (dev ? 'development' : 'production')
+		NODE_ENV: (['development', 'production', 'test'].includes(process?.env?.NODE_ENV ?? '') 
+			? process.env.NODE_ENV 
+			: (dev ? 'development' : 'production'))
 	};
 
 	const logEnvStatus = (name: string, value: string | undefined) => {
