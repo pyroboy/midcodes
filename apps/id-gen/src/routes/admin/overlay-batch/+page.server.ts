@@ -1,10 +1,9 @@
 import type { PageServerLoad, Actions } from './$types';
 import { fail } from '@sveltejs/kit';
-import type { Database } from '$lib/types/database.types';
-
-type TemplateRow = Database['public']['Tables']['templates']['Row'];
-type TemplateInsert = Database['public']['Tables']['templates']['Insert'];
-type IdCardInsert = Database['public']['Tables']['idcards']['Insert'];
+import { db } from '$lib/server/db';
+import { templates, idcards } from '$lib/server/schema';
+import { eq, inArray, sql } from 'drizzle-orm';
+import { getSupabaseAdmin } from '$lib/server/supabase';
 
 interface TemplateListItem {
 	id: string;
@@ -18,7 +17,7 @@ interface TemplateListItem {
 }
 
 export const load: PageServerLoad = async ({ locals }) => {
-	const { supabase, org_id } = locals;
+	const { org_id } = locals;
 
 	if (!org_id) {
 		return {
@@ -27,40 +26,39 @@ export const load: PageServerLoad = async ({ locals }) => {
 		};
 	}
 
-	// Fetch all templates for this org with card counts
-	const { data: templates, error: templatesError } = await supabase
-		.from('templates')
-		.select(
-			'id, name, width_pixels, height_pixels, dpi, orientation, front_background, back_background'
-		)
-		.eq('org_id', org_id)
-		.order('name');
+	// Fetch all templates for this org with Drizzle
+	const templatesData = await db.select({
+		id: templates.id,
+		name: templates.name,
+		width_pixels: templates.widthPixels,
+		height_pixels: templates.heightPixels,
+		dpi: templates.dpi,
+		orientation: templates.orientation,
+		front_background: templates.frontBackground,
+		back_background: templates.backBackground
+	})
+		.from(templates)
+		.where(eq(templates.orgId, org_id))
+		.orderBy(templates.name);
 
-	if (templatesError) {
-		console.error('Error fetching templates:', templatesError);
-		return {
-			templates: [] as TemplateListItem[],
-			templateCardCounts: {} as Record<string, number>
-		};
-	}
-
-	const typedTemplates = (templates || []) as TemplateListItem[];
+	const typedTemplates = (templatesData || []) as TemplateListItem[];
 
 	// Get card counts for each template
 	const templateIds = typedTemplates.map((t) => t.id);
 	const cardCounts: Record<string, number> = {};
 
 	if (templateIds.length > 0) {
-		const { data: countData, error: countError } = await supabase
-			.from('idcards')
-			.select('template_id')
-			.in('template_id', templateIds);
+		const cardCountsResult = await db.select({
+			templateId: idcards.templateId,
+			count: sql<number>`count(*)`
+		})
+			.from(idcards)
+			.where(inArray(idcards.templateId, templateIds))
+			.groupBy(idcards.templateId);
 
-		if (!countError && countData) {
-			for (const card of countData as { template_id: string | null }[]) {
-				if (card.template_id) {
-					cardCounts[card.template_id] = (cardCounts[card.template_id] || 0) + 1;
-				}
+		for (const row of cardCountsResult) {
+			if (row.templateId) {
+				cardCounts[row.templateId] = Number(row.count);
 			}
 		}
 	}
@@ -73,7 +71,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 export const actions: Actions = {
 	createTemplate: async ({ request, locals }) => {
-		const { supabase, org_id, user } = locals;
+		const { org_id, user } = locals;
 
 		if (!org_id) {
 			return fail(400, { error: 'Organization not found' });
@@ -87,41 +85,32 @@ export const actions: Actions = {
 			return fail(400, { error: 'Missing required fields' });
 		}
 
-		// Fetch source template
-		const { data: sourceTemplate, error: sourceError } = await supabase
-			.from('templates')
-			.select('*')
-			.eq('id', sourceTemplateId)
-			.eq('org_id', org_id)
-			.single();
+		// Fetch source template with Drizzle
+		const sourceTemplates = await db.select()
+			.from(templates)
+			.where(eq(templates.id, sourceTemplateId));
 
-		if (sourceError || !sourceTemplate) {
+		if (sourceTemplates.length === 0) {
 			return fail(404, { error: 'Source template not found' });
 		}
 
-		const typedSource = sourceTemplate as TemplateRow;
+		const sourceTemplate = sourceTemplates[0];
 
 		const templateFront = formData.get('templateFront') as Blob;
 		const templateBack = formData.get('templateBack') as Blob;
 
-		console.log(
-			'Server received templateFront:',
-			templateFront ? `Blob size: ${templateFront.size}` : 'null'
-		);
-		console.log(
-			'Server received templateBack:',
-			templateBack ? `Blob size: ${templateBack.size}` : 'null'
-		);
-
 		let frontPath = null;
 		let backPath = null;
+
+		// Use supabaseAdmin for storage operations
+		const supabaseAdmin = getSupabaseAdmin();
 
 		// Upload new template backgrounds if provided
 		if (templateFront) {
 			const timestamp = Date.now();
 			const frontFilename = `${org_id}/${timestamp}_front.png`;
 
-			const { error: frontUploadError } = await supabase.storage
+			const { error: frontUploadError } = await supabaseAdmin.storage
 				.from('templates')
 				.upload(frontFilename, templateFront, {
 					cacheControl: '3600',
@@ -142,7 +131,7 @@ export const actions: Actions = {
 			const timestamp = Date.now();
 			const backFilename = `${org_id}/${timestamp}_back.png`;
 
-			const { error: backUploadError } = await supabase.storage
+			const { error: backUploadError } = await supabaseAdmin.storage
 				.from('templates')
 				.upload(backFilename, templateBack, {
 					cacheControl: '3600',
@@ -154,7 +143,7 @@ export const actions: Actions = {
 				console.error('Template back upload error:', backUploadError);
 				// Try to cleanup front image if it was uploaded
 				if (frontPath) {
-					await supabase.storage.from('templates').remove([frontPath]);
+					await supabaseAdmin.storage.from('templates').remove([frontPath]);
 				}
 				return fail(500, {
 					error: `Failed to upload template back background: ${backUploadError.message}`
@@ -163,56 +152,32 @@ export const actions: Actions = {
 			backPath = backFilename;
 		}
 
-		// Create new template with same dimensions
-		const insertData: TemplateInsert = {
-			name: newTemplateName,
-			org_id: org_id,
-			user_id: user?.id,
-			width_pixels: typedSource.width_pixels,
-			height_pixels: typedSource.height_pixels,
-			dpi: typedSource.dpi,
-			orientation: typedSource.orientation,
-			template_elements: typedSource.template_elements,
-			front_background: frontPath,
-			back_background: backPath
-		};
-
 		try {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const { data: newTemplate, error: createError } = await supabase
-				.from('templates')
-				.insert(insertData as any)
-				.select()
-				.single();
+			// Create new template with Drizzle
+			const [newTemplate] = await db.insert(templates).values({
+				name: newTemplateName,
+				orgId: org_id,
+				userId: user?.id,
+				widthPixels: sourceTemplate.widthPixels,
+				heightPixels: sourceTemplate.heightPixels,
+				dpi: sourceTemplate.dpi,
+				orientation: sourceTemplate.orientation,
+				templateElements: sourceTemplate.templateElements,
+				frontBackground: frontPath,
+				backBackground: backPath
+			}).returning();
 
-			if (createError) {
-				console.error('Error creating template:', createError);
-				return fail(500, {
-					error: createError.message || 'Failed to create template',
-					details: createError.details,
-					hint: createError.hint
-				});
-			}
-
-			if (!newTemplate) {
-				console.error('Template created but no data returned. Possible RLS issue.');
-				return fail(500, { error: 'Template created but no data returned. Check RLS policies.' });
-			}
-
-			const typedNew = newTemplate as TemplateRow;
-			return { success: true, newTemplateId: typedNew.id, newTemplate: typedNew };
-		} catch (e) {
+			return { success: true, newTemplateId: newTemplate.id, newTemplate };
+		} catch (e: any) {
 			console.error('Unexpected error in createTemplate:', e);
 			return fail(500, {
-				error:
-					'Unexpected server error during template creation: ' +
-					(e instanceof Error ? e.message : String(e))
+				error: 'Unexpected server error during template creation: ' + e.message
 			});
 		}
 	},
 
 	getSourceCards: async ({ request, locals }) => {
-		const { supabase, org_id } = locals;
+		const { org_id } = locals;
 
 		if (!org_id) {
 			return fail(400, { error: 'Organization not found' });
@@ -225,30 +190,21 @@ export const actions: Actions = {
 			return fail(400, { error: 'Missing source template ID' });
 		}
 
-		// Fetch all ID cards for the source template
-		const { data: cards, error: cardsError } = await supabase
-			.from('idcards')
-			.select('id, front_image, back_image, data')
-			.eq('template_id', sourceTemplateId)
-			.eq('org_id', org_id);
-
-		if (cardsError) {
-			console.error('Error fetching cards:', cardsError);
-			return fail(500, { error: cardsError.message || 'Failed to fetch source cards' });
-		}
-
-		console.log('[getSourceCards] Fetched cards:', {
-			count: cards?.length,
-			isArray: Array.isArray(cards),
-			firstCard: cards?.[0] ? 'exists' : 'null',
-			dataType: typeof cards
-		});
+		// Fetch all ID cards for the source template with Drizzle
+		const cards = await db.select({
+				id: idcards.id,
+				front_image: idcards.frontImage,
+				back_image: idcards.backImage,
+				data: idcards.data
+			})
+			.from(idcards)
+			.where(eq(idcards.templateId, sourceTemplateId));
 
 		return { success: true, cards: cards || [] };
 	},
 
 	saveCard: async ({ request, locals }) => {
-		const { supabase, org_id } = locals;
+		const { org_id } = locals;
 
 		if (!org_id) {
 			return fail(400, { error: 'Organization not found' });
@@ -262,25 +218,20 @@ export const actions: Actions = {
 		const bulkKey = formData.get('bulkKey') as string;
 		const bulkValue = formData.get('bulkValue') as string;
 
-		console.log('[saveCard] Inputs:', {
-			newTemplateId,
-			cardDataLength: cardData?.length,
-			frontImageSize: frontImage?.size,
-			backImageSize: backImage?.size,
-			bulkUpdate: bulkKey ? { key: bulkKey, value: bulkValue } : 'none'
-		});
-
 		if (!newTemplateId || !frontImage || !backImage) {
 			console.error('[saveCard] Missing required fields');
 			return fail(400, { error: 'Missing required fields' });
 		}
+
+		// Use supabaseAdmin for storage operations
+		const supabaseAdmin = getSupabaseAdmin();
 
 		// Upload images
 		const timestamp = Date.now();
 		const frontPath = `${org_id}/${newTemplateId}/${timestamp}_front.png`;
 		const backPath = `${org_id}/${newTemplateId}/${timestamp}_back.png`;
 
-		const { error: frontUploadError } = await supabase.storage
+		const { error: frontUploadError } = await supabaseAdmin.storage
 			.from('rendered-id-cards')
 			.upload(frontPath, frontImage, {
 				cacheControl: '3600',
@@ -293,7 +244,7 @@ export const actions: Actions = {
 			return fail(500, { error: `Front image upload failed: ${frontUploadError.message}` });
 		}
 
-		const { error: backUploadError } = await supabase.storage
+		const { error: backUploadError } = await supabaseAdmin.storage
 			.from('rendered-id-cards')
 			.upload(backPath, backImage, {
 				cacheControl: '3600',
@@ -303,7 +254,7 @@ export const actions: Actions = {
 
 		if (backUploadError) {
 			// Rollback front image
-			await supabase.storage.from('rendered-id-cards').remove([frontPath]);
+			await supabaseAdmin.storage.from('rendered-id-cards').remove([frontPath]);
 			console.error('Back upload error:', backUploadError);
 			return fail(500, { error: `Back image upload failed: ${backUploadError.message}` });
 		}
@@ -316,42 +267,25 @@ export const actions: Actions = {
 				parsedData[bulkKey] = bulkValue;
 			}
 		} catch {
-			// Keep as null if parse fails, or empty object if we want to force update?
-			// Better to default to empty object if we have bulk update
 			parsedData = bulkKey && bulkValue ? { [bulkKey]: bulkValue } : null;
 		}
 
-		// Create new ID card record
-		const cardInsert: IdCardInsert = {
-			template_id: newTemplateId,
-			org_id: org_id,
-			front_image: frontPath,
-			back_image: backPath,
-			data: parsedData
-		};
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const { data: newCard, error: insertError } = await supabase
-			.from('idcards')
-			.insert(cardInsert as any)
-			.select()
-			.single();
+		// Create new ID card record with Drizzle
+		try {
+			const [newCard] = await db.insert(idcards).values({
+				templateId: newTemplateId,
+				orgId: org_id,
+				frontImage: frontPath,
+				backImage: backPath,
+				data: parsedData || {}
+			}).returning();
 
-		console.log('[saveCard] Insert result:', {
-			success: !!newCard,
-			error: insertError?.message,
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			newCardId: (newCard as any)?.id
-		});
-
-		if (insertError) {
+			return { success: true, cardId: newCard.id, newCard };
+		} catch (insertError: any) {
 			// Rollback uploads
-			await supabase.storage.from('rendered-id-cards').remove([frontPath, backPath]);
+			await supabaseAdmin.storage.from('rendered-id-cards').remove([frontPath, backPath]);
 			console.error('Insert error:', insertError);
 			return fail(500, { error: `Database insert failed: ${insertError.message}` });
 		}
-
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const typedNewCard = newCard as any;
-		return { success: true, cardId: typedNewCard.id, newCard: typedNewCard };
 	}
 };

@@ -153,12 +153,13 @@ export const createInvoice = command('unchecked', async (input: InvoiceCreateInp
                 };
             });
 
-            // Create invoice (invoice_number might need a custom generator if trigger fails on Neon)
-            // For now assume trigger handles it or we'll need to generate it
+            // Create invoice - generate invoiceNumber since Drizzle doesn't have triggers
+            const invoiceNumber = `INV-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
             const [invoice] = await tx.insert(schema.invoices)
                 .values({
+                    invoiceNumber,
                     userId: user_id,
-                    orgId,
+                    orgId: org_id,
                     invoiceType: invoice_type,
                     status: 'draft',
                     subtotal,

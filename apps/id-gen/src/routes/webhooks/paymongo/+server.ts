@@ -2,7 +2,8 @@
 // Handles incoming webhook events from PayMongo
 
 import type { RequestHandler } from './$types';
-import { PAYMONGO_WEBHOOK_SECRET } from '$env/static/private';
+// @ts-ignore - PAYMONGO_WEBHOOK_SECRET may not exist in all environments
+const PAYMONGO_WEBHOOK_SECRET = (typeof process !== 'undefined' && process.env?.PAYMONGO_WEBHOOK_SECRET) || '';
 import { createHmac, timingSafeEqual } from 'crypto';
 import {
 	checkRateLimit,
@@ -214,7 +215,7 @@ export const POST: RequestHandler = async ({ request }) => {
 					creditsToAdd: creditPackage.credits,
 					packageName: creditPackage.name,
 					packageId: packageId,
-					amountPhp: amount_php
+					amountPhp: Number(amount_php) || 0
 				});
 
 				if (!result.success) {

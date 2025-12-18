@@ -1,9 +1,13 @@
 import type { PageServerLoad, Actions } from './$types';
 import { error, fail } from '@sveltejs/kit';
 import { checkSuperAdmin, checkAdmin, hasRole } from '$lib/utils/adminPermissions';
+import { db } from '$lib/server/db';
+import { profiles } from '$lib/server/schema';
+import { eq, and, desc, sql, ne, inArray } from 'drizzle-orm';
+import { auth } from '$lib/server/auth';
 
 export const load: PageServerLoad = async ({ locals, parent }) => {
-	const { supabase, user, org_id } = locals;
+	const { user, org_id } = locals;
 
 	// Ensure we have parent data (user auth and permissions)
 	const parentData = await parent();
@@ -13,22 +17,22 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 	}
 
 	try {
-		// Get all users in the organization
-		const { data: users, error: usersError } = await supabase
-			.from('profiles')
-			.select('id, email, role, created_at, updated_at')
-			.eq('org_id', org_id!)
-			.order('created_at', { ascending: false });
-
-		if (usersError) {
-			console.error('Error fetching users:', usersError);
-			throw error(500, 'Failed to load users');
-		}
+		// Get all users in the organization with Drizzle
+		const users = await db.select({
+			id: profiles.id,
+			email: profiles.email,
+			role: profiles.role,
+			created_at: profiles.createdAt,
+			updated_at: profiles.updatedAt
+		})
+			.from(profiles)
+			.where(eq(profiles.orgId, org_id))
+			.orderBy(desc(profiles.createdAt));
 
 		return {
 			users: users || [],
 			currentUserId: user?.id,
-			currentUserRole: user?.role,
+			currentUserRole: (user as any)?.role,
 			organization: parentData.organization
 		};
 	} catch (err) {
@@ -39,7 +43,7 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 
 export const actions: Actions = {
 	addUser: async ({ request, locals }) => {
-		const { supabase, user, org_id } = locals;
+		const { user, org_id } = locals;
 
 		// Use robust permission check that respects role emulation
 		if (!hasRole(locals, ['super_admin', 'org_admin'])) {
@@ -67,81 +71,65 @@ export const actions: Actions = {
 				return fail(400, { error: 'Invalid role specified' });
 			}
 
-			// Check if user already exists
-			const { data: existingUser, error: checkError } = await supabase
-				.from('profiles')
-				.select('id')
-				.eq('email', email)
-				.eq('org_id', org_id!)
-				.single();
+			// Check if user already exists with Drizzle
+			const existingUsers = await db.select({ id: profiles.id })
+				.from(profiles)
+				.where(and(eq(profiles.email, email), eq(profiles.orgId, org_id!)))
+				.limit(1);
 
-			if (checkError && checkError.code !== 'PGRST116') {
-				// PGRST116 = no rows found
-				console.error('Error checking existing user:', checkError);
-				return fail(500, { error: 'Failed to check existing user' });
-			}
-
-			if (existingUser) {
+			if (existingUsers.length > 0) {
 				return fail(400, { error: 'User with this email already exists in your organization' });
 			}
 
-			// Create user in auth (they'll need to set their password via invite)
-			const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-				email,
-				email_confirm: true, // Skip email confirmation for admin-created users
-				user_metadata: {
-					role,
-					org_id,
-					invited_by: user?.id
+			// Create user via Better Auth - sign up with temporary password
+			// Note: In production, you'd want to use an invitation flow
+			const tempPassword = `Temp${Date.now()}!${Math.random().toString(36).slice(2, 10)}`;
+			
+			try {
+				// Use Better Auth signUp endpoint
+				const signUpResult = await auth.api.signUpEmail({
+					body: {
+						email,
+						password: tempPassword,
+						name: email.split('@')[0]
+					}
+				});
+
+				if (!signUpResult?.user?.id) {
+					return fail(500, { error: 'Failed to create user account' });
 				}
-			});
 
-			if (authError) {
-				console.error('Error creating auth user:', authError);
-				return fail(500, { error: `Failed to create user: ${authError.message}` });
+				// Create profile with Drizzle
+				await db.insert(profiles).values({
+					id: signUpResult.user.id,
+					email,
+					role: role as any,
+					orgId: org_id!,
+					createdAt: new Date(),
+					updatedAt: new Date()
+				});
+
+				// Get updated users list
+				const updatedUsers = await db.select({
+					id: profiles.id,
+					email: profiles.email,
+					role: profiles.role,
+					created_at: profiles.createdAt,
+					updated_at: profiles.updatedAt
+				})
+					.from(profiles)
+					.where(eq(profiles.orgId, org_id!))
+					.orderBy(desc(profiles.createdAt));
+
+				return {
+					success: true,
+					message: `User ${email} added successfully. Password reset required.`,
+					updatedUsers: updatedUsers || []
+				};
+			} catch (authErr: any) {
+				console.error('Better Auth signup error:', authErr);
+				return fail(500, { error: `Failed to create user: ${authErr.message || 'Unknown error'}` });
 			}
-
-			// Create profile
-			const { error: profileError } = await supabase.from('profiles').insert({
-				id: authUser.user.id,
-				email,
-				role: role as any,
-				org_id,
-				created_at: new Date().toISOString(),
-				updated_at: new Date().toISOString()
-			} as any);
-
-			if (profileError) {
-				console.error('Error creating profile:', profileError);
-				// Try to cleanup the auth user if profile creation failed
-				await supabase.auth.admin.deleteUser(authUser.user.id);
-				return fail(500, { error: 'Failed to create user profile' });
-			}
-
-			// Send invitation email (this would typically be handled by your email service)
-			const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email);
-
-			if (inviteError) {
-				console.warn('Failed to send invitation email:', inviteError);
-				// Don't fail the request if email fails, user was created successfully
-			}
-
-			// Get updated users list
-			const { data: updatedUsers, error: fetchError } = await supabase
-				.from('profiles')
-				.select('id, email, role, created_at, updated_at')
-				.eq('org_id', org_id!)
-				.order('created_at', { ascending: false });
-
-			if (fetchError) {
-				console.error('Error fetching updated users:', fetchError);
-			}
-
-			return {
-				success: true,
-				message: `User ${email} added successfully. They will receive an invitation email.`,
-				updatedUsers: updatedUsers || []
-			};
 		} catch (err) {
 			console.error('Error in addUser action:', err);
 			return fail(500, { error: 'An unexpected error occurred' });
@@ -149,7 +137,7 @@ export const actions: Actions = {
 	},
 
 	updateUserRole: async ({ request, locals }) => {
-		const { supabase, user, org_id } = locals;
+		const { user, org_id } = locals;
 
 		// Use robust permission check that respects role emulation
 		if (!hasRole(locals, ['super_admin', 'org_admin'])) {
@@ -181,56 +169,47 @@ export const actions: Actions = {
 				return fail(400, { error: 'Cannot downgrade your own super admin role' });
 			}
 
-			// Get current user to check permissions
-			const { data: targetUserData, error: fetchError } = await supabase
-				.from('profiles')
-				.select('role')
-				.eq('id', userId)
-				.eq('org_id', org_id!)
-				.single();
+			// Get current user to check permissions with Drizzle
+			const targetUsers = await db.select({ role: profiles.role })
+				.from(profiles)
+				.where(and(eq(profiles.id, userId), eq(profiles.orgId, org_id!)))
+				.limit(1);
 
-			if (fetchError) {
-				console.error('Error fetching target user:', fetchError);
+			if (targetUsers.length === 0) {
 				return fail(500, { error: 'Failed to find user' });
 			}
 
-			const targetUser = targetUserData as any;
+			const targetUser = targetUsers[0];
 
 			// Only super_admin can modify super_admin roles
-			if (['super_admin'].includes(targetUser.role) && !isSuperAdmin) {
+			if (targetUser.role === 'super_admin' && !isSuperAdmin) {
 				return fail(403, { error: 'Only super administrators can modify super admin roles' });
 			}
 
 			// Only super_admin can create super_admin roles
-			if (['super_admin'].includes(newRole) && !isSuperAdmin) {
+			if (newRole === 'super_admin' && !isSuperAdmin) {
 				return fail(403, { error: 'Only super administrators can assign super admin roles' });
 			}
 
-			// Update user role
-			const { error: updateError } = await (supabase as any)
-				.from('profiles')
-				.update({
-					role: newRole,
-					updated_at: new Date().toISOString()
+			// Update user role with Drizzle
+			await db.update(profiles)
+				.set({
+					role: newRole as any,
+					updatedAt: new Date()
 				})
-				.eq('id', userId)
-				.eq('org_id', org_id!);
-
-			if (updateError) {
-				console.error('Error updating user role:', updateError);
-				return fail(500, { error: 'Failed to update user role' });
-			}
+				.where(and(eq(profiles.id, userId), eq(profiles.orgId, org_id!)));
 
 			// Get updated users list
-			const { data: updatedUsers, error: fetchUsersError } = await supabase
-				.from('profiles')
-				.select('id, email, role, created_at, updated_at')
-				.eq('org_id', org_id!)
-				.order('created_at', { ascending: false });
-
-			if (fetchUsersError) {
-				console.error('Error fetching updated users:', fetchUsersError);
-			}
+			const updatedUsers = await db.select({
+				id: profiles.id,
+				email: profiles.email,
+				role: profiles.role,
+				created_at: profiles.createdAt,
+				updated_at: profiles.updatedAt
+			})
+				.from(profiles)
+				.where(eq(profiles.orgId, org_id!))
+				.orderBy(desc(profiles.createdAt));
 
 			return {
 				success: true,
@@ -244,7 +223,7 @@ export const actions: Actions = {
 	},
 
 	deleteUser: async ({ request, locals }) => {
-		const { supabase, user, org_id } = locals;
+		const { user, org_id } = locals;
 
 		// Use robust permission check that respects role emulation
 		if (!hasRole(locals, ['super_admin', 'org_admin'])) {
@@ -264,67 +243,55 @@ export const actions: Actions = {
 				return fail(400, { error: 'Cannot delete your own account' });
 			}
 
-			// Get target user details
-			const { data: targetUserData, error: fetchError } = await supabase
-				.from('profiles')
-				.select('role, email')
-				.eq('id', userId)
-				.eq('org_id', org_id!)
-				.single();
+			// Get target user details with Drizzle
+			const targetUsers = await db.select({ role: profiles.role, email: profiles.email })
+				.from(profiles)
+				.where(and(eq(profiles.id, userId), eq(profiles.orgId, org_id!)))
+				.limit(1);
 
-			const targetUser = targetUserData as any;
-
-			if (fetchError || !targetUser) {
-				console.error('Error fetching target user:', fetchError);
+			if (targetUsers.length === 0) {
 				return fail(500, { error: 'Failed to find user' });
 			}
 
+			const targetUser = targetUsers[0];
+
 			// Check if this is the last admin
 			const adminRoles = ['super_admin', 'org_admin'];
-			if (adminRoles.includes(targetUser.role)) {
-				const { count: adminCount } = await supabase
-					.from('profiles')
-					.select('*', { count: 'exact', head: true })
-					.eq('org_id', org_id!)
-					.in('role', adminRoles)
-					.neq('id', userId);
+			if (adminRoles.includes(targetUser.role || '')) {
+				const adminCountResult = await db.select({ count: sql<number>`count(*)` })
+					.from(profiles)
+					.where(and(
+						eq(profiles.orgId, org_id!),
+						inArray(profiles.role, adminRoles as any),
+						ne(profiles.id, userId)
+					));
 
-				if ((adminCount || 0) === 0) {
+				const adminCount = Number(adminCountResult[0]?.count || 0);
+				if (adminCount === 0) {
 					return fail(400, {
 						error: 'Cannot delete the last administrator in the organization'
 					});
 				}
 			}
 
-			// Delete profile (this should cascade to related data)
-			const { error: deleteError } = await supabase
-				.from('profiles')
-				.delete()
-				.eq('id', userId)
-				.eq('org_id', org_id!);
+			// Delete profile with Drizzle
+			await db.delete(profiles)
+				.where(and(eq(profiles.id, userId), eq(profiles.orgId, org_id!)));
 
-			if (deleteError) {
-				console.error('Error deleting profile:', deleteError);
-				return fail(500, { error: 'Failed to delete user profile' });
-			}
-
-			// Delete from auth (optional - you might want to keep the auth user)
-			const { error: authDeleteError } = await supabase.auth.admin.deleteUser(userId);
-			if (authDeleteError) {
-				console.warn('Failed to delete auth user:', authDeleteError);
-				// Don't fail the request if auth deletion fails
-			}
+			// Note: Better Auth user table deletion would require auth.api.deleteUser if available
+			// For now, we just delete the profile
 
 			// Get updated users list
-			const { data: updatedUsers, error: fetchUsersError } = await supabase
-				.from('profiles')
-				.select('id, email, role, created_at, updated_at')
-				.eq('org_id', org_id!)
-				.order('created_at', { ascending: false });
-
-			if (fetchUsersError) {
-				console.error('Error fetching updated users:', fetchUsersError);
-			}
+			const updatedUsers = await db.select({
+				id: profiles.id,
+				email: profiles.email,
+				role: profiles.role,
+				created_at: profiles.createdAt,
+				updated_at: profiles.updatedAt
+			})
+				.from(profiles)
+				.where(eq(profiles.orgId, org_id!))
+				.orderBy(desc(profiles.createdAt));
 
 			return {
 				success: true,

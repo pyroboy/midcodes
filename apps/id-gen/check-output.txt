@@ -1,12 +1,10 @@
-﻿node.exe : npm warn config ignoring workspace 
-config at C:\Users\jezka\Documents\GitHub\midcodes
-\apps\id-gen/.npmrc
+﻿node.exe : npm warn config ignoring workspace config at 
+C:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen/.npmrc
 At C:\nvm4w\nodejs\npx.ps1:29 char:3
 +   & $NODE_EXE $NPX_CLI_JS $args
 +   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : NotSpecified: (npm  
-   warn config...s\id-gen/.npmrc:String) [], Rem  
-  oteException
+    + CategoryInfo          : NotSpecified: (npm warn config...s\id-gen/.npmrc:String) 
+[],     RemoteException
     + FullyQualifiedErrorId : NativeCommandError
  
 Loading svelte-check in workspace: c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen
@@ -74,64 +72,6 @@ c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\account\dat
 [36m	const { locals } = getRequestEvent();
 	const { [35msupabase[36m, user } = locals;[39m
 
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\+layout.server.ts[39m:12:10
-[31mError[39m: Property 'supabase' does not exist on type 'Locals'. 
-[36m	});
-	const { [35msupabase[36m, session, user, org_id, permissions, effectiveRoles, roleEmulation } = locals;[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\+page.server.ts[39m:5:10
-[31mError[39m: Property 'supabase' does not exist on type 'Locals'. 
-[36mexport const load: PageServerLoad = async ({ locals, parent }) => {
-	const { [35msupabase[36m, user, org_id } = locals;[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\+page.server.ts[39m:127:11
-[31mError[39m: Property 'supabase' does not exist on type 'Locals'. 
-[36m	updateUserRole: async ({ request, locals }) => {
-		const { [35msupabase[36m, user, org_id } = locals;[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\+page.server.ts[39m:175:11
-[31mError[39m: Property 'supabase' does not exist on type 'Locals'. 
-[36m	deleteUser: async ({ request, locals }) => {
-		const { [35msupabase[36m, user, org_id } = locals;[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\optimization\+page.server.ts[39m:5:10
-[31mError[39m: Property 'supabase' does not exist on type 'Locals'. 
-[36mexport const load: PageServerLoad = async ({ locals }) => {
-	const { [35msupabase[36m, session, org_id } = locals;[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\optimization\+page.server.ts[39m:23:55
-[31mError[39m: Parameter 't' implicitly has an 'any' type. 
-[36m
-	const templatesToOptimize = (templates || []).filter([35mt[36m => 
-		(t.front_background && !t.front_background_low_res) ||[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\optimization\+page.server.ts[39m:26:8
-[31mError[39m: Parameter 't' implicitly has an 'any' type. 
-[36m		(t.back_background && !t.back_background_low_res)
-	).map([35mt[36m => ({ ...t, type: 'template' }));[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\optimization\+page.server.ts[39m:28:51
-[31mError[39m: Parameter 'c' implicitly has an 'any' type. 
-[36m
-	const idcardsToOptimize = (idcards || []).filter([35mc[36m => 
-		(c.front_image && !c.front_image_low_res) ||[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\optimization\+page.server.ts[39m:31:8
-[31mError[39m: Parameter 'c' implicitly has an 'any' type. 
-[36m		(c.back_image && !c.back_image_low_res)
-	).map([35mc[36m => ({ ...c, type: 'idcard', name: `ID Card ${c.id.slice(0,8)}` }));[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\optimization\+page.server.ts[39m:50:11
-[31mError[39m: Property 'supabase' does not exist on type 'Locals'. 
-[36m	uploadThumbnail: async ({ request, locals }) => {
-		const { [35msupabase[36m, session } = locals;[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\optimization\+page.server.ts[39m:86:11
-[31mError[39m: Property 'supabase' does not exist on type 'Locals'. 
-[36m	updateLowRes: async ({ request, locals }) => {
-		const { [35msupabase[36m } = locals;
-		const formData = await request.formData();[39m
-
 c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\organization\+page.server.ts[39m:23:10
 [31mError[39m: Property 'supabase' does not exist on type 'Locals'. 
 [36m	const parentData = await parent();
@@ -157,30 +97,10 @@ c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\overl
 [36m	saveCard: async ({ request, locals }) => {
 		const { [35msupabase[36m, org_id } = locals;[39m
 
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\template-assets\+page.server.ts[39m:5:10
-[31mError[39m: Property 'supabase' does not exist on type 'Locals'. 
-[36mexport const load: PageServerLoad = async ({ locals }) => {
-	const { [35msupabase[36m } = locals;[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\template-assets\+page.server.ts[39m:25:11
-[31mError[39m: Property 'supabase' does not exist on type 'Locals'. 
-[36m	saveAsset: async ({ request, locals }) => {
-		const { [35msupabase[36m, user } = locals;[39m
-
 c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\template-assets\manage\+page.server.ts[39m:5:10
 [31mError[39m: Property 'supabase' does not exist on type 'Locals'. 
 [36mexport const load: PageServerLoad = async ({ locals }) => {
 	const { [35msupabase[36m } = locals;[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\upload-custom-id\+page.server.ts[39m:10:10
-[31mError[39m: Property 'supabase' does not exist on type 'Locals'. 
-[36mexport const load: PageServerLoad = async ({ locals }) => {
-	const { [35msupabase[36m, org_id } = locals;[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\upload-custom-id\+page.server.ts[39m:39:11
-[31mError[39m: Property 'supabase' does not exist on type 'Locals'. 
-[36m	upload: async ({ request, locals }) => {
-		const { [35msupabase[36m, org_id, user } = locals;[39m
 
 c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\users\+page.server.ts[39m:6:10
 [31mError[39m: Property 'supabase' does not exist on type 'Locals'. 
@@ -243,18 +163,6 @@ c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\api\auth\re
 		const { data, error } = await locals.[35msupabase[36m.auth.refreshSession({
 			refresh_token: session.session.refresh_token[39m
 
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\auth\callback\+server.ts[39m:4:60
-[31mError[39m: Property 'supabase' does not exist on type 'Locals'. 
-[36m
-export const GET: RequestHandler = async ({ url, locals: { [35msupabase[36m } }) => {
-	const code = url.searchParams.get('code');[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\auth\forgot-password\+page.server.ts[39m:11:19
-[31mError[39m: Property 'forgetPassword' does not exist on type 'InferAPI<{ readonly ok: StrictEndpoint<"/ok", { method: "GET"; metadata: { openapi: { description: string; responses: { "200": { description: string; content: { "application/json": { schema: { type: "object"; properties: { ok: { type: string; description: string; }; }; required: string[]; }; }; }; }; }; }; scope: "s...'. Did you mean 'resetPassword'? 
-[36m		try {
-			await auth.api.[35mforgetPassword[36m({
-				body: {[39m
-
 c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\auth\reset-password\+page.server.ts[39m:5:56
 [31mError[39m: Property 'safeGetSession' does not exist on type 'Locals'. 
 [36m
@@ -267,61 +175,10 @@ c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\auth\reset-
 	default: async ({ request, locals: { [35msupabase[36m } }) => {
 		const formData = await request.formData();[39m
 
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\billing\+page.server.ts[39m:5:10
-[31mError[39m: Property 'supabase' does not exist on type 'Locals'. 
-[36mexport const load: PageServerLoad = async ({ locals }) => {
-	const { [35msupabase[36m, user } = locals;[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\credits\+page.server.ts[39m:12:43
-[31mError[39m: Property 'supabase' does not exist on type 'Locals'. 
-[36m		// Get user's current credit balance and transactions
-		const { data: profile } = (await locals.[35msupabase[36m
-			.from('profiles')[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\credits\+page.server.ts[39m:19:47
-[31mError[39m: Property 'supabase' does not exist on type 'Locals'. 
-[36m		// Get recent credit transactions
-		const { data: transactions } = await locals.[35msupabase[36m
-			.from('credit_transactions')[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\credits\+page.server.ts[39m:30:47
-[31mError[39m: Property 'supabase' does not exist on type 'Locals'. 
-[36m
-		const { data: monthlyUsage } = await locals.[35msupabase[36m
-			.from('id_cards')[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\credits\+page.server.ts[39m:38:51
-[31mError[39m: Property 'supabase' does not exist on type 'Locals'. 
-[36m		// Get all-time stats
-		const { data: totalGenerations } = await locals.[35msupabase[36m
-			.from('id_cards')[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\credits\+page.server.ts[39m:44:44
-[31mError[39m: Property 'supabase' does not exist on type 'Locals'. 
-[36m		// Get purchase history from payments table
-		const { data: purchases } = await locals.[35msupabase[36m
-			.from('payments')[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\history\+page.server.ts[39m:6:10
-[31mError[39m: Property 'supabase' does not exist on type 'Locals'. 
-[36mexport const load: PageServerLoad = async ({ locals, url }) => {
-	const { [35msupabase[36m, user, org_id } = locals;[39m
-
 c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\id\[slug]\+page.server.ts[39m:6:10
 [31mError[39m: Property 'supabase' does not exist on type 'Locals'. 
 [36m	const { slug } = params;
 	const { [35msupabase[36m } = locals;[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\organization\+page.server.ts[39m:8:10
-[31mError[39m: Property 'supabase' does not exist on type 'Locals'. 
-[36m	const parentData = await parent();
-	const { [35msupabase[36m, user, org_id } = locals;[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\pricing\+page.server.ts[39m:9:10
-[31mError[39m: Property 'supabase' does not exist on type 'Locals'. 
-[36m
-	const { [35msupabase[36m, org_id, user } = locals;
-	let paymentsEnabled = true;[39m
 
 c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\profile\+page.server.ts[39m:79:11
 [31mError[39m: Property 'supabase' does not exist on type 'Locals'. 
@@ -348,41 +205,17 @@ c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\profile\+pa
 [36m	deleteAccount: async ({ locals }) => {
 		const { [35msupabase[36m, user, org_id } = locals;[39m
 
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\test-3d\+page.server.ts[39m:12:13
-[31mError[39m: Property 'supabase' does not exist on type 'Locals'. 
-[36mexport const load: PageServerLoad = async ({ locals }) => {
-    const { [35msupabase[36m, org_id } = locals;[39m
-
 c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\webhooks\paymongo\+server.ts[39m:5:10
 [31mError[39m: Module '"$env/static/private"' has no exported member 'PAYMONGO_WEBHOOK_SECRET'. 
 [36mimport type { RequestHandler } from './$types';
 import { [35mPAYMONGO_WEBHOOK_SECRET[36m } from '$env/static/private';
 import { createHmac, timingSafeEqual } from 'crypto';[39m
 
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\webhooks\paymongo\+server.ts[39m:170:12
-[31mError[39m: Property 'user_id' does not exist on type '{ id: string; createdAt: Date | null; updatedAt: Date | null; userId: string; sessionId: string; providerPaymentId: string | null; kind: string; skuId: string; amountPhp: string; ... 8 more ...; reason: string | null; }'. 
-[36m			// Extract metadata from our safe local record
-			const { [35muser_id[36m, metadata, kind, amount_php } = localRecord;
-			// We need org_id, but payment_records might not have it directly if it's on the user profile[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\webhooks\paymongo\+server.ts[39m:170:37
-[31mError[39m: Property 'amount_php' does not exist on type '{ id: string; createdAt: Date | null; updatedAt: Date | null; userId: string; sessionId: string; providerPaymentId: string | null; kind: string; skuId: string; amountPhp: string; ... 8 more ...; reason: string | null; }'. 
-[36m			// Extract metadata from our safe local record
-			const { user_id, metadata, kind, [35mamount_php[36m } = localRecord;
-			// We need org_id, but payment_records might not have it directly if it's on the user profile[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\webhooks\paymongo\+server.ts[39m:213:25
-[31mError[39m: Property 'org_id' does not exist on type '{ orgId: string | null; }'. Did you mean 'orgId'? 
-[36m					userId: user_id,
-					orgId: userProfile.[35morg_id[36m,
-					creditsToAdd: creditPackage.credits,[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\webhooks\paymongo\+server.ts[39m:221:64
-[31mError[39m: Property 'error' does not exist on type '{ success: boolean; newBalance: number; oldBalance: number; } | { success: boolean; error: string; }'.
-  Property 'error' does not exist on type '{ success: boolean; newBalance: number; oldBalance: number; }'. 
-[36m				if (!result.success) {
-					console.error('Failed to process credit payment:', result.[35merror[36m);
-					return new Response(JSON.stringify({ error: 'Processing failed' }), { status: 500 });[39m
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\webhooks\paymongo\+server.ts[39m:217:6
+[31mError[39m: Type 'string' is not assignable to type 'number'. 
+[36m					packageId: packageId,
+					[35mamountPhp[36m: amount_php
+				});[39m
 
 c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\+page.svelte[39m:831:9
 [31mError[39m: Type '{}' is missing the following properties from type 'TemplateElementOverlay[]': length, pop, push, concat, and 35 more. (ts)
@@ -390,95 +223,25 @@ c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\+page.svelt
 								[35mtemplateElements[36m={selectedTemplate?.template_elements || []}
 								showOverlays={showElementOverlays}[39m
 
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\ai-settings\+page.svelte[39m:56:19
-[31mError[39m: Property 'is_enabled' does not exist on type 'AISettings'. Did you mean 'isEnabled'? (ts)
-[36m				model = s.model || 'default';
-				isEnabled = s.[35mis_enabled[36m ?? true;
-				rateLimit = s.rate_limit_per_minute || 60;[39m
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\template-assets\+page.svelte[39m:68:5
+[31mError[39m: Type '{ id: string; name: string; slug: string; widthInches: string; heightInches: string; widthMm: string; heightMm: string; widthPixels: number; heightPixels: number; dpi: number; aspectRatio: string | null; ... 4 more ...; updatedAt: Date | null; }[]' is not assignable to type '{ id: string; name: string; slug: string; width_inches: number; height_inches: number; width_mm: number; height_mm: number; width_pixels: number; height_pixels: number; dpi: number; sort_order: number; ... 4 more ...; updated_at?: string | undefined; }[]'.
+  Type '{ id: string; name: string; slug: string; widthInches: string; heightInches: string; widthMm: string; heightMm: string; widthPixels: number; heightPixels: number; dpi: number; aspectRatio: string | null; ... 4 more ...; updatedAt: Date | null; }' is missing the following properties from type '{ id: string; name: string; slug: string; width_inches: number; height_inches: number; width_mm: number; height_mm: number; width_pixels: number; height_pixels: number; dpi: number; sort_order: number; ... 4 more ...; updated_at?: string | undefined; }': width_inches, height_inches, width_mm, height_mm, and 4 more. (ts)
+[36m			<AssetUploadWizard
+				[35msizePresets[36m={data.sizePresets}
+				userId={data.user?.id}[39m
 
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\ai-settings\+page.svelte[39m:57:19
-[31mError[39m: Property 'rate_limit_per_minute' does not exist on type 'AISettings'. Did you mean 'rateLimitPerMinute'? (ts)
-[36m				isEnabled = s.is_enabled ?? true;
-				rateLimit = s.[35mrate_limit_per_minute[36m || 60;
-			}[39m
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\organization\+page.svelte[39m:64:32
+[31mError[39m: Conversion of type '{ id: string; name: string; createdAt: Date | null; updatedAt: Date | null; }' to type 'Organization' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ id: string; name: string; createdAt: Date | null; updatedAt: Date | null; }' is missing the following properties from type 'Organization': created_at, updated_at (ts)
+[36m	// Cast data with proper types
+	const organization = $derived([35mdata.organization as Organization | null[36m);
+	const members = $derived((data.members || []) as Member[]);[39m
 
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\ai-settings\+page.svelte[39m:198:26
-[31mError[39m: Property 'api_key_last_four' does not exist on type 'AISettings'. Did you mean 'apiKeyLastFour'? (ts)
-[36m					<CardTitle class="text-2xl">
-						{#if settingsData?.[35mapi_key_last_four[36m}
-							<span class="text-green-600">Connected</span>[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\ai-settings\+page.svelte[39m:207:26
-[31mError[39m: Property 'api_key_last_four' does not exist on type 'AISettings'. Did you mean 'apiKeyLastFour'? (ts)
-[36m					<p class="text-xs text-muted-foreground">
-						{#if settingsData?.[35mapi_key_last_four[36m}
-							Key ending in ...{settingsData.api_key_last_four}[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\ai-settings\+page.svelte[39m:208:39
-[31mError[39m: Property 'api_key_last_four' does not exist on type 'AISettings'. Did you mean 'apiKeyLastFour'? (ts)
-[36m						{#if settingsData?.api_key_last_four}
-							Key ending in ...{settingsData.[35mapi_key_last_four[36m}
-						{:else}[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\ai-settings\+page.svelte[39m:222:62
-[31mError[39m: Property 'credits_balance' does not exist on type 'AISettings'. Did you mean 'creditsBalance'? (ts)
-[36m					</CardDescription>
-					<CardTitle class="text-2xl">{formatNumber(settingsData?.[35mcredits_balance[36m || 0)}</CardTitle>
-				</CardHeader>[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\ai-settings\+page.svelte[39m:226:35
-[31mError[39m: Property 'credits_used' does not exist on type 'AISettings'. Did you mean 'creditsUsed'? (ts)
-[36m					<p class="text-xs text-muted-foreground">
-						{formatNumber(settingsData?.[35mcredits_used[36m || 0)} used total
-					</p>[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\ai-settings\+page.svelte[39m:253:26
-[31mError[39m: Property 'is_enabled' does not exist on type 'AISettings'. Did you mean 'isEnabled'? (ts)
-[36m					<CardTitle class="text-2xl">
-						{#if settingsData?.[35mis_enabled[36m}
-							<span class="text-green-600">Enabled</span>[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\ai-settings\+page.svelte[39m:262:34
-[31mError[39m: Property 'rate_limit_per_minute' does not exist on type 'AISettings'. Did you mean 'rateLimitPerMinute'? (ts)
-[36m					<p class="text-xs text-muted-foreground">
-						Rate limit: {settingsData?.[35mrate_limit_per_minute[36m || 60}/min
-					</p>[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\ai-settings\+page.svelte[39m:358:26
-[31mError[39m: Property 'api_key_masked' does not exist on type 'AISettings'. Did you mean 'apiKeyMasked'? (ts)
-[36m					{#await settings then settingsData}
-						{#if settingsData?.[35mapi_key_masked[36m}
-							<div class="space-y-2">[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\ai-settings\+page.svelte[39m:363:38
-[31mError[39m: Property 'api_key_masked' does not exist on type 'AISettings'. Did you mean 'apiKeyMasked'? (ts)
-[36m									<div class="flex-1 font-mono text-sm bg-muted px-3 py-2 rounded">
-										{showApiKey ? settingsData.[35mapi_key_masked[36m : 'ΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇó' + settingsData.api_key_last_four}
-									</div>[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\ai-settings\+page.svelte[39m:363:105
-[31mError[39m: Property 'api_key_last_four' does not exist on type 'AISettings'. Did you mean 'apiKeyLastFour'? (ts)
-[36m									<div class="flex-1 font-mono text-sm bg-muted px-3 py-2 rounded">
-										{showApiKey ? settingsData.api_key_masked : 'ΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇóΓÇó' + settingsData.[35mapi_key_last_four[36m}
-									</div>[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\ai-settings\+page.svelte[39m:395:27
-[31mError[39m: Property 'api_key_last_four' does not exist on type 'AISettings'. Did you mean 'apiKeyLastFour'? (ts)
-[36m						{#await settings then settingsData}
-							{#if settingsData?.[35mapi_key_last_four[36m}
-								<Button variant="destructive" onclick={handleDeleteKey} disabled={isUpdating}>[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\ai-settings\+page.svelte[39m:423:80
-[31mError[39m: Property 'credits_balance' does not exist on type 'AISettings'. Did you mean 'creditsBalance'? (ts)
-[36m							<div class="text-center py-4">
-								<p class="text-5xl font-bold text-primary">{formatNumber(settingsData?.[35mcredits_balance[36m || 0)}</p>
-								<p class="text-sm text-muted-foreground mt-2">credits available</p>[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\ai-settings\+page.svelte[39m:427:49
-[31mError[39m: Property 'credits_used' does not exist on type 'AISettings'. Did you mean 'creditsUsed'? (ts)
-[36m							<div class="text-sm text-muted-foreground text-center">
-								Total used: {formatNumber(settingsData?.[35mcredits_used[36m || 0)}
-							</div>[39m
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\organization\+page.svelte[39m:67:31
+[31mError[39m: Conversion of type '{ orgId: string; paymentsEnabled: boolean; paymentsBypass: boolean; updatedBy: string | null; updatedAt: Date | null; }' to type 'OrgSettings' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ orgId: string; paymentsEnabled: boolean; paymentsBypass: boolean; updatedBy: string | null; updatedAt: Date | null; }' is missing the following properties from type 'OrgSettings': org_id, payments_enabled, payments_bypass, updated_at, updated_by (ts)
+[36m	const availableRoles = $derived((data.availableRoles || []) as OrgRole[]);
+	const orgSettings = $derived([35mdata.orgSettings as OrgSettings | null[36m);[39m
 
 c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\profile\+page.svelte[39m:47:5
 [31mError[39m: Type '{ updated_at: string; id: string; email: string | null; role: "super_admin" | "org_admin" | "id_gen_admin" | "id_gen_user" | "user" | null; created_at: Date | null; }' is not assignable to type '{ id: string; email: string | null; role: "super_admin" | "org_admin" | "id_gen_admin" | "id_gen_user" | "user" | null; created_at: Date | null; updated_at: Date | null; }'.
@@ -523,23 +286,6 @@ c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\profile\+pa
 						<span class="text-sm">{formatDate([35mprofile.updated_at[36m, 'date')}</span>
 					</div>[39m
 
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\test-3d\+page.svelte[39m:19:9
-[31mError[39m: Parameter 'c' implicitly has an 'any' type. (ts)
-[36m	let cardUrls = $derived(data.cards
-		.map(([35mc[36m) => c.front_image)
-		.filter((path): path is string => !!path)[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\test-3d\+page.svelte[39m:20:12
-[31mError[39m: Parameter 'path' implicitly has an 'any' type. (ts)
-[36m		.map((c) => c.front_image)
-		.filter(([35mpath[36m): path is string => !!path)
-		.map((path) => getSupabaseStorageUrl(path, 'rendered-id-cards')));[39m
-
-c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\test-3d\+page.svelte[39m:21:9
-[31mError[39m: Parameter 'path' implicitly has an 'any' type. (ts)
-[36m		.filter((path): path is string => !!path)
-		.map(([35mpath[36m) => getSupabaseStorageUrl(path, 'rendered-id-cards')));[39m
-
 ====================================
-[31msvelte-check found 93 errors and 3 warnings in 32 files
+[31msvelte-check found 48 errors and 3 warnings in 19 files
 [39m

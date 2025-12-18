@@ -1,13 +1,16 @@
 import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
 import { checkSuperAdmin, checkSuperAdminEmulatedOnly, shouldBypassFor403, wantsToAssumeRole } from '$lib/utils/adminPermissions';
+import { db } from '$lib/server/db';
+import { organizations, profiles, idcards, templates } from '$lib/server/schema';
+import { eq, sql, desc } from 'drizzle-orm';
 
 // Type for organization from database
 interface Organization {
 	id: string;
 	name: string;
-	created_at: string | null;
-	updated_at: string | null;
+	created_at: Date | null;
+	updated_at: Date | null;
 }
 
 // Type for organization with stats
@@ -20,7 +23,7 @@ interface OrganizationWithStats extends Organization {
 export const load: PageServerLoad = async ({ parent, locals, url }) => {
 	// Get data from parent layout (authentication check happens there)
 	const parentData = await parent();
-	const { supabase, user, roleEmulation } = locals;
+	const { user, roleEmulation } = locals;
 
 	if (!user) {
 		throw error(403, 'Access denied');
@@ -66,69 +69,54 @@ export const load: PageServerLoad = async ({ parent, locals, url }) => {
 	const bypassedAccess = canBypass;
 
 	try {
-		// Fetch ALL organizations with member counts
-		const { data: organizations, error: orgsError } = await supabase
-			.from('organizations')
-			.select(
-				`
-				id,
-				name,
-				created_at,
-				updated_at
-			`
-			)
-			.order('name', { ascending: true });
+		// Fetch ALL organizations using Drizzle
+		const orgs = await db.select({
+			id: organizations.id,
+			name: organizations.name,
+			created_at: organizations.createdAt,
+			updated_at: organizations.updatedAt
+		})
+			.from(organizations)
+			.orderBy(organizations.name);
 
-		if (orgsError) {
-			console.error('Error fetching organizations:', orgsError);
-			throw error(500, 'Failed to fetch organizations');
-		}
+		// Get member counts using aggregation queries for efficiency
+		// We'll perform separate queries for stats to avoid complex joins/group bys if possible, 
+		// or loop if N is small. For admin page, N is likely manageable, but better to be efficient.
 
-		// Cast to proper type
-		const typedOrganizations = (organizations || []) as Organization[];
+		// Let's use individual counts per org for simplicity and accuracy matching previous logic
+		// Or perform a group by query if we want to be fancy.
+		// Drizzle group by:
+		// db.select({ orgId: profiles.orgId, count: count() }).from(profiles).groupBy(profiles.orgId)
+		
+		const [memberCounts, cardCounts, templateCounts] = await Promise.all([
+			db.select({ orgId: profiles.orgId, count: sql<number>`count(*)` })
+				.from(profiles)
+				.groupBy(profiles.orgId),
+			db.select({ orgId: idcards.orgId, count: sql<number>`count(*)` })
+				.from(idcards)
+				.groupBy(idcards.orgId),
+			db.select({ orgId: templates.orgId, count: sql<number>`count(*)` })
+				.from(templates)
+				.groupBy(templates.orgId)
+		]);
 
-		// Get member counts and card counts for each organization
-		const orgStats: OrganizationWithStats[] = await Promise.all(
-			typedOrganizations.map(async (org: Organization) => {
-				const [{ count: memberCount }, { count: cardCount }, { count: templateCount }] =
-					await Promise.all([
-						supabase
-							.from('profiles')
-							.select('*', { count: 'exact', head: true })
-							.eq('org_id', org.id),
-						supabase
-							.from('idcards')
-							.select('*', { count: 'exact', head: true })
-							.eq('org_id', org.id),
-						supabase
-							.from('templates')
-							.select('*', { count: 'exact', head: true })
-							.eq('org_id', org.id)
-					]);
+		const memberCountMap = new Map(memberCounts.map(m => [m.orgId, Number(m.count)]));
+		const cardCountMap = new Map(cardCounts.map(c => [c.orgId, Number(c.count)]));
+		const templateCountMap = new Map(templateCounts.map(t => [t.orgId, Number(t.count)]));
 
-				return {
-					...org,
-					memberCount: memberCount || 0,
-					cardCount: cardCount || 0,
-					templateCount: templateCount || 0
-				};
-			})
-		);
+		// Combine data
+		const orgStats: OrganizationWithStats[] = orgs.map(org => ({
+			...org,
+			memberCount: memberCountMap.get(org.id) || 0,
+			cardCount: cardCountMap.get(org.id) || 0,
+			templateCount: templateCountMap.get(org.id) || 0
+		}));
 
 		// Calculate global stats
 		const totalOrganizations = orgStats.length;
-		const totalMembers = orgStats.reduce(
-			(sum: number, org: OrganizationWithStats) => sum + org.memberCount,
-			0
-		);
-		const totalCards = orgStats.reduce(
-			(sum: number, org: OrganizationWithStats) => sum + org.cardCount,
-			0
-		);
-		const totalTemplates = orgStats.reduce(
-			(sum: number, org: OrganizationWithStats) => sum + org.templateCount,
-			0
-		);
+		const totalMembers = orgStats.reduce((sum, org) => sum + org.memberCount, 0);
+		const totalCards = orgStats.reduce((sum, org) => sum + org.cardCount, 0);
+		const totalTemplates = orgStats.reduce((sum, org) => sum + org.templateCount, 0);
 
 		return {
 			...parentData,

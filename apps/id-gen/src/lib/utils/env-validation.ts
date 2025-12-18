@@ -6,12 +6,17 @@
 
 import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
 import { dev } from '$app/environment';
-// @ts-ignore
 import {
-	PRIVATE_SERVICE_ROLE,
-	PAYMONGO_SECRET_KEY,
-	PAYMONGO_WEBHOOK_SECRET
+	PRIVATE_SERVICE_ROLE
 } from '$env/static/private';
+
+// PayMongo env vars are optional - accessed via process.env to avoid build errors
+// @ts-ignore
+const PAYMONGO_SECRET_KEY = (typeof process !== 'undefined' && process.env?.PAYMONGO_SECRET_KEY) || '';
+// @ts-ignore  
+const PAYMONGO_WEBHOOK_SECRET = (typeof process !== 'undefined' && process.env?.PAYMONGO_WEBHOOK_SECRET) || '';
+
+
 
 interface EnvValidationResult {
 	isValid: boolean;
