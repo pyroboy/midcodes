@@ -12,7 +12,17 @@ function getConnectionString(): string {
     // Try multiple sources for the env variable
     // process.env works in Node.js/Vite dev, privateEnv works in SvelteKit runtime
     const url = process.env.NEON_DATABASE_URL || privateEnv.NEON_DATABASE_URL;
+    console.log('[db.ts DEBUG] Checking Env Vars:', {
+        process_env_exists: !!process.env.NEON_DATABASE_URL,
+        private_env_exists: !!privateEnv.NEON_DATABASE_URL,
+        node_env: process.env.NODE_ENV
+    });
+
     if (!url) {
+        if (process.env.NODE_ENV === 'development') {
+            console.warn('⚠️ NEON_DATABASE_URL is missing in dev. Using dummy URL.');
+            return 'postgres://dummy:dummy@localhost:5432/dummy';
+        }
         throw new Error(
             'Missing NEON_DATABASE_URL environment variable. Configure it in Cloudflare Pages environment variables (and locally via .env).'
         );
