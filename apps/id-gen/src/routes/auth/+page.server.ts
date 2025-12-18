@@ -1,4 +1,4 @@
-import { fail, redirect } from '@sveltejs/kit';
+import { fail, redirect, isRedirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { auth } from '$lib/server/auth';
 
@@ -38,6 +38,7 @@ export const actions: Actions = {
 				throw redirect(303, returnTo || '/');
 			}
 		} catch (error: any) {
+			if (isRedirect(error)) throw error;
 			console.error('Sign in error:', error);
 			if (error.status === 400 || error.code === 'INVALID_CREDENTIALS') {
 				return fail(400, {
@@ -89,6 +90,7 @@ export const actions: Actions = {
 				};
 			}
 		} catch (error: any) {
+			if (isRedirect(error)) throw error;
 			console.error('Sign up error:', error);
 			if (error.status === 400) {
 				return fail(400, {

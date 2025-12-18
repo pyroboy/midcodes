@@ -23,9 +23,12 @@
                 class="space-y-4"
                 use:enhance={() => {
                     loading = true;
-                    return async ({ update }) => {
+                    return async ({ update, result }) => {
                         await update();
                         loading = false;
+                        if (result.type === 'success') {
+                            window.location.href = '/auth';
+                        }
                     };
                 }}
             >

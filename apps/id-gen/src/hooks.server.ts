@@ -179,6 +179,7 @@ const authGuard: Handle = async ({ event, resolve }) => {
 	const isAuthRoute = path.startsWith('/auth') || path.startsWith('/api/auth');
 	const isPublicRoute =
 		path === '/' ||
+		path.startsWith('/setup') ||
 		path.startsWith('/features') ||
 		path.startsWith('/pricing') ||
 		path.startsWith('/contact') ||
