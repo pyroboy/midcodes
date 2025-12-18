@@ -193,8 +193,8 @@
 							<div class="space-y-2">
 								<Label for="role">Role</Label>
 								<div class="flex items-center space-x-2">
-									<Badge variant={getRoleBadgeVariant(profile.role)}>
-										{formatRoleName(profile.role)}
+									<Badge variant={getRoleBadgeVariant(profile.role || '')}>
+										{formatRoleName(profile.role || '')}
 									</Badge>
 								</div>
 								<p class="text-xs text-muted-foreground">
@@ -216,7 +216,7 @@
 								<Label for="member_since">Member Since</Label>
 								<Input
 									id="member_since"
-									value={formatDate(profile.created_at, 'date')}
+									value={formatDate(profile.created_at || new Date(), 'date')}
 									disabled
 									class="bg-muted"
 								/>
@@ -324,7 +324,7 @@
 										onCheckedChange={(checked) => {
 											preferences.adminNotifications = checked;
 										}}
-										disabled={!['super_admin', 'org_admin', 'id_gen_admin'].includes(profile.role)}
+										disabled={!['super_admin', 'org_admin', 'id_gen_admin'].includes(profile.role || '')}
 									/>
 								</div>
 							</div>
@@ -492,7 +492,7 @@
 					</div>
 					<div class="flex items-center justify-between">
 						<span class="text-sm text-muted-foreground">Last Login</span>
-						<span class="text-sm">{formatDate(profile.updated_at, 'date')}</span>
+						<span class="text-sm">{formatDate(profile.updated_at || new Date(), 'date')}</span>
 					</div>
 					<div class="flex items-center justify-between">
 						<span class="text-sm text-muted-foreground">ID Cards Created</span>

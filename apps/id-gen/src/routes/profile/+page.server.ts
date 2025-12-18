@@ -2,7 +2,8 @@ import type { PageServerLoad, Actions } from './$types';
 import { error, fail, redirect } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { profiles, organizations, templates, idcards } from '$lib/server/schema';
-import { eq, count, and } from 'drizzle-orm';
+import { eq, desc, sql, and, inArray } from 'drizzle-orm';
+import { auth } from '$lib/server/auth';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	const { session, user, org_id } = locals;
@@ -35,13 +36,12 @@ export const load: PageServerLoad = async ({ locals }) => {
 		}
 
 		// Get available templates for default template selection
-		const templatesList = await db.query.templates.findMany({
-			where: eq(templates.orgId, org_id || ''),
-			orderBy: (templates, { asc }) => [asc(templates.name)]
-		});
+		const templatesList = await db.select()
+			.from(templates)
+			.where(eq(templates.orgId, org_id || ''))
+			.orderBy(templates.name);
 
 		// Get user statistics
-		// Note: profiles table has card_generation_count which we can use
 		const cardsCreated = profile.cardGenerationCount || 0;
 
 		// Extract preferences from context
@@ -76,18 +76,13 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 export const actions: Actions = {
 	updateProfile: async ({ request, locals }) => {
-		const { supabase, user } = locals;
+		const { user } = locals;
 
 		if (!user) {
 			return fail(401, { error: 'Not authenticated' });
 		}
 
 		try {
-			const formData = await request.formData();
-
-			// For now, we don't allow email changes via this form
-			// Email updates should go through proper email verification flow
-
 			// Update timestamp
 			await db.update(profiles)
 				.set({
@@ -99,7 +94,7 @@ export const actions: Actions = {
 				success: true,
 				message: 'Profile updated successfully',
 				updatedProfile: {
-					updated_at: new Date().toISOString()
+					updated_at: new Date()
 				}
 			};
 		} catch (err) {
@@ -109,7 +104,7 @@ export const actions: Actions = {
 	},
 
 	updatePreferences: async ({ request, locals }) => {
-		const { supabase, user } = locals;
+		const { user } = locals;
 
 		if (!user) {
 			return fail(401, { error: 'Not authenticated' });
@@ -123,21 +118,20 @@ export const actions: Actions = {
 			const defaultTemplate = formData.get('defaultTemplate') as string;
 
 			// Get current profile to preserve other context data
-			const { data: currentProfile, error: fetchError } = await supabase
-				.from('profiles')
-				.select('context')
-				.eq('id', user.id)
-				.single();
+			const currentProfiles = await db.select({ context: profiles.context })
+				.from(profiles)
+				.where(eq(profiles.id, user.id))
+				.limit(1);
 
-			if (fetchError) {
-				console.error('Error fetching current profile:', fetchError);
+			if (currentProfiles.length === 0) {
 				return fail(500, { error: 'Failed to fetch current profile' });
 			}
 
+			const currentContext = (currentProfiles[0].context as any) || {};
+
 			// Update preferences in context
-			const currentProfileData = currentProfile as any;
 			const updatedContext = {
-				...currentProfileData.context,
+				...currentContext,
 				preferences: {
 					darkMode,
 					emailNotifications,
@@ -146,18 +140,12 @@ export const actions: Actions = {
 				}
 			};
 
-			const { error: updateError } = await (supabase as any)
-				.from('profiles')
-				.update({
+			await db.update(profiles)
+				.set({
 					context: updatedContext,
-					updated_at: new Date().toISOString()
+					updatedAt: new Date()
 				})
-				.eq('id', user.id);
-
-			if (updateError) {
-				console.error('Error updating preferences:', updateError);
-				return fail(500, { error: 'Failed to update preferences' });
-			}
+				.where(eq(profiles.id, user.id));
 
 			return {
 				success: true,
@@ -171,7 +159,7 @@ export const actions: Actions = {
 	},
 
 	changePassword: async ({ request, locals }) => {
-		const { supabase, user } = locals;
+		const { user } = locals;
 
 		if (!user) {
 			return fail(401, { error: 'Not authenticated' });
@@ -195,24 +183,18 @@ export const actions: Actions = {
 				return fail(400, { error: 'Password must be at least 6 characters long' });
 			}
 
-			// Verify current password by attempting to sign in
-			const { error: signInError } = await supabase.auth.signInWithPassword({
-				email: user.email || '',
-				password: currentPassword
-			});
-
-			if (signInError) {
-				return fail(400, { error: 'Current password is incorrect' });
-			}
-
-			// Update password
-			const { error: updateError } = await supabase.auth.updateUser({
-				password: newPassword
-			});
-
-			if (updateError) {
-				console.error('Error updating password:', updateError);
-				return fail(500, { error: 'Failed to update password' });
+			// Better Auth change password
+			try {
+				await auth.api.changePassword({
+					body: {
+						newPassword: newPassword,
+						currentPassword: currentPassword,
+						revokeOtherSessions: true
+					},
+					headers: request.headers
+				});
+			} catch (authError: any) {
+				return fail(400, { error: authError.message || 'Failed to update password' });
 			}
 
 			return {
@@ -226,7 +208,7 @@ export const actions: Actions = {
 	},
 
 	exportData: async ({ locals }) => {
-		const { supabase, user, org_id } = locals;
+		const { user } = locals;
 
 		if (!user) {
 			return fail(401, { error: 'Not authenticated' });
@@ -234,40 +216,43 @@ export const actions: Actions = {
 
 		try {
 			// Get user's profile data
-			const { data: profile, error: profileError } = await supabase
-				.from('profiles')
-				.select('*')
-				.eq('id', user.id)
-				.single();
+			const profile = await db.query.profiles.findFirst({
+				where: eq(profiles.id, user.id)
+			});
 
-			// Get user's created ID cards
-			const { data: idCards, error: cardsError } = await supabase
-				.from('idcards')
-				.select('id, template_id, created_at, data')
-				.eq('user_id', user.id);
+			// Get user's created ID cards (using orgId for now as specific user tracking might be on org level)
+			const idCardsData = await db.select({
+				id: idcards.id,
+				template_id: idcards.templateId,
+				created_at: idcards.createdAt,
+				data: idcards.data
+			})
+				.from(idcards)
+				.where(eq(idcards.orgId, user.orgId || ''));
 
 			// Get user's created templates (if any)
-			const { data: templates, error: templatesError } = await supabase
-				.from('templates')
-				.select('id, name, created_at')
-				.eq('user_id', user.id);
+			const templatesData = await db.select({
+				id: templates.id,
+				name: templates.name,
+				created_at: templates.createdAt
+			})
+				.from(templates)
+				.where(eq(templates.userId, user.id));
 
-			if (profileError || cardsError || templatesError) {
-				console.error('Error exporting data:', { profileError, cardsError, templatesError });
+			if (!profile) {
 				return fail(500, { error: 'Failed to export data' });
 			}
 
 			// Create export data
 			const profileData = profile as any;
-			const idCardsData = idCards as any[];
 			const exportData = {
 				exportDate: new Date().toISOString(),
 				profile: {
 					id: profileData.id,
 					email: profileData.email,
 					role: profileData.role,
-					created_at: profileData.created_at,
-					updated_at: profileData.updated_at,
+					created_at: profileData.createdAt,
+					updated_at: profileData.updatedAt,
 					preferences: profileData.context?.preferences || {}
 				},
 				idCards:
@@ -277,10 +262,10 @@ export const actions: Actions = {
 						created_at: card.created_at,
 						data: card.data
 					})) || [],
-				templates: templates || [],
+				templates: templatesData || [],
 				statistics: {
-					totalIdCards: idCards?.length || 0,
-					totalTemplates: templates?.length || 0
+					totalIdCards: idCardsData?.length || 0,
+					totalTemplates: templatesData?.length || 0
 				}
 			};
 
@@ -296,8 +281,8 @@ export const actions: Actions = {
 		}
 	},
 
-	deleteAccount: async ({ locals }) => {
-		const { supabase, user, org_id } = locals;
+	deleteAccount: async ({ locals, request }) => {
+		const { user } = locals; // org_id might not be available if not set in locals yet
 
 		if (!user) {
 			return fail(401, { error: 'Not authenticated' });
@@ -305,49 +290,51 @@ export const actions: Actions = {
 
 		try {
 			// First get the user's profile to check their role
-			const { data: profile, error: profileError } = await supabase
-				.from('profiles')
-				.select('role, org_id')
-				.eq('id', user.id)
-				.single();
+			const profile = await db.query.profiles.findFirst({
+				where: eq(profiles.id, user.id),
+				columns: { role: true, orgId: true }
+			});
 
-			if (profileError) {
-				console.error('Error fetching profile:', profileError);
+			if (!profile) {
 				return fail(500, { error: 'Failed to access profile' });
 			}
 
-			// Note: This is a soft delete - we remove the profile but the auth user remains
-			// In a production system, you might want to implement a proper account deletion flow
-			// that includes email verification and a grace period
-
 			// Check if user has admin role - prevent deletion of last admin
-			const profileData = profile as any;
-			if (profileData.role && ['super_admin', 'org_admin'].includes(profileData.role)) {
-				// Count other admins in organization
-				const { count: adminCount } = await supabase
-					.from('profiles')
-					.select('*', { count: 'exact', head: true })
-					.eq('org_id', profileData.org_id || org_id || '')
-					.in('role', ['super_admin', 'org_admin'])
-					.neq('id', user.id);
+			if (profile.role && ['super_admin', 'org_admin'].includes(profile.role)) {
+                // If orgId is missing, they can't be the last admin of an org, but let's be safe
+                if (profile.orgId) {
+                    // Count other admins in organization
+                    const adminCountResult = await db.select({ count: sql<number>`count(*)` })
+                        .from(profiles)
+                        .where(and(
+                            eq(profiles.orgId, profile.orgId),
+                            inArray(profiles.role, ['super_admin', 'org_admin'] as any),
+                            sql`${profiles.id} != ${user.id}`
+                        ));
 
-				if ((adminCount || 0) === 0) {
-					return fail(400, {
-						error: 'Cannot delete account: You are the last administrator in your organization'
-					});
-				}
+                    const adminCount = Number(adminCountResult[0]?.count || 0);
+
+                    if (adminCount === 0) {
+                        return fail(400, {
+                            error: 'Cannot delete account: You are the last administrator in your organization'
+                        });
+                    }
+                }
 			}
 
-			// Delete profile (this should cascade to related data based on foreign key constraints)
-			const { error: deleteError } = await supabase.from('profiles').delete().eq('id', user.id);
-
-			if (deleteError) {
-				console.error('Error deleting profile:', deleteError);
-				return fail(500, { error: 'Failed to delete account' });
+			// Delete Better Auth user
+			try {
+				await auth.api.deleteUser({
+                    body: {},
+                    headers: request.headers
+                });
+			} catch (authError: any) {
+				console.error('Error deleting auth user:', authError);
+				return fail(500, { error: 'Failed to delete account auth: ' + authError.message });
 			}
 
-			// Sign out the user
-			await supabase.auth.signOut();
+            // Explicitly delete profile in case cascade is not set up
+            await db.delete(profiles).where(eq(profiles.id, user.id));
 
 			// Redirect to auth page with message
 			throw redirect(303, '/auth?message=Account deleted successfully');

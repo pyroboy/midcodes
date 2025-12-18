@@ -187,7 +187,6 @@ export async function processSuccessfulPayment(
 	switch (metadata.type) {
 		case 'credit_purchase':
 			const creditResult = await addCredits(
-				supabase,
 				metadata.user_id,
 				metadata.org_id,
 				parseInt(metadata.credits),
@@ -203,7 +202,6 @@ export async function processSuccessfulPayment(
 		case 'premium_feature_purchase':
 			if (metadata.feature_id === 'unlimited_templates') {
 				const templatesResult = await grantUnlimitedTemplates(
-					supabase,
 					metadata.user_id,
 					metadata.org_id,
 					paymentIntent.id
@@ -214,7 +212,6 @@ export async function processSuccessfulPayment(
 				}
 			} else if (metadata.feature_id === 'remove_watermarks') {
 				const watermarkResult = await grantWatermarkRemoval(
-					supabase,
 					metadata.user_id,
 					metadata.org_id,
 					paymentIntent.id

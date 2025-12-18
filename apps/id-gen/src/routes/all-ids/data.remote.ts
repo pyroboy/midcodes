@@ -1,5 +1,8 @@
 import { query, getRequestEvent } from '$app/server';
 import { z } from 'zod';
+import { db } from '$lib/server/db';
+import { idcards, templates } from '$lib/server/schema';
+import { eq, sql, desc, inArray, and } from 'drizzle-orm';
 
 // Types for ID cards
 interface IDCardField {
@@ -14,7 +17,7 @@ export interface IDCard {
 	back_image: string | null;
 	front_image_low_res?: string | null;
 	back_image_low_res?: string | null;
-	created_at: string;
+	created_at: Date | null;
 	fields: {
 		[fieldName: string]: IDCardField;
 	};
@@ -37,7 +40,7 @@ const TemplateNamesSchema = z.array(z.string());
 // Query for paginated ID cards
 export const getIDCards = query(PaginationSchema, async ({ offset, limit }) => {
 	const { locals } = getRequestEvent();
-	const { supabase, org_id } = locals;
+	const { org_id } = locals;
 
 	if (!org_id) {
 		return { cards: [], hasMore: false };
@@ -46,38 +49,32 @@ export const getIDCards = query(PaginationSchema, async ({ offset, limit }) => {
 	// Fetch one extra row so we can accurately determine if there's more.
 	const fetchLimit = Math.max(0, limit) + 1;
 
-	const { data: cards, error } = await supabase
-		.from('idcards')
-		.select(`
-			id,
-			template_id,
-			front_image,
-			back_image,
-			front_image_low_res,
-			back_image_low_res,
-			created_at,
-			data,
-			templates (
-				name
-			)
-		`)
-		.eq('org_id', org_id)
-		.order('created_at', { ascending: false })
-		.range(offset, offset + fetchLimit - 1);
+	// Fetch cards with template names using Drizzle
+	// We'll perform a join
+	const results = await db.select({
+			id: idcards.id,
+			templateId: idcards.templateId,
+			frontImage: idcards.frontImage,
+			backImage: idcards.backImage,
+			frontImageLowRes: idcards.frontImageLowRes,
+			backImageLowRes: idcards.backImageLowRes,
+			createdAt: idcards.createdAt,
+			data: idcards.data,
+			templateName: templates.name
+		})
+		.from(idcards)
+		.leftJoin(templates, eq(idcards.templateId, templates.id))
+		.where(eq(idcards.orgId, org_id))
+		.orderBy(desc(idcards.createdAt))
+		.offset(offset)
+		.limit(fetchLimit);
 
-	if (error) {
-		console.error('Error fetching ID cards:', error);
-		return { cards: [], hasMore: false };
-	}
-
-	const rows = cards || [];
-	const hasMore = rows.length > limit;
-	const pageRows = hasMore ? rows.slice(0, limit) : rows;
+	const hasMore = results.length > limit;
+	const pageRows = hasMore ? results.slice(0, limit) : results;
 
 	// Transform to expected format
-	const idCards: IDCard[] = pageRows.map((card: any) => {
-		const templateName = card.templates?.name || null;
-		const cardData = card.data || {};
+	const cards: IDCard[] = pageRows.map((row) => {
+		const cardData = (row.data as any) || {};
 
 		const fields: { [fieldName: string]: IDCardField } = {};
 		Object.entries(cardData).forEach(([key, value]) => {
@@ -90,19 +87,19 @@ export const getIDCards = query(PaginationSchema, async ({ offset, limit }) => {
 		});
 
 		return {
-			idcard_id: card.id,
-			template_name: templateName,
-			front_image: card.front_image,
-			back_image: card.back_image,
-			front_image_low_res: card.front_image_low_res,
-			back_image_low_res: card.back_image_low_res,
-			created_at: card.created_at,
+			idcard_id: row.id,
+			template_name: row.templateName || '',
+			front_image: row.frontImage,
+			back_image: row.backImage,
+			front_image_low_res: row.frontImageLowRes,
+			back_image_low_res: row.backImageLowRes,
+			created_at: row.createdAt,
 			fields
 		};
 	});
 
 	return {
-		cards: idCards,
+		cards,
 		hasMore
 	};
 });
@@ -110,39 +107,31 @@ export const getIDCards = query(PaginationSchema, async ({ offset, limit }) => {
 // Query for paginated card IDs only (lightweight)
 export const getCardIDs = query(PaginationSchema, async ({ offset, limit }) => {
 	const { locals } = getRequestEvent();
-	const { supabase, org_id } = locals;
+	const { org_id } = locals;
 
 	if (!org_id) {
 		return { cards: [], hasMore: false };
 	}
 
-	// Fetch one extra row so we can accurately determine if there's more.
 	const fetchLimit = Math.max(0, limit) + 1;
 
-	const { data: cards, error } = await supabase
-		.from('idcards')
-		.select(`
-			id,
-			templates (
-				name
-			)
-		`)
-		.eq('org_id', org_id)
-		.order('created_at', { ascending: false })
-		.range(offset, offset + fetchLimit - 1);
+	const results = await db.select({
+			id: idcards.id,
+			templateName: templates.name
+		})
+		.from(idcards)
+		.leftJoin(templates, eq(idcards.templateId, templates.id))
+		.where(eq(idcards.orgId, org_id))
+		.orderBy(desc(idcards.createdAt))
+		.offset(offset)
+		.limit(fetchLimit);
 
-	if (error) {
-		console.error('Error fetching card IDs:', error);
-		return { cards: [], hasMore: false };
-	}
+	const hasMore = results.length > limit;
+	const pageRows = hasMore ? results.slice(0, limit) : results;
 
-	const rows = cards || [];
-	const hasMore = rows.length > limit;
-	const pageRows = hasMore ? rows.slice(0, limit) : rows;
-
-	const cardIDs = pageRows.map((card: any) => ({
-		idcard_id: card.id,
-		template_name: card.templates?.name || null
+	const cardIDs = pageRows.map((row) => ({
+		idcard_id: row.id,
+		template_name: row.templateName || ''
 	}));
 
 	return {
@@ -154,39 +143,30 @@ export const getCardIDs = query(PaginationSchema, async ({ offset, limit }) => {
 // Query for single card details
 export const getCardDetails = query(z.string(), async (id) => {
 	const { locals } = getRequestEvent();
-	const { supabase, org_id } = locals;
+	const { org_id } = locals;
 
 	if (!org_id) return null;
 
-	const { data: card, error } = await supabase
-		.from('idcards')
-		.select(`
-			id,
-			template_id,
-			front_image,
-			back_image,
-			front_image_low_res,
-			back_image_low_res,
-			created_at,
-			data,
-			templates (
-				name
-			)
-		`)
-		.eq('id', id)
-		.eq('org_id', org_id)
-		.single();
+	const results = await db.select({
+			id: idcards.id,
+			templateId: idcards.templateId,
+			frontImage: idcards.frontImage,
+			backImage: idcards.backImage,
+			frontImageLowRes: idcards.frontImageLowRes,
+			backImageLowRes: idcards.backImageLowRes,
+			createdAt: idcards.createdAt,
+			data: idcards.data,
+			templateName: templates.name
+		})
+		.from(idcards)
+		.leftJoin(templates, eq(idcards.templateId, templates.id))
+		.where(and(eq(idcards.id, id), eq(idcards.orgId, org_id)))
+		.limit(1);
 
-	if (error) {
-		console.error('Error fetching card details:', error);
-		return null;
-	}
+	if (results.length === 0) return null;
 
-	if (!card) return null;
-
-	const cardAny = card as any;
-	const templateName = cardAny.templates?.name || null;
-	const cardData = cardAny.data || {};
+	const row = results[0];
+	const cardData = (row.data as any) || {};
 
 	const fields: { [fieldName: string]: IDCardField } = {};
 	Object.entries(cardData).forEach(([key, value]) => {
@@ -199,13 +179,13 @@ export const getCardDetails = query(z.string(), async (id) => {
 	});
 
 	return {
-		idcard_id: cardAny.id,
-		template_name: templateName,
-		front_image: cardAny.front_image,
-		back_image: cardAny.back_image,
-		front_image_low_res: cardAny.front_image_low_res,
-		back_image_low_res: cardAny.back_image_low_res,
-		created_at: cardAny.created_at,
+		idcard_id: row.id,
+		template_name: row.templateName || '',
+		front_image: row.frontImage,
+		back_image: row.backImage,
+		front_image_low_res: row.frontImageLowRes,
+		back_image_low_res: row.backImageLowRes,
+		created_at: row.createdAt,
 		fields
 	} as IDCard;
 });
@@ -213,60 +193,48 @@ export const getCardDetails = query(z.string(), async (id) => {
 // Query for total card count (no args)
 export const getCardCount = query(async () => {
 	const { locals } = getRequestEvent();
-	const { supabase, org_id } = locals;
+	const { org_id } = locals;
 	
 	if (!org_id) return 0;
 
-	const { count, error } = await supabase
-		.from('idcards')
-		.select('*', { count: 'exact', head: true })
-		.eq('org_id', org_id);
+	const result = await db.select({ count: sql<number>`count(*)` })
+		.from(idcards)
+		.where(eq(idcards.orgId, org_id));
 
-	if (error) {
-		console.error('Error fetching card count:', error);
-		return 0;
-	}
-
-	return count || 0;
+	return Number(result[0]?.count || 0);
 });
 
 // Query for template dimensions (with template names arg)
 export const getTemplateDimensions = query(TemplateNamesSchema, async (templateNames) => {
 	const { locals } = getRequestEvent();
-	const { supabase, org_id } = locals;
+	const { org_id } = locals;
 
 	if (!org_id || templateNames.length === 0) {
 		return {};
 	}
 
-	const { data, error } = await supabase
-		.from('templates')
-		.select('name, width_pixels, height_pixels, orientation')
-		.eq('org_id', org_id)
-		.in('name', templateNames);
-
-	if (error) {
-		console.error('Error fetching template dimensions:', error);
-		return {};
-	}
+	const foundTemplates = await db.select({
+			name: templates.name,
+			widthPixels: templates.widthPixels,
+			heightPixels: templates.heightPixels,
+			orientation: templates.orientation
+		})
+		.from(templates)
+		.where(and(eq(templates.orgId, org_id), inArray(templates.name, templateNames)));
 
 	const dimensions: Record<string, { width: number; height: number; orientation: 'landscape' | 'portrait'; unit: string }> = {};
-	(data || []).forEach((template: any) => {
-		// Use actual dimensions from database - these should always be set for proper cards
-		const width = template.width_pixels;
-		const height = template.height_pixels;
+	
+	foundTemplates.forEach((template) => {
+		const width = template.widthPixels;
+		const height = template.heightPixels;
 		
-		// Derive orientation from actual dimensions if available, otherwise use database orientation
 		let orientation: 'landscape' | 'portrait';
 		if (width && height) {
-			// Derive from actual dimensions - more reliable than stored orientation
 			orientation = width < height ? 'portrait' : 'landscape';
 		} else {
-			// Fallback to stored orientation if dimensions are missing
-			orientation = template.orientation || 'landscape';
+			orientation = (template.orientation as 'landscape' | 'portrait') || 'landscape';
 		}
 		
-		// Only use defaults if dimensions are truly missing (which shouldn't happen for properly created templates)
 		const defaultWidth = orientation === 'portrait' ? 638 : 1013;
 		const defaultHeight = orientation === 'portrait' ? 1013 : 638;
 
@@ -284,26 +252,22 @@ export const getTemplateDimensions = query(TemplateNamesSchema, async (templateN
 // Query for template metadata (fields)
 export const getTemplateMetadata = query(TemplateNamesSchema, async (templateNames) => {
 	const { locals } = getRequestEvent();
-	const { supabase, org_id } = locals;
+	const { org_id } = locals;
 	
 	if (!org_id || templateNames.length === 0) {
 		return {};
 	}
 
-	const { data, error } = await supabase
-		.from('templates')
-		.select('name, template_elements')
-		.eq('org_id', org_id)
-		.in('name', templateNames);
-
-	if (error) {
-		console.error('Error fetching template metadata:', error);
-		return {};
-	}
+	const foundTemplates = await db.select({
+			name: templates.name,
+			templateElements: templates.templateElements
+		})
+		.from(templates)
+		.where(and(eq(templates.orgId, org_id), inArray(templates.name, templateNames)));
 
 	const templateFields: { [templateName: string]: TemplateVariable[] } = {};
-	(data || []).forEach((template: any) => {
-		const elements = template.template_elements || [];
+	foundTemplates.forEach((template) => {
+		const elements = (template.templateElements as any[]) || [];
 		templateFields[template.name] = elements
 			.filter((el: any) => el.type === 'text' || el.type === 'selection')
 			.map((el: any) => ({

@@ -23,7 +23,7 @@ function makeSnapshot(overrides: Partial<AllIdsCacheSnapshot> = {}): AllIdsCache
 				template_name: 'T1',
 				front_image: null,
 				back_image: null,
-				created_at: '2025-01-01T00:00:00.000Z',
+				created_at: new Date('2025-01-01T00:00:00.000Z'),
 				fields: {}
 			}
 		],

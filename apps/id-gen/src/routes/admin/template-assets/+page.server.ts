@@ -12,8 +12,24 @@ export const load: PageServerLoad = async ({ locals }) => {
 		.where(eq(templateSizePresets.isActive, true))
 		.orderBy(templateSizePresets.sortOrder);
 
+	// Map to snake_case for frontend compatibility (components expect Supabase usage)
+	const mappedPresets = sizePresets.map(p => ({
+		...p,
+		width_inches: Number(p.widthInches),
+		height_inches: Number(p.heightInches),
+		width_mm: Number(p.widthMm),
+		height_mm: Number(p.heightMm),
+		width_pixels: p.widthPixels,
+		height_pixels: p.heightPixels,
+		aspect_ratio: p.aspectRatio ? Number(p.aspectRatio) : undefined,
+		sort_order: p.sortOrder,
+		is_active: p.isActive,
+		created_at: p.createdAt?.toISOString(), // Serialize dates as strings for SvelteKit data
+		updated_at: p.updatedAt?.toISOString()
+	}));
+
 	return {
-		sizePresets: sizePresets ?? []
+		sizePresets: mappedPresets
 	};
 };
 

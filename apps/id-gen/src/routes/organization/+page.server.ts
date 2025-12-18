@@ -76,14 +76,25 @@ export const load: PageServerLoad = async ({ parent, locals }) => {
 
 		return {
 			...parentData,
-			organization,
+			organization: {
+				...organization,
+				created_at: organization.createdAt,
+				updated_at: organization.updatedAt
+			},
 			members: members || [],
 			stats: {
 				totalCards,
 				totalTemplates,
 				totalMembers: members?.length || 0
 			},
-			orgSettings: orgSettingsData[0] || null,
+			orgSettings: orgSettingsData[0] ? {
+				...orgSettingsData[0],
+				org_id: orgSettingsData[0].orgId,
+				payments_enabled: orgSettingsData[0].paymentsEnabled,
+				payments_bypass: orgSettingsData[0].paymentsBypass,
+				updated_at: orgSettingsData[0].updatedAt,
+				updated_by: orgSettingsData[0].updatedBy
+			} : null,
 			availableRoles: availableRoles || [],
 			capabilities: {
 				isSuperAdmin,

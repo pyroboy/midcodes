@@ -73,8 +73,8 @@
 	class="group relative h-full w-full"
 	role="button"
 	tabindex="0"
-	on:click={handleClick}
-	on:keydown={(e) => {
+	onclick={handleClick}
+	onkeydown={(e) => {
 		if (e.key === 'Enter') handleClick(new MouseEvent('click'));
 	}}
 >
@@ -84,7 +84,7 @@
 			aria-label="Select card"
 			type="checkbox"
 			checked={isSelected}
-			on:click={(e) => {
+			onclick={(e: MouseEvent) => {
 				e.stopPropagation();
 				onToggleSelect(card);
 			}}

@@ -43,7 +43,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 			success: true,
 			// Return minimal info for debugging
 			refreshed: true,
-			expiresAt: session.expiresAt
+			expiresAt: (session as any).expiresAt
 		});
 	} catch (err) {
 		console.error('Error refreshing session:', err);

@@ -1,0 +1,197 @@
+﻿
+> id-gen@2 check C:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen
+> svelte-kit sync && svelte-check --tsconfig ./tsconfig.json
+
+Loading svelte-check in workspace: c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen
+Getting Svelte diagnostics...
+
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\lib\services\payments.ts[39m:195:5
+[31mError[39m: Expected 4-5 arguments, but got 6. 
+[36m				paymentIntent.id,
+				[35mmetadata.description[36m
+			);[39m
+
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\lib\services\payments.ts[39m:209:6
+[31mError[39m: Expected 3 arguments, but got 4. 
+[36m					metadata.org_id,
+					[35mpaymentIntent.id[36m
+				);[39m
+
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\lib\services\payments.ts[39m:220:6
+[31mError[39m: Expected 3 arguments, but got 4. 
+[36m					metadata.org_id,
+					[35mpaymentIntent.id[36m
+				);[39m
+
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\all-ids\data.remote.ts[39m:163:10
+[31mError[39m: Cannot find name 'and'. 
+[36m		.leftJoin(templates, eq(idcards.templateId, templates.id))
+		.where([35mand[36m(eq(idcards.id, id), eq(idcards.orgId, org_id)))
+		.limit(1);[39m
+
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\all-ids\data.remote.ts[39m:223:10
+[31mError[39m: Cannot find name 'and'. 
+[36m		.from(templates)
+		.where([35mand[36m(eq(templates.orgId, org_id), inArray(templates.name, templateNames)));[39m
+
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\all-ids\data.remote.ts[39m:266:10
+[31mError[39m: Cannot find name 'and'. 
+[36m		.from(templates)
+		.where([35mand[36m(eq(templates.orgId, org_id), inArray(templates.name, templateNames)));[39m
+
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\api\auth\refresh-session\+server.ts[39m:46:23
+[31mError[39m: Property 'expiresAt' does not exist on type '{ session: { id: string; createdAt: Date; updatedAt: Date; userId: string; expiresAt: Date; token: string; ipAddress?: string | null | undefined; userAgent?: string | null | undefined; impersonatedBy?: string | ... 1 more ... | undefined; }; user: { ...; }; }'. 
+[36m			refreshed: true,
+			expiresAt: session.[35mexpiresAt[36m
+		});[39m
+
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\id\[slug]\+page.server.ts[39m:28:36
+[31mError[39m: Property 'idCardId' does not exist on type '{ id: string; slug: string; ownerId: string | null; orgId: string | null; linkedIdCardId: string | null; status: string | null; claimCodeHash: string | null; privacySettings: unknown; profileContent: unknown; themeConfig: unknown; views: number | null; createdAt: Date | null; updatedAt: Date | null; }'. 
+[36m        .from(idcards)
+        .where(eq(idcards.id, card.[35midCardId[36m!))
+        .limit(1);[39m
+
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\profile\+page.server.ts[39m:231:23
+[31mError[39m: Property 'userId' does not exist on type 'PgTableWithColumns<{ name: "idcards"; schema: undefined; columns: { id: PgColumn<{ name: "id"; tableName: "idcards"; dataType: "string"; columnType: "PgUUID"; data: string; driverParam: string; notNull: true; hasDefault: true; ... 6 more ...; generated: undefined; }, {}, {}>; ... 8 more ...; updatedAt: PgColumn<...>...'. 
+[36m				.from(idcards)
+				.where(eq(idcards.[35muserId[36m, user.id));[39m
+
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\profile\+page.server.ts[39m:307:71
+[31mError[39m: Cannot find name 'sql'. 
+[36m                    // Count other admins in organization
+                    const adminCountResult = await db.select({ count: [35msql[36m<number>`count(*)` })
+                        .from(profiles)[39m
+
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\profile\+page.server.ts[39m:309:32
+[31mError[39m: Cannot find name 'and'. 
+[36m                        .from(profiles)
+                        .where([35mand[36m(
+                            eq(profiles.orgId, profile.orgId),[39m
+
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\profile\+page.server.ts[39m:311:29
+[31mError[39m: Cannot find name 'inArray'. Did you mean 'Array'? 
+[36m                            eq(profiles.orgId, profile.orgId),
+                            [35minArray[36m(profiles.role, ['super_admin', 'org_admin'] as any),
+                            sql`${profiles.id} != ${user.id}`[39m
+
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\profile\+page.server.ts[39m:312:29
+[31mError[39m: Cannot find name 'sql'. 
+[36m                            inArray(profiles.role, ['super_admin', 'org_admin'] as any),
+                            [35msql[36m`${profiles.id} != ${user.id}`
+                        ));[39m
+
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\profile\+page.server.ts[39m:327:31
+[31mError[39m: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type '{ headers: Headers; }' is not assignable to parameter of type 'InputContext<"/delete-user", { method: "POST"; use: ((inputContext: MiddlewareInputContext<MiddlewareOptions>) => Promise<{ session: { session: Record<string, any> & { ...; }; user: Record<...> & { ...; }; }; }>)[]; body: ZodObject<...>; metadata: { ...; }; }>'.
+      Property 'body' is missing in type '{ headers: Headers; }' but required in type '{ body: { callbackURL?: string | undefined; password?: string | undefined; token?: string | undefined; }; }'. 
+[36m			try {
+				await auth.api.deleteUser([35m{
+                    headers: request.headers
+                }[36m);
+			} catch (authError: any) {[39m
+
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\lib\components\SimpleIDCard.svelte[39m:76:2
+[33mWarn[39m: Using `on:click` to listen to the click event is deprecated. Use the event attribute `onclick` instead
+https://svelte.dev/e/event_directive_deprecated (svelte)
+[36m	tabindex="0"
+	[35mon:click={handleClick}[36m
+	on:keydown={(e) => {[39m
+
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\lib\components\SimpleIDCard.svelte[39m:77:2
+[33mWarn[39m: Using `on:keydown` to listen to the keydown event is deprecated. Use the event attribute `onkeydown` instead
+https://svelte.dev/e/event_directive_deprecated (svelte)
+[36m	on:click={handleClick}
+	[35mon:keydown={(e) => {
+		if (e.key === 'Enter') handleClick(new MouseEvent('click'));
+	}}[36m
+>[39m
+
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\lib\components\SimpleIDCard.svelte[39m:87:4
+[33mWarn[39m: Using `on:click` to listen to the click event is deprecated. Use the event attribute `onclick` instead
+https://svelte.dev/e/event_directive_deprecated (svelte)
+[36m			checked={isSelected}
+			[35mon:click={(e) => {
+				e.stopPropagation();
+				onToggleSelect(card);
+			}}[36m
+			class="h-5 w-5 rounded border-muted-foreground text-primary focus:ring-primary"[39m
+
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\+page.svelte[39m:831:9
+[31mError[39m: Type '{}' is missing the following properties from type 'TemplateElementOverlay[]': length, pop, push, concat, and 35 more. (ts)
+[36m								templateId={selectedTemplateId}
+								[35mtemplateElements[36m={selectedTemplate?.template_elements || []}
+								showOverlays={showElementOverlays}[39m
+
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\admin\template-assets\+page.svelte[39m:68:5
+[31mError[39m: Type '{ id: string; name: string; slug: string; widthInches: string; heightInches: string; widthMm: string; heightMm: string; widthPixels: number; heightPixels: number; dpi: number; aspectRatio: string | null; ... 4 more ...; updatedAt: Date | null; }[]' is not assignable to type '{ id: string; name: string; slug: string; width_inches: number; height_inches: number; width_mm: number; height_mm: number; width_pixels: number; height_pixels: number; dpi: number; sort_order: number; ... 4 more ...; updated_at?: string | undefined; }[]'.
+  Type '{ id: string; name: string; slug: string; widthInches: string; heightInches: string; widthMm: string; heightMm: string; widthPixels: number; heightPixels: number; dpi: number; aspectRatio: string | null; ... 4 more ...; updatedAt: Date | null; }' is missing the following properties from type '{ id: string; name: string; slug: string; width_inches: number; height_inches: number; width_mm: number; height_mm: number; width_pixels: number; height_pixels: number; dpi: number; sort_order: number; ... 4 more ...; updated_at?: string | undefined; }': width_inches, height_inches, width_mm, height_mm, and 4 more. (ts)
+[36m			<AssetUploadWizard
+				[35msizePresets[36m={data.sizePresets}
+				userId={data.user?.id}[39m
+
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\organization\+page.svelte[39m:64:32
+[31mError[39m: Conversion of type '{ id: string; name: string; createdAt: Date | null; updatedAt: Date | null; }' to type 'Organization' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ id: string; name: string; createdAt: Date | null; updatedAt: Date | null; }' is missing the following properties from type 'Organization': created_at, updated_at (ts)
+[36m	// Cast data with proper types
+	const organization = $derived([35mdata.organization as Organization | null[36m);
+	const members = $derived((data.members || []) as Member[]);[39m
+
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\organization\+page.svelte[39m:67:31
+[31mError[39m: Conversion of type '{ orgId: string; paymentsEnabled: boolean; paymentsBypass: boolean; updatedBy: string | null; updatedAt: Date | null; }' to type 'OrgSettings' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type '{ orgId: string; paymentsEnabled: boolean; paymentsBypass: boolean; updatedBy: string | null; updatedAt: Date | null; }' is missing the following properties from type 'OrgSettings': org_id, payments_enabled, payments_bypass, updated_at, updated_by (ts)
+[36m	const availableRoles = $derived((data.availableRoles || []) as OrgRole[]);
+	const orgSettings = $derived([35mdata.orgSettings as OrgSettings | null[36m);[39m
+
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\profile\+page.svelte[39m:47:5
+[31mError[39m: Type '{ updated_at: string; id: string; email: string | null; role: "super_admin" | "org_admin" | "id_gen_admin" | "id_gen_user" | "user" | null; created_at: Date | null; }' is not assignable to type '{ id: string; email: string | null; role: "super_admin" | "org_admin" | "id_gen_admin" | "id_gen_user" | "user" | null; created_at: Date | null; updated_at: Date | null; }'.
+  Types of property 'updated_at' are incompatible.
+    Type 'string' is not assignable to type 'Date'. (ts)
+[36m			if (form.updatedProfile) {
+				[35mprofile[36m = { ...profile, ...form.updatedProfile };
+			}[39m
+
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\profile\+page.svelte[39m:196:46
+[31mError[39m: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+  Type 'null' is not assignable to type 'string'. (ts)
+[36m								<div class="flex items-center space-x-2">
+									<Badge variant={getRoleBadgeVariant([35mprofile.role[36m)}>
+										{formatRoleName(profile.role)}[39m
+
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\profile\+page.svelte[39m:197:27
+[31mError[39m: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+  Type 'null' is not assignable to type 'string'. (ts)
+[36m									<Badge variant={getRoleBadgeVariant(profile.role)}>
+										{formatRoleName([35mprofile.role[36m)}
+									</Badge>[39m
+
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\profile\+page.svelte[39m:219:28
+[31mError[39m: Argument of type 'Date | null' is not assignable to parameter of type 'string | Date'.
+  Type 'null' is not assignable to type 'string | Date'. (ts)
+[36m									id="member_since"
+									value={formatDate([35mprofile.created_at[36m, 'date')}
+									disabled[39m
+
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\profile\+page.svelte[39m:327:76
+[31mError[39m: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+  Type 'null' is not assignable to type 'string'. (ts)
+[36m										}}
+										disabled={!['super_admin', 'org_admin', 'id_gen_admin'].includes([35mprofile.role[36m)}
+									/>[39m
+
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32msrc\routes\profile\+page.svelte[39m:495:41
+[31mError[39m: Argument of type 'Date | null' is not assignable to parameter of type 'string | Date'.
+  Type 'null' is not assignable to type 'string | Date'. (ts)
+[36m						<span class="text-sm text-muted-foreground">Last Login</span>
+						<span class="text-sm">{formatDate([35mprofile.updated_at[36m, 'date')}</span>
+					</div>[39m
+
+c:\Users\jezka\Documents\GitHub\midcodes\apps\id-gen\[32mtests\unit\allIdsCache.test.ts[39m:26:5
+[31mError[39m: Type 'string' is not assignable to type 'Date'. 
+[36m				back_image: null,
+				[35mcreated_at[36m: '2025-01-01T00:00:00.000Z',
+				fields: {}[39m
+
+====================================
+[31msvelte-check found 25 errors and 3 warnings in 11 files
+[39mΓÇëELIFECYCLEΓÇë Command failed with exit code 1.
