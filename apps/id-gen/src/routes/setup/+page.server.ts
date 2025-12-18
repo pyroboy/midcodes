@@ -1,4 +1,4 @@
-import { fail, redirect } from '@sveltejs/kit';
+import { fail, redirect, isRedirect } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { db } from '$lib/server/db';
 import { user, profiles, organizations } from '$lib/server/schema';
@@ -72,6 +72,7 @@ export const actions: Actions = {
 
 			return { success: true };
 		} catch (err: any) {
+			if (isRedirect(err)) throw err;
 			console.error('Setup error:', err);
 			return fail(500, { error: err.message || 'Setup failed' });
 		}
