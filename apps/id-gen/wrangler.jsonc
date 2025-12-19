@@ -17,7 +17,8 @@
         },
         "production": {
             "vars": {
-                "NODE_ENV": "production"
+                "NODE_ENV": "production",
+                "BETTER_AUTH_URL": "https://kanaya.app"
             }
         }
     }
