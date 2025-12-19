@@ -5,7 +5,7 @@
 		canProceedToNext,
 		stepProgress,
 		stepLabels,
-		selectedRegions
+		previewPairs
 	} from '$lib/stores/assetUploadStore';
 	import Step1SizeSelection from './steps/Step1SizeSelection.svelte';
 	import Step2ImageUpload from './steps/Step2ImageUpload.svelte';
@@ -31,51 +31,73 @@
 	let uploadProgress = $state({ current: 0, total: 0 });
 
 	async function saveAssets() {
-		if ($selectedRegions.length === 0) return;
+		// Filter for valid pairs (must have at least front)
+        const pairsToSave = $previewPairs.filter(p => p.status === 'paired' || p.status === 'unpaired-front');
+        
+		if (pairsToSave.length === 0) return;
 
 		assetUploadStore.setProcessing(true);
 		assetUploadStore.setError(null);
-		uploadProgress = { current: 0, total: $selectedRegions.length };
+		uploadProgress = { current: 0, total: pairsToSave.length };
 
 		try {
-			const file = $assetUploadStore.uploadedImage;
-			if (!file) throw new Error('No image file found');
+            const frontFile = $assetUploadStore.frontImage;
+            const backFile = $assetUploadStore.backImage;
+            
+			if (!frontFile && !backFile) throw new Error('No image files found');
 
 			const preset = $assetUploadStore.selectedSizePreset;
 			if (!preset) throw new Error('No size preset selected');
 
 			if (!userId) throw new Error('You must be logged in to save assets');
 
-			const timestamp = Date.now();
 			let successCount = 0;
 
-			// Process each selected region
-			for (const [index, region] of $selectedRegions.entries()) {
+			// Process each pair
+			for (const [index, pair] of pairsToSave.entries()) {
 				// Update progress
-				uploadProgress = { current: index + 1, total: $selectedRegions.length };
+				uploadProgress = { current: index + 1, total: pairsToSave.length };
 
 				// 1. Extract and resize to full dimensions
-				const extracted = await extractAndResizeRegion(file, region, preset);
-
-				// 2. Generate variants (full, preview, thumb)
-				const variants = await generateImageVariants(extracted.blob, TEMPLATE_VARIANTS);
+                // Front
+                if (!frontFile) throw new Error('Front image is missing');
+				const extractedFront = await extractAndResizeRegion(frontFile, pair.front, preset);
+				const frontVariants = await generateImageVariants(extractedFront.blob, TEMPLATE_VARIANTS);
+                
+                // Back (Optional)
+                let backVariants = null;
+                let extractedBack = null;
+                if (pair.back && backFile) {
+                    extractedBack = await extractAndResizeRegion(backFile, pair.back, preset);
+                    backVariants = await generateImageVariants(extractedBack.blob, TEMPLATE_VARIANTS);
+                }
 
 				// 3. Prepare FormData for server action
 				const formData = new FormData();
-				formData.set('image_full', variants.full, 'full.png');
-				formData.set('image_preview', variants.preview, 'preview.jpg');
-				formData.set('image_thumb', variants.thumb, 'thumb.jpg');
+                
+                // Append Front
+				formData.set('image_front_full', frontVariants.full, 'front-full.png');
+				formData.set('image_front_preview', frontVariants.preview, 'front-preview.jpg');
+				formData.set('image_front_thumb', frontVariants.thumb, 'front-thumb.jpg');
+                
+                // Append Back (if exists)
+                if (backVariants) {
+                    formData.set('image_back_full', backVariants.full, 'back-full.png');
+				    formData.set('image_back_preview', backVariants.preview, 'back-preview.jpg');
+				    formData.set('image_back_thumb', backVariants.thumb, 'back-thumb.jpg');
+                }
 				
-				const meta = $assetUploadStore.assetMetadata.get(region.id);
-				formData.set('name', meta?.name || `Asset ${region.id}`);
+                // Use Front ID for metadata lookup (as we keyed it by Front ID in store logic)
+				const meta = $assetUploadStore.assetMetadata.get(pair.front.id);
+				formData.set('name', meta?.name || `Template ${index + 1}`);
 				formData.set('description', meta?.description || '');
 				formData.set('category', meta?.category || '');
 				formData.set('tags', JSON.stringify(meta?.tags || []));
 				formData.set('sizePresetId', preset.id);
 				formData.set('sampleType', $assetUploadStore.sampleType || 'blank_template');
-				formData.set('orientation', region.orientation);
-				formData.set('widthPixels', extracted.width.toString());
-				formData.set('heightPixels', extracted.height.toString());
+				formData.set('orientation', pair.front.orientation);
+				formData.set('widthPixels', extractedFront.width.toString());
+				formData.set('heightPixels', extractedFront.height.toString());
 
 				// 4. Call server action
 				const response = await fetch('?/saveAsset', {
@@ -96,7 +118,7 @@
 				successCount++;
 			}
 
-			if (successCount === $selectedRegions.length) {
+			if (successCount === pairsToSave.length) {
 				if (onComplete) onComplete();
 			}
 
@@ -154,9 +176,9 @@
 					</svg>
 				</div>
 				<div>
-					<h3 class="text-lg font-semibold text-foreground">Processing Assets</h3>
+					<h3 class="text-lg font-semibold text-foreground">Processing Templates</h3>
 					<p class="text-muted-foreground mt-1">
-						Uploading {uploadProgress.current} of {uploadProgress.total} cards...
+						Saving {uploadProgress.current} of {uploadProgress.total} templates...
 					</p>
 				</div>
 				<!-- Progress Bar -->
@@ -296,7 +318,7 @@
 						Saving...
 					{/if}
 				{:else if $assetUploadStore.currentStep === 'save'}
-					Save Assets
+					Save Templates
 					<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
 					</svg>
