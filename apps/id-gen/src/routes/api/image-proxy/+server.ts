@@ -12,7 +12,7 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
     // Check against allowed domains from our config
     try {
         const u = new URL(imageUrl);
-        const allowedHosts = ['.r2.dev', '.r2.cloudflarestorage.com'];
+        const allowedHosts = ['.r2.dev', '.r2.cloudflarestorage.com', 'assets.kanaya.app', 'kanaya.app'];
         if (!allowedHosts.some(host => u.hostname.endsWith(host))) {
             throw error(403, 'Forbidden domain');
         }
