@@ -14,13 +14,13 @@ async function main() {
 
     const db = drizzle(neon(PROD_URI), { schema });
 
-    console.log('--- DEBUG: Listing first 5 ID Cards ---');
-    const debugCards = await db.select({
-        id: schema.idcards.id,
-        front: schema.idcards.frontImage,
-        back: schema.idcards.backImage
-    }).from(schema.idcards).limit(5);
-    console.log(JSON.stringify(debugCards, null, 2));
+    console.log('--- DEBUG: Listing first 5 Templates ---');
+    const debugTemplates = await db.select({
+        id: schema.templates.id,
+        sampleFront: schema.templates.sampleFrontUrl,
+        sampleBack: schema.templates.sampleBackUrl
+    }).from(schema.templates).limit(5);
+    console.log(JSON.stringify(debugTemplates, null, 2));
     console.log('---------------------------------------');
 
     // 1. Template Assets
