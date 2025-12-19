@@ -147,6 +147,7 @@
 					/>
 					<button
 						type="button"
+						aria-label="Remove front image"
 						onclick={() => handleRemoveImage('front')}
 						class="absolute right-2 top-2 rounded-full bg-destructive/90 p-1.5 text-destructive-foreground hover:bg-destructive"
 					>
@@ -198,6 +199,7 @@
 					/>
 					<button
 						type="button"
+						aria-label="Remove back image"
 						onclick={() => handleRemoveImage('back')}
 						class="absolute right-2 top-2 rounded-full bg-destructive/90 p-1.5 text-destructive-foreground hover:bg-destructive"
 					>
