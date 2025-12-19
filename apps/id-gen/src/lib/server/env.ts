@@ -1,4 +1,5 @@
 import { env as privateEnv } from '$env/dynamic/private';
+import { env as publicEnv } from '$env/dynamic/public';
 import * as staticPrivate from '$env/static/private';
 import { dev } from '$app/environment';
 import { z } from 'zod';
@@ -78,38 +79,35 @@ export function initializeEnv() {
 
 	const rawEnv = {
 		NEON_DATABASE_URL: 
-			(staticPrivate as any).NEON_DATABASE_URL || 
-			(staticPrivate as any).DATABASE_URL || 
 			privateEnv.NEON_DATABASE_URL || 
+			privateEnv.DATABASE_URL || 
 			dotEnvParsed.NEON_DATABASE_URL ||
 			dotEnvParsed.DATABASE_URL ||
 			process?.env?.NEON_DATABASE_URL || 
 			process?.env?.DATABASE_URL,
 		
 		BETTER_AUTH_SECRET: 
-			(staticPrivate as any).BETTER_AUTH_SECRET || 
 			privateEnv.BETTER_AUTH_SECRET || 
 			dotEnvParsed.BETTER_AUTH_SECRET ||
 			process?.env?.BETTER_AUTH_SECRET || 
 			(dev ? 'dev_secret_only_for_local' : undefined),
 		
 		BETTER_AUTH_URL: 
-			(staticPrivate as any).BETTER_AUTH_URL || 
 			privateEnv.BETTER_AUTH_URL || 
 			dotEnvParsed.BETTER_AUTH_URL ||
 			process?.env?.BETTER_AUTH_URL,
 		
-		R2_ACCOUNT_ID: (staticPrivate as any).R2_ACCOUNT_ID || privateEnv.R2_ACCOUNT_ID || dotEnvParsed.R2_ACCOUNT_ID || process?.env?.R2_ACCOUNT_ID,
-		R2_ACCESS_KEY_ID: (staticPrivate as any).R2_ACCESS_KEY_ID || privateEnv.R2_ACCESS_KEY_ID || dotEnvParsed.R2_ACCESS_KEY_ID || process?.env?.R2_ACCESS_KEY_ID,
-		R2_SECRET_ACCESS_KEY: (staticPrivate as any).R2_SECRET_ACCESS_KEY || privateEnv.R2_SECRET_ACCESS_KEY || dotEnvParsed.R2_SECRET_ACCESS_KEY || process?.env?.R2_SECRET_ACCESS_KEY,
-		R2_BUCKET_NAME: (staticPrivate as any).R2_BUCKET_NAME || privateEnv.R2_BUCKET_NAME || dotEnvParsed.R2_BUCKET_NAME || process?.env?.R2_BUCKET_NAME,
-		R2_PUBLIC_DOMAIN: (staticPrivate as any).R2_PUBLIC_DOMAIN || privateEnv.R2_PUBLIC_DOMAIN || dotEnvParsed.R2_PUBLIC_DOMAIN || process?.env?.R2_PUBLIC_DOMAIN,
-		PAYMONGO_SECRET_KEY: (staticPrivate as any).PAYMONGO_SECRET_KEY || privateEnv.PAYMONGO_SECRET_KEY || dotEnvParsed.PAYMONGO_SECRET_KEY || process?.env?.PAYMONGO_SECRET_KEY,
-		PAYMONGO_WEBHOOK_SECRET: (staticPrivate as any).PAYMONGO_WEBHOOK_SECRET || privateEnv.PAYMONGO_WEBHOOK_SECRET || dotEnvParsed.PAYMONGO_WEBHOOK_SECRET || process?.env?.PAYMONGO_WEBHOOK_SECRET,
-		PAYMONGO_CHECKOUT_SUCCESS_PATH: (staticPrivate as any).PAYMONGO_CHECKOUT_SUCCESS_PATH || privateEnv.PAYMONGO_CHECKOUT_SUCCESS_PATH || dotEnvParsed.PAYMONGO_CHECKOUT_SUCCESS_PATH || process?.env?.PAYMONGO_CHECKOUT_SUCCESS_PATH,
-		PAYMONGO_CHECKOUT_CANCEL_PATH: (staticPrivate as any).PAYMONGO_CHECKOUT_CANCEL_PATH || privateEnv.PAYMONGO_CHECKOUT_CANCEL_PATH || dotEnvParsed.PAYMONGO_CHECKOUT_CANCEL_PATH || process?.env?.PAYMONGO_CHECKOUT_CANCEL_PATH,
-		RUNWARE_API_KEY: (staticPrivate as any).RUNWARE_API_KEY || privateEnv.RUNWARE_API_KEY || dotEnvParsed.RUNWARE_API_KEY || process?.env?.RUNWARE_API_KEY,
-		CSRF_SECRET: (staticPrivate as any).CSRF_SECRET || privateEnv.CSRF_SECRET || dotEnvParsed.CSRF_SECRET || process?.env?.CSRF_SECRET,
+		R2_ACCOUNT_ID: privateEnv.R2_ACCOUNT_ID || dotEnvParsed.R2_ACCOUNT_ID || process?.env?.R2_ACCOUNT_ID,
+		R2_ACCESS_KEY_ID: privateEnv.R2_ACCESS_KEY_ID || dotEnvParsed.R2_ACCESS_KEY_ID || process?.env?.R2_ACCESS_KEY_ID,
+		R2_SECRET_ACCESS_KEY: privateEnv.R2_SECRET_ACCESS_KEY || dotEnvParsed.R2_SECRET_ACCESS_KEY || process?.env?.R2_SECRET_ACCESS_KEY,
+		R2_BUCKET_NAME: privateEnv.R2_BUCKET_NAME || dotEnvParsed.R2_BUCKET_NAME || process?.env?.R2_BUCKET_NAME,
+		R2_PUBLIC_DOMAIN: privateEnv.R2_PUBLIC_DOMAIN || dotEnvParsed.R2_PUBLIC_DOMAIN || process?.env?.R2_PUBLIC_DOMAIN,
+		PAYMONGO_SECRET_KEY: privateEnv.PAYMONGO_SECRET_KEY || dotEnvParsed.PAYMONGO_SECRET_KEY || process?.env?.PAYMONGO_SECRET_KEY,
+		PAYMONGO_WEBHOOK_SECRET: privateEnv.PAYMONGO_WEBHOOK_SECRET || dotEnvParsed.PAYMONGO_WEBHOOK_SECRET || process?.env?.PAYMONGO_WEBHOOK_SECRET,
+		PAYMONGO_CHECKOUT_SUCCESS_PATH: privateEnv.PAYMONGO_CHECKOUT_SUCCESS_PATH || dotEnvParsed.PAYMONGO_CHECKOUT_SUCCESS_PATH || process?.env?.PAYMONGO_CHECKOUT_SUCCESS_PATH,
+		PAYMONGO_CHECKOUT_CANCEL_PATH: privateEnv.PAYMONGO_CHECKOUT_CANCEL_PATH || dotEnvParsed.PAYMONGO_CHECKOUT_CANCEL_PATH || process?.env?.PAYMONGO_CHECKOUT_CANCEL_PATH,
+		RUNWARE_API_KEY: privateEnv.RUNWARE_API_KEY || dotEnvParsed.RUNWARE_API_KEY || process?.env?.RUNWARE_API_KEY,
+		CSRF_SECRET: privateEnv.CSRF_SECRET || dotEnvParsed.CSRF_SECRET || process?.env?.CSRF_SECRET,
 		NODE_ENV: (['development', 'production', 'test'].includes(process?.env?.NODE_ENV ?? '') 
 			? process.env.NODE_ENV 
 			: (dev ? 'development' : 'production'))
@@ -183,7 +181,7 @@ export const env = new Proxy({} as Env, {
 export function getCheckoutUrls() {
 	const e = getEnv();
 	// Use static public if available, otherwise dynamic or localhost
-	const baseUrl = (staticPrivate as any).PUBLIC_APP_URL || 'http://localhost:5173';
+	const baseUrl = publicEnv.PUBLIC_APP_URL || 'http://localhost:5173';
 
 	return {
 		success: `${baseUrl}${e.PAYMONGO_CHECKOUT_SUCCESS_PATH}`,

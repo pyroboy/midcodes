@@ -1,8 +1,5 @@
 import { error } from '@sveltejs/kit';
 import { query, command, getRequestEvent } from '$app/server';
-import { PRIVATE_SERVICE_ROLE } from '$env/static/private';
-import { PUBLIC_SUPABASE_URL } from '$env/static/public';
-import { createClient } from '@supabase/supabase-js';
 import { db } from '$lib/server/db';
 import * as schema from '$lib/server/schema';
 import { eq, and, desc, count } from 'drizzle-orm';
@@ -14,9 +11,7 @@ import {
 } from '$lib/schemas/custom-design.schema';
 
 // Helper to get admin client (Keep for Storage only)
-function getStorageClient() {
-	return createClient(PUBLIC_SUPABASE_URL, PRIVATE_SERVICE_ROLE);
-}
+import { uploadToR2 } from '$lib/server/s3';
 
 // Helper to get authenticated user from request event
 async function getAuthenticatedUser() {
@@ -214,26 +209,17 @@ export const uploadCustomDesignAsset = command(
 	async ({ file, fileName }: { file: Buffer; fileName: string }): Promise<{ path: string }> => {
 		const { user } = await getAuthenticatedUser();
         // Storage still uses Supabase
-		const supabase = getStorageClient();
-
 		try {
 			const timestamp = Date.now();
 			const sanitizedName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
-			const path = `${user.id}/${timestamp}-${sanitizedName}`;
+			// Use a subfolder in the bucket
+			const key = `custom-design-assets/${user.id}/${timestamp}-${sanitizedName}`;
 
-			const { data, error: uploadError } = await supabase.storage
-				.from('custom-design-assets')
-				.upload(path, file, {
-					contentType: 'image/png',
-					upsert: false
-				});
+			// Upload to R2
+			await uploadToR2(key, file, 'image/png');
 
-			if (uploadError) {
-				console.error('Error uploading custom design asset:', uploadError);
-				throw error(500, 'Failed to upload file');
-			}
-
-			return { path: data.path };
+			// Return the key (path)
+			return { path: key };
 		} catch (err) {
 			console.error('Error in uploadCustomDesignAsset:', err);
 			throw error(500, 'Failed to upload file');
