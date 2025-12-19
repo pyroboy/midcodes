@@ -69,7 +69,7 @@
 		<!-- Header -->
 		<div class="text-center max-w-3xl mx-auto mb-16" in:fly={{ y: -50, duration: 800 }}>
 			<h1 class="text-4xl md:text-6xl font-black tracking-tight mb-4 text-foreground">
-				How <span class="text-primary">KINATAO</span> Works
+				How <span class="text-primary">Kanaya</span> Works
 			</h1>
 			<p class="text-xl text-muted-foreground">
 				From design to delivery in 6 simple steps.

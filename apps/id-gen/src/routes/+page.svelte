@@ -100,6 +100,10 @@
 	let showAnimateText = $state(true);
 	let showShadowControls = $state(false); // Collapsed by default
 
+	// Kanaya flip clock animation state
+	let flipStates = $state([false, false, false]); // KA, NA, YA
+	let isFlipping = $state(false);
+
 	const fallbackAssets: ShowcaseImage[] = [
 		{
 			image_url: '/placeholder_error_card.png',
@@ -428,11 +432,14 @@
 	const transformedCards = $derived(transformRecentCards(data.recentCards || []));
 
 	const marketingPhrases = [
-		"Only in the Philippines",
-		"Fastest ID Generation",
-		"Cheapest Rates",
-		"Premium Templates",
-		"Secure & Private"
+		"Digital ID in Seconds",
+		"Design. Print. Done.",
+		"ᜃᜈᜌ — Proudly Filipino",
+		"No Software to Install",
+		"Works on Any Device",
+		"Bulk Print Ready",
+		"Simple Template Editor",
+		"Professional ID Cards"
 	];
 	let marketingIndex = $state(0);
 	
@@ -532,14 +539,39 @@
 			<!-- Center: 3D Card Preview -->
 			<div class="flex flex-col items-center justify-center flex-1">
 				<!-- Marketing Header -->
-				<div class="mb-6 text-center z-10 pointer-events-none select-none">
-					<h1 class="text-4xl md:text-7xl font-black tracking-tighter mb-2 drop-shadow-sm flex items-center justify-center gap-3">
-						<span class="text-3xl md:text-6xl text-foreground/80 font-normal">ᜃ</span>
-						<span class="text-foreground">
-							KINATAO
-						</span>
+				<div class="mb-6 text-center z-10 select-none">
+					<!-- svelte-ignore a11y_click_events_have_key_events -->
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<h1 
+						class="text-4xl md:text-7xl font-black tracking-normal mb-2 drop-shadow-sm flex items-center justify-center cursor-pointer"
+						onclick={() => {
+							if (isFlipping) return;
+							isFlipping = true;
+							// Sequential flip: KA, then NA, then YA
+							setTimeout(() => { flipStates[0] = !flipStates[0]; flipStates = flipStates; }, 0);
+							setTimeout(() => { flipStates[1] = !flipStates[1]; flipStates = flipStates; }, 120);
+							setTimeout(() => { flipStates[2] = !flipStates[2]; flipStates = flipStates; }, 240);
+							setTimeout(() => { isFlipping = false; }, 800);
+						}}
+					>
+						{#each [
+							{ latin: 'KA', baybayin: 'ᜃ' },
+							{ latin: 'NA', baybayin: 'ᜈ' },
+							{ latin: 'YA', baybayin: 'ᜌ' }
+						] as syllable, i}
+							<div class="flip-card {i === 0 ? 'mr-4' : i === 1 ? 'mr-2' : ''}" class:flipped={flipStates[i]}>
+								<div class="flip-card-inner">
+									<div class="flip-card-front">
+										<span class="text-foreground">{syllable.latin}</span>
+									</div>
+									<div class="flip-card-back">
+										<span class="text-foreground/80">{syllable.baybayin}</span>
+									</div>
+								</div>
+							</div>
+						{/each}
 					</h1>
-					<div class="relative h-8 md:h-12 w-full flex justify-center items-center overflow-hidden">
+					<div class="relative h-10 md:h-14 w-full flex justify-center items-center overflow-visible">
 						{#key marketingIndex}
 							<p 
 								class="absolute text-lg md:text-3xl font-bold text-muted-foreground whitespace-nowrap"
@@ -578,7 +610,7 @@
 					
 					<!-- Debug panel (modern Tweakpane UI) -->
 					{#if showDebugPanel}
-						<Pane title="KINATAO Debug" position="fixed" width={320}>
+						<Pane title="Kanaya Debug" position="fixed" width={320}>
 							<Folder title="Element Overlays">
 								<Checkbox bind:value={showElementOverlays} label="Enable Overlays" />
 								{#if showElementOverlays}
@@ -1158,5 +1190,55 @@
 <style>
 	:global(.dark) {
 		color-scheme: dark;
+	}
+
+	/* Flip Clock Animation for KANAYA */
+	.flip-card {
+		perspective: 1000px;
+		display: inline-block;
+		width: 1.2em;
+		height: 1.2em;
+	}
+
+	.flip-card-inner {
+		position: relative;
+		width: 100%;
+		height: 100%;
+		transition: transform 0.5s cubic-bezier(0.4, 0.0, 0.2, 1);
+		transform-style: preserve-3d;
+	}
+
+	.flip-card.flipped .flip-card-inner {
+		transform: rotateX(180deg);
+	}
+
+	.flip-card-front,
+	.flip-card-back {
+		position: absolute;
+		width: 100%;
+		height: 100%;
+		backface-visibility: hidden;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 0.15em;
+		background: linear-gradient(145deg, hsl(var(--muted) / 0.3), hsl(var(--muted) / 0.1));
+		box-shadow: 
+			0 2px 4px hsl(var(--foreground) / 0.1),
+			inset 0 1px 0 hsl(var(--background) / 0.5);
+	}
+
+	.flip-card-back {
+		transform: rotateX(180deg);
+		font-weight: normal;
+	}
+
+	/* Hover hint */
+	h1:has(.flip-card):hover .flip-card-inner {
+		transform: rotateX(10deg);
+	}
+
+	h1:has(.flip-card):hover .flip-card.flipped .flip-card-inner {
+		transform: rotateX(190deg);
 	}
 </style>

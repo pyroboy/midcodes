@@ -127,7 +127,7 @@
 </script>
 
 <svelte:head>
-	<title>Pricing - KINATAO ID</title>
+	<title>Pricing - Kanaya ID</title>
 	<meta name="description" content="Professional ID Card Production with security features: RFID, UV overlay, hologram, barcode. Business packages available." />
 </svelte:head>
 
@@ -633,7 +633,7 @@
 	<section id="smart-tech" class="py-16 px-4 scroll-mt-16">
 		<div class="max-w-5xl mx-auto">
 			<div class="mb-10">
-				<p class="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-2">V. Kinatao Smart Series</p>
+				<p class="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-2">V. Kanaya Smart Series</p>
 				<h2 class="text-2xl font-bold text-slate-900 dark:text-white">Lifestyle Tech</h2>
 				<p class="text-sm text-muted-foreground mt-2">NFC-enabled products for modern networking. One-time purchase, no subscriptions. Tap to share contact info, social media, website, or payment apps.</p>
 			</div>
