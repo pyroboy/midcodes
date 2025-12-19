@@ -4,6 +4,7 @@
 	import { debounce } from 'lodash-es';
 	import type { TemplateElement } from '../stores/templateStore';
 	import { CoordinateSystem } from '$lib/utils/coordinateSystem';
+	import { generateImageVariants, CARD_VARIANTS } from '$lib/utils/imageProcessing';
 
 	let {
 		elements,
@@ -729,11 +730,43 @@
 		renderCoordSystem: CoordinateSystem,
 		isOffScreen: boolean
 	) {
-		if (element.type !== 'photo' && element.type !== 'signature') return;
+		if (element.type !== 'photo' && element.type !== 'signature' && element.type !== 'graphic') return;
 
 		try {
-			const file = fileUploads[element.variableName];
-			const pos = imagePositions[element.variableName];
+			// Graphics use element.content as URL, photos/signatures use fileUploads
+			let file = fileUploads[element.variableName];
+			let imageUrl: string | null = null;
+
+			if (element.type === 'graphic' && element.content) {
+				imageUrl = element.content;
+			} else if (file) {
+				imageUrl = URL.createObjectURL(file);
+			}
+
+			if (!imageUrl) {
+				if (!isOffScreen && (element.type === 'photo' || element.type === 'signature')) {
+					const position = renderCoordSystem.storageToPreview({
+						x: element.x || 0,
+						y: element.y || 0
+					});
+					const dimensions = renderCoordSystem.storageToPreviewDimensions({
+						width: element.width || 100,
+						height: element.height || 100
+					});
+					renderPlaceholder(
+						ctx,
+						position.x,
+						position.y,
+						dimensions.width,
+						dimensions.height,
+						element.type,
+						renderCoordSystem.scale
+					);
+				}
+				return;
+			}
+
+			const pos = imagePositions[element.variableName] || { x: 0, y: 0, scale: 1 };
 
 			// Use coordinate system for consistent positioning
 			const position = renderCoordSystem.storageToPreview({
@@ -777,67 +810,57 @@
 			ctx.rect(elementX, elementY, elementWidth, elementHeight);
 			ctx.clip();
 
-			if (file) {
-				try {
-					const image = await loadAndCacheImage(
-						URL.createObjectURL(file),
-						isDragging && !isOffScreen && !(element.type === 'signature')
-					);
-					const imgAspectRatio = image.width / image.height;
-					const elementAspectRatio = elementWidth / elementHeight;
+			try {
+				if (element.type === 'signature') {
+					ctx.globalCompositeOperation = 'multiply';
+				}
 
-					let drawWidth = Math.round(elementWidth * (pos.scale || 1));
-					let drawHeight = Math.round(elementHeight * (pos.scale || 1));
+				const image = await loadAndCacheImage(
+					imageUrl,
+					isDragging && !isOffScreen && !(element.type === 'signature')
+				);
+				const imgAspectRatio = image.width / image.height;
+				const elementAspectRatio = elementWidth / elementHeight;
 
-					if (imgAspectRatio > elementAspectRatio) {
-						drawHeight = Math.round(drawWidth / imgAspectRatio);
-					} else {
-						drawWidth = Math.round(drawHeight * imgAspectRatio);
-					}
+				let drawWidth = Math.round(elementWidth * (pos.scale || 1));
+				let drawHeight = Math.round(elementHeight * (pos.scale || 1));
 
-					// Apply position offset from imagePositions, scaled through coordinate system
-					const offsetPosition = renderCoordSystem.storageToPreview({
-						x: pos.x || 0,
-						y: pos.y || 0
-					});
+				if (imgAspectRatio > elementAspectRatio) {
+					drawHeight = Math.round(drawWidth / imgAspectRatio);
+				} else {
+					drawWidth = Math.round(drawHeight * imgAspectRatio);
+				}
 
-					const x = Math.round(elementX + (elementWidth - drawWidth) / 2 + offsetPosition.x);
-					const y = Math.round(elementY + (elementHeight - drawHeight) / 2 + offsetPosition.y);
+				// Apply position offset from imagePositions, scaled through coordinate system
+				const offsetPosition = renderCoordSystem.storageToPreview({
+					x: pos.x || 0,
+					y: pos.y || 0
+				});
 
-					if (element.type === 'signature') {
-						ctx.globalCompositeOperation = 'multiply';
-					}
+				const x = Math.round(elementX + (elementWidth - drawWidth) / 2 + offsetPosition.x);
+				const y = Math.round(elementY + (elementHeight - drawHeight) / 2 + offsetPosition.y);
 
-					ctx.drawImage(image, x, y, drawWidth, drawHeight);
-					ctx.globalCompositeOperation = 'source-over';
-				} catch (error: any) {
-					if (!isOffScreen) {
-						renderPlaceholder(
-							ctx,
-							elementX,
-							elementY,
-							elementWidth,
-							elementHeight,
-							'Error Photo',
-							renderCoordSystem.scale
-						);
-					}
-					throw new CanvasOperationError(
-						`Failed to load image for ${element.variableName}: ${error.message || 'Unknown error'}`,
-						'IMAGE_RENDER_ERROR'
+				ctx.drawImage(image, x, y, drawWidth, drawHeight);
+				ctx.globalCompositeOperation = 'source-over';
+			} catch (error: any) {
+				if (!isOffScreen) {
+					renderPlaceholder(
+						ctx,
+						elementX,
+						elementY,
+						elementWidth,
+						elementHeight,
+						element.type === 'graphic' ? 'Graphic' : 'Error Photo',
+						renderCoordSystem.scale
 					);
 				}
-			} else if (!isOffScreen) {
-				renderPlaceholder(
-					ctx,
-					elementX,
-					elementY,
-					elementWidth,
-					elementHeight,
-					element.type,
-					renderCoordSystem.scale
+				throw new CanvasOperationError(
+					`Failed to load image for ${element.variableName}: ${error.message || 'Unknown error'}`,
+					'IMAGE_RENDER_ERROR'
 				);
 			}
+
+			ctx.restore();
 
 			ctx.restore();
 		} catch (error: any) {
@@ -953,6 +976,15 @@
 			dispatch('error', errorDetails);
 			throw new CanvasOperationError(errorDetails.message, errorDetails.code);
 		}
+	}
+
+	/**
+	 * Render the card at full resolution and generate multiple variants (full, preview).
+	 */
+	export async function renderFullResolutionVariants(): Promise<Record<string, Blob>> {
+		const fullBlob = await renderFullResolution();
+		// Generate variants (full, preview)
+		return await generateImageVariants(fullBlob, CARD_VARIANTS);
 	}
 
 	// Trigger render when any of the dependencies change

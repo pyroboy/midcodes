@@ -25,6 +25,24 @@ export interface SignatureCleanOptions {
 	cropPadding?: number;
 }
 
+export interface ImageVariantConfig {
+	variant: 'full' | 'preview' | 'thumb';
+	maxDimension?: number;
+	quality?: number;
+	format: 'image/png' | 'image/jpeg';
+}
+
+export const TEMPLATE_VARIANTS: ImageVariantConfig[] = [
+	{ variant: 'full', format: 'image/png' },
+	{ variant: 'preview', maxDimension: 800, quality: 0.85, format: 'image/jpeg' },
+	{ variant: 'thumb', maxDimension: 200, quality: 0.8, format: 'image/jpeg' }
+];
+
+export const CARD_VARIANTS: ImageVariantConfig[] = [
+	{ variant: 'full', format: 'image/png' },
+	{ variant: 'preview', maxDimension: 800, quality: 0.85, format: 'image/jpeg' }
+];
+
 // ============================================================================
 // CLOUD BACKGROUND REMOVAL (using Runware AI API)
 // ============================================================================
@@ -257,12 +275,78 @@ function cropTransparentPixels(canvas: HTMLCanvasElement, padding: number): HTML
 	croppedCanvas.width = cropWidth;
 	croppedCanvas.height = cropHeight;
 
-	const croppedCtx = croppedCanvas.getContext('2d');
-	if (croppedCtx) {
-		croppedCtx.drawImage(canvas, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+	return croppedCanvas;
+}
+
+/**
+ * Generate multiple variants of an image based on configurations.
+ *
+ * @param source - Image source (File, Blob, or data URL)
+ * @param configs - List of variant configurations
+ * @returns Map of variant names to Blobs
+ */
+export async function generateImageVariants(
+	source: File | Blob | string,
+	configs: ImageVariantConfig[]
+): Promise<Record<string, Blob>> {
+	const img = await loadImage(source);
+	const results: Record<string, Blob> = {};
+
+	for (const config of configs) {
+		const blob = await generateImageVariantFromLoaded(img, config);
+		results[config.variant] = blob;
 	}
 
-	return croppedCanvas;
+	return results;
+}
+
+/**
+ * Internal helper to generate a single variant from an already loaded image.
+ */
+async function generateImageVariantFromLoaded(
+	img: HTMLImageElement,
+	config: ImageVariantConfig
+): Promise<Blob> {
+	let { width, height } = img;
+	const { maxDimension, quality = 1.0, format } = config;
+
+	// Calculate new dimensions if maxDimension is provided
+	if (maxDimension && (width > maxDimension || height > maxDimension)) {
+		if (width > height) {
+			height = Math.round((height / width) * maxDimension);
+			width = maxDimension;
+		} else {
+			width = Math.round((width / height) * maxDimension);
+			height = maxDimension;
+		}
+	}
+
+	const canvas = document.createElement('canvas');
+	canvas.width = width;
+	canvas.height = height;
+
+	const ctx = canvas.getContext('2d');
+	if (!ctx) throw new Error('Failed to get canvas context');
+
+	// Enable high-quality scaling
+	ctx.imageSmoothingEnabled = true;
+	ctx.imageSmoothingQuality = 'high';
+
+	ctx.drawImage(img, 0, 0, width, height);
+
+	return new Promise((resolve, reject) => {
+		canvas.toBlob(
+			(blob) => {
+				if (blob) {
+					resolve(blob);
+				} else {
+					reject(new Error(`Failed to convert canvas to ${format}`));
+				}
+			},
+			format,
+			quality
+		);
+	});
 }
 
 // ============================================================================

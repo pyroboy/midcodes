@@ -13,6 +13,7 @@
 	import Step4SaveAssets from './steps/Step4SaveAssets.svelte';
 	import { cn } from '$lib/utils';
 	import { extractAndResizeRegion } from '$lib/utils/cardExtraction';
+	import { generateImageVariants, TEMPLATE_VARIANTS } from '$lib/utils/imageProcessing';
 	import { fade } from 'svelte/transition';
 	import { deserialize } from '$app/forms';
 
@@ -53,13 +54,17 @@
 				// Update progress
 				uploadProgress = { current: index + 1, total: $selectedRegions.length };
 
-				// 1. Extract and resize
+				// 1. Extract and resize to full dimensions
 				const extracted = await extractAndResizeRegion(file, region, preset);
 
-				// 2. Prepare FormData for server action
+				// 2. Generate variants (full, preview, thumb)
+				const variants = await generateImageVariants(extracted.blob, TEMPLATE_VARIANTS);
+
+				// 3. Prepare FormData for server action
 				const formData = new FormData();
-				formData.set('image', extracted.blob, `${region.id}.png`);
-				formData.set('filename', `${preset.slug}/${timestamp}-${region.id}.png`);
+				formData.set('image_full', variants.full, 'full.png');
+				formData.set('image_preview', variants.preview, 'preview.jpg');
+				formData.set('image_thumb', variants.thumb, 'thumb.jpg');
 				
 				const meta = $assetUploadStore.assetMetadata.get(region.id);
 				formData.set('name', meta?.name || `Asset ${region.id}`);
@@ -72,7 +77,7 @@
 				formData.set('widthPixels', extracted.width.toString());
 				formData.set('heightPixels', extracted.height.toString());
 
-				// 3. Call server action
+				// 4. Call server action
 				const response = await fetch('?/saveAsset', {
 					method: 'POST',
 					body: formData

@@ -89,7 +89,7 @@
 		onUpdateElements(updatedElements, side);
 	}
 
-	function addElement(type: 'text' | 'photo' | 'signature' | 'selection') {
+	function addElement(type: 'text' | 'photo' | 'signature' | 'selection' | 'graphic') {
 		const newElement: TemplateElement = {
 			id: `new_${type}_${Date.now()}`,
 			variableName: `new_${type}_${Date.now()}`,
@@ -115,7 +115,13 @@
 							color: '#ffffff',
 							alignment: 'left'
 						}
-					: {})
+					: type === 'graphic'
+						? {
+								content: '', // URL of the static image
+								width: 200,
+								height: 200
+							}
+						: {})
 		};
 		onUpdateElements([...elements, newElement], side);
 	}
@@ -348,6 +354,21 @@
 							></textarea>
 						</div>
 						<FontSettings {element} {onUpdateElements} {elements} {fontOptions} {side} />
+					{:else if element.type === 'graphic'}
+						<div class="input-group">
+							<label for="graphic-url-{i}">Image URL (Static Graphic)</label>
+							<div class="flex gap-2">
+								<Input
+									id="graphic-url-{i}"
+									value={element.content}
+									placeholder="https://..."
+									oninput={(e) => handleContentChange(i, e.currentTarget.value)}
+								/>
+							</div>
+							<p class="text-xs text-muted-foreground mt-1">
+								Enter the URL of the static graphic to use as an overlay.
+							</p>
+						</div>
 					{/if}
 
 					<PositionGroup
@@ -369,6 +390,7 @@
 		<button onclick={() => addElement('photo')}>Add Photo</button>
 		<button onclick={() => addElement('signature')}>Add Signature</button>
 		<button onclick={() => addElement('selection')}>Add Selection</button>
+		<button onclick={() => addElement('graphic')}>Add Graphic</button>
 	</div>
 </div>
 

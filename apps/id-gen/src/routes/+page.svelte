@@ -542,6 +542,7 @@
 				<div class="mb-6 text-center z-10 select-none">
 					<!-- svelte-ignore a11y_click_events_have_key_events -->
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 					<h1 
 						class="text-4xl md:text-7xl font-black tracking-normal mb-2 drop-shadow-sm flex items-center justify-center cursor-pointer"
 						onclick={() => {

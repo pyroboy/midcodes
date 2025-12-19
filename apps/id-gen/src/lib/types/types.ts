@@ -13,7 +13,7 @@ export interface SearchItem {
 
 export interface TemplateElement {
 	id: string;
-	type: 'text' | 'image' | 'qr' | 'photo' | 'signature' | 'selection';
+	type: 'text' | 'image' | 'qr' | 'photo' | 'signature' | 'selection' | 'graphic';
 	x: number;
 	y: number;
 	width: number;

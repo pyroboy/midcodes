@@ -547,16 +547,30 @@
 				return;
 			}
 
-			// Re-render at full resolution for submission
-			const [frontBlob, backBlob] = await Promise.all([
-				frontCanvasComponent.renderFullResolution(),
-				backCanvasComponent.renderFullResolution()
+			// Render full resolution variants for submission
+			const [frontVariants, backVariants] = await Promise.all([
+				frontCanvasComponent.renderFullResolutionVariants(),
+				backCanvasComponent.renderFullResolutionVariants()
 			]);
 
 			const submitFormData = new FormData(formElement);
 			submitFormData.append('templateId', $page.params.id);
-			submitFormData.append('frontImage', frontBlob, 'front.png');
-			submitFormData.append('backImage', backBlob, 'back.png');
+			
+			// Master (Full) Images
+			submitFormData.append('frontImage', frontVariants.full, 'front.png');
+			submitFormData.append('backImage', backVariants.full, 'back.png');
+			
+			// Preview Images
+			submitFormData.append('frontImagePreview', frontVariants.preview, 'front-preview.jpg');
+			submitFormData.append('backImagePreview', backVariants.preview, 'back-preview.jpg');
+			
+			// Raw Assets (Photos, Signatures)
+			Object.entries(fileUploads).forEach(([variableName, file]) => {
+				if (file) {
+					submitFormData.append(`raw_asset_${variableName}`, file, file.name || 'asset.png');
+				}
+			});
+			
 			submitFormData.append('createDigitalCard', createDigitalCard.toString());
 
 			const response = await fetch('?/saveIdCard', {

@@ -1,6 +1,8 @@
 import { db } from '$lib/server/db';
 import { idcards, digitalCards } from '$lib/server/schema';
 import { uploadToR2, deleteFromR2 } from '$lib/server/s3';
+import { getCardAssetPath, getCardRawAssetPath } from './storagePath';
+import { v4 as uuidv4 } from 'uuid';
 
 function generateSlug(length = 10) {
 	const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -13,8 +15,12 @@ function generateClaimCode(length = 6) {
 }
 
 export interface ImageUploadResult {
+	cardId: string;
 	frontPath: string;
 	backPath: string;
+	frontPreviewPath: string;
+	backPreviewPath: string;
+	rawAssets: Record<string, { path: string, type: string }>;
 	error?: string;
 }
 
@@ -22,6 +28,8 @@ export interface ImageUploadError {
 	error: string;
 	frontPath?: never;
 	backPath?: never;
+	frontPreviewPath?: never;
+	backPreviewPath?: never;
 }
 
 /**
@@ -35,32 +43,71 @@ export async function handleImageUploads(
 	try {
 		const frontImage = formData.get('frontImage') as Blob;
 		const backImage = formData.get('backImage') as Blob;
+		const frontImagePreview = formData.get('frontImagePreview') as Blob;
+		const backImagePreview = formData.get('backImagePreview') as Blob;
 
 		if (!frontImage || !backImage) {
 			return { error: 'Missing image files' };
 		}
 
-		const timestamp = Date.now();
-		const frontPath = `${orgId}/${templateId}/${timestamp}_front.png`;
-		const backPath = `${orgId}/${templateId}/${timestamp}_back.png`;
+		const cardId = uuidv4();
+		
+		const variants = [
+			{ variant: 'full' as const, side: 'front' as const, blob: frontImage, ext: 'png' },
+			{ variant: 'full' as const, side: 'back' as const, blob: backImage, ext: 'png' },
+			{ variant: 'preview' as const, side: 'front' as const, blob: frontImagePreview, ext: 'jpg' },
+			{ variant: 'preview' as const, side: 'back' as const, blob: backImagePreview, ext: 'jpg' }
+		];
 
-		try {
-			await uploadToR2(frontPath, frontImage, 'image/png');
-		} catch (err) {
-			console.error('Front image upload failed:', err);
-			return { error: 'Front image upload failed' };
+		const uploads = await Promise.allSettled(
+			variants.map(async (v) => {
+				if (!v.blob) return null;
+				const path = getCardAssetPath(orgId, templateId, cardId, v.variant, v.side, v.ext);
+				await uploadToR2(path, v.blob, v.blob.type || (v.ext === 'png' ? 'image/png' : 'image/jpeg'));
+				return { variant: v.variant, side: v.side, path };
+			})
+		);
+
+		const results: Record<string, string> = {};
+		const errors: any[] = [];
+
+		uploads.forEach((res) => {
+			if (res.status === 'fulfilled' && res.value) {
+				const key = `${res.value.variant}${res.value.side.charAt(0).toUpperCase() + res.value.side.slice(1)}Path`;
+				results[key] = res.value.path;
+			} else if (res.status === 'rejected') {
+				errors.push(res.reason);
+			}
+		});
+
+		if (errors.length > 0) {
+			// Cleanup any successful uploads
+			await Promise.allSettled(
+				uploads.map((res) => (res.status === 'fulfilled' && res.value ? deleteFromR2(res.value.path) : null))
+			);
+			return { error: `Image upload failed: ${errors[0]?.message || 'Unknown error'}` };
 		}
 
-		try {
-			await uploadToR2(backPath, backImage, 'image/png');
-		} catch (err) {
-			// Clean up front image on back image failure
-			await deleteFromR2(frontPath).catch(() => {});
-			console.error('Back image upload failed:', err);
-			return { error: 'Back image upload failed' };
+		// Handle Raw Assets (Photos, Signatures)
+		const rawAssets: Record<string, { path: string, type: string }> = {};
+		for (const [key, value] of formData.entries()) {
+			if (key.startsWith('raw_asset_') && value instanceof Blob) {
+				const variableName = key.replace('raw_asset_', '');
+				const ext = value.type === 'image/png' ? 'png' : 'jpg';
+				const path = getCardRawAssetPath(orgId, templateId, cardId, variableName, ext);
+				await uploadToR2(path, value, value.type);
+				rawAssets[variableName] = { path, type: value.type };
+			}
 		}
 
-		return { frontPath, backPath };
+		return {
+			cardId,
+			frontPath: results.fullFrontPath,
+			backPath: results.fullBackPath,
+			frontPreviewPath: results.previewFrontPath,
+			backPreviewPath: results.previewBackPath,
+			rawAssets
+		} as ImageUploadResult;
 	} catch (err) {
 		return {
 			error: err instanceof Error ? err.message : 'Failed to handle image uploads'
@@ -72,18 +119,26 @@ export async function handleImageUploads(
  * Save ID card data to database using Drizzle
  */
 export async function saveIdCardData({
+	cardId,
 	templateId,
 	orgId,
 	frontPath,
 	backPath,
+	frontPreviewPath,
+	backPreviewPath,
+	rawAssets = {},
 	formFields,
 	createDigitalCard,
 	userId
 }: {
+	cardId?: string;
 	templateId: string;
 	orgId: string;
 	frontPath: string;
 	backPath: string;
+	frontPreviewPath?: string;
+	backPreviewPath?: string;
+	rawAssets?: Record<string, { path: string, type: string }>;
 	formFields: Record<string, string>;
 	createDigitalCard?: boolean;
 	userId?: string;
@@ -93,10 +148,14 @@ export async function saveIdCardData({
 		const [idCard] = await db
 			.insert(idcards)
 			.values({
+				id: cardId as any,
 				templateId: templateId,
 				orgId: orgId,
 				frontImage: frontPath,
 				backImage: backPath,
+				frontImageLowRes: frontPreviewPath,
+				backImageLowRes: backPreviewPath,
+				originalAssets: rawAssets,
 				data: formFields,
 				createdAt: new Date(),
 				updatedAt: new Date()
@@ -107,7 +166,9 @@ export async function saveIdCardData({
 			// Clean up uploaded images on failure
 			await Promise.allSettled([
 				deleteFromR2(frontPath),
-				deleteFromR2(backPath)
+				deleteFromR2(backPath),
+				frontPreviewPath ? deleteFromR2(frontPreviewPath) : null,
+				backPreviewPath ? deleteFromR2(backPreviewPath) : null
 			]);
 			return { error: 'Failed to create ID card' };
 		}
@@ -151,7 +212,9 @@ export async function saveIdCardData({
 				template_id: idCard.templateId,
 				org_id: idCard.orgId,
 				front_image: idCard.frontImage,
-				back_image: idCard.backImage
+				back_image: idCard.backImage,
+				front_image_low_res: idCard.frontImageLowRes,
+				back_image_low_res: idCard.backImageLowRes
 			}, 
 			digitalCard, 
 			claimCode 
@@ -161,7 +224,9 @@ export async function saveIdCardData({
 		// Clean up on error
 		await Promise.allSettled([
 			deleteFromR2(frontPath),
-			deleteFromR2(backPath)
+			deleteFromR2(backPath),
+			frontPreviewPath ? deleteFromR2(frontPreviewPath) : null,
+			backPreviewPath ? deleteFromR2(backPreviewPath) : null
 		]);
 		return { error: err instanceof Error ? err.message : 'Failed to save ID card data' };
 	}

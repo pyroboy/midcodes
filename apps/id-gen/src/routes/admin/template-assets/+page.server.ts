@@ -4,6 +4,8 @@ import { db } from '$lib/server/db';
 import { templateSizePresets, templateAssets } from '$lib/server/schema';
 import { eq } from 'drizzle-orm';
 import { uploadToR2, deleteFromR2 } from '$lib/server/s3';
+import { getTemplateAssetPath } from '$lib/utils/storagePath';
+import { v4 as uuidv4 } from 'uuid';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	// Fetch size presets from database with Drizzle
@@ -44,7 +46,10 @@ export const actions: Actions = {
 		try {
 			const formData = await request.formData();
 			
-			const imageBlob = formData.get('image') as File; // Cast to File for better type
+			const fullBlob = formData.get('image_full') as File;
+			const previewBlob = formData.get('image_preview') as File;
+			const thumbBlob = formData.get('image_thumb') as File;
+			
 			const name = formData.get('name') as string;
 			const description = formData.get('description') as string | null;
 			const category = formData.get('category') as string | null;
@@ -54,21 +59,37 @@ export const actions: Actions = {
 			const orientation = formData.get('orientation') as string;
 			const widthPixels = parseInt(formData.get('widthPixels') as string);
 			const heightPixels = parseInt(formData.get('heightPixels') as string);
-			const filename = formData.get('filename') as string;
-
-			if (!imageBlob || !name || !filename) {
+			
+			if (!fullBlob || !name) {
 				return fail(400, { error: 'Missing required fields' });
 			}
 
 			const tags = tagsJson ? JSON.parse(tagsJson) : [];
+			const assetId = uuidv4();
 
-            // 1. Upload to R2 (Cloudflare)
-            // Note: filename should probably be unique, maybe prepend a folder or uuid if not already done by frontend
-            const publicUrl = await uploadToR2(filename, imageBlob, imageBlob.type || 'image/png');
+            // 1. Upload variants to R2
+			const variants = [
+				{ variant: 'full', blob: fullBlob, side: 'front' as const },
+				{ variant: 'preview', blob: previewBlob, side: 'front' as const },
+				{ variant: 'thumb', blob: thumbBlob, side: 'front' as const }
+			];
 
-			// 2. Insert into Database with Drizzle
+			const uploadResults = await Promise.all(
+				variants.map(async (v) => {
+					if (!v.blob) return null;
+					const path = getTemplateAssetPath(assetId, v.variant as any, v.side, 'png');
+					const url = await uploadToR2(path, v.blob, v.blob.type || 'image/png');
+					return { variant: v.variant, path, url };
+				})
+			);
+
+			const fullResult = uploadResults.find(r => r?.variant === 'full');
+			if (!fullResult) throw new Error('Failed to upload full resolution image');
+
+			// 2. Insert into Database
 			try {
 				const [asset] = await db.insert(templateAssets).values({
+					id: assetId,
 					name,
 					description: description || undefined,
 					category: category || undefined,
@@ -76,8 +97,8 @@ export const actions: Actions = {
 					sizePresetId: sizePresetId || undefined,
 					sampleType: sampleType as any,
 					orientation: orientation as any,
-					imagePath: filename,
-					imageUrl: publicUrl,
+					imagePath: fullResult.path,
+					imageUrl: fullResult.url,
 					widthPixels,
 					heightPixels,
 					uploadedBy: user.id,
@@ -86,8 +107,8 @@ export const actions: Actions = {
 
 				return { success: true, asset };
 			} catch (dbError: any) {
-				// Rollback storage upload
-				await deleteFromR2(filename);
+				// Cleanup R2 on DB failure
+				await Promise.allSettled(uploadResults.map(r => r ? deleteFromR2(r.path) : null));
 				console.error('Database insert error:', dbError);
 				return fail(500, { error: `Failed to save asset record: ${dbError.message}` });
 			}

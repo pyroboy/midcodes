@@ -111,6 +111,15 @@ export const templates = pgTable('templates', {
   templateElements: jsonb('template_elements').notNull(),
   frontBackgroundLowRes: text('front_background_low_res'),
   backBackgroundLowRes: text('back_background_low_res'),
+  // Asset variants for optimized loading
+  sampleFrontUrl: text('sample_front_url'),
+  sampleBackUrl: text('sample_back_url'),
+  blankFrontUrl: text('blank_front_url'),
+  blankBackUrl: text('blank_back_url'),
+  thumbFrontUrl: text('thumb_front_url'),
+  thumbBackUrl: text('thumb_back_url'),
+  previewFrontUrl: text('preview_front_url'),
+  previewBackUrl: text('preview_back_url'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
@@ -124,6 +133,7 @@ export const idcards = pgTable('idcards', {
   frontImageLowRes: text('front_image_low_res'),
   backImageLowRes: text('back_image_low_res'),
   data: jsonb('data'),
+  originalAssets: jsonb('original_assets').default({}), // Stores { variableName: { path: string, type: string } }
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });

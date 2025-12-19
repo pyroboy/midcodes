@@ -101,7 +101,7 @@ export const actions: Actions = {
 			}
 
 			// Collect form fields as simple key-value pairs
-			const excludedKeys = ['templateId', 'frontImage', 'backImage', 'createDigitalCard'];
+			const excludedKeys = ['templateId', 'frontImage', 'backImage', 'frontImagePreview', 'backImagePreview', 'createDigitalCard'];
 			const formFields: Record<string, string> = {};
 			for (const [key, value] of formData.entries()) {
 				if (!excludedKeys.includes(key) && typeof value === 'string') {
@@ -113,10 +113,14 @@ export const actions: Actions = {
 
 			// Save data via Drizzle
 			const saveResult = await saveIdCardData({
+				cardId: uploadResult.cardId,
 				templateId,
 				orgId: effectiveOrgId,
 				frontPath: uploadResult.frontPath,
 				backPath: uploadResult.backPath,
+				frontPreviewPath: uploadResult.frontPreviewPath,
+				backPreviewPath: uploadResult.backPreviewPath,
+				rawAssets: uploadResult.rawAssets,
 				formFields,
 				createDigitalCard,
 				userId: user.id
