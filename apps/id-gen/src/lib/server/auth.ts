@@ -4,6 +4,8 @@ import { admin } from "better-auth/plugins/admin";
 import { getDb } from "./db";
 import * as schema from "./schema";
 
+import { env } from "./env";
+
 // Lazy-initialized auth instance
 // Cloudflare Workers require database connections to be created within request handlers,
 // not at module initialization time
@@ -30,7 +32,10 @@ function createAuth() {
         ],
         trustedOrigins: [
             "http://127.0.0.1:5173",
-            "http://localhost:5173"
+            "http://localhost:5173",
+            "https://kanaya.app",
+            "https://www.kanaya.app",
+            ...(env.BETTER_AUTH_URL ? [env.BETTER_AUTH_URL] : [])
         ],
         emailAndPassword: {
             enabled: true
