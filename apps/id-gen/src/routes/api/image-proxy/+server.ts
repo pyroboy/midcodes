@@ -40,6 +40,11 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
         });
     } catch (err) {
         console.error('Image proxy error:', err);
-        throw error(500, 'Proxy error');
+        const msg = err instanceof Error ? err.message : 'Unknown proxy error';
+        console.error('Image proxy error:', msg);
+        return new Response(JSON.stringify({ error: msg, stack: err instanceof Error ? err.stack : undefined }), { 
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+        });
     }
 };
