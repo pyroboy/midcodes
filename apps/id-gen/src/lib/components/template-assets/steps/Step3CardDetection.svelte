@@ -282,7 +282,7 @@
 									<!-- Remove Button -->
 									<button 
 										class="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 w-5 h-5 flex items-center justify-center"
-										onclick={(e) => { e.stopPropagation(); assetUploadStore.unpairRegion(region.id); assetUploadStore.removeRegion(region.id); }} // Need generic removeRegion? No, need side specific.
+										onclick={(e) => { e.stopPropagation(); assetUploadStore.unpairRegion(region.id); assetUploadStore.removeRegion(region.id); }}
 									>
 										×
 									</button>
@@ -344,6 +344,4 @@
 	</div>
 </div>
 
-<script module lang="ts">
-	// ... (Can keep existing crop helper module if needed) ...
-</script>
+

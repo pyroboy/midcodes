@@ -2,12 +2,12 @@
 	import { assetUploadStore, previewPairs } from '$lib/stores/assetUploadStore';
 	import { ASSET_CATEGORIES, type AssetMetadata } from '$lib/schemas/template-assets.schema';
 	import { cn } from '$lib/utils';
-	import type { DetectedRegion } from '$lib/schemas/template-assets.schema';
+	// import type { DetectedRegion } from '$lib/schemas/template-assets.schema';
 
 	// Get metadata for each selected pair
     // previewPairs is a derived store returning { front: Region, back?: Region, id: string, status: 'paired'|'unpaired' }[]
 	let pairMetadataList = $derived(
-		$previewPairs.filter(p => p.status === 'paired' || p.status === 'unpaired-front').map((pair) => ({
+		$previewPairs.map((pair) => ({
 			pair,
 			metadata: $assetUploadStore.assetMetadata.get(pair.front.id) || {
 				regionId: pair.front.id,

@@ -167,6 +167,39 @@ function createAssetUploadStore() {
 				return { ...s, pairs: newPairs };
 			}),
 
+		removeRegion: (id: string) =>
+			update((s) => {
+				// Remove from Front if exists
+				if (s.detectedRegionsFront.some(r => r.id === id)) {
+					const newPairs = new Map(s.pairs);
+					newPairs.delete(id); // If it's a front ID key
+					return {
+						...s,
+						detectedRegionsFront: s.detectedRegionsFront.filter((r) => r.id !== id),
+						pairs: newPairs
+					};
+				}
+
+				// Remove from Back if exists
+				if (s.detectedRegionsBack.some(r => r.id === id)) {
+					const newPairs = new Map(s.pairs);
+					// Find if this back ID is a value in pairs
+					for (const [key, val] of newPairs.entries()) {
+						if (val === id) {
+							newPairs.delete(key);
+							break;
+						}
+					}
+					return {
+						...s,
+						detectedRegionsBack: s.detectedRegionsBack.filter((r) => r.id !== id),
+						pairs: newPairs
+					};
+				}
+
+				return s;
+			}),
+
 		// Step 4: Asset metadata management
 		initializeMetadata: () =>
 			update((s) => {

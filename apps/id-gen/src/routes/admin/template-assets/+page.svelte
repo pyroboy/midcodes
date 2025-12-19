@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import AssetUploadWizard from '$lib/components/template-assets/AssetUploadWizard.svelte';
-	import { assetUploadStore, selectedRegions } from '$lib/stores/assetUploadStore';
+	import { assetUploadStore, previewPairs } from '$lib/stores/assetUploadStore';
 	import { goto } from '$app/navigation';
 
 	let { data }: { data: PageData } = $props();
@@ -81,7 +81,7 @@
 					</div>
 					<h2 class="text-xl font-semibold text-foreground">Detection Complete!</h2>
 					<p class="mt-1 text-muted-foreground">
-						{$selectedRegions.length} card{$selectedRegions.length !== 1 ? 's' : ''} detected and ready
+						{$previewPairs.length} template{$previewPairs.length !== 1 ? 's' : ''} saved successfully
 					</p>
 				</div>
 
@@ -102,44 +102,49 @@
 							</dd>
 						</div>
 						<div>
-							<dt class="text-muted-foreground">Total Regions</dt>
+							<dt class="text-muted-foreground">Total Regions Detected</dt>
 							<dd class="font-medium text-foreground">
-								{$assetUploadStore.detectedRegions.length}
+								{$assetUploadStore.detectedRegionsFront.length + $assetUploadStore.detectedRegionsBack.length}
 							</dd>
 						</div>
 						<div>
-							<dt class="text-muted-foreground">Selected</dt>
+							<dt class="text-muted-foreground">Saved Templates</dt>
 							<dd class="font-medium text-foreground">
-								{$selectedRegions.length}
+								{$previewPairs.length}
 							</dd>
 						</div>
 					</dl>
 				</div>
 
-				<!-- Selected cards preview -->
-				{#if $selectedRegions.length > 0}
+				<!-- Saved Templates Preview -->
+				{#if $previewPairs.length > 0}
 					<div>
-						<h3 class="mb-3 font-medium text-foreground">Selected Cards Preview</h3>
+						<h3 class="mb-3 font-medium text-foreground">Saved Templates Preview</h3>
 						<div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-							{#each $selectedRegions as region, index (region.id)}
+							{#each $previewPairs as pair, index (pair.id)}
 								<div class="relative overflow-hidden rounded-lg border border-border bg-muted">
 									<div class="aspect-[1.6/1] flex items-center justify-center text-muted-foreground">
-										{#if $assetUploadStore.uploadedImageUrl}
+										{#if $assetUploadStore.frontImageUrl}
 											<canvas
-												class="h-full w-full"
-												width={region.width}
-												height={region.height}
+												class="h-full w-full object-contain"
+												width={pair.front.width}
+												height={pair.front.height}
 												use:cropCanvas={{
-													imageUrl: $assetUploadStore.uploadedImageUrl,
-													region
+													imageUrl: $assetUploadStore.frontImageUrl,
+													region: pair.front
 												}}
 											></canvas>
 										{:else}
-											Card {index + 1}
+											Template {index + 1}
 										{/if}
 									</div>
 									<div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-										<span class="text-xs font-medium text-white">Card {index + 1}</span>
+										<span class="text-xs font-medium text-white">
+                                            Template {index + 1}
+                                            {#if pair.isPaired}
+                                                <span class="ml-1 opacity-75">(F+B)</span>
+                                            {/if}
+                                        </span>
 									</div>
 								</div>
 							{/each}

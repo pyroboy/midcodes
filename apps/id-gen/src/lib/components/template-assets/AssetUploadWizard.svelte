@@ -31,10 +31,11 @@
 	let uploadProgress = $state({ current: 0, total: 0 });
 
 	async function saveAssets() {
-		// Filter for valid pairs (must have at least front)
-        const pairsToSave = $previewPairs.filter(p => p.status === 'paired' || p.status === 'unpaired-front');
+		// All items in previewPairs are valid candidates for saving (either paired or selected front)
+        const pairsToSave = $previewPairs;
         
 		if (pairsToSave.length === 0) return;
+
 
 		assetUploadStore.setProcessing(true);
 		assetUploadStore.setError(null);
