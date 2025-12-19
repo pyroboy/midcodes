@@ -8,8 +8,5 @@ export const publicConfig = {
     app: {
         url: publicEnv.PUBLIC_APP_URL || (dev ? 'http://localhost:5173' : ''),
         environment: dev ? 'development' : 'production'
-    },
-    paymongo: {
-        publicKey: publicEnv.PUBLIC_PAYMONGO_PUBLIC_KEY
     }
 } as const;

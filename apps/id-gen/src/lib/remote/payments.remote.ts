@@ -16,11 +16,19 @@ import {
 } from '$lib/payments/schemas';
 
 // Server-only imports
-import { assertServerContext, getCheckoutUrls } from '$lib/server/env';
-import { PayMongoClient } from '$lib/server/paymongo/client';
+import { assertServerContext } from '$lib/server/env';
 import { generateIdempotencyKey } from '$lib/server/utils/crypto';
 import { getCreditPackageById, getFeatureSkuById } from '$lib/payments/catalog';
 import { recordCheckoutInit, listPaymentsByUser } from '$lib/server/payments/persistence';
+import { publicConfig } from '$lib/config/public-env';
+
+function getCheckoutUrls() {
+	const baseUrl = publicConfig.app.url;
+	return {
+		success: `${baseUrl}/account/billing/success`,
+		cancel: `${baseUrl}/pricing?canceled=1`
+	};
+}
 
 // =============================================================================
 // QUERY FUNCTIONS
@@ -127,55 +135,8 @@ export const createCreditPayment = command('unchecked', async (input: any) => {
 		}
 
 		// STANDARD PAYMENT FLOW
-		const idempotencyKey = generateIdempotencyKey();
-		const payMongo = new PayMongoClient();
-		const checkoutUrls = getCheckoutUrls();
-		const successUrl = input.returnTo || checkoutUrls.success;
-
-		const checkoutSession = await payMongo.createCheckoutSession({
-			line_items: [
-				{
-					currency: 'PHP',
-					amount: amountPhp,
-					name: creditPackage.name,
-					quantity: 1
-				}
-			],
-			payment_method_types: input.method ? [input.method] : ['gcash', 'paymaya', 'card'],
-			success_url: successUrl,
-			cancel_url: checkoutUrls.cancel,
-			description,
-			metadata: {
-				userId: user.id,
-				kind: 'credit',
-				skuId: input.packageId,
-				amountPhp: amountPhp.toString()
-			}
-		});
-
-		// Persist pending payment record
-		await recordCheckoutInit({
-			userId: user.id,
-			sessionId: checkoutSession.id,
-			kind: 'credit',
-			skuId: input.packageId,
-			amountPhp,
-			methodAllowed: input.method ? [input.method] : ['gcash', 'paymaya', 'card'],
-			idempotencyKey,
-			metadata: {
-				packageId: input.packageId,
-				credits: creditPackage.credits,
-				description: creditPackage.description
-			}
-		});
-
-		const result: CheckoutInitResult = {
-			checkoutUrl: checkoutSession.checkout_url,
-			sessionId: checkoutSession.id,
-			provider: 'paymongo'
-		};
-
-		return result;
+		// PayMongo integration has been removed.
+		throw error(501, 'Standard payments are currently disabled. Please contact support.');
 	} catch (err) {
 		console.error('[Payment Command Error]', err);
 		if (err instanceof Error && 'status' in err) throw err;
@@ -243,54 +204,8 @@ export const createFeaturePayment = command('unchecked', async (input: any) => {
 		}
 
 		// STANDARD PAYMENT FLOW
-		const idempotencyKey = generateIdempotencyKey();
-		const payMongo = new PayMongoClient();
-		const checkoutUrls = getCheckoutUrls();
-		const successUrl = input.returnTo || checkoutUrls.success;
-
-		const checkoutSession = await payMongo.createCheckoutSession({
-			line_items: [
-				{
-					currency: 'PHP',
-					amount: amountPhp,
-					name: featureSku.name,
-					quantity: 1
-				}
-			],
-			payment_method_types: input.method ? [input.method] : ['gcash', 'paymaya', 'card'],
-			success_url: successUrl,
-			cancel_url: checkoutUrls.cancel,
-			description,
-			metadata: {
-				userId: user.id,
-				kind: 'feature',
-				skuId: input.featureId,
-				amountPhp: amountPhp.toString()
-			}
-		});
-
-		await recordCheckoutInit({
-			userId: user.id,
-			sessionId: checkoutSession.id,
-			kind: 'feature',
-			skuId: input.featureId,
-			amountPhp,
-			methodAllowed: input.method ? [input.method] : ['gcash', 'paymaya', 'card'],
-			idempotencyKey,
-			metadata: {
-				featureId: input.featureId,
-				featureFlag: featureSku.featureFlag,
-				description: featureSku.description
-			}
-		});
-
-		const result: CheckoutInitResult = {
-			checkoutUrl: checkoutSession.checkout_url,
-			sessionId: checkoutSession.id,
-			provider: 'paymongo'
-		};
-
-		return result;
+		// PayMongo integration has been removed.
+		throw error(501, 'Standard payments are currently disabled. Please contact support.');
 	} catch (err) {
 		console.error('[Payment Command Error]', err);
 		if (err instanceof Error && 'status' in err) throw err;

@@ -60,10 +60,6 @@ const envSchema = z.object({
 	R2_SECRET_ACCESS_KEY: z.string().optional(),
 	R2_BUCKET_NAME: z.string().optional(),
 	R2_PUBLIC_DOMAIN: z.string().optional(),
-	PAYMONGO_SECRET_KEY: z.string().startsWith('sk_').optional(),
-	PAYMONGO_WEBHOOK_SECRET: z.string().startsWith('whsec_').optional(),
-	PAYMONGO_CHECKOUT_SUCCESS_PATH: z.string().default('/account/billing/success'),
-	PAYMONGO_CHECKOUT_CANCEL_PATH: z.string().default('/pricing?canceled=1'),
 	RUNWARE_API_KEY: z.string().optional(),
 	CSRF_SECRET: z.string().optional(),
 	NODE_ENV: z.enum(['development', 'production', 'test']).default('development')
@@ -102,10 +98,6 @@ export function initializeEnv() {
 		R2_SECRET_ACCESS_KEY: privateEnv.R2_SECRET_ACCESS_KEY || dotEnvParsed.R2_SECRET_ACCESS_KEY || process?.env?.R2_SECRET_ACCESS_KEY,
 		R2_BUCKET_NAME: privateEnv.R2_BUCKET_NAME || dotEnvParsed.R2_BUCKET_NAME || process?.env?.R2_BUCKET_NAME,
 		R2_PUBLIC_DOMAIN: privateEnv.R2_PUBLIC_DOMAIN || dotEnvParsed.R2_PUBLIC_DOMAIN || process?.env?.R2_PUBLIC_DOMAIN,
-		PAYMONGO_SECRET_KEY: privateEnv.PAYMONGO_SECRET_KEY || dotEnvParsed.PAYMONGO_SECRET_KEY || process?.env?.PAYMONGO_SECRET_KEY,
-		PAYMONGO_WEBHOOK_SECRET: privateEnv.PAYMONGO_WEBHOOK_SECRET || dotEnvParsed.PAYMONGO_WEBHOOK_SECRET || process?.env?.PAYMONGO_WEBHOOK_SECRET,
-		PAYMONGO_CHECKOUT_SUCCESS_PATH: privateEnv.PAYMONGO_CHECKOUT_SUCCESS_PATH || dotEnvParsed.PAYMONGO_CHECKOUT_SUCCESS_PATH || process?.env?.PAYMONGO_CHECKOUT_SUCCESS_PATH,
-		PAYMONGO_CHECKOUT_CANCEL_PATH: privateEnv.PAYMONGO_CHECKOUT_CANCEL_PATH || dotEnvParsed.PAYMONGO_CHECKOUT_CANCEL_PATH || process?.env?.PAYMONGO_CHECKOUT_CANCEL_PATH,
 		RUNWARE_API_KEY: privateEnv.RUNWARE_API_KEY || dotEnvParsed.RUNWARE_API_KEY || process?.env?.RUNWARE_API_KEY,
 		CSRF_SECRET: privateEnv.CSRF_SECRET || dotEnvParsed.CSRF_SECRET || process?.env?.CSRF_SECRET,
 		NODE_ENV: (['development', 'production', 'test'].includes(process?.env?.NODE_ENV ?? '') 
@@ -150,8 +142,15 @@ export function initializeEnv() {
 			console.error('❌ Environment validation failed:\n' + errorMessages);
 			throw new Error('Environment validation failed. App cannot start in production.');
 		} else {
-			console.warn('⚠️  Dev mode: Validation failed but continuing (DX priority).');
-			_env = rawEnv as any;
+			// During build time (static analysis), we might not have secrets.
+			// We should allow the build to proceed but warn loudly.
+			if (process.env.npm_lifecycle_event === 'build' || process.env.CI) {
+				console.warn('⚠️  Build/CI mode: Validation failed but continuing. Ensure vars are set in deployment.');
+				_env = rawEnv as any;
+			} else {
+				console.warn('⚠️  Dev mode: Validation failed but continuing (DX priority).');
+				_env = rawEnv as any;
+			}
 		}
 	} else {
 		console.log('✅ Environment validation passed');
@@ -174,20 +173,6 @@ export const env = new Proxy({} as Env, {
 	}
 });
 
-/**
- * Helper to get full URLs for redirects.
- * Note: Uses PUBLIC_APP_URL which might be undefined in some contexts.
- */
-export function getCheckoutUrls() {
-	const e = getEnv();
-	// Use static public if available, otherwise dynamic or localhost
-	const baseUrl = publicEnv.PUBLIC_APP_URL || 'http://localhost:5173';
-
-	return {
-		success: `${baseUrl}${e.PAYMONGO_CHECKOUT_SUCCESS_PATH}`,
-		cancel: `${baseUrl}${e.PAYMONGO_CHECKOUT_CANCEL_PATH}`
-	};
-}
 
 /**
  * Type guards to prevent accidental client-side usage of server variables.

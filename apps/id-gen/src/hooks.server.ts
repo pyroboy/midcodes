@@ -126,7 +126,7 @@ const securityHeadersHandle: Handle = async ({ event, resolve }) => {
 		"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
 		"img-src 'self' data: blob: https://*.neon.tech https://*.r2.dev", // Added Neon and R2
 		"font-src 'self' https://fonts.gstatic.com",
-		"connect-src 'self' https://api.paymongo.com https://api.runware.ai https://*.runware.ai https://*.neon.tech https://*.r2.dev https://cdn.jsdelivr.net http://localhost:* ws://localhost:* https://cloudflareinsights.com https://static.cloudflareinsights.com", // Added Neon, R2, jsdelivr, localhost & CF analytics
+		"connect-src 'self' https://api.runware.ai https://*.runware.ai https://*.neon.tech https://*.r2.dev https://cdn.jsdelivr.net http://localhost:* ws://localhost:* https://cloudflareinsights.com https://static.cloudflareinsights.com", // Added Neon, R2, jsdelivr, localhost & CF analytics
 		"worker-src 'self' blob:",
 		"frame-ancestors 'none'",
 		"base-uri 'self'",
