@@ -16,6 +16,8 @@ async function requireSuperAdminPermissions() {
 	return { user: locals.user, org_id: locals.org_id };
 }
 
+
+
 // Type definitions
 interface AISettings {
 	id: string;
