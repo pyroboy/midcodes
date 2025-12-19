@@ -1,4 +1,4 @@
-import { writable, derived } from 'svelte/store';
+import { writable, derived, get } from 'svelte/store';
 import type {
 	SizePreset,
 	DetectedRegion,
@@ -15,12 +15,25 @@ import type {
 export interface AssetUploadState {
 	currentStep: WizardStep;
 	selectedSizePreset: SizePreset | null;
-	uploadedImage: File | null;
-	uploadedImageUrl: string | null;
+	
+	// Step 2: Dual Image Upload
+	frontImage: File | null;
+	frontImageUrl: string | null;
+	backImage: File | null;
+	backImageUrl: string | null;
+	
 	sampleType: SampleType | null;
-	detectedRegions: DetectedRegion[];
-	// Step 4: Asset metadata per region
+	
+	// Step 3: Detection & Pairing
+	detectedRegionsFront: DetectedRegion[];
+	detectedRegionsBack: DetectedRegion[];
+	
+	// Map of Front Region ID -> Back Region ID
+	pairs: Map<string, string>;
+	
+	// Step 4: Asset metadata per PAIR (keyed by Front Region ID)
 	assetMetadata: Map<string, AssetMetadata>;
+	
 	isProcessing: boolean;
 	error: string | null;
 }
@@ -29,10 +42,14 @@ function createAssetUploadStore() {
 	const initialState: AssetUploadState = {
 		currentStep: 'size',
 		selectedSizePreset: null,
-		uploadedImage: null,
-		uploadedImageUrl: null,
+		frontImage: null,
+		frontImageUrl: null,
+		backImage: null,
+		backImageUrl: null,
 		sampleType: null,
-		detectedRegions: [],
+		detectedRegionsFront: [],
+		detectedRegionsBack: [],
+		pairs: new Map(),
 		assetMetadata: new Map(),
 		isProcessing: false,
 		error: null
@@ -60,34 +77,42 @@ function createAssetUploadStore() {
 			})),
 
 		// Step 2: Image upload
-		setUploadedImage: (file: File, url: string, type: SampleType) =>
+		setFrontImage: (file: File, url: string) =>
 			update((s) => {
-				// Revoke old URL if exists
-				if (s.uploadedImageUrl) {
-					URL.revokeObjectURL(s.uploadedImageUrl);
-				}
+				if (s.frontImageUrl) URL.revokeObjectURL(s.frontImageUrl);
 				return {
 					...s,
-					uploadedImage: file,
-					uploadedImageUrl: url,
-					sampleType: type,
-					detectedRegions: [],
+					frontImage: file,
+					frontImageUrl: url,
+					detectedRegionsFront: [], // Reset detection
+					pairs: new Map(), // Reset pairs
 					error: null
 				};
 			}),
 
-		clearUploadedImage: () =>
+		setBackImage: (file: File, url: string) =>
 			update((s) => {
-				if (s.uploadedImageUrl) {
-					URL.revokeObjectURL(s.uploadedImageUrl);
-				}
+				if (s.backImageUrl) URL.revokeObjectURL(s.backImageUrl);
 				return {
 					...s,
-					uploadedImage: null,
-					uploadedImageUrl: null,
-					detectedRegions: [],
+					backImage: file,
+					backImageUrl: url,
+					detectedRegionsBack: [], // Reset detection
+					pairs: new Map(), // Reset pairs
 					error: null
 				};
+			}),
+
+		clearFrontImage: () =>
+			update((s) => {
+				if (s.frontImageUrl) URL.revokeObjectURL(s.frontImageUrl);
+				return { ...s, frontImage: null, frontImageUrl: null, detectedRegionsFront: [], pairs: new Map() };
+			}),
+
+		clearBackImage: () =>
+			update((s) => {
+				if (s.backImageUrl) URL.revokeObjectURL(s.backImageUrl);
+				return { ...s, backImage: null, backImageUrl: null, detectedRegionsBack: [], pairs: new Map() };
 			}),
 
 		setSampleType: (type: SampleType) =>
@@ -97,87 +122,80 @@ function createAssetUploadStore() {
 			})),
 
 		// Step 3: Detection results
-		setDetectedRegions: (regions: DetectedRegion[]) =>
+		setDetectedRegions: (side: 'front' | 'back', regions: DetectedRegion[]) =>
 			update((s) => ({
 				...s,
-				detectedRegions: regions,
+				[side === 'front' ? 'detectedRegionsFront' : 'detectedRegionsBack']: regions,
 				error: null
 			})),
 
-		toggleRegionSelection: (id: string) =>
-			update((s) => ({
-				...s,
-				detectedRegions: s.detectedRegions.map((r) =>
-					r.id === id ? { ...r, isSelected: !r.isSelected } : r
-				)
-			})),
+		toggleRegionSelection: (side: 'front' | 'back', id: string) =>
+			update((s) => {
+				const key = side === 'front' ? 'detectedRegionsFront' : 'detectedRegionsBack';
+				return {
+					...s,
+					[key]: s[key].map((r) =>
+						r.id === id ? { ...r, isSelected: !r.isSelected } : r
+					)
+				};
+			}),
 
-		updateRegion: (id: string, updates: Partial<DetectedRegion>) =>
-			update((s) => ({
-				...s,
-				detectedRegions: s.detectedRegions.map((r) =>
-					r.id === id ? { ...r, ...updates, isManuallyAdjusted: true } : r
-				)
-			})),
+		// Pairing Logic
+		autoPair: () =>
+			update((s) => {
+				const pairs = new Map<string, string>();
+				// Simple pairing: Index to Index
+				// TODO: Can improve with spatial matching (closest centers)
+				const minLen = Math.min(s.detectedRegionsFront.length, s.detectedRegionsBack.length);
+				for (let i = 0; i < minLen; i++) {
+					pairs.set(s.detectedRegionsFront[i].id, s.detectedRegionsBack[i].id);
+				}
+				return { ...s, pairs };
+			}),
+		
+		pairRegions: (frontId: string, backId: string) => 
+			update((s) => {
+				const newPairs = new Map(s.pairs);
+				newPairs.set(frontId, backId);
+				return { ...s, pairs: newPairs };
+			}),
 
-		addManualRegion: (region: DetectedRegion) =>
-			update((s) => ({
-				...s,
-				detectedRegions: [...s.detectedRegions, region]
-			})),
-
-		removeRegion: (id: string) =>
-			update((s) => ({
-				...s,
-				detectedRegions: s.detectedRegions.filter((r) => r.id !== id)
-			})),
-
-		selectAllRegions: () =>
-			update((s) => ({
-				...s,
-				detectedRegions: s.detectedRegions.map((r) => ({ ...r, isSelected: true }))
-			})),
-
-		deselectAllRegions: () =>
-			update((s) => ({
-				...s,
-				detectedRegions: s.detectedRegions.map((r) => ({ ...r, isSelected: false }))
-			})),
-
-		// Toggle orientation (swap width/height and flip orientation)
-		toggleOrientation: (id: string) =>
-			update((s) => ({
-				...s,
-				detectedRegions: s.detectedRegions.map((r) => {
-					if (r.id !== id) return r;
-					return {
-						...r,
-						orientation: r.orientation === 'landscape' ? 'portrait' : 'landscape',
-						isManuallyAdjusted: true
-					};
-				})
-			})),
-
-		// Processing state
-		setProcessing: (isProcessing: boolean) => update((s) => ({ ...s, isProcessing })),
-
-		setError: (error: string | null) => update((s) => ({ ...s, error })),
+		unpairRegion: (frontId: string) => 
+			update((s) => {
+				const newPairs = new Map(s.pairs);
+				newPairs.delete(frontId);
+				return { ...s, pairs: newPairs };
+			}),
 
 		// Step 4: Asset metadata management
 		initializeMetadata: () =>
 			update((s) => {
 				const metadata = new Map<string, AssetMetadata>();
-				s.detectedRegions
-					.filter((r) => r.isSelected)
-					.forEach((region, index) => {
-						metadata.set(region.id, {
-							regionId: region.id,
-							name: `Card ${index + 1}`,
+				
+				// Identify paired items
+				s.pairs.forEach((backId, frontId) => {
+					metadata.set(frontId, {
+						regionId: frontId, // Use front ID as key
+						name: `Card Pair ${metadata.size + 1}`,
+						description: '',
+						category: undefined,
+						tags: []
+					});
+				});
+
+				// Identify unpaired Front items
+				s.detectedRegionsFront.forEach(r => {
+					if (r.isSelected && !s.pairs.has(r.id)) {
+						metadata.set(r.id, {
+							regionId: r.id,
+							name: `Front Only ${metadata.size + 1}`,
 							description: '',
 							category: undefined,
 							tags: []
 						});
-					});
+					}
+				});
+				
 				return { ...s, assetMetadata: metadata };
 			}),
 
@@ -191,12 +209,15 @@ function createAssetUploadStore() {
 				return { ...s, assetMetadata: metadata };
 			}),
 
+		// Processing state
+		setProcessing: (isProcessing: boolean) => update((s) => ({ ...s, isProcessing })),
+		setError: (error: string | null) => update((s) => ({ ...s, error })),
+
 		// Reset
 		reset: () => {
 			update((s) => {
-				if (s.uploadedImageUrl) {
-					URL.revokeObjectURL(s.uploadedImageUrl);
-				}
+				if (s.frontImageUrl) URL.revokeObjectURL(s.frontImageUrl);
+				if (s.backImageUrl) URL.revokeObjectURL(s.backImageUrl);
 				return initialState;
 			});
 		}
@@ -207,35 +228,23 @@ export const assetUploadStore = createAssetUploadStore();
 
 // Derived stores
 
-/**
- * Check if user can proceed to next step
- */
 export const canProceedToNext = derived(assetUploadStore, ($state) => {
 	switch ($state.currentStep) {
 		case 'size':
 			return $state.selectedSizePreset !== null;
 		case 'upload':
-			return $state.uploadedImage !== null && $state.sampleType !== null;
+			// Allow if at least one side is uploaded (Front usually)
+			return $state.frontImage !== null && $state.sampleType !== null;
 		case 'detection':
-			return $state.detectedRegions.some((r) => r.isSelected);
+			// Proceed if we have detected regions (logic can be refined)
+			return $state.detectedRegionsFront.length > 0 || $state.detectedRegionsBack.length > 0;
 		case 'save':
-			// Can proceed when all metadata has names
 			return Array.from($state.assetMetadata.values()).every((m) => m.name.trim().length > 0);
 		default:
 			return false;
 	}
 });
 
-/**
- * Get selected regions only
- */
-export const selectedRegions = derived(assetUploadStore, ($state) =>
-	$state.detectedRegions.filter((r) => r.isSelected)
-);
-
-/**
- * Get step progress information
- */
 export const stepProgress = derived(assetUploadStore, ($state) => {
 	const steps: WizardStep[] = ['size', 'upload', 'detection', 'save'];
 	const currentIndex = steps.indexOf($state.currentStep);
@@ -246,12 +255,40 @@ export const stepProgress = derived(assetUploadStore, ($state) => {
 	};
 });
 
-/**
- * Get step labels
- */
 export const stepLabels: Record<WizardStep, string> = {
 	size: 'Select Size',
-	upload: 'Upload Image',
-	detection: 'Detect Cards',
-	save: 'Save Assets'
+	upload: 'Upload Scans',
+	detection: 'Detect & Match',
+	save: 'Review & Save'
 };
+
+/**
+ * Returns list of Pairs for preview
+ * Each item contains { front: Region, back?: Region, meta: Metadata }
+ */
+export const previewPairs = derived(assetUploadStore, ($state) => {
+	const items: Array<{
+		id: string; // Use front ID as main ID
+		front: DetectedRegion;
+		back?: DetectedRegion;
+		isPaired: boolean;
+	}> = [];
+
+	// Add Pairs
+	$state.pairs.forEach((backId, frontId) => {
+		const front = $state.detectedRegionsFront.find(r => r.id === frontId);
+		const back = $state.detectedRegionsBack.find(r => r.id === backId);
+		if (front) {
+			items.push({ id: frontId, front, back, isPaired: true });
+		}
+	});
+
+	// Add Unpaired Fronts (that are selected)
+	$state.detectedRegionsFront.forEach(front => {
+		if (front.isSelected && !$state.pairs.has(front.id)) {
+			items.push({ id: front.id, front, isPaired: false });
+		}
+	});
+
+	return items;
+});

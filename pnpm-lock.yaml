@@ -594,6 +594,9 @@ importers:
       tweakpane:
         specifier: ^4.0.5
         version: 4.0.5
+      uuid:
+        specifier: ^11.1.0
+        version: 11.1.0
       vaul-svelte:
         specifier: ^0.3.2
         version: 0.3.2(svelte@5.45.8)
@@ -637,6 +640,9 @@ importers:
       '@types/three':
         specifier: ^0.171.0
         version: 0.171.0
+      '@types/uuid':
+        specifier: ^10.0.0
+        version: 10.0.0
       '@types/webfontloader':
         specifier: ^1.6.38
         version: 1.6.38

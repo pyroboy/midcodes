@@ -29,7 +29,9 @@ export function getTemplateAssetPath(
     side: AssetSide,
     extension: string = 'png'
 ): string {
-    const filename = variant === 'full' ? `${side}.${extension}` : `${variant}-${side}.${extension}`;
+    // Doc: template-front.png, template-front-preview.png
+    const prefix = `template-${side}`;
+    const filename = variant === 'full' ? `${prefix}.${extension}` : `${prefix}-${variant}.${extension}`;
     return `system/templates/${templateId}/${filename}`;
 }
 
