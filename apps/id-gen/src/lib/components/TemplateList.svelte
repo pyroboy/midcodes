@@ -9,9 +9,9 @@
 	import SizeSelectionDialog from './SizeSelectionDialog.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import type { CardSize } from '$lib/utils/sizeConversion';
-	import { getSupabaseStorageUrl } from '$lib/utils/storage';
 	import DeleteConfirmationDialog from '$lib/components/DeleteConfirmationDialog.svelte';
 	import type { TemplateAsset } from '$lib/schemas/template-assets.schema';
+	import { getProxiedUrl } from '$lib/utils/storage';
 
 	let { templates = $bindable([]), onSelect, onCreateNew, units = 'in', dpi = 300, savingTemplateId = null }: {
 		templates: any[];
@@ -273,10 +273,9 @@
 										src={(() => {
                                             // Prefer low-res if available
                                             const url = template.front_background_low_res || template.front_background;
-                                            if (!url) return '';
-                                            return (url.startsWith('http') || url.startsWith('data:') || url.startsWith('blob:'))
+											return (url.startsWith('http') || url.startsWith('data:') || url.startsWith('blob:'))
 												? url
-												: getSupabaseStorageUrl(url);
+												: getProxiedUrl(url, 'templates');
                                         })()}
 										alt={template.name}
 										class="w-full h-full object-cover"

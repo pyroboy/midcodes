@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { getSupabaseStorageUrl } from '$lib/utils/storage';
 
 	// Types
 	interface IDCard {
@@ -10,6 +9,8 @@
 		created_at?: string;
 		fields?: Record<string, { value: string }>;
 	}
+
+	import { getProxiedUrl } from '$lib/utils/storage';
 
 	// Props
 	let {
@@ -24,7 +25,7 @@
 
 	// Derived values
 	let frontImageUrl = $derived(
-		card.front_image ? getSupabaseStorageUrl(card.front_image, 'rendered-id-cards') : null
+		card.front_image ? getProxiedUrl(card.front_image, 'rendered-id-cards') : null
 	);
 
 	// Event handlers

@@ -4,7 +4,6 @@
 	import * as THREE from 'three';
 	import { NoToneMapping } from 'three';
 	import { onDestroy } from 'svelte';
-	import { getSupabaseStorageUrl } from '$lib/utils/storage';
 	import Carousel3DItem from './Carousel3DItem.svelte';
 
 	// Types
@@ -467,9 +466,11 @@
 		return result;
 	});
 
+	import { getProxiedUrl } from '$lib/utils/storage';
+
 	function getImageUrl(card: IDCard): string | null {
 		if (!card.front_image) return null;
-		return getSupabaseStorageUrl(card.front_image, 'rendered-id-cards');
+		return getProxiedUrl(card.front_image, 'rendered-id-cards');
 	}
 
 	const DEPTH_FACTOR = 1.0;

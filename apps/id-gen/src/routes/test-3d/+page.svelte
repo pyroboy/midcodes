@@ -2,7 +2,7 @@
 	import { Canvas, T } from '@threlte/core';
 	import { NoToneMapping } from 'three';
 	import SimpleTexturePlane from '$lib/components/SimpleTexturePlane.svelte';
-	import { getSupabaseStorageUrl } from '$lib/utils/storage';
+	import { getProxiedUrl } from '$lib/utils/storage';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -18,7 +18,8 @@
 	let cardUrls = $derived(data.cards
 		.map((c) => c.front_image)
 		.filter((path): path is string => !!path)
-		.map((path) => getSupabaseStorageUrl(path, 'rendered-id-cards')));
+		.map((path) => getProxiedUrl(path, 'rendered-id-cards'))
+		.filter((url): url is string => !!url));
 
 	// Grid layout config
 	const COLUMNS = 4;

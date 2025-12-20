@@ -49,7 +49,16 @@ export const load: PageServerLoad = async ({ locals, url, depends, setHeaders })
 				back_background: template.backBackground,
 				front_background_low_res: template.frontBackgroundLowRes,
 				back_background_low_res: template.backBackgroundLowRes,
-				template_elements: template.templateElements
+				template_elements: template.templateElements,
+				// Asset variant URLs
+				thumb_front_url: template.thumbFrontUrl,
+				thumb_back_url: template.thumbBackUrl,
+				preview_front_url: template.previewFrontUrl,
+				preview_back_url: template.previewBackUrl,
+				blank_front_url: template.blankFrontUrl,
+				blank_back_url: template.blankBackUrl,
+				sample_front_url: template.sampleFrontUrl,
+				sample_back_url: template.sampleBackUrl
 			};
 		}
 	}
@@ -71,7 +80,16 @@ export const load: PageServerLoad = async ({ locals, url, depends, setHeaders })
 		back_background: t.backBackground,
 		front_background_low_res: t.frontBackgroundLowRes,
 		back_background_low_res: t.backBackgroundLowRes,
-		template_elements: t.templateElements
+		template_elements: t.templateElements,
+		// Asset variant URLs
+		thumb_front_url: t.thumbFrontUrl,
+		thumb_back_url: t.thumbBackUrl,
+		preview_front_url: t.previewFrontUrl,
+		preview_back_url: t.previewBackUrl,
+		blank_front_url: t.blankFrontUrl,
+		blank_back_url: t.blankBackUrl,
+		sample_front_url: t.sampleFrontUrl,
+		sample_back_url: t.sampleBackUrl
 	}));
 
 	return {
@@ -144,6 +162,15 @@ export const actions: Actions = {
 				backBackgroundLowRes: templateData.back_background_low_res,
 				orientation: templateData.orientation,
 				templateElements: templateData.template_elements,
+				// Asset variant URLs
+				thumbFrontUrl: templateData.thumb_front_url || null,
+				thumbBackUrl: templateData.thumb_back_url || null,
+				previewFrontUrl: templateData.preview_front_url || null,
+				previewBackUrl: templateData.preview_back_url || null,
+				blankFrontUrl: templateData.blank_front_url || null,
+				blankBackUrl: templateData.blank_back_url || null,
+				sampleFrontUrl: templateData.sample_front_url || null,
+				sampleBackUrl: templateData.sample_back_url || null,
 				updatedAt: new Date()
 			};
 
@@ -185,7 +212,16 @@ export const actions: Actions = {
 				back_background: data.backBackground,
 				front_background_low_res: data.frontBackgroundLowRes,
 				back_background_low_res: data.backBackgroundLowRes,
-				template_elements: data.templateElements
+				template_elements: data.templateElements,
+				// Asset variant URLs
+				thumb_front_url: data.thumbFrontUrl,
+				thumb_back_url: data.thumbBackUrl,
+				preview_front_url: data.previewFrontUrl,
+				preview_back_url: data.previewBackUrl,
+				blank_front_url: data.blankFrontUrl,
+				blank_back_url: data.blankBackUrl,
+				sample_front_url: data.sampleFrontUrl,
+				sample_back_url: data.sampleBackUrl
 			};
 
 			return {

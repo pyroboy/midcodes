@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { createLowResVersion } from '$lib/utils/imageCropper';
-	import { getSupabaseStorageUrl } from '$lib/utils/storage';
+	import { getStorageUrl, getProxiedUrl } from '$lib/utils/storage';
 	import { toast } from 'svelte-sonner';
 
 	let { data } = $props();
@@ -25,10 +25,15 @@
 
 	async function downloadImage(url: string, bucket: string): Promise<File> {
 		// Handle both full URLs and storage paths
-		const fullUrl = url.startsWith('http') ? url : getSupabaseStorageUrl(url, bucket);
+		// Use getProxiedUrl to avoid CORS issues when fetching the image
+		const fullUrl = url.startsWith('http') 
+			? (url.includes('assets.kanaya.app') || url.includes('r2.dev') ? getProxiedUrl(url) : url)
+			: getProxiedUrl(url, bucket);
 		
+		if (!fullUrl) throw new Error('Invalid image URL');
+
 		// Add cache buster to ensure we get the file
-		const fetchUrl = `${fullUrl}?t=${Date.now()}`;
+		const fetchUrl = `${fullUrl}${fullUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
 		
 		const response = await fetch(fetchUrl);
 		if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
@@ -64,7 +69,8 @@
 				const pathValue = dataArray[dataArray.length - 1];
 				if (typeof pathValue === 'string' && pathValue.length > 0) {
 					console.log('Upload success, path:', pathValue);
-					return getSupabaseStorageUrl(pathValue, bucket);
+					// Return the full R2 URL (not proxied) for storage/display as is
+					return getStorageUrl(pathValue, bucket);
 				}
 			} catch (e) {
 				console.error('Failed to parse response:', e);
@@ -73,7 +79,7 @@
 		
 		// Fallback: check standard format
 		if (result.data?.success && result.data?.path) {
-			return getSupabaseStorageUrl(result.data.path, bucket);
+			return getStorageUrl(result.data.path, bucket);
 		}
 		
 		const errorMsg = result.data?.message || result.error?.message || 'Upload failed';

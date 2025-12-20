@@ -5,6 +5,7 @@
 	import { onMount, onDestroy, untrack } from 'svelte';
 	import { Card, CardContent } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
+	import { getProxiedUrl } from '$lib/utils/storage';
 	import {
 		Copy,
 		Trash2,
@@ -26,7 +27,6 @@
 	import DuplicateTemplateDialog from '$lib/components/DuplicateTemplateDialog.svelte';
 	import { getPreloadState } from '$lib/services/preloadService';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
-	import { getSupabaseStorageUrl } from '$lib/utils/storage';
 	import type { CardSize } from '$lib/utils/sizeConversion';
 	import type { TemplateAsset } from '$lib/schemas/template-assets.schema';
 	import { recentViewMode } from '$lib/stores/recentViewMode';
@@ -776,14 +776,10 @@
 							<TemplateCard3D
 								bind:this={templateCard3D}
 								imageUrl={selectedTemplate?.front_background
-									? selectedTemplate.front_background.startsWith('http')
-										? selectedTemplate.front_background
-										: getSupabaseStorageUrl(selectedTemplate.front_background)
+									? getProxiedUrl(selectedTemplate.front_background, 'templates')
 									: null}
 								backImageUrl={selectedTemplate?.back_background
-									? selectedTemplate.back_background.startsWith('http')
-										? selectedTemplate.back_background
-										: getSupabaseStorageUrl(selectedTemplate.back_background)
+									? getProxiedUrl(selectedTemplate.back_background, 'templates')
 									: null}
 								widthPixels={selectedTemplate?.width_pixels || 1013}
 								heightPixels={selectedTemplate?.height_pixels || 638}
@@ -921,7 +917,7 @@
 												<img
 													src={template.front_background.startsWith('http')
 														? template.front_background
-														: getSupabaseStorageUrl(template.front_background)}
+														: getProxiedUrl(template.front_background, 'templates')}
 													alt={template.name}
 													class="w-full h-full object-cover"
 													loading="lazy"
@@ -1068,7 +1064,7 @@
 									<div class="flex-none w-20 h-14 rounded-md overflow-hidden bg-muted">
 										{#if card.front_image}
 											<img
-												src={getSupabaseStorageUrl(card.front_image, 'rendered-id-cards')}
+												src={getProxiedUrl(card.front_image, 'rendered-id-cards')}
 												alt="ID Preview"
 												class="w-full h-full object-cover"
 												loading="lazy"

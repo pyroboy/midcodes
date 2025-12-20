@@ -8,7 +8,8 @@
 	import TemplateEdit from '$lib/components/TemplateEdit.svelte';
 	import CroppingConfirmationDialog from '$lib/components/CroppingConfirmationDialog.svelte';
 	import { getStorageUrl } from '$lib/utils/storage';
-	
+	import { generateAndUploadVariants, type VariantUrls } from '$lib/utils/templateVariants';
+
 	// Upload image via server action to R2
 	async function uploadImage(file: File, path: string, userId?: string): Promise<string> {
 		const formData = new FormData();
@@ -448,6 +449,10 @@
 			let frontLowResUrl: string | null = (currentTemplate as any)?.front_background_low_res || null;
 			let backLowResUrl: string | null = (currentTemplate as any)?.back_background_low_res || null;
 
+			// Store cropped blobs for variant generation
+			let croppedFrontBlob: Blob | null = null;
+			let croppedBackBlob: Blob | null = null;
+
 			// Update progress: Processing images
 			toast.loading('Processing background images...', { id: toastId });
 
@@ -469,6 +474,9 @@
 					originalSize: frontResult.originalSize,
 					finalSize: frontResult.croppedSize
 				});
+
+				// Store cropped blob for variant generation
+				croppedFrontBlob = frontResult.croppedFile;
 
 				// Immediately preview the cropped image using a stable data URL
 				try {
@@ -534,6 +542,9 @@
 					originalSize: backResult.originalSize,
 					finalSize: backResult.croppedSize
 				});
+
+				// Store cropped blob for variant generation
+				croppedBackBlob = backResult.croppedFile;
 
 				// Immediately preview the cropped image using a stable data URL
 				try {
@@ -601,6 +612,43 @@
 				);
 			}
 
+			// Generate and upload asset variants (thumb, preview, blank, sample)
+			let variantUrls: VariantUrls = {
+				thumb_front_url: '',
+				thumb_back_url: '',
+				preview_front_url: '',
+				preview_back_url: '',
+				blank_front_url: '',
+				blank_back_url: '',
+				sample_front_url: '',
+				sample_back_url: ''
+			};
+
+			if (croppedFrontBlob && croppedBackBlob && requiredPixelDimensions) {
+				try {
+					toast.loading('Generating template variants...', { id: toastId });
+					console.log('🎨 Generating template variants...');
+
+					const templateId = currentTemplate?.id || crypto.randomUUID();
+					variantUrls = await generateAndUploadVariants(
+						{
+							templateId,
+							frontBackground: croppedFrontBlob,
+							backBackground: croppedBackBlob,
+							elements: allElements,
+							dimensions: requiredPixelDimensions
+						},
+						async (file, path) => await uploadImage(file, path, user?.id)
+					);
+
+					console.log('✅ Variants generated and uploaded:', variantUrls);
+					toast.loading('Variants uploaded ✓ Saving to database...', { id: toastId });
+				} catch (variantError) {
+					console.warn('⚠️ Failed to generate variants (non-fatal):', variantError);
+					// Continue saving without variants - they're non-critical
+				}
+			}
+
 			console.log('🔍 URLs before saving to database:', {
 				frontUrl: frontUrl,
 				backUrl: backUrl,
@@ -639,7 +687,9 @@
 				dpi: 300, // Standardize on 300 DPI
 				template_elements: allElements,
 				created_at: currentTemplate?.created_at || new Date().toISOString(),
-				org_id: org_id ?? ''
+				org_id: org_id ?? '',
+				// Asset variant URLs
+				...variantUrls
 			};
 
 			// 🚨 DEBUG: Confirm the final ID being sent

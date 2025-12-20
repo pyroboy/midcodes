@@ -26,6 +26,8 @@ export interface TemplateElement {
 	side: 'front' | 'back';
 	letterSpacing?: number;
 	lineHeight?: number | string;
+	defaultValue?: string;
+	placeholder?: string;
 }
 
 export interface TemplateData {

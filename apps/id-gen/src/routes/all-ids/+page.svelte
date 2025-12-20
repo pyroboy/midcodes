@@ -10,7 +10,7 @@
 	import { page } from '$app/stores';
 	import { onMount, tick } from 'svelte';
 	import JSZip from 'jszip';
-	import { getSupabaseStorageUrl } from '$lib/utils/storage';
+	import { getProxiedUrl } from '$lib/utils/storage';
 	import { createCardFromInches } from '$lib/utils/cardGeometry';
 	import ViewModeToggle from '$lib/components/ViewModeToggle.svelte';
 	import { viewMode, detectViewportDefault } from '$lib/stores/viewMode';
@@ -780,7 +780,7 @@
 			if (!folder) throw new Error('Failed to create folder');
 
 			if (card.front_image) {
-				const frontImageUrl = getSupabaseStorageUrl(card.front_image, 'rendered-id-cards');
+				const frontImageUrl = getProxiedUrl(card.front_image, 'rendered-id-cards');
 				if (frontImageUrl) {
 					const frontResponse = await fetch(frontImageUrl);
 					if (frontResponse.ok) {
@@ -791,7 +791,7 @@
 			}
 
 			if (card.back_image) {
-				const backImageUrl = getSupabaseStorageUrl(card.back_image, 'rendered-id-cards');
+				const backImageUrl = getProxiedUrl(card.back_image, 'rendered-id-cards');
 				if (backImageUrl) {
 					const backResponse = await fetch(backImageUrl);
 					if (backResponse.ok) {
@@ -836,7 +836,7 @@
 
 				if (folder) {
 					if (card.front_image) {
-						const frontImageUrl = getSupabaseStorageUrl(card.front_image, 'rendered-id-cards');
+						const frontImageUrl = getProxiedUrl(card.front_image, 'rendered-id-cards');
 						if (frontImageUrl) {
 							const frontResponse = await fetch(frontImageUrl);
 							if (frontResponse.ok) {
@@ -846,7 +846,7 @@
 						}
 					}
 					if (card.back_image) {
-						const backImageUrl = getSupabaseStorageUrl(card.back_image, 'rendered-id-cards');
+						const backImageUrl = getProxiedUrl(card.back_image, 'rendered-id-cards');
 						if (backImageUrl) {
 							const backResponse = await fetch(backImageUrl);
 							if (backResponse.ok) {
@@ -1204,7 +1204,7 @@
 												>
 													{#if card.front_image}
 														<img
-															src={getSupabaseStorageUrl(card.front_image, 'rendered-id-cards')}
+															src={getProxiedUrl(card.front_image, 'rendered-id-cards')}
 															alt="Thumb"
 															class="w-full h-full"
 															loading="lazy"
@@ -1404,10 +1404,10 @@
 	<ClientOnly>
 		<ImagePreviewModal
 			frontImageUrl={selectedFrontImage
-				? getSupabaseStorageUrl(selectedFrontImage, 'rendered-id-cards')
+				? getProxiedUrl(selectedFrontImage, 'rendered-id-cards')
 				: null}
 			backImageUrl={selectedBackImage
-				? getSupabaseStorageUrl(selectedBackImage, 'rendered-id-cards')
+				? getProxiedUrl(selectedBackImage, 'rendered-id-cards')
 				: null}
 			cardGeometry={selectedCardGeometry}
 			templateDimensions={selectedTemplateDimensions}
