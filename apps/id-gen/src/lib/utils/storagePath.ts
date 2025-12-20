@@ -33,7 +33,7 @@ export function getTemplateAssetPath(
 	const prefix = `template-${side}`;
 	const filename =
 		variant === 'full' ? `${prefix}.${extension}` : `${prefix}-${variant}.${extension}`;
-	return `system/templates/${templateId}/${filename}`;
+	return `templates/${templateId}/${filename}`;
 }
 
 /**
@@ -56,7 +56,7 @@ export function getCardAssetPath(
  * Generates path for global assets
  */
 export function getGlobalAssetPath(category: 'icons' | 'fonts', filename: string): string {
-	return `system/global-assets/${category}/${filename}`;
+	return `global-assets/${category}/${filename}`;
 }
 
 /**

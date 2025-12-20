@@ -141,6 +141,7 @@
 	import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeometry';
 	import { toast } from 'svelte-sonner';
 	import { imageCache } from '$lib/utils/imageCache';
+	import { getTemplateAssetPath } from '$lib/utils/storagePath';
 	import IdCanvas from '$lib/components/IdCanvas.svelte';
 	import { FlipHorizontal, FlipVertical, Save, X, Edit, RotateCcw } from 'lucide-svelte';
 
@@ -463,6 +464,9 @@
 			// Store cropped blobs for variant generation
 			let croppedFrontBlob: Blob | null = null;
 			let croppedBackBlob: Blob | null = null;
+			
+			// Generate template ID early for consistent styling
+			const templateId = currentTemplate?.id || crypto.randomUUID();
 
 			// Update progress: Processing images
 			toast.loading('Processing background images...', { id: toastId });
@@ -506,7 +510,11 @@
 					toast.loading('Uploading front image to cloud storage...', { id: toastId });
 					console.log('📄 Starting front image upload...');
 
-					frontUrl = await uploadImage(frontResult.croppedFile, `front_${Date.now()}`, user?.id);
+					const frontPath = getTemplateAssetPath( templateId, 'full', 'front', 'png');
+					console.log('📄 Front path generated:', frontPath);
+					
+					// Just pass the path - server should handle it
+					frontUrl = await uploadImage(frontResult.croppedFile, frontPath, user?.id);
 
 					if (!frontUrl || typeof frontUrl !== 'string') {
 						throw new Error('Upload succeeded but returned invalid URL');
@@ -517,7 +525,16 @@
 						console.log('🖼️ Generating front low-res version...');
 						const frontLowRes = await createLowResVersion(frontResult.croppedFile);
 						console.log('📄 Uploading front low-res image...');
-						frontLowResUrl = await uploadImage(frontLowRes, `front_low_${Date.now()}`, user?.id);
+						// Generate low-res path. Assuming standard naming convention if not in storagePath explicitly as variant
+						// Looking at storagePath, 'full' gives .png. For low res, we might want a different variant or just use 'full' but upload low res content?
+						// Wait, storagePath has variants 'thumb', 'preview', 'blank', 'sample'. It doesn't have 'low-res'. 
+						// The original code used `front_low_${Date.now()}`.
+						// Let's use 'preview' variant for low res if that matches intent, or stick to a custom path helper if needed.
+						// The template variants generator makes 'preview'. 
+						// Let's use 'preview' variant for now as it seems to map to 800px which is likely what low res means here.
+						const frontLowResPath = getTemplateAssetPath(templateId, 'preview', 'front', 'jpg');
+						
+						frontLowResUrl = await uploadImage(frontLowRes, frontLowResPath, user?.id);
 						console.log('✅ Front low-res uploaded:', frontLowResUrl);
 					} catch (lowResError) {
 						console.warn('⚠️ Failed to generate/upload front low-res (non-fatal):', lowResError);
@@ -574,7 +591,10 @@
 					toast.loading('Uploading back image to cloud storage...', { id: toastId });
 					console.log('📄 Starting back image upload...');
 
-					backUrl = await uploadImage(backResult.croppedFile, `back_${Date.now()}`, user?.id);
+					const backPath = getTemplateAssetPath(templateId, 'full', 'back', 'png');
+					console.log('📄 Back path generated:', backPath);
+
+					backUrl = await uploadImage(backResult.croppedFile, backPath, user?.id);
 
 					if (!backUrl || typeof backUrl !== 'string') {
 						throw new Error('Upload succeeded but returned invalid URL');
@@ -585,7 +605,8 @@
 						console.log('🖼️ Generating back low-res version...');
 						const backLowRes = await createLowResVersion(backResult.croppedFile);
 						console.log('📄 Uploading back low-res image...');
-						backLowResUrl = await uploadImage(backLowRes, `back_low_${Date.now()}`, user?.id);
+						const backLowResPath = getTemplateAssetPath(templateId, 'preview', 'back', 'jpg');
+						backLowResUrl = await uploadImage(backLowRes, backLowResPath, user?.id);
 						console.log('✅ Back low-res uploaded:', backLowResUrl);
 					} catch (lowResError) {
 						console.warn('⚠️ Failed to generate/upload back low-res (non-fatal):', lowResError);

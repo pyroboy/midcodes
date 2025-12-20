@@ -122,7 +122,8 @@ export const actions: Actions = {
 				return { success: false, error: 'Missing file or path' };
 			}
 
-			const finalPath = userId ? `${userId}/${path}` : path;
+			// Client should provide the full path using getTemplateAssetPath
+			const finalPath = path;
 
 			const { uploadToR2, getPublicUrl } = await import('$lib/server/s3');
 			const arrayBuffer = await file.arrayBuffer();
