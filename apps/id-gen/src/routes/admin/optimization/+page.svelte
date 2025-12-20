@@ -105,7 +105,7 @@
 			currentItem = `Processing ${isTemplate ? 'Template' : 'ID Card'}: ${item.name || item.id} (${i + 1}/${totalToProcess})`;
 
 			// Determine property names and bucket based on type
-			const bucket = isTemplate ? 'templates' : 'rendered-id-cards';
+			const bucket = isTemplate ? 'templates' : 'cards';
 			const frontSrc = isTemplate ? item.front_background : item.front_image;
 			const backSrc = isTemplate ? item.back_background : item.back_image;
 

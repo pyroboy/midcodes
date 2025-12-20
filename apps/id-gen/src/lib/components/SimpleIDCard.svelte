@@ -70,9 +70,9 @@
 	// Use getProxiedUrl to ensure we get the full URL with bucket prepended AND proxied for CORS if needed
 	let frontUrl = $derived(
 		card.front_image_low_res
-			? getStorageUrl(card.front_image_low_res, 'rendered-id-cards')
+			? getStorageUrl(card.front_image_low_res, 'cards')
 			: card.front_image
-				? getStorageUrl(card.front_image, 'rendered-id-cards')
+				? getStorageUrl(card.front_image, 'cards')
 				: null
 	);
 </script>

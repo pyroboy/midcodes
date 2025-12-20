@@ -57,7 +57,7 @@
 		if (path.startsWith('http')) return path;
 		const supabaseUrl = env.PUBLIC_SUPABASE_URL;
 		if (!supabaseUrl) return 'about:blank';
-		return `${supabaseUrl}/storage/v1/object/public/rendered-id-cards/${path}`;
+		return `${supabaseUrl}/storage/v1/object/public/cards/${path}`;
 	}
 
 	function getTemplateStorageUrl(path: string): string {

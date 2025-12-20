@@ -16,7 +16,7 @@ export function getCardRawAssetPath(
 	variableName: string,
 	extension: string = 'png'
 ): string {
-	return `rendered-id-cards/cards/${orgId}/${templateId}/${cardId}/raw/${variableName}.${extension}`;
+	return `cards/${orgId}/${templateId}/${cardId}/raw/${variableName}.${extension}`;
 }
 
 /**
@@ -49,7 +49,7 @@ export function getCardAssetPath(
 	extension: string = 'png'
 ): string {
 	const prefix = variant === 'master' || variant === 'full' ? side : `${variant}-${side}`;
-	return `rendered-id-cards/cards/${orgId}/${templateId}/${cardId}/${prefix}.${extension}`;
+	return `cards/${orgId}/${templateId}/${cardId}/${prefix}.${extension}`;
 }
 
 /**

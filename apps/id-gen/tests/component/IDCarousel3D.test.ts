@@ -114,7 +114,7 @@ function getCardTransform(cardIndex: number, effectiveIndex: number) {
 function getImageUrl(card: IDCard): string | null {
 	if (!card.front_image) return null;
 	// Using mocked function - returns Supabase URL format
-	return `https://supabase.co/storage/v1/rendered-id-cards/${card.front_image}`;
+	return `https://supabase.co/storage/v1/cards/${card.front_image}`;
 }
 
 /**
@@ -317,7 +317,7 @@ describe('IDCarousel3D Component Logic', () => {
 		it('returns Supabase URL for cards with front_image', () => {
 			const card = mockCards[0];
 			const url = getImageUrl(card);
-			expect(url).toBe('https://supabase.co/storage/v1/rendered-id-cards/card1.png');
+			expect(url).toBe('https://supabase.co/storage/v1/cards/card1.png');
 		});
 
 		it('returns null for cards without front_image', () => {

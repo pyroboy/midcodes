@@ -3,7 +3,7 @@ import { env } from '$env/dynamic/public';
 /**
  * Generates the public URL for an asset stored in R2.
  * @param path The file path/key (e.g., "my-image.png")
- * @param bucket Optional bucket/folder name (e.g., "templates", "rendered-id-cards").
+ * @param bucket Optional bucket/folder name (e.g., "templates", "cards").
  *               If provided, it will be prepended to the path if not already present.
  */
 export function getStorageUrl(path: string, bucket: string = 'templates'): string {

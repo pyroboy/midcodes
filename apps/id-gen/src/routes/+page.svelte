@@ -1215,7 +1215,7 @@
 										<div class="flex-none w-20 h-14 rounded-md overflow-hidden bg-muted">
 											{#if card.front_image}
 												<img
-													src={getProxiedUrl(card.front_image, 'rendered-id-cards')}
+													src={getProxiedUrl(card.front_image, 'cards')}
 													alt="ID Preview"
 													class="w-full h-full object-cover"
 													loading="lazy"

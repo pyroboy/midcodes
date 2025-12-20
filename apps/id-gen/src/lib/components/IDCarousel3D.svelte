@@ -470,7 +470,7 @@
 
 	function getImageUrl(card: IDCard): string | null {
 		if (!card.front_image) return null;
-		return getProxiedUrl(card.front_image, 'rendered-id-cards');
+		return getProxiedUrl(card.front_image, 'cards');
 	}
 
 	const DEPTH_FACTOR = 1.0;

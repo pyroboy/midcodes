@@ -24,7 +24,7 @@
 
 	// Derived values
 	let frontImageUrl = $derived(
-		card.front_image ? getProxiedUrl(card.front_image, 'rendered-id-cards') : null
+		card.front_image ? getProxiedUrl(card.front_image, 'cards') : null
 	);
 
 	// Event handlers

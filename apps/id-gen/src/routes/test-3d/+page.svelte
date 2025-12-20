@@ -19,7 +19,7 @@
 		data.cards
 			.map((c) => c.front_image)
 			.filter((path): path is string => !!path)
-			.map((path) => getProxiedUrl(path, 'rendered-id-cards'))
+			.map((path) => getProxiedUrl(path, 'cards'))
 			.filter((url): url is string => !!url)
 	);
 

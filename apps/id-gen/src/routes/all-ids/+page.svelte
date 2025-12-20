@@ -882,7 +882,7 @@
 			if (!folder) throw new Error('Failed to create folder');
 
 			if (card.front_image) {
-				const frontImageUrl = getProxiedUrl(card.front_image, 'rendered-id-cards');
+				const frontImageUrl = getProxiedUrl(card.front_image, 'cards');
 				if (frontImageUrl) {
 					const frontResponse = await fetch(frontImageUrl);
 					if (frontResponse.ok) {
@@ -893,7 +893,7 @@
 			}
 
 			if (card.back_image) {
-				const backImageUrl = getProxiedUrl(card.back_image, 'rendered-id-cards');
+				const backImageUrl = getProxiedUrl(card.back_image, 'cards');
 				if (backImageUrl) {
 					const backResponse = await fetch(backImageUrl);
 					if (backResponse.ok) {
@@ -938,7 +938,7 @@
 
 				if (folder) {
 					if (card.front_image) {
-						const frontImageUrl = getProxiedUrl(card.front_image, 'rendered-id-cards');
+						const frontImageUrl = getProxiedUrl(card.front_image, 'cards');
 						if (frontImageUrl) {
 							const frontResponse = await fetch(frontImageUrl);
 							if (frontResponse.ok) {
@@ -948,7 +948,7 @@
 						}
 					}
 					if (card.back_image) {
-						const backImageUrl = getProxiedUrl(card.back_image, 'rendered-id-cards');
+						const backImageUrl = getProxiedUrl(card.back_image, 'cards');
 						if (backImageUrl) {
 							const backResponse = await fetch(backImageUrl);
 							if (backResponse.ok) {
@@ -1312,7 +1312,7 @@
 												>
 													{#if card.front_image}
 														<img
-															src={getProxiedUrl(card.front_image, 'rendered-id-cards')}
+															src={getProxiedUrl(card.front_image, 'cards')}
 															alt="Thumb"
 															class="w-full h-full"
 															loading="lazy"
@@ -1584,10 +1584,10 @@
 	<ClientOnly>
 		<ImagePreviewModal
 			frontImageUrl={selectedFrontImage
-				? getProxiedUrl(selectedFrontImage, 'rendered-id-cards')
+				? getProxiedUrl(selectedFrontImage, 'cards')
 				: null}
 			backImageUrl={selectedBackImage
-				? getProxiedUrl(selectedBackImage, 'rendered-id-cards')
+				? getProxiedUrl(selectedBackImage, 'cards')
 				: null}
 			cardGeometry={selectedCardGeometry}
 			templateDimensions={selectedTemplateDimensions}
