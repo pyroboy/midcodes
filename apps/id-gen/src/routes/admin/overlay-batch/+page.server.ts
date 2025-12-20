@@ -4,6 +4,8 @@ import { db } from '$lib/server/db';
 import { templates, idcards } from '$lib/server/schema';
 import { eq, inArray, sql } from 'drizzle-orm';
 import { uploadToR2, deleteFromR2 } from '$lib/server/s3';
+import { getTemplateAssetPath } from '$lib/utils/storagePath';
+import { v4 as uuidv4 } from 'uuid';
 
 interface TemplateListItem {
 	id: string;
@@ -105,10 +107,13 @@ export const actions: Actions = {
 		let frontPath = null;
 		let backPath = null;
 
+		// Generate new template ID for path consistency
+		const newTemplateId = uuidv4();
+
 		// Upload new template backgrounds if provided (to R2)
+		// Use standard "templates/{id}/{variant-side}.ext" path
 		if (templateFront && templateFront.size > 0) {
-			const timestamp = Date.now();
-			const frontFilename = `${org_id}/${timestamp}_front.png`;
+			const frontFilename = getTemplateAssetPath(newTemplateId, 'full', 'front', 'png');
 			// Upload to R2
 			try {
 				await uploadToR2(frontFilename, templateFront, 'image/png');
@@ -122,8 +127,7 @@ export const actions: Actions = {
 		}
 
 		if (templateBack && templateBack.size > 0) {
-			const timestamp = Date.now();
-			const backFilename = `${org_id}/${timestamp}_back.png`;
+			const backFilename = getTemplateAssetPath(newTemplateId, 'full', 'back', 'png');
 
 			try {
 				await uploadToR2(backFilename, templateBack, 'image/png');
@@ -145,6 +149,7 @@ export const actions: Actions = {
 			const [newTemplate] = await db
 				.insert(templates)
 				.values({
+					id: newTemplateId,
 					name: newTemplateName,
 					orgId: org_id,
 					userId: user?.id,

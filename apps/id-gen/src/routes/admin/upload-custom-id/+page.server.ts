@@ -6,6 +6,8 @@ import { db } from '$lib/server/db';
 import { templates, idcards } from '$lib/server/schema';
 import { eq } from 'drizzle-orm';
 import { uploadToR2, deleteFromR2 } from '$lib/server/s3';
+import { getCardAssetPath } from '$lib/utils/storagePath';
+import { v4 as uuidv4 } from 'uuid';
 
 // SECURITY: Maximum file size for uploads (10MB)
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -85,43 +87,31 @@ export const actions: Actions = {
 				return fail(400, { error: `Back image: ${backValidation.error}` });
 			}
 
-			// SECURITY: Sanitize filenames to prevent path traversal
-			const safeFrontName = sanitizeFilename(frontImage.name);
-			const safeBackName = sanitizeFilename(backImage.name);
+			// Generate ID early for path verification
+			const cardId = uuidv4();
 
-			// Upload front image to R2
-			const frontPath = `front_custom_${Date.now()}_${safeFrontName}`;
-			// uploadToR2 returns the public URL, but the logic below might expect just the path
-			// The original code stored 'frontPath' in DB.
-			// If we switch to R2, we should probably store the public URL or continue storing the path
-			// BUT the getSupabaseStorageUrl util now expects a path and prepends the domain.
-			// So storing the path (key) is still consistent with the updated utility.
-			// Wait, uploadToR2 returns the FULL public URL.
-			// If the DB stores the PATH, we should just use the path.
-			// But wait, the previous code stored `frontPath` (filename).
-			// Let's rely on standardizing to storing the key or URL.
-			// Drizzle schema for idcards has `frontImage: text`.
-			// If I store the full URL, validation/display might break if it expects a relative path.
-			// However, `uploadToR2` returns the full URL.
-			// The `getSupabaseStorageUrl` (now R2 util) handles full URLs correctly (returns them as is).
-			// So storing the FULL URL is safer for R2 to allow external domains.
-			// OR I can just ignore the return value and store the KEY, and let the util rebuild it.
-			// Storing the KEY is more flexible (allows domain changes).
-			// Let's store the KEY for now to match previous behavior of storing `frontPath`.
+			// Determine extension from MIME or filename (default png)
+			const frontExt = frontImage.type === 'image/jpeg' ? 'jpg' : 'png';
+			const backExt = backImage.type === 'image/jpeg' ? 'jpg' : 'png';
 
+			// Upload front image to R2 using standardized path
+			// variant 'master' or 'full'? storagePath says 'master' | 'full'. Let's use 'full' to match other parts.
+			const frontPath = getCardAssetPath(org_id, templateId, cardId, 'full', 'front', frontExt);
+			
+			// We store the KEY (path) in DB, consistent with other uploaders
 			await uploadToR2(
 				frontPath,
 				Buffer.from(frontBuffer),
-				frontValidation.detectedMime || 'application/octet-stream'
+				frontValidation.detectedMime || frontImage.type
 			);
 
 			// Upload back image to R2
-			const backPath = `back_custom_${Date.now()}_${safeBackName}`;
+			const backPath = getCardAssetPath(org_id, templateId, cardId, 'full', 'back', backExt);
 			try {
 				await uploadToR2(
 					backPath,
 					Buffer.from(backBuffer),
-					backValidation.detectedMime || 'application/octet-stream'
+					backValidation.detectedMime || backImage.type
 				);
 			} catch (backError) {
 				await deleteFromR2(frontPath);
@@ -131,9 +121,10 @@ export const actions: Actions = {
 			// Insert ID card record with Drizzle
 			try {
 				await db.insert(idcards).values({
+					id: cardId, // Use pre-generated ID
 					templateId: templateId,
 					orgId: org_id,
-					frontImage: frontPath, // Storing key, compatible with updated util
+					frontImage: frontPath, // Storing standard path
 					backImage: backPath,
 					data: {}
 				});
