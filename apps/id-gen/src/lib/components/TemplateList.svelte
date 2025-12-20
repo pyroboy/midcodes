@@ -20,7 +20,7 @@
 	import type { CardSize } from '$lib/utils/sizeConversion';
 	import DeleteConfirmationDialog from '$lib/components/DeleteConfirmationDialog.svelte';
 	import type { TemplateAsset } from '$lib/schemas/template-assets.schema';
-	import { getProxiedUrl } from '$lib/utils/storage';
+	import { getStorageUrl } from '$lib/utils/storage';
 
 	let {
 		templates = $bindable([]),
@@ -302,7 +302,7 @@
 												url.startsWith('data:') ||
 												url.startsWith('blob:')
 												? url
-												: getProxiedUrl(url, 'templates');
+												: getStorageUrl(url, 'templates');
 										})()}
 										alt={template.name}
 										class="w-full h-full object-cover"

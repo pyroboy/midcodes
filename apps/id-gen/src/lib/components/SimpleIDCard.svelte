@@ -3,7 +3,7 @@
 	import CardContent from '$lib/components/ui/card/card-content.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Download, Trash2, Eye } from 'lucide-svelte';
-	import { getProxiedUrl } from '$lib/utils/storage';
+	import { getStorageUrl } from '$lib/utils/storage';
 
 	// Props using Svelte 5 $props() rune
 	interface Props {
@@ -70,9 +70,9 @@
 	// Use getProxiedUrl to ensure we get the full URL with bucket prepended AND proxied for CORS if needed
 	let frontUrl = $derived(
 		card.front_image_low_res
-			? getProxiedUrl(card.front_image_low_res, 'rendered-id-cards')
+			? getStorageUrl(card.front_image_low_res, 'rendered-id-cards')
 			: card.front_image
-				? getProxiedUrl(card.front_image, 'rendered-id-cards')
+				? getStorageUrl(card.front_image, 'rendered-id-cards')
 				: null
 	);
 </script>

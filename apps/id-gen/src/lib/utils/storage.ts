@@ -45,6 +45,10 @@ export function getProxiedUrl(pathOrUrl: string | null, bucket?: string): string
 	const fullUrl = getStorageUrl(pathOrUrl, bucket);
 
 	// Check if this is a URL that needs proxying (R2 or our custom domain)
+	// Check if this is a URL that needs proxying (R2 or our custom domain)
+	// PRODUCTION UPDATE: We now have CORS configured on R2, so we can load directly.
+	// Proxying is disabled for R2 to improve performance and reduce server load.
+	/*
 	if (
 		fullUrl.includes('.r2.dev') ||
 		fullUrl.includes('r2.cloudflarestorage.com') ||
@@ -52,6 +56,8 @@ export function getProxiedUrl(pathOrUrl: string | null, bucket?: string): string
 	) {
 		return `/api/image-proxy?url=${encodeURIComponent(fullUrl)}`;
 	}
+	*/
+	
 	return fullUrl;
 }
 
