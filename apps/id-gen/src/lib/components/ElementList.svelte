@@ -376,7 +376,7 @@
 						width={element.width}
 						height={element.height}
 						rotation={element.rotation || 0}
-						onUpdate={(updates: Record) => handlePositionChange(i, updates)}
+						onUpdate={(updates: Record<string, any>) => handlePositionChange(i, updates)}
 					/>
 				</div>
 			{/if}

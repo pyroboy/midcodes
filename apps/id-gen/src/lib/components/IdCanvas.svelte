@@ -5,6 +5,7 @@
 	import type { TemplateElement } from '../stores/templateStore';
 	import { CoordinateSystem } from '$lib/utils/coordinateSystem';
 	import { generateImageVariants, CARD_VARIANTS } from '$lib/utils/imageProcessing';
+	import { getProxiedUrl } from '$lib/utils/storage';
 
 	let {
 		elements,
@@ -388,10 +389,12 @@
 		}
 
 		return new Promise((resolve, reject) => {
-			let src = url;
-			// Check if it's an R2 URL that needs proxying
-			if (url.includes('.r2.dev') || url.includes('.r2.cloudflarestorage.com')) {
-				src = `/api/image-proxy?url=${encodeURIComponent(url)}`;
+			// Use the centralized proxy helper which handles R2, custom domains, etc.
+			// Passing 'templates' as default bucket, though full URLs are usually passed here
+			const proxiedUrl = getProxiedUrl(url, 'templates');
+			const src = proxiedUrl || url;
+
+			if (src !== url) {
 				console.log(`[IdCanvas] Proxying image: ${url} -> ${src}`);
 			} else {
 				console.log(`[IdCanvas] Loading image directly: ${url}`);
