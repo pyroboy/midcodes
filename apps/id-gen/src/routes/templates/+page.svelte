@@ -799,11 +799,6 @@
 				console.warn('Failed to revoke old blob URLs', e);
 			}
 
-			// Force a re-render before setting the new image URLs
-			frontPreview = null;
-			backPreview = null;
-			await tick();
-
 			// Ensure previews use the full public URL and bust cache to show immediately
 			const makePublicUrl = (value: unknown) => {
 				if (!value) return null;
@@ -832,15 +827,26 @@
 				return null;
 			};
 			// Prefer the freshly uploaded URLs if available (most reliable)
-			if (typeof frontUrl === 'string' && frontUrl.startsWith('http')) {
-				frontPreview = `${frontUrl}?t=${Date.now()}`;
-			} else {
-				frontPreview = makePublicUrl(savedTemplate.front_background);
+			// Prefer the freshly uploaded URLs if available (most reliable)
+			// BUT if we currently have a Blob/Data URL (local preview), keep it to prevent flashing during animation/transition
+			// The list update below handles the permanent URL for the dashboard
+			const isFrontBlob = frontPreview?.startsWith('blob:') || frontPreview?.startsWith('data:');
+			const isBackBlob = backPreview?.startsWith('blob:') || backPreview?.startsWith('data:');
+
+			if (!isFrontBlob) {
+				if (typeof frontUrl === 'string' && frontUrl.startsWith('http')) {
+					frontPreview = `${frontUrl}?t=${Date.now()}`;
+				} else {
+					frontPreview = makePublicUrl(savedTemplate.front_background);
+				}
 			}
-			if (typeof backUrl === 'string' && backUrl.startsWith('http')) {
-				backPreview = `${backUrl}?t=${Date.now()}`;
-			} else {
-				backPreview = makePublicUrl(savedTemplate.back_background);
+
+			if (!isBackBlob) {
+				if (typeof backUrl === 'string' && backUrl.startsWith('http')) {
+					backPreview = `${backUrl}?t=${Date.now()}`;
+				} else {
+					backPreview = makePublicUrl(savedTemplate.back_background);
+				}
 			}
 
 			// Persist public URLs in cache and resolve
@@ -1028,7 +1034,7 @@
 					// Ideally we want front face?
 					if (reviewSide === 'back') {
 						// Optional: quickly flip back to front or just land as is
-						reviewRotation = 0;
+						// reviewRotation = 0;
 					}
 
 					// 4. Wait for CSS transition (600ms matching the style)
