@@ -2,7 +2,6 @@
 	import { enhance } from '$app/forms';
 	import { createLowResVersion } from '$lib/utils/imageCropper';
 	import { getStorageUrl, getProxiedUrl } from '$lib/utils/storage';
-	import { getTemplateAssetPath, getCardAssetPath } from '$lib/utils/storagePath';
 	import { toast } from 'svelte-sonner';
 
 	let { data } = $props();
@@ -129,20 +128,18 @@
 					// Derive path from original to keep in same folder (handles RLS scoping better)
 					let uploadPath;
 					if (isTemplate) {
-						// thumbnails/ is implied by R2 path? No, storagePath defines it.
-						// getTemplateAssetPath uses 'templates/ID/...'
-						// We want the 'thumb' variant.
-						uploadPath = getTemplateAssetPath(item.id, 'thumb', 'front', 'jpg');
+						uploadPath = `system_batch/front_low_${item.id}_${Date.now()}.jpg`;
 					} else {
-						// For ID cards
-						// We need orgId and templateId.
-						// item is from idcardsData query. Check if we added them.
-						// We added template_id and org_id to the query.
-						if (item.org_id && item.template_id) {
-							uploadPath = getCardAssetPath(item.org_id, item.template_id, item.id, 'thumb', 'front', 'jpg');
+						// For ID cards, try to put in same folder as original
+						// Original path usually: ORG_ID/TEMPLATE_ID/filename.png
+						if (frontSrc && !frontSrc.startsWith('http')) {
+							const dir = frontSrc.substring(0, frontSrc.lastIndexOf('/'));
+							const name = frontSrc.substring(frontSrc.lastIndexOf('/') + 1);
+							// Create new filename: original_low.jpg
+							const newName = name.replace(/\.[^/.]+$/, '') + '_low.jpg';
+							uploadPath = dir ? `${dir}/${newName}` : `thumbnails/${newName}`;
 						} else {
-							// Fallback if missing data (shouldn't happen if query updated)
-							console.warn('Missing orgId or templateId for card', item.id);
+							// Fallback if full URL or weird path
 							uploadPath = `thumbnails/front_low_${item.id}_${Date.now()}.jpg`;
 						}
 					}
@@ -163,10 +160,13 @@
 
 					let uploadPath;
 					if (isTemplate) {
-						uploadPath = getTemplateAssetPath(item.id, 'thumb', 'back', 'jpg');
+						uploadPath = `system_batch/back_low_${item.id}_${Date.now()}.jpg`;
 					} else {
-						if (item.org_id && item.template_id) {
-							uploadPath = getCardAssetPath(item.org_id, item.template_id, item.id, 'thumb', 'back', 'jpg');
+						if (backSrc && !backSrc.startsWith('http')) {
+							const dir = backSrc.substring(0, backSrc.lastIndexOf('/'));
+							const name = backSrc.substring(backSrc.lastIndexOf('/') + 1);
+							const newName = name.replace(/\.[^/.]+$/, '') + '_low.jpg';
+							uploadPath = dir ? `${dir}/${newName}` : `thumbnails/${newName}`;
 						} else {
 							uploadPath = `thumbnails/back_low_${item.id}_${Date.now()}.jpg`;
 						}

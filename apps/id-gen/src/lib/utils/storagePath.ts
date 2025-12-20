@@ -5,6 +5,9 @@
 export type AssetVariant = 'full' | 'preview' | 'thumb' | 'sample' | 'blank';
 export type AssetSide = 'front' | 'back';
 
+export const TEMPLATES_BUCKET = 'templates';
+export const CARDS_BUCKET = 'cards';
+
 /**
  * Generate a structured path for an ID card's raw uploaded assets (photo, signature)
  * Path: cards/[orgId]/[templateId]/[cardId]/raw/[variableName].[extension]

@@ -31,9 +31,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			front_image: idcards.frontImage,
 			back_image: idcards.backImage,
 			front_image_low_res: idcards.frontImageLowRes,
-			back_image_low_res: idcards.backImageLowRes,
-			template_id: idcards.templateId,
-			org_id: idcards.orgId
+			back_image_low_res: idcards.backImageLowRes
 		})
 		.from(idcards)
 		.where(eq(idcards.orgId, org_id!));
