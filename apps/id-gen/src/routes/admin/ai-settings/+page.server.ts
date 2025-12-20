@@ -1,6 +1,11 @@
 import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
-import { checkSuperAdmin, checkSuperAdminEmulatedOnly, shouldBypassFor403, wantsToAssumeRole } from '$lib/utils/adminPermissions';
+import {
+	checkSuperAdmin,
+	checkSuperAdminEmulatedOnly,
+	shouldBypassFor403,
+	wantsToAssumeRole
+} from '$lib/utils/adminPermissions';
 
 export const load: PageServerLoad = async ({ parent, locals, url }) => {
 	const parentData = await parent();
@@ -14,10 +19,8 @@ export const load: PageServerLoad = async ({ parent, locals, url }) => {
 	const assumingRole = wantsToAssumeRole(locals, url);
 
 	// Require super admin role for AI settings - use emulated-only check if user wants to assume role
-	const isSuperAdmin = assumingRole 
-		? checkSuperAdminEmulatedOnly(locals) 
-		: checkSuperAdmin(locals);
-	
+	const isSuperAdmin = assumingRole ? checkSuperAdminEmulatedOnly(locals) : checkSuperAdmin(locals);
+
 	const canBypass = shouldBypassFor403(locals, url);
 
 	// If not super admin and not bypassing, handle denial

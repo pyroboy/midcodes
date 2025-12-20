@@ -47,7 +47,7 @@ export interface BackgroundRemovalResult {
 
 /**
  * Remove background from an image using Runware AI API.
- * 
+ *
  * @param imageBase64 - Base64 encoded image data (with or without data URI prefix)
  * @returns Result with processed image URL or base64 data
  */
@@ -55,7 +55,7 @@ export async function removeBackgroundWithRunware(
 	imageBase64: string
 ): Promise<BackgroundRemovalResult> {
 	const RUNWARE_API_KEY = env.RUNWARE_API_KEY;
-	
+
 	if (!RUNWARE_API_KEY) {
 		console.error('[Runware] API key not configured');
 		return {
@@ -84,12 +84,12 @@ export async function removeBackgroundWithRunware(
 
 	try {
 		console.log('[Runware] Sending background removal request...');
-		
+
 		const response = await fetch(RUNWARE_API_URL, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
-				'Authorization': `Bearer ${RUNWARE_API_KEY}`
+				Authorization: `Bearer ${RUNWARE_API_KEY}`
 			},
 			body: JSON.stringify(requestBody)
 		});
@@ -103,7 +103,7 @@ export async function removeBackgroundWithRunware(
 			};
 		}
 
-		const result = await response.json() as RunwareBackgroundRemovalResponse;
+		const result = (await response.json()) as RunwareBackgroundRemovalResponse;
 
 		if (result.error) {
 			console.error('[Runware] API returned error:', result.error);

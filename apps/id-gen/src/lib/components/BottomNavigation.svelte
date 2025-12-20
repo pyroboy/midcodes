@@ -2,7 +2,11 @@
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
 	import { Button } from '$lib/components/ui/button';
-	import { preloadStates, initPreloadService, type RoutePreloadState } from '$lib/services/preloadService';
+	import {
+		preloadStates,
+		initPreloadService,
+		type RoutePreloadState
+	} from '$lib/services/preloadService';
 
 	interface Props {
 		user?: any;
@@ -13,7 +17,7 @@
 
 	// Reactive preload states
 	let states = $state<Map<string, RoutePreloadState>>(new Map());
-	
+
 	// Subscribe to preload states
 	$effect(() => {
 		const unsubscribe = preloadStates.subscribe((value) => {
@@ -111,9 +115,11 @@
 					</span>
 					<!-- Mini loading bar -->
 					{#if preloadState?.serverData === 'loading' || preloadState?.assets === 'loading'}
-						<div class="absolute bottom-1 left-2 right-2 h-0.5 bg-muted rounded-full overflow-hidden">
-							<div 
-								class="h-full bg-primary/60 transition-all duration-100 ease-out" 
+						<div
+							class="absolute bottom-1 left-2 right-2 h-0.5 bg-muted rounded-full overflow-hidden"
+						>
+							<div
+								class="h-full bg-primary/60 transition-all duration-100 ease-out"
 								style="width: {preloadState.progress}%"
 							></div>
 						</div>
@@ -156,8 +162,8 @@
 					<!-- Preload indicator -->
 					{#if preloadState?.serverData === 'loading' || preloadState?.assets === 'loading'}
 						<div class="w-12 h-1 bg-muted rounded-full overflow-hidden">
-							<div 
-								class="h-full bg-primary/60 transition-all duration-100 ease-out" 
+							<div
+								class="h-full bg-primary/60 transition-all duration-100 ease-out"
 								style="width: {preloadState.progress}%"
 							></div>
 						</div>

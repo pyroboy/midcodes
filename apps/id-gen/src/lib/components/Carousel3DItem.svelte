@@ -138,7 +138,7 @@
 						position.y={0.2}
 					/>
 					<Text
-						text={error ? "Error Loading Image" : "Preview Unavailable"}
+						text={error ? 'Error Loading Image' : 'Preview Unavailable'}
 						fontSize={0.15}
 						color="#94a3b8"
 						anchorX="center"

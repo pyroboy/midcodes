@@ -3,7 +3,11 @@
  * Detects rectangular ID card shapes in A4 scanned images using Canvas API
  */
 
-import type { DetectionConfig, DetectedRegion, Orientation } from '$lib/schemas/template-assets.schema';
+import type {
+	DetectionConfig,
+	DetectedRegion,
+	Orientation
+} from '$lib/schemas/template-assets.schema';
 
 export interface DetectedCard {
 	id: string;
@@ -64,39 +68,39 @@ export class CardDetector {
 
 		// 3. Enhanced Preprocessing pipeline for gray A4 scans
 		const grayscale = this.toGrayscale(imageData);
-		
+
 		// Apply contrast enhancement for gray backgrounds
 		const enhanced = this.enhanceContrast(grayscale, this.width, this.height);
-		
+
 		// Apply local contrast enhancement (CLAHE-style) for better edge visibility
 		const localEnhanced = this.localContrastEnhancement(enhanced, this.width, this.height);
-		
+
 		// Apply bilateral-style denoising to reduce noise while preserving edges
 		const denoised = this.bilateralFilter(localEnhanced, this.width, this.height);
-		
+
 		// Multiple gaussian blur passes for smoothing
 		let blurred = this.gaussianBlur(denoised, this.width, this.height);
 		blurred = this.gaussianBlur(blurred, this.width, this.height);
-		
+
 		// 4. Multi-pass detection with different sensitivities
 		let allDetectedRegions: DetectedRegion[] = [];
-		
+
 		// Pass 1: High sensitivity (for well-defined edges)
 		const highSensitivityRegions = this.runDetectionPass(blurred, grayscale, 'high');
 		allDetectedRegions.push(...highSensitivityRegions);
-		
+
 		// Pass 2: Medium sensitivity (for moderate contrast)
 		if (allDetectedRegions.length < 2) {
 			const mediumSensitivityRegions = this.runDetectionPass(blurred, grayscale, 'medium');
 			allDetectedRegions.push(...mediumSensitivityRegions);
 		}
-		
+
 		// Pass 3: Low sensitivity (for very low contrast / gray images)
 		if (allDetectedRegions.length < 1) {
 			const lowSensitivityRegions = this.runDetectionPass(blurred, grayscale, 'low');
 			allDetectedRegions.push(...lowSensitivityRegions);
 		}
-		
+
 		// 5. Sort by confidence and remove overlaps
 		allDetectedRegions = allDetectedRegions.sort((a, b) => b.confidence - a.confidence);
 		return this.removeOverlaps(allDetectedRegions);
@@ -130,13 +134,19 @@ export class CardDetector {
 		// Canny-style edge detection with non-maximum suppression
 		const { magnitude, direction } = this.computeGradients(blurred, this.width, this.height);
 		const suppressed = this.nonMaximumSuppression(magnitude, direction, this.width, this.height);
-		const edges = this.hysteresisThreshold(suppressed, this.width, this.height, lowThreshold, highThreshold);
-		
+		const edges = this.hysteresisThreshold(
+			suppressed,
+			this.width,
+			this.height,
+			lowThreshold,
+			highThreshold
+		);
+
 		// Apply morphological closing to connect broken edges
 		const closed = this.morphologicalClose(edges, this.width, this.height);
 		// Apply additional dilation to thicken edges
 		const thickened = this.dilate(closed, this.width, this.height);
-		
+
 		// Adaptive threshold with dynamic constant based on image statistics
 		const binary = this.adaptiveThresholdEnhanced(thickened, this.width, this.height, grayscale);
 
@@ -144,19 +154,25 @@ export class CardDetector {
 		const contours = this.findContoursEnhanced(binary, this.width, this.height);
 
 		// Analyze shapes and compute rectangularity
-		const analyzedContours = contours.map(c => this.analyzeContourShape(c));
+		const analyzedContours = contours.map((c) => this.analyzeContourShape(c));
 
 		// Filter rectangles by aspect ratio, area, and rectangularity
 		const validRectangles = analyzedContours.filter((c) => this.isValidCardRectangleEnhanced(c));
 
 		// Convert to DetectedRegion format with confidence based on rectangularity
-		return validRectangles.map((contour, index) => this.toDetectedRegionEnhanced(contour, index, sensitivity));
+		return validRectangles.map((contour, index) =>
+			this.toDetectedRegionEnhanced(contour, index, sensitivity)
+		);
 	}
 
 	/**
 	 * Compute gradient magnitude and direction using Sobel operators
 	 */
-	private computeGradients(data: Uint8Array, w: number, h: number): { magnitude: Uint8Array; direction: Float32Array } {
+	private computeGradients(
+		data: Uint8Array,
+		w: number,
+		h: number
+	): { magnitude: Uint8Array; direction: Float32Array } {
 		const magnitude = new Uint8Array(data.length);
 		const direction = new Float32Array(data.length);
 		const sobelX = [-1, 0, 1, -2, 0, 2, -1, 0, 1];
@@ -164,7 +180,8 @@ export class CardDetector {
 
 		for (let y = 1; y < h - 1; y++) {
 			for (let x = 1; x < w - 1; x++) {
-				let gx = 0, gy = 0;
+				let gx = 0,
+					gy = 0;
 
 				for (let ky = -1; ky <= 1; ky++) {
 					for (let kx = -1; kx <= 1; kx++) {
@@ -186,7 +203,12 @@ export class CardDetector {
 	/**
 	 * Non-maximum suppression for edge thinning
 	 */
-	private nonMaximumSuppression(magnitude: Uint8Array, direction: Float32Array, w: number, h: number): Uint8Array {
+	private nonMaximumSuppression(
+		magnitude: Uint8Array,
+		direction: Float32Array,
+		w: number,
+		h: number
+	): Uint8Array {
 		const result = new Uint8Array(magnitude.length);
 
 		for (let y = 1; y < h - 1; y++) {
@@ -196,7 +218,8 @@ export class CardDetector {
 				const mag = magnitude[idx];
 
 				// Determine which neighbors to compare based on gradient direction
-				let neighbor1 = 0, neighbor2 = 0;
+				let neighbor1 = 0,
+					neighbor2 = 0;
 				const normalizedAngle = ((angle % 180) + 180) % 180;
 
 				if (normalizedAngle < 22.5 || normalizedAngle >= 157.5) {
@@ -218,7 +241,7 @@ export class CardDetector {
 				}
 
 				// Keep only if local maximum
-				result[idx] = (mag >= neighbor1 && mag >= neighbor2) ? mag : 0;
+				result[idx] = mag >= neighbor1 && mag >= neighbor2 ? mag : 0;
 			}
 		}
 		return result;
@@ -227,7 +250,13 @@ export class CardDetector {
 	/**
 	 * Hysteresis thresholding for edge detection
 	 */
-	private hysteresisThreshold(data: Uint8Array, w: number, h: number, low: number, high: number): Uint8Array {
+	private hysteresisThreshold(
+		data: Uint8Array,
+		w: number,
+		h: number,
+		low: number,
+		high: number
+	): Uint8Array {
 		const result = new Uint8Array(data.length);
 		const strong = 255;
 		const weak = 128;
@@ -297,9 +326,13 @@ export class CardDetector {
 					const edgePoints: [number, number][] = [];
 					const stack: [number, number][] = [[x, y]];
 
-					let minX = x, maxX = x, minY = y, maxY = y;
+					let minX = x,
+						maxX = x,
+						minY = y,
+						maxY = y;
 
-					while (stack.length > 0 && points.length < 100000) { // Limit to prevent infinite loops
+					while (stack.length > 0 && points.length < 100000) {
+						// Limit to prevent infinite loops
 						const [cx, cy] = stack.pop()!;
 						const cidx = cy * w + cx;
 
@@ -361,30 +394,30 @@ export class CardDetector {
 	 */
 	private analyzeContourShape(contour: Contour): Contour {
 		const { points, boundingBox, edgePoints } = contour;
-		
+
 		// Use edge points if available, otherwise use all points
 		const analyzePoints = edgePoints && edgePoints.length > 10 ? edgePoints : points;
-		
+
 		// Compute convex hull
 		const hull = this.computeConvexHull(analyzePoints);
 		const hullArea = this.computePolygonArea(hull);
-		
+
 		// Compute perimeter of convex hull
 		const perimeter = this.computePolygonPerimeter(hull);
-		
+
 		// Find approximate corner points of the convex hull
 		const corners = this.findCornerPoints(hull);
-		
+
 		// Compute rectangularity: how closely the shape matches a rectangle
 		// Perfect rectangle has rectangularity = 1
 		const boundingArea = boundingBox.width * boundingBox.height;
 		const rectangularity = hullArea / boundingArea;
-		
+
 		contour.convexHullArea = hullArea;
 		contour.perimeter = perimeter;
 		contour.cornerPoints = corners;
 		contour.rectangularityScore = rectangularity;
-		
+
 		return contour;
 	}
 
@@ -397,8 +430,10 @@ export class CardDetector {
 		// Find the bottom-most point (or left-most in case of tie)
 		let start = 0;
 		for (let i = 1; i < points.length; i++) {
-			if (points[i][1] > points[start][1] ||
-				(points[i][1] === points[start][1] && points[i][0] < points[start][0])) {
+			if (
+				points[i][1] > points[start][1] ||
+				(points[i][1] === points[start][1] && points[i][0] < points[start][0])
+			) {
 				start = i;
 			}
 		}
@@ -426,7 +461,8 @@ export class CardDetector {
 				const top = stack[stack.length - 1];
 				const nextToTop = stack[stack.length - 2];
 				// Cross product to check if we make a left turn
-				const cross = (top[0] - nextToTop[0]) * (point[1] - nextToTop[1]) -
+				const cross =
+					(top[0] - nextToTop[0]) * (point[1] - nextToTop[1]) -
 					(top[1] - nextToTop[1]) * (point[0] - nextToTop[0]);
 				if (cross <= 0) {
 					stack.pop();
@@ -445,7 +481,7 @@ export class CardDetector {
 	 */
 	private computePolygonArea(points: [number, number][]): number {
 		if (points.length < 3) return 0;
-		
+
 		let area = 0;
 		for (let i = 0; i < points.length; i++) {
 			const j = (i + 1) % points.length;
@@ -460,7 +496,7 @@ export class CardDetector {
 	 */
 	private computePolygonPerimeter(points: [number, number][]): number {
 		if (points.length < 2) return 0;
-		
+
 		let perimeter = 0;
 		for (let i = 0; i < points.length; i++) {
 			const j = (i + 1) % points.length;
@@ -476,7 +512,7 @@ export class CardDetector {
 	 */
 	private findCornerPoints(hull: [number, number][]): [number, number][] {
 		if (hull.length < 4) return hull;
-		
+
 		// Simplify hull to approximately 4 points (corners of rectangle)
 		const epsilon = this.computePolygonPerimeter(hull) * 0.02; // 2% of perimeter
 		return this.douglasPeucker(hull, epsilon);
@@ -515,7 +551,11 @@ export class CardDetector {
 	/**
 	 * Calculate distance from point to line segment
 	 */
-	private pointToLineDistance(point: [number, number], lineStart: [number, number], lineEnd: [number, number]): number {
+	private pointToLineDistance(
+		point: [number, number],
+		lineStart: [number, number],
+		lineEnd: [number, number]
+	): number {
 		const dx = lineEnd[0] - lineStart[0];
 		const dy = lineEnd[1] - lineStart[1];
 		const lineLengthSquared = dx * dx + dy * dy;
@@ -526,9 +566,13 @@ export class CardDetector {
 		}
 
 		// Project point onto line
-		const t = Math.max(0, Math.min(1, 
-			((point[0] - lineStart[0]) * dx + (point[1] - lineStart[1]) * dy) / lineLengthSquared
-		));
+		const t = Math.max(
+			0,
+			Math.min(
+				1,
+				((point[0] - lineStart[0]) * dx + (point[1] - lineStart[1]) * dy) / lineLengthSquared
+			)
+		);
 
 		const projX = lineStart[0] + t * dx;
 		const projY = lineStart[1] + t * dy;
@@ -563,8 +607,10 @@ export class CardDetector {
 		const tolerance = this.config.aspectRatioTolerance * 1.5; // More lenient tolerance
 
 		// Check if matches landscape or portrait orientation
-		const matchesLandscape = Math.abs(landscapeRatio - targetRatio) <= targetRatio * tolerance && width > height;
-		const matchesPortrait = Math.abs(portraitRatio - targetRatio) <= targetRatio * tolerance && height > width;
+		const matchesLandscape =
+			Math.abs(landscapeRatio - targetRatio) <= targetRatio * tolerance && width > height;
+		const matchesPortrait =
+			Math.abs(portraitRatio - targetRatio) <= targetRatio * tolerance && height > width;
 
 		if (!matchesLandscape && !matchesPortrait) {
 			// Check normalized ratio
@@ -590,7 +636,11 @@ export class CardDetector {
 	/**
 	 * Enhanced DetectedRegion conversion with better confidence scoring
 	 */
-	private toDetectedRegionEnhanced(contour: Contour, index: number, sensitivity: 'high' | 'medium' | 'low'): DetectedRegion {
+	private toDetectedRegionEnhanced(
+		contour: Contour,
+		index: number,
+		sensitivity: 'high' | 'medium' | 'low'
+	): DetectedRegion {
 		const { x, y, width, height } = contour.boundingBox;
 		const orientation = contour.detectedOrientation || (width >= height ? 'landscape' : 'portrait');
 
@@ -609,12 +659,17 @@ export class CardDetector {
 		const rectangularityScore = contour.rectangularityScore || 0.5;
 
 		// Sensitivity penalty (lower confidence for lower sensitivity passes)
-		const sensitivityMultiplier = sensitivity === 'high' ? 1.0 : sensitivity === 'medium' ? 0.85 : 0.7;
+		const sensitivityMultiplier =
+			sensitivity === 'high' ? 1.0 : sensitivity === 'medium' ? 0.85 : 0.7;
 
 		// Combined confidence
-		const confidence = Math.max(0, Math.min(1, 
-			(ratioScore * 0.3 + areaScore * 0.2 + rectangularityScore * 0.5) * sensitivityMultiplier
-		));
+		const confidence = Math.max(
+			0,
+			Math.min(
+				1,
+				(ratioScore * 0.3 + areaScore * 0.2 + rectangularityScore * 0.5) * sensitivityMultiplier
+			)
+		);
 
 		return {
 			id: `card-${index}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
@@ -636,18 +691,18 @@ export class CardDetector {
 	 */
 	private enhanceContrast(data: Uint8Array, w: number, h: number): Uint8Array {
 		const result = new Uint8Array(data.length);
-		
+
 		// Find min and max values (ignoring outliers)
 		const histogram = new Uint32Array(256);
 		for (let i = 0; i < data.length; i++) {
 			histogram[data[i]]++;
 		}
-		
+
 		// Find 1% and 99% percentiles to avoid outlier influence
 		const totalPixels = w * h;
 		const lowerBound = Math.floor(totalPixels * 0.01);
 		const upperBound = Math.floor(totalPixels * 0.99);
-		
+
 		let count = 0;
 		let minVal = 0;
 		for (let i = 0; i < 256; i++) {
@@ -657,24 +712,24 @@ export class CardDetector {
 				break;
 			}
 		}
-		
+
 		count = 0;
 		let maxVal = 255;
 		for (let i = 255; i >= 0; i--) {
 			count += histogram[i];
-			if (count >= (totalPixels - upperBound)) {
+			if (count >= totalPixels - upperBound) {
 				maxVal = i;
 				break;
 			}
 		}
-		
+
 		// Apply contrast stretching
 		const range = maxVal - minVal || 1;
 		for (let i = 0; i < data.length; i++) {
 			const normalized = (data[i] - minVal) / range;
 			result[i] = Math.max(0, Math.min(255, Math.round(normalized * 255)));
 		}
-		
+
 		return result;
 	}
 
@@ -686,52 +741,52 @@ export class CardDetector {
 		const result = new Uint8Array(data.length);
 		const tileSize = 64; // Process in 64x64 tiles
 		const clipLimit = 3.0; // Limit contrast enhancement
-		
+
 		for (let ty = 0; ty < h; ty += tileSize) {
 			for (let tx = 0; tx < w; tx += tileSize) {
 				const tileW = Math.min(tileSize, w - tx);
 				const tileH = Math.min(tileSize, h - ty);
-				
+
 				// Build histogram for this tile
 				const histogram = new Uint32Array(256);
 				let tilePixels = 0;
-				
+
 				for (let y = ty; y < ty + tileH; y++) {
 					for (let x = tx; x < tx + tileW; x++) {
 						histogram[data[y * w + x]]++;
 						tilePixels++;
 					}
 				}
-				
+
 				// Clip histogram
 				const avgBin = tilePixels / 256;
 				const clipThreshold = Math.floor(clipLimit * avgBin);
 				let excess = 0;
-				
+
 				for (let i = 0; i < 256; i++) {
 					if (histogram[i] > clipThreshold) {
 						excess += histogram[i] - clipThreshold;
 						histogram[i] = clipThreshold;
 					}
 				}
-				
+
 				// Redistribute excess
 				const redistribution = Math.floor(excess / 256);
 				for (let i = 0; i < 256; i++) {
 					histogram[i] += redistribution;
 				}
-				
+
 				// Build CDF
 				const cdf = new Uint32Array(256);
 				cdf[0] = histogram[0];
 				for (let i = 1; i < 256; i++) {
 					cdf[i] = cdf[i - 1] + histogram[i];
 				}
-				
+
 				// Normalize CDF
-				const cdfMin = cdf.find(v => v > 0) || 0;
-				const cdfRange = (cdf[255] - cdfMin) || 1;
-				
+				const cdfMin = cdf.find((v) => v > 0) || 0;
+				const cdfRange = cdf[255] - cdfMin || 1;
+
 				// Apply transformation
 				for (let y = ty; y < ty + tileH; y++) {
 					for (let x = tx; x < tx + tileW; x++) {
@@ -742,7 +797,7 @@ export class CardDetector {
 				}
 			}
 		}
-		
+
 		return result;
 	}
 
@@ -754,40 +809,42 @@ export class CardDetector {
 		const spatialSigma = 3.0;
 		const rangeSigma = 30.0;
 		const radius = 3;
-		
+
 		// Pre-compute spatial weights
 		const spatialWeights: number[] = [];
 		for (let dy = -radius; dy <= radius; dy++) {
 			for (let dx = -radius; dx <= radius; dx++) {
 				const spatialDist = Math.sqrt(dx * dx + dy * dy);
-				spatialWeights.push(Math.exp(-(spatialDist * spatialDist) / (2 * spatialSigma * spatialSigma)));
+				spatialWeights.push(
+					Math.exp(-(spatialDist * spatialDist) / (2 * spatialSigma * spatialSigma))
+				);
 			}
 		}
-		
+
 		for (let y = radius; y < h - radius; y++) {
 			for (let x = radius; x < w - radius; x++) {
 				const centerVal = data[y * w + x];
 				let weightSum = 0;
 				let valueSum = 0;
 				let kernelIdx = 0;
-				
+
 				for (let dy = -radius; dy <= radius; dy++) {
 					for (let dx = -radius; dx <= radius; dx++) {
 						const neighborVal = data[(y + dy) * w + (x + dx)];
 						const rangeDist = Math.abs(neighborVal - centerVal);
 						const rangeWeight = Math.exp(-(rangeDist * rangeDist) / (2 * rangeSigma * rangeSigma));
 						const weight = spatialWeights[kernelIdx] * rangeWeight;
-						
+
 						weightSum += weight;
 						valueSum += neighborVal * weight;
 						kernelIdx++;
 					}
 				}
-				
+
 				result[y * w + x] = Math.round(valueSum / weightSum);
 			}
 		}
-		
+
 		// Copy border pixels
 		for (let y = 0; y < h; y++) {
 			for (let x = 0; x < w; x++) {
@@ -796,7 +853,7 @@ export class CardDetector {
 				}
 			}
 		}
-		
+
 		return result;
 	}
 
@@ -816,7 +873,7 @@ export class CardDetector {
 	 */
 	private dilate(data: Uint8Array, w: number, h: number): Uint8Array {
 		const result = new Uint8Array(data.length);
-		
+
 		for (let y = 1; y < h - 1; y++) {
 			for (let x = 1; x < w - 1; x++) {
 				let maxVal = 0;
@@ -828,7 +885,7 @@ export class CardDetector {
 				result[y * w + x] = maxVal;
 			}
 		}
-		
+
 		return result;
 	}
 
@@ -837,7 +894,7 @@ export class CardDetector {
 	 */
 	private erode(data: Uint8Array, w: number, h: number): Uint8Array {
 		const result = new Uint8Array(data.length);
-		
+
 		for (let y = 1; y < h - 1; y++) {
 			for (let x = 1; x < w - 1; x++) {
 				let minVal = 255;
@@ -849,7 +906,7 @@ export class CardDetector {
 				result[y * w + x] = minVal;
 			}
 		}
-		
+
 		return result;
 	}
 
@@ -872,14 +929,14 @@ export class CardDetector {
 			mean += originalGrayscale[i];
 		}
 		mean /= originalGrayscale.length;
-		
+
 		for (let i = 0; i < originalGrayscale.length; i++) {
 			const diff = originalGrayscale[i] - mean;
 			variance += diff * diff;
 		}
 		variance /= originalGrayscale.length;
 		const stdDev = Math.sqrt(variance);
-		
+
 		// Dynamic C based on image contrast - lower for low contrast images
 		const C = Math.max(2, Math.min(15, stdDev * 0.15));
 

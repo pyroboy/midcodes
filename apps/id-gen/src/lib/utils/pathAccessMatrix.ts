@@ -1,6 +1,6 @@
 /**
  * Path Access Matrix
- * 
+ *
  * Defines which roles can access which paths in the application.
  * Used by the role emulation banner to show access status.
  */
@@ -8,16 +8,9 @@
 // Role definitions
 export const SUPER_ADMIN_ROLES = ['super_admin'];
 
-export const ADMIN_ROLES = [
-	'super_admin',
-	'org_admin',
-	'id_gen_admin'
-];
+export const ADMIN_ROLES = ['super_admin', 'org_admin', 'id_gen_admin'];
 
-export const ORG_ADMIN_ROLES = [
-	'super_admin',
-	'org_admin'
-];
+export const ORG_ADMIN_ROLES = ['super_admin', 'org_admin'];
 
 // CRUD permission types
 export type CrudAction = 'create' | 'read' | 'update' | 'delete';
@@ -34,7 +27,7 @@ export interface CrudPermissions {
 // This is a simplified matrix - actual permissions come from database
 export const ROLE_CRUD_PERMISSIONS: Record<string, Record<string, CrudPermissions>> = {
 	// Super admins have all permissions
-	'super_admin': {
+	super_admin: {
 		templates: { create: true, read: true, update: true, delete: true },
 		idcards: { create: true, read: true, update: true, delete: true },
 		users: { create: true, read: true, update: true, delete: true },
@@ -43,7 +36,7 @@ export const ROLE_CRUD_PERMISSIONS: Record<string, Record<string, CrudPermission
 		organizations: { create: true, read: true, update: true, delete: true },
 		analytics: { create: false, read: true, update: false, delete: false }
 	},
-	'org_admin': {
+	org_admin: {
 		templates: { create: true, read: true, update: true, delete: true },
 		idcards: { create: true, read: true, update: true, delete: true },
 		users: { create: true, read: true, update: true, delete: false },
@@ -52,7 +45,7 @@ export const ROLE_CRUD_PERMISSIONS: Record<string, Record<string, CrudPermission
 		organizations: { create: false, read: true, update: true, delete: false },
 		analytics: { create: false, read: true, update: false, delete: false }
 	},
-	'id_gen_admin': {
+	id_gen_admin: {
 		templates: { create: true, read: true, update: true, delete: false },
 		idcards: { create: true, read: true, update: true, delete: true },
 		users: { create: false, read: true, update: true, delete: false },
@@ -61,7 +54,7 @@ export const ROLE_CRUD_PERMISSIONS: Record<string, Record<string, CrudPermission
 		organizations: { create: false, read: true, update: false, delete: false },
 		analytics: { create: false, read: true, update: false, delete: false }
 	},
-	'id_gen_encoder': {
+	id_gen_encoder: {
 		templates: { create: false, read: true, update: false, delete: false },
 		idcards: { create: true, read: true, update: true, delete: false },
 		users: { create: false, read: false, update: false, delete: false },
@@ -70,7 +63,7 @@ export const ROLE_CRUD_PERMISSIONS: Record<string, Record<string, CrudPermission
 		organizations: { create: false, read: false, update: false, delete: false },
 		analytics: { create: false, read: false, update: false, delete: false }
 	},
-	'id_gen_printer': {
+	id_gen_printer: {
 		templates: { create: false, read: true, update: false, delete: false },
 		idcards: { create: false, read: true, update: false, delete: false },
 		users: { create: false, read: false, update: false, delete: false },
@@ -79,7 +72,7 @@ export const ROLE_CRUD_PERMISSIONS: Record<string, Record<string, CrudPermission
 		organizations: { create: false, read: false, update: false, delete: false },
 		analytics: { create: false, read: false, update: false, delete: false }
 	},
-	'id_gen_viewer': {
+	id_gen_viewer: {
 		templates: { create: false, read: true, update: false, delete: false },
 		idcards: { create: false, read: true, update: false, delete: false },
 		users: { create: false, read: false, update: false, delete: false },
@@ -88,7 +81,7 @@ export const ROLE_CRUD_PERMISSIONS: Record<string, Record<string, CrudPermission
 		organizations: { create: false, read: false, update: false, delete: false },
 		analytics: { create: false, read: false, update: false, delete: false }
 	},
-	'id_gen_template_designer': {
+	id_gen_template_designer: {
 		templates: { create: true, read: true, update: true, delete: false },
 		idcards: { create: false, read: true, update: false, delete: false },
 		users: { create: false, read: false, update: false, delete: false },
@@ -97,7 +90,7 @@ export const ROLE_CRUD_PERMISSIONS: Record<string, Record<string, CrudPermission
 		organizations: { create: false, read: false, update: false, delete: false },
 		analytics: { create: false, read: false, update: false, delete: false }
 	},
-	'id_gen_auditor': {
+	id_gen_auditor: {
 		templates: { create: false, read: true, update: false, delete: false },
 		idcards: { create: false, read: true, update: false, delete: false },
 		users: { create: false, read: true, update: false, delete: false },
@@ -106,7 +99,7 @@ export const ROLE_CRUD_PERMISSIONS: Record<string, Record<string, CrudPermission
 		organizations: { create: false, read: true, update: false, delete: false },
 		analytics: { create: false, read: true, update: false, delete: false }
 	},
-	'id_gen_accountant': {
+	id_gen_accountant: {
 		templates: { create: false, read: false, update: false, delete: false },
 		idcards: { create: false, read: false, update: false, delete: false },
 		users: { create: false, read: false, update: false, delete: false },
@@ -115,7 +108,7 @@ export const ROLE_CRUD_PERMISSIONS: Record<string, Record<string, CrudPermission
 		organizations: { create: false, read: true, update: false, delete: false },
 		analytics: { create: false, read: true, update: false, delete: false }
 	},
-	'id_gen_user': {
+	id_gen_user: {
 		templates: { create: false, read: true, update: false, delete: false },
 		idcards: { create: true, read: true, update: true, delete: false },
 		users: { create: false, read: false, update: false, delete: false },
@@ -129,7 +122,12 @@ export const ROLE_CRUD_PERMISSIONS: Record<string, Record<string, CrudPermission
 // Map paths to their relevant resource types
 export function getResourceTypeForPath(pathname: string): string {
 	if (pathname.includes('/template')) return 'templates';
-	if (pathname.includes('/idcard') || pathname.includes('/all-ids') || pathname.includes('/use-template')) return 'idcards';
+	if (
+		pathname.includes('/idcard') ||
+		pathname.includes('/all-ids') ||
+		pathname.includes('/use-template')
+	)
+		return 'idcards';
 	if (pathname.includes('/user')) return 'users';
 	if (pathname.includes('/invoice')) return 'invoices';
 	if (pathname.includes('/credit')) return 'credits';
@@ -143,16 +141,16 @@ export function getResourceTypeForPath(pathname: string): string {
 export function getCrudPermissionsForRole(role: string, pathname: string): CrudPermissions {
 	const resourceType = getResourceTypeForPath(pathname);
 	const rolePerms = ROLE_CRUD_PERMISSIONS[role];
-	
+
 	if (!rolePerms) {
 		return { create: false, read: false, update: false, delete: false };
 	}
-	
+
 	return rolePerms[resourceType] || { create: false, read: false, update: false, delete: false };
 }
 
 // All available roles
-export type RoleName = 
+export type RoleName =
 	| 'super_admin'
 	| 'org_admin'
 	| 'id_gen_admin'
@@ -196,7 +194,7 @@ export const PATH_ACCESS_MATRIX: PathAccessConfig[] = [
 		name: 'Debug User',
 		description: 'Debug user information'
 	},
-	
+
 	// Admin pages (any admin role)
 	{
 		pattern: '/admin/analytics',
@@ -246,7 +244,7 @@ export const PATH_ACCESS_MATRIX: PathAccessConfig[] = [
 		name: 'Admin Dashboard',
 		description: 'Admin dashboard access'
 	},
-	
+
 	// Organization page
 	{
 		pattern: '/organization',
@@ -254,8 +252,8 @@ export const PATH_ACCESS_MATRIX: PathAccessConfig[] = [
 		name: 'My Organization',
 		description: 'View and manage your organization'
 	},
-	
-	// Templates 
+
+	// Templates
 	{
 		pattern: /^\/templates/,
 		allowedRoles: 'authenticated',
@@ -268,7 +266,7 @@ export const PATH_ACCESS_MATRIX: PathAccessConfig[] = [
 		name: 'Use Template',
 		description: 'Generate ID cards from template'
 	},
-	
+
 	// IDs and cards
 	{
 		pattern: /^\/all-ids/,
@@ -276,7 +274,7 @@ export const PATH_ACCESS_MATRIX: PathAccessConfig[] = [
 		name: 'All IDs',
 		description: 'View all generated ID cards'
 	},
-	
+
 	// Profile
 	{
 		pattern: '/profile',
@@ -284,7 +282,7 @@ export const PATH_ACCESS_MATRIX: PathAccessConfig[] = [
 		name: 'Profile',
 		description: 'User profile settings'
 	},
-	
+
 	// Account
 	{
 		pattern: '/account',
@@ -292,7 +290,7 @@ export const PATH_ACCESS_MATRIX: PathAccessConfig[] = [
 		name: 'Account',
 		description: 'Account settings and billing'
 	},
-	
+
 	// Public pages
 	{
 		pattern: '/',
@@ -361,7 +359,7 @@ export function checkPathAccess(
 
 	// When emulating, check if the emulated role has access
 	const roleToCheck = isEmulating ? emulatedRole : originalRole;
-	
+
 	// Check access based on allowed roles
 	if (pathConfig.allowedRoles === 'all') {
 		return {
@@ -382,7 +380,7 @@ export function checkPathAccess(
 	if (pathConfig.allowedRoles === 'super_admin_only') {
 		const emulatedIsSuperAdmin = SUPER_ADMIN_ROLES.includes(emulatedRole || '');
 		const originalIsSuperAdmin = SUPER_ADMIN_ROLES.includes(originalRole || '');
-		
+
 		// If emulating and emulated role doesn't have access
 		if (isEmulating && !emulatedIsSuperAdmin && originalIsSuperAdmin) {
 			// Only show "bypassing" if they have the bypass param
@@ -401,7 +399,7 @@ export function checkPathAccess(
 				};
 			}
 		}
-		
+
 		const roleHasAccess = SUPER_ADMIN_ROLES.includes(roleToCheck || '');
 		if (roleHasAccess) {
 			return {
@@ -410,7 +408,7 @@ export function checkPathAccess(
 				reason: 'Super Admin access granted'
 			};
 		}
-		
+
 		return {
 			status: 'blocked',
 			pathConfig,
@@ -522,16 +520,16 @@ export const ALL_ROLES: RoleName[] = [
 
 // Role display names for better readability
 export const ROLE_DISPLAY_NAMES: Record<RoleName, string> = {
-	'super_admin': 'Super Admin',
-	'org_admin': 'Org Admin',
-	'id_gen_admin': 'Admin',
-	'id_gen_encoder': 'Encoder',
-	'id_gen_printer': 'Printer',
-	'id_gen_viewer': 'Viewer',
-	'id_gen_template_designer': 'Template Designer',
-	'id_gen_auditor': 'Auditor',
-	'id_gen_accountant': 'Accountant',
-	'id_gen_user': 'User'
+	super_admin: 'Super Admin',
+	org_admin: 'Org Admin',
+	id_gen_admin: 'Admin',
+	id_gen_encoder: 'Encoder',
+	id_gen_printer: 'Printer',
+	id_gen_viewer: 'Viewer',
+	id_gen_template_designer: 'Template Designer',
+	id_gen_auditor: 'Auditor',
+	id_gen_accountant: 'Accountant',
+	id_gen_user: 'User'
 };
 
 export interface RoleAccessInfo {
@@ -559,7 +557,7 @@ export function getAllRolesAccessForPath(
 		return config.pattern.test(pathname);
 	});
 
-	return ALL_ROLES.map(role => {
+	return ALL_ROLES.map((role) => {
 		let hasAccess = false;
 
 		if (!pathConfig) {
@@ -592,10 +590,12 @@ export function getAllRolesAccessForPath(
  * Get path config for current pathname
  */
 export function getPathConfig(pathname: string): PathAccessConfig | null {
-	return PATH_ACCESS_MATRIX.find((config) => {
-		if (typeof config.pattern === 'string') {
-			return pathname === config.pattern || pathname.startsWith(config.pattern + '/');
-		}
-		return config.pattern.test(pathname);
-	}) || null;
+	return (
+		PATH_ACCESS_MATRIX.find((config) => {
+			if (typeof config.pattern === 'string') {
+				return pathname === config.pattern || pathname.startsWith(config.pattern + '/');
+			}
+			return config.pattern.test(pathname);
+		}) || null
+	);
 }

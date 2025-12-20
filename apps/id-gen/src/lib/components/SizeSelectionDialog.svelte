@@ -67,14 +67,23 @@
 	let countsLoaded = $state(false);
 
 	const dispatch = createEventDispatcher<{
-		sizeSelected: { cardSize: CardSize; templateName: string; selectedTemplateAsset?: TemplateAsset };
-		customDesignSubmitted: { sizeInfo: { width: number; height: number; name: string }; instructions: string; files: File[]; requestId?: string };
+		sizeSelected: {
+			cardSize: CardSize;
+			templateName: string;
+			selectedTemplateAsset?: TemplateAsset;
+		};
+		customDesignSubmitted: {
+			sizeInfo: { width: number; height: number; name: string };
+			instructions: string;
+			files: File[];
+			requestId?: string;
+		};
 		cancel: void;
 	}>();
 
 	// Wizard state
 	let currentStep = $state<WizardStep>('size');
-	
+
 	// Size selection state
 	let selectedSizeType: 'common' | 'custom' = $state('common');
 	let selectedCommonSize: CardSize = $state(COMMON_CARD_SIZES[0]);
@@ -106,7 +115,11 @@
 	// Check if CR80 size (Premium materials only available for CR80)
 	let isCR80 = $derived(() => {
 		const size = baseCardSize();
-		return size.slug === 'cr80' || size.name?.toLowerCase().includes('cr80') || size.name?.toLowerCase().includes('atm');
+		return (
+			size.slug === 'cr80' ||
+			size.name?.toLowerCase().includes('cr80') ||
+			size.name?.toLowerCase().includes('atm')
+		);
 	});
 
 	// Compute the base card size (always landscape orientation for 3D preview)
@@ -146,7 +159,9 @@
 
 	// Progress indicator (main steps, excluding custom which is a branch)
 	const steps: WizardStep[] = ['size', 'template', 'material', 'addons', 'naming'];
-	let currentStepIndex = $derived(steps.indexOf(currentStep === 'custom' ? 'template' : currentStep));
+	let currentStepIndex = $derived(
+		steps.indexOf(currentStep === 'custom' ? 'template' : currentStep)
+	);
 
 	// Get template count for a size and current orientation
 	function getTemplateCount(size: CardSize): number {
@@ -376,15 +391,19 @@
 					heightPixels={basePixelDimensions.height}
 					sizeName={finalCardSize().name}
 					imageUrl={selectedTemplateAsset?.image_url || null}
-					isPortrait={isPortrait}
+					{isPortrait}
 					height={currentStep === 'size' ? '55vh' : '200px'}
 					showControls={true}
 					autoRotate={false}
 				/>
 				<!-- Portrait toggle overlay (only on size step) -->
 				{#if currentStep === 'size'}
-					<div class="absolute bottom-3 right-3 flex items-center gap-2 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-full border border-border shadow-sm">
-						<Label for="portrait-toggle" class="text-xs cursor-pointer text-muted-foreground">Portrait</Label>
+					<div
+						class="absolute bottom-3 right-3 flex items-center gap-2 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-full border border-border shadow-sm"
+					>
+						<Label for="portrait-toggle" class="text-xs cursor-pointer text-muted-foreground"
+							>Portrait</Label
+						>
 						<Switch id="portrait-toggle" bind:checked={isPortrait} />
 					</div>
 				{/if}
@@ -400,7 +419,11 @@
 					<div
 						class={cn(
 							'h-2 rounded-full transition-all',
-							isCurrent ? 'w-8 bg-primary' : isActive ? 'w-2 bg-primary/60' : 'w-2 bg-muted-foreground/30'
+							isCurrent
+								? 'w-8 bg-primary'
+								: isActive
+									? 'w-2 bg-primary/60'
+									: 'w-2 bg-muted-foreground/30'
 						)}
 					></div>
 				{/each}
@@ -474,7 +497,10 @@
 										<div class="flex justify-center mb-1.5 h-[32px] items-center">
 											<div
 												class="border border-foreground/20 bg-background shadow-sm"
-												style="width: {Math.min(32, 32 * aspectRatio)}px; height: {Math.min(32 / aspectRatio, 32)}px;"
+												style="width: {Math.min(32, 32 * aspectRatio)}px; height: {Math.min(
+													32 / aspectRatio,
+													32
+												)}px;"
 											></div>
 										</div>
 										<div class="text-center">
@@ -553,7 +579,7 @@
 					{/if}
 				</div>
 
-			<!-- STEP 2: Template Selection -->
+				<!-- STEP 2: Template Selection -->
 			{:else if currentStep === 'template'}
 				<div class="space-y-4">
 					<!-- Template Browser -->
@@ -567,7 +593,7 @@
 					/>
 				</div>
 
-			<!-- STEP 2b: Custom Design Request -->
+				<!-- STEP 2b: Custom Design Request -->
 			{:else if currentStep === 'custom'}
 				<CustomDesignForm
 					sizeName={finalCardSize().name}
@@ -577,13 +603,16 @@
 					onCancel={() => (currentStep = 'template')}
 				/>
 
-			<!-- STEP 3: Material Selection -->
+				<!-- STEP 3: Material Selection -->
 			{:else if currentStep === 'material'}
 				<div class="space-y-4">
 					<RadioGroup bind:value={selectedMaterial} class="space-y-3">
 						<!-- Standard Laminated - Available for all sizes -->
-						<label 
-							class="flex items-start gap-3 p-4 rounded-lg border cursor-pointer transition-all hover:border-primary/50 {selectedMaterial === 'standard_laminated' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border'}"
+						<label
+							class="flex items-start gap-3 p-4 rounded-lg border cursor-pointer transition-all hover:border-primary/50 {selectedMaterial ===
+							'standard_laminated'
+								? 'border-primary bg-primary/5 ring-1 ring-primary'
+								: 'border-border'}"
 						>
 							<RadioGroupItem value="standard_laminated" id="mat-standard" class="mt-1" />
 							<div class="flex-1">
@@ -591,75 +620,128 @@
 									<span class="font-medium">Standard Laminated (PVC)</span>
 									<span class="text-sm text-muted-foreground">₱23-50/card</span>
 								</div>
-								<p class="text-sm text-muted-foreground mt-1">Durable PVC with protective lamination. Available for all sizes.</p>
+								<p class="text-sm text-muted-foreground mt-1">
+									Durable PVC with protective lamination. Available for all sizes.
+								</p>
 							</div>
 						</label>
 
 						<!-- Premium Direct Print - CR80 only -->
-						<label 
-							class="flex items-start gap-3 p-4 rounded-lg border transition-all {!isCR80() ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-primary/50'} {selectedMaterial === 'premium_direct' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border'}"
+						<label
+							class="flex items-start gap-3 p-4 rounded-lg border transition-all {!isCR80()
+								? 'opacity-50 cursor-not-allowed'
+								: 'cursor-pointer hover:border-primary/50'} {selectedMaterial === 'premium_direct'
+								? 'border-primary bg-primary/5 ring-1 ring-primary'
+								: 'border-border'}"
 						>
-							<RadioGroupItem value="premium_direct" id="mat-premium" class="mt-1" disabled={!isCR80()} />
+							<RadioGroupItem
+								value="premium_direct"
+								id="mat-premium"
+								class="mt-1"
+								disabled={!isCR80()}
+							/>
 							<div class="flex-1">
 								<div class="flex items-center justify-between">
 									<span class="font-medium">Premium Direct Print</span>
 									<span class="text-sm text-muted-foreground">₱120-180/card</span>
 								</div>
-								<p class="text-sm text-muted-foreground mt-1">Professional edge-to-edge printing. {!isCR80() ? 'Only available for CR80 size.' : 'Premium quality finish.'}</p>
+								<p class="text-sm text-muted-foreground mt-1">
+									Professional edge-to-edge printing. {!isCR80()
+										? 'Only available for CR80 size.'
+										: 'Premium quality finish.'}
+								</p>
 							</div>
 						</label>
 
 						<!-- TechSmart NFC - CR80 only -->
-						<label 
-							class="flex items-start gap-3 p-4 rounded-lg border transition-all {!isCR80() ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-primary/50'} {selectedMaterial === 'techsmart_nfc' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border'}"
+						<label
+							class="flex items-start gap-3 p-4 rounded-lg border transition-all {!isCR80()
+								? 'opacity-50 cursor-not-allowed'
+								: 'cursor-pointer hover:border-primary/50'} {selectedMaterial === 'techsmart_nfc'
+								? 'border-primary bg-primary/5 ring-1 ring-primary'
+								: 'border-border'}"
 						>
-							<RadioGroupItem value="techsmart_nfc" id="mat-nfc" class="mt-1" disabled={!isCR80()} />
+							<RadioGroupItem
+								value="techsmart_nfc"
+								id="mat-nfc"
+								class="mt-1"
+								disabled={!isCR80()}
+							/>
 							<div class="flex-1">
 								<div class="flex items-center justify-between">
 									<span class="font-medium">TechSmart NFC</span>
 									<span class="text-sm text-muted-foreground">₱180-220/card</span>
 								</div>
-								<p class="text-sm text-muted-foreground mt-1">Embedded NFC chip for digital ID linking. {!isCR80() ? 'Only available for CR80 size.' : 'Tap to verify.'}</p>
+								<p class="text-sm text-muted-foreground mt-1">
+									Embedded NFC chip for digital ID linking. {!isCR80()
+										? 'Only available for CR80 size.'
+										: 'Tap to verify.'}
+								</p>
 							</div>
 						</label>
 
 						<!-- TechSmart RFID - CR80 only -->
-						<label 
-							class="flex items-start gap-3 p-4 rounded-lg border transition-all {!isCR80() ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-primary/50'} {selectedMaterial === 'techsmart_rfid' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border'}"
+						<label
+							class="flex items-start gap-3 p-4 rounded-lg border transition-all {!isCR80()
+								? 'opacity-50 cursor-not-allowed'
+								: 'cursor-pointer hover:border-primary/50'} {selectedMaterial === 'techsmart_rfid'
+								? 'border-primary bg-primary/5 ring-1 ring-primary'
+								: 'border-border'}"
 						>
-							<RadioGroupItem value="techsmart_rfid" id="mat-rfid" class="mt-1" disabled={!isCR80()} />
+							<RadioGroupItem
+								value="techsmart_rfid"
+								id="mat-rfid"
+								class="mt-1"
+								disabled={!isCR80()}
+							/>
 							<div class="flex-1">
 								<div class="flex items-center justify-between">
 									<span class="font-medium">TechSmart RFID</span>
 									<span class="text-sm text-muted-foreground">₱220-280/card</span>
 								</div>
-								<p class="text-sm text-muted-foreground mt-1">Embedded RFID chip for access control. {!isCR80() ? 'Only available for CR80 size.' : 'Door & gate access.'}</p>
+								<p class="text-sm text-muted-foreground mt-1">
+									Embedded RFID chip for access control. {!isCR80()
+										? 'Only available for CR80 size.'
+										: 'Door & gate access.'}
+								</p>
 							</div>
 						</label>
 					</RadioGroup>
 				</div>
 
-			<!-- STEP 4: Add-ons & Accessories -->
+				<!-- STEP 4: Add-ons & Accessories -->
 			{:else if currentStep === 'addons'}
 				<div class="space-y-6">
 					<!-- Security Features -->
 					<div class="space-y-3">
 						<h4 class="text-sm font-medium">Security Features</h4>
 						<div class="space-y-2">
-							<label class="flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:border-primary/50 transition-all {addOns.uvOverlay ? 'border-primary bg-primary/5' : 'border-border'}">
+							<label
+								class="flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:border-primary/50 transition-all {addOns.uvOverlay
+									? 'border-primary bg-primary/5'
+									: 'border-border'}"
+							>
 								<div>
 									<span class="font-medium">UV Overlay</span>
-									<p class="text-xs text-muted-foreground">Hidden security pattern visible under UV light</p>
+									<p class="text-xs text-muted-foreground">
+										Hidden security pattern visible under UV light
+									</p>
 								</div>
 								<div class="flex items-center gap-2">
 									<span class="text-sm text-muted-foreground">+₱25/card</span>
 									<Switch bind:checked={addOns.uvOverlay} />
 								</div>
 							</label>
-							<label class="flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:border-primary/50 transition-all {addOns.holographic ? 'border-primary bg-primary/5' : 'border-border'}">
+							<label
+								class="flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:border-primary/50 transition-all {addOns.holographic
+									? 'border-primary bg-primary/5'
+									: 'border-border'}"
+							>
 								<div>
 									<span class="font-medium">Holographic Overlay</span>
-									<p class="text-xs text-muted-foreground">Tamper-evident holographic security layer</p>
+									<p class="text-xs text-muted-foreground">
+										Tamper-evident holographic security layer
+									</p>
 								</div>
 								<div class="flex items-center gap-2">
 									<span class="text-sm text-muted-foreground">+₱35/card</span>
@@ -675,23 +757,29 @@
 						<div class="grid grid-cols-3 gap-2">
 							<button
 								type="button"
-								class="p-3 rounded-lg border text-center transition-all {addOns.lanyard === 'none' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border hover:border-primary/50'}"
-								onclick={() => addOns.lanyard = 'none'}
+								class="p-3 rounded-lg border text-center transition-all {addOns.lanyard === 'none'
+									? 'border-primary bg-primary/5 ring-1 ring-primary'
+									: 'border-border hover:border-primary/50'}"
+								onclick={() => (addOns.lanyard = 'none')}
 							>
 								<span class="text-sm font-medium">None</span>
 							</button>
 							<button
 								type="button"
-								class="p-3 rounded-lg border text-center transition-all {addOns.lanyard === '3/4' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border hover:border-primary/50'}"
-								onclick={() => addOns.lanyard = '3/4'}
+								class="p-3 rounded-lg border text-center transition-all {addOns.lanyard === '3/4'
+									? 'border-primary bg-primary/5 ring-1 ring-primary'
+									: 'border-border hover:border-primary/50'}"
+								onclick={() => (addOns.lanyard = '3/4')}
 							>
 								<span class="text-sm font-medium">3/4"</span>
 								<p class="text-xs text-muted-foreground">₱40-50</p>
 							</button>
 							<button
 								type="button"
-								class="p-3 rounded-lg border text-center transition-all {addOns.lanyard === '1' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border hover:border-primary/50'}"
-								onclick={() => addOns.lanyard = '1'}
+								class="p-3 rounded-lg border text-center transition-all {addOns.lanyard === '1'
+									? 'border-primary bg-primary/5 ring-1 ring-primary'
+									: 'border-border hover:border-primary/50'}"
+								onclick={() => (addOns.lanyard = '1')}
 							>
 								<span class="text-sm font-medium">1"</span>
 								<p class="text-xs text-muted-foreground">₱55-70</p>
@@ -705,23 +793,29 @@
 						<div class="grid grid-cols-3 gap-2">
 							<button
 								type="button"
-								class="p-3 rounded-lg border text-center transition-all {addOns.caseType === 'none' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border hover:border-primary/50'}"
-								onclick={() => addOns.caseType = 'none'}
+								class="p-3 rounded-lg border text-center transition-all {addOns.caseType === 'none'
+									? 'border-primary bg-primary/5 ring-1 ring-primary'
+									: 'border-border hover:border-primary/50'}"
+								onclick={() => (addOns.caseType = 'none')}
 							>
 								<span class="text-sm font-medium">None</span>
 							</button>
 							<button
 								type="button"
-								class="p-3 rounded-lg border text-center transition-all {addOns.caseType === 'soft' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border hover:border-primary/50'}"
-								onclick={() => addOns.caseType = 'soft'}
+								class="p-3 rounded-lg border text-center transition-all {addOns.caseType === 'soft'
+									? 'border-primary bg-primary/5 ring-1 ring-primary'
+									: 'border-border hover:border-primary/50'}"
+								onclick={() => (addOns.caseType = 'soft')}
 							>
 								<span class="text-sm font-medium">Soft</span>
 								<p class="text-xs text-muted-foreground">₱10</p>
 							</button>
 							<button
 								type="button"
-								class="p-3 rounded-lg border text-center transition-all {addOns.caseType === 'hard' ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border hover:border-primary/50'}"
-								onclick={() => addOns.caseType = 'hard'}
+								class="p-3 rounded-lg border text-center transition-all {addOns.caseType === 'hard'
+									? 'border-primary bg-primary/5 ring-1 ring-primary'
+									: 'border-border hover:border-primary/50'}"
+								onclick={() => (addOns.caseType = 'hard')}
 							>
 								<span class="text-sm font-medium">Hard</span>
 								<p class="text-xs text-muted-foreground">₱25</p>
@@ -730,7 +824,11 @@
 					</div>
 
 					<!-- Retractor -->
-					<label class="flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:border-primary/50 transition-all {addOns.retractor ? 'border-primary bg-primary/5' : 'border-border'}">
+					<label
+						class="flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:border-primary/50 transition-all {addOns.retractor
+							? 'border-primary bg-primary/5'
+							: 'border-border'}"
+					>
 						<div>
 							<span class="font-medium">Badge Retractor</span>
 							<p class="text-xs text-muted-foreground">Retractable reel for easy badge access</p>
@@ -742,7 +840,7 @@
 					</label>
 				</div>
 
-			<!-- STEP 5: Naming -->
+				<!-- STEP 5: Naming -->
 			{:else if currentStep === 'naming'}
 				<div class="space-y-4 py-4">
 					<div class="space-y-2">
@@ -753,19 +851,46 @@
 							placeholder="e.g., Company Employee ID, Student Card"
 							class="w-full bg-background text-lg"
 						/>
-						<p class="text-xs text-muted-foreground">This name will help you identify this template in your library.</p>
+						<p class="text-xs text-muted-foreground">
+							This name will help you identify this template in your library.
+						</p>
 					</div>
 
 					<!-- Summary of selections -->
 					<div class="mt-6 p-4 rounded-lg bg-muted/50 border border-border space-y-2">
 						<h4 class="text-sm font-medium">Summary</h4>
 						<div class="text-sm text-muted-foreground space-y-1">
-							<p><span class="text-foreground">Size:</span> {finalCardSize().name} ({isPortrait ? 'Portrait' : 'Landscape'})</p>
-							<p><span class="text-foreground">Template:</span> {selectedTemplateAsset?.name || 'Blank'}</p>
-							<p><span class="text-foreground">Material:</span> {selectedMaterial === 'standard_laminated' ? 'Standard Laminated' : selectedMaterial === 'premium_direct' ? 'Premium Direct Print' : selectedMaterial === 'techsmart_nfc' ? 'TechSmart NFC' : 'TechSmart RFID'}</p>
+							<p>
+								<span class="text-foreground">Size:</span>
+								{finalCardSize().name} ({isPortrait ? 'Portrait' : 'Landscape'})
+							</p>
+							<p>
+								<span class="text-foreground">Template:</span>
+								{selectedTemplateAsset?.name || 'Blank'}
+							</p>
+							<p>
+								<span class="text-foreground">Material:</span>
+								{selectedMaterial === 'standard_laminated'
+									? 'Standard Laminated'
+									: selectedMaterial === 'premium_direct'
+										? 'Premium Direct Print'
+										: selectedMaterial === 'techsmart_nfc'
+											? 'TechSmart NFC'
+											: 'TechSmart RFID'}
+							</p>
 							{#if addOns.uvOverlay || addOns.holographic || addOns.lanyard !== 'none' || addOns.caseType !== 'none' || addOns.retractor}
-								<p><span class="text-foreground">Add-ons:</span> 
-									{[addOns.uvOverlay && 'UV Overlay', addOns.holographic && 'Holographic', addOns.lanyard !== 'none' && `${addOns.lanyard}" Lanyard`, addOns.caseType !== 'none' && `${addOns.caseType === 'soft' ? 'Soft' : 'Hard'} Case`, addOns.retractor && 'Retractor'].filter(Boolean).join(', ')}
+								<p>
+									<span class="text-foreground">Add-ons:</span>
+									{[
+										addOns.uvOverlay && 'UV Overlay',
+										addOns.holographic && 'Holographic',
+										addOns.lanyard !== 'none' && `${addOns.lanyard}" Lanyard`,
+										addOns.caseType !== 'none' &&
+											`${addOns.caseType === 'soft' ? 'Soft' : 'Hard'} Case`,
+										addOns.retractor && 'Retractor'
+									]
+										.filter(Boolean)
+										.join(', ')}
 								</p>
 							{/if}
 						</div>
@@ -774,7 +899,9 @@
 			{/if}
 
 			{#if error}
-				<div class="text-sm text-destructive bg-destructive/10 p-3 rounded-md border border-destructive/20 mt-4">
+				<div
+					class="text-sm text-destructive bg-destructive/10 p-3 rounded-md border border-destructive/20 mt-4"
+				>
 					{error}
 				</div>
 			{/if}
@@ -784,9 +911,7 @@
 		{#if currentStep !== 'custom'}
 			<DialogFooter class="flex-shrink-0 flex-row justify-between border-t border-border p-4 gap-2">
 				{#if currentStep === 'size'}
-					<Button variant="outline" onclick={handleCancel}>
-						Cancel
-					</Button>
+					<Button variant="outline" onclick={handleCancel}>Cancel</Button>
 					<Button onclick={goNext}>
 						Next
 						<ChevronRight class="h-4 w-4 ml-1" />

@@ -1,5 +1,4 @@
 <script lang="ts">
-
 	// Types
 	interface IDCard {
 		idcard_id?: number;

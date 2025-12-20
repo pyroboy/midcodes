@@ -17,7 +17,9 @@
 	</div>
 
 	<!-- Filters Bar -->
-	<div class="flex flex-col sm:flex-row gap-4 mb-6 p-4 bg-muted/30 rounded-lg border border-border/50">
+	<div
+		class="flex flex-col sm:flex-row gap-4 mb-6 p-4 bg-muted/30 rounded-lg border border-border/50"
+	>
 		<Skeleton class="h-10 flex-1 rounded-md" />
 		<div class="flex gap-2">
 			<Skeleton class="h-10 w-24 rounded-md" />

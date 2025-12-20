@@ -15,14 +15,7 @@
 		maxFiles?: number;
 	}
 
-	let {
-		sizeName,
-		widthPixels,
-		heightPixels,
-		onSubmit,
-		onCancel,
-		maxFiles = 5
-	}: Props = $props();
+	let { sizeName, widthPixels, heightPixels, onSubmit, onCancel, maxFiles = 5 }: Props = $props();
 
 	// Form state
 	let instructions = $state('');
@@ -148,11 +141,7 @@
 	<div class="form-group">
 		<Label>Reference Images (Optional)</Label>
 		<div
-			class={cn(
-				'drop-zone',
-				dragActive && 'drag-active',
-				files.length >= maxFiles && 'disabled'
-			)}
+			class={cn('drop-zone', dragActive && 'drag-active', files.length >= maxFiles && 'disabled')}
 			role="button"
 			tabindex="0"
 			ondragover={handleDragOver}
@@ -175,9 +164,7 @@
 				<span class="drop-text disabled">Maximum {maxFiles} files reached</span>
 			{:else}
 				<Upload class="h-6 w-6 text-muted-foreground" />
-				<span class="drop-text">
-					Drag & drop or click to upload
-				</span>
+				<span class="drop-text"> Drag & drop or click to upload </span>
 				<span class="drop-hint">
 					{files.length}/{maxFiles} files • PNG, JPG up to 5MB
 				</span>
@@ -213,9 +200,7 @@
 
 	<!-- Actions -->
 	<div class="form-actions">
-		<Button variant="outline" onclick={onCancel} disabled={isSubmitting}>
-			Cancel
-		</Button>
+		<Button variant="outline" onclick={onCancel} disabled={isSubmitting}>Cancel</Button>
 		<Button onclick={handleSubmit} disabled={isSubmitting || !instructions.trim()}>
 			{#if isSubmitting}
 				<Loader2 class="h-4 w-4 mr-2 animate-spin" />
@@ -228,7 +213,8 @@
 	</div>
 
 	<p class="submit-note">
-		Your request will be reviewed by our design team. You'll be notified when your template is ready.
+		Your request will be reviewed by our design team. You'll be notified when your template is
+		ready.
 	</p>
 </div>
 

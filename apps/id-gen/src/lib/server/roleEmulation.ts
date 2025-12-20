@@ -16,11 +16,13 @@ export interface RoleEmulationState {
 /**
  * SECURITY: Verifies that role emulation is still valid (not expired)
  * Should be called before critical operations when emulation is active
- * 
+ *
  * @param roleEmulation - The role emulation state from session
  * @returns true if valid, throws error if expired
  */
-export function verifyRoleEmulationActive(roleEmulation: RoleEmulationState | null | undefined): boolean {
+export function verifyRoleEmulationActive(
+	roleEmulation: RoleEmulationState | null | undefined
+): boolean {
 	// No emulation active - always valid
 	if (!roleEmulation?.active) {
 		return true;
@@ -30,7 +32,7 @@ export function verifyRoleEmulationActive(roleEmulation: RoleEmulationState | nu
 	if (roleEmulation.expiresAt) {
 		const expiresAt = new Date(roleEmulation.expiresAt);
 		const now = new Date();
-		
+
 		if (now > expiresAt) {
 			throw new Error('Role emulation has expired. Please refresh your session.');
 		}
@@ -42,11 +44,13 @@ export function verifyRoleEmulationActive(roleEmulation: RoleEmulationState | nu
 /**
  * SECURITY: Checks if role emulation is expired without throwing
  * Useful for conditional checks
- * 
+ *
  * @param roleEmulation - The role emulation state from session
  * @returns true if emulation is expired or needs refresh
  */
-export function isRoleEmulationExpired(roleEmulation: RoleEmulationState | null | undefined): boolean {
+export function isRoleEmulationExpired(
+	roleEmulation: RoleEmulationState | null | undefined
+): boolean {
 	if (!roleEmulation?.active) {
 		return false; // No emulation = not expired
 	}
@@ -62,7 +66,7 @@ export function isRoleEmulationExpired(roleEmulation: RoleEmulationState | null 
 /**
  * SECURITY: Checks if role emulation will expire soon (within specified minutes)
  * Useful for showing warnings to admins
- * 
+ *
  * @param roleEmulation - The role emulation state from session
  * @param withinMinutes - Minutes before expiration to consider "expiring soon"
  */
@@ -76,7 +80,7 @@ export function isRoleEmulationExpiringSoon(
 
 	const expiresAt = new Date(roleEmulation.expiresAt);
 	const warningTime = new Date(expiresAt.getTime() - withinMinutes * 60 * 1000);
-	
+
 	return new Date() > warningTime;
 }
 
@@ -91,7 +95,7 @@ export function validateRoleEmulation(session: GetSessionResult): {
 	expiresAt: Date | null;
 } {
 	const roleEmulation = session.roleEmulation;
-	
+
 	if (!roleEmulation?.active) {
 		return {
 			isEmulating: false,
@@ -102,10 +106,10 @@ export function validateRoleEmulation(session: GetSessionResult): {
 	}
 
 	const isExpired = isRoleEmulationExpired(roleEmulation);
-	
+
 	return {
 		isEmulating: !isExpired,
-		effectiveRole: isExpired ? null : (roleEmulation.emulatedRole || null),
+		effectiveRole: isExpired ? null : roleEmulation.emulatedRole || null,
 		isExpired,
 		expiresAt: roleEmulation.expiresAt ? new Date(roleEmulation.expiresAt) : null
 	};

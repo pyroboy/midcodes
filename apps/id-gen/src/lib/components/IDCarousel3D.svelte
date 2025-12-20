@@ -57,18 +57,18 @@
 	let initialCameraZ = 0;
 	let initialColumns = 0;
 	let isPinching = false;
-	
+
 	// Touch drag state for grid elastic drag
 	let touchStartX = 0;
 	let touchStartY = 0;
 	let lastTouchY = 0;
-	
+
 	// Scroll container ref for programmatic scroll
 	let scrollContainerRef: HTMLElement | null = null;
-	
+
 	// Container width for dynamic card scaling (bigger screen = bigger cards)
 	let containerWidth = $state(400); // Default mobile width
-	
+
 	// DEBUG: Adjustable target card width (temporary)
 	let debugTargetCardWidth = $state(400);
 	let debugManualOverride = $state(false); // When true, slider value is used instead of computed
@@ -85,28 +85,28 @@
 			// Card sizing with linear interpolation based on container width:
 			// Derived from user testing:
 			// - 333px → 0.80 multiplier
-			// - 765px → 1.02 multiplier  
+			// - 765px → 1.02 multiplier
 			// - 1487px → 1.62 multiplier (adjusted down for 3-col desktop)
 			// Formula: multiplier = 0.5 + containerWidth * 0.00075
 			const multiplier = 0.5 + containerWidth * 0.00075;
 			let computedWidth = (containerWidth / columns) * multiplier;
-			
+
 			// Cap max card size for 3 columns to avoid oversized cards on large screens
 			if (columns === 3 && computedWidth > 550) {
 				computedWidth = 650;
 			}
-			
+
 			// Use manual slider value if override is on, otherwise use computed
 			const targetCardWidth = debugManualOverride ? debugTargetCardWidth : computedWidth;
 			if (!debugManualOverride) {
 				debugTargetCardWidth = Math.round(computedWidth);
 			}
-			
+
 			// Calculate camera Z so 3D card (3.6 units) appears as targetCardWidth pixels
 			const fovRadians = (50 * Math.PI) / 180;
 			const desiredVisibleWidth = (3.6 * containerWidth) / targetCardWidth;
 			const targetZ = desiredVisibleWidth / (2 * Math.tan(fovRadians / 2));
-			
+
 			// Clamp to reasonable range
 			cameraZ.set(Math.max(5, Math.min(50, targetZ)));
 			cameraY.set(0);
@@ -133,16 +133,16 @@
 	// Track container width for dynamic card scaling
 	$effect(() => {
 		if (!scrollContainerRef) return;
-		
+
 		const observer = new ResizeObserver((entries) => {
 			for (const entry of entries) {
 				containerWidth = entry.contentRect.width;
 			}
 		});
-		
+
 		observer.observe(scrollContainerRef);
 		containerWidth = scrollContainerRef.clientWidth;
-		
+
 		return () => observer.disconnect();
 	});
 
@@ -159,10 +159,10 @@
 	// Config (Grid)
 	const GRID_SPACING_X = 3.8; // Tighter horizontal spacing for cards to fill width
 	const GRID_SPACING_Y = 2.8; // Reduced row spacing for tighter layout
-	
+
 	// Dynamic PAGE_SIZE = columns * 4 rows
 	let pageSize = $derived(columns * 4);
-	
+
 	// Total rows (approx)
 	let totalRows = $derived(Math.ceil(cards.length / columns));
 	// Visible rows in viewport (container is ~500px, each row takes ~150px visually)
@@ -199,10 +199,10 @@
 	// Hold-to-scroll handlers
 	function startHolding(direction: 'prev' | 'next') {
 		if (holdInterval) return;
-		
+
 		const move = direction === 'next' ? next : prev;
 		move(); // Immediate first move
-		
+
 		let speed = holdSpeed;
 		const accelerate = () => {
 			move();
@@ -223,7 +223,7 @@
 		if (viewMode !== 'grid') return;
 		const target = e.currentTarget as HTMLElement;
 		const newScrollTop = target.scrollTop;
-		
+
 		// Calculate scroll velocity for vertical tilt effect
 		const scrollDelta = newScrollTop - lastScrollTop;
 		// Apply velocity to spring - high sensitivity for reactive tilt
@@ -231,7 +231,7 @@
 		gridSpringY.set(scrollDelta * scrollVelocityFactor, { hard: true });
 		// Schedule bounce back to neutral (longer delay for visible effect)
 		setTimeout(() => gridSpringY.set(0), 150);
-		
+
 		lastScrollTop = newScrollTop;
 		scrollTop = newScrollTop;
 	}
@@ -241,7 +241,7 @@
 	let dragStartX = 0;
 	let dragStartY = 0;
 	let dragOffset = $state(0);
-	
+
 	// ... hold handlers ...
 
 	function handlePointerDown(e: PointerEvent) {
@@ -253,7 +253,7 @@
 		lastPointerX = e.clientX;
 		lastPointerY = e.clientY;
 		lastPointerTime = performance.now();
-		
+
 		// Only capture pointer in carousel mode - grid mode uses native scroll
 		if (viewMode !== 'grid') {
 			(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -265,7 +265,7 @@
 
 		const now = performance.now();
 		const dt = now - lastPointerTime;
-		
+
 		if (viewMode === 'grid') {
 			// Grid mode: elastic horizontal drag effect only
 			const deltaX = e.clientX - dragStartX;
@@ -277,16 +277,16 @@
 			// Carousel mode: horizontal drag to navigate cards
 			const deltaX = e.clientX - lastPointerX;
 			const DRAG_SENSITIVITY = 100; // pixels per card
-			
+
 			// Update drag offset (negative because drag left = next card)
 			dragOffset -= deltaX / DRAG_SENSITIVITY;
-			
+
 			// Track velocity for inertia
 			if (dt > 0) {
 				velocity = -deltaX / dt;
 			}
 		}
-		
+
 		lastPointerX = e.clientX;
 		lastPointerY = e.clientY;
 		lastPointerTime = now;
@@ -295,7 +295,7 @@
 	function handlePointerUp(e: PointerEvent) {
 		if (!isDragging) return;
 		isDragging = false;
-		
+
 		// Only release capture in carousel mode (where it was set)
 		if (viewMode !== 'grid') {
 			(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
@@ -346,14 +346,14 @@
 			const dx = e.touches[0].clientX - e.touches[1].clientX;
 			const dy = e.touches[0].clientY - e.touches[1].clientY;
 			const dist = Math.sqrt(dx * dx + dy * dy);
-			
+
 			// Map pinch distance change to column adjustment
 			// Pinch in (smaller dist) = more columns, pinch out = fewer columns
 			const ratio = initialPinchDist / dist;
 			// Scale to column range: pinch in doubles = +4 cols, pinch out halves = -4 cols
 			const colDelta = Math.round((ratio - 1) * 4);
 			const newColumns = Math.max(2, Math.min(8, initialColumns + colDelta));
-			
+
 			if (newColumns !== columns) {
 				// Dispatch event to parent to update columns
 				const event = new CustomEvent('columnschange', { detail: { columns: newColumns } });
@@ -362,22 +362,22 @@
 		} else if (!isPinching && e.touches.length === 1 && viewMode === 'grid') {
 			const currentX = e.touches[0].clientX;
 			const currentY = e.touches[0].clientY;
-			
+
 			// Horizontal: subtle elastic effect (face tilt)
 			const deltaX = currentX - touchStartX;
 			const elasticFactor = 0.08;
 			gridSpringX.set(deltaX * elasticFactor, { hard: true });
-			
+
 			// Vertical: programmatic scroll + face tilt
 			const deltaY = lastTouchY - currentY; // Positive = scroll down
 			if (scrollContainerRef) {
 				scrollContainerRef.scrollTop += deltaY;
 			}
-			
+
 			// Apply vertical tilt based on scroll velocity - high sensitivity for reactive tilt
 			const scrollVelocityFactor = 0.15;
 			gridSpringY.set(deltaY * scrollVelocityFactor, { hard: true });
-			
+
 			lastTouchY = currentY;
 		}
 	}
@@ -386,7 +386,7 @@
 		if (isPinching && e.touches.length < 2) {
 			isPinching = false;
 		}
-		
+
 		if (viewMode === 'grid') {
 			// Bounce back both horizontal and vertical tilt with spring animation
 			gridSpringX.set(0);
@@ -428,7 +428,7 @@
 		if (Math.abs(e.deltaY) > 20 || Math.abs(e.deltaX) > 20) {
 			const delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
 			goTo(currentIndex + Math.sign(delta));
-			
+
 			wheelTimeout = setTimeout(() => {
 				wheelTimeout = null;
 			}, 50); // Fast response
@@ -438,7 +438,7 @@
 	// Calculate visible indices
 	let visibleIndices = $derived.by(() => {
 		const result: number[] = [];
-		
+
 		if (viewMode === 'grid') {
 			// Sync currentIndex purely for valid calculation reference, though we use scrollTop mostly
 			// We calculate a "virtual" currentIndex based on scrollTop
@@ -454,7 +454,7 @@
 				result.push(i);
 			}
 		} else {
-// ...
+			// ...
 			const half = 20;
 			for (let i = -half; i <= half; i++) {
 				const idx = currentIndex + i;
@@ -484,49 +484,49 @@
 			const ps = pageSize;
 			const pageStart = Math.floor(currentIndex / ps) * ps;
 			const indexInPage = cardIndex - pageStart;
-			
+
 			const col = indexInPage % columns;
 			const totalRow = Math.floor(indexInPage / columns);
-			
+
 			// Center grid: (cols * spacing) / 2
 			const gridWidth = columns * GRID_SPACING_X;
 			const gridHeight = 3 * GRID_SPACING_Y; // Assume 3 rows visible
-			
+
 			// Cards stay in fixed positions (no horizontal movement from drag)
-			x = (col * GRID_SPACING_X) - (gridWidth / 2) + (GRID_SPACING_X / 2);
+			x = col * GRID_SPACING_X - gridWidth / 2 + GRID_SPACING_X / 2;
 
 			// Center vertically relative to camera
 			// Calculate scroll offset based on scrollTop
 			// The grid is centered at 0,0,0
 			// We shift the entire grid UP as we scroll DOWN
-			
+
 			const scrollRow = scrollTop / ROW_HEIGHT_PIXELS;
-				
+
 			// We position relative to the "Top" of the grid minus the scroll offset
 			// Row 0 should be at the top when scrollTop is 0
-			// 
+			//
 			// Let's assume camera is at Y=0 looking at center.
 			// At scroll 0, we want row 0 to be near top of screen.
-			// 
+			//
 			// Let's start row 0 at some positive Y offset.
 			const topY = 10; // Simple offset to bring row 0 into view
-			
-			const relativeRow = totalRow; 
-			
+
+			const relativeRow = totalRow;
+
 			// y = top - (row * spacing) + (scrollTopConverted)
 			// Actually we can just map row directly relative to scrollRow
-			
+
 			const effectiveRow = totalRow - scrollRow;
 			// For 3D: positive Y is UP.
 			// So row 0 is high up. Row 1 is lower.
 			// As we scroll (scrollTop increases), scrollRow increases, effectiveRow decreases?
 			// No. As we scroll down, we want to see lower rows.
 			// So row 10 should move UP into view.
-			
+
 			// If scrollRow = 0, row 0 is at topY.
 			// If scrollRow = 10, row 10 is at topY.
 			// So Y = topY - (row - scrollRow) * spacing
-			
+
 			// Offset to position first row at top of visible area (not cut off)
 			// Dynamic offset based on camera distance - more columns = camera further back = need more offset
 			// Base offset 1.4 works for 3 columns (camera ~12), scale proportionally
@@ -534,20 +534,20 @@
 			const cameraRatio = $cameraZ / baseCameraZ;
 			const visibleRowOffset = 1.2 * cameraRatio;
 			const y = (visibleRowOffset - (totalRow - scrollRow)) * GRID_SPACING_Y;
-			
+
 			z = 0;
 			// Face tilt based on drag/scroll - cards rotate to face direction
 			// Clamp to maximum tilt angle
 			const maxTiltRad = 0.2324;
-			
+
 			// Horizontal: rotY from horizontal drag
 			const rawTiltY = $gridSpringX * 0.5;
 			rotY = Math.max(-maxTiltRad, Math.min(maxTiltRad, rawTiltY));
-			
+
 			// Vertical: rotX from scroll velocity
 			const rawTiltX = $gridSpringY * 0.5;
 			const rotX = Math.max(-maxTiltRad, Math.min(maxTiltRad, rawTiltX));
-			
+
 			scale = 1.0;
 			opacity = 1;
 			distFromCenter = 0;
@@ -568,7 +568,7 @@
 					? CENTER_SCALE
 					: Math.max(SIDE_SCALE, CENTER_SCALE - distFromCenter * 0.35);
 			opacity = Math.max(0.4, 1 - distFromCenter * 0.25);
-			
+
 			return { x, z, rotY, rotX: 0, scale, opacity, distFromCenter, y: 0 };
 		}
 	}
@@ -629,36 +629,47 @@
 
 <!-- DEBUG PANEL - HIDDEN (set to true to show) -->
 {#if false && viewMode === 'grid'}
-<div class="bg-yellow-100 dark:bg-yellow-900 p-3 mb-2 rounded text-sm space-y-2">
-	<div class="font-bold">DEBUG: Card Sizing</div>
-	<div class="grid grid-cols-2 gap-2 text-xs">
-		<div>Container Width: <span class="font-mono">{containerWidth}px</span></div>
-		<div>Camera Z: <span class="font-mono">{$cameraZ.toFixed(2)}</span></div>
-		<div>Columns: <span class="font-mono">{columns}</span></div>
-		<div>Target Card Width: <span class="font-mono">{debugTargetCardWidth}px</span></div>
-		<div>Mode: <span class="font-mono">{containerWidth < 768 ? 'Mobile' : 'Desktop'}</span></div>
-		<div>Override: <span class="font-mono">{debugManualOverride ? 'ON' : 'OFF'}</span></div>
+	<div class="bg-yellow-100 dark:bg-yellow-900 p-3 mb-2 rounded text-sm space-y-2">
+		<div class="font-bold">DEBUG: Card Sizing</div>
+		<div class="grid grid-cols-2 gap-2 text-xs">
+			<div>Container Width: <span class="font-mono">{containerWidth}px</span></div>
+			<div>Camera Z: <span class="font-mono">{$cameraZ.toFixed(2)}</span></div>
+			<div>Columns: <span class="font-mono">{columns}</span></div>
+			<div>Target Card Width: <span class="font-mono">{debugTargetCardWidth}px</span></div>
+			<div>Mode: <span class="font-mono">{containerWidth < 768 ? 'Mobile' : 'Desktop'}</span></div>
+			<div>Override: <span class="font-mono">{debugManualOverride ? 'ON' : 'OFF'}</span></div>
+		</div>
+		<div class="flex items-center gap-2">
+			<input type="checkbox" id="debug-override" bind:checked={debugManualOverride} />
+			<label for="debug-override" class="text-xs">Manual Override</label>
+		</div>
+		<div class="flex items-center gap-2">
+			<span class="text-xs">Target Card Width:</span>
+			<input
+				type="range"
+				min="50"
+				max="800"
+				bind:value={debugTargetCardWidth}
+				class="flex-1"
+				disabled={!debugManualOverride}
+			/>
+			<span class="font-mono text-xs w-16">{debugTargetCardWidth}px</span>
+		</div>
+		<div class="text-xs text-gray-600">
+			Computed: {columns} cards × {debugTargetCardWidth}px = {columns * debugTargetCardWidth}px
+			(container: {containerWidth}px)
+		</div>
 	</div>
-	<div class="flex items-center gap-2">
-		<input type="checkbox" id="debug-override" bind:checked={debugManualOverride} />
-		<label for="debug-override" class="text-xs">Manual Override</label>
-	</div>
-	<div class="flex items-center gap-2">
-		<span class="text-xs">Target Card Width:</span>
-		<input type="range" min="50" max="800" bind:value={debugTargetCardWidth} class="flex-1" disabled={!debugManualOverride} />
-		<span class="font-mono text-xs w-16">{debugTargetCardWidth}px</span>
-	</div>
-	<div class="text-xs text-gray-600">
-		Computed: {columns} cards × {debugTargetCardWidth}px = {columns * debugTargetCardWidth}px (container: {containerWidth}px)
-	</div>
-</div>
 {/if}
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-<div 
+<div
 	bind:this={scrollContainerRef}
-	class="relative w-full select-none h-[180px] sm:h-[200px] md:h-[240px] lg:h-[280px] xl:h-[320px] {viewMode === 'grid' ? 'overflow-y-auto overflow-x-hidden !h-[380px] sm:!h-[480px] md:!h-[580px] lg:!h-[700px] xl:!h-[800px]' : 'overflow-hidden'}"
+	class="relative w-full select-none h-[180px] sm:h-[200px] md:h-[240px] lg:h-[280px] xl:h-[320px] {viewMode ===
+	'grid'
+		? 'overflow-y-auto overflow-x-hidden !h-[380px] sm:!h-[480px] md:!h-[580px] lg:!h-[700px] xl:!h-[800px]'
+		: 'overflow-hidden'}"
 	role="application"
 	aria-roledescription="3D card carousel"
 	onscroll={handleScroll}
@@ -680,86 +691,83 @@
 		ontouchmove={handleTouchMove}
 		ontouchend={handleTouchEnd}
 	>
+		<Canvas toneMapping={NoToneMapping}>
+			<T.PerspectiveCamera makeDefault position={[0, $cameraY, $cameraZ]} fov={50} />
+			<T.AmbientLight intensity={1.2} />
+			<T.DirectionalLight position={[4, 4, 6]} intensity={0.7} />
 
+			{#each visibleIndices as cardIndex (cardIndex)}
+				{@const card = cards[cardIndex]}
+				{@const transform = getCardTransform(cardIndex)}
 
-	<Canvas toneMapping={NoToneMapping}>
-		<T.PerspectiveCamera makeDefault position={[0, $cameraY, $cameraZ]} fov={50} />
-		<T.AmbientLight intensity={1.2} />
-		<T.DirectionalLight position={[4, 4, 6]} intensity={0.7} />
+				<!-- Use new component - texture handling is isolated here -->
+				<Carousel3DItem
+					url={getImageUrl(card)}
+					{card}
+					geometry={cardGeometry}
+					{borderGeometry}
+					{transform}
+					{onCardClick}
+					{isDragging}
+				/>
+			{/each}
+		</Canvas>
 
-
-
-		{#each visibleIndices as cardIndex (cardIndex)}
-			{@const card = cards[cardIndex]}
-			{@const transform = getCardTransform(cardIndex)}
-
-			<!-- Use new component - texture handling is isolated here -->
-			<Carousel3DItem
-				url={getImageUrl(card)}
-				{card}
-				geometry={cardGeometry}
-				{borderGeometry}
-				{transform}
-				{onCardClick}
-				{isDragging}
-			/>
-		{/each}
-	</Canvas>
-
-	<!-- Nav Buttons -->
-	{#if viewMode !== 'grid'}
-	<button
-		type="button"
-		class="absolute left-2 sm:left-6 top-1/2 -translate-y-1/2 p-3 sm:p-4 rounded-full bg-background/95 border border-border shadow-xl hover:bg-accent transition-all disabled:opacity-30 z-10"
-		onmousedown={() => startHolding('prev')}
-		onmouseup={stopHolding}
-		onmouseleave={stopHolding}
-		ontouchstart={() => startHolding('prev')}
-		ontouchend={stopHolding}
-		disabled={currentIndex === 0}
-		aria-label="Previous"
-	>
-		<svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"
-			></path>
-		</svg>
-	</button>
-
-	<button
-		type="button"
-		class="absolute right-2 sm:right-6 top-1/2 -translate-y-1/2 p-3 sm:p-4 rounded-full bg-background/95 border border-border shadow-xl hover:bg-accent transition-all disabled:opacity-30 z-10"
-		onmousedown={() => startHolding('next')}
-		onmouseup={stopHolding}
-		onmouseleave={stopHolding}
-		ontouchstart={() => startHolding('next')}
-		ontouchend={stopHolding}
-		disabled={currentIndex === cards.length - 1}
-		aria-label="Next"
-	>
-		<svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-		</svg>
-	</button>
-	{/if}
-
-	<!-- Dot indicators -->
-	{#if viewMode !== 'grid'}
-	<div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
-		{#each cards.slice(0, 8) as _, i}
+		<!-- Nav Buttons -->
+		{#if viewMode !== 'grid'}
 			<button
 				type="button"
-				class="w-2.5 h-2.5 rounded-full transition-all duration-300 {i === currentIndex
-					? 'bg-primary w-6'
-					: 'bg-muted-foreground/40 hover:bg-muted-foreground/60'}"
-				onclick={() => goTo(i)}
-				aria-label="Go to card {i + 1}"
-			></button>
-		{/each}
-		{#if cards.length > 8}
-			<span class="text-xs text-muted-foreground ml-1">+{cards.length - 8}</span>
+				class="absolute left-2 sm:left-6 top-1/2 -translate-y-1/2 p-3 sm:p-4 rounded-full bg-background/95 border border-border shadow-xl hover:bg-accent transition-all disabled:opacity-30 z-10"
+				onmousedown={() => startHolding('prev')}
+				onmouseup={stopHolding}
+				onmouseleave={stopHolding}
+				ontouchstart={() => startHolding('prev')}
+				ontouchend={stopHolding}
+				disabled={currentIndex === 0}
+				aria-label="Previous"
+			>
+				<svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"
+					></path>
+				</svg>
+			</button>
+
+			<button
+				type="button"
+				class="absolute right-2 sm:right-6 top-1/2 -translate-y-1/2 p-3 sm:p-4 rounded-full bg-background/95 border border-border shadow-xl hover:bg-accent transition-all disabled:opacity-30 z-10"
+				onmousedown={() => startHolding('next')}
+				onmouseup={stopHolding}
+				onmouseleave={stopHolding}
+				ontouchstart={() => startHolding('next')}
+				ontouchend={stopHolding}
+				disabled={currentIndex === cards.length - 1}
+				aria-label="Next"
+			>
+				<svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"
+					></path>
+				</svg>
+			</button>
 		{/if}
-	</div>
-	{/if}
+
+		<!-- Dot indicators -->
+		{#if viewMode !== 'grid'}
+			<div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+				{#each cards.slice(0, 8) as _, i}
+					<button
+						type="button"
+						class="w-2.5 h-2.5 rounded-full transition-all duration-300 {i === currentIndex
+							? 'bg-primary w-6'
+							: 'bg-muted-foreground/40 hover:bg-muted-foreground/60'}"
+						onclick={() => goTo(i)}
+						aria-label="Go to card {i + 1}"
+					></button>
+				{/each}
+				{#if cards.length > 8}
+					<span class="text-xs text-muted-foreground ml-1">+{cards.length - 8}</span>
+				{/if}
+			</div>
+		{/if}
 	</div>
 
 	<!-- Phantom spacer to create scrollable area -->

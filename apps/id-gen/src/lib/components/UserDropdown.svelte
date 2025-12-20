@@ -205,7 +205,7 @@
 				</DropdownMenu.SubTrigger>
 				<DropdownMenu.SubContent class="w-48">
 					{#each availableRoles as role}
-						<DropdownMenu.Item 
+						<DropdownMenu.Item
 							onSelect={() => startEmulation(role.value)}
 							disabled={emulationLoading}
 						>

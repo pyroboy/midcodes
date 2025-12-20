@@ -20,7 +20,7 @@ export interface ImageUploadResult {
 	backPath: string;
 	frontPreviewPath: string;
 	backPreviewPath: string;
-	rawAssets: Record<string, { path: string, type: string }>;
+	rawAssets: Record<string, { path: string; type: string }>;
 	error?: string;
 }
 
@@ -51,7 +51,7 @@ export async function handleImageUploads(
 		}
 
 		const cardId = uuidv4();
-		
+
 		const variants = [
 			{ variant: 'full' as const, side: 'front' as const, blob: frontImage, ext: 'png' },
 			{ variant: 'full' as const, side: 'back' as const, blob: backImage, ext: 'png' },
@@ -63,7 +63,11 @@ export async function handleImageUploads(
 			variants.map(async (v) => {
 				if (!v.blob) return null;
 				const path = getCardAssetPath(orgId, templateId, cardId, v.variant, v.side, v.ext);
-				await uploadToR2(path, v.blob, v.blob.type || (v.ext === 'png' ? 'image/png' : 'image/jpeg'));
+				await uploadToR2(
+					path,
+					v.blob,
+					v.blob.type || (v.ext === 'png' ? 'image/png' : 'image/jpeg')
+				);
 				return { variant: v.variant, side: v.side, path };
 			})
 		);
@@ -83,13 +87,15 @@ export async function handleImageUploads(
 		if (errors.length > 0) {
 			// Cleanup any successful uploads
 			await Promise.allSettled(
-				uploads.map((res) => (res.status === 'fulfilled' && res.value ? deleteFromR2(res.value.path) : null))
+				uploads.map((res) =>
+					res.status === 'fulfilled' && res.value ? deleteFromR2(res.value.path) : null
+				)
 			);
 			return { error: `Image upload failed: ${errors[0]?.message || 'Unknown error'}` };
 		}
 
 		// Handle Raw Assets (Photos, Signatures)
-		const rawAssets: Record<string, { path: string, type: string }> = {};
+		const rawAssets: Record<string, { path: string; type: string }> = {};
 		for (const [key, value] of formData.entries()) {
 			if (key.startsWith('raw_asset_') && value instanceof Blob) {
 				const variableName = key.replace('raw_asset_', '');
@@ -138,7 +144,7 @@ export async function saveIdCardData({
 	backPath: string;
 	frontPreviewPath?: string;
 	backPreviewPath?: string;
-	rawAssets?: Record<string, { path: string, type: string }>;
+	rawAssets?: Record<string, { path: string; type: string }>;
 	formFields: Record<string, string>;
 	createDigitalCard?: boolean;
 	userId?: string;
@@ -179,7 +185,7 @@ export async function saveIdCardData({
 		if (createDigitalCard && idCard.id) {
 			const slug = generateSlug();
 			const code = generateClaimCode();
-			
+
 			const [dcData] = await db
 				.insert(digitalCards)
 				.values({
@@ -193,7 +199,7 @@ export async function saveIdCardData({
 					updatedAt: new Date()
 				})
 				.returning();
-			
+
 			if (dcData) {
 				digitalCard = {
 					...dcData,
@@ -206,7 +212,7 @@ export async function saveIdCardData({
 			}
 		}
 
-		return { 
+		return {
 			data: {
 				...idCard,
 				template_id: idCard.templateId,
@@ -215,9 +221,9 @@ export async function saveIdCardData({
 				back_image: idCard.backImage,
 				front_image_low_res: idCard.frontImageLowRes,
 				back_image_low_res: idCard.backImageLowRes
-			}, 
-			digitalCard, 
-			claimCode 
+			},
+			digitalCard,
+			claimCode
 		};
 	} catch (err) {
 		console.error('Error in saveIdCardData:', err);

@@ -389,11 +389,11 @@
 
 		return new Promise((resolve, reject) => {
 			let src = url;
-            // Check if it's an R2 URL that needs proxying
-            if (url.includes('.r2.dev') || url.includes('.r2.cloudflarestorage.com')) {
-                 src = `/api/image-proxy?url=${encodeURIComponent(url)}`;
-				 console.log(`[IdCanvas] Proxying image: ${url} -> ${src}`);
-            } else {
+			// Check if it's an R2 URL that needs proxying
+			if (url.includes('.r2.dev') || url.includes('.r2.cloudflarestorage.com')) {
+				src = `/api/image-proxy?url=${encodeURIComponent(url)}`;
+				console.log(`[IdCanvas] Proxying image: ${url} -> ${src}`);
+			} else {
 				console.log(`[IdCanvas] Loading image directly: ${url}`);
 			}
 
@@ -617,7 +617,9 @@
 
 		try {
 			// Use fontSize (new) with fallback to size (legacy) for backwards compatibility
-			const fontSize = Math.round((element.fontSize || element.size || 12) * renderCoordSystem.scale);
+			const fontSize = Math.round(
+				(element.fontSize || element.size || 12) * renderCoordSystem.scale
+			);
 			const fontOptions = {
 				// Use fontFamily (new) with fallback to font (legacy)
 				family: element.fontFamily || element.font,
@@ -730,7 +732,8 @@
 		renderCoordSystem: CoordinateSystem,
 		isOffScreen: boolean
 	) {
-		if (element.type !== 'photo' && element.type !== 'signature' && element.type !== 'graphic') return;
+		if (element.type !== 'photo' && element.type !== 'signature' && element.type !== 'graphic')
+			return;
 
 		try {
 			// Graphics use element.content as URL, photos/signatures use fileUploads
@@ -889,7 +892,7 @@
 			const roundedHeight = Math.round(height);
 
 			// Transparent background (don't fill)
-			
+
 			// Dashed border
 			ctx.save();
 			ctx.strokeStyle = '#aaaaaa';
@@ -901,14 +904,14 @@
 			// Uniform text size based on card scale (standardized)
 			ctx.fillStyle = '#aaaaaa';
 			const fontSize = Math.round(24 * scale);
-			
+
 			ctx.font = `${fontSize}px Arial`;
 			ctx.textAlign = 'center';
 			ctx.textBaseline = 'middle';
-			
+
 			// Format type string (e.g. "photo" -> "Photo")
 			const label = type.charAt(0).toUpperCase() + type.slice(1);
-			
+
 			ctx.fillText(
 				label,
 				Math.round(roundedX + roundedWidth / 2),

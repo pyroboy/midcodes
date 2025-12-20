@@ -26,18 +26,20 @@
 	async function downloadImage(url: string, bucket: string): Promise<File> {
 		// Handle both full URLs and storage paths
 		// Use getProxiedUrl to avoid CORS issues when fetching the image
-		const fullUrl = url.startsWith('http') 
-			? (url.includes('assets.kanaya.app') || url.includes('r2.dev') ? getProxiedUrl(url) : url)
+		const fullUrl = url.startsWith('http')
+			? url.includes('assets.kanaya.app') || url.includes('r2.dev')
+				? getProxiedUrl(url)
+				: url
 			: getProxiedUrl(url, bucket);
-		
+
 		if (!fullUrl) throw new Error('Invalid image URL');
 
 		// Add cache buster to ensure we get the file
 		const fetchUrl = `${fullUrl}${fullUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
-		
+
 		const response = await fetch(fetchUrl);
 		if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
-		
+
 		const blob = await response.blob();
 		// Use a generic name, we'll rename in createLowResVersion or upload
 		return new File([blob], 'source_image.jpg', { type: blob.type });
@@ -49,15 +51,15 @@
 		formData.append('file', file);
 		formData.append('path', path);
 		formData.append('bucket', bucket);
-		
+
 		const response = await fetch('?/uploadThumbnail', {
 			method: 'POST',
 			body: formData
 		});
-		
+
 		const result = await response.json();
 		console.log('Upload result:', result);
-		
+
 		// SvelteKit uses devalue serialization for form action responses
 		// The response format is: {type: 'success', status: 200, data: '[{...refs...}, value1, value2, ...]'}
 		if (result.type === 'success' && result.status === 200 && result.data) {
@@ -76,12 +78,12 @@
 				console.error('Failed to parse response:', e);
 			}
 		}
-		
+
 		// Fallback: check standard format
 		if (result.data?.success && result.data?.path) {
 			return getStorageUrl(result.data.path, bucket);
 		}
-		
+
 		const errorMsg = result.data?.message || result.error?.message || 'Upload failed';
 		console.error('Upload failed:', errorMsg, result);
 		throw new Error(errorMsg);
@@ -101,16 +103,16 @@
 			const item = itemsToOptimize[i];
 			const isTemplate = item.type === 'template';
 			currentItem = `Processing ${isTemplate ? 'Template' : 'ID Card'}: ${item.name || item.id} (${i + 1}/${totalToProcess})`;
-			
+
 			// Determine property names and bucket based on type
 			const bucket = isTemplate ? 'templates' : 'rendered-id-cards';
 			const frontSrc = isTemplate ? item.front_background : item.front_image;
 			const backSrc = isTemplate ? item.back_background : item.back_image;
-			
+
 			// Paths
 			let frontLowResUrl = isTemplate ? item.front_background_low_res : item.front_image_low_res;
 			let backLowResUrl = isTemplate ? item.back_background_low_res : item.back_image_low_res;
-			
+
 			try {
 				let updated = false;
 
@@ -118,10 +120,10 @@
 				if (frontSrc && !frontLowResUrl) {
 					addLog(`Downloading front for "${item.name || item.id}"...`);
 					const file = await downloadImage(frontSrc, bucket);
-					
+
 					addLog(`Resizing front...`);
 					const lowResFile = await createLowResVersion(file);
-					
+
 					addLog(`Uploading front thumbnail...`);
 					// Derive path from original to keep in same folder (handles RLS scoping better)
 					let uploadPath;
@@ -150,12 +152,12 @@
 				if (backSrc && !backLowResUrl) {
 					addLog(`Downloading back for "${item.name || item.id}"...`);
 					const file = await downloadImage(backSrc, bucket);
-					
+
 					addLog(`Resizing back...`);
 					const lowResFile = await createLowResVersion(file);
-					
+
 					addLog(`Uploading back thumbnail...`);
-					
+
 					let uploadPath;
 					if (isTemplate) {
 						uploadPath = `system_batch/back_low_${item.id}_${Date.now()}.jpg`;
@@ -186,7 +188,7 @@
 						method: 'POST',
 						body: formData
 					});
-					
+
 					if (res.ok) {
 						addLog(`✅ Successfully updated "${item.name || item.id}"`, 'success');
 						processedCount++;
@@ -196,7 +198,6 @@
 				} else {
 					addLog(`Skipped "${item.name || item.id}" - no update needed`, 'info');
 				}
-
 			} catch (err: any) {
 				console.error(err);
 				addLog(`❌ Error processing "${item.name || item.id}": ${err.message}`, 'error');
@@ -207,11 +208,14 @@
 			progress = Math.round(((i + 1) / totalToProcess) * 100);
 		}
 
-		addLog(`Batch processing complete! Processed: ${processedCount}, Errors: ${errorsCount}`, 'success');
+		addLog(
+			`Batch processing complete! Processed: ${processedCount}, Errors: ${errorsCount}`,
+			'success'
+		);
 		currentItem = 'Done';
 		processing = false;
 		toast.success('Batch optimization completed');
-		
+
 		// Refresh page data
 		window.location.reload();
 	}
@@ -221,33 +225,51 @@
 	<!-- Header Stats -->
 	<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
 		<div class="bg-card border border-border rounded-xl p-6 shadow-sm">
-			<h3 class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Items</h3>
+			<h3 class="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+				Total Items
+			</h3>
 			<div class="mt-2 flex items-baseline gap-2">
-				<span class="text-3xl font-bold text-foreground">{data.stats.needsOptimization + data.stats.optimizedTemplates + data.stats.optimizedCards}</span>
+				<span class="text-3xl font-bold text-foreground"
+					>{data.stats.needsOptimization +
+						data.stats.optimizedTemplates +
+						data.stats.optimizedCards}</span
+				>
 			</div>
 			<div class="text-xs text-muted-foreground mt-1">
 				{data.stats.totalTemplates} Templates, {data.stats.totalCards} Cards
 			</div>
 		</div>
-		
+
 		<div class="bg-card border border-border rounded-xl p-6 shadow-sm">
-			<h3 class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Templates Needed</h3>
+			<h3 class="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+				Templates Needed
+			</h3>
 			<div class="mt-2 flex items-baseline gap-2">
-				<span class="text-3xl font-bold text-amber-600">{data.itemsToOptimize.filter(i => i.type === 'template').length}</span>
+				<span class="text-3xl font-bold text-amber-600"
+					>{data.itemsToOptimize.filter((i) => i.type === 'template').length}</span
+				>
 			</div>
 		</div>
 
 		<div class="bg-card border border-border rounded-xl p-6 shadow-sm">
-			<h3 class="text-xs font-medium text-muted-foreground uppercase tracking-wider">ID Cards Needed</h3>
+			<h3 class="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+				ID Cards Needed
+			</h3>
 			<div class="mt-2 flex items-baseline gap-2">
-				<span class="text-3xl font-bold text-amber-600">{data.itemsToOptimize.filter(i => i.type === 'idcard').length}</span>
+				<span class="text-3xl font-bold text-amber-600"
+					>{data.itemsToOptimize.filter((i) => i.type === 'idcard').length}</span
+				>
 			</div>
 		</div>
-		
+
 		<div class="bg-card border border-border rounded-xl p-6 shadow-sm">
-			<h3 class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Optimized</h3>
+			<h3 class="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+				Total Optimized
+			</h3>
 			<div class="mt-2 flex items-baseline gap-2">
-				<span class="text-3xl font-bold text-green-600">{data.stats.optimizedTemplates + data.stats.optimizedCards}</span>
+				<span class="text-3xl font-bold text-green-600"
+					>{data.stats.optimizedTemplates + data.stats.optimizedCards}</span
+				>
 			</div>
 		</div>
 	</div>
@@ -258,10 +280,11 @@
 			<div>
 				<h2 class="text-lg font-semibold text-foreground">Batch Optimization Tool</h2>
 				<p class="text-sm text-muted-foreground">
-					Automatically generate and upload low-resolution thumbnails (300px) for all items (Templates and ID Cards) that are missing them.
+					Automatically generate and upload low-resolution thumbnails (300px) for all items
+					(Templates and ID Cards) that are missing them.
 				</p>
 			</div>
-			
+
 			<button
 				onclick={processBatch}
 				disabled={processing || totalToProcess === 0}
@@ -278,7 +301,7 @@
 					<span class="text-muted-foreground">{progress}%</span>
 				</div>
 				<div class="h-2 w-full bg-muted rounded-full overflow-hidden">
-					<div 
+					<div
 						class="h-full bg-primary transition-all duration-300 ease-out"
 						style="width: {progress}%"
 					></div>
@@ -290,9 +313,13 @@
 	<!-- Logs / Audit -->
 	<div class="bg-card border border-border rounded-xl p-6 shadow-sm">
 		<h3 class="text-lg font-semibold text-foreground mb-4">Process Audit Log</h3>
-		<div class="bg-muted/50 rounded-lg border border-border p-4 h-96 overflow-y-auto font-mono text-sm space-y-1">
+		<div
+			class="bg-muted/50 rounded-lg border border-border p-4 h-96 overflow-y-auto font-mono text-sm space-y-1"
+		>
 			{#if logs.length === 0}
-				<div class="text-muted-foreground italic text-center py-8">No logs yet. Start the process to see activity.</div>
+				<div class="text-muted-foreground italic text-center py-8">
+					No logs yet. Start the process to see activity.
+				</div>
 			{:else}
 				{#each logs as log}
 					<div class="border-b border-border/10 pb-1 last:border-0 last:pb-0">

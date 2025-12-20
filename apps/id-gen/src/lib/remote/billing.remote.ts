@@ -9,11 +9,11 @@ import { eq, desc, and, sql } from 'drizzle-orm';
 async function requireSuperAdminPermissions() {
 	const { locals } = getRequestEvent();
 	const user = locals.user;
-	
+
 	if (!user || user.role !== 'super_admin') {
 		throw error(403, 'Super admin privileges required.');
 	}
-	
+
 	return { user, org_id: locals.org_id };
 }
 
@@ -29,14 +29,15 @@ export const getBillingSettings = query(async (): Promise<any> => {
 
 		if (!settings) {
 			// Initialize default settings if missing
-			const [newSettings] = await db.insert(schema.orgSettings)
-				.values({ 
-					orgId: org_id, 
-					paymentsEnabled: true, 
-					paymentsBypass: false 
+			const [newSettings] = await db
+				.insert(schema.orgSettings)
+				.values({
+					orgId: org_id,
+					paymentsEnabled: true,
+					paymentsBypass: false
 				})
 				.returning();
-			
+
 			return {
 				...newSettings,
 				updated_at: newSettings.updatedAt?.toISOString() || null
@@ -64,7 +65,8 @@ export const togglePayments = command('unchecked', async ({ enabled, keyword }: 
 	}
 
 	try {
-		await db.update(schema.orgSettings)
+		await db
+			.update(schema.orgSettings)
 			.set({
 				paymentsEnabled: enabled,
 				updatedBy: user?.id ?? null,
@@ -85,7 +87,8 @@ export const setPaymentsBypass = command('unchecked', async ({ bypass }: any) =>
 	if (!org_id) throw error(500, 'Org ID missing');
 
 	try {
-		await db.update(schema.orgSettings)
+		await db
+			.update(schema.orgSettings)
 			.set({
 				paymentsBypass: bypass,
 				updatedBy: user!.id,
@@ -106,7 +109,8 @@ export const getUsersWithCredits = query(async (): Promise<any[]> => {
 	if (!org_id) throw error(500, 'Org ID missing');
 
 	try {
-		const users = await db.select({
+		const users = await db
+			.select({
 				id: schema.profiles.id,
 				email: schema.profiles.email,
 				role: schema.profiles.role,
@@ -122,7 +126,7 @@ export const getUsersWithCredits = query(async (): Promise<any[]> => {
 			.where(eq(schema.profiles.orgId, org_id))
 			.orderBy(desc(schema.profiles.createdAt));
 
-		return users.map(u => ({
+		return users.map((u) => ({
 			...u,
 			updated_at: u.updated_at?.toISOString() || null,
 			created_at: u.created_at?.toISOString() || null
@@ -150,15 +154,17 @@ export const adjustUserCredits = command('unchecked', async ({ userId, delta, re
 		const after = Math.max(0, before + delta);
 
 		// Update profile
-		await db.update(schema.profiles)
-			.set({ 
-				creditsBalance: after, 
-				updatedAt: new Date() 
+		await db
+			.update(schema.profiles)
+			.set({
+				creditsBalance: after,
+				updatedAt: new Date()
 			})
 			.where(eq(schema.profiles.id, userId));
 
 		// Record transaction
-		const description = reason || (delta >= 0 ? 'Manual credit addition' : 'Manual credit deduction');
+		const description =
+			reason || (delta >= 0 ? 'Manual credit addition' : 'Manual credit deduction');
 
 		try {
 			await db.insert(schema.creditTransactions).values({

@@ -1,25 +1,23 @@
 {
-    "$schema": "node_modules/wrangler/config-schema.json",
-    "name": "midcodes",
-    "compatibility_date": "2024-12-01",
-    "compatibility_flags": [
-        "nodejs_compat"
-    ],
-    "vars": {
-        "NODE_ENV": "production"
-    },
-    // Use this section only if you want different vars for preview/prod
-    "env": {
-        "preview": {
-            "vars": {
-                "NODE_ENV": "development"
-            }
-        },
-        "production": {
-            "vars": {
-                "NODE_ENV": "production",
-                "BETTER_AUTH_URL": "https://kanaya.app"
-            }
-        }
-    }
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "midcodes",
+	"compatibility_date": "2024-12-01",
+	"compatibility_flags": ["nodejs_compat"],
+	"vars": {
+		"NODE_ENV": "production"
+	},
+	// Use this section only if you want different vars for preview/prod
+	"env": {
+		"preview": {
+			"vars": {
+				"NODE_ENV": "development"
+			}
+		},
+		"production": {
+			"vars": {
+				"NODE_ENV": "production",
+				"BETTER_AUTH_URL": "https://kanaya.app"
+			}
+		}
+	}
 }

@@ -2,7 +2,16 @@
 	import { fade } from 'svelte/transition';
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-	import { Copy, Trash2, Edit, Plus, FileText, Image as ImageIcon, Type, MoreVertical } from '@lucide/svelte';
+	import {
+		Copy,
+		Trash2,
+		Edit,
+		Plus,
+		FileText,
+		Image as ImageIcon,
+		Type,
+		MoreVertical
+	} from '@lucide/svelte';
 	import type { TemplateData, TemplateElement } from '../stores/templateStore';
 	import { goto } from '$app/navigation';
 	import { invalidate } from '$app/navigation';
@@ -13,10 +22,23 @@
 	import type { TemplateAsset } from '$lib/schemas/template-assets.schema';
 	import { getProxiedUrl } from '$lib/utils/storage';
 
-	let { templates = $bindable([]), onSelect, onCreateNew, units = 'in', dpi = 300, savingTemplateId = null }: {
+	let {
+		templates = $bindable([]),
+		onSelect,
+		onCreateNew,
+		units = 'in',
+		dpi = 300,
+		savingTemplateId = null
+	}: {
 		templates: any[];
 		onSelect: (id: string) => void;
-		onCreateNew?: (cardSize: CardSize, templateName: string, orientation?: 'landscape' | 'portrait', frontBackgroundUrl?: string, selectedTemplateAsset?: TemplateAsset) => void;
+		onCreateNew?: (
+			cardSize: CardSize,
+			templateName: string,
+			orientation?: 'landscape' | 'portrait',
+			frontBackgroundUrl?: string,
+			selectedTemplateAsset?: TemplateAsset
+		) => void;
 		units?: string;
 		dpi?: number;
 		savingTemplateId?: string | null;
@@ -58,10 +80,10 @@
 	// Uses higher precision to ensure pixel-perfect positioning
 	function getElementStyle(el: TemplateElement, templateW: number, templateH: number) {
 		// Use high precision percentages to avoid sub-pixel rounding issues
-		const left = ((el.x / templateW) * 100);
-		const top = ((el.y / templateH) * 100);
-		const width = ((el.width / templateW) * 100);
-		const height = ((el.height / templateH) * 100);
+		const left = (el.x / templateW) * 100;
+		const top = (el.y / templateH) * 100;
+		const width = (el.width / templateW) * 100;
+		const height = (el.height / templateH) * 100;
 		const rotation = el.rotation || 0;
 
 		return `
@@ -81,9 +103,7 @@
 		// This ensures text scales proportionally with the container
 		// Use fontSize (new) with fallback to size (legacy) for backwards compatibility
 		const fontSizeCqw = ((el.fontSize || el.size || 16) / templateW) * 100;
-		const letterSpacingCqw = el.letterSpacing
-			? (el.letterSpacing / templateW) * 100
-			: null;
+		const letterSpacingCqw = el.letterSpacing ? (el.letterSpacing / templateW) * 100 : null;
 
 		return `
 			font-family: "${el.fontFamily || el.font || 'Arial'}", sans-serif;
@@ -103,7 +123,6 @@
 			word-break: break-word;
 		`;
 	}
-
 
 	let selectedTemplate: TemplateData | null = null;
 	let notification: string | null = $state(null);
@@ -198,10 +217,16 @@
 	function handleCreateNew() {
 		showSizeDialog = true;
 	}
-	function handleSizeSelected(event: CustomEvent<{ cardSize: CardSize; templateName: string; selectedTemplateAsset?: TemplateAsset }>) {
+	function handleSizeSelected(
+		event: CustomEvent<{
+			cardSize: CardSize;
+			templateName: string;
+			selectedTemplateAsset?: TemplateAsset;
+		}>
+	) {
 		const { cardSize, templateName, selectedTemplateAsset } = event.detail;
 		showSizeDialog = false;
-		
+
 		// Debug: Log the event details
 		console.log('📤 [TemplateList] handleSizeSelected:', {
 			cardSize,
@@ -209,10 +234,10 @@
 			selectedTemplateAsset,
 			selectedTemplateAsset_image_url: selectedTemplateAsset?.image_url
 		});
-		
+
 		// Determine orientation from card dimensions
 		const orientation = cardSize.width < cardSize.height ? 'portrait' : 'landscape';
-		
+
 		// Pass all parameters including the front background URL
 		onCreateNew?.(cardSize, templateName, orientation, selectedTemplateAsset?.image_url);
 	}
@@ -271,12 +296,14 @@
 								{#if template.front_background}
 									<img
 										src={(() => {
-                                            // Prefer low-res if available
-                                            const url = template.front_background_low_res || template.front_background;
-											return (url.startsWith('http') || url.startsWith('data:') || url.startsWith('blob:'))
+											// Prefer low-res if available
+											const url = template.front_background_low_res || template.front_background;
+											return url.startsWith('http') ||
+												url.startsWith('data:') ||
+												url.startsWith('blob:')
 												? url
 												: getProxiedUrl(url, 'templates');
-                                        })()}
+										})()}
 										alt={template.name}
 										class="w-full h-full object-cover"
 										loading="lazy"
@@ -306,14 +333,11 @@
 												{#if el.type === 'photo'}
 													<ImageIcon class="w-3 h-3 text-blue-500/50" />
 												{:else if el.type === 'text' || el.type === 'selection'}
-									<span
-										class="truncate px-0.5"
-										style="{getTextStyle(el, dims.w)}"
-									>
-										{el.type === 'selection' 
-											? (el.content || el.options?.[0] || '')
-											: (el.content || '')}
-									</span>
+													<span class="truncate px-0.5" style={getTextStyle(el, dims.w)}>
+														{el.type === 'selection'
+															? el.content || el.options?.[0] || ''
+															: el.content || ''}
+													</span>
 												{:else if el.type === 'qr'}
 													<div class="w-full h-full bg-black/10 flex items-center justify-center">
 														<div class="w-1/2 h-1/2 bg-black/20"></div>
@@ -332,11 +356,15 @@
 								<div
 									class="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-200"
 								></div>
-								
+
 								<!-- Loading Overlay -->
 								{#if savingTemplateId === template.id}
-									<div class="absolute inset-0 bg-white/50 backdrop-blur-sm flex items-center justify-center z-20 transition-all duration-300">
-										<div class="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+									<div
+										class="absolute inset-0 bg-white/50 backdrop-blur-sm flex items-center justify-center z-20 transition-all duration-300"
+									>
+										<div
+											class="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"
+										></div>
 									</div>
 								{/if}
 							</div>

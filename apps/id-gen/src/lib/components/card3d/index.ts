@@ -61,9 +61,5 @@ export {
 } from './overlay-helpers';
 
 // Tap controller
-export {
-	initTapWobble,
-	updateTapWobble,
-	uvToLocalCoords
-} from './TapController';
+export { initTapWobble, updateTapWobble, uvToLocalCoords } from './TapController';
 export type { TapWobbleState } from './TapController';

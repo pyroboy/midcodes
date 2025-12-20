@@ -29,34 +29,34 @@
 
 	<section id="overview">
 		<h2>I. System Overview</h2>
-		
+
 		<p>
-			The Kanaya Asset Management System provides a comprehensive framework for managing all visual 
-			assets across the platform—from admin-created templates to user-generated ID cards. The system 
+			The Kanaya Asset Management System provides a comprehensive framework for managing all visual
+			assets across the platform—from admin-created templates to user-generated ID cards. The system
 			is designed with three core principles:
 		</p>
 
 		<div class="pillar">
 			<h3>Cost-Effective Processing</h3>
 			<p>
-				All image processing happens client-side using Canvas APIs, eliminating server costs. 
-				Assets are pre-rendered at upload time into multiple resolutions for optimal loading.
+				All image processing happens client-side using Canvas APIs, eliminating server costs. Assets
+				are pre-rendered at upload time into multiple resolutions for optimal loading.
 			</p>
 		</div>
 
 		<div class="pillar">
 			<h3>Data Isolation</h3>
 			<p>
-				Assets are organized by ownership level—system templates, organization branding, 
-				and user-generated content are stored in separate paths with appropriate access controls.
+				Assets are organized by ownership level—system templates, organization branding, and
+				user-generated content are stored in separate paths with appropriate access controls.
 			</p>
 		</div>
 
 		<div class="pillar">
 			<h3>Print-Ready Quality</h3>
 			<p>
-				All source assets maintain 300 DPI resolution for professional printing, while 
-				optimized variants (preview, thumbnail) ensure fast loading in the interface.
+				All source assets maintain 300 DPI resolution for professional printing, while optimized
+				variants (preview, thumbnail) ensure fast loading in the interface.
 			</p>
 		</div>
 	</section>
@@ -317,14 +317,22 @@
 		<h3>5.2 Pre-render Strategy</h3>
 		<p>Assets are generated at upload time, not on-demand, for optimal performance:</p>
 		<ul>
-			<li><strong>Templates:</strong> Generate 3 sizes (full, preview, thumb) plus sample and blank variants</li>
-			<li><strong>User ID Cards:</strong> Generate 2 sizes (full for print, preview for viewing)</li>
-			<li><strong>User Photos:</strong> Generate 2 sizes (full for rendering, thumbnail for forms)</li>
+			<li>
+				<strong>Templates:</strong> Generate 3 sizes (full, preview, thumb) plus sample and blank variants
+			</li>
+			<li>
+				<strong>User ID Cards:</strong> Generate 2 sizes (full for print, preview for viewing)
+			</li>
+			<li>
+				<strong>User Photos:</strong> Generate 2 sizes (full for rendering, thumbnail for forms)
+			</li>
 		</ul>
 
 		<h3>5.3 Caching Layers</h3>
 		<ul>
-			<li><strong>Browser Cache:</strong> Long TTL for static assets (templates don't change often)</li>
+			<li>
+				<strong>Browser Cache:</strong> Long TTL for static assets (templates don't change often)
+			</li>
 			<li><strong>Memory Cache:</strong> ImageCache utility for loaded images during session</li>
 			<li><strong>CDN Cache:</strong> Cloudflare edge caching for global distribution</li>
 		</ul>
@@ -367,8 +375,8 @@
 		</table>
 
 		<div class="note">
-			<strong>Privacy Note:</strong> Super Admins can view all user-generated ID cards for 
-			support and compliance purposes. This access is logged in the admin audit trail.
+			<strong>Privacy Note:</strong> Super Admins can view all user-generated ID cards for support and
+			compliance purposes. This access is logged in the admin audit trail.
 		</div>
 	</section>
 
@@ -383,7 +391,10 @@
 		max-width: 800px;
 		margin: 0 auto;
 		padding: 2rem;
-		font-family: system-ui, -apple-system, sans-serif;
+		font-family:
+			system-ui,
+			-apple-system,
+			sans-serif;
 		line-height: 1.6;
 		color: #222;
 	}
@@ -475,7 +486,8 @@
 		margin-bottom: 0;
 	}
 
-	ul, ol {
+	ul,
+	ol {
 		margin: 0.5rem 0;
 		padding-left: 1.5rem;
 	}
@@ -491,7 +503,8 @@
 		font-size: 0.95rem;
 	}
 
-	th, td {
+	th,
+	td {
 		border: 1px solid #ddd;
 		padding: 0.75rem;
 		text-align: left;

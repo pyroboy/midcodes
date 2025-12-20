@@ -25,12 +25,12 @@
 
 			const result = deserialize(await response.text());
 			console.log('[uploadImage] Server response (deserialized):', result);
-		
+
 			if (result.type === 'success') {
 				const data = result.data as any;
 				if (data?.url) return data.url;
 			}
-			
+
 			if (result.type === 'failure') {
 				const data = result.data as any;
 				throw new Error(data?.error || 'Upload failed');
@@ -39,7 +39,7 @@
 			if (result.type === 'error') {
 				throw new Error(result.error?.message || 'Upload error');
 			}
-			
+
 			throw new Error('Invalid response from upload server: ' + JSON.stringify(result));
 		} catch (e) {
 			console.error('[uploadImage] Error:', e);
@@ -62,7 +62,10 @@
 	 * Robustly detect orientation from pixel dimensions
 	 * @returns 'portrait' if height > width, 'landscape' otherwise
 	 */
-	function detectOrientationFromDimensions(width: number, height: number): 'landscape' | 'portrait' {
+	function detectOrientationFromDimensions(
+		width: number,
+		height: number
+	): 'landscape' | 'portrait' {
 		return height > width ? 'portrait' : 'landscape';
 	}
 
@@ -78,7 +81,7 @@
 		expectedOrientation: 'landscape' | 'portrait'
 	): { width: number; height: number } {
 		const currentOrientation = detectOrientationFromDimensions(dims.width, dims.height);
-		
+
 		if (currentOrientation !== expectedOrientation) {
 			// Swap width and height to match expected orientation
 			console.log('🔄 Swapping dimensions to match orientation:', {
@@ -87,7 +90,7 @@
 			});
 			return { width: dims.height, height: dims.width };
 		}
-		
+
 		return dims;
 	}
 
@@ -160,7 +163,14 @@
 			selectedTemplate?: any;
 			user: any;
 			org_id: string;
-			newTemplateParams?: { name: string; width: number; height: number; unit: string; orientation?: 'landscape' | 'portrait'; front_background?: string } | null;
+			newTemplateParams?: {
+				name: string;
+				width: number;
+				height: number;
+				unit: string;
+				orientation?: 'landscape' | 'portrait';
+				front_background?: string;
+			} | null;
 		};
 	} = $props();
 
@@ -200,7 +210,7 @@
 	let isReviewing = $state(false);
 	let reviewSide = $state<'front' | 'back'>('front');
 	let reviewRotation = $state(0);
-	
+
 	// Fly Animation State
 	let isClosingReview = $state(false);
 	let flyTarget = $state<{ top: number; left: number; width: number; height: number } | null>(null);
@@ -276,7 +286,7 @@
 	$effect(() => {
 		if (data.newTemplateParams && !hasHandledNewTemplate) {
 			hasHandledNewTemplate = true;
-			
+
 			// Debug: Log the incoming newTemplateParams
 			console.log('📥 [Templates Page] Received newTemplateParams from server:', {
 				name: data.newTemplateParams.name,
@@ -288,7 +298,7 @@
 				front_background_length: data.newTemplateParams.front_background?.length || 0,
 				front_background_type: typeof data.newTemplateParams.front_background
 			});
-			
+
 			// Create CardSize from params
 			const cardSize: CardSize = {
 				name: data.newTemplateParams.name,
@@ -298,7 +308,7 @@
 			};
 			// Trigger new template creation with optional front_background
 			handleCreateNewTemplate(
-				cardSize, 
+				cardSize,
 				data.newTemplateParams.name,
 				data.newTemplateParams.orientation,
 				data.newTemplateParams.front_background
@@ -446,7 +456,8 @@
 
 			let frontUrl = frontPreview;
 			let backUrl = backPreview;
-			let frontLowResUrl: string | null = (currentTemplate as any)?.front_background_low_res || null;
+			let frontLowResUrl: string | null =
+				(currentTemplate as any)?.front_background_low_res || null;
 			let backLowResUrl: string | null = (currentTemplate as any)?.back_background_low_res || null;
 
 			// Store cropped blobs for variant generation
@@ -511,7 +522,7 @@
 					} catch (lowResError) {
 						console.warn('⚠️ Failed to generate/upload front low-res (non-fatal):', lowResError);
 						// Fallback to high-res if low-res fails
-						frontLowResUrl = frontUrl; 
+						frontLowResUrl = frontUrl;
 					}
 
 					console.log('✅ Front background uploaded successfully:', frontUrl);
@@ -667,9 +678,15 @@
 			});
 
 			// Ensure we are saving the exact dimensions used in the editor
-			const widthToSave = requiredPixelDimensions?.width || (currentTemplate as any)?.width_pixels || LEGACY_CARD_SIZE.width;
-			const heightToSave = requiredPixelDimensions?.height || (currentTemplate as any)?.height_pixels || LEGACY_CARD_SIZE.height;
-			
+			const widthToSave =
+				requiredPixelDimensions?.width ||
+				(currentTemplate as any)?.width_pixels ||
+				LEGACY_CARD_SIZE.width;
+			const heightToSave =
+				requiredPixelDimensions?.height ||
+				(currentTemplate as any)?.height_pixels ||
+				LEGACY_CARD_SIZE.height;
+
 			// Robustly detect orientation from the dimensions we are about to save
 			const orientationToSave = detectOrientationFromDimensions(widthToSave, heightToSave);
 
@@ -787,9 +804,7 @@
 						| undefined;
 					if (fromObj && typeof fromObj === 'string') {
 						if (fromObj.startsWith('blob:') || fromObj.startsWith('data:')) return fromObj;
-						const url = fromObj.startsWith('http')
-							? fromObj
-							: getStorageUrl(fromObj, 'templates');
+						const url = fromObj.startsWith('http') ? fromObj : getStorageUrl(fromObj, 'templates');
 						return `${url}?t=${Date.now()}`;
 					}
 				} catch {}
@@ -891,12 +906,14 @@
 			// Prefer the known uploaded URLs for the list as well
 			// Prefer the already-loaded preview (Blob/Data URL) for instant display
 			// This avoids "skeleton" loading states by using the image we already have in memory
-			const listFront = frontPreview || 
+			const listFront =
+				frontPreview ||
 				(typeof frontUrl === 'string' && frontUrl.startsWith('http')
 					? `${frontUrl}?t=${Date.now()}`
 					: makePublicUrl(savedTemplate.front_background));
 
-			const listBack = backPreview ||
+			const listBack =
+				backPreview ||
 				(typeof backUrl === 'string' && backUrl.startsWith('http')
 					? `${backUrl}?t=${Date.now()}`
 					: makePublicUrl(savedTemplate.back_background));
@@ -959,7 +976,7 @@
 				savingTemplateId = savedTemplate.id; // Set loading state on list item
 				isEditMode = false;
 				await tick();
-				
+
 				// Small delay to ensure list rendering (TemplateList component mount)
 				// With persistent list, this is mostly for the 'invisible' class removal to take effect
 				await new Promise((r) => setTimeout(r, 50));
@@ -968,37 +985,37 @@
 				const targetEl = document.getElementById(`template-card-${savedTemplate.id}`);
 				if (targetEl) {
 					console.log('🎯 Found fly target:', targetEl);
-					
+
 					// Scroll to it if needed (optional but good for seamless)
 					targetEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-					
+
 					const rect = targetEl.getBoundingClientRect();
-					
+
 					// Capture target coordinates
-					flyTarget = { 
-						top: rect.top, 
-						left: rect.left, 
-						width: rect.width, 
-						height: rect.height 
+					flyTarget = {
+						top: rect.top,
+						left: rect.left,
+						width: rect.width,
+						height: rect.height
 					};
-					
+
 					// 3. Trigger Animation State
 					// This will transform the card to 'fixed' at the target rect
-					isClosingReview = true; 
-					
-					// Reset rotation to flat for landing if needed, or keep it. 
+					isClosingReview = true;
+
+					// Reset rotation to flat for landing if needed, or keep it.
 					// Ideally we want front face?
 					if (reviewSide === 'back') {
 						// Optional: quickly flip back to front or just land as is
-						reviewRotation = 0; 
+						reviewRotation = 0;
 					}
-					
+
 					// 4. Wait for CSS transition (600ms matching the style)
 					await new Promise((r) => setTimeout(r, 600));
 				} else {
 					console.warn('⚠️ Could not find target card element for animation');
 				}
-				
+
 				// 5. Final Cleanup
 				isReviewing = false;
 				isClosingReview = false;
@@ -1431,17 +1448,20 @@
 		// D. Set Dimensions with robust orientation handling
 		const td = templateData as any;
 		const storedOrientation = templateData.orientation || 'landscape';
-		
+
 		if (td.width_pixels && td.height_pixels) {
 			// Validate that stored dimensions match the orientation field
-			const detectedOrientation = detectOrientationFromDimensions(td.width_pixels, td.height_pixels);
-			
+			const detectedOrientation = detectOrientationFromDimensions(
+				td.width_pixels,
+				td.height_pixels
+			);
+
 			// Ensure dimensions match the expected orientation
 			const correctedDimensions = getOrientationAwarePixelDimensions(
 				{ width: td.width_pixels, height: td.height_pixels },
 				storedOrientation
 			);
-			
+
 			console.log('📐 Template dimensions check:', {
 				storedOrientation,
 				detectedOrientation,
@@ -1449,7 +1469,7 @@
 				correctedDims: correctedDimensions,
 				dimensionsWereSwapped: detectedOrientation !== storedOrientation
 			});
-			
+
 			currentCardSize = {
 				name: templateData.name,
 				width: correctedDimensions.width,
@@ -1461,21 +1481,21 @@
 			// Legacy fallback - apply orientation to the default size
 			let defaultSize = findBestDefaultSize();
 			let defaultPixels = cardSizeToPixels(defaultSize, 300);
-			
+
 			// Ensure the default dimensions match the template's stored orientation
 			const correctedPixels = getOrientationAwarePixelDimensions(defaultPixels, storedOrientation);
-			
+
 			// If dimensions were swapped, update the card size too
 			if (correctedPixels.width !== defaultPixels.width) {
 				defaultSize = switchOrientation(defaultSize);
 			}
-			
+
 			console.log('📐 Legacy template orientation fix:', {
 				storedOrientation,
 				originalDefaultDims: defaultPixels,
 				correctedDims: correctedPixels
 			});
-			
+
 			currentCardSize = defaultSize;
 			requiredPixelDimensions = correctedPixels;
 		}
@@ -1528,7 +1548,7 @@
 		if (browser && window.location.search) {
 			await goto('/templates', { replaceState: true });
 		}
-		
+
 		currentTemplate = null;
 		clearForm();
 	}
@@ -1553,7 +1573,7 @@
 	}
 
 	function handleCreateNewTemplate(
-		cardSize: CardSize, 
+		cardSize: CardSize,
 		templateName: string,
 		orientation?: 'landscape' | 'portrait',
 		frontBackgroundUrl?: string
@@ -1568,13 +1588,18 @@
 			frontBackgroundUrl_type: typeof frontBackgroundUrl,
 			frontBackgroundUrl_truthy: !!frontBackgroundUrl
 		});
-		
+
 		// Set up new template creation
 		currentCardSize = cardSize;
 		requiredPixelDimensions = cardSizeToPixels(cardSize, 300); // Use hardcoded DPI
 
 		// Determine orientation from params or calculate from dimensions
-		const finalOrientation = orientation || detectOrientationFromDimensions(requiredPixelDimensions.width, requiredPixelDimensions.height);
+		const finalOrientation =
+			orientation ||
+			detectOrientationFromDimensions(
+				requiredPixelDimensions.width,
+				requiredPixelDimensions.height
+			);
 
 		// Create new template with only database-compatible properties
 		currentTemplate = {
@@ -1689,18 +1714,24 @@
 	<div class="grid grid-cols-1 grid-rows-1 w-full h-full overflow-hidden bg-background">
 		<!-- Template List (Always mounted, Base Layer) -->
 		<!-- Using col-start-1 row-start-1 to place it in the same cell as editor -->
-		<div class="col-start-1 row-start-1 w-full h-full overflow-hidden {isEditMode ? 'invisible pointer-events-none' : 'visible'}">
+		<div
+			class="col-start-1 row-start-1 w-full h-full overflow-hidden {isEditMode
+				? 'invisible pointer-events-none'
+				: 'visible'}"
+		>
 			<TemplateList
 				templates={templates ?? []}
 				onSelect={(id: string) => handleTemplateSelect(id)}
 				onCreateNew={handleCreateNewTemplate}
-				savingTemplateId={savingTemplateId}
+				{savingTemplateId}
 			/>
 		</div>
 
 		<!-- Edit View Overlay (Top Layer) -->
 		{#if isEditMode}
-			<div class="col-start-1 row-start-1 z-10 w-full h-full bg-background animate-in fade-in slide-in-from-bottom-4 duration-300">
+			<div
+				class="col-start-1 row-start-1 z-10 w-full h-full bg-background animate-in fade-in slide-in-from-bottom-4 duration-300"
+			>
 				{#key editorVersion}
 					<TemplateEdit
 						version={editorVersion}
@@ -1746,22 +1777,31 @@
 	{#if isReviewing && requiredPixelDimensions}
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-		<div 
+		<div
 			class="fixed inset-0 z-50 flex items-center justify-center p-4"
 			role="dialog"
 			tabindex="-1"
 			aria-modal="true"
-			onclick={(e) => { if(e.target === e.currentTarget && !isClosingReview) cancelReview() }}
+			onclick={(e) => {
+				if (e.target === e.currentTarget && !isClosingReview) cancelReview();
+			}}
 		>
 			<!-- Backdrop with fade out -->
-			<div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity duration-600" class:opacity-0={isClosingReview}></div>
+			<div
+				class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity duration-600"
+				class:opacity-0={isClosingReview}
+			></div>
 
-			<div class="relative w-full max-w-4xl flex flex-col items-center animate-in fade-in zoom-in duration-200">
-				
+			<div
+				class="relative w-full max-w-4xl flex flex-col items-center animate-in fade-in zoom-in duration-200"
+			>
 				<!-- Header -->
-				<div class="w-full flex items-center justify-center mb-8 relative transition-opacity duration-300" class:opacity-0={isClosingReview}>
+				<div
+					class="w-full flex items-center justify-center mb-8 relative transition-opacity duration-300"
+					class:opacity-0={isClosingReview}
+				>
 					<h2 class="text-2xl font-bold text-white">Review Template</h2>
-					<button 
+					<button
 						onclick={cancelReview}
 						class="absolute right-0 p-2 text-white/50 hover:text-white transition-colors"
 					>
@@ -1771,8 +1811,8 @@
 
 				<!-- 3D Flip Preview Area -->
 				<!-- Scale down large cards to fit screen -->
-				<div 
-					class="relative perspective-1000 mb-8 select-none" 
+				<div
+					class="relative perspective-1000 mb-8 select-none"
 					style="
 						width: {isClosingReview && flyTarget ? flyTarget.width : requiredPixelDimensions.width * 0.6}px; 
 						height: {isClosingReview && flyTarget ? flyTarget.height : requiredPixelDimensions.height * 0.6}px;
@@ -1785,7 +1825,7 @@
 					"
 				>
 					<!-- Flip Container -->
-					<div 
+					<div
 						class="w-full h-full relative transition-transform duration-700 ease-in-out transform-style-3d cursor-pointer"
 						style="transform: rotateY({isClosingReview ? 0 : reviewRotation}deg);"
 						onclick={flipReview}
@@ -1793,7 +1833,9 @@
 						tabindex="0"
 					>
 						<!-- Front Face -->
-						<div class="absolute inset-0 backface-hidden shadow-2xl rounded-lg overflow-hidden bg-white">
+						<div
+							class="absolute inset-0 backface-hidden shadow-2xl rounded-lg overflow-hidden bg-white"
+						>
 							<IdCanvas
 								pixelDimensions={requiredPixelDimensions}
 								backgroundUrl={frontPreview || ''}
@@ -1803,11 +1845,15 @@
 								fileUploads={{}}
 								imagePositions={{}}
 							/>
-							<div class="absolute top-4 left-4 px-3 py-1 bg-black/50 text-white text-xs font-bold rounded-full backdrop-blur-md z-10">FRONT</div>
+							<div
+								class="absolute top-4 left-4 px-3 py-1 bg-black/50 text-white text-xs font-bold rounded-full backdrop-blur-md z-10"
+							>
+								FRONT
+							</div>
 						</div>
 
 						<!-- Back Face -->
-						<div 
+						<div
 							class="absolute inset-0 backface-hidden shadow-2xl rounded-lg overflow-hidden bg-white"
 							style="transform: rotateY(180deg);"
 						>
@@ -1820,18 +1866,28 @@
 								fileUploads={{}}
 								imagePositions={{}}
 							/>
-							<div class="absolute top-4 left-4 px-3 py-1 bg-black/50 text-white text-xs font-bold rounded-full backdrop-blur-md z-10">BACK</div>
+							<div
+								class="absolute top-4 left-4 px-3 py-1 bg-black/50 text-white text-xs font-bold rounded-full backdrop-blur-md z-10"
+							>
+								BACK
+							</div>
 						</div>
 					</div>
-					
-						<div class="absolute -bottom-12 left-1/2 -translate-x-1/2 text-white/60 text-sm flex items-center gap-2 pointer-events-none whitespace-nowrap transition-opacity duration-300" class:opacity-0={isClosingReview}>
+
+					<div
+						class="absolute -bottom-12 left-1/2 -translate-x-1/2 text-white/60 text-sm flex items-center gap-2 pointer-events-none whitespace-nowrap transition-opacity duration-300"
+						class:opacity-0={isClosingReview}
+					>
 						<RotateCcw size={14} />
 						Click card to flip • Verify your design before saving
 					</div>
 				</div>
 
 				<!-- Actions -->
-				<div class="flex gap-4 items-center mt-4 transition-opacity duration-300" class:opacity-0={isClosingReview}>
+				<div
+					class="flex gap-4 items-center mt-4 transition-opacity duration-300"
+					class:opacity-0={isClosingReview}
+				>
 					<button
 						onclick={cancelReview}
 						class="px-6 py-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-all font-medium flex items-center gap-2 border border-white/10"
@@ -1839,7 +1895,7 @@
 						<Edit size={18} />
 						Back to Edit
 					</button>
-					
+
 					<button
 						onclick={() => saveTemplate()}
 						class="px-8 py-3 rounded-full bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-500/20 hover:shadow-green-500/40 transition-all font-bold flex items-center gap-2 transform hover:scale-105 active:scale-95"
@@ -1850,11 +1906,16 @@
 				</div>
 
 				<!-- Metadata -->
-				<div class="mt-8 text-center text-white/40 text-sm transition-opacity duration-300" class:opacity-0={isClosingReview}>
+				<div
+					class="mt-8 text-center text-white/40 text-sm transition-opacity duration-300"
+					class:opacity-0={isClosingReview}
+				>
 					<p class="font-medium">{currentTemplate?.name || 'Untitled Template'}</p>
-					<p>{requiredPixelDimensions.width}px × {requiredPixelDimensions.height}px • {frontElements.length + backElements.length} Elements</p>
+					<p>
+						{requiredPixelDimensions.width}px × {requiredPixelDimensions.height}px • {frontElements.length +
+							backElements.length} Elements
+					</p>
 				</div>
-
 			</div>
 		</div>
 	{/if}
@@ -1870,7 +1931,6 @@
 	.backface-hidden {
 		backface-visibility: hidden;
 	}
-
 
 	:global(.animate-pulse) {
 		animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;

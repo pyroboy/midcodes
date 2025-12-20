@@ -27,16 +27,17 @@ export const load: PageServerLoad = async ({ locals }) => {
 	}
 
 	// Fetch all templates for this org with Drizzle
-	const templatesData = await db.select({
-		id: templates.id,
-		name: templates.name,
-		width_pixels: templates.widthPixels,
-		height_pixels: templates.heightPixels,
-		dpi: templates.dpi,
-		orientation: templates.orientation,
-		front_background: templates.frontBackground,
-		back_background: templates.backBackground
-	})
+	const templatesData = await db
+		.select({
+			id: templates.id,
+			name: templates.name,
+			width_pixels: templates.widthPixels,
+			height_pixels: templates.heightPixels,
+			dpi: templates.dpi,
+			orientation: templates.orientation,
+			front_background: templates.frontBackground,
+			back_background: templates.backBackground
+		})
 		.from(templates)
 		.where(eq(templates.orgId, org_id))
 		.orderBy(templates.name);
@@ -48,10 +49,11 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const cardCounts: Record<string, number> = {};
 
 	if (templateIds.length > 0) {
-		const cardCountsResult = await db.select({
-			templateId: idcards.templateId,
-			count: sql<number>`count(*)`
-		})
+		const cardCountsResult = await db
+			.select({
+				templateId: idcards.templateId,
+				count: sql<number>`count(*)`
+			})
 			.from(idcards)
 			.where(inArray(idcards.templateId, templateIds))
 			.groupBy(idcards.templateId);
@@ -86,7 +88,8 @@ export const actions: Actions = {
 		}
 
 		// Fetch source template with Drizzle
-		const sourceTemplates = await db.select()
+		const sourceTemplates = await db
+			.select()
 			.from(templates)
 			.where(eq(templates.id, sourceTemplateId));
 
@@ -106,26 +109,26 @@ export const actions: Actions = {
 		if (templateFront && templateFront.size > 0) {
 			const timestamp = Date.now();
 			const frontFilename = `${org_id}/${timestamp}_front.png`;
-            // Upload to R2
-            try {
-			    await uploadToR2(frontFilename, templateFront, 'image/png');
-                frontPath = frontFilename;
-            } catch (err: any) {
+			// Upload to R2
+			try {
+				await uploadToR2(frontFilename, templateFront, 'image/png');
+				frontPath = frontFilename;
+			} catch (err: any) {
 				console.error('Template front upload error:', err);
 				return fail(500, {
 					error: `Failed to upload template front background: ${err.message}`
 				});
-            }
+			}
 		}
 
 		if (templateBack && templateBack.size > 0) {
 			const timestamp = Date.now();
 			const backFilename = `${org_id}/${timestamp}_back.png`;
 
-            try {
-			    await uploadToR2(backFilename, templateBack, 'image/png');
-                backPath = backFilename;
-            } catch (err: any) {
+			try {
+				await uploadToR2(backFilename, templateBack, 'image/png');
+				backPath = backFilename;
+			} catch (err: any) {
 				console.error('Template back upload error:', err);
 				// Try to cleanup front image if it was uploaded
 				if (frontPath) {
@@ -134,23 +137,26 @@ export const actions: Actions = {
 				return fail(500, {
 					error: `Failed to upload template back background: ${err.message}`
 				});
-            }
+			}
 		}
 
 		try {
 			// Create new template with Drizzle
-			const [newTemplate] = await db.insert(templates).values({
-				name: newTemplateName,
-				orgId: org_id,
-				userId: user?.id,
-				widthPixels: sourceTemplate.widthPixels,
-				heightPixels: sourceTemplate.heightPixels,
-				dpi: sourceTemplate.dpi,
-				orientation: sourceTemplate.orientation,
-				templateElements: sourceTemplate.templateElements,
-				frontBackground: frontPath,
-				backBackground: backPath
-			}).returning();
+			const [newTemplate] = await db
+				.insert(templates)
+				.values({
+					name: newTemplateName,
+					orgId: org_id,
+					userId: user?.id,
+					widthPixels: sourceTemplate.widthPixels,
+					heightPixels: sourceTemplate.heightPixels,
+					dpi: sourceTemplate.dpi,
+					orientation: sourceTemplate.orientation,
+					templateElements: sourceTemplate.templateElements,
+					frontBackground: frontPath,
+					backBackground: backPath
+				})
+				.returning();
 
 			return { success: true, newTemplateId: newTemplate.id, newTemplate };
 		} catch (e: any) {
@@ -176,7 +182,8 @@ export const actions: Actions = {
 		}
 
 		// Fetch all ID cards for the source template with Drizzle
-		const cards = await db.select({
+		const cards = await db
+			.select({
 				id: idcards.id,
 				front_image: idcards.frontImage,
 				back_image: idcards.backImage,
@@ -210,25 +217,25 @@ export const actions: Actions = {
 
 		// Upload images to R2
 		const timestamp = Date.now();
-        // Using same path structure? R2 handles it.
+		// Using same path structure? R2 handles it.
 		const frontPath = `${org_id}/${newTemplateId}/${timestamp}_front.png`;
 		const backPath = `${org_id}/${newTemplateId}/${timestamp}_back.png`;
 
-        try {
-		    await uploadToR2(frontPath, frontImage, 'image/png');
-        } catch (err: any) {
+		try {
+			await uploadToR2(frontPath, frontImage, 'image/png');
+		} catch (err: any) {
 			console.error('Front upload error:', err);
 			return fail(500, { error: `Front image upload failed: ${err.message}` });
-        }
+		}
 
-        try {
-		    await uploadToR2(backPath, backImage, 'image/png');
-        } catch (err: any) {
+		try {
+			await uploadToR2(backPath, backImage, 'image/png');
+		} catch (err: any) {
 			// Rollback front image
 			await deleteFromR2(frontPath);
 			console.error('Back upload error:', err);
 			return fail(500, { error: `Back image upload failed: ${err.message}` });
-        }
+		}
 
 		// Parse card data
 		let parsedData = null;
@@ -243,19 +250,22 @@ export const actions: Actions = {
 
 		// Create new ID card record with Drizzle
 		try {
-			const [newCard] = await db.insert(idcards).values({
-				templateId: newTemplateId,
-				orgId: org_id,
-				frontImage: frontPath,
-				backImage: backPath,
-				data: parsedData || {}
-			}).returning();
+			const [newCard] = await db
+				.insert(idcards)
+				.values({
+					templateId: newTemplateId,
+					orgId: org_id,
+					frontImage: frontPath,
+					backImage: backPath,
+					data: parsedData || {}
+				})
+				.returning();
 
 			return { success: true, cardId: newCard.id, newCard };
 		} catch (insertError: any) {
 			// Rollback uploads
 			await deleteFromR2(frontPath);
-            await deleteFromR2(backPath);
+			await deleteFromR2(backPath);
 			console.error('Insert error:', insertError);
 			return fail(500, { error: `Database insert failed: ${insertError.message}` });
 		}

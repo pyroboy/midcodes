@@ -16,47 +16,46 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 
 	try {
 		// Get organization stats with Drizzle
-		const [
-			totalCardsResult,
-			usersData,
-			templatesData,
-			recentCardsData
-		] = await Promise.all([
+		const [totalCardsResult, usersData, templatesData, recentCardsData] = await Promise.all([
 			// Total cards count
-			db.select({ count: sql<number>`count(*)` })
+			db
+				.select({ count: sql<number>`count(*)` })
 				.from(idcards)
 				.where(eq(idcards.orgId, org_id)),
 
 			// All users in organization
-			db.select({
-				id: profiles.id,
-				email: profiles.email,
-				role: profiles.role,
-				created_at: profiles.createdAt,
-				updated_at: profiles.updatedAt
-			})
+			db
+				.select({
+					id: profiles.id,
+					email: profiles.email,
+					role: profiles.role,
+					created_at: profiles.createdAt,
+					updated_at: profiles.updatedAt
+				})
 				.from(profiles)
 				.where(eq(profiles.orgId, org_id))
 				.orderBy(desc(profiles.createdAt)),
 
 			// All templates in organization
-			db.select({
-				id: templates.id,
-				name: templates.name,
-				created_at: templates.createdAt,
-				user_id: templates.userId
-			})
+			db
+				.select({
+					id: templates.id,
+					name: templates.name,
+					created_at: templates.createdAt,
+					user_id: templates.userId
+				})
 				.from(templates)
 				.where(eq(templates.orgId, org_id))
 				.orderBy(desc(templates.createdAt)),
 
 			// Recent card generations
-			db.select({
-				id: idcards.id,
-				template_id: idcards.templateId,
-				created_at: idcards.createdAt,
-				data: idcards.data
-			})
+			db
+				.select({
+					id: idcards.id,
+					template_id: idcards.templateId,
+					created_at: idcards.createdAt,
+					data: idcards.data
+				})
 				.from(idcards)
 				.where(eq(idcards.orgId, org_id))
 				.orderBy(desc(idcards.createdAt))
@@ -158,15 +157,13 @@ export const actions: Actions = {
 			}
 
 			// Update user role with Drizzle
-			await db.update(profiles)
-				.set({ 
-					role: newRole as any, 
-					updatedAt: new Date() 
+			await db
+				.update(profiles)
+				.set({
+					role: newRole as any,
+					updatedAt: new Date()
 				})
-				.where(and(
-					eq(profiles.id, userId),
-					eq(profiles.orgId, org_id!)
-				));
+				.where(and(eq(profiles.id, userId), eq(profiles.orgId, org_id!)));
 
 			return { success: true, message: 'User role updated successfully' };
 		} catch (err) {
@@ -202,11 +199,7 @@ export const actions: Actions = {
 			}
 
 			// Delete user profile with Drizzle
-			await db.delete(profiles)
-				.where(and(
-					eq(profiles.id, userId),
-					eq(profiles.orgId, org_id!)
-				));
+			await db.delete(profiles).where(and(eq(profiles.id, userId), eq(profiles.orgId, org_id!)));
 
 			return { success: true, message: 'User deleted successfully' };
 		} catch (err) {
@@ -215,4 +208,3 @@ export const actions: Actions = {
 		}
 	}
 };
-

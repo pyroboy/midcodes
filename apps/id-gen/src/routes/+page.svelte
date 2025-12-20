@@ -39,7 +39,15 @@
 	import { T, Canvas } from '@threlte/core';
 	import { OrbitControls } from '@threlte/extras';
 	import { NoToneMapping } from 'three';
-	import { Pane, Folder, Slider as TweakSlider, Checkbox, Button as TweakButton, Separator as TweakSeparator, Monitor } from 'svelte-tweakpane-ui';
+	import {
+		Pane,
+		Folder,
+		Slider as TweakSlider,
+		Checkbox,
+		Button as TweakButton,
+		Separator as TweakSeparator,
+		Monitor
+	} from 'svelte-tweakpane-ui';
 
 	interface Props {
 		data: PageData & { user?: any; templates?: any[] };
@@ -51,7 +59,7 @@
 	const preloadState = getPreloadState('/');
 	let isStructureReady = $derived($preloadState?.serverData === 'ready');
 	let areAssetsReady = $derived($preloadState?.assets === 'ready');
-	
+
 	// Fallback loading if preload state isn't initialized yet
 	let isLoading = $state(true);
 
@@ -66,7 +74,7 @@
 
 	// Template state - filter out default templates
 	let templates = $state(untrack(() => data.templates || []));
-	
+
 	$effect(() => {
 		templates = (data.templates || []).filter(
 			(t: any) =>
@@ -132,7 +140,12 @@
 	let texturesTotal = $state(0);
 
 	// Handle loading progress from TemplateCard3D
-	function handleLoadingProgress(progress: number, loaded: number, total: number, isReady: boolean) {
+	function handleLoadingProgress(
+		progress: number,
+		loaded: number,
+		total: number,
+		isReady: boolean
+	) {
 		texturesProgress = progress;
 		texturesLoaded = loaded;
 		texturesTotal = total;
@@ -167,9 +180,9 @@
 	let shadowFastOpacity = $state(0.01); // Requested: 0.01
 	let shadowSlowOblong = $state(0.75); // Requested: 0.75
 	let shadowFastOblong = $state(0.55); // Requested: 0.55
-	let shadowSlowSize = $state(1.00);   // Requested: 1.00
-	let shadowFastSize = $state(0.80);   // Requested: 0.80
-	let shadowLerpSpeed = $state(0.18);  // Requested: 0.18
+	let shadowSlowSize = $state(1.0); // Requested: 1.00
+	let shadowFastSize = $state(0.8); // Requested: 0.80
+	let shadowLerpSpeed = $state(0.18); // Requested: 0.18
 
 	// Target values for lerping
 	let targetShadowOpacity = 0.35;
@@ -339,10 +352,16 @@
 		showSizeDialog = true;
 	}
 
-	function handleSizeSelected(event: CustomEvent<{ cardSize: CardSize; templateName: string; selectedTemplateAsset?: TemplateAsset }>) {
+	function handleSizeSelected(
+		event: CustomEvent<{
+			cardSize: CardSize;
+			templateName: string;
+			selectedTemplateAsset?: TemplateAsset;
+		}>
+	) {
 		const { cardSize, templateName, selectedTemplateAsset } = event.detail;
 		showSizeDialog = false;
-		
+
 		// Debug: Log event details
 		console.log('📤 [Home Page] handleSizeSelected called:', {
 			cardSize: cardSize,
@@ -351,10 +370,10 @@
 			selectedTemplateAsset_image_url: selectedTemplateAsset?.image_url,
 			selectedTemplateAsset_image_url_length: selectedTemplateAsset?.image_url?.length || 0
 		});
-		
+
 		// Determine orientation from card dimensions
 		const orientation = cardSize.width < cardSize.height ? 'portrait' : 'landscape';
-		
+
 		// Navigate to templates page with the new template params
 		const params = new URLSearchParams({
 			new: 'true',
@@ -364,7 +383,7 @@
 			unit: cardSize.unit,
 			orientation
 		});
-		
+
 		// Add front background if template asset was selected
 		if (selectedTemplateAsset?.image_url) {
 			params.set('front_background', selectedTemplateAsset.image_url);
@@ -373,10 +392,10 @@
 				encoded_in_params: params.get('front_background')
 			});
 		}
-		
+
 		const finalUrl = `/templates?${params.toString()}`;
 		console.log('📤 [Home Page] Navigating to:', finalUrl);
-		
+
 		goto(finalUrl);
 	}
 
@@ -432,25 +451,25 @@
 	const transformedCards = $derived(transformRecentCards(data.recentCards || []));
 
 	const marketingPhrases = [
-		"Digital ID in Seconds",
-		"Design. Print. Done.",
-		"ᜃᜈᜌ — Proudly Filipino",
-		"No Software to Install",
-		"Works on Any Device",
-		"Bulk Print Ready",
-		"Simple Template Editor",
-		"Professional ID Cards"
+		'Digital ID in Seconds',
+		'Design. Print. Done.',
+		'ᜃᜈᜌ — Proudly Filipino',
+		'No Software to Install',
+		'Works on Any Device',
+		'Bulk Print Ready',
+		'Simple Template Editor',
+		'Professional ID Cards'
 	];
 	let marketingIndex = $state(0);
-	
+
 	const targetAudiences = [
-		"Schools",
-		"Companies",
-		"Events",
-		"Startups",
-		"Government",
-		"Small Businesses",
-		"Residences"
+		'Schools',
+		'Companies',
+		'Events',
+		'Startups',
+		'Government',
+		'Small Businesses',
+		'Residences'
 	];
 	let selectedAudience = $state<string | null>(null);
 	const SHOW_AUDIENCE_BADGE = false;
@@ -464,16 +483,20 @@
 </script>
 
 <svelte:head>
-	<link rel="preconnect" href="https://fonts.googleapis.com">
-	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
-	<link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+	<link
+		href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap"
+		rel="stylesheet"
+	/>
 </svelte:head>
 
 <div class="h-[calc(100vh-4rem)] overflow-hidden flex flex-col">
 	<div class="container mx-auto px-4 py-2 flex-1 flex flex-col overflow-hidden">
 		<!-- View Toggle Buttons - Mobile Only -->
 		<div class="flex flex-col gap-1 w-fit flex-shrink-0 lg:hidden">
-			<Button variant="outline" size="sm" onclick={() => (activeView = 'templates')}>Templates</Button
+			<Button variant="outline" size="sm" onclick={() => (activeView = 'templates')}
+				>Templates</Button
 			>
 			<Button variant="outline" size="sm" onclick={() => (activeView = 'generations')}
 				>Generations</Button
@@ -487,280 +510,392 @@
 			>
 				{#if SHOW_AUDIENCE_BADGE}
 					<!-- Floating Target Audience Badge (Moved for Visibility) -->
-					<div class="absolute top-28 left-0 w-full lg:left-8 lg:top-32 lg:w-auto z-50 pointer-events-none flex justify-center lg:justify-start">
+					<div
+						class="absolute top-28 left-0 w-full lg:left-8 lg:top-32 lg:w-auto z-50 pointer-events-none flex justify-center lg:justify-start"
+					>
 						<div class="transform -rotate-2 flex items-center gap-3 pointer-events-auto">
-						<!-- Brush Text -->
-						<span class="text-xl md:text-2xl text-foreground bg-background/80 backdrop-blur-sm px-2 rounded-sm" style="font-family: 'Permanent Marker', cursive;">
-							Great for
-						</span>
-						
-						<!-- Dropdown Box -->
-						<DropdownMenu.Root>
-							<DropdownMenu.Trigger class="outline-none">
-								<div class="bg-card border border-border shadow-lg rounded-md px-3 py-1.5 flex items-center gap-2 min-w-[140px] md:min-w-[200px] cursor-pointer hover:bg-accent/10 transition-colors">
-									<div class="flex-1 relative h-6 w-full overflow-hidden text-sm md:text-base font-medium text-left text-foreground">
-										{#if selectedAudience}
-											<div class="absolute inset-0 flex items-center whitespace-nowrap" in:fade={{ duration: 200 }}>
-												{selectedAudience}
-											</div>
-										{:else}
-											{#key marketingIndex}
-												<div 
+							<!-- Brush Text -->
+							<span
+								class="text-xl md:text-2xl text-foreground bg-background/80 backdrop-blur-sm px-2 rounded-sm"
+								style="font-family: 'Permanent Marker', cursive;"
+							>
+								Great for
+							</span>
+
+							<!-- Dropdown Box -->
+							<DropdownMenu.Root>
+								<DropdownMenu.Trigger class="outline-none">
+									<div
+										class="bg-card border border-border shadow-lg rounded-md px-3 py-1.5 flex items-center gap-2 min-w-[140px] md:min-w-[200px] cursor-pointer hover:bg-accent/10 transition-colors"
+									>
+										<div
+											class="flex-1 relative h-6 w-full overflow-hidden text-sm md:text-base font-medium text-left text-foreground"
+										>
+											{#if selectedAudience}
+												<div
 													class="absolute inset-0 flex items-center whitespace-nowrap"
-													in:fly={{ y: 20, duration: 300 }}
-													out:fly={{ y: -20, duration: 300 }}
+													in:fade={{ duration: 200 }}
 												>
-													{targetAudiences[marketingIndex % targetAudiences.length]}
+													{selectedAudience}
 												</div>
-											{/key}
-										{/if}
+											{:else}
+												{#key marketingIndex}
+													<div
+														class="absolute inset-0 flex items-center whitespace-nowrap"
+														in:fly={{ y: 20, duration: 300 }}
+														out:fly={{ y: -20, duration: 300 }}
+													>
+														{targetAudiences[marketingIndex % targetAudiences.length]}
+													</div>
+												{/key}
+											{/if}
+										</div>
+										<ChevronDown class="w-4 h-4 text-muted-foreground" />
 									</div>
-									<ChevronDown class="w-4 h-4 text-muted-foreground" />
-								</div>
-							</DropdownMenu.Trigger>
-							<DropdownMenu.Content class="w-[220px] max-h-[300px] overflow-y-auto z-[100]">
-								<DropdownMenu.Label>Select Audience</DropdownMenu.Label>
-								<DropdownMenu.Separator />
-								{#each targetAudiences as audience}
-									<DropdownMenu.Item onSelect={() => selectedAudience = audience}>
-										{audience}
+								</DropdownMenu.Trigger>
+								<DropdownMenu.Content class="w-[220px] max-h-[300px] overflow-y-auto z-[100]">
+									<DropdownMenu.Label>Select Audience</DropdownMenu.Label>
+									<DropdownMenu.Separator />
+									{#each targetAudiences as audience}
+										<DropdownMenu.Item onSelect={() => (selectedAudience = audience)}>
+											{audience}
+										</DropdownMenu.Item>
+									{/each}
+									<DropdownMenu.Separator />
+									<DropdownMenu.Item onSelect={() => (selectedAudience = null)}>
+										<span class="text-muted-foreground italic">Auto-cycle</span>
 									</DropdownMenu.Item>
-								{/each}
-								<DropdownMenu.Separator />
-								<DropdownMenu.Item onSelect={() => selectedAudience = null}>
-									<span class="text-muted-foreground italic">Auto-cycle</span>
-								</DropdownMenu.Item>
-							</DropdownMenu.Content>
-						</DropdownMenu.Root>
+								</DropdownMenu.Content>
+							</DropdownMenu.Root>
+						</div>
 					</div>
-				</div>
 				{/if}
 
-			<!-- Center: 3D Card Preview -->
-			<div class="flex flex-col items-center justify-center flex-1">
-				<!-- Marketing Header -->
-				<div class="mb-6 text-center z-10 select-none">
+				<!-- Center: 3D Card Preview -->
+				<div class="flex flex-col items-center justify-center flex-1">
+					<!-- Marketing Header -->
+					<div class="mb-6 text-center z-10 select-none">
+						<!-- svelte-ignore a11y_click_events_have_key_events -->
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
+						<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+						<h1
+							class="text-4xl md:text-7xl font-black tracking-normal mb-2 drop-shadow-sm flex items-center justify-center cursor-pointer"
+							onclick={() => {
+								if (isFlipping) return;
+								isFlipping = true;
+								// Sequential flip: KA, then NA, then YA
+								setTimeout(() => {
+									flipStates[0] = !flipStates[0];
+									flipStates = flipStates;
+								}, 0);
+								setTimeout(() => {
+									flipStates[1] = !flipStates[1];
+									flipStates = flipStates;
+								}, 120);
+								setTimeout(() => {
+									flipStates[2] = !flipStates[2];
+									flipStates = flipStates;
+								}, 240);
+								setTimeout(() => {
+									isFlipping = false;
+								}, 800);
+							}}
+						>
+							{#each [{ latin: 'KA', baybayin: 'ᜃ' }, { latin: 'NA', baybayin: 'ᜈ' }, { latin: 'YA', baybayin: 'ᜌ' }] as syllable, i}
+								<div
+									class="flip-card {i === 0 ? 'mr-4' : i === 1 ? 'mr-2' : ''}"
+									class:flipped={flipStates[i]}
+								>
+									<div class="flip-card-inner">
+										<div class="flip-card-front">
+											<span class="text-foreground">{syllable.latin}</span>
+										</div>
+										<div class="flip-card-back">
+											<span class="text-foreground/80">{syllable.baybayin}</span>
+										</div>
+									</div>
+								</div>
+							{/each}
+						</h1>
+						<div
+							class="relative h-10 md:h-14 w-full flex justify-center items-center overflow-visible"
+						>
+							{#key marketingIndex}
+								<p
+									class="absolute text-lg md:text-3xl font-bold text-muted-foreground whitespace-nowrap"
+									in:fly={{ y: 20, duration: 400, delay: 100 }}
+									out:fly={{ y: -20, duration: 400 }}
+								>
+									{marketingPhrases[marketingIndex]}
+								</p>
+							{/key}
+						</div>
+
+						<!-- Divider or Spacer -->
+					</div>
+
+					<!-- 3D Card Container - Responsive, max width on mobile -->
 					<!-- svelte-ignore a11y_click_events_have_key_events -->
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-					<h1 
-						class="text-4xl md:text-7xl font-black tracking-normal mb-2 drop-shadow-sm flex items-center justify-center cursor-pointer"
+					<div
+						class="w-full max-w-[500px] h-[400px] sm:h-[450px] lg:max-w-[650px] lg:h-[550px] relative cursor-pointer"
 						onclick={() => {
-							if (isFlipping) return;
-							isFlipping = true;
-							// Sequential flip: KA, then NA, then YA
-							setTimeout(() => { flipStates[0] = !flipStates[0]; flipStates = flipStates; }, 0);
-							setTimeout(() => { flipStates[1] = !flipStates[1]; flipStates = flipStates; }, 120);
-							setTimeout(() => { flipStates[2] = !flipStates[2]; flipStates = flipStates; }, 240);
-							setTimeout(() => { isFlipping = false; }, 800);
+							if (!selectedTemplateId && templateCard3D) {
+								// Use handleTap for center tap (triggers wobble + advance)
+								templateCard3D.handleTap(0.5, 0.5);
+							}
 						}}
 					>
-						{#each [
-							{ latin: 'KA', baybayin: 'ᜃ' },
-							{ latin: 'NA', baybayin: 'ᜈ' },
-							{ latin: 'YA', baybayin: 'ᜌ' }
-						] as syllable, i}
-							<div class="flip-card {i === 0 ? 'mr-4' : i === 1 ? 'mr-2' : ''}" class:flipped={flipStates[i]}>
-								<div class="flip-card-inner">
-									<div class="flip-card-front">
-										<span class="text-foreground">{syllable.latin}</span>
-									</div>
-									<div class="flip-card-back">
-										<span class="text-foreground/80">{syllable.baybayin}</span>
-									</div>
-								</div>
-							</div>
-						{/each}
-					</h1>
-					<div class="relative h-10 md:h-14 w-full flex justify-center items-center overflow-visible">
-						{#key marketingIndex}
-							<p 
-								class="absolute text-lg md:text-3xl font-bold text-muted-foreground whitespace-nowrap"
-								in:fly={{ y: 20, duration: 400, delay: 100 }}
-								out:fly={{ y: -20, duration: 400 }}
-							>
-								{marketingPhrases[marketingIndex]}
-							</p>
-						{/key}
-					</div>
-					
-					<!-- Divider or Spacer -->
-				</div>
-				
-				<!-- 3D Card Container - Responsive, max width on mobile -->
-				<!-- svelte-ignore a11y_click_events_have_key_events -->
-				<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<div
-					class="w-full max-w-[500px] h-[400px] sm:h-[450px] lg:max-w-[650px] lg:h-[550px] relative cursor-pointer"
-					onclick={() => {
-						if (!selectedTemplateId && templateCard3D) {
-							// Use handleTap for center tap (triggers wobble + advance)
-							templateCard3D.handleTap(0.5, 0.5);
-						}
-					}}
-				>
-					<!-- Debug toggle button -->
-					<button
-						type="button"
-						class="absolute top-2 right-2 z-10 p-2 rounded-lg bg-black/30 hover:bg-black/50 text-white/70 hover:text-white transition-colors"
-						onclick={() => (showDebugPanel = !showDebugPanel)}
-						title="Debug options"
-					>
-						<Settings2 class="w-4 h-4" />
-					</button>
-					
-					<!-- Debug panel (modern Tweakpane UI) -->
-					{#if showDebugPanel}
-						<Pane title="Kanaya Debug" position="fixed" width={320}>
-							<Folder title="Element Overlays">
-								<Checkbox bind:value={showElementOverlays} label="Enable Overlays" />
-								{#if showElementOverlays}
-									<Checkbox bind:value={showOverlayColors} label="Layer Colors" />
-									<Checkbox bind:value={showOverlayBorders} label="Borders" />
-									<Checkbox bind:value={showOverlayText} label="Text Content" />
-									<Checkbox bind:value={showOverlayIcons} label="Icons" />
-									<Checkbox bind:value={showAnimateText} label="Animate Text" />
-								{/if}
-							</Folder>
-
-							<Folder title="Shadow Dynamics" expanded={showShadowControls}>
-								<TweakSlider bind:value={shadowSlowOpacity} min={0} max={0.5} step={0.01} label="Slow Opacity" />
-								<TweakSlider bind:value={shadowFastOpacity} min={0} max={0.2} step={0.005} label="Fast Opacity" />
-								<TweakSlider bind:value={shadowSlowOblong} min={0} max={1} step={0.05} label="Slow Oblong" />
-								<TweakSlider bind:value={shadowFastOblong} min={0} max={1} step={0.05} label="Fast Oblong" />
-								<TweakSlider bind:value={shadowSlowSize} min={0.2} max={1.5} step={0.05} label="Slow Size" />
-								<TweakSlider bind:value={shadowFastSize} min={0.2} max={1.5} step={0.05} label="Fast Size" />
-								<TweakSlider bind:value={shadowLerpSpeed} min={0.05} max={0.5} step={0.01} label="Lerp Speed" />
-							</Folder>
-
-							<Folder title="Animation & Beats" expanded={wobbleControlsExpanded}>
-								<TweakSlider bind:value={beatMs} min={50} max={3000} step={50} label="Beat (ms)" />
-								<Monitor value={currentBeatCount} label="Beat Count" />
-								<Monitor value={lastBeatAction || 'none'} label="Last Action" />
-								
-								<TweakSeparator />
-								
-								<TweakSlider bind:value={spinSpeed} min={0.01} max={0.15} step={0.01} label="Spin Speed" />
-								<TweakSlider bind:value={wobbleStrength} min={0} max={0.3} step={0.01} label="Wobble Strength" />
-								<TweakSlider bind:value={wobbleOscillations} min={1} max={10} step={1} label="Oscillations" />
-								<TweakSlider bind:value={wobbleLinger} min={0.2} max={3} step={0.1} label="Linger" />
-								
-								<TweakSeparator />
-								
-								<div class="flex flex-col gap-1 p-1">
-									<span class="text-[10px] text-white/50 mb-1">Tap Pressure: {displayTapPressure}</span>
-									<div class="flex gap-1 h-2" role="meter" aria-label="Tap Pressure" aria-valuenow={displayTapPressure} aria-valuemin={0} aria-valuemax={5}>
-										{#each [1, 2, 3, 4, 5] as level}
-											<div 
-												class="flex-1 rounded transition-all duration-150 {displayTapPressure >= level ? 'bg-emerald-500 shadow-lg' : 'bg-white/10'}"
-											></div>
-										{/each}
-									</div>
-								</div>
-							</Folder>
-							
-							<TweakButton title="Close Debug" on:click={() => showDebugPanel = false} />
-						</Pane>
-					{/if}
-
-					<!-- Loading overlay with progress bar -->
-					{#if texturesLoading && !selectedTemplateId && (data.templateAssets?.length ?? 0) > 0}
-						<div
-							class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm rounded-xl"
-							transition:fade={{ duration: 300 }}
+						<!-- Debug toggle button -->
+						<button
+							type="button"
+							class="absolute top-2 right-2 z-10 p-2 rounded-lg bg-black/30 hover:bg-black/50 text-white/70 hover:text-white transition-colors"
+							onclick={() => (showDebugPanel = !showDebugPanel)}
+							title="Debug options"
 						>
-							<div class="flex flex-col items-center gap-4 px-8 w-full max-w-xs">
-								<!-- Loading spinner -->
-								<div class="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+							<Settings2 class="w-4 h-4" />
+						</button>
 
-								<!-- Progress text -->
-								<p class="text-sm text-muted-foreground">
-									Loading templates... {texturesLoaded}/{texturesTotal}
-								</p>
+						<!-- Debug panel (modern Tweakpane UI) -->
+						{#if showDebugPanel}
+							<Pane title="Kanaya Debug" position="fixed" width={320}>
+								<Folder title="Element Overlays">
+									<Checkbox bind:value={showElementOverlays} label="Enable Overlays" />
+									{#if showElementOverlays}
+										<Checkbox bind:value={showOverlayColors} label="Layer Colors" />
+										<Checkbox bind:value={showOverlayBorders} label="Borders" />
+										<Checkbox bind:value={showOverlayText} label="Text Content" />
+										<Checkbox bind:value={showOverlayIcons} label="Icons" />
+										<Checkbox bind:value={showAnimateText} label="Animate Text" />
+									{/if}
+								</Folder>
 
-								<!-- Progress bar -->
-								<div class="w-full h-2 bg-muted rounded-full overflow-hidden">
-									<div
-										class="h-full bg-primary transition-all duration-200 ease-out rounded-full"
-										style="width: {texturesProgress * 100}%"
-									></div>
-								</div>
+								<Folder title="Shadow Dynamics" expanded={showShadowControls}>
+									<TweakSlider
+										bind:value={shadowSlowOpacity}
+										min={0}
+										max={0.5}
+										step={0.01}
+										label="Slow Opacity"
+									/>
+									<TweakSlider
+										bind:value={shadowFastOpacity}
+										min={0}
+										max={0.2}
+										step={0.005}
+										label="Fast Opacity"
+									/>
+									<TweakSlider
+										bind:value={shadowSlowOblong}
+										min={0}
+										max={1}
+										step={0.05}
+										label="Slow Oblong"
+									/>
+									<TweakSlider
+										bind:value={shadowFastOblong}
+										min={0}
+										max={1}
+										step={0.05}
+										label="Fast Oblong"
+									/>
+									<TweakSlider
+										bind:value={shadowSlowSize}
+										min={0.2}
+										max={1.5}
+										step={0.05}
+										label="Slow Size"
+									/>
+									<TweakSlider
+										bind:value={shadowFastSize}
+										min={0.2}
+										max={1.5}
+										step={0.05}
+										label="Fast Size"
+									/>
+									<TweakSlider
+										bind:value={shadowLerpSpeed}
+										min={0.05}
+										max={0.5}
+										step={0.01}
+										label="Lerp Speed"
+									/>
+								</Folder>
 
-								<!-- Percentage -->
-								<p class="text-xs text-muted-foreground/70">
-									{Math.round(texturesProgress * 100)}%
-								</p>
-							</div>
-						</div>
-					{/if}
+								<Folder title="Animation & Beats" expanded={wobbleControlsExpanded}>
+									<TweakSlider
+										bind:value={beatMs}
+										min={50}
+										max={3000}
+										step={50}
+										label="Beat (ms)"
+									/>
+									<Monitor value={currentBeatCount} label="Beat Count" />
+									<Monitor value={lastBeatAction || 'none'} label="Last Action" />
 
-					<ClientOnly>
-						<Canvas toneMapping={NoToneMapping}>
-						<T.PerspectiveCamera makeDefault position={[0, 0, 5]} fov={50}>
-							<OrbitControls
-								enableDamping
-								enableZoom={true}
-								enablePan={false}
-								minDistance={3}
-								maxDistance={10}
-								minAzimuthAngle={-Math.PI / 6}
-								maxAzimuthAngle={Math.PI / 6}
-								minPolarAngle={Math.PI / 3}
-								maxPolarAngle={Math.PI * 2 / 3}
-							/>
-						</T.PerspectiveCamera>
-							<!-- Scene fog for depth - starts near card, fades to background -->
-							<T.Fog attach="fog" args={['#1a1a2e', 3, 12]} />
+									<TweakSeparator />
 
-							<!-- Ambient light for full color luster -->
-							<T.AmbientLight intensity={1.0} color="#ffffff" />
-							<!-- Main spotlight for visible reflection shape -->
-							<T.SpotLight
-								position={[1.5, 1.5, 5]}
-								intensity={3}
-								color="#ffffff"
-								angle={0.8}
-								penumbra={0.4}
-							/>
-							<!-- Second spotlight from opposite side -->
-							<T.SpotLight
-								position={[-2, 0.5, 5]}
-								intensity={2}
-								color="#ffffff"
-								angle={0.7}
-								penumbra={0.5}
-							/>
+									<TweakSlider
+										bind:value={spinSpeed}
+										min={0.01}
+										max={0.15}
+										step={0.01}
+										label="Spin Speed"
+									/>
+									<TweakSlider
+										bind:value={wobbleStrength}
+										min={0}
+										max={0.3}
+										step={0.01}
+										label="Wobble Strength"
+									/>
+									<TweakSlider
+										bind:value={wobbleOscillations}
+										min={1}
+										max={10}
+										step={1}
+										label="Oscillations"
+									/>
+									<TweakSlider
+										bind:value={wobbleLinger}
+										min={0.2}
+										max={3}
+										step={0.1}
+										label="Linger"
+									/>
 
-							<!-- Shadow beneath card - oblong ellipse that rotates with card -->
-							{@const cardW = selectedTemplate?.width_pixels || 1013}
-							{@const cardH = selectedTemplate?.height_pixels || 638}
-							{@const aspect = cardW / cardH}
-							{@const baseX = aspect >= 1 ? 5.0 : 5.0 * aspect}
-							{@const baseY = aspect >= 1 ? 2.5 / aspect : 2.5}
-							{@const avgSize = (baseX + baseY) / 2}
-							<T.Mesh
-								rotation.x={-Math.PI / 2}
-								rotation.z={cardRotationY}
-								position.y={-1.8}
-								position.z={0}
-								scale.x={(baseX * shadowOblongFactor + avgSize * (1 - shadowOblongFactor)) * shadowSizeFactor}
-								scale.y={(baseY * shadowOblongFactor + avgSize * (1 - shadowOblongFactor)) * shadowSizeFactor}
+									<TweakSeparator />
+
+									<div class="flex flex-col gap-1 p-1">
+										<span class="text-[10px] text-white/50 mb-1"
+											>Tap Pressure: {displayTapPressure}</span
+										>
+										<div
+											class="flex gap-1 h-2"
+											role="meter"
+											aria-label="Tap Pressure"
+											aria-valuenow={displayTapPressure}
+											aria-valuemin={0}
+											aria-valuemax={5}
+										>
+											{#each [1, 2, 3, 4, 5] as level}
+												<div
+													class="flex-1 rounded transition-all duration-150 {displayTapPressure >=
+													level
+														? 'bg-emerald-500 shadow-lg'
+														: 'bg-white/10'}"
+												></div>
+											{/each}
+										</div>
+									</div>
+								</Folder>
+
+								<TweakButton title="Close Debug" on:click={() => (showDebugPanel = false)} />
+							</Pane>
+						{/if}
+
+						<!-- Loading overlay with progress bar -->
+						{#if texturesLoading && !selectedTemplateId && (data.templateAssets?.length ?? 0) > 0}
+							<div
+								class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm rounded-xl"
+								transition:fade={{ duration: 300 }}
 							>
-								<T.PlaneGeometry args={[1, 1, 1, 1]} />
-								<T.ShaderMaterial
-									transparent={true}
-									uniforms={{
-										uColor: { value: [0.02, 0.02, 0.05] },
-										uOpacity: { value: shadowOpacity }
-									}}
-									vertexShader={`
+								<div class="flex flex-col items-center gap-4 px-8 w-full max-w-xs">
+									<!-- Loading spinner -->
+									<div
+										class="w-12 h-12 border-4 border-primary/30 border-t-primary rounded-full animate-spin"
+									></div>
+
+									<!-- Progress text -->
+									<p class="text-sm text-muted-foreground">
+										Loading templates... {texturesLoaded}/{texturesTotal}
+									</p>
+
+									<!-- Progress bar -->
+									<div class="w-full h-2 bg-muted rounded-full overflow-hidden">
+										<div
+											class="h-full bg-primary transition-all duration-200 ease-out rounded-full"
+											style="width: {texturesProgress * 100}%"
+										></div>
+									</div>
+
+									<!-- Percentage -->
+									<p class="text-xs text-muted-foreground/70">
+										{Math.round(texturesProgress * 100)}%
+									</p>
+								</div>
+							</div>
+						{/if}
+
+						<ClientOnly>
+							<Canvas toneMapping={NoToneMapping}>
+								<T.PerspectiveCamera makeDefault position={[0, 0, 5]} fov={50}>
+									<OrbitControls
+										enableDamping
+										enableZoom={true}
+										enablePan={false}
+										minDistance={3}
+										maxDistance={10}
+										minAzimuthAngle={-Math.PI / 6}
+										maxAzimuthAngle={Math.PI / 6}
+										minPolarAngle={Math.PI / 3}
+										maxPolarAngle={(Math.PI * 2) / 3}
+									/>
+								</T.PerspectiveCamera>
+								<!-- Scene fog for depth - starts near card, fades to background -->
+								<T.Fog attach="fog" args={['#1a1a2e', 3, 12]} />
+
+								<!-- Ambient light for full color luster -->
+								<T.AmbientLight intensity={1.0} color="#ffffff" />
+								<!-- Main spotlight for visible reflection shape -->
+								<T.SpotLight
+									position={[1.5, 1.5, 5]}
+									intensity={3}
+									color="#ffffff"
+									angle={0.8}
+									penumbra={0.4}
+								/>
+								<!-- Second spotlight from opposite side -->
+								<T.SpotLight
+									position={[-2, 0.5, 5]}
+									intensity={2}
+									color="#ffffff"
+									angle={0.7}
+									penumbra={0.5}
+								/>
+
+								<!-- Shadow beneath card - oblong ellipse that rotates with card -->
+								{@const cardW = selectedTemplate?.width_pixels || 1013}
+								{@const cardH = selectedTemplate?.height_pixels || 638}
+								{@const aspect = cardW / cardH}
+								{@const baseX = aspect >= 1 ? 5.0 : 5.0 * aspect}
+								{@const baseY = aspect >= 1 ? 2.5 / aspect : 2.5}
+								{@const avgSize = (baseX + baseY) / 2}
+								<T.Mesh
+									rotation.x={-Math.PI / 2}
+									rotation.z={cardRotationY}
+									position.y={-1.8}
+									position.z={0}
+									scale.x={(baseX * shadowOblongFactor + avgSize * (1 - shadowOblongFactor)) *
+										shadowSizeFactor}
+									scale.y={(baseY * shadowOblongFactor + avgSize * (1 - shadowOblongFactor)) *
+										shadowSizeFactor}
+								>
+									<T.PlaneGeometry args={[1, 1, 1, 1]} />
+									<T.ShaderMaterial
+										transparent={true}
+										uniforms={{
+											uColor: { value: [0.02, 0.02, 0.05] },
+											uOpacity: { value: shadowOpacity }
+										}}
+										vertexShader={`
 										varying vec2 vUv;
 										void main() {
 											vUv = uv;
 											gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 										}
 									`}
-									fragmentShader={`
+										fragmentShader={`
 										uniform vec3 uColor;
 										uniform float uOpacity;
 										varying vec2 vUv;
@@ -771,362 +906,378 @@
 											gl_FragColor = vec4(uColor, alpha);
 										}
 									`}
+									/>
+								</T.Mesh>
+								<TemplateCard3D
+									bind:this={templateCard3D}
+									imageUrl={selectedTemplate?.front_background
+										? getProxiedUrl(selectedTemplate.front_background, 'templates')
+										: null}
+									backImageUrl={selectedTemplate?.back_background
+										? getProxiedUrl(selectedTemplate.back_background, 'templates')
+										: null}
+									widthPixels={selectedTemplate?.width_pixels || 1013}
+									heightPixels={selectedTemplate?.height_pixels || 638}
+									templateId={selectedTemplateId}
+									templateElements={(selectedTemplate?.template_elements || []) as any}
+									showOverlays={showElementOverlays}
+									showColors={showOverlayColors}
+									showBorders={showOverlayBorders}
+									showText={showOverlayText}
+									showIcons={showOverlayIcons}
+									animateText={showAnimateText}
+									rotating={false}
+									onRotationChange={handleRotationChange}
+									showcaseImages={data.templateAssets && data.templateAssets.length > 0
+										? data.templateAssets
+										: fallbackAssets}
+									{beatMs}
+									onBeat={handleBeat}
+									{spinSpeed}
+									{wobbleStrength}
+									{wobbleOscillations}
+									{wobbleLinger}
+									onLoadingProgress={handleLoadingProgress}
+									onTapPressureChange={handleTapPressureChange}
 								/>
-							</T.Mesh>
-							<TemplateCard3D
-								bind:this={templateCard3D}
-								imageUrl={selectedTemplate?.front_background
-									? getProxiedUrl(selectedTemplate.front_background, 'templates')
-									: null}
-								backImageUrl={selectedTemplate?.back_background
-									? getProxiedUrl(selectedTemplate.back_background, 'templates')
-									: null}
-								widthPixels={selectedTemplate?.width_pixels || 1013}
-								heightPixels={selectedTemplate?.height_pixels || 638}
-								templateId={selectedTemplateId}
-								templateElements={(selectedTemplate?.template_elements || []) as any}
-								showOverlays={showElementOverlays}
-								showColors={showOverlayColors}
-								showBorders={showOverlayBorders}
-								showText={showOverlayText}
-								showIcons={showOverlayIcons}
-								animateText={showAnimateText}
-								rotating={false}
-								onRotationChange={handleRotationChange}
-								showcaseImages={(data.templateAssets && data.templateAssets.length > 0) ? data.templateAssets : fallbackAssets}
-								beatMs={beatMs}
-								onBeat={handleBeat}
-								spinSpeed={spinSpeed}
-								wobbleStrength={wobbleStrength}
-								wobbleOscillations={wobbleOscillations}
-								wobbleLinger={wobbleLinger}
-								onLoadingProgress={handleLoadingProgress}
-								onTapPressureChange={handleTapPressureChange}
+							</Canvas>
+						</ClientOnly>
+					</div>
 
-							/>
-						</Canvas>
-					</ClientOnly>
+					<!-- Action Buttons -->
+					<div class="flex flex-col sm:flex-row gap-3">
+						{#if selectedTemplate}
+							<Button href="/use-template/{selectedTemplate.id}" size="lg" class="gap-2">
+								<Plus class="h-5 w-5" />
+								Use Template
+							</Button>
+							<Button
+								variant="outline"
+								size="lg"
+								class="gap-2"
+								onclick={() => editTemplate(selectedTemplate)}
+							>
+								<Edit class="h-5 w-5" />
+								Edit Template
+							</Button>
+						{:else}
+							<Button onclick={handleCreateNew} size="lg" class="gap-2">
+								<Plus class="h-5 w-5" />
+								Create New Template
+							</Button>
+						{/if}
+					</div>
 				</div>
 
-				<!-- Action Buttons -->
-				<div class="flex flex-col sm:flex-row gap-3">
-					{#if selectedTemplate}
-						<Button href="/use-template/{selectedTemplate.id}" size="lg" class="gap-2">
-							<Plus class="h-5 w-5" />
-							Use Template
-						</Button>
-						<Button
-							variant="outline"
-							size="lg"
-							class="gap-2"
-							onclick={() => editTemplate(selectedTemplate)}
-						>
-							<Edit class="h-5 w-5" />
-							Edit Template
-						</Button>
-					{:else}
-						<Button onclick={handleCreateNew} size="lg" class="gap-2">
-							<Plus class="h-5 w-5" />
-							Create New Template
-						</Button>
-					{/if}
-				</div>
-			</div>
-
-			<!-- Right: Template List with Toggle - Overlays on mobile -->
-			<div class="absolute right-0 top-1/2 -translate-y-1/2 flex items-start z-30 lg:relative lg:right-auto lg:top-auto lg:translate-y-0 lg:flex-shrink-0">
-				<!-- Mobile: Collapse toggle button - always visible -->
-				<button
-					type="button"
-					class="lg:hidden flex items-center justify-center w-8 h-20 bg-primary text-primary-foreground rounded-l-xl shadow-lg hover:bg-primary/90 transition-colors"
-					onclick={() => (templateListCollapsed = !templateListCollapsed)}
-					title={templateListCollapsed ? 'Show templates' : 'Hide templates'}
-				>
-					{#if templateListCollapsed}
-						<ChevronLeft class="w-4 h-4" />
-					{:else}
-						<ChevronRight class="w-4 h-4" />
-					{/if}
-				</button>
-
-				<!-- Template list panel -->
+				<!-- Right: Template List with Toggle - Overlays on mobile -->
 				<div
-					class="w-64 lg:w-72 transition-all duration-300 ease-in-out shadow-xl lg:shadow-none {templateListCollapsed ? 'max-w-0 opacity-0 overflow-hidden lg:max-w-72 lg:opacity-100' : 'max-w-72 opacity-100'}"
+					class="absolute right-0 top-1/2 -translate-y-1/2 flex items-start z-30 lg:relative lg:right-auto lg:top-auto lg:translate-y-0 lg:flex-shrink-0"
 				>
-				{#if data.user}
-					<div class="bg-card border border-border rounded-xl p-3 {templateListCollapsed ? 'lg:block' : ''}">
-						<!-- Desktop View Toggle Buttons -->
-						<div class="hidden lg:flex gap-2 mb-4 w-full">
-							<Button 
-								variant={activeView === 'templates' ? 'default' : 'outline'} 
-								size="sm" 
-								class="flex-1"
-								onclick={() => activeView = 'templates'}
-							>
-								Templates
-							</Button>
-							<Button 
-								variant={(activeView as string) === 'generations' ? 'default' : 'outline'} 
-								size="sm" 
-								class="flex-1"
-								onclick={() => activeView = 'generations'}
-							>
-								Generations
-							</Button>
-						</div>
+					<!-- Mobile: Collapse toggle button - always visible -->
+					<button
+						type="button"
+						class="lg:hidden flex items-center justify-center w-8 h-20 bg-primary text-primary-foreground rounded-l-xl shadow-lg hover:bg-primary/90 transition-colors"
+						onclick={() => (templateListCollapsed = !templateListCollapsed)}
+						title={templateListCollapsed ? 'Show templates' : 'Hide templates'}
+					>
+						{#if templateListCollapsed}
+							<ChevronLeft class="w-4 h-4" />
+						{:else}
+							<ChevronRight class="w-4 h-4" />
+						{/if}
+					</button>
 
-						<h3 class="font-semibold text-foreground mb-2 text-sm">Templates</h3>
-
-						<div class="space-y-1 max-h-[320px] overflow-y-auto">
-							<!-- New Card option to go back to empty morphing state -->
-							<button
-								type="button"
-								class="w-full flex items-center gap-3 px-2 py-2 rounded-lg text-sm transition-colors {selectedTemplateId === null
-									? 'bg-primary text-primary-foreground'
-									: 'hover:bg-muted text-foreground'}"
-								onclick={() => (selectedTemplateId = null)}
+					<!-- Template list panel -->
+					<div
+						class="w-64 lg:w-72 transition-all duration-300 ease-in-out shadow-xl lg:shadow-none {templateListCollapsed
+							? 'max-w-0 opacity-0 overflow-hidden lg:max-w-72 lg:opacity-100'
+							: 'max-w-72 opacity-100'}"
+					>
+						{#if data.user}
+							<div
+								class="bg-card border border-border rounded-xl p-3 {templateListCollapsed
+									? 'lg:block'
+									: ''}"
 							>
-								<!-- Morphing card icon -->
-								<div
-									class="flex-shrink-0 w-14 h-10 rounded overflow-hidden bg-gradient-to-br from-slate-700 to-slate-900 border border-border/50 flex items-center justify-center"
-								>
-									<span class="text-blue-400 font-bold text-xs">ID</span>
+								<!-- Desktop View Toggle Buttons -->
+								<div class="hidden lg:flex gap-2 mb-4 w-full">
+									<Button
+										variant={activeView === 'templates' ? 'default' : 'outline'}
+										size="sm"
+										class="flex-1"
+										onclick={() => (activeView = 'templates')}
+									>
+										Templates
+									</Button>
+									<Button
+										variant={(activeView as string) === 'generations' ? 'default' : 'outline'}
+										size="sm"
+										class="flex-1"
+										onclick={() => (activeView = 'generations')}
+									>
+										Generations
+									</Button>
 								</div>
-								<span class="truncate flex-1 text-left font-medium">New Card</span>
-							</button>
 
-							{#if templates.length === 0}
-								<p class="text-sm text-muted-foreground py-4 text-center">No templates yet</p>
-							{:else}
-								{#each templates as template (template.id)}
-									{@const dims = getPixelDims(template)}
+								<h3 class="font-semibold text-foreground mb-2 text-sm">Templates</h3>
+
+								<div class="space-y-1 max-h-[320px] overflow-y-auto">
+									<!-- New Card option to go back to empty morphing state -->
 									<button
 										type="button"
 										class="w-full flex items-center gap-3 px-2 py-2 rounded-lg text-sm transition-colors {selectedTemplateId ===
-										template.id
+										null
 											? 'bg-primary text-primary-foreground'
 											: 'hover:bg-muted text-foreground'}"
-										onclick={() => (selectedTemplateId = template.id)}
+										onclick={() => (selectedTemplateId = null)}
 									>
-										<!-- Thumbnail with Elements Overlay -->
+										<!-- Morphing card icon -->
 										<div
-											class="flex-shrink-0 w-14 h-10 rounded overflow-hidden bg-muted border border-border/50 relative"
-											style="aspect-ratio: {dims.w} / {dims.h};"
+											class="flex-shrink-0 w-14 h-10 rounded overflow-hidden bg-gradient-to-br from-slate-700 to-slate-900 border border-border/50 flex items-center justify-center"
 										>
-											{#if template.front_background}
+											<span class="text-blue-400 font-bold text-xs">ID</span>
+										</div>
+										<span class="truncate flex-1 text-left font-medium">New Card</span>
+									</button>
+
+									{#if templates.length === 0}
+										<p class="text-sm text-muted-foreground py-4 text-center">No templates yet</p>
+									{:else}
+										{#each templates as template (template.id)}
+											{@const dims = getPixelDims(template)}
+											<button
+												type="button"
+												class="w-full flex items-center gap-3 px-2 py-2 rounded-lg text-sm transition-colors {selectedTemplateId ===
+												template.id
+													? 'bg-primary text-primary-foreground'
+													: 'hover:bg-muted text-foreground'}"
+												onclick={() => (selectedTemplateId = template.id)}
+											>
+												<!-- Thumbnail with Elements Overlay -->
+												<div
+													class="flex-shrink-0 w-14 h-10 rounded overflow-hidden bg-muted border border-border/50 relative"
+													style="aspect-ratio: {dims.w} / {dims.h};"
+												>
+													{#if template.front_background}
+														<img
+															src={template.front_background.startsWith('http')
+																? template.front_background
+																: getProxiedUrl(template.front_background, 'templates')}
+															alt={template.name}
+															class="w-full h-full object-cover"
+															loading="lazy"
+														/>
+													{:else}
+														<div
+															class="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-gray-700"
+														>
+															<FileText class="w-3 h-3 text-muted-foreground" />
+														</div>
+													{/if}
+													<!-- Elements Overlay -->
+													{#if template.template_elements?.length > 0}
+														<div class="absolute inset-0 pointer-events-none">
+															{#each template.template_elements.filter((el: any) => el.side === 'front') as el}
+																<div
+																	class="absolute border border-dashed border-black/20 bg-black/5"
+																	style={getElementStyle(el, dims.w, dims.h)}
+																>
+																	{#if el.type === 'text' || el.type === 'selection'}
+																		<span
+																			class="block w-full h-full"
+																			style="font-size: 2px; color: {el.color ??
+																				'#000'}; opacity: 0.7;"
+																		></span>
+																	{/if}
+																</div>
+															{/each}
+														</div>
+													{/if}
+												</div>
+												<!-- Name -->
+												<span class="truncate flex-1 text-left">{template.name}</span>
+											</button>
+										{/each}
+									{/if}
+								</div>
+
+								<!-- View All Button -->
+								<div class="mt-3 pt-2 border-t border-border">
+									<Button variant="outline" size="sm" class="w-full" href="/templates"
+										>View All</Button
+									>
+								</div>
+							</div>
+						{:else}
+							<!-- Not signed in - show sign in prompt -->
+							<div class="bg-card border border-border rounded-xl p-4">
+								<p class="text-sm text-muted-foreground text-center">Sign in to view templates</p>
+							</div>
+						{/if}
+					</div>
+				</div>
+			</section>
+		{/if}
+
+		<!-- Recent Section (Generations) -->
+		{#if activeView === 'generations'}
+			<section class="space-y-6">
+				<!-- Big Heading -->
+				<div class="flex items-center justify-between">
+					<div>
+						<h1 class="text-3xl font-bold text-foreground">Your Recent Generations</h1>
+						<p class="text-muted-foreground mt-1">View and manage your generated ID cards</p>
+					</div>
+					<div class="flex items-center gap-3">
+						<Button
+							variant="outline"
+							size="sm"
+							class="hidden lg:flex"
+							onclick={() => (activeView = 'templates')}
+						>
+							Back to 3D
+						</Button>
+						{#if transformedCards.length > 0}
+							<RecentViewModeToggle />
+						{/if}
+					</div>
+				</div>
+
+				{#if $recentViewMode === 'grid'}
+					<div class="flex items-center gap-2">
+						<span class="text-sm text-muted-foreground whitespace-nowrap"
+							>Columns: {gridColumns}</span
+						>
+						<Slider
+							type="multiple"
+							value={[gridColumns]}
+							min={3}
+							max={7}
+							step={1}
+							onValueChange={(v: number[]) => (gridColumns = v[0])}
+							class="w-32"
+						/>
+					</div>
+				{/if}
+
+				{#if data.error}
+					<Card class="border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800">
+						<CardContent class="p-6">
+							<div class="flex items-center gap-3">
+								<svg
+									class="h-5 w-5 text-red-600"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+									/>
+								</svg>
+								<p class="text-red-700 dark:text-red-300">
+									Error loading recent activity. Please try again later.
+								</p>
+							</div>
+						</CardContent>
+					</Card>
+				{:else if transformedCards.length > 0}
+					<div class="space-y-4">
+						<!-- Carousel View (3D) - Always mounted to preserve texture cache -->
+						<div
+							class={$recentViewMode === 'list'
+								? 'invisible absolute -z-50 pointer-events-none'
+								: ''}
+						>
+							<ClientOnly>
+								<IDCarousel3D
+									cards={transformedCards}
+									viewMode={$recentViewMode === 'grid' ? 'grid' : 'carousel'}
+									columns={gridColumns}
+									onCardClick={(card) => openSinglePreview(card)}
+								/>
+							</ClientOnly>
+						</div>
+
+						<!-- Grid View - NOW HANDLED BY 3D COMPONENT -->
+
+						<!-- List View -->
+						{#if $recentViewMode === 'list'}
+							<div class="space-y-3">
+								{#each transformedCards.slice(0, 10) as card}
+									<button
+										type="button"
+										class="w-full flex items-center gap-4 p-3 bg-card border border-border rounded-lg hover:shadow-md hover:border-primary/50 transition-all cursor-pointer text-left"
+										onclick={() => openSinglePreview(card)}
+									>
+										<div class="flex-none w-20 h-14 rounded-md overflow-hidden bg-muted">
+											{#if card.front_image}
 												<img
-													src={template.front_background.startsWith('http')
-														? template.front_background
-														: getProxiedUrl(template.front_background, 'templates')}
-													alt={template.name}
+													src={getProxiedUrl(card.front_image, 'rendered-id-cards')}
+													alt="ID Preview"
 													class="w-full h-full object-cover"
 													loading="lazy"
 												/>
 											{:else}
 												<div
-													class="w-full h-full flex items-center justify-center bg-gray-200 dark:bg-gray-700"
+													class="w-full h-full flex items-center justify-center text-muted-foreground"
 												>
-													<FileText class="w-3 h-3 text-muted-foreground" />
-												</div>
-											{/if}
-											<!-- Elements Overlay -->
-											{#if template.template_elements?.length > 0}
-												<div class="absolute inset-0 pointer-events-none">
-													{#each template.template_elements.filter((el: any) => el.side === 'front') as el}
-														<div
-															class="absolute border border-dashed border-black/20 bg-black/5"
-															style={getElementStyle(el, dims.w, dims.h)}
-														>
-															{#if el.type === 'text' || el.type === 'selection'}
-																<span
-																	class="block w-full h-full"
-																	style="font-size: 2px; color: {el.color ?? '#000'}; opacity: 0.7;"
-																></span>
-															{/if}
-														</div>
-													{/each}
+													<ImageIcon class="w-6 h-6" />
 												</div>
 											{/if}
 										</div>
-										<!-- Name -->
-										<span class="truncate flex-1 text-left">{template.name}</span>
+										<div class="flex-1 min-w-0">
+											<p class="font-medium text-foreground truncate">{card.template_name}</p>
+											{#if card.created_at}
+												<p class="text-xs text-muted-foreground">
+													{new Date(card.created_at).toLocaleDateString()}
+												</p>
+											{/if}
+										</div>
+										<ChevronRight class="flex-none w-5 h-5 text-muted-foreground" />
 									</button>
 								{/each}
-							{/if}
-						</div>
-
-						<!-- View All Button -->
-						<div class="mt-3 pt-2 border-t border-border">
-							<Button variant="outline" size="sm" class="w-full" href="/templates">View All</Button>
-						</div>
+							</div>
+						{/if}
 					</div>
 				{:else}
-					<!-- Not signed in - show sign in prompt -->
-					<div class="bg-card border border-border rounded-xl p-4">
-						<p class="text-sm text-muted-foreground text-center">Sign in to view templates</p>
-					</div>
-				{/if}
-				</div>
-			</div>
-		</section>
-	{/if}
-
-	<!-- Recent Section (Generations) -->
-	{#if activeView === 'generations'}
-		<section class="space-y-6">
-			<!-- Big Heading -->
-			<div class="flex items-center justify-between">
-				<div>
-					<h1 class="text-3xl font-bold text-foreground">Your Recent Generations</h1>
-					<p class="text-muted-foreground mt-1">View and manage your generated ID cards</p>
-				</div>
-				<div class="flex items-center gap-3">
-					<Button 
-						variant="outline" 
-						size="sm"
-						class="hidden lg:flex" 
-						onclick={() => activeView = 'templates'}
-					>
-						Back to 3D
-					</Button>
-					{#if transformedCards.length > 0}
-						<RecentViewModeToggle />
-					{/if}
-				</div>
-			</div>
-
-			{#if $recentViewMode === 'grid'}
-				<div class="flex items-center gap-2">
-					<span class="text-sm text-muted-foreground whitespace-nowrap">Columns: {gridColumns}</span
-					>
-					<Slider
-						type="multiple"
-						value={[gridColumns]}
-						min={3}
-						max={7}
-						step={1}
-						onValueChange={(v: number[]) => (gridColumns = v[0])}
-						class="w-32"
-					/>
-				</div>
-			{/if}
-
-			{#if data.error}
-				<Card class="border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800">
-					<CardContent class="p-6">
-						<div class="flex items-center gap-3">
-							<svg
-								class="h-5 w-5 text-red-600"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
+					<Card>
+						<CardContent class="p-12 text-center">
+							<div
+								class="w-20 h-20 mx-auto mb-6 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center"
 							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-								/>
-							</svg>
-							<p class="text-red-700 dark:text-red-300">
-								Error loading recent activity. Please try again later.
-							</p>
-						</div>
-					</CardContent>
-				</Card>
-			{:else if transformedCards.length > 0}
-				<div class="space-y-4">
-					<!-- Carousel View (3D) - Always mounted to preserve texture cache -->
-					<div
-						class={$recentViewMode === 'list' ? 'invisible absolute -z-50 pointer-events-none' : ''}
-					>
-						<ClientOnly>
-							<IDCarousel3D
-								cards={transformedCards}
-								viewMode={$recentViewMode === 'grid' ? 'grid' : 'carousel'}
-								columns={gridColumns}
-								onCardClick={(card) => openSinglePreview(card)}
-							/>
-						</ClientOnly>
-					</div>
-
-					<!-- Grid View - NOW HANDLED BY 3D COMPONENT -->
-
-					<!-- List View -->
-					{#if $recentViewMode === 'list'}
-						<div class="space-y-3">
-							{#each transformedCards.slice(0, 10) as card}
-								<button
-									type="button"
-									class="w-full flex items-center gap-4 p-3 bg-card border border-border rounded-lg hover:shadow-md hover:border-primary/50 transition-all cursor-pointer text-left"
-									onclick={() => openSinglePreview(card)}
+								<svg
+									class="h-10 w-10 text-gray-400"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
 								>
-									<div class="flex-none w-20 h-14 rounded-md overflow-hidden bg-muted">
-										{#if card.front_image}
-											<img
-												src={getProxiedUrl(card.front_image, 'rendered-id-cards')}
-												alt="ID Preview"
-												class="w-full h-full object-cover"
-												loading="lazy"
-											/>
-										{:else}
-											<div
-												class="w-full h-full flex items-center justify-center text-muted-foreground"
-											>
-												<ImageIcon class="w-6 h-6" />
-											</div>
-										{/if}
-									</div>
-									<div class="flex-1 min-w-0">
-										<p class="font-medium text-foreground truncate">{card.template_name}</p>
-										{#if card.created_at}
-											<p class="text-xs text-muted-foreground">
-												{new Date(card.created_at).toLocaleDateString()}
-											</p>
-										{/if}
-									</div>
-									<ChevronRight class="flex-none w-5 h-5 text-muted-foreground" />
-								</button>
-							{/each}
-						</div>
-					{/if}
-				</div>
-			{:else}
-				<Card>
-					<CardContent class="p-12 text-center">
-						<div
-							class="w-20 h-20 mx-auto mb-6 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center"
-						>
-							<svg
-								class="h-10 w-10 text-gray-400"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V4a2 2 0 114 0v2m-4 0a2 2 0 104 0m-4 0V4a2 2 0 014 0v2"
-								/>
-							</svg>
-						</div>
-						<h3 class="text-xl font-semibold text-foreground mb-3">No ID Cards Yet</h3>
-						<p class="text-muted-foreground mb-6 max-w-md mx-auto">
-							Get started by creating your first ID card. Choose from your templates and customize
-							them to your needs.
-						</p>
-						{#if templates.length > 0}
-							<Button href={`/use-template/${templates[0].id}`} size="lg">
-								<Plus class="w-4 h-4 mr-2" />
-								Create Your First ID
-							</Button>
-						{/if}
-					</CardContent>
-				</Card>
-			{/if}
-		</section>
-	{/if}
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V4a2 2 0 114 0v2m-4 0a2 2 0 104 0m-4 0V4a2 2 0 014 0v2"
+									/>
+								</svg>
+							</div>
+							<h3 class="text-xl font-semibold text-foreground mb-3">No ID Cards Yet</h3>
+							<p class="text-muted-foreground mb-6 max-w-md mx-auto">
+								Get started by creating your first ID card. Choose from your templates and customize
+								them to your needs.
+							</p>
+							{#if templates.length > 0}
+								<Button href={`/use-template/${templates[0].id}`} size="lg">
+									<Plus class="w-4 h-4 mr-2" />
+									Create Your First ID
+								</Button>
+							{/if}
+						</CardContent>
+					</Card>
+				{/if}
+			</section>
+		{/if}
 	</div>
 </div>
 
@@ -1201,7 +1352,7 @@
 		position: relative;
 		width: 100%;
 		height: 100%;
-		transition: transform 0.5s cubic-bezier(0.4, 0.0, 0.2, 1);
+		transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 		transform-style: preserve-3d;
 	}
 
@@ -1220,7 +1371,7 @@
 		justify-content: center;
 		border-radius: 0.15em;
 		background: linear-gradient(145deg, hsl(var(--muted) / 0.3), hsl(var(--muted) / 0.1));
-		box-shadow: 
+		box-shadow:
 			0 2px 4px hsl(var(--foreground) / 0.1),
 			inset 0 1px 0 hsl(var(--background) / 0.5);
 	}

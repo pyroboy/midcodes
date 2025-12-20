@@ -10,10 +10,7 @@ import * as schema from '$lib/server/schema';
 import { eq, and } from 'drizzle-orm';
 
 // Schema imports
-import {
-	type CheckoutInitResult,
-	type PaymentHistory
-} from '$lib/payments/schemas';
+import { type CheckoutInitResult, type PaymentHistory } from '$lib/payments/schemas';
 
 // Server-only imports
 import { assertServerContext } from '$lib/server/env';
@@ -108,9 +105,8 @@ export const createCreditPayment = command('unchecked', async (input: any) => {
 
 		// CHECK FOR BYPASS MODE
 		if (orgSettings.paymentsBypass) {
-			const { addCreditsBypass, generateBypassReference } = await import(
-				'$lib/server/credits/bypass-helpers'
-			);
+			const { addCreditsBypass, generateBypassReference } =
+				await import('$lib/server/credits/bypass-helpers');
 
 			const bypassReference = generateBypassReference();
 
@@ -177,9 +173,8 @@ export const createFeaturePayment = command('unchecked', async (input: any) => {
 
 		// CHECK FOR BYPASS MODE
 		if (orgSettings.paymentsBypass) {
-			const { grantFeatureBypass, generateBypassReference } = await import(
-				'$lib/server/credits/bypass-helpers'
-			);
+			const { grantFeatureBypass, generateBypassReference } =
+				await import('$lib/server/credits/bypass-helpers');
 
 			const bypassReference = generateBypassReference();
 

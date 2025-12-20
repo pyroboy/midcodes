@@ -1,6 +1,11 @@
 import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
-import { checkSuperAdmin, checkSuperAdminEmulatedOnly, shouldBypassFor403, wantsToAssumeRole } from '$lib/utils/adminPermissions';
+import {
+	checkSuperAdmin,
+	checkSuperAdminEmulatedOnly,
+	shouldBypassFor403,
+	wantsToAssumeRole
+} from '$lib/utils/adminPermissions';
 import { db } from '$lib/server/db';
 import { organizations, profiles, idcards, templates } from '$lib/server/schema';
 import { eq, sql, desc } from 'drizzle-orm';
@@ -31,13 +36,11 @@ export const load: PageServerLoad = async ({ parent, locals, url }) => {
 
 	// Check if user wants to assume the emulated role and experience being blocked
 	const assumingRole = wantsToAssumeRole(locals, url);
-	
+
 	// Super admin only - this page manages ALL organizations
 	// Use emulated-only check if user wants to assume role
-	const isSuperAdmin = assumingRole 
-		? checkSuperAdminEmulatedOnly(locals) 
-		: checkSuperAdmin(locals);
-	
+	const isSuperAdmin = assumingRole ? checkSuperAdminEmulatedOnly(locals) : checkSuperAdmin(locals);
+
 	const canBypass = shouldBypassFor403(locals, url);
 
 	// If not super admin and not bypassing, show soft denial for super admins to bypass
@@ -70,42 +73,46 @@ export const load: PageServerLoad = async ({ parent, locals, url }) => {
 
 	try {
 		// Fetch ALL organizations using Drizzle
-		const orgs = await db.select({
-			id: organizations.id,
-			name: organizations.name,
-			created_at: organizations.createdAt,
-			updated_at: organizations.updatedAt
-		})
+		const orgs = await db
+			.select({
+				id: organizations.id,
+				name: organizations.name,
+				created_at: organizations.createdAt,
+				updated_at: organizations.updatedAt
+			})
 			.from(organizations)
 			.orderBy(organizations.name);
 
 		// Get member counts using aggregation queries for efficiency
-		// We'll perform separate queries for stats to avoid complex joins/group bys if possible, 
+		// We'll perform separate queries for stats to avoid complex joins/group bys if possible,
 		// or loop if N is small. For admin page, N is likely manageable, but better to be efficient.
 
 		// Let's use individual counts per org for simplicity and accuracy matching previous logic
 		// Or perform a group by query if we want to be fancy.
 		// Drizzle group by:
 		// db.select({ orgId: profiles.orgId, count: count() }).from(profiles).groupBy(profiles.orgId)
-		
+
 		const [memberCounts, cardCounts, templateCounts] = await Promise.all([
-			db.select({ orgId: profiles.orgId, count: sql<number>`count(*)` })
+			db
+				.select({ orgId: profiles.orgId, count: sql<number>`count(*)` })
 				.from(profiles)
 				.groupBy(profiles.orgId),
-			db.select({ orgId: idcards.orgId, count: sql<number>`count(*)` })
+			db
+				.select({ orgId: idcards.orgId, count: sql<number>`count(*)` })
 				.from(idcards)
 				.groupBy(idcards.orgId),
-			db.select({ orgId: templates.orgId, count: sql<number>`count(*)` })
+			db
+				.select({ orgId: templates.orgId, count: sql<number>`count(*)` })
 				.from(templates)
 				.groupBy(templates.orgId)
 		]);
 
-		const memberCountMap = new Map(memberCounts.map(m => [m.orgId, Number(m.count)]));
-		const cardCountMap = new Map(cardCounts.map(c => [c.orgId, Number(c.count)]));
-		const templateCountMap = new Map(templateCounts.map(t => [t.orgId, Number(t.count)]));
+		const memberCountMap = new Map(memberCounts.map((m) => [m.orgId, Number(m.count)]));
+		const cardCountMap = new Map(cardCounts.map((c) => [c.orgId, Number(c.count)]));
+		const templateCountMap = new Map(templateCounts.map((t) => [t.orgId, Number(t.count)]));
 
 		// Combine data
-		const orgStats: OrganizationWithStats[] = orgs.map(org => ({
+		const orgStats: OrganizationWithStats[] = orgs.map((org) => ({
 			...org,
 			memberCount: memberCountMap.get(org.id) || 0,
 			cardCount: cardCountMap.get(org.id) || 0,

@@ -36,7 +36,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 		}
 
 		// Get available templates for default template selection
-		const templatesList = await db.select()
+		const templatesList = await db
+			.select()
 			.from(templates)
 			.where(eq(templates.orgId, org_id || ''))
 			.orderBy(templates.name);
@@ -84,7 +85,8 @@ export const actions: Actions = {
 
 		try {
 			// Update timestamp
-			await db.update(profiles)
+			await db
+				.update(profiles)
 				.set({
 					updatedAt: new Date()
 				})
@@ -118,7 +120,8 @@ export const actions: Actions = {
 			const defaultTemplate = formData.get('defaultTemplate') as string;
 
 			// Get current profile to preserve other context data
-			const currentProfiles = await db.select({ context: profiles.context })
+			const currentProfiles = await db
+				.select({ context: profiles.context })
 				.from(profiles)
 				.where(eq(profiles.id, user.id))
 				.limit(1);
@@ -140,7 +143,8 @@ export const actions: Actions = {
 				}
 			};
 
-			await db.update(profiles)
+			await db
+				.update(profiles)
 				.set({
 					context: updatedContext,
 					updatedAt: new Date()
@@ -221,21 +225,23 @@ export const actions: Actions = {
 			});
 
 			// Get user's created ID cards (using orgId for now as specific user tracking might be on org level)
-			const idCardsData = await db.select({
-				id: idcards.id,
-				template_id: idcards.templateId,
-				created_at: idcards.createdAt,
-				data: idcards.data
-			})
+			const idCardsData = await db
+				.select({
+					id: idcards.id,
+					template_id: idcards.templateId,
+					created_at: idcards.createdAt,
+					data: idcards.data
+				})
 				.from(idcards)
 				.where(eq(idcards.orgId, user.orgId || ''));
 
 			// Get user's created templates (if any)
-			const templatesData = await db.select({
-				id: templates.id,
-				name: templates.name,
-				created_at: templates.createdAt
-			})
+			const templatesData = await db
+				.select({
+					id: templates.id,
+					name: templates.name,
+					created_at: templates.createdAt
+				})
 				.from(templates)
 				.where(eq(templates.userId, user.id));
 
@@ -301,40 +307,43 @@ export const actions: Actions = {
 
 			// Check if user has admin role - prevent deletion of last admin
 			if (profile.role && ['super_admin', 'org_admin'].includes(profile.role)) {
-                // If orgId is missing, they can't be the last admin of an org, but let's be safe
-                if (profile.orgId) {
-                    // Count other admins in organization
-                    const adminCountResult = await db.select({ count: sql<number>`count(*)` })
-                        .from(profiles)
-                        .where(and(
-                            eq(profiles.orgId, profile.orgId),
-                            inArray(profiles.role, ['super_admin', 'org_admin'] as any),
-                            sql`${profiles.id} != ${user.id}`
-                        ));
+				// If orgId is missing, they can't be the last admin of an org, but let's be safe
+				if (profile.orgId) {
+					// Count other admins in organization
+					const adminCountResult = await db
+						.select({ count: sql<number>`count(*)` })
+						.from(profiles)
+						.where(
+							and(
+								eq(profiles.orgId, profile.orgId),
+								inArray(profiles.role, ['super_admin', 'org_admin'] as any),
+								sql`${profiles.id} != ${user.id}`
+							)
+						);
 
-                    const adminCount = Number(adminCountResult[0]?.count || 0);
+					const adminCount = Number(adminCountResult[0]?.count || 0);
 
-                    if (adminCount === 0) {
-                        return fail(400, {
-                            error: 'Cannot delete account: You are the last administrator in your organization'
-                        });
-                    }
-                }
+					if (adminCount === 0) {
+						return fail(400, {
+							error: 'Cannot delete account: You are the last administrator in your organization'
+						});
+					}
+				}
 			}
 
 			// Delete Better Auth user
 			try {
 				await auth.api.deleteUser({
-                    body: {},
-                    headers: request.headers
-                });
+					body: {},
+					headers: request.headers
+				});
 			} catch (authError: any) {
 				console.error('Error deleting auth user:', authError);
 				return fail(500, { error: 'Failed to delete account auth: ' + authError.message });
 			}
 
-            // Explicitly delete profile in case cascade is not set up
-            await db.delete(profiles).where(eq(profiles.id, user.id));
+			// Explicitly delete profile in case cascade is not set up
+			await db.delete(profiles).where(eq(profiles.id, user.id));
 
 			// Redirect to auth page with message
 			throw redirect(303, '/auth?message=Account deleted successfully');

@@ -23,7 +23,11 @@
 	// Pass minWidth to skeleton to match grid
 	export let minWidth: number = 250;
 	// Template dimensions for correct aspect ratio (portrait vs landscape)
-	export let templateDimensions: { width: number; height: number; orientation: 'landscape' | 'portrait' } | null = null;
+	export let templateDimensions: {
+		width: number;
+		height: number;
+		orientation: 'landscape' | 'portrait';
+	} | null = null;
 
 	let cardData: IDCard | null = initialData;
 	// Treat as loading if no data OR if data is partial (missing front_image means it's a stub)
@@ -34,11 +38,17 @@
 	onMount(async () => {
 		globalMountCount++;
 		const hasImage = initialData?.front_image !== null;
-		console.log(`%c[SmartIDCard] #${globalMountCount} mounted (id=${id.slice(0,8)}...) hasImage=${hasImage}`, 'color: #8b5cf6');
-		
+		console.log(
+			`%c[SmartIDCard] #${globalMountCount} mounted (id=${id.slice(0, 8)}...) hasImage=${hasImage}`,
+			'color: #8b5cf6'
+		);
+
 		// Fetch full details if this is a stub (front_image is null)
 		if (!cardData || cardData.front_image === null) {
-			console.log(`%c[SmartIDCard] #${globalMountCount} ⚠️ FETCHING (front_image is null)`, 'color: #ef4444; font-weight: bold');
+			console.log(
+				`%c[SmartIDCard] #${globalMountCount} ⚠️ FETCHING (front_image is null)`,
+				'color: #ef4444; font-weight: bold'
+			);
 			try {
 				cardData = await getCardDetails(id);
 				if (cardData) {
@@ -53,10 +63,13 @@
 				loading = false;
 			}
 		} else {
-			console.log(`%c[SmartIDCard] #${globalMountCount} ✅ DIRECT RENDER (has front_image)`, 'color: #22c55e');
+			console.log(
+				`%c[SmartIDCard] #${globalMountCount} ✅ DIRECT RENDER (has front_image)`,
+				'color: #22c55e'
+			);
 		}
 	});
-	
+
 	// Set to true to use minimal render for performance testing
 	const USE_MINIMAL_RENDER = false;
 </script>
@@ -64,27 +77,31 @@
 {#if loading}
 	<IDCardSkeleton count={1} {minWidth} />
 {:else if error}
-	<div class="h-full w-full flex items-center justify-center p-4 border border-destructive/20 rounded-xl bg-destructive/5 text-destructive text-sm min-h-[200px]">
+	<div
+		class="h-full w-full flex items-center justify-center p-4 border border-destructive/20 rounded-xl bg-destructive/5 text-destructive text-sm min-h-[200px]"
+	>
 		<div class="text-center">
 			<p class="font-semibold">Failed to load</p>
 			<p class="text-xs opacity-70 mt-1">ID: {id.slice(0, 8)}...</p>
-			<button 
+			<button
 				class="mt-2 text-xs underline hover:no-underline"
 				on:click={() => {
 					loading = true;
 					error = false;
-					getCardDetails(id).then(data => {
-						if (data) {
-							cardData = data;
-							onDataLoaded?.(data);
-						} else {
+					getCardDetails(id)
+						.then((data) => {
+							if (data) {
+								cardData = data;
+								onDataLoaded?.(data);
+							} else {
+								error = true;
+							}
+							loading = false;
+						})
+						.catch(() => {
 							error = true;
-						}
-						loading = false;
-					}).catch(() => {
-						error = true;
-						loading = false;
-					});
+							loading = false;
+						});
 				}}
 			>
 				Retry

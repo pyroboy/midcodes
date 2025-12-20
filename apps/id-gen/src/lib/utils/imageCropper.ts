@@ -388,7 +388,6 @@ export function getImageDimensions(file: File): Promise<ImageDimensions> {
 			reject(new Error('Failed to load image'));
 		};
 
-
 		img.src = URL.createObjectURL(file);
 	});
 }
@@ -408,7 +407,7 @@ export async function createLowResVersion(
 			URL.revokeObjectURL(img.src);
 			try {
 				let { width, height } = img;
-				
+
 				// Calculate new dimensions maintaining aspect ratio
 				if (width > height) {
 					if (width > maxDimension) {
@@ -425,16 +424,16 @@ export async function createLowResVersion(
 				const canvas = document.createElement('canvas');
 				canvas.width = width;
 				canvas.height = height;
-				
+
 				const ctx = canvas.getContext('2d');
 				if (!ctx) throw new Error('Failed to get canvas context');
-				
+
 				// Use better interpolation for downscaling
 				ctx.imageSmoothingEnabled = true;
 				ctx.imageSmoothingQuality = 'high';
-				
+
 				ctx.drawImage(img, 0, 0, width, height);
-				
+
 				canvas.toBlob(
 					(blob) => {
 						if (!blob) {

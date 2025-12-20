@@ -7,9 +7,9 @@ import { eq, sql, desc, gte, and } from 'drizzle-orm';
 export const getUserCredits = query(async () => {
 	const { locals } = getRequestEvent();
 	const { user } = locals;
-	
+
 	if (!user?.id) return null;
-	
+
 	const profile = await db.query.profiles.findFirst({
 		where: eq(profiles.id, user.id),
 		columns: {
@@ -38,7 +38,7 @@ export const getUserCredits = query(async () => {
 export const getDashboardStats = query(async () => {
 	const { locals } = getRequestEvent();
 	const { org_id } = locals;
-	
+
 	if (!org_id) {
 		return { totalCards: 0, totalTemplates: 0, weeklyCards: 0, recentCardsCount: 0 };
 	}
@@ -46,27 +46,32 @@ export const getDashboardStats = query(async () => {
 	const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
 	// Run all count queries in parallel using Drizzle
-	const [cardsCountResult, templatesCountResult, weeklyCardsResult, recentCardsResult] = await Promise.all([
-		// Total cards
-		db.select({ count: sql<number>`count(*)` })
-			.from(idcards)
-			.where(eq(idcards.orgId, org_id)),
-		// Total templates
-		db.select({ count: sql<number>`count(*)` })
-			.from(templates)
-			.where(eq(templates.orgId, org_id)),
-		// This week's cards
-		db.select({ count: sql<number>`count(*)` })
-			.from(idcards)
-			.where(and(eq(idcards.orgId, org_id), gte(idcards.createdAt, oneWeekAgo))),
-		// Recent cards (just to get count of recent ones? Or do we need list? The return type implies count)
-		// But previous code selected ID with limit 12 then returned length.
-		db.select({ id: idcards.id })
-			.from(idcards)
-			.where(eq(idcards.orgId, org_id))
-			.orderBy(desc(idcards.createdAt))
-			.limit(12)
-	]);
+	const [cardsCountResult, templatesCountResult, weeklyCardsResult, recentCardsResult] =
+		await Promise.all([
+			// Total cards
+			db
+				.select({ count: sql<number>`count(*)` })
+				.from(idcards)
+				.where(eq(idcards.orgId, org_id)),
+			// Total templates
+			db
+				.select({ count: sql<number>`count(*)` })
+				.from(templates)
+				.where(eq(templates.orgId, org_id)),
+			// This week's cards
+			db
+				.select({ count: sql<number>`count(*)` })
+				.from(idcards)
+				.where(and(eq(idcards.orgId, org_id), gte(idcards.createdAt, oneWeekAgo))),
+			// Recent cards (just to get count of recent ones? Or do we need list? The return type implies count)
+			// But previous code selected ID with limit 12 then returned length.
+			db
+				.select({ id: idcards.id })
+				.from(idcards)
+				.where(eq(idcards.orgId, org_id))
+				.orderBy(desc(idcards.createdAt))
+				.limit(12)
+		]);
 
 	return {
 		totalCards: Number(cardsCountResult[0]?.count || 0),
@@ -80,10 +85,11 @@ export const getDashboardStats = query(async () => {
 export const getCreditHistory = query(async () => {
 	const { locals } = getRequestEvent();
 	const { user } = locals;
-	
+
 	if (!user?.id) return [];
 
-	const history = await db.select()
+	const history = await db
+		.select()
 		.from(creditTransactions)
 		.where(eq(creditTransactions.userId, user.id))
 		.orderBy(desc(creditTransactions.createdAt))

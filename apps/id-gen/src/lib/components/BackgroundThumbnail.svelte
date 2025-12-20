@@ -804,7 +804,6 @@
 			<Move size={14} />
 		</button>
 
-
 		<button
 			class="control-handle auto-fit-handle"
 			onclick={autoFit}
@@ -963,8 +962,6 @@
 	.move-handle:not(:disabled) {
 		cursor: move;
 	}
-
-
 
 	/* Crop Preview Overlay */
 	.crop-preview {

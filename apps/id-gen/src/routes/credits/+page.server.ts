@@ -12,15 +12,17 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	try {
 		// Get user's current credit balance
-		const [profile] = await db.select({
-			creditsBalance: profiles.creditsBalance
-		})
+		const [profile] = await db
+			.select({
+				creditsBalance: profiles.creditsBalance
+			})
 			.from(profiles)
 			.where(eq(profiles.id, locals.user.id))
 			.limit(1);
 
 		// Get recent credit transactions
-		const transactions = await db.select()
+		const transactions = await db
+			.select()
 			.from(creditTransactions)
 			.where(eq(creditTransactions.userId, locals.user.id))
 			.orderBy(desc(creditTransactions.createdAt))
@@ -31,18 +33,19 @@ export const load: PageServerLoad = async ({ locals }) => {
 		const startOfMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
 
 		// Get monthly usage (cards created this month by user's org)
-		const monthlyUsageResult = await db.select({ count: sql<number>`count(*)` })
+		const monthlyUsageResult = await db
+			.select({ count: sql<number>`count(*)` })
 			.from(idcards)
 			.where(gte(idcards.createdAt, startOfMonth));
 		const monthlyUsage = Number(monthlyUsageResult[0]?.count || 0);
 
 		// Get all-time card count
-		const totalGenResult = await db.select({ count: sql<number>`count(*)` })
-			.from(idcards);
+		const totalGenResult = await db.select({ count: sql<number>`count(*)` }).from(idcards);
 		const totalGenerations = Number(totalGenResult[0]?.count || 0);
 
 		// Get purchase history from payment_records table
-		const purchases = await db.select()
+		const purchases = await db
+			.select()
 			.from(paymentRecords)
 			.where(eq(paymentRecords.userId, locals.user.id))
 			.orderBy(desc(paymentRecords.createdAt))
@@ -54,7 +57,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			transactions: transactions || [],
 			monthlyUsage,
 			totalGenerations,
-			purchases: purchases.filter(p => p.status === 'paid' || p.status === 'completed') || []
+			purchases: purchases.filter((p) => p.status === 'paid' || p.status === 'completed') || []
 		};
 	} catch (error) {
 		console.error('Error loading credits data:', error);

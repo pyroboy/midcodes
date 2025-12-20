@@ -1,6 +1,11 @@
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { checkSuperAdmin, checkSuperAdminEmulatedOnly, shouldBypassFor403, wantsToAssumeRole } from '$lib/utils/adminPermissions';
+import {
+	checkSuperAdmin,
+	checkSuperAdminEmulatedOnly,
+	shouldBypassFor403,
+	wantsToAssumeRole
+} from '$lib/utils/adminPermissions';
 
 export const load: PageServerLoad = async ({ locals, url, parent }) => {
 	const parentData = await parent();
@@ -8,12 +13,10 @@ export const load: PageServerLoad = async ({ locals, url, parent }) => {
 
 	// Check if user wants to assume the emulated role and experience being blocked
 	const assumingRole = wantsToAssumeRole(locals, url);
-	
+
 	// Use emulated-only check if user wants to assume role, otherwise use full check
-	const isSuperAdmin = assumingRole 
-		? checkSuperAdminEmulatedOnly(locals) 
-		: checkSuperAdmin(locals);
-	
+	const isSuperAdmin = assumingRole ? checkSuperAdminEmulatedOnly(locals) : checkSuperAdmin(locals);
+
 	const canBypass = shouldBypassFor403(locals, url);
 
 	// If not super admin (based on the appropriate check) and not bypassing, handle denial

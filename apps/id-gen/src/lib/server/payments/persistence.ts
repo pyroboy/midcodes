@@ -64,7 +64,8 @@ export async function recordCheckoutInit({
 		}
 
 		// Create new payment record
-		const [data] = await db.insert(schema.paymentRecords)
+		const [data] = await db
+			.insert(schema.paymentRecords)
 			.values({
 				userId,
 				sessionId,
@@ -118,7 +119,8 @@ export async function markPaymentPaid({
 		whereClause = eq(schema.paymentRecords.providerPaymentId, providerPaymentId!);
 	}
 
-	const [data] = await db.update(schema.paymentRecords)
+	const [data] = await db
+		.update(schema.paymentRecords)
 		.set(baseUpdate as any)
 		.where(whereClause)
 		.returning();
@@ -157,7 +159,8 @@ export async function markPaymentFailed({
 		whereClause = eq(schema.paymentRecords.providerPaymentId, providerPaymentId!);
 	}
 
-	const [data] = await db.update(schema.paymentRecords)
+	const [data] = await db
+		.update(schema.paymentRecords)
 		.set(baseUpdate as any)
 		.where(whereClause)
 		.returning();
@@ -173,29 +176,30 @@ export async function markPaymentFailed({
  * Retrieves a payment record by session ID
  */
 export async function getPaymentBySessionId(sessionId: string) {
-	return await db.query.paymentRecords.findFirst({
-		where: eq(schema.paymentRecords.sessionId, sessionId)
-	}) || null;
+	return (
+		(await db.query.paymentRecords.findFirst({
+			where: eq(schema.paymentRecords.sessionId, sessionId)
+		})) || null
+	);
 }
 
 /**
  * Retrieves a payment record by provider payment ID
  */
 export async function getPaymentByProviderId(providerPaymentId: string) {
-	return await db.query.paymentRecords.findFirst({
-		where: eq(schema.paymentRecords.providerPaymentId, providerPaymentId)
-	}) || null;
+	return (
+		(await db.query.paymentRecords.findFirst({
+			where: eq(schema.paymentRecords.providerPaymentId, providerPaymentId)
+		})) || null
+	);
 }
 
 /**
  * Lists payment records for a user with pagination
  */
-export async function listPaymentsByUser({
-	userId,
-	limit = 50,
-	cursor
-}: ListPaymentsByUserParams) {
-	const results = await db.select()
+export async function listPaymentsByUser({ userId, limit = 50, cursor }: ListPaymentsByUserParams) {
+	const results = await db
+		.select()
 		.from(schema.paymentRecords)
 		.where(
 			and(
@@ -227,7 +231,8 @@ export async function processWebhookEventAtomically(
 	provider: string = 'paymongo'
 ) {
 	try {
-		const [event] = await db.insert(schema.webhookEvents)
+		const [event] = await db
+			.insert(schema.webhookEvents)
 			.values({
 				eventId,
 				eventType,
@@ -270,7 +275,8 @@ export async function processPaymentAndAddCreditsAtomic(params: {
 	try {
 		return await db.transaction(async (tx) => {
 			// 1. Update Payment Record
-			const [payment] = await tx.update(schema.paymentRecords)
+			const [payment] = await tx
+				.update(schema.paymentRecords)
 				.set({
 					status: 'paid',
 					method: params.method,
@@ -295,7 +301,8 @@ export async function processPaymentAndAddCreditsAtomic(params: {
 			const oldBalance = profile.creditsBalance;
 			const newBalance = oldBalance + params.creditsToAdd;
 
-			await tx.update(schema.profiles)
+			await tx
+				.update(schema.profiles)
 				.set({
 					creditsBalance: newBalance,
 					updatedAt: new Date()
@@ -303,21 +310,20 @@ export async function processPaymentAndAddCreditsAtomic(params: {
 				.where(eq(schema.profiles.id, params.userId));
 
 			// 3. Record Credit Transaction
-			await tx.insert(schema.creditTransactions)
-				.values({
-					userId: params.userId,
-					orgId: params.orgId,
-					transactionType: 'purchase',
-					amount: params.creditsToAdd,
-					creditsBefore: oldBalance,
-					creditsAfter: newBalance,
-					description: `Purchase: ${params.packageName}`,
-					metadata: {
-						packageId: params.packageId,
-						amountPhp: params.amountPhp,
-						sessionId: params.sessionId
-					}
-				});
+			await tx.insert(schema.creditTransactions).values({
+				userId: params.userId,
+				orgId: params.orgId,
+				transactionType: 'purchase',
+				amount: params.creditsToAdd,
+				creditsBefore: oldBalance,
+				creditsAfter: newBalance,
+				description: `Purchase: ${params.packageName}`,
+				metadata: {
+					packageId: params.packageId,
+					amountPhp: params.amountPhp,
+					sessionId: params.sessionId
+				}
+			});
 
 			return {
 				success: true,
@@ -354,11 +360,9 @@ export async function markPaymentFailedAtomic(params: {
 /**
  * Updates a payment record with provider payment ID
  */
-export async function updatePaymentWithProviderId(
-	sessionId: string,
-	providerPaymentId: string
-) {
-	const [data] = await db.update(schema.paymentRecords)
+export async function updatePaymentWithProviderId(sessionId: string, providerPaymentId: string) {
+	const [data] = await db
+		.update(schema.paymentRecords)
 		.set({ providerPaymentId, updatedAt: new Date() })
 		.where(eq(schema.paymentRecords.sessionId, sessionId))
 		.returning();
@@ -374,7 +378,8 @@ export async function updatePaymentWithProviderId(
  * Gets payment statistics for a user
  */
 export async function getPaymentStats(userId: string) {
-	const records = await db.select()
+	const records = await db
+		.select()
 		.from(schema.paymentRecords)
 		.where(eq(schema.paymentRecords.userId, userId));
 

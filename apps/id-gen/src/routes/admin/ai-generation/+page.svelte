@@ -19,18 +19,18 @@
 	let errorMessage = $state('');
 
 	// Mock assets for demo - replace with actual asset fetching
-	let assets = $state<{id: string; name: string; url: string; type: string}[]>([
+	let assets = $state<{ id: string; name: string; url: string; type: string }[]>([
 		{ id: '1', name: 'Logo', url: '/placeholder-logo.png', type: 'image' },
 		{ id: '2', name: 'Background', url: '/placeholder-bg.png', type: 'image' },
 		{ id: '3', name: 'Pattern 1', url: '/placeholder-pattern.png', type: 'pattern' },
 		{ id: '4', name: 'Icon Set', url: '/placeholder-icons.png', type: 'icons' },
 		{ id: '5', name: 'Border Frame', url: '/placeholder-border.png', type: 'frame' },
-		{ id: '6', name: 'Texture', url: '/placeholder-texture.png', type: 'texture' },
+		{ id: '6', name: 'Texture', url: '/placeholder-texture.png', type: 'texture' }
 	]);
 
 	function toggleAsset(id: string) {
 		if (selectedAssets.includes(id)) {
-			selectedAssets = selectedAssets.filter(a => a !== id);
+			selectedAssets = selectedAssets.filter((a) => a !== id);
 		} else {
 			selectedAssets = [...selectedAssets, id];
 		}
@@ -53,8 +53,8 @@
 		try {
 			// TODO: Replace with actual AI generation API call
 			// Simulating API call
-			await new Promise(resolve => setTimeout(resolve, 2000));
-			
+			await new Promise((resolve) => setTimeout(resolve, 2000));
+
 			// Mock response - replace with actual AI response
 			generatedOutput = `Generated template based on:
 - ${selectedAssets.length} selected assets
@@ -126,17 +126,25 @@
 				<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 gap-3">
 					{#each assets as asset}
 						<button
-							class="relative group aspect-square rounded-lg border-2 overflow-hidden transition-all hover:scale-105 {selectedAssets.includes(asset.id) ? 'border-primary ring-2 ring-primary/30' : 'border-muted hover:border-primary/50'}"
+							class="relative group aspect-square rounded-lg border-2 overflow-hidden transition-all hover:scale-105 {selectedAssets.includes(
+								asset.id
+							)
+								? 'border-primary ring-2 ring-primary/30'
+								: 'border-muted hover:border-primary/50'}"
 							onclick={() => toggleAsset(asset.id)}
 						>
 							<!-- Placeholder image -->
-							<div class="absolute inset-0 bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center">
+							<div
+								class="absolute inset-0 bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center"
+							>
 								<Image class="w-8 h-8 text-muted-foreground/50" />
 							</div>
-							
+
 							<!-- Selection indicator -->
 							{#if selectedAssets.includes(asset.id)}
-								<div class="absolute top-1 right-1 w-6 h-6 bg-primary rounded-full flex items-center justify-center">
+								<div
+									class="absolute top-1 right-1 w-6 h-6 bg-primary rounded-full flex items-center justify-center"
+								>
 									<Check class="w-4 h-4 text-white" />
 								</div>
 							{/if}
@@ -170,9 +178,7 @@
 					<Wand2 class="w-5 h-5" />
 					Prompt
 				</CardTitle>
-				<CardDescription>
-					Describe the template you want to generate
-				</CardDescription>
+				<CardDescription>Describe the template you want to generate</CardDescription>
 			</CardHeader>
 			<CardContent class="space-y-4">
 				<textarea
@@ -194,7 +200,7 @@ Example:
 						{#each ['Professional employee ID', 'Student ID card', 'Event badge', 'Membership card'] as quickPrompt}
 							<button
 								class="text-xs px-2 py-1 rounded-full bg-muted hover:bg-primary/20 transition-colors"
-								onclick={() => prompt = quickPrompt}
+								onclick={() => (prompt = quickPrompt)}
 							>
 								{quickPrompt}
 							</button>
@@ -203,8 +209,8 @@ Example:
 				</div>
 
 				<!-- Generate button -->
-				<Button 
-					class="w-full" 
+				<Button
+					class="w-full"
 					size="lg"
 					onclick={handleGenerate}
 					disabled={isGenerating || !prompt.trim()}
@@ -232,14 +238,14 @@ Example:
 					<Sparkles class="w-5 h-5" />
 					AI Output
 				</CardTitle>
-				<CardDescription>
-					Generated template preview
-				</CardDescription>
+				<CardDescription>Generated template preview</CardDescription>
 			</CardHeader>
 			<CardContent>
 				{#if isGenerating}
 					<!-- Loading state -->
-					<div class="aspect-[3/4] rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
+					<div
+						class="aspect-[3/4] rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center"
+					>
 						<div class="text-center">
 							<Loader2 class="w-12 h-12 mx-auto text-primary animate-spin mb-4" />
 							<p class="text-sm text-muted-foreground">Generating template...</p>
@@ -249,7 +255,9 @@ Example:
 				{:else if generatedOutput}
 					<!-- Output preview -->
 					<div class="space-y-4">
-						<div class="aspect-[3/4] rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 border-2 border-dashed border-primary/30 flex items-center justify-center p-4">
+						<div
+							class="aspect-[3/4] rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 border-2 border-dashed border-primary/30 flex items-center justify-center p-4"
+						>
 							<div class="text-center">
 								<Sparkles class="w-12 h-12 mx-auto text-primary mb-4" />
 								<p class="text-sm text-muted-foreground">Template Preview</p>
@@ -272,7 +280,9 @@ Example:
 					</div>
 				{:else}
 					<!-- Empty state -->
-					<div class="aspect-[3/4] rounded-lg bg-muted/30 border-2 border-dashed border-muted flex items-center justify-center">
+					<div
+						class="aspect-[3/4] rounded-lg bg-muted/30 border-2 border-dashed border-muted flex items-center justify-center"
+					>
 						<div class="text-center p-4">
 							<Bot class="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
 							<p class="text-sm text-muted-foreground">No output yet</p>

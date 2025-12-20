@@ -40,7 +40,8 @@ async function loadImage(source: string | Blob): Promise<HTMLImageElement> {
 		img.crossOrigin = 'anonymous';
 
 		img.onload = () => resolve(img);
-		img.onerror = () => reject(new Error(`Failed to load image: ${typeof source === 'string' ? source : 'blob'}`));
+		img.onerror = () =>
+			reject(new Error(`Failed to load image: ${typeof source === 'string' ? source : 'blob'}`));
 
 		if (source instanceof Blob) {
 			img.src = URL.createObjectURL(source);
@@ -232,7 +233,13 @@ async function renderImageElement(
 	fileUploads: Record<string, File | Blob | null>,
 	mode: 'sample' | 'blank'
 ): Promise<void> {
-	if (element.type !== 'photo' && element.type !== 'signature' && element.type !== 'image' && element.type !== 'graphic') return;
+	if (
+		element.type !== 'photo' &&
+		element.type !== 'signature' &&
+		element.type !== 'image' &&
+		element.type !== 'graphic'
+	)
+		return;
 
 	const position = coordSystem.storageToPreview({
 		x: element.x || 0,
@@ -251,7 +258,15 @@ async function renderImageElement(
 	// For blank mode, always show placeholder
 	if (mode === 'blank') {
 		const label = getPlaceholderLabel(element);
-		renderPlaceholder(ctx, elementX, elementY, elementWidth, elementHeight, label, coordSystem.scale);
+		renderPlaceholder(
+			ctx,
+			elementX,
+			elementY,
+			elementWidth,
+			elementHeight,
+			label,
+			coordSystem.scale
+		);
 		return;
 	}
 
@@ -276,7 +291,15 @@ async function renderImageElement(
 			ctx.restore();
 		} catch {
 			// If image fails to load, show placeholder
-			renderPlaceholder(ctx, elementX, elementY, elementWidth, elementHeight, 'Image', coordSystem.scale);
+			renderPlaceholder(
+				ctx,
+				elementX,
+				elementY,
+				elementWidth,
+				elementHeight,
+				'Image',
+				coordSystem.scale
+			);
 		}
 		return;
 	}
@@ -322,12 +345,28 @@ async function renderImageElement(
 			ctx.restore();
 		} catch {
 			const label = getPlaceholderLabel(element);
-			renderPlaceholder(ctx, elementX, elementY, elementWidth, elementHeight, label, coordSystem.scale);
+			renderPlaceholder(
+				ctx,
+				elementX,
+				elementY,
+				elementWidth,
+				elementHeight,
+				label,
+				coordSystem.scale
+			);
 		}
 	} else {
 		// No file uploaded, show placeholder
 		const label = getPlaceholderLabel(element);
-		renderPlaceholder(ctx, elementX, elementY, elementWidth, elementHeight, label, coordSystem.scale);
+		renderPlaceholder(
+			ctx,
+			elementX,
+			elementY,
+			elementWidth,
+			elementHeight,
+			label,
+			coordSystem.scale
+		);
 	}
 }
 
@@ -357,7 +396,15 @@ function renderQrElement(
 	const elementHeight = Math.round(dimensions.height);
 
 	// For both modes, we show a QR placeholder (actual QR generation would require a library)
-	renderPlaceholder(ctx, elementX, elementY, elementWidth, elementHeight, 'QR Code', coordSystem.scale);
+	renderPlaceholder(
+		ctx,
+		elementX,
+		elementY,
+		elementWidth,
+		elementHeight,
+		'QR Code',
+		coordSystem.scale
+	);
 }
 
 /**

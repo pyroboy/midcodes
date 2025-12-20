@@ -40,12 +40,12 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 			.from(schemaTemplateAssets)
 			.where(eq(schemaTemplateAssets.isPublished, true))
 			.orderBy(desc(schemaTemplateAssets.createdAt))
-			.catch(err => {
+			.catch((err) => {
 				logger.warn('⚠️ Template assets fetch failed:', formatDbError(err));
 				return [];
 			});
 
-		const templateAssets = templateAssetsData.map(a => ({
+		const templateAssets = templateAssetsData.map((a) => ({
 			...a,
 			image_url: a.imageUrl,
 			width_pixels: a.widthPixels,
@@ -72,51 +72,76 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 			totalCardsResult,
 			totalTemplatesResult,
 			weeklyCardsResult
-		] = await (Promise.all([
-			// Fetch templates for the hero section
-			db.select().from(templates).where(eq(templates.orgId, effectiveOrgId)).orderBy(desc(templates.createdAt)),
-			// Get recent cards
-			db.select({
-				id: idcards.id,
-				templateId: idcards.templateId,
-				frontImage: idcards.frontImage,
-				backImage: idcards.backImage,
-				createdAt: idcards.createdAt,
-				data: idcards.data
-			}).from(idcards).where(eq(idcards.orgId, effectiveOrgId)).orderBy(desc(idcards.createdAt)).limit(12),
-			// Total cards
-			db.select({ count: sql`count(*)` }).from(idcards).where(eq(idcards.orgId, effectiveOrgId)),
-			// Total templates
-			db.select({ count: sql`count(*)` }).from(templates).where(eq(templates.orgId, effectiveOrgId)),
-			// This week's cards count
-			db.select({ count: sql`count(*)` }).from(idcards).where(
-				and(
-					eq(idcards.orgId, effectiveOrgId),
-					gte(idcards.createdAt, new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))
-				)
-			)
-		]) as Promise<[any[], any[], any[], any[], any[]]>).catch(err => {
+		] = await (
+			Promise.all([
+				// Fetch templates for the hero section
+				db
+					.select()
+					.from(templates)
+					.where(eq(templates.orgId, effectiveOrgId))
+					.orderBy(desc(templates.createdAt)),
+				// Get recent cards
+				db
+					.select({
+						id: idcards.id,
+						templateId: idcards.templateId,
+						frontImage: idcards.frontImage,
+						backImage: idcards.backImage,
+						createdAt: idcards.createdAt,
+						data: idcards.data
+					})
+					.from(idcards)
+					.where(eq(idcards.orgId, effectiveOrgId))
+					.orderBy(desc(idcards.createdAt))
+					.limit(12),
+				// Total cards
+				db
+					.select({ count: sql`count(*)` })
+					.from(idcards)
+					.where(eq(idcards.orgId, effectiveOrgId)),
+				// Total templates
+				db
+					.select({ count: sql`count(*)` })
+					.from(templates)
+					.where(eq(templates.orgId, effectiveOrgId)),
+				// This week's cards count
+				db
+					.select({ count: sql`count(*)` })
+					.from(idcards)
+					.where(
+						and(
+							eq(idcards.orgId, effectiveOrgId),
+							gte(idcards.createdAt, new Date(Date.now() - 7 * 24 * 60 * 60 * 1000))
+						)
+					)
+			]) as Promise<[any[], any[], any[], any[], any[]]>
+		).catch((err) => {
 			logger.error('❌ Dashboard data fetch error:', formatDbError(err));
-			return [[], [], [{count: 0}], [{count: 0}], [{count: 0}]];
+			return [[], [], [{ count: 0 }], [{ count: 0 }], [{ count: 0 }]];
 		});
 
 		// Fetch template names for recent cards
 		let templateNames: Record<string, string> = {};
-		const templateIds = [...new Set(recentCardsData.map(c => c.templateId).filter(Boolean))] as string[];
+		const templateIds = [
+			...new Set(recentCardsData.map((c) => c.templateId).filter(Boolean))
+		] as string[];
 		if (templateIds.length > 0) {
 			const templateNamesData = await db
 				.select({ id: templates.id, name: templates.name })
 				.from(templates)
 				.where(inArray(templates.id, templateIds))
 				.catch(() => []);
-			
-			templateNames = templateNamesData.reduce((acc, t) => {
-				acc[t.id] = t.name;
-				return acc;
-			}, {} as Record<string, string>);
+
+			templateNames = templateNamesData.reduce(
+				(acc, t) => {
+					acc[t.id] = t.name;
+					return acc;
+				},
+				{} as Record<string, string>
+			);
 		}
 
-		const enhancedRecentCards = recentCardsData.map(card => ({
+		const enhancedRecentCards = recentCardsData.map((card) => ({
 			...card,
 			front_image: card.frontImage,
 			back_image: card.backImage,
@@ -126,7 +151,7 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 		}));
 
 		return {
-			templates: templatesData.map(t => ({
+			templates: templatesData.map((t) => ({
 				...t,
 				user_id: t.userId,
 				org_id: t.orgId,
@@ -147,7 +172,7 @@ export const load: PageServerLoad = async ({ locals, depends }) => {
 	} catch (err: any) {
 		const dbMessage = formatDbError(err);
 		logger.error('❌ Server: Critical error in homepage load:', dbMessage);
-		
+
 		return {
 			templates: [],
 			recentCards: [],
@@ -194,20 +219,23 @@ export const actions: Actions = {
 			}
 
 			// Create the duplicate
-			const [duplicated] = await db.insert(templates).values({
-				userId: session.user.id,
-				orgId: org_id,
-				name: newName,
-				widthPixels: original.widthPixels,
-				heightPixels: original.heightPixels,
-				dpi: original.dpi,
-				frontBackground: original.frontBackground,
-				backBackground: original.backBackground,
-				orientation: original.orientation,
-				templateElements: original.templateElements,
-				createdAt: new Date(),
-				updatedAt: new Date()
-			}).returning();
+			const [duplicated] = await db
+				.insert(templates)
+				.values({
+					userId: session.user.id,
+					orgId: org_id,
+					name: newName,
+					widthPixels: original.widthPixels,
+					heightPixels: original.heightPixels,
+					dpi: original.dpi,
+					frontBackground: original.frontBackground,
+					backBackground: original.backBackground,
+					orientation: original.orientation,
+					templateElements: original.templateElements,
+					createdAt: new Date(),
+					updatedAt: new Date()
+				})
+				.returning();
 
 			console.log('✅ Server: Template duplicated successfully:', {
 				originalId: templateId,
@@ -237,7 +265,7 @@ export const actions: Actions = {
 
 	delete: async ({ request, locals }) => {
 		const { session } = locals;
-		
+
 		if (!session) {
 			return fail(401, { message: 'Unauthorized' });
 		}
@@ -276,9 +304,11 @@ export const actions: Actions = {
 					if (imagesToDelete.length > 0) {
 						// Delete from R2 - use Promise.allSettled to handle partial failures
 						const deleteResults = await Promise.allSettled(
-							imagesToDelete.map(key => deleteFromR2(key).catch(err => {
-								console.warn(`⚠️ Failed to delete ${key}:`, err);
-							}))
+							imagesToDelete.map((key) =>
+								deleteFromR2(key).catch((err) => {
+									console.warn(`⚠️ Failed to delete ${key}:`, err);
+								})
+							)
 						);
 						console.log(`✅ Attempted to delete ${imagesToDelete.length} images from R2`);
 					}
@@ -289,17 +319,17 @@ export const actions: Actions = {
 				}
 			} else {
 				// Unlink IDs (keep them but remove template association)
-				await db.update(idcards).set({ templateId: null }).where(eq(idcards.templateId, templateId));
+				await db
+					.update(idcards)
+					.set({ templateId: null })
+					.where(eq(idcards.templateId, templateId));
 				console.log('✅ Server: Unlinked associated ID cards');
 			}
 
 			// Delete the template
-			await db.delete(templates).where(
-				and(
-					eq(templates.id, templateId),
-					eq(templates.userId, session.user.id)
-				)
-			);
+			await db
+				.delete(templates)
+				.where(and(eq(templates.id, templateId), eq(templates.userId, session.user.id)));
 
 			console.log('✅ Server: Template deleted successfully:', { templateId });
 

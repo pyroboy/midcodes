@@ -24,5 +24,6 @@ pnpm -C apps/id-gen test:unit
 ```
 
 Notes:
+
 - Tests run in `jsdom` (configured in [`vitest.config.ts`](../../vitest.config.ts:1)).
 - These cache modules use module-level in-memory Maps; tests isolate state via `vi.resetModules()` and clearing `sessionStorage` between cases.

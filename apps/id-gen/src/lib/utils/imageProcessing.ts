@@ -47,7 +47,6 @@ export const CARD_VARIANTS: ImageVariantConfig[] = [
 // CLOUD BACKGROUND REMOVAL (using Runware AI API)
 // ============================================================================
 
-
 /**
  * Remove background from an image using Runware AI API (server-side).
  * This is faster and more reliable than the client-side library.
@@ -363,9 +362,9 @@ async function generateImageVariantFromLoaded(
  */
 async function resizeImageForApi(source: File | Blob, maxDimension: number = 1024): Promise<Blob> {
 	const img = await loadImage(source);
-	
+
 	let { width, height } = img;
-	
+
 	// Only resize if larger than maxDimension
 	if (width > maxDimension || height > maxDimension) {
 		if (width > height) {
@@ -376,24 +375,26 @@ async function resizeImageForApi(source: File | Blob, maxDimension: number = 102
 			height = maxDimension;
 		}
 	}
-	
+
 	const canvas = document.createElement('canvas');
 	canvas.width = width;
 	canvas.height = height;
-	
+
 	const ctx = canvas.getContext('2d');
 	if (!ctx) {
 		throw new Error('Failed to get canvas context');
 	}
-	
+
 	ctx.drawImage(img, 0, 0, width, height);
-	
+
 	// Convert to JPEG with 85% quality for good balance of size/quality
 	return new Promise((resolve, reject) => {
 		canvas.toBlob(
 			(blob) => {
 				if (blob) {
-					console.log(`[resizeImageForApi] Resized: ${img.width}x${img.height} → ${width}x${height}, size: ${(blob.size / 1024).toFixed(1)}KB`);
+					console.log(
+						`[resizeImageForApi] Resized: ${img.width}x${img.height} → ${width}x${height}, size: ${(blob.size / 1024).toFixed(1)}KB`
+					);
 					resolve(blob);
 				} else {
 					reject(new Error('Failed to convert canvas to blob'));

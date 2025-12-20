@@ -3,7 +3,7 @@
 	import { OrbitControls } from '@threlte/extras';
 	import type { OrbitControls as OrbitControlsImpl } from 'three/examples/jsm/controls/OrbitControls.js';
 	import * as THREE from 'three';
-import { NoToneMapping } from 'three';
+	import { NoToneMapping } from 'three';
 	import { onMount, onDestroy } from 'svelte';
 	import { createRoundedRectCard } from '$lib/utils/cardGeometry';
 	import { getCardDimensions, lerp } from '$lib/components/card3d/card3d-state.svelte';
@@ -38,7 +38,14 @@ import { NoToneMapping } from 'three';
 	// Ruler geometry state
 	let horizontalRulerGeometry = $state<THREE.BufferGeometry | null>(null);
 	let verticalRulerGeometry = $state<THREE.BufferGeometry | null>(null);
-	let rulerLabelTextures = $state<{ texture: THREE.CanvasTexture; position: [number, number, number]; isHorizontal: boolean; isTotal: boolean }[]>([]);
+	let rulerLabelTextures = $state<
+		{
+			texture: THREE.CanvasTexture;
+			position: [number, number, number];
+			isHorizontal: boolean;
+			isTotal: boolean;
+		}[]
+	>([]);
 
 	// Ruler position state for animation (independent of card rotation)
 	let currentRulerRotation = $state(0); // 0 = landscape, PI/2 = portrait
@@ -104,10 +111,14 @@ import { NoToneMapping } from 'three';
 
 	// Create or get cached background canvas
 	function getBackgroundCanvas(width: number, height: number): HTMLCanvasElement {
-		if (cachedBackgroundCanvas && cachedBackgroundSize.w === width && cachedBackgroundSize.h === height) {
+		if (
+			cachedBackgroundCanvas &&
+			cachedBackgroundSize.w === width &&
+			cachedBackgroundSize.h === height
+		) {
 			return cachedBackgroundCanvas;
 		}
-		
+
 		const canvas = document.createElement('canvas');
 		const ctx = canvas.getContext('2d')!;
 		canvas.width = width;
@@ -151,7 +162,13 @@ import { NoToneMapping } from 'three';
 	// Create info texture with card details - OPTIMIZED
 	// contentRotation: rotation angle in radians for the text content (to counter card rotation)
 	// highRes: use higher resolution for final/static rendering
-	function createInfoTexture(w: number, h: number, sName: string, contentRotation: number = 0, highRes: boolean = false): THREE.CanvasTexture {
+	function createInfoTexture(
+		w: number,
+		h: number,
+		sName: string,
+		contentRotation: number = 0,
+		highRes: boolean = false
+	): THREE.CanvasTexture {
 		const canvas = document.createElement('canvas');
 		const ctx = canvas.getContext('2d')!;
 
@@ -198,7 +215,11 @@ import { NoToneMapping } from 'three';
 		ctx.font = `${Math.round(12 * fontScale)}px monospace`;
 		const displayW = isInPortrait ? h : w;
 		const displayH = isInPortrait ? w : h;
-		ctx.fillText(`${Math.round(displayW)} × ${Math.round(displayH)} px`, centerX, centerY + 10 * fontScale);
+		ctx.fillText(
+			`${Math.round(displayW)} × ${Math.round(displayH)} px`,
+			centerX,
+			centerY + 10 * fontScale
+		);
 
 		// Orientation
 		ctx.fillStyle = 'rgba(100, 116, 139, 0.5)';
@@ -221,10 +242,10 @@ import { NoToneMapping } from 'three';
 		console.log('[3D Preview] Card dimensions:', dims);
 		const radius = Math.min(dims.width, dims.height) * 0.04;
 		const cardGeometry = await createRoundedRectCard(dims.width, dims.height, 0.02, radius);
-		console.log('[3D Preview] Geometry created:', { 
-			frontGeometry: !!cardGeometry.frontGeometry, 
-			backGeometry: !!cardGeometry.backGeometry, 
-			edgeGeometry: !!cardGeometry.edgeGeometry 
+		console.log('[3D Preview] Geometry created:', {
+			frontGeometry: !!cardGeometry.frontGeometry,
+			backGeometry: !!cardGeometry.backGeometry,
+			edgeGeometry: !!cardGeometry.edgeGeometry
 		});
 		frontGeometry = cardGeometry.frontGeometry;
 		backGeometry = cardGeometry.backGeometry;
@@ -253,7 +274,7 @@ import { NoToneMapping } from 'three';
 		// Total labels get a subtle background
 		if (isTotal) {
 			ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-			ctx.roundRect(4, 4, (canvas.width / scale) - 8, (canvas.height / scale) - 8, 6);
+			ctx.roundRect(4, 4, canvas.width / scale - 8, canvas.height / scale - 8, 6);
 			ctx.fill();
 			ctx.strokeStyle = '#64748b';
 			ctx.lineWidth = 2;
@@ -264,7 +285,7 @@ import { NoToneMapping } from 'three';
 		ctx.font = isTotal ? 'bold 36px system-ui, sans-serif' : 'bold 28px system-ui, sans-serif';
 		ctx.textAlign = 'center';
 		ctx.textBaseline = 'middle';
-		ctx.fillText(text, (canvas.width / scale) / 2, (canvas.height / scale) / 2);
+		ctx.fillText(text, canvas.width / scale / 2, canvas.height / scale / 2);
 
 		const tex = new THREE.CanvasTexture(canvas);
 		tex.needsUpdate = true;
@@ -294,7 +315,12 @@ import { NoToneMapping } from 'three';
 		// Clean up old label textures
 		rulerLabelTextures.forEach((item) => item.texture.dispose());
 
-		const newLabels: { texture: THREE.CanvasTexture; position: [number, number, number]; isHorizontal: boolean; isTotal: boolean }[] = [];
+		const newLabels: {
+			texture: THREE.CanvasTexture;
+			position: [number, number, number];
+			isHorizontal: boolean;
+			isTotal: boolean;
+		}[] = [];
 
 		// Format inches with appropriate decimal places
 		const formatInches = (val: number) => {
@@ -400,7 +426,7 @@ import { NoToneMapping } from 'three';
 	// Update rulers with rotation - for animated transitions
 	// Rulers stay in fixed positions (top and left) but measurements update based on rotation
 	// rotation: 0 = landscape (top=width, left=height), PI/2 = portrait (top=height, left=width)
-	
+
 	// FAST: Update only ruler line geometry (no texture creation)
 	function updateRulerGeometry(wPixels: number, hPixels: number, rotation: number) {
 		const dims = getCardDimensions(wPixels, hPixels);
@@ -516,7 +542,12 @@ import { NoToneMapping } from 'three';
 		// Clean up old label textures
 		rulerLabelTextures.forEach((item) => item.texture.dispose());
 
-		const newLabels: { texture: THREE.CanvasTexture; position: [number, number, number]; isHorizontal: boolean; isTotal: boolean }[] = [];
+		const newLabels: {
+			texture: THREE.CanvasTexture;
+			position: [number, number, number];
+			isHorizontal: boolean;
+			isTotal: boolean;
+		}[] = [];
 
 		const formatInches = (val: number) => {
 			const formatted = val.toFixed(2).replace(/\.?0+$/, '');
@@ -561,7 +592,7 @@ import { NoToneMapping } from 'three';
 	function loadTexture(url: string) {
 		console.log('[3D Preview] loadTexture called with URL:', url, 'isPortrait:', isPortrait);
 		textureLoading = true; // Start loading
-		
+
 		if (!textureLoader) {
 			textureLoader = new THREE.TextureLoader();
 			textureLoader.crossOrigin = 'anonymous';
@@ -580,15 +611,15 @@ import { NoToneMapping } from 'three';
 				loadedTexture.colorSpace = THREE.SRGBColorSpace;
 				loadedTexture.wrapS = THREE.ClampToEdgeWrapping;
 				loadedTexture.wrapT = THREE.ClampToEdgeWrapping;
-				
+
 				// Get image dimensions
 				const imgWidth = loadedTexture.image?.width || 1;
 				const imgHeight = loadedTexture.image?.height || 1;
 				const imgAspect = imgWidth / imgHeight;
-				
+
 				// Card geometry aspect ratio (always landscape internally, width > height)
 				const cardAspect = widthPixels / heightPixels;
-				
+
 				// When in portrait mode:
 				// - The card mesh is rotated 90° clockwise (rotationZ = PI/2)
 				// - The texture needs to be counter-rotated to appear upright
@@ -597,11 +628,11 @@ import { NoToneMapping } from 'three';
 					// Rotate texture 90° counter-clockwise to compensate for card rotation
 					loadedTexture.center.set(0.5, 0.5); // Rotate around center
 					loadedTexture.rotation = -Math.PI / 2;
-					
+
 					// In portrait mode, the visual aspect is height/width (inverted)
 					// The image should fill the portrait view
 					const visualAspect = heightPixels / widthPixels; // Visual card aspect when rotated
-					
+
 					// Adjust repeat to fit the rotated view
 					if (imgAspect > visualAspect) {
 						// Image is wider than portrait card view - scale down width
@@ -625,7 +656,7 @@ import { NoToneMapping } from 'three';
 					// Landscape mode - standard aspect ratio correction
 					loadedTexture.rotation = 0;
 					loadedTexture.center.set(0.5, 0.5);
-					
+
 					if (imgAspect > cardAspect) {
 						// Image is wider than card - crop width
 						const scale = cardAspect / imgAspect;
@@ -644,11 +675,16 @@ import { NoToneMapping } from 'three';
 						offset: loadedTexture.offset.toArray()
 					});
 				}
-				
+
 				loadedTexture.needsUpdate = true;
 				texture = loadedTexture;
 				textureLoading = false; // Done loading - triggers reactivity!
-				console.log('[3D Preview] texture state updated, texture is now:', texture ? 'SET' : 'NULL', 'loading:', textureLoading);
+				console.log(
+					'[3D Preview] texture state updated, texture is now:',
+					texture ? 'SET' : 'NULL',
+					'loading:',
+					textureLoading
+				);
 			},
 			(progress) => {
 				console.log('[3D Preview] Texture loading progress:', progress);
@@ -665,7 +701,13 @@ import { NoToneMapping } from 'three';
 		if (infoTexture) {
 			infoTexture.dispose();
 		}
-		infoTexture = createInfoTexture(animState.currentWidth, animState.currentHeight, sizeName, rotation, false);
+		infoTexture = createInfoTexture(
+			animState.currentWidth,
+			animState.currentHeight,
+			sizeName,
+			rotation,
+			false
+		);
 	}
 
 	// Update info texture with high resolution (for final frame after animation)
@@ -673,7 +715,13 @@ import { NoToneMapping } from 'three';
 		if (infoTexture) {
 			infoTexture.dispose();
 		}
-		infoTexture = createInfoTexture(animState.currentWidth, animState.currentHeight, sizeName, rotation, true);
+		infoTexture = createInfoTexture(
+			animState.currentWidth,
+			animState.currentHeight,
+			sizeName,
+			rotation,
+			true
+		);
 	}
 
 	// Animation loop using requestAnimationFrame
@@ -698,7 +746,7 @@ import { NoToneMapping } from 'three';
 				const currentDims = getCardDimensions(animState.currentWidth, animState.currentHeight);
 				renderScaleX = currentDims.width / baseDims.width;
 				renderScaleY = currentDims.height / baseDims.height;
-				
+
 				// Counter-scale texture to prevent distortion during morphing
 				// When card scales up, texture UVs need to scale down (and vice versa)
 				animState.textureScaleX = 1 / renderScaleX;
@@ -744,7 +792,11 @@ import { NoToneMapping } from 'three';
 				// Final high-resolution texture for crisp static display
 				updateInfoTextureHighRes();
 				// Final ruler update with exact values
-				updateRulersForRotation(animState.currentWidth, animState.currentHeight, currentRulerRotation);
+				updateRulersForRotation(
+					animState.currentWidth,
+					animState.currentHeight,
+					currentRulerRotation
+				);
 			} else {
 				needsContinue = true;
 			}
@@ -758,7 +810,11 @@ import { NoToneMapping } from 'three';
 			renderRotationZ = animState.rotationZ;
 
 			// Animate texture counter-rotation (opposite direction to keep text upright)
-			animState.textureRotation = lerp(animState.textureRotation, animState.targetTextureRotation, rotLerpFactor);
+			animState.textureRotation = lerp(
+				animState.textureRotation,
+				animState.targetTextureRotation,
+				rotLerpFactor
+			);
 
 			// Animate ruler rotation (they rotate to follow the card edges)
 			currentRulerRotation = lerp(currentRulerRotation, targetRulerRotation, rotLerpFactor);
@@ -784,7 +840,11 @@ import { NoToneMapping } from 'three';
 				animState.isRotating = false;
 				// Final high-resolution texture for crisp static display
 				updateInfoTextureHighRes(animState.textureRotation);
-				updateRulersForRotation(animState.currentWidth, animState.currentHeight, currentRulerRotation);
+				updateRulersForRotation(
+					animState.currentWidth,
+					animState.currentHeight,
+					currentRulerRotation
+				);
 			} else {
 				needsContinue = true;
 			}
@@ -813,7 +873,12 @@ import { NoToneMapping } from 'three';
 	}
 
 	onMount(() => {
-		console.log('[3D Preview] onMount - Props:', { widthPixels, heightPixels, sizeName, isPortrait });
+		console.log('[3D Preview] onMount - Props:', {
+			widthPixels,
+			heightPixels,
+			sizeName,
+			isPortrait
+		});
 		// Initialize animation state from props
 		animState.currentWidth = widthPixels;
 		animState.currentHeight = heightPixels;
@@ -851,7 +916,14 @@ import { NoToneMapping } from 'three';
 		// Sync reactive state (no warning since this is in onMount callback)
 		currentWidth = widthPixels;
 		currentHeight = heightPixels;
-		console.log('[3D Preview] Initial state:', { currentWidth, currentHeight, renderScaleX, renderScaleY, isPortrait, renderRotationZ });
+		console.log('[3D Preview] Initial state:', {
+			currentWidth,
+			currentHeight,
+			renderScaleX,
+			renderScaleY,
+			isPortrait,
+			renderRotationZ
+		});
 
 		loadGeometry(widthPixels, heightPixels);
 		// Use high-resolution texture for initial render (crisp first impression)
@@ -889,7 +961,7 @@ import { NoToneMapping } from 'three';
 			animState.prevWidthPixels = widthPixels;
 			animState.prevHeightPixels = heightPixels;
 			startAnimationLoop();
-			
+
 			// Reset OrbitControls to center when dimensions change
 			// This ensures camera always looks at origin regardless of user interactions
 			if (orbitControlsRef) {
@@ -931,8 +1003,13 @@ import { NoToneMapping } from 'three';
 	$effect(() => {
 		// Access imageUrl to register the dependency
 		const currentUrl = imageUrl;
-		console.log('[3D Preview] imageUrl $effect triggered, currentUrl:', currentUrl, 'prevUrl:', prevImageUrl);
-		
+		console.log(
+			'[3D Preview] imageUrl $effect triggered, currentUrl:',
+			currentUrl,
+			'prevUrl:',
+			prevImageUrl
+		);
+
 		if (currentUrl !== prevImageUrl) {
 			console.log('[3D Preview] URL changed! Disposing old texture and loading new one');
 			// Dispose old texture if exists
@@ -941,13 +1018,13 @@ import { NoToneMapping } from 'three';
 				texture.dispose();
 				texture = null;
 			}
-			
+
 			// Load new texture if URL provided
 			if (currentUrl) {
 				console.log('[3D Preview] Calling loadTexture with:', currentUrl);
 				loadTexture(currentUrl);
 			}
-			
+
 			prevImageUrl = currentUrl;
 		} else {
 			console.log('[3D Preview] URL unchanged, skipping');
@@ -1011,44 +1088,50 @@ import { NoToneMapping } from 'three';
 
 		<!-- Card mesh with scale-based animation -->
 		{#if frontGeometry && backGeometry && edgeGeometry}
-			<T.Group rotation.y={renderRotationY} rotation.x={-0.1} rotation.z={renderRotationZ} scale.x={renderScaleX} scale.y={renderScaleY}>
+			<T.Group
+				rotation.y={renderRotationY}
+				rotation.x={-0.1}
+				rotation.z={renderRotationZ}
+				scale.x={renderScaleX}
+				scale.y={renderScaleY}
+			>
 				<!-- Front face - key block forces re-render when texture changes -->
 				{#key texture}
-				<T.Mesh geometry={frontGeometry}>
-					{#if textureLoading}
-						<!-- Show loading state while texture loads -->
-						<T.MeshStandardMaterial
-							color="#e2e8f0"
-							side={THREE.FrontSide}
-							metalness={0.05}
-							roughness={0.6}
-						/>
-					{:else if texture}
-						<!-- Loaded texture from URL -->
-						<T.MeshStandardMaterial
-							map={texture}
-							side={THREE.FrontSide}
-							metalness={0.05}
-							roughness={0.6}
-						/>
-					{:else if infoTexture}
-						<!-- Default info texture -->
-						<T.MeshStandardMaterial
-							map={infoTexture}
-							side={THREE.FrontSide}
-							metalness={0.05}
-							roughness={0.6}
-						/>
-					{:else}
-						<!-- Fallback solid color -->
-						<T.MeshStandardMaterial
-							color="#f1f5f9"
-							side={THREE.FrontSide}
-							metalness={0.05}
-							roughness={0.6}
-						/>
-					{/if}
-				</T.Mesh>
+					<T.Mesh geometry={frontGeometry}>
+						{#if textureLoading}
+							<!-- Show loading state while texture loads -->
+							<T.MeshStandardMaterial
+								color="#e2e8f0"
+								side={THREE.FrontSide}
+								metalness={0.05}
+								roughness={0.6}
+							/>
+						{:else if texture}
+							<!-- Loaded texture from URL -->
+							<T.MeshStandardMaterial
+								map={texture}
+								side={THREE.FrontSide}
+								metalness={0.05}
+								roughness={0.6}
+							/>
+						{:else if infoTexture}
+							<!-- Default info texture -->
+							<T.MeshStandardMaterial
+								map={infoTexture}
+								side={THREE.FrontSide}
+								metalness={0.05}
+								roughness={0.6}
+							/>
+						{:else}
+							<!-- Fallback solid color -->
+							<T.MeshStandardMaterial
+								color="#f1f5f9"
+								side={THREE.FrontSide}
+								metalness={0.05}
+								roughness={0.6}
+							/>
+						{/if}
+					</T.Mesh>
 				{/key}
 
 				<!-- Back face -->
@@ -1070,7 +1153,7 @@ import { NoToneMapping } from 'three';
 			<!-- Rulers - OUTSIDE rotating group, fixed to viewport -->
 			<!-- Rulers measure the visual top and left of the card as seen on screen -->
 			{@const baseScale = Math.max(cardDimensions.width, cardDimensions.height) * 0.12}
-			
+
 			{#if horizontalRulerGeometry}
 				<T.LineSegments geometry={horizontalRulerGeometry}>
 					<T.LineBasicMaterial color="#94a3b8" linewidth={1} />
@@ -1087,7 +1170,9 @@ import { NoToneMapping } from 'three';
 			{#each rulerLabelTextures as label}
 				<T.Sprite
 					position={label.position}
-					scale={label.isTotal ? [baseScale * 1.6, baseScale * 0.7, 1] : [baseScale, baseScale * 0.5, 1]}
+					scale={label.isTotal
+						? [baseScale * 1.6, baseScale * 0.7, 1]
+						: [baseScale, baseScale * 0.5, 1]}
 				>
 					<T.SpriteMaterial map={label.texture} transparent={true} depthTest={false} />
 				</T.Sprite>

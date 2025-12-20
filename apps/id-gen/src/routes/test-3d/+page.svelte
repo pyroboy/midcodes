@@ -15,11 +15,13 @@
 	const CARD_HEIGHT = 2; // 3:2 aspect ratio
 
 	// Get all card URLs
-	let cardUrls = $derived(data.cards
-		.map((c) => c.front_image)
-		.filter((path): path is string => !!path)
-		.map((path) => getProxiedUrl(path, 'rendered-id-cards'))
-		.filter((url): url is string => !!url));
+	let cardUrls = $derived(
+		data.cards
+			.map((c) => c.front_image)
+			.filter((path): path is string => !!path)
+			.map((path) => getProxiedUrl(path, 'rendered-id-cards'))
+			.filter((url): url is string => !!url)
+	);
 
 	// Grid layout config
 	const COLUMNS = 4;

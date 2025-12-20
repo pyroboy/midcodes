@@ -265,8 +265,8 @@
 
 	<!-- Elements List -->
 	{#each elements ?? [] as element, i}
-		<div 
-			class="element-item" 
+		<div
+			class="element-item"
 			class:highlighted={hoveredElementId === element.id || selectedElementId === element.id}
 			id={`element-item-${i}`}
 		>
@@ -296,7 +296,6 @@
 				</div>
 				<button class="remove-element" onclick={stopPropagation(() => removeElement(i))}>×</button>
 			</div>
-
 
 			{#if openSectionIndex === i}
 				<div class="element-inputs" transition:slide={{ duration: 200 }}>
@@ -377,8 +376,7 @@
 						width={element.width}
 						height={element.height}
 						rotation={element.rotation || 0}
-						onUpdate={(updates: Record<'x' | 'y' | 'width' | 'height' | 'rotation', number | undefined>) =>
-							handlePositionChange(i, updates)}
+						onUpdate={(updates: Record) => handlePositionChange(i, updates)}
 					/>
 				</div>
 			{/if}

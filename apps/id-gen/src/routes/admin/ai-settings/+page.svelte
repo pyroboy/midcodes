@@ -26,7 +26,19 @@
 		rotateAPIKey,
 		deleteAPIKey
 	} from '$lib/remote/ai-settings.remote';
-	import { Key, Bot, Sparkles, Users, Settings, AlertTriangle, Eye, EyeOff, Plus, RefreshCw, Trash2 } from 'lucide-svelte';
+	import {
+		Key,
+		Bot,
+		Sparkles,
+		Users,
+		Settings,
+		AlertTriangle,
+		Eye,
+		EyeOff,
+		Plus,
+		RefreshCw,
+		Trash2
+	} from 'lucide-svelte';
 
 	// State
 	let activeTab = $state('overview');
@@ -35,7 +47,7 @@
 	let isUpdating = $state(false);
 	let successMessage = $state('');
 	let errorMessage = $state('');
-	
+
 	// Settings form state
 	let provider = $state('nano_banana');
 	let model = $state('default');
@@ -49,7 +61,7 @@
 
 	// Initialize form from settings
 	$effect(() => {
-		settings.then(s => {
+		settings.then((s) => {
 			if (s) {
 				provider = s.provider || 'nano_banana';
 				model = s.model || 'default';
@@ -125,7 +137,8 @@
 
 	async function handleDeleteKey() {
 		clearMessages();
-		if (!confirm('Are you sure you want to delete the API key? This will disable AI features.')) return;
+		if (!confirm('Are you sure you want to delete the API key? This will disable AI features.'))
+			return;
 		isUpdating = true;
 		try {
 			await deleteAPIKey();
@@ -159,18 +172,27 @@
 
 	<!-- Messages -->
 	{#if successMessage}
-		<div class="bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200 px-4 py-3 rounded-lg flex items-center gap-2">
+		<div
+			class="bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200 px-4 py-3 rounded-lg flex items-center gap-2"
+		>
 			<Sparkles class="w-4 h-4" />
 			{successMessage}
-			<button class="ml-auto text-green-600 hover:text-green-800" onclick={() => successMessage = ''}>×</button>
+			<button
+				class="ml-auto text-green-600 hover:text-green-800"
+				onclick={() => (successMessage = '')}>×</button
+			>
 		</div>
 	{/if}
 
 	{#if errorMessage}
-		<div class="bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 px-4 py-3 rounded-lg flex items-center gap-2">
+		<div
+			class="bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 px-4 py-3 rounded-lg flex items-center gap-2"
+		>
 			<AlertTriangle class="w-4 h-4" />
 			{errorMessage}
-			<button class="ml-auto text-red-600 hover:text-red-800" onclick={() => errorMessage = ''}>×</button>
+			<button class="ml-auto text-red-600 hover:text-red-800" onclick={() => (errorMessage = '')}
+				>×</button
+			>
 		</div>
 	{/if}
 
@@ -278,7 +300,11 @@
 		<!-- Overview Tab -->
 		<Tabs.Content value="overview" class="mt-6">
 			{#await usage}
-				<Card><CardContent class="pt-6"><p class="text-muted-foreground">Loading usage stats...</p></CardContent></Card>
+				<Card
+					><CardContent class="pt-6"
+						><p class="text-muted-foreground">Loading usage stats...</p></CardContent
+					></Card
+				>
 			{:then usageData}
 				<div class="grid gap-6 md:grid-cols-2">
 					<Card>
@@ -293,15 +319,20 @@
 							</div>
 							<div class="flex justify-between">
 								<span class="text-muted-foreground">This Month</span>
-								<span class="font-semibold text-blue-600">{formatNumber(usageData.generationsThisMonth)}</span>
+								<span class="font-semibold text-blue-600"
+									>{formatNumber(usageData.generationsThisMonth)}</span
+								>
 							</div>
 							<div class="flex justify-between">
 								<span class="text-muted-foreground">Credits Used (Month)</span>
-								<span class="font-semibold text-amber-600">{formatNumber(usageData.creditsUsedThisMonth)}</span>
+								<span class="font-semibold text-amber-600"
+									>{formatNumber(usageData.creditsUsedThisMonth)}</span
+								>
 							</div>
 							<div class="flex justify-between">
 								<span class="text-muted-foreground">Avg Credits/Generation</span>
-								<span class="font-semibold">{usageData.averageCreditsPerGeneration.toFixed(1)}</span>
+								<span class="font-semibold">{usageData.averageCreditsPerGeneration.toFixed(1)}</span
+								>
 							</div>
 						</CardContent>
 					</Card>
@@ -327,7 +358,9 @@
 										{#each usageData.topUsers as user}
 											<TableRow>
 												<TableCell class="truncate max-w-[200px]">{user.email}</TableCell>
-												<TableCell class="text-right font-medium">{formatNumber(user.count)}</TableCell>
+												<TableCell class="text-right font-medium"
+													>{formatNumber(user.count)}</TableCell
+												>
 											</TableRow>
 										{/each}
 									</TableBody>
@@ -349,9 +382,7 @@
 						<Key class="w-5 h-5" />
 						API Key Management
 					</CardTitle>
-					<CardDescription>
-						Manage your Nano Banana API key. Keep this key secure.
-					</CardDescription>
+					<CardDescription>Manage your Nano Banana API key. Keep this key secure.</CardDescription>
 				</CardHeader>
 				<CardContent class="space-y-6">
 					{#await settings then settingsData}
@@ -360,9 +391,11 @@
 								<span class="text-sm font-medium">Current API Key</span>
 								<div class="flex items-center gap-2">
 									<div class="flex-1 font-mono text-sm bg-muted px-3 py-2 rounded">
-										{showApiKey ? settingsData.apiKeyMasked : '••••••••••••••••••••••••••••••••' + settingsData.apiKeyLastFour}
+										{showApiKey
+											? settingsData.apiKeyMasked
+											: '••••••••••••••••••••••••••••••••' + settingsData.apiKeyLastFour}
 									</div>
-									<Button variant="outline" size="sm" onclick={() => showApiKey = !showApiKey}>
+									<Button variant="outline" size="sm" onclick={() => (showApiKey = !showApiKey)}>
 										{#if showApiKey}
 											<EyeOff class="w-4 h-4" />
 										{:else}
@@ -376,13 +409,14 @@
 
 					<div class="space-y-2">
 						<span class="text-sm font-medium">{$effect.tracking() ? 'New' : 'New'} API Key</span>
-						<Input
-							type="password"
-							placeholder="Enter new API key..."
-							bind:value={newApiKey}
-						/>
+						<Input type="password" placeholder="Enter new API key..." bind:value={newApiKey} />
 						<p class="text-xs text-muted-foreground">
-							Get your API key from <a href="https://nanobanana.com" target="_blank" rel="noopener" class="text-primary hover:underline">nanobanana.com</a>
+							Get your API key from <a
+								href="https://nanobanana.com"
+								target="_blank"
+								rel="noopener"
+								class="text-primary hover:underline">nanobanana.com</a
+							>
 						</p>
 					</div>
 
@@ -413,14 +447,14 @@
 							<Sparkles class="w-5 h-5" />
 							Credit Balance
 						</CardTitle>
-						<CardDescription>
-							AI credits are consumed when generating templates
-						</CardDescription>
+						<CardDescription>AI credits are consumed when generating templates</CardDescription>
 					</CardHeader>
 					<CardContent>
 						{#await settings then settingsData}
 							<div class="text-center py-4">
-								<p class="text-5xl font-bold text-primary">{formatNumber(settingsData?.creditsBalance || 0)}</p>
+								<p class="text-5xl font-bold text-primary">
+									{formatNumber(settingsData?.creditsBalance || 0)}
+								</p>
 								<p class="text-sm text-muted-foreground mt-2">credits available</p>
 							</div>
 							<div class="text-sm text-muted-foreground text-center">
@@ -436,22 +470,16 @@
 							<Plus class="w-5 h-5" />
 							Add Credits
 						</CardTitle>
-						<CardDescription>
-							Manually add AI credits to your balance
-						</CardDescription>
+						<CardDescription>Manually add AI credits to your balance</CardDescription>
 					</CardHeader>
 					<CardContent class="space-y-4">
 						<div class="space-y-2">
 							<span class="text-sm font-medium">Amount to Add</span>
-							<Input
-								type="number"
-								min="1"
-								bind:value={creditsToAdd}
-							/>
+							<Input type="number" min="1" bind:value={creditsToAdd} />
 						</div>
 						<div class="flex gap-2">
 							{#each [100, 500, 1000] as amount}
-								<Button variant="outline" size="sm" onclick={() => creditsToAdd = amount}>
+								<Button variant="outline" size="sm" onclick={() => (creditsToAdd = amount)}>
 									+{formatNumber(amount)}
 								</Button>
 							{/each}
@@ -473,9 +501,7 @@
 						<Settings class="w-5 h-5" />
 						AI Configuration
 					</CardTitle>
-					<CardDescription>
-						Configure AI provider settings and rate limits
-					</CardDescription>
+					<CardDescription>Configure AI provider settings and rate limits</CardDescription>
 				</CardHeader>
 				<CardContent class="space-y-6">
 					<div class="grid gap-4 md:grid-cols-2">
@@ -493,10 +519,7 @@
 
 						<div class="space-y-2">
 							<span class="text-sm font-medium">Model</span>
-							<select
-								class="w-full px-3 py-2 border rounded-md bg-background"
-								bind:value={model}
-							>
+							<select class="w-full px-3 py-2 border rounded-md bg-background" bind:value={model}>
 								<option value="default">Default</option>
 								<option value="fast">Fast (Lower Quality)</option>
 								<option value="quality">Quality (Slower)</option>
@@ -505,24 +528,23 @@
 
 						<div class="space-y-2">
 							<span class="text-sm font-medium">Rate Limit (per minute)</span>
-							<Input
-								type="number"
-								min="1"
-								max="1000"
-								bind:value={rateLimit}
-							/>
+							<Input type="number" min="1" max="1000" bind:value={rateLimit} />
 						</div>
 
 						<div class="space-y-2">
 							<span class="text-sm font-medium">Status</span>
 							<div class="flex items-center gap-3 pt-2">
 								<button
-									class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors {isEnabled ? 'bg-primary' : 'bg-muted'}"
-									onclick={() => isEnabled = !isEnabled}
+									class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors {isEnabled
+										? 'bg-primary'
+										: 'bg-muted'}"
+									onclick={() => (isEnabled = !isEnabled)}
 									aria-label="Toggle AI features"
 								>
 									<span
-										class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {isEnabled ? 'translate-x-6' : 'translate-x-1'}"
+										class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {isEnabled
+											? 'translate-x-6'
+											: 'translate-x-1'}"
 									></span>
 								</button>
 								<span class="text-sm">{isEnabled ? 'Enabled' : 'Disabled'}</span>

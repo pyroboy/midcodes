@@ -15,25 +15,25 @@ import type {
 export interface AssetUploadState {
 	currentStep: WizardStep;
 	selectedSizePreset: SizePreset | null;
-	
+
 	// Step 2: Dual Image Upload
 	frontImage: File | null;
 	frontImageUrl: string | null;
 	backImage: File | null;
 	backImageUrl: string | null;
-	
+
 	sampleType: SampleType | null;
-	
+
 	// Step 3: Detection & Pairing
 	detectedRegionsFront: DetectedRegion[];
 	detectedRegionsBack: DetectedRegion[];
-	
+
 	// Map of Front Region ID -> Back Region ID
 	pairs: Map<string, string>;
-	
+
 	// Step 4: Asset metadata per PAIR (keyed by Front Region ID)
 	assetMetadata: Map<string, AssetMetadata>;
-	
+
 	isProcessing: boolean;
 	error: string | null;
 }
@@ -106,13 +106,25 @@ function createAssetUploadStore() {
 		clearFrontImage: () =>
 			update((s) => {
 				if (s.frontImageUrl) URL.revokeObjectURL(s.frontImageUrl);
-				return { ...s, frontImage: null, frontImageUrl: null, detectedRegionsFront: [], pairs: new Map() };
+				return {
+					...s,
+					frontImage: null,
+					frontImageUrl: null,
+					detectedRegionsFront: [],
+					pairs: new Map()
+				};
 			}),
 
 		clearBackImage: () =>
 			update((s) => {
 				if (s.backImageUrl) URL.revokeObjectURL(s.backImageUrl);
-				return { ...s, backImage: null, backImageUrl: null, detectedRegionsBack: [], pairs: new Map() };
+				return {
+					...s,
+					backImage: null,
+					backImageUrl: null,
+					detectedRegionsBack: [],
+					pairs: new Map()
+				};
 			}),
 
 		setSampleType: (type: SampleType) =>
@@ -134,9 +146,7 @@ function createAssetUploadStore() {
 				const key = side === 'front' ? 'detectedRegionsFront' : 'detectedRegionsBack';
 				return {
 					...s,
-					[key]: s[key].map((r) =>
-						r.id === id ? { ...r, isSelected: !r.isSelected } : r
-					)
+					[key]: s[key].map((r) => (r.id === id ? { ...r, isSelected: !r.isSelected } : r))
 				};
 			}),
 
@@ -152,15 +162,15 @@ function createAssetUploadStore() {
 				}
 				return { ...s, pairs };
 			}),
-		
-		pairRegions: (frontId: string, backId: string) => 
+
+		pairRegions: (frontId: string, backId: string) =>
 			update((s) => {
 				const newPairs = new Map(s.pairs);
 				newPairs.set(frontId, backId);
 				return { ...s, pairs: newPairs };
 			}),
 
-		unpairRegion: (frontId: string) => 
+		unpairRegion: (frontId: string) =>
 			update((s) => {
 				const newPairs = new Map(s.pairs);
 				newPairs.delete(frontId);
@@ -170,7 +180,7 @@ function createAssetUploadStore() {
 		removeRegion: (id: string) =>
 			update((s) => {
 				// Remove from Front if exists
-				if (s.detectedRegionsFront.some(r => r.id === id)) {
+				if (s.detectedRegionsFront.some((r) => r.id === id)) {
 					const newPairs = new Map(s.pairs);
 					newPairs.delete(id); // If it's a front ID key
 					return {
@@ -181,7 +191,7 @@ function createAssetUploadStore() {
 				}
 
 				// Remove from Back if exists
-				if (s.detectedRegionsBack.some(r => r.id === id)) {
+				if (s.detectedRegionsBack.some((r) => r.id === id)) {
 					const newPairs = new Map(s.pairs);
 					// Find if this back ID is a value in pairs
 					for (const [key, val] of newPairs.entries()) {
@@ -204,7 +214,7 @@ function createAssetUploadStore() {
 		initializeMetadata: () =>
 			update((s) => {
 				const metadata = new Map<string, AssetMetadata>();
-				
+
 				// Identify paired items
 				s.pairs.forEach((backId, frontId) => {
 					metadata.set(frontId, {
@@ -217,7 +227,7 @@ function createAssetUploadStore() {
 				});
 
 				// Identify unpaired Front items
-				s.detectedRegionsFront.forEach(r => {
+				s.detectedRegionsFront.forEach((r) => {
 					if (r.isSelected && !s.pairs.has(r.id)) {
 						metadata.set(r.id, {
 							regionId: r.id,
@@ -228,7 +238,7 @@ function createAssetUploadStore() {
 						});
 					}
 				});
-				
+
 				return { ...s, assetMetadata: metadata };
 			}),
 
@@ -309,15 +319,15 @@ export const previewPairs = derived(assetUploadStore, ($state) => {
 
 	// Add Pairs
 	$state.pairs.forEach((backId, frontId) => {
-		const front = $state.detectedRegionsFront.find(r => r.id === frontId);
-		const back = $state.detectedRegionsBack.find(r => r.id === backId);
+		const front = $state.detectedRegionsFront.find((r) => r.id === frontId);
+		const back = $state.detectedRegionsBack.find((r) => r.id === backId);
 		if (front) {
 			items.push({ id: frontId, front, back, isPaired: true });
 		}
 	});
 
 	// Add Unpaired Fronts (that are selected)
-	$state.detectedRegionsFront.forEach(front => {
+	$state.detectedRegionsFront.forEach((front) => {
 		if (front.isSelected && !$state.pairs.has(front.id)) {
 			items.push({ id: front.id, front, isPaired: false });
 		}

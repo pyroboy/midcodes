@@ -50,11 +50,7 @@
 		<div class="template-grid">
 			<!-- Custom Design Card (First Position) -->
 			{#if onCustomDesign}
-				<button
-					type="button"
-					class="template-card custom-design-card"
-					onclick={onCustomDesign}
-				>
+				<button type="button" class="template-card custom-design-card" onclick={onCustomDesign}>
 					<div class="custom-design-content">
 						<Wand2 class="h-8 w-8 text-primary" />
 						<span class="custom-design-label">Custom Design</span>
@@ -67,22 +63,25 @@
 				{@const isSelected = selectedAssetId === asset.id}
 				<button
 					type="button"
-					class={cn(
-						'template-card',
-						isSelected && 'selected'
-					)}
+					class={cn('template-card', isSelected && 'selected')}
 					onclick={() => handleSelect(asset)}
 				>
 					<div class="template-image">
-						<img
-							src={asset.image_url}
-							alt={asset.name}
-							loading="lazy"
-						/>
+						<img src={asset.image_url} alt={asset.name} loading="lazy" />
 						{#if isSelected}
 							<div class="selected-overlay">
-								<svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+								<svg
+									class="h-6 w-6 text-white"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke="currentColor"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="3"
+										d="M5 13l4 4L19 7"
+									/>
 								</svg>
 							</div>
 						{/if}

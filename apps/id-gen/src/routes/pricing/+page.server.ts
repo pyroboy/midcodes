@@ -14,9 +14,10 @@ export const load: PageServerLoad = async ({ locals, setHeaders }) => {
 
 	// Check if payments are enabled for this organization using Drizzle
 	if (org_id) {
-		const [settings] = await db.select({
-			paymentsEnabled: orgSettings.paymentsEnabled
-		})
+		const [settings] = await db
+			.select({
+				paymentsEnabled: orgSettings.paymentsEnabled
+			})
 			.from(orgSettings)
 			.where(eq(orgSettings.orgId, org_id))
 			.limit(1);

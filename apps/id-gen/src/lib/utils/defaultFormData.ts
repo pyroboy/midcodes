@@ -173,9 +173,7 @@ export function getSampleValue(variableName: string): string {
 /**
  * Generate sample form data for all template elements
  */
-export function generateSampleFormData(
-	elements: TemplateElement[]
-): Record<string, string> {
+export function generateSampleFormData(elements: TemplateElement[]): Record<string, string> {
 	const formData: Record<string, string> = {};
 
 	for (const element of elements) {

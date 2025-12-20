@@ -30,7 +30,7 @@
 		texture.wrapS = THREE.ClampToEdgeWrapping;
 		texture.wrapT = THREE.ClampToEdgeWrapping;
 		texture.colorSpace = THREE.SRGBColorSpace;
-		
+
 		// Ensure image has finished loading before updating
 		if (texture.image) {
 			texture.needsUpdate = true;
@@ -144,7 +144,7 @@
 
 						// Store the actual 3D world dimensions for texture transform
 						geometryDimensions = { width: worldWidth, height: worldHeight };
-						
+
 						// Store effective dimensions for texture transform
 						effectiveTemplateDimensions = {
 							width: widthInches,

@@ -6,9 +6,9 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 	await auth.api.signOut({
 		headers: request.headers
 	});
-	
+
 	// Also clear emulation cookie if present
 	cookies.delete('role_emulation', { path: '/' });
-	
+
 	throw redirect(303, '/auth');
 };

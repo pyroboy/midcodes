@@ -35,19 +35,19 @@ export function sanitizeFilename(name: string): string {
 
 	// Split into name parts and extension
 	const parts = base.split('.');
-	
+
 	// Get the last extension
 	const ext = parts.length > 1 ? parts.pop()?.toLowerCase() || '' : '';
-	
+
 	// Join remaining parts as the name (removes double extensions like .php.jpg)
 	const nameWithoutExt = parts.join('_');
-	
+
 	// Sanitize name part (no dots, only alphanumeric, underscore, hyphen)
 	const safeName = nameWithoutExt.replace(/[^a-zA-Z0-9_-]/g, '_') || 'upload';
-	
+
 	// Validate extension against whitelist
 	const safeExt = (ALLOWED_EXTENSIONS as readonly string[]).includes(ext) ? ext : 'unknown';
-	
+
 	return `${safeName}.${safeExt}`;
 }
 
@@ -65,19 +65,19 @@ export function validateImageUpload(file: File): ImageValidationResult {
 	}
 
 	const sanitizedName = sanitizeFilename(file.name);
-	
+
 	// Reject if extension couldn't be validated
 	if (sanitizedName.endsWith('.unknown')) {
 		return { valid: false, error: 'Invalid file extension' };
 	}
-	
+
 	return { valid: true, sanitizedName };
 }
 
 /**
  * SECURITY: Server-side validation with magic byte checking
  * This validates the actual file content, not just the claimed MIME type
- * 
+ *
  * @param buffer - ArrayBuffer of the file content
  * @param claimedFilename - Original filename (for extension extraction)
  * @returns Validation result with detected MIME type
@@ -119,7 +119,7 @@ export async function validateImageUploadServer(
 
 	// Sanitize filename
 	const sanitizedName = sanitizeFilename(claimedFilename);
-	
+
 	// Override extension with detected type for extra safety
 	const nameWithoutExt = sanitizedName.replace(/\.[^.]*$/, '');
 	const safeFilename = `${nameWithoutExt}.${fileType.ext}`;

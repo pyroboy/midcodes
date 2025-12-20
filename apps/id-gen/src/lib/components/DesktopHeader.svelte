@@ -8,7 +8,7 @@
 	import { aiModelStore } from '$lib/stores/aiModel';
 
 	let { user, class: className = '' } = $props();
-	
+
 	let aiState = $derived($aiModelStore);
 </script>
 
@@ -43,7 +43,8 @@
 			</Button>
 
 			<!-- AI Status Indicator -->
-			<div class="flex items-center gap-2 px-3 py-1.5 rounded-full border bg-muted/30 text-xs font-medium transition-colors"
+			<div
+				class="flex items-center gap-2 px-3 py-1.5 rounded-full border bg-muted/30 text-xs font-medium transition-colors"
 				class:border-green-500-20={aiState.status === 'ready'}
 				class:bg-green-500-10={aiState.status === 'ready'}
 				class:text-green-600={aiState.status === 'ready'}

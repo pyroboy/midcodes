@@ -9,8 +9,8 @@ export const load: LayoutServerLoad = async ({ locals, url, setHeaders }) => {
 	// Prevent caching of admin pages
 	setHeaders({
 		'Cache-Control': 'no-store, no-cache, must-revalidate, private',
-		'Pragma': 'no-cache',
-		'Expires': '0'
+		Pragma: 'no-cache',
+		Expires: '0'
 	});
 	const { session, user, org_id, permissions, effectiveRoles, roleEmulation } = locals;
 
@@ -26,10 +26,10 @@ export const load: LayoutServerLoad = async ({ locals, url, setHeaders }) => {
 	if (!hasAdminAccess) {
 		// If user is actively emulating but originally has admin rights, we allow them in
 		// but flag it so the UI can show a warning (checkAdmin already handles this)
-		
+
 		// If still no access after robust check, they truly don't have permission
 		console.log('Admin access denied. User:', user?.email, 'Effective roles:', effectiveRoles);
-		
+
 		if (roleEmulation?.active) {
 			// Show blocked by emulation UI instead of error
 			return {
@@ -47,18 +47,19 @@ export const load: LayoutServerLoad = async ({ locals, url, setHeaders }) => {
 				availableRolesForEmulation: []
 			};
 		}
-		
+
 		throw error(403, 'Access denied. Admin privileges required.');
 	}
 
 	// Get organization information using Drizzle
 	let organization = null;
 	if (org_id) {
-		const [orgData] = await db.select({
-			id: organizations.id,
-			name: organizations.name,
-			created_at: organizations.createdAt
-		})
+		const [orgData] = await db
+			.select({
+				id: organizations.id,
+				name: organizations.name,
+				created_at: organizations.createdAt
+			})
 			.from(organizations)
 			.where(eq(organizations.id, org_id))
 			.limit(1);
@@ -70,18 +71,20 @@ export const load: LayoutServerLoad = async ({ locals, url, setHeaders }) => {
 
 	// Available roles for emulation (only shown to super admins)
 	// isSuperAdmin is already defined above using the robust check
-	
-	const availableRolesForEmulation = isSuperAdmin ? [
-		{ value: 'org_admin', label: 'Org Admin' },
-		{ value: 'id_gen_admin', label: 'ID Gen Admin' },
-		{ value: 'id_gen_encoder', label: 'Encoder' },
-		{ value: 'id_gen_printer', label: 'Printer' },
-		{ value: 'id_gen_viewer', label: 'Viewer' },
-		{ value: 'id_gen_template_designer', label: 'Template Designer' },
-		{ value: 'id_gen_auditor', label: 'Auditor' },
-		{ value: 'id_gen_accountant', label: 'Accountant' },
-		{ value: 'id_gen_user', label: 'User' }
-	] : [];
+
+	const availableRolesForEmulation = isSuperAdmin
+		? [
+				{ value: 'org_admin', label: 'Org Admin' },
+				{ value: 'id_gen_admin', label: 'ID Gen Admin' },
+				{ value: 'id_gen_encoder', label: 'Encoder' },
+				{ value: 'id_gen_printer', label: 'Printer' },
+				{ value: 'id_gen_viewer', label: 'Viewer' },
+				{ value: 'id_gen_template_designer', label: 'Template Designer' },
+				{ value: 'id_gen_auditor', label: 'Auditor' },
+				{ value: 'id_gen_accountant', label: 'Accountant' },
+				{ value: 'id_gen_user', label: 'User' }
+			]
+		: [];
 
 	return {
 		user: {

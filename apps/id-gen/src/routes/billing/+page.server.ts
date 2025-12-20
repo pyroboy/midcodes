@@ -13,39 +13,43 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	try {
 		// Get payment records with Drizzle
-		const payments = await db.select()
+		const payments = await db
+			.select()
 			.from(paymentRecords)
 			.where(eq(paymentRecords.userId, user.id))
 			.orderBy(desc(paymentRecords.createdAt))
 			.limit(50);
 
 		// Get invoices with items for this user
-		const invoicesData = await db.select()
+		const invoicesData = await db
+			.select()
 			.from(invoices)
 			.where(eq(invoices.userId, user.id))
 			.orderBy(desc(invoices.createdAt));
 
 		// Get invoice items for all invoices
-		const invoiceIds = invoicesData.map(inv => inv.id);
-		const items = invoiceIds.length > 0 
-			? await db.select().from(invoiceItems).where(
-				// Simple approach: get all items and filter in memory
-				eq(invoiceItems.invoiceId, invoiceIds[0]) // Will be enhanced if needed
-			)
-			: [];
+		const invoiceIds = invoicesData.map((inv) => inv.id);
+		const items =
+			invoiceIds.length > 0
+				? await db.select().from(invoiceItems).where(
+						// Simple approach: get all items and filter in memory
+						eq(invoiceItems.invoiceId, invoiceIds[0]) // Will be enhanced if needed
+					)
+				: [];
 
 		// Attach items to invoices (simplified)
-		const invoicesWithItems = invoicesData.map(inv => ({
+		const invoicesWithItems = invoicesData.map((inv) => ({
 			...inv,
-			invoice_items: items.filter(item => item.invoiceId === inv.id)
+			invoice_items: items.filter((item) => item.invoiceId === inv.id)
 		}));
 
 		// Get current profile info
-		const [profile] = await db.select({
-			creditsBalance: profiles.creditsBalance,
-			unlimitedTemplates: profiles.unlimitedTemplates,
-			removeWatermarks: profiles.removeWatermarks
-		})
+		const [profile] = await db
+			.select({
+				creditsBalance: profiles.creditsBalance,
+				unlimitedTemplates: profiles.unlimitedTemplates,
+				removeWatermarks: profiles.removeWatermarks
+			})
 			.from(profiles)
 			.where(eq(profiles.id, user.id))
 			.limit(1);

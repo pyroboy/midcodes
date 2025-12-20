@@ -4,7 +4,7 @@
 	import * as THREE from 'three';
 	import { onMount, onDestroy, untrack } from 'svelte';
 	import { createRoundedRectCard } from '$lib/utils/cardGeometry';
-    // ... (rest of imports not needed in replacement if using replace loop strategy or careful targeting)
+	// ... (rest of imports not needed in replacement if using replace loop strategy or careful targeting)
 
 	import {
 		CARD3D_CONSTANTS,
@@ -42,7 +42,6 @@
 		WobbleState,
 		TapWobbleState
 	} from './card3d';
-
 
 	interface Props {
 		imageUrl?: string | null;
@@ -163,8 +162,6 @@
 	let tapOffsetZ = $state(0);
 	let lastTapTime = $state(0); // Track time for succession stacking
 
-
-
 	// Morphing animation state
 	let morphTime = $state(0);
 	let morphGeometries = $state<CachedGeometry[]>([]);
@@ -173,7 +170,7 @@
 	// Available orientations from showcase images
 	const availableOrientations = $derived(() => {
 		const orientations = new Set<'landscape' | 'portrait'>();
-		showcaseImages.forEach(img => {
+		showcaseImages.forEach((img) => {
 			if (img.orientation) orientations.add(img.orientation);
 		});
 		return orientations;
@@ -243,26 +240,33 @@
 
 		// Convert UV to local coords (-1 to 1)
 		const localCoords = uvToLocalCoords(u, v);
-		
+
 		// If card is facing back (cos(rotationY) < 0), invert X direction
 		// to ensure correct "Look At" behavior (Back Face looks at finger)
 		const isBackFacing = Math.cos(rotationY) < 0;
 		tapX = isBackFacing ? -localCoords.x : localCoords.x;
 		tapY = localCoords.y;
-		
+
 		// Initialize tap wobble - only stacks if tapping quickly in succession
-		const tapState = initTapWobble(tapX, tapY, tapPressure, wobbleStrength * 2, tapWobbleLinger, lastTapTime);
+		const tapState = initTapWobble(
+			tapX,
+			tapY,
+			tapPressure,
+			wobbleStrength * 2,
+			tapWobbleLinger,
+			lastTapTime
+		);
 		tapWobbleActive = tapState.active;
 		tapWobbleProgress = tapState.progress;
 		tapPressure = tapState.pressure;
 		tapWobbleIntensity = tapState.intensity;
-		
+
 		// Notify parent of pressure change for debug display
 		onTapPressureChange?.(tapPressure);
-		
+
 		// Update last tap time for succession detection
 		lastTapTime = performance.now();
-		
+
 		// Also advance showcase image (existing behavior)
 		advanceShowcaseImage();
 	}
@@ -281,8 +285,8 @@
 		const currentMorphOrientation = currentShape.w >= currentShape.h ? 'landscape' : 'portrait';
 
 		// Filter images by matching orientation
-		const matchingImages = showcaseImages.filter(img =>
-			img.orientation === currentMorphOrientation
+		const matchingImages = showcaseImages.filter(
+			(img) => img.orientation === currentMorphOrientation
 		);
 
 		if (matchingImages.length > 0) {
@@ -297,31 +301,30 @@
 		}
 	}
 
-	
 	// Get current morph orientation
 	const getCurrentMorphOrientation = () => {
 		const shape = MORPH_SHAPES[currentMorphIndex] || MORPH_SHAPES[0];
 		return shape.w >= shape.h ? 'landscape' : 'portrait';
 	};
-	
+
 	// Should show showcase texture (orientation match + texture valid)
 	const shouldShowShowcaseTexture = $derived(
-		showcaseTexture !== null && 
-		showcaseTextureValid &&
-		!showcaseTextureError &&
-		currentShowcaseImageOrientation !== null && 
-		currentShowcaseImageOrientation === getCurrentMorphOrientation()
+		showcaseTexture !== null &&
+			showcaseTextureValid &&
+			!showcaseTextureError &&
+			currentShowcaseImageOrientation !== null &&
+			currentShowcaseImageOrientation === getCurrentMorphOrientation()
 	);
-	
+
 	// Check texture ready for orientation (prevents blank cards)
 	function hasReadyTextureForOrientation(orientation: 'landscape' | 'portrait'): boolean {
 		return textureManager?.hasReadyTextureForOrientation(showcaseImages, orientation) ?? false;
 	}
-	
+
 	// Show loading indicator after debounce delay
 	const shouldShowLoadingIndicator = $derived(
 		showcaseTextureLoading &&
-		(performance.now() - showcaseLoadingDebounceStart) >= CARD3D_CONSTANTS.LOADING_DEBOUNCE_MS
+			performance.now() - showcaseLoadingDebounceStart >= CARD3D_CONSTANTS.LOADING_DEBOUNCE_MS
 	);
 
 	// Track previous values
@@ -342,7 +345,6 @@
 		}
 		return animatedTexts.get(idx) || '';
 	}
-
 
 	// Load geometry (front, back, edge) for card
 	async function loadGeometry(w: number, h: number) {
@@ -369,7 +371,12 @@
 			const dims = getCardDimensions(shape.w, shape.h);
 			const radius = Math.min(dims.width, dims.height) * 0.04;
 			const geo = await createRoundedRectCard(dims.width, dims.height, 0.02, radius);
-			cached.push({ front: geo.frontGeometry, back: geo.backGeometry, edge: geo.edgeGeometry, dims });
+			cached.push({
+				front: geo.frontGeometry,
+				back: geo.backGeometry,
+				edge: geo.edgeGeometry,
+				dims
+			});
 		}
 		morphGeometries = cached;
 		morphGeometriesLoaded = true;
@@ -412,7 +419,6 @@
 		);
 	}
 
-
 	// Load showcase texture - delegates to TextureManager
 	function loadShowcaseTexture(url: string) {
 		// Don't load if URL is empty or invalid
@@ -422,7 +428,7 @@
 			showcaseTextureValid = false;
 			return;
 		}
-		
+
 		textureManager.loadShowcaseTexture(
 			url,
 			(loadedTexture) => {
@@ -445,7 +451,7 @@
 			}
 		);
 	}
-	
+
 	// Preload all showcase textures - delegates to TextureManager
 	async function preloadShowcaseTextures() {
 		await textureManager.preloadShowcaseTextures(showcaseImages);
@@ -462,22 +468,20 @@
 			showcaseCacheReady = progress.isReady;
 			onLoadingProgress?.(progress.progress, progress.loaded, progress.total, progress.isReady);
 		});
-		
+
 		// Pre-cache morph geometries for empty state
 		preCacheMorphGeometries();
-		
+
 		// Preload all showcase textures into cache for instant swapping
 		if (!templateId && showcaseImages.length > 0) {
 			preloadShowcaseTextures().then(() => {
 				// After preloading, load the first matching image
 				const firstShape = MORPH_SHAPES[0];
 				const firstOrientation = firstShape.w >= firstShape.h ? 'landscape' : 'portrait';
-				
-				const matchingImages = showcaseImages.filter(img => 
-					img.orientation === firstOrientation
-				);
+
+				const matchingImages = showcaseImages.filter((img) => img.orientation === firstOrientation);
 				const firstImage = matchingImages[0];
-				
+
 				if (firstImage?.image_url) {
 					loadShowcaseTexture(firstImage.image_url);
 					currentShowcaseImageOrientation = firstImage.orientation || null;
@@ -494,7 +498,7 @@
 		if (backImageUrl) {
 			loadBackTexture(backImageUrl, widthPixels / heightPixels);
 		}
-		
+
 		prevImageUrl = imageUrl;
 		prevBackImageUrl = backImageUrl;
 		prevTemplateId = templateId;
@@ -507,7 +511,6 @@
 		textureManager?.dispose();
 		showcaseTexture = null;
 	});
-
 
 	// Animation loop
 	useTask(() => {
@@ -524,7 +527,7 @@
 			// Clear animated texts cache
 			animatedTexts.clear();
 			textAnimationFrame = 0;
-			
+
 			// Notify parent of spin beat
 			beatCount++;
 			onBeat?.(beatCount, 'spin');
@@ -572,15 +575,27 @@
 		// In showcase mode with cache ready: rotation ONLY happens during spin beats (no freeloader spins)
 		// Outside showcase mode: continuous rotation with variable speed
 		const inShowcaseWithCache = !templateId && showcaseImages.length > 0 && showcaseCacheReady;
-		
+
 		if (spinAnimation) {
 			// Use animation controller for spin calculation
-			const spinResult = updateSpinAnimation(spinProgress, spinTarget, spinStartRotation, spinSpeed);
+			const spinResult = updateSpinAnimation(
+				spinProgress,
+				spinTarget,
+				spinStartRotation,
+				spinSpeed
+			);
 			spinProgress = spinResult.newProgress;
-			
+
 			// Pre-calculate wobble state at spin START for seamless multi-axis interpolation
 			if (!wobblePreCalculated && spinResult.newProgress > 0.01) {
-				const preWobble = initWobble(spinTarget, spinStartRotation, spinSpeed, wobbleStrength, wobbleOscillations, wobbleLinger);
+				const preWobble = initWobble(
+					spinTarget,
+					spinStartRotation,
+					spinSpeed,
+					wobbleStrength,
+					wobbleOscillations,
+					wobbleLinger
+				);
 				wobblePreCalculated = true;
 				wobbleSpinDirection = preWobble.spinDirection;
 				wobbleIntensity = preWobble.intensity;
@@ -591,7 +606,7 @@
 				wobblePhaseZ = preWobble.phaseZ;
 				wobbleInitialOffsets = preWobble.initialOffsets;
 			}
-			
+
 			// Blend wobble offsets throughout ENTIRE spin using easeOut
 			// This makes spin interpolate all axes toward wobble peak, not just Y
 			if (wobblePreCalculated && !spinResult.complete) {
@@ -600,7 +615,7 @@
 				wobbleOffsetY = wobbleInitialOffsets.y * easeOut;
 				wobbleOffsetZ = wobbleInitialOffsets.z * easeOut;
 			}
-			
+
 			if (spinResult.complete) {
 				// Spin complete - at first wobble peak
 				rotationY = finalAngle;
@@ -614,17 +629,13 @@
 			} else {
 				rotationY = spinResult.rotationY;
 			}
-
 		} else if (!inShowcaseWithCache) {
 			// Only do continuous rotation when NOT in showcase mode
 			rotationY += getRotationSpeed(rotationY);
 		}
 
-
-
-
 		// else: In showcase mode without spin animation, card stays still
-		
+
 		// Wobble effect - use controller for calculations
 		if (wobbleActive) {
 			const wobbleState: WobbleState = {
@@ -666,11 +677,11 @@
 			tapOffsetY = tapResult.offsets.y;
 			tapOffsetZ = tapResult.offsets.z;
 			tapPressure = tapResult.newPressure;
-			
+
 			// Update debug panel with decaying pressure
 			// Update debug panel with decaying pressure
 			onTapPressureChange?.(tapPressure);
-			
+
 			if (tapResult.complete) {
 				tapWobbleActive = false;
 			}
@@ -686,45 +697,49 @@
 		// Combine spin wobble + tap wobble with oscillation
 		tiltX = oscillation.tiltX + wobbleOffsetX + tapOffsetX;
 
-
 		// Notify parent of rotation change for shadow sync
 		const currentSpeed = getRotationSpeed(rotationY);
 		const isSlowSpin = !spinAnimation && currentSpeed === CARD3D_CONSTANTS.ROTATION_SPEED_FACE;
 		onRotationChange?.(rotationY, isSlowSpin);
-		
+
 		// Define isShowcaseMode for use in beat system and morphing
 		const isShowcaseMode = !templateId && showcaseImages.length > 0;
 
 		// Morphing animation - runs in empty state OR showcase mode (when no specific template selected)
 		// Now controlled by unified beat system
 		// Note: isShowcaseMode is already defined above in spin beat detection
-		const shouldMorph = (
-			(!imageUrl && !isShowcaseMode) || isShowcaseMode
-		) && !loading && !error && !spinAnimation && morphGeometriesLoaded && morphGeometries.length > 0;
+		const shouldMorph =
+			((!imageUrl && !isShowcaseMode) || isShowcaseMode) &&
+			!loading &&
+			!error &&
+			!spinAnimation &&
+			morphGeometriesLoaded &&
+			morphGeometries.length > 0;
 
 		// === UNIFIED BEAT SYSTEM ===
 		// Use BeatController for timing and action decisions
 		if (isShowcaseMode && showcaseImages.length > 0 && showcaseCacheReady) {
 			const now = performance.now();
 			const beatResult = checkBeat(now, lastBeatTime, beatMs, beatCount);
-			
+
 			if (beatResult.shouldTrigger) {
 				lastBeatTime = beatResult.lastBeatTime;
 				beatCount = beatResult.beatCount;
-				
+
 				if (beatResult.action === 'shape' && shouldMorph) {
 					// === SHAPE CHANGE BEAT ===
 					const validIndices = validMorphShapeIndices();
 					const cycleLength = validIndices.length;
-					
+
 					if (cycleLength > 0) {
 						// Use controller for next index calculation
 						const nextValidIdx = getNextShapeIndex(currentValidIndex, cycleLength);
 						const actualShapeIndex = validIndices[nextValidIdx];
 
 						const newShape = MORPH_SHAPES[actualShapeIndex];
-						const newOrientation: 'landscape' | 'portrait' = newShape.w >= newShape.h ? 'landscape' : 'portrait';
-						
+						const newOrientation: 'landscape' | 'portrait' =
+							newShape.w >= newShape.h ? 'landscape' : 'portrait';
+
 						// Only switch if we have a cached texture ready for the new orientation
 						if (hasReadyTextureForOrientation(newOrientation)) {
 							currentValidIndex = nextValidIdx;
@@ -732,19 +747,25 @@
 							frontGeometry = morphGeometries[actualShapeIndex].front;
 							backGeometry = morphGeometries[actualShapeIndex].back;
 							edgeGeometry = morphGeometries[actualShapeIndex].edge;
-							
+
 							// Immediately load a matching texture from cache to prevent any flash
-							const cached = textureManager.findCachedImageForOrientation(showcaseImages, newOrientation);
+							const cached = textureManager.findCachedImageForOrientation(
+								showcaseImages,
+								newOrientation
+							);
 							if (cached) {
 								showcaseTexture = cached.texture;
 								currentShowcaseImageOrientation = newOrientation;
 								showcaseTextureValid = true;
 								showcaseTextureError = false;
 								// Reset showcaseIndex for new orientation
-								const matchingImages = textureManager.getMatchingImages(showcaseImages, newOrientation);
+								const matchingImages = textureManager.getMatchingImages(
+									showcaseImages,
+									newOrientation
+								);
 								showcaseIndex = matchingImages.indexOf(cached.image);
 							}
-							
+
 							// Notify parent of shape change beat
 							onBeat?.(beatCount, 'shape');
 
@@ -767,20 +788,20 @@
 					spinAnimation = true;
 					spinTarget = spinSetup.spinTarget;
 					finalAngle = spinSetup.finalAngle;
-					
+
 					// Notify parent of spin beat
 					onBeat?.(beatCount, 'spin');
 				} else if (beatResult.action === 'texture') {
-
 					// === TEXTURE CHANGE BEAT ===
 					const currentShape = MORPH_SHAPES[currentMorphIndex] || MORPH_SHAPES[0];
-					const currentMorphOrientation = currentShape.w >= currentShape.h ? 'landscape' : 'portrait';
-					
+					const currentMorphOrientation =
+						currentShape.w >= currentShape.h ? 'landscape' : 'portrait';
+
 					// Filter images by matching orientation
-					const matchingImages = showcaseImages.filter(img =>
-						img.orientation === currentMorphOrientation
+					const matchingImages = showcaseImages.filter(
+						(img) => img.orientation === currentMorphOrientation
 					);
-					
+
 					if (matchingImages.length > 0) {
 						// Move to next image in the filtered set
 						showcaseIndex = (showcaseIndex + 1) % matchingImages.length;
@@ -800,7 +821,7 @@
 							}
 						}
 					}
-					
+
 					// Notify parent of texture change beat
 					onBeat?.(beatCount, 'texture');
 				}
@@ -832,9 +853,13 @@
 
 {#if frontGeometry}
 	<!-- Card Group -->
-	<T.Group rotation.x={tiltX} rotation.y={rotationY + wobbleOffsetY + tapOffsetY} rotation.z={wobbleOffsetZ + tapOffsetZ}>
+	<T.Group
+		rotation.x={tiltX}
+		rotation.y={rotationY + wobbleOffsetY + tapOffsetY}
+		rotation.z={wobbleOffsetZ + tapOffsetZ}
+	>
 		{#if loading}
-			<T.Mesh 
+			<T.Mesh
 				geometry={frontGeometry}
 				onclick={(e: { uv?: { x: number; y: number } }) => {
 					const uv = e.uv;
@@ -866,7 +891,7 @@
 				position.z={0.06}
 			/>
 		{:else if error}
-			<T.Mesh 
+			<T.Mesh
 				geometry={frontGeometry}
 				onclick={(e: { uv?: { x: number; y: number } }) => {
 					const uv = e.uv;
@@ -899,7 +924,7 @@
 			/>
 		{:else if texture}
 			<!-- Front: Full color texture - clickable for tap wobble -->
-			<T.Mesh 
+			<T.Mesh
 				geometry={frontGeometry}
 				onclick={(e: { uv?: { x: number; y: number } }) => {
 					const uv = e.uv;
@@ -910,10 +935,7 @@
 					}
 				}}
 			>
-				<T.MeshBasicMaterial
-					map={texture}
-					side={THREE.DoubleSide}
-				/>
+				<T.MeshBasicMaterial map={texture} side={THREE.DoubleSide} />
 			</T.Mesh>
 			<!-- Front: Shiny overlay for reflections -->
 			<T.Mesh geometry={frontGeometry} position.z={0.001}>
@@ -971,7 +993,12 @@
 					{@const isTextType = el.type === 'text' || el.type === 'selection'}
 					<!-- Colored background overlay -->
 					{#if showColors}
-						<T.Mesh position.x={pos3d.x} position.y={pos3d.y} position.z={0.025} rotation.z={pos3d.rotation}>
+						<T.Mesh
+							position.x={pos3d.x}
+							position.y={pos3d.y}
+							position.z={0.025}
+							rotation.z={pos3d.rotation}
+						>
 							<T.PlaneGeometry args={[pos3d.width, pos3d.height]} />
 							<T.MeshBasicMaterial
 								color={getElementColor(el.type)}
@@ -1014,7 +1041,12 @@
 					{/if}
 					<!-- Element border -->
 					{#if showBorders}
-						<T.LineLoop position.x={pos3d.x} position.y={pos3d.y} position.z={0.026} rotation.z={pos3d.rotation}>
+						<T.LineLoop
+							position.x={pos3d.x}
+							position.y={pos3d.y}
+							position.z={0.026}
+							rotation.z={pos3d.rotation}
+						>
 							<T.BufferGeometry>
 								<T.Float32BufferAttribute
 									attach="attributes-position"
@@ -1048,7 +1080,12 @@
 					{@const backIdx = idx + 1000}
 					<!-- Colored background overlay -->
 					{#if showColors}
-						<T.Mesh position.x={-pos3d.x} position.y={pos3d.y} position.z={-0.025} rotation.z={-pos3d.rotation}>
+						<T.Mesh
+							position.x={-pos3d.x}
+							position.y={pos3d.y}
+							position.z={-0.025}
+							rotation.z={-pos3d.rotation}
+						>
 							<T.PlaneGeometry args={[pos3d.width, pos3d.height]} />
 							<T.MeshBasicMaterial
 								color={getElementColor(el.type)}
@@ -1092,7 +1129,12 @@
 					{/if}
 					<!-- Element border -->
 					{#if showBorders}
-						<T.LineLoop position.x={-pos3d.x} position.y={pos3d.y} position.z={-0.026} rotation.z={-pos3d.rotation}>
+						<T.LineLoop
+							position.x={-pos3d.x}
+							position.y={pos3d.y}
+							position.z={-0.026}
+							rotation.z={-pos3d.rotation}
+						>
 							<T.BufferGeometry>
 								<T.Float32BufferAttribute
 									attach="attributes-position"
@@ -1121,10 +1163,10 @@
 				{/each}
 			{/if}
 		{:else}
-		<!-- Morphing card - Persistent Hit Box + Conditional Texture -->
+			<!-- Morphing card - Persistent Hit Box + Conditional Texture -->
 			<T.Group scale.x={morphScaleX} scale.y={morphScaleY}>
 				<!-- Invisible Hit Box - always captures taps even if texture is loading/swapping -->
-				<T.Mesh 
+				<T.Mesh
 					geometry={frontGeometry}
 					visible={false}
 					onclick={(e: { uv?: { x: number; y: number } }) => {
@@ -1143,33 +1185,10 @@
 				{#if shouldShowShowcaseTexture}
 					<!-- Front face with showcase texture -->
 					<T.Mesh geometry={frontGeometry}>
-						<T.MeshBasicMaterial
-							map={showcaseTexture}
-							side={THREE.FrontSide}
-						/>
-					</T.Mesh>
-				<!-- Shiny overlay for reflections -->
-				<T.Mesh geometry={frontGeometry} position.z={0.001}>
-					<T.MeshPhysicalMaterial
-						transparent={true}
-						opacity={0.08}
-						roughness={0.1}
-						metalness={0.0}
-						clearcoat={1.0}
-						clearcoatRoughness={0.1}
-						side={THREE.FrontSide}
-					/>
-				</T.Mesh>
-				{#if backGeometry}
-					<!-- Back face with showcase texture -->
-					<T.Mesh geometry={backGeometry}>
-						<T.MeshBasicMaterial
-							map={showcaseTexture}
-							side={THREE.FrontSide}
-						/>
+						<T.MeshBasicMaterial map={showcaseTexture} side={THREE.FrontSide} />
 					</T.Mesh>
 					<!-- Shiny overlay for reflections -->
-					<T.Mesh geometry={backGeometry} position.z={-0.001}>
+					<T.Mesh geometry={frontGeometry} position.z={0.001}>
 						<T.MeshPhysicalMaterial
 							transparent={true}
 							opacity={0.08}
@@ -1180,22 +1199,39 @@
 							side={THREE.FrontSide}
 						/>
 					</T.Mesh>
-				{/if}
-				{#if edgeGeometry}
-					<T.Mesh geometry={edgeGeometry}>
-						<T.MeshPhysicalMaterial
-							color="#475569"
-							side={THREE.DoubleSide}
-							metalness={0.0}
-							roughness={0.2}
-							clearcoat={0.6}
-							clearcoatRoughness={0.15}
-						/>
-					</T.Mesh>
-				{/if}
+					{#if backGeometry}
+						<!-- Back face with showcase texture -->
+						<T.Mesh geometry={backGeometry}>
+							<T.MeshBasicMaterial map={showcaseTexture} side={THREE.FrontSide} />
+						</T.Mesh>
+						<!-- Shiny overlay for reflections -->
+						<T.Mesh geometry={backGeometry} position.z={-0.001}>
+							<T.MeshPhysicalMaterial
+								transparent={true}
+								opacity={0.08}
+								roughness={0.1}
+								metalness={0.0}
+								clearcoat={1.0}
+								clearcoatRoughness={0.1}
+								side={THREE.FrontSide}
+							/>
+						</T.Mesh>
+					{/if}
+					{#if edgeGeometry}
+						<T.Mesh geometry={edgeGeometry}>
+							<T.MeshPhysicalMaterial
+								color="#475569"
+								side={THREE.DoubleSide}
+								metalness={0.0}
+								roughness={0.2}
+								clearcoat={0.6}
+								clearcoatRoughness={0.15}
+							/>
+						</T.Mesh>
+					{/if}
 				{/if}
 			</T.Group>
-		<!-- No else block - we NEVER show a gray/plain card. Loading overlay in parent handles waiting state -->
+			<!-- No else block - we NEVER show a gray/plain card. Loading overlay in parent handles waiting state -->
 		{/if}
 	</T.Group>
 {/if}

@@ -2,7 +2,14 @@ import type { PageServerLoad } from './$types';
 import { error, redirect } from '@sveltejs/kit';
 import { hasRole, checkSuperAdmin } from '$lib/utils/adminPermissions';
 import { db } from '$lib/server/db';
-import { organizations, profiles, idcards, templates, orgSettings, roles } from '$lib/server/schema';
+import {
+	organizations,
+	profiles,
+	idcards,
+	templates,
+	orgSettings,
+	roles
+} from '$lib/server/schema';
 import { eq, desc, sql, or, isNull } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ parent, locals }) => {
@@ -28,7 +35,8 @@ export const load: PageServerLoad = async ({ parent, locals }) => {
 
 	try {
 		// Fetch current organization details
-		const [organization] = await db.select()
+		const [organization] = await db
+			.select()
 			.from(organizations)
 			.where(eq(organizations.id, org_id))
 			.limit(1);
@@ -38,23 +46,30 @@ export const load: PageServerLoad = async ({ parent, locals }) => {
 		}
 
 		// Fetch organization members with their profiles
-		const members = await db.select({
-			id: profiles.id,
-			email: profiles.email,
-			role: profiles.role,
-			created_at: profiles.createdAt,
-			updated_at: profiles.updatedAt,
-			credits_balance: profiles.creditsBalance,
-			card_generation_count: profiles.cardGenerationCount
-		})
+		const members = await db
+			.select({
+				id: profiles.id,
+				email: profiles.email,
+				role: profiles.role,
+				created_at: profiles.createdAt,
+				updated_at: profiles.updatedAt,
+				credits_balance: profiles.creditsBalance,
+				card_generation_count: profiles.cardGenerationCount
+			})
 			.from(profiles)
 			.where(eq(profiles.orgId, org_id))
 			.orderBy(desc(profiles.createdAt));
 
 		// Fetch org statistics
 		const [totalCardsResult, totalTemplatesResult, orgSettingsData] = await Promise.all([
-			db.select({ count: sql<number>`count(*)` }).from(idcards).where(eq(idcards.orgId, org_id)),
-			db.select({ count: sql<number>`count(*)` }).from(templates).where(eq(templates.orgId, org_id)),
+			db
+				.select({ count: sql<number>`count(*)` })
+				.from(idcards)
+				.where(eq(idcards.orgId, org_id)),
+			db
+				.select({ count: sql<number>`count(*)` })
+				.from(templates)
+				.where(eq(templates.orgId, org_id)),
 			db.select().from(orgSettings).where(eq(orgSettings.orgId, org_id)).limit(1)
 		]);
 
@@ -62,14 +77,15 @@ export const load: PageServerLoad = async ({ parent, locals }) => {
 		const totalTemplates = Number(totalTemplatesResult[0]?.count || 0);
 
 		// Fetch available roles (system roles + org-specific roles)
-		const availableRoles = await db.select({
-			id: roles.id,
-			name: roles.name,
-			display_name: roles.displayName,
-			description: roles.description,
-			is_system: roles.isSystem,
-			org_id: roles.orgId
-		})
+		const availableRoles = await db
+			.select({
+				id: roles.id,
+				name: roles.name,
+				display_name: roles.displayName,
+				description: roles.description,
+				is_system: roles.isSystem,
+				org_id: roles.orgId
+			})
 			.from(roles)
 			.where(or(isNull(roles.orgId), eq(roles.orgId, org_id)))
 			.orderBy(roles.name);
@@ -87,14 +103,16 @@ export const load: PageServerLoad = async ({ parent, locals }) => {
 				totalTemplates,
 				totalMembers: members?.length || 0
 			},
-			orgSettings: orgSettingsData[0] ? {
-				...orgSettingsData[0],
-				org_id: orgSettingsData[0].orgId,
-				payments_enabled: orgSettingsData[0].paymentsEnabled,
-				payments_bypass: orgSettingsData[0].paymentsBypass,
-				updated_at: orgSettingsData[0].updatedAt,
-				updated_by: orgSettingsData[0].updatedBy
-			} : null,
+			orgSettings: orgSettingsData[0]
+				? {
+						...orgSettingsData[0],
+						org_id: orgSettingsData[0].orgId,
+						payments_enabled: orgSettingsData[0].paymentsEnabled,
+						payments_bypass: orgSettingsData[0].paymentsBypass,
+						updated_at: orgSettingsData[0].updatedAt,
+						updated_by: orgSettingsData[0].updatedBy
+					}
+				: null,
 			availableRoles: availableRoles || [],
 			capabilities: {
 				isSuperAdmin,

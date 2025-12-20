@@ -71,9 +71,8 @@ describe('remoteFunctionCache', () => {
 		vi.resetModules();
 		vi.mock('$app/environment', () => ({ browser: true }));
 
-		const { cachedRemoteFunctionCall: cachedRemoteFunctionCall2 } = await import(
-			'../../src/lib/remote/remoteFunctionCache'
-		);
+		const { cachedRemoteFunctionCall: cachedRemoteFunctionCall2 } =
+			await import('../../src/lib/remote/remoteFunctionCache');
 
 		const secondFetcher = vi.fn(async () => 999);
 
@@ -93,10 +92,7 @@ describe('remoteFunctionCache', () => {
 		const scopeKey = 'user:org';
 		const keyBase = 'all-ids:getTemplateMetadata';
 
-		const fetcher = vi
-			.fn()
-			.mockResolvedValueOnce({ a: 1 })
-			.mockResolvedValueOnce({ a: 2 });
+		const fetcher = vi.fn().mockResolvedValueOnce({ a: 1 }).mockResolvedValueOnce({ a: 2 });
 
 		const v1 = await cachedRemoteFunctionCall({
 			scopeKey,
@@ -130,10 +126,7 @@ describe('remoteFunctionCache', () => {
 		const scopeKey = 'user:org';
 		const keyBase = 'all-ids:getIDCards';
 
-		const fetcher = vi
-			.fn()
-			.mockResolvedValueOnce('first')
-			.mockResolvedValueOnce('second');
+		const fetcher = vi.fn().mockResolvedValueOnce('first').mockResolvedValueOnce('second');
 
 		const ttlMs = 10;
 

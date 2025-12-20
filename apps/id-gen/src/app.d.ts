@@ -1,6 +1,6 @@
 // See https://kit.svelte.dev/docs/types#app
 // for information about these interfaces
-import type { auth } from "./lib/server/auth";
+import type { auth } from './lib/server/auth';
 
 declare global {
 	namespace App {
@@ -21,8 +21,6 @@ declare global {
 			// SECURITY: CSRF token for client-side requests
 			csrfToken?: string;
 		}
-
-
 
 		interface PageData {
 			user?: User | null;

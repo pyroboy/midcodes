@@ -24,7 +24,9 @@ export const load: PageServerLoad = async ({ locals, url, depends, setHeaders })
 				width: parseFloat(url.searchParams.get('width') || '3.375'),
 				height: parseFloat(url.searchParams.get('height') || '2.125'),
 				unit: url.searchParams.get('unit') || 'inches',
-				orientation: (url.searchParams.get('orientation') || 'landscape') as 'landscape' | 'portrait',
+				orientation: (url.searchParams.get('orientation') || 'landscape') as
+					| 'landscape'
+					| 'portrait',
 				front_background: url.searchParams.get('front_background') || ''
 			}
 		: null;
@@ -70,7 +72,7 @@ export const load: PageServerLoad = async ({ locals, url, depends, setHeaders })
 		.where(eq(templatesSchema.orgId, org_id!))
 		.orderBy(desc(templatesSchema.createdAt));
 
-	const transformedTemplates = templatesList.map(t => ({
+	const transformedTemplates = templatesList.map((t) => ({
 		...t,
 		user_id: t.userId,
 		org_id: t.orgId,
@@ -105,7 +107,7 @@ export const actions: Actions = {
 	// Upload image to R2 storage
 	uploadImage: async ({ request, locals }) => {
 		const { session } = locals;
-		
+
 		if (!session) {
 			return { success: false, error: 'Unauthorized' };
 		}
@@ -121,7 +123,7 @@ export const actions: Actions = {
 			}
 
 			const finalPath = userId ? `${userId}/${path}` : path;
-			
+
 			const { uploadToR2, getPublicUrl } = await import('$lib/server/s3');
 			const arrayBuffer = await file.arrayBuffer();
 			await uploadToR2(finalPath, Buffer.from(arrayBuffer), file.type || 'image/png');
@@ -275,7 +277,7 @@ export const actions: Actions = {
 					if (imagesToDelete.length > 0) {
 						try {
 							const { deleteFromR2 } = await import('$lib/server/s3');
-							await Promise.allSettled(imagesToDelete.map(key => deleteFromR2(key)));
+							await Promise.allSettled(imagesToDelete.map((key) => deleteFromR2(key)));
 							console.log(`✅ Deleted ${imagesToDelete.length} images from R2`);
 						} catch (storageError) {
 							console.warn('⚠️ Server: Error deleting card images (non-fatal):', storageError);
@@ -288,17 +290,19 @@ export const actions: Actions = {
 				}
 			} else {
 				// Default behavior: Unlink IDs
-				await db.update(idcards).set({ templateId: null }).where(eq(idcards.templateId, templateId));
+				await db
+					.update(idcards)
+					.set({ templateId: null })
+					.where(eq(idcards.templateId, templateId));
 				console.log('✅ Server: Unlinked associated ID cards');
 			}
 
 			// Then delete the template
-			await db.delete(templatesSchema).where(
-				and(
-					eq(templatesSchema.id, templateId),
-					eq(templatesSchema.userId, session.user.id)
-				)
-			);
+			await db
+				.delete(templatesSchema)
+				.where(
+					and(eq(templatesSchema.id, templateId), eq(templatesSchema.userId, session.user.id))
+				);
 
 			console.log('✅ Server: Template deleted successfully:', { templateId });
 

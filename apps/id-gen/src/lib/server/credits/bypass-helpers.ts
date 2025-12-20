@@ -45,7 +45,8 @@ export async function addCreditsBypass(
 			const newBalance = oldBalance + creditsToAdd;
 
 			// 2. Update balance
-			await tx.update(schema.profiles)
+			await tx
+				.update(schema.profiles)
 				.set({
 					creditsBalance: newBalance,
 					updatedAt: new Date()
@@ -119,7 +120,8 @@ export async function grantFeatureBypass(
 
 		return await db.transaction(async (tx) => {
 			// 1. Update user profile with feature flag
-			await tx.update(schema.profiles)
+			await tx
+				.update(schema.profiles)
 				.set(updateData)
 				.where(and(eq(schema.profiles.id, userId), eq(schema.profiles.orgId, orgId)));
 

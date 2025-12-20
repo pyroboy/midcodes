@@ -294,7 +294,11 @@ export class TextureManager {
 
 		await Promise.all(loadPromises);
 		this.onProgress?.({ progress: 1, loaded, total, isReady: true });
-		console.log('[TextureManager] Preloaded', this.showcaseCache.size, 'showcase textures into cache');
+		console.log(
+			'[TextureManager] Preloaded',
+			this.showcaseCache.size,
+			'showcase textures into cache'
+		);
 	}
 
 	/**

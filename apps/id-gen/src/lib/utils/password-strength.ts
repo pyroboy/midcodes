@@ -1,7 +1,7 @@
 /**
  * Password Strength Validation
  * SECURITY: Client-side password strength checking and enforcement
- * 
+ *
  * NOTE: Supabase Auth handles the actual password storage and hashing.
  * These utilities provide client-side feedback and can be used to
  * enforce stronger passwords before submission.
@@ -19,19 +19,47 @@ export interface PasswordStrengthResult {
  * In production, consider using a server-side check against a larger list
  */
 const COMMON_PASSWORDS = new Set([
-	'password', 'password1', 'password123', '123456', '12345678', '123456789',
-	'qwerty', 'abc123', 'monkey', 'letmein', 'dragon', 'iloveyou', 'trustno1',
-	'admin', 'welcome', 'login', 'master', 'hello', 'freedom', 'whatever',
-	'qazwsx', 'passw0rd', 'shadow', 'sunshine', 'princess', 'football'
+	'password',
+	'password1',
+	'password123',
+	'123456',
+	'12345678',
+	'123456789',
+	'qwerty',
+	'abc123',
+	'monkey',
+	'letmein',
+	'dragon',
+	'iloveyou',
+	'trustno1',
+	'admin',
+	'welcome',
+	'login',
+	'master',
+	'hello',
+	'freedom',
+	'whatever',
+	'qazwsx',
+	'passw0rd',
+	'shadow',
+	'sunshine',
+	'princess',
+	'football'
 ]);
 
 /**
  * Check for sequential characters (abc, 123, etc.)
  */
 function hasSequentialChars(password: string): boolean {
-	const sequences = ['abcdefghijklmnopqrstuvwxyz', '0123456789', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+	const sequences = [
+		'abcdefghijklmnopqrstuvwxyz',
+		'0123456789',
+		'qwertyuiop',
+		'asdfghjkl',
+		'zxcvbnm'
+	];
 	const lowerPass = password.toLowerCase();
-	
+
 	for (const seq of sequences) {
 		for (let i = 0; i <= seq.length - 3; i++) {
 			if (lowerPass.includes(seq.substring(i, i + 3))) {
@@ -51,7 +79,7 @@ function hasRepeatedChars(password: string): boolean {
 
 /**
  * Evaluate password strength
- * 
+ *
  * Scoring criteria:
  * - Length (min 8, better 12+, best 16+)
  * - Character variety (lowercase, uppercase, numbers, symbols)
@@ -126,7 +154,13 @@ export function evaluatePasswordStrength(password: string): PasswordStrengthResu
 	score = Math.min(4, Math.max(0, score));
 
 	// Determine label
-	const labels: PasswordStrengthResult['label'][] = ['Very Weak', 'Weak', 'Fair', 'Strong', 'Very Strong'];
+	const labels: PasswordStrengthResult['label'][] = [
+		'Very Weak',
+		'Weak',
+		'Fair',
+		'Strong',
+		'Very Strong'
+	];
 	const label = labels[score];
 
 	return {

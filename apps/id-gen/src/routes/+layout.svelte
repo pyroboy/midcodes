@@ -24,10 +24,10 @@
 	import { page } from '$app/stores';
 
 	// Path access checking for emulation banner
-	import { 
-		checkPathAccess, 
-		getAccessStatusColor, 
-		getAccessStatusLabel, 
+	import {
+		checkPathAccess,
+		getAccessStatusColor,
+		getAccessStatusLabel,
 		getAccessStatusIcon,
 		getAllRolesAccessForPath,
 		getPathConfig,
@@ -71,9 +71,7 @@
 
 	// Get current path config for displaying page name
 	let currentPathConfig = $derived(
-		data.roleEmulation?.active
-			? getPathConfig($page.url.pathname)
-			: null
+		data.roleEmulation?.active ? getPathConfig($page.url.pathname) : null
 	);
 
 	// State for showing/hiding the permission matrix (shown by default)
@@ -81,9 +79,7 @@
 
 	// Get the resource type for current path (for CRUD display)
 	let currentResourceType = $derived(
-		data.roleEmulation?.active
-			? getResourceTypeForPath($page.url.pathname)
-			: ''
+		data.roleEmulation?.active ? getResourceTypeForPath($page.url.pathname) : ''
 	);
 
 	function toggleMenu() {
@@ -130,14 +126,12 @@
 	}
 
 	// Check if currently in bypass mode (via URL param)
-	let isBypassingViaUrl = $derived(
-		$page.url.searchParams.get('superadmin_bypass') === 'true'
-	);
+	let isBypassingViaUrl = $derived($page.url.searchParams.get('superadmin_bypass') === 'true');
 
 	// Toggle between bypassing (super admin access) and assuming role (get blocked)
 	function toggleAssumeRole() {
 		const url = new URL($page.url);
-		
+
 		if (isBypassingViaUrl) {
 			// Currently bypassing -> switch to assuming role (remove bypass param)
 			url.searchParams.delete('superadmin_bypass');
@@ -145,7 +139,7 @@
 			// Currently assuming role or auto-bypassing -> switch to explicit bypass
 			url.searchParams.set('superadmin_bypass', 'true');
 		}
-		
+
 		// Navigate to the new URL
 		window.location.href = url.toString();
 	}
@@ -176,16 +170,16 @@
 		if (browser) {
 			// initAnalytics(); // Not in original, not adding
 			// initLogging(); // Not in original, not adding
-			
+
 			// Initialize smart preloading
 			const cleanupPreload = initPreloadService();
-			
+
 			return () => {
 				cleanupPreload?.();
 			};
 		}
 	});
-	
+
 	// Track current path for preload service
 	$effect(() => {
 		if (browser) {
@@ -243,7 +237,7 @@
 <div class="min-h-screen bg-background text-foreground theme-transition">
 	<!-- Navigation Loading Overlay -->
 	<NavigationLoader />
-	
+
 	{#if data.user}
 		<!-- Mobile Header -->
 		<MobileHeader user={data.user} onMenuToggle={toggleMenu} class="lg:hidden" />
@@ -256,17 +250,37 @@
 
 		<!-- Role Emulation Banner (Global) -->
 		{#if data.roleEmulation?.active}
-			<div class="fixed top-16 left-0 right-0 z-40 bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg lg:ml-64">
+			<div
+				class="fixed top-16 left-0 right-0 z-40 bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg lg:ml-64"
+			>
 				<div class="px-4 py-2 flex items-center justify-between gap-2">
 					<div class="flex items-center gap-3 flex-wrap min-w-0">
 						<!-- Eye icon -->
-						<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-4 w-4 flex-shrink-0"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+							/>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+							/>
 						</svg>
 						<!-- Role transition -->
 						<span class="text-sm font-medium whitespace-nowrap">
-							<span class="opacity-75">{formatRoleName(data.roleEmulation.originalRole || 'Admin')}</span>
+							<span class="opacity-75"
+								>{formatRoleName(data.roleEmulation.originalRole || 'Admin')}</span
+							>
 							<span class="mx-1">→</span>
 							<span class="font-bold">{formatRoleName(data.roleEmulation.emulatedRole || '')}</span>
 						</span>
@@ -276,16 +290,23 @@
 						{#if pathAccessResult}
 							<div class="hidden sm:flex items-center gap-2 text-xs">
 								<!-- Page path -->
-								<span class="font-mono bg-white/10 px-2 py-0.5 rounded truncate max-w-[200px]" title={$page.url.pathname}>
+								<span
+									class="font-mono bg-white/10 px-2 py-0.5 rounded truncate max-w-[200px]"
+									title={$page.url.pathname}
+								>
 									{$page.url.pathname}
 								</span>
 								<!-- Access status badge -->
-								<span 
-									class="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold {getAccessStatusColor(pathAccessResult.status)}"
+								<span
+									class="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold {getAccessStatusColor(
+										pathAccessResult.status
+									)}"
 									title={pathAccessResult.reason}
 								>
 									<span>{getAccessStatusIcon(pathAccessResult.status)}</span>
-									<span class="hidden md:inline">{getAccessStatusLabel(pathAccessResult.status)}</span>
+									<span class="hidden md:inline"
+										>{getAccessStatusLabel(pathAccessResult.status)}</span
+									>
 								</span>
 							</div>
 						{/if}
@@ -301,8 +322,19 @@
 									class="hidden sm:flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-amber-500/30 hover:bg-amber-500/50 rounded-full transition-colors border border-amber-400/50"
 									title="Experience this page as {data.roleEmulation.emulatedRole} (get blocked)"
 								>
-									<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										class="h-3 w-3"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+										/>
 									</svg>
 									<span>Assume Role</span>
 								</button>
@@ -313,8 +345,19 @@
 									class="hidden sm:flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-amber-500/30 hover:bg-amber-500/50 rounded-full transition-colors border border-amber-400/50"
 									title="Experience this page as {data.roleEmulation.emulatedRole} (get blocked)"
 								>
-									<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										class="h-3 w-3"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+										/>
 									</svg>
 									<span>Assume Role</span>
 								</button>
@@ -325,8 +368,19 @@
 									class="hidden sm:flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-green-500/30 hover:bg-green-500/50 rounded-full transition-colors border border-green-400/50"
 									title="Bypass restriction using {data.roleEmulation.originalRole} privileges"
 								>
-									<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										class="h-3 w-3"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+										/>
 									</svg>
 									<span>Use Bypass</span>
 								</button>
@@ -337,8 +391,19 @@
 							onclick={stopEmulation}
 							class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-white/20 hover:bg-white/30 rounded-full transition-colors border border-white/30"
 						>
-							<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								class="h-3 w-3"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M6 18L18 6M6 6l12 12"
+								/>
 							</svg>
 							<span class="hidden sm:inline">Stop Emulating</span>
 							<span class="sm:hidden">Stop</span>
@@ -348,11 +413,16 @@
 				<!-- Mobile: show access status and actions on second row -->
 				<div class="sm:hidden px-4 pb-2 flex items-center gap-2 text-xs">
 					{#if pathAccessResult}
-						<span class="font-mono bg-white/10 px-2 py-0.5 rounded truncate flex-1" title={$page.url.pathname}>
+						<span
+							class="font-mono bg-white/10 px-2 py-0.5 rounded truncate flex-1"
+							title={$page.url.pathname}
+						>
 							{$page.url.pathname}
 						</span>
-						<span 
-							class="flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold {getAccessStatusColor(pathAccessResult.status)}"
+						<span
+							class="flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold {getAccessStatusColor(
+								pathAccessResult.status
+							)}"
 							title={pathAccessResult.reason}
 						>
 							<span>{getAccessStatusIcon(pathAccessResult.status)}</span>
@@ -381,17 +451,22 @@
 				<!-- Permission Matrix Toggle Button -->
 				<div class="px-4 pb-2 border-t border-white/10">
 					<button
-						onclick={() => showPermissionMatrix = !showPermissionMatrix}
+						onclick={() => (showPermissionMatrix = !showPermissionMatrix)}
 						class="w-full flex items-center justify-center gap-2 py-1 text-xs text-white/70 hover:text-white transition-colors"
 					>
-						<svg 
-							xmlns="http://www.w3.org/2000/svg" 
-							class="h-3 w-3 transition-transform {showPermissionMatrix ? 'rotate-180' : ''}" 
-							fill="none" 
-							viewBox="0 0 24 24" 
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-3 w-3 transition-transform {showPermissionMatrix ? 'rotate-180' : ''}"
+							fill="none"
+							viewBox="0 0 24 24"
 							stroke="currentColor"
 						>
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M19 9l-7 7-7-7"
+							/>
 						</svg>
 						<span>{showPermissionMatrix ? 'Hide' : 'Show'} Permission Matrix</span>
 					</button>
@@ -401,14 +476,18 @@
 					<div class="bg-gray-900/50 border-t border-white/10">
 						<!-- Page Info Header -->
 						{#if currentPathConfig}
-							<div class="px-4 py-2 text-xs text-white/60 border-b border-white/10 flex items-center justify-between">
+							<div
+								class="px-4 py-2 text-xs text-white/60 border-b border-white/10 flex items-center justify-between"
+							>
 								<div>
 									<span class="font-medium text-white/80">{currentPathConfig.name}</span>
 									<span class="mx-2">—</span>
 									<span>{currentPathConfig.description}</span>
 								</div>
 								<div class="text-[10px] bg-gray-700/50 px-2 py-0.5 rounded">
-									Resource: <span class="font-medium text-white/80 capitalize">{currentResourceType}</span>
+									Resource: <span class="font-medium text-white/80 capitalize"
+										>{currentResourceType}</span
+									>
 								</div>
 							</div>
 						{/if}
@@ -416,7 +495,7 @@
 						<div class="overflow-x-auto">
 							<div class="flex gap-0 min-w-max">
 								{#each allRolesAccess as roleInfo}
-									<div 
+									<div
 										class="flex flex-col items-center px-3 py-2 border-r border-white/10 last:border-r-0 min-w-[90px]
 											{roleInfo.isEmulatedRole ? 'bg-purple-600/30' : ''}
 											{roleInfo.isCurrentRole && !roleInfo.isEmulatedRole ? 'bg-blue-600/30' : ''}"
@@ -430,7 +509,7 @@
 											{/if}
 										</div>
 										<!-- Role Name -->
-										<div 
+										<div
 											class="text-[10px] text-center leading-tight font-medium mb-1.5
 												{roleInfo.isEmulatedRole ? 'text-purple-200' : ''}
 												{roleInfo.isCurrentRole && !roleInfo.isEmulatedRole ? 'text-blue-200' : 'text-white/70'}"
@@ -439,35 +518,54 @@
 										</div>
 										<!-- CRUD Indicators -->
 										<div class="flex gap-0.5 text-[9px] font-mono">
-											<span 
-												class="w-4 h-4 flex items-center justify-center rounded {roleInfo.crud.create ? 'bg-green-500/30 text-green-300' : 'bg-red-500/20 text-red-400/50'}"
-												title="Create"
-											>C</span>
-											<span 
-												class="w-4 h-4 flex items-center justify-center rounded {roleInfo.crud.read ? 'bg-green-500/30 text-green-300' : 'bg-red-500/20 text-red-400/50'}"
-												title="Read"
-											>R</span>
-											<span 
-												class="w-4 h-4 flex items-center justify-center rounded {roleInfo.crud.update ? 'bg-green-500/30 text-green-300' : 'bg-red-500/20 text-red-400/50'}"
-												title="Update"
-											>U</span>
-											<span 
-												class="w-4 h-4 flex items-center justify-center rounded {roleInfo.crud.delete ? 'bg-green-500/30 text-green-300' : 'bg-red-500/20 text-red-400/50'}"
-												title="Delete"
-											>D</span>
+											<span
+												class="w-4 h-4 flex items-center justify-center rounded {roleInfo.crud
+													.create
+													? 'bg-green-500/30 text-green-300'
+													: 'bg-red-500/20 text-red-400/50'}"
+												title="Create">C</span
+											>
+											<span
+												class="w-4 h-4 flex items-center justify-center rounded {roleInfo.crud.read
+													? 'bg-green-500/30 text-green-300'
+													: 'bg-red-500/20 text-red-400/50'}"
+												title="Read">R</span
+											>
+											<span
+												class="w-4 h-4 flex items-center justify-center rounded {roleInfo.crud
+													.update
+													? 'bg-green-500/30 text-green-300'
+													: 'bg-red-500/20 text-red-400/50'}"
+												title="Update">U</span
+											>
+											<span
+												class="w-4 h-4 flex items-center justify-center rounded {roleInfo.crud
+													.delete
+													? 'bg-green-500/30 text-green-300'
+													: 'bg-red-500/20 text-red-400/50'}"
+												title="Delete">D</span
+											>
 										</div>
 										<!-- Current/Emulated Badge -->
 										{#if roleInfo.isEmulatedRole}
-											<span class="mt-1.5 text-[8px] px-1 py-0.5 rounded bg-purple-500/50 text-purple-200">EMULATED</span>
+											<span
+												class="mt-1.5 text-[8px] px-1 py-0.5 rounded bg-purple-500/50 text-purple-200"
+												>EMULATED</span
+											>
 										{:else if roleInfo.isCurrentRole}
-											<span class="mt-1.5 text-[8px] px-1 py-0.5 rounded bg-blue-500/50 text-blue-200">ORIGINAL</span>
+											<span
+												class="mt-1.5 text-[8px] px-1 py-0.5 rounded bg-blue-500/50 text-blue-200"
+												>ORIGINAL</span
+											>
 										{/if}
 									</div>
 								{/each}
 							</div>
 						</div>
 						<!-- Legend -->
-						<div class="px-4 py-1.5 border-t border-white/10 flex flex-wrap items-center gap-3 text-[10px] text-white/50">
+						<div
+							class="px-4 py-1.5 border-t border-white/10 flex flex-wrap items-center gap-3 text-[10px] text-white/50"
+						>
 							<span class="flex items-center gap-1">
 								<span class="text-green-400">✓</span> Has Access
 							</span>
@@ -476,16 +574,24 @@
 							</span>
 							<span class="text-white/30">|</span>
 							<span class="flex items-center gap-1">
-								<span class="bg-green-500/30 text-green-300 px-1 rounded text-[9px] font-mono">C</span> Create
+								<span class="bg-green-500/30 text-green-300 px-1 rounded text-[9px] font-mono"
+									>C</span
+								> Create
 							</span>
 							<span class="flex items-center gap-1">
-								<span class="bg-green-500/30 text-green-300 px-1 rounded text-[9px] font-mono">R</span> Read
+								<span class="bg-green-500/30 text-green-300 px-1 rounded text-[9px] font-mono"
+									>R</span
+								> Read
 							</span>
 							<span class="flex items-center gap-1">
-								<span class="bg-green-500/30 text-green-300 px-1 rounded text-[9px] font-mono">U</span> Update
+								<span class="bg-green-500/30 text-green-300 px-1 rounded text-[9px] font-mono"
+									>U</span
+								> Update
 							</span>
 							<span class="flex items-center gap-1">
-								<span class="bg-green-500/30 text-green-300 px-1 rounded text-[9px] font-mono">D</span> Delete
+								<span class="bg-green-500/30 text-green-300 px-1 rounded text-[9px] font-mono"
+									>D</span
+								> Delete
 							</span>
 							<span class="text-white/30">|</span>
 							<span class="flex items-center gap-1">
@@ -499,8 +605,6 @@
 				{/if}
 			</div>
 		{/if}
-
-
 
 		<!-- Main Content with proper spacing -->
 		<main class="lg:ml-64 lg:pt-16">
@@ -533,21 +637,27 @@
 					</a>
 
 					<div class="flex items-center gap-6">
-					<a href="/how-it-works" class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden md:block">
-						How It Works
-					</a>
-					<a href="/pricing" class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden md:block">
-						Rates
-					</a>
-					<ThemeToggle variant="ghost" />
-					<a
-						href="/auth"
-						class="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
-					>
-						> Sign In
-					</a>
+						<a
+							href="/how-it-works"
+							class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden md:block"
+						>
+							How It Works
+						</a>
+						<a
+							href="/pricing"
+							class="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors hidden md:block"
+						>
+							Rates
+						</a>
+						<ThemeToggle variant="ghost" />
+						<a
+							href="/auth"
+							class="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
+						>
+							> Sign In
+						</a>
+					</div>
 				</div>
-			</div>
 			</div>
 		</header>
 

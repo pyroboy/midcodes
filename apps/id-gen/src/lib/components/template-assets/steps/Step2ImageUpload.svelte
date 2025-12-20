@@ -8,7 +8,7 @@
 	// Independent states for drag behavior
 	let isDraggingFront = $state(false);
 	let isDraggingBack = $state(false);
-	
+
 	let frontInput = $state<HTMLInputElement>();
 	let backInput = $state<HTMLInputElement>();
 
@@ -65,7 +65,7 @@
 
 		// Create object URL for preview
 		const url = URL.createObjectURL(file);
-		
+
 		if (side === 'front') {
 			assetUploadStore.setFrontImage(file, url);
 		} else {
@@ -100,7 +100,6 @@
 </script>
 
 <div class="space-y-6 min-h-[500px]">
-	
 	<!-- Header & Controls -->
 	<div class="flex items-start justify-between">
 		<div>
@@ -109,7 +108,7 @@
 				Upload scanned A4 pages. Upload both Front and Back scans to create paired templates.
 			</p>
 		</div>
-		
+
 		<!-- Sample Type Selection (Compact) -->
 		<div class="flex gap-2">
 			{#each sampleTypes as type (type.value)}
@@ -119,8 +118,8 @@
 					onclick={() => handleSampleTypeChange(type.value)}
 					class={cn(
 						'px-3 py-1.5 text-xs font-medium rounded-md border transition-all',
-						isSelected 
-							? 'bg-primary text-primary-foreground border-primary' 
+						isSelected
+							? 'bg-primary text-primary-foreground border-primary'
 							: 'bg-background text-muted-foreground border-border hover:border-primary/50'
 					)}
 				>
@@ -137,9 +136,11 @@
 			<span class="text-sm font-semibold text-foreground flex items-center gap-2">
 				<span class="bg-primary/10 text-primary px-1.5 py-0.5 rounded text-xs">A</span> Front Page
 			</span>
-			
+
 			{#if $assetUploadStore.frontImage}
-				<div class="relative overflow-hidden rounded-lg border border-border bg-muted/20 aspect-[1/1.414]">
+				<div
+					class="relative overflow-hidden rounded-lg border border-border bg-muted/20 aspect-[1/1.414]"
+				>
 					<img
 						src={$assetUploadStore.frontImageUrl}
 						alt="Front scan"
@@ -152,11 +153,18 @@
 						class="absolute right-2 top-2 rounded-full bg-destructive/90 p-1.5 text-destructive-foreground hover:bg-destructive"
 					>
 						<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M6 18L18 6M6 6l12 12"
+							/>
 						</svg>
 					</button>
 					<div class="absolute bottom-0 left-0 right-0 bg-black/50 p-2 backdrop-blur-sm">
-						<p class="text-xs text-white truncate text-center">{$assetUploadStore.frontImage.name}</p>
+						<p class="text-xs text-white truncate text-center">
+							{$assetUploadStore.frontImage.name}
+						</p>
 					</div>
 				</div>
 			{:else}
@@ -175,11 +183,27 @@
 							: 'border-muted-foreground/30 hover:border-primary/50 hover:bg-muted/50'
 					)}
 				>
-					<svg class="mb-2 h-10 w-10 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+					<svg
+						class="mb-2 h-10 w-10 text-muted-foreground"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+					>
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="1.5"
+							d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+						/>
 					</svg>
 					<p class="text-sm font-medium text-foreground">Upload Front</p>
-					<input bind:this={frontInput} type="file" accept="image/png,image/jpeg,image/jpg" onchange={(e) => handleFileSelect(e, 'front')} class="hidden" />
+					<input
+						bind:this={frontInput}
+						type="file"
+						accept="image/png,image/jpeg,image/jpg"
+						onchange={(e) => handleFileSelect(e, 'front')}
+						class="hidden"
+					/>
 				</div>
 			{/if}
 		</div>
@@ -189,9 +213,11 @@
 			<span class="text-sm font-semibold text-foreground flex items-center gap-2">
 				<span class="bg-primary/10 text-primary px-1.5 py-0.5 rounded text-xs">B</span> Back Page
 			</span>
-			
+
 			{#if $assetUploadStore.backImage}
-				<div class="relative overflow-hidden rounded-lg border border-border bg-muted/20 aspect-[1/1.414]">
+				<div
+					class="relative overflow-hidden rounded-lg border border-border bg-muted/20 aspect-[1/1.414]"
+				>
 					<img
 						src={$assetUploadStore.backImageUrl}
 						alt="Back scan"
@@ -204,11 +230,18 @@
 						class="absolute right-2 top-2 rounded-full bg-destructive/90 p-1.5 text-destructive-foreground hover:bg-destructive"
 					>
 						<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M6 18L18 6M6 6l12 12"
+							/>
 						</svg>
 					</button>
 					<div class="absolute bottom-0 left-0 right-0 bg-black/50 p-2 backdrop-blur-sm">
-						<p class="text-xs text-white truncate text-center">{$assetUploadStore.backImage.name}</p>
+						<p class="text-xs text-white truncate text-center">
+							{$assetUploadStore.backImage.name}
+						</p>
 					</div>
 				</div>
 			{:else}
@@ -227,11 +260,27 @@
 							: 'border-muted-foreground/30 hover:border-primary/50 hover:bg-muted/50'
 					)}
 				>
-					<svg class="mb-2 h-10 w-10 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+					<svg
+						class="mb-2 h-10 w-10 text-muted-foreground"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+					>
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="1.5"
+							d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+						/>
 					</svg>
 					<p class="text-sm font-medium text-foreground">Upload Back</p>
-					<input bind:this={backInput} type="file" accept="image/png,image/jpeg,image/jpg" onchange={(e) => handleFileSelect(e, 'back')} class="hidden" />
+					<input
+						bind:this={backInput}
+						type="file"
+						accept="image/png,image/jpeg,image/jpg"
+						onchange={(e) => handleFileSelect(e, 'back')}
+						class="hidden"
+					/>
 				</div>
 			{/if}
 		</div>
@@ -239,18 +288,23 @@
 
 	<!-- Info Footer -->
 	{#if $assetUploadStore.selectedSizePreset}
-		<div class="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3 flex justify-between items-center">
+		<div
+			class="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3 flex justify-between items-center"
+		>
 			<div class="flex items-center gap-2">
 				<svg class="h-4 w-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+					/>
 				</svg>
 				<span class="text-sm text-blue-700 dark:text-blue-300">
 					Detecting <strong>{$assetUploadStore.selectedSizePreset.name}</strong> sized cards
 				</span>
 			</div>
-			<span class="text-xs text-muted-foreground">
-				Format: PNG/JPG • Max: 10MB
-			</span>
+			<span class="text-xs text-muted-foreground"> Format: PNG/JPG • Max: 10MB </span>
 		</div>
 	{/if}
 </div>

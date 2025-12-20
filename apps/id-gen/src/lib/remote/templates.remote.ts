@@ -61,9 +61,9 @@ export const getTemplateAssetsBySize = command(
 
 			// Build query
 			let conditions = [
-                eq(schema.templateAssets.isPublished, true),
-                eq(schema.templateAssets.orientation, orientation as any)
-            ];
+				eq(schema.templateAssets.isPublished, true),
+				eq(schema.templateAssets.orientation, orientation as any)
+			];
 
 			if (sizePresetId) {
 				conditions.push(eq(schema.templateAssets.sizePresetId, sizePresetId));
@@ -174,7 +174,8 @@ export const createCustomDesignRequest = command(
 		const validatedInput = validationResult.data;
 
 		try {
-			const [inserted] = await db.insert(schema.customDesignRequests)
+			const [inserted] = await db
+				.insert(schema.customDesignRequests)
 				.values({
 					userId: user.id,
 					orgId: org_id || null,
@@ -208,7 +209,7 @@ export const uploadCustomDesignAsset = command(
 	'unchecked',
 	async ({ file, fileName }: { file: Buffer; fileName: string }): Promise<{ path: string }> => {
 		const { user } = await getAuthenticatedUser();
-        // Storage still uses Supabase
+		// Storage still uses Supabase
 		try {
 			const timestamp = Date.now();
 			const sanitizedName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');

@@ -134,34 +134,34 @@
 	const GAP = 16; // gap-4 = 16px
 	let createDigitalCard = $state(false);
 	let createdDigitalCard = $state<{ slug: string; claimCode: string; status: string } | null>(null);
-	
+
 	// Calculate the scale based on scroll position
 	// Simple approach: scale from 1 to MIN_SCALE based on scroll amount
 	let previewScale = $derived.by(() => {
 		// At scroll 0, scale is 1. As you scroll, scale decreases.
 		// Scale reaches MIN_SCALE after scrolling ~300px
 		const scrollThreshold = 300;
-		
+
 		if (scrollY <= 0) return 1;
 		if (scrollY >= scrollThreshold) return MIN_SCALE;
-		
+
 		// Linear interpolation between 1 and MIN_SCALE
 		const progress = scrollY / scrollThreshold;
-		return 1 - (progress * (1 - MIN_SCALE));
+		return 1 - progress * (1 - MIN_SCALE);
 	});
-	
+
 	// Calculate the margin compensation in pixels (not percentage - CSS % margins are relative to width, not height!)
 	let cardMarginCompensation = $derived((1 - previewScale) * cardOriginalHeight);
-	
+
 	// Calculate opacity and height for title and face label (fade out as card scales down)
 	// At scale 1.0 -> opacity 1, full height | At MIN_SCALE (0.5) -> opacity 0, height 0
 	let labelOpacity = $derived(Math.max(0, (previewScale - MIN_SCALE) / (1 - MIN_SCALE)));
-	
+
 	// Combined Backlash + Hysteresis algorithm for anti-jitter
 	// Backlash: larger dead zone window around stable scroll position
 	let stableScrollY = $state(0);
 	const BACKLASH_WINDOW = 50; // Dead zone: ±50px from stable position
-	
+
 	$effect(() => {
 		// Only update stable scroll if we've moved outside the backlash window
 		const diff = Math.abs(scrollY - stableScrollY);
@@ -169,15 +169,15 @@
 			stableScrollY = scrollY;
 		}
 	});
-	
+
 	// Calculate stable scale from the filtered stable scroll position
 	const scrollThreshold = 300;
 	let stableScale = $derived.by(() => {
 		if (stableScrollY <= 0) return 1;
 		if (stableScrollY >= scrollThreshold) return MIN_SCALE;
-		return 1 - ((stableScrollY / scrollThreshold) * (1 - MIN_SCALE));
+		return 1 - (stableScrollY / scrollThreshold) * (1 - MIN_SCALE);
 	});
-	
+
 	// Hysteresis: different thresholds for collapse vs expand
 	// Collapse at scale < 0.75 (scrollY ~150), expand at scale > 0.95 (scrollY ~30)
 	let labelsCollapsed = $state(false);
@@ -189,19 +189,23 @@
 			labelsCollapsed = false;
 		}
 	});
-	
+
 	// Height snaps based on collapsed state
 	let titleHeight = $derived(labelsCollapsed ? 0 : 50);
 	let faceLabelHeight = $derived(labelsCollapsed ? 0 : 30);
 	let labelMargins = $derived(labelsCollapsed ? 0 : 1);
-	
+
 	// Calculate the minimum container height: padding + scaled card (title/label collapse to 0)
-	let containerMinHeight = $derived((cardOriginalHeight * MIN_SCALE) + 32); // 32px for padding
-	
+	let containerMinHeight = $derived(cardOriginalHeight * MIN_SCALE + 32); // 32px for padding
+
 	// Uniform sizing for portrait cards - constrain width proportionally so longEdge matches landscape
 	// Apply on both mobile and desktop to keep portrait cards smaller and prevent clipping
-	let templateWidth = $derived(template?.width_pixels || (template?.orientation === 'portrait' ? 638 : 1013));
-	let templateHeight = $derived(template?.height_pixels || (template?.orientation === 'portrait' ? 1013 : 638));
+	let templateWidth = $derived(
+		template?.width_pixels || (template?.orientation === 'portrait' ? 638 : 1013)
+	);
+	let templateHeight = $derived(
+		template?.height_pixels || (template?.orientation === 'portrait' ? 1013 : 638)
+	);
 	let isPortraitCard = $derived(templateHeight > templateWidth);
 	let longEdge = $derived(Math.max(templateWidth, templateHeight));
 	let shortEdge = $derived(Math.min(templateWidth, templateHeight));
@@ -214,28 +218,32 @@
 	// Smart auto-flip based on focused input
 	let currentInputSide = $state<'front' | 'back'>('front');
 	let formErrors = $state<Record<string, boolean>>({});
-	
+
 	// Highlight glow state for focused input elements (form -> preview mapping)
 	let focusedVariableName = $state<string | null>(null);
 	let highlightState = $state<'off' | 'idle' | 'active'>('off');
 	let highlightTimeout: ReturnType<typeof setTimeout> | null = null;
-	
+
 	// Zoom state
 	let zoomState = $state<'idle' | 'zoomed'>('idle');
-	
+
 	// Helper function to get element dimensions with type-aware fallbacks
 	// Uses the actual stored dimensions, with sensible defaults when missing
-	function getElementDimensions(element: TemplateElement | undefined, cardWidth: number, cardHeight: number): { width: number; height: number } {
+	function getElementDimensions(
+		element: TemplateElement | undefined,
+		cardWidth: number,
+		cardHeight: number
+	): { width: number; height: number } {
 		if (!element) return { width: 0, height: 0 };
-		
+
 		// Use stored dimensions - template elements should have width/height from the editor
 		let width = element.width ?? 0;
 		let height = element.height ?? 0;
-		
+
 		// If dimensions are missing or zero, use type-specific defaults
 		if (width === 0 || height === 0) {
 			const type = element.type;
-			
+
 			if (type === 'photo') {
 				// Default photo placeholder: reasonable square
 				width = width || cardWidth * 0.2;
@@ -255,63 +263,74 @@
 				height = height || 50;
 			}
 		}
-		
+
 		return { width, height };
 	}
 
 	// Dynamic zoom transform calculation (derived from state + scroll position)
 	let zoomTransform = $derived.by(() => {
-		if (!focusedVariableName || !template?.template_elements || !cardOriginalWidth || !cardOriginalHeight) {
+		if (
+			!focusedVariableName ||
+			!template?.template_elements ||
+			!cardOriginalWidth ||
+			!cardOriginalHeight
+		) {
 			return { x: 0, y: 0, scale: 1 };
 		}
 
 		// 1. Find the element
-		const element = template.template_elements.find(el => el.variableName === focusedVariableName && el.side === (isFlipped ? 'back' : 'front'));
+		const element = template.template_elements.find(
+			(el) => el.variableName === focusedVariableName && el.side === (isFlipped ? 'back' : 'front')
+		);
 		if (!element) return { x: 0, y: 0, scale: 1 };
 
 		// 2. Get Card Dimensions (Template vs Rendered)
 		const tmplWidth = template.width_pixels || 1013;
 		const tmplHeight = template.height_pixels || 638;
-		
+
 		// Conversion ratio (Template Pixels -> Rendered DOM Pixels)
 		const widthRatio = cardOriginalWidth / tmplWidth;
 		const heightRatio = cardOriginalHeight / tmplHeight;
 		// Use width ratio as primary if aspect ratio is preserved (it is)
-		const pxScale = widthRatio; 
+		const pxScale = widthRatio;
 
 		// 3. Get Element Dimensions & Position (Converted to DOM Pixels)
-		const { width: elemWidth, height: elemHeight } = getElementDimensions(element, tmplWidth, tmplHeight);
+		const { width: elemWidth, height: elemHeight } = getElementDimensions(
+			element,
+			tmplWidth,
+			tmplHeight
+		);
 		const elX = (element.x || 0) * pxScale;
 		const elY = (element.y || 0) * pxScale;
 		const elW = elemWidth * pxScale;
 		const elH = elemHeight * pxScale;
 
 		// 4. Calculate Center of Element (in DOM Pixels)
-		const elCenterX = elX + (elW / 2);
-		const elCenterY = elY + (elH / 2);
+		const elCenterX = elX + elW / 2;
+		const elCenterY = elY + elH / 2;
 
 		// 5. Determine Zoom Scale
 		// Aim for element filling ~40-60% of container
 		// We use the rendered dimensions for this calculation
 		const wRatioScale = cardOriginalWidth / elW;
 		const hRatioScale = cardOriginalHeight / elH;
-		
+
 		let rawScale = Math.min(wRatioScale, hRatioScale) * 0.5;
 		rawScale = Math.min(Math.max(rawScale, 1.0), 3.0); // Allow slightly deeper zoom (3.0x) since we are accurate now
 
 		// 6. Calculate Translation to Center
 		// Visible viewport logic matches our previous mask fix
-		const VISIBLE_HEIGHT = cardOriginalHeight * previewScale; 
-		const VIEWPORT_CENTER_X = 0; 
+		const VISIBLE_HEIGHT = cardOriginalHeight * previewScale;
+		const VIEWPORT_CENTER_X = 0;
 		const VIEWPORT_CENTER_Y = VISIBLE_HEIGHT / 2;
 
 		// Relative position from Transform Origin (Top-Center of rendered card)
-		const relX = elCenterX - (cardOriginalWidth / 2);
+		const relX = elCenterX - cardOriginalWidth / 2;
 		const relY = elCenterY;
 
 		// Formula: translate(tx, ty) scale(s)
-		const tx = VIEWPORT_CENTER_X - (rawScale * relX);
-		const ty = VIEWPORT_CENTER_Y - (rawScale * relY);
+		const tx = VIEWPORT_CENTER_X - rawScale * relX;
+		const ty = VIEWPORT_CENTER_Y - rawScale * relY;
 
 		return {
 			x: tx,
@@ -319,7 +338,7 @@
 			scale: rawScale
 		};
 	});
-	
+
 	let fileUrls = $state<Record<string, string>>({});
 
 	// Overlay states for confirmation and success flows
@@ -414,7 +433,7 @@
 		});
 
 		initializeFormData();
-		
+
 		// Robust measurement: wait for layout, then measure using requestAnimationFrame
 		// This ensures CSS has been applied before measuring
 		const measureCard = () => {
@@ -425,13 +444,16 @@
 				if (newHeight > 0 && newWidth > 0) {
 					cardOriginalHeight = newHeight;
 					cardOriginalWidth = newWidth;
-					console.log('[Card Measure] Updated dimensions:', { cardOriginalHeight: newHeight, cardOriginalWidth: newWidth });
+					console.log('[Card Measure] Updated dimensions:', {
+						cardOriginalHeight: newHeight,
+						cardOriginalWidth: newWidth
+					});
 				}
 			}
 		};
-		
+
 		// Initial measurement after a short delay for CSS to apply
-		await new Promise(resolve => setTimeout(resolve, 50));
+		await new Promise((resolve) => setTimeout(resolve, 50));
 		requestAnimationFrame(() => {
 			measureCard();
 			// Second measurement after potential image loads
@@ -555,22 +577,22 @@
 
 			const submitFormData = new FormData(formElement);
 			submitFormData.append('templateId', $page.params.id);
-			
+
 			// Master (Full) Images
 			submitFormData.append('frontImage', frontVariants.full, 'front.png');
 			submitFormData.append('backImage', backVariants.full, 'back.png');
-			
+
 			// Preview Images
 			submitFormData.append('frontImagePreview', frontVariants.preview, 'front-preview.jpg');
 			submitFormData.append('backImagePreview', backVariants.preview, 'back-preview.jpg');
-			
+
 			// Raw Assets (Photos, Signatures)
 			Object.entries(fileUploads).forEach(([variableName, file]) => {
 				if (file) {
 					submitFormData.append(`raw_asset_${variableName}`, file, file.name || 'asset.png');
 				}
 			});
-			
+
 			submitFormData.append('createDigitalCard', createDigitalCard.toString());
 
 			const response = await fetch('?/saveIdCard', {
@@ -612,10 +634,15 @@
 
 				idCardsCache.invalidate();
 				recentCardsCache.invalidate();
-				
+
 				// Hide confirmation overlay and show success overlay
 				// Hide confirmation overlay and show success overlay
-				if (result.type === 'success' && result.data && result.data[0] && result.data[0].digitalCard) {
+				if (
+					result.type === 'success' &&
+					result.data &&
+					result.data[0] &&
+					result.data[0].digitalCard
+				) {
 					createdDigitalCard = result.data[0].digitalCard;
 				}
 				showConfirmation = false;
@@ -705,36 +732,36 @@
 	function handleInputFocus(side: 'front' | 'back', variableName?: string) {
 		currentInputSide = side;
 		isFlipped = side === 'back';
-		
+
 		// Show highlight for this element
 		if (variableName) {
 			focusedVariableName = variableName;
 			highlightState = 'idle';
-			
+
 			// Clear any existing highlight timer
 			if (highlightTimeout) {
 				clearTimeout(highlightTimeout);
 				highlightTimeout = null;
 			}
-			
+
 			// Reset zoom on fresh focus change (wait for type to zoom)
 			zoomState = 'idle';
 		}
 	}
-	
+
 	// Handle input blur - fade out highlight and reset zoom
 	function handleInputBlur() {
 		// Start fade-out animation
 		highlightState = 'off';
 		zoomState = 'idle';
-		
+
 		// Clear the focused variable after fade animation completes
 		if (highlightTimeout) clearTimeout(highlightTimeout);
 		highlightTimeout = setTimeout(() => {
 			focusedVariableName = null;
 		}, 250); // Match the CSS transition duration
 	}
-	
+
 	// Trigger highlight pulse on value change (pulse, then minimize)
 	function handleInputChange() {
 		if (focusedVariableName) {
@@ -756,9 +783,12 @@
 		}
 	}
 
-	async function handleSelectFile(variableName: string, eventDetails: { file: File, source: string, aiEnabled?: boolean }) {
+	async function handleSelectFile(
+		variableName: string,
+		eventDetails: { file: File; source: string; aiEnabled?: boolean }
+	) {
 		console.log('[handleSelectFile] Called with:', { variableName, eventDetails });
-		
+
 		// Safety check for eventDetails
 		if (!eventDetails || !eventDetails.file) {
 			console.error('[handleSelectFile] Invalid event details:', eventDetails);
@@ -784,7 +814,7 @@
 			fileUrls[variableName] = initialUrl;
 			// Also update fileUploads immediately with raw file so it works in canvas
 			fileUploads = { ...fileUploads, [variableName]: file };
-			
+
 			// Indicate loading state immediately
 			const element = template?.template_elements?.find((el) => el.variableName === variableName);
 			if (element?.type === 'photo' || element?.type === 'signature') {
@@ -801,9 +831,9 @@
 
 		// Find the element to determine its type
 		const element = template?.template_elements?.find((el) => el.variableName === variableName);
-		
+
 		let processedFile = file;
-		
+
 		// Apply image processing based on element type
 		if (element?.type === 'photo' && aiEnabled) {
 			// Remove background from photos using Runware AI API (cloud-based)
@@ -811,16 +841,16 @@
 				const blob = await removeBackgroundCloud(file, (progress) => {
 					processingStatus = { ...processingStatus, [variableName]: progress };
 				});
-				
+
 				processedFile = new File([blob], file.name.replace(/\.[^.]+$/, '.png'), {
 					type: 'image/png'
 				});
-				
+
 				// SUCCESS: Update with processed file
 				const processedUrl = URL.createObjectURL(processedFile);
 				if (fileUrls[variableName]) URL.revokeObjectURL(fileUrls[variableName]);
 				fileUrls[variableName] = processedUrl;
-				
+
 				// Update fileUploads with processed file
 				fileUploads = {
 					...fileUploads,
@@ -841,11 +871,11 @@
 					autoCrop: true,
 					cropPadding: 10
 				});
-				
+
 				processedFile = new File([blob], file.name.replace(/\.[^.]+$/, '.png'), {
 					type: 'image/png'
 				});
-				
+
 				// Update URL and file
 				const processedUrl = URL.createObjectURL(processedFile);
 				if (fileUrls[variableName]) URL.revokeObjectURL(fileUrls[variableName]);
@@ -855,7 +885,7 @@
 					...fileUploads,
 					[variableName]: processedFile
 				};
-				
+
 				processingStatus = { ...processingStatus, [variableName]: null };
 			} catch (err) {
 				console.error('[handleSelectFile] Signature cleaning failed:', err);
@@ -916,40 +946,43 @@
 	});
 </script>
 
-
-
-
 <svelte:window on:resize={handleResize} on:scroll={handleScroll} />
 <div class="container mx-auto p-4 flex flex-col gap-4 max-w-2xl">
 	<!-- Sticky Preview Container -->
-	<div 
-		class="sticky top-[68px] z-10" 
+	<div
+		class="sticky top-[68px] z-10"
 		bind:this={previewContainerRef}
 		style="min-height: {containerMinHeight}px;"
 	>
 		<Card>
 			<div class="p-4">
-				<h2 
+				<h2
 					class="text-2xl font-bold overflow-hidden"
-					style="opacity: {labelOpacity}; height: {titleHeight}px; margin-bottom: {labelMargins * 16}px; transition: opacity 200ms ease-out, height 200ms ease-out, margin-bottom 200ms ease-out; will-change: opacity, height;"
-				>ID Card Preview</h2>
+					style="opacity: {labelOpacity}; height: {titleHeight}px; margin-bottom: {labelMargins *
+						16}px; transition: opacity 200ms ease-out, height 200ms ease-out, margin-bottom 200ms ease-out; will-change: opacity, height;"
+				>
+					ID Card Preview
+				</h2>
 
 				{#if template}
 					<!-- Masking Container with Border -->
-					<div 
-						class="w-full mx-auto relative overflow-hidden rounded-lg transition-all duration-300 {zoomState === 'zoomed' ? 'max-w-full' : 'max-w-md'}"
+					<div
+						class="w-full mx-auto relative overflow-hidden rounded-lg transition-all duration-300 {zoomState ===
+						'zoomed'
+							? 'max-w-full'
+							: 'max-w-md'}"
 						style="
 							height: {cardOriginalHeight ? `${cardOriginalHeight * previewScale}px` : 'auto'};
 						"
 					>
 						<!-- Scaling wrapper - only the card scales, with uniform sizing for portrait -->
-					<div 
-						bind:this={cardScalingWrapperRef}
-						class="origin-top w-full max-w-md mx-auto"
-						style="
+						<div
+							bind:this={cardScalingWrapperRef}
+							class="origin-top w-full max-w-md mx-auto"
+							style="
 							width: {cardWidthPercent}%;
-							transform: {zoomState === 'zoomed' 
-								? `translate(${zoomTransform.x}px, ${zoomTransform.y}px) scale(${zoomTransform.scale})` 
+							transform: {zoomState === 'zoomed'
+								? `translate(${zoomTransform.x}px, ${zoomTransform.y}px) scale(${zoomTransform.scale})`
 								: `scale(${previewScale})`};
 							margin-bottom: -{cardMarginCompensation}px;
 							transition: transform 300ms cubic-bezier(0.2, 0, 0.2, 1), margin-bottom 300ms ease-out;
@@ -957,7 +990,7 @@
 							z-index: 10;
 							position: relative;
 						"
-					>	
+						>
 							<!-- svelte-ignore a11y_no_static_element_interactions -->
 							<div
 								class="flip-container relative cursor-pointer group"
@@ -1015,15 +1048,15 @@
 												{@const cardWidth = template.width_pixels || 1013}
 												{@const cardHeight = template.height_pixels || 638}
 												{@const dims = getElementDimensions(focusedElement, cardWidth, cardHeight)}
-										<div 
-											class="element-highlight-overlay state-{highlightState}"
-											style="
+												<div
+													class="element-highlight-overlay state-{highlightState}"
+													style="
 												left: {((focusedElement.x || 0) / cardWidth) * 100}%;
 												top: {((focusedElement.y || 0) / cardHeight) * 100}%;
 												width: {(dims.width / cardWidth) * 100}%;
 												height: {(dims.height / cardHeight) * 100}%;
 											"
-										></div>
+												></div>
 											{/if}
 										{/if}
 									</div>
@@ -1055,29 +1088,30 @@
 												(el) => el.variableName === focusedVariableName && el.side === 'back'
 											)}
 											{#if focusedElement}
-									{@const cardWidth = template.width_pixels || 1013}
-									{@const cardHeight = template.height_pixels || 638}
-									{@const dims = getElementDimensions(focusedElement, cardWidth, cardHeight)}
-								<div 
-									class="element-highlight-overlay state-{highlightState}"
-									style="
+												{@const cardWidth = template.width_pixels || 1013}
+												{@const cardHeight = template.height_pixels || 638}
+												{@const dims = getElementDimensions(focusedElement, cardWidth, cardHeight)}
+												<div
+													class="element-highlight-overlay state-{highlightState}"
+													style="
 										left: {((focusedElement.x || 0) / cardWidth) * 100}%;
 										top: {((focusedElement.y || 0) / cardHeight) * 100}%;
 										width: {(dims.width / cardWidth) * 100}%;
 										height: {(dims.height / cardHeight) * 100}%;
 									"
-								></div>
-									{/if}
-								{/if}
+												></div>
+											{/if}
+										{/if}
 									</div>
 								</div>
 							</div>
 						</div>
 
 						<!-- Side indicator - fades out with collapse -->
-						<p 
+						<p
 							class="text-center text-sm text-muted-foreground overflow-hidden"
-							style="opacity: {labelOpacity}; height: {faceLabelHeight}px; margin-top: {labelMargins * 12}px; transition: opacity 200ms ease-out, height 200ms ease-out, margin-top 200ms ease-out; will-change: opacity, height;"
+							style="opacity: {labelOpacity}; height: {faceLabelHeight}px; margin-top: {labelMargins *
+								12}px; transition: opacity 200ms ease-out, height 200ms ease-out, margin-top 200ms ease-out; will-change: opacity, height;"
 						>
 							{isFlipped ? 'Back' : 'Front'} Side
 						</p>
@@ -1096,10 +1130,22 @@
 				<!-- Warning marquee -->
 				<div class="overflow-hidden mb-6">
 					<div class="marquee-track">
-						<span class="marquee-content">All data submitted is final. Please double check before saving.&nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp;</span>
-						<span class="marquee-content">All data submitted is final. Please double check before saving.&nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp;</span>
-						<span class="marquee-content">All data submitted is final. Please double check before saving.&nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp;</span>
-						<span class="marquee-content">All data submitted is final. Please double check before saving.&nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp;</span>
+						<span class="marquee-content"
+							>All data submitted is final. Please double check before
+							saving.&nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp;</span
+						>
+						<span class="marquee-content"
+							>All data submitted is final. Please double check before
+							saving.&nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp;</span
+						>
+						<span class="marquee-content"
+							>All data submitted is final. Please double check before
+							saving.&nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp;</span
+						>
+						<span class="marquee-content"
+							>All data submitted is final. Please double check before
+							saving.&nbsp;&nbsp;&nbsp;•&nbsp;&nbsp;&nbsp;</span
+						>
 					</div>
 				</div>
 
@@ -1130,13 +1176,22 @@
 									<div class="mb-6">
 										{#if !isMobile}
 											<div class="grid grid-cols-[7rem_1fr] gap-4 items-start">
-												<Label for={element.variableName} class="text-right pt-2 text-sm font-medium">
+												<Label
+													for={element.variableName}
+													class="text-right pt-2 text-sm font-medium"
+												>
 													{element.variableName}
 													<span class="text-red-500">*</span>
 												</Label>
-													<!-- svelte-ignore a11y_no_static_element_interactions -->
-								<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center relative transition-all duration-500" onclick={() => handleInputFocus('front', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('front', element.variableName)} role="button" tabindex="0">
-
+												<!-- svelte-ignore a11y_no_static_element_interactions -->
+												<div
+													class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center relative transition-all duration-500"
+													onclick={() => handleInputFocus('front', element.variableName)}
+													onkeydown={(e) =>
+														e.key === 'Enter' && handleInputFocus('front', element.variableName)}
+													role="button"
+													tabindex="0"
+												>
 													<div class="flex-shrink-0">
 														<ThumbnailInput
 															width={element.width}
@@ -1145,11 +1200,13 @@
 															initialScale={imagePositions[element.variableName]?.scale ?? 1}
 															initialX={imagePositions[element.variableName]?.x ?? 0}
 															initialY={imagePositions[element.variableName]?.y ?? 0}
-															initialBorderSize={imagePositions[element.variableName]?.borderSize ?? 0}
+															initialBorderSize={imagePositions[element.variableName]?.borderSize ??
+																0}
 															isSignature={element.type === 'signature'}
 															showAiToggle={element.type === 'photo'}
 															isProcessing={!!processingStatus[element.variableName]}
-															on:selectfile={(e) => handleSelectFile(element.variableName, e.detail)}
+															on:selectfile={(e) =>
+																handleSelectFile(element.variableName, e.detail)}
 															on:update={(e) => handleImageUpdate(e, element.variableName)}
 															on:dragstart={() => (mouseMoving = true)}
 															on:dragend={() => (mouseMoving = false)}
@@ -1163,8 +1220,14 @@
 												<span class="text-red-500">*</span>
 											</Label>
 											<!-- svelte-ignore a11y_no_static_element_interactions -->
-								<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center relative transition-all duration-500" onclick={() => handleInputFocus('front', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('front', element.variableName)} role="button" tabindex="0">
-
+											<div
+												class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center relative transition-all duration-500"
+												onclick={() => handleInputFocus('front', element.variableName)}
+												onkeydown={(e) =>
+													e.key === 'Enter' && handleInputFocus('front', element.variableName)}
+												role="button"
+												tabindex="0"
+											>
 												<div class="flex-shrink-0">
 													<ThumbnailInput
 														width={element.width}
@@ -1173,7 +1236,8 @@
 														initialScale={imagePositions[element.variableName]?.scale ?? 1}
 														initialX={imagePositions[element.variableName]?.x ?? 0}
 														initialY={imagePositions[element.variableName]?.y ?? 0}
-														initialBorderSize={imagePositions[element.variableName]?.borderSize ?? 0}
+														initialBorderSize={imagePositions[element.variableName]?.borderSize ??
+															0}
 														isSignature={element.type === 'signature'}
 														showAiToggle={element.type === 'photo'}
 														isProcessing={!!processingStatus[element.variableName]}
@@ -1200,36 +1264,39 @@
 										onmousedown={handleMouseDown}
 										onmouseup={handleMouseUp}
 									>
-										<Label for={element.variableName} class="{!isMobile ? 'text-right' : 'block mb-2'} text-sm font-medium">
+										<Label
+											for={element.variableName}
+											class="{!isMobile ? 'text-right' : 'block mb-2'} text-sm font-medium"
+										>
 											{element.variableName}
 											<span class="text-red-500">*</span>
 										</Label>
 										{#if element.type === 'text'}
 											<div class="w-full">
-													<Input
-														type="text"
-														id={element.variableName}
-														name={element.variableName}
-														bind:value={formData[element.variableName]}
-														class="w-full"
-														placeholder={`Enter ${element.variableName}`}
-														onfocus={() => handleInputFocus('front', element.variableName)}
-														onblur={handleInputBlur}
-														oninput={handleInputChange}
-													/>
+												<Input
+													type="text"
+													id={element.variableName}
+													name={element.variableName}
+													bind:value={formData[element.variableName]}
+													class="w-full"
+													placeholder={`Enter ${element.variableName}`}
+													onfocus={() => handleInputFocus('front', element.variableName)}
+													onblur={handleInputBlur}
+													oninput={handleInputChange}
+												/>
 												{#if formErrors[element.variableName]}
 													<p class="mt-1 text-sm text-destructive">This field is required</p>
 												{/if}
 											</div>
 										{:else if element.type === 'selection' && element.options}
-														<div
-															class="w-full"
-															onfocusin={() => handleInputFocus('front', element.variableName)}
-															onfocusout={handleInputBlur}
-														>
-															<Select.Root
-																type="single"
-																value={selectStates[element.variableName]?.value}
+											<div
+												class="w-full"
+												onfocusin={() => handleInputFocus('front', element.variableName)}
+												onfocusout={handleInputBlur}
+											>
+												<Select.Root
+													type="single"
+													value={selectStates[element.variableName]?.value}
 													onValueChange={(value) =>
 														handleSelectionChange(value, element.variableName)}
 												>
@@ -1247,7 +1314,7 @@
 												{#if formErrors[element.variableName]}
 													<p class="mt-1 text-sm text-destructive">Please select an option</p>
 												{/if}
-														</div>
+											</div>
 										{/if}
 									</div>
 								{/if}
@@ -1267,13 +1334,22 @@
 									<div class="mb-6">
 										{#if !isMobile}
 											<div class="grid grid-cols-[7rem_1fr] gap-4 items-start">
-												<Label for={element.variableName} class="text-right pt-2 text-sm font-medium">
+												<Label
+													for={element.variableName}
+													class="text-right pt-2 text-sm font-medium"
+												>
 													{element.variableName}
 													<span class="text-red-500">*</span>
 												</Label>
-													<!-- svelte-ignore a11y_no_static_element_interactions -->
-									<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center relative transition-all duration-500" onclick={() => handleInputFocus('back', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('back', element.variableName)} role="button" tabindex="0">
-
+												<!-- svelte-ignore a11y_no_static_element_interactions -->
+												<div
+													class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center relative transition-all duration-500"
+													onclick={() => handleInputFocus('back', element.variableName)}
+													onkeydown={(e) =>
+														e.key === 'Enter' && handleInputFocus('back', element.variableName)}
+													role="button"
+													tabindex="0"
+												>
 													<div class="flex-shrink-0">
 														<ThumbnailInput
 															width={element.width}
@@ -1282,11 +1358,13 @@
 															initialScale={imagePositions[element.variableName]?.scale ?? 1}
 															initialX={imagePositions[element.variableName]?.x ?? 0}
 															initialY={imagePositions[element.variableName]?.y ?? 0}
-															initialBorderSize={imagePositions[element.variableName]?.borderSize ?? 0}
+															initialBorderSize={imagePositions[element.variableName]?.borderSize ??
+																0}
 															isSignature={element.type === 'signature'}
 															showAiToggle={element.type === 'photo'}
 															isProcessing={!!processingStatus[element.variableName]}
-															on:selectfile={(e) => handleSelectFile(element.variableName, e.detail)}
+															on:selectfile={(e) =>
+																handleSelectFile(element.variableName, e.detail)}
 															on:update={(e) => handleImageUpdate(e, element.variableName)}
 															on:dragstart={() => (mouseMoving = true)}
 															on:dragend={() => (mouseMoving = false)}
@@ -1300,8 +1378,14 @@
 												<span class="text-red-500">*</span>
 											</Label>
 											<!-- svelte-ignore a11y_no_static_element_interactions -->
-								<div class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center relative transition-all duration-500" onclick={() => handleInputFocus('back', element.variableName)} onkeydown={(e) => e.key === 'Enter' && handleInputFocus('back', element.variableName)} role="button" tabindex="0">
-
+											<div
+												class="w-full bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4 max-h-80 flex items-center justify-center relative transition-all duration-500"
+												onclick={() => handleInputFocus('back', element.variableName)}
+												onkeydown={(e) =>
+													e.key === 'Enter' && handleInputFocus('back', element.variableName)}
+												role="button"
+												tabindex="0"
+											>
 												<div class="flex-shrink-0">
 													<ThumbnailInput
 														width={element.width}
@@ -1310,7 +1394,8 @@
 														initialScale={imagePositions[element.variableName]?.scale ?? 1}
 														initialX={imagePositions[element.variableName]?.x ?? 0}
 														initialY={imagePositions[element.variableName]?.y ?? 0}
-														initialBorderSize={imagePositions[element.variableName]?.borderSize ?? 0}
+														initialBorderSize={imagePositions[element.variableName]?.borderSize ??
+															0}
 														isSignature={element.type === 'signature'}
 														showAiToggle={element.type === 'photo'}
 														isProcessing={!!processingStatus[element.variableName]}
@@ -1337,36 +1422,39 @@
 										onmousedown={handleMouseDown}
 										onmouseup={handleMouseUp}
 									>
-										<Label for={element.variableName} class="{!isMobile ? 'text-right' : 'block mb-2'} text-sm font-medium">
+										<Label
+											for={element.variableName}
+											class="{!isMobile ? 'text-right' : 'block mb-2'} text-sm font-medium"
+										>
 											{element.variableName}
 											<span class="text-red-500">*</span>
 										</Label>
 										{#if element.type === 'text'}
 											<div class="w-full">
-													<Input
-														type="text"
-														id={element.variableName}
-														name={element.variableName}
-														bind:value={formData[element.variableName]}
-														class="w-full"
-														placeholder={`Enter ${element.variableName}`}
-														onfocus={() => handleInputFocus('back', element.variableName)}
-														onblur={handleInputBlur}
-														oninput={handleInputChange}
-													/>
+												<Input
+													type="text"
+													id={element.variableName}
+													name={element.variableName}
+													bind:value={formData[element.variableName]}
+													class="w-full"
+													placeholder={`Enter ${element.variableName}`}
+													onfocus={() => handleInputFocus('back', element.variableName)}
+													onblur={handleInputBlur}
+													oninput={handleInputChange}
+												/>
 												{#if formErrors[element.variableName]}
 													<p class="mt-1 text-sm text-destructive">This field is required</p>
 												{/if}
 											</div>
 										{:else if element.type === 'selection' && element.options}
-														<div
-															class="w-full"
-															onfocusin={() => handleInputFocus('back', element.variableName)}
-															onfocusout={handleInputBlur}
-														>
-															<Select.Root
-																type="single"
-																value={selectStates[element.variableName]?.value}
+											<div
+												class="w-full"
+												onfocusin={() => handleInputFocus('back', element.variableName)}
+												onfocusout={handleInputBlur}
+											>
+												<Select.Root
+													type="single"
+													value={selectStates[element.variableName]?.value}
 													onValueChange={(value) =>
 														handleSelectionChange(value, element.variableName)}
 												>
@@ -1384,7 +1472,7 @@
 												{#if formErrors[element.variableName]}
 													<p class="mt-1 text-sm text-destructive">Please select an option</p>
 												{/if}
-														</div>
+											</div>
 										{/if}
 									</div>
 								{/if}
@@ -1429,9 +1517,7 @@
 		transition:fade={{ duration: 200 }}
 	>
 		<!-- Heading -->
-		<h2 class="text-2xl font-bold text-center mb-8 text-white">
-			Confirm Your ID Card
-		</h2>
+		<h2 class="text-2xl font-bold text-center mb-8 text-white">Confirm Your ID Card</h2>
 
 		<!-- Flippable Card Preview Container -->
 		<div
@@ -1470,7 +1556,7 @@
 
 			<!-- Loading Overlay ON TOP of the card (seamless transition to success) -->
 			{#if loading}
-				<div 
+				<div
 					class="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/40 rounded-lg backdrop-blur-[2px]"
 					transition:fade={{ duration: 200 }}
 				>
@@ -1483,11 +1569,11 @@
 		<p class="text-center text-sm text-white/50 mb-4">
 			Tap card to flip • Showing {confirmationShowingFront ? 'Front' : 'Back'}
 		</p>
-		
+
 		<div class="mb-6 flex items-center justify-center gap-2">
-			<input 
-				type="checkbox" 
-				id="createDigitalCard" 
+			<input
+				type="checkbox"
+				id="createDigitalCard"
 				bind:checked={createDigitalCard}
 				class="w-5 h-5 rounded border-white/20 bg-white/10 text-primary focus:ring-primary"
 			/>
@@ -1498,17 +1584,17 @@
 
 		<!-- Action Buttons -->
 		<div class="flex flex-col gap-3 w-full max-w-xs px-4">
-			<Button 
-				size="lg" 
-				class="w-full bg-white text-black hover:bg-gray-200 font-semibold" 
-				onclick={confirmAndSubmit} 
+			<Button
+				size="lg"
+				class="w-full bg-white text-black hover:bg-gray-200 font-semibold"
+				onclick={confirmAndSubmit}
 				disabled={loading}
 			>
 				Yes, create card
 			</Button>
-			<Button 
-				variant="ghost" 
-				class="w-full text-white hover:bg-white/10" 
+			<Button
+				variant="ghost"
+				class="w-full text-white hover:bg-white/10"
 				onclick={cancelConfirmation}
 				disabled={loading}
 			>
@@ -1554,7 +1640,9 @@
 			</p>
 
 			{#if createdDigitalCard}
-				<div class="bg-white/10 p-4 rounded-lg mb-6 max-w-sm mx-auto backdrop-blur-md border border-white/10 text-left">
+				<div
+					class="bg-white/10 p-4 rounded-lg mb-6 max-w-sm mx-auto backdrop-blur-md border border-white/10 text-left"
+				>
 					<h3 class="font-bold text-white mb-2 flex items-center gap-2">
 						<Icons.Link size={16} /> Digital Card Created
 					</h3>
@@ -1562,7 +1650,13 @@
 						<p><span class="opacity-50">URL:</span> /id/{createdDigitalCard.slug}</p>
 						<p><span class="opacity-50">Claim Code:</span> {createdDigitalCard.claimCode}</p>
 					</div>
-					<Button variant="secondary" size="sm" class="w-full mt-3" href="/id/{createdDigitalCard.slug}" target="_blank">
+					<Button
+						variant="secondary"
+						size="sm"
+						class="w-full mt-3"
+						href="/id/{createdDigitalCard.slug}"
+						target="_blank"
+					>
 						View Profile
 					</Button>
 				</div>
@@ -1576,7 +1670,6 @@
 {/if}
 
 <style>
-
 	:global(.dark) {
 		color-scheme: dark;
 	}

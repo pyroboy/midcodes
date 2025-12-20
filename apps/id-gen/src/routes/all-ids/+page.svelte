@@ -1,9 +1,18 @@
 <script lang="ts">
 	// TIMING: Log when script module starts executing (before onMount)
 	const SCRIPT_START_TIME = performance.now();
-	console.log('%c═══════════════════════════════════════════════════════════════', 'color: #a855f7; font-weight: bold');
-	console.log(`%c📜 ALL-IDS SCRIPT START @ ${new Date().toISOString()}`, 'color: #a855f7; font-weight: bold; font-size: 14px');
-	console.log('%c═══════════════════════════════════════════════════════════════', 'color: #a855f7; font-weight: bold');
+	console.log(
+		'%c═══════════════════════════════════════════════════════════════',
+		'color: #a855f7; font-weight: bold'
+	);
+	console.log(
+		`%c📜 ALL-IDS SCRIPT START @ ${new Date().toISOString()}`,
+		'color: #a855f7; font-weight: bold; font-size: 14px'
+	);
+	console.log(
+		'%c═══════════════════════════════════════════════════════════════',
+		'color: #a855f7; font-weight: bold'
+	);
 	import ImagePreviewModal from '$lib/components/ImagePreviewModal.svelte';
 	import ClientOnly from '$lib/components/ClientOnly.svelte';
 	import { browser } from '$app/environment';
@@ -91,9 +100,12 @@
 
 	// Data states
 	let dataRows = $state<any[]>([]);
-	let templateDimensions = $state<Record<string, { width: number; height: number; orientation: 'landscape' | 'portrait'; unit: string }>>(
-		{}
-	);
+	let templateDimensions = $state<
+		Record<
+			string,
+			{ width: number; height: number; orientation: 'landscape' | 'portrait'; unit: string }
+		>
+	>({});
 	let templateFields = $state<Record<string, { variableName: string; side: string }[]>>({});
 
 	// UI states
@@ -164,7 +176,10 @@
 		const startTime = performance.now();
 
 		console.group(`%c${LOG_PREFIX} 📥 loadInitialCards()`, logStyles.fetch);
-		console.log(`%c├─ forceRefresh: ${forceRefresh}`, forceRefresh ? logStyles.stale : logStyles.info);
+		console.log(
+			`%c├─ forceRefresh: ${forceRefresh}`,
+			forceRefresh ? logStyles.stale : logStyles.info
+		);
 		console.log(`%c├─ background: ${background}`, logStyles.info);
 		console.log(`%c├─ current dataRows.length: ${dataRows.length}`, logStyles.info);
 
@@ -230,13 +245,19 @@
 	// Load more cards (infinite scroll)
 	async function loadMoreCards(opts: { forceRefresh?: boolean } = {}) {
 		if (loadingMore || !hasMore) {
-			console.log(`%c${LOG_PREFIX} ⏸️ loadMoreCards() skipped - loadingMore: ${loadingMore}, hasMore: ${hasMore}`, logStyles.info);
+			console.log(
+				`%c${LOG_PREFIX} ⏸️ loadMoreCards() skipped - loadingMore: ${loadingMore}, hasMore: ${hasMore}`,
+				logStyles.info
+			);
 			return;
 		}
 
 		// Don't load more if we already have all cards
 		if (dataRows.length >= totalCount && totalCount > 0) {
-			console.log(`%c${LOG_PREFIX} ✅ loadMoreCards() - All cards loaded (${dataRows.length}/${totalCount})`, logStyles.cache);
+			console.log(
+				`%c${LOG_PREFIX} ✅ loadMoreCards() - All cards loaded (${dataRows.length}/${totalCount})`,
+				logStyles.cache
+			);
 			hasMore = false;
 			return;
 		}
@@ -313,8 +334,11 @@
 		);
 
 		if (newTemplateNames.length > 0) {
-			console.log(`%c${LOG_PREFIX} │  📐 Loading ${newTemplateNames.length} template(s): ${newTemplateNames.join(', ')}`, logStyles.info);
-			
+			console.log(
+				`%c${LOG_PREFIX} │  📐 Loading ${newTemplateNames.length} template(s): ${newTemplateNames.join(', ')}`,
+				logStyles.info
+			);
+
 			// Load both dimensions and metadata in parallel
 			const [dims, fields] = await Promise.all([
 				cachedRemoteFunctionCall({
@@ -336,7 +360,10 @@
 			]);
 			templateDimensions = { ...templateDimensions, ...dims };
 			templateFields = { ...templateFields, ...fields };
-			console.log(`%c${LOG_PREFIX} │  ✅ Template data loaded for: ${newTemplateNames.join(', ')}`, logStyles.cache);
+			console.log(
+				`%c${LOG_PREFIX} │  ✅ Template data loaded for: ${newTemplateNames.join(', ')}`,
+				logStyles.cache
+			);
 		} else {
 			console.log(`%c${LOG_PREFIX} │  ✅ All template dimensions already cached`, logStyles.cache);
 		}
@@ -353,7 +380,10 @@
 
 		// 1) First: Show more cached cards if available
 		if (hasMoreCachedCards) {
-			console.log(`%c${LOG_PREFIX} 📜 checkAndLoadMore() - Showing more cached cards (${filteredCards.length}/${allFilteredCards.length} visible)`, logStyles.cache);
+			console.log(
+				`%c${LOG_PREFIX} 📜 checkAndLoadMore() - Showing more cached cards (${filteredCards.length}/${allFilteredCards.length} visible)`,
+				logStyles.cache
+			);
 			loadLock = true;
 			showMoreCachedCards();
 			await tick();
@@ -363,7 +393,10 @@
 
 		// 2) Then: Fetch more from server if no more cached cards
 		if (hasMore && !loadingMore) {
-			console.log(`%c${LOG_PREFIX} 🌐 checkAndLoadMore() - Fetching more from server...`, logStyles.fetch);
+			console.log(
+				`%c${LOG_PREFIX} 🌐 checkAndLoadMore() - Fetching more from server...`,
+				logStyles.fetch
+			);
 			await loadMoreCards();
 		}
 	}
@@ -371,10 +404,19 @@
 	onMount(() => {
 		const mountStartTime = performance.now();
 		const absoluteTime = Date.now();
-		
-		console.log('%c═══════════════════════════════════════════════════════════════', 'color: #f59e0b; font-weight: bold');
-		console.log(`%c🚀 ALL-IDS PAGE MOUNT @ ${new Date(absoluteTime).toISOString()}`, 'color: #f59e0b; font-weight: bold; font-size: 14px');
-		console.log('%c═══════════════════════════════════════════════════════════════', 'color: #f59e0b; font-weight: bold');
+
+		console.log(
+			'%c═══════════════════════════════════════════════════════════════',
+			'color: #f59e0b; font-weight: bold'
+		);
+		console.log(
+			`%c🚀 ALL-IDS PAGE MOUNT @ ${new Date(absoluteTime).toISOString()}`,
+			'color: #f59e0b; font-weight: bold; font-size: 14px'
+		);
+		console.log(
+			'%c═══════════════════════════════════════════════════════════════',
+			'color: #f59e0b; font-weight: bold'
+		);
 		console.log(`%c├─ [T+0ms] onMount started`, 'color: #64748b');
 		console.log(`%c├─ scopeKey: ${scopeKey}`, logStyles.info);
 
@@ -384,28 +426,46 @@
 		if (!storedViewMode) {
 			const optimalMode = detectViewportDefault();
 			if (optimalMode !== $viewMode) {
-				console.log(`%c${LOG_PREFIX} 📱 Applying viewport-based view mode: ${optimalMode}`, logStyles.info);
+				console.log(
+					`%c${LOG_PREFIX} 📱 Applying viewport-based view mode: ${optimalMode}`,
+					logStyles.info
+				);
 				viewMode.set(optimalMode);
 			}
 		}
 
 		// 1) Check for cached data
-		console.log(`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] Reading cache...`, 'color: #64748b');
+		console.log(
+			`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] Reading cache...`,
+			'color: #64748b'
+		);
 		const cacheReadStart = performance.now();
 		const cached = readAllIdsCache(scopeKey);
-		console.log(`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] Cache read complete (${(performance.now() - cacheReadStart).toFixed(1)}ms)`, 'color: #64748b');
+		console.log(
+			`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] Cache read complete (${(performance.now() - cacheReadStart).toFixed(1)}ms)`,
+			'color: #64748b'
+		);
 
 		if (cached) {
 			const cacheAge = Date.now() - cached.cachedAt;
 			const cacheAgeSeconds = (cacheAge / 1000).toFixed(1);
 			const isFresh = isAllIdsCacheFresh(cached, ALL_IDS_CACHE_TTL_MS);
 
-			console.log(`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] ✅ Cache HIT`, 'color: #22c55e; font-weight: bold');
+			console.log(
+				`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] ✅ Cache HIT`,
+				'color: #22c55e; font-weight: bold'
+			);
 			console.log(`%c│  ├─ cards: ${cached.cards.length}`, 'color: #64748b');
-			console.log(`%c│  ├─ age: ${cacheAgeSeconds}s (${isFresh ? 'FRESH' : 'STALE'})`, 'color: #64748b');
+			console.log(
+				`%c│  ├─ age: ${cacheAgeSeconds}s (${isFresh ? 'FRESH' : 'STALE'})`,
+				'color: #64748b'
+			);
 
 			// Step 1: Hydrate metadata + UI state
-			console.log(`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] Hydrating metadata...`, 'color: #64748b');
+			console.log(
+				`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] Hydrating metadata...`,
+				'color: #64748b'
+			);
 			const metadataStart = performance.now();
 			templateDimensions = cached.templateDimensions;
 			templateFields = cached.templateFields;
@@ -415,31 +475,64 @@
 			dataCachedAt = cached.cachedAt;
 			totalCount = cached.totalCount;
 			hasMore = cached.hasMore;
-			console.log(`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] Metadata hydrated (${(performance.now() - metadataStart).toFixed(1)}ms)`, 'color: #64748b');
-			
+			console.log(
+				`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] Metadata hydrated (${(performance.now() - metadataStart).toFixed(1)}ms)`,
+				'color: #64748b'
+			);
+
 			// Step 2: Schedule card hydration for next frame
-			console.log(`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] Scheduling card hydration (rAF)...`, 'color: #64748b');
-			console.log('%c└─ ════════════════════════════════════════════════════════════', 'color: #f59e0b');
-			
+			console.log(
+				`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] Scheduling card hydration (rAF)...`,
+				'color: #64748b'
+			);
+			console.log(
+				'%c└─ ════════════════════════════════════════════════════════════',
+				'color: #f59e0b'
+			);
+
 			requestAnimationFrame(() => {
 				const rafStart = performance.now();
-				console.log(`%c├─ [T+${(rafStart - mountStartTime).toFixed(1)}ms] rAF fired - hydrating ${cached.cards.length} cards...`, 'color: #f59e0b; font-weight: bold');
-				
+				console.log(
+					`%c├─ [T+${(rafStart - mountStartTime).toFixed(1)}ms] rAF fired - hydrating ${cached.cards.length} cards...`,
+					'color: #f59e0b; font-weight: bold'
+				);
+
 				// Hydrate card data
 				dataRows = cached.cards;
 				initialLoading = false;
 				totalCount = cached.totalCount;
-				
-				console.log(`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] Cards assigned to state (${dataRows.length} cards)`, 'color: #64748b');
-				
+
+				console.log(
+					`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] Cards assigned to state (${dataRows.length} cards)`,
+					'color: #64748b'
+				);
+
 				// Wait for Svelte to finish rendering all cards to DOM
 				tick().then(() => {
-					console.log(`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] tick() complete - DOM updated`, 'color: #22c55e');
-					console.log('%c═══════════════════════════════════════════════════════════════', 'color: #22c55e; font-weight: bold');
-					console.log(`%c🎉 RENDER COMPLETE @ ${new Date().toISOString()}`, 'color: #22c55e; font-weight: bold; font-size: 14px');
-					console.log(`%c   Total time from script start to render: ${(performance.now() - SCRIPT_START_TIME).toFixed(1)}ms`, 'color: #22c55e; font-weight: bold');
-					console.log(`%c   Total time from mount to render: ${(performance.now() - mountStartTime).toFixed(1)}ms`, 'color: #22c55e; font-weight: bold');
-					console.log('%c═══════════════════════════════════════════════════════════════', 'color: #22c55e; font-weight: bold');
+					console.log(
+						`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] tick() complete - DOM updated`,
+						'color: #22c55e'
+					);
+					console.log(
+						'%c═══════════════════════════════════════════════════════════════',
+						'color: #22c55e; font-weight: bold'
+					);
+					console.log(
+						`%c🎉 RENDER COMPLETE @ ${new Date().toISOString()}`,
+						'color: #22c55e; font-weight: bold; font-size: 14px'
+					);
+					console.log(
+						`%c   Total time from script start to render: ${(performance.now() - SCRIPT_START_TIME).toFixed(1)}ms`,
+						'color: #22c55e; font-weight: bold'
+					);
+					console.log(
+						`%c   Total time from mount to render: ${(performance.now() - mountStartTime).toFixed(1)}ms`,
+						'color: #22c55e; font-weight: bold'
+					);
+					console.log(
+						'%c═══════════════════════════════════════════════════════════════',
+						'color: #22c55e; font-weight: bold'
+					);
 				});
 
 				// Restore scroll position after cards are rendered
@@ -447,7 +540,10 @@
 					const el = document.querySelector('.all-ids-scroll') as HTMLElement | null;
 					if (el) {
 						el.scrollTop = cached.scrollTop || 0;
-						console.log(`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] Scroll restored to ${cached.scrollTop}`, 'color: #64748b');
+						console.log(
+							`%c├─ [T+${(performance.now() - mountStartTime).toFixed(1)}ms] Scroll restored to ${cached.scrollTop}`,
+							'color: #64748b'
+						);
 					}
 				});
 
@@ -495,7 +591,7 @@
 	// Track if cache needs writing (only true after actual data changes)
 	let cacheNeedsWrite = $state(false);
 	let cacheWriteDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-	
+
 	// Mark cache as needing write when data actually changes
 	$effect(() => {
 		if (!browser || initialLoading) return;
@@ -542,7 +638,10 @@
 
 			writeAllIdsCache(snapshot, scopeKey);
 			cacheNeedsWrite = false;
-			console.log(`%c[Cache] Cache write complete (${(performance.now() - writeStart).toFixed(1)}ms)`, 'color: #64748b');
+			console.log(
+				`%c[Cache] Cache write complete (${(performance.now() - writeStart).toFixed(1)}ms)`,
+				'color: #64748b'
+			);
 		}, 500); // 500ms debounce - only write after activity settles
 	});
 
@@ -569,7 +668,7 @@
 
 	// Get unique template names for filter dropdown
 	let availableTemplates = $derived(
-		[...new Set(dataRows.map(card => card.template_name).filter(Boolean))].sort()
+		[...new Set(dataRows.map((card) => card.template_name).filter(Boolean))].sort()
 	);
 
 	// Get unique column names from template fields metadata for filter dropdown
@@ -577,8 +676,8 @@
 		(() => {
 			const columns = new Set<string>();
 			// Use templateFields for actual template column data
-			Object.values(templateFields).forEach(fields => {
-				fields.forEach(field => columns.add(field.variableName));
+			Object.values(templateFields).forEach((fields) => {
+				fields.forEach((field) => columns.add(field.variableName));
 			});
 			return [...columns].sort();
 		})()
@@ -591,12 +690,12 @@
 
 			// Template filter
 			if (selectedTemplateFilter !== 'all') {
-				filtered = filtered.filter(card => card.template_name === selectedTemplateFilter);
+				filtered = filtered.filter((card) => card.template_name === selectedTemplateFilter);
 			}
 
 			// Column filter (only show cards that have a value in the selected column)
 			if (selectedColumnFilter !== 'all') {
-				filtered = filtered.filter(card => {
+				filtered = filtered.filter((card) => {
 					const fieldValue = card.fields?.[selectedColumnFilter]?.value;
 					return fieldValue !== undefined && fieldValue !== '';
 				});
@@ -624,7 +723,10 @@
 	// Visible cards - limited for performance, but cache stores all
 	let filteredCards = $derived.by(() => {
 		const sliced = allFilteredCards.slice(0, visibleStartIndex + VISIBLE_LIMIT);
-		console.log(`%c[DEBUG] filteredCards: ${sliced.length} of ${allFilteredCards.length} (visibleStartIndex=${visibleStartIndex}, VISIBLE_LIMIT=${VISIBLE_LIMIT})`, 'color: #ec4899');
+		console.log(
+			`%c[DEBUG] filteredCards: ${sliced.length} of ${allFilteredCards.length} (visibleStartIndex=${visibleStartIndex}, VISIBLE_LIMIT=${VISIBLE_LIMIT})`,
+			'color: #ec4899'
+		);
 		return sliced;
 	});
 
@@ -1015,7 +1117,11 @@
 				<!-- Clear Filters Button -->
 				{#if searchQuery || selectedTemplateFilter !== 'all' || selectedColumnFilter !== 'all'}
 					<button
-						onclick={() => { searchQuery = ''; selectedTemplateFilter = 'all'; selectedColumnFilter = 'all'; }}
+						onclick={() => {
+							searchQuery = '';
+							selectedTemplateFilter = 'all';
+							selectedColumnFilter = 'all';
+						}}
 						class="px-3 py-2 text-xs text-muted-foreground hover:text-foreground bg-muted/50 hover:bg-muted rounded-lg transition-colors"
 					>
 						Clear filters
@@ -1200,7 +1306,9 @@
 											<td class="px-4 py-2" onclick={(e) => openPreview(e, card)}>
 												<div
 													class="bg-muted rounded overflow-hidden cursor-pointer border border-border hover:border-primary transition-colors flex items-center justify-center"
-													style="width: {isPortrait ? '28px' : '48px'}; height: {isPortrait ? '44px' : '30px'};"
+													style="width: {isPortrait ? '28px' : '48px'}; height: {isPortrait
+														? '44px'
+														: '30px'};"
 												>
 													{#if card.front_image}
 														<img
@@ -1298,24 +1406,60 @@
 						{#if loadingMore}
 							<div class="flex flex-col items-center gap-2">
 								<div class="flex items-center gap-3 text-primary">
-									<svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+									<svg
+										class="animate-spin h-5 w-5"
+										xmlns="http://www.w3.org/2000/svg"
+										fill="none"
+										viewBox="0 0 24 24"
+									>
+										<circle
+											class="opacity-25"
+											cx="12"
+											cy="12"
+											r="10"
+											stroke="currentColor"
+											stroke-width="4"
+										></circle>
+										<path
+											class="opacity-75"
+											fill="currentColor"
+											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+										></path>
 									</svg>
 									<span class="text-sm font-medium">Fetching more cards...</span>
 								</div>
-								<span class="text-xs text-muted-foreground">{dataRows.length} of {totalCount} loaded</span>
+								<span class="text-xs text-muted-foreground"
+									>{dataRows.length} of {totalCount} loaded</span
+								>
 							</div>
 						{:else if hasMoreCachedCards}
 							<div class="flex flex-col items-center gap-2">
 								<div class="flex items-center gap-3 text-primary">
-									<svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+									<svg
+										class="animate-spin h-5 w-5"
+										xmlns="http://www.w3.org/2000/svg"
+										fill="none"
+										viewBox="0 0 24 24"
+									>
+										<circle
+											class="opacity-25"
+											cx="12"
+											cy="12"
+											r="10"
+											stroke="currentColor"
+											stroke-width="4"
+										></circle>
+										<path
+											class="opacity-75"
+											fill="currentColor"
+											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+										></path>
 									</svg>
 									<span class="text-sm font-medium">Loading more cards...</span>
 								</div>
-								<span class="text-xs text-muted-foreground">{filteredCards.length} of {allFilteredCards.length} displayed</span>
+								<span class="text-xs text-muted-foreground"
+									>{filteredCards.length} of {allFilteredCards.length} displayed</span
+								>
 							</div>
 						{:else}
 							<div class="h-1"></div>
@@ -1367,13 +1511,31 @@
 						{#if loadingMore}
 							<div class="flex flex-col items-center gap-2 mb-4">
 								<div class="flex items-center gap-3 text-primary">
-									<svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+									<svg
+										class="animate-spin h-5 w-5"
+										xmlns="http://www.w3.org/2000/svg"
+										fill="none"
+										viewBox="0 0 24 24"
+									>
+										<circle
+											class="opacity-25"
+											cx="12"
+											cy="12"
+											r="10"
+											stroke="currentColor"
+											stroke-width="4"
+										></circle>
+										<path
+											class="opacity-75"
+											fill="currentColor"
+											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+										></path>
 									</svg>
 									<span class="text-sm font-medium">Fetching more cards...</span>
 								</div>
-								<span class="text-xs text-muted-foreground">{dataRows.length} of {totalCount} loaded</span>
+								<span class="text-xs text-muted-foreground"
+									>{dataRows.length} of {totalCount} loaded</span
+								>
 							</div>
 							<div class="responsive-grid">
 								<IDCardSkeleton count={3} minWidth={cardMinWidth} />
@@ -1381,13 +1543,31 @@
 						{:else if hasMoreCachedCards}
 							<div class="flex flex-col items-center gap-2">
 								<div class="flex items-center gap-3 text-primary">
-									<svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+									<svg
+										class="animate-spin h-5 w-5"
+										xmlns="http://www.w3.org/2000/svg"
+										fill="none"
+										viewBox="0 0 24 24"
+									>
+										<circle
+											class="opacity-25"
+											cx="12"
+											cy="12"
+											r="10"
+											stroke="currentColor"
+											stroke-width="4"
+										></circle>
+										<path
+											class="opacity-75"
+											fill="currentColor"
+											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+										></path>
 									</svg>
 									<span class="text-sm font-medium">Loading more cards...</span>
 								</div>
-								<span class="text-xs text-muted-foreground">{filteredCards.length} of {allFilteredCards.length} displayed</span>
+								<span class="text-xs text-muted-foreground"
+									>{filteredCards.length} of {allFilteredCards.length} displayed</span
+								>
 							</div>
 						{:else}
 							<div class="h-1"></div>

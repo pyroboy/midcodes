@@ -12,10 +12,7 @@
 		"moduleResolution": "bundler",
 		"verbatimModuleSyntax": true,
 		"allowArbitraryExtensions": true,
-		"typeRoots": [
-			"./node_modules/@types",
-			"./src/types"
-		]
+		"typeRoots": ["./node_modules/@types", "./src/types"]
 	},
 	"include": [
 		".svelte-kit/ambient.d.ts",

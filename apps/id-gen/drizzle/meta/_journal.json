@@ -1,20 +1,20 @@
 {
-  "version": "7",
-  "dialect": "postgresql",
-  "entries": [
-    {
-      "idx": 0,
-      "version": "7",
-      "when": 1766013213567,
-      "tag": "0000_lyrical_shinko_yamashiro",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1766116062855,
-      "tag": "0001_mixed_longshot",
-      "breakpoints": true
-    }
-  ]
+	"version": "7",
+	"dialect": "postgresql",
+	"entries": [
+		{
+			"idx": 0,
+			"version": "7",
+			"when": 1766013213567,
+			"tag": "0000_lyrical_shinko_yamashiro",
+			"breakpoints": true
+		},
+		{
+			"idx": 1,
+			"version": "7",
+			"when": 1766116062855,
+			"tag": "0001_mixed_longshot",
+			"breakpoints": true
+		}
+	]
 }

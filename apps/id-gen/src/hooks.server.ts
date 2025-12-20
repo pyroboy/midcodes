@@ -17,7 +17,7 @@ let _envValidated = false;
 
 const betterAuthHandle: Handle = async ({ event, resolve }) => {
 	console.log('[AUTH DEBUG] betterAuthHandle started for:', event.url.pathname);
-	
+
 	// SECURITY: Validate environment variables on first request
 	// (Cloudflare Workers don't allow this at module scope)
 	// This ensures $env/dynamic/private is hydrated
@@ -40,7 +40,11 @@ const betterAuthHandle: Handle = async ({ event, resolve }) => {
 		result = await auth.api.getSession({
 			headers: event.request.headers
 		});
-		console.log('[AUTH DEBUG] Session result:', result ? 'Session found' : 'No session', result?.user?.email ?? 'no email');
+		console.log(
+			'[AUTH DEBUG] Session result:',
+			result ? 'Session found' : 'No session',
+			result?.user?.email ?? 'no email'
+		);
 	} catch (e) {
 		console.error('[AUTH DEBUG] getSession FAILED:', e);
 	}
@@ -49,7 +53,6 @@ const betterAuthHandle: Handle = async ({ event, resolve }) => {
 	event.locals.session = result?.session ?? null;
 	event.locals.user = result?.user ?? null;
 	console.log('[AUTH DEBUG] locals.user set to:', event.locals.user?.email ?? 'null');
-
 
 	if (result?.user) {
 		console.log('[AUTH DEBUG] Fetching profile for user:', result.user.id);
@@ -141,9 +144,11 @@ const securityHeadersHandle: Handle = async ({ event, resolve }) => {
 		'Cross-Origin-Embedder-Policy': 'credentialless',
 		'Cross-Origin-Opener-Policy': 'same-origin',
 		'Content-Security-Policy': cspDirectives,
-		...(dev ? {} : {
-			'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload'
-		})
+		...(dev
+			? {}
+			: {
+					'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload'
+				})
 	});
 
 	// SECURITY: Generate and set CSRF token

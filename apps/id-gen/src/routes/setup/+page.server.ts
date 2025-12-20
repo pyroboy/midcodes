@@ -51,12 +51,16 @@ export const actions: Actions = {
 
 			// 3. Promote to superadmin and set org details
 			// Create 'Default Organization'
-			const [newOrg] = await db.insert(organizations).values({
-				name: orgName
-			}).returning();
+			const [newOrg] = await db
+				.insert(organizations)
+				.values({
+					name: orgName
+				})
+				.returning();
 
 			// Update profile (created by hook) to be super_admin and link to org
-			await db.update(profiles)
+			await db
+				.update(profiles)
 				.set({
 					role: 'super_admin',
 					orgId: newOrg.id

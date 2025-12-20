@@ -20,11 +20,7 @@ interface AdminCheckResult {
 const SUPER_ADMIN_ROLES = ['super_admin'];
 
 // All roles that grant general admin access
-const ADMIN_ROLES = [
-	'super_admin',
-	'org_admin',
-	'id_gen_admin'
-];
+const ADMIN_ROLES = ['super_admin', 'org_admin', 'id_gen_admin'];
 
 /**
  * Comprehensive check for super admin status.
@@ -165,7 +161,7 @@ export function wantsToAssumeRole(locals: App.Locals, url: URL): boolean {
 	const { roleEmulation } = locals;
 	const isSuperAdmin = checkSuperAdmin(locals);
 	const hasBypassParam = url.searchParams.get('superadmin_bypass') === 'true';
-	
+
 	// User wants to assume role if:
 	// 1. They are a super admin
 	// 2. They are actively emulating a role
@@ -179,12 +175,12 @@ export function wantsToAssumeRole(locals: App.Locals, url: URL): boolean {
  */
 export function checkSuperAdminEmulatedOnly(locals: App.Locals): boolean {
 	const { roleEmulation } = locals;
-	
+
 	// If emulating, check only the emulated role
 	if (roleEmulation?.active && roleEmulation?.emulatedRole) {
 		return SUPER_ADMIN_ROLES.includes(roleEmulation.emulatedRole);
 	}
-	
+
 	// Not emulating - fall back to normal check
 	return checkSuperAdmin(locals);
 }
@@ -195,12 +191,12 @@ export function checkSuperAdminEmulatedOnly(locals: App.Locals): boolean {
  */
 export function checkAdminEmulatedOnly(locals: App.Locals): boolean {
 	const { roleEmulation } = locals;
-	
+
 	// If emulating, check only the emulated role
 	if (roleEmulation?.active && roleEmulation?.emulatedRole) {
 		return ADMIN_ROLES.includes(roleEmulation.emulatedRole);
 	}
-	
+
 	// Not emulating - fall back to normal check
 	return checkAdmin(locals);
 }

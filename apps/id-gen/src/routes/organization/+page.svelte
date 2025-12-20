@@ -150,7 +150,9 @@
 	}
 
 	async function removeMember(memberId: string, email: string | null) {
-		if (!confirm(`Are you sure you want to remove ${email || 'this user'} from this organization?`)) {
+		if (
+			!confirm(`Are you sure you want to remove ${email || 'this user'} from this organization?`)
+		) {
 			return;
 		}
 
@@ -197,7 +199,9 @@
 
 	<!-- Success/Error Messages -->
 	{#if successMessage}
-		<div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md dark:bg-green-900/20 dark:border-green-800 dark:text-green-400">
+		<div
+			class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md dark:bg-green-900/20 dark:border-green-800 dark:text-green-400"
+		>
 			<div class="flex">
 				<svg class="flex-shrink-0 h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
 					<path
@@ -214,7 +218,9 @@
 	{/if}
 
 	{#if errorMessage}
-		<div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md dark:bg-red-900/20 dark:border-red-800 dark:text-red-400">
+		<div
+			class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md dark:bg-red-900/20 dark:border-red-800 dark:text-red-400"
+		>
 			<div class="flex">
 				<svg class="flex-shrink-0 h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
 					<path
@@ -533,8 +539,7 @@
 								</p>
 							</div>
 							<div
-								class="px-3 py-1 rounded-full text-sm font-medium {orgSettings
-									?.payments_enabled
+								class="px-3 py-1 rounded-full text-sm font-medium {orgSettings?.payments_enabled
 									? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
 									: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'}"
 							>
@@ -566,8 +571,8 @@
 					</CardHeader>
 					<CardContent>
 						<p class="text-sm text-muted-foreground">
-							For actions like deleting this organization, transferring assets, or changing billing settings,
-							please contact your system administrator.
+							For actions like deleting this organization, transferring assets, or changing billing
+							settings, please contact your system administrator.
 						</p>
 					</CardContent>
 				</Card>

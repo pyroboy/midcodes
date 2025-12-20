@@ -30,7 +30,9 @@ function makeSnapshot(overrides: Partial<AllIdsCacheSnapshot> = {}): AllIdsCache
 		totalCount: 1,
 		hasMore: false,
 		nextOffset: 1,
-		templateDimensions: { T1: { width: 1013, height: 638, orientation: 'landscape' as const, unit: 'pixels' } },
+		templateDimensions: {
+			T1: { width: 1013, height: 638, orientation: 'landscape' as const, unit: 'pixels' }
+		},
 		templateFields: { T1: [{ variableName: 'Name', side: 'front' }] },
 		ui: { searchQuery: '', cardMinWidth: 250, viewMode: 'card' },
 		scrollTop: 0,
@@ -63,7 +65,10 @@ describe('allIdsCache', () => {
 
 	it('writeAllIdsCache + readAllIdsCache round-trip (scoped)', () => {
 		const scopeKey = 'user:org';
-		const snap = makeSnapshot({ scrollTop: 123, ui: { searchQuery: 'abc', cardMinWidth: 200, viewMode: 'table' } });
+		const snap = makeSnapshot({
+			scrollTop: 123,
+			ui: { searchQuery: 'abc', cardMinWidth: 200, viewMode: 'table' }
+		});
 
 		writeAllIdsCache(snap, scopeKey);
 
@@ -99,7 +104,10 @@ describe('allIdsCache', () => {
 		const key = storageKey(scopeKey);
 
 		// Valid JSON but invalid schema (missing required fields)
-		window.sessionStorage.setItem(key, JSON.stringify({ version: 1, cachedAt: Date.now(), value: 'nope' }));
+		window.sessionStorage.setItem(
+			key,
+			JSON.stringify({ version: 1, cachedAt: Date.now(), value: 'nope' })
+		);
 		expect(window.sessionStorage.getItem(key)).toBeTruthy();
 
 		const read = readAllIdsCache(scopeKey);
@@ -146,7 +154,6 @@ describe('allIdsCache', () => {
 	});
 
 	it('isAllIdsCacheFresh respects ttlMs', async () => {
-
 		const nowSpy = vi.spyOn(Date, 'now');
 
 		nowSpy.mockReturnValue(1000);

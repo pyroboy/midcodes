@@ -176,5 +176,4 @@ export const ASSET_CATEGORIES = [
 	'Other'
 ] as const;
 
-export type AssetCategory = typeof ASSET_CATEGORIES[number];
-
+export type AssetCategory = (typeof ASSET_CATEGORIES)[number];

@@ -105,7 +105,17 @@ export async function extractRegionPreview(
 	const ctx = canvas.getContext('2d');
 	if (!ctx) throw new Error('Failed to get canvas context');
 
-	ctx.drawImage(img, region.x, region.y, region.width, region.height, 0, 0, region.width, region.height);
+	ctx.drawImage(
+		img,
+		region.x,
+		region.y,
+		region.width,
+		region.height,
+		0,
+		0,
+		region.width,
+		region.height
+	);
 
 	const blob = await canvasToBlob(canvas, 'image/png', 0.9);
 	const dataUrl = canvas.toDataURL('image/png');

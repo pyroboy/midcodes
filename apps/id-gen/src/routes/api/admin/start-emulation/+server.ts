@@ -1,9 +1,5 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
-import {
-	checkRateLimit,
-	createRateLimitResponse,
-	RateLimitConfigs
-} from '$lib/utils/rate-limiter';
+import { checkRateLimit, createRateLimitResponse, RateLimitConfigs } from '$lib/utils/rate-limiter';
 import { validateCSRFFromRequest, csrfErrorResponse } from '$lib/server/csrf';
 import { logRoleEmulationStart } from '$lib/server/audit';
 

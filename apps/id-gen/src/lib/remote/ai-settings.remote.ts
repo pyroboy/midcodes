@@ -16,8 +16,6 @@ async function requireSuperAdminPermissions() {
 	return { user: locals.user, org_id: locals.org_id };
 }
 
-
-
 // Type definitions
 interface AISettings {
 	id: string;
@@ -84,45 +82,35 @@ export const getAIUsageStats = query(async (): Promise<AIUsageStats> => {
 		const generationsThisMonthResult = await db
 			.select({ count: sql<number>`count(*)` })
 			.from(aiGenerations)
-			.where(
-				and(
-					eq(aiGenerations.orgId, org_id),
-					gte(aiGenerations.createdAt, thisMonth)
-				)
-			);
+			.where(and(eq(aiGenerations.orgId, org_id), gte(aiGenerations.createdAt, thisMonth)));
 		const generationsThisMonth = Number(generationsThisMonthResult[0]?.count || 0);
 
 		// Get detailed usage for this month
 		const usage = await db
 			.select({ creditsUsed: aiGenerations.creditsUsed, userId: aiGenerations.userId })
 			.from(aiGenerations)
-			.where(
-				and(
-					eq(aiGenerations.orgId, org_id),
-					gte(aiGenerations.createdAt, thisMonth)
-				)
-			);
+			.where(and(eq(aiGenerations.orgId, org_id), gte(aiGenerations.createdAt, thisMonth)));
 
 		const creditsUsedThisMonth = usage.reduce((sum, u) => sum + (u.creditsUsed || 0), 0);
 		const averageCreditsPerGeneration = usage.length > 0 ? creditsUsedThisMonth / usage.length : 0;
 
 		// Get top users
 		const userCounts = new Map<string, number>();
-		usage.forEach(u => {
+		usage.forEach((u) => {
 			userCounts.set(u.userId, (userCounts.get(u.userId) || 0) + 1);
 		});
 
 		// Fetch user emails
 		const userIds = Array.from(userCounts.keys());
 		let topUsers: { email: string; count: number }[] = [];
-		
+
 		if (userIds.length > 0) {
 			const users = await db
 				.select({ id: profiles.id, email: profiles.email })
 				.from(profiles)
 				.where(inArray(profiles.id, userIds));
 
-			const userMap = new Map<string, string>(users.map(u => [u.id, u.email || 'Unknown']));
+			const userMap = new Map<string, string>(users.map((u) => [u.id, u.email || 'Unknown']));
 			topUsers = Array.from(userCounts.entries())
 				.sort((a, b) => b[1] - a[1])
 				.slice(0, 5)

@@ -10,7 +10,7 @@ import { inArray } from 'drizzle-orm';
 interface CacheEntry {
 	permissions: string[];
 	timestamp: number;
-	userId?: string; 
+	userId?: string;
 }
 
 interface PermissionCache {
@@ -18,13 +18,13 @@ interface PermissionCache {
 }
 
 interface UserCacheIndex {
-	[userId: string]: Set<string>; 
+	[userId: string]: Set<string>;
 }
 
 let permissionCache: PermissionCache = {};
 let userCacheIndex: UserCacheIndex = {};
 
-const CACHE_TTL = 5 * 60 * 1000; 
+const CACHE_TTL = 5 * 60 * 1000;
 
 export async function getUserPermissions(
 	roles: string[] | undefined,
@@ -69,12 +69,12 @@ export async function getUserPermissions(
 /**
  * SECURITY: Invalidate all cached permissions for a specific user
  * Call this when a user's roles change to prevent stale permissions
- * 
+ *
  * @param userId - The user ID whose permissions should be invalidated
  */
 export function invalidateUserPermissionCache(userId: string): void {
 	const cacheKeys = userCacheIndex[userId];
-	
+
 	if (cacheKeys) {
 		for (const key of cacheKeys) {
 			delete permissionCache[key];
@@ -87,17 +87,17 @@ export function invalidateUserPermissionCache(userId: string): void {
 /**
  * SECURITY: Invalidate permissions for specific role combinations
  * Call this when role definitions change (e.g., admin updates role_permissions table)
- * 
+ *
  * @param roles - Array of roles that were modified
  */
 export function invalidateRolePermissions(roles: string[]): void {
 	const roleSet = new Set(roles);
-	
+
 	// Find and invalidate all cache entries that include any of the modified roles
 	for (const [cacheKey, entry] of Object.entries(permissionCache)) {
 		const cachedRoles = cacheKey.split(',');
-		const hasAffectedRole = cachedRoles.some(role => roleSet.has(role));
-		
+		const hasAffectedRole = cachedRoles.some((role) => roleSet.has(role));
+
 		if (hasAffectedRole) {
 			delete permissionCache[cacheKey];
 			console.log(`🔒 [Permissions] Invalidated cache for roles: ${cacheKey}`);
@@ -112,7 +112,7 @@ export function invalidateRolePermissions(roles: string[]): void {
 export function cleanupPermissionCache(): void {
 	const now = Date.now();
 	let cleanedCount = 0;
-	
+
 	Object.keys(permissionCache).forEach((key) => {
 		if (now - permissionCache[key].timestamp > CACHE_TTL) {
 			// Also clean up user index
@@ -123,12 +123,12 @@ export function cleanupPermissionCache(): void {
 					delete userCacheIndex[userId];
 				}
 			}
-			
+
 			delete permissionCache[key];
 			cleanedCount++;
 		}
 	});
-	
+
 	if (cleanedCount > 0) {
 		console.log(`🧹 [Permissions] Cleaned up ${cleanedCount} expired cache entries`);
 	}
@@ -147,16 +147,14 @@ export function clearPermissionCache(): void {
 /**
  * Get current cache statistics (for debugging/monitoring)
  */
-export function getCacheStats(): { 
-	totalEntries: number; 
-	usersTracked: number; 
-	oldestEntry: number | null 
+export function getCacheStats(): {
+	totalEntries: number;
+	usersTracked: number;
+	oldestEntry: number | null;
 } {
 	const entries = Object.values(permissionCache);
-	const oldestTimestamp = entries.length > 0 
-		? Math.min(...entries.map(e => e.timestamp))
-		: null;
-	
+	const oldestTimestamp = entries.length > 0 ? Math.min(...entries.map((e) => e.timestamp)) : null;
+
 	return {
 		totalEntries: entries.length,
 		usersTracked: Object.keys(userCacheIndex).length,

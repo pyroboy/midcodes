@@ -35,7 +35,7 @@
 			allFonts: fontOptions || '(none)',
 			side
 		});
-		
+
 		// Additional warning if no fonts
 		if (!fontOptions || fontOptions.length === 0) {
 			console.warn('⚠️ [FontSettings] No font options received! Font dropdown will be empty.');
@@ -111,9 +111,9 @@
 
 <div class="font-settings">
 	<div class="settings-row">
-		<select 
-			value={element.fontFamily} 
-			onchange={handleFontChange} 
+		<select
+			value={element.fontFamily}
+			onchange={handleFontChange}
 			class="font-select"
 			style="font-family: '{element.fontFamily || 'Roboto'}', sans-serif;"
 		>
@@ -131,12 +131,12 @@
 		<label class="font-size-label" for="font-size-{element.id}">Size:</label>
 		<button class="size-button" onclick={() => adjustFontSize(-5)} title="Decrease by 5">-5</button>
 		<button class="size-button" onclick={() => adjustFontSize(-1)} title="Decrease by 1">-1</button>
-		<input 
-			type="number" 
+		<input
+			type="number"
 			id="font-size-{element.id}"
-			value={element.fontSize || element.size || 16} 
-			onchange={handleFontSizeChange} 
-			class="font-size-input" 
+			value={element.fontSize || element.size || 16}
+			onchange={handleFontSizeChange}
+			class="font-size-input"
 		/>
 		<button class="size-button" onclick={() => adjustFontSize(1)} title="Increase by 1">+1</button>
 		<button class="size-button" onclick={() => adjustFontSize(5)} title="Increase by 5">+5</button>
@@ -208,18 +208,17 @@
 		gap: 4px;
 		align-items: center;
 	}
-	
+
 	.font-size-row {
 		gap: 6px;
 	}
-	
+
 	.font-size-label {
 		font-size: 13px;
 		color: #cccccc;
 		margin-right: 4px;
 	}
-	
-	
+
 	select,
 	input[type='number'] {
 		background-color: #3d3d3d;
@@ -242,12 +241,12 @@
 		background-size: 12px;
 		padding-right: 28px;
 	}
-	
+
 	select:hover {
 		border-color: #6d6d6d;
 		background-color: #4d4d4d;
 	}
-	
+
 	select:focus {
 		outline: none;
 		border-color: #8b5cf6;
@@ -259,7 +258,7 @@
 		flex: 1;
 		min-width: 120px;
 	}
-	
+
 	.font-select option {
 		padding: 4px 8px;
 		background-color: #2d2d2d;
@@ -269,12 +268,12 @@
 	input[type='number'] {
 		width: 60px;
 	}
-	
+
 	.font-size-input {
 		width: 55px;
 		text-align: center;
 	}
-	
+
 	.size-button {
 		background-color: #3d3d3d;
 		color: #ffffff;
@@ -286,17 +285,17 @@
 		min-width: 32px;
 		transition: all 0.15s;
 	}
-	
+
 	.size-button:hover {
 		background-color: #4d4d4d;
 		border-color: #5d5d5d;
 	}
-	
+
 	.size-button:active {
 		background-color: #5d5d5d;
 		transform: scale(0.95);
 	}
-	
+
 	.icon-button {
 		background-color: transparent;
 		border: none;

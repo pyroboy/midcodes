@@ -42,11 +42,13 @@ export type AuditAction =
 
 /**
  * Log an admin action to the audit trail
- * 
+ *
  * @param entry - The audit log entry details
  * @returns Success status
  */
-export async function logAdminAction(entry: AuditLogEntry): Promise<{ success: boolean; error?: string }> {
+export async function logAdminAction(
+	entry: AuditLogEntry
+): Promise<{ success: boolean; error?: string }> {
 	try {
 		await db.insert(adminAudit).values({
 			adminId: entry.adminId,
@@ -56,11 +58,13 @@ export async function logAdminAction(entry: AuditLogEntry): Promise<{ success: b
 			metadata: entry.metadata,
 			ipAddress: entry.ipAddress ?? null,
 			userAgent: entry.userAgent ?? null,
-			orgId: entry.orgId ?? null as any, // Cast for potential type mismatch if orgId is null but marked notNull in schema temporarily
+			orgId: entry.orgId ?? (null as any), // Cast for potential type mismatch if orgId is null but marked notNull in schema temporarily
 			createdAt: new Date()
 		});
 
-		console.log(`[AuditLog] ${entry.action} by ${entry.adminId} on ${entry.targetType}:${entry.targetId}`);
+		console.log(
+			`[AuditLog] ${entry.action} by ${entry.adminId} on ${entry.targetType}:${entry.targetId}`
+		);
 		return { success: true };
 	} catch (err: any) {
 		console.error('[AuditLog] Exception logging admin action:', err);
@@ -71,11 +75,15 @@ export async function logAdminAction(entry: AuditLogEntry): Promise<{ success: b
 /**
  * Helper to extract request metadata for audit logging
  */
-export function extractRequestMetadata(request: Request): { ipAddress: string | null; userAgent: string | null } {
+export function extractRequestMetadata(request: Request): {
+	ipAddress: string | null;
+	userAgent: string | null;
+} {
 	return {
-		ipAddress: request.headers.get('x-real-ip') || 
-			request.headers.get('cf-connecting-ip') || 
-			request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+		ipAddress:
+			request.headers.get('x-real-ip') ||
+			request.headers.get('cf-connecting-ip') ||
+			request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
 			null,
 		userAgent: request.headers.get('user-agent')
 	};
@@ -93,7 +101,7 @@ export async function logRoleEmulationStart(
 	orgId?: string
 ): Promise<void> {
 	const { ipAddress, userAgent } = extractRequestMetadata(request);
-	
+
 	await logAdminAction({
 		adminId,
 		action: 'role_emulation_start',
@@ -119,7 +127,7 @@ export async function logRoleEmulationStop(
 	orgId?: string
 ): Promise<void> {
 	const { ipAddress, userAgent } = extractRequestMetadata(request);
-	
+
 	await logAdminAction({
 		adminId,
 		action: 'role_emulation_stop',
@@ -146,7 +154,7 @@ export async function logCreditAdjustment(
 	orgId?: string
 ): Promise<void> {
 	const { ipAddress, userAgent } = extractRequestMetadata(request);
-	
+
 	await logAdminAction({
 		adminId,
 		action: 'credit_adjustment',
@@ -175,7 +183,7 @@ export async function logUserRoleChange(
 	orgId?: string
 ): Promise<void> {
 	const { ipAddress, userAgent } = extractRequestMetadata(request);
-	
+
 	await logAdminAction({
 		adminId,
 		action: 'user_role_change',
@@ -202,7 +210,7 @@ export async function logOrgSettingsChange(
 	request: Request
 ): Promise<void> {
 	const { ipAddress, userAgent } = extractRequestMetadata(request);
-	
+
 	await logAdminAction({
 		adminId,
 		action: 'org_settings_changed',
@@ -229,7 +237,7 @@ export async function logSensitiveDataAccess(
 	orgId?: string
 ): Promise<void> {
 	const { ipAddress, userAgent } = extractRequestMetadata(request);
-	
+
 	await logAdminAction({
 		adminId,
 		action: 'sensitive_data_accessed',

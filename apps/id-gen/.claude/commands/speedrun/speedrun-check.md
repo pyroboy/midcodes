@@ -14,6 +14,7 @@ Running speedrun pre-commit checks for: **$ARGUMENTS**
 !`npm run build`
 
 If all checks pass, create a commit with:
+
 - Concise message about $ARGUMENTS
 - Follow project commit style
 - Include co-authorship footer

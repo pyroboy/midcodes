@@ -24,15 +24,16 @@ export function getCardRawAssetPath(
  * Path: system/templates/[templateId]/[variant]-[side].[extension]
  */
 export function getTemplateAssetPath(
-    templateId: string,
-    variant: AssetVariant,
-    side: AssetSide,
-    extension: string = 'png'
+	templateId: string,
+	variant: AssetVariant,
+	side: AssetSide,
+	extension: string = 'png'
 ): string {
-    // Doc: template-front.png, template-front-preview.png
-    const prefix = `template-${side}`;
-    const filename = variant === 'full' ? `${prefix}.${extension}` : `${prefix}-${variant}.${extension}`;
-    return `system/templates/${templateId}/${filename}`;
+	// Doc: template-front.png, template-front-preview.png
+	const prefix = `template-${side}`;
+	const filename =
+		variant === 'full' ? `${prefix}.${extension}` : `${prefix}-${variant}.${extension}`;
+	return `system/templates/${templateId}/${filename}`;
 }
 
 /**
@@ -40,27 +41,27 @@ export function getTemplateAssetPath(
  * Path: cards/[orgId]/[templateId]/[cardId]/[variant]-[side].[extension]
  */
 export function getCardAssetPath(
-    orgId: string,
-    templateId: string,
-    cardId: string,
-    variant: AssetVariant | 'master',
-    side: AssetSide,
-    extension: string = 'png'
+	orgId: string,
+	templateId: string,
+	cardId: string,
+	variant: AssetVariant | 'master',
+	side: AssetSide,
+	extension: string = 'png'
 ): string {
-    const prefix = variant === 'master' || variant === 'full' ? side : `${variant}-${side}`;
-    return `cards/${orgId}/${templateId}/${cardId}/${prefix}.${extension}`;
+	const prefix = variant === 'master' || variant === 'full' ? side : `${variant}-${side}`;
+	return `cards/${orgId}/${templateId}/${cardId}/${prefix}.${extension}`;
 }
 
 /**
  * Generates path for global assets
  */
 export function getGlobalAssetPath(category: 'icons' | 'fonts', filename: string): string {
-    return `system/global-assets/${category}/${filename}`;
+	return `system/global-assets/${category}/${filename}`;
 }
 
 /**
  * Generates path for organization branding
  */
 export function getOrgBrandingPath(orgId: string, filename: string): string {
-    return `orgs/${orgId}/branding/${filename}`;
+	return `orgs/${orgId}/branding/${filename}`;
 }

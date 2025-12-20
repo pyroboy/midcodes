@@ -16,8 +16,10 @@
 			<Card>
 				<CardContent class="p-6">
 					<div class="flex items-center justify-between mb-4">
-						<Skeleton class="h-10 w-10 rounded-lg" /> <!-- Icon -->
-						<Skeleton class="h-5 w-20 rounded-full" /> <!-- Badge -->
+						<Skeleton class="h-10 w-10 rounded-lg" />
+						<!-- Icon -->
+						<Skeleton class="h-5 w-20 rounded-full" />
+						<!-- Badge -->
 					</div>
 					<div class="space-y-2">
 						<Skeleton class="h-8 w-1/2" />
@@ -56,7 +58,9 @@
 			</CardHeader>
 			<CardContent class="grid grid-cols-2 gap-4">
 				{#each Array(4) as _}
-					<div class="p-4 border rounded-lg flex flex-col items-center justify-center gap-3 bg-muted/10 h-32">
+					<div
+						class="p-4 border rounded-lg flex flex-col items-center justify-center gap-3 bg-muted/10 h-32"
+					>
 						<Skeleton class="h-10 w-10 rounded-full" />
 						<Skeleton class="h-4 w-24" />
 					</div>

@@ -128,7 +128,12 @@ export async function cachedRemoteFunctionCall<TArgs, TResult>(params: {
 			const raw = window.sessionStorage.getItem(key);
 			if (!raw) return null;
 			const parsed = safeParse(raw) as any;
-			if (!parsed || parsed.version !== 1 || typeof parsed.cachedAt !== 'number' || !('value' in parsed)) {
+			if (
+				!parsed ||
+				parsed.version !== 1 ||
+				typeof parsed.cachedAt !== 'number' ||
+				!('value' in parsed)
+			) {
 				window.sessionStorage.removeItem(key);
 				return null;
 			}
@@ -165,7 +170,8 @@ export async function cachedRemoteFunctionCall<TArgs, TResult>(params: {
 	if (mem) {
 		const fresh = isFresh(mem, ttlMs);
 
-		if (debug) console.info('[remote-cache] memory hit', { keyBase: params.keyBase, argsKey, fresh });
+		if (debug)
+			console.info('[remote-cache] memory hit', { keyBase: params.keyBase, argsKey, fresh });
 
 		if (fresh) return mem.value;
 
@@ -184,7 +190,8 @@ export async function cachedRemoteFunctionCall<TArgs, TResult>(params: {
 	if (stored) {
 		const fresh = isFresh(stored, ttlMs);
 
-		if (debug) console.info('[remote-cache] storage hit', { keyBase: params.keyBase, argsKey, fresh });
+		if (debug)
+			console.info('[remote-cache] storage hit', { keyBase: params.keyBase, argsKey, fresh });
 
 		memory.set(key, stored as CacheEntry<unknown>);
 

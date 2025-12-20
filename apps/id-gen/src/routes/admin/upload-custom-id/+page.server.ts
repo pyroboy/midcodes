@@ -20,10 +20,11 @@ export const load: PageServerLoad = async ({ locals }) => {
 	}
 
 	// Fetch templates for the dropdown with Drizzle
-	const templatesData = await db.select({
-		id: templates.id,
-		name: templates.name
-	})
+	const templatesData = await db
+		.select({
+			id: templates.id,
+			name: templates.name
+		})
 		.from(templates)
 		.where(eq(templates.orgId, org_id))
 		.orderBy(templates.name);
@@ -90,34 +91,42 @@ export const actions: Actions = {
 
 			// Upload front image to R2
 			const frontPath = `front_custom_${Date.now()}_${safeFrontName}`;
-            // uploadToR2 returns the public URL, but the logic below might expect just the path
-            // The original code stored 'frontPath' in DB.
-            // If we switch to R2, we should probably store the public URL or continue storing the path 
-            // BUT the getSupabaseStorageUrl util now expects a path and prepends the domain.
-            // So storing the path (key) is still consistent with the updated utility.
-            // Wait, uploadToR2 returns the FULL public URL. 
-            // If the DB stores the PATH, we should just use the path.
-            // But wait, the previous code stored `frontPath` (filename).
-            // Let's rely on standardizing to storing the key or URL.
-            // Drizzle schema for idcards has `frontImage: text`.
-            // If I store the full URL, validation/display might break if it expects a relative path.
-            // However, `uploadToR2` returns the full URL.
-            // The `getSupabaseStorageUrl` (now R2 util) handles full URLs correctly (returns them as is).
-            // So storing the FULL URL is safer for R2 to allow external domains.
-            // OR I can just ignore the return value and store the KEY, and let the util rebuild it.
-            // Storing the KEY is more flexible (allows domain changes).
-            // Let's store the KEY for now to match previous behavior of storing `frontPath`.
-            
-			await uploadToR2(frontPath, Buffer.from(frontBuffer), frontValidation.detectedMime || 'application/octet-stream');
+			// uploadToR2 returns the public URL, but the logic below might expect just the path
+			// The original code stored 'frontPath' in DB.
+			// If we switch to R2, we should probably store the public URL or continue storing the path
+			// BUT the getSupabaseStorageUrl util now expects a path and prepends the domain.
+			// So storing the path (key) is still consistent with the updated utility.
+			// Wait, uploadToR2 returns the FULL public URL.
+			// If the DB stores the PATH, we should just use the path.
+			// But wait, the previous code stored `frontPath` (filename).
+			// Let's rely on standardizing to storing the key or URL.
+			// Drizzle schema for idcards has `frontImage: text`.
+			// If I store the full URL, validation/display might break if it expects a relative path.
+			// However, `uploadToR2` returns the full URL.
+			// The `getSupabaseStorageUrl` (now R2 util) handles full URLs correctly (returns them as is).
+			// So storing the FULL URL is safer for R2 to allow external domains.
+			// OR I can just ignore the return value and store the KEY, and let the util rebuild it.
+			// Storing the KEY is more flexible (allows domain changes).
+			// Let's store the KEY for now to match previous behavior of storing `frontPath`.
+
+			await uploadToR2(
+				frontPath,
+				Buffer.from(frontBuffer),
+				frontValidation.detectedMime || 'application/octet-stream'
+			);
 
 			// Upload back image to R2
 			const backPath = `back_custom_${Date.now()}_${safeBackName}`;
-            try {
-			    await uploadToR2(backPath, Buffer.from(backBuffer), backValidation.detectedMime || 'application/octet-stream');
-            } catch (backError) {
-                await deleteFromR2(frontPath);
-                throw backError;
-            }
+			try {
+				await uploadToR2(
+					backPath,
+					Buffer.from(backBuffer),
+					backValidation.detectedMime || 'application/octet-stream'
+				);
+			} catch (backError) {
+				await deleteFromR2(frontPath);
+				throw backError;
+			}
 
 			// Insert ID card record with Drizzle
 			try {
@@ -132,7 +141,7 @@ export const actions: Actions = {
 				console.error('Error inserting ID card:', insertError);
 				// Cleanup uploaded images
 				await deleteFromR2(frontPath);
-                await deleteFromR2(backPath);
+				await deleteFromR2(backPath);
 				return fail(500, { error: 'Failed to save ID card' });
 			}
 

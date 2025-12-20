@@ -121,15 +121,7 @@ export async function generateTemplateVariants(
 				dimensions,
 				'sample'
 			),
-			renderTemplateSide(
-				backBackground,
-				elements,
-				'back',
-				sampleFormData,
-				{},
-				dimensions,
-				'sample'
-			)
+			renderTemplateSide(backBackground, elements, 'back', sampleFormData, {}, dimensions, 'sample')
 		]);
 
 	return {

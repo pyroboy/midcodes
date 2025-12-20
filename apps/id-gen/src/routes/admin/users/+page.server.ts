@@ -18,13 +18,14 @@ export const load: PageServerLoad = async ({ locals, parent }) => {
 
 	try {
 		// Get all users in the organization with Drizzle
-		const users = await db.select({
-			id: profiles.id,
-			email: profiles.email,
-			role: profiles.role,
-			created_at: profiles.createdAt,
-			updated_at: profiles.updatedAt
-		})
+		const users = await db
+			.select({
+				id: profiles.id,
+				email: profiles.email,
+				role: profiles.role,
+				created_at: profiles.createdAt,
+				updated_at: profiles.updatedAt
+			})
 			.from(profiles)
 			.where(eq(profiles.orgId, org_id))
 			.orderBy(desc(profiles.createdAt));
@@ -72,7 +73,8 @@ export const actions: Actions = {
 			}
 
 			// Check if user already exists with Drizzle
-			const existingUsers = await db.select({ id: profiles.id })
+			const existingUsers = await db
+				.select({ id: profiles.id })
 				.from(profiles)
 				.where(and(eq(profiles.email, email), eq(profiles.orgId, org_id!)))
 				.limit(1);
@@ -84,7 +86,7 @@ export const actions: Actions = {
 			// Create user via Better Auth - sign up with temporary password
 			// Note: In production, you'd want to use an invitation flow
 			const tempPassword = `Temp${Date.now()}!${Math.random().toString(36).slice(2, 10)}`;
-			
+
 			try {
 				// Use Better Auth signUp endpoint
 				const signUpResult = await auth.api.signUpEmail({
@@ -110,13 +112,14 @@ export const actions: Actions = {
 				});
 
 				// Get updated users list
-				const updatedUsers = await db.select({
-					id: profiles.id,
-					email: profiles.email,
-					role: profiles.role,
-					created_at: profiles.createdAt,
-					updated_at: profiles.updatedAt
-				})
+				const updatedUsers = await db
+					.select({
+						id: profiles.id,
+						email: profiles.email,
+						role: profiles.role,
+						created_at: profiles.createdAt,
+						updated_at: profiles.updatedAt
+					})
 					.from(profiles)
 					.where(eq(profiles.orgId, org_id!))
 					.orderBy(desc(profiles.createdAt));
@@ -161,16 +164,13 @@ export const actions: Actions = {
 
 			// Prevent self role changes to lower privilege (safety check)
 			const isSuperAdmin = checkSuperAdmin(locals);
-			if (
-				userId === user?.id &&
-				isSuperAdmin &&
-				!['super_admin'].includes(newRole)
-			) {
+			if (userId === user?.id && isSuperAdmin && !['super_admin'].includes(newRole)) {
 				return fail(400, { error: 'Cannot downgrade your own super admin role' });
 			}
 
 			// Get current user to check permissions with Drizzle
-			const targetUsers = await db.select({ role: profiles.role })
+			const targetUsers = await db
+				.select({ role: profiles.role })
 				.from(profiles)
 				.where(and(eq(profiles.id, userId), eq(profiles.orgId, org_id!)))
 				.limit(1);
@@ -192,7 +192,8 @@ export const actions: Actions = {
 			}
 
 			// Update user role with Drizzle
-			await db.update(profiles)
+			await db
+				.update(profiles)
 				.set({
 					role: newRole as any,
 					updatedAt: new Date()
@@ -200,13 +201,14 @@ export const actions: Actions = {
 				.where(and(eq(profiles.id, userId), eq(profiles.orgId, org_id!)));
 
 			// Get updated users list
-			const updatedUsers = await db.select({
-				id: profiles.id,
-				email: profiles.email,
-				role: profiles.role,
-				created_at: profiles.createdAt,
-				updated_at: profiles.updatedAt
-			})
+			const updatedUsers = await db
+				.select({
+					id: profiles.id,
+					email: profiles.email,
+					role: profiles.role,
+					created_at: profiles.createdAt,
+					updated_at: profiles.updatedAt
+				})
 				.from(profiles)
 				.where(eq(profiles.orgId, org_id!))
 				.orderBy(desc(profiles.createdAt));
@@ -244,7 +246,8 @@ export const actions: Actions = {
 			}
 
 			// Get target user details with Drizzle
-			const targetUsers = await db.select({ role: profiles.role, email: profiles.email })
+			const targetUsers = await db
+				.select({ role: profiles.role, email: profiles.email })
 				.from(profiles)
 				.where(and(eq(profiles.id, userId), eq(profiles.orgId, org_id!)))
 				.limit(1);
@@ -258,13 +261,16 @@ export const actions: Actions = {
 			// Check if this is the last admin
 			const adminRoles = ['super_admin', 'org_admin'];
 			if (adminRoles.includes(targetUser.role || '')) {
-				const adminCountResult = await db.select({ count: sql<number>`count(*)` })
+				const adminCountResult = await db
+					.select({ count: sql<number>`count(*)` })
 					.from(profiles)
-					.where(and(
-						eq(profiles.orgId, org_id!),
-						inArray(profiles.role, adminRoles as any),
-						ne(profiles.id, userId)
-					));
+					.where(
+						and(
+							eq(profiles.orgId, org_id!),
+							inArray(profiles.role, adminRoles as any),
+							ne(profiles.id, userId)
+						)
+					);
 
 				const adminCount = Number(adminCountResult[0]?.count || 0);
 				if (adminCount === 0) {
@@ -275,20 +281,20 @@ export const actions: Actions = {
 			}
 
 			// Delete profile with Drizzle
-			await db.delete(profiles)
-				.where(and(eq(profiles.id, userId), eq(profiles.orgId, org_id!)));
+			await db.delete(profiles).where(and(eq(profiles.id, userId), eq(profiles.orgId, org_id!)));
 
 			// Note: Better Auth user table deletion would require auth.api.deleteUser if available
 			// For now, we just delete the profile
 
 			// Get updated users list
-			const updatedUsers = await db.select({
-				id: profiles.id,
-				email: profiles.email,
-				role: profiles.role,
-				created_at: profiles.createdAt,
-				updated_at: profiles.updatedAt
-			})
+			const updatedUsers = await db
+				.select({
+					id: profiles.id,
+					email: profiles.email,
+					role: profiles.role,
+					created_at: profiles.createdAt,
+					updated_at: profiles.updatedAt
+				})
 				.from(profiles)
 				.where(eq(profiles.orgId, org_id!))
 				.orderBy(desc(profiles.createdAt));

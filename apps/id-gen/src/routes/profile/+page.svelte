@@ -324,7 +324,9 @@
 										onCheckedChange={(checked) => {
 											preferences.adminNotifications = checked;
 										}}
-										disabled={!['super_admin', 'org_admin', 'id_gen_admin'].includes(profile.role || '')}
+										disabled={!['super_admin', 'org_admin', 'id_gen_admin'].includes(
+											profile.role || ''
+										)}
 									/>
 								</div>
 							</div>

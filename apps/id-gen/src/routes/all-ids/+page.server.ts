@@ -44,7 +44,7 @@ export const actions: Actions = {
 			if (imagesToDelete.length > 0) {
 				try {
 					const { deleteFromR2 } = await import('$lib/server/s3');
-					await Promise.allSettled(imagesToDelete.map(key => deleteFromR2(key)));
+					await Promise.allSettled(imagesToDelete.map((key) => deleteFromR2(key)));
 				} catch (storageError) {
 					console.error('Error deleting images from R2:', storageError);
 					// Non-fatal - continue with database deletion
@@ -96,7 +96,7 @@ export const actions: Actions = {
 			if (imagesToDelete.length > 0) {
 				try {
 					const { deleteFromR2 } = await import('$lib/server/s3');
-					await Promise.allSettled(imagesToDelete.map(key => deleteFromR2(key)));
+					await Promise.allSettled(imagesToDelete.map((key) => deleteFromR2(key)));
 				} catch (storageError) {
 					console.error('Error deleting images from R2:', storageError);
 					// Non-fatal - continue with database deletion

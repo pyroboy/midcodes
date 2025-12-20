@@ -1,6 +1,12 @@
 import type { PageServerLoad } from './$types';
 import { error } from '@sveltejs/kit';
-import { checkAdmin, checkAdminEmulatedOnly, checkSuperAdmin, shouldBypassFor403, wantsToAssumeRole } from '$lib/utils/adminPermissions';
+import {
+	checkAdmin,
+	checkAdminEmulatedOnly,
+	checkSuperAdmin,
+	shouldBypassFor403,
+	wantsToAssumeRole
+} from '$lib/utils/adminPermissions';
 
 export const load: PageServerLoad = async ({ parent, locals, url }) => {
 	// Get data from parent layout (authentication check happens there)
@@ -15,10 +21,8 @@ export const load: PageServerLoad = async ({ parent, locals, url }) => {
 	const assumingRole = wantsToAssumeRole(locals, url);
 
 	// Require admin role - use emulated-only check if user wants to assume role
-	const isAdmin = assumingRole 
-		? checkAdminEmulatedOnly(locals) 
-		: checkAdmin(locals);
-	
+	const isAdmin = assumingRole ? checkAdminEmulatedOnly(locals) : checkAdmin(locals);
+
 	const isSuperAdmin = checkSuperAdmin(locals);
 	const canBypass = shouldBypassFor403(locals, url);
 

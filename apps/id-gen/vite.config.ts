@@ -12,10 +12,10 @@ dotenv.config({ path: resolve(process.cwd(), '.env') });
 export default defineConfig(({ mode }) => {
 	// Also use Vite's loadEnv as a fallback
 	const env = loadEnv(mode, process.cwd(), '');
-	
+
 	// Merge into process.env for SSR
 	Object.assign(process.env, env);
-	
+
 	return {
 		plugins: [tailwindcss(), sveltekit()],
 		server: {

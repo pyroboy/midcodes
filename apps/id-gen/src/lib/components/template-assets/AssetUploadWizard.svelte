@@ -27,24 +27,23 @@
 	let { sizePresets, userId, onComplete, onCancel }: Props = $props();
 
 	const steps = ['size', 'upload', 'detection', 'save'] as const;
-	
+
 	let uploadProgress = $state({ current: 0, total: 0 });
 
 	async function saveAssets() {
 		// All items in previewPairs are valid candidates for saving (either paired or selected front)
-        const pairsToSave = $previewPairs;
-        
-		if (pairsToSave.length === 0) return;
+		const pairsToSave = $previewPairs;
 
+		if (pairsToSave.length === 0) return;
 
 		assetUploadStore.setProcessing(true);
 		assetUploadStore.setError(null);
 		uploadProgress = { current: 0, total: pairsToSave.length };
 
 		try {
-            const frontFile = $assetUploadStore.frontImage;
-            const backFile = $assetUploadStore.backImage;
-            
+			const frontFile = $assetUploadStore.frontImage;
+			const backFile = $assetUploadStore.backImage;
+
 			if (!frontFile && !backFile) throw new Error('No image files found');
 
 			const preset = $assetUploadStore.selectedSizePreset;
@@ -60,35 +59,35 @@
 				uploadProgress = { current: index + 1, total: pairsToSave.length };
 
 				// 1. Extract and resize to full dimensions
-                // Front
-                if (!frontFile) throw new Error('Front image is missing');
+				// Front
+				if (!frontFile) throw new Error('Front image is missing');
 				const extractedFront = await extractAndResizeRegion(frontFile, pair.front, preset);
 				const frontVariants = await generateImageVariants(extractedFront.blob, TEMPLATE_VARIANTS);
-                
-                // Back (Optional)
-                let backVariants = null;
-                let extractedBack = null;
-                if (pair.back && backFile) {
-                    extractedBack = await extractAndResizeRegion(backFile, pair.back, preset);
-                    backVariants = await generateImageVariants(extractedBack.blob, TEMPLATE_VARIANTS);
-                }
+
+				// Back (Optional)
+				let backVariants = null;
+				let extractedBack = null;
+				if (pair.back && backFile) {
+					extractedBack = await extractAndResizeRegion(backFile, pair.back, preset);
+					backVariants = await generateImageVariants(extractedBack.blob, TEMPLATE_VARIANTS);
+				}
 
 				// 3. Prepare FormData for server action
 				const formData = new FormData();
-                
-                // Append Front
+
+				// Append Front
 				formData.set('image_front_full', frontVariants.full, 'front-full.png');
 				formData.set('image_front_preview', frontVariants.preview, 'front-preview.jpg');
 				formData.set('image_front_thumb', frontVariants.thumb, 'front-thumb.jpg');
-                
-                // Append Back (if exists)
-                if (backVariants) {
-                    formData.set('image_back_full', backVariants.full, 'back-full.png');
-				    formData.set('image_back_preview', backVariants.preview, 'back-preview.jpg');
-				    formData.set('image_back_thumb', backVariants.thumb, 'back-thumb.jpg');
-                }
-				
-                // Use Front ID for metadata lookup (as we keyed it by Front ID in store logic)
+
+				// Append Back (if exists)
+				if (backVariants) {
+					formData.set('image_back_full', backVariants.full, 'back-full.png');
+					formData.set('image_back_preview', backVariants.preview, 'back-preview.jpg');
+					formData.set('image_back_thumb', backVariants.thumb, 'back-thumb.jpg');
+				}
+
+				// Use Front ID for metadata lookup (as we keyed it by Front ID in store logic)
 				const meta = $assetUploadStore.assetMetadata.get(pair.front.id);
 				formData.set('name', meta?.name || `Template ${index + 1}`);
 				formData.set('description', meta?.description || '');
@@ -107,11 +106,11 @@
 				});
 
 				const result = deserialize(await response.text());
-				
+
 				if (result.type === 'failure') {
 					throw new Error((result.data as { error?: string })?.error || 'Failed to save asset');
 				}
-				
+
 				if (result.type !== 'success') {
 					throw new Error('Unexpected response from server');
 				}
@@ -122,7 +121,6 @@
 			if (successCount === pairsToSave.length) {
 				if (onComplete) onComplete();
 			}
-
 		} catch (e) {
 			console.error('Save error:', e);
 			assetUploadStore.setError(e instanceof Error ? e.message : 'Failed to save assets');
@@ -143,7 +141,7 @@
 		if ($assetUploadStore.currentStep === 'detection') {
 			assetUploadStore.initializeMetadata();
 		}
-		
+
 		if (currentIndex < steps.length - 1) {
 			assetUploadStore.goToStep(steps[currentIndex + 1]);
 		}
@@ -165,15 +163,28 @@
 <div class="space-y-6 relative">
 	<!-- Upload Progress Overlay -->
 	{#if $assetUploadStore.isProcessing && uploadProgress.total > 0}
-		<div 
+		<div
 			transition:fade={{ duration: 200 }}
 			class="absolute inset-0 z-50 flex flex-col items-center justify-center rounded-lg bg-background/90 backdrop-blur-sm"
 		>
-			<div class="w-full max-w-sm space-y-4 p-6 bg-card rounded-xl border border-border shadow-lg text-center">
+			<div
+				class="w-full max-w-sm space-y-4 p-6 bg-card rounded-xl border border-border shadow-lg text-center"
+			>
 				<div class="mx-auto h-12 w-12 text-primary">
 					<svg class="animate-spin h-full w-full" fill="none" viewBox="0 0 24 24">
-						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+						<circle
+							class="opacity-25"
+							cx="12"
+							cy="12"
+							r="10"
+							stroke="currentColor"
+							stroke-width="4"
+						/>
+						<path
+							class="opacity-75"
+							fill="currentColor"
+							d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+						/>
 					</svg>
 				</div>
 				<div>
@@ -184,7 +195,7 @@
 				</div>
 				<!-- Progress Bar -->
 				<div class="h-2 w-full overflow-hidden rounded-full bg-secondary">
-					<div 
+					<div
 						class="h-full bg-primary transition-all duration-300 ease-out"
 						style="width: {(uploadProgress.current / uploadProgress.total) * 100}%"
 					></div>
@@ -215,13 +226,19 @@
 						class={cn(
 							'flex h-10 w-10 items-center justify-center rounded-full border-2 text-sm font-semibold transition-all',
 							isCurrent && 'border-primary bg-primary text-primary-foreground',
-							isCompleted && 'border-primary bg-primary text-primary-foreground cursor-pointer hover:bg-primary/90',
+							isCompleted &&
+								'border-primary bg-primary text-primary-foreground cursor-pointer hover:bg-primary/90',
 							!isCurrent && !isCompleted && 'border-muted bg-background text-muted-foreground'
 						)}
 					>
 						{#if isCompleted}
 							<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2.5"
+									d="M5 13l4 4L19 7"
+								/>
 							</svg>
 						{:else}
 							{stepNumber}
@@ -242,9 +259,21 @@
 
 	<!-- Error display -->
 	{#if $assetUploadStore.error}
-		<div class="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4">
-			<svg class="mt-0.5 h-5 w-5 flex-shrink-0 text-destructive" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+		<div
+			class="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-4"
+		>
+			<svg
+				class="mt-0.5 h-5 w-5 flex-shrink-0 text-destructive"
+				fill="none"
+				viewBox="0 0 24 24"
+				stroke="currentColor"
+			>
+				<path
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					stroke-width="2"
+					d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+				/>
 			</svg>
 			<div class="flex-1">
 				<p class="text-sm font-medium text-destructive">Error</p>
@@ -257,7 +286,12 @@
 				class="text-destructive/60 hover:text-destructive"
 			>
 				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M6 18L18 6M6 6l12 12"
+					/>
 				</svg>
 			</button>
 		</div>
@@ -296,7 +330,12 @@
 					class="inline-flex items-center gap-2 rounded-md border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50"
 				>
 					<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M15 19l-7-7 7-7"
+						/>
 					</svg>
 					Previous
 				</button>
@@ -310,8 +349,19 @@
 			>
 				{#if $assetUploadStore.isProcessing}
 					<svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+						<circle
+							class="opacity-25"
+							cx="12"
+							cy="12"
+							r="10"
+							stroke="currentColor"
+							stroke-width="4"
+						/>
+						<path
+							class="opacity-75"
+							fill="currentColor"
+							d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+						/>
 					</svg>
 					{#if $assetUploadStore.currentStep === 'detection'}
 						Processing...
@@ -321,12 +371,22 @@
 				{:else if $assetUploadStore.currentStep === 'save'}
 					Save Templates
 					<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M5 13l4 4L19 7"
+						/>
 					</svg>
 				{:else}
 					Next
 					<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M9 5l7 7-7 7"
+						/>
 					</svg>
 				{/if}
 			</button>

@@ -82,7 +82,7 @@
 	let startX: number, startY: number;
 	let currentElementIndex: number | null = $state(null);
 	let resizeHandle: string | null = $state(null);
-	
+
 	// Original dimensions at resize start (for proportional font scaling)
 	let originalWidth: number = 0;
 	let originalHeight: number = 0;
@@ -241,11 +241,11 @@
 		}
 
 		console.log('🔤 [TemplateForm] Starting font load...', { side });
-		
+
 		// Debug: Check what getAllFontFamilies returns BEFORE loading
 		const preLoadFonts = getAllFontFamilies();
 		console.log('🔤 [TemplateForm] Pre-load available fonts:', preLoadFonts);
-		
+
 		loadGoogleFonts()
 			.then(() => {
 				const loadedFonts = getAllFontFamilies();
@@ -415,20 +415,20 @@
 			size: `(${Number((el.width || 0).toFixed(2))}x${Number((el.height || 0).toFixed(2))})`,
 			side
 		}));
-		
+
 		console.log(`📏 [TemplateForm:${side}] Updating ${elementList.length} elements:`, debugInfo);
-		
+
 		onUpdateElements?.(
 			elementList.map((el: TemplateElement) => ({ ...el, side })),
 			side
 		);
 	}
-	
+
 	/**
 	 * Measure the true bounding box height for a text element based on text wrapping.
 	 * Returns the height needed to fit all text at the given width and font size.
 	 * All dimensions are in storage coordinates (actual pixels).
-	 * 
+	 *
 	 * Handles:
 	 * - Word wrapping (split on spaces)
 	 * - Character-level breaking for long words that exceed container width
@@ -441,14 +441,14 @@
 		const fontFamily = element.fontFamily || element.font || 'Arial';
 		const fontWeight = element.fontWeight || '400';
 		const lineHeight = 1.3; // Slightly more generous line height for readability
-		
+
 		// Handle empty or whitespace-only text
 		if (!text.trim()) {
 			const defaultHeight = fontSize * lineHeight + 10;
 			console.log('📐 [measureTextBoundingBox] Empty text, using default height:', defaultHeight);
 			return defaultHeight;
 		}
-		
+
 		// Create a temporary canvas for measurement
 		const canvas = document.createElement('canvas');
 		const ctx = canvas.getContext('2d');
@@ -456,28 +456,28 @@
 			console.warn('📐 [measureTextBoundingBox] Could not get canvas context');
 			return element.height || 50;
 		}
-		
+
 		// Set up font for measurement
 		ctx.font = `${fontWeight} ${fontSize}px "${fontFamily}"`;
-		
+
 		/**
 		 * Break a word into chunks that fit within maxWidth.
 		 * Uses character-level breaking to ensure every chunk fits.
 		 */
 		function breakWord(word: string, maxWidth: number): string[] {
 			const result: string[] = [];
-			
+
 			/**
 			 * Break a single segment into character-sized chunks that fit within maxWidth
 			 */
 			function breakToCharacters(segment: string): string[] {
 				const charChunks: string[] = [];
 				let currentChunk = '';
-				
+
 				for (let i = 0; i < segment.length; i++) {
 					const char = segment[i];
 					const testChunk = currentChunk + char;
-					
+
 					if (ctx!.measureText(testChunk).width <= maxWidth) {
 						currentChunk = testChunk;
 					} else {
@@ -490,19 +490,19 @@
 				if (currentChunk) {
 					charChunks.push(currentChunk);
 				}
-				
+
 				return charChunks.length > 0 ? charChunks : [segment];
 			}
-			
+
 			// First, try breaking on hyphens (for ID-like content)
 			if (word.includes('-')) {
 				const hyphenParts = word.split('-');
-				
+
 				for (let i = 0; i < hyphenParts.length; i++) {
 					const part = hyphenParts[i];
 					// Add hyphen back except for last part
 					const segment = i < hyphenParts.length - 1 ? part + '-' : part;
-					
+
 					// Check if this segment fits
 					if (ctx!.measureText(segment).width <= maxWidth) {
 						result.push(segment);
@@ -512,39 +512,39 @@
 						result.push(...brokenChunks);
 					}
 				}
-				
+
 				return result;
 			}
-			
+
 			// No hyphens - do character-level breaking
 			return breakToCharacters(word);
 		}
-		
+
 		// Split text into lines (handle explicit newlines)
 		const paragraphs = text.split('\n');
 		let totalLineCount = 0;
-		
+
 		for (const paragraph of paragraphs) {
 			if (paragraph.trim() === '') {
 				// Empty paragraph still counts as one line
 				totalLineCount++;
 				continue;
 			}
-			
+
 			// Word wrap the paragraph to calculate how many lines we need
-			const words = paragraph.split(/\s+/).filter(w => w.length > 0);
+			const words = paragraph.split(/\s+/).filter((w) => w.length > 0);
 			if (words.length === 0) {
 				totalLineCount++;
 				continue;
 			}
-			
+
 			let line = '';
 			let paragraphLineCount = 0;
-			
+
 			for (let i = 0; i < words.length; i++) {
 				const word = words[i];
 				const wordWidth = ctx.measureText(word).width;
-				
+
 				// If word itself is wider than the container, break it
 				if (wordWidth > newWidth) {
 					// Finish current line if there's content
@@ -552,7 +552,7 @@
 						paragraphLineCount++;
 						line = '';
 					}
-					
+
 					// Break the word into smaller chunks
 					const wordChunks = breakWord(word, newWidth);
 					for (const chunk of wordChunks) {
@@ -560,10 +560,10 @@
 					}
 					continue;
 				}
-				
+
 				const testLine = line + (line ? ' ' : '') + word;
 				const metrics = ctx.measureText(testLine);
-				
+
 				if (metrics.width > newWidth && line !== '') {
 					// Current line would exceed width, wrap to new line
 					paragraphLineCount++;
@@ -572,24 +572,24 @@
 					line = testLine;
 				}
 			}
-			
+
 			// Don't forget the last line
 			if (line) {
 				paragraphLineCount++;
 			}
-			
+
 			totalLineCount += Math.max(1, paragraphLineCount);
 		}
-		
+
 		// Ensure at least 1 line
 		totalLineCount = Math.max(1, totalLineCount);
-		
+
 		// Calculate height based on line count and line height
 		// Add some padding for better visual appearance
 		const textHeight = totalLineCount * fontSize * lineHeight;
 		const padding = 8; // Small padding top/bottom
 		const calculatedHeight = Math.ceil(textHeight + padding);
-		
+
 		console.log('📐 [measureTextBoundingBox] Calculated:', {
 			text: text.substring(0, 30) + (text.length > 30 ? '...' : ''),
 			fontSize,
@@ -599,7 +599,7 @@
 			textHeight,
 			calculatedHeight
 		});
-		
+
 		// Ensure minimum height (at least one line of text)
 		return Math.max(calculatedHeight, fontSize * lineHeight + padding);
 	}
@@ -613,26 +613,29 @@
 			const newElements = elements.map((el: TemplateElement) => {
 				const maxX = Math.max(0, dim.actualWidth - (el.width || 0));
 				const maxY = Math.max(0, dim.actualHeight - (el.height || 0));
-				
+
 				const currentX = el.x || 0;
 				const currentY = el.y || 0;
-				
+
 				// Clamp to new bounds
 				const newX = Math.min(Math.max(currentX, 0), maxX);
 				const newY = Math.min(Math.max(currentY, 0), maxY);
-				
+
 				if (newX !== currentX || newY !== currentY) {
-					console.log(`⚠️ [TemplateForm:${side}] Clamping element ${el.id} (${el.type}) to fit new bounds:`, {
-						from: { x: currentX, y: currentY },
-						to: { x: newX, y: newY },
-						bounds: { w: dim.actualWidth, h: dim.actualHeight }
-					});
+					console.log(
+						`⚠️ [TemplateForm:${side}] Clamping element ${el.id} (${el.type}) to fit new bounds:`,
+						{
+							from: { x: currentX, y: currentY },
+							to: { x: newX, y: newY },
+							bounds: { w: dim.actualWidth, h: dim.actualHeight }
+						}
+					);
 					changed = true;
 					return { ...el, x: newX, y: newY };
 				}
 				return el;
 			});
-			
+
 			if (changed) {
 				elements = newElements;
 				updateElements();
@@ -664,7 +667,10 @@
 						newEl.width = Math.max(20, Number(width.toFixed(2)));
 						newEl.height = Math.max(20, Number(height.toFixed(2)));
 					} else if (el.type === 'text' && metrics) {
-						newEl.width = Math.max(20, Number((metrics.width / previewDimensions.scale).toFixed(2)));
+						newEl.width = Math.max(
+							20,
+							Number((metrics.width / previewDimensions.scale).toFixed(2))
+						);
 					}
 				}
 				return newEl;
@@ -674,8 +680,6 @@
 		// Pass the new list directly to updateElements
 		updateElements(newElements);
 	}
-
-
 
 	function handleSidebarSelect(id: string | null) {
 		selectedElementId = id;
@@ -712,14 +716,14 @@
 		currentElementIndex = index;
 		startX = event.clientX;
 		startY = event.clientY;
-		// Don't prevent default immediately if we want to allow some events, 
+		// Don't prevent default immediately if we want to allow some events,
 		// but for dragging we usually do.
 		// However, for simple selection (click), we might not want to prevent everything.
 		// But since we are starting a drag/resize, preventDefault is standard to stop text selection/scrolling.
-		event.preventDefault(); 
+		event.preventDefault();
 		event.stopPropagation(); // Prevent clearing selection via background click
 	}
-	
+
 	function onTouchStart(event: TouchEvent, index: number, handle: string | null = null) {
 		if (event.touches.length > 0) {
 			// Prevent default to stop scrolling interaction immediately on touch start
@@ -745,8 +749,8 @@
 			// Only call preventDefault if the event is cancelable (not from a passive listener)
 			if (event.cancelable) {
 				event.preventDefault();
-			} 
-			
+			}
+
 			const touch = event.touches[0];
 			const mouseEvent = new MouseEvent('mousemove', {
 				clientX: touch.clientX,
@@ -757,7 +761,7 @@
 			onMouseMove(mouseEvent);
 		}
 	}
-	
+
 	function onTouchEnd(event: TouchEvent) {
 		onMouseUp();
 	}
@@ -788,7 +792,8 @@
 		const centerY = rect.top + previewPos.y;
 
 		// Calculate starting angle from center to mouse position
-		rotateStartAngle = Math.atan2(event.clientY - centerY, event.clientX - centerX) * (180 / Math.PI);
+		rotateStartAngle =
+			Math.atan2(event.clientY - centerY, event.clientX - centerX) * (180 / Math.PI);
 		rotateElementStartRotation = element.rotation || 0;
 
 		event.preventDefault();
@@ -819,7 +824,12 @@
 	}
 
 	function onMouseMove(event: MouseEvent) {
-		if ((!isDragging && !isResizing && !isRotating) || currentElementIndex === null || !activeDragElement) return;
+		if (
+			(!isDragging && !isResizing && !isRotating) ||
+			currentElementIndex === null ||
+			!activeDragElement
+		)
+			return;
 
 		// Handle rotation
 		if (isRotating) {
@@ -872,11 +882,14 @@
 		}
 
 		if (isResizing) {
-			console.log('⚪ Dragging White Circle:', $state.snapshot({ 
-				handle: resizeHandle, 
-				mouseX: event.clientX, 
-				mouseY: event.clientY 
-			}));
+			console.log(
+				'⚪ Dragging White Circle:',
+				$state.snapshot({
+					handle: resizeHandle,
+					mouseX: event.clientX,
+					mouseY: event.clientY
+				})
+			);
 		}
 
 		const dx = event.clientX - startX;
@@ -887,16 +900,18 @@
 
 		// Operate on local state activeDragElement instead of elements array
 		const updatedElement = { ...activeDragElement }; // Start from current local state
-		
+
 		if (isResizing && updatedElement.width !== undefined && updatedElement.height !== undefined) {
 			let newWidth = updatedElement.width;
 			let newHeight = updatedElement.height;
 			let newX = updatedElement.x || 0;
 			let newY = updatedElement.y || 0;
-			
+
 			// Determine if this is a side handle (width-only) or corner handle (proportional)
 			const isSideHandle = resizeHandle === 'middle-left' || resizeHandle === 'middle-right';
-			const isCornerHandle = ['top-left', 'top-right', 'bottom-left', 'bottom-right'].includes(resizeHandle || '');
+			const isCornerHandle = ['top-left', 'top-right', 'bottom-left', 'bottom-right'].includes(
+				resizeHandle || ''
+			);
 
 			switch (resizeHandle) {
 				// CORNER HANDLES
@@ -905,18 +920,22 @@
 				case 'bottom-left':
 				case 'bottom-right': {
 					// Check if this is a text element (uniform scaling) or photo/signature (freeform)
-					const isTextElement = updatedElement.type === 'text' || updatedElement.type === 'selection';
-					
+					const isTextElement =
+						updatedElement.type === 'text' || updatedElement.type === 'selection';
+
 					if (isTextElement) {
 						// TEXT ELEMENTS: Uniform scaling (maintain aspect ratio like Canva)
 						// Use CUMULATIVE delta from resize start for stable uniform scaling
 						const cumulativeDx = event.clientX - resizeStartMouseX;
 						const cumulativeDy = event.clientY - resizeStartMouseY;
-						const cumulativeStorageDelta = coordSystem().scaleMouseDelta(cumulativeDx, cumulativeDy);
-						
+						const cumulativeStorageDelta = coordSystem().scaleMouseDelta(
+							cumulativeDx,
+							cumulativeDy
+						);
+
 						const aspectRatio = originalWidth / originalHeight;
 						let scaleDelta: number;
-						
+
 						if (resizeHandle === 'bottom-right') {
 							scaleDelta = (cumulativeStorageDelta.x + cumulativeStorageDelta.y) / 2;
 							newWidth = originalWidth + scaleDelta;
@@ -970,7 +989,6 @@
 					break;
 			}
 
-
 			// Constrain to bounds using coordinate system
 			const constrainedPos = coordSystem().constrainToStorage(
 				{ x: newX, y: newY },
@@ -982,21 +1000,22 @@
 			updatedElement.y = Number(constrainedPos.y.toFixed(2));
 			updatedElement.width = Math.max(20, Number(newWidth.toFixed(2)));
 			updatedElement.height = Math.max(20, Number(newHeight.toFixed(2)));
-			
+
 			// Proportional font scaling for text/selection elements when using CORNER handles
 			const isTextElement = updatedElement.type === 'text' || updatedElement.type === 'selection';
 			if (isTextElement && isCornerHandle && originalWidth > 0 && originalHeight > 0) {
 				// Use geometric mean (sqrt of area ratio) for balanced scaling
-				const areaRatio = (updatedElement.width * updatedElement.height) / (originalWidth * originalHeight);
+				const areaRatio =
+					(updatedElement.width * updatedElement.height) / (originalWidth * originalHeight);
 				const scaleFactor = Math.sqrt(areaRatio);
 				// Calculate new font size with minimum of 8px
 				const newFontSize = Math.max(8, Math.round(originalFontSize * scaleFactor));
 				updatedElement.fontSize = newFontSize;
 			}
-			
+
 			// Side handles: auto-calculate height based on text wrapping (fontSize remains unchanged)
 			// (isTextElement already defined above)
-			
+
 			console.log('🔍 [Resize Debug] Checking side handle auto-height:', {
 				elementType: updatedElement.type,
 				isTextElement,
@@ -1007,7 +1026,7 @@
 				fontSize: updatedElement.fontSize || updatedElement.size,
 				content: (updatedElement.content || '').substring(0, 30)
 			});
-			
+
 			if (isTextElement && isSideHandle) {
 				console.log('📏 [Side Handle Resize] TRIGGERED - Before auto-height:', {
 					elementType: updatedElement.type,
@@ -1045,7 +1064,7 @@
 		// Update local state
 		activeDragElement = updatedElement;
 		hasModified = true;
-		
+
 		// Live update for text elements during resize - push to elements array immediately
 		// This allows sidebar to show live font size changes (no throttling)
 		if (isResizing && currentElementIndex !== null) {
@@ -1064,7 +1083,12 @@
 
 	function onMouseUp() {
 		// Commit changes ONLY if we actually modified the element
-		if (hasModified && (isDragging || isResizing || isRotating) && currentElementIndex !== null && activeDragElement) {
+		if (
+			hasModified &&
+			(isDragging || isResizing || isRotating) &&
+			currentElementIndex !== null &&
+			activeDragElement
+		) {
 			const updatedElements = [...elements];
 			updatedElements[currentElementIndex] = activeDragElement;
 			updateElements(updatedElements);
@@ -1322,13 +1346,13 @@
 	// Custom action to add non-passive touch listeners
 	function nonPassiveTouch(node: HTMLElement, handler: (e: TouchEvent) => void) {
 		let currentHandler = handler;
-		
+
 		const eventHandler = (e: TouchEvent) => {
 			currentHandler(e);
 		};
-		
+
 		node.addEventListener('touchstart', eventHandler, { passive: false });
-		
+
 		return {
 			update(newHandler: (e: TouchEvent) => void) {
 				currentHandler = newHandler;
@@ -1351,10 +1375,7 @@
 	});
 </script>
 
-<svelte:window 
-	onmousemove={onMouseMove} 
-	onmouseup={onMouseUp} 
-/>
+<svelte:window onmousemove={onMouseMove} onmouseup={onMouseUp} />
 
 <div class="template-section">
 	<h2 class="text-2xl font-semibold mb-4 text-foreground">
@@ -1382,7 +1403,7 @@
 						style="display: block;"
 					></canvas>
 					<!-- Click listener for background to clear selection -->
-					<div 
+					<div
 						class="selection-clear-layer"
 						role="button"
 						tabindex="0"
@@ -1452,7 +1473,11 @@
 								class="template-element {element.type}"
 								class:highlighted={hoveredElementId === element.id}
 								class:selected={selectedElementId === element.id}
-								style={Object.entries(elementStyle(activeDragIndex === i && activeDragElement ? activeDragElement : element))
+								style={Object.entries(
+									elementStyle(
+										activeDragIndex === i && activeDragElement ? activeDragElement : element
+									)
+								)
 									.map(([key, value]) => `${key}: ${value}`)
 									.join(';')}
 								onmouseenter={() => (hoveredElementId = element.id)}
@@ -1519,27 +1544,31 @@
 										tabindex="0"
 										aria-label="Resize bottom right"
 									></div>
-								<!-- Side handles for width-only resize (text elements only) -->
-								{#if element.type === 'text' || element.type === 'selection'}
-									<div
-										class="resize-handle side-handle middle-left"
-										class:active={resizeHandle === 'middle-left' && currentElementIndex === i}
-										onmousedown={stopPropagation((e) => onMouseDown(e, i, 'middle-left'))}
-										use:nonPassiveTouch={stopPropagation((e) => onTouchStart(e, i, 'middle-left'))}
-										role="button"
-										tabindex="0"
-										aria-label="Resize width left"
-									></div>
-									<div
-										class="resize-handle side-handle middle-right"
-										class:active={resizeHandle === 'middle-right' && currentElementIndex === i}
-										onmousedown={stopPropagation((e) => onMouseDown(e, i, 'middle-right'))}
-										use:nonPassiveTouch={stopPropagation((e) => onTouchStart(e, i, 'middle-right'))}
-										role="button"
-										tabindex="0"
-										aria-label="Resize width right"
-									></div>
-								{/if}
+									<!-- Side handles for width-only resize (text elements only) -->
+									{#if element.type === 'text' || element.type === 'selection'}
+										<div
+											class="resize-handle side-handle middle-left"
+											class:active={resizeHandle === 'middle-left' && currentElementIndex === i}
+											onmousedown={stopPropagation((e) => onMouseDown(e, i, 'middle-left'))}
+											use:nonPassiveTouch={stopPropagation((e) =>
+												onTouchStart(e, i, 'middle-left')
+											)}
+											role="button"
+											tabindex="0"
+											aria-label="Resize width left"
+										></div>
+										<div
+											class="resize-handle side-handle middle-right"
+											class:active={resizeHandle === 'middle-right' && currentElementIndex === i}
+											onmousedown={stopPropagation((e) => onMouseDown(e, i, 'middle-right'))}
+											use:nonPassiveTouch={stopPropagation((e) =>
+												onTouchStart(e, i, 'middle-right')
+											)}
+											role="button"
+											tabindex="0"
+											aria-label="Resize width right"
+										></div>
+									{/if}
 									<!-- Rotation handle - positioned 40px below element bottom center -->
 									<div
 										class="rotation-handle"
@@ -1786,9 +1815,9 @@
 	.template-element:hover,
 	.template-element.selected {
 		/* Show border when highlighted, hovered, OR selected */
-		outline: 3px solid #8b5cf6; 
+		outline: 3px solid #8b5cf6;
 	}
-	
+
 	/* Add a specific style for selected to be very clear */
 	.template-element.selected {
 		z-index: 25; /* Bring selected to front */
@@ -1812,11 +1841,11 @@
 	}
 
 	.template-element:hover .resize-handle,
-	.template-element.selected .resize-handle, 
+	.template-element.selected .resize-handle,
 	.resize-handle.active {
 		display: flex;
 	}
-	
+
 	/* The Visual White Circle (Visual Indicator) */
 	.resize-handle::after {
 		content: '';
@@ -1825,10 +1854,10 @@
 		background-color: white;
 		border: 1px solid #8b5cf6; /* Violet border */
 		border-radius: 50%;
-		box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 		transition: transform 0.1s;
 	}
-	
+
 	/* Hover effect on the handle itself */
 	.resize-handle:hover::after {
 		transform: scale(1.2);
@@ -1980,7 +2009,6 @@
 		background-color: #8b5cf6;
 		color: white;
 	}
-
 
 	/* Rotation tooltip - positioned fixed to follow cursor */
 	:global(.rotation-tooltip) {

@@ -7,9 +7,28 @@
 	import { createCreditPayment } from '$lib/remote/payments.remote';
 	import { paymentFlags } from '$lib/stores/featureFlags';
 	import {
-		Check, Zap, CreditCard, Smartphone, Key, Tag, ShieldCheck, Cpu,
-		AlertTriangle, Clock, FileCheck, Users, Building2, Wallet, Award,
-		Shield, Fingerprint, QrCode, Sparkles, Package, ArrowRight, Mail
+		Check,
+		Zap,
+		CreditCard,
+		Smartphone,
+		Key,
+		Tag,
+		ShieldCheck,
+		Cpu,
+		AlertTriangle,
+		Clock,
+		FileCheck,
+		Users,
+		Building2,
+		Wallet,
+		Award,
+		Shield,
+		Fingerprint,
+		QrCode,
+		Sparkles,
+		Package,
+		ArrowRight,
+		Mail
 	} from 'lucide-svelte';
 	import { getPreloadState } from '$lib/services/preloadService';
 
@@ -32,7 +51,7 @@
 		console.log('--- Pricing Page Theme Debug ---');
 		console.log('HTML classList contains "dark":', isDarkClass);
 		console.log('System prefers dark scheme:', systemPrefersDark);
-		
+
 		const mainContainer = document.querySelector('.min-h-screen');
 		if (mainContainer) {
 			const computedStyle = window.getComputedStyle(mainContainer);
@@ -72,9 +91,16 @@
 		...pkg,
 		price: pkg.amountPhp,
 		pricePerCard: pkg.amountPhp / pkg.credits,
-		discount: index > 0
-			? Math.round((1 - pkg.amountPhp / pkg.credits / (CREDIT_PACKAGES[0].amountPhp / CREDIT_PACKAGES[0].credits)) * 100)
-			: 0,
+		discount:
+			index > 0
+				? Math.round(
+						(1 -
+							pkg.amountPhp /
+								pkg.credits /
+								(CREDIT_PACKAGES[0].amountPhp / CREDIT_PACKAGES[0].credits)) *
+							100
+					)
+				: 0,
 		popular: pkg.id === 'credits_1000',
 		features: [
 			`${pkg.credits} ID Generations`,
@@ -128,11 +154,13 @@
 
 <svelte:head>
 	<title>Pricing - Kanaya ID</title>
-	<meta name="description" content="Professional ID Card Production with security features: RFID, UV overlay, hologram, barcode. Business packages available." />
+	<meta
+		name="description"
+		content="Professional ID Card Production with security features: RFID, UV overlay, hologram, barcode. Business packages available."
+	/>
 </svelte:head>
 
 <div class="min-h-screen bg-white dark:bg-slate-950">
-
 	<!-- Header -->
 	<section class="py-16 md:py-20 text-center px-4 max-w-4xl mx-auto">
 		<p class="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">Pricing</p>
@@ -140,7 +168,8 @@
 			Service Menu
 		</h1>
 		<p class="text-lg text-muted-foreground max-w-xl mx-auto">
-			Professional ID cards with advanced security features. From student IDs to enterprise access control.
+			Professional ID cards with advanced security features. From student IDs to enterprise access
+			control.
 		</p>
 	</section>
 
@@ -149,7 +178,9 @@
 		<div class="max-w-5xl mx-auto px-4 py-6">
 			<div class="flex items-start gap-3 mb-4">
 				<AlertTriangle class="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-				<p class="text-sm font-medium text-slate-700 dark:text-slate-300">Please read before ordering</p>
+				<p class="text-sm font-medium text-slate-700 dark:text-slate-300">
+					Please read before ordering
+				</p>
 			</div>
 			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
 				<div class="flex items-start gap-2">
@@ -191,8 +222,12 @@
 				<div class="flex items-center gap-3">
 					<Sparkles class="w-5 h-5 text-primary shrink-0" />
 					<div>
-						<p class="font-medium text-slate-800 dark:text-slate-200">Free Digital Template Generation</p>
-						<p class="text-xs text-muted-foreground">Design your ID layout online at no cost. For complex or custom designs, contact us.</p>
+						<p class="font-medium text-slate-800 dark:text-slate-200">
+							Free Digital Template Generation
+						</p>
+						<p class="text-xs text-muted-foreground">
+							Design your ID layout online at no cost. For complex or custom designs, contact us.
+						</p>
 					</div>
 				</div>
 				<Button variant="outline" size="sm" href="/templates">
@@ -203,14 +238,40 @@
 	</section>
 
 	<!-- Quick Nav -->
-	<nav class="sticky top-0 z-20 bg-white/80 dark:bg-slate-950/80 backdrop-blur border-b border-slate-200 dark:border-slate-800">
+	<nav
+		class="sticky top-0 z-20 bg-white/80 dark:bg-slate-950/80 backdrop-blur border-b border-slate-200 dark:border-slate-800"
+	>
 		<div class="max-w-5xl mx-auto px-4 py-3 flex flex-wrap justify-center gap-2 text-sm">
-			<a href="#id-cards" class="px-3 py-1.5 rounded-md text-muted-foreground hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">ID Cards</a>
-			<a href="#security" class="px-3 py-1.5 rounded-md text-muted-foreground hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Security Features</a>
-			<a href="#packages" class="px-3 py-1.5 rounded-md text-muted-foreground hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Business Packages</a>
-			<a href="#accessories" class="px-3 py-1.5 rounded-md text-muted-foreground hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Accessories</a>
-			<a href="#smart-tech" class="px-3 py-1.5 rounded-md text-muted-foreground hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Smart Tech</a>
-			<a href="#digital" class="px-3 py-1.5 rounded-md text-muted-foreground hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Digital Credits</a>
+			<a
+				href="#id-cards"
+				class="px-3 py-1.5 rounded-md text-muted-foreground hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+				>ID Cards</a
+			>
+			<a
+				href="#security"
+				class="px-3 py-1.5 rounded-md text-muted-foreground hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+				>Security Features</a
+			>
+			<a
+				href="#packages"
+				class="px-3 py-1.5 rounded-md text-muted-foreground hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+				>Business Packages</a
+			>
+			<a
+				href="#accessories"
+				class="px-3 py-1.5 rounded-md text-muted-foreground hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+				>Accessories</a
+			>
+			<a
+				href="#smart-tech"
+				class="px-3 py-1.5 rounded-md text-muted-foreground hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+				>Smart Tech</a
+			>
+			<a
+				href="#digital"
+				class="px-3 py-1.5 rounded-md text-muted-foreground hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+				>Digital Credits</a
+			>
 		</div>
 	</nav>
 
@@ -218,19 +279,28 @@
 	<section id="id-cards" class="py-16 px-4 scroll-mt-16">
 		<div class="max-w-5xl mx-auto">
 			<div class="mb-10">
-				<p class="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-2">I. ID Card Production</p>
+				<p class="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-2">
+					I. ID Card Production
+				</p>
 				<h2 class="text-2xl font-bold text-slate-900 dark:text-white">Corporate & School IDs</h2>
 			</div>
 
 			<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
 				<!-- Standard Laminated -->
-				<div class="border border-slate-200 dark:border-slate-800 rounded-lg p-6 hover:border-slate-300 dark:hover:border-slate-700 transition-colors">
+				<div
+					class="border border-slate-200 dark:border-slate-800 rounded-lg p-6 hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
+				>
 					<div class="mb-4">
-						<span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Option A</span>
-						<h3 class="text-lg font-semibold text-slate-900 dark:text-white mt-1">Standard Laminated</h3>
+						<span class="text-xs font-medium text-muted-foreground uppercase tracking-wider"
+							>Option A</span
+						>
+						<h3 class="text-lg font-semibold text-slate-900 dark:text-white mt-1">
+							Standard Laminated
+						</h3>
 						<p class="text-sm text-muted-foreground mt-2">
-							The industry standard for schools and organizations. Heat-pressed sandwich construction with a glossy, professional finish. Print is sealed inside the laminate for scratch and fade resistance.
+							The industry standard for schools and organizations. Heat-pressed sandwich
+							construction with a glossy, professional finish. Print is sealed inside the laminate
+							for scratch and fade resistance.
 						</p>
 					</div>
 					<div class="flex items-center gap-2 text-xs text-muted-foreground mb-4">
@@ -244,26 +314,64 @@
 					</div>
 					<table class="w-full text-sm mb-4">
 						<tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-							<tr><td class="py-2 text-slate-700 dark:text-slate-300">5 - 19 pcs</td><td class="py-2 text-right font-semibold text-slate-900 dark:text-white">₱50</td></tr>
-							<tr><td class="py-2 text-slate-700 dark:text-slate-300">20 - 49 pcs</td><td class="py-2 text-right font-semibold text-slate-900 dark:text-white">₱45</td></tr>
-							<tr><td class="py-2 text-slate-700 dark:text-slate-300">50 - 99 pcs</td><td class="py-2 text-right font-semibold text-slate-900 dark:text-white">₱40</td></tr>
-							<tr><td class="py-2 text-slate-700 dark:text-slate-300">100 - 199 pcs</td><td class="py-2 text-right font-semibold text-slate-900 dark:text-white">₱35</td></tr>
-							<tr><td class="py-2 text-slate-700 dark:text-slate-300">200 - 499 pcs</td><td class="py-2 text-right font-semibold text-slate-900 dark:text-white">₱30</td></tr>
-							<tr><td class="py-2 text-slate-700 dark:text-slate-300">500 - 999 pcs</td><td class="py-2 text-right font-semibold text-slate-900 dark:text-white">₱27</td></tr>
-							<tr class="bg-primary/5"><td class="py-2 font-semibold text-slate-900 dark:text-white">1,000+ pcs</td><td class="py-2 text-right font-bold text-primary">₱23</td></tr>
+							<tr
+								><td class="py-2 text-slate-700 dark:text-slate-300">5 - 19 pcs</td><td
+									class="py-2 text-right font-semibold text-slate-900 dark:text-white">₱50</td
+								></tr
+							>
+							<tr
+								><td class="py-2 text-slate-700 dark:text-slate-300">20 - 49 pcs</td><td
+									class="py-2 text-right font-semibold text-slate-900 dark:text-white">₱45</td
+								></tr
+							>
+							<tr
+								><td class="py-2 text-slate-700 dark:text-slate-300">50 - 99 pcs</td><td
+									class="py-2 text-right font-semibold text-slate-900 dark:text-white">₱40</td
+								></tr
+							>
+							<tr
+								><td class="py-2 text-slate-700 dark:text-slate-300">100 - 199 pcs</td><td
+									class="py-2 text-right font-semibold text-slate-900 dark:text-white">₱35</td
+								></tr
+							>
+							<tr
+								><td class="py-2 text-slate-700 dark:text-slate-300">200 - 499 pcs</td><td
+									class="py-2 text-right font-semibold text-slate-900 dark:text-white">₱30</td
+								></tr
+							>
+							<tr
+								><td class="py-2 text-slate-700 dark:text-slate-300">500 - 999 pcs</td><td
+									class="py-2 text-right font-semibold text-slate-900 dark:text-white">₱27</td
+								></tr
+							>
+							<tr class="bg-primary/5"
+								><td class="py-2 font-semibold text-slate-900 dark:text-white">1,000+ pcs</td><td
+									class="py-2 text-right font-bold text-primary">₱23</td
+								></tr
+							>
 						</tbody>
 					</table>
-					<Button variant="default" class="w-full" href="/contact?subject=Standard+Laminated+ID">Get Quote</Button>
+					<Button variant="default" class="w-full" href="/contact?subject=Standard+Laminated+ID"
+						>Get Quote</Button
+					>
 				</div>
 
 				<!-- Premium Direct Print -->
-				<div class="border border-slate-200 dark:border-slate-800 rounded-lg p-6 hover:border-slate-300 dark:hover:border-slate-700 transition-colors relative">
+				<div
+					class="border border-slate-200 dark:border-slate-800 rounded-lg p-6 hover:border-slate-300 dark:hover:border-slate-700 transition-colors relative"
+				>
 					<Badge class="absolute -top-2.5 right-4 text-xs">Popular</Badge>
 					<div class="mb-4">
-						<span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Option B</span>
-						<h3 class="text-lg font-semibold text-slate-900 dark:text-white mt-1">Premium Direct Print</h3>
+						<span class="text-xs font-medium text-muted-foreground uppercase tracking-wider"
+							>Option B</span
+						>
+						<h3 class="text-lg font-semibold text-slate-900 dark:text-white mt-1">
+							Premium Direct Print
+						</h3>
 						<p class="text-sm text-muted-foreground mt-2">
-							Executive-grade solid PVC cards with edge-to-edge thermal transfer printing. The same technology used in bank cards, government IDs, and corporate access credentials. Exceptional durability and professional appearance.
+							Executive-grade solid PVC cards with edge-to-edge thermal transfer printing. The same
+							technology used in bank cards, government IDs, and corporate access credentials.
+							Exceptional durability and professional appearance.
 						</p>
 					</div>
 					<div class="flex items-center gap-2 text-xs text-muted-foreground mb-4">
@@ -278,21 +386,43 @@
 					</div>
 					<table class="w-full text-sm mb-4">
 						<tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-							<tr><td class="py-2 text-slate-700 dark:text-slate-300">1 - 9 pcs</td><td class="py-2 text-right font-semibold text-slate-900 dark:text-white">₱180</td></tr>
-							<tr><td class="py-2 text-slate-700 dark:text-slate-300">10 - 49 pcs</td><td class="py-2 text-right font-semibold text-slate-900 dark:text-white">₱150</td></tr>
-							<tr class="bg-primary/5"><td class="py-2 font-semibold text-slate-900 dark:text-white">50+ pcs</td><td class="py-2 text-right font-bold text-primary">₱120</td></tr>
+							<tr
+								><td class="py-2 text-slate-700 dark:text-slate-300">1 - 9 pcs</td><td
+									class="py-2 text-right font-semibold text-slate-900 dark:text-white">₱180</td
+								></tr
+							>
+							<tr
+								><td class="py-2 text-slate-700 dark:text-slate-300">10 - 49 pcs</td><td
+									class="py-2 text-right font-semibold text-slate-900 dark:text-white">₱150</td
+								></tr
+							>
+							<tr class="bg-primary/5"
+								><td class="py-2 font-semibold text-slate-900 dark:text-white">50+ pcs</td><td
+									class="py-2 text-right font-bold text-primary">₱120</td
+								></tr
+							>
 						</tbody>
 					</table>
-					<Button variant="default" class="w-full" href="/contact?subject=Premium+Direct+ID">Get Quote</Button>
+					<Button variant="default" class="w-full" href="/contact?subject=Premium+Direct+ID"
+						>Get Quote</Button
+					>
 				</div>
 
 				<!-- TechSmart Credentials -->
-				<div class="border border-slate-200 dark:border-slate-800 rounded-lg p-6 hover:border-slate-300 dark:hover:border-slate-700 transition-colors">
+				<div
+					class="border border-slate-200 dark:border-slate-800 rounded-lg p-6 hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
+				>
 					<div class="mb-4">
-						<span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Option C</span>
-						<h3 class="text-lg font-semibold text-slate-900 dark:text-white mt-1">TechSmart Credentials</h3>
+						<span class="text-xs font-medium text-muted-foreground uppercase tracking-wider"
+							>Option C</span
+						>
+						<h3 class="text-lg font-semibold text-slate-900 dark:text-white mt-1">
+							TechSmart Credentials
+						</h3>
 						<p class="text-sm text-muted-foreground mt-2">
-							Premium Direct Print with embedded contactless microchip. Dual-function cards that serve as both visual ID and electronic access credential. No batteries required - powered by the reader's RF field.
+							Premium Direct Print with embedded contactless microchip. Dual-function cards that
+							serve as both visual ID and electronic access credential. No batteries required -
+							powered by the reader's RF field.
 						</p>
 					</div>
 					<div class="flex items-center gap-2 text-xs text-muted-foreground mb-4">
@@ -317,21 +447,30 @@
 						<tbody class="divide-y divide-slate-100 dark:divide-slate-800">
 							<tr>
 								<td class="py-2 text-slate-700 dark:text-slate-300 text-xs">RFID 125kHz</td>
-								<td class="py-2 text-right font-semibold text-xs text-slate-900 dark:text-white">₱250</td>
-								<td class="py-2 text-right font-semibold text-xs text-slate-900 dark:text-white">₱220</td>
+								<td class="py-2 text-right font-semibold text-xs text-slate-900 dark:text-white"
+									>₱250</td
+								>
+								<td class="py-2 text-right font-semibold text-xs text-slate-900 dark:text-white"
+									>₱220</td
+								>
 								<td class="py-2 text-right font-bold text-xs text-primary">₱180</td>
 							</tr>
 							<tr>
 								<td class="py-2 text-slate-700 dark:text-slate-300 text-xs">NFC 13.56MHz</td>
-								<td class="py-2 text-right font-semibold text-xs text-slate-900 dark:text-white">₱280</td>
-								<td class="py-2 text-right font-semibold text-xs text-slate-900 dark:text-white">₱250</td>
+								<td class="py-2 text-right font-semibold text-xs text-slate-900 dark:text-white"
+									>₱280</td
+								>
+								<td class="py-2 text-right font-semibold text-xs text-slate-900 dark:text-white"
+									>₱250</td
+								>
 								<td class="py-2 text-right font-bold text-xs text-primary">₱200</td>
 							</tr>
 						</tbody>
 					</table>
-					<Button variant="default" class="w-full" href="/contact?subject=TechSmart+Credential">Get Quote</Button>
+					<Button variant="default" class="w-full" href="/contact?subject=TechSmart+Credential"
+						>Get Quote</Button
+					>
 				</div>
-
 			</div>
 		</div>
 	</section>
@@ -342,54 +481,97 @@
 	<section id="security" class="py-16 px-4 scroll-mt-16 bg-white dark:bg-slate-900/30">
 		<div class="max-w-5xl mx-auto">
 			<div class="mb-10">
-				<p class="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-2">II. Security Add-ons</p>
-				<h2 class="text-2xl font-bold text-slate-900 dark:text-white">Anti-Counterfeiting & Authentication</h2>
-				<p class="text-sm text-muted-foreground mt-2">Protect your organization with industry-standard security features. Available for Premium Direct Print and TechSmart cards.</p>
+				<p class="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-2">
+					II. Security Add-ons
+				</p>
+				<h2 class="text-2xl font-bold text-slate-900 dark:text-white">
+					Anti-Counterfeiting & Authentication
+				</h2>
+				<p class="text-sm text-muted-foreground mt-2">
+					Protect your organization with industry-standard security features. Available for Premium
+					Direct Print and TechSmart cards.
+				</p>
 			</div>
 
 			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-
-				<div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5">
-					<div class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3">
+				<div
+					class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5"
+				>
+					<div
+						class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3"
+					>
 						<Shield class="w-5 h-5 text-muted-foreground" />
 					</div>
 					<h3 class="font-semibold text-slate-900 dark:text-white text-sm">UV Overlay</h3>
-					<p class="text-xs text-muted-foreground mt-1 mb-3">Invisible under normal light, glows under UV blacklight. Custom patterns or logos for instant verification.</p>
-					<p class="font-bold text-slate-900 dark:text-white text-lg">+₱25 <span class="text-sm font-normal text-slate-600 dark:text-slate-400">/ card</span></p>
+					<p class="text-xs text-muted-foreground mt-1 mb-3">
+						Invisible under normal light, glows under UV blacklight. Custom patterns or logos for
+						instant verification.
+					</p>
+					<p class="font-bold text-slate-900 dark:text-white text-lg">
+						+₱25 <span class="text-sm font-normal text-slate-600 dark:text-slate-400">/ card</span>
+					</p>
 				</div>
 
-				<div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5">
-					<div class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3">
+				<div
+					class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5"
+				>
+					<div
+						class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3"
+					>
 						<Sparkles class="w-5 h-5 text-muted-foreground" />
 					</div>
 					<h3 class="font-semibold text-slate-900 dark:text-white text-sm">Holographic Overlay</h3>
-					<p class="text-xs text-muted-foreground mt-1 mb-3">Tamper-evident holographic laminate. Generic or custom hologram patterns available.</p>
-					<p class="font-bold text-slate-900 dark:text-white text-lg">+₱35 <span class="text-sm font-normal text-slate-600 dark:text-slate-400">/ card</span></p>
+					<p class="text-xs text-muted-foreground mt-1 mb-3">
+						Tamper-evident holographic laminate. Generic or custom hologram patterns available.
+					</p>
+					<p class="font-bold text-slate-900 dark:text-white text-lg">
+						+₱35 <span class="text-sm font-normal text-slate-600 dark:text-slate-400">/ card</span>
+					</p>
 				</div>
 
-				<div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5">
-					<div class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3">
+				<div
+					class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5"
+				>
+					<div
+						class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3"
+					>
 						<QrCode class="w-5 h-5 text-muted-foreground" />
 					</div>
 					<h3 class="font-semibold text-slate-900 dark:text-white text-sm">QR / Barcode</h3>
-					<p class="text-xs text-muted-foreground mt-1 mb-3">Unique QR codes or barcodes (Code 128, Code 39) for digital verification and database lookup.</p>
-					<p class="font-bold text-slate-900 dark:text-white text-lg">Included <span class="text-sm font-normal text-slate-600 dark:text-slate-400">in design</span></p>
+					<p class="text-xs text-muted-foreground mt-1 mb-3">
+						Unique QR codes or barcodes (Code 128, Code 39) for digital verification and database
+						lookup.
+					</p>
+					<p class="font-bold text-slate-900 dark:text-white text-lg">
+						Included <span class="text-sm font-normal text-slate-600 dark:text-slate-400"
+							>in design</span
+						>
+					</p>
 				</div>
 
-				<div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5">
-					<div class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3">
+				<div
+					class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5"
+				>
+					<div
+						class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3"
+					>
 						<Fingerprint class="w-5 h-5 text-muted-foreground" />
 					</div>
 					<h3 class="font-semibold text-slate-900 dark:text-white text-sm">RFID / NFC</h3>
-					<p class="text-xs text-muted-foreground mt-1 mb-3">Embedded chip for contactless authentication. Works with doors, turnstiles, and attendance systems.</p>
+					<p class="text-xs text-muted-foreground mt-1 mb-3">
+						Embedded chip for contactless authentication. Works with doors, turnstiles, and
+						attendance systems.
+					</p>
 					<p class="font-bold text-slate-900 dark:text-white text-lg">See TechSmart</p>
 				</div>
-
 			</div>
 
-			<div class="mt-6 p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg">
+			<div
+				class="mt-6 p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg"
+			>
 				<p class="text-sm text-muted-foreground">
-					<strong class="text-slate-900 dark:text-white">Combine for maximum security:</strong> Many organizations use UV + Hologram + QR for layered authentication. Contact us for bundle pricing on 100+ cards.
+					<strong class="text-slate-900 dark:text-white">Combine for maximum security:</strong> Many organizations
+					use UV + Hologram + QR for layered authentication. Contact us for bundle pricing on 100+ cards.
 				</p>
 			</div>
 		</div>
@@ -401,20 +583,25 @@
 	<section id="packages" class="py-16 px-4 scroll-mt-16">
 		<div class="max-w-5xl mx-auto">
 			<div class="mb-10">
-				<p class="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-2">III. Business Packages</p>
+				<p class="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-2">
+					III. Business Packages
+				</p>
 				<h2 class="text-2xl font-bold text-slate-900 dark:text-white">Complete Solutions</h2>
-				<p class="text-sm text-muted-foreground mt-2">Pre-configured packages for common business needs. Includes hardware, cards, and setup.</p>
+				<p class="text-sm text-muted-foreground mt-2">
+					Pre-configured packages for common business needs. Includes hardware, cards, and setup.
+				</p>
 			</div>
 
 			<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-
 				<!-- Starter Package -->
 				<div class="border border-slate-200 dark:border-slate-800 rounded-lg p-6">
 					<div class="flex items-center gap-2 mb-4">
 						<Package class="w-5 h-5 text-muted-foreground" />
 						<h3 class="font-semibold text-slate-900 dark:text-white">Startup Package</h3>
 					</div>
-					<p class="text-xs text-muted-foreground mb-4">For small offices and startups. Basic time tracking without complex infrastructure.</p>
+					<p class="text-xs text-muted-foreground mb-4">
+						For small offices and startups. Basic time tracking without complex infrastructure.
+					</p>
 					<ul class="space-y-2 text-sm mb-4">
 						<li class="flex items-start gap-2">
 							<Check class="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
@@ -435,7 +622,9 @@
 					</ul>
 					<p class="text-xs text-muted-foreground mb-1">Starting at</p>
 					<p class="text-2xl font-black text-slate-900 dark:text-white mb-4">₱25,000</p>
-					<Button variant="outline" class="w-full" href="/contact?subject=Startup+Package">Get Quote</Button>
+					<Button variant="outline" class="w-full" href="/contact?subject=Startup+Package"
+						>Get Quote</Button
+					>
 				</div>
 
 				<!-- Business Package -->
@@ -445,7 +634,9 @@
 						<Package class="w-5 h-5 text-primary" />
 						<h3 class="font-semibold text-slate-900 dark:text-white">Business Package</h3>
 					</div>
-					<p class="text-xs text-muted-foreground mb-4">For growing businesses. Full time & attendance with door access capability.</p>
+					<p class="text-xs text-muted-foreground mb-4">
+						For growing businesses. Full time & attendance with door access capability.
+					</p>
 					<ul class="space-y-2 text-sm mb-4">
 						<li class="flex items-start gap-2">
 							<Check class="w-4 h-4 text-primary mt-0.5 shrink-0" />
@@ -470,7 +661,9 @@
 					</ul>
 					<p class="text-xs text-muted-foreground mb-1">Starting at</p>
 					<p class="text-2xl font-black text-slate-900 dark:text-white mb-4">₱55,000</p>
-					<Button variant="default" class="w-full" href="/contact?subject=Business+Package">Get Quote</Button>
+					<Button variant="default" class="w-full" href="/contact?subject=Business+Package"
+						>Get Quote</Button
+					>
 				</div>
 
 				<!-- Enterprise Package -->
@@ -479,7 +672,9 @@
 						<Package class="w-5 h-5 text-muted-foreground" />
 						<h3 class="font-semibold text-slate-900 dark:text-white">Enterprise Package</h3>
 					</div>
-					<p class="text-xs text-muted-foreground mb-4">For large organizations. Multi-location, multi-door with centralized management.</p>
+					<p class="text-xs text-muted-foreground mb-4">
+						For large organizations. Multi-location, multi-door with centralized management.
+					</p>
 					<ul class="space-y-2 text-sm mb-4">
 						<li class="flex items-start gap-2">
 							<Check class="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
@@ -504,9 +699,10 @@
 					</ul>
 					<p class="text-xs text-muted-foreground mb-1">Custom quote</p>
 					<p class="text-2xl font-bold text-slate-900 dark:text-white mb-4">Contact Us</p>
-					<Button variant="outline" class="w-full" href="/contact?subject=Enterprise+Package">Request Consultation</Button>
+					<Button variant="outline" class="w-full" href="/contact?subject=Enterprise+Package"
+						>Request Consultation</Button
+					>
 				</div>
-
 			</div>
 		</div>
 	</section>
@@ -517,25 +713,37 @@
 	<section id="accessories" class="py-16 px-4 scroll-mt-16 bg-white dark:bg-slate-900/30">
 		<div class="max-w-5xl mx-auto">
 			<div class="mb-10">
-				<p class="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-2">IV. Accessories</p>
+				<p class="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-2">
+					IV. Accessories
+				</p>
 				<h2 class="text-2xl font-bold text-slate-900 dark:text-white">Lanyards & Add-ons</h2>
-				<p class="text-sm text-muted-foreground mt-2">Complete your ID system with quality accessories. All items include free layout design.</p>
+				<p class="text-sm text-muted-foreground mt-2">
+					Complete your ID system with quality accessories. All items include free layout design.
+				</p>
 			</div>
 
 			<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-
 				<!-- Lanyards -->
-				<div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-6">
+				<div
+					class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-6"
+				>
 					<div class="flex items-center gap-3 mb-4">
 						<Tag class="w-5 h-5 text-muted-foreground" />
 						<div>
-							<h3 class="font-semibold text-slate-900 dark:text-white">Premium Sublimation Lanyards</h3>
-							<p class="text-xs text-muted-foreground">Full-color edge-to-edge printing. Soft, comfortable polyester. Free layout design included.</p>
+							<h3 class="font-semibold text-slate-900 dark:text-white">
+								Premium Sublimation Lanyards
+							</h3>
+							<p class="text-xs text-muted-foreground">
+								Full-color edge-to-edge printing. Soft, comfortable polyester. Free layout design
+								included.
+							</p>
 						</div>
 					</div>
 					<table class="w-full text-sm">
 						<thead>
-							<tr class="text-xs text-slate-600 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800">
+							<tr
+								class="text-xs text-slate-600 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800"
+							>
 								<th class="py-2 text-left font-semibold">Width</th>
 								<th class="py-2 text-right font-semibold">1-49</th>
 								<th class="py-2 text-right font-semibold">50-99</th>
@@ -560,65 +768,95 @@
 				</div>
 
 				<!-- Add-ons -->
-				<div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-6">
+				<div
+					class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-6"
+				>
 					<h3 class="font-semibold text-slate-900 dark:text-white mb-4">Essential Add-ons</h3>
 					<ul class="space-y-3 text-sm">
 						<li class="flex justify-between items-center">
 							<div>
-								<span class="text-slate-800 dark:text-slate-200 font-medium">Side Release Buckle</span>
-								<p class="text-xs text-slate-500 dark:text-slate-400">Quick-release safety feature</p>
+								<span class="text-slate-800 dark:text-slate-200 font-medium"
+									>Side Release Buckle</span
+								>
+								<p class="text-xs text-slate-500 dark:text-slate-400">
+									Quick-release safety feature
+								</p>
 							</div>
 							<span class="font-bold text-slate-900 dark:text-white">+₱10</span>
 						</li>
 						<li class="flex justify-between items-center">
 							<div>
-								<span class="text-slate-800 dark:text-slate-200 font-medium">ID Soft Case (Zip-Lock)</span>
-								<p class="text-xs text-slate-500 dark:text-slate-400">Water-resistant, resealable</p>
+								<span class="text-slate-800 dark:text-slate-200 font-medium"
+									>ID Soft Case (Zip-Lock)</span
+								>
+								<p class="text-xs text-slate-500 dark:text-slate-400">
+									Water-resistant, resealable
+								</p>
 							</div>
 							<span class="font-bold text-slate-900 dark:text-white">₱10</span>
 						</li>
 						<li class="flex justify-between items-center">
 							<div>
-								<span class="text-slate-800 dark:text-slate-200 font-medium">ID Hard Case (Acrylic)</span>
-								<p class="text-xs text-slate-500 dark:text-slate-400">Rigid protection, clear view</p>
+								<span class="text-slate-800 dark:text-slate-200 font-medium"
+									>ID Hard Case (Acrylic)</span
+								>
+								<p class="text-xs text-slate-500 dark:text-slate-400">
+									Rigid protection, clear view
+								</p>
 							</div>
 							<span class="font-bold text-slate-900 dark:text-white">₱25</span>
 						</li>
 						<li class="flex justify-between items-center">
 							<div>
-								<span class="text-slate-800 dark:text-slate-200 font-medium">ID Retractor / Yoyo</span>
+								<span class="text-slate-800 dark:text-slate-200 font-medium"
+									>ID Retractor / Yoyo</span
+								>
 								<p class="text-xs text-slate-500 dark:text-slate-400">Spring-loaded, clip-on</p>
 							</div>
 							<span class="font-bold text-slate-900 dark:text-white">₱35</span>
 						</li>
 					</ul>
 				</div>
-
 			</div>
 
 			<!-- Rubber Logo -->
-			<div class="mt-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-6">
+			<div
+				class="mt-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-6"
+			>
 				<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
 					<div>
 						<h3 class="font-semibold text-slate-900 dark:text-white">Custom 3D Rubber Logo Loop</h3>
-						<p class="text-xs text-muted-foreground mt-1">Premium PVC rubber with your logo in raised 3D relief. Sewn onto lanyards for a professional, branded look. Includes custom mold creation.</p>
-						<p class="text-xs text-muted-foreground mt-2">Minimum order: 50 pieces (mold fee included)</p>
+						<p class="text-xs text-muted-foreground mt-1">
+							Premium PVC rubber with your logo in raised 3D relief. Sewn onto lanyards for a
+							professional, branded look. Includes custom mold creation.
+						</p>
+						<p class="text-xs text-muted-foreground mt-2">
+							Minimum order: 50 pieces (mold fee included)
+						</p>
 					</div>
 				</div>
 				<div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center text-sm">
-					<div class="py-3 border border-slate-200 dark:border-slate-800 rounded-md bg-white dark:bg-slate-800">
+					<div
+						class="py-3 border border-slate-200 dark:border-slate-800 rounded-md bg-white dark:bg-slate-800"
+					>
 						<p class="text-xs text-slate-500 dark:text-slate-400 mb-1">50 - 99</p>
 						<p class="font-bold text-lg text-slate-900 dark:text-white">₱65</p>
 					</div>
-					<div class="py-3 border border-slate-200 dark:border-slate-800 rounded-md bg-white dark:bg-slate-800">
+					<div
+						class="py-3 border border-slate-200 dark:border-slate-800 rounded-md bg-white dark:bg-slate-800"
+					>
 						<p class="text-xs text-slate-500 dark:text-slate-400 mb-1">100 - 199</p>
 						<p class="font-bold text-lg text-slate-900 dark:text-white">₱55</p>
 					</div>
-					<div class="py-3 border border-slate-200 dark:border-slate-800 rounded-md bg-white dark:bg-slate-800">
+					<div
+						class="py-3 border border-slate-200 dark:border-slate-800 rounded-md bg-white dark:bg-slate-800"
+					>
 						<p class="text-xs text-slate-500 dark:text-slate-400 mb-1">200 - 499</p>
 						<p class="font-bold text-lg text-slate-900 dark:text-white">₱45</p>
 					</div>
-					<div class="py-3 border border-primary/30 dark:border-primary/30 rounded-md bg-primary/10">
+					<div
+						class="py-3 border border-primary/30 dark:border-primary/30 rounded-md bg-primary/10"
+					>
 						<p class="text-xs text-slate-600 dark:text-slate-400 mb-1 font-medium">500+</p>
 						<p class="font-bold text-lg text-primary">₱35</p>
 					</div>
@@ -633,40 +871,69 @@
 	<section id="smart-tech" class="py-16 px-4 scroll-mt-16">
 		<div class="max-w-5xl mx-auto">
 			<div class="mb-10">
-				<p class="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-2">V. Kanaya Smart Series</p>
+				<p class="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-2">
+					V. Kanaya Smart Series
+				</p>
 				<h2 class="text-2xl font-bold text-slate-900 dark:text-white">Lifestyle Tech</h2>
-				<p class="text-sm text-muted-foreground mt-2">NFC-enabled products for modern networking. One-time purchase, no subscriptions. Tap to share contact info, social media, website, or payment apps.</p>
+				<p class="text-sm text-muted-foreground mt-2">
+					NFC-enabled products for modern networking. One-time purchase, no subscriptions. Tap to
+					share contact info, social media, website, or payment apps.
+				</p>
 			</div>
 
 			<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-				<div class="border border-slate-200 dark:border-slate-800 rounded-lg p-6 text-center hover:border-slate-300 dark:hover:border-slate-700 transition-colors">
-					<div class="w-12 h-12 mx-auto mb-4 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+				<div
+					class="border border-slate-200 dark:border-slate-800 rounded-lg p-6 text-center hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
+				>
+					<div
+						class="w-12 h-12 mx-auto mb-4 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center"
+					>
 						<CreditCard class="w-6 h-6 text-muted-foreground" />
 					</div>
 					<h3 class="font-semibold text-slate-900 dark:text-white">Smart Business Card</h3>
-					<p class="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-4">Custom-printed PVC + embedded NFC chip. The last business card you'll ever need.</p>
+					<p class="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-4">
+						Custom-printed PVC + embedded NFC chip. The last business card you'll ever need.
+					</p>
 					<p class="text-2xl font-black text-slate-900 dark:text-white mb-4">₱1,000</p>
-					<Button variant="outline" class="w-full" href="/contact?subject=Smart+Business+Card">Order</Button>
+					<Button variant="outline" class="w-full" href="/contact?subject=Smart+Business+Card"
+						>Order</Button
+					>
 				</div>
 
-				<div class="border border-slate-200 dark:border-slate-800 rounded-lg p-6 text-center hover:border-slate-300 dark:hover:border-slate-700 transition-colors">
-					<div class="w-12 h-12 mx-auto mb-4 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+				<div
+					class="border border-slate-200 dark:border-slate-800 rounded-lg p-6 text-center hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
+				>
+					<div
+						class="w-12 h-12 mx-auto mb-4 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center"
+					>
 						<Key class="w-6 h-6 text-muted-foreground" />
 					</div>
 					<h3 class="font-semibold text-slate-900 dark:text-white">Smart Key Fob</h3>
-					<p class="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-4">Premium epoxy or leather finish. Attach to keys, bags, or use as a "Lost & Found" tag.</p>
+					<p class="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-4">
+						Premium epoxy or leather finish. Attach to keys, bags, or use as a "Lost & Found" tag.
+					</p>
 					<p class="text-2xl font-black text-slate-900 dark:text-white mb-4">₱1,000</p>
-					<Button variant="outline" class="w-full" href="/contact?subject=Smart+Key+Fob">Order</Button>
+					<Button variant="outline" class="w-full" href="/contact?subject=Smart+Key+Fob"
+						>Order</Button
+					>
 				</div>
 
-				<div class="border border-slate-200 dark:border-slate-800 rounded-lg p-6 text-center hover:border-slate-300 dark:hover:border-slate-700 transition-colors">
-					<div class="w-12 h-12 mx-auto mb-4 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+				<div
+					class="border border-slate-200 dark:border-slate-800 rounded-lg p-6 text-center hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
+				>
+					<div
+						class="w-12 h-12 mx-auto mb-4 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center"
+					>
 						<Smartphone class="w-6 h-6 text-muted-foreground" />
 					</div>
 					<h3 class="font-semibold text-slate-900 dark:text-white">Smart Sticker Coin</h3>
-					<p class="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-4">Adhesive NFC tag. Stick on your phone case to turn it into a tappable business card.</p>
+					<p class="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-4">
+						Adhesive NFC tag. Stick on your phone case to turn it into a tappable business card.
+					</p>
 					<p class="text-2xl font-black text-slate-900 dark:text-white mb-4">₱1,000</p>
-					<Button variant="outline" class="w-full" href="/contact?subject=Smart+Sticker+Coin">Order</Button>
+					<Button variant="outline" class="w-full" href="/contact?subject=Smart+Sticker+Coin"
+						>Order</Button
+					>
 				</div>
 			</div>
 		</div>
@@ -678,29 +945,47 @@
 	<section class="py-16 px-4 bg-white dark:bg-slate-900/30">
 		<div class="max-w-5xl mx-auto">
 			<div class="mb-10">
-				<p class="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-2">VI. Event Solutions</p>
-				<h2 class="text-2xl font-bold text-slate-900 dark:text-white">Conferences, Concerts & Expos</h2>
+				<p class="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-2">
+					VI. Event Solutions
+				</p>
+				<h2 class="text-2xl font-bold text-slate-900 dark:text-white">
+					Conferences, Concerts & Expos
+				</h2>
 			</div>
 
 			<div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl">
-				<div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-6">
+				<div
+					class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-6"
+				>
 					<div class="flex items-center gap-3 mb-3">
 						<Award class="w-5 h-5 text-muted-foreground" />
 						<h3 class="font-semibold text-slate-900 dark:text-white">Oversized VIP Badge</h3>
 					</div>
-					<p class="text-xs text-slate-500 dark:text-slate-400 mb-4">4"x6" Laminated. All Access / Media / Staff credentials.</p>
-					<p class="text-xl font-black text-slate-900 dark:text-white mb-4">₱150 <span class="text-sm font-normal text-slate-500 dark:text-slate-400">/ badge</span></p>
-					<Button variant="outline" class="w-full" href="/contact?subject=VIP+Badge">Request Quote</Button>
+					<p class="text-xs text-slate-500 dark:text-slate-400 mb-4">
+						4"x6" Laminated. All Access / Media / Staff credentials.
+					</p>
+					<p class="text-xl font-black text-slate-900 dark:text-white mb-4">
+						₱150 <span class="text-sm font-normal text-slate-500 dark:text-slate-400">/ badge</span>
+					</p>
+					<Button variant="outline" class="w-full" href="/contact?subject=VIP+Badge"
+						>Request Quote</Button
+					>
 				</div>
 
-				<div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-6">
+				<div
+					class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-6"
+				>
 					<div class="flex items-center gap-3 mb-3">
 						<Cpu class="w-5 h-5 text-muted-foreground" />
 						<h3 class="font-semibold text-slate-900 dark:text-white">RFID Lite Card</h3>
 					</div>
-					<p class="text-xs text-muted-foreground mb-4">Paper or eco-plastic. Disposable smart cards for 1-day events.</p>
+					<p class="text-xs text-muted-foreground mb-4">
+						Paper or eco-plastic. Disposable smart cards for 1-day events.
+					</p>
 					<p class="text-base font-medium text-muted-foreground mb-4">Contact for bulk pricing</p>
-					<Button variant="outline" class="w-full" href="/contact?subject=RFID+Lite+Event">Contact Us</Button>
+					<Button variant="outline" class="w-full" href="/contact?subject=RFID+Lite+Event"
+						>Contact Us</Button
+					>
 				</div>
 			</div>
 		</div>
@@ -712,14 +997,22 @@
 	<section id="digital" class="py-16 px-4 scroll-mt-16">
 		<div class="max-w-6xl mx-auto">
 			<div class="text-center mb-10">
-				<p class="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-2">Self-Service Platform</p>
-				<h2 class="text-2xl font-bold text-slate-900 dark:text-white">Digital Generation Credits</h2>
-				<p class="text-sm text-muted-foreground mt-2">Design and generate printable ID files online. 1 Credit = 1 Digital ID.</p>
+				<p class="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-2">
+					Self-Service Platform
+				</p>
+				<h2 class="text-2xl font-bold text-slate-900 dark:text-white">
+					Digital Generation Credits
+				</h2>
+				<p class="text-sm text-muted-foreground mt-2">
+					Design and generate printable ID files online. 1 Credit = 1 Digital ID.
+				</p>
 			</div>
 
 			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
 				{#each allPackages as pkg}
-					<div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 flex flex-col {pkg.color} hover:border-slate-300 dark:hover:border-slate-700 transition-colors relative">
+					<div
+						class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 flex flex-col {pkg.color} hover:border-slate-300 dark:hover:border-slate-700 transition-colors relative"
+					>
 						{#if (pkg as any).popular}
 							<div class="absolute -top-2.5 left-1/2 -translate-x-1/2">
 								<Badge class="text-xs">Best Value</Badge>
@@ -727,7 +1020,9 @@
 						{/if}
 
 						<div class="text-center mb-4">
-							<h3 class="font-semibold text-slate-900 dark:text-white text-sm">{(pkg as any).name}</h3>
+							<h3 class="font-semibold text-slate-900 dark:text-white text-sm">
+								{(pkg as any).name}
+							</h3>
 							<p class="text-2xl font-bold mt-2 text-slate-900 dark:text-white">
 								{#if (pkg as any).amountPhp === -1}
 									Custom
@@ -752,15 +1047,24 @@
 							{#if (pkg as any).discount > 0}
 								<li class="flex items-start gap-2">
 									<Zap class="w-3 h-3 text-amber-500 mt-0.5 shrink-0" />
-									<span class="font-medium text-slate-900 dark:text-white">Save {(pkg as any).discount}%</span>
+									<span class="font-medium text-slate-900 dark:text-white"
+										>Save {(pkg as any).discount}%</span
+									>
 								</li>
 							{/if}
 						</ul>
 
 						{#if pkg.id === 'free_starter'}
-							<Button variant="outline" size="sm" class="w-full" onclick={() => purchaseCredits(pkg.id)}>Get Started</Button>
+							<Button
+								variant="outline"
+								size="sm"
+								class="w-full"
+								onclick={() => purchaseCredits(pkg.id)}>Get Started</Button
+							>
 						{:else if pkg.id === 'enterprise_custom'}
-							<Button variant="outline" size="sm" class="w-full" href="/contact?subject=Enterprise">Contact Sales</Button>
+							<Button variant="outline" size="sm" class="w-full" href="/contact?subject=Enterprise"
+								>Contact Sales</Button
+							>
 						{:else}
 							<Button
 								variant={(pkg as any).popular ? 'default' : 'outline'}
@@ -790,24 +1094,24 @@
 			<Mail class="w-10 h-10 mx-auto mb-4 text-muted-foreground" />
 			<h2 class="text-xl font-bold text-slate-900 dark:text-white mb-3">Custom Design Request</h2>
 			<p class="text-muted-foreground text-sm mb-6">
-				For complex layouts, specific branding requirements, or if you have a design reference to follow — send us your requirements and we'll provide a custom quote.
+				For complex layouts, specific branding requirements, or if you have a design reference to
+				follow — send us your requirements and we'll provide a custom quote.
 			</p>
 			<div class="flex flex-col sm:flex-row justify-center gap-3">
 				<Button href="/contact?subject=Custom+Design+Request">
 					<Mail class="w-4 h-4 mr-2" />
 					Send Design Brief
 				</Button>
-				<Button variant="outline" href="/templates">
-					Try Free Template Builder
-				</Button>
+				<Button variant="outline" href="/templates">Try Free Template Builder</Button>
 			</div>
 		</div>
 	</section>
 
 	<!-- Footer CTA -->
 	<section class="py-12 px-4 text-center border-t border-slate-200 dark:border-slate-800">
-		<p class="text-muted-foreground text-sm mb-4">Questions about pricing or need a custom solution?</p>
+		<p class="text-muted-foreground text-sm mb-4">
+			Questions about pricing or need a custom solution?
+		</p>
 		<Button variant="outline" href="/contact">Contact Support</Button>
 	</section>
-
 </div>

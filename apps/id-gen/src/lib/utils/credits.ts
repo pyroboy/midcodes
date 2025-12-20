@@ -36,27 +36,25 @@ export interface UserCredits {
 /**
  * Get current user credit information
  */
-export async function getUserCredits(
-	userId: string
-): Promise<UserCredits | null> {
-    try {
-        const profile = await db.query.profiles.findFirst({
-            where: eq(schema.profiles.id, userId),
-            columns: {
-                creditsBalance: true,
-                cardGenerationCount: true,
-                templateCount: true,
-                unlimitedTemplates: true,
-                removeWatermarks: true
-            }
-        });
+export async function getUserCredits(userId: string): Promise<UserCredits | null> {
+	try {
+		const profile = await db.query.profiles.findFirst({
+			where: eq(schema.profiles.id, userId),
+			columns: {
+				creditsBalance: true,
+				cardGenerationCount: true,
+				templateCount: true,
+				unlimitedTemplates: true,
+				removeWatermarks: true
+			}
+		});
 
-        if (!profile) return null;
-        return profile;
-    } catch (err) {
-        console.error('Error fetching user credits:', err);
-        return null;
-    }
+		if (!profile) return null;
+		return profile;
+	} catch (err) {
+		console.error('Error fetching user credits:', err);
+		return null;
+	}
 }
 
 /**
@@ -119,71 +117,74 @@ export async function deductTemplateCreationCredit(
 	templateId?: string
 ): Promise<{ success: boolean; newBalance: number; usedFreeTier: boolean; error?: string }> {
 	try {
-        return await db.transaction(async (tx) => {
-            const profile = await tx.query.profiles.findFirst({
-                where: eq(schema.profiles.id, userId),
-            });
+		return await db.transaction(async (tx) => {
+			const profile = await tx.query.profiles.findFirst({
+				where: eq(schema.profiles.id, userId)
+			});
 
-            if (!profile) {
-                return { success: false, newBalance: 0, usedFreeTier: false, error: 'User not found' };
-            }
+			if (!profile) {
+				return { success: false, newBalance: 0, usedFreeTier: false, error: 'User not found' };
+			}
 
-            // Check if user has unlimited templates
-            if (profile.unlimitedTemplates) {
-                await tx.update(schema.profiles)
-                    .set({ templateCount: profile.templateCount + 1 })
-                    .where(eq(schema.profiles.id, userId));
-                
-                return { success: true, newBalance: profile.creditsBalance, usedFreeTier: false };
-            }
+			// Check if user has unlimited templates
+			if (profile.unlimitedTemplates) {
+				await tx
+					.update(schema.profiles)
+					.set({ templateCount: profile.templateCount + 1 })
+					.where(eq(schema.profiles.id, userId));
 
-            // Check if within free tier
-            if (profile.templateCount < FREE_TIER.TEMPLATES) {
-                await tx.update(schema.profiles)
-                    .set({ templateCount: profile.templateCount + 1 })
-                    .where(eq(schema.profiles.id, userId));
-                
-                return { success: true, newBalance: profile.creditsBalance, usedFreeTier: true };
-            }
+				return { success: true, newBalance: profile.creditsBalance, usedFreeTier: false };
+			}
 
-            // Beyond free tier - deduct credits
-            const cost = CREDIT_COSTS.TEMPLATE_CREATION;
-            if (profile.creditsBalance < cost) {
-                return {
-                    success: false,
-                    newBalance: profile.creditsBalance,
-                    usedFreeTier: false,
-                    error: `Insufficient credits. Need ${cost} credits, have ${profile.creditsBalance}.`
-                };
-            }
+			// Check if within free tier
+			if (profile.templateCount < FREE_TIER.TEMPLATES) {
+				await tx
+					.update(schema.profiles)
+					.set({ templateCount: profile.templateCount + 1 })
+					.where(eq(schema.profiles.id, userId));
 
-            const newBalance = profile.creditsBalance - cost;
+				return { success: true, newBalance: profile.creditsBalance, usedFreeTier: true };
+			}
 
-            // Update balance and template count
-            await tx.update(schema.profiles)
-                .set({
-                    creditsBalance: newBalance,
-                    templateCount: profile.templateCount + 1,
-                    updatedAt: new Date()
-                })
-                .where(eq(schema.profiles.id, userId));
+			// Beyond free tier - deduct credits
+			const cost = CREDIT_COSTS.TEMPLATE_CREATION;
+			if (profile.creditsBalance < cost) {
+				return {
+					success: false,
+					newBalance: profile.creditsBalance,
+					usedFreeTier: false,
+					error: `Insufficient credits. Need ${cost} credits, have ${profile.creditsBalance}.`
+				};
+			}
 
-            // Create transaction record
-            await tx.insert(schema.creditTransactions).values({
-                userId,
-                orgId,
-                transactionType: TRANSACTION_TYPES.USAGE,
-                amount: -cost,
-                creditsBefore: profile.creditsBalance,
-                creditsAfter: newBalance,
-                description: 'Template creation',
-                referenceId: templateId || null,
-                usageType: USAGE_TYPES.TEMPLATE_CREATION,
-                metadata: { type: 'template_creation' }
-            });
+			const newBalance = profile.creditsBalance - cost;
 
-            return { success: true, newBalance, usedFreeTier: false };
-        });
+			// Update balance and template count
+			await tx
+				.update(schema.profiles)
+				.set({
+					creditsBalance: newBalance,
+					templateCount: profile.templateCount + 1,
+					updatedAt: new Date()
+				})
+				.where(eq(schema.profiles.id, userId));
+
+			// Create transaction record
+			await tx.insert(schema.creditTransactions).values({
+				userId,
+				orgId,
+				transactionType: TRANSACTION_TYPES.USAGE,
+				amount: -cost,
+				creditsBefore: profile.creditsBalance,
+				creditsAfter: newBalance,
+				description: 'Template creation',
+				referenceId: templateId || null,
+				usageType: USAGE_TYPES.TEMPLATE_CREATION,
+				metadata: { type: 'template_creation' }
+			});
+
+			return { success: true, newBalance, usedFreeTier: false };
+		});
 	} catch (error) {
 		console.error('Error deducting template creation credit:', error);
 		return {
@@ -204,62 +205,63 @@ export async function deductCardGenerationCredit(
 	cardId?: string
 ): Promise<{ success: boolean; newBalance: number; usedFreeTier: boolean; error?: string }> {
 	try {
-        return await db.transaction(async (tx) => {
-            const profile = await tx.query.profiles.findFirst({
-                where: eq(schema.profiles.id, userId),
-            });
+		return await db.transaction(async (tx) => {
+			const profile = await tx.query.profiles.findFirst({
+				where: eq(schema.profiles.id, userId)
+			});
 
-            if (!profile) {
-                return { success: false, newBalance: 0, usedFreeTier: false, error: 'User not found' };
-            }
+			if (!profile) {
+				return { success: false, newBalance: 0, usedFreeTier: false, error: 'User not found' };
+			}
 
-            let newCardCount = profile.cardGenerationCount;
-            let newBalance = profile.creditsBalance;
-            let usedFreeTier = false;
+			let newCardCount = profile.cardGenerationCount;
+			let newBalance = profile.creditsBalance;
+			let usedFreeTier = false;
 
-            // If user has free generations left, use those first
-            if (profile.cardGenerationCount < FREE_TIER.CARD_GENERATIONS) {
-                newCardCount = profile.cardGenerationCount + 1;
-                usedFreeTier = true;
-            } else if (profile.creditsBalance >= CREDIT_COSTS.CARD_GENERATION) {
-                // Use paid credits
-                newBalance = profile.creditsBalance - CREDIT_COSTS.CARD_GENERATION;
-            } else {
-                return {
-                    success: false,
-                    newBalance: profile.creditsBalance,
-                    usedFreeTier: false,
-                    error: 'Insufficient credits'
-                };
-            }
+			// If user has free generations left, use those first
+			if (profile.cardGenerationCount < FREE_TIER.CARD_GENERATIONS) {
+				newCardCount = profile.cardGenerationCount + 1;
+				usedFreeTier = true;
+			} else if (profile.creditsBalance >= CREDIT_COSTS.CARD_GENERATION) {
+				// Use paid credits
+				newBalance = profile.creditsBalance - CREDIT_COSTS.CARD_GENERATION;
+			} else {
+				return {
+					success: false,
+					newBalance: profile.creditsBalance,
+					usedFreeTier: false,
+					error: 'Insufficient credits'
+				};
+			}
 
-            // Update user profile
-            await tx.update(schema.profiles)
-                .set({
-                    cardGenerationCount: newCardCount,
-                    creditsBalance: newBalance,
-                    updatedAt: new Date()
-                })
-                .where(eq(schema.profiles.id, userId));
+			// Update user profile
+			await tx
+				.update(schema.profiles)
+				.set({
+					cardGenerationCount: newCardCount,
+					creditsBalance: newBalance,
+					updatedAt: new Date()
+				})
+				.where(eq(schema.profiles.id, userId));
 
-            // Create transaction record if credits were used
-            if (!usedFreeTier) {
-                await tx.insert(schema.creditTransactions).values({
-                    userId,
-                    orgId,
-                    transactionType: TRANSACTION_TYPES.USAGE,
-                    amount: -CREDIT_COSTS.CARD_GENERATION,
-                    creditsBefore: profile.creditsBalance,
-                    creditsAfter: newBalance,
-                    description: 'Card generation',
-                    referenceId: cardId || null,
-                    usageType: USAGE_TYPES.CARD_GENERATION,
-                    metadata: { type: 'card_generation' }
-                });
-            }
+			// Create transaction record if credits were used
+			if (!usedFreeTier) {
+				await tx.insert(schema.creditTransactions).values({
+					userId,
+					orgId,
+					transactionType: TRANSACTION_TYPES.USAGE,
+					amount: -CREDIT_COSTS.CARD_GENERATION,
+					creditsBefore: profile.creditsBalance,
+					creditsAfter: newBalance,
+					description: 'Card generation',
+					referenceId: cardId || null,
+					usageType: USAGE_TYPES.CARD_GENERATION,
+					metadata: { type: 'card_generation' }
+				});
+			}
 
-            return { success: true, newBalance, usedFreeTier };
-        });
+			return { success: true, newBalance, usedFreeTier };
+		});
 	} catch (error) {
 		console.error('Error deducting card generation credit:', error);
 		return {
@@ -282,40 +284,41 @@ export async function addCredits(
 	description?: string
 ): Promise<{ success: boolean; newBalance: number; error?: string }> {
 	try {
-        return await db.transaction(async (tx) => {
-            const profile = await tx.query.profiles.findFirst({
-                where: eq(schema.profiles.id, userId),
-            });
+		return await db.transaction(async (tx) => {
+			const profile = await tx.query.profiles.findFirst({
+				where: eq(schema.profiles.id, userId)
+			});
 
-            if (!profile) {
-                return { success: false, newBalance: 0, error: 'User not found' };
-            }
+			if (!profile) {
+				return { success: false, newBalance: 0, error: 'User not found' };
+			}
 
-            const newBalance = profile.creditsBalance + amount;
+			const newBalance = profile.creditsBalance + amount;
 
-            // Update user balance
-            await tx.update(schema.profiles)
-                .set({ 
-                    creditsBalance: newBalance,
-                    updatedAt: new Date()
-                })
-                .where(eq(schema.profiles.id, userId));
+			// Update user balance
+			await tx
+				.update(schema.profiles)
+				.set({
+					creditsBalance: newBalance,
+					updatedAt: new Date()
+				})
+				.where(eq(schema.profiles.id, userId));
 
-            // Create transaction record
-            await tx.insert(schema.creditTransactions).values({
-                userId,
-                orgId,
-                transactionType: TRANSACTION_TYPES.PURCHASE,
-                amount: amount,
-                creditsBefore: profile.creditsBalance,
-                creditsAfter: newBalance,
-                description: description || 'Credit purchase',
-                invoiceId,
-                metadata: { type: 'credit_purchase' }
-            });
+			// Create transaction record
+			await tx.insert(schema.creditTransactions).values({
+				userId,
+				orgId,
+				transactionType: TRANSACTION_TYPES.PURCHASE,
+				amount: amount,
+				creditsBefore: profile.creditsBalance,
+				creditsAfter: newBalance,
+				description: description || 'Credit purchase',
+				invoiceId,
+				metadata: { type: 'credit_purchase' }
+			});
 
-            return { success: true, newBalance };
-        });
+			return { success: true, newBalance };
+		});
 	} catch (error) {
 		console.error('Error adding credits:', error);
 		return {
@@ -337,40 +340,41 @@ export async function refundCredits(
 	description?: string
 ): Promise<{ success: boolean; newBalance: number; error?: string }> {
 	try {
-        return await db.transaction(async (tx) => {
-            const profile = await tx.query.profiles.findFirst({
-                where: eq(schema.profiles.id, userId),
-            });
+		return await db.transaction(async (tx) => {
+			const profile = await tx.query.profiles.findFirst({
+				where: eq(schema.profiles.id, userId)
+			});
 
-            if (!profile) {
-                return { success: false, newBalance: 0, error: 'User not found' };
-            }
+			if (!profile) {
+				return { success: false, newBalance: 0, error: 'User not found' };
+			}
 
-            const newBalance = profile.creditsBalance + amount;
+			const newBalance = profile.creditsBalance + amount;
 
-            // Update user balance
-            await tx.update(schema.profiles)
-                .set({ 
-                    creditsBalance: newBalance,
-                    updatedAt: new Date()
-                })
-                .where(eq(schema.profiles.id, userId));
+			// Update user balance
+			await tx
+				.update(schema.profiles)
+				.set({
+					creditsBalance: newBalance,
+					updatedAt: new Date()
+				})
+				.where(eq(schema.profiles.id, userId));
 
-            // Create transaction record
-            await tx.insert(schema.creditTransactions).values({
-                userId,
-                orgId,
-                transactionType: TRANSACTION_TYPES.REFUND,
-                amount: amount,
-                creditsBefore: profile.creditsBalance,
-                creditsAfter: newBalance,
-                description: description || 'Credit refund',
-                invoiceId,
-                metadata: { type: 'credit_refund' }
-            });
+			// Create transaction record
+			await tx.insert(schema.creditTransactions).values({
+				userId,
+				orgId,
+				transactionType: TRANSACTION_TYPES.REFUND,
+				amount: amount,
+				creditsBefore: profile.creditsBalance,
+				creditsAfter: newBalance,
+				description: description || 'Credit refund',
+				invoiceId,
+				metadata: { type: 'credit_refund' }
+			});
 
-            return { success: true, newBalance };
-        });
+			return { success: true, newBalance };
+		});
 	} catch (error) {
 		console.error('Error refunding credits:', error);
 		return {
@@ -390,31 +394,32 @@ export async function grantUnlimitedTemplates(
 	invoiceId: string
 ): Promise<{ success: boolean; error?: string }> {
 	try {
-        await db.transaction(async (tx) => {
-            const profile = await tx.query.profiles.findFirst({
-                where: eq(schema.profiles.id, userId)
-            });
+		await db.transaction(async (tx) => {
+			const profile = await tx.query.profiles.findFirst({
+				where: eq(schema.profiles.id, userId)
+			});
 
-            await tx.update(schema.profiles)
-                .set({ 
-                    unlimitedTemplates: true,
-                    updatedAt: new Date()
-                })
-                .where(eq(schema.profiles.id, userId));
+			await tx
+				.update(schema.profiles)
+				.set({
+					unlimitedTemplates: true,
+					updatedAt: new Date()
+				})
+				.where(eq(schema.profiles.id, userId));
 
-            // Create transaction record
-            await tx.insert(schema.creditTransactions).values({
-                userId,
-                orgId,
-                transactionType: TRANSACTION_TYPES.PURCHASE,
-                amount: 0,
-                creditsBefore: profile?.creditsBalance || 0,
-                creditsAfter: profile?.creditsBalance || 0,
-                description: 'Unlimited templates upgrade',
-                invoiceId,
-                metadata: { type: 'unlimited_templates_purchase' }
-            });
-        });
+			// Create transaction record
+			await tx.insert(schema.creditTransactions).values({
+				userId,
+				orgId,
+				transactionType: TRANSACTION_TYPES.PURCHASE,
+				amount: 0,
+				creditsBefore: profile?.creditsBalance || 0,
+				creditsAfter: profile?.creditsBalance || 0,
+				description: 'Unlimited templates upgrade',
+				invoiceId,
+				metadata: { type: 'unlimited_templates_purchase' }
+			});
+		});
 
 		return { success: true };
 	} catch (error) {
@@ -432,31 +437,32 @@ export async function grantWatermarkRemoval(
 	invoiceId: string
 ): Promise<{ success: boolean; error?: string }> {
 	try {
-        await db.transaction(async (tx) => {
-            const profile = await tx.query.profiles.findFirst({
-                where: eq(schema.profiles.id, userId)
-            });
+		await db.transaction(async (tx) => {
+			const profile = await tx.query.profiles.findFirst({
+				where: eq(schema.profiles.id, userId)
+			});
 
-            await tx.update(schema.profiles)
-                .set({ 
-                    removeWatermarks: true,
-                    updatedAt: new Date()
-                })
-                .where(eq(schema.profiles.id, userId));
+			await tx
+				.update(schema.profiles)
+				.set({
+					removeWatermarks: true,
+					updatedAt: new Date()
+				})
+				.where(eq(schema.profiles.id, userId));
 
-            // Create transaction record
-            await tx.insert(schema.creditTransactions).values({
-                userId,
-                orgId,
-                transactionType: TRANSACTION_TYPES.PURCHASE,
-                amount: 0,
-                creditsBefore: profile?.creditsBalance || 0,
-                creditsAfter: profile?.creditsBalance || 0,
-                description: 'Remove watermarks upgrade',
-                invoiceId,
-                metadata: { type: 'watermark_removal_purchase' }
-            });
-        });
+			// Create transaction record
+			await tx.insert(schema.creditTransactions).values({
+				userId,
+				orgId,
+				transactionType: TRANSACTION_TYPES.PURCHASE,
+				amount: 0,
+				creditsBefore: profile?.creditsBalance || 0,
+				creditsAfter: profile?.creditsBalance || 0,
+				description: 'Remove watermarks upgrade',
+				invoiceId,
+				metadata: { type: 'watermark_removal_purchase' }
+			});
+		});
 
 		return { success: true };
 	} catch (error) {
@@ -468,20 +474,18 @@ export async function grantWatermarkRemoval(
 /**
  * Get user's credit transaction history
  */
-export async function getCreditHistory(
-	userId: string,
-	limit = 50
-): Promise<any[]> {
-    try {
-        const history = await db.select()
-            .from(schema.creditTransactions)
-            .where(eq(schema.creditTransactions.userId, userId))
-            .orderBy(desc(schema.creditTransactions.createdAt))
-            .limit(limit);
+export async function getCreditHistory(userId: string, limit = 50): Promise<any[]> {
+	try {
+		const history = await db
+			.select()
+			.from(schema.creditTransactions)
+			.where(eq(schema.creditTransactions.userId, userId))
+			.orderBy(desc(schema.creditTransactions.createdAt))
+			.limit(limit);
 
-        return history;
-    } catch (err) {
-        console.error('Error fetching credit history:', err);
-        return [];
-    }
+		return history;
+	} catch (err) {
+		console.error('Error fetching credit history:', err);
+		return [];
+	}
 }

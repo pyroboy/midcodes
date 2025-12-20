@@ -55,7 +55,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 export const actions: Actions = {
 	saveIdCard: async ({ request, locals }) => {
 		const { org_id: userOrgId, session, user } = locals;
-		
+
 		if (!session || !user) {
 			return fail(401, { error: 'Unauthorized' });
 		}
@@ -65,7 +65,7 @@ export const actions: Actions = {
 		try {
 			const formData = await request.formData();
 			const templateId = formData.get('templateId')?.toString();
-			
+
 			if (!templateId) {
 				return fail(400, { error: 'Template ID is required' });
 			}
@@ -87,7 +87,7 @@ export const actions: Actions = {
 			}
 
 			const effectiveOrgId = userOrgId || template.orgId;
-			
+
 			if (!effectiveOrgId) {
 				return fail(400, { error: 'Organization ID is required' });
 			}
@@ -101,7 +101,14 @@ export const actions: Actions = {
 			}
 
 			// Collect form fields as simple key-value pairs
-			const excludedKeys = ['templateId', 'frontImage', 'backImage', 'frontImagePreview', 'backImagePreview', 'createDigitalCard'];
+			const excludedKeys = [
+				'templateId',
+				'frontImage',
+				'backImage',
+				'frontImagePreview',
+				'backImagePreview',
+				'createDigitalCard'
+			];
 			const formFields: Record<string, string> = {};
 			for (const [key, value] of formData.entries()) {
 				if (!excludedKeys.includes(key) && typeof value === 'string') {
@@ -139,11 +146,13 @@ export const actions: Actions = {
 					{
 						success: true,
 						idCardId: idCard?.id,
-						digitalCard: digitalCard ? {
-							slug: digitalCard.slug,
-							claimCode: claimCode,
-							status: digitalCard.status
-						} : null
+						digitalCard: digitalCard
+							? {
+									slug: digitalCard.slug,
+									claimCode: claimCode,
+									status: digitalCard.status
+								}
+							: null
 					}
 				]
 			};

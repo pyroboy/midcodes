@@ -19,11 +19,13 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	try {
 		// Build query for credit transactions
-		const whereConditions = type && type !== 'all'
-			? and(eq(creditTransactions.userId, user.id), eq(creditTransactions.transactionType, type))
-			: eq(creditTransactions.userId, user.id);
+		const whereConditions =
+			type && type !== 'all'
+				? and(eq(creditTransactions.userId, user.id), eq(creditTransactions.transactionType, type))
+				: eq(creditTransactions.userId, user.id);
 
-		const transactions = await db.select()
+		const transactions = await db
+			.select()
 			.from(creditTransactions)
 			.where(whereConditions)
 			.orderBy(desc(creditTransactions.createdAt))
@@ -31,18 +33,20 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			.offset(offset);
 
 		// Get total count
-		const countResult = await db.select({ count: sql<number>`count(*)` })
+		const countResult = await db
+			.select({ count: sql<number>`count(*)` })
 			.from(creditTransactions)
 			.where(whereConditions);
 		const count = Number(countResult[0]?.count || 0);
 
 		// Get user's current credit info
-		const [profile] = await db.select({
-			creditsBalance: profiles.creditsBalance,
-			cardGenerationCount: profiles.cardGenerationCount,
-			templateCount: profiles.templateCount,
-			unlimitedTemplates: profiles.unlimitedTemplates
-		})
+		const [profile] = await db
+			.select({
+				creditsBalance: profiles.creditsBalance,
+				cardGenerationCount: profiles.cardGenerationCount,
+				templateCount: profiles.templateCount,
+				unlimitedTemplates: profiles.unlimitedTemplates
+			})
 			.from(profiles)
 			.where(eq(profiles.id, user.id))
 			.limit(1);
@@ -52,15 +56,15 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		startOfMonth.setDate(1);
 		startOfMonth.setHours(0, 0, 0, 0);
 
-		const monthlyTransactions = await db.select({
-			amount: creditTransactions.amount,
-			transactionType: creditTransactions.transactionType
-		})
+		const monthlyTransactions = await db
+			.select({
+				amount: creditTransactions.amount,
+				transactionType: creditTransactions.transactionType
+			})
 			.from(creditTransactions)
-			.where(and(
-				eq(creditTransactions.userId, user.id),
-				gte(creditTransactions.createdAt, startOfMonth)
-			));
+			.where(
+				and(eq(creditTransactions.userId, user.id), gte(creditTransactions.createdAt, startOfMonth))
+			);
 
 		// Calculate monthly usage
 		let creditsUsedThisMonth = 0;
@@ -75,20 +79,16 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		}
 
 		// Get ID cards and templates created this month
-		const cardsThisMonthResult = await db.select({ count: sql<number>`count(*)` })
+		const cardsThisMonthResult = await db
+			.select({ count: sql<number>`count(*)` })
 			.from(idcards)
-			.where(and(
-				eq(idcards.orgId, org_id!),
-				gte(idcards.createdAt, startOfMonth)
-			));
+			.where(and(eq(idcards.orgId, org_id!), gte(idcards.createdAt, startOfMonth)));
 		const cardsThisMonth = Number(cardsThisMonthResult[0]?.count || 0);
 
-		const templatesThisMonthResult = await db.select({ count: sql<number>`count(*)` })
+		const templatesThisMonthResult = await db
+			.select({ count: sql<number>`count(*)` })
 			.from(templates)
-			.where(and(
-				eq(templates.orgId, org_id!),
-				gte(templates.createdAt, startOfMonth)
-			));
+			.where(and(eq(templates.orgId, org_id!), gte(templates.createdAt, startOfMonth)));
 		const templatesThisMonth = Number(templatesThisMonthResult[0]?.count || 0);
 
 		return {

@@ -14,16 +14,14 @@ export const load: PageServerLoad = async ({ locals }) => {
 		// Fetch assets with size preset data using Drizzle
 		// Drizzle doesn't support direct relation expansion like Supabase yet unless using db.query
 		// We'll fetch assets first
-		const assets = await db.select()
-			.from(templateAssets)
-			.orderBy(desc(templateAssets.createdAt));
+		const assets = await db.select().from(templateAssets).orderBy(desc(templateAssets.createdAt));
 
 		// Fetch presets separately to join manually (or use db.query if schema relations defined)
 		// Assuming we want all presets to map them
 		const presets = await db.select().from(templateSizePresets);
-		const presetMap = new Map(presets.map(p => [p.id, p]));
+		const presetMap = new Map(presets.map((p) => [p.id, p]));
 
-		const assetsWithPresets = assets.map(asset => ({
+		const assetsWithPresets = assets.map((asset) => ({
 			...asset,
 			size_preset: asset.sizePresetId ? presetMap.get(asset.sizePresetId) : null
 		}));

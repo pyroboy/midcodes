@@ -196,21 +196,21 @@
 				{#each secondaryNavItems as item}
 					{#if hasPermission(item.roles, user?.role)}
 						<a
-								href={item.href}
-								class="flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-								onclick={handleLinkClick}
+							href={item.href}
+							class="flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+							onclick={handleLinkClick}
+						>
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								class="h-5 w-5"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
 							>
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									class="h-5 w-5"
-									fill="none"
-									viewBox="0 0 24 24"
-									stroke="currentColor"
-								>
-									{@html item.icon}
-								</svg>
-								{item.label}
-							</a>
+								{@html item.icon}
+							</svg>
+							{item.label}
+						</a>
 					{/if}
 				{/each}
 			</div>

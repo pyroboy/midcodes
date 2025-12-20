@@ -514,7 +514,6 @@
 		const videoWidth = videoElement.videoWidth;
 		const videoHeight = videoElement.videoHeight;
 
-
 		// Accurate mapping from Screen Overlay -> Video Source
 		// considering object-fit: cover and transform: scale(imageScale)
 
@@ -542,7 +541,7 @@
 		const screenOverlayHeight = safePixelHeight;
 		const screenOverlayX = (screenWidth - safePixelWidth) / 2;
 		const screenOverlayY = topPaddingPx + (availablePixelHeight - safePixelHeight) / 2;
-		
+
 		const screenCenterX = screenWidth / 2;
 		const screenCenterY = screenHeight / 2;
 		const overlayCenterX = screenOverlayX + screenOverlayWidth / 2;
@@ -564,8 +563,8 @@
 		// Calculate Source Rect
 		const sourceWidth = screenOverlayWidth * ratio;
 		const sourceHeight = screenOverlayHeight * ratio;
-		const sourceCenterX = (videoWidth / 2) + deltaX;
-		const sourceCenterY = (videoHeight / 2) + deltaY;
+		const sourceCenterX = videoWidth / 2 + deltaX;
+		const sourceCenterY = videoHeight / 2 + deltaY;
 
 		const x = sourceCenterX - sourceWidth / 2;
 		const y = sourceCenterY - sourceHeight / 2;
@@ -776,8 +775,6 @@
 		</div>
 	</div>
 </div>
-
-
 
 <!-- Bottom sheet popup -->
 {#if showPopup}
@@ -1064,7 +1061,6 @@
 					/>
 					<span class="text-xs text-white/70 w-12 text-right">{Math.round(imageScale * 100)}%</span>
 				</div>
-
 			</div>
 
 			<div class="flex items-center justify-between max-w-md mx-auto">
@@ -1105,8 +1101,13 @@
 
 <style>
 	@keyframes pulse-brightness {
-		0%, 100% { filter: brightness(1); }
-		50% { filter: brightness(1.75); }
+		0%,
+		100% {
+			filter: brightness(1);
+		}
+		50% {
+			filter: brightness(1.75);
+		}
 	}
 	.processing-glow {
 		animation: pulse-brightness 1.2s infinite ease-in-out;

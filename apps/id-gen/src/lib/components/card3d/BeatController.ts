@@ -38,10 +38,10 @@ export function checkBeat(
 			lastBeatTime
 		};
 	}
-	
+
 	const newBeatCount = currentBeatCount + 1;
 	const action = getBeatAction(newBeatCount);
-	
+
 	return {
 		shouldTrigger: true,
 		action,
@@ -84,19 +84,13 @@ export function isSpinBeat(beatCount: number): boolean {
 /**
  * Get the next valid morph shape index
  */
-export function getNextShapeIndex(
-	currentValidIndex: number,
-	validIndicesCount: number
-): number {
+export function getNextShapeIndex(currentValidIndex: number, validIndicesCount: number): number {
 	return (currentValidIndex + 1) % validIndicesCount;
 }
 
 /**
  * Get the next showcase image index
  */
-export function getNextShowcaseIndex(
-	currentIndex: number,
-	matchingImagesCount: number
-): number {
+export function getNextShowcaseIndex(currentIndex: number, matchingImagesCount: number): number {
 	return (currentIndex + 1) % matchingImagesCount;
 }

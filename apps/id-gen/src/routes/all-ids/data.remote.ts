@@ -51,7 +51,8 @@ export const getIDCards = query(PaginationSchema, async ({ offset, limit }) => {
 
 	// Fetch cards with template names using Drizzle
 	// We'll perform a join
-	const results = await db.select({
+	const results = await db
+		.select({
 			id: idcards.id,
 			templateId: idcards.templateId,
 			frontImage: idcards.frontImage,
@@ -115,7 +116,8 @@ export const getCardIDs = query(PaginationSchema, async ({ offset, limit }) => {
 
 	const fetchLimit = Math.max(0, limit) + 1;
 
-	const results = await db.select({
+	const results = await db
+		.select({
 			id: idcards.id,
 			templateName: templates.name
 		})
@@ -147,7 +149,8 @@ export const getCardDetails = query(z.string(), async (id) => {
 
 	if (!org_id) return null;
 
-	const results = await db.select({
+	const results = await db
+		.select({
 			id: idcards.id,
 			templateId: idcards.templateId,
 			frontImage: idcards.frontImage,
@@ -194,10 +197,11 @@ export const getCardDetails = query(z.string(), async (id) => {
 export const getCardCount = query(async () => {
 	const { locals } = getRequestEvent();
 	const { org_id } = locals;
-	
+
 	if (!org_id) return 0;
 
-	const result = await db.select({ count: sql<number>`count(*)` })
+	const result = await db
+		.select({ count: sql<number>`count(*)` })
 		.from(idcards)
 		.where(eq(idcards.orgId, org_id));
 
@@ -213,7 +217,8 @@ export const getTemplateDimensions = query(TemplateNamesSchema, async (templateN
 		return {};
 	}
 
-	const foundTemplates = await db.select({
+	const foundTemplates = await db
+		.select({
 			name: templates.name,
 			widthPixels: templates.widthPixels,
 			heightPixels: templates.heightPixels,
@@ -222,19 +227,22 @@ export const getTemplateDimensions = query(TemplateNamesSchema, async (templateN
 		.from(templates)
 		.where(and(eq(templates.orgId, org_id), inArray(templates.name, templateNames)));
 
-	const dimensions: Record<string, { width: number; height: number; orientation: 'landscape' | 'portrait'; unit: string }> = {};
-	
+	const dimensions: Record<
+		string,
+		{ width: number; height: number; orientation: 'landscape' | 'portrait'; unit: string }
+	> = {};
+
 	foundTemplates.forEach((template) => {
 		const width = template.widthPixels;
 		const height = template.heightPixels;
-		
+
 		let orientation: 'landscape' | 'portrait';
 		if (width && height) {
 			orientation = width < height ? 'portrait' : 'landscape';
 		} else {
 			orientation = (template.orientation as 'landscape' | 'portrait') || 'landscape';
 		}
-		
+
 		const defaultWidth = orientation === 'portrait' ? 638 : 1013;
 		const defaultHeight = orientation === 'portrait' ? 1013 : 638;
 
@@ -253,12 +261,13 @@ export const getTemplateDimensions = query(TemplateNamesSchema, async (templateN
 export const getTemplateMetadata = query(TemplateNamesSchema, async (templateNames) => {
 	const { locals } = getRequestEvent();
 	const { org_id } = locals;
-	
+
 	if (!org_id || templateNames.length === 0) {
 		return {};
 	}
 
-	const foundTemplates = await db.select({
+	const foundTemplates = await db
+		.select({
 			name: templates.name,
 			templateElements: templates.templateElements
 		})

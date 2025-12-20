@@ -15,7 +15,11 @@
 		onOpenPreview: (e: MouseEvent, card: any) => void;
 		downloading?: boolean;
 		deleting?: boolean;
-		templateDimensions?: { width: number; height: number; orientation: 'landscape' | 'portrait' } | null;
+		templateDimensions?: {
+			width: number;
+			height: number;
+			orientation: 'landscape' | 'portrait';
+		} | null;
 	}
 
 	let {
@@ -32,25 +36,27 @@
 
 	// Calculate aspect ratio from template dimensions
 	// Use actual dimensions if provided, otherwise derive from orientation or default to landscape
-	let aspectRatio = $derived(templateDimensions
-		? `${templateDimensions.width}/${templateDimensions.height}`
-		: '1013/638');
+	let aspectRatio = $derived(
+		templateDimensions ? `${templateDimensions.width}/${templateDimensions.height}` : '1013/638'
+	);
 
 	// Calculate the "long edge" - this is the max dimension of the card
 	// We use this to ensure uniform visual sizing across different orientations
-	let longEdge = $derived(templateDimensions 
-		? Math.max(templateDimensions.width, templateDimensions.height)
-		: 1013);
-	
-	let shortEdge = $derived(templateDimensions
-		? Math.min(templateDimensions.width, templateDimensions.height)
-		: 638);
+	let longEdge = $derived(
+		templateDimensions ? Math.max(templateDimensions.width, templateDimensions.height) : 1013
+	);
+
+	let shortEdge = $derived(
+		templateDimensions ? Math.min(templateDimensions.width, templateDimensions.height) : 638
+	);
 
 	// Calculate container width that ensures uniform visual footprint:
 	// - For landscape (width > height): use 100% of available width
 	// - For portrait (width < height): width should be (shortEdge/longEdge) of container
 	// This makes the "long edge" visually consistent across both orientations
-	let isPortrait = $derived(templateDimensions ? templateDimensions.width < templateDimensions.height : false);
+	let isPortrait = $derived(
+		templateDimensions ? templateDimensions.width < templateDimensions.height : false
+	);
 	let containerWidthPercent = $derived(isPortrait ? (shortEdge / longEdge) * 100 : 100);
 
 	function handleClick(e: MouseEvent) {
@@ -62,13 +68,14 @@
 
 	// Use low-res version if available, fallback to full resolution
 	// Use getProxiedUrl to ensure we get the full URL with bucket prepended AND proxied for CORS if needed
-	let frontUrl = $derived(card.front_image_low_res
-		? getProxiedUrl(card.front_image_low_res, 'rendered-id-cards')
-		: card.front_image
-			? getProxiedUrl(card.front_image, 'rendered-id-cards')
-			: null);
+	let frontUrl = $derived(
+		card.front_image_low_res
+			? getProxiedUrl(card.front_image_low_res, 'rendered-id-cards')
+			: card.front_image
+				? getProxiedUrl(card.front_image, 'rendered-id-cards')
+				: null
+	);
 </script>
-
 
 <div
 	class="group relative h-full w-full"
@@ -97,11 +104,10 @@
 		class="h-full flex flex-col overflow-hidden border-border bg-card hover:shadow-md transition-all duration-200 hover:border-primary/50"
 	>
 		<!-- Image Area - uniform sizing: portrait cards are narrower to match landscape visual footprint -->
-		<div class="w-full bg-muted/50 flex items-center justify-center overflow-hidden border-b border-border py-2">
-			<div
-				class="relative"
-				style="width: {containerWidthPercent}%; aspect-ratio: {aspectRatio};"
-			>
+		<div
+			class="w-full bg-muted/50 flex items-center justify-center overflow-hidden border-b border-border py-2"
+		>
+			<div class="relative" style="width: {containerWidthPercent}%; aspect-ratio: {aspectRatio};">
 				{#if frontUrl}
 					<img
 						src={frontUrl}
@@ -110,7 +116,9 @@
 						loading="lazy"
 					/>
 				{:else}
-					<div class="flex flex-col items-center justify-center w-full h-full text-muted-foreground">
+					<div
+						class="flex flex-col items-center justify-center w-full h-full text-muted-foreground"
+					>
 						<Eye class="w-8 h-8 mb-1 opacity-50" />
 						<span class="text-xs">No Preview</span>
 					</div>

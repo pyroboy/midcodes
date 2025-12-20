@@ -11,13 +11,10 @@ export const load: PageServerLoad = async ({ locals }) => {
 	}
 
 	try {
-		const templatesData = await db
-			.select()
-			.from(templates)
-			.orderBy(desc(templates.createdAt));
+		const templatesData = await db.select().from(templates).orderBy(desc(templates.createdAt));
 
 		return {
-			templates: templatesData.map(t => ({
+			templates: templatesData.map((t) => ({
 				...t,
 				user_id: t.userId,
 				org_id: t.orgId,

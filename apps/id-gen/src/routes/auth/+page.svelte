@@ -24,7 +24,7 @@
 	async function handleSignIn(e: Event) {
 		e.preventDefault();
 		loading = true;
-		
+
 		try {
 			const { data, error } = await authClient.signIn.email({
 				email,
@@ -58,7 +58,7 @@
 			const { data, error } = await authClient.signUp.email({
 				email,
 				password,
-				name: email.split('@')[0],
+				name: email.split('@')[0]
 			});
 
 			if (error) {
@@ -106,12 +106,12 @@
 							</div>
 							<div class="grid gap-2">
 								<Label for="password">Password</Label>
-								<Input 
-									id="password" 
-									name="password" 
-									type="password" 
+								<Input
+									id="password"
+									name="password"
+									type="password"
 									bind:value={password}
-									required 
+									required
 									disabled={loading}
 								/>
 							</div>
@@ -143,23 +143,23 @@
 							</div>
 							<div class="grid gap-2">
 								<Label for="signup-password">Password</Label>
-								<Input 
-									id="signup-password" 
-									name="password" 
-									type="password" 
+								<Input
+									id="signup-password"
+									name="password"
+									type="password"
 									bind:value={password}
-									required 
+									required
 									disabled={loading}
 								/>
 							</div>
 							<div class="grid gap-2">
 								<Label for="confirm-password">Confirm Password</Label>
-								<Input 
-									id="confirm-password" 
-									name="confirmPassword" 
-									type="password" 
+								<Input
+									id="confirm-password"
+									name="confirmPassword"
+									type="password"
 									bind:value={confirmPassword}
-									required 
+									required
 									disabled={loading}
 								/>
 							</div>
