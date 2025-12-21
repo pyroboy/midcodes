@@ -10,11 +10,18 @@ import type { TemplateElement } from '$lib/schemas/template-element.schema';
 
 // Helper to check for admin access
 async function requireAdmin() {
-	const { locals } = getRequestEvent();
+	const event = getRequestEvent();
+	console.log('[decompose.remote] requireAdmin - event:', !!event);
+	console.log('[decompose.remote] requireAdmin - locals:', !!event?.locals);
+	console.log('[decompose.remote] requireAdmin - user:', event?.locals?.user?.email);
+	console.log('[decompose.remote] requireAdmin - role:', event?.locals?.user?.role);
+
+	const { locals } = event;
 	if (
 		!locals.user ||
 		!['super_admin', 'org_admin', 'id_gen_admin'].includes(locals.user.role as string)
 	) {
+		console.error('[decompose.remote] Admin access denied for role:', locals.user?.role);
 		throw error(403, 'Admin access required');
 	}
 	return locals;
@@ -51,14 +58,28 @@ export const decomposeImage = command(
 		prompt?: string;
 		seed?: number;
 	}): Promise<DecomposeResponse> => {
+		console.log('[decompose.remote] decomposeImage called with:', { imageUrl, numLayers });
 		await requireAdmin();
+		console.log('[decompose.remote] Admin check passed, calling decomposeWithFal...');
 
-		return await decomposeWithFal({
-			imageUrl,
-			numLayers,
-			prompt,
-			seed
-		});
+		try {
+			const result = await decomposeWithFal({
+				imageUrl,
+				numLayers,
+				prompt,
+				seed
+			});
+			console.log(
+				'[decompose.remote] decomposeWithFal result:',
+				result.success,
+				result.layers?.length ?? 0,
+				'layers'
+			);
+			return result;
+		} catch (err) {
+			console.error('[decompose.remote] decomposeWithFal error:', err);
+			throw err;
+		}
 	}
 );
 

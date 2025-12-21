@@ -36,11 +36,17 @@ export interface DecomposeResponse {
 }
 
 // Initialize fal client with credentials if available
-function initFal() {
+function initFal(): boolean {
 	const falKey = env.FAL_KEY;
+	console.log('[fal-layers] FAL_KEY present:', !!falKey);
 	if (falKey) {
-		fal.config({ credentials: falKey });
-		return true;
+		try {
+			fal.config({ credentials: falKey });
+			return true;
+		} catch (e) {
+			console.error('[fal-layers] Failed to configure fal client:', e);
+			return false;
+		}
 	}
 	return false;
 }
@@ -59,6 +65,8 @@ export async function decomposeWithFal(request: DecomposeRequest): Promise<Decom
 
 	try {
 		console.log('[fal-layers] Calling fal.ai qwen-image-layered API...');
+		console.log('[fal-layers] Image URL:', request.imageUrl);
+		console.log('[fal-layers] Num layers:', request.numLayers ?? 4);
 
 		const result = await fal.subscribe('fal-ai/qwen-image-layered', {
 			input: {
@@ -71,12 +79,14 @@ export async function decomposeWithFal(request: DecomposeRequest): Promise<Decom
 			},
 			logs: true,
 			onQueueUpdate: (update) => {
+				console.log('[fal-layers] Queue status:', update.status);
 				if (update.status === 'IN_PROGRESS' && update.logs) {
 					update.logs.map((log) => log.message).forEach((msg) => console.log('[fal-layers]', msg));
 				}
 			}
 		});
 
+		console.log('[fal-layers] Result received:', JSON.stringify(result.data, null, 2));
 		console.log('[fal-layers] Received', result.data.images?.length ?? 0, 'layers');
 
 		return {
@@ -90,13 +100,26 @@ export async function decomposeWithFal(request: DecomposeRequest): Promise<Decom
 			seed: result.data.seed as number,
 			prompt: result.data.prompt as string | undefined
 		};
-	} catch (error) {
+	} catch (error: unknown) {
 		console.error('[fal-layers] API error:', error);
+		console.error('[fal-layers] Error type:', typeof error);
+		console.error(
+			'[fal-layers] Error details:',
+			JSON.stringify(error, Object.getOwnPropertyNames(error as object), 2)
+		);
+
+		const errorMessage =
+			error instanceof Error
+				? error.message
+				: typeof error === 'object' && error !== null && 'message' in error
+					? String((error as { message: unknown }).message)
+					: 'Unknown error calling fal.ai API';
+
 		return {
 			success: false,
 			layers: [],
 			seed: 0,
-			error: error instanceof Error ? error.message : 'Unknown error calling fal.ai API'
+			error: errorMessage
 		};
 	}
 }

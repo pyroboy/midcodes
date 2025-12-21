@@ -1,7 +1,7 @@
 import { fail, type Actions } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
-import { templateSizePresets, templates } from '$lib/server/schema'; // Changed to templates
+import { templateSizePresets, templates, templateAssets } from '$lib/server/schema'; // Changed to templates
 import { eq } from 'drizzle-orm';
 import { uploadToR2, deleteFromR2 } from '$lib/server/s3';
 import { getTemplateAssetPath } from '$lib/utils/storagePath';
@@ -62,8 +62,18 @@ export const actions: Actions = {
 			const category = formData.get('category') as string | null;
 			const tagsJson = formData.get('tags') as string;
 			const sizePresetId = formData.get('sizePresetId') as string;
-			const sampleType = formData.get('sampleType') as string;
-			const orientation = formData.get('orientation') as string;
+			const rawSampleType = formData.get('sampleType') as string;
+			const rawOrientation = formData.get('orientation') as string;
+
+			// Map client sample types to DB enum values
+			// DB Enum: 'student', 'employee', 'membership', 'visitor', 'other'
+			let sampleType = 'other';
+			if (['student', 'employee', 'membership', 'visitor'].includes(rawSampleType)) {
+				sampleType = rawSampleType;
+			}
+			
+			// Map orientation
+			const orientation = (['landscape', 'portrait'].includes(rawOrientation) ? rawOrientation : 'landscape');
 			const widthPixels = parseInt(formData.get('widthPixels') as string);
 			const heightPixels = parseInt(formData.get('heightPixels') as string);
 
@@ -116,48 +126,45 @@ export const actions: Actions = {
 
 			// 2. Insert into Database
 			try {
-				await db.transaction(async (tx) => {
-					// A. Create Template Record
-					await tx.insert(templates).values({
-						id: templateId,
-						userId: user.id,
-						name,
-						orientation: orientation as any,
-						widthPixels,
-						heightPixels,
+				// A. Create Template Record
+				await db.insert(templates).values({
+					id: templateId,
+					userId: user.id,
+					name,
+					orientation: orientation as any,
+					widthPixels,
+					heightPixels,
 
-						frontBackground: frontBackground,
-						previewFrontUrl: getUrl('front', 'preview'),
-						thumbFrontUrl: getUrl('front', 'thumb'),
+					frontBackground: frontBackground,
+					previewFrontUrl: getUrl('front', 'preview'),
+					thumbFrontUrl: getUrl('front', 'thumb'),
 
-						backBackground: getUrl('back', 'full'),
-						previewBackUrl: getUrl('back', 'preview'),
-						thumbBackUrl: getUrl('back', 'thumb'),
+					backBackground: getUrl('back', 'full'),
+					previewBackUrl: getUrl('back', 'preview'),
+					thumbBackUrl: getUrl('back', 'thumb'),
 
-						templateElements: []
-					});
+					templateElements: []
+				});
 
-					// B. Create Asset Library Record
-					// This makes it visible in "Manage Assets"
-					const { templateAssets } = await import('$lib/server/schema');
-					await tx.insert(templateAssets).values({
-						name,
-						description,
-						category,
-						tags,
-						sizePresetId: sizePresetId || null,
-						templateId: templateId, // Link to the template record
-						sampleType: (sampleType as any) || 'stock',
-						orientation: orientation as any,
-						imagePath: frontPath, // Store R2 path
-						imageUrl: frontBackground, // Store public URL
-						backImagePath: getPath('back', 'full'), // Store R2 path for back
-						backImageUrl: getUrl('back', 'full'), // Store public URL for back
-						widthPixels,
-						heightPixels,
-						isPublished: true, // Auto-publish for now? Or keep draft.
-						uploadedBy: user.id
-					});
+				// B. Create Asset Library Record
+				// This makes it visible in "Manage Assets"
+				await db.insert(templateAssets).values({
+					name,
+					description,
+					category,
+					tags,
+					sizePresetId: sizePresetId || null,
+					templateId: templateId, // Link to the template record
+					sampleType: (sampleType as any),
+					orientation: orientation as any,
+					imagePath: frontPath, // Store R2 path
+					imageUrl: frontBackground, // Store public URL
+					backImagePath: getPath('back', 'full'), // Store R2 path for back
+					backImageUrl: getUrl('back', 'full'), // Store public URL for back
+					widthPixels,
+					heightPixels,
+					isPublished: true, // Auto-publish for now? Or keep draft.
+					uploadedBy: user.id
 				});
 
 				return { success: true, id: templateId };

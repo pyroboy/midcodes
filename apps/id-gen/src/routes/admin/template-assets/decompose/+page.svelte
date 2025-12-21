@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { decomposeImage, saveLayers } from '$lib/remote/decompose.remote';
+	import { decomposeImage, saveLayers } from '$lib/remote/index.remote';
 	import { goto } from '$app/navigation';
 	import { toast } from 'svelte-sonner';
 	import { Layers, Wand2, Save, ArrowLeft, Loader2, Eye, EyeOff, ImageIcon } from 'lucide-svelte';

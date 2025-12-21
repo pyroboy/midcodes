@@ -3,6 +3,7 @@ import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
 import { templateAssets, templates } from '$lib/server/schema';
 import { eq } from 'drizzle-orm';
+import { checkAdmin } from '$lib/utils/adminPermissions';
 
 export const load: PageServerLoad = async ({ url, locals }) => {
 	// Require auth
@@ -11,10 +12,8 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 	}
 
 	// Check admin role
-	if (
-		!locals.user ||
-		!['super_admin', 'org_admin', 'id_gen_admin'].includes(locals.user.role as string)
-	) {
+	// Check admin role
+	if (!checkAdmin(locals)) {
 		throw error(403, 'Admin access required');
 	}
 

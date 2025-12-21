@@ -23,7 +23,8 @@
 		if (data.blockedByEmulation) return;
 
 		const hasAdminRole =
-			data.user.role && ['super_admin', 'org_admin', 'id_gen_admin'].includes(data.user.role);
+			data.isSuperAdmin ||
+			(data.user.role && ['super_admin', 'org_admin', 'id_gen_admin'].includes(data.user.role));
 		if (!hasAdminRole) {
 			console.warn('User does not have admin permissions');
 		}

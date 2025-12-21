@@ -66,3 +66,10 @@ export {
 	getCardAnalytics,
 	getUserAnalytics
 } from './analytics.remote';
+
+// Decompose functions
+export {
+	checkDecomposeAvailable,
+	decomposeImage,
+	saveLayers
+} from './decompose.remote';
