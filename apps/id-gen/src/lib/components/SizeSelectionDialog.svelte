@@ -58,9 +58,47 @@
 
 	interface Props {
 		open?: boolean;
+		sizePresets?: any[]; // Database template size presets
 	}
 
-	let { open = $bindable(false) }: Props = $props();
+	let { open = $bindable(false), sizePresets = [] }: Props = $props();
+
+	// Merge DB presets with common card sizes, preferring DB values
+	const availableSizes = $derived.by(() => {
+		if (!sizePresets || sizePresets.length === 0) {
+			return COMMON_CARD_SIZES;
+		}
+
+		// Map DB presets to CardSize format
+		const dbSizes: CardSize[] = sizePresets
+			.filter((p) => p.is_active !== false)
+			.map((p) => ({
+				name: p.name,
+				slug: p.slug,
+				// Prefer inches for display if available, otherwise consistent standard
+				width: parseFloat(p.width_inches) || p.width_pixels / (p.dpi || DEFAULT_DPI),
+				height: parseFloat(p.height_inches) || p.height_pixels / (p.dpi || DEFAULT_DPI),
+				unit: 'inches' as UnitType,
+				description: p.description || ''
+			}));
+
+		// Create a map by slug for easy lookup
+		const dbSizeMap = new Map(dbSizes.map((s) => [s.slug, s]));
+
+		// Start with common sizes to maintain order and fallbacks
+		const mergedSizes = COMMON_CARD_SIZES.map((commonSize) => {
+			if (commonSize.slug && dbSizeMap.has(commonSize.slug)) {
+				return dbSizeMap.get(commonSize.slug)!;
+			}
+			return commonSize;
+		});
+
+		// Add any DB-only sizes that weren't in common sizes
+		const commonSlugs = new Set(COMMON_CARD_SIZES.map((s) => s.slug).filter(Boolean));
+		const newSizes = dbSizes.filter((s) => s.slug && !commonSlugs.has(s.slug));
+
+		return [...mergedSizes, ...newSizes];
+	});
 
 	// Template asset counts loaded from server (keyed by "slug:orientation")
 	let templateAssetCounts = $state<Record<string, number>>({});
@@ -87,6 +125,14 @@
 	// Size selection state
 	let selectedSizeType: 'common' | 'custom' = $state('common');
 	let selectedCommonSize: CardSize = $state(COMMON_CARD_SIZES[0]);
+
+	// Update selected size when available sizes change or on init
+	$effect(() => {
+		if (selectedCommonSize === COMMON_CARD_SIZES[0] && availableSizes.length > 0) {
+			selectedCommonSize = availableSizes[0];
+		}
+	});
+
 	let isPortrait: boolean = $state(false);
 	let customWidth: number = $state(3.5);
 	let customHeight: number = $state(2.0);
@@ -344,7 +390,7 @@
 		currentStep = 'size';
 		templateName = '';
 		selectedSizeType = 'common';
-		selectedCommonSize = COMMON_CARD_SIZES[0];
+		selectedCommonSize = availableSizes.length > 0 ? availableSizes[0] : COMMON_CARD_SIZES[0];
 		isPortrait = false;
 		customWidth = 3.5;
 		customHeight = 2.0;
@@ -479,7 +525,7 @@
 						<!-- Horizontal scrollable card sizes -->
 						<div class="overflow-x-auto pb-2 -mx-4 px-4">
 							<div class="flex gap-2 min-w-max">
-								{#each COMMON_CARD_SIZES as size}
+								{#each availableSizes as size}
 									{@const currentSize = isPortrait ? switchOrientation(size) : size}
 									{@const aspectRatio = currentSize.width / currentSize.height}
 									{@const templateCount = getTemplateCount(size)}

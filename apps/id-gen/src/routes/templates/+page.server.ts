@@ -1,8 +1,8 @@
 import { error, fail } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { db } from '$lib/server/db';
-import { templates as templatesSchema, idcards } from '$lib/server/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { templates as templatesSchema, idcards, templateSizePresets } from '$lib/server/schema';
+import { eq, and, desc, asc } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ locals, url, depends, setHeaders }) => {
 	// Register dependency for selective invalidation
@@ -72,6 +72,13 @@ export const load: PageServerLoad = async ({ locals, url, depends, setHeaders })
 		.where(eq(templatesSchema.orgId, org_id!))
 		.orderBy(desc(templatesSchema.createdAt));
 
+	// Fetch size presets
+	const sizePresets = await db
+		.select()
+		.from(templateSizePresets)
+		.where(eq(templateSizePresets.isActive, true))
+		.orderBy(asc(templateSizePresets.sortOrder));
+
 	const transformedTemplates = templatesList.map((t) => ({
 		...t,
 		user_id: t.userId,
@@ -99,7 +106,8 @@ export const load: PageServerLoad = async ({ locals, url, depends, setHeaders })
 		selectedTemplate,
 		user,
 		org_id,
-		newTemplateParams
+		newTemplateParams,
+		sizePresets
 	};
 };
 

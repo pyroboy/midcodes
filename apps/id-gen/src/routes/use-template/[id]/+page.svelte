@@ -1022,9 +1022,11 @@
 										<IdCanvas
 											bind:this={frontCanvasComponent}
 											elements={template.template_elements.filter((el) => el.side === 'front')}
-											backgroundUrl={template.front_background.startsWith('http')
-												? template.front_background
-												: getStorageUrl(template.front_background)}
+											backgroundUrl={template.front_background
+												? (template.front_background.startsWith('http')
+														? template.front_background
+														: getStorageUrl(template.front_background, 'templates'))
+												: ''}
 											{formData}
 											{fileUploads}
 											{imagePositions}
@@ -1065,9 +1067,11 @@
 										<IdCanvas
 											bind:this={backCanvasComponent}
 											elements={template.template_elements.filter((el) => el.side === 'back')}
-											backgroundUrl={template.back_background.startsWith('http')
-												? template.back_background
-												: getStorageUrl(template.back_background)}
+											backgroundUrl={template.back_background
+												? template.back_background.startsWith('http')
+													? template.back_background
+													: getStorageUrl(template.back_background, 'templates')
+												: ''}
 											{formData}
 											{fileUploads}
 											{imagePositions}

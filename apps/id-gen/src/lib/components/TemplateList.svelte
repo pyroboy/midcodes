@@ -28,7 +28,8 @@
 		onCreateNew,
 		units = 'in',
 		dpi = 300,
-		savingTemplateId = null
+		savingTemplateId = null,
+		sizePresets = []
 	}: {
 		templates: any[];
 		onSelect: (id: string) => void;
@@ -42,6 +43,7 @@
 		units?: string;
 		dpi?: number;
 		savingTemplateId?: string | null;
+		sizePresets?: any[];
 	} = $props();
 	type Units = 'px' | 'in' | 'mm' | 'cm';
 
@@ -434,6 +436,7 @@
 	bind:open={showSizeDialog}
 	on:sizeSelected={handleSizeSelected}
 	on:cancel={handleSizeSelectionCancel}
+	{sizePresets}
 />
 
 {#if templateToDelete}

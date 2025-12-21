@@ -172,12 +172,15 @@
 				orientation?: 'landscape' | 'portrait';
 				front_background?: string;
 			} | null;
+			sizePresets?: any[];
 		};
 	} = $props();
 
 	let templates = $state<DatabaseTemplate[]>(untrack(() => data.templates));
 	let user = $state(untrack(() => data.user));
 	let org_id = $state(untrack(() => data.org_id));
+	// Default to empty array if not provided
+	let sizePresets = $derived(data.sizePresets || []);
 
 	$effect(() => {
 		templates = data.templates;
@@ -464,7 +467,7 @@
 			// Store cropped blobs for variant generation
 			let croppedFrontBlob: Blob | null = null;
 			let croppedBackBlob: Blob | null = null;
-			
+
 			// Generate template ID early for consistent styling
 			const templateId = currentTemplate?.id || crypto.randomUUID();
 
@@ -510,9 +513,9 @@
 					toast.loading('Uploading front image to cloud storage...', { id: toastId });
 					console.log('📄 Starting front image upload...');
 
-					const frontPath = getTemplateAssetPath( templateId, 'full', 'front', 'png');
+					const frontPath = getTemplateAssetPath(templateId, 'full', 'front', 'png');
 					console.log('📄 Front path generated:', frontPath);
-					
+
 					// Just pass the path - server should handle it
 					frontUrl = await uploadImage(frontResult.croppedFile, frontPath, user?.id);
 
@@ -527,13 +530,13 @@
 						console.log('📄 Uploading front low-res image...');
 						// Generate low-res path. Assuming standard naming convention if not in storagePath explicitly as variant
 						// Looking at storagePath, 'full' gives .png. For low res, we might want a different variant or just use 'full' but upload low res content?
-						// Wait, storagePath has variants 'thumb', 'preview', 'blank', 'sample'. It doesn't have 'low-res'. 
+						// Wait, storagePath has variants 'thumb', 'preview', 'blank', 'sample'. It doesn't have 'low-res'.
 						// The original code used `front_low_${Date.now()}`.
 						// Let's use 'preview' variant for low res if that matches intent, or stick to a custom path helper if needed.
-						// The template variants generator makes 'preview'. 
+						// The template variants generator makes 'preview'.
 						// Let's use 'preview' variant for now as it seems to map to 800px which is likely what low res means here.
 						const frontLowResPath = getTemplateAssetPath(templateId, 'preview', 'front', 'jpg');
-						
+
 						frontLowResUrl = await uploadImage(frontLowRes, frontLowResPath, user?.id);
 						console.log('✅ Front low-res uploaded:', frontLowResUrl);
 					} catch (lowResError) {
@@ -1747,10 +1750,11 @@
 				: 'visible'}"
 		>
 			<TemplateList
-				templates={templates ?? []}
-				onSelect={(id: string) => handleTemplateSelect(id)}
+				bind:templates
+				onSelect={(id) => goto(`/templates/edit/${id}`)}
 				onCreateNew={handleCreateNewTemplate}
-				{savingTemplateId}
+				savingTemplateId={isSaving ? savingTemplateId : null}
+				{sizePresets}
 			/>
 		</div>
 

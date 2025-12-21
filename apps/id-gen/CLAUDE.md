@@ -33,21 +33,31 @@ pnpm run clean            # Clear .svelte-kit, build, and cache
 ## Technology Stack
 
 - **SvelteKit 2.x** with TypeScript - Full-stack framework
-- **Supabase** - Database, auth, storage (type-safe via generated `database.types.ts`)
+- **Better Auth** - Authentication (replaces Supabase Auth)
+- **Drizzle ORM + Neon** - Database via `@neondatabase/serverless` (type-safe via `src/lib/server/schema.ts`)
+- **Cloudflare R2** - Asset storage via AWS S3 SDK
 - **TailwindCSS 4.x** - Styling with `@tailwindcss/vite`
 - **Threlte** - 3D graphics (Three.js wrapper for Svelte)
 - **shadcn-svelte** + **bits-ui** - UI component library
 - **sveltekit-superforms** + **Zod 4** - Form validation
-- **Vercel** - Deployment (Node.js 20.x runtime)
+- **Vercel/Cloudflare** - Deployment (Node.js 20.x runtime)
 
 ## Architecture Overview
 
-### Authentication Flow
+### Authentication Flow (Better Auth)
 
-1. `src/hooks.server.ts` initializes Supabase client and handles auth guard
-2. Session/user/permissions populated in `event.locals` via `safeGetSession()`
-3. `src/routes/+layout.server.ts` passes auth data to all routes
-4. JWT decoded for role-based permissions via `getUserPermissions()`
+1. `src/hooks.server.ts` uses Better Auth via lazy-initialized `auth` proxy
+2. Session retrieved via `auth.api.getSession({ headers })` - populates `event.locals`
+3. Profile fetched from Neon/Drizzle `profiles` table (linked by `user.id`)
+4. Role emulation state stored in profile's `context` JSONB field
+5. Permissions fetched via `getUserPermissions()` with 5-minute cache TTL
+
+### Lazy Initialization Pattern
+
+Database and auth are lazily initialized to support Cloudflare Workers:
+- `src/lib/server/db.ts` - `getDb()` returns Drizzle instance, `db` is a Proxy
+- `src/lib/server/auth.ts` - `getAuth()` returns Better Auth instance, `auth` is a Proxy
+- Environment validation runs on first request via `initializeEnv()`
 
 ### Role-Based Access Control
 
@@ -67,7 +77,24 @@ Hierarchy: `super_admin` > `org_admin` > `id_gen_admin` > `id_gen_user`
 
 - **Templates**: Dimensions stored as pixels + DPI (not physical units)
 - **Template Elements**: Discriminated union by `type` field (`text`, `image`, `qr`, `photo`, `signature`, `selection`)
-- **Database Operations**: Use type-safe Supabase client from `event.locals.supabase`
+- **Database Operations**: Use Drizzle ORM via `db` from `$lib/server/db`
+- **Storage Operations**: Use R2 helpers from `$lib/server/s3` (`uploadToR2`, `getPublicUrl`)
+
+### Asset Storage (Cloudflare R2)
+
+Storage paths defined in `src/lib/utils/storagePath.ts`:
+
+```
+templates/[templateId]/template-front.png           # Full-res template background
+templates/[templateId]/template-front-preview.png   # Preview variant
+cards/[orgId]/[templateId]/[cardId]/front.png       # Rendered ID card
+cards/[orgId]/[templateId]/[cardId]/raw/photo.png   # Uploaded user assets
+```
+
+Key functions:
+- `getTemplateAssetPath(templateId, variant, side)` - Template backgrounds
+- `getCardAssetPath(orgId, templateId, cardId, variant, side)` - Rendered cards
+- `getCardRawAssetPath(orgId, templateId, cardId, variableName)` - User uploads
 
 ### Schemas (Single Source of Truth)
 
@@ -81,10 +108,13 @@ All validation schemas in `src/lib/schemas/`:
 ## Key File Locations
 
 - `src/hooks.server.ts` - Auth initialization, route guards, security headers
-- `src/routes/+layout.server.ts` - Root data loading
-- `src/lib/types/database.types.ts` - Generated Supabase types
+- `src/lib/server/auth.ts` - Better Auth configuration with Drizzle adapter
+- `src/lib/server/db.ts` - Neon/Drizzle database connection
+- `src/lib/server/schema.ts` - Drizzle table definitions (source of truth for DB types)
+- `src/lib/server/s3.ts` - Cloudflare R2 storage client
+- `src/lib/server/env.ts` - Environment variable validation
 - `src/lib/services/permissions.ts` - Permission checking with cache
-- `tests/setup.ts` - Test environment setup
+- `tests/setup.ts` - Test environment setup (includes File API mock for jsdom)
 
 ## Testing Patterns
 
@@ -100,141 +130,105 @@ All validation schemas in `src/lib/schemas/`:
 - Environment variables via `$env/static/public` and `$env/static/private`
 - 3D libraries optimized in `vite.config.ts` (exclude ws/events, include three/threlte)
 
-## Database Schema (Supabase)
+## Database Schema (Neon + Drizzle)
 
-### Core ID-Gen Tables
+Schema defined in `src/lib/server/schema.ts`. Key tables:
 
-#### `templates`
+### Core Tables
 
-| Column              | Type                    | Description               |
-| ------------------- | ----------------------- | ------------------------- |
-| `id`                | UUID (PK)               | Auto-generated            |
-| `user_id`           | UUID                    | Creator reference         |
-| `org_id`            | UUID (FK→organizations) | Organization scope        |
-| `name`              | TEXT                    | Template name (required)  |
-| `front_background`  | TEXT                    | Front image URL           |
-| `back_background`   | TEXT                    | Back image URL            |
-| `orientation`       | TEXT                    | 'landscape' or 'portrait' |
-| `template_elements` | JSONB                   | Array of TemplateElement  |
-| `width_pixels`      | INTEGER                 | Width in pixels           |
-| `height_pixels`     | INTEGER                 | Height in pixels          |
-| `dpi`               | INTEGER                 | Resolution (default: 300) |
-| `created_at`        | TIMESTAMPTZ             | Auto-generated            |
-| `updated_at`        | TIMESTAMPTZ             | Auto-updated              |
+- **`profiles`** - User data linked to Better Auth `user.id` (TEXT PK, not UUID)
+  - `role`: user_role enum, `creditsBalance`, `context` (JSONB for role emulation)
+- **`templates`** - ID card templates with `templateElements` JSONB
+- **`idcards`** - Generated cards with `originalAssets` JSONB for raw uploads
+- **`organizations`** - Multi-tenant scope for all data
+- **`rolePermissions`** - RBAC mapping (role → permission)
 
-#### `idcards`
+### Better Auth Tables
 
-| Column        | Type                    | Description               |
-| ------------- | ----------------------- | ------------------------- |
-| `id`          | UUID (PK)               | Auto-generated            |
-| `template_id` | UUID (FK→templates)     | Source template           |
-| `org_id`      | UUID (FK→organizations) | Organization scope        |
-| `front_image` | TEXT                    | Rendered front image path |
-| `back_image`  | TEXT                    | Rendered back image path  |
-| `data`        | JSONB                   | Form field data           |
-| `created_at`  | TIMESTAMPTZ             | Auto-generated            |
+- **`user`**, **`session`**, **`account`**, **`verification`** - Managed by Better Auth
 
-#### `profiles`
-
-| Column                  | Type                    | Description           |
-| ----------------------- | ----------------------- | --------------------- |
-| `id`                    | UUID (PK)               | References auth.users |
-| `org_id`                | UUID (FK→organizations) | Organization scope    |
-| `email`                 | TEXT                    | User email            |
-| `role`                  | user_role               | User role enum        |
-| `credits_balance`       | INTEGER                 | Available credits     |
-| `card_generation_count` | INTEGER                 | Total cards generated |
-| `template_count`        | INTEGER                 | Templates created     |
-| `unlimited_templates`   | BOOLEAN                 | Feature flag          |
-| `remove_watermarks`     | BOOLEAN                 | Feature flag          |
-| `context`               | JSONB                   | User context data     |
-| `created_at`            | TIMESTAMPTZ             | Auto-generated        |
-| `updated_at`            | TIMESTAMPTZ             | Auto-updated          |
-
-#### `organizations`
-
-| Column       | Type        | Description                  |
-| ------------ | ----------- | ---------------------------- |
-| `id`         | UUID (PK)   | Auto-generated               |
-| `name`       | TEXT        | Organization name (required) |
-| `created_at` | TIMESTAMPTZ | Auto-generated               |
-| `updated_at` | TIMESTAMPTZ | Auto-updated                 |
-
-#### `org_settings`
-
-| Column             | Type                        | Description            |
-| ------------------ | --------------------------- | ---------------------- |
-| `org_id`           | UUID (PK, FK→organizations) | One-to-one             |
-| `payments_enabled` | BOOLEAN                     | Payment feature toggle |
-| `payments_bypass`  | BOOLEAN                     | Bypass payment checks  |
-| `updated_by`       | UUID (FK→profiles)          | Last updater           |
-| `updated_at`       | TIMESTAMPTZ                 | Auto-updated           |
-
-#### `credit_transactions`
-
-| Column             | Type                    | Description                    |
-| ------------------ | ----------------------- | ------------------------------ |
-| `id`               | UUID (PK)               | Auto-generated                 |
-| `user_id`          | UUID (FK→profiles)      | User reference                 |
-| `org_id`           | UUID (FK→organizations) | Organization scope             |
-| `transaction_type` | TEXT                    | 'purchase', 'deduct', 'refund' |
-| `amount`           | INTEGER                 | Credit amount                  |
-| `credits_before`   | INTEGER                 | Balance before                 |
-| `credits_after`    | INTEGER                 | Balance after                  |
-| `description`      | TEXT                    | Transaction description        |
-| `reference_id`     | TEXT                    | External reference             |
-| `metadata`         | JSONB                   | Additional data                |
-| `created_at`       | TIMESTAMPTZ             | Auto-generated                 |
-
-#### `payment_records`
-
-| Column                | Type        | Description                                        |
-| --------------------- | ----------- | -------------------------------------------------- |
-| `id`                  | UUID (PK)   | Auto-generated                                     |
-| `user_id`             | UUID        | User reference                                     |
-| `session_id`          | TEXT        | Checkout session                                   |
-| `provider_payment_id` | TEXT        | Provider reference                                 |
-| `kind`                | TEXT        | 'credit' or 'feature'                              |
-| `sku_id`              | TEXT        | Product identifier                                 |
-| `amount_php`          | NUMERIC     | Amount in PHP                                      |
-| `currency`            | TEXT        | Currency code                                      |
-| `status`              | TEXT        | 'pending', 'paid', 'failed', 'expired', 'refunded' |
-| `method`              | TEXT        | 'gcash', 'paymaya', 'card', 'online_banking'       |
-| `method_allowed`      | TEXT[]      | Allowed payment methods                            |
-| `paid_at`             | TIMESTAMPTZ | Payment completion time                            |
-| `idempotency_key`     | TEXT        | Unique key for dedup                               |
-| `metadata`            | JSONB       | Additional data                                    |
-| `raw_event`           | JSONB       | Provider webhook payload                           |
-| `created_at`          | TIMESTAMPTZ | Auto-generated                                     |
-| `updated_at`          | TIMESTAMPTZ | Auto-updated                                       |
-
-#### `role_permissions`
-
-| Column       | Type           | Description     |
-| ------------ | -------------- | --------------- |
-| `id`         | INTEGER (PK)   | Auto-generated  |
-| `role`       | app_role       | Role enum       |
-| `permission` | app_permission | Permission enum |
-
-### Enums
+### Enums (Drizzle pgEnum)
 
 ```typescript
-// User roles hierarchy
-type user_role = 'super_admin' | 'org_admin' | 'id_gen_admin' | 'id_gen_user' | 'user' | ...;
-
-// ID-Gen specific permissions
-type app_permission =
-  | 'templates.create' | 'templates.read' | 'templates.update' | 'templates.delete'
-  | 'idcards.create' | 'idcards.read' | 'idcards.update' | 'idcards.delete'
-  | 'organizations.create' | 'organizations.read' | 'organizations.update' | 'organizations.delete'
-  | 'profiles.read' | 'profiles.update';
+userRoleEnum: 'super_admin' | 'org_admin' | 'id_gen_admin' | 'id_gen_user' | 'user'
+appPermissionEnum: 'templates.create' | 'templates.read' | 'idcards.create' | ...
 ```
 
-### Storage Buckets
+### R2 Storage Buckets
 
-- `template-backgrounds` - Template front/back images
-- `rendered-id-cards` - Generated ID card images
-- `user-uploads` - User-uploaded photos/signatures
+- Single bucket configured via `R2_BUCKET_NAME` env var (default: `id-gen-assets`)
+- Public domain: `R2_PUBLIC_DOMAIN` (e.g., `assets.kanaya.app`)
+
+---
+
+## Image Loading Best Practices
+
+### URL Types and Handling
+
+There are three types of image URLs in this codebase:
+
+| Type | Example | Handling |
+|------|---------|----------|
+| Local paths | `/placeholder.png` | Return as-is, no processing |
+| Full R2 URLs | `https://assets.kanaya.app/templates/abc/img.png` | Route through proxy |
+| Relative paths | `templates/abc/img.png` | Resolve via `getStorageUrl`, then proxy |
+
+### Key Functions (`src/lib/utils/storage.ts`)
+
+```typescript
+// Converts path to full URL (adds domain)
+getStorageUrl(path, bucket?) → string
+
+// Handles CORS - routes R2 URLs through proxy
+getProxiedUrl(pathOrUrl, bucket?) → string | null
+```
+
+### When to Use Each Function
+
+- **`getStorageUrl`**: For `<img>` tags and direct display (no CORS issues)
+- **`getProxiedUrl`**: For Canvas/Three.js texture loading (requires CORS)
+
+### CORS and the Image Proxy
+
+Canvas operations (`drawImage`, Three.js textures) require CORS headers. The proxy at `/api/image-proxy` bypasses this:
+
+```
+Browser → /api/image-proxy?url=... (same-origin, no CORS)
+Server  → fetches from R2 (server-to-server, no CORS needed)
+Server  → returns image to browser
+```
+
+**Security**: Proxy only allows `assets.kanaya.app` domain (see `src/routes/api/image-proxy/+server.ts`)
+
+### Database Storage Format
+
+Templates store **full URLs** in `frontBackground`/`backBackground`:
+```
+https://assets.kanaya.app/templates/{templateId}/template-front.png
+```
+
+### Common Patterns
+
+```svelte
+<!-- For regular <img> display -->
+<img src={getStorageUrl(path, 'templates')} />
+
+<!-- For IdCanvas/3D textures (handles null + CORS) -->
+backgroundUrl={template.front_background
+  ? (template.front_background.startsWith('http')
+      ? template.front_background
+      : getStorageUrl(template.front_background, 'templates'))
+  : ''}
+```
+
+### Troubleshooting
+
+| Issue | Cause | Fix |
+|-------|-------|-----|
+| CORS error on canvas | Direct R2 URL without proxy | Use `getProxiedUrl` |
+| 500 from proxy | URL not from `assets.kanaya.app` | Check URL format |
+| Gray 3D texture | Texture failed to load | Check browser console for errors |
+| Local image 404 through proxy | Local path processed as R2 path | Ensure `/` paths bypass proxy |
 
 ---
 

@@ -78,11 +78,8 @@ export function initializeEnv() {
 	const rawEnv = {
 		NEON_DATABASE_URL:
 			privateEnv.NEON_DATABASE_URL ||
-			privateEnv.DATABASE_URL ||
 			dotEnvParsed.NEON_DATABASE_URL ||
-			dotEnvParsed.DATABASE_URL ||
-			process?.env?.NEON_DATABASE_URL ||
-			process?.env?.DATABASE_URL,
+			process?.env?.NEON_DATABASE_URL,
 
 		BETTER_AUTH_SECRET:
 			privateEnv.BETTER_AUTH_SECRET ||

@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import type { ShowcaseImage, TextureLoadResult, PreloadProgress } from './types';
+import { getProxiedUrl } from '$lib/utils/storage';
 
 export class TextureManager {
 	private textureLoader: THREE.TextureLoader;
@@ -21,15 +22,6 @@ export class TextureManager {
 		this.onProgress = onProgress;
 	}
 
-	/**
-	 * Route R2 URLs through proxy to avoid CORS issues
-	 */
-	private getProxiedUrl(url: string): string {
-		if (url.includes('.r2.dev') || url.includes('r2.cloudflarestorage.com')) {
-			return `/api/image-proxy?url=${encodeURIComponent(url)}`;
-		}
-		return url;
-	}
 
 	/**
 	 * Configure texture with standard settings
@@ -78,7 +70,7 @@ export class TextureManager {
 		console.log('[TextureManager] Loading front:', url);
 
 		this.textureLoader.load(
-			this.getProxiedUrl(url),
+			getProxiedUrl(url) || url,
 			(loadedTexture) => {
 				this.configureTexture(loadedTexture);
 				this.applyAspectCorrection(loadedTexture, aspect);
@@ -112,7 +104,7 @@ export class TextureManager {
 		console.log('[TextureManager] Loading back:', url);
 
 		this.textureLoader.load(
-			this.getProxiedUrl(url),
+			getProxiedUrl(url) || url,
 			(loadedTexture) => {
 				this.configureTexture(loadedTexture);
 				this.applyAspectCorrection(loadedTexture, aspect);
@@ -158,7 +150,7 @@ export class TextureManager {
 		showcaseLoader.crossOrigin = 'anonymous';
 
 		showcaseLoader.load(
-			this.getProxiedUrl(url),
+			getProxiedUrl(url) || url,
 			(loadedTexture) => {
 				// Validate texture has actual image data
 				if (
@@ -265,7 +257,7 @@ export class TextureManager {
 				}
 
 				loader.load(
-					this.getProxiedUrl(img.image_url),
+					getProxiedUrl(img.image_url) || img.image_url,
 					(loadedTexture) => {
 						if (
 							loadedTexture.image &&

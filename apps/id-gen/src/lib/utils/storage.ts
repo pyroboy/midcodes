@@ -38,26 +38,28 @@ export function getStorageUrl(path: string, bucket: string = 'templates'): strin
  * Helper to route R2 URLs through our proxy to avoid CORS issues.
  * Uses `getStorageUrl` internally to resolve the full URL first if needed.
  */
-export function getProxiedUrl(pathOrUrl: string | null, bucket?: string): string | null {
+export function getProxiedUrl(pathOrUrl: string | null, bucket?: string){
 	if (!pathOrUrl) return null;
 
-	// Resolve full URL
+	// Local paths (starting with /) should be returned as-is
+	if (pathOrUrl.startsWith('/')) return pathOrUrl;
+
+	// Full URLs starting with http should be checked for R2 domain
+	if (pathOrUrl.startsWith('http')) {
+		if (pathOrUrl.includes('assets.kanaya.app')) {
+			return `/api/image-proxy?url=${encodeURIComponent(pathOrUrl)}`;
+		}
+		return pathOrUrl;
+	}
+
+	// Relative paths need to be resolved to full R2 URLs
 	const fullUrl = getStorageUrl(pathOrUrl, bucket);
 
-	// Check if this is a URL that needs proxying (R2 or our custom domain)
-	// Check if this is a URL that needs proxying (R2 or our custom domain)
-	// PRODUCTION UPDATE: We now have CORS configured on R2, so we can load directly.
-	// Proxying is disabled for R2 to improve performance and reduce server load.
-	/*
-	if (
-		fullUrl.includes('.r2.dev') ||
-		fullUrl.includes('r2.cloudflarestorage.com') ||
-		fullUrl.includes('assets.kanaya.app')
-	) {
+	// Route through proxy to avoid CORS issues with canvas/Three.js texture loading
+	if (fullUrl.includes('assets.kanaya.app')) {
 		return `/api/image-proxy?url=${encodeURIComponent(fullUrl)}`;
 	}
-	*/
-	
+
 	return fullUrl;
 }
 

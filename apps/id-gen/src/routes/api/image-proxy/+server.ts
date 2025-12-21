@@ -8,21 +8,17 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 		throw error(400, 'Missing url parameter');
 	}
 
-	// Validate that we are only proxying our own R2 images to prevent abuse
-	// Check against allowed domains from our config
+	// Validate URL format
+	let parsedUrl: URL;
 	try {
-		const u = new URL(imageUrl);
-		const allowedHosts = [
-			'.r2.dev',
-			'.r2.cloudflarestorage.com',
-			'assets.kanaya.app',
-			'kanaya.app'
-		];
-		if (!allowedHosts.some((host) => u.hostname.endsWith(host))) {
-			throw error(403, 'Forbidden domain');
-		}
-	} catch (e) {
+		parsedUrl = new URL(imageUrl);
+	} catch {
 		throw error(400, 'Invalid URL');
+	}
+
+	// Only allow our R2 domain to prevent abuse
+	if (parsedUrl.hostname !== 'assets.kanaya.app') {
+		throw error(403, 'Forbidden domain');
 	}
 
 	try {

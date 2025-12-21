@@ -1,7 +1,7 @@
 <script lang="ts">
 	// --- IMPORTS ---
 	import { T, Canvas } from '@threlte/core';
-	import { OrbitControls, useTexture } from '@threlte/extras';
+	import { OrbitControls } from '@threlte/extras';
 	import * as THREE from 'three';
 	import { NoToneMapping } from 'three';
 	import { onMount } from 'svelte';
@@ -10,6 +10,7 @@
 	// --- LOCAL IMPORTS ---
 	import type { CardGeometry } from '$lib/utils/cardGeometry';
 	import { createCardFromInches, createRoundedRectCard } from '$lib/utils/cardGeometry';
+	import { getProxiedUrl } from '$lib/utils/storage';
 
 	// --- TYPES ---
 	type GeometryDimensions = { width: number; height: number } | null;
@@ -76,15 +77,11 @@
 	let resolvedTemplateDimensions = $state<TemplateDimensions>(null);
 	let effectiveTemplateDimensions = $state<TemplateDimensions>(null);
 
-	// Helper: Route R2 URLs through our proxy to avoid CORS issues
-	function getProxiedUrl(url: string | null): string | null {
-		if (!url) return null;
-		// Check if this is an R2 URL that needs proxying
-		if (url.includes('.r2.dev') || url.includes('r2.cloudflarestorage.com')) {
-			return `/api/image-proxy?url=${encodeURIComponent(url)}`;
-		}
-		return url;
-	}
+	let frontTexture = $state<THREE.Texture | null>(null);
+	let backTexture = $state<THREE.Texture | null>(null);
+	let isLoadingTexture = $state(false);
+
+
 
 	// Effect 1: Resolve incoming props, which may be functions or promises
 	$effect(() => {
@@ -99,8 +96,8 @@
 					resolveProp(templateDimensionsProp)
 				]);
 				// Proxy R2 URLs to avoid CORS issues with Three.js texture loading
-				resolvedFrontUrl = getProxiedUrl(front);
-				resolvedBackUrl = getProxiedUrl(back);
+				resolvedFrontUrl = getProxiedUrl(front,'cards');
+				resolvedBackUrl = getProxiedUrl(back,'cards');
 				resolvedCardGeometry = geo;
 				resolvedTemplateDimensions = dims;
 			} catch (error) {
@@ -215,6 +212,58 @@
 		} else {
 			isLoadingGeometry = false;
 		}
+	});
+
+	// Effect 3: Load Textures manually with crossOrigin = 'anonymous'
+	$effect(() => {
+		const loadTextures = async () => {
+			// Reset textures when URLs change
+			frontTexture = null;
+			backTexture = null;
+
+			if (!resolvedFrontUrl && !resolvedBackUrl) return;
+			
+			isLoadingTexture = true;
+			const loader = new THREE.TextureLoader();
+			loader.crossOrigin = 'anonymous';
+
+			const loadOne = (url: string | null) => {
+				if (!url) return Promise.resolve(null);
+				return new Promise<THREE.Texture>((resolve, reject) => {
+					loader.load(
+						url,
+						(tex) => {
+							tex.colorSpace = THREE.SRGBColorSpace;
+							// Transform happens in render loop or material, 
+							// but here we just prepare the texture.
+							// We'll apply transformTextureToFit when using it.
+							resolve(tex);
+						},
+						undefined,
+						(err) => {
+							console.error('Failed to load texture:', url, err);
+							reject(err);
+						}
+					);
+				});
+			};
+
+			try {
+				const [fTex, bTex] = await Promise.all([
+					loadOne(resolvedFrontUrl),
+					loadOne(resolvedBackUrl)
+				]);
+				
+				if (fTex) frontTexture = transformTextureToFit(fTex, effectiveTemplateDimensions, geometryDimensions);
+				if (bTex) backTexture = transformTextureToFit(bTex, effectiveTemplateDimensions, geometryDimensions);
+			} catch (e) {
+				console.error('Texture load error', e);
+			} finally {
+				isLoadingTexture = false;
+			}
+		};
+
+		loadTextures();
 	});
 
 	// --- RESPONSIVE CALCULATIONS ---
@@ -357,17 +406,13 @@
 								<T.DirectionalLight position={[5, 5, 5]} intensity={1.5} />
 
 								<T.Group rotation.y={rotationY}>
-									{#if currentGeometry.frontGeometry && resolvedFrontUrl}
-										{@const frontTexture = useTexture(resolvedFrontUrl, {
-											transform: (texture) =>
-												transformTextureToFit(
-													texture,
-													effectiveTemplateDimensions,
-													geometryDimensions
-												)
-										})}
-
-										{#await frontTexture}
+									{#if currentGeometry.frontGeometry}
+										{#if frontTexture}
+											<!-- Front texture loaded -->
+											<T.Mesh geometry={currentGeometry.frontGeometry}>
+												<T.MeshStandardMaterial map={frontTexture} roughness={0.4} />
+											</T.Mesh>
+										{:else if isLoadingTexture && resolvedFrontUrl}
 											<!-- Front texture loading -->
 											<T.Mesh geometry={currentGeometry.frontGeometry}>
 												<T.MeshBasicMaterial color="#1a1a1a" transparent opacity={0.9} />
@@ -417,36 +462,21 @@
 													/>
 												</T.Mesh>
 											</T.Group>
-										{:then map}
-											<!-- Front texture loaded -->
+										{:else}
+											<!-- Front geometry without texture -->
 											<T.Mesh geometry={currentGeometry.frontGeometry}>
-												<T.MeshStandardMaterial {map} roughness={0.4} />
+												<T.MeshStandardMaterial color="#e0e0e0" roughness={0.8} />
 											</T.Mesh>
-										{:catch error}
-											<!-- Front texture error -->
-											<T.Mesh geometry={currentGeometry.frontGeometry}>
-												<T.MeshStandardMaterial color="#ff6b6b" />
-											</T.Mesh>
-											{console.error('Front texture failed to load:', error)}
-										{/await}
-									{:else if currentGeometry.frontGeometry}
-										<!-- Front geometry without texture -->
-										<T.Mesh geometry={currentGeometry.frontGeometry}>
-											<T.MeshStandardMaterial color="#e0e0e0" roughness={0.8} />
-										</T.Mesh>
+										{/if}
 									{/if}
 
-									{#if currentGeometry.backGeometry && resolvedBackUrl}
-										{@const backTexture = useTexture(resolvedBackUrl, {
-											transform: (texture) =>
-												transformTextureToFit(
-													texture,
-													effectiveTemplateDimensions,
-													geometryDimensions
-												)
-										})}
-
-										{#await backTexture}
+									{#if currentGeometry.backGeometry}
+										{#if backTexture}
+											<!-- Back texture loaded -->
+											<T.Mesh geometry={currentGeometry.backGeometry}>
+												<T.MeshStandardMaterial map={backTexture} roughness={0.4} />
+											</T.Mesh>
+										{:else if isLoadingTexture && resolvedBackUrl}
 											<!-- Back texture loading -->
 											<T.Mesh geometry={currentGeometry.backGeometry}>
 												<T.MeshBasicMaterial color="#1a1a1a" transparent opacity={0.9} />
@@ -496,28 +526,12 @@
 													/>
 												</T.Mesh>
 											</T.Group>
-										{:then rawMap}
-											<!-- Back texture loaded -->
-											{@const map = transformTextureToFit(
-												rawMap,
-												effectiveTemplateDimensions,
-												geometryDimensions
-											)}
+										{:else}
+											<!-- Back geometry without texture -->
 											<T.Mesh geometry={currentGeometry.backGeometry}>
-												<T.MeshStandardMaterial {map} roughness={0.4} />
+												<T.MeshStandardMaterial color="#e0e0e0" roughness={0.8} />
 											</T.Mesh>
-										{:catch error}
-											<!-- Back texture error -->
-											<T.Mesh geometry={currentGeometry.backGeometry}>
-												<T.MeshStandardMaterial color="#ff6b6b" />
-											</T.Mesh>
-											{console.error('Back texture failed to load:', error)}
-										{/await}
-									{:else if currentGeometry.backGeometry}
-										<!-- Back geometry without texture -->
-										<T.Mesh geometry={currentGeometry.backGeometry}>
-											<T.MeshStandardMaterial color="#e0e0e0" roughness={0.8} />
-										</T.Mesh>
+										{/if}
 									{/if}
 
 									{#if currentGeometry.edgeGeometry}
