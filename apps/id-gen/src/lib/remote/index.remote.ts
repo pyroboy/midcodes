@@ -75,5 +75,7 @@ export {
 	saveLayers,
 	getDecomposeHistory,
 	getDecomposeHistoryWithStats,
+	uploadProcessedImage,
+	removeElementFromLayer,
 	type HistoryStats
 } from './decompose.remote';

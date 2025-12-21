@@ -292,6 +292,22 @@
 								Decompose
 							</a>
 
+							<a
+								href="/admin/template-assets/enhance?assetId={asset.id}"
+								class="flex items-center justify-center text-xs font-medium text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 py-1.5 rounded transition-colors"
+								title="Remove elements or upscale image"
+							>
+								<svg class="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+									/>
+								</svg>
+								Enhance
+							</a>
+
 							<form
 								action="?/regenerateAsset"
 								method="POST"

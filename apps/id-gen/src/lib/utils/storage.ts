@@ -1,5 +1,8 @@
 import { env } from '$env/dynamic/public';
 
+// Get R2 domain from env with fallback
+const R2_DOMAIN = (env as any).PUBLIC_R2_PUBLIC_DOMAIN || 'assets.kanaya.app';
+
 /**
  * Generates the public URL for an asset stored in R2.
  * @param path The file path/key (e.g., "my-image.png")
@@ -13,7 +16,7 @@ export function getStorageUrl(path: string, bucket: string = 'templates'): strin
 	if (path.startsWith('http')) return path;
 
 	// Use R2 Public Domain from environment
-	const domain = (env as any).PUBLIC_R2_PUBLIC_DOMAIN || 'assets.kanaya.app';
+	const domain = R2_DOMAIN;
 
 	let finalPath = path;
 	// Prepend bucket/folder if not already present
@@ -46,7 +49,8 @@ export function getProxiedUrl(pathOrUrl: string | null, bucket?: string){
 
 	// Full URLs starting with http should be checked for R2 domain
 	if (pathOrUrl.startsWith('http')) {
-		if (pathOrUrl.includes('assets.kanaya.app')) {
+		// Use configured domain instead of hardcoded value
+		if (pathOrUrl.includes(R2_DOMAIN)) {
 			return `/api/image-proxy?url=${encodeURIComponent(pathOrUrl)}`;
 		}
 		return pathOrUrl;
@@ -56,7 +60,7 @@ export function getProxiedUrl(pathOrUrl: string | null, bucket?: string){
 	const fullUrl = getStorageUrl(pathOrUrl, bucket);
 
 	// Route through proxy to avoid CORS issues with canvas/Three.js texture loading
-	if (fullUrl.includes('assets.kanaya.app')) {
+	if (fullUrl.includes(R2_DOMAIN)) {
 		return `/api/image-proxy?url=${encodeURIComponent(fullUrl)}`;
 	}
 

@@ -41,7 +41,8 @@ export const decomposedLayerSchema = z.object({
 		.optional(), // Computed from non-transparent pixels
 	zIndex: z.number().int().min(0),
 	suggestedType: layerElementTypeSchema.default('unknown'),
-	side: z.enum(['front', 'back']).default('front')
+	side: z.enum(['front', 'back']).default('front'),
+	parentId: z.string().optional()
 });
 export type DecomposedLayer = z.infer<typeof decomposedLayerSchema>;
 

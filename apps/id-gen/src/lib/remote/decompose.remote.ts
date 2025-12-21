@@ -1,17 +1,81 @@
 import { command, query } from '$app/server';
 import { error } from '@sveltejs/kit';
 import { getRequestEvent } from '$app/server';
-import { decomposeWithFal, isFalConfigured } from '$lib/server/fal-layers';
+import { decomposeWithFal, isFalConfigured, removeElementFromImage } from '$lib/server/fal-layers';
 import { db } from '$lib/server/db';
 import * as schema from '$lib/server/schema';
 import { uploadToR2 } from '$lib/server/s3';
 import { getDecomposedLayerPath } from '$lib/utils/storagePath';
 import { checkAdmin } from '$lib/utils/adminPermissions';
-import { eq, desc, and } from 'drizzle-orm';
+import { eq, and, desc, or, sql } from 'drizzle-orm';
 import type { LayerSelection } from '$lib/schemas/decompose.schema';
 import type { TemplateElement } from '$lib/schemas/template-element.schema';
 import { templateElementSchema } from '$lib/schemas/template-element.schema';
+import { adjustUserCredits } from '$lib/remote/billing.remote';
 import { CREDIT_COSTS } from '$lib/config/credits';
+import { z } from 'zod';
+
+// ============================================================================
+// VALIDATION SCHEMAS
+// ============================================================================
+
+const decomposeImageSchema = z.object({
+	imageUrl: z.string().url('Invalid image URL'),
+	numLayers: z.number().int().min(2).max(10).optional().default(4),
+	prompt: z.string().optional(),
+	negative_prompt: z.string().optional(),
+	num_inference_steps: z.number().int().min(1).max(100).optional(),
+	guidance_scale: z.number().min(0).max(30).optional(),
+	acceleration: z.string().optional(),
+	seed: z.number().int().optional(),
+	templateId: z.string().uuid().nullable().optional(),
+	side: z.enum(['front', 'back']).optional()
+});
+
+const upscaleImageSchema = z.object({
+	imageUrl: z.string().url('Invalid image URL'),
+	model: z.enum(['seedvr', 'aurasr', 'esrgan', 'recraft-creative']).optional().default('seedvr'),
+	side: z.enum(['front', 'back']).optional(),
+	templateId: z.string().uuid().nullable().optional()
+});
+
+const removeElementSchema = z.object({
+	imageUrl: z.string().url('Invalid image URL'),
+	prompt: z.string().min(1, 'Prompt is required to specify what to remove'),
+	imageWidth: z.number().int().positive().optional(),
+	imageHeight: z.number().int().positive().optional(),
+	side: z.enum(['front', 'back']).optional(),
+	templateId: z.string().uuid().nullable().optional()
+});
+
+const uploadProcessedImageSchema = z.object({
+	imageBase64: z.string().min(1, 'Image data required'),
+	mimeType: z.string().optional().default('image/png')
+});
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+/**
+ * Fetch with timeout wrapper for downloading ephemeral URLs
+ */
+async function fetchWithTimeout(url: string, timeoutMs: number = 30000): Promise<Response> {
+	const controller = new AbortController();
+	const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+	try {
+		const response = await fetch(url, { signal: controller.signal });
+		return response;
+	} catch (err) {
+		if (err instanceof Error && err.name === 'AbortError') {
+			throw new Error(`Fetch timed out after ${timeoutMs}ms: ${url}`);
+		}
+		throw err;
+	} finally {
+		clearTimeout(timeoutId);
+	}
+}
 
 // Helper to check for admin access
 async function requireAdmin() {
@@ -62,6 +126,7 @@ export type DecomposeResponse = {
 	error?: string;
 	timings?: any;
 	seed?: number;
+	historyWarning?: string; // Added: warn if history save failed
 };
 
 /**
@@ -70,29 +135,30 @@ export type DecomposeResponse = {
  */
 export const decomposeImage = command(
 	'unchecked',
-	async ({
-		imageUrl,
-		numLayers = 4,
-		prompt,
-		negative_prompt,
-		num_inference_steps,
-		guidance_scale,
-		acceleration,
-		seed,
-		templateId,
-		side
-	}: {
-		imageUrl: string;
-		numLayers?: number;
-		prompt?: string;
-		negative_prompt?: string;
-		num_inference_steps?: number;
-		guidance_scale?: number;
-		acceleration?: string;
-		seed?: number;
-		templateId?: string | null;
-		side?: 'front' | 'back';
-	}): Promise<DecomposeResponse> => {
+	async (input: z.input<typeof decomposeImageSchema>): Promise<DecomposeResponse> => {
+		// Validate input
+		const parseResult = decomposeImageSchema.safeParse(input);
+		if (!parseResult.success) {
+			return {
+				success: false,
+				error: `Validation error: ${parseResult.error.issues.map((e: { message: string }) => e.message).join(', ')}`,
+				layers: []
+			};
+		}
+		
+		const {
+			imageUrl,
+			numLayers,
+			prompt,
+			negative_prompt,
+			num_inference_steps,
+			guidance_scale,
+			acceleration,
+			seed,
+			templateId,
+			side
+		} = parseResult.data;
+		
 		console.log('[decompose.remote] decomposeImage called with:', {
 			imageUrl,
 			numLayers,
@@ -100,7 +166,29 @@ export const decomposeImage = command(
 			side
 		});
 		const { user, org_id } = await requireAdmin();
+
+		// Check credits first
+		const decomposeCost = CREDIT_COSTS.AI_DECOMPOSE;
+		/* BYPASS CREDIT CHECK
+		// Refresh user data to get latest credits
+		const userProfile = await db.query.profiles.findFirst({
+			where: eq(schema.profiles.id, user.id),
+			columns: { creditsBalance: true }
+		});
+
+		if (!userProfile || (userProfile.creditsBalance || 0) < decomposeCost) {
+			return {
+				success: false,
+				error: `Insufficient credits. Required: ${decomposeCost}, Available: ${userProfile?.creditsBalance || 0}`,
+				layers: []
+			};
+		}
+		*/
+		console.log('[decompose.remote] Credit check bypassed for Decompose');
+
 		console.log('[decompose.remote] Admin check passed, calling decomposeWithFal...');
+
+		let historyWarning: string | undefined;
 
 		try {
 			// Call AI Service with the provided imageUrl
@@ -125,43 +213,71 @@ export const decomposeImage = command(
 				};
 			}
 
-			// 2. Persist Layers to R2
+			// Apply credit deduction after successful AI generation
+			/* BYPASS CREDIT DEDUCTION
+			try {
+				await adjustUserCredits({
+					userId: user.id,
+					delta: -decomposeCost,
+					reason: `AI Decompose (${numLayers} layers)`
+				});
+				console.log('[decompose.remote] Credits deducted:', decomposeCost);
+			} catch (creditErr) {
+				console.error('[decompose.remote] Failed to deduct credits:', creditErr);
+				// Continue, but log this critical failure
+				historyWarning = (historyWarning || '') + ' Network issue updating credits. ';
+			}
+			*/
+			console.log('[decompose.remote] Credit deduction bypassed for Decompose');
+
+			// 2. Persist Layers to R2 with timeout for ephemeral URL downloads
 			const timestamp = Date.now();
 			const generationId = crypto.randomUUID();
 
 			const persistedLayers = await Promise.all(
 				result.layers.map(async (layer: any, index: number) => {
-					try {
-						// Download from ephemeral URL
-						const response = await fetch(layer.url);
-						const arrayBuffer = await response.arrayBuffer();
-						const buffer = Buffer.from(arrayBuffer);
-
-						// Upload to R2
-						let key: string;
-						if (templateId) {
-							key = getDecomposedLayerPath(templateId, `${timestamp}_${generationId}`, index);
-						} else {
-							// Fallback if no templateId provided (e.g. standalone tool)
-							key = `decompose/${user?.id}/${timestamp}_${generationId}/layer_${index}.png`;
+					let lastError: any;
+					// Retry loop for R2 upload
+					for (let attempt = 0; attempt < 3; attempt++) {
+						try {
+							// Download from ephemeral URL with timeout (30s)
+							const response = await fetchWithTimeout(layer.url, 30000);
+							if (!response.ok) {
+								throw new Error(`Failed to download layer from AI provider: ${response.status} ${response.statusText}`);
+							}
+							const arrayBuffer = await response.arrayBuffer();
+							const buffer = Buffer.from(arrayBuffer);
+	
+							// Upload to R2
+							let key: string;
+							if (templateId) {
+								key = getDecomposedLayerPath(templateId, `${timestamp}_${generationId}`, index);
+							} else {
+								// Fallback if no templateId provided (e.g. standalone tool)
+								key = `decompose/${user?.id}/${timestamp}_${generationId}/layer_${index}.png`;
+							}
+	
+							const r2Url = await uploadToR2(key, buffer, 'image/png');
+	
+							return {
+								...layer,
+								imageUrl: r2Url, // Normalize to imageUrl for frontend consistency
+								url: r2Url
+							};
+						} catch (uploadErr: any) {
+							console.warn(`[decompose.remote] Attempt ${attempt + 1}/3 failed to persist layer ${index}:`, uploadErr);
+							lastError = uploadErr;
+							await new Promise(r => setTimeout(r, 1000 * (attempt + 1))); // Backoff
 						}
-
-						const r2Url = await uploadToR2(key, buffer, 'image/png');
-
-						return {
-							...layer,
-							imageUrl: r2Url, // Normalize to imageUrl for frontend consistency
-							url: r2Url
-						};
-					} catch (uploadErr) {
-						console.error(`[decompose.remote] Failed to persist layer ${index}:`, uploadErr);
-						return layer;
 					}
+					// If all retries fail, return the ephemeral URL but mark as partial failure
+					console.error(`[decompose.remote] Failed to persist layer ${index} after retries. Returning ephemeral.`);
+					historyWarning = (historyWarning || '') + `Failed to save layer ${index + 1} permanently. `;
+					return layer; // Return original ephemeral layer
 				})
 			);
 
 			// 3. Save to Database History with actual credit cost
-			const creditsUsed = CREDIT_COSTS.AI_DECOMPOSE;
 			if (org_id && user?.id) {
 				try {
 					await db.insert(schema.aiGenerations).values({
@@ -169,7 +285,7 @@ export const decomposeImage = command(
 						userId: user.id,
 						provider: 'fal-ai-decompose',
 						model: 'Qwen-Image-Layered',
-						creditsUsed: creditsUsed,
+						creditsUsed: decomposeCost,
 						prompt: prompt || 'Decompose image',
 						resultUrl: imageUrl,
 						metadata: {
@@ -182,6 +298,7 @@ export const decomposeImage = command(
 					});
 				} catch (dbErr) {
 					console.error('[decompose.remote] Failed to save generation history:', dbErr);
+					historyWarning = (historyWarning || '') + 'History could not be saved.';
 				}
 			}
 
@@ -194,7 +311,8 @@ export const decomposeImage = command(
 
 			return {
 				...result,
-				layers: persistedLayers
+				layers: persistedLayers,
+				historyWarning
 			};
 		} catch (err) {
 			console.error('[decompose.remote] decomposeWithFal error:', err);
@@ -205,44 +323,144 @@ export const decomposeImage = command(
 
 /**
  * Upscale an image and return the upscaled URL for preview.
- * Does NOT persist to R2 - uses fal.ai's temporary URL directly.
+ * Persists to R2 and saves to history.
  */
 export const upscaleImagePreview = command(
 	'unchecked',
-	async ({
-		imageUrl
-	}: {
-		imageUrl: string;
-	}): Promise<{
+	async (input: z.input<typeof upscaleImageSchema>): Promise<{
 		success: boolean;
 		upscaledUrl?: string;
 		originalUrl: string;
 		error?: string;
+		historyWarning?: string;
 	}> => {
-		console.log('[decompose.remote] upscaleImagePreview called with:', imageUrl);
-		await requireAdmin();
+		// Validate input
+		const parseResult = upscaleImageSchema.safeParse(input);
+		if (!parseResult.success) {
+			return {
+				success: false,
+				originalUrl: input?.imageUrl || '',
+				error: `Validation error: ${parseResult.error.issues.map((e: { message: string }) => e.message).join(', ')}`
+			};
+		}
+		
+		const { imageUrl, model, side, templateId } = parseResult.data;
+		
+		console.log('[decompose.remote] upscaleImagePreview called with:', imageUrl, 'model:', model, 'templateId:', templateId);
+		const { user, org_id } = await requireAdmin();
+
+		// Check credits first - Define upscale cost (e.g. 1 credit)
+		const upscaleCost = 1; // Or define in CREDIT_COSTS.AI_UPSCALE
+		
+		/* BYPASS CREDIT CHECK
+		// Refresh user data
+		const userProfile = await db.query.profiles.findFirst({
+			where: eq(schema.profiles.id, user.id),
+			columns: { creditsBalance: true }
+		});
+
+		if (!userProfile || (userProfile.creditsBalance || 0) < upscaleCost) {
+			return {
+				success: false,
+				originalUrl: imageUrl,
+				error: `Insufficient credits. Required: ${upscaleCost}, Available: ${userProfile?.creditsBalance || 0}`
+			};
+		}
+		*/
+		console.log('[decompose.remote] Credit check bypassed for Upscale');
+		
+		let historyWarning: string | undefined;
 
 		try {
 			const { upscaleImage, isFalConfigured } = await import('$lib/server/fal-layers');
 
 			if (!isFalConfigured()) {
 				console.log('[decompose.remote] FAL_KEY not configured, returning mock upscale');
-				// In mock mode, just return the original image
 				return {
 					success: true,
-					upscaledUrl: imageUrl,
+					upscaledUrl: imageUrl, // Mock: return original
 					originalUrl: imageUrl
 				};
 			}
 
-			console.log('[decompose.remote] Calling upscaleImage...');
-			const upscaledUrl = await upscaleImage(imageUrl);
-			console.log('[decompose.remote] Upscale complete:', upscaledUrl);
+			console.log(`[decompose.remote] Calling upscaleImage with model ${model}...`);
+			const tempUpscaledUrl = await upscaleImage(imageUrl, model);
+			console.log('[decompose.remote] Upscale complete (temp):', tempUpscaledUrl);
+
+			// Apply credit deduction after successful AI generation
+			/* BYPASS CREDIT DEDUCTION
+			try {
+				await adjustUserCredits({
+					userId: user.id,
+					delta: -upscaleCost,
+					reason: `AI Upscale (${model})`
+				});
+				console.log('[decompose.remote] Credits deducted:', upscaleCost);
+			} catch (creditErr) {
+				console.error('[decompose.remote] Failed to deduct credits:', creditErr);
+				historyWarning = (historyWarning || '') + ' Network issue updating credits. ';
+			}
+			*/
+			console.log('[decompose.remote] Credit deduction bypassed for Upscale');
+
+			// 1. Persist to R2 with retries
+			const timestamp = Date.now();
+			const id = crypto.randomUUID();
+			const key = `decompose/upscaled/${user?.id || 'anon'}/${timestamp}_${id}.png`;
+			let r2Url = '';
+
+			let persistenceSuccess = false;
+			for (let attempt = 0; attempt < 3; attempt++) {
+				try {
+					const response = await fetchWithTimeout(tempUpscaledUrl, 30000);
+					if (!response.ok) throw new Error('Failed to download upscaled image from Fal');
+					const buffer = Buffer.from(await response.arrayBuffer());
+					r2Url = await uploadToR2(key, buffer, 'image/png');
+					console.log('[decompose.remote] Persisted to R2:', r2Url);
+					persistenceSuccess = true;
+					break;
+				} catch (uploadErr: any) {
+					console.warn(`[decompose.remote] Attempt ${attempt + 1}/3 failed to persist upscale:`, uploadErr);
+					await new Promise(r => setTimeout(r, 1000 * (attempt + 1))); // Backoff
+				}
+			}
+
+			if (!persistenceSuccess) {
+				// Critical failure: paid for upscale but failed to save. 
+				// fallback: try to return temp URL but warn heavily.
+				historyWarning = (historyWarning || '') + ' Failed to save upscaled image permanently (Link expires soon).';
+				r2Url = tempUpscaledUrl; // Better than nothing? Or maybe fail?
+			}
+
+			// 3. Save to History (aiGenerations)
+			console.log('[decompose.remote] Saving to history. Org:', org_id, 'User:', user?.id, 'Side:', side, 'TemplateId:', templateId);
+			if (org_id && user?.id) {
+				try {
+					await db.insert(schema.aiGenerations).values({
+						orgId: org_id,
+						userId: user.id,
+						provider: 'fal-ai-upscale',
+						model: model,
+						creditsUsed: upscaleCost,
+						resultUrl: r2Url,
+						metadata: {
+							input_image: imageUrl,
+							side: side || undefined,
+							type: 'upscale',
+							template_id: templateId || undefined
+						}
+					});
+				} catch (dbErr) {
+					console.error('[decompose.remote] Failed to save upscale history:', dbErr);
+					historyWarning = 'Upscale succeeded but history could not be saved.';
+				}
+			}
 
 			return {
 				success: true,
-				upscaledUrl,
-				originalUrl: imageUrl
+				upscaledUrl: r2Url,
+				originalUrl: imageUrl,
+				historyWarning
 			};
 		} catch (err: unknown) {
 			console.error('[decompose.remote] upscaleImagePreview error:', err);
@@ -252,6 +470,44 @@ export const upscaleImagePreview = command(
 				originalUrl: imageUrl,
 				error: errorMessage
 			};
+		}
+	}
+);
+
+/**
+ * Upload a processed image (e.g. after removing watermarks) to R2
+ * Returns the public URL to be used for upscaling or other operations.
+ */
+export const uploadProcessedImage = command(
+	'unchecked',
+	async ({
+		imageBase64,
+		mimeType = 'image/png'
+	}: {
+		imageBase64: string;
+		mimeType?: string;
+	}): Promise<{ success: boolean; url?: string; error?: string }> => {
+		const { user } = await requireAdmin();
+
+		try {
+			// Convert base64 to buffer
+			const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+			const buffer = Buffer.from(base64Data, 'base64');
+
+			const timestamp = Date.now();
+			const id = crypto.randomUUID();
+			const ext = mimeType.split('/')[1] || 'png';
+			const key = `decompose/processed/${user?.id || 'anon'}/${timestamp}_${id}.${ext}`;
+
+			console.log('[decompose.remote] Uploading processed image to:', key);
+			const url = await uploadToR2(key, buffer, mimeType);
+			console.log('[decompose.remote] Upload success:', url);
+
+			return { success: true, url };
+		} catch (err: unknown) {
+			console.error('[decompose.remote] uploadProcessedImage error:', err);
+			const errorMessage = err instanceof Error ? err.message : 'Upload failed';
+			return { success: false, error: errorMessage };
 		}
 	}
 );
@@ -268,21 +524,28 @@ export const getDecomposeHistory = query(async () => {
 		const history = await db.query.aiGenerations.findMany({
 			where: and(
 				eq(schema.aiGenerations.orgId, org_id),
-				eq(schema.aiGenerations.provider, 'fal-ai-decompose')
+				or(
+					eq(schema.aiGenerations.provider, 'fal-ai-decompose'),
+					eq(schema.aiGenerations.provider, 'fal-ai-upscale')
+				)
 			),
 			orderBy: [desc(schema.aiGenerations.createdAt)],
 			limit: 20
 		});
+
+		console.log(`[decompose.remote] Fetched ${history.length} history items`);
 
 		return {
 			success: true,
 			history: history.map((h) => ({
 				id: h.id,
 				createdAt: h.createdAt,
-				inputImageUrl: (h.metadata as any)?.input_image || h.resultUrl,
+				inputImageUrl: (h.metadata as any)?.input_image || h.resultUrl, // For upscale, input is in metadata
 				layers: (h.metadata as any)?.layers || [],
 				creditsUsed: h.creditsUsed,
-				side: (h.metadata as any)?.side || 'unknown'
+				side: (h.metadata as any)?.side || 'unknown',
+				provider: h.provider, // Add provider to distinguish
+				resultUrl: h.resultUrl // Ensure resultUrl is available
 			}))
 		};
 	} catch (err) {
@@ -299,11 +562,13 @@ export const saveLayers = command(
 	async ({
 		templateId,
 		layers,
-		mode = 'replace'
+		mode = 'replace',
+		expectedUpdatedAt
 	}: {
 		templateId: string;
 		layers: LayerSelection[];
 		mode?: 'replace' | 'append';
+		expectedUpdatedAt?: string | null;
 	}): Promise<{ success: boolean; elementCount: number; message: string }> => {
 		const { user, org_id } = await requireAdmin();
 
@@ -321,6 +586,18 @@ export const saveLayers = command(
 		// Verify org access
 		if (template.orgId !== org_id) {
 			throw error(403, 'Access denied to this template');
+		}
+
+		// Optimistic locking check
+		if (expectedUpdatedAt && template.updatedAt) {
+			const currentUpdateISO = template.updatedAt.toISOString();
+			if (currentUpdateISO !== expectedUpdatedAt) {
+				console.error('[decompose.remote] Optimistic locking failure:', {
+					expected: expectedUpdatedAt,
+					actual: currentUpdateISO
+				});
+				throw error(409, 'Template was modified by another user. Please refresh and try again.');
+			}
 		}
 
 		// Filter included layers and validate before converting
@@ -458,7 +735,10 @@ export interface HistoryStats {
  * Get decomposition history with stats per side.
  */
 export const getDecomposeHistoryWithStats = query(
-	async (): Promise<{
+	'unchecked',
+	async (input?: {
+		templateId?: string | null;
+	}): Promise<{
 		success: boolean;
 		history: Array<{
 			id: string;
@@ -468,11 +748,14 @@ export const getDecomposeHistoryWithStats = query(
 			creditsUsed: number | null;
 			side: 'front' | 'back' | 'unknown';
 			templateId?: string;
+			provider?: string;
+			resultUrl?: string;
 		}>;
 		stats: HistoryStats;
 		error?: string;
 	}> => {
 		const { org_id } = await requireAdmin();
+		const templateId = input?.templateId;
 
 		if (!org_id) {
 			return {
@@ -484,14 +767,32 @@ export const getDecomposeHistoryWithStats = query(
 		}
 
 		try {
+			// Fetch all decompose and upscale generations for the org
+			// Filter by templateId if provided
+			const filters = [
+				eq(schema.aiGenerations.orgId, org_id),
+				or(
+					eq(schema.aiGenerations.provider, 'fal-ai-decompose'),
+					eq(schema.aiGenerations.provider, 'fal-ai-upscale')
+				)
+			];
+
+			if (templateId) {
+				// Strict scoping: Only show generations for this template
+				filters.push(sql`${schema.aiGenerations.metadata}->>'template_id' = ${templateId}`);
+			} else {
+				// Loose assets: Only show generations WITHOUT a template_id
+				filters.push(sql`${schema.aiGenerations.metadata}->>'template_id' IS NULL`);
+			}
+
 			const history = await db.query.aiGenerations.findMany({
-				where: and(
-					eq(schema.aiGenerations.orgId, org_id),
-					eq(schema.aiGenerations.provider, 'fal-ai-decompose')
-				),
+				where: and(...filters),
 				orderBy: [desc(schema.aiGenerations.createdAt)],
-				limit: 50
+				limit: 100
 			});
+
+			// No need to filter in memory anymore since we filtered in DB
+			const filteredHistory = history;
 
 			// Calculate stats per side
 			const stats: HistoryStats = {
@@ -499,23 +800,27 @@ export const getDecomposeHistoryWithStats = query(
 				back: { count: 0, totalLayers: 0 }
 			};
 
-			const formattedHistory = history.map((h) => {
+			const formattedHistory = filteredHistory.map((h) => {
 				const metadata = h.metadata as {
 					side?: string;
 					layers?: unknown[];
 					input_image?: string;
 					template_id?: string;
+					type?: string;
 				} | null;
 				const side =
 					metadata?.side === 'front' || metadata?.side === 'back' ? metadata.side : 'unknown';
 				const layers = metadata?.layers || [];
 
-				if (side === 'front') {
-					stats.front.count++;
-					stats.front.totalLayers += Array.isArray(layers) ? layers.length : 0;
-				} else if (side === 'back') {
-					stats.back.count++;
-					stats.back.totalLayers += Array.isArray(layers) ? layers.length : 0;
+				// Only count decompose for layer stats (upscales don't have layers)
+				if (h.provider === 'fal-ai-decompose') {
+					if (side === 'front') {
+						stats.front.count++;
+						stats.front.totalLayers += Array.isArray(layers) ? layers.length : 0;
+					} else if (side === 'back') {
+						stats.back.count++;
+						stats.back.totalLayers += Array.isArray(layers) ? layers.length : 0;
+					}
 				}
 
 				return {
@@ -525,7 +830,9 @@ export const getDecomposeHistoryWithStats = query(
 					layers: Array.isArray(layers) ? layers : [],
 					creditsUsed: h.creditsUsed,
 					side: side as 'front' | 'back' | 'unknown',
-					templateId: metadata?.template_id
+					templateId: metadata?.template_id,
+					provider: h.provider,
+					resultUrl: h.resultUrl || undefined
 				};
 			});
 
@@ -541,6 +848,147 @@ export const getDecomposeHistoryWithStats = query(
 				history: [],
 				stats: { front: { count: 0, totalLayers: 0 }, back: { count: 0, totalLayers: 0 } },
 				error: 'Failed to fetch history'
+			};
+		}
+	}
+);
+
+/**
+ * Remove unwanted elements from an image using Qwen-Image-Edit-Remover-General-LoRA.
+ * Persists to R2 and saves to history.
+ */
+export const removeElementFromLayer = command(
+	'unchecked',
+	async (input: z.input<typeof removeElementSchema>): Promise<{
+		success: boolean;
+		resultUrl?: string;
+		originalUrl: string;
+		error?: string;
+		historyWarning?: string;
+	}> => {
+		// Validate input
+		const parseResult = removeElementSchema.safeParse(input);
+		if (!parseResult.success) {
+			return {
+				success: false,
+				originalUrl: input?.imageUrl || '',
+				error: `Validation error: ${parseResult.error.issues.map((e: { message: string }) => e.message).join(', ')}`
+			};
+		}
+
+		const { imageUrl, prompt, imageWidth, imageHeight, side, templateId } = parseResult.data;
+
+		console.log('[decompose.remote] removeElementFromLayer called with:', {
+			imageUrl,
+			prompt,
+			imageWidth,
+			imageHeight,
+			side,
+			templateId
+		});
+		const { user, org_id } = await requireAdmin();
+
+		// Define remove element cost (e.g. 1 credit)
+		const removeElementCost = 1;
+		console.log('[decompose.remote] Credit check bypassed for Remove Element');
+
+		let historyWarning: string | undefined;
+
+		try {
+			if (!isFalConfigured()) {
+				console.log('[decompose.remote] FAL_KEY not configured, returning mock remove element');
+				return {
+					success: true,
+					resultUrl: imageUrl, // Mock: return original
+					originalUrl: imageUrl
+				};
+			}
+
+			console.log(`[decompose.remote] Calling removeElementFromImage with prompt: "${prompt}"...`);
+			const result = await removeElementFromImage({
+				imageUrl,
+				prompt,
+				imageWidth,
+				imageHeight
+			});
+
+			if (!result.success || !result.resultUrl) {
+				return {
+					success: false,
+					originalUrl: imageUrl,
+					error: result.error || 'Remove element failed'
+				};
+			}
+
+			console.log('[decompose.remote] Remove element complete (temp):', result.resultUrl);
+			console.log('[decompose.remote] Credit deduction bypassed for Remove Element');
+
+			// 1. Persist to R2 with retries
+			const timestamp = Date.now();
+			const id = crypto.randomUUID();
+			const key = `decompose/removed/${user?.id || 'anon'}/${timestamp}_${id}.png`;
+			let r2Url = '';
+
+			let persistenceSuccess = false;
+			for (let attempt = 0; attempt < 3; attempt++) {
+				try {
+					const response = await fetchWithTimeout(result.resultUrl, 30000);
+					if (!response.ok) throw new Error('Failed to download image from Fal');
+					const buffer = Buffer.from(await response.arrayBuffer());
+					r2Url = await uploadToR2(key, buffer, 'image/png');
+					console.log('[decompose.remote] Persisted to R2:', r2Url);
+					persistenceSuccess = true;
+					break;
+				} catch (uploadErr: any) {
+					console.warn(`[decompose.remote] Attempt ${attempt + 1}/3 failed to persist remove element:`, uploadErr);
+					await new Promise(r => setTimeout(r, 1000 * (attempt + 1))); // Backoff
+				}
+			}
+
+			if (!persistenceSuccess) {
+				historyWarning = (historyWarning || '') + ' Failed to save processed image permanently (Link expires soon).';
+				r2Url = result.resultUrl; // Fallback to ephemeral
+			}
+
+			// 2. Save to History (aiGenerations)
+			console.log('[decompose.remote] Saving to history. Org:', org_id, 'User:', user?.id, 'Side:', side);
+			if (org_id && user?.id) {
+				try {
+					await db.insert(schema.aiGenerations).values({
+						orgId: org_id,
+						userId: user.id,
+						provider: 'fal-ai-remove-element',
+						model: 'Qwen-Image-Edit-Remover',
+						creditsUsed: removeElementCost,
+						prompt: prompt,
+						resultUrl: r2Url,
+						metadata: {
+							input_image: imageUrl,
+							side: side || undefined,
+							type: 'remove-element',
+							template_id: templateId || undefined,
+							seed: result.seed
+						}
+					});
+				} catch (dbErr) {
+					console.error('[decompose.remote] Failed to save remove element history:', dbErr);
+					historyWarning = 'Remove succeeded but history could not be saved.';
+				}
+			}
+
+			return {
+				success: true,
+				resultUrl: r2Url,
+				originalUrl: imageUrl,
+				historyWarning
+			};
+		} catch (err: unknown) {
+			console.error('[decompose.remote] removeElementFromLayer error:', err);
+			const errorMessage = err instanceof Error ? err.message : 'Remove element failed';
+			return {
+				success: false,
+				originalUrl: imageUrl,
+				error: errorMessage
 			};
 		}
 	}

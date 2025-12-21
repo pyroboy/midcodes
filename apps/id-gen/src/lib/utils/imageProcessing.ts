@@ -274,6 +274,16 @@ function cropTransparentPixels(canvas: HTMLCanvasElement, padding: number): HTML
 	croppedCanvas.width = cropWidth;
 	croppedCanvas.height = cropHeight;
 
+	// BUG FIX: Actually draw the cropped content to the new canvas
+	const croppedCtx = croppedCanvas.getContext('2d');
+	if (croppedCtx) {
+		croppedCtx.drawImage(
+			canvas,
+			cropX, cropY, cropWidth, cropHeight,  // Source rectangle
+			0, 0, cropWidth, cropHeight            // Destination rectangle
+		);
+	}
+
 	return croppedCanvas;
 }
 
@@ -403,6 +413,41 @@ async function resizeImageForApi(source: File | Blob, maxDimension: number = 102
 			'image/jpeg',
 			0.85
 		);
+	});
+}
+
+/**
+ * Downscale an image by a factor (e.g. 0.5 for half size).
+ * Helpful for creating "artificially lower res" inputs for upscalers.
+ *
+ * @param source - Image source
+ * @param scaleFactor - Factor to multiply dimensions by (0 < scale < 1)
+ * @returns Blob (PNG)
+ */
+export async function downscaleImage(source: File | Blob | string, scaleFactor: number): Promise<Blob> {
+	const img = await loadImage(source);
+	
+	const width = Math.round(img.width * scaleFactor);
+	const height = Math.round(img.height * scaleFactor);
+
+	const canvas = document.createElement('canvas');
+	canvas.width = width;
+	canvas.height = height;
+
+	const ctx = canvas.getContext('2d');
+	if (!ctx) throw new Error('Failed to get canvas context');
+
+	// Use medium quality for downscaling to simulate "lower res" but not terrible
+	ctx.imageSmoothingEnabled = true;
+	ctx.imageSmoothingQuality = 'medium';
+
+	ctx.drawImage(img, 0, 0, width, height);
+
+	return new Promise((resolve, reject) => {
+		canvas.toBlob((blob) => {
+			if (blob) resolve(blob);
+			else reject(new Error('Failed to create blob'));
+		}, 'image/png');
 	});
 }
 

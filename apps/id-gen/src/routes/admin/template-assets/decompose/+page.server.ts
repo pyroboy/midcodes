@@ -70,9 +70,8 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 						orientation: template.orientation,
 						frontBackground: template.frontBackground,
 						backBackground: template.backBackground,
-						elementCount: Array.isArray(template.templateElements)
-							? template.templateElements.length
-							: 0
+						templateElements: (template.templateElements as any[]) || [],
+						updatedAt: template.updatedAt?.toISOString() || null
 					}
 				: null
 		};

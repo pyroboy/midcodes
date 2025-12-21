@@ -39,13 +39,20 @@ export interface DecomposeResponse {
 	error?: string;
 }
 
-// Initialize fal client with credentials if available
+// Cache fal client initialization status
+let falInitialized = false;
+
+// Initialize fal client with credentials if available (cached)
 function initFal(): boolean {
+	// Return cached status if already initialized
+	if (falInitialized) return true;
+	
 	const falKey = env.FAL_KEY;
 	console.log('[fal-layers] FAL_KEY present:', !!falKey);
 	if (falKey) {
 		try {
 			fal.config({ credentials: falKey });
+			falInitialized = true;
 			return true;
 		} catch (e) {
 			console.error('[fal-layers] Failed to configure fal client:', e);
@@ -57,6 +64,7 @@ function initFal(): boolean {
 
 /**
  * Decompose an image into multiple RGBA layers using Qwen-Image-Layered.
+ * Includes retry logic with exponential backoff.
  */
 export async function decomposeWithFal(request: DecomposeRequest): Promise<DecomposeResponse> {
 	const isConfigured = initFal();
@@ -67,69 +75,105 @@ export async function decomposeWithFal(request: DecomposeRequest): Promise<Decom
 		return getMockResponse(request.numLayers ?? 4, request.imageUrl);
 	}
 
-	try {
-		console.log('[fal-layers] Calling fal.ai qwen-image-layered API...');
-		console.log('[fal-layers] Image URL:', request.imageUrl);
-		console.log('[fal-layers] Num layers:', request.numLayers ?? 4);
+	const maxAttempts = 3;
+	let lastError: unknown;
+	let delay = 2000; // Start with 2 seconds for AI API calls
 
-		const result = await fal.subscribe('fal-ai/qwen-image-layered', {
-			input: {
-				image_url: request.imageUrl,
-				prompt: request.prompt,
-				negative_prompt: request.negative_prompt ?? "",
-				num_inference_steps: request.num_inference_steps ?? 28,
-				guidance_scale: request.guidance_scale ?? 5,
-				acceleration: request.acceleration ?? "regular",
-				num_layers: request.numLayers ?? 4,
-				output_format: 'png',
-				enable_safety_checker: true, 
-				seed: request.seed
-			},
-			logs: true,
-			onQueueUpdate: (update) => {
-				console.log('[fal-layers] Queue status:', update.status);
-				if (update.status === 'IN_PROGRESS' && update.logs) {
-					update.logs.map((log) => log.message).forEach((msg) => console.log('[fal-layers]', msg));
+	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+		try {
+			console.log(`[fal-layers] Attempt ${attempt}/${maxAttempts}: Calling fal.ai qwen-image-layered API...`);
+			console.log('[fal-layers] Image URL:', request.imageUrl);
+			console.log('[fal-layers] Num layers:', request.numLayers ?? 4);
+
+			const result = await fal.subscribe('fal-ai/qwen-image-layered', {
+				input: {
+					image_url: request.imageUrl,
+					prompt: request.prompt,
+					negative_prompt: request.negative_prompt ?? "",
+					num_inference_steps: request.num_inference_steps ?? 28,
+					guidance_scale: request.guidance_scale ?? 5,
+					acceleration: request.acceleration ?? "regular",
+					num_layers: request.numLayers ?? 4,
+					output_format: 'png',
+					enable_safety_checker: true, 
+					seed: request.seed
+				},
+				logs: true,
+				onQueueUpdate: (update) => {
+					console.log('[fal-layers] Queue status:', update.status);
+					if (update.status === 'IN_PROGRESS' && update.logs) {
+						update.logs.map((log) => log.message).forEach((msg) => console.log('[fal-layers]', msg));
+					}
 				}
+			});
+
+			console.log('[fal-layers] Result received:', JSON.stringify(result.data, null, 2));
+			console.log('[fal-layers] Received', result.data.images?.length ?? 0, 'layers');
+
+			return {
+				success: true,
+				layers: (result.data.images as FalLayerImage[]).map((img, index) => ({
+					url: img.url,
+					width: img.width ?? 0,
+					height: img.height ?? 0,
+					zIndex: index
+				})),
+				seed: result.data.seed as number,
+				prompt: result.data.prompt as string | undefined
+			};
+		} catch (error: unknown) {
+			lastError = error;
+			console.error(`[fal-layers] Attempt ${attempt} failed:`, error);
+			
+			// Check if error is retryable (network issues, timeouts, 5xx errors)
+			const isRetryable = isRetryableError(error);
+			
+			if (attempt < maxAttempts && isRetryable) {
+				console.log(`[fal-layers] Retrying in ${delay}ms...`);
+				await new Promise(resolve => setTimeout(resolve, delay));
+				delay = Math.min(delay * 2, 15000); // Exponential backoff, max 15s
+				continue;
 			}
-		});
-
-		console.log('[fal-layers] Result received:', JSON.stringify(result.data, null, 2));
-		console.log('[fal-layers] Received', result.data.images?.length ?? 0, 'layers');
-
-		return {
-			success: true,
-			layers: (result.data.images as FalLayerImage[]).map((img, index) => ({
-				url: img.url,
-				width: img.width ?? 0,
-				height: img.height ?? 0,
-				zIndex: index
-			})),
-			seed: result.data.seed as number,
-			prompt: result.data.prompt as string | undefined
-		};
-	} catch (error: unknown) {
-		console.error('[fal-layers] API error:', error);
-		console.error('[fal-layers] Error type:', typeof error);
-		console.error(
-			'[fal-layers] Error details:',
-			JSON.stringify(error, Object.getOwnPropertyNames(error as object), 2)
-		);
-
-		const errorMessage =
-			error instanceof Error
-				? error.message
-				: typeof error === 'object' && error !== null && 'message' in error
-					? String((error as { message: unknown }).message)
-					: 'Unknown error calling fal.ai API';
-
-		return {
-			success: false,
-			layers: [],
-			seed: 0,
-			error: errorMessage
-		};
+			
+			// Non-retryable or exhausted attempts
+			break;
+		}
 	}
+
+	// Failed after all attempts
+	const errorMessage =
+		lastError instanceof Error
+			? lastError.message
+			: typeof lastError === 'object' && lastError !== null && 'message' in lastError
+				? String((lastError as { message: unknown }).message)
+				: 'Unknown error calling fal.ai API';
+
+	console.error('[fal-layers] All attempts failed. Last error:', errorMessage);
+
+	return {
+		success: false,
+		layers: [],
+		seed: 0,
+		error: errorMessage
+	};
+}
+
+/**
+ * Check if an error is retryable (network issues, timeouts, server errors)
+ */
+function isRetryableError(error: unknown): boolean {
+	if (error instanceof TypeError) return true; // Network error
+	if (error instanceof Error) {
+		const msg = error.message.toLowerCase();
+		if (msg.includes('timeout')) return true;
+		if (msg.includes('network')) return true;
+		if (msg.includes('econnreset')) return true;
+		if (msg.includes('econnrefused')) return true;
+		if (msg.includes('503')) return true;
+		if (msg.includes('502')) return true;
+		if (msg.includes('504')) return true;
+	}
+	return false;
 }
 
 /**
@@ -166,10 +210,12 @@ export function isFalConfigured(): boolean {
 	return !!env.FAL_KEY;
 }
 
+export type UpscaleModel = 'seedvr' | 'aurasr' | 'esrgan' | 'recraft-creative';
+
 /**
- * Upscale an image by 2x using seedvr/upscale/image model.
+ * Upscale an image by 2x using the selected model.
  */
-export async function upscaleImage(imageUrl: string): Promise<string> {
+export async function upscaleImage(imageUrl: string, model: UpscaleModel = 'seedvr'): Promise<string> {
 	const isConfigured = initFal();
 	if (!isConfigured) {
 		console.log('[fal-layers] FAL_KEY not configured, returning original image for mock upscale');
@@ -177,23 +223,69 @@ export async function upscaleImage(imageUrl: string): Promise<string> {
 	}
 
 	try {
-		console.log('[fal-layers] Calling fal.ai upscale API...');
-		const result = await fal.subscribe('fal-ai/seedvr/upscale/image', {
-			input: {
-				image_url: imageUrl,
-				upscale_mode: 'factor',
-				upscale_factor: 2,
-				target_resolution: '1080p',
-				noise_scale: 0.1,
-				output_format: 'png'
-			},
-			logs: true,
-			onQueueUpdate: (update) => {
-				if (update.status === 'IN_PROGRESS' && update.logs) {
-					update.logs.map((log) => log.message).forEach((msg) => console.log('[fal-layers] [upscale]', msg));
+		console.log(`[fal-layers] Calling fal.ai upscale API (${model})...`);
+		let result: any;
+
+		if (model === 'seedvr') {
+			result = await fal.subscribe('fal-ai/seedvr/upscale/image', {
+				input: {
+					image_url: imageUrl,
+					upscale_mode: 'factor',
+					upscale_factor: 2,
+					target_resolution: '1080p',
+					noise_scale: 0.1,
+					output_format: 'png'
+				},
+				logs: true,
+				onQueueUpdate: (update) => {
+					if (update.status === 'IN_PROGRESS' && update.logs) {
+						update.logs.map((log) => log.message).forEach((msg) => console.log('[fal-layers] [upscale]', msg));
+					}
 				}
-			}
-		});
+			});
+		} else if (model === 'aurasr') {
+			result = await fal.subscribe('fal-ai/aura-sr', {
+				input: {
+					image_url: imageUrl,
+					upscaling_factor: 4 as any
+				},
+
+				logs: true,
+				onQueueUpdate: (update) => {
+					if (update.status === 'IN_PROGRESS' && update.logs) {
+						update.logs.map((log) => log.message).forEach((msg) => console.log('[fal-layers] [upscale]', msg));
+					}
+				}
+			});
+		} else if (model === 'esrgan') {
+			result = await fal.subscribe('fal-ai/esrgan', {
+				input: {
+					image_url: imageUrl
+				},
+
+				logs: true,
+				onQueueUpdate: (update) => {
+					if (update.status === 'IN_PROGRESS' && update.logs) {
+						update.logs.map((log) => log.message).forEach((msg) => console.log('[fal-layers] [upscale]', msg));
+					}
+				}
+			});
+		} else if (model === 'recraft-creative') {
+			result = await fal.subscribe('fal-ai/recraft/upscale/creative', {
+				input: {
+					image_url: imageUrl
+				},
+
+				logs: true,
+				onQueueUpdate: (update) => {
+					if (update.status === 'IN_PROGRESS' && update.logs) {
+						update.logs.map((log) => log.message).forEach((msg) => console.log('[fal-layers] [upscale]', msg));
+					}
+				}
+			});
+		} else {
+			throw new Error(`Unknown upscale model: ${model}`);
+		}
 
 		console.log('[fal-layers] Upscale result:', JSON.stringify(result.data, null, 2));
 		
@@ -207,4 +299,119 @@ export async function upscaleImage(imageUrl: string): Promise<string> {
 		console.error('[fal-layers] Upscale failed:', error);
 		throw error;
 	}
+}
+
+export interface RemoveElementRequest {
+	imageUrl: string;
+	prompt: string; // What to remove from the image
+	imageWidth?: number;
+	imageHeight?: number;
+	guidanceScale?: number;
+	numInferenceSteps?: number;
+	seed?: number;
+}
+
+export interface RemoveElementResponse {
+	success: boolean;
+	resultUrl?: string;
+	seed?: number;
+	error?: string;
+}
+
+/**
+ * Remove unwanted elements from images using Qwen-Image-Edit-Remover-General-LoRA.
+ * Cleanly removes specified elements while maintaining consistency and quality.
+ */
+export async function removeElementFromImage(request: RemoveElementRequest): Promise<RemoveElementResponse> {
+	const isConfigured = initFal();
+	if (!isConfigured) {
+		console.log('[fal-layers] FAL_KEY not configured, returning mock data for remove element');
+		return {
+			success: true,
+			resultUrl: request.imageUrl, // Return original in mock mode
+			seed: 12345
+		};
+	}
+
+	const maxAttempts = 3;
+	let lastError: unknown;
+	let delay = 2000;
+
+	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+		try {
+			console.log(`[fal-layers] Attempt ${attempt}/${maxAttempts}: Calling fal.ai remove-element API...`);
+			console.log('[fal-layers] Image URL:', request.imageUrl);
+			console.log('[fal-layers] Remove prompt:', request.prompt);
+
+			// Build image_size parameter if dimensions provided
+			const imageSize = (request.imageWidth && request.imageHeight) ? {
+				width: request.imageWidth,
+				height: request.imageHeight
+			} : undefined;
+
+			const result = await fal.subscribe('fal-ai/qwen-image-edit-2509-lora-gallery/remove-element', {
+				input: {
+					image_urls: [request.imageUrl],
+					prompt: request.prompt || 'Remove the specified element from the scene',
+					guidance_scale: request.guidanceScale ?? 1,
+					num_inference_steps: request.numInferenceSteps ?? 6,
+					acceleration: 'regular',
+					negative_prompt: ' ',
+					enable_safety_checker: true,
+					output_format: 'png',
+					num_images: 1,
+					lora_scale: 1,
+					...(imageSize && { image_size: imageSize }),
+					...(request.seed && { seed: request.seed })
+				},
+				logs: true,
+				onQueueUpdate: (update) => {
+					console.log('[fal-layers] [remove-element] Queue status:', update.status);
+					if (update.status === 'IN_PROGRESS' && update.logs) {
+						update.logs.map((log) => log.message).forEach((msg) => console.log('[fal-layers] [remove-element]', msg));
+					}
+				}
+			});
+
+			console.log('[fal-layers] Remove element result:', JSON.stringify(result.data, null, 2));
+
+			// Extract the first image from results
+			const images = result.data.images as Array<{ url: string }>;
+			if (images && images.length > 0 && images[0].url) {
+				return {
+					success: true,
+					resultUrl: images[0].url,
+					seed: result.data.seed as number | undefined
+				};
+			}
+
+			throw new Error('No image URL in remove element response');
+		} catch (error: unknown) {
+			lastError = error;
+			console.error(`[fal-layers] Remove element attempt ${attempt} failed:`, error);
+
+			const isRetryable = isRetryableError(error);
+			if (attempt < maxAttempts && isRetryable) {
+				console.log(`[fal-layers] Retrying remove element in ${delay}ms...`);
+				await new Promise(resolve => setTimeout(resolve, delay));
+				delay = Math.min(delay * 2, 15000);
+				continue;
+			}
+			break;
+		}
+	}
+
+	const errorMessage =
+		lastError instanceof Error
+			? lastError.message
+			: typeof lastError === 'object' && lastError !== null && 'message' in lastError
+				? String((lastError as { message: unknown }).message)
+				: 'Unknown error calling fal.ai remove element API';
+
+	console.error('[fal-layers] Remove element all attempts failed. Last error:', errorMessage);
+
+	return {
+		success: false,
+		error: errorMessage
+	};
 }

@@ -127,7 +127,7 @@ const securityHeadersHandle: Handle = async ({ event, resolve }) => {
 		"default-src 'self'",
 		"script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://static.cloudflareinsights.com",
 		"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-		"img-src 'self' data: blob: https://*.neon.tech https://assets.kanaya.app https://*.fal.media", // Custom R2 domain and fal.ai images
+		"img-src 'self' data: blob: https://*.neon.tech https://assets.kanaya.app https://*.fal.media https://im.runware.ai", // Custom R2 domain and fal.ai images
 		"font-src 'self' https://fonts.gstatic.com",
 		"connect-src 'self' https://api.runware.ai https://*.runware.ai https://*.neon.tech https://assets.kanaya.app https://cdn.jsdelivr.net http://localhost:* ws://localhost:* https://cloudflareinsights.com https://static.cloudflareinsights.com", // Custom R2 domain
 		"worker-src 'self' blob:",
