@@ -63,6 +63,7 @@ const envSchema = z.object({
 	R2_BUCKET_NAME: z.string().optional(),
 	R2_PUBLIC_DOMAIN: z.string().optional(),
 	RUNWARE_API_KEY: z.string().optional(),
+	GOOGLE_GENERATIVE_AI_API_KEY: z.string().optional(),
 	CSRF_SECRET: z.string().optional(),
 	NODE_ENV: z.enum(['development', 'production', 'test']).default('development')
 });
@@ -108,6 +109,10 @@ export function initializeEnv() {
 			process?.env?.R2_PUBLIC_DOMAIN,
 		RUNWARE_API_KEY:
 			privateEnv.RUNWARE_API_KEY || dotEnvParsed.RUNWARE_API_KEY || process?.env?.RUNWARE_API_KEY,
+		GOOGLE_GENERATIVE_AI_API_KEY:
+			privateEnv.GOOGLE_GENERATIVE_AI_API_KEY ||
+			dotEnvParsed.GOOGLE_GENERATIVE_AI_API_KEY ||
+			process?.env?.GOOGLE_GENERATIVE_AI_API_KEY,
 		CSRF_SECRET: privateEnv.CSRF_SECRET || dotEnvParsed.CSRF_SECRET || process?.env?.CSRF_SECRET,
 		NODE_ENV: ['development', 'production', 'test'].includes(process?.env?.NODE_ENV ?? '')
 			? process.env.NODE_ENV

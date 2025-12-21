@@ -59,15 +59,10 @@ export const actions: Actions = {
 
 			const name = formData.get('name') as string;
 			const description = formData.get('description') as string | null;
-			// category/tags logic if needed, currently schema doesn't have them on templates, but we can check if we need to add them.
-			// Templates table doesn't have category/tags. I will skip them for now or store in context/metadata if available?
-			// The prompt said "The `templates` database table will be the target".
-			// The `templates` table has `orientation`, `widthPixels`, `heightPixels`.
-
-			// const category = formData.get('category') as string | null;
-			// const tagsJson = formData.get('tags') as string;
-			// const sizePresetId = formData.get('sizePresetId') as string;
-			// const sampleType = formData.get('sampleType') as string;
+			const category = formData.get('category') as string | null;
+			const tagsJson = formData.get('tags') as string;
+			const sizePresetId = formData.get('sizePresetId') as string;
+			const sampleType = formData.get('sampleType') as string;
 			const orientation = formData.get('orientation') as string;
 			const widthPixels = parseInt(formData.get('widthPixels') as string);
 			const heightPixels = parseInt(formData.get('heightPixels') as string);
@@ -76,7 +71,7 @@ export const actions: Actions = {
 				return fail(400, { error: 'Missing required fields (Front Image or Name)' });
 			}
 
-			// const tags = tagsJson ? JSON.parse(tagsJson) : [];
+			const tags = tagsJson ? JSON.parse(tagsJson) : [];
 			const templateId = uuidv4();
 
 			// 1. Upload variants to R2
@@ -98,9 +93,7 @@ export const actions: Actions = {
 			const uploadResults = await Promise.all(
 				variants.map(async (v) => {
 					if (!v.blob) return null;
-					const path = getTemplateAssetPath(templateId, v.variant as any, v.side, 'png'); // using png extension for standard
-					// Note: Previews/Thumbs might be JPEGs based on generateImageVariants, need to handle extension from blob type?
-					// getTemplateAssetPath handles extension arg.
+					// Use png for consistency
 					const extension = v.blob.type === 'image/jpeg' ? 'jpg' : 'png';
 					const finalPath = getTemplateAssetPath(templateId, v.variant as any, v.side, extension);
 
@@ -112,26 +105,23 @@ export const actions: Actions = {
 			// Extract URLs
 			const getUrl = (side: 'front' | 'back', variant: 'full' | 'preview' | 'thumb') =>
 				uploadResults.find((r) => r?.side === side && r?.variant === variant)?.url;
+			
+			const getPath = (side: 'front' | 'back', variant: 'full' | 'preview' | 'thumb') =>
+				uploadResults.find((r) => r?.side === side && r?.variant === variant)?.path;
 
 			const frontBackground = getUrl('front', 'full');
-			if (!frontBackground) throw new Error('Failed to upload front background');
+			const frontPath = getPath('front', 'full'); // Need path for R2 deletion reference if needed
+			
+			if (!frontBackground || !frontPath) throw new Error('Failed to upload front background');
 
 			// 2. Insert into Database
 			try {
-				const [template] = await db
-					.insert(templates)
-					.values({
+				await db.transaction(async (tx) => {
+					// A. Create Template Record
+					await tx.insert(templates).values({
 						id: templateId,
-						userId: user.id, // Linked to profile
-						// orgId: user.orgId // We might need orgId from profile? `user` object from locals might not have orgId directly if it's BetterAuth User.
-						// Need to check `user` object structure. `locals.user` is usually BetterAuth user.
-						// Profiles table links user.id.
-						// For now, I'll omit orgId if I don't have it handy, or fetch profile.
-						// The original code used `uploadedBy: user.id` on `templateAssets`.
-						// `templates` has `userId`.
+						userId: user.id,
 						name,
-						// description? No description col in `templates`
-						// category? No.
 						orientation: orientation as any,
 						widthPixels,
 						heightPixels,
@@ -144,13 +134,30 @@ export const actions: Actions = {
 						previewBackUrl: getUrl('back', 'preview'),
 						thumbBackUrl: getUrl('back', 'thumb'),
 
-						templateElements: [] // Initialize empty
+						templateElements: []
+					});
 
-						// isPublished? templates doesn't have isPublished.
-					})
-					.returning();
+					// B. Create Asset Library Record
+					// This makes it visible in "Manage Assets"
+					const { templateAssets } = await import('$lib/server/schema');
+					await tx.insert(templateAssets).values({
+						name,
+						description,
+						category,
+						tags,
+						sizePresetId: sizePresetId || null,
+						sampleType: (sampleType as any) || 'stock',
+						orientation: orientation as any,
+						imagePath: frontPath, // Store R2 path
+						imageUrl: frontBackground, // Store public URL
+						widthPixels,
+						heightPixels,
+						isPublished: true, // Auto-publish for now? Or keep draft.
+						uploadedBy: user.id
+					});
+				});
 
-				return { success: true, template };
+				return { success: true, id: templateId };
 			} catch (dbError: any) {
 				// Cleanup R2 on DB failure
 				await Promise.allSettled(uploadResults.map((r) => (r ? deleteFromR2(r.path) : null)));
