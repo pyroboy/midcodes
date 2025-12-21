@@ -10,6 +10,8 @@ import { checkAdmin } from '$lib/utils/adminPermissions';
 import { eq, desc, and } from 'drizzle-orm';
 import type { LayerSelection } from '$lib/schemas/decompose.schema';
 import type { TemplateElement } from '$lib/schemas/template-element.schema';
+import { templateElementSchema } from '$lib/schemas/template-element.schema';
+import { CREDIT_COSTS } from '$lib/config/credits';
 
 // Helper to check for admin access
 async function requireAdmin() {
@@ -28,7 +30,7 @@ async function requireAdmin() {
 		console.error('[decompose.remote] Admin access denied for role:', locals.user?.role);
 		throw error(403, 'Admin access required');
 	}
-	return { locals, user: locals.user, org_id: locals.user.orgId };
+	return { locals, user: locals.user, org_id: locals.org_id };
 }
 
 /**
@@ -72,25 +74,63 @@ export const decomposeImage = command(
 		imageUrl,
 		numLayers = 4,
 		prompt,
+		negative_prompt,
+		num_inference_steps,
+		guidance_scale,
+		acceleration,
 		seed,
-		templateId
+		templateId,
+		side,
+		upscale
 	}: {
 		imageUrl: string;
 		numLayers?: number;
 		prompt?: string;
+		negative_prompt?: string;
+		num_inference_steps?: number;
+		guidance_scale?: number;
+		acceleration?: string;
 		seed?: number;
 		templateId?: string | null;
+		side?: 'front' | 'back';
+		upscale?: boolean;
 	}): Promise<DecomposeResponse> => {
-		console.log('[decompose.remote] decomposeImage called with:', { imageUrl, numLayers, templateId });
+		console.log('[decompose.remote] decomposeImage called with:', {
+			imageUrl,
+			numLayers,
+			templateId,
+			side,
+			upscale
+		});
 		const { user, org_id } = await requireAdmin();
 		console.log('[decompose.remote] Admin check passed, calling decomposeWithFal...');
 
 		try {
-			// 1. Call AI Service
+			let inputUrl = imageUrl;
+
+			// 1. Optional Upscale
+			if (upscale) {
+				const { upscaleImage } = await import('$lib/server/fal-layers');
+				try {
+					console.log('[decompose.remote] Upscaling image before decomposition...');
+					inputUrl = await upscaleImage(imageUrl);
+					console.log('[decompose.remote] Image upscaled to:', inputUrl);
+				} catch (upscaleErr) {
+					console.error('[decompose.remote] Upscale failed, falling back to original image:', upscaleErr);
+					// Fallback to original image or throw? 
+					// Let's fallback to original for robustness, but maybe logging is enough.
+				}
+			}
+
+			// 2. Call AI Service
 			const result = await decomposeWithFal({
-				imageUrl,
+				imageUrl: inputUrl,
 				numLayers,
 				prompt,
+				negative_prompt,
+				num_inference_steps,
+				guidance_scale,
+				acceleration,
 				seed
 			});
 
@@ -106,7 +146,7 @@ export const decomposeImage = command(
 			// 2. Persist Layers to R2
 			const timestamp = Date.now();
 			const generationId = crypto.randomUUID();
-			
+
 			const persistedLayers = await Promise.all(
 				result.layers.map(async (layer: any, index: number) => {
 					try {
@@ -123,13 +163,13 @@ export const decomposeImage = command(
 							// Fallback if no templateId provided (e.g. standalone tool)
 							key = `decompose/${user?.id}/${timestamp}_${generationId}/layer_${index}.png`;
 						}
-						
+
 						const r2Url = await uploadToR2(key, buffer, 'image/png');
 
 						return {
 							...layer,
 							imageUrl: r2Url, // Normalize to imageUrl for frontend consistency
-                            url: r2Url
+							url: r2Url
 						};
 					} catch (uploadErr) {
 						console.error(`[decompose.remote] Failed to persist layer ${index}:`, uploadErr);
@@ -138,23 +178,24 @@ export const decomposeImage = command(
 				})
 			);
 
-			// 3. Save to Database History
+			// 3. Save to Database History with actual credit cost
+			const creditsUsed = CREDIT_COSTS.AI_DECOMPOSE;
 			if (org_id && user?.id) {
 				try {
-					const creditsUsed = 0; 
 					await db.insert(schema.aiGenerations).values({
 						orgId: org_id,
 						userId: user.id,
 						provider: 'fal-ai-decompose',
 						model: 'Qwen-Image-Layered',
-						creditsUsed: creditsUsed, 
+						creditsUsed: creditsUsed,
 						prompt: prompt || 'Decompose image',
 						resultUrl: imageUrl,
 						metadata: {
 							layers: persistedLayers,
 							seed: result.seed,
 							input_image: imageUrl,
-							template_id: templateId // Store in metadata at minimum
+							template_id: templateId,
+							side: side // Store side information
 						}
 					});
 				} catch (dbErr) {
@@ -173,7 +214,6 @@ export const decomposeImage = command(
 				...result,
 				layers: persistedLayers
 			};
-
 		} catch (err) {
 			console.error('[decompose.remote] decomposeWithFal error:', err);
 			throw err;
@@ -185,34 +225,35 @@ export const decomposeImage = command(
  * Get decomposition history for the current user/org
  */
 export const getDecomposeHistory = query(async () => {
-    const { user, org_id } = await requireAdmin();
-    
-    if (!org_id) return [];
+	const { user, org_id } = await requireAdmin();
 
-    try {
-        const history = await db.query.aiGenerations.findMany({
-            where: and(
-                eq(schema.aiGenerations.orgId, org_id),
-                eq(schema.aiGenerations.provider, 'fal-ai-decompose')
-            ),
-            orderBy: [desc(schema.aiGenerations.createdAt)],
-            limit: 20
-        });
+	if (!org_id) return { success: false, history: [], error: 'Organization context missing' };
 
-        return {
+	try {
+		const history = await db.query.aiGenerations.findMany({
+			where: and(
+				eq(schema.aiGenerations.orgId, org_id),
+				eq(schema.aiGenerations.provider, 'fal-ai-decompose')
+			),
+			orderBy: [desc(schema.aiGenerations.createdAt)],
+			limit: 20
+		});
+
+		return {
 			success: true,
-			history: history.map(h => ({
+			history: history.map((h) => ({
 				id: h.id,
 				createdAt: h.createdAt,
 				inputImageUrl: (h.metadata as any)?.input_image || h.resultUrl,
 				layers: (h.metadata as any)?.layers || [],
-				creditsUsed: h.creditsUsed
+				creditsUsed: h.creditsUsed,
+				side: (h.metadata as any)?.side || 'unknown'
 			}))
 		};
-    } catch (err) {
-        console.error('[decompose.remote] Failed to fetch history:', err);
-        return { success: false, history: [], error: 'Failed to fetch history' };
-    }
+	} catch (err) {
+		console.error('[decompose.remote] Failed to fetch history:', err);
+		return { success: false, history: [], error: 'Failed to fetch history' };
+	}
 });
 
 /**
@@ -247,8 +288,25 @@ export const saveLayers = command(
 			throw error(403, 'Access denied to this template');
 		}
 
-		// Filter included layers and convert to template elements
+		// Filter included layers and validate before converting
 		const includedLayers = layers.filter((l) => l.included);
+		const validationErrors: string[] = [];
+
+		// Validate image elements have valid URLs before processing
+		for (const layer of includedLayers) {
+			if (
+				layer.elementType === 'image' &&
+				(!layer.layerImageUrl || layer.layerImageUrl.trim() === '')
+			) {
+				validationErrors.push(`Image element "${layer.variableName}" requires a valid image URL`);
+			}
+		}
+
+		if (validationErrors.length > 0) {
+			throw error(400, `Validation failed:\n${validationErrors.join('\n')}`);
+		}
+
+		// Convert to template elements with correct side
 		const newElements: TemplateElement[] = includedLayers.map((layer) => {
 			const baseElement = {
 				id: crypto.randomUUID(),
@@ -258,7 +316,7 @@ export const saveLayers = command(
 				width: layer.bounds.width,
 				height: layer.bounds.height,
 				rotation: 0,
-				side: 'front' as const,
+				side: layer.side || 'front', // Use layer's side instead of hardcoded 'front'
 				visible: true,
 				opacity: 1
 			};
@@ -268,7 +326,7 @@ export const saveLayers = command(
 					return {
 						...baseElement,
 						type: 'image' as const,
-						src: layer.layerImageUrl || '',
+						src: layer.layerImageUrl!, // Already validated above
 						fit: 'contain' as const
 					};
 				case 'text':
@@ -314,9 +372,27 @@ export const saveLayers = command(
 			}
 		});
 
+		// Validate each element against schema before saving
+		const validatedElements: TemplateElement[] = [];
+		for (const element of newElements) {
+			const result = templateElementSchema.safeParse(element);
+			if (result.success) {
+				validatedElements.push(result.data as TemplateElement);
+			} else {
+				validationErrors.push(
+					`Element "${element.variableName}": ${result.error.issues.map((e) => e.message).join(', ')}`
+				);
+			}
+		}
+
+		if (validationErrors.length > 0) {
+			throw error(400, `Element validation failed:\n${validationErrors.join('\n')}`);
+		}
+
 		// Determine final elements based on mode
 		const existingElements = (template.templateElements as TemplateElement[]) || [];
-		const finalElements = mode === 'replace' ? newElements : [...existingElements, ...newElements];
+		const finalElements =
+			mode === 'replace' ? validatedElements : [...existingElements, ...validatedElements];
 
 		// Update the template
 		await db
@@ -329,8 +405,108 @@ export const saveLayers = command(
 
 		return {
 			success: true,
-			elementCount: newElements.length,
-			message: `${newElements.length} elements ${mode === 'replace' ? 'replaced' : 'added'} successfully`
+			elementCount: validatedElements.length,
+			message: `${validatedElements.length} elements ${mode === 'replace' ? 'replaced' : 'added'} successfully`
 		};
+	}
+);
+
+/**
+ * History stats per side for UI display
+ */
+export interface HistoryStats {
+	front: { count: number; totalLayers: number };
+	back: { count: number; totalLayers: number };
+}
+
+/**
+ * Get decomposition history with stats per side.
+ */
+export const getDecomposeHistoryWithStats = query(
+	async (): Promise<{
+		success: boolean;
+		history: Array<{
+			id: string;
+			createdAt: Date | null;
+			inputImageUrl: string;
+			layers: unknown[];
+			creditsUsed: number | null;
+			side: 'front' | 'back' | 'unknown';
+			templateId?: string;
+		}>;
+		stats: HistoryStats;
+		error?: string;
+	}> => {
+		const { org_id } = await requireAdmin();
+
+		if (!org_id) {
+			return {
+				success: false,
+				history: [],
+				stats: { front: { count: 0, totalLayers: 0 }, back: { count: 0, totalLayers: 0 } },
+				error: 'Organization context missing'
+			};
+		}
+
+		try {
+			const history = await db.query.aiGenerations.findMany({
+				where: and(
+					eq(schema.aiGenerations.orgId, org_id),
+					eq(schema.aiGenerations.provider, 'fal-ai-decompose')
+				),
+				orderBy: [desc(schema.aiGenerations.createdAt)],
+				limit: 50
+			});
+
+			// Calculate stats per side
+			const stats: HistoryStats = {
+				front: { count: 0, totalLayers: 0 },
+				back: { count: 0, totalLayers: 0 }
+			};
+
+			const formattedHistory = history.map((h) => {
+				const metadata = h.metadata as {
+					side?: string;
+					layers?: unknown[];
+					input_image?: string;
+					template_id?: string;
+				} | null;
+				const side =
+					metadata?.side === 'front' || metadata?.side === 'back' ? metadata.side : 'unknown';
+				const layers = metadata?.layers || [];
+
+				if (side === 'front') {
+					stats.front.count++;
+					stats.front.totalLayers += Array.isArray(layers) ? layers.length : 0;
+				} else if (side === 'back') {
+					stats.back.count++;
+					stats.back.totalLayers += Array.isArray(layers) ? layers.length : 0;
+				}
+
+				return {
+					id: h.id,
+					createdAt: h.createdAt,
+					inputImageUrl: metadata?.input_image || h.resultUrl || '',
+					layers: Array.isArray(layers) ? layers : [],
+					creditsUsed: h.creditsUsed,
+					side: side as 'front' | 'back' | 'unknown',
+					templateId: metadata?.template_id
+				};
+			});
+
+			return {
+				success: true,
+				history: formattedHistory,
+				stats
+			};
+		} catch (err) {
+			console.error('[decompose.remote] Failed to fetch history with stats:', err);
+			return {
+				success: false,
+				history: [],
+				stats: { front: { count: 0, totalLayers: 0 }, back: { count: 0, totalLayers: 0 } },
+				error: 'Failed to fetch history'
+			};
+		}
 	}
 );

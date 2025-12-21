@@ -11,7 +11,9 @@ export const CREDIT_COSTS = {
 	/** Cost for bulk export per card */
 	BULK_EXPORT_PER_CARD: 1,
 	/** Cost for API usage per call */
-	API_CALL: 1
+	API_CALL: 1,
+	/** Cost for AI image decomposition */
+	AI_DECOMPOSE: 2
 } as const;
 
 export const FREE_TIER = {
@@ -43,7 +45,8 @@ export const USAGE_TYPES = {
 	CARD_GENERATION: 'card_generation',
 	TEMPLATE_CREATION: 'template_creation',
 	BULK_EXPORT: 'bulk_export',
-	API_USAGE: 'api_usage'
+	API_USAGE: 'api_usage',
+	AI_DECOMPOSE: 'ai_decompose'
 } as const;
 
 export type UsageType = (typeof USAGE_TYPES)[keyof typeof USAGE_TYPES];

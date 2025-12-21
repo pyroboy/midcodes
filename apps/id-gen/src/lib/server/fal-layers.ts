@@ -10,6 +10,10 @@ export interface DecomposeRequest {
 	imageUrl: string; // Must be publicly accessible URL
 	numLayers?: number; // Default: 4
 	prompt?: string; // Optional caption for better layer detection
+	negative_prompt?: string; // Optional negative prompt
+	num_inference_steps?: number; // Default: 28
+	guidance_scale?: number; // Default: 5
+	acceleration?: string; // Default: "regular"
 	seed?: number; // For reproducible results
 }
 
@@ -72,9 +76,13 @@ export async function decomposeWithFal(request: DecomposeRequest): Promise<Decom
 			input: {
 				image_url: request.imageUrl,
 				prompt: request.prompt,
+				negative_prompt: request.negative_prompt ?? "",
+				num_inference_steps: request.num_inference_steps ?? 28,
+				guidance_scale: request.guidance_scale ?? 5,
+				acceleration: request.acceleration ?? "regular",
 				num_layers: request.numLayers ?? 4,
 				output_format: 'png',
-				enable_safety_checker: false, // ID cards shouldn't trigger safety
+				enable_safety_checker: true, 
 				seed: request.seed
 			},
 			logs: true,
@@ -156,4 +164,47 @@ function getMockResponse(numLayers: number, sourceImageUrl: string): DecomposeRe
  */
 export function isFalConfigured(): boolean {
 	return !!env.FAL_KEY;
+}
+
+/**
+ * Upscale an image by 2x using seedvr/upscale/image model.
+ */
+export async function upscaleImage(imageUrl: string): Promise<string> {
+	const isConfigured = initFal();
+	if (!isConfigured) {
+		console.log('[fal-layers] FAL_KEY not configured, returning original image for mock upscale');
+		return imageUrl;
+	}
+
+	try {
+		console.log('[fal-layers] Calling fal.ai upscale API...');
+		const result = await fal.subscribe('fal-ai/seedvr/upscale/image', {
+			input: {
+				image_url: imageUrl,
+				upscale_mode: 'factor',
+				upscale_factor: 2,
+				target_resolution: '1080p',
+				noise_scale: 0.1,
+				output_format: 'png'
+			},
+			logs: true,
+			onQueueUpdate: (update) => {
+				if (update.status === 'IN_PROGRESS' && update.logs) {
+					update.logs.map((log) => log.message).forEach((msg) => console.log('[fal-layers] [upscale]', msg));
+				}
+			}
+		});
+
+		console.log('[fal-layers] Upscale result:', JSON.stringify(result.data, null, 2));
+		
+		if (result.data.image && result.data.image.url) {
+			return result.data.image.url;
+		}
+		
+		throw new Error('No image URL in upscale response');
+
+	} catch (error) {
+		console.error('[fal-layers] Upscale failed:', error);
+		throw error;
+	}
 }

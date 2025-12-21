@@ -72,5 +72,7 @@ export {
 	checkDecomposeAvailable,
 	decomposeImage,
 	saveLayers,
-    getDecomposeHistory
+	getDecomposeHistory,
+	getDecomposeHistoryWithStats,
+	type HistoryStats
 } from './decompose.remote';

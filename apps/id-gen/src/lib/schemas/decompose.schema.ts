@@ -59,7 +59,8 @@ export const layerSelectionSchema = z.object({
 		width: z.number().int().positive(),
 		height: z.number().int().positive()
 	}),
-	layerImageUrl: z.string().optional() // For 'image' type: store layer PNG URL
+	layerImageUrl: z.string().optional(), // For 'image' type: store layer PNG URL
+	side: z.enum(['front', 'back']).default('front') // Which side this layer belongs to
 });
 export type LayerSelection = z.infer<typeof layerSelectionSchema>;
 
