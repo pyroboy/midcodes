@@ -2,6 +2,7 @@
 	import type { PageData } from './$types';
 	import {
 		decomposeImage,
+		upscaleImagePreview,
 		saveLayers,
 		getDecomposeHistoryWithStats,
 		type HistoryStats
@@ -20,7 +21,9 @@
 		History,
 		Clock,
 		Check,
-		AlertTriangle
+		AlertTriangle,
+		ZoomIn,
+		X
 	} from 'lucide-svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -32,9 +35,9 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 	import { Slider } from '$lib/components/ui/slider';
 	import { Switch } from '$lib/components/ui/switch';
-    import { Separator } from '$lib/components/ui/separator';
-    import { ChevronDown, ChevronUp } from 'lucide-svelte';
-    import * as Collapsible from '$lib/components/ui/collapsible';
+	import { Separator } from '$lib/components/ui/separator';
+	import { ChevronDown, ChevronUp } from 'lucide-svelte';
+	import * as Collapsible from '$lib/components/ui/collapsible';
 
 	let { data }: { data: PageData } = $props();
 
@@ -42,17 +45,29 @@
 	let activeSide = $state<'front' | 'back'>('front');
 	let isDecomposing = $state(false);
 	let isSaving = $state(false);
-	
-    // Decompose Settings
-    let numLayers = $state(4);
-    let prompt = $state("A professional portrait ID card composed of distinct layers. Foreground: A high-resolution realistic photograph of a person and sharp, legible sans-serif typography. Midground: Vector graphical elements, logos, and a high-contrast black and white QR code. Background: Clean flat geometric patterns, solid color blocks, and gradients. High contrast between the subject, text, and the background design.");
-    let negativePrompt = $state("merged layers, text embedded in background, blurry text, jpeg artifacts, dirty edges around hair, transparent subject, distortion, grain, low contrast, fused elements");
-    let numInferenceSteps = $state(28);
-    let guidanceScale = $state(5);
-    let acceleration = $state("regular");
-    let showAdvancedSettings = $state(false);
-    let shouldUpscale = $state(false);
 
+	// Decompose Settings
+	let numLayers = $state(4);
+	let prompt = $state(
+		'A professional portrait ID card composed of distinct layers. Foreground: A high-resolution realistic photograph of a person and sharp, legible sans-serif typography. Midground: Vector graphical elements, logos, and a high-contrast black and white QR code. Background: Clean flat geometric patterns, solid color blocks, and gradients. High contrast between the subject, text, and the background design.'
+	);
+	let negativePrompt = $state(
+		'merged layers, text embedded in background, blurry text, jpeg artifacts, dirty edges around hair, transparent subject, distortion, grain, low contrast, fused elements'
+	);
+	let numInferenceSteps = $state(28);
+	let guidanceScale = $state(5);
+	let acceleration = $state('regular');
+	let showAdvancedSettings = $state(false);
+
+	// Upscale state - separate for front and back
+	let isUpscaling = $state(false);
+	let frontUpscaledUrl = $state<string | null>(null);
+	let backUpscaledUrl = $state<string | null>(null);
+	let showUpscaleModal = $state(false);
+
+	// Derived: current upscaled URL based on active side
+	let currentUpscaledUrl = $derived(activeSide === 'front' ? frontUpscaledUrl : backUpscaledUrl);
+	let hasUpscaledPreview = $derived(currentUpscaledUrl !== null);
 
 	// Layers state - separate for front and back
 	let frontLayers = $state<DecomposedLayer[]>([]);
@@ -121,6 +136,51 @@
 		} finally {
 			isLoadingHistory = false;
 		}
+	}
+
+	async function handleUpscale() {
+		if (!currentImageUrl) {
+			toast.error('No image available for this side');
+			return;
+		}
+
+		isUpscaling = true;
+
+		try {
+			const result = await upscaleImagePreview({ imageUrl: currentImageUrl });
+
+			if (result.success && result.upscaledUrl) {
+				// Store upscaled URL for the current side
+				console.log('[Decompose UI] Upscale success, setting URL:', result.upscaledUrl);
+				console.log('[Decompose UI] Active side:', activeSide);
+				if (activeSide === 'front') {
+					frontUpscaledUrl = result.upscaledUrl;
+					console.log('[Decompose UI] Set frontUpscaledUrl:', frontUpscaledUrl);
+				} else {
+					backUpscaledUrl = result.upscaledUrl;
+					console.log('[Decompose UI] Set backUpscaledUrl:', backUpscaledUrl);
+				}
+				toast.success('Image upscaled successfully! You can now decompose the upscaled version.');
+			} else {
+				console.log('[Decompose UI] Upscale failed:', result);
+				toast.error(result.error || 'Upscale failed');
+			}
+		} catch (err: unknown) {
+			console.error('Upscale error:', err);
+			const errorMessage = err instanceof Error ? err.message : 'Failed to upscale image';
+			toast.error(errorMessage);
+		} finally {
+			isUpscaling = false;
+		}
+	}
+
+	function clearUpscaledPreview() {
+		if (activeSide === 'front') {
+			frontUpscaledUrl = null;
+		} else {
+			backUpscaledUrl = null;
+		}
+		toast.info('Upscaled preview cleared. Will use original image.');
 	}
 
 	function requestLoadFromHistory(item: HistoryItem) {
@@ -221,6 +281,9 @@
 			return;
 		}
 
+		// Use upscaled URL if available, otherwise use original
+		const imageToDecompose = currentUpscaledUrl || currentImageUrl;
+
 		isDecomposing = true;
 		// Clear current side's layers (can't assign to derived currentLayers)
 		if (activeSide === 'front') {
@@ -232,21 +295,20 @@
 
 		try {
 			const result = await decomposeImage({
-				imageUrl: currentImageUrl,
+				imageUrl: imageToDecompose,
 				numLayers,
-                prompt,
-                negative_prompt: negativePrompt,
-                num_inference_steps: numInferenceSteps,
-                guidance_scale: guidanceScale,
-                acceleration,
+				prompt,
+				negative_prompt: negativePrompt,
+				num_inference_steps: numInferenceSteps,
+				guidance_scale: guidanceScale,
+				acceleration,
 				seed: Math.floor(Math.random() * 1000000),
 				templateId: data.asset?.templateId ?? undefined,
-				side: activeSide,
-                upscale: shouldUpscale
+				side: activeSide
 			});
 
 			if (result.success && result.layers) {
-                // ... (rest of function)
+				// ... (rest of function)
 				const layers: DecomposedLayer[] = result.layers.map((layer: any, index: number) => ({
 					id: crypto.randomUUID(),
 					name: `Layer ${index + 1}`,
@@ -516,113 +578,216 @@
 
 				<!-- Controls -->
 				<div class="p-4 border-t border-border space-y-4">
-                    <!-- Advanced Settings Toggle -->
-                    <div class="flex items-center justify-between">
-                         <Button variant="ghost" size="sm" class="h-8 text-xs text-muted-foreground" onclick={() => showAdvancedSettings = !showAdvancedSettings}>
-                            {#if showAdvancedSettings}
-                                <ChevronUp class="mr-2 h-3 w-3" />
-                                Hide Advanced Settings
-                            {:else}
-                                <ChevronDown class="mr-2 h-3 w-3" />
-                                Show Advanced Settings
-                            {/if}
-                        </Button>
-                    </div>
+					<!-- Advanced Settings Toggle -->
+					<div class="flex items-center justify-between">
+						<Button
+							variant="ghost"
+							size="sm"
+							class="h-8 text-xs text-muted-foreground"
+							onclick={() => (showAdvancedSettings = !showAdvancedSettings)}
+						>
+							{#if showAdvancedSettings}
+								<ChevronUp class="mr-2 h-3 w-3" />
+								Hide Advanced Settings
+							{:else}
+								<ChevronDown class="mr-2 h-3 w-3" />
+								Show Advanced Settings
+							{/if}
+						</Button>
+					</div>
 
-                    {#if showAdvancedSettings}
-                        <div class="space-y-4 pt-2 pb-4 border-b border-border">
-                            <!-- Prompt -->
-                            <div class="grid gap-2">
-                                <Label for="prompt">Prompt</Label>
-                                <Textarea id="prompt" bind:value={prompt} class="h-24 text-xs" placeholder="Describe the ID card structure..." />
-                            </div>
+					{#if showAdvancedSettings}
+						<div class="space-y-4 pt-2 pb-4 border-b border-border">
+							<!-- Prompt -->
+							<div class="grid gap-2">
+								<Label for="prompt">Prompt</Label>
+								<Textarea
+									id="prompt"
+									bind:value={prompt}
+									class="h-24 text-xs"
+									placeholder="Describe the ID card structure..."
+								/>
+							</div>
 
-                            <!-- Negative Prompt -->
-                            <div class="grid gap-2">
-                                <Label for="negative_prompt">Negative Prompt</Label>
-                                <Textarea id="negative_prompt" bind:value={negativePrompt} class="h-16 text-xs" placeholder="What to avoid..." />
-                            </div>
+							<!-- Negative Prompt -->
+							<div class="grid gap-2">
+								<Label for="negative_prompt">Negative Prompt</Label>
+								<Textarea
+									id="negative_prompt"
+									bind:value={negativePrompt}
+									class="h-16 text-xs"
+									placeholder="What to avoid..."
+								/>
+							</div>
 
-                             <div class="grid grid-cols-2 gap-4">
-                                <!-- Inference Steps -->
-                                <div class="grid gap-2">
-                                    <div class="flex items-center justify-between">
-                                        <Label for="steps">Inference Steps: {numInferenceSteps}</Label>
-                                    </div>
-                                    <Slider id="steps" min={10} max={50} step={1} value={[numInferenceSteps]} onValueChange={(v) => numInferenceSteps = v[0]} />
-                                </div>
+							<div class="grid grid-cols-2 gap-4">
+								<!-- Inference Steps -->
+								<div class="grid gap-2">
+									<div class="flex items-center justify-between">
+										<Label for="steps">Inference Steps: {numInferenceSteps}</Label>
+									</div>
+									<Slider
+										id="steps"
+										min={10}
+										max={50}
+										step={1}
+										value={[numInferenceSteps]}
+										onValueChange={(v) => (numInferenceSteps = v[0])}
+									/>
+								</div>
 
-                                <!-- Upscale -->
-                                <div class="flex items-center justify-between space-x-2">
-                                    <Label for="upscale" class="flex flex-col space-y-1">
-                                        <span>Upscale 2x</span>
-                                        <span class="font-normal text-xs text-muted-foreground">Upscale image before decomposition</span>
-                                    </Label>
-                                    <Switch id="upscale" checked={shouldUpscale} onCheckedChange={(v) => shouldUpscale = v} />
-                                </div>
+								<!-- Guidance Scale -->
+								<div class="grid gap-2">
+									<div class="flex items-center justify-between">
+										<Label for="guidance">Guidance Scale: {guidanceScale}</Label>
+									</div>
+									<Slider
+										id="guidance"
+										min={1}
+										max={20}
+										step={0.1}
+										value={[guidanceScale]}
+										onValueChange={(v) => (guidanceScale = v[0])}
+									/>
+								</div>
+							</div>
 
-                                <Separator />
+							<!-- Acceleration -->
+							<div class="grid gap-2">
+								<Label>Acceleration</Label>
+								<div class="flex items-center gap-4">
+									<div class="flex items-center space-x-2">
+										<input
+											type="radio"
+											id="acc_none"
+											name="acceleration"
+											value="none"
+											bind:group={acceleration}
+											class="radio"
+										/>
+										<Label for="acc_none" class="font-normal">None</Label>
+									</div>
+									<div class="flex items-center space-x-2">
+										<input
+											type="radio"
+											id="acc_regular"
+											name="acceleration"
+											value="regular"
+											bind:group={acceleration}
+											class="radio"
+										/>
+										<Label for="acc_regular" class="font-normal">Regular</Label>
+									</div>
+									<div class="flex items-center space-x-2">
+										<input
+											type="radio"
+											id="acc_high"
+											name="acceleration"
+											value="high"
+											bind:group={acceleration}
+											class="radio"
+										/>
+										<Label for="acc_high" class="font-normal">High</Label>
+									</div>
+								</div>
+							</div>
+						</div>
+					{/if}
 
-                                <!-- Guidance Scale -->
-                                <div class="grid gap-2">
-                                    <div class="flex items-center justify-between">
-                                         <Label for="guidance">Guidance Scale: {guidanceScale}</Label>
-                                    </div>
-                                    <Slider id="guidance" min={1} max={20} step={0.1} value={[guidanceScale]} onValueChange={(v) => guidanceScale = v[0]} />
-                                </div>
-                             </div>
-                             
-                             <!-- Acceleration -->
-                             <div class="grid gap-2">
-                                <Label>Acceleration</Label>
-                                <div class="flex items-center gap-4">
-                                    <div class="flex items-center space-x-2">
-                                         <input type="radio" id="acc_none" name="acceleration" value="none" bind:group={acceleration} class="radio" />
-                                         <Label for="acc_none" class="font-normal">None</Label>
-                                     </div>
-                                    <div class="flex items-center space-x-2">
-                                        <input type="radio" id="acc_regular" name="acceleration" value="regular" bind:group={acceleration} class="radio" />
-                                        <Label for="acc_regular" class="font-normal">Regular</Label>
-                                    </div>
-                                     <div class="flex items-center space-x-2">
-                                        <input type="radio" id="acc_high" name="acceleration" value="high" bind:group={acceleration} class="radio" />
-                                        <Label for="acc_high" class="font-normal">High</Label>
-                                    </div>
-                                </div>
-                             </div>
-                        </div>
-                    {/if}
+					<!-- Upscale Preview Section -->
+					{#if hasUpscaledPreview}
+						<div class="mb-4 rounded-lg border border-green-500/30 bg-green-500/5 p-3">
+							<div class="flex items-start gap-3">
+								<button
+									onclick={() => (showUpscaleModal = true)}
+									class="h-16 w-24 flex-shrink-0 overflow-hidden rounded border border-green-500/30 bg-muted cursor-pointer hover:border-green-500 transition-colors group relative"
+									title="Click to view full size"
+								>
+									<img
+										src={currentUpscaledUrl}
+										alt="Upscaled preview"
+										class="h-full w-full object-contain"
+									/>
+									<div
+										class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center"
+									>
+										<ZoomIn
+											class="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+										/>
+									</div>
+								</button>
+								<div class="flex-1 min-w-0">
+									<p
+										class="text-sm font-medium text-green-700 dark:text-green-300 flex items-center gap-2"
+									>
+										<ZoomIn class="h-4 w-4" />
+										Upscaled Preview Ready
+									</p>
+									<p class="text-xs text-green-600/80 dark:text-green-400/80 mt-0.5">
+										Click thumbnail to view full size. Click "Decompose" to use this version.
+									</p>
+								</div>
+								<button
+									onclick={clearUpscaledPreview}
+									class="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-200"
+									title="Clear upscaled preview"
+								>
+									<X class="h-4 w-4" />
+								</button>
+							</div>
+						</div>
+					{/if}
 
-                    <div class="flex items-center gap-4">
-                        <div class="flex items-center gap-2">
-                            <label for="numLayers" class="text-sm text-muted-foreground">Layers:</label>
-                            <select
-                                id="numLayers"
-                                bind:value={numLayers}
-                                class="rounded border border-border bg-background px-2 py-1 text-sm"
-                            >
-                                {#each [2, 3, 4, 5, 6, 8, 10] as n}
-                                    <option value={n}>{n}</option>
-                                {/each}
-                            </select>
-                        </div>
+					<div class="flex items-center gap-4 flex-wrap">
+						<div class="flex items-center gap-2">
+							<label for="numLayers" class="text-sm text-muted-foreground">Layers:</label>
+							<select
+								id="numLayers"
+								bind:value={numLayers}
+								class="rounded border border-border bg-background px-2 py-1 text-sm"
+							>
+								{#each [2, 3, 4, 5, 6, 8, 10] as n}
+									<option value={n}>{n}</option>
+								{/each}
+							</select>
+						</div>
 
-                        <Button
-                            onclick={handleDecompose}
-                            disabled={isDecomposing || !currentImageUrl}
-                            variant="secondary"
-                        >
-                            {#if isDecomposing}
-                                <Loader2 class="mr-2 h-4 w-4 animate-spin" />
-                                Decomposing...
-                            {:else}
-                                <Wand2 class="mr-2 h-4 w-4" />
-                                Decompose {activeSide === 'front' ? 'Front' : 'Back'}
-                                <span class="ml-1 text-xs opacity-70">({decomposeCost} credits)</span>
-                            {/if}
-                        </Button>
-                    </div>
-                </div>
+						<!-- Upscale Button -->
+						<Button
+							onclick={handleUpscale}
+							disabled={isUpscaling || !currentImageUrl || hasUpscaledPreview}
+							variant="outline"
+							size="sm"
+						>
+							{#if isUpscaling}
+								<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+								Upscaling...
+							{:else}
+								<ZoomIn class="mr-2 h-4 w-4" />
+								Upscale 2x
+							{/if}
+						</Button>
+
+						<!-- Decompose Button -->
+						<Button
+							onclick={handleDecompose}
+							disabled={isDecomposing || !currentImageUrl}
+							variant="secondary"
+						>
+							{#if isDecomposing}
+								<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+								Decomposing...
+							{:else}
+								<Wand2 class="mr-2 h-4 w-4" />
+								Decompose {activeSide === 'front' ? 'Front' : 'Back'}
+								{#if hasUpscaledPreview}
+									<span class="ml-1 text-xs opacity-70">(upscaled)</span>
+								{/if}
+								<span class="ml-1 text-xs opacity-70">({decomposeCost} credits)</span>
+							{/if}
+						</Button>
+					</div>
+				</div>
 			</div>
 
 			<!-- Linked Template Info -->
@@ -886,6 +1051,42 @@
 		<Dialog.Footer class="gap-2">
 			<Button variant="outline" onclick={cancelLoadFromHistory}>Cancel</Button>
 			<Button onclick={confirmLoadFromHistory}>Replace Layers</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>
+
+<!-- Upscale Preview Modal -->
+<Dialog.Root bind:open={showUpscaleModal}>
+	<Dialog.Content class="max-w-4xl max-h-[90vh] overflow-auto">
+		<Dialog.Header>
+			<Dialog.Title class="flex items-center gap-2">
+				<ZoomIn class="h-5 w-5 text-green-500" />
+				Upscaled Image Preview (2x)
+			</Dialog.Title>
+			<Dialog.Description>
+				This is the upscaled version that will be used for decomposition.
+			</Dialog.Description>
+		</Dialog.Header>
+		<div class="mt-4 flex items-center justify-center bg-muted/30 rounded-lg p-4 overflow-auto">
+			{#if currentUpscaledUrl}
+				<img
+					src={currentUpscaledUrl}
+					alt="Upscaled preview full size"
+					class="max-w-full max-h-[70vh] object-contain rounded border border-border"
+				/>
+			{/if}
+		</div>
+		<Dialog.Footer class="mt-4">
+			<Button variant="outline" onclick={() => (showUpscaleModal = false)}>Close</Button>
+			<Button
+				onclick={() => {
+					showUpscaleModal = false;
+					handleDecompose();
+				}}
+			>
+				<Wand2 class="mr-2 h-4 w-4" />
+				Decompose This Image
+			</Button>
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>

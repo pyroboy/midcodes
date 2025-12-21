@@ -80,8 +80,7 @@ export const decomposeImage = command(
 		acceleration,
 		seed,
 		templateId,
-		side,
-		upscale
+		side
 	}: {
 		imageUrl: string;
 		numLayers?: number;
@@ -93,38 +92,21 @@ export const decomposeImage = command(
 		seed?: number;
 		templateId?: string | null;
 		side?: 'front' | 'back';
-		upscale?: boolean;
 	}): Promise<DecomposeResponse> => {
 		console.log('[decompose.remote] decomposeImage called with:', {
 			imageUrl,
 			numLayers,
 			templateId,
-			side,
-			upscale
+			side
 		});
 		const { user, org_id } = await requireAdmin();
 		console.log('[decompose.remote] Admin check passed, calling decomposeWithFal...');
 
 		try {
-			let inputUrl = imageUrl;
-
-			// 1. Optional Upscale
-			if (upscale) {
-				const { upscaleImage } = await import('$lib/server/fal-layers');
-				try {
-					console.log('[decompose.remote] Upscaling image before decomposition...');
-					inputUrl = await upscaleImage(imageUrl);
-					console.log('[decompose.remote] Image upscaled to:', inputUrl);
-				} catch (upscaleErr) {
-					console.error('[decompose.remote] Upscale failed, falling back to original image:', upscaleErr);
-					// Fallback to original image or throw? 
-					// Let's fallback to original for robustness, but maybe logging is enough.
-				}
-			}
-
-			// 2. Call AI Service
+			// Call AI Service with the provided imageUrl
+			// (if upscaled, the upscaled URL should already be passed here)
 			const result = await decomposeWithFal({
-				imageUrl: inputUrl,
+				imageUrl,
 				numLayers,
 				prompt,
 				negative_prompt,
@@ -217,6 +199,59 @@ export const decomposeImage = command(
 		} catch (err) {
 			console.error('[decompose.remote] decomposeWithFal error:', err);
 			throw err;
+		}
+	}
+);
+
+/**
+ * Upscale an image and return the upscaled URL for preview.
+ * Does NOT persist to R2 - uses fal.ai's temporary URL directly.
+ */
+export const upscaleImagePreview = command(
+	'unchecked',
+	async ({
+		imageUrl
+	}: {
+		imageUrl: string;
+	}): Promise<{
+		success: boolean;
+		upscaledUrl?: string;
+		originalUrl: string;
+		error?: string;
+	}> => {
+		console.log('[decompose.remote] upscaleImagePreview called with:', imageUrl);
+		await requireAdmin();
+
+		try {
+			const { upscaleImage, isFalConfigured } = await import('$lib/server/fal-layers');
+
+			if (!isFalConfigured()) {
+				console.log('[decompose.remote] FAL_KEY not configured, returning mock upscale');
+				// In mock mode, just return the original image
+				return {
+					success: true,
+					upscaledUrl: imageUrl,
+					originalUrl: imageUrl
+				};
+			}
+
+			console.log('[decompose.remote] Calling upscaleImage...');
+			const upscaledUrl = await upscaleImage(imageUrl);
+			console.log('[decompose.remote] Upscale complete:', upscaledUrl);
+
+			return {
+				success: true,
+				upscaledUrl,
+				originalUrl: imageUrl
+			};
+		} catch (err: unknown) {
+			console.error('[decompose.remote] upscaleImagePreview error:', err);
+			const errorMessage = err instanceof Error ? err.message : 'Upscale failed';
+			return {
+				success: false,
+				originalUrl: imageUrl,
+				error: errorMessage
+			};
 		}
 	}
 );

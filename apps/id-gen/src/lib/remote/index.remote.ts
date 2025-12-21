@@ -71,6 +71,7 @@ export {
 export {
 	checkDecomposeAvailable,
 	decomposeImage,
+	upscaleImagePreview,
 	saveLayers,
 	getDecomposeHistory,
 	getDecomposeHistoryWithStats,
