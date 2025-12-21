@@ -100,9 +100,10 @@ export function getRotationSpeed(angle: number): number {
  */
 export function getCardDimensions(w: number, h: number): CardDimensions {
 	// Guard against zero dimensions
-	if (w <= 0 || h <= 0) {
+	if (!Number.isFinite(w) || w <= 0 || !Number.isFinite(h) || h <= 0) {
 		console.warn('[getCardDimensions] Invalid dimensions:', { w, h });
-		return { width: CARD3D_CONSTANTS.BASE_SCALE, height: CARD3D_CONSTANTS.BASE_SCALE };
+		// Use base scale as fallback
+		return { width: CARD3D_CONSTANTS.BASE_SCALE, height: CARD3D_CONSTANTS.BASE_SCALE / 1.58 }; // Standard aspect ratio fallback
 	}
 	const aspect = w / h;
 	if (aspect >= 1) {

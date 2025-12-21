@@ -111,51 +111,62 @@
 
 	// Create or get cached background canvas
 	function getBackgroundCanvas(width: number, height: number): HTMLCanvasElement {
+		// Ensure valid dimensions (at least 1px)
+		const safeWidth = Math.max(1, Math.floor(width || 100));
+		const safeHeight = Math.max(1, Math.floor(height || 60));
+
 		if (
 			cachedBackgroundCanvas &&
-			cachedBackgroundSize.w === width &&
-			cachedBackgroundSize.h === height
+			cachedBackgroundSize.w === safeWidth &&
+			cachedBackgroundSize.h === safeHeight
 		) {
 			return cachedBackgroundCanvas;
 		}
 
+		console.log(`[3D Preview] Creating background canvas: ${safeWidth}x${safeHeight}`);
+
 		const canvas = document.createElement('canvas');
 		const ctx = canvas.getContext('2d')!;
-		canvas.width = width;
-		canvas.height = height;
+		canvas.width = safeWidth;
+		canvas.height = safeHeight;
 
 		// Background gradient
-		const gradient = ctx.createLinearGradient(0, 0, width, height);
+		const gradient = ctx.createLinearGradient(0, 0, safeWidth, safeHeight);
 		gradient.addColorStop(0, '#f8fafc');
 		gradient.addColorStop(1, '#e2e8f0');
 		ctx.fillStyle = gradient;
-		ctx.fillRect(0, 0, width, height);
+		ctx.fillRect(0, 0, safeWidth, safeHeight);
 
 		// Subtle pattern (reduced density for performance)
 		ctx.strokeStyle = 'rgba(148, 163, 184, 0.15)';
 		ctx.lineWidth = 1;
-		for (let i = 0; i < width; i += 30) {
+		for (let i = 0; i < safeWidth; i += 30) {
 			ctx.beginPath();
 			ctx.moveTo(i, 0);
-			ctx.lineTo(i, height);
+			ctx.lineTo(i, safeHeight);
 			ctx.stroke();
 		}
-		for (let i = 0; i < height; i += 30) {
+		for (let i = 0; i < safeHeight; i += 30) {
 			ctx.beginPath();
 			ctx.moveTo(0, i);
-			ctx.lineTo(width, i);
+			ctx.lineTo(safeWidth, i);
 			ctx.stroke();
 		}
 
 		// Border - scale proportionally to canvas size for seamless low-res/high-res transition
-		const sizeScale = width / 256; // 256 is base size
+		const sizeScale = safeWidth / 256; // 256 is base size
 		ctx.strokeStyle = 'rgba(100, 116, 139, 0.3)';
 		ctx.lineWidth = 4 * sizeScale;
 		const borderOffset = 8 * sizeScale;
-		ctx.strokeRect(borderOffset, borderOffset, width - borderOffset * 2, height - borderOffset * 2);
+		ctx.strokeRect(
+			borderOffset,
+			borderOffset,
+			safeWidth - borderOffset * 2,
+			safeHeight - borderOffset * 2
+		);
 
 		cachedBackgroundCanvas = canvas;
-		cachedBackgroundSize = { w: width, h: height };
+		cachedBackgroundSize = { w: safeWidth, h: safeHeight };
 		return canvas;
 	}
 
@@ -169,13 +180,18 @@
 		contentRotation: number = 0,
 		highRes: boolean = false
 	): THREE.CanvasTexture {
+		// Validations to prevent 0x0 canvas errors
+		const safeW = Number.isFinite(w) && w > 0 ? w : 100;
+		const safeH = Number.isFinite(h) && h > 0 ? h : 60;
+
 		const canvas = document.createElement('canvas');
 		const ctx = canvas.getContext('2d')!;
 
 		// Use 256 for animation (performance), 512 for final render (quality)
 		const baseSize = highRes ? 512 : 256;
 		canvas.width = baseSize;
-		canvas.height = Math.round(baseSize * (h / w));
+		// Ensure height is at least 1px
+		canvas.height = Math.max(1, Math.round(baseSize * (safeH / safeW)));
 
 		// Draw cached background (no gradient/pattern recalculation)
 		const bg = getBackgroundCanvas(canvas.width, canvas.height);
@@ -213,8 +229,8 @@
 		// Dimensions
 		ctx.fillStyle = '#64748b';
 		ctx.font = `${Math.round(12 * fontScale)}px monospace`;
-		const displayW = isInPortrait ? h : w;
-		const displayH = isInPortrait ? w : h;
+		const displayW = isInPortrait ? safeH : safeW;
+		const displayH = isInPortrait ? safeW : safeH;
 		ctx.fillText(
 			`${Math.round(displayW)} × ${Math.round(displayH)} px`,
 			centerX,
@@ -873,21 +889,28 @@
 	}
 
 	onMount(() => {
-		console.log('[3D Preview] onMount - Props:', {
+		// Validated dimensions
+		const validWidth = Number.isFinite(widthPixels) && widthPixels > 0 ? widthPixels : 1013;
+		const validHeight = Number.isFinite(heightPixels) && heightPixels > 0 ? heightPixels : 638;
+
+		console.log('[3D Preview] onMount - Props (Validated):', {
 			widthPixels,
 			heightPixels,
+			validWidth,
+			validHeight,
 			sizeName,
 			isPortrait
 		});
+
 		// Initialize animation state from props
-		animState.currentWidth = widthPixels;
-		animState.currentHeight = heightPixels;
-		animState.targetWidth = widthPixels;
-		animState.targetHeight = heightPixels;
-		animState.baseWidth = widthPixels; // Geometry base size
-		animState.baseHeight = heightPixels;
-		animState.prevWidthPixels = widthPixels;
-		animState.prevHeightPixels = heightPixels;
+		animState.currentWidth = validWidth;
+		animState.currentHeight = validHeight;
+		animState.targetWidth = validWidth;
+		animState.targetHeight = validHeight;
+		animState.baseWidth = validWidth; // Geometry base size
+		animState.baseHeight = validHeight;
+		animState.prevWidthPixels = validWidth;
+		animState.prevHeightPixels = validHeight;
 		animState.prevIsPortrait = isPortrait;
 		animState.prevSizeName = sizeName;
 
@@ -914,8 +937,8 @@
 		}
 
 		// Sync reactive state (no warning since this is in onMount callback)
-		currentWidth = widthPixels;
-		currentHeight = heightPixels;
+		currentWidth = validWidth;
+		currentHeight = validHeight;
 		console.log('[3D Preview] Initial state:', {
 			currentWidth,
 			currentHeight,
@@ -925,7 +948,7 @@
 			renderRotationZ
 		});
 
-		loadGeometry(widthPixels, heightPixels);
+		loadGeometry(validWidth, validHeight);
 		// Use high-resolution texture for initial render (crisp first impression)
 		updateInfoTextureHighRes(animState.textureRotation);
 		if (imageUrl) {
@@ -954,20 +977,34 @@
 
 	// Watch for dimension changes and trigger morph animation
 	$effect(() => {
-		if (widthPixels !== animState.prevWidthPixels || heightPixels !== animState.prevHeightPixels) {
+		const validW = Number.isFinite(widthPixels) && widthPixels > 0;
+		const validH = Number.isFinite(heightPixels) && heightPixels > 0;
+
+		if (
+			validW &&
+			validH &&
+			(widthPixels !== animState.prevWidthPixels || heightPixels !== animState.prevHeightPixels)
+		) {
 			animState.targetWidth = widthPixels;
 			animState.targetHeight = heightPixels;
 			animState.isAnimating = true;
+			// Don't update prev* immediately here if we want to allow re-triggering? 
+			// Actually it's fine as long as we use isAnimating to drive the loop.
 			animState.prevWidthPixels = widthPixels;
 			animState.prevHeightPixels = heightPixels;
+			
 			startAnimationLoop();
 
 			// Reset OrbitControls to center when dimensions change
-			// This ensures camera always looks at origin regardless of user interactions
 			if (orbitControlsRef) {
 				orbitControlsRef.target.set(0, 0, 0);
 				orbitControlsRef.update();
 			}
+		} else if (!validW || !validH) {
+			console.warn('[3D Preview] Received invalid dimensions update:', {
+				widthPixels,
+				heightPixels
+			});
 		}
 	});
 

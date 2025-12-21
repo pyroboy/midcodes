@@ -22,6 +22,7 @@
 		getUnitSymbol,
 		switchOrientation,
 		DEFAULT_DPI,
+		UNIT_TO_INCHES,
 		type CardSize,
 		type UnitType
 	} from '$lib/utils/sizeConversion';
@@ -72,15 +73,37 @@
 		// Map DB presets to CardSize format
 		const dbSizes: CardSize[] = sizePresets
 			.filter((p) => p.is_active !== false)
-			.map((p) => ({
-				name: p.name,
-				slug: p.slug,
-				// Prefer inches for display if available, otherwise consistent standard
-				width: parseFloat(p.width_inches) || p.width_pixels / (p.dpi || DEFAULT_DPI),
-				height: parseFloat(p.height_inches) || p.height_pixels / (p.dpi || DEFAULT_DPI),
-				unit: 'inches' as UnitType,
-				description: p.description || ''
-			}));
+			.map((p) => {
+				// Handle both snake_case (raw DB/legacy) and camelCase (Drizzle) property names
+				const wIn = p.widthInches ?? p.width_inches;
+				const hIn = p.heightInches ?? p.height_inches;
+				const wPx = p.widthPixels ?? p.width_pixels;
+				const hPx = p.heightPixels ?? p.height_pixels;
+				
+				const widthInches = typeof wIn === 'string' ? parseFloat(wIn) : Number(wIn);
+				const heightInches = typeof hIn === 'string' ? parseFloat(hIn) : Number(hIn);
+				const dpi = p.dpi || DEFAULT_DPI;
+
+				// Calculate dimensions with fallbacks
+				const finalWidth = Number.isFinite(widthInches)
+					? widthInches
+					: (wPx && dpi ? wPx / dpi : 3.375);
+
+				const finalHeight = Number.isFinite(heightInches)
+					? heightInches
+					: (hPx && dpi ? hPx / dpi : 2.125);
+
+				return {
+					name: p.name,
+					slug: p.slug,
+					width: finalWidth,
+					height: finalHeight,
+					unit: 'inches' as UnitType,
+					description: p.description || ''
+				};
+			});
+
+		console.log('[SizeSelection] DB Presets loaded:', { count: sizePresets.length, dbSizes });
 
 		// Create a map by slug for easy lookup
 		const dbSizeMap = new Map(dbSizes.map((s) => [s.slug, s]));
@@ -96,8 +119,10 @@
 		// Add any DB-only sizes that weren't in common sizes
 		const commonSlugs = new Set(COMMON_CARD_SIZES.map((s) => s.slug).filter(Boolean));
 		const newSizes = dbSizes.filter((s) => s.slug && !commonSlugs.has(s.slug));
-
-		return [...mergedSizes, ...newSizes];
+		
+		const result = [...mergedSizes, ...newSizes];
+		console.log('[SizeSelection] Final Available Sizes:', result);
+		return result;
 	});
 
 	// Template asset counts loaded from server (keyed by "slug:orientation")
@@ -168,23 +193,51 @@
 		);
 	});
 
+
+
 	// Compute the base card size (always landscape orientation for 3D preview)
-	let baseCardSize = $derived(() => {
-		return selectedSizeType === 'common'
-			? selectedCommonSize
-			: { name: customSizeName, width: customWidth, height: customHeight, unit: customUnit };
+	let baseCardSize = $derived.by(() => {
+		let size;
+		if (selectedSizeType === 'common') {
+			// Ensure safe defaults even for common sizes
+			size = {
+				...selectedCommonSize,
+				width: Number.isFinite(selectedCommonSize?.width) ? selectedCommonSize.width : 3.375,
+				height: Number.isFinite(selectedCommonSize?.height) ? selectedCommonSize.height : 2.125
+			};
+		} else {
+			// Sanitize custom inputs - prevent NaN/null propagation
+			size = {
+				name: customSizeName,
+				width: Number.isFinite(customWidth) && customWidth > 0 ? customWidth : 3.5,
+				height: Number.isFinite(customHeight) && customHeight > 0 ? customHeight : 2.0,
+				unit: customUnit
+			};
+		}
+		return size;
 	});
 
 	// Compute the final card size with orientation (for actual template creation)
-	let finalCardSize = $derived(() => {
-		return isPortrait ? switchOrientation(baseCardSize()) : baseCardSize();
+	let finalCardSize = $derived.by(() => {
+		return isPortrait ? switchOrientation(baseCardSize) : baseCardSize;
 	});
 
 	// Base pixel dimensions (always landscape, for 3D preview rotation only)
-	let basePixelDimensions = $derived(cardSizeToPixels(baseCardSize()));
+	let basePixelDimensions = $derived(cardSizeToPixels(baseCardSize));
+
+	$effect(() => {
+		console.log('[SizeSelection] State Debug:', {
+			selectedSizeType,
+			selectedCommonSize,
+			customWidth,
+			customHeight,
+			baseCardSize,
+			basePixelDimensions
+		});
+	});
 
 	// Final pixel dimensions (with orientation applied, for template creation)
-	let pixelDimensions = $derived(cardSizeToPixels(finalCardSize()));
+	let pixelDimensions = $derived(cardSizeToPixels(finalCardSize));
 
 	const availableUnits: { value: UnitType; label: string }[] = [
 		{ value: 'inches', label: 'Inches (")' },
@@ -292,7 +345,7 @@
 		loadingAssets = true;
 		try {
 			const orientation = isPortrait ? 'portrait' : 'landscape';
-			const sizePresetSlug = baseCardSize().slug || null;
+			const sizePresetSlug = baseCardSize.slug || null;
 			const assets = await getTemplateAssetsBySize({ sizePresetSlug, orientation });
 			templateAssets = assets || [];
 		} catch (e) {
@@ -337,7 +390,7 @@
 				size_preset_id: null, // Using custom size from client-side definitions
 				width_pixels: pixelDimensions.width,
 				height_pixels: pixelDimensions.height,
-				size_name: finalCardSize().name,
+				size_name: finalCardSize.name,
 				design_instructions: data.instructions,
 				reference_assets: uploadedPaths
 			});
@@ -347,7 +400,7 @@
 				sizeInfo: {
 					width: pixelDimensions.width,
 					height: pixelDimensions.height,
-					name: finalCardSize().name
+					name: finalCardSize.name
 				},
 				instructions: data.instructions,
 				files: data.files,
@@ -373,7 +426,7 @@
 		}
 
 		dispatch('sizeSelected', {
-			cardSize: finalCardSize(),
+			cardSize: finalCardSize,
 			templateName: templateName.trim(),
 			selectedTemplateAsset: selectedTemplateAsset || undefined
 		});
@@ -435,7 +488,7 @@
 				<ModalCard3DPreview
 					widthPixels={basePixelDimensions.width}
 					heightPixels={basePixelDimensions.height}
-					sizeName={finalCardSize().name}
+					sizeName={finalCardSize.name}
 					imageUrl={selectedTemplateAsset?.image_url || null}
 					{isPortrait}
 					height={currentStep === 'size' ? '55vh' : '200px'}
@@ -635,14 +688,14 @@
 						onSelect={handleTemplateSelect}
 						onCustomDesign={handleCustomDesignClick}
 						selectedAssetId={selectedTemplateAsset?.id || null}
-						emptyMessage="No templates available for {finalCardSize().name}"
+						emptyMessage="No templates available for {finalCardSize.name}"
 					/>
 				</div>
 
 				<!-- STEP 2b: Custom Design Request -->
 			{:else if currentStep === 'custom'}
 				<CustomDesignForm
-					sizeName={finalCardSize().name}
+					sizeName={finalCardSize.name}
 					widthPixels={pixelDimensions.width}
 					heightPixels={pixelDimensions.height}
 					onSubmit={handleCustomDesignSubmit}

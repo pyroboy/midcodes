@@ -26,6 +26,8 @@ export interface StoredCardSize {
 // Standard DPI for high-quality printing
 export const DEFAULT_DPI = 300;
 
+console.log('[sizeConversion] Module initializing...', { DEFAULT_DPI });
+
 // Utility to switch card orientation
 export function switchOrientation(cardSize: CardSize): CardSize {
 	return {
@@ -86,6 +88,8 @@ export const UNIT_TO_INCHES: Record<UnitType, number> = {
 	cm: 0.393701,
 	pixels: 1 / DEFAULT_DPI // pixels converted at default DPI
 };
+
+console.log('[sizeConversion] UNIT_TO_INCHES initialized:', UNIT_TO_INCHES);
 
 /**
  * Get unit symbol for display
