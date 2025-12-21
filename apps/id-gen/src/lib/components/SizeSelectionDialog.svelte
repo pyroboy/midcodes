@@ -185,7 +185,7 @@
 
 	// Check if CR80 size (Premium materials only available for CR80)
 	let isCR80 = $derived(() => {
-		const size = baseCardSize();
+		const size = baseCardSize;
 		return (
 			size.slug === 'cr80' ||
 			size.name?.toLowerCase().includes('cr80') ||
@@ -311,7 +311,7 @@
 			// Go to material selection
 			currentStep = 'material';
 			// Reset material to standard if not CR80
-			if (!isCR80()) {
+			if (!isCR80) {
 				selectedMaterial = 'standard_laminated';
 			}
 		} else if (currentStep === 'material') {
@@ -727,7 +727,7 @@
 
 						<!-- Premium Direct Print - CR80 only -->
 						<label
-							class="flex items-start gap-3 p-4 rounded-lg border transition-all {!isCR80()
+							class="flex items-start gap-3 p-4 rounded-lg border transition-all {!isCR80
 								? 'opacity-50 cursor-not-allowed'
 								: 'cursor-pointer hover:border-primary/50'} {selectedMaterial === 'premium_direct'
 								? 'border-primary bg-primary/5 ring-1 ring-primary'
@@ -737,7 +737,7 @@
 								value="premium_direct"
 								id="mat-premium"
 								class="mt-1"
-								disabled={!isCR80()}
+								disabled={!isCR80}
 							/>
 							<div class="flex-1">
 								<div class="flex items-center justify-between">
@@ -745,7 +745,7 @@
 									<span class="text-sm text-muted-foreground">₱120-180/card</span>
 								</div>
 								<p class="text-sm text-muted-foreground mt-1">
-									Professional edge-to-edge printing. {!isCR80()
+									Professional edge-to-edge printing. {!isCR80
 										? 'Only available for CR80 size.'
 										: 'Premium quality finish.'}
 								</p>
@@ -754,7 +754,7 @@
 
 						<!-- TechSmart NFC - CR80 only -->
 						<label
-							class="flex items-start gap-3 p-4 rounded-lg border transition-all {!isCR80()
+							class="flex items-start gap-3 p-4 rounded-lg border transition-all {!isCR80
 								? 'opacity-50 cursor-not-allowed'
 								: 'cursor-pointer hover:border-primary/50'} {selectedMaterial === 'techsmart_nfc'
 								? 'border-primary bg-primary/5 ring-1 ring-primary'
@@ -764,7 +764,7 @@
 								value="techsmart_nfc"
 								id="mat-nfc"
 								class="mt-1"
-								disabled={!isCR80()}
+								disabled={!isCR80}
 							/>
 							<div class="flex-1">
 								<div class="flex items-center justify-between">
@@ -772,7 +772,7 @@
 									<span class="text-sm text-muted-foreground">₱180-220/card</span>
 								</div>
 								<p class="text-sm text-muted-foreground mt-1">
-									Embedded NFC chip for digital ID linking. {!isCR80()
+									Embedded NFC chip for digital ID linking. {!isCR80
 										? 'Only available for CR80 size.'
 										: 'Tap to verify.'}
 								</p>
@@ -781,7 +781,7 @@
 
 						<!-- TechSmart RFID - CR80 only -->
 						<label
-							class="flex items-start gap-3 p-4 rounded-lg border transition-all {!isCR80()
+							class="flex items-start gap-3 p-4 rounded-lg border transition-all {!isCR80
 								? 'opacity-50 cursor-not-allowed'
 								: 'cursor-pointer hover:border-primary/50'} {selectedMaterial === 'techsmart_rfid'
 								? 'border-primary bg-primary/5 ring-1 ring-primary'
@@ -791,7 +791,7 @@
 								value="techsmart_rfid"
 								id="mat-rfid"
 								class="mt-1"
-								disabled={!isCR80()}
+								disabled={!isCR80}
 							/>
 							<div class="flex-1">
 								<div class="flex items-center justify-between">
@@ -799,7 +799,7 @@
 									<span class="text-sm text-muted-foreground">₱220-280/card</span>
 								</div>
 								<p class="text-sm text-muted-foreground mt-1">
-									Embedded RFID chip for access control. {!isCR80()
+									Embedded RFID chip for access control. {!isCR80
 										? 'Only available for CR80 size.'
 										: 'Door & gate access.'}
 								</p>
@@ -961,7 +961,7 @@
 						<div class="text-sm text-muted-foreground space-y-1">
 							<p>
 								<span class="text-foreground">Size:</span>
-								{finalCardSize().name} ({isPortrait ? 'Portrait' : 'Landscape'})
+								{finalCardSize.name} ({isPortrait ? 'Portrait' : 'Landscape'})
 							</p>
 							<p>
 								<span class="text-foreground">Template:</span>

@@ -55,6 +55,7 @@ pnpm run clean            # Clear .svelte-kit, build, and cache
 ### Lazy Initialization Pattern
 
 Database and auth are lazily initialized to support Cloudflare Workers:
+
 - `src/lib/server/db.ts` - `getDb()` returns Drizzle instance, `db` is a Proxy
 - `src/lib/server/auth.ts` - `getAuth()` returns Better Auth instance, `auth` is a Proxy
 - Environment validation runs on first request via `initializeEnv()`
@@ -92,6 +93,7 @@ cards/[orgId]/[templateId]/[cardId]/raw/photo.png   # Uploaded user assets
 ```
 
 Key functions:
+
 - `getTemplateAssetPath(templateId, variant, side)` - Template backgrounds
 - `getCardAssetPath(orgId, templateId, cardId, variant, side)` - Rendered cards
 - `getCardRawAssetPath(orgId, templateId, cardId, variableName)` - User uploads
@@ -167,11 +169,11 @@ appPermissionEnum: 'templates.create' | 'templates.read' | 'idcards.create' | ..
 
 There are three types of image URLs in this codebase:
 
-| Type | Example | Handling |
-|------|---------|----------|
-| Local paths | `/placeholder.png` | Return as-is, no processing |
-| Full R2 URLs | `https://assets.kanaya.app/templates/abc/img.png` | Route through proxy |
-| Relative paths | `templates/abc/img.png` | Resolve via `getStorageUrl`, then proxy |
+| Type           | Example                                           | Handling                                |
+| -------------- | ------------------------------------------------- | --------------------------------------- |
+| Local paths    | `/placeholder.png`                                | Return as-is, no processing             |
+| Full R2 URLs   | `https://assets.kanaya.app/templates/abc/img.png` | Route through proxy                     |
+| Relative paths | `templates/abc/img.png`                           | Resolve via `getStorageUrl`, then proxy |
 
 ### Key Functions (`src/lib/utils/storage.ts`)
 
@@ -203,6 +205,7 @@ Server  → returns image to browser
 ### Database Storage Format
 
 Templates store **full URLs** in `frontBackground`/`backBackground`:
+
 ```
 https://assets.kanaya.app/templates/{templateId}/template-front.png
 ```
@@ -215,20 +218,130 @@ https://assets.kanaya.app/templates/{templateId}/template-front.png
 
 <!-- For IdCanvas/3D textures (handles null + CORS) -->
 backgroundUrl={template.front_background
-  ? (template.front_background.startsWith('http')
-      ? template.front_background
-      : getStorageUrl(template.front_background, 'templates'))
-  : ''}
+	? template.front_background.startsWith('http')
+		? template.front_background
+		: getStorageUrl(template.front_background, 'templates')
+	: ''}
 ```
 
 ### Troubleshooting
 
-| Issue | Cause | Fix |
-|-------|-------|-----|
-| CORS error on canvas | Direct R2 URL without proxy | Use `getProxiedUrl` |
-| 500 from proxy | URL not from `assets.kanaya.app` | Check URL format |
-| Gray 3D texture | Texture failed to load | Check browser console for errors |
-| Local image 404 through proxy | Local path processed as R2 path | Ensure `/` paths bypass proxy |
+| Issue                         | Cause                            | Fix                              |
+| ----------------------------- | -------------------------------- | -------------------------------- |
+| CORS error on canvas          | Direct R2 URL without proxy      | Use `getProxiedUrl`              |
+| 500 from proxy                | URL not from `assets.kanaya.app` | Check URL format                 |
+| Gray 3D texture               | Texture failed to load           | Check browser console for errors |
+| Local image 404 through proxy | Local path processed as R2 path  | Ensure `/` paths bypass proxy    |
+
+---
+
+## AI Layer Decomposition (Qwen-Image-Layered via fal.ai)
+
+The Decompose feature uses fal.ai's Qwen-Image-Layered model to separate template images into RGBA layers for element extraction.
+
+### Route & Files
+
+| Path                                           | Purpose                   |
+| ---------------------------------------------- | ------------------------- |
+| `/admin/template-assets/decompose?assetId=xxx` | Decompose UI page         |
+| `src/lib/server/fal-layers.ts`                 | fal.ai API integration    |
+| `src/lib/schemas/decompose.schema.ts`          | Layer & selection schemas |
+| `src/lib/remote/decompose.remote.ts`           | Server commands           |
+
+### API Configuration
+
+```bash
+# Add to .env (optional - mock mode if missing)
+FAL_KEY=your_fal_api_key
+```
+
+### Key Types
+
+```typescript
+// Layer from fal.ai (full-size transparent PNG)
+interface FalLayer {
+	url: string; // Hosted PNG URL
+	width: number;
+	height: number;
+	zIndex: number; // 0 = bottom layer
+}
+
+// User selection for element conversion
+interface LayerSelection {
+	layerId: string;
+	included: boolean;
+	elementType: 'image' | 'text' | 'photo' | 'qr' | 'signature';
+	variableName: string;
+	bounds: { x; y; width; height };
+	layerImageUrl?: string;
+}
+```
+
+### Workflow
+
+1. Navigate to `/admin/template-assets/manage`
+2. Click "Decompose" button (purple) on any asset
+3. Click "Decompose Front/Back" to run AI analysis
+4. Tag each layer with element type and variable name
+5. Click "Save to Template" to convert layers to `templateElements`
+6. Redirects to `/templates?id=xxx` for editing
+
+---
+
+## Template Data Conformity (Assets ↔ Templates)
+
+### Data Relationship
+
+```
+templateAssets (catalog entry)
+    ├── templateId → templates.id (FK)
+    ├── imageUrl, backImageUrl (stored URLs - can drift)
+    └── widthPixels, heightPixels, orientation
+
+templates (actual template data)
+    ├── frontBackground, backBackground (canonical URLs)
+    ├── templateElements (JSONB array)
+    └── widthPixels, heightPixels, dpi, orientation
+```
+
+### Known Conformity Gaps
+
+| Issue                       | Description                                                                  | Mitigation                                                |
+| --------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------- |
+| **URL Drift**               | Asset `imageUrl` can become stale when template `frontBackground` is updated | Use "Sync" button in manage page to re-pull from template |
+| **Direct Supabase Calls**   | Manage page uses Supabase client for delete/toggle instead of server actions | Should migrate to server actions for consistency          |
+| **Element Stats Staleness** | `stats.elementCount` from initial load doesn't update after decompose        | Page reload required to see updated counts                |
+
+### URL Priority (Manage Page)
+
+The manage page prefers live template URLs over stored asset URLs:
+
+```typescript
+// In +page.server.ts load function
+image_url: stats?.urls?.front || asset.imageUrl,
+back_image_url: stats?.urls?.back || asset.backImageUrl,
+```
+
+### Sync Operation
+
+The "Sync" button (`regenerateAsset` action) pulls current data from linked template:
+
+```typescript
+await db.update(templateAssets).set({
+	imageUrl: template.frontBackground,
+	backImageUrl: template.backBackground,
+	widthPixels: template.widthPixels,
+	heightPixels: template.heightPixels,
+	orientation: template.orientation
+});
+```
+
+### Best Practices
+
+1. **Always edit via template** - Don't update asset URLs directly
+2. **Use Sync after template edits** - Ensures asset catalog stays current
+3. **Prefer template URLs** - When displaying, use joined template data if available
+4. **Decompose creates elements** - Not new images; layers become `templateElements`
 
 ---
 

@@ -146,10 +146,13 @@ export const actions: Actions = {
 						category,
 						tags,
 						sizePresetId: sizePresetId || null,
+						templateId: templateId, // Link to the template record
 						sampleType: (sampleType as any) || 'stock',
 						orientation: orientation as any,
 						imagePath: frontPath, // Store R2 path
 						imageUrl: frontBackground, // Store public URL
+						backImagePath: getPath('back', 'full'), // Store R2 path for back
+						backImageUrl: getUrl('back', 'full'), // Store public URL for back
 						widthPixels,
 						heightPixels,
 						isPublished: true, // Auto-publish for now? Or keep draft.

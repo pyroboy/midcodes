@@ -95,15 +95,30 @@ export const templateAssetSchema = z.object({
 	category: z.string().nullable(),
 	tags: z.array(z.string()),
 	size_preset_id: z.string().uuid().nullable(),
+	template_id: z.string().uuid().nullable().optional(),
 	sample_type: sampleTypeSchema,
 	orientation: orientationSchema,
 	image_path: z.string(),
 	image_url: z.string(),
+	back_image_path: z.string().nullable().optional(),
+	back_image_url: z.string().nullable().optional(),
 	width_pixels: z.number().int().positive(),
 	height_pixels: z.number().int().positive(),
 	is_published: z.boolean(),
 	published_at: z.string().nullable(),
-	uploaded_by: z.string().uuid().nullable()
+	uploaded_by: z.string().uuid().nullable(),
+	// Stats from joined template data (server-side only usually, but passed to client)
+	stats: z.object({
+		hasElements: z.boolean(),
+		elementCount: z.number(),
+		variants: z.object({
+			front: z.boolean(),
+			back: z.boolean(),
+			preview: z.boolean(),
+			blank: z.boolean(),
+			sample: z.boolean()
+		})
+	}).optional()
 });
 
 export type TemplateAsset = z.infer<typeof templateAssetSchema>;
