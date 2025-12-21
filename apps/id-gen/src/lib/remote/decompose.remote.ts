@@ -1,10 +1,13 @@
-import { command } from '$app/server';
-import { decomposeWithFal, isFalConfigured, type DecomposeResponse } from '$lib/server/fal-layers';
-import { db } from '$lib/server/db';
-import * as schema from '$lib/server/schema';
-import { eq } from 'drizzle-orm';
+import { command, query } from '$app/server';
 import { error } from '@sveltejs/kit';
 import { getRequestEvent } from '$app/server';
+import { decomposeWithFal, isFalConfigured } from '$lib/server/fal-layers';
+import { db } from '$lib/server/db';
+import * as schema from '$lib/server/schema';
+import { uploadToR2 } from '$lib/server/s3';
+import { getDecomposedLayerPath } from '$lib/utils/storagePath';
+import { checkAdmin } from '$lib/utils/adminPermissions';
+import { eq, desc, and } from 'drizzle-orm';
 import type { LayerSelection } from '$lib/schemas/decompose.schema';
 import type { TemplateElement } from '$lib/schemas/template-element.schema';
 
@@ -17,14 +20,15 @@ async function requireAdmin() {
 	console.log('[decompose.remote] requireAdmin - role:', event?.locals?.user?.role);
 
 	const { locals } = event;
-	if (
-		!locals.user ||
-		!['super_admin', 'org_admin', 'id_gen_admin'].includes(locals.user.role as string)
-	) {
+	const hasAdminAccess = checkAdmin(locals);
+
+	console.log('[decompose.remote] requireAdmin - hasAdminAccess:', hasAdminAccess);
+
+	if (!locals.user || !hasAdminAccess) {
 		console.error('[decompose.remote] Admin access denied for role:', locals.user?.role);
 		throw error(403, 'Admin access required');
 	}
-	return locals;
+	return { locals, user: locals.user, org_id: locals.user.orgId };
 }
 
 /**
@@ -42,8 +46,25 @@ export const checkDecomposeAvailable = command(
 	}
 );
 
+export interface DecomposedLayer {
+	url: string;
+	width: number;
+	height: number;
+	zIndex: number;
+	imageUrl: string; // Helper for R2 url or fal url
+}
+
+export type DecomposeResponse = {
+	success: boolean;
+	layers?: DecomposedLayer[];
+	error?: string;
+	timings?: any;
+	seed?: number;
+};
+
 /**
  * Decompose an image into layers using fal.ai Qwen-Image-Layered.
+ * Persists results to R2 and database.
  */
 export const decomposeImage = command(
 	'unchecked',
@@ -51,37 +72,148 @@ export const decomposeImage = command(
 		imageUrl,
 		numLayers = 4,
 		prompt,
-		seed
+		seed,
+		templateId
 	}: {
 		imageUrl: string;
 		numLayers?: number;
 		prompt?: string;
 		seed?: number;
+		templateId?: string | null;
 	}): Promise<DecomposeResponse> => {
-		console.log('[decompose.remote] decomposeImage called with:', { imageUrl, numLayers });
-		await requireAdmin();
+		console.log('[decompose.remote] decomposeImage called with:', { imageUrl, numLayers, templateId });
+		const { user, org_id } = await requireAdmin();
 		console.log('[decompose.remote] Admin check passed, calling decomposeWithFal...');
 
 		try {
+			// 1. Call AI Service
 			const result = await decomposeWithFal({
 				imageUrl,
 				numLayers,
 				prompt,
 				seed
 			});
+
+			if (!result.success || !result.layers) {
+				return {
+					success: result.success,
+					error: result.error,
+					layers: [],
+					seed: result.seed
+				};
+			}
+
+			// 2. Persist Layers to R2
+			const timestamp = Date.now();
+			const generationId = crypto.randomUUID();
+			
+			const persistedLayers = await Promise.all(
+				result.layers.map(async (layer: any, index: number) => {
+					try {
+						// Download from ephemeral URL
+						const response = await fetch(layer.url);
+						const arrayBuffer = await response.arrayBuffer();
+						const buffer = Buffer.from(arrayBuffer);
+
+						// Upload to R2
+						let key: string;
+						if (templateId) {
+							key = getDecomposedLayerPath(templateId, `${timestamp}_${generationId}`, index);
+						} else {
+							// Fallback if no templateId provided (e.g. standalone tool)
+							key = `decompose/${user?.id}/${timestamp}_${generationId}/layer_${index}.png`;
+						}
+						
+						const r2Url = await uploadToR2(key, buffer, 'image/png');
+
+						return {
+							...layer,
+							imageUrl: r2Url, // Normalize to imageUrl for frontend consistency
+                            url: r2Url
+						};
+					} catch (uploadErr) {
+						console.error(`[decompose.remote] Failed to persist layer ${index}:`, uploadErr);
+						return layer;
+					}
+				})
+			);
+
+			// 3. Save to Database History
+			if (org_id && user?.id) {
+				try {
+					const creditsUsed = 0; 
+					await db.insert(schema.aiGenerations).values({
+						orgId: org_id,
+						userId: user.id,
+						provider: 'fal-ai-decompose',
+						model: 'Qwen-Image-Layered',
+						creditsUsed: creditsUsed, 
+						prompt: prompt || 'Decompose image',
+						resultUrl: imageUrl,
+						metadata: {
+							layers: persistedLayers,
+							seed: result.seed,
+							input_image: imageUrl,
+							template_id: templateId // Store in metadata at minimum
+						}
+					});
+				} catch (dbErr) {
+					console.error('[decompose.remote] Failed to save generation history:', dbErr);
+				}
+			}
+
 			console.log(
-				'[decompose.remote] decomposeWithFal result:',
-				result.success,
-				result.layers?.length ?? 0,
+				'[decompose.remote] decomposeWithFal result persisted:',
+				true,
+				persistedLayers.length,
 				'layers'
 			);
-			return result;
+
+			return {
+				...result,
+				layers: persistedLayers
+			};
+
 		} catch (err) {
 			console.error('[decompose.remote] decomposeWithFal error:', err);
 			throw err;
 		}
 	}
 );
+
+/**
+ * Get decomposition history for the current user/org
+ */
+export const getDecomposeHistory = query(async () => {
+    const { user, org_id } = await requireAdmin();
+    
+    if (!org_id) return [];
+
+    try {
+        const history = await db.query.aiGenerations.findMany({
+            where: and(
+                eq(schema.aiGenerations.orgId, org_id),
+                eq(schema.aiGenerations.provider, 'fal-ai-decompose')
+            ),
+            orderBy: [desc(schema.aiGenerations.createdAt)],
+            limit: 20
+        });
+
+        return {
+			success: true,
+			history: history.map(h => ({
+				id: h.id,
+				createdAt: h.createdAt,
+				inputImageUrl: (h.metadata as any)?.input_image || h.resultUrl,
+				layers: (h.metadata as any)?.layers || [],
+				creditsUsed: h.creditsUsed
+			}))
+		};
+    } catch (err) {
+        console.error('[decompose.remote] Failed to fetch history:', err);
+        return { success: false, history: [], error: 'Failed to fetch history' };
+    }
+});
 
 /**
  * Save decomposed layers as template elements.

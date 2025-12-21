@@ -7,10 +7,12 @@ import { error } from '@sveltejs/kit';
 import { getRequestEvent } from '$app/server';
 import type { TemplateElementInput } from '$lib/schemas/template-element.schema';
 
+import { checkAdmin } from '$lib/utils/adminPermissions';
+
 // Helper to check for admin access
 async function requireAdmin() {
     const { locals } = getRequestEvent();
-    if (!locals.user || !['super_admin', 'org_admin', 'id_gen_admin'].includes(locals.user.role as string)) {
+    if (!checkAdmin(locals)) {
         throw error(403, 'Admin access required');
     }
 }

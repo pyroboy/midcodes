@@ -71,5 +71,6 @@ export {
 export {
 	checkDecomposeAvailable,
 	decomposeImage,
-	saveLayers
+	saveLayers,
+    getDecomposeHistory
 } from './decompose.remote';

@@ -4,17 +4,17 @@ import { getUsersData } from '$lib/remote/admin.remote';
 import { db } from '$lib/server/db';
 import * as schema from '$lib/server/schema';
 import { eq, desc, and, sql } from 'drizzle-orm';
+import { checkSuperAdmin } from '$lib/utils/adminPermissions';
 
-// Use a shared permission utility once refactored, but for now local check
+// Use a shared permission utility
 async function requireSuperAdminPermissions() {
 	const { locals } = getRequestEvent();
-	const user = locals.user;
-
-	if (!user || user.role !== 'super_admin') {
+	
+	if (!checkSuperAdmin(locals)) {
 		throw error(403, 'Super admin privileges required.');
 	}
 
-	return { user, org_id: locals.org_id };
+	return { user: locals.user, org_id: locals.org_id };
 }
 
 export const getBillingSettings = query(async (): Promise<any> => {

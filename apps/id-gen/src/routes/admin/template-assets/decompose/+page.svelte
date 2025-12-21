@@ -1,11 +1,14 @@
+```html
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { decomposeImage, saveLayers } from '$lib/remote/index.remote';
+	import { decomposeImage, saveLayers, getDecomposeHistory } from '$lib/remote/index.remote';
 	import { goto } from '$app/navigation';
 	import { toast } from 'svelte-sonner';
-	import { Layers, Wand2, Save, ArrowLeft, Loader2, Eye, EyeOff, ImageIcon } from 'lucide-svelte';
+	import { Layers, Wand2, Save, ArrowLeft, Loader2, Eye, EyeOff, ImageIcon, History, Clock } from 'lucide-svelte';
 	import { Button } from '$lib/components/ui/button';
 	import type { DecomposedLayer, LayerSelection } from '$lib/schemas/decompose.schema';
+	import { onMount } from 'svelte';
+	import { slide } from 'svelte/transition';
 
 	let { data }: { data: PageData } = $props();
 
@@ -32,6 +35,92 @@
 	// Layer selections for saving
 	let layerSelections = $state<Map<string, LayerSelection>>(new Map());
 
+	// History State
+	interface HistoryItem {
+		id: string;
+		createdAt: Date;
+		inputImageUrl: string;
+		layers: any[]; // Ideally typed better but effectively DecomposedLayer-like
+		creditsUsed: number;
+	}
+
+	let history = $state<HistoryItem[]>([]);
+	let isLoadingHistory = $state(false);
+	let showHistory = $state(false);
+
+	onMount(() => {
+		loadHistory();
+	});
+
+	async function loadHistory() {
+		try {
+			isLoadingHistory = true;
+			const result = await getDecomposeHistory();
+			if (result.success && result.history) {
+				history = result.history as HistoryItem[];
+			} else {
+				toast.error(result.error || 'Failed to load history');
+			}
+		} catch (err) {
+			console.error('Failed to load history:', err);
+			toast.error('Failed to load history');
+		} finally {
+			isLoadingHistory = false;
+		}
+	}
+
+	function loadFromHistory(item: HistoryItem) {
+		if (!item.layers || item.layers.length === 0) {
+			toast.error('No layers found in this history item.');
+			return;
+		}
+
+		// Determine which side this history item belongs to
+		// Assuming history items are for the current asset's front image for simplicity
+		const targetSide = activeSide; 
+
+		const layers: DecomposedLayer[] = item.layers.map((layer: any, index: number) => ({
+			id: crypto.randomUUID(),
+			name: layer.name || `Layer ${(layer.zIndex || index) + 1}`,
+			imageUrl: layer.imageUrl,
+			zIndex: layer.zIndex || index,
+			suggestedType: layer.suggestedType || 'unknown',
+			side: targetSide,
+			bounds: layer.bounds || { x: 0, y: 0, width: layer.width || 100, height: layer.height || 100 },
+			confidence: layer.confidence || 1
+		}));
+
+		// Clear existing selections for the target side
+		if (targetSide === 'front') {
+			frontLayers.forEach(layer => layerSelections.delete(layer.id));
+			frontLayers = layers;
+		} else {
+			backLayers.forEach(layer => layerSelections.delete(layer.id));
+			backLayers = layers;
+		}
+
+		// Initialize layer selections for the loaded layers
+		layers.forEach((layer) => {
+			const type = layer.suggestedType;
+			// Safe cast to valid element type
+			let elementType: 'image' | 'signature' | 'text' | 'qr' | 'photo' = 'image';
+			if (type === 'signature' || type === 'text' || type === 'qr' || type === 'photo') {
+				elementType = type;
+			}
+			
+			layerSelections.set(layer.id, {
+				layerId: layer.id,
+				included: true,
+				elementType,
+				variableName: `layer_${layer.zIndex + 1}`,
+				bounds: layer.bounds || { x: 0, y: 0, width: 100, height: 100 },
+				layerImageUrl: layer.imageUrl
+			});
+		});
+
+		toast.success('Loaded layers from history');
+	}
+
 	async function handleDecompose() {
 		if (!currentImageUrl) {
 			toast.error('No image available for this side');
@@ -39,15 +128,24 @@
 		}
 
 		isDecomposing = true;
+		currentLayers = [];
+		// Don't clear selections immediately, wait for result? 
+		// Actually typical flow is new decomposition replaces old state.
+		// layerSelections.clear(); 
+		selectedLayerId = null;
+
 		try {
 			const result = await decomposeImage({
 				imageUrl: currentImageUrl,
-				numLayers
+				numLayers,
+				// prompt: prompt || undefined
+				seed: Math.floor(Math.random() * 1000000),
+				templateId: data.asset?.templateId ?? undefined
 			});
 
-			if (result.success) {
+			if (result.success && result.layers) {
 				// Convert to DecomposedLayer format
-				const layers: DecomposedLayer[] = result.layers.map((layer, index) => ({
+				const layers: DecomposedLayer[] = result.layers.map((layer: any, index: number) => ({
 					id: crypto.randomUUID(),
 					name: `Layer ${index + 1}`,
 					imageUrl: layer.url,
@@ -61,6 +159,15 @@
 						height: layer.height
 					}
 				}));
+
+				// Clear existing selections for the active side
+				if (activeSide === 'front') {
+					frontLayers.forEach(layer => layerSelections.delete(layer.id));
+					frontLayers = layers;
+				} else {
+					backLayers.forEach(layer => layerSelections.delete(layer.id));
+					backLayers = layers;
+				}
 
 				// Initialize layer selections
 				layers.forEach((layer) => {
@@ -249,30 +356,38 @@
 				</div>
 
 				<div class="relative aspect-[1.6/1] bg-muted/50 flex items-center justify-center">
-					{#if currentImageUrl}
+					{#if currentLayers.length > 0}
+						<!-- Render Decomposed Layers -->
+						<div class="relative w-full h-full">
+							{#each currentLayers as layer (layer.id)}
+								{@const selection = layerSelections.get(layer.id)}
+								<img
+									src={layer.imageUrl}
+									alt={layer.name}
+									class="absolute inset-0 w-full h-full object-contain transition-opacity duration-200"
+									style="z-index: {layer.zIndex}; opacity: {selection?.included ? 1 : 0};"
+								/>
+							{/each}
+
+							<!-- Selection Overlay (High Z-Index) -->
+							<div class="absolute inset-0 pointer-events-none" style="z-index: 9999;">
+								{#each currentLayers as layer (layer.id)}
+									<div
+										class="absolute inset-0 border-2 transition-opacity {selectedLayerId ===
+										layer.id
+											? 'border-primary opacity-100'
+											: 'border-transparent opacity-0'}"
+									></div>
+								{/each}
+							</div>
+						</div>
+					{:else if currentImageUrl}
 						<img
 							src={currentImageUrl}
 							alt="{data.asset.name} - {activeSide}"
 							class="max-w-full max-h-full object-contain"
 						/>
 
-						<!-- Layer overlays when decomposed -->
-						{#if currentLayers.length > 0}
-							<div class="absolute inset-0 pointer-events-none">
-								{#each currentLayers as layer, index (layer.id)}
-									{@const selection = layerSelections.get(layer.id)}
-									{#if selection?.included}
-										<div
-											class="absolute inset-0 border-2 transition-opacity {selectedLayerId ===
-											layer.id
-												? 'border-primary opacity-100'
-												: 'border-transparent opacity-0'}"
-											style="mix-blend-mode: multiply;"
-										></div>
-									{/if}
-								{/each}
-							</div>
-						{/if}
 					{:else}
 						<div class="text-center text-muted-foreground">
 							<ImageIcon class="h-12 w-12 mx-auto mb-2 opacity-30" />

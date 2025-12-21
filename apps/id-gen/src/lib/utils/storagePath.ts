@@ -68,3 +68,16 @@ export function getGlobalAssetPath(category: 'icons' | 'fonts', filename: string
 export function getOrgBrandingPath(orgId: string, filename: string): string {
 	return `orgs/${orgId}/branding/${filename}`;
 }
+
+/**
+ * Generates path for decomposed layers
+ * Path: templates/[templateId]/decompose/[generationId]/layer_[index].png
+ */
+export function getDecomposedLayerPath(
+	templateId: string,
+	generationId: string,
+	layerIndex: number,
+	extension: string = 'png'
+): string {
+	return `templates/${templateId}/decompose/${generationId}/layer_${layerIndex}.${extension}`;
+}
