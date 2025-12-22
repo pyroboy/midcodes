@@ -5,7 +5,15 @@
 	import FontSettings from './FontSettings.svelte';
 	import * as Select from '$lib/components/ui/select';
 	import { Input } from '$lib/components/ui/input';
-	import { ChevronDown, ChevronUp, Move, Scaling, Image, Settings } from '@lucide/svelte';
+	import {
+		ChevronDown,
+		ChevronUp,
+		ArrowUp,
+		ArrowDown,
+		Scaling,
+		Image,
+		Settings
+	} from '@lucide/svelte';
 	import { slide } from 'svelte/transition';
 	import {
 		computeVisibleRectInImage,
@@ -14,6 +22,8 @@
 	} from '$lib/utils/backgroundGeometry';
 	import type { Dims } from '$lib/utils/backgroundGeometry';
 	import BackgroundThumbnail from './BackgroundThumbnail.svelte';
+	import OrgAssetPickerModal from './OrgAssetPickerModal.svelte';
+	import { uploadOrgGraphic } from '$lib/remote/graphic.remote';
 
 	let {
 		elements,
@@ -89,6 +99,104 @@
 		onUpdateElements(updatedElements, side);
 	}
 
+	// Z-order controls: array order = render order (first = bottom/back, last = top/front)
+	function moveElementUp(index: number) {
+		// Move toward back (earlier in array = rendered first = behind)
+		if (index === 0) return;
+		const updated = [...elements];
+		[updated[index - 1], updated[index]] = [updated[index], updated[index - 1]];
+		onUpdateElements(updated, side);
+	}
+
+	function moveElementDown(index: number) {
+		// Move toward front (later in array = rendered last = on top)
+		if (index >= elements.length - 1) return;
+		const updated = [...elements];
+		[updated[index], updated[index + 1]] = [updated[index + 1], updated[index]];
+		onUpdateElements(updated, side);
+	}
+
+	// Graphic element: file upload and asset picker state
+	let assetPickerOpen = $state(false);
+	let assetPickerTargetIndex = $state<number | null>(null);
+	let uploadingGraphic = $state(false);
+
+	async function handleGraphicFileUpload(index: number, event: Event) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+
+		// Validate file type
+		const allowedTypes = ['image/png', 'image/webp', 'image/svg+xml'];
+		if (!allowedTypes.includes(file.type)) {
+			alert('Only PNG, WebP, and SVG files are allowed');
+			return;
+		}
+
+		// Validate file size (5MB max)
+		if (file.size > 5 * 1024 * 1024) {
+			alert('File size must be under 5MB');
+			return;
+		}
+
+		uploadingGraphic = true;
+
+		try {
+			// Convert file to base64
+			const base64 = await fileToBase64(file);
+
+			// Upload to R2
+			const result = await uploadOrgGraphic({
+				filename: file.name,
+				contentType: file.type as 'image/png' | 'image/webp' | 'image/svg+xml',
+				base64Data: base64
+			});
+
+			if (result.success && result.url) {
+				updateElementAtIndex(index, { src: result.url });
+			} else {
+				alert(result.error || 'Failed to upload graphic');
+			}
+		} catch (err) {
+			console.error('Graphic upload error:', err);
+			alert('Failed to upload graphic');
+		} finally {
+			uploadingGraphic = false;
+			input.value = '';
+		}
+	}
+
+	function fileToBase64(file: File): Promise<string> {
+		return new Promise((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = () => {
+				const result = reader.result as string;
+				const base64 = result.split(',')[1];
+				resolve(base64);
+			};
+			reader.onerror = reject;
+			reader.readAsDataURL(file);
+		});
+	}
+
+	function openAssetPicker(index: number) {
+		assetPickerTargetIndex = index;
+		assetPickerOpen = true;
+	}
+
+	function handleAssetSelect(url: string) {
+		if (assetPickerTargetIndex !== null) {
+			updateElementAtIndex(assetPickerTargetIndex, { src: url });
+		}
+		assetPickerOpen = false;
+		assetPickerTargetIndex = null;
+	}
+
+	function closeAssetPicker() {
+		assetPickerOpen = false;
+		assetPickerTargetIndex = null;
+	}
+
 	function addElement(type: 'text' | 'photo' | 'signature' | 'selection' | 'graphic') {
 		const newElement: TemplateElement = {
 			id: `new_${type}_${Date.now()}`,
@@ -117,7 +225,9 @@
 						}
 					: type === 'graphic'
 						? {
-								content: '', // URL of the static image
+								src: '', // URL of the static graphic
+								fit: 'contain' as const,
+								maintainAspectRatio: true,
 								width: 200,
 								height: 200
 							}
@@ -294,6 +404,25 @@
 						{element.variableName}
 					</span>
 				</div>
+				<!-- Z-order controls -->
+				<div class="z-order-controls">
+					<button
+						class="z-btn"
+						onclick={stopPropagation(() => moveElementUp(i))}
+						disabled={i === 0}
+						title="Move back (behind other elements)"
+					>
+						<ArrowUp size={12} />
+					</button>
+					<button
+						class="z-btn"
+						onclick={stopPropagation(() => moveElementDown(i))}
+						disabled={i === elements.length - 1}
+						title="Move forward (in front of other elements)"
+					>
+						<ArrowDown size={12} />
+					</button>
+				</div>
 				<button class="remove-element" onclick={stopPropagation(() => removeElement(i))}>×</button>
 			</div>
 
@@ -355,18 +484,95 @@
 						<FontSettings {element} {onUpdateElements} {elements} {fontOptions} {side} />
 					{:else if element.type === 'graphic'}
 						<div class="input-group">
-							<label for="graphic-url-{i}">Image URL (Static Graphic)</label>
-							<div class="flex gap-2">
+							<label>Graphic Source</label>
+							<!-- File upload button -->
+							<div class="graphic-source-buttons">
+								<input
+									type="file"
+									id="graphic-file-{i}"
+									accept="image/png,image/webp,image/svg+xml"
+									class="hidden"
+									onchange={(e) => handleGraphicFileUpload(i, e)}
+									disabled={uploadingGraphic}
+								/>
+								<button
+									type="button"
+									class="graphic-btn"
+									onclick={() => document.getElementById(`graphic-file-${i}`)?.click()}
+									disabled={uploadingGraphic}
+								>
+									<Image size={14} />
+									{uploadingGraphic ? 'Uploading...' : 'Upload File'}
+								</button>
+								<button
+									type="button"
+									class="graphic-btn"
+									onclick={() => openAssetPicker(i)}
+									disabled={uploadingGraphic}
+								>
+									<Settings size={14} />
+									Choose from Assets
+								</button>
+							</div>
+							<!-- URL input (advanced) -->
+							<details class="mt-2">
+								<summary class="text-xs text-muted-foreground cursor-pointer">Or enter URL manually</summary>
 								<Input
 									id="graphic-url-{i}"
-									value={element.content}
+									value={element.src || ''}
 									placeholder="https://..."
-									oninput={(e) => handleContentChange(i, e.currentTarget.value)}
+									class="mt-1"
+									oninput={(e) => updateElementAtIndex(i, { src: e.currentTarget.value })}
 								/>
-							</div>
-							<p class="text-xs text-muted-foreground mt-1">
-								Enter the URL of the static graphic to use as an overlay.
-							</p>
+							</details>
+							<!-- Preview -->
+							{#if element.src}
+								<div class="graphic-preview mt-2">
+									<img
+										src={element.src}
+										alt="Graphic preview"
+										class="max-w-full max-h-20 rounded border border-border object-contain"
+									/>
+									<button
+										type="button"
+										class="remove-graphic-btn"
+										onclick={() => updateElementAtIndex(i, { src: '' })}
+									>
+										Remove
+									</button>
+								</div>
+							{/if}
+						</div>
+						<div class="input-group">
+							<label for="fit-mode-{i}">Fit Mode</label>
+							<Select.Root
+								name="fit-mode-{i}"
+								type="single"
+								value={element.fit || 'contain'}
+								onValueChange={(value) =>
+									updateElementAtIndex(i, { fit: value as 'cover' | 'contain' | 'fill' | 'none' })}
+							>
+								<Select.Trigger id="fit-mode-{i}">
+									{element.fit || 'contain'}
+								</Select.Trigger>
+								<Select.Content>
+									<Select.Item value="contain">Contain (fit inside, centered)</Select.Item>
+									<Select.Item value="cover">Cover (fill box, clip overflow)</Select.Item>
+									<Select.Item value="fill">Fill (stretch to fit)</Select.Item>
+									<Select.Item value="none">None (original size, centered)</Select.Item>
+								</Select.Content>
+							</Select.Root>
+						</div>
+						<div class="input-group">
+							<label for="border-radius-{i}">Border Radius</label>
+							<Input
+								id="border-radius-{i}"
+								type="number"
+								min="0"
+								value={element.borderRadius || 0}
+								oninput={(e) =>
+									updateElementAtIndex(i, { borderRadius: parseInt(e.currentTarget.value) || 0 })}
+							/>
 						</div>
 					{/if}
 
@@ -391,6 +597,13 @@
 		<button onclick={() => addElement('graphic')}>Add Graphic</button>
 	</div>
 </div>
+
+<!-- Organization Asset Picker Modal -->
+<OrgAssetPickerModal
+	bind:open={assetPickerOpen}
+	onSelect={handleAssetSelect}
+	onClose={closeAssetPicker}
+/>
 
 <style>
 	.element-list {
@@ -490,6 +703,89 @@
 	.remove-element:hover {
 		color: #ff4444;
 		background-color: rgba(255, 68, 68, 0.1);
+	}
+
+	.z-order-controls {
+		display: flex;
+		gap: 2px;
+		margin-right: 0.5rem;
+	}
+
+	.z-btn {
+		background: none;
+		border: 1px solid var(--color-border);
+		color: var(--color-muted-foreground);
+		cursor: pointer;
+		padding: 2px;
+		line-height: 1;
+		border-radius: 0.25rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.z-btn:hover:not(:disabled) {
+		color: var(--color-foreground);
+		background-color: var(--color-accent);
+		border-color: var(--color-accent);
+	}
+
+	.z-btn:disabled {
+		opacity: 0.3;
+		cursor: not-allowed;
+	}
+
+	/* Graphic element styles */
+	.graphic-source-buttons {
+		display: flex;
+		gap: 0.5rem;
+		margin-bottom: 0.5rem;
+	}
+
+	.graphic-btn {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		padding: 0.375rem 0.75rem;
+		font-size: 0.75rem;
+		background-color: var(--color-secondary);
+		color: var(--color-foreground);
+		border: 1px solid var(--color-border);
+		border-radius: 0.375rem;
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.graphic-btn:hover {
+		background-color: var(--color-accent);
+		border-color: var(--color-accent);
+	}
+
+	.graphic-preview {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.5rem;
+		background-color: var(--color-muted);
+		border-radius: 0.375rem;
+	}
+
+	.remove-graphic-btn {
+		padding: 0.25rem 0.5rem;
+		font-size: 0.625rem;
+		background-color: transparent;
+		color: #ff4444;
+		border: 1px solid #ff4444;
+		border-radius: 0.25rem;
+		cursor: pointer;
+	}
+
+	.remove-graphic-btn:hover {
+		background-color: rgba(255, 68, 68, 0.1);
+	}
+
+	.hidden {
+		display: none;
 	}
 
 	.options-textarea {

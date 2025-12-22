@@ -1776,7 +1776,7 @@
 		>
 			<TemplateList
 				bind:templates
-				onSelect={(id) => goto(`/templates/edit/${id}`)}
+				onSelect={handleTemplateSelect}
 				onCreateNew={handleCreateNewTemplate}
 				savingTemplateId={isSaving ? savingTemplateId : null}
 				{sizePresets}

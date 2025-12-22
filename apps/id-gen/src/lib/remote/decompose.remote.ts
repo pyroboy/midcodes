@@ -1,10 +1,13 @@
 import { command, query } from '$app/server';
 import { error } from '@sveltejs/kit';
 import { getRequestEvent } from '$app/server';
-import { 
-	decomposeWithFal, isFalConfigured, 
-	submitDecomposeWithFal, submitUpscaleWithFal, submitRemoveElement,
-	checkFalStatus 
+import {
+	decomposeWithFal,
+	isFalConfigured,
+	submitDecomposeWithFal,
+	submitUpscaleWithFal,
+	submitRemoveElement,
+	checkFalStatus
 } from '$lib/server/fal-layers';
 import { editImageWithRunware } from '$lib/server/runware';
 import { db } from '$lib/server/db';
@@ -143,7 +146,9 @@ export type DecomposeResponse = {
  */
 export const decomposeImage = command(
 	'unchecked',
-	async (input: z.input<typeof decomposeImageSchema>): Promise<{ success: boolean; jobId?: string; error?: string }> => {
+	async (
+		input: z.input<typeof decomposeImageSchema>
+	): Promise<{ success: boolean; jobId?: string; error?: string }> => {
 		// Validate input
 		const parseResult = decomposeImageSchema.safeParse(input);
 		if (!parseResult.success) {
@@ -171,26 +176,33 @@ export const decomposeImage = command(
 		if (!org_id) return { success: false, error: 'Organization context missing' };
 
 		const decomposeCost = CREDIT_COSTS.AI_DECOMPOSE;
-		console.log('[decompose.remote] decomposeImage (Async) called for:', { imageUrl, numLayers, templateId });
+		console.log('[decompose.remote] decomposeImage (Async) called for:', {
+			imageUrl,
+			numLayers,
+			templateId
+		});
 
 		try {
 			// 1. Create a "pending" generation record
-			const [generation] = await db.insert(schema.aiGenerations).values({
-				orgId: org_id,
-				userId: user.id,
-				provider: 'fal-ai-decompose',
-				model: 'Qwen-Image-Layered',
-				creditsUsed: decomposeCost,
-				prompt: prompt || 'Decompose image',
-				status: 'pending',
-				metadata: {
-					input_image: imageUrl,
-					template_id: templateId,
-					side: side,
-					numLayers: numLayers,
-					endpoint: 'fal-ai/qwen-image-layered' // Store endpoint for polling
-				}
-			}).returning();
+			const [generation] = await db
+				.insert(schema.aiGenerations)
+				.values({
+					orgId: org_id,
+					userId: user.id,
+					provider: 'fal-ai-decompose',
+					model: 'Qwen-Image-Layered',
+					creditsUsed: decomposeCost,
+					prompt: prompt || 'Decompose image',
+					status: 'pending',
+					metadata: {
+						input_image: imageUrl,
+						template_id: templateId,
+						side: side,
+						numLayers: numLayers,
+						endpoint: 'fal-ai/qwen-image-layered' // Store endpoint for polling
+					}
+				})
+				.returning();
 
 			// 2. Submit to Fal queue
 			const { requestId } = await submitDecomposeWithFal({
@@ -205,7 +217,8 @@ export const decomposeImage = command(
 			});
 
 			// 3. Update record with external request ID
-			await db.update(schema.aiGenerations)
+			await db
+				.update(schema.aiGenerations)
 				.set({ externalRequestId: requestId })
 				.where(eq(schema.aiGenerations.id, generation.id));
 
@@ -215,7 +228,10 @@ export const decomposeImage = command(
 			};
 		} catch (err) {
 			console.error('[decompose.remote] decomposeImage error:', err);
-			return { success: false, error: err instanceof Error ? err.message : 'Failed to queue decomposition' };
+			return {
+				success: false,
+				error: err instanceof Error ? err.message : 'Failed to queue decomposition'
+			};
 		}
 	}
 );
@@ -225,7 +241,9 @@ export const decomposeImage = command(
  */
 export const upscaleImagePreview = command(
 	'unchecked',
-	async (input: z.input<typeof upscaleImageSchema>): Promise<{ success: boolean; jobId?: string; error?: string }> => {
+	async (
+		input: z.input<typeof upscaleImageSchema>
+	): Promise<{ success: boolean; jobId?: string; error?: string }> => {
 		const parseResult = upscaleImageSchema.safeParse(input);
 		if (!parseResult.success) {
 			return {
@@ -243,29 +261,33 @@ export const upscaleImagePreview = command(
 
 		try {
 			// 1. Create a "pending" generation record
-			const [generation] = await db.insert(schema.aiGenerations).values({
-				orgId: org_id,
-				userId: user.id,
-				provider: `fal-ai-upscale-${model}`,
-				model: model,
-				creditsUsed: CREDIT_COSTS.AI_UPSCALE,
-				prompt: `Upscale image (${model})`,
-				status: 'pending',
-				metadata: {
-					input_image: imageUrl,
-					template_id: templateId,
-					side: side,
-					type: 'upscale',
+			const [generation] = await db
+				.insert(schema.aiGenerations)
+				.values({
+					orgId: org_id,
+					userId: user.id,
+					provider: `fal-ai-upscale-${model}`,
 					model: model,
-					endpoint: getEndpointForModel(model)
-				}
-			}).returning();
+					creditsUsed: CREDIT_COSTS.AI_UPSCALE,
+					prompt: `Upscale image (${model})`,
+					status: 'pending',
+					metadata: {
+						input_image: imageUrl,
+						template_id: templateId,
+						side: side,
+						type: 'upscale',
+						model: model,
+						endpoint: getEndpointForModel(model)
+					}
+				})
+				.returning();
 
 			// 2. Submit to Fal queue
 			const { requestId } = await submitUpscaleWithFal(imageUrl, model as any);
 
 			// 3. Update record with external request ID
-			await db.update(schema.aiGenerations)
+			await db
+				.update(schema.aiGenerations)
 				.set({ externalRequestId: requestId })
 				.where(eq(schema.aiGenerations.id, generation.id));
 
@@ -275,19 +297,28 @@ export const upscaleImagePreview = command(
 			};
 		} catch (err) {
 			console.error('[decompose.remote] upscaleImagePreview error:', err);
-			return { success: false, error: err instanceof Error ? err.message : 'Failed to queue upscale' };
+			return {
+				success: false,
+				error: err instanceof Error ? err.message : 'Failed to queue upscale'
+			};
 		}
 	}
 );
 
 function getEndpointForModel(model: string): string {
-	switch(model) {
-		case 'seedvr': return 'fal-ai/seedvr/upscale/image';
-		case 'aurasr': return 'fal-ai/aura-sr';
-		case 'esrgan': return 'fal-ai/esrgan';
-		case 'recraft-creative': return 'fal-ai/recraft/upscale/creative';
-		case 'ccsr': return 'fal-ai/ccsr';
-		default: return 'fal-ai/ccsr';
+	switch (model) {
+		case 'seedvr':
+			return 'fal-ai/seedvr/upscale/image';
+		case 'aurasr':
+			return 'fal-ai/aura-sr';
+		case 'esrgan':
+			return 'fal-ai/esrgan';
+		case 'recraft-creative':
+			return 'fal-ai/recraft/upscale/creative';
+		case 'ccsr':
+			return 'fal-ai/ccsr';
+		default:
+			return 'fal-ai/ccsr';
 	}
 }
 
@@ -491,6 +522,14 @@ export const saveLayers = command(
 						placeholder: 'Signature',
 						borderWidth: 1
 					};
+				case 'graphic':
+					return {
+						...baseElement,
+						type: 'graphic' as const,
+						src: layer.layerImageUrl!, // URL of the static graphic
+						fit: 'contain' as const,
+						maintainAspectRatio: true
+					};
 				default:
 					return {
 						...baseElement,
@@ -686,7 +725,9 @@ export const getDecomposeHistoryWithStats = query(
  */
 export const removeElementFromLayer = command(
 	'unchecked',
-	async (input: z.input<typeof removeElementSchema>): Promise<{ success: boolean; jobId?: string; error?: string }> => {
+	async (
+		input: z.input<typeof removeElementSchema>
+	): Promise<{ success: boolean; jobId?: string; error?: string }> => {
 		const parseResult = removeElementSchema.safeParse(input);
 		if (!parseResult.success) {
 			return {
@@ -700,26 +741,32 @@ export const removeElementFromLayer = command(
 
 		if (!org_id) return { success: false, error: 'Organization context missing' };
 
-		console.log('[decompose.remote] removeElementFromLayer (Async) called with:', { imageUrl, prompt });
+		console.log('[decompose.remote] removeElementFromLayer (Async) called with:', {
+			imageUrl,
+			prompt
+		});
 
 		try {
 			// 1. Create a "pending" generation record
-			const [generation] = await db.insert(schema.aiGenerations).values({
-				orgId: org_id,
-				userId: user.id,
-				provider: 'fal-ai-remove',
-				model: 'qwen-image-edit',
-				creditsUsed: CREDIT_COSTS.AI_REMOVE,
-				prompt: prompt,
-				status: 'pending',
-				metadata: {
-					input_image: imageUrl,
-					template_id: templateId,
-					side: side,
-					type: 'remove-element',
-					endpoint: 'fal-ai/qwen-image-edit-2509-lora-gallery/remove-element'
-				}
-			}).returning();
+			const [generation] = await db
+				.insert(schema.aiGenerations)
+				.values({
+					orgId: org_id,
+					userId: user.id,
+					provider: 'fal-ai-remove',
+					model: 'qwen-image-edit',
+					creditsUsed: CREDIT_COSTS.AI_REMOVE,
+					prompt: prompt,
+					status: 'pending',
+					metadata: {
+						input_image: imageUrl,
+						template_id: templateId,
+						side: side,
+						type: 'remove-element',
+						endpoint: 'fal-ai/qwen-image-edit-2509-lora-gallery/remove-element'
+					}
+				})
+				.returning();
 
 			// 2. Submit to Fal queue
 			const { requestId } = await submitRemoveElement({
@@ -730,7 +777,8 @@ export const removeElementFromLayer = command(
 			});
 
 			// 3. Update record with external request ID
-			await db.update(schema.aiGenerations)
+			await db
+				.update(schema.aiGenerations)
 				.set({ externalRequestId: requestId })
 				.where(eq(schema.aiGenerations.id, generation.id));
 
@@ -740,25 +788,23 @@ export const removeElementFromLayer = command(
 			};
 		} catch (err) {
 			console.error('[decompose.remote] removeElementFromLayer error:', err);
-			return { success: false, error: err instanceof Error ? err.message : 'Failed to queue element removal' };
+			return {
+				success: false,
+				error: err instanceof Error ? err.message : 'Failed to queue element removal'
+			};
 		}
 	}
 );
 /**
  * Check the status of a scheduled AI job.
  */
-export const checkJobStatus = query(
-	z.object({ jobId: z.string() }),
-	async ({ jobId }) => {
+export const checkJobStatus = query(z.object({ jobId: z.string() }), async ({ jobId }) => {
 	const { user, org_id } = await requireAdmin();
 	if (!org_id) throw error(500, 'Org context missing');
 
 	try {
 		const generation = await db.query.aiGenerations.findFirst({
-			where: and(
-				eq(schema.aiGenerations.id, jobId),
-				eq(schema.aiGenerations.orgId, org_id)
-			)
+			where: and(eq(schema.aiGenerations.id, jobId), eq(schema.aiGenerations.orgId, org_id))
 		});
 
 		if (!generation) throw error(404, 'Job not found');
@@ -792,7 +838,7 @@ export const checkJobStatus = query(
 					const timestamp = Date.now();
 					const genId = crypto.randomUUID();
 					const templateId = (generation.metadata as any)?.template_id;
-					
+
 					const persistedLayers = await Promise.all(
 						images.map(async (layer: any, index: number) => {
 							const url = layer.url || layer.imageUrl;
@@ -800,16 +846,19 @@ export const checkJobStatus = query(
 
 							const response = await fetchWithTimeout(url, 30000);
 							const buffer = Buffer.from(await response.arrayBuffer());
-							let key = templateId 
+							let key = templateId
 								? getDecomposedLayerPath(templateId, `${timestamp}_${genId}`, index)
 								: `decompose/${user?.id}/${timestamp}_${genId}/layer_${index}.png`;
-							
+
 							const r2Url = await uploadToR2(key, buffer, 'image/png');
 							return { ...layer, url: r2Url, imageUrl: r2Url };
 						})
 					);
 					finalResult = { layers: persistedLayers };
-				} else if (generation.provider.includes('upscale') || generation.provider.includes('remove')) {
+				} else if (
+					generation.provider.includes('upscale') ||
+					generation.provider.includes('remove')
+				) {
 					// Persist single image
 					let tempUrl = '';
 					if (result.image && result.image.url) tempUrl = result.image.url;
@@ -822,13 +871,17 @@ export const checkJobStatus = query(
 						const type = generation.provider.includes('upscale') ? 'upscaled' : 'removed';
 						const key = `decompose/${type}/${user?.id}/${timestamp}_${crypto.randomUUID()}.png`;
 						const r2Url = await uploadToR2(key, buffer, 'image/png');
-						finalResult = { resultUrl: r2Url, originalUrl: (generation.metadata as any)?.input_image };
+						finalResult = {
+							resultUrl: r2Url,
+							originalUrl: (generation.metadata as any)?.input_image
+						};
 					}
 				}
 
 				// 2. Update DB
-				await db.update(schema.aiGenerations)
-					.set({ 
+				await db
+					.update(schema.aiGenerations)
+					.set({
 						status: 'completed',
 						resultUrl: finalResult.resultUrl || (generation.metadata as any)?.input_image,
 						metadata: { ...(generation.metadata as any), ...finalResult }
@@ -839,7 +892,8 @@ export const checkJobStatus = query(
 			}
 
 			if (falStatus.status === 'FAILED') {
-				await db.update(schema.aiGenerations)
+				await db
+					.update(schema.aiGenerations)
 					.set({ status: 'failed' })
 					.where(eq(schema.aiGenerations.id, jobId));
 				return { status: 'failed', error: falStatus.error || 'AI provider failed' };

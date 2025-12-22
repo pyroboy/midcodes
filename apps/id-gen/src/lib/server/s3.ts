@@ -1,4 +1,9 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import {
+	S3Client,
+	PutObjectCommand,
+	DeleteObjectCommand,
+	ListObjectsV2Command
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { env } from './env';
 
@@ -118,4 +123,34 @@ export async function getPresignedUrl(key: string, expiresIn = 3600): Promise<st
 	});
 
 	return getSignedUrl(r2, command, { expiresIn });
+}
+
+export interface R2Object {
+	key: string;
+	url: string;
+	size: number;
+	lastModified: Date;
+}
+
+export async function listFromR2(prefix: string, maxKeys = 100): Promise<R2Object[]> {
+	if (!r2) throw new Error('R2 client not configured');
+
+	const command = new ListObjectsV2Command({
+		Bucket: R2_BUCKET,
+		Prefix: prefix,
+		MaxKeys: maxKeys
+	});
+
+	console.log(`[R2] Listing objects with prefix: ${prefix}`);
+	const response = await r2.send(command);
+
+	const objects: R2Object[] = (response.Contents || []).map((obj) => ({
+		key: obj.Key || '',
+		url: getPublicUrl(obj.Key || ''),
+		size: obj.Size || 0,
+		lastModified: obj.LastModified || new Date()
+	}));
+
+	console.log(`[R2] Found ${objects.length} objects`);
+	return objects;
 }

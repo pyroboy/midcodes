@@ -50,7 +50,7 @@ export type DecomposedLayer = z.infer<typeof decomposedLayerSchema>;
 export const layerSelectionSchema = z.object({
 	layerId: z.string().uuid(),
 	included: z.boolean().default(true),
-	elementType: z.enum(['image', 'text', 'photo', 'qr', 'signature']),
+	elementType: z.enum(['image', 'text', 'photo', 'qr', 'signature', 'graphic']),
 	variableName: z
 		.string()
 		.regex(/^[a-zA-Z][a-zA-Z0-9_]*$/, 'Must start with letter, alphanumeric + underscore only'),
@@ -94,26 +94,26 @@ export type SaveLayersRequest = z.infer<typeof saveLayersRequestSchema>;
 
 // History Item Schema
 export interface HistoryItem {
-    id: string;
-    createdAt: Date | null;
-    inputImageUrl: string;
-    layers: any[];
-    creditsUsed: number | null;
-    side?: 'front' | 'back' | 'unknown';
-    provider?: string;
-    status?: 'pending' | 'processing' | 'completed' | 'failed';
-    resultUrl?: string; // For upscales
-    model?: string;
-    metadata?: any;
+	id: string;
+	createdAt: Date | null;
+	inputImageUrl: string;
+	layers: any[];
+	creditsUsed: number | null;
+	side?: 'front' | 'back' | 'unknown';
+	provider?: string;
+	status?: 'pending' | 'processing' | 'completed' | 'failed';
+	resultUrl?: string; // For upscales
+	model?: string;
+	metadata?: any;
 }
 
 // Map layer element type to template element type
 export function mapLayerTypeToElementType(
 	layerType: LayerElementType
-): 'image' | 'text' | 'photo' | 'qr' | 'signature' {
+): 'image' | 'text' | 'photo' | 'qr' | 'signature' | 'graphic' {
 	switch (layerType) {
 		case 'graphic':
-			return 'image';
+			return 'graphic'; // Map directly to graphic type (static overlays)
 		case 'text':
 			return 'text';
 		case 'photo':

@@ -1,7 +1,33 @@
 import { z } from 'zod';
 
 // Element type enumeration
-export const elementTypeSchema = z.enum(['text', 'image', 'qr', 'photo', 'signature', 'selection']);
+export const elementTypeSchema = z.enum([
+	'text',
+	'image',
+	'qr',
+	'photo',
+	'signature',
+	'selection',
+	'graphic'
+]);
+
+// Anchor position schema (9-point grid)
+export const anchorPositionSchema = z
+	.enum([
+		'top-left',
+		'top-center',
+		'top-right',
+		'center-left',
+		'center',
+		'center-right',
+		'bottom-left',
+		'bottom-center',
+		'bottom-right'
+	])
+	.default('center');
+
+// Fit mode schema for images
+export const fitModeSchema = z.enum(['cover', 'contain', 'fill', 'none']).default('contain');
 
 // Position and dimension schemas (always in pixels)
 export const positionSchema = z.number().min(0, 'Position cannot be negative');
@@ -132,6 +158,17 @@ export const signatureElementSchema = baseTemplateElementSchema.extend({
 	borderWidth: z.number().min(0).default(1)
 });
 
+// Graphic element specific schema (static images - logos, watermarks, decorative elements)
+// Note: Graphics are always centered within their bounding box (anchor removed for simplicity)
+export const graphicElementSchema = baseTemplateElementSchema.extend({
+	type: z.literal('graphic'),
+	src: z.string().url('Graphic source must be a valid URL').optional(),
+	alt: z.string().max(200, 'Alt text cannot exceed 200 characters').optional(),
+	fit: fitModeSchema, // 'cover' | 'contain' | 'fill' | 'none'
+	maintainAspectRatio: z.boolean().default(true),
+	borderRadius: z.number().min(0).optional()
+});
+
 // Selection element specific schema (dropdown/radio)
 export const selectionElementSchema = baseTemplateElementSchema.extend({
 	type: z.literal('selection'),
@@ -150,7 +187,8 @@ export const templateElementSchema = z.discriminatedUnion('type', [
 	qrElementSchema,
 	photoElementSchema,
 	signatureElementSchema,
-	selectionElementSchema
+	selectionElementSchema,
+	graphicElementSchema
 ]);
 
 // Element creation input (before ID assignment)
@@ -164,6 +202,7 @@ const qrInputElementSchema = baseInputElementSchema.extend(qrElementSchema.shape
 const photoInputElementSchema = baseInputElementSchema.extend(photoElementSchema.shape);
 const signatureInputElementSchema = baseInputElementSchema.extend(signatureElementSchema.shape);
 const selectionInputElementSchema = baseInputElementSchema.extend(selectionElementSchema.shape);
+const graphicInputElementSchema = baseInputElementSchema.extend(graphicElementSchema.shape);
 
 // Element creation input (before ID assignment)
 export const templateElementInputSchema = z.discriminatedUnion('type', [
@@ -172,7 +211,8 @@ export const templateElementInputSchema = z.discriminatedUnion('type', [
 	qrInputElementSchema,
 	photoInputElementSchema,
 	signatureInputElementSchema,
-	selectionInputElementSchema
+	selectionInputElementSchema,
+	graphicInputElementSchema
 ]);
 
 // Element update schema (partial updates allowed)
@@ -183,6 +223,7 @@ const partialQrElementSchema = qrElementSchema.partial();
 const partialPhotoElementSchema = photoElementSchema.partial();
 const partialSignatureElementSchema = signatureElementSchema.partial();
 const partialSelectionElementSchema = selectionElementSchema.partial();
+const partialGraphicElementSchema = graphicElementSchema.partial();
 
 export const templateElementUpdateSchema = z
 	.discriminatedUnion('type', [
@@ -191,7 +232,8 @@ export const templateElementUpdateSchema = z
 		partialQrElementSchema,
 		partialPhotoElementSchema,
 		partialSignatureElementSchema,
-		partialSelectionElementSchema
+		partialSelectionElementSchema,
+		partialGraphicElementSchema
 	])
 	.and(z.object({ id: z.string().uuid() }));
 
@@ -206,3 +248,6 @@ export type QrElement = z.infer<typeof qrElementSchema>;
 export type PhotoElement = z.infer<typeof photoElementSchema>;
 export type SignatureElement = z.infer<typeof signatureElementSchema>;
 export type SelectionElement = z.infer<typeof selectionElementSchema>;
+export type GraphicElement = z.infer<typeof graphicElementSchema>;
+export type AnchorPosition = z.infer<typeof anchorPositionSchema>;
+export type FitMode = z.infer<typeof fitModeSchema>;

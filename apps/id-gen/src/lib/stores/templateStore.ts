@@ -28,6 +28,12 @@ export interface TemplateElement {
 	lineHeight?: number | string;
 	defaultValue?: string;
 	placeholder?: string;
+	// Graphic element properties
+	src?: string; // URL for graphic elements
+	fit?: 'cover' | 'contain' | 'fill' | 'none';
+	alt?: string;
+	maintainAspectRatio?: boolean;
+	borderRadius?: number;
 }
 
 export interface TemplateData {

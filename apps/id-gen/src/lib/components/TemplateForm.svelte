@@ -1506,6 +1506,19 @@
 									<div class="placeholder signature-placeholder">
 										<span>Signature Area</span>
 									</div>
+								{:else if element.type === 'graphic'}
+									{#if element.src}
+										<img
+											src={element.src}
+											alt={element.alt || 'Graphic'}
+											class="graphic-image"
+											style="object-fit: {element.fit || 'contain'}; width: 100%; height: 100%;"
+										/>
+									{:else}
+										<div class="placeholder graphic-placeholder">
+											<span>Graphic</span>
+										</div>
+									{/if}
 								{/if}
 								<div class="resize-handles">
 									<div
@@ -1894,6 +1907,18 @@
 		font-size: 14px;
 		width: 100%;
 		height: 100%;
+	}
+
+	.graphic-image {
+		display: block;
+		width: 100%;
+		height: 100%;
+		pointer-events: none;
+	}
+
+	.graphic-placeholder {
+		background-color: rgba(139, 92, 246, 0.2);
+		border: 1px dashed rgba(139, 92, 246, 0.5);
 	}
 
 	.upload-button {

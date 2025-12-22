@@ -613,10 +613,11 @@
 			try {
 				if (element.type === 'text' || element.type === 'selection') {
 					renderTextElement(ctx, element, renderCoordSystem);
-				} else if (element.type === 'photo' || element.type === 'signature') {
+				} else if (element.type === 'photo' || element.type === 'signature' || element.type === 'graphic') {
 					await renderImageElement(ctx, element, renderCoordSystem, isOffScreen);
 				}
 			} catch (error) {
+				console.error(`[IdCanvas] Error rendering element ${element.variableName}:`, error);
 				dispatch('error', {
 					code: 'ELEMENT_RENDER_ERROR',
 					message: `Error rendering element ${element.variableName}`
@@ -743,6 +744,41 @@
 		}
 	}
 
+	// Calculate fit dimensions for graphic elements
+	function calculateFitDimensions(
+		imgWidth: number,
+		imgHeight: number,
+		boxWidth: number,
+		boxHeight: number,
+		fit: 'cover' | 'contain' | 'fill' | 'none' = 'contain'
+	): { width: number; height: number; x: number; y: number } {
+		switch (fit) {
+			case 'contain': {
+				const scale = Math.min(boxWidth / imgWidth, boxHeight / imgHeight);
+				const w = imgWidth * scale;
+				const h = imgHeight * scale;
+				return { width: w, height: h, x: (boxWidth - w) / 2, y: (boxHeight - h) / 2 };
+			}
+			case 'cover': {
+				const scale = Math.max(boxWidth / imgWidth, boxHeight / imgHeight);
+				const w = imgWidth * scale;
+				const h = imgHeight * scale;
+				return { width: w, height: h, x: (boxWidth - w) / 2, y: (boxHeight - h) / 2 };
+			}
+			case 'fill':
+				return { width: boxWidth, height: boxHeight, x: 0, y: 0 };
+			case 'none':
+			default:
+				// Center the image at original size
+				return {
+					width: imgWidth,
+					height: imgHeight,
+					x: (boxWidth - imgWidth) / 2,
+					y: (boxHeight - imgHeight) / 2
+				};
+		}
+	}
+
 	async function renderImageElement(
 		ctx: CanvasRenderingContext2D,
 		element: TemplateElement,
@@ -753,12 +789,12 @@
 			return;
 
 		try {
-		// Graphics use element.content as URL, photos/signatures use fileUploads
+			// Graphics use element.src, photos/signatures use fileUploads
 			let file = fileUploads[element.variableName];
 			let imageUrl: string | null = null;
 
-			if (element.type === 'graphic' && element.content) {
-				imageUrl = element.content;
+			if (element.type === 'graphic' && (element as any).src) {
+				imageUrl = (element as any).src;
 			} else if (file) {
 				// Use cached blob URL to avoid creating new ones on every render
 				imageUrl = getBlobUrlForFile(file);
@@ -840,26 +876,46 @@
 					imageUrl,
 					isDragging && !isOffScreen && !(element.type === 'signature')
 				);
-				const imgAspectRatio = image.width / image.height;
-				const elementAspectRatio = elementWidth / elementHeight;
 
-				let drawWidth = Math.round(elementWidth * (pos.scale || 1));
-				let drawHeight = Math.round(elementHeight * (pos.scale || 1));
+				let x: number, y: number, drawWidth: number, drawHeight: number;
 
-				if (imgAspectRatio > elementAspectRatio) {
-					drawHeight = Math.round(drawWidth / imgAspectRatio);
+				if (element.type === 'graphic') {
+					// Use fit mode calculation for graphics (no user positioning)
+					const fitMode = (element.fit as 'cover' | 'contain' | 'fill' | 'none') || 'contain';
+					const dims = calculateFitDimensions(
+						image.width,
+						image.height,
+						elementWidth,
+						elementHeight,
+						fitMode
+					);
+					drawWidth = Math.round(dims.width);
+					drawHeight = Math.round(dims.height);
+					x = Math.round(elementX + dims.x);
+					y = Math.round(elementY + dims.y);
 				} else {
-					drawWidth = Math.round(drawHeight * imgAspectRatio);
+					// Photo/signature: allow user positioning and scaling
+					const imgAspectRatio = image.width / image.height;
+					const elementAspectRatio = elementWidth / elementHeight;
+
+					drawWidth = Math.round(elementWidth * (pos.scale || 1));
+					drawHeight = Math.round(elementHeight * (pos.scale || 1));
+
+					if (imgAspectRatio > elementAspectRatio) {
+						drawHeight = Math.round(drawWidth / imgAspectRatio);
+					} else {
+						drawWidth = Math.round(drawHeight * imgAspectRatio);
+					}
+
+					// Apply position offset from imagePositions, scaled through coordinate system
+					const offsetPosition = renderCoordSystem.storageToPreview({
+						x: pos.x || 0,
+						y: pos.y || 0
+					});
+
+					x = Math.round(elementX + (elementWidth - drawWidth) / 2 + offsetPosition.x);
+					y = Math.round(elementY + (elementHeight - drawHeight) / 2 + offsetPosition.y);
 				}
-
-				// Apply position offset from imagePositions, scaled through coordinate system
-				const offsetPosition = renderCoordSystem.storageToPreview({
-					x: pos.x || 0,
-					y: pos.y || 0
-				});
-
-				const x = Math.round(elementX + (elementWidth - drawWidth) / 2 + offsetPosition.x);
-				const y = Math.round(elementY + (elementHeight - drawHeight) / 2 + offsetPosition.y);
 
 				ctx.drawImage(image, x, y, drawWidth, drawHeight);
 				ctx.globalCompositeOperation = 'source-over';
@@ -880,8 +936,6 @@
 					'IMAGE_RENDER_ERROR'
 				);
 			}
-
-			ctx.restore();
 
 			ctx.restore();
 		} catch (error: any) {
@@ -1017,11 +1071,15 @@
 		fullResolution;
 		isDragging;
 
-		// Track individual formData properties being used in text elements
+		// Track individual element properties for deep reactivity
 		elements.forEach((element) => {
 			if (element.type === 'text' || element.type === 'selection') {
 				// Access the specific formData property to trigger reactivity
 				formData[element.variableName];
+			}
+			// Track graphic src changes
+			if (element.type === 'graphic') {
+				(element as any).src;
 			}
 		});
 

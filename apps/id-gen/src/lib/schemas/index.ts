@@ -18,7 +18,10 @@ import type {
 	QrElement,
 	PhotoElement,
 	SignatureElement,
-	SelectionElement
+	SelectionElement,
+	GraphicElement,
+	AnchorPosition,
+	FitMode
 } from './template-element.schema';
 import type { TemplateDimensionSummary } from './display-conversion.schema';
 
@@ -61,6 +64,9 @@ export {
 	photoElementSchema,
 	signatureElementSchema,
 	selectionElementSchema,
+	graphicElementSchema,
+	anchorPositionSchema,
+	fitModeSchema,
 	templateElementSchema,
 	templateElementInputSchema,
 	templateElementUpdateSchema,
@@ -73,7 +79,10 @@ export {
 	type QrElement,
 	type PhotoElement,
 	type SignatureElement,
-	type SelectionElement
+	type SelectionElement,
+	type GraphicElement,
+	type AnchorPosition,
+	type FitMode
 } from './template-element.schema';
 
 // Template Update Schemas & Types
@@ -296,6 +305,7 @@ export type ElementsByType = {
 	photo: PhotoElement[];
 	signature: SignatureElement[];
 	selection: SelectionElement[];
+	graphic: GraphicElement[];
 };
 
 export type TemplateFormData = {
