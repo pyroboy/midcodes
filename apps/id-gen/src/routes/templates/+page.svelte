@@ -7,7 +7,7 @@
 	import TemplateList from '$lib/components/TemplateList.svelte';
 	import TemplateEdit from '$lib/components/TemplateEdit.svelte';
 	import CroppingConfirmationDialog from '$lib/components/CroppingConfirmationDialog.svelte';
-	import { getStorageUrl } from '$lib/utils/storage';
+	import { getStorageUrl, getProxiedUrl } from '$lib/utils/storage';
 	import { generateAndUploadVariants, type VariantUrls } from '$lib/utils/templateVariants';
 
 	// Upload image via server action to R2
@@ -1458,11 +1458,13 @@
 		currentTemplate = templateData;
 
 		// B. Setup Previews (Handle both URLs and Storage Paths)
-		// Helper to ensure we have a usable URL
+		// Helper to ensure we have a usable URL with CORS proxy for canvas loading
 		const resolveUrl = (pathOrUrl: string | null) => {
 			if (!pathOrUrl) return null;
-			if (pathOrUrl.startsWith('http') || pathOrUrl.startsWith('blob:')) return pathOrUrl;
-			return getStorageUrl(pathOrUrl, 'templates');
+			// Blob URLs are already local, no proxy needed
+			if (pathOrUrl.startsWith('blob:')) return pathOrUrl;
+			// For remote URLs and storage paths, use proxied URL to avoid CORS issues
+			return getProxiedUrl(pathOrUrl, 'templates');
 		};
 
 		frontPreview = resolveUrl(templateData.front_background);

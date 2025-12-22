@@ -22,13 +22,24 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 	}
 
 	try {
+		console.log('[image-proxy] Fetching:', imageUrl);
 		const response = await fetch(imageUrl);
 
 		if (!response.ok) {
-			throw error(response.status, 'Failed to fetch image');
+			console.error('[image-proxy] Upstream error:', response.status, response.statusText, 'for URL:', imageUrl);
+			// Return error with CORS headers to avoid ORB blocking
+			return new Response(`Failed to fetch image: ${response.status} ${response.statusText}`, {
+				status: response.status,
+				headers: {
+					'Content-Type': 'text/plain',
+					'Access-Control-Allow-Origin': '*',
+					'X-Error-URL': imageUrl
+				}
+			});
 		}
 
 		const contentType = response.headers.get('content-type') || 'application/octet-stream';
+		console.log('[image-proxy] Success:', imageUrl, 'Content-Type:', contentType);
 
 		// Copy relevant headers and ensure CORS is set
 		return new Response(response.body, {
@@ -40,15 +51,16 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 			}
 		});
 	} catch (err) {
-		console.error('Image proxy error:', err);
+		console.error('[image-proxy] Error:', err, 'for URL:', imageUrl);
 		const msg = err instanceof Error ? err.message : 'Unknown proxy error';
-		console.error('Image proxy error:', msg);
-		return new Response(
-			JSON.stringify({ error: msg, stack: err instanceof Error ? err.stack : undefined }),
-			{
-				status: 500,
-				headers: { 'Content-Type': 'application/json' }
+		// Return error with CORS headers to avoid ORB blocking
+		return new Response(msg, {
+			status: 500,
+			headers: {
+				'Content-Type': 'text/plain',
+				'Access-Control-Allow-Origin': '*',
+				'X-Error-URL': imageUrl
 			}
-		);
+		});
 	}
 };

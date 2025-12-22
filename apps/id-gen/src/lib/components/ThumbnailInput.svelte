@@ -88,6 +88,10 @@
 	});
 	let isDragging = $state(false);
 
+	// Cache the loaded image to avoid creating new Image objects on every update
+	let cachedImage: HTMLImageElement | null = $state(null);
+	let cachedImageUrl: string | null = $state(null);
+
 	const MAX_HEIGHT = 150;
 	const aspectRatio = $derived(width / height);
 	const thumbnailHeight = $derived(Math.min(MAX_HEIGHT, height));
@@ -175,6 +179,9 @@
 
 	onDestroy(() => {
 		stopCamera();
+		// Clear image cache
+		cachedImage = null;
+		cachedImageUrl = null;
 	});
 
 	function drawPlaceholder() {
@@ -647,11 +654,23 @@
 	}
 
 	function updateImage() {
-		if (fileUrl) {
-			const img = new Image();
-			img.onload = () => drawImage(img);
-			img.src = fileUrl;
+		if (!fileUrl) return;
+
+		// If we have a cached image for this URL, reuse it (no new network request)
+		if (cachedImage && cachedImageUrl === fileUrl) {
+			drawImage(cachedImage);
+			return;
 		}
+
+		// Only create a new Image if URL changed
+		const img = new Image();
+		img.onload = () => {
+			// Cache the loaded image
+			cachedImage = img;
+			cachedImageUrl = fileUrl;
+			drawImage(img);
+		};
+		img.src = fileUrl;
 	}
 
 	function handleStart(event: MouseEvent | TouchEvent, mode: 'move' | 'resize') {
@@ -714,10 +733,9 @@
 	}
 
 	run(() => {
+		// Use updateImage which has caching logic
 		if (fileUrl) {
-			const img = new Image();
-			img.onload = () => drawImage(img);
-			img.src = fileUrl;
+			updateImage();
 		}
 	});
 </script>

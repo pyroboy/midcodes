@@ -115,6 +115,8 @@
 
 	const imageCache = new Map<string, { image: HTMLImageElement; lastUsed: number }>();
 	const lowResImageCache = new Map<string, { image: HTMLImageElement; lastUsed: number }>();
+	// Cache File -> blobUrl to avoid creating new blob URLs on every render
+	const blobUrlCache = new WeakMap<File, string>();
 	let memoryCheckInterval: ReturnType<typeof setInterval>;
 
 	function cleanImageCache() {
@@ -151,6 +153,18 @@
 				imageCache.delete(oldestUrl);
 			}
 		}
+	}
+
+	/**
+	 * Get or create a blob URL for a File, using cache to avoid creating new URLs on every render
+	 */
+	function getBlobUrlForFile(file: File): string {
+		let blobUrl = blobUrlCache.get(file);
+		if (!blobUrl) {
+			blobUrl = URL.createObjectURL(file);
+			blobUrlCache.set(file, blobUrl);
+		}
+		return blobUrl;
 	}
 
 	function checkMemoryUsage() {
@@ -739,14 +753,15 @@
 			return;
 
 		try {
-			// Graphics use element.content as URL, photos/signatures use fileUploads
+		// Graphics use element.content as URL, photos/signatures use fileUploads
 			let file = fileUploads[element.variableName];
 			let imageUrl: string | null = null;
 
 			if (element.type === 'graphic' && element.content) {
 				imageUrl = element.content;
 			} else if (file) {
-				imageUrl = URL.createObjectURL(file);
+				// Use cached blob URL to avoid creating new ones on every render
+				imageUrl = getBlobUrlForFile(file);
 			}
 
 			if (!imageUrl) {
