@@ -9,14 +9,59 @@ export class HistoryManager {
 	expandedItems = $state<Set<string>>(new Set());
 	private pollingJobs = new Set<string>();
 
-	constructor(private layerManager: LayerManager, private templateId?: string) {}
+	constructor(
+		private layerManager: LayerManager, 
+		private getTemplateId: () => string | undefined
+	) {}
+
+    private get templateId() { return this.getTemplateId(); }
+
+	addOptimisticItem(provider: string, model: string, inputImageUrl: string, side: 'front' | 'back' | 'unknown') {
+		const tempId = 'temp-' + Math.random().toString(36).slice(2, 11);
+		const tempItem = {
+			id: tempId,
+			createdAt: new Date().toISOString(),
+			status: 'pending',
+			provider,
+			model,
+			inputImageUrl,
+			side,
+			layers: [],
+			creditsUsed: 0,
+			isOptimistic: true
+		};
+		// Prepend to history
+		this.history = [tempItem, ...this.history];
+		return tempId;
+	}
+
+	updateOptimisticId(tempId: string, realId: string) {
+		const index = this.history.findIndex(item => item.id === tempId);
+		if (index !== -1) {
+			console.log(`[HistoryManager] Reconciling ${tempId} -> ${realId}`);
+			// Keep isOptimistic = true so it continues to be tracked until it appears in load() results
+			this.history[index] = { ...this.history[index], id: realId, isOptimistic: true };
+			
+			// Start polling for the real ID
+			if (!this.pollingJobs.has(realId)) {
+				this.startPollingItem(realId);
+			}
+		}
+	}
 
 	async load() {
 		this.isLoading = true;
 		try {
 			const res = await getDecomposeHistoryWithStats({ templateId: this.templateId });
 			if (res.success) {
-				this.history = res.history;
+				// Keep optimistic items that aren't in the response yet
+				const optimisticItems = this.history.filter(h => h.isOptimistic);
+				const realIds = new Set(res.history.map(h => h.id));
+				
+				// Filter out any optimistic items that have now been matched by a real ID
+				const remainingOptimistic = optimisticItems.filter(o => !realIds.has(o.id));
+				
+				this.history = [...remainingOptimistic, ...res.history];
 				this.stats = res.stats;
 				
 				// Automatically poll for any pending items
@@ -33,7 +78,6 @@ export class HistoryManager {
 
 	private async startPollingItem(jobId: string) {
 		this.pollingJobs.add(jobId);
-		console.log(`[HistoryManager] Starting polling for job: ${jobId}`);
 
 		try {
 			let attempts = 0;
@@ -41,7 +85,6 @@ export class HistoryManager {
 				const res = await checkJobStatus({ jobId });
 				
 				if (res.status === 'completed') {
-					console.log(`[HistoryManager] Job ${jobId} completed!`);
 					// Update local state by re-fetching history or updating the item directly
 					await this.load(); // Refresh full history to get results
 					toast.success('A background task has completed');
@@ -49,7 +92,6 @@ export class HistoryManager {
 				}
 				
 				if (res.status === 'failed') {
-					console.error(`[HistoryManager] Job ${jobId} failed`);
 					await this.load();
 					break;
 				}

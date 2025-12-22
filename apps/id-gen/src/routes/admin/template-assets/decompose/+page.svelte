@@ -7,6 +7,7 @@
 	import { LayerManager } from '$lib/logic/LayerManager.svelte';
 	import { ImageProcessor } from '$lib/logic/ImageProcessor.svelte';
 	import { HistoryManager } from '$lib/logic/HistoryManager.svelte';
+	import { getProxiedUrl } from '$lib/utils/storage';
 
 	// Components
 	import DecomposeHeader from './components/DecomposeHeader.svelte';
@@ -33,13 +34,14 @@
 
 	// --- Initialize Logic ---
 	const layerMgr = new LayerManager();
-	const processor = new ImageProcessor(layerMgr, { 
-		id: data.asset.id, 
-		width: data.asset.widthPixels || 1050, 
-		height: data.asset.heightPixels || 600,
-		templateId: data.template?.id 
-	});
-	const historyMgr = new HistoryManager(layerMgr, data.template?.id);
+	const historyMgr = new HistoryManager(layerMgr, () => data.template?.id);
+    const assetConfig = $derived({
+        id: data.asset.id,
+        width: data.asset.widthPixels || 1050,
+        height: data.asset.heightPixels || 600,
+        templateId: data.template?.id
+    });
+	const processor = new ImageProcessor(layerMgr, historyMgr, () => assetConfig);
 
 	// --- Local UI State ---
 	let selectedLayerId = $state<string | null>(null);
@@ -70,7 +72,6 @@
     });
 	
     let actionModalLayerId = $state<string | null>(null);
-    let cropTargetLayerId = $state<string | null>(null);
 	let removePrompt = $state('');
     let previewData = $state({ url: '', title: '' });
 
@@ -95,17 +96,16 @@
 	// --- Handlers ---
 	function handleMenuAction(action: 'decompose' | 'upscale' | 'remove' | 'crop', layerId: string) {
 		actionModalLayerId = layerId;
+        selectedLayerId = layerId;
 		if (action === 'decompose') modals.decompose = true;
 		if (action === 'upscale') modals.upscale = true;
 		if (action === 'remove') { removePrompt = ''; modals.remove = true; }
         if (action === 'crop') {
-            const layer = layerId === 'original-file' 
+            const layerFound = layerId === 'original-file' 
                 ? { imageUrl: currentImageUrl || '', name: 'Original' }
                 : layerMgr.currentLayers.find(l => l.id === layerId);
             
-            if (layer && layer.imageUrl) {
-                cropTargetLayerId = layerId;
-                // We'll set the image url in the modal binding
+            if (layerFound && layerFound.imageUrl) {
                 modals.crop = true;
             }
         }
@@ -132,7 +132,6 @@
 			negativePrompt: settings.negativePrompt,
 			settings: { num_inference_steps: settings.steps, guidance_scale: settings.guidance }
 		});
-		historyMgr.load();
 	}
 
     async function onUpscaleSubmit() {
@@ -141,7 +140,6 @@
             const layer = layerMgr.currentLayers.find(l => l.id === actionModalLayerId);
             if (layer) {
                 await processor.upscaleLayer(layer, settings.upscaleModel, settings.removeWatermark);
-                historyMgr.load();
             } else if (actionModalLayerId === 'original-file') {
                  // Handle upgrading original file separately if needed, or create a new layer from it
                  const newLayer = { id: 'original-file', imageUrl: currentImageUrl || '' };
@@ -257,7 +255,7 @@
 					</div>
 				{/if}
 
-				<div class="flex-1 overflow-y-auto p-2 space-y-2" ondrop={handleDrop} ondragover={(e)=>e.preventDefault()}>
+				<div class="flex-1 overflow-y-auto p-2 space-y-2" ondrop={handleDrop} ondragover={(e)=>e.preventDefault()} role="region" aria-label="Layer list">
 					{#if layerMgr.showOriginalLayer}
 						<LayerCard 
 							layer={{ id: 'original-file', name: 'Original Background', imageUrl: currentImageUrl || '', zIndex: -1, side: layerMgr.activeSide } as any}
@@ -268,6 +266,10 @@
                             onToggleOriginalLayer={() => layerMgr.showOriginalLayer = !layerMgr.showOriginalLayer}
                             visible={layerMgr.showOriginalLayer}
                             onAction={(action) => handleMenuAction(action as any, 'original-file')}
+                            onPreviewImage={(url, title) => {
+                                previewData = { url, title };
+                                modals.preview = true;
+                            }}
 						/>
 					{/if}
 					
@@ -301,13 +303,13 @@
 				</div>
 
                 <!-- Action Bar (External) -->
-				<div class="p-3 border-t border-border grid grid-cols-4 gap-2 shrink-0">
+				<div class="p-3 border-t border-border grid grid-cols-5 gap-2 shrink-0">
 					<button 
 						class="flex flex-col items-center gap-1 p-2 rounded hover:bg-violet-500/10 disabled:opacity-50 transition-colors"
 						disabled={!selectedLayerId}
 						onclick={() => selectedLayerId && handleMenuAction('decompose', selectedLayerId)}
 					>
-						<Wand2 class="h-4 w-4 text-violet-600" />
+						<Sparkles class="h-4 w-4 text-violet-600" />
 						<span class="text-[10px]">Decompose</span>
 					</button>
 					<button 
@@ -317,6 +319,14 @@
 					>
 						<ZoomIn class="h-4 w-4 text-green-600" />
 						<span class="text-[10px]">Upscale</span>
+					</button>
+					<button 
+						class="flex flex-col items-center gap-1 p-2 rounded hover:bg-orange-500/10 disabled:opacity-50 transition-colors"
+						disabled={!selectedLayerId}
+						onclick={() => selectedLayerId && handleMenuAction('crop', selectedLayerId)}
+					>
+						<Crop class="h-4 w-4 text-orange-600" />
+						<span class="text-[10px]">Crop</span>
 					</button>
 					<button 
 						class="flex flex-col items-center gap-1 p-2 rounded hover:bg-red-500/10 disabled:opacity-50 transition-colors"
@@ -349,7 +359,7 @@
                         <div class="flex justify-center p-4"><Loader2 class="h-6 w-6 animate-spin text-muted-foreground" /></div>
                     {/if}
                     
-					{#each historyMgr.history as item}
+					{#each historyMgr.history as item (item.id)}
                         <HistoryItemCard
                             {item}
                             onLoadRequest={() => historyMgr.restoreSession(item)}
@@ -392,13 +402,15 @@
         isProcessing={processor.isProcessing}
 		onProceed={async () => {
 			modals.remove = false;
-			const layer = layerMgr.currentLayers.find(l => l.id === actionModalLayerId);
+			const layer = actionModalLayerId === 'original-file'
+				? { id: 'original-file', name: 'Original', imageUrl: currentImageUrl || '', side: layerMgr.activeSide }
+				: layerMgr.currentLayers.find(l => l.id === actionModalLayerId);
+			
 			if (layer) {
-				await processor.removeElement(layer, removePrompt);
-				historyMgr.load();
+				await processor.removeElement(layer as any, removePrompt);
 			} 
 		}}
-        actionLayer={layerMgr.currentLayers.find(l => l.id === actionModalLayerId)}
+        actionLayer={actionModalLayerId === 'original-file' ? { id: 'original-file', name: 'Original', imageUrl: currentImageUrl || '' } : layerMgr.currentLayers.find(l => l.id === actionModalLayerId)}
 	/>
     
     <ImagePreviewModal
@@ -411,14 +423,14 @@
     {#if modals.crop}
         <CropModal
             bind:isOpen={modals.crop}
-            imageUrl={cropTargetLayerId === 'original-file' ? currentImageUrl! : layerMgr.currentLayers.find(l => l.id === cropTargetLayerId)?.imageUrl!}
+            imageUrl={getProxiedUrl(actionModalLayerId === 'original-file' ? currentImageUrl! : layerMgr.currentLayers.find(l => l.id === actionModalLayerId)?.imageUrl!) || ''}
             targetWidth={data.asset.widthPixels || 1050}
             targetHeight={data.asset.heightPixels || 600}
             aspectRatio={(data.asset.widthPixels || 1050) / (data.asset.heightPixels || 600)}
             onCropComplete={async (croppedUrl) => {
                 modals.crop = false;
-                if (cropTargetLayerId) {
-                    await processor.handleCrop(cropTargetLayerId, croppedUrl, cropTargetLayerId === 'original-file' ? 'Original' : layerMgr.currentLayers.find(l => l.id === cropTargetLayerId)?.name || 'Layer');
+                if (actionModalLayerId) {
+                    await processor.handleCrop(actionModalLayerId, croppedUrl, actionModalLayerId === 'original-file' ? 'Original' : layerMgr.currentLayers.find(l => l.id === actionModalLayerId)?.name || 'Layer');
                 }
             }}
         />

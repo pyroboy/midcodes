@@ -140,9 +140,9 @@ export class LayerManager {
 	}
 
     addFromHistory(historyLayer: any) {
-        // Handle full history item (with layers) or single layer
-        if (historyLayer.layers) {
-            // It's a history item, shouldn't happen via drag of single layer but just in case
+        // Handle full history item (with layers)
+        if (historyLayer.layers && historyLayer.layers.length > 0) {
+            // It's a decompose history item with sub-layers
             historyLayer.layers.forEach((l: any, i: number) => {
                  const { layer, selection } = this.createLayerObj(
                     l.imageUrl,
@@ -154,10 +154,13 @@ export class LayerManager {
                 this.addLayer(layer, selection);
             });
         } else {
-            // Single layer
+            // Single layer or history item without layers
+            const imageUrl = historyLayer.imageUrl || historyLayer.resultUrl || historyLayer.inputImageUrl;
+            if (!imageUrl) return;
+
             const { layer, selection } = this.createLayerObj(
-                historyLayer.imageUrl,
-                historyLayer.name || 'History Item',
+                imageUrl,
+                historyLayer.name || historyLayer.model || 'AI Result',
                 historyLayer.bounds || { x: 0, y: 0, width: 100, height: 100 },
                 this.activeSide,
                 this.currentLayers.length

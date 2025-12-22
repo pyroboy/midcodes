@@ -135,7 +135,12 @@
 	>
 		<!-- Drag Handle / Merge Checkbox -->
         {#if mergeMode && !isOriginal}
-             <div class="flex items-center justify-center w-5" onclick={e => e.stopPropagation()}>
+             <div 
+                class="flex items-center justify-center w-5" 
+                onclick={e => e.stopPropagation()}
+                onkeydown={e => { if (e.key === ' ' || e.key === 'Enter') e.stopPropagation(); }}
+                role="presentation"
+            >
                 <input 
                     type="checkbox" 
                     checked={isSelectedForMerge} 
@@ -189,7 +194,7 @@
 			class="w-14 h-14 rounded-lg border border-border bg-muted overflow-hidden flex-shrink-0 flex items-center justify-center cursor-zoom-in group relative"
 			onclick={(e) => {
 				e.stopPropagation();
-				onPreviewImage?.(layer.imageUrl, 'layer.name');
+				onPreviewImage?.(layer.imageUrl, layer.name);
 			}}
 			title="Click to view full image"
 		>
@@ -236,7 +241,12 @@
 		</div>
 
 		<!-- Right Side Controls -->
-		<div class="flex items-center gap-1 flex-shrink-0" onclick={(e) => e.stopPropagation()}>
+		<div 
+            class="flex items-center gap-1 flex-shrink-0" 
+            onclick={(e) => e.stopPropagation()}
+            onkeydown={e => { if (e.key === ' ' || e.key === 'Enter') e.stopPropagation(); }}
+            role="presentation"
+        >
             <!-- Move Up/Down -->
             {#if !isOriginal && !mergeMode}
                  <div class="flex flex-col mr-1">
@@ -252,7 +262,7 @@
             <!-- Actions Menu -->
             {#if !mergeMode}
                 <DropdownMenu.Root>
-                    <DropdownMenu.Trigger asChild>
+                    <DropdownMenu.Trigger>
                         {#snippet child({ props })}
                             <Button {...props} variant="ghost" size="icon" class="h-8 w-8">
                                 <MoreVertical class="h-4 w-4" />

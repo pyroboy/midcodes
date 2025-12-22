@@ -34,6 +34,11 @@ export interface DecomposeResponse {
 		height: number;
 		zIndex: number; // 0 = bottom layer
 	}>;
+	images?: Array<{
+		url: string;
+		width: number;
+		height: number;
+	}>;
 	seed: number;
 	prompt?: string;
 	error?: string;

@@ -7,6 +7,7 @@ import { saveEnhancedImage } from '$lib/remote/enhance.remote';
 import { fileToImageData, processImageLSB, imageDataToBlob } from '$lib/utils/bye-synth-id';
 import { fileToDataUrl } from '$lib/utils/imageProcessing';
 import type { LayerManager } from './LayerManager.svelte';
+import type { HistoryManager } from './HistoryManager.svelte';
 import type { DecomposedLayer } from '$lib/schemas/decompose.schema';
 
 export class ImageProcessor {
@@ -15,8 +16,11 @@ export class ImageProcessor {
 
 	constructor(
 		private layerManager: LayerManager,
-		private assetData: { id: string; width: number; height: number; templateId?: string }
+		private historyManager: HistoryManager,
+		private getAssetData: () => { id: string; width: number; height: number; templateId?: string }
 	) {}
+
+    private get assetData() { return this.getAssetData(); }
 
 	/**
 	 * Polls for job completion
@@ -57,6 +61,14 @@ export class ImageProcessor {
 		this.isProcessing = true;
 		const toastId = toast.loading('Queuing decomposition task...');
 
+		// 1. Truly Optimistic Update (Immediate)
+		const tempId = this.historyManager.addOptimisticItem(
+			'fal-ai-decompose', 
+			'Qwen-Image-Layered', 
+			params.imageUrl, 
+			this.layerManager.activeSide
+		);
+
 		try {
 			const result = await decomposeImage({
 				imageUrl: params.imageUrl,
@@ -71,6 +83,10 @@ export class ImageProcessor {
 			if (!result.success || !result.jobId) {
 				throw new Error(result.error || 'Failed to queue decomposition');
 			}
+
+			// 2. Reconcile ID
+			this.historyManager.updateOptimisticId(tempId, result.jobId);
+			this.historyManager.load();
 
 			toast.loading('Processing decomposition in background...', { id: toastId });
 			
@@ -121,6 +137,14 @@ export class ImageProcessor {
 				targetUrl = await this.removeWatermarkLogic(targetUrl);
 			}
 
+			// 1. Truly Optimistic Update
+			const tempId = this.historyManager.addOptimisticItem(
+				`fal-ai-upscale-${model}`, 
+				model, 
+				layer.imageUrl, 
+				this.layerManager.activeSide
+			);
+
 			const result = await upscaleImagePreview({
 				imageUrl: targetUrl,
 				model: model as any,
@@ -132,20 +156,25 @@ export class ImageProcessor {
 				throw new Error(result.error || 'Failed to queue upscale');
 			}
 
+			// 2. Reconcile ID
+			this.historyManager.updateOptimisticId(tempId, result.jobId);
+			this.historyManager.load();
+
 			toast.loading('Processing upscale in background...', { id: toastId });
 
 			const pollResult = await this.pollJobStatus(result.jobId);
 
 			if (pollResult && pollResult.resultUrl) {
-				if (layer.id === 'original-file') {
-					toast.success('Upscale complete', { id: toastId });
-					return pollResult.resultUrl;
-				} else {
-					this.layerManager.updateSelection(layer.id, { layerImageUrl: pollResult.resultUrl });
-					const l = this.layerManager.currentLayers.find(x => x.id === layer.id);
-					if(l) l.imageUrl = pollResult.resultUrl;
-					toast.success('Layer upscaled', { id: toastId });
-				}
+				const { layer: newLayer, selection } = this.layerManager.createLayerObj(
+					pollResult.resultUrl,
+					`Upscaled: ${layer.id === 'original-file' ? 'Background' : ( (layer as any).name || 'Layer' )}`,
+					(layer as DecomposedLayer).bounds || { x: 0, y: 0, width: this.assetData.width, height: this.assetData.height },
+					this.layerManager.activeSide,
+					this.layerManager.currentLayers.length
+				);
+				this.layerManager.addLayer(newLayer, selection);
+				toast.success('Upscale complete and added to layers', { id: toastId });
+				return pollResult.resultUrl;
 			}
 		} catch (e: any) {
 			toast.error(e.message, { id: toastId });
@@ -157,22 +186,34 @@ export class ImageProcessor {
 
 	// --- 3. Remove Element ---
 	async removeElement(layer: DecomposedLayer, prompt: string) {
-		this.isProcessing = true;
 		this.processingLayerId = layer.id;
 		const toastId = toast.loading(`Queuing removal of "${prompt}"...`);
+
+		// 1. Truly Optimistic Update
+		const tempId = this.historyManager.addOptimisticItem(
+			'runware-remove-element', 
+			'Remover', 
+			layer.imageUrl, 
+			this.layerManager.activeSide
+		);
+
 		try {
 			const result = await removeElementFromLayer({
 				imageUrl: layer.imageUrl,
 				prompt,
 				imageWidth: this.assetData.width,
 				imageHeight: this.assetData.height,
-				side: layer.side,
+				side: (layer as any).side || this.layerManager.activeSide,
 				templateId: this.assetData.templateId || null
 			});
 
 			if (!result.success || !result.jobId) {
 				throw new Error(result.error || 'Failed to queue removal');
 			}
+
+			// 2. Reconcile ID
+			this.historyManager.updateOptimisticId(tempId, result.jobId);
+			this.historyManager.load();
 
 			toast.loading('Processing removal in background...', { id: toastId });
 
@@ -317,6 +358,16 @@ export class ImageProcessor {
             }
 
             const newImageUrl = uploadRes.url;
+            
+            // Optimistic Update
+            this.historyManager.addOptimisticItem(
+                'manual-edit', 
+                'Crop', 
+                newImageUrl, 
+                this.layerManager.activeSide
+            );
+            this.historyManager.load();
+
             const layerName = layerId === 'original-file' 
                     ? `Cropped Original` 
                     : `Cropped ${originalLayerName}`;

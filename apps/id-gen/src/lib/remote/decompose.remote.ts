@@ -782,13 +782,20 @@ export const checkJobStatus = query(
 
 				if (generation.provider === 'fal-ai-decompose') {
 					// Persist layers
+					const images = result.images || result.layers;
+					if (!images || !Array.isArray(images)) {
+						throw new Error('Decomposition result missing images/layers array');
+					}
 					const timestamp = Date.now();
 					const genId = crypto.randomUUID();
 					const templateId = (generation.metadata as any)?.template_id;
 					
 					const persistedLayers = await Promise.all(
-						result.layers.map(async (layer: any, index: number) => {
-							const response = await fetchWithTimeout(layer.url, 30000);
+						images.map(async (layer: any, index: number) => {
+							const url = layer.url || layer.imageUrl;
+							if (!url) throw new Error(`Layer ${index} missing URL`);
+
+							const response = await fetchWithTimeout(url, 30000);
 							const buffer = Buffer.from(await response.arrayBuffer());
 							let key = templateId 
 								? getDecomposedLayerPath(templateId, `${timestamp}_${genId}`, index)
