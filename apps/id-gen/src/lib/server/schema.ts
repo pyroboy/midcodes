@@ -29,6 +29,13 @@ export const templateSampleTypeEnum = pgEnum('template_sample_type', [
 	'other'
 ]);
 
+export const aiGenerationStatusEnum = pgEnum('ai_generation_status', [
+	'pending',
+	'processing',
+	'completed',
+	'failed'
+]);
+
 export const appRoleEnum = pgEnum('app_role', [
 	'super_admin',
 	'org_admin',
@@ -413,6 +420,8 @@ export const aiGenerations = pgTable('ai_generations', {
 	creditsUsed: integer('credits_used').notNull().default(0),
 	prompt: text('prompt'),
 	resultUrl: text('result_url'),
+	status: aiGenerationStatusEnum('status').notNull().default('completed'),
+	externalRequestId: text('external_request_id'),
 	metadata: jsonb('metadata').default({}),
 	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow()
 });

@@ -42,7 +42,7 @@ export const decomposedLayerSchema = z.object({
 	zIndex: z.number().int().min(0),
 	suggestedType: layerElementTypeSchema.default('unknown'),
 	side: z.enum(['front', 'back']).default('front'),
-	parentId: z.string().optional()
+	parentId: z.string().optional() // Make sure parentId is supported
 });
 export type DecomposedLayer = z.infer<typeof decomposedLayerSchema>;
 
@@ -91,6 +91,21 @@ export const saveLayersRequestSchema = z.object({
 	mode: z.enum(['replace', 'append']).default('replace')
 });
 export type SaveLayersRequest = z.infer<typeof saveLayersRequestSchema>;
+
+// History Item Schema
+export interface HistoryItem {
+    id: string;
+    createdAt: Date | null;
+    inputImageUrl: string;
+    layers: any[];
+    creditsUsed: number | null;
+    side?: 'front' | 'back' | 'unknown';
+    provider?: string;
+    status?: 'pending' | 'processing' | 'completed' | 'failed';
+    resultUrl?: string; // For upscales
+    model?: string;
+    metadata?: any;
+}
 
 // Map layer element type to template element type
 export function mapLayerTypeToElementType(

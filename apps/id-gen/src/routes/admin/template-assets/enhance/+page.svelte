@@ -17,7 +17,9 @@
 	let activeSide = $state<'front' | 'back'>('front');
 
 	// Source image for processing
+	// svelte-ignore state_referenced_locally
 	let frontSourceUrl = $state<string>(data.asset.frontImageUrl);
+	// svelte-ignore state_referenced_locally
 	let backSourceUrl = $state<string | null>(data.asset.backImageUrl);
 
 	// Current source based on active side
@@ -864,6 +866,7 @@
 			onclick={() => (imageModalOpen = false)}
 			role="dialog"
 			aria-modal="true"
+			tabindex="-1"
 		>
 			<div
 				class="relative max-w-7xl max-h-full w-full h-full flex items-center justify-center"
@@ -878,6 +881,7 @@
 				<button
 					class="absolute top-4 right-4 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
 					onclick={() => (imageModalOpen = false)}
+					aria-label="Close"
 				>
 					<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 						<path

@@ -210,6 +210,89 @@ export function isFalConfigured(): boolean {
 	return !!env.FAL_KEY;
 }
 
+/**
+ * Submit a decomposition task to the fal.ai queue.
+ * Returns a requestId immediately.
+ */
+export async function submitDecomposeWithFal(request: DecomposeRequest): Promise<{ requestId: string }> {
+	initFal();
+	const res = await fal.queue.submit('fal-ai/qwen-image-layered', {
+		input: {
+			image_url: request.imageUrl,
+			prompt: request.prompt,
+			negative_prompt: request.negative_prompt ?? "",
+			num_inference_steps: request.num_inference_steps ?? 28,
+			guidance_scale: request.guidance_scale ?? 5,
+			acceleration: request.acceleration ?? "regular",
+			num_layers: request.numLayers ?? 4,
+			output_format: 'png',
+			enable_safety_checker: true, 
+			seed: request.seed
+		}
+	});
+	return { requestId: res.request_id };
+}
+
+/**
+ * Submit an upscale task to the fal.ai queue.
+ */
+export async function submitUpscaleWithFal(
+	imageUrl: string, 
+	model: UpscaleModel = 'seedvr',
+	options?: {
+		upscaleFactor?: number;
+		denoise?: number | 'Low' | 'Medium' | 'High';
+	}
+): Promise<{ requestId: string }> {
+	initFal();
+	let endpoint = '';
+	let input: any = { image_url: imageUrl };
+
+	if (model === 'seedvr') {
+		endpoint = 'fal-ai/seedvr/upscale/image';
+		input = { ...input, upscale_mode: 'factor', upscale_factor: options?.upscaleFactor ?? 2, target_resolution: '1080p', noise_scale: 0.1, output_format: 'png' };
+	} else if (model === 'aurasr') {
+		endpoint = 'fal-ai/aura-sr';
+		input = { ...input, upscaling_factor: options?.upscaleFactor ?? 4 };
+	} else if (model === 'esrgan') {
+		endpoint = 'fal-ai/esrgan';
+		input = { ...input, face_enhance: true, denoise: options?.denoise ?? 3 };
+	} else if (model === 'recraft-creative') {
+		endpoint = 'fal-ai/recraft/upscale/creative';
+	} else if (model === 'ccsr') {
+		endpoint = 'fal-ai/ccsr';
+		input = { ...input, scale: 1.5, steps: 30, color_fix_type: "adain" };
+	}
+
+	const res = await fal.queue.submit(endpoint, { input });
+	return { requestId: res.request_id };
+}
+
+/**
+ * Check status of a fal.ai queue request.
+ */
+export async function checkFalStatus(endpoint: string, requestId: string): Promise<{ 
+    status: 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'IN_QUEUE';
+    result?: any;
+    error?: any;
+}> {
+	initFal();
+	// Use type casting for options to avoid requestId missing error if the lib requires it in the object
+	const status = await fal.queue.status(endpoint, { requestId, logs: false } as any);
+	
+	if (status.status === 'COMPLETED') {
+		const result = await fal.queue.result(endpoint, { requestId } as any);
+		return { status: 'COMPLETED', result: result.data };
+	}
+    
+    // Use type casting for comparison if the enum is too narrow
+    if ((status.status as string) === 'FAILED') {
+        return { status: 'FAILED', error: 'Fal.ai task failed' };
+    }
+
+	return { status: status.status as any };
+}
+
 export type UpscaleModel = 'seedvr' | 'aurasr' | 'esrgan' | 'recraft-creative' | 'ccsr';
 
 /**
@@ -348,6 +431,35 @@ export interface RemoveElementResponse {
 	resultUrl?: string;
 	seed?: number;
 	error?: string;
+}
+
+/**
+ * Submit a remove element task to the fal.ai queue.
+ */
+export async function submitRemoveElement(request: RemoveElementRequest): Promise<{ requestId: string }> {
+	initFal();
+	const imageSize = (request.imageWidth && request.imageHeight) ? {
+		width: request.imageWidth,
+		height: request.imageHeight
+	} : undefined;
+
+	const res = await fal.queue.submit('fal-ai/qwen-image-edit-2509-lora-gallery/remove-element', {
+		input: {
+			image_urls: [request.imageUrl],
+			prompt: request.prompt || 'Remove the specified element from the scene',
+			guidance_scale: request.guidanceScale ?? 1,
+			num_inference_steps: request.numInferenceSteps ?? 6,
+			acceleration: 'regular',
+			negative_prompt: ' ',
+			enable_safety_checker: true,
+			output_format: 'png',
+			num_images: 1,
+			lora_scale: 1,
+			...(imageSize && { image_size: imageSize }),
+			...(request.seed && { seed: request.seed })
+		}
+	});
+	return { requestId: res.request_id };
 }
 
 /**

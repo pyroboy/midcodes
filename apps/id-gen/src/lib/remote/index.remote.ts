@@ -77,5 +77,7 @@ export {
 	getDecomposeHistoryWithStats,
 	uploadProcessedImage,
 	removeElementFromLayer,
+	checkJobStatus,
+	saveHistoryItem,
 	type HistoryStats
 } from './decompose.remote';

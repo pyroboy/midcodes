@@ -13,7 +13,11 @@ export const CREDIT_COSTS = {
 	/** Cost for API usage per call */
 	API_CALL: 1,
 	/** Cost for AI image decomposition */
-	AI_DECOMPOSE: 2
+	AI_DECOMPOSE: 2,
+	/** Cost for AI image upscale */
+	AI_UPSCALE: 1,
+	/** Cost for AI element removal */
+	AI_REMOVE: 1
 } as const;
 
 export const FREE_TIER = {
@@ -46,7 +50,9 @@ export const USAGE_TYPES = {
 	TEMPLATE_CREATION: 'template_creation',
 	BULK_EXPORT: 'bulk_export',
 	API_USAGE: 'api_usage',
-	AI_DECOMPOSE: 'ai_decompose'
+	AI_DECOMPOSE: 'ai_decompose',
+	AI_UPSCALE: 'ai_upscale',
+	AI_REMOVE: 'ai_remove'
 } as const;
 
 export type UsageType = (typeof USAGE_TYPES)[keyof typeof USAGE_TYPES];
