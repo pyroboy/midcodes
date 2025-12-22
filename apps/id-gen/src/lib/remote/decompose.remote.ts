@@ -567,6 +567,9 @@ export const getDecomposeHistoryWithStats = query(
 			templateId?: string;
 			provider?: string;
 			resultUrl?: string;
+			status?: string;
+			model?: string;
+			metadata?: unknown;
 		}>;
 		stats: HistoryStats;
 		error?: string;

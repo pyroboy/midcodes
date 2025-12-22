@@ -1308,6 +1308,13 @@
 		// Wait a bit for the dimensions to be processed
 		await new Promise((resolve) => setTimeout(resolve, 100));
 
+		// Skip element creation for existing templates that have stored elements
+		// Only create default elements for brand new templates
+		if (currentTemplate?.id && data.selectedTemplate?.id === currentTemplate.id) {
+			console.log('🔧 Skipping element creation - editing existing template with ID:', currentTemplate.id);
+			return;
+		}
+
 		if (requiredPixelDimensions && frontElements.length === 0 && backElements.length === 0) {
 			console.log('🔧 Creating default template elements...');
 
@@ -1438,6 +1445,14 @@
 	function initializeEditor(templateData: DatabaseTemplate) {
 		console.log('🚀 Initializing Editor with:', templateData.name);
 
+		// Log background data received for debugging
+		console.log('🖼️ Template backgrounds:', {
+			front: templateData.front_background || 'MISSING',
+			back: templateData.back_background || 'MISSING',
+			hasFront: !!templateData.front_background,
+			hasBack: !!templateData.back_background
+		});
+
 		// A. Enable Edit Mode
 		isEditMode = true;
 		currentTemplate = templateData;
@@ -1452,6 +1467,14 @@
 
 		frontPreview = resolveUrl(templateData.front_background);
 		backPreview = resolveUrl(templateData.back_background);
+
+		// Warn user if backgrounds are missing
+		if (!frontPreview) {
+			toast.warning('Front background image is missing. Please upload one.');
+		}
+		if (!backPreview) {
+			toast.warning('Back background image is missing. Please upload one.');
+		}
 
 		// C. Sanitize Elements (CRITICAL for Bounding Boxes)
 		const sanitizeElement = (el: TemplateElement) => ({

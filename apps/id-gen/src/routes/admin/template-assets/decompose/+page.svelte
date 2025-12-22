@@ -80,6 +80,37 @@
 		historyMgr.load();
 		// Attempt session load
 		layerMgr.loadFromStorage(data.asset.id);
+		
+		// Set up callback to auto-add completed job results to layers
+		historyMgr.onJobComplete = (jobId: string, result: any, provider: string) => {
+			console.log(`[Page] Job ${jobId} completed, provider: ${provider}`, result);
+			
+			if (provider === 'fal-ai-decompose' && result?.layers) {
+				// Add decomposed layers
+				result.layers.forEach((l: any, i: number) => {
+					const { layer, selection } = layerMgr.createLayerObj(
+						l.url || l.imageUrl,
+						`Layer ${i + 1}`,
+						{ x: 0, y: 0, width: l.width || 100, height: l.height || 100 },
+						layerMgr.activeSide,
+						layerMgr.currentLayers.length
+					);
+					layerMgr.addLayer(layer, selection);
+				});
+				toast.success(`Added ${result.layers.length} decomposed layers`);
+			} else if ((provider.includes('upscale') || provider.includes('remove')) && result?.resultUrl) {
+				// Add single result image as layer
+				const { layer, selection } = layerMgr.createLayerObj(
+					result.resultUrl,
+					provider.includes('upscale') ? 'Upscaled' : 'Removed',
+					{ x: 0, y: 0, width: assetConfig.width, height: assetConfig.height },
+					layerMgr.activeSide,
+					layerMgr.currentLayers.length
+				);
+				layerMgr.addLayer(layer, selection);
+				toast.success('Result added to layers');
+			}
+		};
 	});
 
 	$effect(() => {
@@ -430,7 +461,13 @@
             onCropComplete={async (croppedUrl) => {
                 modals.crop = false;
                 if (actionModalLayerId) {
-                    await processor.handleCrop(actionModalLayerId, croppedUrl, actionModalLayerId === 'original-file' ? 'Original' : layerMgr.currentLayers.find(l => l.id === actionModalLayerId)?.name || 'Layer');
+                    const originalUrl = actionModalLayerId === 'original-file' 
+                        ? currentImageUrl 
+                        : layerMgr.currentLayers.find(l => l.id === actionModalLayerId)?.imageUrl;
+                    const layerName = actionModalLayerId === 'original-file' 
+                        ? 'Original' 
+                        : layerMgr.currentLayers.find(l => l.id === actionModalLayerId)?.name || 'Layer';
+                    await processor.handleCrop(actionModalLayerId, croppedUrl, layerName, originalUrl || '');
                 }
             }}
         />

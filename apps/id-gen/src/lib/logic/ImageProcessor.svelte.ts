@@ -1,7 +1,7 @@
 import { toast } from 'svelte-sonner';
 import { 
 	decomposeImage, upscaleImagePreview, removeElementFromLayer, 
-	uploadProcessedImage, checkJobStatus
+	uploadProcessedImage, saveHistoryItem
 } from '$lib/remote/index.remote';
 import { saveEnhancedImage } from '$lib/remote/enhance.remote';
 import { fileToImageData, processImageLSB, imageDataToBlob } from '$lib/utils/bye-synth-id';
@@ -22,33 +22,8 @@ export class ImageProcessor {
 
     private get assetData() { return this.getAssetData(); }
 
-	/**
-	 * Polls for job completion
-	 */
-	private async pollJobStatus(jobId: string, onUpdate?: (status: string) => void): Promise<any> {
-		let attempts = 0;
-		const maxAttempts = 60; // 5 minutes at 5s interval
-		
-		while (attempts < maxAttempts) {
-			const res = await checkJobStatus({ jobId });
-			
-			if (res.status === 'completed') {
-				return res.result;
-			}
-			
-			if (res.status === 'failed') {
-				throw new Error(res.error || 'Job failed');
-			}
-			
-			if (onUpdate) onUpdate(res.status);
-			
-			// Wait 5 seconds
-			await new Promise(resolve => setTimeout(resolve, 5000));
-			attempts++;
-		}
-		
-		throw new Error('Polling timed out after 5 minutes');
-	}
+	// Note: Polling is now handled entirely by HistoryManager for better
+	// synchronization and to avoid duplicate polling.
 
 	// --- 1. Decompose ---
 	async decompose(params: {
@@ -58,10 +33,9 @@ export class ImageProcessor {
 		negativePrompt?: string;
 		settings: any;
 	}) {
-		this.isProcessing = true;
 		const toastId = toast.loading('Queuing decomposition task...');
 
-		// 1. Truly Optimistic Update (Immediate)
+		// 1. Optimistic Update (Immediate)
 		const tempId = this.historyManager.addOptimisticItem(
 			'fal-ai-decompose', 
 			'Qwen-Image-Layered', 
@@ -84,49 +58,25 @@ export class ImageProcessor {
 				throw new Error(result.error || 'Failed to queue decomposition');
 			}
 
-			// 2. Reconcile ID
+			// 2. Reconcile temp ID with real job ID - HistoryManager handles polling
 			this.historyManager.updateOptimisticId(tempId, result.jobId);
-			this.historyManager.load();
 
-			toast.loading('Processing decomposition in background...', { id: toastId });
-			
-			const pollResult = await this.pollJobStatus(result.jobId, (status) => {
-				if (status === 'processing') toast.loading('AI is processing layers...', { id: toastId });
-			});
-
-			if (pollResult && pollResult.layers) {
-				// Hide original if decomposing background
-				if (params.imageUrl.includes('original')) {
-					this.layerManager.showOriginalLayer = false;
-				}
-
-				pollResult.layers.forEach((l: any, i: number) => {
-					const { layer, selection } = this.layerManager.createLayerObj(
-						l.url,
-						`Layer ${i + 1}`,
-						{ x: 0, y: 0, width: l.width, height: l.height },
-						this.layerManager.activeSide,
-						this.layerManager.currentLayers.length
-					);
-					this.layerManager.addLayer(layer, selection);
-				});
-				toast.success('Decomposition complete', { id: toastId });
-				return true;
+			// Hide original if decomposing background
+			if (params.imageUrl.includes('original')) {
+				this.layerManager.showOriginalLayer = false;
 			}
-			throw new Error('Decomposition result missing layers');
+
+			toast.success('Decomposition queued! Processing in background...', { id: toastId });
+			return true;
 		} catch (e: any) {
 			console.error(e);
-			toast.error(e.message || 'Failed', { id: toastId });
+			toast.error(e.message || 'Failed to queue', { id: toastId });
 			return false;
-		} finally {
-			this.isProcessing = false;
 		}
 	}
 
 	// --- 2. Upscale (with SynthID Removal) ---
 	async upscaleLayer(layer: DecomposedLayer | { imageUrl: string; id: string }, model: string, removeWatermark = false) {
-		this.isProcessing = true;
-		this.processingLayerId = layer.id;
 		const toastId = toast.loading('Queuing upscale task...');
 
 		try {
@@ -137,7 +87,7 @@ export class ImageProcessor {
 				targetUrl = await this.removeWatermarkLogic(targetUrl);
 			}
 
-			// 1. Truly Optimistic Update
+			// 1. Optimistic Update
 			const tempId = this.historyManager.addOptimisticItem(
 				`fal-ai-upscale-${model}`, 
 				model, 
@@ -156,43 +106,25 @@ export class ImageProcessor {
 				throw new Error(result.error || 'Failed to queue upscale');
 			}
 
-			// 2. Reconcile ID
+			// 2. Reconcile ID - HistoryManager handles polling
 			this.historyManager.updateOptimisticId(tempId, result.jobId);
-			this.historyManager.load();
 
-			toast.loading('Processing upscale in background...', { id: toastId });
-
-			const pollResult = await this.pollJobStatus(result.jobId);
-
-			if (pollResult && pollResult.resultUrl) {
-				const { layer: newLayer, selection } = this.layerManager.createLayerObj(
-					pollResult.resultUrl,
-					`Upscaled: ${layer.id === 'original-file' ? 'Background' : ( (layer as any).name || 'Layer' )}`,
-					(layer as DecomposedLayer).bounds || { x: 0, y: 0, width: this.assetData.width, height: this.assetData.height },
-					this.layerManager.activeSide,
-					this.layerManager.currentLayers.length
-				);
-				this.layerManager.addLayer(newLayer, selection);
-				toast.success('Upscale complete and added to layers', { id: toastId });
-				return pollResult.resultUrl;
-			}
+			toast.success('Upscale queued! Processing in background...', { id: toastId });
+			return true;
 		} catch (e: any) {
 			toast.error(e.message, { id: toastId });
-		} finally {
-			this.isProcessing = false;
-			this.processingLayerId = null;
+			return false;
 		}
 	}
 
 	// --- 3. Remove Element ---
 	async removeElement(layer: DecomposedLayer, prompt: string) {
-		this.processingLayerId = layer.id;
 		const toastId = toast.loading(`Queuing removal of "${prompt}"...`);
 
-		// 1. Truly Optimistic Update
+		// 1. Optimistic Update
 		const tempId = this.historyManager.addOptimisticItem(
-			'runware-remove-element', 
-			'Remover', 
+			'fal-ai-remove', 
+			'qwen-image-edit', 
 			layer.imageUrl, 
 			this.layerManager.activeSide
 		);
@@ -211,30 +143,14 @@ export class ImageProcessor {
 				throw new Error(result.error || 'Failed to queue removal');
 			}
 
-			// 2. Reconcile ID
+			// 2. Reconcile ID - HistoryManager handles polling
 			this.historyManager.updateOptimisticId(tempId, result.jobId);
-			this.historyManager.load();
 
-			toast.loading('Processing removal in background...', { id: toastId });
-
-			const pollResult = await this.pollJobStatus(result.jobId);
-
-			if (pollResult && pollResult.resultUrl) {
-				const { layer: newLayer, selection } = this.layerManager.createLayerObj(
-					pollResult.resultUrl,
-					`Removed: ${prompt.slice(0, 10)}`,
-					layer.bounds,
-					layer.side,
-					this.layerManager.currentLayers.length
-				);
-				this.layerManager.addLayer(newLayer, selection);
-				toast.success('Element removed', { id: toastId });
-			}
+			toast.success('Removal queued! Processing in background...', { id: toastId });
+			return true;
 		} catch (e: any) {
 			toast.error(e.message, { id: toastId });
-		} finally {
-			this.isProcessing = false;
-			this.processingLayerId = null;
+			return false;
 		}
 	}
 
@@ -338,14 +254,13 @@ export class ImageProcessor {
 	}
 
     // --- 6. Handle Crop ---
-    async handleCrop(layerId: string, croppedImageUrl: string, originalLayerName: string) {
+    // Crop is a fast, synchronous operation - no need for optimistic updates
+    async handleCrop(layerId: string, croppedImageUrl: string, originalLayerName: string, originalImageUrl: string) {
         const toastId = toast.loading('Processing crop...');
         try {
             // 1. Upload the cropped image
             const response = await fetch(croppedImageUrl);
             const blob = await response.blob();
-            // Convert to base64 for uploadProcessedImage
-            // Or use a helper
             const base64 = await fileToDataUrl(blob);
 
             const uploadRes = await uploadProcessedImage({
@@ -359,15 +274,19 @@ export class ImageProcessor {
 
             const newImageUrl = uploadRes.url;
             
-            // Optimistic Update
-            this.historyManager.addOptimisticItem(
-                'manual-edit', 
-                'Crop', 
-                newImageUrl, 
-                this.layerManager.activeSide
-            );
-            this.historyManager.load();
+            // 3. Save to history directly (crop is synchronous, no need for optimistic update)
+            await saveHistoryItem({
+                originalUrl: originalImageUrl || croppedImageUrl,
+                resultUrl: newImageUrl,
+                action: 'crop',
+                side: this.layerManager.activeSide,
+                templateId: this.assetData.templateId
+            });
 
+            // 4. Refresh history to show the new crop item
+            await this.historyManager.load();
+
+            // 5. Add the cropped image as a layer
             const layerName = layerId === 'original-file' 
                     ? `Cropped Original` 
                     : `Cropped ${originalLayerName}`;
