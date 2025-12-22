@@ -1,8 +1,15 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { upscaleImage, removeFromImage, saveEnhancedImage } from '$lib/remote/enhance.remote';
+	import {
+		upscaleImage,
+		removeFromImage,
+		saveEnhancedImage,
+		uploadImage
+	} from '$lib/remote/enhance.remote';
 	import { toast } from 'svelte-sonner';
 	import { fade, scale } from 'svelte/transition';
+	import CropModal from './CropModal.svelte';
+	import { getProxiedUrl } from '$lib/utils/storage';
 
 	let { data }: { data: PageData } = $props();
 
@@ -37,10 +44,81 @@
 	// Image Modal state
 	let imageModalOpen = $state(false);
 
+	// Crop Modal State
+	let cropModalOpen = $state(false);
+
+	// Function to handle crop completion (from CropModal component)
+	async function onCropComplete(croppedImageUrl: string) {
+		isProcessing = true;
+		processingAction = 'crop';
+
+		try {
+			// Convert blob URL to base64 for upload
+			const response = await fetch(croppedImageUrl);
+			const blob = await response.blob();
+
+			// Convert to base64
+			const reader = new FileReader();
+			reader.readAsDataURL(blob);
+
+			reader.onloadend = async () => {
+				const base64data = reader.result?.toString().split(',')[1];
+				if (base64data) {
+					const result = await uploadImage({ base64: base64data, contentType: blob.type });
+
+					if (result.success && result.url) {
+						const newResult: ProcessedResult = {
+							id: crypto.randomUUID(),
+							imageUrl: result.url,
+							action: 'Crop',
+							timestamp: new Date(),
+							side: activeSide
+						};
+						results = [newResult, ...results];
+
+						// Auto-set as source
+						if (activeSide === 'front') {
+							frontSourceUrl = newResult.imageUrl;
+						} else {
+							backSourceUrl = newResult.imageUrl;
+						}
+						activeDropdownId = null;
+
+						toast.success('Image cropped and set as source');
+					} else {
+						toast.error(result.error || 'Failed to upload cropped image');
+					}
+				} else {
+					toast.error('Failed to process cropped image');
+				}
+				isProcessing = false;
+				processingAction = null;
+			};
+		} catch (e) {
+			console.error('Crop processing error:', e);
+			toast.error('Failed to process cropped image');
+			isProcessing = false;
+			processingAction = null;
+		}
+	}
+
 	// Dropdown state for result items
 	let activeDropdownId = $state<string | null>(null);
 
-	async function handleAction(action: 'face' | 'text' | 'logo' | 'qr' | 'upscale') {
+	async function handleAction(
+		action:
+			| 'face'
+			| 'text'
+			| 'logo'
+			| 'qr'
+			| 'upscale'
+			| 'esrgan-upscale'
+			| 'seedvr-upscale'
+			| 'ccsr-upscale'
+			| 'crop'
+			| 'all'
+			| 'custom'
+	) {
 		if (!currentSourceUrl) {
 			toast.error('No source image available');
 			return;
@@ -54,20 +132,45 @@
 
 			if (action === 'upscale') {
 				result = await upscaleImage({ imageUrl: currentSourceUrl, upscaleFactor: 2 });
+			} else if (action === 'esrgan-upscale') {
+				result = await upscaleImage({ imageUrl: currentSourceUrl, model: 'esrgan' });
+			} else if (action === 'seedvr-upscale') {
+				result = await upscaleImage({ imageUrl: currentSourceUrl, model: 'seedvr' });
+			} else if (action === 'ccsr-upscale') {
+				result = await upscaleImage({ imageUrl: currentSourceUrl, model: 'ccsr' });
+			} else if (action === 'crop') {
+				cropModalOpen = true;
+				isProcessing = false;
+				processingAction = null;
+				return;
 			} else {
-				result = await removeFromImage({ 
-					imageUrl: currentSourceUrl, 
-					removeType: action,
+				// For custom action, we use 'all' as the base type, but the custom prompt will override it
+				const removeType = action === 'custom' ? 'all' : action;
+
+				result = await removeFromImage({
+					imageUrl: currentSourceUrl,
+					removeType: removeType,
 					customPrompt: customPrompt.trim() || undefined
 				});
 			}
 
 			if (result.success && result.imageUrl) {
 				// Add to results gallery
+				let actionLabel = '';
+				if (action === 'upscale') actionLabel = 'Upscale 2x';
+				else if (action === 'esrgan-upscale') actionLabel = 'ESRGAN Upscale';
+				else if (action === 'seedvr-upscale') actionLabel = 'SeedVR Upscale';
+				else if (action === 'ccsr-upscale') actionLabel = 'CCSR Upscale';
+				else if (action === 'custom') actionLabel = 'Custom Edit';
+				else if (action === 'all') actionLabel = 'Remove All';
+				else if (action === 'face') actionLabel = 'Remove Face & Body';
+				else if (customPrompt.trim()) actionLabel = 'Custom Edit';
+				else actionLabel = `Remove ${action}`;
+
 				const newResult: ProcessedResult = {
 					id: crypto.randomUUID(),
 					imageUrl: result.imageUrl,
-					action: action === 'upscale' ? 'Upscale 2x' : (customPrompt.trim() && action !== 'qr' ? 'Custom Edit' : `Remove ${action}`),
+					action: actionLabel,
 					timestamp: new Date(),
 					side: activeSide
 				};
@@ -87,8 +190,12 @@
 
 	async function saveAndReplace() {
 		if (!currentSourceUrl) return;
-		
-		if (!confirm(`Are you sure you want to replace the ${activeSide} template background with this image?`)) {
+
+		if (
+			!confirm(
+				`Are you sure you want to replace the ${activeSide} template background with this image?`
+			)
+		) {
 			return;
 		}
 
@@ -153,7 +260,12 @@
 				class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
 			>
 				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M15 19l-7-7 7-7"
+					/>
 				</svg>
 				Admin
 			</a>
@@ -175,9 +287,7 @@
 		<div class="flex gap-1 px-6">
 			<button
 				class="relative px-6 py-3 text-sm font-medium transition-colors
-					{activeSide === 'front'
-					? 'text-primary'
-					: 'text-muted-foreground hover:text-foreground'}"
+					{activeSide === 'front' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}"
 				onclick={() => (activeSide = 'front')}
 			>
 				Front
@@ -187,9 +297,7 @@
 			</button>
 			<button
 				class="relative px-6 py-3 text-sm font-medium transition-colors
-					{activeSide === 'back'
-					? 'text-primary'
-					: 'text-muted-foreground hover:text-foreground'}
+					{activeSide === 'back' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}
 					{!data.asset.backImageUrl ? 'opacity-50 cursor-not-allowed' : ''}"
 				onclick={() => data.asset.backImageUrl && (activeSide = 'back')}
 				disabled={!data.asset.backImageUrl}
@@ -218,16 +326,12 @@
 					class="relative aspect-[1.586/1] w-full overflow-hidden rounded-lg border border-border bg-muted"
 				>
 					{#if currentSourceUrl}
-						<button 
+						<button
 							class="absolute inset-0 w-full h-full cursor-zoom-in"
-							onclick={() => imageModalOpen = true}
+							onclick={() => (imageModalOpen = true)}
 							title="Click to view full image"
 						>
-							<img
-								src={currentSourceUrl}
-								alt="Source"
-								class="h-full w-full object-contain p-2"
-							/>
+							<img src={currentSourceUrl} alt="Source" class="h-full w-full object-contain p-2" />
 						</button>
 					{:else}
 						<div class="flex h-full items-center justify-center text-muted-foreground">
@@ -238,7 +342,7 @@
 				<p class="mt-2 text-xs text-muted-foreground text-center">
 					{data.asset.widthPixels} × {data.asset.heightPixels}px
 				</p>
-				
+
 				<!-- Save & Replace Button -->
 				<button
 					class="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg
@@ -248,11 +352,18 @@
 					disabled={isSaving || !currentSourceUrl}
 				>
 					{#if isSaving}
-						<div class="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+						<div
+							class="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"
+						></div>
 						Saving...
 					{:else}
 						<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
+							/>
 						</svg>
 						Save & Replace {activeSide === 'front' ? 'Front' : 'Back'}
 					{/if}
@@ -265,6 +376,31 @@
 			<!-- Action Buttons -->
 			<div class="space-y-3">
 				<h3 class="text-sm font-semibold text-foreground uppercase tracking-wide">Actions</h3>
+
+				<!-- Crop -->
+				<button
+					class="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-border
+						bg-gradient-to-r from-gray-500/10 to-slate-500/10 hover:from-gray-500/20 hover:to-slate-500/20
+						text-foreground transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+					onclick={() => handleAction('crop')}
+					disabled={isProcessing || !currentSourceUrl}
+				>
+					<svg class="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+						/>
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+						/>
+					</svg>
+					<span class="font-medium">Crop & Resize</span>
+				</button>
 
 				<!-- Remove Face -->
 				<button
@@ -282,7 +418,7 @@
 							d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"
 						/>
 					</svg>
-					<span class="font-medium">Remove Face</span>
+					<span class="font-medium">Remove Face & Body</span>
 					{#if isProcessing && processingAction === 'face'}
 						<div
 							class="ml-auto w-4 h-4 border-2 border-rose-500 border-t-transparent rounded-full animate-spin"
@@ -322,7 +458,12 @@
 					onclick={() => handleAction('logo')}
 					disabled={isProcessing || !currentSourceUrl}
 				>
-					<svg class="w-5 h-5 text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<svg
+						class="w-5 h-5 text-violet-500"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+					>
 						<path
 							stroke-linecap="round"
 							stroke-linejoin="round"
@@ -346,7 +487,12 @@
 					onclick={() => handleAction('qr')}
 					disabled={isProcessing || !currentSourceUrl}
 				>
-					<svg class="w-5 h-5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<svg
+						class="w-5 h-5 text-orange-500"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+					>
 						<path
 							stroke-linecap="round"
 							stroke-linejoin="round"
@@ -362,6 +508,30 @@
 					{/if}
 				</button>
 
+				<!-- Remove All -->
+				<button
+					class="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-border
+						bg-gradient-to-r from-red-500/10 to-rose-500/10 hover:from-red-500/20 hover:to-rose-500/20
+						text-foreground transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+					onclick={() => handleAction('all')}
+					disabled={isProcessing || !currentSourceUrl}
+				>
+					<svg class="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+						/>
+					</svg>
+					<span class="font-medium">Remove All</span>
+					{#if isProcessing && processingAction === 'all'}
+						<div
+							class="ml-auto w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin"
+						></div>
+					{/if}
+				</button>
+
 				<!-- Separator -->
 				<div class="border-t border-border my-2"></div>
 
@@ -373,7 +543,12 @@
 					onclick={() => handleAction('upscale')}
 					disabled={isProcessing || !currentSourceUrl}
 				>
-					<svg class="w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<svg
+						class="w-5 h-5 text-emerald-500"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+					>
 						<path
 							stroke-linecap="round"
 							stroke-linejoin="round"
@@ -389,21 +564,131 @@
 					{/if}
 				</button>
 
+				<!-- ESRGAN Upscale -->
+				<button
+					class="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-border
+						bg-gradient-to-r from-emerald-500/10 to-teal-500/10 hover:from-emerald-500/20 hover:to-teal-500/20
+						text-foreground transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+					onclick={() => handleAction('esrgan-upscale')}
+					disabled={isProcessing || !currentSourceUrl}
+				>
+					<svg
+						class="w-5 h-5 text-emerald-500"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke="currentColor"
+					>
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M13 10V3L4 14h7v7l9-11h-7z"
+						/>
+					</svg>
+					<span class="font-medium">ESRGAN Upscale (Denoise)</span>
+					{#if isProcessing && processingAction === 'esrgan-upscale'}
+						<div
+							class="ml-auto w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"
+						></div>
+					{/if}
+				</button>
+
+				<!-- SeedVR Upscale -->
+				<button
+					class="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-border
+						bg-gradient-to-r from-blue-500/10 to-indigo-500/10 hover:from-blue-500/20 hover:to-indigo-500/20
+						text-foreground transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+					onclick={() => handleAction('seedvr-upscale')}
+					disabled={isProcessing || !currentSourceUrl}
+				>
+					<svg class="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+						/>
+					</svg>
+					<span class="font-medium">SeedVR Upscale</span>
+					{#if isProcessing && processingAction === 'seedvr-upscale'}
+						<div
+							class="ml-auto w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"
+						></div>
+					{/if}
+				</button>
+
+				<!-- CCSR Upscale -->
+				<button
+					class="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-border
+						bg-gradient-to-r from-teal-500/10 to-cyan-500/10 hover:from-teal-500/20 hover:to-cyan-500/20
+						text-foreground transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+					onclick={() => handleAction('ccsr-upscale')}
+					disabled={isProcessing || !currentSourceUrl}
+				>
+					<svg class="w-5 h-5 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"
+						/>
+					</svg>
+					<span class="font-medium">CCSR Upscale (1.5x)</span>
+					{#if isProcessing && processingAction === 'ccsr-upscale'}
+						<div
+							class="ml-auto w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin"
+						></div>
+					{/if}
+				</button>
+
 				<!-- Custom Prompt -->
 				<div class="pt-2">
-					<label for="custom-prompt" class="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wide">
+					<label
+						for="custom-prompt"
+						class="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wide"
+					>
 						Custom Prompt
 					</label>
-					<textarea
-						id="custom-prompt"
-						bind:value={customPrompt}
-						placeholder="e.g. remove the red hat"
-						class="w-full px-3 py-2 rounded-md border border-input bg-background ring-offset-background 
-							placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 
-							focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 text-sm resize-none"
-						rows="2"
-						disabled={isProcessing}
-					></textarea>
+					<div class="flex gap-2">
+						<textarea
+							id="custom-prompt"
+							bind:value={customPrompt}
+							placeholder="e.g. remove the red hat"
+							class="flex-1 px-3 py-2 rounded-md border border-input bg-background ring-offset-background
+								placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2
+								focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 text-sm resize-none"
+							rows="2"
+							disabled={isProcessing}
+							onkeydown={(e) => {
+								if (e.key === 'Enter' && !e.shiftKey) {
+									e.preventDefault();
+									if (customPrompt.trim()) handleAction('custom');
+								}
+							}}
+						></textarea>
+						<button
+							class="flex-shrink-0 px-3 py-2 rounded-md border border-border bg-muted hover:bg-muted/80
+								text-foreground transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+							onclick={() => handleAction('custom')}
+							disabled={isProcessing || !currentSourceUrl || !customPrompt.trim()}
+							title="Run custom prompt"
+						>
+							{#if isProcessing && processingAction === 'custom'}
+								<div
+									class="w-4 h-4 border-2 border-foreground border-t-transparent rounded-full animate-spin"
+								></div>
+							{:else}
+								<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M14 5l7 7m0 0l-7 7m7-7H3"
+									/>
+								</svg>
+							{/if}
+						</button>
+					</div>
 				</div>
 			</div>
 
@@ -447,7 +732,9 @@
 						/>
 					</svg>
 					<p class="text-muted-foreground text-sm">No processed images yet</p>
-					<p class="text-muted-foreground/70 text-xs mt-1">Use the actions on the left to process images</p>
+					<p class="text-muted-foreground/70 text-xs mt-1">
+						Use the actions on the left to process images
+					</p>
 				</div>
 			{:else}
 				<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -530,12 +817,7 @@
 												class="w-full px-3 py-2 text-left text-sm hover:bg-muted transition-colors flex items-center gap-2"
 												onclick={() => useAsSource(result)}
 											>
-												<svg
-													class="w-4 h-4"
-													fill="none"
-													viewBox="0 0 24 24"
-													stroke="currentColor"
-												>
+												<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 													<path
 														stroke-linecap="round"
 														stroke-linejoin="round"
@@ -551,12 +833,7 @@
 												rel="noopener noreferrer"
 												class="w-full px-3 py-2 text-left text-sm hover:bg-muted transition-colors flex items-center gap-2"
 											>
-												<svg
-													class="w-4 h-4"
-													fill="none"
-													viewBox="0 0 24 24"
-													stroke="currentColor"
-												>
+												<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 													<path
 														stroke-linecap="round"
 														stroke-linejoin="round"
@@ -581,14 +858,14 @@
 	{#if imageModalOpen && currentSourceUrl}
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-		<div 
+		<div
 			class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
 			transition:fade={{ duration: 200 }}
-			onclick={() => imageModalOpen = false}
+			onclick={() => (imageModalOpen = false)}
 			role="dialog"
 			aria-modal="true"
 		>
-			<div 
+			<div
 				class="relative max-w-7xl max-h-full w-full h-full flex items-center justify-center"
 				onclick={(e) => e.stopPropagation()}
 			>
@@ -600,13 +877,30 @@
 				/>
 				<button
 					class="absolute top-4 right-4 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
-					onclick={() => imageModalOpen = false}
+					onclick={() => (imageModalOpen = false)}
 				>
 					<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M6 18L18 6M6 6l12 12"
+						/>
 					</svg>
 				</button>
 			</div>
 		</div>
+	{/if}
+
+	<!-- Crop Modal -->
+	{#if cropModalOpen && currentSourceUrl}
+		<CropModal
+			bind:isOpen={cropModalOpen}
+			imageUrl={getProxiedUrl(currentSourceUrl) ?? currentSourceUrl}
+			aspectRatio={data.asset.widthPixels / data.asset.heightPixels}
+			targetWidth={data.asset.widthPixels}
+			targetHeight={data.asset.heightPixels}
+			{onCropComplete}
+		/>
 	{/if}
 </div>

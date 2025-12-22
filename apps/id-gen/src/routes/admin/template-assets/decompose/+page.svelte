@@ -9,6 +9,7 @@
 		removeElementFromLayer,
 		type HistoryStats
 	} from '$lib/remote/index.remote';
+	import { saveEnhancedImage } from '$lib/remote/enhance.remote';
 
 	import { fileToImageData, processImageLSB, imageDataToBlob } from '$lib/utils/bye-synth-id';
 	import { downscaleImage, fileToDataUrl } from '$lib/utils/imageProcessing';
@@ -43,7 +44,9 @@
 		CheckSquare,
 		GripVertical,
 		Circle,
-		Eraser
+		Eraser,
+		RotateCcw,
+		ImageDown
 	} from 'lucide-svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -78,7 +81,7 @@
 
 	// Upscale state - separate for front and back
 	let isUpscaling = $state(false);
-	let upscaleModel = $state<'seedvr' | 'aurasr' | 'esrgan' | 'recraft-creative'>('seedvr');
+	let upscaleModel = $state<'ccsr' | 'seedvr' | 'aurasr' | 'esrgan' | 'recraft-creative'>('ccsr');
 	let frontUpscaledUrl = $state<string | null>(null);
 	let backUpscaledUrl = $state<string | null>(null);
 	let showUpscaleModal = $state(false);
@@ -91,15 +94,17 @@
 	let frontLayers = $state<DecomposedLayer[]>([]);
 	let backLayers = $state<DecomposedLayer[]>([]);
 
+	// Local state for image URLs (allows reactivity when reset)
+	let frontImageUrl = $state(data.asset.imageUrl);
+	let backImageUrl = $state<string | null>(data.asset.backImageUrl);
+
 	// Selected layer for highlighting
 	let selectedLayerId = $state<string | null>(null);
 
 	// Get current layers based on active side
 	let currentLayers = $derived(activeSide === 'front' ? frontLayers : backLayers);
-	let currentImageUrl = $derived(
-		activeSide === 'front' ? data.asset.imageUrl : data.asset.backImageUrl
-	);
-	let hasBackImage = $derived(!!data.asset.backImageUrl);
+	let currentImageUrl = $derived(activeSide === 'front' ? frontImageUrl : backImageUrl);
+	let hasBackImage = $derived(!!backImageUrl);
 
 	// Layer selections for saving
 	let layerSelections = $state<Map<string, LayerSelection>>(new Map());
@@ -169,6 +174,98 @@
 
 	// Layer opacity state
 	let layerOpacity = $state<Map<string, number>>(new Map());
+
+	// Layer card expansion state (for settings panel)
+	let expandedLayerIds = $state<Set<string>>(new Set());
+
+	// All layers visibility toggle
+	let allLayersVisible = $state(true);
+
+	function toggleLayerExpanded(layerId: string) {
+		const newSet = new Set(expandedLayerIds);
+		if (newSet.has(layerId)) {
+			newSet.delete(layerId);
+		} else {
+			newSet.add(layerId);
+		}
+		expandedLayerIds = newSet;
+	}
+
+	function toggleAllLayersVisibility() {
+		allLayersVisible = !allLayersVisible;
+		// Update all layer selections
+		for (const [layerId, selection] of layerSelections) {
+			if (selection) {
+				layerSelections.set(layerId, { ...selection, included: allLayersVisible });
+			}
+		}
+		layerSelections = new Map(layerSelections);
+		hasUnsavedChanges = true;
+		saveState = 'unsaved';
+	}
+
+	function handleMenuAction(
+		action: 'decompose' | 'upscale' | 'remove' | 'custom',
+		layerId: string
+	) {
+		if (action === 'custom') {
+			// TODO: Custom prompt action
+			toast.info('Custom prompt coming soon');
+		} else {
+			setPendingAction(action, layerId);
+		}
+	}
+
+	// Set layer as main image state
+	let isSettingMain = $state(false);
+
+	async function setAsMainImage(layerId: string) {
+		// Find the layer
+		const layer = currentLayers.find((l) => l.id === layerId);
+		if (!layer) {
+			toast.error('Layer not found');
+			return;
+		}
+
+		// Confirm action
+		if (
+			!confirm(
+				`Are you sure you want to set this layer as the ${activeSide} template background?\n\nThis will replace the current ${activeSide} image.`
+			)
+		) {
+			return;
+		}
+
+		isSettingMain = true;
+		try {
+			const result = await saveEnhancedImage({
+				assetId: data.asset.id,
+				imageUrl: layer.imageUrl,
+				side: activeSide
+			});
+
+			if (result.success) {
+				toast.success(`Successfully set layer as ${activeSide} template background`);
+				// Update local state
+				if (activeSide === 'front') {
+					frontImageUrl = result.url;
+					if (data.template) {
+						data.template.frontBackground = result.url;
+					}
+				} else {
+					backImageUrl = result.url;
+					if (data.template) {
+						data.template.backBackground = result.url;
+					}
+				}
+			}
+		} catch (err) {
+			console.error('Set as main error:', err);
+			toast.error('Failed to set layer as main image');
+		} finally {
+			isSettingMain = false;
+		}
+	}
 
 	let originalLayer = $derived({
 		id: 'original-file',
@@ -830,7 +927,12 @@
 						included: true,
 						elementType: 'image',
 						variableName: `removed_${newLayer.name.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase()}`,
-						bounds: newLayer.bounds || { x: 0, y: 0, width: data.asset.widthPixels || 1050, height: data.asset.heightPixels || 600 },
+						bounds: newLayer.bounds || {
+							x: 0,
+							y: 0,
+							width: data.asset.widthPixels || 1050,
+							height: data.asset.heightPixels || 600
+						},
 						layerImageUrl: newLayer.imageUrl,
 						side: activeSide
 					});
@@ -1136,6 +1238,43 @@
 			backUpscaledUrl = null;
 		}
 		toast.info('Upscaled preview cleared. Will use original image.');
+	}
+
+	/**
+	 * Reset the current side - clears layers and loads latest template image
+	 */
+	function resetCurrentSide() {
+		// Clear layers for current side
+		if (activeSide === 'front') {
+			// Clear selections for front layers
+			frontLayers.forEach((layer) => layerSelections.delete(layer.id));
+			frontLayers = [];
+			frontUpscaledUrl = null;
+
+			// Update image URL from template if available (latest version)
+			if (data.template?.frontBackground) {
+				frontImageUrl = data.template.frontBackground;
+			}
+		} else {
+			// Clear selections for back layers
+			backLayers.forEach((layer) => layerSelections.delete(layer.id));
+			backLayers = [];
+			backUpscaledUrl = null;
+
+			// Update image URL from template if available (latest version)
+			if (data.template?.backBackground) {
+				backImageUrl = data.template.backBackground;
+			}
+		}
+
+		// Clear pending action
+		pendingAction = null;
+		pendingActionLayerId = null;
+
+		// Mark as no unsaved changes for this side
+		hasUnsavedChanges = false;
+
+		toast.success(`Reset ${activeSide} side. Loaded latest template image.`);
 	}
 
 	function requestLoadFromHistory(item: HistoryItem) {
@@ -1596,7 +1735,7 @@
 		<!-- Left Panel: Image Preview -->
 		<div class="lg:col-span-2 space-y-4">
 			<!-- Side Tabs with Stats -->
-			<div class="flex gap-2">
+			<div class="flex gap-2 items-center">
 				<button
 					class="px-4 py-2 rounded-md text-sm font-medium transition-colors {activeSide === 'front'
 						? 'bg-primary text-primary-foreground'
@@ -1631,6 +1770,23 @@
 						<span class="ml-1 text-xs opacity-50">(N/A)</span>
 					{/if}
 				</button>
+
+				<!-- Spacer -->
+				<div class="flex-1"></div>
+
+				<!-- Reset Current Side Button -->
+				{#if currentLayers.length > 0 || hasUpscaledPreview}
+					<button
+						class="px-3 py-1.5 rounded-md text-xs font-medium transition-colors
+							bg-destructive/10 text-destructive hover:bg-destructive/20
+							flex items-center gap-1.5"
+						onclick={resetCurrentSide}
+						title="Clear layers and reload latest template image"
+					>
+						<RotateCcw class="h-3.5 w-3.5" />
+						Reset
+					</button>
+				{/if}
 			</div>
 
 			<!-- Image Preview Card -->
@@ -1878,6 +2034,7 @@
 								bind:value={upscaleModel}
 								class="rounded border border-border bg-background px-2 py-1 text-sm"
 							>
+								<option value="ccsr">CCSR (1.5x)</option>
 								<option value="seedvr">SeedVR</option>
 								<option value="aurasr">AuraSR</option>
 								<option value="esrgan">ESRGAN</option>
@@ -1915,73 +2072,78 @@
 												class="w-full h-full object-contain"
 											/>
 										</div>
-											<div>
-									<p
-										class="text-sm font-medium text-green-700 dark:text-green-300 flex items-center gap-2"
-									>
-										{#if pendingAction === 'upscale'}
-											<ZoomIn class="h-4 w-4" />
-											Upscale Layer: {actionLayer.name}
-										{:else if pendingAction === 'decompose'}
-											<Wand2 class="h-4 w-4" />
-											Decompose Layer: {actionLayer.name}
-										{:else if pendingAction === 'remove'}
-											<Eraser class="h-4 w-4" />
-											Remove from Layer: {actionLayer.name}
-										{/if}
-									</p>
-									<p class="text-xs text-green-600/80 dark:text-green-400/80">
-										{#if pendingAction === 'upscale'}
-											Using {upscaleModel} model
-										{:else if pendingAction === 'decompose'}
-											Split into {numLayers} sub-layers ({decomposeCost} credits)
-										{:else if pendingAction === 'remove'}
-											Enter what to remove (e.g. "watermark", "person", "text")
-										{/if}
-									</p>
+										<div>
+											<p
+												class="text-sm font-medium text-green-700 dark:text-green-300 flex items-center gap-2"
+											>
+												{#if pendingAction === 'upscale'}
+													<ZoomIn class="h-4 w-4" />
+													Upscale Layer: {actionLayer.name}
+												{:else if pendingAction === 'decompose'}
+													<Wand2 class="h-4 w-4" />
+													Decompose Layer: {actionLayer.name}
+												{:else if pendingAction === 'remove'}
+													<Eraser class="h-4 w-4" />
+													Remove from Layer: {actionLayer.name}
+												{/if}
+											</p>
+											<p class="text-xs text-green-600/80 dark:text-green-400/80">
+												{#if pendingAction === 'upscale'}
+													Using {upscaleModel} model
+												{:else if pendingAction === 'decompose'}
+													Split into {numLayers} sub-layers ({decomposeCost} credits)
+												{:else if pendingAction === 'remove'}
+													Enter what to remove (e.g. "watermark", "person", "text")
+												{/if}
+											</p>
+										</div>
+									</div>
+									<div class="flex items-center gap-2">
+										<Button variant="ghost" size="sm" class="h-8" onclick={clearPendingAction}>
+											Cancel
+										</Button>
+										<Button
+											variant="default"
+											size="sm"
+											class="h-8 bg-green-600 hover:bg-green-700 text-white"
+											onclick={executePendingAction}
+											disabled={isAnyProcessing ||
+												(pendingAction === 'remove' && !removePrompt.trim())}
+										>
+											{#if isAnyProcessing}
+												<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+												Processing...
+											{:else}
+												<Check class="mr-2 h-4 w-4" />
+												Proceed
+											{/if}
+										</Button>
+									</div>
 								</div>
-							</div>
-							<div class="flex items-center gap-2">
-								<Button variant="ghost" size="sm" class="h-8" onclick={clearPendingAction}>
-									Cancel
-								</Button>
-								<Button
-									variant="default"
-									size="sm"
-									class="h-8 bg-green-600 hover:bg-green-700 text-white"
-									onclick={executePendingAction}
-									disabled={isAnyProcessing || (pendingAction === 'remove' && !removePrompt.trim())}
-								>
-									{#if isAnyProcessing}
-										<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-										Processing...
-									{:else}
-										<Check class="mr-2 h-4 w-4" />
-										Proceed
-									{/if}
-								</Button>
-							</div>
-						</div>
-						
-						{#if pendingAction === 'remove'}
-							<div class="mt-3 pt-3 border-t border-green-500/20">
-								<label for="remove-prompt" class="block text-xs font-medium text-green-700 dark:text-green-300 mb-1.5">
-									What do you want to remove?
-								</label>
-								<input
-									id="remove-prompt"
-									type="text"
-									bind:value={removePrompt}
-									placeholder="e.g. watermark, logo, person, text, background clutter..."
-									class="w-full rounded-md border border-green-500/30 bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500/50"
-								/>
-								<p class="mt-1.5 text-[10px] text-green-600/60 dark:text-green-400/60">
-									AI will cleanly remove the specified element while maintaining image consistency.
-								</p>
+
+								{#if pendingAction === 'remove'}
+									<div class="mt-3 pt-3 border-t border-green-500/20">
+										<label
+											for="remove-prompt"
+											class="block text-xs font-medium text-green-700 dark:text-green-300 mb-1.5"
+										>
+											What do you want to remove?
+										</label>
+										<input
+											id="remove-prompt"
+											type="text"
+											bind:value={removePrompt}
+											placeholder="e.g. watermark, logo, person, text, background clutter..."
+											class="w-full rounded-md border border-green-500/30 bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500/50"
+										/>
+										<p class="mt-1.5 text-[10px] text-green-600/60 dark:text-green-400/60">
+											AI will cleanly remove the specified element while maintaining image
+											consistency.
+										</p>
+									</div>
+								{/if}
 							</div>
 						{/if}
-					</div>
-				{/if}
 					{/if}
 				</div>
 			</div>
@@ -2019,67 +2181,67 @@
 
 		<!-- Right Panel: Layers List -->
 		<div class="space-y-4">
-			<div class="rounded-lg border border-border bg-card">
+			<div class="rounded-xl border border-border bg-card shadow-sm">
+				<!-- Redesigned Header -->
 				<div class="p-4 border-b border-border">
 					<div class="flex items-center justify-between">
 						<div class="flex items-center gap-3">
-							<h2 class="font-medium text-foreground flex items-center gap-2">
-								<Layers class="h-4 w-4" />
-								Detected Layers
-								{#if currentLayers.length > 0}
-									<span class="text-xs text-muted-foreground">({currentLayers.length})</span>
-								{/if}
-							</h2>
-							<!-- Save Status Indicator -->
-							<div class="flex items-center gap-1.5 text-[10px]">
-								{#if saveState === 'saving'}
-									<Loader2 class="h-3 w-3 animate-spin text-muted-foreground" />
-									<span class="text-muted-foreground">Saving...</span>
-								{:else if saveState === 'saved'}
-									<Check class="h-3 w-3 text-green-500" />
-									<span class="text-green-600 dark:text-green-400">Saved</span>
-								{:else}
-									<Circle class="h-3 w-3 text-yellow-500" />
-									<span class="text-yellow-600 dark:text-yellow-400">Unsaved</span>
-								{/if}
-								<Button
-									variant="ghost"
-									size="sm"
-									class="h-5 w-5 p-0 ml-1"
-									onclick={saveSessionToStorage}
-									title="Save now"
-								>
-									<Save class="h-3 w-3" />
-								</Button>
+							<!-- Layers Icon with Background -->
+							<div class="w-10 h-10 rounded-lg bg-muted/50 flex items-center justify-center">
+								<Layers class="h-5 w-5 text-muted-foreground" />
+							</div>
+							<div>
+								<h2 class="font-semibold text-foreground flex items-center gap-2">
+									Detected Layers
+								</h2>
+								<div class="flex items-center gap-2 text-sm">
+									<span class="text-muted-foreground"
+										>({currentLayers.length + (showOriginalLayer ? 1 : 0)})</span
+									>
+									<!-- Save Status Indicator -->
+									{#if saveState === 'saving'}
+										<span class="flex items-center gap-1 text-muted-foreground">
+											<Loader2 class="h-3 w-3 animate-spin" />
+											<span class="text-xs">Saving...</span>
+										</span>
+									{:else if saveState === 'saved'}
+										<span class="flex items-center gap-1 text-green-600 dark:text-green-400">
+											<Check class="h-3 w-3" />
+											<span class="text-xs">Saved</span>
+										</span>
+									{:else}
+										<span class="flex items-center gap-1 text-yellow-600 dark:text-yellow-400">
+											<Circle class="h-3 w-3" />
+											<span class="text-xs">Unsaved</span>
+										</span>
+									{/if}
+								</div>
 							</div>
 						</div>
 						<div class="flex items-center gap-2">
-							{#if currentImageUrl}
-								<Button
-									variant={showOriginalLayer ? 'secondary' : 'ghost'}
-									size="sm"
-									class="h-7 text-xs"
-									onclick={() => (showOriginalLayer = !showOriginalLayer)}
-									title={showOriginalLayer ? 'Hide original file' : 'Show original file'}
-								>
-									{#if showOriginalLayer}
-										<Eye class="h-3 w-3 mr-1" />
-									{:else}
-										<EyeOff class="h-3 w-3 mr-1" />
-									{/if}
-									Original
-								</Button>
-							{/if}
+							<!-- Toggle All Visibility -->
+							<button
+								class="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+								onclick={toggleAllLayersVisibility}
+								title={allLayersVisible ? 'Hide all layers' : 'Show all layers'}
+							>
+								{#if allLayersVisible}
+									<Eye class="h-5 w-5" />
+								{:else}
+									<EyeOff class="h-5 w-5" />
+								{/if}
+							</button>
+							<!-- Merge Mode Toggle -->
 							{#if currentLayers.length > 1}
-								<Button
-									variant={mergeMode ? 'secondary' : 'ghost'}
-									size="sm"
-									class="h-7 text-xs"
+								<button
+									class="p-2 rounded-lg transition-colors {mergeMode
+										? 'bg-violet-500/20 text-violet-600'
+										: 'hover:bg-muted text-muted-foreground hover:text-foreground'}"
 									onclick={toggleMergeMode}
+									title={mergeMode ? 'Cancel merge' : 'Merge layers'}
 								>
-									<Merge class="h-3 w-3 mr-1" />
-									{mergeMode ? 'Cancel' : 'Merge'}
-								</Button>
+									<Merge class="h-5 w-5" />
+								</button>
 							{/if}
 						</div>
 					</div>
@@ -2127,75 +2289,62 @@
 							<p class="text-sm">No image available</p>
 						</div>
 					{:else}
-						<div class="divide-y divide-border">
+						<div class="divide-y divide-border/50">
 							{#each displayLayers as { layer, depth, hasChildren, isExpanded, isParent } (layer.id)}
 								{@const selection = layerSelections.get(layer.id)}
 								{@const isOriginal = layer.id === 'original-file'}
 								{@const visible = isOriginal ? showOriginalLayer : selection?.included}
+								{@const isLayerExpanded = expandedLayerIds.has(layer.id)}
 
+								<!-- svelte-ignore a11y_no_static_element_interactions -->
+								<!-- Layer Card -->
 								<div
-									class="relative p-3 hover:bg-muted/50 transition-colors cursor-pointer
-										{selectedLayerId === layer.id ? 'bg-primary/5' : ''}
-										{depth > 0 ? 'bg-muted/10' : ''}
+									class="relative bg-muted/30 transition-colors
 										{draggedLayerId === layer.id ? 'opacity-50' : ''}
 										{dragOverLayerId === layer.id ? 'border-t-2 border-primary' : ''}"
-									style="padding-left: {0.75 + depth * 1.5}rem;"
 									draggable={!isOriginal}
 									ondragstart={(e) => handleLayerDragStart(e, layer.id)}
 									ondragover={(e) => handleLayerDragOver(e, layer.id)}
 									ondragleave={handleLayerDragLeave}
 									ondrop={(e) => handleLayerDrop(e, layer.id)}
 									ondragend={handleLayerDragEnd}
-									onclick={() => {
-										if (!isOriginal) selectedLayerId = layer.id;
-									}}
-									onkeydown={(e) =>
-										e.key === 'Enter' && !isOriginal && (selectedLayerId = layer.id)}
-									tabindex={isOriginal ? -1 : 0}
-									role="button"
 								>
-									<!-- Active Indicator Bar -->
+									<!-- Active/Selected Indicator Bar -->
 									<div
-										class="absolute left-0 top-0 bottom-0 w-1 {selectedLayerId === layer.id
-											? 'bg-primary'
-											: 'bg-transparent'}"
+										class="absolute left-0 top-0 bottom-0 w-1 rounded-l transition-colors {selectedLayerId ===
+										layer.id
+											? 'bg-cyan-500'
+											: isLayerExpanded
+												? 'bg-cyan-500/50'
+												: 'bg-transparent'}"
 									></div>
 
-									<!-- Layer Header -->
-									<div class="flex items-center gap-3">
-										<!-- Drag Handle (only for non-original layers) -->
+									<!-- Layer Row (Collapsed View) -->
+									<div
+										class="flex items-center gap-3 p-3 pl-4 cursor-pointer hover:bg-muted/50"
+										onclick={() => {
+											if (!isOriginal) selectedLayerId = layer.id;
+										}}
+										onkeydown={(e) =>
+											e.key === 'Enter' && !isOriginal && (selectedLayerId = layer.id)}
+										tabindex={isOriginal ? -1 : 0}
+										role="button"
+									>
+										<!-- Drag Handle -->
 										{#if !isOriginal}
 											<div
-												class="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
+												class="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground flex-shrink-0"
 											>
 												<GripVertical class="h-4 w-4" />
 											</div>
 										{:else}
-											<div class="w-4"></div>
+											<div class="w-4 flex-shrink-0"></div>
 										{/if}
-
-										<!-- Parent/Group Toggle -->
-										<button
-											class="w-4 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-0"
-											onclick={(e) => {
-												e.stopPropagation();
-												toggleLayerGroup(layer.id);
-											}}
-											disabled={!isParent}
-										>
-											{#if isParent}
-												{#if isExpanded}
-													<ChevronUp class="h-3 w-3" />
-												{:else}
-													<ChevronDown class="h-3 w-3" />
-												{/if}
-											{/if}
-										</button>
 
 										<!-- Visibility Toggle -->
 										{#if isOriginal}
 											<button
-												class="text-muted-foreground hover:text-foreground"
+												class="flex-shrink-0 text-muted-foreground hover:text-foreground"
 												onclick={(e) => {
 													e.stopPropagation();
 													showOriginalLayer = !showOriginalLayer;
@@ -2212,7 +2361,10 @@
 											{@const mergeOptions = getMergeTargetOptions(layer.id)}
 											{@const currentTarget = mergeTargets.get(layer.id)}
 											<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-											<div class="flex items-center" onclick={(e) => e.stopPropagation()}>
+											<div
+												class="flex items-center flex-shrink-0"
+												onclick={(e) => e.stopPropagation()}
+											>
 												<Select.Root
 													type="single"
 													value={currentTarget}
@@ -2244,7 +2396,7 @@
 											</div>
 										{:else}
 											<button
-												class="text-muted-foreground hover:text-foreground"
+												class="flex-shrink-0 text-muted-foreground hover:text-foreground"
 												onclick={(e) => {
 													e.stopPropagation();
 													toggleLayerIncluded(layer.id);
@@ -2259,175 +2411,95 @@
 											</button>
 										{/if}
 
-										<!-- Layer Preview Thumbnail -->
+										<!-- Layer Thumbnail (Larger, Square) -->
 										<div
-											class="w-12 h-8 rounded border border-border bg-muted overflow-hidden flex-shrink-0"
+											class="w-14 h-14 rounded-lg border border-border bg-muted overflow-hidden flex-shrink-0 flex items-center justify-center"
 										>
-											<img
-												src={layer.imageUrl}
-												alt={layer.name}
-												class="w-full h-full object-contain"
-												style="opacity: {getLayerOpacity(layer.id) / 100}"
-											/>
+											{#if isOriginal && selection?.elementType === 'qr'}
+												<span class="text-[10px] text-muted-foreground font-medium"
+													>QR<br />Code</span
+												>
+											{:else}
+												<img
+													src={layer.imageUrl}
+													alt={layer.name}
+													class="w-full h-full object-contain"
+													style="opacity: {getLayerOpacity(layer.id) / 100}"
+												/>
+											{/if}
 										</div>
 
 										<!-- Layer Info -->
 										<div class="flex-1 min-w-0">
-											<div class="flex items-center gap-2 flex-wrap">
-												<span class="text-sm font-medium text-foreground truncate max-w-[120px]">
+											<div class="flex items-center gap-2">
+												<span class="text-sm font-medium text-foreground truncate">
 													{layer.name}
 												</span>
-
-												{#if isOriginal}
-													<span
-														class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-500/20 text-amber-700 dark:text-amber-400"
-													>
-														SOURCE
-													</span>
-												{:else}
-													<span
-														class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-primary/10 text-primary"
-													>
-														{getTypeIcon(selection?.elementType || 'image')}
-													</span>
-												{/if}
-
-												<!-- Actions (only for visible layers or Original) -->
-												<div class="flex items-center gap-1">
-													<Button
-														variant={pendingAction === 'upscale' &&
-														pendingActionLayerId === layer.id
-															? 'default'
-															: 'ghost'}
-														size="sm"
-														class="h-6 px-2 {pendingAction === 'upscale' &&
-														pendingActionLayerId === layer.id
-															? 'bg-green-600 hover:bg-green-700 text-white'
-															: 'text-muted-foreground hover:text-green-600'}"
-														disabled={!!processingLayerId || isAnyProcessing}
-														onclick={(e) => {
-															e.stopPropagation();
-															setPendingAction('upscale', layer.id);
-														}}
-														title="Upscale"
-													>
-														{#if processingLayerId === layer.id && pendingAction === 'upscale'}
-															<Loader2 class="h-3 w-3 mr-1 animate-spin" />
-															<span class="text-[10px]">Upscaling...</span>
-														{:else}
-															<ZoomIn class="h-3 w-3 mr-1" />
-															<span class="text-[10px]">Upscale</span>
-														{/if}
-													</Button>
-
-													<Button
-														variant={pendingAction === 'decompose' &&
-														pendingActionLayerId === layer.id
-															? 'default'
-															: 'ghost'}
-														size="sm"
-														class="h-6 px-2 {pendingAction === 'decompose' &&
-														pendingActionLayerId === layer.id
-															? 'bg-green-600 hover:bg-green-700 text-white'
-															: 'text-muted-foreground hover:text-violet-600'}"
-														disabled={!!processingLayerId || isAnyProcessing}
-														onclick={(e) => {
-															e.stopPropagation();
-															setPendingAction('decompose', layer.id);
-														}}
-														title="Decompose"
-													>
-													{#if processingLayerId === layer.id && pendingAction === 'decompose'}
-															<Loader2 class="h-3 w-3 mr-1 animate-spin" />
-															<span class="text-[10px]">Decomposing...</span>
-														{:else}
-															<Wand2 class="h-3 w-3 mr-1" />
-															<span class="text-[10px]">Decompose</span>
-														{/if}
-													</Button>
-
-													<Button
-														variant={pendingAction === 'remove' &&
-														pendingActionLayerId === layer.id
-															? 'default'
-															: 'ghost'}
-														size="sm"
-														class="h-6 px-2 {pendingAction === 'remove' &&
-														pendingActionLayerId === layer.id
-															? 'bg-green-600 hover:bg-green-700 text-white'
-															: 'text-muted-foreground hover:text-red-600'}"
-														disabled={!!processingLayerId || isAnyProcessing}
-														onclick={(e) => {
-															e.stopPropagation();
-															setPendingAction('remove', layer.id);
-														}}
-														title="Remove Element"
-													>
-														{#if processingLayerId === layer.id && pendingAction === 'remove'}
-															<Loader2 class="h-3 w-3 mr-1 animate-spin" />
-															<span class="text-[10px]">Removing...</span>
-														{:else}
-															<Eraser class="h-3 w-3 mr-1" />
-															<span class="text-[10px]">Remove</span>
-														{/if}
-													</Button>
-												</div>
+												<!-- Type Badge -->
+												<span
+													class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase flex-shrink-0
+														{isOriginal
+														? 'bg-amber-500/20 text-amber-700 dark:text-amber-400'
+														: 'bg-muted text-muted-foreground border border-border'}"
+												>
+													{isOriginal ? 'SOURCE' : getTypeIcon(selection?.elementType || 'image')}
+												</span>
 											</div>
-											{#if !isOriginal && !isParent}
-												<p class="text-[10px] text-muted-foreground">
+											<div class="flex items-center gap-2 mt-0.5">
+												<span class="text-xs text-muted-foreground">
 													z-index: {layer.zIndex}
-												</p>
-											{/if}
+												</span>
+												<!-- Status Dot -->
+												{#if !isOriginal && selection?.included}
+													<span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+												{/if}
+											</div>
 										</div>
 
-										<!-- Controls for standard layers only -->
-										{#if !isOriginal}
-											<div class="flex items-center gap-1 border-l border-border pl-1 ml-auto">
+										<!-- Right Side Controls -->
+										<div class="flex items-center gap-1 flex-shrink-0">
+											<!-- Delete Button -->
+											{#if !isOriginal}
 												<button
-													class="p-1 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
-													onclick={(e) => {
-														e.stopPropagation();
-														moveLayerUp(layer.id);
-													}}
-													disabled={currentLayers.findIndex((l) => l.id === layer.id) === 0}
-													title="Move up"
-												>
-													<ChevronUp class="h-4 w-4" />
-												</button>
-												<button
-													class="p-1 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
-													onclick={(e) => {
-														e.stopPropagation();
-														moveLayerDown(layer.id);
-													}}
-													disabled={currentLayers.findIndex((l) => l.id === layer.id) ===
-														currentLayers.length - 1}
-													title="Move down"
-												>
-													<ChevronDown class="h-4 w-4" />
-												</button>
-												<button
-													class="p-1 text-muted-foreground hover:text-destructive"
+													class="p-2 rounded-md hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive"
 													onclick={(e) => {
 														e.stopPropagation();
 														deleteLayer(layer.id);
 													}}
-													title="Delete"
+													title="Delete layer"
 												>
 													<Trash2 class="h-4 w-4" />
 												</button>
-											</div>
-										{/if}
+											{/if}
+
+											<!-- Expand/Collapse Chevron -->
+											{#if !isOriginal}
+												<button
+													class="p-2 text-muted-foreground hover:text-foreground transition-colors"
+													onclick={(e) => {
+														e.stopPropagation();
+														toggleLayerExpanded(layer.id);
+													}}
+													title={isLayerExpanded ? 'Collapse' : 'Expand settings'}
+												>
+													{#if isLayerExpanded}
+														<ChevronUp class="h-4 w-4" />
+													{:else}
+														<ChevronDown class="h-4 w-4" />
+													{/if}
+												</button>
+											{/if}
+										</div>
 									</div>
 
-									<!-- Expanded Editor (Standard Layers Only) -->
-									{#if !isOriginal && selectedLayerId === layer.id && selection}
-										<div class="mt-3 pt-3 border-t border-border space-y-3">
+									<!-- Expanded Settings Panel -->
+									{#if !isOriginal && isLayerExpanded && selection}
+										<div class="px-4 pb-4 space-y-4 border-t border-border/30 bg-background/50">
 											<!-- Variable Name -->
-											<div>
+											<div class="pt-4">
 												<label
 													for="varName-{layer.id}"
-													class="text-xs text-muted-foreground block mb-1"
+													class="text-xs font-medium text-cyan-600 dark:text-cyan-400 block mb-2"
 												>
 													Variable Name
 												</label>
@@ -2437,8 +2509,8 @@
 													value={selection.variableName}
 													oninput={(e) =>
 														updateVariableName(layer.id, (e.target as HTMLInputElement).value)}
-													class="w-full rounded border border-border bg-background px-2 py-1 text-sm font-mono"
-													placeholder="layer_name"
+													class="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+													placeholder="layer_1"
 												/>
 											</div>
 
@@ -2446,33 +2518,41 @@
 											<div>
 												<label
 													for="type-{layer.id}"
-													class="text-xs text-muted-foreground block mb-1"
+													class="text-xs font-medium text-cyan-600 dark:text-cyan-400 block mb-2"
 												>
 													Element Type
 												</label>
-												<select
-													id="type-{layer.id}"
-													value={selection.elementType}
-													onchange={(e) =>
-														updateLayerType(
-															layer.id,
-															(e.target as HTMLSelectElement).value as LayerSelection['elementType']
-														)}
-													class="w-full rounded border border-border bg-background px-2 py-1 text-sm"
-												>
-													<option value="image">Image (Static graphic)</option>
-													<option value="text">Text (Dynamic field)</option>
-													<option value="photo">Photo (User upload)</option>
-													<option value="qr">QR Code</option>
-													<option value="signature">Signature</option>
-												</select>
+												<div class="relative">
+													<select
+														id="type-{layer.id}"
+														value={selection.elementType}
+														onchange={(e) =>
+															updateLayerType(
+																layer.id,
+																(e.target as HTMLSelectElement)
+																	.value as LayerSelection['elementType']
+															)}
+														class="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm appearance-none pr-10"
+													>
+														<option value="image">Image (Static graphic)</option>
+														<option value="text">Text (Dynamic field)</option>
+														<option value="photo">Photo (User upload)</option>
+														<option value="qr">QR Code</option>
+														<option value="signature">Signature</option>
+													</select>
+													<ChevronDown
+														class="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none"
+													/>
+												</div>
 											</div>
 
 											<!-- Opacity Control -->
 											<div>
-												<div class="flex items-center justify-between mb-1">
-													<label class="text-xs text-muted-foreground">Opacity</label>
-													<span class="text-xs font-mono text-muted-foreground"
+												<div class="flex items-center justify-between mb-2">
+													<label class="text-xs font-medium text-cyan-600 dark:text-cyan-400"
+														>Opacity</label
+													>
+													<span class="text-sm font-medium text-foreground"
 														>{getLayerOpacity(layer.id)}%</span
 													>
 												</div>
@@ -2486,30 +2566,21 @@
 												/>
 											</div>
 
-											<!-- Layer Settings -->
-											<div class="pt-2 border-t border-border/50">
-												<label class="text-xs text-muted-foreground block mb-2"
-													>Layer Settings</label
-												>
-
-												<div class="space-y-2">
-													<div class="flex items-center gap-2 bg-muted/30 p-2 rounded">
-														<Switch
-															id="downscale-{layer.id}"
-															checked={getLayerSettings(layer.id).downscale}
-															onCheckedChange={() => toggleLayerDownscale(layer.id)}
-															class="scale-75 origin-left"
-														/>
-														<div class="flex flex-col">
-															<Label for="downscale-{layer.id}" class="text-[10px] cursor-pointer"
-																>Pre-shrink before upscale</Label
-															>
-															<span class="text-[9px] text-muted-foreground"
-																>Make artificially low-res</span
-															>
-														</div>
-													</div>
+											<!-- Pre-shrink Toggle -->
+											<div
+												class="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30"
+											>
+												<div>
+													<p class="text-sm font-medium text-foreground">
+														Pre-shrink before upscale
+													</p>
+													<p class="text-xs text-muted-foreground">Make artificially low-res</p>
 												</div>
+												<Switch
+													id="downscale-{layer.id}"
+													checked={getLayerSettings(layer.id).downscale}
+													onCheckedChange={() => toggleLayerDownscale(layer.id)}
+												/>
 											</div>
 										</div>
 									{/if}
@@ -2517,6 +2588,63 @@
 							{/each}
 						</div>
 					{/if}
+				</div>
+			</div>
+
+			<!-- Layer Actions Bar -->
+			<div class="rounded-xl border border-border bg-card p-3">
+				<div class="flex items-center justify-between mb-2">
+					<span class="text-xs font-medium text-muted-foreground">
+						{selectedLayerId
+							? `Selected: ${currentLayers.find((l) => l.id === selectedLayerId)?.name || 'Layer'}`
+							: 'Select a layer to enable actions'}
+					</span>
+					{#if selectedLayerId}
+						<button
+							class="text-xs text-muted-foreground hover:text-foreground"
+							onclick={() => (selectedLayerId = null)}
+						>
+							Clear
+						</button>
+					{/if}
+				</div>
+				<div class="grid grid-cols-4 gap-2">
+					<button
+						class="flex flex-col items-center gap-1 p-3 rounded-lg border border-border bg-background hover:bg-violet-500/10 hover:border-violet-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-background disabled:hover:border-border"
+						onclick={() => selectedLayerId && handleMenuAction('decompose', selectedLayerId)}
+						disabled={!selectedLayerId || isAnyProcessing}
+						title="Decompose layer"
+					>
+						<Wand2 class="h-5 w-5 text-violet-600" />
+						<span class="text-[10px] font-medium">Decompose</span>
+					</button>
+					<button
+						class="flex flex-col items-center gap-1 p-3 rounded-lg border border-border bg-background hover:bg-green-500/10 hover:border-green-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-background disabled:hover:border-border"
+						onclick={() => selectedLayerId && handleMenuAction('upscale', selectedLayerId)}
+						disabled={!selectedLayerId || isAnyProcessing}
+						title="Upscale layer"
+					>
+						<ZoomIn class="h-5 w-5 text-green-600" />
+						<span class="text-[10px] font-medium">Upscale</span>
+					</button>
+					<button
+						class="flex flex-col items-center gap-1 p-3 rounded-lg border border-border bg-background hover:bg-red-500/10 hover:border-red-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-background disabled:hover:border-border"
+						onclick={() => selectedLayerId && handleMenuAction('remove', selectedLayerId)}
+						disabled={!selectedLayerId || isAnyProcessing}
+						title="Remove element from layer"
+					>
+						<Eraser class="h-5 w-5 text-red-600" />
+						<span class="text-[10px] font-medium">Remove</span>
+					</button>
+					<button
+						class="flex flex-col items-center gap-1 p-3 rounded-lg border border-border bg-background hover:bg-amber-500/10 hover:border-amber-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-background disabled:hover:border-border"
+						onclick={() => selectedLayerId && handleMenuAction('custom', selectedLayerId)}
+						disabled={!selectedLayerId || isAnyProcessing}
+						title="Custom AI prompt"
+					>
+						<Sparkles class="h-5 w-5 text-amber-600" />
+						<span class="text-[10px] font-medium">Custom</span>
+					</button>
 				</div>
 			</div>
 
@@ -2541,8 +2669,9 @@
 						{:else}
 							<div class="flex flex-col gap-3">
 								{#each history as item (item.id)}
-									{@const isUpscale =
-										item.provider === 'fal-ai-upscale' || (!item.layers?.length && item.resultUrl)}
+									{@const isUpscale = item.provider === 'fal-ai-upscale'}
+									{@const isRemove = item.provider === 'runware-remove-element'}
+									{@const isSingleResult = isUpscale || isRemove}
 									{@const isExpanded = expandedHistoryItems.has(item.id)}
 
 									<div class="space-y-2">
@@ -2551,7 +2680,7 @@
 											class="w-full group relative flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-2 overflow-hidden transition-all hover:border-primary/50 hover:shadow-md
 												{activeHistoryId === item.id ? 'ring-2 ring-primary border-primary' : ''}"
 											onclick={() => {
-												if (isUpscale) {
+												if (isSingleResult) {
 													requestLoadFromHistory(item);
 												} else {
 													toggleHistoryExpanded(item.id);
@@ -2563,7 +2692,9 @@
 												class="relative h-12 w-20 flex-shrink-0 overflow-hidden rounded border border-border bg-muted"
 											>
 												<img
-													src={isUpscale && item.resultUrl ? item.resultUrl : item.inputImageUrl}
+													src={isSingleResult && item.resultUrl
+														? item.resultUrl
+														: item.inputImageUrl}
 													alt="AI Generation"
 													class="w-full h-full object-cover"
 												/>
@@ -2596,13 +2727,19 @@
 														class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium
 															{isUpscale
 															? 'bg-green-500/10 text-green-700 dark:text-green-400 border border-green-500/20'
-															: 'bg-violet-500/10 text-violet-700 dark:text-violet-400 border border-violet-500/20'}"
+															: isRemove
+																? 'bg-orange-500/10 text-orange-700 dark:text-orange-400 border border-orange-500/20'
+																: 'bg-violet-500/10 text-violet-700 dark:text-violet-400 border border-violet-500/20'}"
 													>
-														{isUpscale ? 'Upscale' : `${item.layers?.length || 0} layers`}
+														{isUpscale
+															? 'Upscale'
+															: isRemove
+																? 'Remove'
+																: `${item.layers?.length || 0} layers`}
 													</span>
 
 													<!-- Expand Indicator -->
-													{#if !isUpscale}
+													{#if !isSingleResult}
 														<div
 															class="text-muted-foreground group-hover:text-foreground transition-colors"
 														>
@@ -2618,7 +2755,7 @@
 										</button>
 
 										<!-- Expanded Layers List (Draggable) (Stays same) -->
-										{#if isExpanded && !isUpscale && item.layers}
+										{#if isExpanded && !isSingleResult && item.layers}
 											<div class="pl-4 space-y-2 border-l-2 border-border/50">
 												<p class="text-[10px] text-muted-foreground font-medium">
 													Drag layers to add:

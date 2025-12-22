@@ -1,7 +1,8 @@
 import { command, query } from '$app/server';
 import { error } from '@sveltejs/kit';
 import { getRequestEvent } from '$app/server';
-import { decomposeWithFal, isFalConfigured, removeElementFromImage } from '$lib/server/fal-layers';
+import { decomposeWithFal, isFalConfigured } from '$lib/server/fal-layers';
+import { editImageWithRunware } from '$lib/server/runware';
 import { db } from '$lib/server/db';
 import * as schema from '$lib/server/schema';
 import { uploadToR2 } from '$lib/server/s3';
@@ -34,7 +35,10 @@ const decomposeImageSchema = z.object({
 
 const upscaleImageSchema = z.object({
 	imageUrl: z.string().url('Invalid image URL'),
-	model: z.enum(['seedvr', 'aurasr', 'esrgan', 'recraft-creative']).optional().default('seedvr'),
+	model: z
+		.enum(['ccsr', 'seedvr', 'aurasr', 'esrgan', 'recraft-creative'])
+		.optional()
+		.default('ccsr'),
 	side: z.enum(['front', 'back']).optional(),
 	templateId: z.string().uuid().nullable().optional()
 });
@@ -145,7 +149,7 @@ export const decomposeImage = command(
 				layers: []
 			};
 		}
-		
+
 		const {
 			imageUrl,
 			numLayers,
@@ -158,7 +162,7 @@ export const decomposeImage = command(
 			templateId,
 			side
 		} = parseResult.data;
-		
+
 		console.log('[decompose.remote] decomposeImage called with:', {
 			imageUrl,
 			numLayers,
@@ -243,11 +247,13 @@ export const decomposeImage = command(
 							// Download from ephemeral URL with timeout (30s)
 							const response = await fetchWithTimeout(layer.url, 30000);
 							if (!response.ok) {
-								throw new Error(`Failed to download layer from AI provider: ${response.status} ${response.statusText}`);
+								throw new Error(
+									`Failed to download layer from AI provider: ${response.status} ${response.statusText}`
+								);
 							}
 							const arrayBuffer = await response.arrayBuffer();
 							const buffer = Buffer.from(arrayBuffer);
-	
+
 							// Upload to R2
 							let key: string;
 							if (templateId) {
@@ -256,23 +262,29 @@ export const decomposeImage = command(
 								// Fallback if no templateId provided (e.g. standalone tool)
 								key = `decompose/${user?.id}/${timestamp}_${generationId}/layer_${index}.png`;
 							}
-	
+
 							const r2Url = await uploadToR2(key, buffer, 'image/png');
-	
+
 							return {
 								...layer,
 								imageUrl: r2Url, // Normalize to imageUrl for frontend consistency
 								url: r2Url
 							};
 						} catch (uploadErr: any) {
-							console.warn(`[decompose.remote] Attempt ${attempt + 1}/3 failed to persist layer ${index}:`, uploadErr);
+							console.warn(
+								`[decompose.remote] Attempt ${attempt + 1}/3 failed to persist layer ${index}:`,
+								uploadErr
+							);
 							lastError = uploadErr;
-							await new Promise(r => setTimeout(r, 1000 * (attempt + 1))); // Backoff
+							await new Promise((r) => setTimeout(r, 1000 * (attempt + 1))); // Backoff
 						}
 					}
 					// If all retries fail, return the ephemeral URL but mark as partial failure
-					console.error(`[decompose.remote] Failed to persist layer ${index} after retries. Returning ephemeral.`);
-					historyWarning = (historyWarning || '') + `Failed to save layer ${index + 1} permanently. `;
+					console.error(
+						`[decompose.remote] Failed to persist layer ${index} after retries. Returning ephemeral.`
+					);
+					historyWarning =
+						(historyWarning || '') + `Failed to save layer ${index + 1} permanently. `;
 					return layer; // Return original ephemeral layer
 				})
 			);
@@ -327,7 +339,9 @@ export const decomposeImage = command(
  */
 export const upscaleImagePreview = command(
 	'unchecked',
-	async (input: z.input<typeof upscaleImageSchema>): Promise<{
+	async (
+		input: z.input<typeof upscaleImageSchema>
+	): Promise<{
 		success: boolean;
 		upscaledUrl?: string;
 		originalUrl: string;
@@ -343,15 +357,22 @@ export const upscaleImagePreview = command(
 				error: `Validation error: ${parseResult.error.issues.map((e: { message: string }) => e.message).join(', ')}`
 			};
 		}
-		
+
 		const { imageUrl, model, side, templateId } = parseResult.data;
-		
-		console.log('[decompose.remote] upscaleImagePreview called with:', imageUrl, 'model:', model, 'templateId:', templateId);
+
+		console.log(
+			'[decompose.remote] upscaleImagePreview called with:',
+			imageUrl,
+			'model:',
+			model,
+			'templateId:',
+			templateId
+		);
 		const { user, org_id } = await requireAdmin();
 
 		// Check credits first - Define upscale cost (e.g. 1 credit)
 		const upscaleCost = 1; // Or define in CREDIT_COSTS.AI_UPSCALE
-		
+
 		/* BYPASS CREDIT CHECK
 		// Refresh user data
 		const userProfile = await db.query.profiles.findFirst({
@@ -368,7 +389,7 @@ export const upscaleImagePreview = command(
 		}
 		*/
 		console.log('[decompose.remote] Credit check bypassed for Upscale');
-		
+
 		let historyWarning: string | undefined;
 
 		try {
@@ -420,20 +441,34 @@ export const upscaleImagePreview = command(
 					persistenceSuccess = true;
 					break;
 				} catch (uploadErr: any) {
-					console.warn(`[decompose.remote] Attempt ${attempt + 1}/3 failed to persist upscale:`, uploadErr);
-					await new Promise(r => setTimeout(r, 1000 * (attempt + 1))); // Backoff
+					console.warn(
+						`[decompose.remote] Attempt ${attempt + 1}/3 failed to persist upscale:`,
+						uploadErr
+					);
+					await new Promise((r) => setTimeout(r, 1000 * (attempt + 1))); // Backoff
 				}
 			}
 
 			if (!persistenceSuccess) {
-				// Critical failure: paid for upscale but failed to save. 
+				// Critical failure: paid for upscale but failed to save.
 				// fallback: try to return temp URL but warn heavily.
-				historyWarning = (historyWarning || '') + ' Failed to save upscaled image permanently (Link expires soon).';
+				historyWarning =
+					(historyWarning || '') +
+					' Failed to save upscaled image permanently (Link expires soon).';
 				r2Url = tempUpscaledUrl; // Better than nothing? Or maybe fail?
 			}
 
 			// 3. Save to History (aiGenerations)
-			console.log('[decompose.remote] Saving to history. Org:', org_id, 'User:', user?.id, 'Side:', side, 'TemplateId:', templateId);
+			console.log(
+				'[decompose.remote] Saving to history. Org:',
+				org_id,
+				'User:',
+				user?.id,
+				'Side:',
+				side,
+				'TemplateId:',
+				templateId
+			);
 			if (org_id && user?.id) {
 				try {
 					await db.insert(schema.aiGenerations).values({
@@ -767,13 +802,14 @@ export const getDecomposeHistoryWithStats = query(
 		}
 
 		try {
-			// Fetch all decompose and upscale generations for the org
+			// Fetch all decompose, upscale, and remove generations for the org
 			// Filter by templateId if provided
 			const filters = [
 				eq(schema.aiGenerations.orgId, org_id),
 				or(
 					eq(schema.aiGenerations.provider, 'fal-ai-decompose'),
-					eq(schema.aiGenerations.provider, 'fal-ai-upscale')
+					eq(schema.aiGenerations.provider, 'fal-ai-upscale'),
+					eq(schema.aiGenerations.provider, 'runware-remove-element')
 				)
 			];
 
@@ -854,12 +890,14 @@ export const getDecomposeHistoryWithStats = query(
 );
 
 /**
- * Remove unwanted elements from an image using Qwen-Image-Edit-Remover-General-LoRA.
+ * Remove unwanted elements from an image using Runware AI (prunaai model).
  * Persists to R2 and saves to history.
  */
 export const removeElementFromLayer = command(
 	'unchecked',
-	async (input: z.input<typeof removeElementSchema>): Promise<{
+	async (
+		input: z.input<typeof removeElementSchema>
+	): Promise<{
 		success: boolean;
 		resultUrl?: string;
 		originalUrl: string;
@@ -876,13 +914,11 @@ export const removeElementFromLayer = command(
 			};
 		}
 
-		const { imageUrl, prompt, imageWidth, imageHeight, side, templateId } = parseResult.data;
+		const { imageUrl, prompt, side, templateId } = parseResult.data;
 
 		console.log('[decompose.remote] removeElementFromLayer called with:', {
 			imageUrl,
 			prompt,
-			imageWidth,
-			imageHeight,
 			side,
 			templateId
 		});
@@ -895,24 +931,14 @@ export const removeElementFromLayer = command(
 		let historyWarning: string | undefined;
 
 		try {
-			if (!isFalConfigured()) {
-				console.log('[decompose.remote] FAL_KEY not configured, returning mock remove element');
-				return {
-					success: true,
-					resultUrl: imageUrl, // Mock: return original
-					originalUrl: imageUrl
-				};
-			}
+			console.log(
+				`[decompose.remote] Calling Runware editImageWithRunware with prompt: "${prompt}"...`
+			);
 
-			console.log(`[decompose.remote] Calling removeElementFromImage with prompt: "${prompt}"...`);
-			const result = await removeElementFromImage({
-				imageUrl,
-				prompt,
-				imageWidth,
-				imageHeight
-			});
+			// Use Runware with 'all' as the remove type, but pass the custom prompt
+			const result = await editImageWithRunware(imageUrl, 'all', prompt);
 
-			if (!result.success || !result.resultUrl) {
+			if (!result.success || !result.imageUrl) {
 				return {
 					success: false,
 					originalUrl: imageUrl,
@@ -920,7 +946,7 @@ export const removeElementFromLayer = command(
 				};
 			}
 
-			console.log('[decompose.remote] Remove element complete (temp):', result.resultUrl);
+			console.log('[decompose.remote] Remove element complete (Runware):', result.imageUrl);
 			console.log('[decompose.remote] Credit deduction bypassed for Remove Element');
 
 			// 1. Persist to R2 with retries
@@ -932,33 +958,45 @@ export const removeElementFromLayer = command(
 			let persistenceSuccess = false;
 			for (let attempt = 0; attempt < 3; attempt++) {
 				try {
-					const response = await fetchWithTimeout(result.resultUrl, 30000);
-					if (!response.ok) throw new Error('Failed to download image from Fal');
+					const response = await fetchWithTimeout(result.imageUrl, 30000);
+					if (!response.ok) throw new Error('Failed to download image from Runware');
 					const buffer = Buffer.from(await response.arrayBuffer());
 					r2Url = await uploadToR2(key, buffer, 'image/png');
 					console.log('[decompose.remote] Persisted to R2:', r2Url);
 					persistenceSuccess = true;
 					break;
 				} catch (uploadErr: any) {
-					console.warn(`[decompose.remote] Attempt ${attempt + 1}/3 failed to persist remove element:`, uploadErr);
-					await new Promise(r => setTimeout(r, 1000 * (attempt + 1))); // Backoff
+					console.warn(
+						`[decompose.remote] Attempt ${attempt + 1}/3 failed to persist remove element:`,
+						uploadErr
+					);
+					await new Promise((r) => setTimeout(r, 1000 * (attempt + 1))); // Backoff
 				}
 			}
 
 			if (!persistenceSuccess) {
-				historyWarning = (historyWarning || '') + ' Failed to save processed image permanently (Link expires soon).';
-				r2Url = result.resultUrl; // Fallback to ephemeral
+				historyWarning =
+					(historyWarning || '') +
+					' Failed to save processed image permanently (Link expires soon).';
+				r2Url = result.imageUrl; // Fallback to ephemeral
 			}
 
 			// 2. Save to History (aiGenerations)
-			console.log('[decompose.remote] Saving to history. Org:', org_id, 'User:', user?.id, 'Side:', side);
+			console.log(
+				'[decompose.remote] Saving to history. Org:',
+				org_id,
+				'User:',
+				user?.id,
+				'Side:',
+				side
+			);
 			if (org_id && user?.id) {
 				try {
 					await db.insert(schema.aiGenerations).values({
 						orgId: org_id,
 						userId: user.id,
-						provider: 'fal-ai-remove-element',
-						model: 'Qwen-Image-Edit-Remover',
+						provider: 'runware-remove-element',
+						model: 'prunaai:2@1',
 						creditsUsed: removeElementCost,
 						prompt: prompt,
 						resultUrl: r2Url,
@@ -967,7 +1005,7 @@ export const removeElementFromLayer = command(
 							side: side || undefined,
 							type: 'remove-element',
 							template_id: templateId || undefined,
-							seed: result.seed
+							cost: result.cost
 						}
 					});
 				} catch (dbErr) {

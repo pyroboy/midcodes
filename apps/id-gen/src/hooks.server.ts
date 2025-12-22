@@ -123,13 +123,18 @@ const betterAuthHandle: Handle = async ({ event, resolve }) => {
 
 const securityHeadersHandle: Handle = async ({ event, resolve }) => {
 	// SECURITY: Build Content Security Policy
+	// DEV: blob: added to connect-src for local image cropping (blob URL fetch)
+	const connectSrc = dev
+		? "connect-src 'self' blob: https://api.runware.ai https://*.runware.ai https://*.neon.tech https://assets.kanaya.app https://cdn.jsdelivr.net http://localhost:* ws://localhost:* https://cloudflareinsights.com https://static.cloudflareinsights.com"
+		: "connect-src 'self' https://api.runware.ai https://*.runware.ai https://*.neon.tech https://assets.kanaya.app https://cdn.jsdelivr.net http://localhost:* ws://localhost:* https://cloudflareinsights.com https://static.cloudflareinsights.com";
+
 	const cspDirectives = [
 		"default-src 'self'",
 		"script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://static.cloudflareinsights.com",
 		"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
 		"img-src 'self' data: blob: https://*.neon.tech https://assets.kanaya.app https://*.fal.media https://im.runware.ai", // Custom R2 domain and fal.ai images
 		"font-src 'self' https://fonts.gstatic.com",
-		"connect-src 'self' https://api.runware.ai https://*.runware.ai https://*.neon.tech https://assets.kanaya.app https://cdn.jsdelivr.net http://localhost:* ws://localhost:* https://cloudflareinsights.com https://static.cloudflareinsights.com", // Custom R2 domain
+		connectSrc, // Custom R2 domain; blob: only in dev
 		"worker-src 'self' blob:",
 		"frame-ancestors 'none'",
 		"base-uri 'self'",

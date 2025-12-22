@@ -1,0 +1,229 @@
+
+> id-gen@2 check /Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen
+> svelte-kit sync && svelte-check --tsconfig ./tsconfig.json
+
+Loading svelte-check in workspace: /Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen
+Getting Svelte diagnostics...
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/routes/admin/template-assets/decompose/+page.svelte:127:42
+Warn: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+	let hasUnsavedChanges = $state(false);
+	let lastUpdated = $state<string | null>(data.template?.updatedAt || null);
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/routes/admin/template-assets/decompose/+page.svelte:2215:12
+Warn: `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+											<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+											<div class="flex items-center" onclick={(e) => e.stopPropagation()}>
+												<Select.Root
+													type="single"
+													value={currentTarget}
+													onValueChange={(v) => setMergeTarget(layer.id, v || undefined)}
+												>
+													<Select.Trigger class="h-6 w-24 text-[10px] px-2">
+														{#if currentTarget}
+															<span class="text-violet-600 truncate">
+																→ {currentLayers.find((l) => l.id === currentTarget)?.name ||
+																	'Layer'}
+															</span>
+														{:else}
+															<span class="text-muted-foreground">Merge into...</span>
+														{/if}
+													</Select.Trigger>
+													<Select.Content>
+														{#if currentTarget}
+															<Select.Item value="">
+																<span class="text-muted-foreground">None</span>
+															</Select.Item>
+														{/if}
+														{#each mergeOptions as target (target.id)}
+															<Select.Item value={target.id}>
+																{target.name}
+															</Select.Item>
+														{/each}
+													</Select.Content>
+												</Select.Root>
+											</div>
+										{:else}
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/routes/admin/template-assets/decompose/+page.svelte:2474:14
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+												<div class="flex items-center justify-between mb-1">
+													<label class="text-xs text-muted-foreground">Opacity</label>
+													<span class="text-xs font-mono text-muted-foreground"
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/routes/admin/template-assets/decompose/+page.svelte:2491:13
+Warn: A form label must be associated with a control
+https://svelte.dev/e/a11y_label_has_associated_control (svelte)
+											<div class="pt-2 border-t border-border/50">
+												<label class="text-xs text-muted-foreground block mb-2"
+													>Layer Settings</label
+												>
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/routes/admin/template-assets/decompose/+page.svelte:2479:19
+Error: Type '{ min: number; max: number; step: number; value: number[]; onValueChange: (v: any) => void; class: string; }' is not assignable to type 'WithoutChildrenOrChild<SliderRootProps> | undefined'.
+  Property 'type' is missing in type '{ min: number; max: number; step: number; value: number[]; onValueChange: (v: any) => void; class: string; }' but required in type 'Omit<Omit<Omit<SliderMultiRootPropsWithoutHTML, "children" | "child"> & { child?: Snippet<[SliderRootSnippetProps & { ...; }]> | undefined; children?: Snippet<...> | undefined; style?: string | ... 2 more ... | undefined; ref?: HTMLElement | ... 1 more ... | undefined; } & Without<...>, "child">, "children">'. (ts)
+												</div>
+												<Slider
+													min={0}
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/routes/admin/template-assets/decompose/+page.svelte:2484:30
+Error: Parameter 'v' implicitly has an 'any' type. (ts)
+													value={[getLayerOpacity(layer.id)]}
+													onValueChange={(v) => setLayerOpacity(layer.id, v[0])}
+													class="w-full"
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/routes/admin/template-assets/enhance/CropModal.svelte:234:5
+Warn: Buttons and links should either contain text or have an `aria-label`, `aria-labelledby` or `title` attribute
+https://svelte.dev/e/a11y_consider_explicit_label (svelte)
+				<h3 class="text-lg font-semibold text-foreground">Crop Image</h3>
+				<button 
+					class="text-muted-foreground hover:text-foreground"
+					onclick={() => isOpen = false}
+				>
+					<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+					</svg>
+				</button>
+			</div>
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/routes/admin/template-assets/enhance/CropModal.svelte:245:4
+Warn: Non-interactive element `<div>` should not be assigned mouse or keyboard event listeners
+https://svelte.dev/e/a11y_no_noninteractive_element_interactions (svelte)
+			<!-- Workspace -->
+			<div 
+				class="relative flex-1 bg-neutral-900 overflow-hidden cursor-move select-none"
+				bind:this={containerElement}
+				onwheel={handleWheel}
+				onmousedown={handleMouseDown}
+				onmousemove={handleMouseMove}
+				onmouseup={handleMouseUp}
+				onmouseleave={handleMouseUp}
+				role="application"
+				aria-label="Image crop workspace"
+			>
+				<!-- Image Layer -->
+				<div 
+					class="absolute w-full h-full flex items-center justify-center pointer-events-none"
+				>
+					<img 
+						bind:this={imageElement}
+						src={imageUrl} 
+						alt="To crop"
+						class="max-w-none origin-center transition-transform duration-75"
+						style:transform="translate({transform.x}px, {transform.y}px) scale({transform.scale})"
+						style:max-height="80vh" 
+						onload={() => {
+							calculateViewport();
+						}}
+					/>
+				</div>
+
+				<!-- Overlay Mask Layer -->
+				{#if viewport.width > 0}
+					<!-- Top -->
+					<div class="absolute bg-black/50 backdrop-blur-[1px]" 
+						style="top: 0; left: 0; right: 0; height: {viewport.y}px;"></div>
+					<!-- Bottom -->
+					<div class="absolute bg-black/50 backdrop-blur-[1px]" 
+						style="bottom: 0; left: 0; right: 0; top: {viewport.y + viewport.height}px;"></div>
+					<!-- Left -->
+					<div class="absolute bg-black/50 backdrop-blur-[1px]" 
+						style="top: {viewport.y}px; bottom: {containerElement?.clientHeight - (viewport.y + viewport.height)}px; left: 0; width: {viewport.x}px;"></div>
+					<!-- Right -->
+					<div class="absolute bg-black/50 backdrop-blur-[1px]" 
+						style="top: {viewport.y}px; bottom: {containerElement?.clientHeight - (viewport.y + viewport.height)}px; right: 0; left: {viewport.x + viewport.width}px;"></div>
+					
+					<!-- Viewport Border -->
+					<div 
+						class="absolute border-2 border-white shadow-[0_0_0_1px_rgba(0,0,0,0.5)] pointer-events-none"
+						style="top: {viewport.y}px; left: {viewport.x}px; width: {viewport.width}px; height: {viewport.height}px;"
+					>
+						<!-- Grid lines (Thirds) -->
+						<div class="absolute top-1/3 left-0 right-0 h-px bg-white/30"></div>
+						<div class="absolute top-2/3 left-0 right-0 h-px bg-white/30"></div>
+						<div class="absolute left-1/3 top-0 bottom-0 w-px bg-white/30"></div>
+						<div class="absolute left-2/3 top-0 bottom-0 w-px bg-white/30"></div>
+					</div>
+				{/if}
+			</div>
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/routes/admin/template-assets/enhance/CropModal.svelte:22:6
+Warn: `containerElement` is updated, but is not declared with `$state(...)`. Changing its value will not correctly trigger updates
+https://svelte.dev/e/non_reactive_update (svelte)
+
+	let containerElement: HTMLDivElement;
+	let imageElement: HTMLImageElement;
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/routes/admin/template-assets/enhance/CropModal.svelte:23:6
+Warn: `imageElement` is updated, but is not declared with `$state(...)`. Changing its value will not correctly trigger updates
+https://svelte.dev/e/non_reactive_update (svelte)
+	let containerElement: HTMLDivElement;
+	let imageElement: HTMLImageElement;
+	let isProcessing = $state(false);
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/routes/admin/template-assets/enhance/+page.svelte:14:38
+Warn: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+	// Source image for processing
+	let frontSourceUrl = $state<string>(data.asset.frontImageUrl);
+	let backSourceUrl = $state<string | null>(data.asset.backImageUrl);
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/routes/admin/template-assets/enhance/+page.svelte:15:44
+Warn: This reference only captures the initial value of `data`. Did you mean to reference it inside a derived instead?
+https://svelte.dev/e/state_referenced_locally (svelte)
+	let frontSourceUrl = $state<string>(data.asset.frontImageUrl);
+	let backSourceUrl = $state<string | null>(data.asset.backImageUrl);
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/routes/admin/template-assets/enhance/+page.svelte:815:3
+Warn: Elements with the 'dialog' interactive role must have a tabindex value
+https://svelte.dev/e/a11y_interactive_supports_focus (svelte)
+		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+		<div 
+			class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+			transition:fade={{ duration: 200 }}
+			onclick={() => imageModalOpen = false}
+			role="dialog"
+			aria-modal="true"
+		>
+			<div 
+				class="relative max-w-7xl max-h-full w-full h-full flex items-center justify-center"
+				onclick={(e) => e.stopPropagation()}
+			>
+				<img
+					src={currentSourceUrl}
+					alt="Full view"
+					class="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+					transition:scale={{ start: 0.95, duration: 200 }}
+				/>
+				<button
+					class="absolute top-4 right-4 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+					onclick={() => imageModalOpen = false}
+				>
+					<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+					</svg>
+				</button>
+			</div>
+		</div>
+	{/if}
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/routes/admin/template-assets/enhance/+page.svelte:832:5
+Warn: Buttons and links should either contain text or have an `aria-label`, `aria-labelledby` or `title` attribute
+https://svelte.dev/e/a11y_consider_explicit_label (svelte)
+				/>
+				<button
+					class="absolute top-4 right-4 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+					onclick={() => imageModalOpen = false}
+				>
+					<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+					</svg>
+				</button>
+			</div>
+
+====================================
+svelte-check found 2 errors and 12 warnings in 3 files
+ ELIFECYCLE  Command failed with exit code 1.

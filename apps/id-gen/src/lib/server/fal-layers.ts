@@ -210,12 +210,19 @@ export function isFalConfigured(): boolean {
 	return !!env.FAL_KEY;
 }
 
-export type UpscaleModel = 'seedvr' | 'aurasr' | 'esrgan' | 'recraft-creative';
+export type UpscaleModel = 'seedvr' | 'aurasr' | 'esrgan' | 'recraft-creative' | 'ccsr';
 
 /**
  * Upscale an image by 2x using the selected model.
  */
-export async function upscaleImage(imageUrl: string, model: UpscaleModel = 'seedvr'): Promise<string> {
+export async function upscaleImage(
+	imageUrl: string, 
+	model: UpscaleModel = 'seedvr',
+	options?: {
+		upscaleFactor?: number;
+		denoise?: number | 'Low' | 'Medium' | 'High'; // For models that support it
+	}
+): Promise<string> {
 	const isConfigured = initFal();
 	if (!isConfigured) {
 		console.log('[fal-layers] FAL_KEY not configured, returning original image for mock upscale');
@@ -231,11 +238,11 @@ export async function upscaleImage(imageUrl: string, model: UpscaleModel = 'seed
 				input: {
 					image_url: imageUrl,
 					upscale_mode: 'factor',
-					upscale_factor: 2,
+					upscale_factor: options?.upscaleFactor ?? 2,
 					target_resolution: '1080p',
 					noise_scale: 0.1,
 					output_format: 'png'
-				},
+				} as any, // Cast input to any as requested
 				logs: true,
 				onQueueUpdate: (update) => {
 					if (update.status === 'IN_PROGRESS' && update.logs) {
@@ -247,8 +254,8 @@ export async function upscaleImage(imageUrl: string, model: UpscaleModel = 'seed
 			result = await fal.subscribe('fal-ai/aura-sr', {
 				input: {
 					image_url: imageUrl,
-					upscaling_factor: 4 as any
-				},
+					upscaling_factor: (options?.upscaleFactor ?? 4) as any
+				} as any, // Cast input to any as requested
 
 				logs: true,
 				onQueueUpdate: (update) => {
@@ -260,8 +267,10 @@ export async function upscaleImage(imageUrl: string, model: UpscaleModel = 'seed
 		} else if (model === 'esrgan') {
 			result = await fal.subscribe('fal-ai/esrgan', {
 				input: {
-					image_url: imageUrl
-				},
+					image_url: imageUrl,
+					face_enhance: true, // Commonly desired with ESRGAN
+					denoise: options?.denoise ?? 3 // Default to Level 3 as requested ("usually High/Level 3")
+				} as any, // Cast input to any as requested
 
 				logs: true,
 				onQueueUpdate: (update) => {
@@ -274,7 +283,30 @@ export async function upscaleImage(imageUrl: string, model: UpscaleModel = 'seed
 			result = await fal.subscribe('fal-ai/recraft/upscale/creative', {
 				input: {
 					image_url: imageUrl
-				},
+				} as any, // Cast input to any as requested
+
+				logs: true,
+				onQueueUpdate: (update) => {
+					if (update.status === 'IN_PROGRESS' && update.logs) {
+						update.logs.map((log) => log.message).forEach((msg) => console.log('[fal-layers] [upscale]', msg));
+					}
+				}
+			});
+		} else if (model === 'ccsr') {
+			result = await fal.subscribe('fal-ai/ccsr', {
+				input: {
+					image_url: imageUrl,
+					scale: 1.5, // Default from request
+					tile_diffusion: "none",
+					tile_diffusion_size: 1024,
+					tile_diffusion_stride: 512,
+					tile_vae_decoder_size: 314, // Note: using 314 as requested, though seems specific
+					tile_vae_encoder_size: 1024,
+					steps: 30,
+					t_max: 0.5,
+					t_min: 0.4,
+					color_fix_type: "adain"
+				} as any,
 
 				logs: true,
 				onQueueUpdate: (update) => {

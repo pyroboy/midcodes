@@ -10,6 +10,7 @@ import {
 	type UpscaleResult,
 	type EditResult
 } from '$lib/server/runware';
+import { upscaleImage as upscaleWithFal } from '$lib/server/fal-layers';
 import { error } from '@sveltejs/kit';
 import { checkAdmin } from '$lib/utils/adminPermissions';
 import { db } from '$lib/server/db';
@@ -30,8 +31,56 @@ async function requireAdmin() {
  */
 export const upscaleImage = command(
 	'unchecked',
-	async ({ imageUrl, upscaleFactor = 2 }: { imageUrl: string; upscaleFactor?: 2 | 4 }): Promise<UpscaleResult> => {
+	async ({ imageUrl, upscaleFactor = 2, model = 'runware' }: { imageUrl: string; upscaleFactor?: 2 | 4; model?: 'runware' | 'esrgan' | 'seedvr' | 'ccsr' }): Promise<UpscaleResult> => {
 		await requireAdmin();
+
+		if (model === 'esrgan') {
+			try {
+				const url = await upscaleWithFal(imageUrl, 'esrgan', { denoise: 3 });
+				return {
+					success: true,
+					imageUrl: url,
+					cost: 0 // Fal cost tracking not implemented here yet
+				};
+			} catch (e) {
+				console.error('Fal upscale error:', e);
+				return {
+					success: false,
+					error: e instanceof Error ? e.message : 'Fal upscale failed'
+				};
+			}
+		} else if (model === 'seedvr') {
+			try {
+				const url = await upscaleWithFal(imageUrl, 'seedvr');
+				return {
+					success: true,
+					imageUrl: url,
+					cost: 0 // Fal cost tracking not implemented here yet
+				};
+			} catch (e) {
+				console.error('Fal seedvr upscale error:', e);
+				return {
+					success: false,
+					error: e instanceof Error ? e.message : 'Fal seedvr upscale failed'
+				};
+			}
+		} else if (model === 'ccsr') {
+			try {
+				const url = await upscaleWithFal(imageUrl, 'ccsr');
+				return {
+					success: true,
+					imageUrl: url,
+					cost: 0 // Fal cost tracking not implemented here yet
+				};
+			} catch (e) {
+				console.error('Fal ccsr upscale error:', e);
+				return {
+					success: false,
+					error: e instanceof Error ? e.message : 'Fal ccsr upscale failed'
+				};
+			}
+		}
+
 		const result = await upscaleImageWithRunware(imageUrl, upscaleFactor);
 		return result;
 	}
@@ -139,6 +188,33 @@ export const saveEnhancedImage = command(
 		} catch (err) {
 			console.error('[saveEnhancedImage] Error:', err);
 			throw error(500, err instanceof Error ? err.message : 'Failed to save enhanced image');
+		}
+	}
+);
+
+/**
+ * Upload a raw image (base64) to R2 and return the URL.
+ * distinct from saveEnhancedImage which updates DB.
+ */
+export const uploadImage = command(
+	'unchecked',
+	async ({ base64, contentType }: { base64: string; contentType: string }) => {
+		await requireAdmin();
+
+		try {
+			const buffer = Buffer.from(base64, 'base64');
+			const ext = contentType.split('/')[1] || 'png';
+			// Use a clean path: assets/uploads/{timestamp}_{random}.{ext}
+			const timestamp = Date.now();
+			const filename = `assets/uploads/${timestamp}_${Math.random().toString(36).substring(7)}.${ext}`;
+
+			console.log(`[uploadImage] Uploading to R2: ${filename}`);
+			const publicUrl = await uploadToR2(filename, buffer, contentType);
+			
+			return { success: true, url: publicUrl };
+		} catch (err) {
+			console.error('[uploadImage] Error:', err);
+			return { success: false, error: err instanceof Error ? err.message : 'Upload failed' };
 		}
 	}
 );

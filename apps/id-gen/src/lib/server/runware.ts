@@ -78,7 +78,7 @@ export interface UpscaleResult {
  */
 export async function upscaleImageWithRunware(
 	imageInput: string, // URL or base64
-	upscaleFactor: 2 | 4 = 2
+	upscaleFactor: 2 | 4 = 4
 ): Promise<UpscaleResult> {
 	const RUNWARE_API_KEY = env.RUNWARE_API_KEY;
 
