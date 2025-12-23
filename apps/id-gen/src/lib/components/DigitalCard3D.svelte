@@ -15,12 +15,16 @@
 		frontUrl,
 		backUrl,
 		stage = 'intro', // 'intro', 'profile', 'expanded'
-		onLoad // Callback when fully loaded
+		onLoad, // Callback when fully loaded
+		cardAspectRatio = 1.588, // Card aspect ratio (width/height), default CR80
+		sceneScale = 1.0 // Scene scale factor - card is scaled by 1/sceneScale to match 2D size
 	} = $props<{
 		frontUrl: string;
 		backUrl: string;
 		stage?: 'intro' | 'profile' | 'expanded';
 		onLoad?: () => void;
+		cardAspectRatio?: number;
+		sceneScale?: number;
 	}>();
 
 	// State
@@ -35,16 +39,18 @@
 	// Animation State
 	let isFlipped = $state(false);
 
-	// Tweens
+	// Tweens - for flip animation only
+	// Position and scale use immediate values (no animation) to prevent flicker
 	const position = tweened<[number, number, number]>([0, 0, 0], {
-		duration: 1500,
+		duration: 0, // No animation - instant positioning
 		easing: cubicOut
 	});
 	const rotation = tweened<[number, number, number]>([0, 0, 0], {
-		duration: 1200,
+		duration: 800, // Only rotation animates (for flip)
 		easing: cubicOut
 	});
-	const scale = tweened(1, { duration: 1500, easing: cubicOut });
+	// Scale is NOT tweened - we use a plain state to avoid flicker
+	let currentScale = $state(1);
 
 	// Route R2 URLs through proxy to avoid CORS issues
 	function getProxiedUrl(url: string): string {
@@ -54,8 +60,45 @@
 		return url;
 	}
 
+	// Camera configuration constants (must match the Camera component)
+	const CAMERA_FOV = 45; // degrees
+	const CAMERA_DISTANCE = 8; // Z position
+
 	// Constants
 	const BASE_SCALE = 3.6;
+	
+	// Universal padding: 90% fill = 10% padding on each side
+	// This must match the CSS padding in the 2D container
+	const CARD_FILL_PERCENT = 0.90;
+
+	// Calculate the visible 3D height at camera distance
+	function getVisible3DHeight(fovDegrees: number, distance: number): number {
+		const fovRadians = (fovDegrees * Math.PI) / 180;
+		return 2 * Math.tan(fovRadians / 2) * distance;
+	}
+
+	// Calculate optimal 3D scale with scene scaling
+	// The 3D card is scaled by 1/sceneScale to match 2D image size in larger canvas
+	function calculateOptimalScale(cardWidth3D: number, cardHeight3D: number): number {
+		// Calculate visible 3D space based on camera
+		const visible3DHeight = getVisible3DHeight(CAMERA_FOV, CAMERA_DISTANCE);
+		
+		// Container has same aspect ratio as card (using CSS aspect-ratio)
+		const visible3DWidth = visible3DHeight * cardAspectRatio;
+		
+		// Calculate scale needed to fill visible area
+		const scaleByHeight = visible3DHeight / cardHeight3D;
+		const scaleByWidth = visible3DWidth / cardWidth3D;
+		
+		// Use the smaller scale to fit entirely (contain behavior)
+		// Apply CARD_FILL_PERCENT for padding, then divide by sceneScale
+		// This makes the card appear same size as 2D but in larger canvas
+		const baseScale = Math.min(scaleByHeight, scaleByWidth) * CARD_FILL_PERCENT;
+		return baseScale / sceneScale;
+	}
+
+	// Store calculated card dimensions for scale calculation
+	let cardDims3D = $state({ width: BASE_SCALE, height: BASE_SCALE / 1.588 });
 
 	// Helper to calculate card dimensions from aspect ratio
 	function getCardDimensions(w: number, h: number) {
@@ -70,6 +113,8 @@
 	// Load geometry based on dimensions
 	async function updateGeometry(widthProps: number, heightProps: number) {
 		const dims = getCardDimensions(widthProps, heightProps);
+		cardDims3D = dims; // Store for scale calculation
+
 		// Radius ~4% of min dimension
 		const minDim = Math.min(dims.width, dims.height);
 		const radius = minDim * 0.04;
@@ -100,11 +145,13 @@
 	$effect(() => {
 		if (stage === 'intro') {
 			position.set([0, 0, 0]);
-			scale.set(1.5);
+			currentScale = 1.5;
 			// Rotation loop handled in useTask
 		} else if (stage === 'profile') {
 			position.set([0, 0, 0]);
-			scale.set(1.2);
+			// Calculate scale to fill container - set immediately, no animation
+			const optimalScale = calculateOptimalScale(cardDims3D.width, cardDims3D.height);
+			currentScale = optimalScale;
 			// Reset rotation to front view (0) or back view (PI) + whatever current flip state is
 			const targetY = isFlipped ? Math.PI : 0;
 			rotation.set([0, targetY, 0]);
@@ -133,11 +180,24 @@
 				// Fallback dimensions
 				await updateGeometry(1013, 638);
 			}
+
+			// Set the correct scale BEFORE notifying parent
+			// This ensures there's no flicker when the 3D view becomes visible
+			if (stage === 'profile') {
+				currentScale = calculateOptimalScale(cardDims3D.width, cardDims3D.height);
+			}
+
 			onLoad?.(); // Notify parent that 3D assets are ready
 		} catch (e) {
 			console.error('Failed to load card textures', e);
 			// Fallback geometry
 			await updateGeometry(1013, 638);
+			
+			// Still set correct scale for fallback
+			if (stage === 'profile') {
+				currentScale = calculateOptimalScale(cardDims3D.width, cardDims3D.height);
+			}
+			
 			onLoad?.(); // Still notify to avoid getting stuck
 		}
 	});
@@ -162,7 +222,7 @@
 <T.Group
 	position={$position}
 	rotation={stage === 'intro' ? ([0, time * 0.5, 0] as [number, number, number]) : $rotation}
-	scale={$scale}
+	scale={currentScale}
 	onclick={(e: any) => {
 		e.stopPropagation();
 		toggleFlip();

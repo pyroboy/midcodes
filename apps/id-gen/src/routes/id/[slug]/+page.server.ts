@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
-import { digitalCards, idcards } from '$lib/server/schema';
+import { digitalCards, idcards, templates } from '$lib/server/schema';
 import { eq } from 'drizzle-orm';
 
 // On-demand rendering - pages render on first visit, then cached at edge
@@ -10,6 +10,9 @@ export const prerender = 'auto';
 
 // Status type for clarity
 type CardStatus = 'unclaimed' | 'active' | 'banned' | 'suspended' | 'expired';
+
+// Default aspect ratio for CR80 cards (3.375" × 2.125")
+const DEFAULT_ASPECT_RATIO = 1.588;
 
 export const load: PageServerLoad = async ({ params, locals, setHeaders }) => {
 	// Set cache headers for Cloudflare edge caching
@@ -42,6 +45,7 @@ export const load: PageServerLoad = async ({ params, locals, setHeaders }) => {
 					: 'This profile has been temporarily suspended.',
 			profile: null,
 			cardImages: { front: null, back: null },
+			cardAspectRatio: DEFAULT_ASPECT_RATIO,
 			theme: null,
 			isOwner: false,
 			canClaim: false,
@@ -49,12 +53,13 @@ export const load: PageServerLoad = async ({ params, locals, setHeaders }) => {
 		};
 	}
 
-	// 3. Fetch associated ID card (needed for unclaimed, active, expired)
+	// 3. Fetch associated ID card and template dimensions (needed for unclaimed, active, expired)
 	let idCard = null;
 	let frontUrl = null;
 	let backUrl = null;
 	let frontLowRes = null;
 	let backLowRes = null;
+	let cardAspectRatio = DEFAULT_ASPECT_RATIO;
 
 	if (card.linkedIdCardId) {
 		const associatedIdCards = await db
@@ -70,6 +75,19 @@ export const load: PageServerLoad = async ({ params, locals, setHeaders }) => {
 			if (idCard.backImage) backUrl = getPublicUrl(idCard.backImage);
 			if (idCard.frontImageLowRes) frontLowRes = getPublicUrl(idCard.frontImageLowRes);
 			if (idCard.backImageLowRes) backLowRes = getPublicUrl(idCard.backImageLowRes);
+
+			// Fetch template dimensions for aspect ratio calculation
+			if (idCard.templateId) {
+				const templateData = await db
+					.select({ widthPixels: templates.widthPixels, heightPixels: templates.heightPixels })
+					.from(templates)
+					.where(eq(templates.id, idCard.templateId))
+					.limit(1);
+
+				if (templateData[0]?.widthPixels && templateData[0]?.heightPixels) {
+					cardAspectRatio = templateData[0].widthPixels / templateData[0].heightPixels;
+				}
+			}
 		}
 	}
 
@@ -85,6 +103,7 @@ export const load: PageServerLoad = async ({ params, locals, setHeaders }) => {
 				frontLowRes,
 				backLowRes
 			},
+			cardAspectRatio,
 			theme: card.themeConfig,
 			isOwner: false,
 			canClaim: true,
@@ -108,6 +127,7 @@ export const load: PageServerLoad = async ({ params, locals, setHeaders }) => {
 				frontLowRes,
 				backLowRes
 			},
+			cardAspectRatio,
 			theme: card.themeConfig,
 			isOwner: locals.session?.user?.id === card.ownerId,
 			canClaim: locals.session?.user?.id === card.ownerId,
@@ -128,6 +148,7 @@ export const load: PageServerLoad = async ({ params, locals, setHeaders }) => {
 			frontLowRes,
 			backLowRes
 		},
+		cardAspectRatio,
 		theme: card.themeConfig,
 		isOwner: locals.session?.user?.id === card.ownerId,
 		canClaim: false,
