@@ -1519,6 +1519,21 @@
 											<span>Graphic</span>
 										</div>
 									{/if}
+								{:else if element.type === 'qr'}
+									<div 
+										class="qr-preview"
+										style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background-color: {element.backgroundColor || '#ffffff'};"
+									>
+										{#await import('$lib/utils/qrCodeGenerator').then(m => m.generateQRDataUrl('https://kanaya.app/id/SAMPLE-preview123', { width: 256, errorCorrectionLevel: element.errorCorrectionLevel || 'M', color: { dark: element.foregroundColor || '#000000', light: element.backgroundColor || '#ffffff' } }))}
+											<span style="color: {element.foregroundColor || '#000000'}; font-size: 12px;">Loading QR...</span>
+										{:then dataUrl}
+											<img src={dataUrl} alt="QR Code Preview" style="width: 100%; height: 100%; object-fit: contain;" />
+										{:catch}
+											<div class="placeholder qr-placeholder">
+												<span>QR Code</span>
+											</div>
+										{/await}
+									</div>
 								{/if}
 								<div class="resize-handles">
 									<div

@@ -132,10 +132,14 @@ export const imageElementSchema = baseTemplateElementSchema.extend({
 	borderRadius: z.number().min(0).optional()
 });
 
+// QR content mode schema
+export const qrContentModeSchema = z.enum(['auto', 'custom']).default('auto');
+
 // QR code element specific schema
 export const qrElementSchema = baseTemplateElementSchema.extend({
 	type: z.literal('qr'),
-	content: z.string().optional(),
+	contentMode: qrContentModeSchema, // 'auto' = uses digitalCard slug URL, 'custom' = uses content field
+	content: z.string().optional(), // Only used when contentMode is 'custom'
 	errorCorrectionLevel: z.enum(['L', 'M', 'Q', 'H']).default('M'),
 	backgroundColor: colorSchema.optional(),
 	foregroundColor: colorSchema.optional()
@@ -251,3 +255,4 @@ export type SelectionElement = z.infer<typeof selectionElementSchema>;
 export type GraphicElement = z.infer<typeof graphicElementSchema>;
 export type AnchorPosition = z.infer<typeof anchorPositionSchema>;
 export type FitMode = z.infer<typeof fitModeSchema>;
+export type QrContentMode = z.infer<typeof qrContentModeSchema>;

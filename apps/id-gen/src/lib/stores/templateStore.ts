@@ -34,6 +34,11 @@ export interface TemplateElement {
 	alt?: string;
 	maintainAspectRatio?: boolean;
 	borderRadius?: number;
+	// QR element properties
+	contentMode?: 'auto' | 'custom'; // 'auto' = digital profile URL, 'custom' = manual content
+	errorCorrectionLevel?: 'L' | 'M' | 'Q' | 'H';
+	foregroundColor?: string;
+	backgroundColor?: string;
 }
 
 export interface TemplateData {

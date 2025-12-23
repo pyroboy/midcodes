@@ -96,6 +96,8 @@ export const appPermissionEnum = pgEnum('app_permission', [
 export const organizations = pgTable('organizations', {
 	id: uuid('id').primaryKey().defaultRandom(),
 	name: text('name').notNull(),
+	urlSlug: text('url_slug').unique(),
+	shortform: varchar('shortform', { length: 8 }).unique(),
 	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
 });
@@ -166,6 +168,7 @@ export const idcards = pgTable('idcards', {
 	backImageLowRes: text('back_image_low_res'),
 	data: jsonb('data'),
 	originalAssets: jsonb('original_assets').default({}), // Stores { variableName: { path: string, type: string } }
+	orgMetadata: jsonb('org_metadata').default({}), // Admin-controlled metadata (2KB limit enforced at app level)
 	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
 });
@@ -360,6 +363,10 @@ export const digitalCards = pgTable('digital_cards', {
 	linkedIdCardId: uuid('linked_id_card_id').references(() => idcards.id),
 	status: text('status').default('unclaimed'),
 	claimCodeHash: text('claim_code_hash'),
+	recipientEmail: text('recipient_email'), // Email for magic link claiming
+	personalMetadata: jsonb('personal_metadata').default({}), // User-editable profile metadata
+	claimToken: text('claim_token'), // Magic link token
+	claimTokenExpiresAt: timestamp('claim_token_expires_at', { withTimezone: true }),
 	privacySettings: jsonb('privacy_settings').default({ public: true, show_phone: false }),
 	profileContent: jsonb('profile_content').default({}),
 	themeConfig: jsonb('theme_config').default({ style: 'minimal' }),

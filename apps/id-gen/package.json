@@ -32,6 +32,7 @@
 		"@types/eslint": "^8.56.0",
 		"@types/lodash-es": "^4.17.12",
 		"@types/node": "^22.10.1",
+		"@types/qrcode": "^1.5.5",
 		"@types/three": "^0.171.0",
 		"@types/uuid": "^10.0.0",
 		"@types/webfontloader": "^1.6.38",
@@ -69,6 +70,7 @@
 	},
 	"dependencies": {
 		"@aws-sdk/client-s3": "^3.954.0",
+		"qrcode": "^1.5.4",
 		"@aws-sdk/s3-request-presigner": "^3.954.0",
 		"@faker-js/faker": "^9.3.0",
 		"@fal-ai/client": "^1.8.0",

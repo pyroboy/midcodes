@@ -513,6 +513,7 @@ export const saveLayers = command(
 						...baseElement,
 						type: 'qr' as const,
 						content: '',
+						contentMode: 'custom' as const,
 						errorCorrectionLevel: 'M' as const
 					};
 				case 'signature':

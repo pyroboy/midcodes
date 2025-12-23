@@ -9,6 +9,8 @@ import { browser } from '$app/environment';
 import { CoordinateSystem } from './coordinateSystem';
 import type { TemplateElement } from '$lib/stores/templateStore';
 import { getPlaceholderLabel } from './defaultFormData';
+import { generateQRDataUrl, loadQRImage } from './qrCodeGenerator';
+import { buildDigitalProfileUrl } from './slugGeneration';
 
 export interface RenderOptions {
 	/** Background image URL or Blob */
@@ -23,6 +25,8 @@ export interface RenderOptions {
 	dimensions: { width: number; height: number };
 	/** Render mode: 'sample' shows text, 'blank' shows placeholders */
 	mode: 'sample' | 'blank';
+	/** Digital card slug for QR auto mode */
+	digitalCardSlug?: string | null;
 }
 
 export interface RenderResult {
@@ -371,14 +375,15 @@ async function renderImageElement(
 }
 
 /**
- * Render a QR code element placeholder
+ * Render a QR code element
  */
-function renderQrElement(
+async function renderQrElement(
 	ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
 	element: TemplateElement,
 	coordSystem: CoordinateSystem,
-	mode: 'sample' | 'blank'
-): void {
+	mode: 'sample' | 'blank',
+	digitalCardSlug?: string | null
+): Promise<void> {
 	if (element.type !== 'qr') return;
 
 	const position = coordSystem.storageToPreview({
@@ -395,16 +400,84 @@ function renderQrElement(
 	const elementWidth = Math.round(dimensions.width);
 	const elementHeight = Math.round(dimensions.height);
 
-	// For both modes, we show a QR placeholder (actual QR generation would require a library)
-	renderPlaceholder(
-		ctx,
-		elementX,
-		elementY,
-		elementWidth,
-		elementHeight,
-		'QR Code',
-		coordSystem.scale
-	);
+	// Handle rotation
+	const rotation = element.rotation || 0;
+	const centerX = elementX + elementWidth / 2;
+	const centerY = elementY + elementHeight / 2;
+
+	ctx.save();
+
+	if (rotation !== 0) {
+		ctx.translate(centerX, centerY);
+		ctx.rotate((rotation * Math.PI) / 180);
+		ctx.translate(-centerX, -centerY);
+	}
+
+	// Determine QR content based on contentMode
+	let qrContent: string | null = null;
+	const contentMode = (element as any).contentMode || 'auto';
+
+	if (contentMode === 'auto' && digitalCardSlug) {
+		qrContent = buildDigitalProfileUrl(digitalCardSlug);
+	} else if (contentMode === 'custom' && (element as any).content) {
+		qrContent = (element as any).content;
+	}
+
+	// In blank mode or no content, show placeholder
+	if (mode === 'blank' || !qrContent) {
+		renderPlaceholder(
+			ctx,
+			elementX,
+			elementY,
+			elementWidth,
+			elementHeight,
+			'QR Code',
+			coordSystem.scale
+		);
+		ctx.restore();
+		return;
+	}
+
+	// Generate actual QR code
+	try {
+		const errorLevel = (element as any).errorCorrectionLevel || 'M';
+		const fgColor = (element as any).foregroundColor || '#000000';
+		const bgColor = (element as any).backgroundColor || '#ffffff';
+
+		// Generate at 2x resolution for quality
+		const qrSize = Math.max(elementWidth, elementHeight) * 2;
+		const dataUrl = await generateQRDataUrl(qrContent, {
+			width: qrSize,
+			errorCorrectionLevel: errorLevel,
+			color: {
+				dark: fgColor,
+				light: bgColor
+			}
+		});
+
+		const qrImage = await loadQRImage(dataUrl);
+
+		// Draw QR code - maintain square aspect ratio, centered
+		const size = Math.min(elementWidth, elementHeight);
+		const drawX = elementX + (elementWidth - size) / 2;
+		const drawY = elementY + (elementHeight - size) / 2;
+
+		ctx.drawImage(qrImage, drawX, drawY, size, size);
+	} catch (error) {
+		console.warn(`Failed to generate QR code for ${element.variableName}:`, error);
+		// Show placeholder on error
+		renderPlaceholder(
+			ctx,
+			elementX,
+			elementY,
+			elementWidth,
+			elementHeight,
+			'QR Error',
+			coordSystem.scale
+		);
+	}
+
+	ctx.restore();
 }
 
 /**
@@ -415,7 +488,7 @@ export async function renderTemplate(options: RenderOptions): Promise<RenderResu
 		throw new Error('renderTemplate can only be called in browser environment');
 	}
 
-	const { background, elements, formData, fileUploads = {}, dimensions, mode } = options;
+	const { background, elements, formData, fileUploads = {}, dimensions, mode, digitalCardSlug } = options;
 
 	// Create offscreen canvas
 	const canvas = new OffscreenCanvas(dimensions.width, dimensions.height);
@@ -456,7 +529,7 @@ export async function renderTemplate(options: RenderOptions): Promise<RenderResu
 					await renderImageElement(ctx, element, coordSystem, fileUploads, mode);
 					break;
 				case 'qr':
-					renderQrElement(ctx, element, coordSystem, mode);
+					await renderQrElement(ctx, element, coordSystem, mode, digitalCardSlug);
 					break;
 			}
 		} catch (error) {
@@ -484,7 +557,8 @@ export async function renderTemplateSide(
 	formData: Record<string, string>,
 	fileUploads: Record<string, File | Blob | null>,
 	dimensions: { width: number; height: number },
-	mode: 'sample' | 'blank'
+	mode: 'sample' | 'blank',
+	digitalCardSlug?: string | null
 ): Promise<Blob> {
 	// Filter elements for this side
 	const sideElements = elements.filter((el) => el.side === side);
@@ -495,7 +569,8 @@ export async function renderTemplateSide(
 		formData,
 		fileUploads,
 		dimensions,
-		mode
+		mode,
+		digitalCardSlug
 	});
 
 	return result.blob;

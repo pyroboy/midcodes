@@ -6,6 +6,8 @@
 	import { CoordinateSystem } from '$lib/utils/coordinateSystem';
 	import { generateImageVariants, CARD_VARIANTS } from '$lib/utils/imageProcessing';
 	import { getProxiedUrl } from '$lib/utils/storage';
+	import { generateQRDataUrl, loadQRImage } from '$lib/utils/qrCodeGenerator';
+	import { buildDigitalProfileUrl } from '$lib/utils/slugGeneration';
 
 	let {
 		elements,
@@ -16,7 +18,8 @@
 		fullResolution = false,
 		isDragging = false,
 		showBoundingBoxes = false, // Flag to control bounding box visibility
-		pixelDimensions = null
+		pixelDimensions = null,
+		digitalCardSlug = null // For QR auto mode - generates profile URL
 	}: {
 		elements: TemplateElement[];
 		backgroundUrl: string;
@@ -29,6 +32,7 @@
 		isDragging?: boolean;
 		showBoundingBoxes?: boolean;
 		pixelDimensions?: { width: number; height: number } | null;
+		digitalCardSlug?: string | null;
 	} = $props();
 
 	const dispatch = createEventDispatcher<{
@@ -615,6 +619,8 @@
 					renderTextElement(ctx, element, renderCoordSystem);
 				} else if (element.type === 'photo' || element.type === 'signature' || element.type === 'graphic') {
 					await renderImageElement(ctx, element, renderCoordSystem, isOffScreen);
+				} else if (element.type === 'qr') {
+					await renderQrElement(ctx, element, renderCoordSystem, isOffScreen);
 				}
 			} catch (error) {
 				console.error(`[IdCanvas] Error rendering element ${element.variableName}:`, error);
@@ -994,6 +1000,150 @@
 		}
 	}
 
+	// Cache for QR code images to avoid regenerating on every render
+	const qrImageCache = new Map<string, { image: HTMLImageElement; lastUsed: number }>();
+
+	async function renderQrElement(
+		ctx: CanvasRenderingContext2D,
+		element: TemplateElement,
+		renderCoordSystem: CoordinateSystem,
+		isOffScreen: boolean
+	) {
+		if (element.type !== 'qr') return;
+
+		try {
+			// Determine QR content based on contentMode
+			let qrContent: string;
+			let isPlaceholder = false;
+
+			const contentMode = element.contentMode || 'auto';
+
+			if (contentMode === 'auto' && digitalCardSlug) {
+				// Auto mode: generate URL from digital card slug
+				qrContent = buildDigitalProfileUrl(digitalCardSlug);
+			} else if (contentMode === 'custom' && element.content) {
+				// Custom mode: use the content field
+				qrContent = element.content;
+			} else {
+				// No real content available - use placeholder for template editing preview
+				// This shows an actual QR code so users can see size/position
+				qrContent = 'https://kanaya.app/id/SAMPLE-preview123';
+				isPlaceholder = true;
+			}
+
+			// Calculate position and dimensions
+			const position = renderCoordSystem.storageToPreview({
+				x: element.x || 0,
+				y: element.y || 0
+			});
+			const dimensions = renderCoordSystem.storageToPreviewDimensions({
+				width: element.width || 100,
+				height: element.height || 100
+			});
+
+			const elementX = Math.round(position.x);
+			const elementY = Math.round(position.y);
+			const elementWidth = Math.round(dimensions.width);
+			const elementHeight = Math.round(dimensions.height);
+
+			// Calculate center point for rotation
+			const centerX = elementX + elementWidth / 2;
+			const centerY = elementY + elementHeight / 2;
+
+			// Apply rotation if present
+			const rotation = element.rotation || 0;
+
+			ctx.save();
+
+			if (rotation !== 0) {
+				ctx.translate(centerX, centerY);
+				ctx.rotate((rotation * Math.PI) / 180);
+				ctx.translate(-centerX, -centerY);
+			}
+
+			// Draw bounding box if enabled
+			if (showBoundingBoxes) {
+				ctx.strokeStyle = 'red';
+				ctx.lineWidth = 1;
+				ctx.strokeRect(elementX, elementY, elementWidth, elementHeight);
+			}
+
+			// Generate cache key based on content and colors
+			const errorLevel = (element as any).errorCorrectionLevel || 'M';
+			const fgColor = (element as any).foregroundColor || '#000000';
+			const bgColor = (element as any).backgroundColor || '#ffffff';
+			const cacheKey = `${qrContent}-${errorLevel}-${fgColor}-${bgColor}`;
+
+			// Check cache for existing QR image
+			let qrImage: HTMLImageElement;
+			const cachedEntry = qrImageCache.get(cacheKey);
+
+			if (cachedEntry) {
+				cachedEntry.lastUsed = Date.now();
+				qrImage = cachedEntry.image;
+			} else {
+				// Generate QR code data URL
+				const qrSize = Math.max(elementWidth, elementHeight) * 2; // 2x for quality
+				const dataUrl = await generateQRDataUrl(qrContent, {
+					width: qrSize,
+					errorCorrectionLevel: errorLevel,
+					color: {
+						dark: fgColor,
+						light: bgColor
+					}
+				});
+
+				// Load as image
+				qrImage = await loadQRImage(dataUrl);
+
+				// Cache the image
+				qrImageCache.set(cacheKey, { image: qrImage, lastUsed: Date.now() });
+
+				// Clean old cache entries
+				if (qrImageCache.size > 10) {
+					let oldestKey: string | null = null;
+					let oldestTime = Infinity;
+					for (const [key, entry] of qrImageCache) {
+						if (entry.lastUsed < oldestTime) {
+							oldestTime = entry.lastUsed;
+							oldestKey = key;
+						}
+					}
+					if (oldestKey) qrImageCache.delete(oldestKey);
+				}
+			}
+
+			// Draw QR code - maintain square aspect ratio, centered
+			const size = Math.min(elementWidth, elementHeight);
+			const drawX = elementX + (elementWidth - size) / 2;
+			const drawY = elementY + (elementHeight - size) / 2;
+
+			ctx.drawImage(qrImage, drawX, drawY, size, size);
+
+			ctx.restore();
+		} catch (error: any) {
+			console.error(`[IdCanvas] Error rendering QR element ${element.variableName}:`, error);
+			// Show placeholder on error
+			const position = renderCoordSystem.storageToPreview({
+				x: element.x || 0,
+				y: element.y || 0
+			});
+			const dimensions = renderCoordSystem.storageToPreviewDimensions({
+				width: element.width || 100,
+				height: element.height || 100
+			});
+			renderPlaceholder(
+				ctx,
+				position.x,
+				position.y,
+				dimensions.width,
+				dimensions.height,
+				'QR Error',
+				renderCoordSystem.scale
+			);
+		}
+	}
+
 	export async function renderFullResolution(): Promise<Blob> {
 		const readinessCheck = isCanvasReady();
 		if (!readinessCheck.ready) {
@@ -1070,6 +1220,7 @@
 		imagePositions;
 		fullResolution;
 		isDragging;
+		digitalCardSlug; // Track slug changes for QR auto mode
 
 		// Track individual element properties for deep reactivity
 		elements.forEach((element) => {
@@ -1080,6 +1231,14 @@
 			// Track graphic src changes
 			if (element.type === 'graphic') {
 				(element as any).src;
+			}
+			// Track QR element property changes
+			if (element.type === 'qr') {
+				(element as any).contentMode;
+				(element as any).content;
+				(element as any).foregroundColor;
+				(element as any).backgroundColor;
+				(element as any).errorCorrectionLevel;
 			}
 		});
 

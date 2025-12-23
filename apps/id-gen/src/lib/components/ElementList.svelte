@@ -197,7 +197,7 @@
 		assetPickerTargetIndex = null;
 	}
 
-	function addElement(type: 'text' | 'photo' | 'signature' | 'selection' | 'graphic') {
+	function addElement(type: 'text' | 'photo' | 'signature' | 'selection' | 'graphic' | 'qr') {
 		const newElement: TemplateElement = {
 			id: `new_${type}_${Date.now()}`,
 			variableName: `new_${type}_${Date.now()}`,
@@ -231,7 +231,17 @@
 								width: 200,
 								height: 200
 							}
-						: {})
+						: type === 'qr'
+							? {
+									contentMode: 'auto' as const, // 'auto' = digital profile URL, 'custom' = manual content
+									content: '',
+									errorCorrectionLevel: 'M' as const,
+									backgroundColor: '#ffffff',
+									foregroundColor: '#000000',
+									width: 150,
+									height: 150
+								}
+							: {})
 		};
 		onUpdateElements([...elements, newElement], side);
 	}
@@ -484,7 +494,7 @@
 						<FontSettings {element} {onUpdateElements} {elements} {fontOptions} {side} />
 					{:else if element.type === 'graphic'}
 						<div class="input-group">
-							<label>Graphic Source</label>
+							<label for="graphic-file-{i}">Graphic Source</label>
 							<!-- File upload button -->
 							<div class="graphic-source-buttons">
 								<input
@@ -574,6 +584,77 @@
 									updateElementAtIndex(i, { borderRadius: parseInt(e.currentTarget.value) || 0 })}
 							/>
 						</div>
+					{:else if element.type === 'qr'}
+						<div class="input-group">
+							<label for="qr-mode-{i}">QR Content Mode</label>
+							<Select.Root
+								name="qr-mode-{i}"
+								type="single"
+								value={element.contentMode || 'auto'}
+								onValueChange={(value) =>
+									updateElementAtIndex(i, { contentMode: value as 'auto' | 'custom' })}
+							>
+								<Select.Trigger id="qr-mode-{i}">
+									{element.contentMode === 'custom' ? 'Custom URL/Text' : 'Auto (Digital Profile)'}
+								</Select.Trigger>
+								<Select.Content>
+									<Select.Item value="auto">Auto (Digital Profile)</Select.Item>
+									<Select.Item value="custom">Custom URL/Text</Select.Item>
+								</Select.Content>
+							</Select.Root>
+							<p class="hint-text">Auto mode generates a QR code linking to the cardholder's digital profile.</p>
+						</div>
+						{#if element.contentMode === 'custom'}
+							<div class="input-group">
+								<label for="qr-content-{i}">QR Content</label>
+								<Input
+									id="qr-content-{i}"
+									value={element.content || ''}
+									placeholder="https://example.com or any text"
+									oninput={(e) => updateElementAtIndex(i, { content: e.currentTarget.value })}
+								/>
+							</div>
+						{/if}
+						<div class="input-group">
+							<label for="qr-error-level-{i}">Error Correction</label>
+							<Select.Root
+								name="qr-error-level-{i}"
+								type="single"
+								value={element.errorCorrectionLevel || 'M'}
+								onValueChange={(value) =>
+									updateElementAtIndex(i, { errorCorrectionLevel: value as 'L' | 'M' | 'Q' | 'H' })}
+							>
+								<Select.Trigger id="qr-error-level-{i}">
+									{element.errorCorrectionLevel || 'M'}
+								</Select.Trigger>
+								<Select.Content>
+									<Select.Item value="L">L - Low (7%)</Select.Item>
+									<Select.Item value="M">M - Medium (15%)</Select.Item>
+									<Select.Item value="Q">Q - Quartile (25%)</Select.Item>
+									<Select.Item value="H">H - High (30%)</Select.Item>
+								</Select.Content>
+							</Select.Root>
+						</div>
+						<div class="input-group color-row">
+							<div class="color-input">
+								<label for="qr-fg-{i}">Foreground</label>
+								<input
+									type="color"
+									id="qr-fg-{i}"
+									value={element.foregroundColor || '#000000'}
+									oninput={(e) => updateElementAtIndex(i, { foregroundColor: e.currentTarget.value })}
+								/>
+							</div>
+							<div class="color-input">
+								<label for="qr-bg-{i}">Background</label>
+								<input
+									type="color"
+									id="qr-bg-{i}"
+									value={element.backgroundColor || '#ffffff'}
+									oninput={(e) => updateElementAtIndex(i, { backgroundColor: e.currentTarget.value })}
+								/>
+							</div>
+						</div>
 					{/if}
 
 					<PositionGroup
@@ -595,6 +676,7 @@
 		<button onclick={() => addElement('signature')}>Add Signature</button>
 		<button onclick={() => addElement('selection')}>Add Selection</button>
 		<button onclick={() => addElement('graphic')}>Add Graphic</button>
+		<button onclick={() => addElement('qr')}>Add QR</button>
 	</div>
 </div>
 
@@ -858,5 +940,33 @@
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
+	}
+
+	/* QR element color inputs */
+	.color-row {
+		display: flex;
+		gap: 1rem;
+	}
+
+	.color-input {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.color-input input[type="color"] {
+		width: 100%;
+		height: 32px;
+		border: 1px solid var(--color-border);
+		border-radius: 0.375rem;
+		cursor: pointer;
+		background: transparent;
+	}
+
+	.hint-text {
+		font-size: 0.75rem;
+		color: var(--color-muted-foreground);
+		margin-top: 0.25rem;
 	}
 </style>

@@ -135,10 +135,12 @@ export const actions: Actions = {
 
 			if ('error' in saveResult) {
 				console.error('[Save ID Card] Save error:', saveResult.error);
-				return fail(500, { error: 'Failed to save ID card' });
+				// Pass the specific error message to the UI for better user feedback
+				return fail(500, { error: saveResult.error || 'Failed to save ID card' });
 			}
 
-			const { data: idCard, digitalCard, claimCode } = saveResult;
+			const idCard = saveResult.data?.idCard;
+			const digitalCard = saveResult.data?.digitalCard;
 
 			return {
 				type: 'success',
@@ -149,7 +151,7 @@ export const actions: Actions = {
 						digitalCard: digitalCard
 							? {
 									slug: digitalCard.slug,
-									claimCode: claimCode,
+									claimCode: digitalCard.claimCode,
 									status: digitalCard.status
 								}
 							: null
