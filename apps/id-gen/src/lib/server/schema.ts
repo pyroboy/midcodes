@@ -36,6 +36,14 @@ export const aiGenerationStatusEnum = pgEnum('ai_generation_status', [
 	'failed'
 ]);
 
+export const digitalCardStatusEnum = pgEnum('digital_card_status', [
+	'unclaimed',
+	'active',
+	'banned',
+	'suspended',
+	'expired'
+]);
+
 export const appRoleEnum = pgEnum('app_role', [
 	'super_admin',
 	'org_admin',
@@ -361,7 +369,7 @@ export const digitalCards = pgTable('digital_cards', {
 	ownerId: text('owner_id').references(() => profiles.id),
 	orgId: uuid('org_id').references(() => organizations.id),
 	linkedIdCardId: uuid('linked_id_card_id').references(() => idcards.id),
-	status: text('status').default('unclaimed'),
+	status: digitalCardStatusEnum('status').default('unclaimed'),
 	claimCodeHash: text('claim_code_hash'),
 	recipientEmail: text('recipient_email'), // Email for magic link claiming
 	personalMetadata: jsonb('personal_metadata').default({}), // User-editable profile metadata

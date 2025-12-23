@@ -922,9 +922,11 @@
 					// Check if this is a text element (uniform scaling) or photo/signature (freeform)
 					const isTextElement =
 						updatedElement.type === 'text' || updatedElement.type === 'selection';
+					// QR elements must always be square (1:1 aspect ratio)
+					const isQrElement = updatedElement.type === 'qr';
 
-					if (isTextElement) {
-						// TEXT ELEMENTS: Uniform scaling (maintain aspect ratio like Canva)
+					if (isTextElement || isQrElement) {
+						// TEXT/QR ELEMENTS: Uniform scaling (maintain aspect ratio)
 						// Use CUMULATIVE delta from resize start for stable uniform scaling
 						const cumulativeDx = event.clientX - resizeStartMouseX;
 						const cumulativeDy = event.clientY - resizeStartMouseY;
@@ -933,7 +935,8 @@
 							cumulativeDy
 						);
 
-						const aspectRatio = originalWidth / originalHeight;
+						// QR codes force 1:1 square aspect ratio
+						const aspectRatio = isQrElement ? 1 : originalWidth / originalHeight;
 						let scaleDelta: number;
 
 						if (resizeHandle === 'bottom-right') {

@@ -55,6 +55,8 @@ export interface SaveIdCardOptions {
 	createDigitalCard?: boolean;
 	recipientEmail?: string;
 	userId?: string;
+	/** Pre-generated slug from client (used for QR code consistency) */
+	preGeneratedSlug?: string;
 }
 
 export interface SaveIdCardResult {
@@ -225,7 +227,8 @@ export async function saveIdCardData(options: SaveIdCardOptions): Promise<SaveId
 		orgMetadata,
 		createDigitalCard,
 		recipientEmail,
-		userId
+		userId,
+		preGeneratedSlug // Use client pre-generated slug for QR consistency
 	} = options;
 
 	// Validate orgMetadata if provided
@@ -314,16 +317,35 @@ export async function saveIdCardData(options: SaveIdCardOptions): Promise<SaveId
 			| { id: string; slug: string; status: string; claimCode?: string; profileUrl?: string }
 			| undefined;
 
-		if (createDigitalCard) {
+		// Step 2: Create Digital Card if requested OR if we have a pre-generated slug (to ensure QR works)
+		if (createDigitalCard || preGeneratedSlug) {
 			try {
-				// Get org shortform for branded slug
+				// Get org shortform for branded slug (needed if we have to generate a new one)
 				const orgShortform = await getOrgShortform(orgId);
 
-				// Generate slug with retry for collisions
+				// Use preGeneratedSlug from client if available (ensures QR code matches)
+				// Only generate a new slug if pre-generated one is not provided or already taken
 				let slug: string | null = null;
 				let attempts = 0;
 				const maxAttempts = 5;
 
+				// First, try the pre-generated slug from the client
+				if (preGeneratedSlug) {
+					const existingPreGen = await db
+						.select({ id: digitalCards.id })
+						.from(digitalCards)
+						.where(eq(digitalCards.slug, preGeneratedSlug))
+						.limit(1);
+
+					if (existingPreGen.length === 0) {
+						slug = preGeneratedSlug;
+						console.log('[saveIdCardData] Using pre-generated slug:', slug);
+					} else {
+						console.warn('[saveIdCardData] Pre-generated slug collision, generating new one');
+					}
+				}
+
+				// If no pre-generated slug or it was taken, generate a new one
 				while (!slug && attempts < maxAttempts) {
 					attempts++;
 					const candidateSlug = generateDigitalCardSlug(orgShortform);
@@ -350,13 +372,18 @@ export async function saveIdCardData(options: SaveIdCardOptions): Promise<SaveId
 					const claimExpiry = calculateClaimExpiry(7); // 7 days
 					const claimCodeHash = await hashClaimCode(claimCode);
 
+					// Determine initial status
+					// Active: Only if explicitly requested AND we have a user
+					// Unclaimed: If not requested (just saving slug) OR requested but no user
+					const initialStatus = createDigitalCard && userId ? 'active' : 'unclaimed';
+
 					const [dcData] = await db
 						.insert(digitalCards)
 						.values({
 							slug,
 							linkedIdCardId: idCard.id,
 							orgId,
-							status: userId ? 'active' : 'unclaimed',
+							status: initialStatus,
 							claimCodeHash,
 							recipientEmail: recipientEmail || null,
 							claimToken,
@@ -369,6 +396,8 @@ export async function saveIdCardData(options: SaveIdCardOptions): Promise<SaveId
 						.returning();
 
 					if (dcData) {
+						console.log(`ID cards saved with : ${slug}`);
+
 						digitalCardResult = {
 							id: dcData.id,
 							slug: dcData.slug,

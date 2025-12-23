@@ -2,8 +2,14 @@ import { error, fail } from '@sveltejs/kit';
 import { handleImageUploads, saveIdCardData } from '$lib/utils/idCardHelpers';
 import type { PageServerLoad, Actions } from './$types';
 import { db } from '$lib/server/db';
-import { templates } from '$lib/server/schema';
+import { templates, organizations } from '$lib/server/schema';
 import { eq } from 'drizzle-orm';
+import { 
+	generateDigitalCardSlug, 
+	generateShortform,
+	buildDigitalProfileUrl,
+	validateSlugForQR 
+} from '$lib/utils/slugGeneration';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
 	const { org_id, session } = locals;
@@ -47,8 +53,46 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		template_elements: templateData.templateElements
 	};
 
+	// Fetch org shortform for QR code slug generation
+	let orgShortform: string | null = null;
+	if (templateData.orgId) {
+		const [org] = await db
+			.select({ shortform: organizations.shortform, name: organizations.name, urlSlug: organizations.urlSlug })
+			.from(organizations)
+			.where(eq(organizations.id, templateData.orgId))
+			.limit(1);
+		
+		// Use existing shortform or generate from org name/slug
+		orgShortform = org?.shortform || (org?.urlSlug ? generateShortform(org.urlSlug) : null) || (org?.name ? generateShortform(org.name) : null);
+	}
+
+	// Generate QR slug server-side for security and consistency
+	let preGeneratedSlug: string | null = null;
+	let slugValidation: { isValid: boolean; profileUrl: string; fitsQRv3: boolean } | null = null;
+
+	if (orgShortform) {
+		preGeneratedSlug = generateDigitalCardSlug(orgShortform);
+		const profileUrl = buildDigitalProfileUrl(preGeneratedSlug);
+		const slugPattern = /^[A-Z0-9]{2,8}-[a-z0-9]{10}$/;
+		
+		slugValidation = {
+			isValid: slugPattern.test(preGeneratedSlug),
+			profileUrl,
+			fitsQRv3: validateSlugForQR(preGeneratedSlug)
+		};
+
+		console.log('[Use Template] Server-generated QR slug:', {
+			slug: preGeneratedSlug,
+			...slugValidation,
+			orgShortform
+		});
+	}
+
 	return {
-		template
+		template,
+		orgShortform,
+		preGeneratedSlug,
+		slugValidation
 	};
 };
 
@@ -107,7 +151,8 @@ export const actions: Actions = {
 				'backImage',
 				'frontImagePreview',
 				'backImagePreview',
-				'createDigitalCard'
+				'createDigitalCard',
+				'preGeneratedSlug'
 			];
 			const formFields: Record<string, string> = {};
 			for (const [key, value] of formData.entries()) {
@@ -117,6 +162,7 @@ export const actions: Actions = {
 			}
 
 			const createDigitalCard = formData.get('createDigitalCard') === 'true';
+			const preGeneratedSlug = formData.get('preGeneratedSlug')?.toString() || undefined;
 
 			// Save data via Drizzle
 			const saveResult = await saveIdCardData({
@@ -130,6 +176,7 @@ export const actions: Actions = {
 				rawAssets: uploadResult.rawAssets,
 				formFields,
 				createDigitalCard,
+				preGeneratedSlug, // Use pre-generated slug for QR code consistency
 				userId: user.id
 			});
 

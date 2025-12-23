@@ -1011,26 +1011,13 @@
 	) {
 		if (element.type !== 'qr') return;
 
+		// Calculate position and dimensions first so we have them for the placeholder in case of error
+		let elementX = 0;
+		let elementY = 0;
+		let elementWidth = 100;
+		let elementHeight = 100;
+
 		try {
-			// Determine QR content based on contentMode
-			let qrContent: string;
-			let isPlaceholder = false;
-
-			const contentMode = element.contentMode || 'auto';
-
-			if (contentMode === 'auto' && digitalCardSlug) {
-				// Auto mode: generate URL from digital card slug
-				qrContent = buildDigitalProfileUrl(digitalCardSlug);
-			} else if (contentMode === 'custom' && element.content) {
-				// Custom mode: use the content field
-				qrContent = element.content;
-			} else {
-				// No real content available - use placeholder for template editing preview
-				// This shows an actual QR code so users can see size/position
-				qrContent = 'https://kanaya.app/id/SAMPLE-preview123';
-				isPlaceholder = true;
-			}
-
 			// Calculate position and dimensions
 			const position = renderCoordSystem.storageToPreview({
 				x: element.x || 0,
@@ -1041,10 +1028,37 @@
 				height: element.height || 100
 			});
 
-			const elementX = Math.round(position.x);
-			const elementY = Math.round(position.y);
-			const elementWidth = Math.round(dimensions.width);
-			const elementHeight = Math.round(dimensions.height);
+			elementX = Math.round(position.x);
+			elementY = Math.round(position.y);
+			elementWidth = Math.round(dimensions.width);
+			elementHeight = Math.round(dimensions.height);
+
+			// Determine QR content based on contentMode
+			let qrContent: string;
+
+			const contentMode = element.contentMode || 'auto';
+
+			if (contentMode === 'auto') {
+				// Auto mode: generate URL from digital card slug
+				if (digitalCardSlug) {
+					qrContent = buildDigitalProfileUrl(digitalCardSlug);
+				} else {
+					// Fallback if slug is missing (shouldn't happen in normal flow if server passes it)
+					console.warn('[IdCanvas] QR Auto Mode: Missing digitalCardSlug, using placeholder');
+					qrContent = 'https://kanaya.app/id/PREVIEW-SLUG-MISSING';
+				}
+			} else if (contentMode === 'custom' && element.content) {
+				// Custom mode: use the content field
+				qrContent = element.content;
+			} else {
+				// No real content available - use placeholder
+				qrContent = 'https://kanaya.app/id/SAMPLE-preview123';
+			}
+
+			// Validate QR content isn't empty
+			if (!qrContent.trim()) {
+				throw new CanvasOperationError('QR content is empty', 'QR_EMPTY_CONTENT');
+			}
 
 			// Calculate center point for rotation
 			const centerX = elementX + elementWidth / 2;
@@ -1068,10 +1082,10 @@
 				ctx.strokeRect(elementX, elementY, elementWidth, elementHeight);
 			}
 
-			// Generate cache key based on content and colors
-			const errorLevel = (element as any).errorCorrectionLevel || 'M';
-			const fgColor = (element as any).foregroundColor || '#000000';
-			const bgColor = (element as any).backgroundColor || '#ffffff';
+			// Generate cache key
+			const errorLevel = element.errorCorrectionLevel || 'M';
+			const fgColor = element.foregroundColor || '#000000';
+			const bgColor = element.backgroundColor || '#ffffff';
 			const cacheKey = `${qrContent}-${errorLevel}-${fgColor}-${bgColor}`;
 
 			// Check cache for existing QR image
@@ -1083,33 +1097,39 @@
 				qrImage = cachedEntry.image;
 			} else {
 				// Generate QR code data URL
-				const qrSize = Math.max(elementWidth, elementHeight) * 2; // 2x for quality
-				const dataUrl = await generateQRDataUrl(qrContent, {
-					width: qrSize,
-					errorCorrectionLevel: errorLevel,
-					color: {
-						dark: fgColor,
-						light: bgColor
-					}
-				});
-
-				// Load as image
-				qrImage = await loadQRImage(dataUrl);
-
-				// Cache the image
-				qrImageCache.set(cacheKey, { image: qrImage, lastUsed: Date.now() });
-
-				// Clean old cache entries
-				if (qrImageCache.size > 10) {
-					let oldestKey: string | null = null;
-					let oldestTime = Infinity;
-					for (const [key, entry] of qrImageCache) {
-						if (entry.lastUsed < oldestTime) {
-							oldestTime = entry.lastUsed;
-							oldestKey = key;
+				const qrSize = Math.max(elementWidth, elementHeight) * 2; // 2x for quality (retina-like)
+				
+				try {
+					const dataUrl = await generateQRDataUrl(qrContent, {
+						width: qrSize,
+						errorCorrectionLevel: errorLevel,
+						color: {
+							dark: fgColor,
+							light: bgColor
 						}
+					});
+
+					// Load as image
+					qrImage = await loadQRImage(dataUrl);
+
+					// Cache the image
+					qrImageCache.set(cacheKey, { image: qrImage, lastUsed: Date.now() });
+
+					// Clean old cache entries
+					if (qrImageCache.size > 15) {
+						let oldestKey: string | null = null;
+						let oldestTime = Infinity;
+						for (const [key, entry] of qrImageCache) {
+							if (entry.lastUsed < oldestTime) {
+								oldestTime = entry.lastUsed;
+								oldestKey = key;
+							}
+						}
+						if (oldestKey) qrImageCache.delete(oldestKey);
 					}
-					if (oldestKey) qrImageCache.delete(oldestKey);
+				} catch (err) {
+					console.error('[IdCanvas] QR Generation failed internally:', err);
+					throw new CanvasOperationError('Failed to generate QR code image', 'QR_GEN_ERROR');
 				}
 			}
 
@@ -1123,24 +1143,30 @@
 			ctx.restore();
 		} catch (error: any) {
 			console.error(`[IdCanvas] Error rendering QR element ${element.variableName}:`, error);
+			
+			// Restore context to ensure we don't leave it in a transformed state
+			ctx.restore(); 
+
 			// Show placeholder on error
-			const position = renderCoordSystem.storageToPreview({
-				x: element.x || 0,
-				y: element.y || 0
-			});
-			const dimensions = renderCoordSystem.storageToPreviewDimensions({
-				width: element.width || 100,
-				height: element.height || 100
-			});
+			// Re-calculate basic dimensions if they failed (fallback)
+			if (elementWidth <= 0) elementWidth = 100;
+			if (elementHeight <= 0) elementHeight = 100;
+			
+			// Ensure we are drawing in a clean state (no rotation from previous try)
+			ctx.save();
+			// Note: We don't re-apply rotation for the error placeholder to keep it readable,
+			// or apply it if we successfully calculated it. Let's stick to simple placement for error.
+			
 			renderPlaceholder(
 				ctx,
-				position.x,
-				position.y,
-				dimensions.width,
-				dimensions.height,
+				elementX,
+				elementY,
+				elementWidth,
+				elementHeight,
 				'QR Error',
 				renderCoordSystem.scale
 			);
+			ctx.restore();
 		}
 	}
 
@@ -1234,11 +1260,11 @@
 			}
 			// Track QR element property changes
 			if (element.type === 'qr') {
-				(element as any).contentMode;
-				(element as any).content;
-				(element as any).foregroundColor;
-				(element as any).backgroundColor;
-				(element as any).errorCorrectionLevel;
+				element.contentMode;
+				element.content;
+				element.foregroundColor;
+				element.backgroundColor;
+				element.errorCorrectionLevel;
 			}
 		});
 

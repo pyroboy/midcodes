@@ -59,6 +59,9 @@
 		onSelect?: (id: string | null) => void;
 	}>();
 
+    import { fitsInQRVersion3 } from '$lib/utils/qrCodeGenerator';
+    import { AlertTriangle } from 'lucide-svelte';
+
 	let openSectionIndex: number | null = $state(null);
 
 	// Debug: Log fontOptions when they change
@@ -613,6 +616,14 @@
 									placeholder="https://example.com or any text"
 									oninput={(e) => updateElementAtIndex(i, { content: e.currentTarget.value })}
 								/>
+                                {#if element.content && !fitsInQRVersion3(element.content, element.errorCorrectionLevel || 'M')}
+                                    <div class="text-xs text-yellow-600 dark:text-yellow-400 mt-1 flex items-start gap-1">
+                                        <AlertTriangle size={12} class="mt-0.5 shrink-0" />
+                                        <span>
+                                            Content is too long for compact QR (Version 3). Consider shortening to ensure printability on small cards.
+                                        </span>
+                                    </div>
+                                {/if}
 							</div>
 						{/if}
 						<div class="input-group">

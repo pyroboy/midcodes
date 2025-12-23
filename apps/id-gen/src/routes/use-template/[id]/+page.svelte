@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { run, preventDefault } from 'svelte/legacy';
-	import { onMount, onDestroy, untrack } from 'svelte';
+	import { onMount, onDestroy, untrack, tick } from 'svelte';
 	import { page } from '$app/stores';
 	import { auth, session, user } from '$lib/stores/auth';
 	import IdCanvas from '$lib/components/IdCanvas.svelte';
@@ -26,6 +26,7 @@
 		cleanSignature,
 		type ProcessingProgress
 	} from '$lib/utils/imageProcessing';
+	import { generateDigitalCardSlug } from '$lib/utils/slugGeneration';
 
 	// Enhanced type definitions for better type safety
 	interface SelectOption {
@@ -62,6 +63,7 @@
 		[key: string]: File | null;
 	}
 
+
 	interface Props {
 		data: {
 			template: {
@@ -73,6 +75,9 @@
 				back_background: string;
 				orientation: 'landscape' | 'portrait';
 			};
+			orgShortform: string | null;
+			preGeneratedSlug: string | null;
+			slugValidation: { isValid: boolean; profileUrl: string; fitsQRv3: boolean } | null;
 		};
 	}
 
@@ -134,6 +139,8 @@
 	const GAP = 16; // gap-4 = 16px
 	let createDigitalCard = $state(false);
 	let createdDigitalCard = $state<{ slug: string; claimCode: string; status: string } | null>(null);
+	// Pre-generated slug for QR code rendering (from server for security)
+	let preGeneratedSlug = $state<string | null>(untrack(() => data.preGeneratedSlug));
 
 	// Calculate the scale based on scroll position
 	// Simple approach: scale from 1 to MIN_SCALE based on scroll amount
@@ -432,6 +439,25 @@
 			backBackgroundType: typeof template.back_background
 		});
 
+		// Log server-generated QR slug for validation
+		if (data.preGeneratedSlug) {
+			const profileUrl = `https://kanaya.app/id/${data.preGeneratedSlug}`;
+			
+			console.log('[QR Slug] Using server-generated slug:', {
+				slug: data.preGeneratedSlug,
+				isValid: data.slugValidation?.isValid,
+				fitsQRv3: data.slugValidation?.fitsQRv3,
+				profileUrl,
+				urlLength: profileUrl.length
+			});
+
+			if (!data.slugValidation?.isValid) {
+				console.warn('[QR Slug] ⚠️ Server returned invalid slug format!');
+			}
+		} else {
+			console.warn('[QR Slug] ⚠️ No pre-generated slug from server - QR will show placeholder');
+		}
+
 		initializeFormData();
 
 		// Robust measurement: wait for layout, then measure using requestAnimationFrame
@@ -528,7 +554,14 @@
 				return;
 			}
 
-			// Render preview images for confirmation overlay
+			// Slug should already be generated from onMount
+			// This is just a fallback safety check
+			if (!preGeneratedSlug && data.orgShortform) {
+				preGeneratedSlug = generateDigitalCardSlug(data.orgShortform);
+				console.log('[handleSubmit] Fallback: Generated slug (should have been set in onMount):', preGeneratedSlug);
+			}
+
+			// Render preview images for confirmation overlay (now includes real QR URL)
 			const [frontBlob, backBlob] = await Promise.all([
 				frontCanvasComponent.renderFullResolution(),
 				backCanvasComponent.renderFullResolution()
@@ -569,6 +602,15 @@
 				return;
 			}
 
+			// If createDigitalCard is enabled but slug wasn't pre-generated (fallback safety)
+			// Note: slug should already exist from handleSubmit, this is just a safety check
+			if (createDigitalCard && !preGeneratedSlug && data.orgShortform) {
+				preGeneratedSlug = generateDigitalCardSlug(data.orgShortform);
+				console.log('[confirmAndSubmit] Fallback: generated slug for QR:', preGeneratedSlug);
+				// Allow IdCanvas to pick up the new slug before rendering
+				await new Promise(resolve => setTimeout(resolve, 50));
+			}
+
 			// Render full resolution variants for submission
 			const [frontVariants, backVariants] = await Promise.all([
 				frontCanvasComponent.renderFullResolutionVariants(),
@@ -594,6 +636,10 @@
 			});
 
 			submitFormData.append('createDigitalCard', createDigitalCard.toString());
+			// Include pre-generated slug so server uses the same one
+			if (preGeneratedSlug) {
+				submitFormData.append('preGeneratedSlug', preGeneratedSlug);
+			}
 
 			const response = await fetch('?/saveIdCard', {
 				method: 'POST',
@@ -1032,6 +1078,7 @@
 											{imagePositions}
 											{fullResolution}
 											isDragging={mouseMoving}
+											digitalCardSlug={preGeneratedSlug}
 											pixelDimensions={template.width_pixels && template.height_pixels
 												? { width: template.width_pixels, height: template.height_pixels }
 												: template.orientation === 'portrait'
@@ -1077,6 +1124,7 @@
 											{imagePositions}
 											{fullResolution}
 											isDragging={mouseMoving}
+											digitalCardSlug={preGeneratedSlug}
 											pixelDimensions={template.width_pixels && template.height_pixels
 												? { width: template.width_pixels, height: template.height_pixels }
 												: template.orientation === 'portrait'
@@ -1259,8 +1307,27 @@
 											</p>
 										{/if}
 									</div>
-								{:else}
-									<!-- Text/Selection inputs -->
+								{:else if element.type === 'qr'}
+									<!-- QR Code dedicated display -->
+									<div class="mb-6">
+										<div class="{!isMobile ? 'grid grid-cols-[7rem_1fr] gap-4 items-start' : ''}">
+											<Label
+												class="{!isMobile ? 'text-right pt-2' : 'block mb-2'} text-sm font-medium"
+											>
+												{element.variableName || 'QR Code'}
+											</Label>
+											<div
+												class="w-full bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-xl p-4 flex items-center gap-3"
+											>
+												<CheckCircle class="w-5 h-5 text-green-600 dark:text-green-500 flex-shrink-0" />
+												<span class="text-sm text-green-700 dark:text-green-400 font-medium">
+													Ready, save to make the card online
+												</span>
+											</div>
+										</div>
+									</div>
+								{:else if element.type !== 'graphic'}
+									<!-- Text/Selection inputs (Graphic elements are skipped) -->
 									<div
 										role="button"
 										tabindex="-1"
@@ -1417,8 +1484,27 @@
 											</p>
 										{/if}
 									</div>
-								{:else}
-									<!-- Text/Selection inputs -->
+								{:else if element.type === 'qr'}
+									<!-- QR Code dedicated display -->
+									<div class="mb-6">
+										<div class="{!isMobile ? 'grid grid-cols-[7rem_1fr] gap-4 items-start' : ''}">
+											<Label
+												class="{!isMobile ? 'text-right pt-2' : 'block mb-2'} text-sm font-medium"
+											>
+												{element.variableName || 'QR Code'}
+											</Label>
+											<div
+												class="w-full bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-xl p-4 flex items-center gap-3"
+											>
+												<CheckCircle class="w-5 h-5 text-green-600 dark:text-green-500 flex-shrink-0" />
+												<span class="text-sm text-green-700 dark:text-green-400 font-medium">
+													Ready, save to make the card online
+												</span>
+											</div>
+										</div>
+									</div>
+								{:else if element.type !== 'graphic'}
+									<!-- Text/Selection inputs (Graphic elements are skipped) -->
 									<div
 										role="button"
 										tabindex="-1"

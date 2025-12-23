@@ -26,6 +26,7 @@
 	import SmartIDCard from './SmartIDCard.svelte';
 	import EmptyIDs from '$lib/components/empty-states/EmptyIDs.svelte';
 	import IDCardSkeleton from '$lib/components/IDCardSkeleton.svelte';
+	import SecureTokenBadge from '$lib/components/SecureTokenBadge.svelte';
 
 	import type { AllIdsCacheSnapshot } from './allIdsCache';
 	import {
@@ -1281,6 +1282,7 @@
 											/>
 										</th>
 										<th class="px-4 py-3 font-medium">Preview</th>
+										<th class="px-4 py-3 font-medium whitespace-nowrap">SecureToken</th>
 										{#if templateFields[templateName]}
 											{#each templateFields[templateName] || [] as field}
 												<th class="px-4 py-3 font-medium whitespace-nowrap">{field.variableName}</th
@@ -1319,6 +1321,14 @@
 														/>
 													{/if}
 												</div>
+											</td>
+											<td class="px-4 py-3">
+												<SecureTokenBadge
+													slug={card.digital_card?.slug}
+													status={card.digital_card?.status}
+													showLink={true}
+													compact={false}
+												/>
 											</td>
 											{#if templateFields[templateName]}
 												{#each templateFields[templateName] || [] as field}

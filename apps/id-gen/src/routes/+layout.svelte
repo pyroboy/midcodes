@@ -23,6 +23,9 @@
 	import { browser } from '$app/environment';
 	import { page } from '$app/stores';
 
+	// Check if current route is a public profile page (no layout needed)
+	const isPublicProfilePage = $derived($page.url.pathname.startsWith('/id/'));
+
 	// Path access checking for emulation banner
 	import {
 		checkPathAccess,
@@ -235,10 +238,14 @@
 </svelte:head>
 
 <div class="min-h-screen bg-background text-foreground theme-transition">
-	<!-- Navigation Loading Overlay -->
-	<NavigationLoader />
+	{#if isPublicProfilePage}
+		<!-- Public profile pages: minimal layout, no navigation -->
+		{@render children()}
+	{:else}
+		<!-- Navigation Loading Overlay -->
+		<NavigationLoader />
 
-	{#if data.user}
+		{#if data.user}
 		<!-- Mobile Header -->
 		<MobileHeader user={data.user} onMenuToggle={toggleMenu} class="lg:hidden" />
 
@@ -664,6 +671,7 @@
 		<main class="min-h-screen bg-background">
 			{@render children()}
 		</main>
+		{/if}
 	{/if}
 </div>
 

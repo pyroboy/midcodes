@@ -4,6 +4,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Download, Trash2, Eye } from 'lucide-svelte';
 	import { getStorageUrl } from '$lib/utils/storage';
+	import SecureTokenBadge from '$lib/components/SecureTokenBadge.svelte';
 
 	// Props using Svelte 5 $props() rune
 	interface Props {
@@ -141,6 +142,16 @@
 				<p class="text-xs text-muted-foreground truncate">
 					{card.template_name}
 				</p>
+				{#if card.digital_card}
+					<div class="mt-1">
+						<SecureTokenBadge
+							slug={card.digital_card.slug}
+							status={card.digital_card.status}
+							showLink={true}
+							compact={true}
+						/>
+					</div>
+				{/if}
 			</div>
 
 			<!-- Action Buttons -->

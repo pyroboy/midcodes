@@ -415,12 +415,14 @@ async function renderQrElement(
 
 	// Determine QR content based on contentMode
 	let qrContent: string | null = null;
-	const contentMode = (element as any).contentMode || 'auto';
+	// No longer need cast as contentMode is now required in TemplateElement type
+	const contentMode = element.contentMode || 'auto'; 
 
+	// For custom content, we check element.content. It's optional on the type, so simple check is fine.
 	if (contentMode === 'auto' && digitalCardSlug) {
 		qrContent = buildDigitalProfileUrl(digitalCardSlug);
-	} else if (contentMode === 'custom' && (element as any).content) {
-		qrContent = (element as any).content;
+	} else if (contentMode === 'custom' && element.content) {
+		qrContent = element.content;
 	}
 
 	// In blank mode or no content, show placeholder
@@ -440,9 +442,9 @@ async function renderQrElement(
 
 	// Generate actual QR code
 	try {
-		const errorLevel = (element as any).errorCorrectionLevel || 'M';
-		const fgColor = (element as any).foregroundColor || '#000000';
-		const bgColor = (element as any).backgroundColor || '#ffffff';
+		const errorLevel = element.errorCorrectionLevel || 'M';
+		const fgColor = element.foregroundColor || '#000000';
+		const bgColor = element.backgroundColor || '#ffffff';
 
 		// Generate at 2x resolution for quality
 		const qrSize = Math.max(elementWidth, elementHeight) * 2;

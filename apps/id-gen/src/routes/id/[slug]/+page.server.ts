@@ -4,7 +4,21 @@ import { db } from '$lib/server/db';
 import { digitalCards, idcards } from '$lib/server/schema';
 import { eq } from 'drizzle-orm';
 
-export const load: PageServerLoad = async ({ params, locals }) => {
+// On-demand rendering - pages render on first visit, then cached at edge
+// Much better for 10k+ pages than prerender=true (which rebuilds ALL on deploy)
+export const prerender = 'auto';
+
+// Status type for clarity
+type CardStatus = 'unclaimed' | 'active' | 'banned' | 'suspended' | 'expired';
+
+export const load: PageServerLoad = async ({ params, locals, setHeaders }) => {
+	// Set cache headers for Cloudflare edge caching
+	// - public: cacheable by CDN
+	// - max-age=3600: fresh for 1 hour
+	// - stale-while-revalidate=86400: serve stale for 1 day while refreshing in background
+	setHeaders({
+		'Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400'
+	});
 	const { slug } = params;
 
 	// 1. Fetch Digital Card using Drizzle
@@ -16,61 +30,97 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		throw error(404, 'Card not found');
 	}
 
-	// Fetch associated ID card
-	const associatedIdCards = await db
-		.select()
-		.from(idcards)
-		.where(eq(idcards.id, card.linkedIdCardId!))
-		.limit(1);
+	const status = (card.status as CardStatus) || 'unclaimed';
 
-	const idCard = associatedIdCards[0];
-	const cardData = {
-		...card,
-		idcards: idCard
-	};
-
-	// 2. Check Status & Privacy
-	// If status is unclaimed, hide it
-	if (cardData.status === 'unclaimed') {
-		throw error(404, 'Profile not active');
+	// 2. Handle banned/suspended - return minimal data with status message
+	if (status === 'banned' || status === 'suspended') {
+		return {
+			status,
+			statusMessage:
+				status === 'banned'
+					? 'This profile has been banned and is no longer accessible.'
+					: 'This profile has been temporarily suspended.',
+			profile: null,
+			cardImages: { front: null, back: null },
+			theme: null,
+			isOwner: false,
+			canClaim: false,
+			claimTokenValid: false
+		};
 	}
 
-	// 3. Generate Public/Signed URLs for images using R2
+	// 3. Fetch associated ID card (needed for unclaimed, active, expired)
+	let idCard = null;
 	let frontUrl = null;
 	let backUrl = null;
-	const { getPublicUrl, getPresignedUrl } = await import('$lib/server/s3');
 
-	if (idCard) {
-		if (idCard.frontImage) {
-			// Using getPresignedUrl to match previous security behavior for ID cards
-			// Though if users switch to Public R2.dev, getPublicUrl is more efficient.
-			// But since ID cards contain PII, signed URLs are safer if the bucket is not fully public
-			// however USER said "R2.dev subdomain" which is fully public.
-			// Checking implementation plan... user chose "Migrate to Cloudflare R2".
-			// I'll default to getPublicUrl if it's a key, but I'll check if it looks like a URL.
-			// Actually, if we use R2.dev public domain, we don't need presigning for READS if the bucket is public.
-			// But R2 presigning works even on private buckets.
-			// Let's use getPublicUrl since user enabled "Public Access".
-			// AND we updated the storage logic to return public URLs.
-			// IF the stored value is a PATH (key), getPublicUrl helps.
-			// IF the stored value is a URL, getPublicUrl returns it as is.
-			frontUrl = getPublicUrl(idCard.frontImage);
-		}
-		if (idCard.backImage) {
-			backUrl = getPublicUrl(idCard.backImage);
+	if (card.linkedIdCardId) {
+		const associatedIdCards = await db
+			.select()
+			.from(idcards)
+			.where(eq(idcards.id, card.linkedIdCardId))
+			.limit(1);
+		idCard = associatedIdCards[0];
+
+		if (idCard) {
+			const { getPublicUrl } = await import('$lib/server/s3');
+			if (idCard.frontImage) frontUrl = getPublicUrl(idCard.frontImage);
+			if (idCard.backImage) backUrl = getPublicUrl(idCard.backImage);
 		}
 	}
 
+	// 4. For unclaimed - show card with claim CTA
+	if (status === 'unclaimed') {
+		return {
+			status,
+			statusMessage: null,
+			profile: null,
+			cardImages: {
+				front: frontUrl,
+				back: backUrl
+			},
+			theme: card.themeConfig,
+			isOwner: false,
+			canClaim: true,
+			claimTokenValid:
+				card.claimToken && card.claimTokenExpiresAt
+					? new Date(card.claimTokenExpiresAt) > new Date()
+					: false,
+			claimToken: card.claimToken
+		};
+	}
+
+	// 5. For expired - show card with re-claim option
+	if (status === 'expired') {
+		return {
+			status,
+			statusMessage: 'This profile has expired. It can be re-claimed by the owner.',
+			profile: card.profileContent,
+			cardImages: {
+				front: frontUrl,
+				back: backUrl
+			},
+			theme: card.themeConfig,
+			isOwner: locals.session?.user?.id === card.ownerId,
+			canClaim: locals.session?.user?.id === card.ownerId,
+			claimTokenValid: false
+		};
+	}
+
+	// 6. For active - full profile display (existing behavior)
 	return {
+		status,
+		statusMessage: null,
 		profile: {
-			...(cardData.profileContent as any),
-			status: cardData.status
+			...(card.profileContent as any)
 		},
 		cardImages: {
 			front: frontUrl,
 			back: backUrl
 		},
-		theme: cardData.themeConfig,
-		isOwner: locals.session?.user?.id === cardData.ownerId
+		theme: card.themeConfig,
+		isOwner: locals.session?.user?.id === card.ownerId,
+		canClaim: false,
+		claimTokenValid: false
 	};
 };

@@ -1,8 +1,18 @@
 import { query, getRequestEvent } from '$app/server';
 import { z } from 'zod';
 import { db } from '$lib/server/db';
-import { idcards, templates } from '$lib/server/schema';
+import { idcards, templates, digitalCards } from '$lib/server/schema';
 import { eq, sql, desc, inArray, and } from 'drizzle-orm';
+
+// Digital card status type
+export type DigitalCardStatus = 'unclaimed' | 'active' | 'banned' | 'suspended' | 'expired';
+
+// Digital card info for display
+export interface DigitalCardInfo {
+	slug: string;
+	status: DigitalCardStatus;
+	profileUrl: string;
+}
 
 // Types for ID cards
 interface IDCardField {
@@ -21,6 +31,7 @@ export interface IDCard {
 	fields: {
 		[fieldName: string]: IDCardField;
 	};
+	digital_card?: DigitalCardInfo | null;
 }
 
 interface TemplateVariable {
@@ -49,8 +60,7 @@ export const getIDCards = query(PaginationSchema, async ({ offset, limit }) => {
 	// Fetch one extra row so we can accurately determine if there's more.
 	const fetchLimit = Math.max(0, limit) + 1;
 
-	// Fetch cards with template names using Drizzle
-	// We'll perform a join
+	// Fetch cards with template names and digital card info using Drizzle
 	const results = await db
 		.select({
 			id: idcards.id,
@@ -61,10 +71,13 @@ export const getIDCards = query(PaginationSchema, async ({ offset, limit }) => {
 			backImageLowRes: idcards.backImageLowRes,
 			createdAt: idcards.createdAt,
 			data: idcards.data,
-			templateName: templates.name
+			templateName: templates.name,
+			digitalCardSlug: digitalCards.slug,
+			digitalCardStatus: digitalCards.status
 		})
 		.from(idcards)
 		.leftJoin(templates, eq(idcards.templateId, templates.id))
+		.leftJoin(digitalCards, eq(digitalCards.linkedIdCardId, idcards.id))
 		.where(eq(idcards.orgId, org_id))
 		.orderBy(desc(idcards.createdAt))
 		.offset(offset)
@@ -95,7 +108,14 @@ export const getIDCards = query(PaginationSchema, async ({ offset, limit }) => {
 			front_image_low_res: row.frontImageLowRes,
 			back_image_low_res: row.backImageLowRes,
 			created_at: row.createdAt,
-			fields
+			fields,
+			digital_card: row.digitalCardSlug
+				? {
+						slug: row.digitalCardSlug,
+						status: (row.digitalCardStatus as DigitalCardStatus) || 'unclaimed',
+						profileUrl: `/id/${row.digitalCardSlug}`
+					}
+				: null
 		};
 	});
 
