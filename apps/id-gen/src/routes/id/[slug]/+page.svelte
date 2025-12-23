@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { Canvas, T } from '@threlte/core';
-	import { OrbitControls } from '@threlte/extras';
 	import { NoToneMapping } from 'three';
 	import { onMount } from 'svelte';
 	import { fade } from 'svelte/transition';
@@ -124,6 +123,55 @@
 	// Progressive loading state
 	let is3DReady = $state(false);
 	let load3D = $state(false);
+	
+	// Custom orbit control state (for 1-inch control zone)
+	let cardRotationX = $state(0); // X rotation (up/down tilt)
+	let cardRotationY = $state(0); // Y rotation (left/right spin)
+	let isFlipped = $state(false); // Track flip state
+	let isDragging = $state(false);
+	let dragStartX = $state(0);
+	let dragStartY = $state(0);
+	let rotationStartX = $state(0);
+	let rotationStartY = $state(0);
+	let totalDragDistance = $state(0); // To detect tap vs drag
+	
+	// Drag handlers for control zone
+	function handleDragStart(e: PointerEvent) {
+		isDragging = true;
+		dragStartX = e.clientX;
+		dragStartY = e.clientY;
+		rotationStartX = cardRotationX;
+		rotationStartY = cardRotationY;
+		totalDragDistance = 0;
+		(e.target as HTMLElement).setPointerCapture(e.pointerId);
+	}
+	
+	function handleDragMove(e: PointerEvent) {
+		if (!isDragging) return;
+		const deltaX = e.clientX - dragStartX;
+		const deltaY = e.clientY - dragStartY;
+		totalDragDistance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+		
+		// Sensitivity: 0.01 radians per pixel
+		cardRotationY = rotationStartY + deltaX * 0.01;
+		cardRotationX = rotationStartX - deltaY * 0.01; // Inverted for natural feel
+		
+		// Clamp X rotation to prevent flipping over (max ~45 degrees)
+		cardRotationX = Math.max(-0.8, Math.min(0.8, cardRotationX));
+	}
+	
+	function handleDragEnd(e: PointerEvent) {
+		const wasTap = totalDragDistance < 5; // Less than 5px movement = tap
+		isDragging = false;
+		(e.target as HTMLElement).releasePointerCapture(e.pointerId);
+		
+		// Tap to flip the card
+		if (wasTap) {
+			isFlipped = !isFlipped;
+			cardRotationY = isFlipped ? Math.PI : 0;
+			cardRotationX = 0; // Reset tilt on flip
+		}
+	}
 
 	onMount(() => {
 		// Update viewport dimensions on mount and resize
@@ -239,34 +287,44 @@
 					class="absolute inset-0 flex items-center justify-center z-20 border-4 border-blue-500"
 					style="opacity: {is3DReady ? 1 : 0}; transition: opacity 700ms ease-out;"
 				>
-					<!-- DEBUG: PURPLE border = 3D canvas container (scaled larger for orbit room) -->
+					<!-- DEBUG: PURPLE border = 3D canvas container (square for orbit room) -->
 					<div
 						data-debug-name="CARD3D-CONTAINER-PURPLE"
-						class="overflow-hidden rounded-xl shadow-2xl border-4 border-purple-500"
-						style="width: {purpleContainerWidth}px; height: {purpleContainerHeight}px;"
+						class="overflow-hidden rounded-xl shadow-2xl border-4 border-purple-500 relative"
+						style="width: {purpleContainerWidth}px; height: {purpleContainerWidth}px;"
 					>
-						<Canvas toneMapping={NoToneMapping}>
-							<T.PerspectiveCamera makeDefault position={[0, 0, 8]} fov={45}>
-								<OrbitControls
-									enableZoom={false}
-									enablePan={false}
-									enableRotate={true}
-									autoRotate={false}
-								/>
-							</T.PerspectiveCamera>
-							<T.AmbientLight intensity={1.5} />
-							<T.DirectionalLight position={[5, 5, 5]} intensity={1} castShadow />
-							<T.DirectionalLight position={[-5, 5, -5]} intensity={0.5} />
+						<!-- Canvas layer - pointer-events disabled to allow scroll through -->
+						<div class="absolute inset-0 pointer-events-none">
+							<Canvas toneMapping={NoToneMapping}>
+								<T.PerspectiveCamera makeDefault position={[0, 0, 8]} fov={45} />
+								<T.AmbientLight intensity={1.5} />
+								<T.DirectionalLight position={[5, 5, 5]} intensity={1} castShadow />
+								<T.DirectionalLight position={[-5, 5, -5]} intensity={0.5} />
 
-							<DigitalCard3D
-								{frontUrl}
-								{backUrl}
-								stage="profile"
-								onLoad={on3DLoad}
-								{cardAspectRatio}
-								sceneScale={actualSceneScale}
-							/>
-						</Canvas>
+								<DigitalCard3D
+									{frontUrl}
+									{backUrl}
+									stage="profile"
+									onLoad={on3DLoad}
+									{cardAspectRatio}
+									sceneScale={actualSceneScale}
+									externalRotationX={cardRotationX}
+									externalRotationY={cardRotationY}
+								/>
+							</Canvas>
+						</div>
+						
+						<!-- 1-inch (96px) control zone - ONLY this area responds to drag -->
+						<div
+							data-debug-name="ORBIT-CONTROL-ZONE"
+							class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing rounded-lg touch-none"
+							class:cursor-grabbing={isDragging}
+							style="width: 96px; height: 96px; background: rgba(255,255,255,0.05); border: 2px dashed rgba(255,255,255,0.3);"
+							onpointerdown={handleDragStart}
+							onpointermove={handleDragMove}
+							onpointerup={handleDragEnd}
+							onpointercancel={handleDragEnd}
+						></div>
 					</div>
 				</div>
 			{/if}

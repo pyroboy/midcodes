@@ -17,7 +17,9 @@
 		stage = 'intro', // 'intro', 'profile', 'expanded'
 		onLoad, // Callback when fully loaded
 		cardAspectRatio = 1.588, // Card aspect ratio (width/height), default CR80
-		sceneScale = 1.0 // Scene scale factor - card is scaled by 1/sceneScale to match 2D size
+		sceneScale = 1.0, // Scene scale factor - card is scaled by 1/sceneScale to match 2D size
+		externalRotationX = 0, // External X rotation for up/down tilt
+		externalRotationY = 0 // External Y rotation for left/right spin
 	} = $props<{
 		frontUrl: string;
 		backUrl: string;
@@ -25,6 +27,8 @@
 		onLoad?: () => void;
 		cardAspectRatio?: number;
 		sceneScale?: number;
+		externalRotationX?: number;
+		externalRotationY?: number;
 	}>();
 
 	// State
@@ -83,8 +87,8 @@
 		// Calculate visible 3D space based on camera
 		const visible3DHeight = getVisible3DHeight(CAMERA_FOV, CAMERA_DISTANCE);
 		
-		// Container has same aspect ratio as card (using CSS aspect-ratio)
-		const visible3DWidth = visible3DHeight * cardAspectRatio;
+		// Canvas is SQUARE (1:1 aspect ratio), so visible width = visible height
+		const visible3DWidth = visible3DHeight; // Square canvas
 		
 		// Calculate scale needed to fill visible area
 		const scaleByHeight = visible3DHeight / cardHeight3D;
@@ -221,11 +225,13 @@
 
 <T.Group
 	position={$position}
-	rotation={stage === 'intro' ? ([0, time * 0.5, 0] as [number, number, number]) : $rotation}
+	rotation={stage === 'intro' 
+		? ([0, time * 0.5, 0] as [number, number, number]) 
+		: ([externalRotationX, externalRotationY, 0] as [number, number, number])}
 	scale={currentScale}
 	onclick={(e: any) => {
 		e.stopPropagation();
-		toggleFlip();
+		// toggleFlip() removed - flip handled externally via tap
 	}}
 >
 	{#if frontGeometry && backGeometry && edgeGeometry}
