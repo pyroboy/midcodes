@@ -1,29 +1,33 @@
 <!doctype html>
 <html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" href="%sveltekit.assets%/favicon.png" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		%sveltekit.head%
-		<script>
-			// Global error handler for debugging
-			window.addEventListener('error', function (e) {
-				console.error('🚨 [GLOBAL ERROR]:', e.error || e.message, {
-					filename: e.filename,
-					lineno: e.lineno,
-					colno: e.colno,
-					stack: e.error?.stack
-				});
-			});
 
-			window.addEventListener('unhandledrejection', function (e) {
-				console.error('🚨 [UNHANDLED PROMISE REJECTION]:', e.reason, {
-					promise: e.promise
-				});
+<head>
+	<meta charset="utf-8" />
+	<link rel="icon" href="%sveltekit.assets%/favicon.png" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	%sveltekit.head%
+	<script>
+		// Global error handler for debugging
+		window.addEventListener('error', function (e) {
+			console.error('🚨 [GLOBAL ERROR]:', e.error || e.message, {
+				filename: e.filename,
+				lineno: e.lineno,
+				colno: e.colno,
+				stack: e.error?.stack
 			});
-		</script>
-	</head>
-	<body data-sveltekit-preload-data="hover" data-sveltekit-preload-code="hover">
-		<div style="display: contents">%sveltekit.body%</div>
-	</body>
+		});
+
+		window.addEventListener('unhandledrejection', function (e) {
+			console.error('🚨 [UNHANDLED PROMISE REJECTION]:', e.reason, {
+				promise: e.promise
+			});
+		});
+	</script>
+</head>
+
+<body data-sveltekit-preload-data="hover" data-sveltekit-preload-code="hover"
+	style="background-color: #030712; color: white;">
+	<div style="display: contents">%sveltekit.body%</div>
+</body>
+
 </html>
