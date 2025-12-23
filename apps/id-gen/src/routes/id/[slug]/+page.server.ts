@@ -53,6 +53,8 @@ export const load: PageServerLoad = async ({ params, locals, setHeaders }) => {
 	let idCard = null;
 	let frontUrl = null;
 	let backUrl = null;
+	let frontLowRes = null;
+	let backLowRes = null;
 
 	if (card.linkedIdCardId) {
 		const associatedIdCards = await db
@@ -66,6 +68,8 @@ export const load: PageServerLoad = async ({ params, locals, setHeaders }) => {
 			const { getPublicUrl } = await import('$lib/server/s3');
 			if (idCard.frontImage) frontUrl = getPublicUrl(idCard.frontImage);
 			if (idCard.backImage) backUrl = getPublicUrl(idCard.backImage);
+			if (idCard.frontImageLowRes) frontLowRes = getPublicUrl(idCard.frontImageLowRes);
+			if (idCard.backImageLowRes) backLowRes = getPublicUrl(idCard.backImageLowRes);
 		}
 	}
 
@@ -77,7 +81,9 @@ export const load: PageServerLoad = async ({ params, locals, setHeaders }) => {
 			profile: null,
 			cardImages: {
 				front: frontUrl,
-				back: backUrl
+				back: backUrl,
+				frontLowRes,
+				backLowRes
 			},
 			theme: card.themeConfig,
 			isOwner: false,
@@ -98,7 +104,9 @@ export const load: PageServerLoad = async ({ params, locals, setHeaders }) => {
 			profile: card.profileContent,
 			cardImages: {
 				front: frontUrl,
-				back: backUrl
+				back: backUrl,
+				frontLowRes,
+				backLowRes
 			},
 			theme: card.themeConfig,
 			isOwner: locals.session?.user?.id === card.ownerId,
@@ -116,7 +124,9 @@ export const load: PageServerLoad = async ({ params, locals, setHeaders }) => {
 		},
 		cardImages: {
 			front: frontUrl,
-			back: backUrl
+			back: backUrl,
+			frontLowRes,
+			backLowRes
 		},
 		theme: card.themeConfig,
 		isOwner: locals.session?.user?.id === card.ownerId,

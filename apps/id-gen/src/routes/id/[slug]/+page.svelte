@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Canvas, T } from '@threlte/core';
+	import { OrbitControls } from '@threlte/extras';
 	import { NoToneMapping } from 'three';
 	import { onMount } from 'svelte';
 	import { fly, fade } from 'svelte/transition';
@@ -30,6 +31,7 @@
 
 	const frontUrl = $derived(data.cardImages?.front);
 	const backUrl = $derived(data.cardImages?.back);
+	const frontLowRes = $derived(data.cardImages?.frontLowRes);
 
 	function getIcon(platform: string) {
 		const p = platform.toLowerCase();
@@ -54,21 +56,45 @@
 		}
 	}
 
+
+	// Progressive loading state
+	import { getNetworkStatus } from '$lib/utils/network';
+	import { Loader2 } from 'lucide-svelte';
+	
+	let is3DReady = $state(false);
+	let load3D = $state(false);
+	let show2D = $state(true); // Always start true
+	
 	onMount(() => {
 		// For banned/suspended, show content immediately without animation
 		if (isBannedOrSuspended) {
 			showContent = true;
 			return;
 		}
+        
+        // Show content state (kept for other potential uses, but footer is now static)
+        showContent = true;
 
-		// Start animation sequence for other states
+		// Progressive Loading Logic
+		const { isSlow } = getNetworkStatus();
+		
+		// If fast, load 3D shortly. If slow, give more time for 2D to settle.
 		setTimeout(() => {
-			stage = 'profile';
-			setTimeout(() => {
-				showContent = true;
-			}, 500);
-		}, 2000);
+			load3D = true;
+		}, isSlow ? 1500 : 200);
+
+        // We no longer delay 'stage', it defaults to 'profile' (static front) to match 2D.
 	});
+
+    function on3DLoad() {
+        // 3D assets loaded. Transition from 2D to 3D.
+        is3DReady = true;
+        
+        // Wait a beat for the first frame to render then hide 2D
+        setTimeout(() => {
+            show2D = false;
+        }, 500);
+    }
 </script>
 
 <svelte:head>
@@ -94,156 +120,87 @@
 		</div>
 	</div>
 {:else}
-	<!-- 3D Card Background for unclaimed, active, expired -->
-	<div class="fixed inset-0 z-0 bg-neutral-950">
-		<Canvas toneMapping={NoToneMapping}>
-			<T.PerspectiveCamera makeDefault position={[0, 0, 8]} fov={45} />
-			<T.AmbientLight intensity={1.5} />
-			<T.DirectionalLight position={[5, 5, 5]} intensity={1} castShadow />
-			<T.DirectionalLight position={[-5, 5, -5]} intensity={0.5} />
+	<!-- Main Container -->
+	<div class="fixed inset-0 z-0 bg-neutral-950 flex flex-col items-center justify-between overflow-hidden">
+		
+        <!-- Card Area (Center) -->
+        <div class="flex-1 w-full flex items-center justify-center relative">
+            
+            <!-- 3D Layer (Background) -->
+            {#if load3D}
+                <div 
+                    class="absolute inset-0 transition-opacity duration-1000 ease-out"
+                    class:opacity-0={!is3DReady}
+                    class:opacity-100={is3DReady}
+                >
+                    <Canvas toneMapping={NoToneMapping}>
+                        <T.PerspectiveCamera makeDefault position={[0, 0, 8]} fov={45}>
+                            <OrbitControls
+                                enableZoom={false}
+                                enablePan={true}
+                                enableRotate={true}
+                                autoRotate={false} 
+                            />
+                        </T.PerspectiveCamera>
+                        <T.AmbientLight intensity={1.5} />
+                        <T.DirectionalLight position={[5, 5, 5]} intensity={1} castShadow />
+                        <T.DirectionalLight position={[-5, 5, -5]} intensity={0.5} />
 
-			{#if frontUrl && backUrl}
-				<DigitalCard3D {frontUrl} {backUrl} {stage} />
-			{/if}
-		</Canvas>
+                        {#if frontUrl && backUrl}
+                            <!-- Stage 'profile' ensures static front facing initially -->
+                            <DigitalCard3D {frontUrl} {backUrl} stage="profile" onLoad={on3DLoad} />
+                        {/if}
+                    </Canvas>
+                </div>
+            {/if}
+
+            <!-- 2D Layer (Foreground / Fallback) -->
+            {#if show2D && (frontLowRes || frontUrl)}
+                <div 
+                    class="relative transition-opacity duration-1000 ease-out z-10 flex flex-col items-center gap-6"
+                    class:opacity-0={is3DReady}
+                >
+                    <!-- 2D Image matching 3D scale approx 
+                         Use max-h to prevent portrait images from taking too much vertical space.
+                         Use max-w to restrict width.
+                         w-auto/h-auto preserves aspect ratio.
+                         Uses frontLowRes if available, falls back to frontUrl.
+                    -->
+				<img 
+                    src={frontLowRes || frontUrl} 
+                    alt="Digital ID" 
+                    class="w-auto h-auto max-w-[85vw] md:max-w-[400px] max-h-[55vh] rounded-xl shadow-2xl object-contain"
+                />
+                    
+                    <!-- Loading Indicator removed from here -->
+                </div>
+            {/if}
+        </div>
+
+        <!-- Footer (Always Visible) -->
+        <div class="w-full pb-8 pointer-events-auto text-center z-20 relative">
+            <div 
+                class="absolute -top-12 left-1/2 -translate-x-1/2 flex items-center gap-2 text-white/50 bg-black/50 px-3 py-1.5 rounded-full backdrop-blur-md text-xs font-medium transition-opacity duration-500"
+                class:opacity-0={is3DReady}
+                class:pointer-events-none={is3DReady}
+            >
+                <Loader2 class="w-3 h-3 animate-spin" />
+                <span>Loading 3D Experience...</span>
+            </div>
+            <div
+                class="inline-flex flex-col items-center gap-2"
+            >
+                <p class="text-neutral-500 text-sm font-medium tracking-wide">
+                    POWERED BY <span class="text-white font-bold ml-1">KANAYA</span>
+                </p>
+                <div class="flex items-center gap-4 text-xs text-neutral-600">
+                    <span>© {new Date().getFullYear()}</span>
+                    <span>•</span>
+                    <a href="/terms" class="hover:text-neutral-400 transition-colors">Terms</a>
+                    <span>•</span>
+                    <a href="/privacy" class="hover:text-neutral-400 transition-colors">Privacy</a>
+                </div>
+            </div>
+        </div>
 	</div>
-
-	{#if showContent}
-		<div class="relative z-10 min-h-screen pt-[40vh] pb-10 px-4 pointer-events-none">
-			<div
-				class="max-w-md mx-auto pointer-events-auto"
-				transition:fly={{ y: 50, duration: 800 }}
-			>
-				{#if isUnclaimed}
-					<!-- Unclaimed State: Show claim CTA -->
-					<Card
-						class="bg-black/40 backdrop-blur-xl border-white/10 text-white shadow-2xl overflow-hidden"
-					>
-						<CardContent class="p-6 md:p-8 flex flex-col items-center text-center gap-4">
-							<div
-								class="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center"
-							>
-								<Icons.UserPlus class="w-8 h-8 text-blue-400" />
-							</div>
-							<h1 class="text-2xl font-bold tracking-tight">Claim Your Profile</h1>
-							<p class="text-neutral-400 text-sm">
-								This digital ID is ready to be activated. Claim it to customize your profile
-								and share your contact information.
-							</p>
-
-							{#if data.canClaim && data.claimTokenValid}
-								<Button
-									variant="default"
-									class="w-full bg-white text-black hover:bg-white/90 mt-4"
-									onclick={handleClaim}
-								>
-									<Icons.Key class="w-4 h-4 mr-2" />
-									Claim This Profile
-								</Button>
-							{:else}
-								<p class="text-xs text-neutral-500">
-									Contact your organization to receive a claim link.
-								</p>
-							{/if}
-						</CardContent>
-					</Card>
-				{:else if isExpired}
-					<!-- Expired State: Show re-claim option -->
-					<Card
-						class="bg-black/40 backdrop-blur-xl border-yellow-500/30 text-white shadow-2xl overflow-hidden"
-					>
-						<CardContent class="p-6 md:p-8 flex flex-col items-center text-center gap-4">
-							<div
-								class="w-16 h-16 bg-yellow-500/20 rounded-full flex items-center justify-center"
-							>
-								<Icons.Clock class="w-8 h-8 text-yellow-400" />
-							</div>
-							<h1 class="text-2xl font-bold tracking-tight">Profile Expired</h1>
-							<p class="text-neutral-400 text-sm">
-								{data.statusMessage}
-							</p>
-
-							{#if data.isOwner}
-								<Button
-									variant="default"
-									class="w-full bg-yellow-500 text-black hover:bg-yellow-400 mt-4"
-								>
-									<Icons.RefreshCw class="w-4 h-4 mr-2" />
-									Renew Profile
-								</Button>
-							{/if}
-						</CardContent>
-					</Card>
-				{:else}
-					<!-- Active State: Full profile -->
-					<Card
-						class="bg-black/40 backdrop-blur-xl border-white/10 text-white shadow-2xl overflow-hidden"
-					>
-						<CardContent class="p-6 md:p-8 flex flex-col items-center text-center gap-4">
-							<!-- Avatar -->
-							<Avatar class="w-24 h-24 border-4 border-white/10 shadow-lg">
-								<AvatarImage src={data.profile?.avatar_url} alt={displayName} />
-								<AvatarFallback>{displayName.substring(0, 2).toUpperCase()}</AvatarFallback>
-							</Avatar>
-
-							<!-- Info -->
-							<div class="space-y-1">
-								<h1 class="text-2xl font-bold tracking-tight">{displayName}</h1>
-								{#if jobTitle}
-									<p class="text-neutral-400 font-medium">{jobTitle}</p>
-								{/if}
-							</div>
-
-							{#if bio}
-								<p class="text-sm text-neutral-300 max-w-sm leading-relaxed">
-									{bio}
-								</p>
-							{/if}
-
-							<!-- Actions -->
-							<div class="w-full grid grid-cols-2 gap-3 mt-4">
-								<Button
-									variant="outline"
-									class="w-full bg-white/5 border-white/10 hover:bg-white/10 hover:text-white"
-									onclick={downloadVCard}
-								>
-									<Icons.Contact class="w-4 h-4 mr-2" />
-									Save Contact
-								</Button>
-								<Button variant="default" class="w-full bg-white text-black hover:bg-white/90">
-									<Icons.MessageCircle class="w-4 h-4 mr-2" />
-									Message
-								</Button>
-							</div>
-
-							<!-- Socials -->
-							{#if socials.length > 0}
-								<div class="flex flex-wrap justify-center gap-3 mt-4">
-									{#each socials as social}
-										{@const Icon = getIcon(social.platform)}
-										<a
-											href={social.url}
-											target="_blank"
-											rel="noopener noreferrer"
-											class="p-3 rounded-full bg-white/5 hover:bg-white/20 transition-colors text-white border border-white/5"
-										>
-											<Icon class="w-5 h-5" />
-										</a>
-									{/each}
-								</div>
-							{/if}
-						</CardContent>
-
-						<!-- Branding Footer -->
-						<div class="p-3 bg-white/5 border-t border-white/5 text-center">
-							<p class="text-xs text-neutral-500 flex items-center justify-center gap-1">
-								<Icons.ShieldCheck class="w-3 h-3" />
-								Verified ID
-							</p>
-						</div>
-					</Card>
-				{/if}
-			</div>
-		</div>
-	{/if}
 {/if}
