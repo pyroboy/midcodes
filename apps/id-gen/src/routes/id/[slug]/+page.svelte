@@ -44,9 +44,9 @@
 	const cardAspectRatio = $derived(data.cardAspectRatio ?? DEFAULT_CARD_ASPECT_RATIO);
 
 	// Viewport dimensions for responsive sizing
-	// Use larger fallback to prevent small initial render during SSR
-	let viewportWidth = $state(typeof window !== 'undefined' ? window.innerWidth : 1024);
-	let viewportHeight = $state(typeof window !== 'undefined' ? window.innerHeight : 768);
+	// Smart default: 375x667 (Mobile) -> Ensures SSR render is visible & fits on small screens
+	let viewportWidth = $state(typeof window !== 'undefined' ? window.innerWidth : 375);
+	let viewportHeight = $state(typeof window !== 'undefined' ? window.innerHeight : 667);
 	let isMobile = $derived(isMobileViewport(viewportWidth));
 
 	// Calculate card display dimensions based on viewport
@@ -75,23 +75,21 @@
 	const SCENE_3D_SCALE = 1.3;
 	
 	// Calculate actual container dimensions in pixels
-	// YELLOW container: min(90% * viewport, 700px)
-	const yellowContainerWidth = $derived(
-		Math.min(viewportWidth * CONTAINER_WIDTH_PERCENT, CONTAINER_MAX_WIDTH_PX)
-	);
-	const yellowContainerHeight = $derived(yellowContainerWidth / cardAspectRatio);
-	
-	// PURPLE container: min(90% * scale * viewport, 700 * scale px)
-	// But also respect the actual viewport constraints
+	// Calculate actual container dimensions in pixels
+	// YELLOW and PURPLE containers now MATCH exactly (Square & Scaled)
 	const purpleMaxWidth = CONTAINER_MAX_WIDTH_PX * SCENE_3D_SCALE;
-	const purpleContainerWidth = $derived(
+	const sharedContainerWidth = $derived(
 		Math.min(viewportWidth * CONTAINER_WIDTH_PERCENT * SCENE_3D_SCALE, purpleMaxWidth, viewportWidth * 0.95)
 	);
-	const purpleContainerHeight = $derived(purpleContainerWidth / cardAspectRatio);
 	
-	// Calculate the ACTUAL ratio between purple and yellow containers
-	// This accounts for max-width constraints on either container
-	const actualSceneScale = $derived(purpleContainerWidth / yellowContainerWidth);
+	const yellowContainerWidth = $derived(sharedContainerWidth);
+	const yellowContainerHeight = $derived(sharedContainerWidth); // Square
+	
+	const purpleContainerWidth = $derived(sharedContainerWidth);
+	const purpleContainerHeight = $derived(sharedContainerWidth); // Square
+	
+	// Ratio is now 1:1 since they match
+	const actualSceneScale = $derived(1.0);
 
 	function scrollToProfile() {
 		document.getElementById('profile')?.scrollIntoView({ behavior: 'smooth' });
