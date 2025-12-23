@@ -45,8 +45,9 @@
 	const cardAspectRatio = $derived(data.cardAspectRatio ?? DEFAULT_CARD_ASPECT_RATIO);
 
 	// Viewport dimensions for responsive sizing
-	let viewportWidth = $state(typeof window !== 'undefined' ? window.innerWidth : 375);
-	let viewportHeight = $state(typeof window !== 'undefined' ? window.innerHeight : 667);
+	// Use larger fallback to prevent small initial render during SSR
+	let viewportWidth = $state(typeof window !== 'undefined' ? window.innerWidth : 1024);
+	let viewportHeight = $state(typeof window !== 'undefined' ? window.innerHeight : 768);
 	let isMobile = $derived(isMobileViewport(viewportWidth));
 
 	// Calculate card display dimensions based on viewport
