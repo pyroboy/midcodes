@@ -124,24 +124,33 @@
 	let is3DReady = $state(false);
 	let load3D = $state(false);
 	
-	// Custom orbit control state (for 1-inch control zone)
-	let cardRotationX = $state(0); // X rotation (up/down tilt)
-	let cardRotationY = $state(0); // Y rotation (left/right spin)
+	// Custom orbit control state
+	// Smooth animated rotation for flip transitions
+	import { tweened } from 'svelte/motion';
+	import { cubicOut } from 'svelte/easing';
+	
+	const animatedRotationX = tweened(0, { duration: 400, easing: cubicOut });
+	const animatedRotationY = tweened(0, { duration: 400, easing: cubicOut });
+	
 	let isFlipped = $state(false); // Track flip state
 	let isDragging = $state(false);
 	let dragStartX = $state(0);
 	let dragStartY = $state(0);
-	let rotationStartX = $state(0);
-	let rotationStartY = $state(0);
+	let dragOffsetX = $state(0); // Current drag offset (added to animated value)
+	let dragOffsetY = $state(0);
 	let totalDragDistance = $state(0); // To detect tap vs drag
+	
+	// Combined rotation values (animated base + drag offset)
+	const cardRotationX = $derived($animatedRotationX + dragOffsetX);
+	const cardRotationY = $derived($animatedRotationY + dragOffsetY);
 	
 	// Drag handlers for control zone
 	function handleDragStart(e: PointerEvent) {
 		isDragging = true;
 		dragStartX = e.clientX;
 		dragStartY = e.clientY;
-		rotationStartX = cardRotationX;
-		rotationStartY = cardRotationY;
+		dragOffsetX = 0;
+		dragOffsetY = 0;
 		totalDragDistance = 0;
 		(e.target as HTMLElement).setPointerCapture(e.pointerId);
 	}
@@ -153,11 +162,15 @@
 		totalDragDistance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 		
 		// Sensitivity: 0.01 radians per pixel
-		cardRotationY = rotationStartY + deltaX * 0.01;
-		cardRotationX = rotationStartX - deltaY * 0.01; // Inverted for natural feel
+		// Drag right → positive Y rotation (spin right)
+		// Drag down → positive X rotation (tilt forward) - Natural direction
+		dragOffsetY = deltaX * 0.01;
+		dragOffsetX = deltaY * 0.01;
 		
 		// Clamp X rotation to prevent flipping over (max ~45 degrees)
-		cardRotationX = Math.max(-0.8, Math.min(0.8, cardRotationX));
+		const totalX = $animatedRotationX + dragOffsetX;
+		if (totalX > 0.8) dragOffsetX = 0.8 - $animatedRotationX;
+		if (totalX < -0.8) dragOffsetX = -0.8 - $animatedRotationX;
 	}
 	
 	function handleDragEnd(e: PointerEvent) {
@@ -165,11 +178,19 @@
 		isDragging = false;
 		(e.target as HTMLElement).releasePointerCapture(e.pointerId);
 		
-		// Tap to flip the card
 		if (wasTap) {
+			// Tap to flip the card with smooth animation
 			isFlipped = !isFlipped;
-			cardRotationY = isFlipped ? Math.PI : 0;
-			cardRotationX = 0; // Reset tilt on flip
+			animatedRotationY.set(isFlipped ? Math.PI : 0);
+			animatedRotationX.set(0); // Reset tilt on flip
+			dragOffsetX = 0;
+			dragOffsetY = 0;
+		} else {
+			// Merge drag offset into animated value (no animation, instant)
+			animatedRotationX.set($animatedRotationX + dragOffsetX, { duration: 0 });
+			animatedRotationY.set($animatedRotationY + dragOffsetY, { duration: 0 });
+			dragOffsetX = 0;
+			dragOffsetY = 0;
 		}
 	}
 
@@ -314,12 +335,12 @@
 							</Canvas>
 						</div>
 						
-						<!-- 1-inch (96px) control zone - ONLY this area responds to drag -->
+						<!-- Control zone - 50% of container (scales with screen, ~2+ inches) -->
 						<div
 							data-debug-name="ORBIT-CONTROL-ZONE"
 							class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing rounded-lg touch-none"
 							class:cursor-grabbing={isDragging}
-							style="width: 96px; height: 96px; background: rgba(255,255,255,0.05); border: 2px dashed rgba(255,255,255,0.3);"
+							style="width: 50%; height: 50%; background: rgba(255,255,255,0.05); border: 2px dashed rgba(255,255,255,0.3);"
 							onpointerdown={handleDragStart}
 							onpointermove={handleDragMove}
 							onpointerup={handleDragEnd}
