@@ -29,9 +29,7 @@
 	}>();
 
 	// Derived values
-	let frontImageUrl = $derived(
-		card.front_image ? getProxiedUrl(card.front_image, 'cards') : null
-	);
+	let frontImageUrl = $derived(card.front_image ? getProxiedUrl(card.front_image, 'cards') : null);
 
 	let cardDisplayName = $derived(
 		card.fields?.['Name']?.value ||

@@ -52,8 +52,14 @@
 			<div class="mt-4 space-y-4">
 				<!-- Layer Preview -->
 				<div class="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-border">
-					<div class="w-16 h-12 rounded border border-border bg-muted overflow-hidden flex-shrink-0">
-						<img src={actionLayer.imageUrl} alt={actionLayer.name} class="w-full h-full object-contain" />
+					<div
+						class="w-16 h-12 rounded border border-border bg-muted overflow-hidden flex-shrink-0"
+					>
+						<img
+							src={actionLayer.imageUrl}
+							alt={actionLayer.name}
+							class="w-full h-full object-contain"
+						/>
 					</div>
 					<div>
 						<p class="font-medium text-sm">{actionLayer.name}</p>

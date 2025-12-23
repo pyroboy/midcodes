@@ -7,7 +7,8 @@ import { env } from './env';
 import type { TemplateElementInput } from '$lib/schemas/template-element.schema';
 
 // We'll use the REST API to avoid adding extra dependencies for now
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+const GEMINI_API_URL =
+	'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
 export interface VisionDetectionResult {
 	success: boolean;
@@ -39,7 +40,7 @@ export async function detectElementsWithVision(
 	// Ensure we have clean base64 data and mime type
 	let cleanBase64 = imageBase64;
 	let mimeType = 'image/png';
-	
+
 	if (imageBase64.includes(',')) {
 		const parts = imageBase64.split(',');
 		const match = parts[0].match(/data:(.*?);/);

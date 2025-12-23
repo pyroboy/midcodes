@@ -279,8 +279,14 @@ function cropTransparentPixels(canvas: HTMLCanvasElement, padding: number): HTML
 	if (croppedCtx) {
 		croppedCtx.drawImage(
 			canvas,
-			cropX, cropY, cropWidth, cropHeight,  // Source rectangle
-			0, 0, cropWidth, cropHeight            // Destination rectangle
+			cropX,
+			cropY,
+			cropWidth,
+			cropHeight, // Source rectangle
+			0,
+			0,
+			cropWidth,
+			cropHeight // Destination rectangle
 		);
 	}
 
@@ -424,9 +430,12 @@ async function resizeImageForApi(source: File | Blob, maxDimension: number = 102
  * @param scaleFactor - Factor to multiply dimensions by (0 < scale < 1)
  * @returns Blob (PNG)
  */
-export async function downscaleImage(source: File | Blob | string, scaleFactor: number): Promise<Blob> {
+export async function downscaleImage(
+	source: File | Blob | string,
+	scaleFactor: number
+): Promise<Blob> {
 	const img = await loadImage(source);
-	
+
 	const width = Math.round(img.width * scaleFactor);
 	const height = Math.round(img.height * scaleFactor);
 

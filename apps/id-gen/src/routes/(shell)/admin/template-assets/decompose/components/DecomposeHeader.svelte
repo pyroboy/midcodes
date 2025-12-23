@@ -54,7 +54,10 @@
 		</div>
 
 		<div class="flex items-center gap-2">
-			<Button onclick={onSave} disabled={isSaving || (frontLayersCount === 0 && backLayersCount === 0)}>
+			<Button
+				onclick={onSave}
+				disabled={isSaving || (frontLayersCount === 0 && backLayersCount === 0)}
+			>
 				{#if isSaving}
 					<Loader2 class="mr-2 h-4 w-4 animate-spin" />
 					Saving...

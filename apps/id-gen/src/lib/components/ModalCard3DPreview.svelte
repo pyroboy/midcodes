@@ -988,11 +988,11 @@
 			animState.targetWidth = widthPixels;
 			animState.targetHeight = heightPixels;
 			animState.isAnimating = true;
-			// Don't update prev* immediately here if we want to allow re-triggering? 
+			// Don't update prev* immediately here if we want to allow re-triggering?
 			// Actually it's fine as long as we use isAnimating to drive the loop.
 			animState.prevWidthPixels = widthPixels;
 			animState.prevHeightPixels = heightPixels;
-			
+
 			startAnimationLoop();
 
 			// Reset OrbitControls to center when dimensions change

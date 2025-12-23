@@ -22,7 +22,6 @@ export class TextureManager {
 		this.onProgress = onProgress;
 	}
 
-
 	/**
 	 * Configure texture with standard settings
 	 */

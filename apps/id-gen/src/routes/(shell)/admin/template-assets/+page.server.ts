@@ -71,9 +71,11 @@ export const actions: Actions = {
 			if (['student', 'employee', 'membership', 'visitor'].includes(rawSampleType)) {
 				sampleType = rawSampleType;
 			}
-			
+
 			// Map orientation
-			const orientation = (['landscape', 'portrait'].includes(rawOrientation) ? rawOrientation : 'landscape');
+			const orientation = ['landscape', 'portrait'].includes(rawOrientation)
+				? rawOrientation
+				: 'landscape';
 			const widthPixels = parseInt(formData.get('widthPixels') as string);
 			const heightPixels = parseInt(formData.get('heightPixels') as string);
 
@@ -115,13 +117,13 @@ export const actions: Actions = {
 			// Extract URLs
 			const getUrl = (side: 'front' | 'back', variant: 'full' | 'preview' | 'thumb') =>
 				uploadResults.find((r) => r?.side === side && r?.variant === variant)?.url;
-			
+
 			const getPath = (side: 'front' | 'back', variant: 'full' | 'preview' | 'thumb') =>
 				uploadResults.find((r) => r?.side === side && r?.variant === variant)?.path;
 
 			const frontBackground = getUrl('front', 'full');
 			const frontPath = getPath('front', 'full'); // Need path for R2 deletion reference if needed
-			
+
 			if (!frontBackground || !frontPath) throw new Error('Failed to upload front background');
 
 			// 2. Insert into Database
@@ -155,7 +157,7 @@ export const actions: Actions = {
 					tags,
 					sizePresetId: sizePresetId || null,
 					templateId: templateId, // Link to the template record
-					sampleType: (sampleType as any),
+					sampleType: sampleType as any,
 					orientation: orientation as any,
 					imagePath: frontPath, // Store R2 path
 					imageUrl: frontBackground, // Store public URL

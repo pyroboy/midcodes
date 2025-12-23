@@ -31,7 +31,15 @@ async function requireAdmin() {
  */
 export const upscaleImage = command(
 	'unchecked',
-	async ({ imageUrl, upscaleFactor = 2, model = 'runware' }: { imageUrl: string; upscaleFactor?: 2 | 4; model?: 'runware' | 'esrgan' | 'seedvr' | 'ccsr' }): Promise<UpscaleResult> => {
+	async ({
+		imageUrl,
+		upscaleFactor = 2,
+		model = 'runware'
+	}: {
+		imageUrl: string;
+		upscaleFactor?: 2 | 4;
+		model?: 'runware' | 'esrgan' | 'seedvr' | 'ccsr';
+	}): Promise<UpscaleResult> => {
 		await requireAdmin();
 
 		if (model === 'esrgan') {
@@ -127,7 +135,7 @@ export const saveEnhancedImage = command(
 			console.log(`[saveEnhancedImage] Downloading from ${imageUrl}`);
 			const response = await fetch(imageUrl);
 			if (!response.ok) throw new Error('Failed to download image from Runware');
-			
+
 			const buffer = await response.arrayBuffer();
 			const contentType = response.headers.get('content-type') || 'image/png';
 			let ext = 'png';
@@ -138,7 +146,7 @@ export const saveEnhancedImage = command(
 			// Use a clean path: assets/enhanced/{assetId}_{side}_{timestamp}.{ext}
 			const timestamp = Date.now();
 			const filename = `assets/enhanced/${assetId}_${side}_${timestamp}.${ext}`;
-			
+
 			console.log(`[saveEnhancedImage] Uploading to R2: ${filename}`);
 			const publicUrl = await uploadToR2(filename, Buffer.from(buffer), contentType);
 
@@ -163,11 +171,8 @@ export const saveEnhancedImage = command(
 				templateUpdate.backBackground = publicUrl;
 				templateUpdate.blankBackUrl = publicUrl;
 			}
-			
-			await db
-				.update(templates)
-				.set(templateUpdate)
-				.where(eq(templates.id, asset.templateId));
+
+			await db.update(templates).set(templateUpdate).where(eq(templates.id, asset.templateId));
 
 			// Update Asset
 			const assetUpdate: any = { updatedAt: new Date() };
@@ -177,14 +182,12 @@ export const saveEnhancedImage = command(
 				assetUpdate.backImageUrl = publicUrl;
 			}
 
-			await db
-				.update(templateAssets)
-				.set(assetUpdate)
-				.where(eq(templateAssets.id, assetId));
+			await db.update(templateAssets).set(assetUpdate).where(eq(templateAssets.id, assetId));
 
-			console.log(`[saveEnhancedImage] Success! Updated template ${asset.templateId} and asset ${assetId}`);
+			console.log(
+				`[saveEnhancedImage] Success! Updated template ${asset.templateId} and asset ${assetId}`
+			);
 			return { success: true, url: publicUrl };
-
 		} catch (err) {
 			console.error('[saveEnhancedImage] Error:', err);
 			throw error(500, err instanceof Error ? err.message : 'Failed to save enhanced image');
@@ -210,7 +213,7 @@ export const uploadImage = command(
 
 			console.log(`[uploadImage] Uploading to R2: ${filename}`);
 			const publicUrl = await uploadToR2(filename, buffer, contentType);
-			
+
 			return { success: true, url: publicUrl };
 		} catch (err) {
 			console.error('[uploadImage] Error:', err);

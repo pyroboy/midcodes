@@ -7,18 +7,18 @@
 		ChevronDown,
 		ChevronUp,
 		ZoomIn,
-        MoreVertical,
-        ArrowUp,
-        ArrowDown,
-        Sparkles,
-        Scissors,
-        Image as ImageIcon
+		MoreVertical,
+		ArrowUp,
+		ArrowDown,
+		Sparkles,
+		Scissors,
+		Image as ImageIcon
 	} from 'lucide-svelte';
 	import { Slider } from '$lib/components/ui/slider';
 	import { Switch } from '$lib/components/ui/switch';
 	import * as Select from '$lib/components/ui/select';
-    import * as DropdownMenu from "$lib/components/ui/dropdown-menu";
-    import { Button } from "$lib/components/ui/button";
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import { Button } from '$lib/components/ui/button';
 	import type { DecomposedLayer, LayerSelection } from '$lib/schemas/decompose.schema';
 
 	let {
@@ -52,9 +52,9 @@
 		onDragOver,
 		onDragLeave,
 		onDrop,
-        onAction,
-        onMoveUp,
-        onMoveDown
+		onAction,
+		onMoveUp,
+		onMoveDown
 	}: {
 		layer: DecomposedLayer | { id: string; name: string; imageUrl: string; zIndex: number };
 		selection: LayerSelection | undefined;
@@ -86,19 +86,25 @@
 		onDragOver?: (e: DragEvent) => void;
 		onDragLeave?: () => void;
 		onDrop?: (e: DragEvent) => void;
-        onAction?: (action: 'decompose' | 'upscale' | 'remove' | 'crop') => void;
-        onMoveUp?: () => void;
-        onMoveDown?: () => void;
+		onAction?: (action: 'decompose' | 'upscale' | 'remove' | 'crop') => void;
+		onMoveUp?: () => void;
+		onMoveDown?: () => void;
 	} = $props();
 
 	function getTypeIcon(type: string): string {
 		switch (type) {
-			case 'image': return 'IMG';
-			case 'text': return 'TXT';
-			case 'photo': return 'PHO';
-			case 'qr': return 'QR';
-			case 'signature': return 'SIG';
-			default: return 'IMG';
+			case 'image':
+				return 'IMG';
+			case 'text':
+				return 'TXT';
+			case 'photo':
+				return 'PHO';
+			case 'qr':
+				return 'QR';
+			case 'signature':
+				return 'SIG';
+			default:
+				return 'IMG';
 		}
 	}
 </script>
@@ -134,22 +140,26 @@
 		role="button"
 	>
 		<!-- Drag Handle / Merge Checkbox -->
-        {#if mergeMode && !isOriginal}
-             <div 
-                class="flex items-center justify-center w-5" 
-                onclick={e => e.stopPropagation()}
-                onkeydown={e => { if (e.key === ' ' || e.key === 'Enter') e.stopPropagation(); }}
-                role="presentation"
-            >
-                <input 
-                    type="checkbox" 
-                    checked={isSelectedForMerge} 
-                    onchange={onMergeSelect}
-                    class="h-4 w-4 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
-                />
-             </div>
+		{#if mergeMode && !isOriginal}
+			<div
+				class="flex items-center justify-center w-5"
+				onclick={(e) => e.stopPropagation()}
+				onkeydown={(e) => {
+					if (e.key === ' ' || e.key === 'Enter') e.stopPropagation();
+				}}
+				role="presentation"
+			>
+				<input
+					type="checkbox"
+					checked={isSelectedForMerge}
+					onchange={onMergeSelect}
+					class="h-4 w-4 rounded border-gray-300 text-cyan-600 focus:ring-cyan-500"
+				/>
+			</div>
 		{:else if !isOriginal}
-			<div class="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground flex-shrink-0">
+			<div
+				class="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground flex-shrink-0"
+			>
 				<GripVertical class="h-4 w-4" />
 			</div>
 		{:else}
@@ -208,7 +218,9 @@
 					style="opacity: {isOriginal ? 1 : (opacity ?? 100) / 100}"
 				/>
 			{/if}
-			<div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+			<div
+				class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center"
+			>
 				<ZoomIn class="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
 			</div>
 		</button>
@@ -241,51 +253,59 @@
 		</div>
 
 		<!-- Right Side Controls -->
-		<div 
-            class="flex items-center gap-1 flex-shrink-0" 
-            onclick={(e) => e.stopPropagation()}
-            onkeydown={e => { if (e.key === ' ' || e.key === 'Enter') e.stopPropagation(); }}
-            role="presentation"
-        >
-            <!-- Move Up/Down -->
-            {#if !isOriginal && !mergeMode}
-                 <div class="flex flex-col mr-1">
-                    <button class="p-0.5 hover:bg-slate-200 dark:hover:bg-slate-800 rounded" onclick={onMoveUp}>
-                        <ArrowUp class="w-3 h-3 text-muted-foreground"/>
-                    </button>
-                    <button class="p-0.5 hover:bg-slate-200 dark:hover:bg-slate-800 rounded" onclick={onMoveDown}>
-                        <ArrowDown class="w-3 h-3 text-muted-foreground"/>
-                    </button>
-                 </div>
-            {/if}
+		<div
+			class="flex items-center gap-1 flex-shrink-0"
+			onclick={(e) => e.stopPropagation()}
+			onkeydown={(e) => {
+				if (e.key === ' ' || e.key === 'Enter') e.stopPropagation();
+			}}
+			role="presentation"
+		>
+			<!-- Move Up/Down -->
+			{#if !isOriginal && !mergeMode}
+				<div class="flex flex-col mr-1">
+					<button
+						class="p-0.5 hover:bg-slate-200 dark:hover:bg-slate-800 rounded"
+						onclick={onMoveUp}
+					>
+						<ArrowUp class="w-3 h-3 text-muted-foreground" />
+					</button>
+					<button
+						class="p-0.5 hover:bg-slate-200 dark:hover:bg-slate-800 rounded"
+						onclick={onMoveDown}
+					>
+						<ArrowDown class="w-3 h-3 text-muted-foreground" />
+					</button>
+				</div>
+			{/if}
 
-            <!-- Actions Menu -->
-            {#if !mergeMode}
-                <DropdownMenu.Root>
-                    <DropdownMenu.Trigger>
-                        {#snippet child({ props })}
-                            <Button {...props} variant="ghost" size="icon" class="h-8 w-8">
-                                <MoreVertical class="h-4 w-4" />
-                            </Button>
-                        {/snippet}
-                    </DropdownMenu.Trigger>
-                    <DropdownMenu.Content align="end">
-                        <DropdownMenu.Item onclick={() => onAction?.('upscale')}>
-                            <Sparkles class="mr-2 h-4 w-4" /> Upscale
-                        </DropdownMenu.Item>
-                         <DropdownMenu.Item onclick={() => onAction?.('decompose')}>
-                            <ImageIcon class="mr-2 h-4 w-4" /> Decompose
-                        </DropdownMenu.Item>
-                        <DropdownMenu.Item onclick={() => onAction?.('crop')}>
-                            <Scissors class="mr-2 h-4 w-4" /> Crop
-                        </DropdownMenu.Item>
-                        <DropdownMenu.Separator />
-                        <DropdownMenu.Item onclick={() => onAction?.('remove')}>
-                            <Trash2 class="mr-2 h-4 w-4" /> Remove Element
-                        </DropdownMenu.Item>
-                    </DropdownMenu.Content>
-                </DropdownMenu.Root>
-            {/if}
+			<!-- Actions Menu -->
+			{#if !mergeMode}
+				<DropdownMenu.Root>
+					<DropdownMenu.Trigger>
+						{#snippet child({ props })}
+							<Button {...props} variant="ghost" size="icon" class="h-8 w-8">
+								<MoreVertical class="h-4 w-4" />
+							</Button>
+						{/snippet}
+					</DropdownMenu.Trigger>
+					<DropdownMenu.Content align="end">
+						<DropdownMenu.Item onclick={() => onAction?.('upscale')}>
+							<Sparkles class="mr-2 h-4 w-4" /> Upscale
+						</DropdownMenu.Item>
+						<DropdownMenu.Item onclick={() => onAction?.('decompose')}>
+							<ImageIcon class="mr-2 h-4 w-4" /> Decompose
+						</DropdownMenu.Item>
+						<DropdownMenu.Item onclick={() => onAction?.('crop')}>
+							<Scissors class="mr-2 h-4 w-4" /> Crop
+						</DropdownMenu.Item>
+						<DropdownMenu.Separator />
+						<DropdownMenu.Item onclick={() => onAction?.('remove')}>
+							<Trash2 class="mr-2 h-4 w-4" /> Remove Element
+						</DropdownMenu.Item>
+					</DropdownMenu.Content>
+				</DropdownMenu.Root>
+			{/if}
 
 			<!-- Delete Button (Quick access) -->
 			{#if !isOriginal && !mergeMode}
@@ -349,7 +369,9 @@
 						id="type-{layer.id}"
 						value={selection.elementType}
 						onchange={(e) =>
-							onUpdateType?.((e.target as HTMLSelectElement).value as LayerSelection['elementType'])}
+							onUpdateType?.(
+								(e.target as HTMLSelectElement).value as LayerSelection['elementType']
+							)}
 						class="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm appearance-none pr-10"
 					>
 						<option value="image">Image (Static graphic)</option>
@@ -382,7 +404,9 @@
 			</div>
 
 			<!-- Pre-shrink Toggle -->
-			<div class="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30">
+			<div
+				class="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30"
+			>
 				<div>
 					<p class="text-sm font-medium text-foreground">Pre-shrink before upscale</p>
 					<p class="text-xs text-muted-foreground">Make artificially low-res</p>

@@ -32,7 +32,10 @@
 				: 'Select a layer to enable actions'}
 		</span>
 		{#if selectedLayerId}
-			<button class="text-xs text-muted-foreground hover:text-foreground" onclick={onClearSelection}>
+			<button
+				class="text-xs text-muted-foreground hover:text-foreground"
+				onclick={onClearSelection}
+			>
 				Clear
 			</button>
 		{/if}

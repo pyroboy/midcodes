@@ -83,7 +83,7 @@ export function getStorageUrl(path: string, bucket: string = 'templates'): strin
  * Uses `getStorageUrl` internally to resolve the full URL first if needed.
  * Also handles corrupted URLs that already contain embedded proxy paths.
  */
-export function getProxiedUrl(pathOrUrl: string | null, bucket?: string){
+export function getProxiedUrl(pathOrUrl: string | null, bucket?: string) {
 	if (!pathOrUrl) return null;
 
 	// Blob URLs are local and don't need proxying - return as-is
@@ -109,7 +109,11 @@ export function getProxiedUrl(pathOrUrl: string | null, bucket?: string){
 	const extractedUrl = extractRealUrlFromCorrupted(pathOrUrl);
 	if (extractedUrl) {
 		// If extracted URL is a blob or localhost URL, return it directly
-		if (extractedUrl.startsWith('blob:') || extractedUrl.includes('localhost') || extractedUrl.includes('127.0.0.1')) {
+		if (
+			extractedUrl.startsWith('blob:') ||
+			extractedUrl.includes('localhost') ||
+			extractedUrl.includes('127.0.0.1')
+		) {
 			return extractedUrl;
 		}
 		// Proxy the extracted clean URL

@@ -108,17 +108,19 @@ export const templateAssetSchema = z.object({
 	published_at: z.string().nullable(),
 	uploaded_by: z.string().uuid().nullable(),
 	// Stats from joined template data (server-side only usually, but passed to client)
-	stats: z.object({
-		hasElements: z.boolean(),
-		elementCount: z.number(),
-		variants: z.object({
-			front: z.boolean(),
-			back: z.boolean(),
-			preview: z.boolean(),
-			blank: z.boolean(),
-			sample: z.boolean()
+	stats: z
+		.object({
+			hasElements: z.boolean(),
+			elementCount: z.number(),
+			variants: z.object({
+				front: z.boolean(),
+				back: z.boolean(),
+				preview: z.boolean(),
+				blank: z.boolean(),
+				sample: z.boolean()
+			})
 		})
-	}).optional()
+		.optional()
 });
 
 export type TemplateAsset = z.infer<typeof templateAssetSchema>;

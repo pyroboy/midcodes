@@ -26,7 +26,7 @@
 	// State
 	let frontTexture = $state<THREE.Texture | null>(null);
 	let backTexture = $state<THREE.Texture | null>(null);
-	
+
 	// Geometries
 	let frontGeometry = $state<THREE.BufferGeometry | null>(null);
 	let backGeometry = $state<THREE.BufferGeometry | null>(null);
@@ -34,7 +34,7 @@
 
 	// Animation State
 	let isFlipped = $state(false);
-	
+
 	// Tweens
 	const position = tweened<[number, number, number]>([0, 0, 0], {
 		duration: 1500,
@@ -73,7 +73,7 @@
 		// Radius ~4% of min dimension
 		const minDim = Math.min(dims.width, dims.height);
 		const radius = minDim * 0.04;
-		
+
 		const geometries = await createRoundedRectCard(dims.width, dims.height, 0.02, radius);
 		frontGeometry = geometries.frontGeometry;
 		backGeometry = geometries.backGeometry;
@@ -110,7 +110,7 @@
 			rotation.set([0, targetY, 0]);
 		}
 	});
-	
+
 	// Flip handler
 	function toggleFlip() {
 		isFlipped = !isFlipped;
@@ -152,53 +152,44 @@
 	});
 
 	// Material for Edge
-	const edgeMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4, metalness: 0.1 });
+	const edgeMaterial = new THREE.MeshStandardMaterial({
+		color: 0xffffff,
+		roughness: 0.4,
+		metalness: 0.1
+	});
 </script>
 
 <T.Group
 	position={$position}
 	rotation={stage === 'intro' ? ([0, time * 0.5, 0] as [number, number, number]) : $rotation}
 	scale={$scale}
-	onclick={(e) => {
+	onclick={(e: any) => {
 		e.stopPropagation();
 		toggleFlip();
 	}}
 >
 	{#if frontGeometry && backGeometry && edgeGeometry}
 		<!-- Front Face -->
-		<T.Mesh 
-			geometry={frontGeometry} 
-			castShadow 
-			receiveShadow
-		>
-			<T.MeshStandardMaterial 
-				map={frontTexture} 
-				roughness={0.4} 
+		<T.Mesh geometry={frontGeometry} castShadow receiveShadow>
+			<T.MeshStandardMaterial
+				map={frontTexture}
+				roughness={0.4}
 				metalness={0.1}
 				side={THREE.FrontSide}
 			/>
 		</T.Mesh>
 
 		<!-- Back Face -->
-		<T.Mesh 
-			geometry={backGeometry} 
-			castShadow 
-			receiveShadow
-		>
-			<T.MeshStandardMaterial 
-				map={backTexture} 
-				roughness={0.4} 
-				metalness={0.1} 
+		<T.Mesh geometry={backGeometry} castShadow receiveShadow>
+			<T.MeshStandardMaterial
+				map={backTexture}
+				roughness={0.4}
+				metalness={0.1}
 				side={THREE.FrontSide}
 			/>
 		</T.Mesh>
 
 		<!-- Edges -->
-		<T.Mesh 
-			geometry={edgeGeometry} 
-			material={edgeMaterial} 
-			castShadow 
-			receiveShadow 
-		/>
+		<T.Mesh geometry={edgeGeometry} material={edgeMaterial} castShadow receiveShadow />
 	{/if}
 </T.Group>

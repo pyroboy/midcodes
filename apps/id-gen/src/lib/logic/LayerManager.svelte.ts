@@ -5,12 +5,12 @@ export class LayerManager {
 	// Global State
 	activeSide = $state<'front' | 'back'>('front');
 	saveState = $state<'saved' | 'saving' | 'unsaved'>('saved');
-	
+
 	// Layer Data
 	frontLayers = $state<DecomposedLayer[]>([]);
 	backLayers = $state<DecomposedLayer[]>([]);
 	selections = $state<Map<string, LayerSelection>>(new Map());
-	
+
 	// UI State
 	opacity = $state<Map<string, number>>(new Map());
 	expandedIds = $state<Set<string>>(new Set());
@@ -34,7 +34,7 @@ export class LayerManager {
 	addLayer(layer: DecomposedLayer, selection: LayerSelection) {
 		if (layer.side === 'front') this.frontLayers.push(layer);
 		else this.backLayers.push(layer);
-		
+
 		this.selections.set(layer.id, selection);
 		this.selections = new Map(this.selections); // Trigger reactivity
 		this.markUnsaved();
@@ -48,7 +48,7 @@ export class LayerManager {
 		list.splice(index, 1);
 		// Re-index zIndex
 		list.forEach((l, i) => (l.zIndex = i));
-		
+
 		this.selections.delete(layerId);
 		this.selections = new Map(this.selections);
 		this.markUnsaved();
@@ -57,7 +57,7 @@ export class LayerManager {
 	moveLayer(layerId: string, direction: 'up' | 'down') {
 		const list = this.activeSide === 'front' ? this.frontLayers : this.backLayers;
 		const index = list.findIndex((l) => l.id === layerId);
-		
+
 		if (direction === 'up' && index > 0) {
 			[list[index - 1], list[index]] = [list[index], list[index - 1]];
 		} else if (direction === 'down' && index < list.length - 1) {
@@ -139,35 +139,36 @@ export class LayerManager {
 		this.markUnsaved();
 	}
 
-    addFromHistory(historyLayer: any) {
-        // Handle full history item (with layers)
-        if (historyLayer.layers && historyLayer.layers.length > 0) {
-            // It's a decompose history item with sub-layers
-            historyLayer.layers.forEach((l: any, i: number) => {
-                 const { layer, selection } = this.createLayerObj(
-                    l.imageUrl,
-                    l.name || `History Layer ${i}`,
-                    l.bounds || { x: 0, y: 0, width: 100, height: 100 },
-                    this.activeSide,
-                    this.currentLayers.length
-                );
-                this.addLayer(layer, selection);
-            });
-        } else {
-            // Single layer or history item without layers
-            const imageUrl = historyLayer.imageUrl || historyLayer.resultUrl || historyLayer.inputImageUrl;
-            if (!imageUrl) return;
+	addFromHistory(historyLayer: any) {
+		// Handle full history item (with layers)
+		if (historyLayer.layers && historyLayer.layers.length > 0) {
+			// It's a decompose history item with sub-layers
+			historyLayer.layers.forEach((l: any, i: number) => {
+				const { layer, selection } = this.createLayerObj(
+					l.imageUrl,
+					l.name || `History Layer ${i}`,
+					l.bounds || { x: 0, y: 0, width: 100, height: 100 },
+					this.activeSide,
+					this.currentLayers.length
+				);
+				this.addLayer(layer, selection);
+			});
+		} else {
+			// Single layer or history item without layers
+			const imageUrl =
+				historyLayer.imageUrl || historyLayer.resultUrl || historyLayer.inputImageUrl;
+			if (!imageUrl) return;
 
-            const { layer, selection } = this.createLayerObj(
-                imageUrl,
-                historyLayer.name || historyLayer.model || 'AI Result',
-                historyLayer.bounds || { x: 0, y: 0, width: 100, height: 100 },
-                this.activeSide,
-                this.currentLayers.length
-            );
-            this.addLayer(layer, selection);
-        }
-    }
+			const { layer, selection } = this.createLayerObj(
+				imageUrl,
+				historyLayer.name || historyLayer.model || 'AI Result',
+				historyLayer.bounds || { x: 0, y: 0, width: 100, height: 100 },
+				this.activeSide,
+				this.currentLayers.length
+			);
+			this.addLayer(layer, selection);
+		}
+	}
 
 	// Helper to create objects
 	createLayerObj(url: string, name: string, bounds: any, side: 'front' | 'back', zIndex: number) {

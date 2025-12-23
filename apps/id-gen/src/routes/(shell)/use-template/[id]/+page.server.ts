@@ -4,11 +4,11 @@ import type { PageServerLoad, Actions } from './$types';
 import { db } from '$lib/server/db';
 import { templates, organizations } from '$lib/server/schema';
 import { eq } from 'drizzle-orm';
-import { 
-	generateDigitalCardSlug, 
+import {
+	generateDigitalCardSlug,
 	generateShortform,
 	buildDigitalProfileUrl,
-	validateSlugForQR 
+	validateSlugForQR
 } from '$lib/utils/slugGeneration';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
@@ -57,13 +57,20 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	let orgShortform: string | null = null;
 	if (templateData.orgId) {
 		const [org] = await db
-			.select({ shortform: organizations.shortform, name: organizations.name, urlSlug: organizations.urlSlug })
+			.select({
+				shortform: organizations.shortform,
+				name: organizations.name,
+				urlSlug: organizations.urlSlug
+			})
 			.from(organizations)
 			.where(eq(organizations.id, templateData.orgId))
 			.limit(1);
-		
+
 		// Use existing shortform or generate from org name/slug
-		orgShortform = org?.shortform || (org?.urlSlug ? generateShortform(org.urlSlug) : null) || (org?.name ? generateShortform(org.name) : null);
+		orgShortform =
+			org?.shortform ||
+			(org?.urlSlug ? generateShortform(org.urlSlug) : null) ||
+			(org?.name ? generateShortform(org.name) : null);
 	}
 
 	// Generate QR slug server-side for security and consistency
@@ -74,7 +81,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 		preGeneratedSlug = generateDigitalCardSlug(orgShortform);
 		const profileUrl = buildDigitalProfileUrl(preGeneratedSlug);
 		const slugPattern = /^[A-Z0-9]{2,8}-[a-z0-9]{10}$/;
-		
+
 		slugValidation = {
 			isValid: slugPattern.test(preGeneratedSlug),
 			profileUrl,

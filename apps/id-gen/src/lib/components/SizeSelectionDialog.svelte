@@ -79,7 +79,7 @@
 				const hIn = p.heightInches ?? p.height_inches;
 				const wPx = p.widthPixels ?? p.width_pixels;
 				const hPx = p.heightPixels ?? p.height_pixels;
-				
+
 				const widthInches = typeof wIn === 'string' ? parseFloat(wIn) : Number(wIn);
 				const heightInches = typeof hIn === 'string' ? parseFloat(hIn) : Number(hIn);
 				const dpi = p.dpi || DEFAULT_DPI;
@@ -87,11 +87,15 @@
 				// Calculate dimensions with fallbacks
 				const finalWidth = Number.isFinite(widthInches)
 					? widthInches
-					: (wPx && dpi ? wPx / dpi : 3.375);
+					: wPx && dpi
+						? wPx / dpi
+						: 3.375;
 
 				const finalHeight = Number.isFinite(heightInches)
 					? heightInches
-					: (hPx && dpi ? hPx / dpi : 2.125);
+					: hPx && dpi
+						? hPx / dpi
+						: 2.125;
 
 				return {
 					name: p.name,
@@ -119,7 +123,7 @@
 		// Add any DB-only sizes that weren't in common sizes
 		const commonSlugs = new Set(COMMON_CARD_SIZES.map((s) => s.slug).filter(Boolean));
 		const newSizes = dbSizes.filter((s) => s.slug && !commonSlugs.has(s.slug));
-		
+
 		const result = [...mergedSizes, ...newSizes];
 		console.log('[SizeSelection] Final Available Sizes:', result);
 		return result;
@@ -192,8 +196,6 @@
 			size.name?.toLowerCase().includes('atm')
 		);
 	});
-
-
 
 	// Compute the base card size (always landscape orientation for 3D preview)
 	let baseCardSize = $derived.by(() => {
@@ -760,12 +762,7 @@
 								? 'border-primary bg-primary/5 ring-1 ring-primary'
 								: 'border-border'}"
 						>
-							<RadioGroupItem
-								value="techsmart_nfc"
-								id="mat-nfc"
-								class="mt-1"
-								disabled={!isCR80}
-							/>
+							<RadioGroupItem value="techsmart_nfc" id="mat-nfc" class="mt-1" disabled={!isCR80} />
 							<div class="flex-1">
 								<div class="flex items-center justify-between">
 									<span class="font-medium">TechSmart NFC</span>

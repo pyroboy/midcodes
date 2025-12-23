@@ -217,7 +217,10 @@
 								</div>
 								<button
 									class="delete-btn"
-									onclick={(e) => { e.stopPropagation(); handleDelete(graphic.url); }}
+									onclick={(e) => {
+										e.stopPropagation();
+										handleDelete(graphic.url);
+									}}
 									title="Delete"
 								>
 									<Trash2 size={14} />

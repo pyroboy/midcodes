@@ -12,10 +12,10 @@ interface PaymentFlags {
 const { subscribe, set, update } = writable<PaymentFlags>({
 	paymentsEnabled: true,
 	paymentsBypass: false,
-	loaded: true 
+	loaded: true
 });
 
-/* 
+/*
  * Placeholder for future feature flags.
  * Currently disabled to optimize load time.
  */

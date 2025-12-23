@@ -1593,12 +1593,8 @@
 {#if selectedFrontImage || selectedBackImage}
 	<ClientOnly>
 		<ImagePreviewModal
-			frontImageUrl={selectedFrontImage
-				? getProxiedUrl(selectedFrontImage, 'cards')
-				: null}
-			backImageUrl={selectedBackImage
-				? getProxiedUrl(selectedBackImage, 'cards')
-				: null}
+			frontImageUrl={selectedFrontImage ? getProxiedUrl(selectedFrontImage, 'cards') : null}
+			backImageUrl={selectedBackImage ? getProxiedUrl(selectedBackImage, 'cards') : null}
 			cardGeometry={selectedCardGeometry}
 			templateDimensions={selectedTemplateDimensions}
 			onClose={closePreview}

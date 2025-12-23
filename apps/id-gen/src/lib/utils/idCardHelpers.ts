@@ -15,11 +15,7 @@ import {
 } from './slugGeneration';
 import { safeOperationWithRetry, isUniqueViolation } from '$lib/server/transactionUtils';
 import { validateOrgMetadata, type OrgMetadata } from '$lib/schemas/metadata.schema';
-import {
-	type IdCardError,
-	type CleanupResult,
-	createIdCardError
-} from '$lib/errors/idCardErrors';
+import { type IdCardError, type CleanupResult, createIdCardError } from '$lib/errors/idCardErrors';
 
 // --- Types ---
 
@@ -174,7 +170,11 @@ export async function handleImageUploads(
 export async function getOrgShortform(orgId: string): Promise<string> {
 	// Try to fetch existing shortform
 	const [org] = await db
-		.select({ shortform: organizations.shortform, urlSlug: organizations.urlSlug, name: organizations.name })
+		.select({
+			shortform: organizations.shortform,
+			urlSlug: organizations.urlSlug,
+			name: organizations.name
+		})
 		.from(organizations)
 		.where(eq(organizations.id, orgId))
 		.limit(1);
@@ -267,14 +267,17 @@ export async function saveIdCardData(options: SaveIdCardOptions): Promise<SaveId
 				console.log(`[Cleanup] Successfully deleted: ${path}`);
 			} else {
 				failedPaths.push(path);
-				const errorMsg = result.reason instanceof Error ? result.reason.message : String(result.reason);
+				const errorMsg =
+					result.reason instanceof Error ? result.reason.message : String(result.reason);
 				errors.push({ path, error: errorMsg });
 				console.error(`[Cleanup] Failed to delete ${path}:`, errorMsg);
 			}
 		});
 
 		if (failedPaths.length > 0) {
-			console.warn(`[Cleanup] Partial cleanup: ${deletedPaths.length}/${pathsToDelete.length} files deleted`);
+			console.warn(
+				`[Cleanup] Partial cleanup: ${deletedPaths.length}/${pathsToDelete.length} files deleted`
+			);
 		} else {
 			console.log(`[Cleanup] Complete: ${deletedPaths.length} files deleted`);
 		}

@@ -1311,7 +1311,10 @@
 		// Skip element creation for existing templates that have stored elements
 		// Only create default elements for brand new templates
 		if (currentTemplate?.id && data.selectedTemplate?.id === currentTemplate.id) {
-			console.log('🔧 Skipping element creation - editing existing template with ID:', currentTemplate.id);
+			console.log(
+				'🔧 Skipping element creation - editing existing template with ID:',
+				currentTemplate.id
+			);
 			return;
 		}
 

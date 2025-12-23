@@ -4,11 +4,15 @@
 </script>
 
 <div class="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
-	<div class="max-w-md w-full bg-white rounded-xl shadow-lg overflow-hidden border border-slate-100">
+	<div
+		class="max-w-md w-full bg-white rounded-xl shadow-lg overflow-hidden border border-slate-100"
+	>
 		<div class="p-8 text-center">
 			{#if $page.error?.message === 'Profile not active'}
 				<!-- Scenario: QR Code scanned for an ID that exists but isn't claimed/active yet -->
-				<div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+				<div
+					class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6"
+				>
 					<CreditCard class="w-8 h-8 text-blue-600" />
 				</div>
 				<h1 class="text-2xl font-bold text-slate-900 mb-2">Profile Not Active</h1>
@@ -17,12 +21,15 @@
 				</p>
 			{:else}
 				<!-- Scenario: Invalid Slug or Generic 404 -->
-				<div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+				<div
+					class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6"
+				>
 					<ShieldAlert class="w-8 h-8 text-red-600" />
 				</div>
 				<h1 class="text-2xl font-bold text-slate-900 mb-2">ID Not Found</h1>
 				<p class="text-slate-600 mb-8 leading-relaxed">
-					We couldn't find a digital profile associated with this link. It may have been removed or the URL is incorrect.
+					We couldn't find a digital profile associated with this link. It may have been removed or
+					the URL is incorrect.
 				</p>
 			{/if}
 
@@ -36,11 +43,9 @@
 				</a>
 			</div>
 		</div>
-		
+
 		<div class="bg-slate-50 px-8 py-4 border-t border-slate-100 text-center">
-			<p class="text-xs text-slate-400">
-				Secure Digital ID System
-			</p>
+			<p class="text-xs text-slate-400">Secure Digital ID System</p>
 		</div>
 	</div>
 </div>

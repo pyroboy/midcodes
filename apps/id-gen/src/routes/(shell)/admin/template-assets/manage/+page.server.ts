@@ -21,52 +21,61 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 		// 2. Get Templates Information (filtered to those used by assets if possible, or all)
 		const templateIds = assets.map((a) => a.templateId).filter((id): id is string => !!id);
-		
+
 		// Map to store template details: id -> { hasElements, variantFlags }
-		const templateStatsMap = new Map<string, { 
-            hasElements: boolean; 
-            elementCount: number;
-            variants: { front: boolean; back: boolean; preview: boolean; blank: boolean; sample: boolean; };
-			urls?: { front: string | null; back: string | null; };
-        }>();
+		const templateStatsMap = new Map<
+			string,
+			{
+				hasElements: boolean;
+				elementCount: number;
+				variants: {
+					front: boolean;
+					back: boolean;
+					preview: boolean;
+					blank: boolean;
+					sample: boolean;
+				};
+				urls?: { front: string | null; back: string | null };
+			}
+		>();
 
 		if (templateIds.length > 0) {
-            // Needed to avoid "too many parameters" if list is huge, but fine for now
-            // We need: templates (for URLs checks) and template_elements (for count)
-            const { templates } = await import('$lib/server/schema');
+			// Needed to avoid "too many parameters" if list is huge, but fine for now
+			// We need: templates (for URLs checks) and template_elements (for count)
+			const { templates } = await import('$lib/server/schema');
 			const relatedTemplates = await db.query.templates.findMany({
 				where: (t, { inArray }) => inArray(t.id, templateIds),
-                columns: {
-                    id: true,
-                    templateElements: true,
-                    frontBackground: true,
-                    backBackground: true,
-                    previewFrontUrl: true,
+				columns: {
+					id: true,
+					templateElements: true,
+					frontBackground: true,
+					backBackground: true,
+					previewFrontUrl: true,
 					thumbFrontUrl: true, // Add these for potential fallbacks or preferred thumbs
 					thumbBackUrl: true
-                }
+				}
 			});
 
-            for (const tmpl of relatedTemplates) {
-                // templateElements is JSONB, cast as array
-                const elements = (tmpl.templateElements as any[]) || [];
-                templateStatsMap.set(tmpl.id, {
-                    hasElements: elements.length > 0,
-                    elementCount: elements.length,
-                    variants: {
-                        front: !!tmpl.frontBackground,
-                        back: !!tmpl.backBackground,
-                        preview: !!tmpl.previewFrontUrl, // Assuming preview URL is proxy for preview existing
-                        blank: false, // Wizard doesn't gen blank yet
-                        sample: false // Wizard doesn't explicitly mark sample vs blank variant yet
-                    },
+			for (const tmpl of relatedTemplates) {
+				// templateElements is JSONB, cast as array
+				const elements = (tmpl.templateElements as any[]) || [];
+				templateStatsMap.set(tmpl.id, {
+					hasElements: elements.length > 0,
+					elementCount: elements.length,
+					variants: {
+						front: !!tmpl.frontBackground,
+						back: !!tmpl.backBackground,
+						preview: !!tmpl.previewFrontUrl, // Assuming preview URL is proxy for preview existing
+						blank: false, // Wizard doesn't gen blank yet
+						sample: false // Wizard doesn't explicitly mark sample vs blank variant yet
+					},
 					// Store dynamic URLs to override static asset URLs
 					urls: {
 						front: tmpl.frontBackground,
 						back: tmpl.backBackground
 					}
-                });
-            }
+				});
+			}
 		}
 
 		// 3. Get Presets
@@ -75,7 +84,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 		const assetsWithPresets = assets.map((asset) => {
 			const preset = asset.sizePresetId ? presetMap.get(asset.sizePresetId) : null;
-            const stats = asset.templateId ? templateStatsMap.get(asset.templateId) : null;
+			const stats = asset.templateId ? templateStatsMap.get(asset.templateId) : null;
 
 			return {
 				id: asset.id,
@@ -86,7 +95,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 				category: asset.category,
 				tags: asset.tags,
 				size_preset_id: asset.sizePresetId,
-                template_id: asset.templateId,
+				template_id: asset.templateId,
 				sample_type: asset.sampleType,
 				orientation: asset.orientation,
 				// Prefer live template URL if available, otherwise use stored asset URL
@@ -119,11 +128,17 @@ export const load: PageServerLoad = async ({ locals }) => {
 							updated_at: preset.updatedAt?.toISOString()
 						}
 					: null,
-                stats: stats || {
-                    hasElements: false,
-                    elementCount: 0,
-                    variants: { front: true, back: !!asset.backImageUrl, preview: true, blank: false, sample: false }
-                }
+				stats: stats || {
+					hasElements: false,
+					elementCount: 0,
+					variants: {
+						front: true,
+						back: !!asset.backImageUrl,
+						preview: true,
+						blank: false,
+						sample: false
+					}
+				}
 			};
 		});
 
@@ -169,12 +184,17 @@ export const actions: Actions = {
 				.from(templates)
 				.where(eq(templates.id, asset.templateId))
 				.limit(1);
-			
+
 			if (!template) {
 				return fail(404, { message: 'Linked template not found' });
 			}
 
-			if (!template.frontBackground || !template.widthPixels || !template.heightPixels || !template.orientation) {
+			if (
+				!template.frontBackground ||
+				!template.widthPixels ||
+				!template.heightPixels ||
+				!template.orientation
+			) {
 				return fail(400, { message: 'Template data is incomplete (missing image or dimensions)' });
 			}
 

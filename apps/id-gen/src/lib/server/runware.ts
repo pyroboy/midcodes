@@ -236,7 +236,8 @@ export async function editImageWithRunware(
 				}
 			},
 			model: 'prunaai:2@1',
-			positivePrompt: (customPrompt && customPrompt.trim().length > 0) ? customPrompt : promptMap[removeType],
+			positivePrompt:
+				customPrompt && customPrompt.trim().length > 0 ? customPrompt : promptMap[removeType],
 			inputs: {
 				referenceImages: [imageInput]
 			},

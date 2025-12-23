@@ -28,16 +28,13 @@ const DEFAULT_OPTIONS: Required<RetryOptions> = {
 
 /**
  * Execute an async function with retry logic and exponential backoff.
- * 
+ *
  * @param fn - Async function to execute
  * @param options - Retry configuration
  * @returns Result of the function
  * @throws Last error if all retries exhausted
  */
-export async function withRetry<T>(
-	fn: () => Promise<T>,
-	options: RetryOptions = {}
-): Promise<T> {
+export async function withRetry<T>(fn: () => Promise<T>, options: RetryOptions = {}): Promise<T> {
 	const opts = { ...DEFAULT_OPTIONS, ...options };
 	let lastError: unknown;
 	let delay = opts.initialDelayMs;
@@ -68,7 +65,7 @@ export async function withRetry<T>(
 
 /**
  * Fetch with timeout wrapper.
- * 
+ *
  * @param url - URL to fetch
  * @param options - Fetch options
  * @param timeoutMs - Timeout in milliseconds (default: 30000)
@@ -107,19 +104,16 @@ export async function fetchWithRetry(
 	retryOptions: RetryOptions & { timeoutMs?: number } = {}
 ): Promise<Response> {
 	const { timeoutMs = 30000, ...retry } = retryOptions;
-	
-	return withRetry(
-		() => fetchWithTimeout(url, options, timeoutMs),
-		{
-			...retry,
-			isRetryable: (error) => {
-				// Retry on network errors and timeouts, not on 4xx responses
-				if (error instanceof TypeError) return true; // Network error
-				if (error instanceof Error && error.message.includes('timed out')) return true;
-				return retry.isRetryable?.(error) ?? true;
-			}
+
+	return withRetry(() => fetchWithTimeout(url, options, timeoutMs), {
+		...retry,
+		isRetryable: (error) => {
+			// Retry on network errors and timeouts, not on 4xx responses
+			if (error instanceof TypeError) return true; // Network error
+			if (error instanceof Error && error.message.includes('timed out')) return true;
+			return retry.isRetryable?.(error) ?? true;
 		}
-	);
+	});
 }
 
 function sleep(ms: number): Promise<void> {

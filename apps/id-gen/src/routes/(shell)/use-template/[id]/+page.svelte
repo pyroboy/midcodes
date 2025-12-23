@@ -63,7 +63,6 @@
 		[key: string]: File | null;
 	}
 
-
 	interface Props {
 		data: {
 			template: {
@@ -442,7 +441,7 @@
 		// Log server-generated QR slug for validation
 		if (data.preGeneratedSlug) {
 			const profileUrl = `https://kanaya.app/id/${data.preGeneratedSlug}`;
-			
+
 			console.log('[QR Slug] Using server-generated slug:', {
 				slug: data.preGeneratedSlug,
 				isValid: data.slugValidation?.isValid,
@@ -558,7 +557,10 @@
 			// This is just a fallback safety check
 			if (!preGeneratedSlug && data.orgShortform) {
 				preGeneratedSlug = generateDigitalCardSlug(data.orgShortform);
-				console.log('[handleSubmit] Fallback: Generated slug (should have been set in onMount):', preGeneratedSlug);
+				console.log(
+					'[handleSubmit] Fallback: Generated slug (should have been set in onMount):',
+					preGeneratedSlug
+				);
 			}
 
 			// Render preview images for confirmation overlay (now includes real QR URL)
@@ -608,7 +610,7 @@
 				preGeneratedSlug = generateDigitalCardSlug(data.orgShortform);
 				console.log('[confirmAndSubmit] Fallback: generated slug for QR:', preGeneratedSlug);
 				// Allow IdCanvas to pick up the new slug before rendering
-				await new Promise(resolve => setTimeout(resolve, 50));
+				await new Promise((resolve) => setTimeout(resolve, 50));
 			}
 
 			// Render full resolution variants for submission
@@ -1069,9 +1071,9 @@
 											bind:this={frontCanvasComponent}
 											elements={template.template_elements.filter((el) => el.side === 'front')}
 											backgroundUrl={template.front_background
-												? (template.front_background.startsWith('http')
-														? template.front_background
-														: getStorageUrl(template.front_background, 'templates'))
+												? template.front_background.startsWith('http')
+													? template.front_background
+													: getStorageUrl(template.front_background, 'templates')
 												: ''}
 											{formData}
 											{fileUploads}
@@ -1310,7 +1312,7 @@
 								{:else if element.type === 'qr'}
 									<!-- QR Code dedicated display -->
 									<div class="mb-6">
-										<div class="{!isMobile ? 'grid grid-cols-[7rem_1fr] gap-4 items-start' : ''}">
+										<div class={!isMobile ? 'grid grid-cols-[7rem_1fr] gap-4 items-start' : ''}>
 											<Label
 												class="{!isMobile ? 'text-right pt-2' : 'block mb-2'} text-sm font-medium"
 											>
@@ -1319,7 +1321,9 @@
 											<div
 												class="w-full bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-xl p-4 flex items-center gap-3"
 											>
-												<CheckCircle class="w-5 h-5 text-green-600 dark:text-green-500 flex-shrink-0" />
+												<CheckCircle
+													class="w-5 h-5 text-green-600 dark:text-green-500 flex-shrink-0"
+												/>
 												<span class="text-sm text-green-700 dark:text-green-400 font-medium">
 													Ready, save to make the card online
 												</span>
@@ -1487,7 +1491,7 @@
 								{:else if element.type === 'qr'}
 									<!-- QR Code dedicated display -->
 									<div class="mb-6">
-										<div class="{!isMobile ? 'grid grid-cols-[7rem_1fr] gap-4 items-start' : ''}">
+										<div class={!isMobile ? 'grid grid-cols-[7rem_1fr] gap-4 items-start' : ''}>
 											<Label
 												class="{!isMobile ? 'text-right pt-2' : 'block mb-2'} text-sm font-medium"
 											>
@@ -1496,7 +1500,9 @@
 											<div
 												class="w-full bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-xl p-4 flex items-center gap-3"
 											>
-												<CheckCircle class="w-5 h-5 text-green-600 dark:text-green-500 flex-shrink-0" />
+												<CheckCircle
+													class="w-5 h-5 text-green-600 dark:text-green-500 flex-shrink-0"
+												/>
 												<span class="text-sm text-green-700 dark:text-green-400 font-medium">
 													Ready, save to make the card online
 												</span>

@@ -51,7 +51,7 @@ let falInitialized = false;
 function initFal(): boolean {
 	// Return cached status if already initialized
 	if (falInitialized) return true;
-	
+
 	const falKey = env.FAL_KEY;
 	console.log('[fal-layers] FAL_KEY present:', !!falKey);
 	if (falKey) {
@@ -86,7 +86,9 @@ export async function decomposeWithFal(request: DecomposeRequest): Promise<Decom
 
 	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
 		try {
-			console.log(`[fal-layers] Attempt ${attempt}/${maxAttempts}: Calling fal.ai qwen-image-layered API...`);
+			console.log(
+				`[fal-layers] Attempt ${attempt}/${maxAttempts}: Calling fal.ai qwen-image-layered API...`
+			);
 			console.log('[fal-layers] Image URL:', request.imageUrl);
 			console.log('[fal-layers] Num layers:', request.numLayers ?? 4);
 
@@ -94,20 +96,22 @@ export async function decomposeWithFal(request: DecomposeRequest): Promise<Decom
 				input: {
 					image_url: request.imageUrl,
 					prompt: request.prompt,
-					negative_prompt: request.negative_prompt ?? "",
+					negative_prompt: request.negative_prompt ?? '',
 					num_inference_steps: request.num_inference_steps ?? 28,
 					guidance_scale: request.guidance_scale ?? 5,
-					acceleration: request.acceleration ?? "regular",
+					acceleration: request.acceleration ?? 'regular',
 					num_layers: request.numLayers ?? 4,
 					output_format: 'png',
-					enable_safety_checker: true, 
+					enable_safety_checker: true,
 					seed: request.seed
 				},
 				logs: true,
 				onQueueUpdate: (update) => {
 					console.log('[fal-layers] Queue status:', update.status);
 					if (update.status === 'IN_PROGRESS' && update.logs) {
-						update.logs.map((log) => log.message).forEach((msg) => console.log('[fal-layers]', msg));
+						update.logs
+							.map((log) => log.message)
+							.forEach((msg) => console.log('[fal-layers]', msg));
 					}
 				}
 			});
@@ -129,17 +133,17 @@ export async function decomposeWithFal(request: DecomposeRequest): Promise<Decom
 		} catch (error: unknown) {
 			lastError = error;
 			console.error(`[fal-layers] Attempt ${attempt} failed:`, error);
-			
+
 			// Check if error is retryable (network issues, timeouts, 5xx errors)
 			const isRetryable = isRetryableError(error);
-			
+
 			if (attempt < maxAttempts && isRetryable) {
 				console.log(`[fal-layers] Retrying in ${delay}ms...`);
-				await new Promise(resolve => setTimeout(resolve, delay));
+				await new Promise((resolve) => setTimeout(resolve, delay));
 				delay = Math.min(delay * 2, 15000); // Exponential backoff, max 15s
 				continue;
 			}
-			
+
 			// Non-retryable or exhausted attempts
 			break;
 		}
@@ -219,19 +223,21 @@ export function isFalConfigured(): boolean {
  * Submit a decomposition task to the fal.ai queue.
  * Returns a requestId immediately.
  */
-export async function submitDecomposeWithFal(request: DecomposeRequest): Promise<{ requestId: string }> {
+export async function submitDecomposeWithFal(
+	request: DecomposeRequest
+): Promise<{ requestId: string }> {
 	initFal();
 	const res = await fal.queue.submit('fal-ai/qwen-image-layered', {
 		input: {
 			image_url: request.imageUrl,
 			prompt: request.prompt,
-			negative_prompt: request.negative_prompt ?? "",
+			negative_prompt: request.negative_prompt ?? '',
 			num_inference_steps: request.num_inference_steps ?? 28,
 			guidance_scale: request.guidance_scale ?? 5,
-			acceleration: request.acceleration ?? "regular",
+			acceleration: request.acceleration ?? 'regular',
 			num_layers: request.numLayers ?? 4,
 			output_format: 'png',
-			enable_safety_checker: true, 
+			enable_safety_checker: true,
 			seed: request.seed
 		}
 	});
@@ -242,7 +248,7 @@ export async function submitDecomposeWithFal(request: DecomposeRequest): Promise
  * Submit an upscale task to the fal.ai queue.
  */
 export async function submitUpscaleWithFal(
-	imageUrl: string, 
+	imageUrl: string,
 	model: UpscaleModel = 'seedvr',
 	options?: {
 		upscaleFactor?: number;
@@ -255,7 +261,14 @@ export async function submitUpscaleWithFal(
 
 	if (model === 'seedvr') {
 		endpoint = 'fal-ai/seedvr/upscale/image';
-		input = { ...input, upscale_mode: 'factor', upscale_factor: options?.upscaleFactor ?? 2, target_resolution: '1080p', noise_scale: 0.1, output_format: 'png' };
+		input = {
+			...input,
+			upscale_mode: 'factor',
+			upscale_factor: options?.upscaleFactor ?? 2,
+			target_resolution: '1080p',
+			noise_scale: 0.1,
+			output_format: 'png'
+		};
 	} else if (model === 'aurasr') {
 		endpoint = 'fal-ai/aura-sr';
 		input = { ...input, upscaling_factor: options?.upscaleFactor ?? 4 };
@@ -266,7 +279,7 @@ export async function submitUpscaleWithFal(
 		endpoint = 'fal-ai/recraft/upscale/creative';
 	} else if (model === 'ccsr') {
 		endpoint = 'fal-ai/ccsr';
-		input = { ...input, scale: 1.5, steps: 30, color_fix_type: "adain" };
+		input = { ...input, scale: 1.5, steps: 30, color_fix_type: 'adain' };
 	}
 
 	const res = await fal.queue.submit(endpoint, { input });
@@ -276,24 +289,27 @@ export async function submitUpscaleWithFal(
 /**
  * Check status of a fal.ai queue request.
  */
-export async function checkFalStatus(endpoint: string, requestId: string): Promise<{ 
-    status: 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'IN_QUEUE';
-    result?: any;
-    error?: any;
+export async function checkFalStatus(
+	endpoint: string,
+	requestId: string
+): Promise<{
+	status: 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'IN_QUEUE';
+	result?: any;
+	error?: any;
 }> {
 	initFal();
 	// Use type casting for options to avoid requestId missing error if the lib requires it in the object
 	const status = await fal.queue.status(endpoint, { requestId, logs: false } as any);
-	
+
 	if (status.status === 'COMPLETED') {
 		const result = await fal.queue.result(endpoint, { requestId } as any);
 		return { status: 'COMPLETED', result: result.data };
 	}
-    
-    // Use type casting for comparison if the enum is too narrow
-    if ((status.status as string) === 'FAILED') {
-        return { status: 'FAILED', error: 'Fal.ai task failed' };
-    }
+
+	// Use type casting for comparison if the enum is too narrow
+	if ((status.status as string) === 'FAILED') {
+		return { status: 'FAILED', error: 'Fal.ai task failed' };
+	}
 
 	return { status: status.status as any };
 }
@@ -304,7 +320,7 @@ export type UpscaleModel = 'seedvr' | 'aurasr' | 'esrgan' | 'recraft-creative' |
  * Upscale an image by 2x using the selected model.
  */
 export async function upscaleImage(
-	imageUrl: string, 
+	imageUrl: string,
 	model: UpscaleModel = 'seedvr',
 	options?: {
 		upscaleFactor?: number;
@@ -334,7 +350,9 @@ export async function upscaleImage(
 				logs: true,
 				onQueueUpdate: (update) => {
 					if (update.status === 'IN_PROGRESS' && update.logs) {
-						update.logs.map((log) => log.message).forEach((msg) => console.log('[fal-layers] [upscale]', msg));
+						update.logs
+							.map((log) => log.message)
+							.forEach((msg) => console.log('[fal-layers] [upscale]', msg));
 					}
 				}
 			});
@@ -348,7 +366,9 @@ export async function upscaleImage(
 				logs: true,
 				onQueueUpdate: (update) => {
 					if (update.status === 'IN_PROGRESS' && update.logs) {
-						update.logs.map((log) => log.message).forEach((msg) => console.log('[fal-layers] [upscale]', msg));
+						update.logs
+							.map((log) => log.message)
+							.forEach((msg) => console.log('[fal-layers] [upscale]', msg));
 					}
 				}
 			});
@@ -363,7 +383,9 @@ export async function upscaleImage(
 				logs: true,
 				onQueueUpdate: (update) => {
 					if (update.status === 'IN_PROGRESS' && update.logs) {
-						update.logs.map((log) => log.message).forEach((msg) => console.log('[fal-layers] [upscale]', msg));
+						update.logs
+							.map((log) => log.message)
+							.forEach((msg) => console.log('[fal-layers] [upscale]', msg));
 					}
 				}
 			});
@@ -376,7 +398,9 @@ export async function upscaleImage(
 				logs: true,
 				onQueueUpdate: (update) => {
 					if (update.status === 'IN_PROGRESS' && update.logs) {
-						update.logs.map((log) => log.message).forEach((msg) => console.log('[fal-layers] [upscale]', msg));
+						update.logs
+							.map((log) => log.message)
+							.forEach((msg) => console.log('[fal-layers] [upscale]', msg));
 					}
 				}
 			});
@@ -385,7 +409,7 @@ export async function upscaleImage(
 				input: {
 					image_url: imageUrl,
 					scale: 1.5, // Default from request
-					tile_diffusion: "none",
+					tile_diffusion: 'none',
 					tile_diffusion_size: 1024,
 					tile_diffusion_stride: 512,
 					tile_vae_decoder_size: 314, // Note: using 314 as requested, though seems specific
@@ -393,13 +417,15 @@ export async function upscaleImage(
 					steps: 30,
 					t_max: 0.5,
 					t_min: 0.4,
-					color_fix_type: "adain"
+					color_fix_type: 'adain'
 				} as any,
 
 				logs: true,
 				onQueueUpdate: (update) => {
 					if (update.status === 'IN_PROGRESS' && update.logs) {
-						update.logs.map((log) => log.message).forEach((msg) => console.log('[fal-layers] [upscale]', msg));
+						update.logs
+							.map((log) => log.message)
+							.forEach((msg) => console.log('[fal-layers] [upscale]', msg));
 					}
 				}
 			});
@@ -408,13 +434,12 @@ export async function upscaleImage(
 		}
 
 		console.log('[fal-layers] Upscale result:', JSON.stringify(result.data, null, 2));
-		
+
 		if (result.data.image && result.data.image.url) {
 			return result.data.image.url;
 		}
-		
-		throw new Error('No image URL in upscale response');
 
+		throw new Error('No image URL in upscale response');
 	} catch (error) {
 		console.error('[fal-layers] Upscale failed:', error);
 		throw error;
@@ -441,12 +466,17 @@ export interface RemoveElementResponse {
 /**
  * Submit a remove element task to the fal.ai queue.
  */
-export async function submitRemoveElement(request: RemoveElementRequest): Promise<{ requestId: string }> {
+export async function submitRemoveElement(
+	request: RemoveElementRequest
+): Promise<{ requestId: string }> {
 	initFal();
-	const imageSize = (request.imageWidth && request.imageHeight) ? {
-		width: request.imageWidth,
-		height: request.imageHeight
-	} : undefined;
+	const imageSize =
+		request.imageWidth && request.imageHeight
+			? {
+					width: request.imageWidth,
+					height: request.imageHeight
+				}
+			: undefined;
 
 	const res = await fal.queue.submit('fal-ai/qwen-image-edit-2509-lora-gallery/remove-element', {
 		input: {
@@ -471,7 +501,9 @@ export async function submitRemoveElement(request: RemoveElementRequest): Promis
  * Remove unwanted elements from images using Qwen-Image-Edit-Remover-General-LoRA.
  * Cleanly removes specified elements while maintaining consistency and quality.
  */
-export async function removeElementFromImage(request: RemoveElementRequest): Promise<RemoveElementResponse> {
+export async function removeElementFromImage(
+	request: RemoveElementRequest
+): Promise<RemoveElementResponse> {
 	const isConfigured = initFal();
 	if (!isConfigured) {
 		console.log('[fal-layers] FAL_KEY not configured, returning mock data for remove element');
@@ -488,39 +520,49 @@ export async function removeElementFromImage(request: RemoveElementRequest): Pro
 
 	for (let attempt = 1; attempt <= maxAttempts; attempt++) {
 		try {
-			console.log(`[fal-layers] Attempt ${attempt}/${maxAttempts}: Calling fal.ai remove-element API...`);
+			console.log(
+				`[fal-layers] Attempt ${attempt}/${maxAttempts}: Calling fal.ai remove-element API...`
+			);
 			console.log('[fal-layers] Image URL:', request.imageUrl);
 			console.log('[fal-layers] Remove prompt:', request.prompt);
 
 			// Build image_size parameter if dimensions provided
-			const imageSize = (request.imageWidth && request.imageHeight) ? {
-				width: request.imageWidth,
-				height: request.imageHeight
-			} : undefined;
+			const imageSize =
+				request.imageWidth && request.imageHeight
+					? {
+							width: request.imageWidth,
+							height: request.imageHeight
+						}
+					: undefined;
 
-			const result = await fal.subscribe('fal-ai/qwen-image-edit-2509-lora-gallery/remove-element', {
-				input: {
-					image_urls: [request.imageUrl],
-					prompt: request.prompt || 'Remove the specified element from the scene',
-					guidance_scale: request.guidanceScale ?? 1,
-					num_inference_steps: request.numInferenceSteps ?? 6,
-					acceleration: 'regular',
-					negative_prompt: ' ',
-					enable_safety_checker: true,
-					output_format: 'png',
-					num_images: 1,
-					lora_scale: 1,
-					...(imageSize && { image_size: imageSize }),
-					...(request.seed && { seed: request.seed })
-				},
-				logs: true,
-				onQueueUpdate: (update) => {
-					console.log('[fal-layers] [remove-element] Queue status:', update.status);
-					if (update.status === 'IN_PROGRESS' && update.logs) {
-						update.logs.map((log) => log.message).forEach((msg) => console.log('[fal-layers] [remove-element]', msg));
+			const result = await fal.subscribe(
+				'fal-ai/qwen-image-edit-2509-lora-gallery/remove-element',
+				{
+					input: {
+						image_urls: [request.imageUrl],
+						prompt: request.prompt || 'Remove the specified element from the scene',
+						guidance_scale: request.guidanceScale ?? 1,
+						num_inference_steps: request.numInferenceSteps ?? 6,
+						acceleration: 'regular',
+						negative_prompt: ' ',
+						enable_safety_checker: true,
+						output_format: 'png',
+						num_images: 1,
+						lora_scale: 1,
+						...(imageSize && { image_size: imageSize }),
+						...(request.seed && { seed: request.seed })
+					},
+					logs: true,
+					onQueueUpdate: (update) => {
+						console.log('[fal-layers] [remove-element] Queue status:', update.status);
+						if (update.status === 'IN_PROGRESS' && update.logs) {
+							update.logs
+								.map((log) => log.message)
+								.forEach((msg) => console.log('[fal-layers] [remove-element]', msg));
+						}
 					}
 				}
-			});
+			);
 
 			console.log('[fal-layers] Remove element result:', JSON.stringify(result.data, null, 2));
 
@@ -542,7 +584,7 @@ export async function removeElementFromImage(request: RemoveElementRequest): Pro
 			const isRetryable = isRetryableError(error);
 			if (attempt < maxAttempts && isRetryable) {
 				console.log(`[fal-layers] Retrying remove element in ${delay}ms...`);
-				await new Promise(resolve => setTimeout(resolve, delay));
+				await new Promise((resolve) => setTimeout(resolve, delay));
 				delay = Math.min(delay * 2, 15000);
 				continue;
 			}

@@ -27,15 +27,21 @@
 				<Eraser class="h-5 w-5 text-red-500" />
 				Remove Element
 			</Dialog.Title>
-			<Dialog.Description> Use AI to remove unwanted elements from the layer. </Dialog.Description>
+			<Dialog.Description>Use AI to remove unwanted elements from the layer.</Dialog.Description>
 		</Dialog.Header>
 
 		{#if actionLayer}
 			<div class="mt-4 space-y-4">
 				<!-- Layer Preview -->
 				<div class="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-border">
-					<div class="w-16 h-12 rounded border border-border bg-muted overflow-hidden flex-shrink-0">
-						<img src={actionLayer.imageUrl} alt={actionLayer.name} class="w-full h-full object-contain" />
+					<div
+						class="w-16 h-12 rounded border border-border bg-muted overflow-hidden flex-shrink-0"
+					>
+						<img
+							src={actionLayer.imageUrl}
+							alt={actionLayer.name}
+							class="w-full h-full object-contain"
+						/>
 					</div>
 					<div>
 						<p class="font-medium text-sm">{actionLayer.name}</p>
@@ -45,7 +51,9 @@
 
 				<!-- Remove Prompt -->
 				<div>
-					<Label for="modal-remove-prompt" class="text-sm font-medium">What do you want to remove?</Label>
+					<Label for="modal-remove-prompt" class="text-sm font-medium"
+						>What do you want to remove?</Label
+					>
 					<input
 						id="modal-remove-prompt"
 						type="text"

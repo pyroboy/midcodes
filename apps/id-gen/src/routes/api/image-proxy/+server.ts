@@ -26,7 +26,13 @@ export const GET: RequestHandler = async ({ url, fetch }) => {
 		const response = await fetch(imageUrl);
 
 		if (!response.ok) {
-			console.error('[image-proxy] Upstream error:', response.status, response.statusText, 'for URL:', imageUrl);
+			console.error(
+				'[image-proxy] Upstream error:',
+				response.status,
+				response.statusText,
+				'for URL:',
+				imageUrl
+			);
 			// Return error with CORS headers to avoid ORB blocking
 			return new Response(`Failed to fetch image: ${response.status} ${response.statusText}`, {
 				status: response.status,

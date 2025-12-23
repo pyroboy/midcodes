@@ -1,8 +1,22 @@
 <script lang="ts">
-	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '$lib/components/ui/card';
+	import {
+		Card,
+		CardContent,
+		CardDescription,
+		CardHeader,
+		CardTitle
+	} from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import { analyzeIDCard, extractBackground, synthesizeTemplate } from '$lib/remote/ai.remote';
-	import { Wand2, Image as ImageIcon, Layers, Sparkles, Loader2, Check, AlertCircle } from 'lucide-svelte';
+	import {
+		Wand2,
+		Image as ImageIcon,
+		Layers,
+		Sparkles,
+		Loader2,
+		Check,
+		AlertCircle
+	} from 'lucide-svelte';
 	import { toast } from 'svelte-sonner';
 	import { goto } from '$app/navigation';
 
@@ -11,7 +25,7 @@
 	let isAnalyzing = $state(false);
 	let isSeparating = $state(false);
 	let isSynthesizing = $state(false);
-	
+
 	let detectedElements = $state<any[]>([]);
 	let backgroundUrl = $state<string | null>(null);
 	let error = $state<string | null>(null);
@@ -24,7 +38,7 @@
 			const reader = new FileReader();
 			reader.onload = (e) => {
 				selectedImageBase64 = e.target?.result as string;
-				
+
 				// Get dimensions
 				const img = new Image();
 				img.onload = () => {
@@ -45,7 +59,7 @@
 		if (!selectedImageBase64) return;
 		isAnalyzing = true;
 		error = null;
-		
+
 		try {
 			const result = await analyzeIDCard({ imageBase64: selectedImageBase64 });
 			if (result.success) {
@@ -64,7 +78,7 @@
 	async function runLayering() {
 		if (!selectedImageBase64) return;
 		isSeparating = true;
-		
+
 		try {
 			const result = await extractBackground({ imageBase64: selectedImageBase64 });
 			if (result.success) {
@@ -115,7 +129,8 @@
 			AI Layout Toolkit
 		</h1>
 		<p class="text-muted-foreground">
-			Automate template creation by detecting elements and separating background layers from existing ID cards.
+			Automate template creation by detecting elements and separating background layers from
+			existing ID cards.
 		</p>
 	</div>
 
@@ -125,10 +140,12 @@
 			<Card>
 				<CardHeader>
 					<CardTitle>Source Image</CardTitle>
-					<CardDescription>Upload an existing ID card to start the automation process.</CardDescription>
+					<CardDescription
+						>Upload an existing ID card to start the automation process.</CardDescription
+					>
 				</CardHeader>
 				<CardContent class="space-y-4">
-					<button 
+					<button
 						type="button"
 						class="w-full aspect-video bg-muted rounded-lg border-2 border-dashed flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors overflow-hidden relative"
 						onclick={() => fileInput.click()}
@@ -139,18 +156,18 @@
 							<ImageIcon class="w-12 h-12 text-muted-foreground mb-4" />
 							<p class="text-sm text-muted-foreground">Click to upload or drag and drop</p>
 						{/if}
-						<input 
-							type="file" 
-							accept="image/*" 
-							class="hidden" 
+						<input
+							type="file"
+							accept="image/*"
+							class="hidden"
 							bind:this={fileInput}
 							onchange={handleFileChange}
 						/>
 					</button>
 
 					<div class="flex gap-4">
-						<Button 
-							class="flex-1" 
+						<Button
+							class="flex-1"
 							disabled={!selectedImageBase64 || isAnalyzing}
 							onclick={runAnalysis}
 						>
@@ -162,8 +179,8 @@
 								Analyze Elements
 							{/if}
 						</Button>
-						<Button 
-							variant="outline" 
+						<Button
+							variant="outline"
 							class="flex-1"
 							disabled={!selectedImageBase64 || isSeparating}
 							onclick={runLayering}
@@ -181,7 +198,9 @@
 			</Card>
 
 			{#if error}
-				<div class="bg-destructive/10 text-destructive p-4 rounded-lg flex items-start gap-3 border border-destructive/20">
+				<div
+					class="bg-destructive/10 text-destructive p-4 rounded-lg flex items-start gap-3 border border-destructive/20"
+				>
 					<AlertCircle class="w-5 h-5 mt-0.5" />
 					<p class="text-sm font-medium">{error}</p>
 				</div>
@@ -206,16 +225,22 @@
 							{#if detectedElements.length > 0}
 								<ul class="space-y-2">
 									{#each detectedElements as el}
-										<li class="p-2 bg-background rounded border text-xs flex items-center justify-between">
+										<li
+											class="p-2 bg-background rounded border text-xs flex items-center justify-between"
+										>
 											<span class="font-mono">{el.variableName}</span>
-											<span class="bg-primary/10 text-primary px-2 py-0.5 rounded text-[10px] uppercase font-bold">
+											<span
+												class="bg-primary/10 text-primary px-2 py-0.5 rounded text-[10px] uppercase font-bold"
+											>
 												{el.type}
 											</span>
 										</li>
 									{/each}
 								</ul>
 							{:else}
-								<p class="text-muted-foreground text-sm italic">Run analysis to see detected elements...</p>
+								<p class="text-muted-foreground text-sm italic">
+									Run analysis to see detected elements...
+								</p>
 							{/if}
 						</div>
 					</div>
@@ -223,7 +248,9 @@
 					<!-- Background Layer -->
 					<div>
 						<h3 class="text-sm font-semibold mb-3">Background Asset</h3>
-						<div class="aspect-video bg-muted rounded-lg border flex items-center justify-center overflow-hidden">
+						<div
+							class="aspect-video bg-muted rounded-lg border flex items-center justify-center overflow-hidden"
+						>
 							{#if backgroundUrl}
 								<img src={backgroundUrl} alt="Background" class="w-full h-full object-contain" />
 							{:else}
@@ -232,9 +259,9 @@
 						</div>
 					</div>
 
-					<Button 
-						class="w-full" 
-						size="lg" 
+					<Button
+						class="w-full"
+						size="lg"
 						variant="secondary"
 						disabled={detectedElements.length === 0 || !backgroundUrl || isSynthesizing}
 						onclick={convertToTemplate}

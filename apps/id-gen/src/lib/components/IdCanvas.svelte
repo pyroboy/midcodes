@@ -617,7 +617,11 @@
 			try {
 				if (element.type === 'text' || element.type === 'selection') {
 					renderTextElement(ctx, element, renderCoordSystem);
-				} else if (element.type === 'photo' || element.type === 'signature' || element.type === 'graphic') {
+				} else if (
+					element.type === 'photo' ||
+					element.type === 'signature' ||
+					element.type === 'graphic'
+				) {
 					await renderImageElement(ctx, element, renderCoordSystem, isOffScreen);
 				} else if (element.type === 'qr') {
 					await renderQrElement(ctx, element, renderCoordSystem, isOffScreen);
@@ -1098,7 +1102,7 @@
 			} else {
 				// Generate QR code data URL
 				const qrSize = Math.max(elementWidth, elementHeight) * 2; // 2x for quality (retina-like)
-				
+
 				try {
 					const dataUrl = await generateQRDataUrl(qrContent, {
 						width: qrSize,
@@ -1143,20 +1147,20 @@
 			ctx.restore();
 		} catch (error: any) {
 			console.error(`[IdCanvas] Error rendering QR element ${element.variableName}:`, error);
-			
+
 			// Restore context to ensure we don't leave it in a transformed state
-			ctx.restore(); 
+			ctx.restore();
 
 			// Show placeholder on error
 			// Re-calculate basic dimensions if they failed (fallback)
 			if (elementWidth <= 0) elementWidth = 100;
 			if (elementHeight <= 0) elementHeight = 100;
-			
+
 			// Ensure we are drawing in a clean state (no rotation from previous try)
 			ctx.save();
 			// Note: We don't re-apply rotation for the error placeholder to keep it readable,
 			// or apply it if we successfully calculated it. Let's stick to simple placement for error.
-			
+
 			renderPlaceholder(
 				ctx,
 				elementX,

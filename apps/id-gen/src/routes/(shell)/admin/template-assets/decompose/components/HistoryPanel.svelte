@@ -1,7 +1,7 @@
 <script lang="ts">
 	// This is a placeholder component that will use the existing history markup from the main page
 	// In a full refactoring, this would be further broken down into HistoryItem components
-	
+
 	let {
 		// Props would go here - for now this is a placeholder
 		children

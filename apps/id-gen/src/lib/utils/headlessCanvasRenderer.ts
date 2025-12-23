@@ -416,7 +416,7 @@ async function renderQrElement(
 	// Determine QR content based on contentMode
 	let qrContent: string | null = null;
 	// No longer need cast as contentMode is now required in TemplateElement type
-	const contentMode = element.contentMode || 'auto'; 
+	const contentMode = element.contentMode || 'auto';
 
 	// For custom content, we check element.content. It's optional on the type, so simple check is fine.
 	if (contentMode === 'auto' && digitalCardSlug) {
@@ -490,7 +490,15 @@ export async function renderTemplate(options: RenderOptions): Promise<RenderResu
 		throw new Error('renderTemplate can only be called in browser environment');
 	}
 
-	const { background, elements, formData, fileUploads = {}, dimensions, mode, digitalCardSlug } = options;
+	const {
+		background,
+		elements,
+		formData,
+		fileUploads = {},
+		dimensions,
+		mode,
+		digitalCardSlug
+	} = options;
 
 	// Create offscreen canvas
 	const canvas = new OffscreenCanvas(dimensions.width, dimensions.height);

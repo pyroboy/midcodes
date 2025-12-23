@@ -11,66 +11,75 @@ import { checkAdmin } from '$lib/utils/adminPermissions';
 
 // Helper to check for admin access
 async function requireAdmin() {
-    const { locals } = getRequestEvent();
-    if (!checkAdmin(locals)) {
-        throw error(403, 'Admin access required');
-    }
+	const { locals } = getRequestEvent();
+	if (!checkAdmin(locals)) {
+		throw error(403, 'Admin access required');
+	}
 }
 
 /**
  * Analyze an ID card image to detect elements.
  */
-export const analyzeIDCard = command('unchecked', async ({ imageBase64 }: { imageBase64: string }): Promise<VisionDetectionResult> => {
-    await requireAdmin();
-    return await detectElementsWithVision(imageBase64);
-});
+export const analyzeIDCard = command(
+	'unchecked',
+	async ({ imageBase64 }: { imageBase64: string }): Promise<VisionDetectionResult> => {
+		await requireAdmin();
+		return await detectElementsWithVision(imageBase64);
+	}
+);
 
 /**
  * Remove background from an image to separate layers.
  */
-export const extractBackground = command('unchecked', async ({ imageBase64 }: { imageBase64: string }): Promise<BackgroundRemovalResult> => {
-    await requireAdmin();
-    return await removeBackgroundWithRunware(imageBase64);
-});
+export const extractBackground = command(
+	'unchecked',
+	async ({ imageBase64 }: { imageBase64: string }): Promise<BackgroundRemovalResult> => {
+		await requireAdmin();
+		return await removeBackgroundWithRunware(imageBase64);
+	}
+);
 
 /**
  * Synthesize a new template from detected elements and background.
  */
-export const synthesizeTemplate = command('unchecked', async ({ 
-    name, 
-    elements, 
-    backgroundUrl,
-    width,
-    height
-}: { 
-    name: string, 
-    elements: TemplateElementInput[], 
-    backgroundUrl: string,
-    width: number,
-    height: number
-}) => {
-    const { user, org_id } = getRequestEvent().locals;
-    await requireAdmin();
+export const synthesizeTemplate = command(
+	'unchecked',
+	async ({
+		name,
+		elements,
+		backgroundUrl,
+		width,
+		height
+	}: {
+		name: string;
+		elements: TemplateElementInput[];
+		backgroundUrl: string;
+		width: number;
+		height: number;
+	}) => {
+		const { user, org_id } = getRequestEvent().locals;
+		await requireAdmin();
 
-    if (!org_id) throw error(500, 'Organization context missing');
+		if (!org_id) throw error(500, 'Organization context missing');
 
-    const [newTemplate] = await db
-        .insert(schema.templates)
-        .values({
-            name,
-            userId: user?.id,
-            orgId: org_id,
-            frontBackground: backgroundUrl,
-            templateElements: elements,
-            widthPixels: width,
-            heightPixels: height,
-            orientation: width > height ? 'landscape' : 'portrait'
-        })
-        .returning();
+		const [newTemplate] = await db
+			.insert(schema.templates)
+			.values({
+				name,
+				userId: user?.id,
+				orgId: org_id,
+				frontBackground: backgroundUrl,
+				templateElements: elements,
+				widthPixels: width,
+				heightPixels: height,
+				orientation: width > height ? 'landscape' : 'portrait'
+			})
+			.returning();
 
-    return {
-        success: true,
-        templateId: newTemplate.id,
-        message: 'Template synthesized successfully'
-    };
-});
+		return {
+			success: true,
+			templateId: newTemplate.id,
+			message: 'Template synthesized successfully'
+		};
+	}
+);

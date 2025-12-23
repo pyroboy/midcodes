@@ -59,8 +59,8 @@
 		onSelect?: (id: string | null) => void;
 	}>();
 
-    import { fitsInQRVersion3 } from '$lib/utils/qrCodeGenerator';
-    import { AlertTriangle } from 'lucide-svelte';
+	import { fitsInQRVersion3 } from '$lib/utils/qrCodeGenerator';
+	import { AlertTriangle } from 'lucide-svelte';
 
 	let openSectionIndex: number | null = $state(null);
 
@@ -529,7 +529,9 @@
 							</div>
 							<!-- URL input (advanced) -->
 							<details class="mt-2">
-								<summary class="text-xs text-muted-foreground cursor-pointer">Or enter URL manually</summary>
+								<summary class="text-xs text-muted-foreground cursor-pointer"
+									>Or enter URL manually</summary
+								>
 								<Input
 									id="graphic-url-{i}"
 									value={element.src || ''}
@@ -605,7 +607,9 @@
 									<Select.Item value="custom">Custom URL/Text</Select.Item>
 								</Select.Content>
 							</Select.Root>
-							<p class="hint-text">Auto mode generates a QR code linking to the cardholder's digital profile.</p>
+							<p class="hint-text">
+								Auto mode generates a QR code linking to the cardholder's digital profile.
+							</p>
 						</div>
 						{#if element.contentMode === 'custom'}
 							<div class="input-group">
@@ -616,14 +620,17 @@
 									placeholder="https://example.com or any text"
 									oninput={(e) => updateElementAtIndex(i, { content: e.currentTarget.value })}
 								/>
-                                {#if element.content && !fitsInQRVersion3(element.content, element.errorCorrectionLevel || 'M')}
-                                    <div class="text-xs text-yellow-600 dark:text-yellow-400 mt-1 flex items-start gap-1">
-                                        <AlertTriangle size={12} class="mt-0.5 shrink-0" />
-                                        <span>
-                                            Content is too long for compact QR (Version 3). Consider shortening to ensure printability on small cards.
-                                        </span>
-                                    </div>
-                                {/if}
+								{#if element.content && !fitsInQRVersion3(element.content, element.errorCorrectionLevel || 'M')}
+									<div
+										class="text-xs text-yellow-600 dark:text-yellow-400 mt-1 flex items-start gap-1"
+									>
+										<AlertTriangle size={12} class="mt-0.5 shrink-0" />
+										<span>
+											Content is too long for compact QR (Version 3). Consider shortening to ensure
+											printability on small cards.
+										</span>
+									</div>
+								{/if}
 							</div>
 						{/if}
 						<div class="input-group">
@@ -653,7 +660,8 @@
 									type="color"
 									id="qr-fg-{i}"
 									value={element.foregroundColor || '#000000'}
-									oninput={(e) => updateElementAtIndex(i, { foregroundColor: e.currentTarget.value })}
+									oninput={(e) =>
+										updateElementAtIndex(i, { foregroundColor: e.currentTarget.value })}
 								/>
 							</div>
 							<div class="color-input">
@@ -662,7 +670,8 @@
 									type="color"
 									id="qr-bg-{i}"
 									value={element.backgroundColor || '#ffffff'}
-									oninput={(e) => updateElementAtIndex(i, { backgroundColor: e.currentTarget.value })}
+									oninput={(e) =>
+										updateElementAtIndex(i, { backgroundColor: e.currentTarget.value })}
 								/>
 							</div>
 						</div>
@@ -674,7 +683,7 @@
 						width={element.width}
 						height={element.height}
 						rotation={element.rotation || 0}
-						onUpdate={(updates: Record<string, any>) => handlePositionChange(i, updates)}
+						onUpdate={(updates: Record) => handlePositionChange(i, updates)}
 					/>
 				</div>
 			{/if}
@@ -966,7 +975,7 @@
 		gap: 0.25rem;
 	}
 
-	.color-input input[type="color"] {
+	.color-input input[type='color'] {
 		width: 100%;
 		height: 32px;
 		border: 1px solid var(--color-border);

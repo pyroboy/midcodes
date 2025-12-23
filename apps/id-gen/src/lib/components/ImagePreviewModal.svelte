@@ -81,8 +81,6 @@
 	let backTexture = $state<THREE.Texture | null>(null);
 	let isLoadingTexture = $state(false);
 
-
-
 	// Effect 1: Resolve incoming props, which may be functions or promises
 	$effect(() => {
 		const resolveProp = async (prop: any) => (typeof prop === 'function' ? await prop() : prop);
@@ -96,8 +94,8 @@
 					resolveProp(templateDimensionsProp)
 				]);
 				// Proxy R2 URLs to avoid CORS issues with Three.js texture loading
-				resolvedFrontUrl = getProxiedUrl(front,'cards');
-				resolvedBackUrl = getProxiedUrl(back,'cards');
+				resolvedFrontUrl = getProxiedUrl(front, 'cards');
+				resolvedBackUrl = getProxiedUrl(back, 'cards');
 				resolvedCardGeometry = geo;
 				resolvedTemplateDimensions = dims;
 			} catch (error) {
@@ -222,7 +220,7 @@
 			backTexture = null;
 
 			if (!resolvedFrontUrl && !resolvedBackUrl) return;
-			
+
 			isLoadingTexture = true;
 			const loader = new THREE.TextureLoader();
 			loader.crossOrigin = 'anonymous';
@@ -234,7 +232,7 @@
 						url,
 						(tex) => {
 							tex.colorSpace = THREE.SRGBColorSpace;
-							// Transform happens in render loop or material, 
+							// Transform happens in render loop or material,
 							// but here we just prepare the texture.
 							// We'll apply transformTextureToFit when using it.
 							resolve(tex);
@@ -253,9 +251,19 @@
 					loadOne(resolvedFrontUrl),
 					loadOne(resolvedBackUrl)
 				]);
-				
-				if (fTex) frontTexture = transformTextureToFit(fTex, effectiveTemplateDimensions, geometryDimensions);
-				if (bTex) backTexture = transformTextureToFit(bTex, effectiveTemplateDimensions, geometryDimensions);
+
+				if (fTex)
+					frontTexture = transformTextureToFit(
+						fTex,
+						effectiveTemplateDimensions,
+						geometryDimensions
+					);
+				if (bTex)
+					backTexture = transformTextureToFit(
+						bTex,
+						effectiveTemplateDimensions,
+						geometryDimensions
+					);
 			} catch (e) {
 				console.error('Texture load error', e);
 			} finally {

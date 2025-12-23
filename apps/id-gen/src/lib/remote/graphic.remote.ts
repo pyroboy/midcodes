@@ -53,7 +53,9 @@ export interface OrgGraphic {
  */
 export const uploadOrgGraphic = command(
 	'unchecked',
-	async (input: z.input<typeof uploadGraphicSchema>): Promise<{ success: boolean; url?: string; error?: string }> => {
+	async (
+		input: z.input<typeof uploadGraphicSchema>
+	): Promise<{ success: boolean; url?: string; error?: string }> => {
 		const parseResult = uploadGraphicSchema.safeParse(input);
 		if (!parseResult.success) {
 			return {
@@ -123,7 +125,9 @@ export const listOrgGraphics = query(async (): Promise<OrgGraphic[]> => {
  */
 export const deleteOrgGraphic = command(
 	'unchecked',
-	async (input: z.input<typeof deleteGraphicSchema>): Promise<{ success: boolean; error?: string }> => {
+	async (
+		input: z.input<typeof deleteGraphicSchema>
+	): Promise<{ success: boolean; error?: string }> => {
 		const parseResult = deleteGraphicSchema.safeParse(input);
 		if (!parseResult.success) {
 			return {

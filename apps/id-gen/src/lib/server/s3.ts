@@ -51,7 +51,7 @@ export async function uploadToR2(
 	options: UploadOptions = {}
 ): Promise<string> {
 	const { maxAttempts = 3, validate = true } = options;
-	
+
 	if (!r2) throw new Error('R2 client not configured');
 
 	let payload = body;
@@ -73,7 +73,7 @@ export async function uploadToR2(
 		try {
 			console.log(`[R2] Upload attempt ${attempt}/${maxAttempts}: Bucket=${R2_BUCKET}, Key=${key}`);
 			const response = await r2.send(command);
-			
+
 			// Validate response if enabled
 			if (validate && response.$metadata.httpStatusCode !== 200) {
 				throw new Error(`Upload returned status ${response.$metadata.httpStatusCode}`);
@@ -85,10 +85,10 @@ export async function uploadToR2(
 		} catch (error) {
 			lastError = error instanceof Error ? error : new Error(String(error));
 			console.error(`[R2] Upload attempt ${attempt} failed:`, lastError.message);
-			
+
 			if (attempt < maxAttempts) {
 				console.log(`[R2] Retrying in ${delay}ms...`);
-				await new Promise(resolve => setTimeout(resolve, delay));
+				await new Promise((resolve) => setTimeout(resolve, delay));
 				delay = Math.min(delay * 2, 10000); // Exponential backoff, max 10s
 			}
 		}

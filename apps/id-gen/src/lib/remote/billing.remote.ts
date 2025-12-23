@@ -9,7 +9,7 @@ import { checkSuperAdmin } from '$lib/utils/adminPermissions';
 // Use a shared permission utility
 async function requireSuperAdminPermissions() {
 	const { locals } = getRequestEvent();
-	
+
 	if (!checkSuperAdmin(locals)) {
 		throw error(403, 'Super admin privileges required.');
 	}
