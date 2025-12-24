@@ -271,6 +271,25 @@
 				? 'border-4 border-red-500'
 				: ''}"
 		>
+			<!-- VERIFIED BADGE OVERLAY -->
+			<!-- Z-Index 40 to sit above 3D card (z-20) but pointer-events-none to let clicks pass through -->
+			<div
+				class="absolute top-[8%] left-1/2 -translate-x-1/2 z-40 pointer-events-none fade-in slide-in-from-top-4 duration-1000"
+			>
+				<div
+					class="flex items-center gap-3 px-6 py-3 bg-green-950/60 backdrop-blur-md border border-green-500/50 rounded-full shadow-[0_0_30px_rgba(34,197,94,0.4)]"
+				>
+					<Icons.BadgeCheck
+						class="w-6 h-6 sm:w-7 sm:h-7 text-green-400 drop-shadow-[0_0_12px_rgba(34,197,94,0.9)]"
+					/>
+					<span
+						class="text-green-50 font-bold tracking-widest uppercase text-sm sm:text-base drop-shadow-[0_0_8px_rgba(34,197,94,0.6)]"
+					>
+						Verified
+					</span>
+				</div>
+			</div>
+
 			<!-- LAYER 1: Static Placeholder (2D Image) -->
 			<!-- DEBUG: GREEN border = Layer 1 container -->
 			<div
@@ -288,7 +307,7 @@
 				<!-- DEBUG: YELLOW border = 2D card container -->
 				<div
 					data-debug-name="CARD2D-CONTAINER-YELLOW"
-					class="overflow-hidden rounded-xl shadow-2xl flex items-center justify-center bg-neutral-900 {DEBUG_BORDERS
+					class="overflow-hidden rounded-xl shadow-2xl flex items-center justify-center {DEBUG_BORDERS
 						? 'border-4 border-yellow-500'
 						: ''}"
 					style="
