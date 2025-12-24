@@ -74,6 +74,9 @@
 	// 3D Scene Scale: Make 3D canvas larger than 2D container
 	const SCENE_3D_SCALE = 1.3;
 
+	// Debug Flags
+	const DEBUG_BORDERS = false;
+
 	// Calculate actual container dimensions in pixels
 	// Calculate actual container dimensions in pixels
 	// YELLOW and PURPLE containers now MATCH exactly (Square & Scaled)
@@ -264,13 +267,17 @@
 		<!-- DEBUG: RED border = section -->
 		<section
 			data-debug-name="HERO-SECTION-RED"
-			class="relative h-[100dvh] w-full flex flex-col items-center justify-center overflow-hidden border-4 border-red-500"
+			class="relative h-[100dvh] w-full flex flex-col items-center justify-center overflow-hidden {DEBUG_BORDERS
+				? 'border-4 border-red-500'
+				: ''}"
 		>
 			<!-- LAYER 1: Static Placeholder (2D Image) -->
 			<!-- DEBUG: GREEN border = Layer 1 container -->
 			<div
 				data-debug-name="LAYER1-PLACEHOLDER-GREEN"
-				class="absolute inset-0 flex items-center justify-center z-10 border-4 border-green-500"
+				class="absolute inset-0 flex items-center justify-center z-10 {DEBUG_BORDERS
+					? 'border-4 border-green-500'
+					: ''}"
 				style="opacity: {is3DReady
 					? 0
 					: 1}; transition: opacity 700ms ease-out; pointer-events: {is3DReady ? 'none' : 'auto'};
@@ -281,7 +288,9 @@
 				<!-- DEBUG: YELLOW border = 2D card container -->
 				<div
 					data-debug-name="CARD2D-CONTAINER-YELLOW"
-					class="overflow-hidden rounded-xl shadow-2xl border-4 border-yellow-500 flex items-center justify-center"
+					class="overflow-hidden rounded-xl shadow-2xl flex items-center justify-center bg-neutral-900 {DEBUG_BORDERS
+						? 'border-4 border-yellow-500'
+						: ''}"
 					style="
             --target-size: calc(90vw * 1.3);
             --max-size: {CONTAINER_MAX_WIDTH_PX * SCENE_3D_SCALE}px;
@@ -323,13 +332,17 @@
 			{#if load3D && frontUrl && backUrl}
 				<div
 					data-debug-name="LAYER2-3D-BLUE"
-					class="absolute inset-0 flex items-center justify-center z-20 border-4 border-blue-500"
+					class="absolute inset-0 flex items-center justify-center z-20 {DEBUG_BORDERS
+						? 'border-4 border-blue-500'
+						: ''}"
 					style="opacity: {is3DReady ? 1 : 0}; transition: opacity 700ms ease-out;"
 				>
 					<!-- DEBUG: PURPLE border = 3D canvas container (square for orbit room) -->
 					<div
 						data-debug-name="CARD3D-CONTAINER-PURPLE"
-						class="overflow-hidden rounded-xl shadow-2xl border-4 border-purple-500 relative"
+						class="overflow-hidden rounded-xl shadow-2xl relative {DEBUG_BORDERS
+							? 'border-4 border-purple-500'
+							: ''}"
 						style="width: {purpleContainerWidth}px; height: {purpleContainerWidth}px;"
 					>
 						<!-- Canvas layer - pointer-events disabled to allow scroll through -->
@@ -358,7 +371,9 @@
 							data-debug-name="ORBIT-CONTROL-ZONE"
 							class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing rounded-lg touch-none"
 							class:cursor-grabbing={isDragging}
-							style="width: 50%; height: 50%; background: rgba(255,255,255,0.05); border: 2px dashed rgba(255,255,255,0.3);"
+							style="width: 50%; height: 50%; {DEBUG_BORDERS
+								? 'background: rgba(255,255,255,0.05); border: 2px dashed rgba(255,255,255,0.3);'
+								: ''}"
 							onpointerdown={handleDragStart}
 							onpointermove={handleDragMove}
 							onpointerup={handleDragEnd}
