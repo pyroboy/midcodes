@@ -57,8 +57,8 @@
 			viewportWidth,
 			viewportHeight,
 			horizontalPadding: 40, // ~1cm on each side
-			bottomPadding: 180,    // Space for footer/chevron
-			topPadding: 40         // Small top margin
+			bottomPadding: 180, // Space for footer/chevron
+			topPadding: 40 // Small top margin
 		})
 	);
 
@@ -67,27 +67,31 @@
 	const cardHeight = $derived(cardDimensions.height);
 
 	// Container sizing config
-	const CONTAINER_WIDTH_PERCENT = 0.90;  // 90% of parent width
-	const CONTAINER_MAX_WIDTH_PX = 700;    // Maximum width in pixels
+	const CONTAINER_WIDTH_PERCENT = 0.9; // 90% of parent width
+	const CONTAINER_MAX_WIDTH_PX = 700; // Maximum width in pixels
 	const CONTAINER_MAX_HEIGHT_PERCENT = 0.85; // 85% of parent height
-	
+
 	// 3D Scene Scale: Make 3D canvas larger than 2D container
 	const SCENE_3D_SCALE = 1.3;
-	
+
 	// Calculate actual container dimensions in pixels
 	// Calculate actual container dimensions in pixels
 	// YELLOW and PURPLE containers now MATCH exactly (Square & Scaled)
 	const purpleMaxWidth = CONTAINER_MAX_WIDTH_PX * SCENE_3D_SCALE;
 	const sharedContainerWidth = $derived(
-		Math.min(viewportWidth * CONTAINER_WIDTH_PERCENT * SCENE_3D_SCALE, purpleMaxWidth, viewportWidth * 0.95)
+		Math.min(
+			viewportWidth * CONTAINER_WIDTH_PERCENT * SCENE_3D_SCALE,
+			purpleMaxWidth,
+			viewportWidth * 0.95
+		)
 	);
-	
+
 	const yellowContainerWidth = $derived(sharedContainerWidth);
 	const yellowContainerHeight = $derived(sharedContainerWidth); // Square
-	
+
 	const purpleContainerWidth = $derived(sharedContainerWidth);
 	const purpleContainerHeight = $derived(sharedContainerWidth); // Square
-	
+
 	// Ratio is now 1:1 since they match
 	const actualSceneScale = $derived(1.0);
 
@@ -121,15 +125,15 @@
 	// Progressive loading state
 	let is3DReady = $state(false);
 	let load3D = $state(false);
-	
+
 	// Custom orbit control state
 	// Smooth animated rotation for flip transitions
 	import { tweened } from 'svelte/motion';
 	import { cubicOut } from 'svelte/easing';
-	
+
 	const animatedRotationX = tweened(0, { duration: 400, easing: cubicOut });
 	const animatedRotationY = tweened(0, { duration: 400, easing: cubicOut });
-	
+
 	let isFlipped = $state(false); // Track flip state
 	let isDragging = $state(false);
 	let dragStartX = $state(0);
@@ -137,11 +141,12 @@
 	let dragOffsetX = $state(0); // Current drag offset (added to animated value)
 	let dragOffsetY = $state(0);
 	let totalDragDistance = $state(0); // To detect tap vs drag
-	
+	let isMounted = $state(false); // Gatekeeper for SSR hydration fix
+
 	// Combined rotation values (animated base + drag offset)
 	const cardRotationX = $derived($animatedRotationX + dragOffsetX);
 	const cardRotationY = $derived($animatedRotationY + dragOffsetY);
-	
+
 	// Drag handlers for control zone
 	function handleDragStart(e: PointerEvent) {
 		isDragging = true;
@@ -152,30 +157,30 @@
 		totalDragDistance = 0;
 		(e.target as HTMLElement).setPointerCapture(e.pointerId);
 	}
-	
+
 	function handleDragMove(e: PointerEvent) {
 		if (!isDragging) return;
 		const deltaX = e.clientX - dragStartX;
 		const deltaY = e.clientY - dragStartY;
 		totalDragDistance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-		
+
 		// Sensitivity: 0.01 radians per pixel
 		// Drag right → positive Y rotation (spin right)
 		// Drag down → positive X rotation (tilt forward) - Natural direction
 		dragOffsetY = deltaX * 0.01;
 		dragOffsetX = deltaY * 0.01;
-		
+
 		// Clamp X rotation to prevent flipping over (max ~45 degrees)
 		const totalX = $animatedRotationX + dragOffsetX;
 		if (totalX > 0.8) dragOffsetX = 0.8 - $animatedRotationX;
 		if (totalX < -0.8) dragOffsetX = -0.8 - $animatedRotationX;
 	}
-	
+
 	function handleDragEnd(e: PointerEvent) {
 		const wasTap = totalDragDistance < 5; // Less than 5px movement = tap
 		isDragging = false;
 		(e.target as HTMLElement).releasePointerCapture(e.pointerId);
-		
+
 		if (wasTap) {
 			// Tap to flip the card with smooth animation
 			isFlipped = !isFlipped;
@@ -201,6 +206,8 @@
 
 		// Initial update
 		updateViewport();
+		// Unlock precise JS math after measuring real screen
+		isMounted = true;
 
 		// Listen for resize events
 		window.addEventListener('resize', updateViewport);
@@ -264,14 +271,27 @@
 			<div
 				data-debug-name="LAYER1-PLACEHOLDER-GREEN"
 				class="absolute inset-0 flex items-center justify-center z-10 border-4 border-green-500"
-				style="opacity: {is3DReady ? 0 : 1}; transition: opacity 700ms ease-out; pointer-events: {is3DReady ? 'none' : 'auto'};"
+				style="opacity: {is3DReady
+					? 0
+					: 1}; transition: opacity 700ms ease-out; pointer-events: {is3DReady ? 'none' : 'auto'};
+					
+					"
 			>
 				<!-- Card Image Container -->
 				<!-- DEBUG: YELLOW border = 2D card container -->
 				<div
 					data-debug-name="CARD2D-CONTAINER-YELLOW"
 					class="overflow-hidden rounded-xl shadow-2xl border-4 border-yellow-500 flex items-center justify-center"
-					style="width: {yellowContainerWidth}px; height: {yellowContainerHeight}px;"
+					style="
+            --target-size: calc(90vw * 1.3);
+            --max-size: {CONTAINER_MAX_WIDTH_PX * SCENE_3D_SCALE}px;
+			--fallback-width: min(var(--target-size), var(--max-size));
+
+            width: {isMounted ? yellowContainerWidth + 'px' : 'var(--fallback-width)'};
+            
+            aspect-ratio: 1 / 1;
+            height: auto;
+        "
 				>
 					{#if frontLowRes || frontUrl}
 						<!-- DEBUG: CYAN border = actual image -->
@@ -281,7 +301,7 @@
 							src={frontLowRes || frontUrl}
 							alt="Digital ID"
 							class="object-contain rounded-xl"
-							style="width: 90%; height: 90%; border-radius: 4%;"
+							style="width: 90%; height: 90%;object-fit: contain; border-radius: 4%;"
 						/>
 					{/if}
 				</div>
@@ -332,7 +352,7 @@
 								/>
 							</Canvas>
 						</div>
-						
+
 						<!-- Control zone - 50% of container (scales with screen, ~2+ inches) -->
 						<div
 							data-debug-name="ORBIT-CONTROL-ZONE"
