@@ -18,7 +18,11 @@
 		cardSize = null,
 		pixelDimensions = null,
 		onUpdateBackgroundPosition = () => {},
-		version = 0
+		version = 0,
+		isSuperAdmin = false,
+		templateId = null,
+		onDecompose = null,
+		isDecomposing = false
 	}: {
 		isLoading?: boolean;
 		frontElements?: TemplateElement[];
@@ -39,6 +43,10 @@
 			side: 'front' | 'back'
 		) => void;
 		version?: number;
+		isSuperAdmin?: boolean;
+		templateId?: string | null;
+		onDecompose?: (() => void) | null;
+		isDecomposing?: boolean;
 	} = $props();
 
 	// Background position state
@@ -116,6 +124,10 @@
 						onRemoveImage={(side: 'front' | 'back') => onRemoveImage(side)}
 						{onUpdateBackgroundPosition}
 						{version}
+						{isSuperAdmin}
+						{templateId}
+						{onDecompose}
+						{isDecomposing}
 					/>
 				{/key}
 			</div>
@@ -133,6 +145,10 @@
 						onImageUpload={(files: File[], side: 'front' | 'back') => onImageUpload(files, side)}
 						onRemoveImage={(side: 'front' | 'back') => onRemoveImage(side)}
 						{onUpdateBackgroundPosition}
+						{isSuperAdmin}
+						{templateId}
+						{onDecompose}
+						{isDecomposing}
 					/>
 				{/key}
 			</div>

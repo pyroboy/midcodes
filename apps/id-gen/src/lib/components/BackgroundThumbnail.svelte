@@ -805,6 +805,17 @@
 		</button>
 
 		<button
+			class="control-handle zoom-handle"
+			class:dragging={isDragging}
+			onmousedown={(e) => handleStart(e, 'resize')}
+			ontouchstart={(e) => handleStart(e, 'resize')}
+			{disabled}
+			title="Drag to zoom background"
+		>
+			<Scaling size={14} />
+		</button>
+
+		<button
 			class="control-handle auto-fit-handle"
 			onclick={autoFit}
 			{disabled}
@@ -961,6 +972,10 @@
 
 	.move-handle:not(:disabled) {
 		cursor: move;
+	}
+
+	.zoom-handle:not(:disabled) {
+		cursor: ns-resize;
 	}
 
 	/* Crop Preview Overlay */

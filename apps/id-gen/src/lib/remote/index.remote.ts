@@ -45,7 +45,8 @@ export {
 	getSizePresets,
 	createCustomDesignRequest,
 	uploadCustomDesignAsset,
-	getUserCustomDesignRequests
+	getUserCustomDesignRequests,
+	getOrCreateDecomposeAsset
 } from './templates.remote';
 
 // AI settings functions

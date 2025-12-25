@@ -375,23 +375,3 @@ export const actions: Actions = {
 		}
 	}
 };
-
-// Function to determine orientation from image dimensions
-async function getImageOrientation(imageUrl: string): Promise<'landscape' | 'portrait'> {
-	try {
-		const response = await fetch(imageUrl);
-		const buffer = await response.arrayBuffer();
-		const blob = new Blob([buffer]);
-		const url = URL.createObjectURL(blob);
-		const img = new Image();
-		img.src = url;
-		await new Promise((resolve) => (img.onload = resolve));
-		const width = img.width;
-		const height = img.height;
-		URL.revokeObjectURL(url);
-		return width >= height ? 'landscape' : 'portrait';
-	} catch (err) {
-		console.error('Error determining image orientation:', err);
-		return 'landscape'; // default fallback
-	}
-}

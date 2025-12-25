@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { ExternalLink } from 'lucide-svelte';
-	import type { DigitalCardStatus } from '../../routes/all-ids/data.remote';
+	import type { DigitalCardStatus } from '../../routes/(shell)/all-ids/data.remote';
 
 	interface Props {
 		slug?: string | null;

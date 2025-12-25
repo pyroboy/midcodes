@@ -49,12 +49,13 @@ export function needsCropping(
 	const scaledWidth = originalImageSize.width * totalScale;
 	const scaledHeight = originalImageSize.height * totalScale;
 
-	// Check if image extends beyond template bounds or is positioned off-center
+	// Check if image extends beyond template bounds, is positioned off-center, or has custom scale
 	const extendsWidth = scaledWidth > templateSize.width;
 	const extendsHeight = scaledHeight > templateSize.height;
 	const isOffCenter = backgroundPosition.x !== 0 || backgroundPosition.y !== 0;
+	const hasCustomScale = backgroundPosition.scale !== 1;
 
-	return extendsWidth || extendsHeight || isOffCenter;
+	return extendsWidth || extendsHeight || isOffCenter || hasCustomScale;
 }
 
 /**
@@ -368,6 +369,105 @@ export async function generateCropPreviewUrl(
 
 		// Load the original image file
 		img.src = URL.createObjectURL(imageFile);
+	});
+}
+
+/**
+ * Generate a crop preview from an image URL (instead of File)
+ * This is useful for existing templates with URL-based backgrounds
+ */
+export async function generateCropPreviewFromUrl(
+	imageUrl: string,
+	templateSize: ImageDimensions,
+	backgroundPosition: BackgroundPosition,
+	format: 'image/jpeg' | 'image/png' = 'image/jpeg',
+	quality: number = 0.85
+): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const img = new Image();
+		img.crossOrigin = 'anonymous'; // Required for CORS
+
+		img.onload = () => {
+			try {
+				const originalSize = { width: img.width, height: img.height };
+				const wasCropped = needsCropping(originalSize, templateSize, backgroundPosition);
+
+				console.log('🖼️ generateCropPreviewFromUrl:', {
+					originalSize,
+					templateSize,
+					backgroundPosition,
+					wasCropped
+				});
+
+				// Create preview canvas - use smaller dimensions for performance
+				const previewScale = Math.min(1, 400 / Math.max(templateSize.width, templateSize.height));
+				const previewWidth = Math.round(templateSize.width * previewScale);
+				const previewHeight = Math.round(templateSize.height * previewScale);
+
+				const canvas = document.createElement('canvas');
+				canvas.width = previewWidth;
+				canvas.height = previewHeight;
+				const ctx = canvas.getContext('2d', { alpha: false });
+
+				if (!ctx) {
+					throw new Error('Failed to get canvas context for preview');
+				}
+
+				// Fill with white background
+				ctx.fillStyle = 'white';
+				ctx.fillRect(0, 0, previewWidth, previewHeight);
+
+				if (wasCropped) {
+					// Use same crop area calculation as the main function
+					const cropArea = calculateCropArea(originalSize, templateSize, backgroundPosition);
+
+					// Validate crop area
+					if (
+						cropArea.sourceWidth <= 0 ||
+						cropArea.sourceHeight <= 0 ||
+						cropArea.destWidth <= 0 ||
+						cropArea.destHeight <= 0
+					) {
+						throw new Error('Invalid crop area calculated for preview');
+					}
+
+					// Scale crop area to preview dimensions
+					const scaledDestX = cropArea.destX * previewScale;
+					const scaledDestY = cropArea.destY * previewScale;
+					const scaledDestWidth = cropArea.destWidth * previewScale;
+					const scaledDestHeight = cropArea.destHeight * previewScale;
+
+					// Draw the cropped/positioned image at preview scale
+					ctx.drawImage(
+						img,
+						Math.max(0, cropArea.sourceX),
+						Math.max(0, cropArea.sourceY),
+						Math.min(originalSize.width, cropArea.sourceWidth),
+						Math.min(originalSize.height, cropArea.sourceHeight),
+						scaledDestX,
+						scaledDestY,
+						scaledDestWidth,
+						scaledDestHeight
+					);
+				} else {
+					// No cropping needed, draw scaled to fit preview exactly
+					ctx.drawImage(img, 0, 0, previewWidth, previewHeight);
+				}
+
+				// Convert to data URL
+				const dataUrl = canvas.toDataURL(format, quality);
+				resolve(dataUrl);
+			} catch (error) {
+				reject(error);
+			}
+		};
+
+		img.onerror = () => {
+			reject(new Error(`Failed to load image from URL: ${imageUrl.substring(0, 50)}...`));
+		};
+
+		// Load the image from URL
+		img.src = imageUrl;
 	});
 }
 

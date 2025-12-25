@@ -11,7 +11,7 @@ import {
 	readAllIdsCache,
 	writeAllIdsCache,
 	type AllIdsCacheSnapshot
-} from '../../src/routes/all-ids/allIdsCache';
+} from '../../src/routes/(shell)/all-ids/allIdsCache';
 
 function makeSnapshot(overrides: Partial<AllIdsCacheSnapshot> = {}): AllIdsCacheSnapshot {
 	return {

@@ -9,6 +9,7 @@ import {
 	type CustomDesignRequestInput,
 	type CustomDesignRequest
 } from '$lib/schemas/custom-design.schema';
+import { checkSuperAdmin } from '$lib/utils/adminPermissions';
 
 // Helper to get admin client (Keep for Storage only)
 import { uploadToR2 } from '$lib/server/s3';
@@ -248,3 +249,95 @@ export const getUserCustomDesignRequests = query(async (): Promise<CustomDesignR
 		throw error(500, 'Failed to fetch custom design requests');
 	}
 });
+
+/**
+ * Get or create a template asset for decomposition
+ * Used by the template editor to navigate to the decompose page
+ * Super admin only
+ */
+export const getOrCreateDecomposeAsset = command(
+	'unchecked',
+	async ({
+		templateId
+	}: {
+		templateId: string;
+	}): Promise<{ success: boolean; assetId?: string; error?: string }> => {
+		const event = getRequestEvent();
+		const locals = event?.locals;
+
+		// Require super admin access
+		if (!locals || !checkSuperAdmin(locals)) {
+			throw error(403, 'Super admin access required');
+		}
+
+		const { user, org_id } = await getAuthenticatedUser();
+
+		try {
+			// 1. Verify template exists and belongs to user's org
+			const [template] = await db
+				.select()
+				.from(schema.templates)
+				.where(
+					and(eq(schema.templates.id, templateId), eq(schema.templates.orgId, org_id || ''))
+				)
+				.limit(1);
+
+			if (!template) {
+				return { success: false, error: 'Template not found or access denied' };
+			}
+
+			// 2. Check if asset already exists for this template
+			const [existingAsset] = await db
+				.select({ id: schema.templateAssets.id })
+				.from(schema.templateAssets)
+				.where(eq(schema.templateAssets.templateId, templateId))
+				.limit(1);
+
+			if (existingAsset) {
+				return { success: true, assetId: existingAsset.id };
+			}
+
+			// 3. Create new asset from template data
+			// Extract path from URL (e.g., "https://assets.kanaya.app/templates/xxx/img.png" -> "templates/xxx/img.png")
+			const extractPath = (url: string | null): string => {
+				if (!url) return '';
+				try {
+					const urlObj = new URL(url);
+					// Remove leading slash from pathname
+					return urlObj.pathname.replace(/^\//, '');
+				} catch {
+					// If not a valid URL, assume it's already a path
+					return url;
+				}
+			};
+
+			const [newAsset] = await db
+				.insert(schema.templateAssets)
+				.values({
+					name: template.name || 'Untitled Template',
+					description: `Auto-created for decomposition from template: ${template.name || templateId}`,
+					sampleType: 'other',
+					orientation: (template.orientation as 'portrait' | 'landscape') || 'portrait',
+					imagePath: extractPath(template.frontBackground),
+					imageUrl: template.frontBackground || '',
+					backImagePath: template.backBackground ? extractPath(template.backBackground) : null,
+					backImageUrl: template.backBackground || null,
+					widthPixels: template.widthPixels || 0,
+					heightPixels: template.heightPixels || 0,
+					templateId: template.id,
+					isPublished: false,
+					uploadedBy: user.id
+				})
+				.returning({ id: schema.templateAssets.id });
+
+			if (!newAsset) {
+				return { success: false, error: 'Failed to create asset record' };
+			}
+
+			return { success: true, assetId: newAsset.id };
+		} catch (err) {
+			console.error('Error in getOrCreateDecomposeAsset:', err);
+			return { success: false, error: 'Failed to get or create decompose asset' };
+		}
+	}
+);

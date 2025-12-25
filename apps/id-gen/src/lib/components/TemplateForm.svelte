@@ -47,7 +47,12 @@
 		}),
 		onUpdateBackgroundPosition = null, // (position: {x: number, y: number, scale: number}, side: 'front' | 'back') => void
 		// Optional version bump to force re-derivation of internal caches without remount
-		version = 0
+		version = 0,
+		// Decompose feature props (super admin only)
+		isSuperAdmin = false,
+		templateId = null as string | null,
+		onDecompose = null as (() => void) | null,
+		isDecomposing = false
 	} = $props();
 
 	// Calculate dynamic base dimensions
@@ -1632,20 +1637,13 @@
 								</div>
 							</div>
 						{/each}
-						<Button
-							variant="destructive"
-							size="icon"
-							class="remove-image"
-							onclick={() => onRemoveImage(side)}
-						>
-							<X class="w-4 h-4" />
-						</Button>
 					</div>
 					<!-- Close elements-overlay -->
 				{/if}
 			</div>
 		</div>
 		<ElementList
+			onRemoveBackground={() => onRemoveImage(side)}
 			{elements}
 			{onUpdateElements}
 			{fontOptions}
@@ -1662,6 +1660,9 @@
 			onHoverElement={(id) => {
 				hoveredElementId = id;
 			}}
+			{isSuperAdmin}
+			{onDecompose}
+			{isDecomposing}
 		/>
 	</div>
 </div>

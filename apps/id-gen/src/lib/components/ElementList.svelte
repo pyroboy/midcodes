@@ -5,6 +5,7 @@
 	import FontSettings from './FontSettings.svelte';
 	import * as Select from '$lib/components/ui/select';
 	import { Input } from '$lib/components/ui/input';
+	import { Button } from '$lib/components/ui/button';
 	import {
 		ChevronDown,
 		ChevronUp,
@@ -12,7 +13,10 @@
 		ArrowDown,
 		Scaling,
 		Image,
-		Settings
+		Settings,
+		Trash2,
+		Layers,
+		Loader2
 	} from '@lucide/svelte';
 	import { slide } from 'svelte/transition';
 	import {
@@ -33,13 +37,18 @@
 		preview = null,
 		backgroundPosition = $bindable({ x: 0, y: 0, scale: 1 }),
 		onUpdateBackgroundPosition = null,
+		onRemoveBackground = null,
 		cardSize = null,
 		pixelDimensions = null,
 		hoveredElementId = null as string | null,
 		onHoverElement = null as ((id: string | null) => void) | null,
 		selectedElementId = null as string | null,
 		selectionVersion = 0,
-		onSelect = null as ((id: string | null) => void) | null
+		onSelect = null as ((id: string | null) => void) | null,
+		// Decompose feature props (super admin only)
+		isSuperAdmin = false,
+		onDecompose = null as (() => void) | null,
+		isDecomposing = false
 	} = $props<{
 		elements: TemplateElement[];
 		onUpdateElements: (elements: TemplateElement[], side: 'front' | 'back') => void;
@@ -50,6 +59,7 @@
 		onUpdateBackgroundPosition?:
 			| ((position: { x: number; y: number; scale: number }, side: 'front' | 'back') => void)
 			| null;
+		onRemoveBackground?: (() => void) | null;
 		cardSize?: any;
 		pixelDimensions?: { width: number; height: number } | null;
 		hoveredElementId?: string | null;
@@ -57,6 +67,9 @@
 		selectedElementId?: string | null;
 		selectionVersion?: number;
 		onSelect?: (id: string | null) => void;
+		isSuperAdmin?: boolean;
+		onDecompose?: (() => void) | null;
+		isDecomposing?: boolean;
 	}>();
 
 	import { fitsInQRVersion3 } from '$lib/utils/qrCodeGenerator';
@@ -381,6 +394,35 @@
 							{/if}
 						</div>
 					</div>
+
+					{#if onRemoveBackground}
+						<div class="input-group remove-background-group">
+							<Button variant="destructive" size="sm" class="w-full" onclick={onRemoveBackground}>
+								<Trash2 size={16} class="mr-2" />
+								Remove Background
+							</Button>
+						</div>
+					{/if}
+
+					{#if isSuperAdmin && preview && onDecompose}
+						<div class="input-group decompose-group">
+							<Button
+								variant="secondary"
+								size="sm"
+								class="w-full bg-purple-600 hover:bg-purple-700 text-white"
+								onclick={onDecompose}
+								disabled={isDecomposing}
+							>
+								{#if isDecomposing}
+									<Loader2 size={16} class="mr-2 animate-spin" />
+									Preparing...
+								{:else}
+									<Layers size={16} class="mr-2" />
+									Decompose Layers
+								{/if}
+							</Button>
+						</div>
+					{/if}
 				</div>
 			{/if}
 		</div>
@@ -683,7 +725,7 @@
 						width={element.width}
 						height={element.height}
 						rotation={element.rotation || 0}
-						onUpdate={(updates: Record) => handlePositionChange(i, updates)}
+						onUpdate={(updates: Record<string, unknown>) => handlePositionChange(i, updates)}
 					/>
 				</div>
 			{/if}

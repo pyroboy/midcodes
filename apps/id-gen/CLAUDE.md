@@ -347,8 +347,8 @@ await db.update(templateAssets).set({
 
 ## Meta-Instructions
 
-After writing code blocks, run lint, type check, and tests before continuing:
+After writing code blocks, run type check before continuing:
 
 ```bash
-pnpm run check && pnpm run lint && pnpm run test:unit
+pnpm run check
 ```

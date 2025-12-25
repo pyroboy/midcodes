@@ -1,34 +1,35 @@
 {
-	"permissions": {
-		"allow": [
-			"Bash(npm run dev:*)",
-			"mcp__supabase__list_tables",
-			"mcp__supabase__execute_sql",
-			"mcp__context7__get-library-docs",
-			"Bash(npm view:*)",
-			"mcp__context7__resolve-library-id",
-			"Bash(npm run check:*)",
-			"Bash(pnpm run test:unit:*)",
-			"Bash(pnpm run lint)",
-			"Bash(npx prettier:*)",
-			"Bash(pnpm run check:*)",
-			"Bash(npx svelte-check:*)",
-			"Bash(timeout 15 pnpm run dev:*)",
-			"mcp__supabase__list_projects",
-			"mcp__supabase__generate_typescript_types",
-			"Bash(git checkout:*)",
-			"mcp__supabase__list_migrations",
-			"mcp__supabase__apply_migration",
-			"Bash(cat:*)",
-			"Bash(npm install:*)",
-			"WebSearch",
-			"Bash(grep:*)",
-			"Bash(git -C /Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen log --oneline -20 -- src/lib/server/s3.ts src/lib/utils/storage.ts)",
-			"mcp__plugin_neon-plugin_neon__list_projects",
-			"mcp__plugin_neon-plugin_neon__run_sql",
-			"Bash(ls:*)"
-		],
-		"deny": [],
-		"ask": []
-	}
+  "permissions": {
+    "allow": [
+      "Bash(npm run dev:*)",
+      "mcp__supabase__list_tables",
+      "mcp__supabase__execute_sql",
+      "mcp__context7__get-library-docs",
+      "Bash(npm view:*)",
+      "mcp__context7__resolve-library-id",
+      "Bash(npm run check:*)",
+      "Bash(pnpm run test:unit:*)",
+      "Bash(pnpm run lint)",
+      "Bash(npx prettier:*)",
+      "Bash(pnpm run check:*)",
+      "Bash(npx svelte-check:*)",
+      "Bash(timeout 15 pnpm run dev:*)",
+      "mcp__supabase__list_projects",
+      "mcp__supabase__generate_typescript_types",
+      "Bash(git checkout:*)",
+      "mcp__supabase__list_migrations",
+      "mcp__supabase__apply_migration",
+      "Bash(cat:*)",
+      "Bash(npm install:*)",
+      "WebSearch",
+      "Bash(grep:*)",
+      "Bash(git -C /Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen log --oneline -20 -- src/lib/server/s3.ts src/lib/utils/storage.ts)",
+      "mcp__plugin_neon-plugin_neon__list_projects",
+      "mcp__plugin_neon-plugin_neon__run_sql",
+      "Bash(ls:*)",
+      "Bash(find:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
 }

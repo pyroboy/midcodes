@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount, tick, untrack } from 'svelte';
 	import { invalidate, goto } from '$app/navigation';
+	import { page } from '$app/stores';
 	import { deserialize } from '$app/forms';
 	import TemplatesPageSkeleton from '$lib/components/skeletons/TemplatesPageSkeleton.svelte';
 	import { getPreloadState } from '$lib/services/preloadService';
@@ -29,6 +30,8 @@
 			if (result.type === 'success') {
 				const data = result.data as any;
 				if (data?.url) return data.url;
+				// URL missing from success response - this shouldn't happen
+				throw new Error('Upload succeeded but no URL was returned by server');
 			}
 
 			if (result.type === 'failure') {
@@ -134,6 +137,7 @@
 		cropBackgroundImage,
 		getImageDimensions,
 		generateCropPreviewUrl,
+		generateCropPreviewFromUrl,
 		createLowResVersion,
 		type BackgroundPosition
 	} from '$lib/utils/imageCropper';
@@ -144,6 +148,7 @@
 	import { getTemplateAssetPath } from '$lib/utils/storagePath';
 	import IdCanvas from '$lib/components/IdCanvas.svelte';
 	import { FlipHorizontal, FlipVertical, Save, X, Edit, RotateCcw } from 'lucide-svelte';
+	import { getOrCreateDecomposeAsset } from '$lib/remote/templates.remote';
 
 	// Convert a Blob/File to a base64 data URL for stable, in-memory previews
 	async function blobToDataUrl(fileOrBlob: Blob): Promise<string> {
@@ -210,6 +215,10 @@
 	let isEditMode = $state(false);
 	let isSaving = $state(false);
 
+	// Super admin status for decompose feature (from root layout)
+	let isSuperAdmin = $derived($page.data.isSuperAdmin === true);
+	let isDecomposing = $state(false);
+
 	// Review & Animation State
 	let isReviewing = $state(false);
 	let reviewSide = $state<'front' | 'back'>('front');
@@ -220,9 +229,17 @@
 	let flyTarget = $state<{ top: number; left: number; width: number; height: number } | null>(null);
 	let savingTemplateId = $state<string | null>(null);
 
-	function startReview() {
+	async function startReview() {
 		console.log('👀 Starting Template Review');
-		if (!currentTemplate?.name) {
+		console.log('📍 Background positions:', {
+			front: { ...frontBackgroundPosition },
+			back: { ...backBackgroundPosition }
+		});
+		console.log('📁 Background files:', {
+			frontBackground: frontBackground ? 'File exists' : 'null',
+			backBackground: backBackground ? 'File exists' : 'null'
+		});
+		if (!currentTemplate?.name?.trim()) {
 			toast.error('Please enter a template name first');
 			return;
 		}
@@ -230,6 +247,12 @@
 			toast.error('Both front and back designs are required');
 			return;
 		}
+		// Ensure crop previews are up-to-date before showing review
+		await updateCropPreviews();
+		console.log('🖼️ Crop previews after update:', {
+			frontCropPreview: frontCropPreview ? `${frontCropPreview.substring(0, 50)}...` : 'null',
+			backCropPreview: backCropPreview ? `${backCropPreview.substring(0, 50)}...` : 'null'
+		});
 		isReviewing = true;
 		reviewSide = 'front';
 		reviewRotation = 0;
@@ -242,6 +265,17 @@
 	function flipReview() {
 		reviewSide = reviewSide === 'front' ? 'back' : 'front';
 		reviewRotation += 180;
+	}
+
+	/**
+	 * Called from Review Template modal to confirm and save directly.
+	 * Since the user has already reviewed the cropped preview in the modal,
+	 * we bypass the CroppingConfirmationDialog by setting pendingSave = true.
+	 */
+	async function confirmAndSave() {
+		isReviewing = false;
+		pendingSave = true;
+		await saveTemplate();
 	}
 
 	// Preload 3D card geometries for templates
@@ -664,7 +698,7 @@
 					toast.loading('Generating template variants...', { id: toastId });
 					console.log('🎨 Generating template variants...');
 
-					const templateId = currentTemplate?.id || crypto.randomUUID();
+					// Use the templateId already defined earlier in saveTemplate()
 					variantUrls = await generateAndUploadVariants(
 						{
 							templateId,
@@ -754,9 +788,21 @@
 
 			console.log('💾 Saving to database...');
 
-			// Validate URLs before saving
+			// Validate URLs before saving - ensure they are proper http(s):// URLs
 			if (!frontUrl || !backUrl) {
 				throw new Error('Failed to process background images - missing URLs');
+			}
+
+			// Ensure we're not saving data: or blob: URLs to the database
+			if (frontUrl.startsWith('data:') || frontUrl.startsWith('blob:')) {
+				throw new Error(
+					'Front background upload failed - received invalid URL type. Please try again.'
+				);
+			}
+			if (backUrl.startsWith('data:') || backUrl.startsWith('blob:')) {
+				throw new Error(
+					'Back background upload failed - received invalid URL type. Please try again.'
+				);
 			}
 
 			// Create form data
@@ -1401,7 +1447,17 @@
 		// Skip expensive operations during active drag
 		if (isDraggingBackground || !requiredPixelDimensions) return;
 
+		console.log('📷 updateCropPreviews called:', {
+			frontBackground: frontBackground ? 'File' : null,
+			backBackground: backBackground ? 'File' : null,
+			frontPreview: frontPreview ? frontPreview.substring(0, 30) + '...' : null,
+			backPreview: backPreview ? backPreview.substring(0, 30) + '...' : null,
+			frontPosition: { ...frontBackgroundPosition },
+			backPosition: { ...backBackgroundPosition }
+		});
+
 		// Generate front crop preview
+		// Use File if available, otherwise use URL
 		if (frontBackground) {
 			try {
 				const cropPreviewUrl = await generateCropPreviewUrl(
@@ -1410,8 +1466,23 @@
 					frontBackgroundPosition
 				);
 				frontCropPreview = cropPreviewUrl;
+				console.log('✅ Front crop preview generated from File');
 			} catch (e) {
-				console.warn('Failed to generate front crop preview:', e);
+				console.warn('Failed to generate front crop preview from File:', e);
+				frontCropPreview = null;
+			}
+		} else if (frontPreview) {
+			// No File, but we have a URL - try to generate from URL
+			try {
+				const cropPreviewUrl = await generateCropPreviewFromUrl(
+					frontPreview,
+					requiredPixelDimensions,
+					frontBackgroundPosition
+				);
+				frontCropPreview = cropPreviewUrl;
+				console.log('✅ Front crop preview generated from URL');
+			} catch (e) {
+				console.warn('Failed to generate front crop preview from URL:', e);
 				frontCropPreview = null;
 			}
 		}
@@ -1425,8 +1496,23 @@
 					backBackgroundPosition
 				);
 				backCropPreview = cropPreviewUrl;
+				console.log('✅ Back crop preview generated from File');
 			} catch (e) {
-				console.warn('Failed to generate back crop preview:', e);
+				console.warn('Failed to generate back crop preview from File:', e);
+				backCropPreview = null;
+			}
+		} else if (backPreview) {
+			// No File, but we have a URL - try to generate from URL
+			try {
+				const cropPreviewUrl = await generateCropPreviewFromUrl(
+					backPreview,
+					requiredPixelDimensions,
+					backBackgroundPosition
+				);
+				backCropPreview = cropPreviewUrl;
+				console.log('✅ Back crop preview generated from URL');
+			} catch (e) {
+				console.warn('Failed to generate back crop preview from URL:', e);
 				backCropPreview = null;
 			}
 		}
@@ -1441,6 +1527,37 @@
 			backBackground = null;
 			backPreview = null;
 			backCropPreview = null;
+		}
+	}
+
+	/**
+	 * Handle decompose button click - navigates to decompose page
+	 * Creates a template asset if one doesn't exist
+	 */
+	async function handleDecompose() {
+		// Check if template is saved (has an ID)
+		if (!currentTemplate?.id) {
+			toast.error('Please save the template first before decomposing');
+			return;
+		}
+
+		isDecomposing = true;
+		try {
+			const result = await getOrCreateDecomposeAsset({
+				templateId: currentTemplate.id
+			});
+
+			if (result.success && result.assetId) {
+				// Navigate to decompose page
+				goto(`/admin/template-assets/decompose?assetId=${result.assetId}`);
+			} else {
+				toast.error(result.error || 'Failed to prepare decompose asset');
+			}
+		} catch (err) {
+			console.error('Decompose error:', err);
+			toast.error('Failed to start decomposition');
+		} finally {
+			isDecomposing = false;
 		}
 	}
 
@@ -1814,6 +1931,10 @@
 							// Use optimized background position handler with drag performance
 							await handleBackgroundPositionUpdate(position, side);
 						}}
+						{isSuperAdmin}
+						templateId={currentTemplate?.id ?? null}
+						onDecompose={handleDecompose}
+						{isDecomposing}
 					/>
 				{/key}
 			</div>
@@ -1897,7 +2018,7 @@
 						>
 							<IdCanvas
 								pixelDimensions={requiredPixelDimensions}
-								backgroundUrl={frontPreview || ''}
+								backgroundUrl={frontCropPreview || frontPreview || ''}
 								elements={frontElements}
 								showBoundingBoxes={false}
 								formData={{}}
@@ -1918,7 +2039,7 @@
 						>
 							<IdCanvas
 								pixelDimensions={requiredPixelDimensions}
-								backgroundUrl={backPreview || ''}
+								backgroundUrl={backCropPreview || backPreview || ''}
 								elements={backElements}
 								showBoundingBoxes={false}
 								formData={{}}
@@ -1956,7 +2077,7 @@
 					</button>
 
 					<button
-						onclick={() => saveTemplate()}
+						onclick={() => confirmAndSave()}
 						class="px-8 py-3 rounded-full bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-500/20 hover:shadow-green-500/40 transition-all font-bold flex items-center gap-2 transform hover:scale-105 active:scale-95"
 					>
 						<Save size={18} />
