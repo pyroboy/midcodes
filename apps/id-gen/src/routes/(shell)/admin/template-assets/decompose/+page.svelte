@@ -60,9 +60,14 @@
 
 	// --- Local UI State ---
 	let selectedLayerId = $state<string | null>(null);
-	// Derived
+	// Track overridden background URLs after setAsMain completes
+	let overriddenFrontUrl = $state<string | null>(null);
+	let overriddenBackUrl = $state<string | null>(null);
+	// Derived - use override if present, otherwise fall back to server data
 	let currentImageUrl = $derived(
-		layerMgr.activeSide === 'front' ? data.asset.imageUrl : data.asset.backImageUrl || null
+		layerMgr.activeSide === 'front'
+			? (overriddenFrontUrl ?? data.asset.imageUrl)
+			: (overriddenBackUrl ?? data.asset.backImageUrl ?? null)
 	);
 
 	// Settings & Modals
@@ -437,7 +442,18 @@
 					<button
 						class="flex flex-col items-center gap-1 p-2 rounded hover:bg-cyan-500/10 disabled:opacity-50 transition-colors"
 						disabled={!selectedLayerId}
-						onclick={() => selectedLayerId && processor.setAsMain(selectedLayerId)}
+						onclick={async () => {
+							if (!selectedLayerId) return;
+							const newUrl = await processor.setAsMain(selectedLayerId);
+							if (newUrl) {
+								// Update the override to reflect the new background immediately
+								if (layerMgr.activeSide === 'front') {
+									overriddenFrontUrl = newUrl;
+								} else {
+									overriddenBackUrl = newUrl;
+								}
+							}
+						}}
 					>
 						<ImageDown class="h-4 w-4 text-cyan-600" />
 						<span class="text-[10px]">Set BG</span>

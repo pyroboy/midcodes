@@ -1036,12 +1036,10 @@
 
 			// Update local templates array and caches safely
 			try {
-				// Update local templates array instead of full page reload
+				// Update local templates array directly (instant, no server round-trip)
+				// Navigation to /templates always runs a fresh load, so no invalidation needed
 				await refreshTemplatesList(normalizedForList as any);
-
-				// Optimization: Removed explicit invalidation to prevent UI flash
-				// The local update is sufficient for user feedback
-				console.log('⚡️ Optimized: Skipped full invalidation');
+				console.log('✅ Local templates list updated');
 			} catch (e) {
 				console.warn('⚠️ Non-fatal error updating list/cache:', e);
 			}
