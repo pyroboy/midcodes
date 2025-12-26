@@ -160,6 +160,8 @@ export const templates = pgTable('templates', {
 	thumbBackUrl: text('thumb_back_url'),
 	previewFrontUrl: text('preview_front_url'),
 	previewBackUrl: text('preview_back_url'),
+	// Template metadata
+	tags: text('tags').array().default([]),
 	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
 });

@@ -2,7 +2,7 @@ import { error, fail } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { db } from '$lib/server/db';
 import { templates as templatesSchema, idcards, templateSizePresets } from '$lib/server/schema';
-import { eq, and, desc, asc } from 'drizzle-orm';
+import { eq, and, desc, asc, count, sql } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ locals, url, depends, setHeaders }) => {
 	// Register dependency for selective invalidation
@@ -60,7 +60,8 @@ export const load: PageServerLoad = async ({ locals, url, depends, setHeaders })
 				blank_front_url: template.blankFrontUrl,
 				blank_back_url: template.blankBackUrl,
 				sample_front_url: template.sampleFrontUrl,
-				sample_back_url: template.sampleBackUrl
+				sample_back_url: template.sampleBackUrl,
+				tags: template.tags || []
 			};
 		}
 	}
@@ -71,6 +72,21 @@ export const load: PageServerLoad = async ({ locals, url, depends, setHeaders })
 		.from(templatesSchema)
 		.where(eq(templatesSchema.orgId, org_id!))
 		.orderBy(desc(templatesSchema.createdAt));
+
+	// Fetch usage counts for each template (DB-06)
+	const usageCounts = await db
+		.select({
+			templateId: idcards.templateId,
+			count: count()
+		})
+		.from(idcards)
+		.where(eq(idcards.orgId, org_id!))
+		.groupBy(idcards.templateId);
+
+	// Create a lookup map for quick access
+	const usageCountMap = new Map(
+		usageCounts.map((u) => [u.templateId, Number(u.count)])
+	);
 
 	// Fetch size presets
 	const sizePresets = await db
@@ -98,7 +114,9 @@ export const load: PageServerLoad = async ({ locals, url, depends, setHeaders })
 		blank_front_url: t.blankFrontUrl,
 		blank_back_url: t.blankBackUrl,
 		sample_front_url: t.sampleFrontUrl,
-		sample_back_url: t.sampleBackUrl
+		sample_back_url: t.sampleBackUrl,
+		tags: t.tags || [],
+		usage_count: usageCountMap.get(t.id) || 0
 	}));
 
 	return {
@@ -182,6 +200,7 @@ export const actions: Actions = {
 				blankBackUrl: templateData.blank_back_url || null,
 				sampleFrontUrl: templateData.sample_front_url || null,
 				sampleBackUrl: templateData.sample_back_url || null,
+				tags: templateData.tags || [],
 				updatedAt: new Date()
 			};
 
@@ -232,7 +251,8 @@ export const actions: Actions = {
 				blank_front_url: data.blankFrontUrl,
 				blank_back_url: data.blankBackUrl,
 				sample_front_url: data.sampleFrontUrl,
-				sample_back_url: data.sampleBackUrl
+				sample_back_url: data.sampleBackUrl,
+				tags: data.tags || []
 			};
 
 			return {

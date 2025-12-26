@@ -15,6 +15,95 @@ import { renderTemplateSide } from './headlessCanvasRenderer';
 import { generateSampleFormData } from './defaultFormData';
 import { getTemplateAssetPath } from './storagePath';
 
+// ============================================================================
+// WATERMARK CONFIGURATION (OG-04)
+// ============================================================================
+
+export interface WatermarkOptions {
+	text?: string;
+	opacity?: number;
+	fontSize?: number;
+	color?: string;
+	rotation?: number;
+}
+
+const DEFAULT_WATERMARK: WatermarkOptions = {
+	text: 'SAMPLE',
+	opacity: 0.15,
+	fontSize: 48,
+	color: '#000000',
+	rotation: -30
+};
+
+/**
+ * Apply a diagonal watermark pattern to an image blob
+ */
+export async function applyWatermark(
+	imageBlob: Blob,
+	options: WatermarkOptions = {}
+): Promise<Blob> {
+	const opts = { ...DEFAULT_WATERMARK, ...options };
+
+	return new Promise((resolve, reject) => {
+		const img = new Image();
+		img.onload = () => {
+			const canvas = document.createElement('canvas');
+			canvas.width = img.width;
+			canvas.height = img.height;
+			const ctx = canvas.getContext('2d');
+			if (!ctx) {
+				reject(new Error('Could not get canvas context'));
+				return;
+			}
+
+			// Draw original image
+			ctx.drawImage(img, 0, 0);
+
+			// Configure watermark style
+			ctx.globalAlpha = opts.opacity!;
+			ctx.fillStyle = opts.color!;
+			ctx.font = `bold ${opts.fontSize}px Arial, sans-serif`;
+			ctx.textAlign = 'center';
+			ctx.textBaseline = 'middle';
+
+			// Calculate spacing for tiled watermark pattern
+			const textWidth = ctx.measureText(opts.text!).width;
+			const spacing = textWidth * 1.5;
+			const diagonal = Math.sqrt(canvas.width ** 2 + canvas.height ** 2);
+
+			// Save context and apply rotation
+			ctx.save();
+			ctx.translate(canvas.width / 2, canvas.height / 2);
+			ctx.rotate((opts.rotation! * Math.PI) / 180);
+
+			// Draw tiled watermark pattern
+			for (let y = -diagonal; y < diagonal; y += spacing) {
+				for (let x = -diagonal; x < diagonal; x += spacing) {
+					ctx.fillText(opts.text!, x, y);
+				}
+			}
+
+			ctx.restore();
+
+			// Convert back to blob
+			canvas.toBlob(
+				(blob) => {
+					if (blob) {
+						resolve(blob);
+					} else {
+						reject(new Error('Failed to create blob from watermarked canvas'));
+					}
+				},
+				'image/png',
+				1.0
+			);
+		};
+
+		img.onerror = () => reject(new Error('Failed to load image for watermarking'));
+		img.src = URL.createObjectURL(imageBlob);
+	});
+}
+
 /**
  * Configuration for variant generation
  */
@@ -24,6 +113,8 @@ export interface VariantGenerationOptions {
 	backBackground: Blob;
 	elements: TemplateElement[];
 	dimensions: { width: number; height: number };
+	/** Optional watermark configuration for sample images (OG-04) */
+	watermark?: WatermarkOptions | boolean;
 }
 
 /**
@@ -58,7 +149,7 @@ export interface VariantUrls {
  * Generate background variants (thumb and preview) from a blob
  * Uses existing TEMPLATE_VARIANTS config from imageProcessing
  */
-async function generateBackgroundVariants(
+export async function generateBackgroundVariants(
 	blob: Blob
 ): Promise<{ thumb: Blob; preview: Blob; full: Blob }> {
 	const variants = await generateImageVariants(blob, TEMPLATE_VARIANTS);
@@ -124,6 +215,23 @@ export async function generateTemplateVariants(
 			renderTemplateSide(backBackground, elements, 'back', sampleFormData, {}, dimensions, 'sample')
 		]);
 
+	// Apply watermark to sample images if enabled (OG-04)
+	let finalSampleFront = sampleFront;
+	let finalSampleBack = sampleBack;
+
+	if (options.watermark) {
+		const watermarkOpts =
+			typeof options.watermark === 'boolean' ? {} : options.watermark;
+
+		const [watermarkedFront, watermarkedBack] = await Promise.all([
+			applyWatermark(sampleFront, watermarkOpts),
+			applyWatermark(sampleBack, watermarkOpts)
+		]);
+
+		finalSampleFront = watermarkedFront;
+		finalSampleBack = watermarkedBack;
+	}
+
 	return {
 		thumbFront: frontBgVariants.thumb,
 		thumbBack: backBgVariants.thumb,
@@ -131,8 +239,8 @@ export async function generateTemplateVariants(
 		previewBack: backBgVariants.preview,
 		blankFront,
 		blankBack,
-		sampleFront,
-		sampleBack
+		sampleFront: finalSampleFront,
+		sampleBack: finalSampleBack
 	};
 }
 

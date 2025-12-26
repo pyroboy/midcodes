@@ -4,7 +4,10 @@ import { db } from '$lib/server/db';
 import { templates } from '$lib/server/schema';
 import { desc } from 'drizzle-orm';
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, depends }) => {
+	// Register dependency for selective invalidation when templates are updated
+	depends('app:templates');
+
 	const { session } = locals;
 	if (!session) {
 		throw error(401, 'Unauthorized');

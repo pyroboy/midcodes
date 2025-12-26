@@ -27,7 +27,9 @@
       "mcp__plugin_neon-plugin_neon__list_projects",
       "mcp__plugin_neon-plugin_neon__run_sql",
       "Bash(ls:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(node -e:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": []

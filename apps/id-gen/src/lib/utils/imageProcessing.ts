@@ -29,19 +29,54 @@ export interface ImageVariantConfig {
 	variant: 'full' | 'preview' | 'thumb';
 	maxDimension?: number;
 	quality?: number;
-	format: 'image/png' | 'image/jpeg';
+	format: 'image/png' | 'image/jpeg' | 'image/webp';
 }
 
+// Standard variants using JPEG for wide compatibility
 export const TEMPLATE_VARIANTS: ImageVariantConfig[] = [
 	{ variant: 'full', format: 'image/png' },
 	{ variant: 'preview', maxDimension: 800, quality: 0.85, format: 'image/jpeg' },
 	{ variant: 'thumb', maxDimension: 200, quality: 0.8, format: 'image/jpeg' }
 ];
 
+// WebP variants for modern browsers (AG-08) - ~30% smaller files
+export const TEMPLATE_VARIANTS_WEBP: ImageVariantConfig[] = [
+	{ variant: 'full', format: 'image/png' }, // Keep full as PNG for lossless
+	{ variant: 'preview', maxDimension: 800, quality: 0.85, format: 'image/webp' },
+	{ variant: 'thumb', maxDimension: 200, quality: 0.8, format: 'image/webp' }
+];
+
 export const CARD_VARIANTS: ImageVariantConfig[] = [
 	{ variant: 'full', format: 'image/png' },
 	{ variant: 'preview', maxDimension: 800, quality: 0.85, format: 'image/jpeg' }
 ];
+
+// WebP card variants for modern browsers (AG-08)
+export const CARD_VARIANTS_WEBP: ImageVariantConfig[] = [
+	{ variant: 'full', format: 'image/png' },
+	{ variant: 'preview', maxDimension: 800, quality: 0.85, format: 'image/webp' }
+];
+
+/**
+ * Check if WebP is supported in the current browser
+ */
+export function isWebPSupported(): boolean {
+	if (typeof document === 'undefined') return false;
+	const canvas = document.createElement('canvas');
+	canvas.width = 1;
+	canvas.height = 1;
+	return canvas.toDataURL('image/webp').startsWith('data:image/webp');
+}
+
+/**
+ * Get the appropriate variant config based on WebP support
+ */
+export function getVariantConfig(type: 'template' | 'card', preferWebP = true): ImageVariantConfig[] {
+	if (preferWebP && isWebPSupported()) {
+		return type === 'template' ? TEMPLATE_VARIANTS_WEBP : CARD_VARIANTS_WEBP;
+	}
+	return type === 'template' ? TEMPLATE_VARIANTS : CARD_VARIANTS;
+}
 
 // ============================================================================
 // CLOUD BACKGROUND REMOVAL (using Runware AI API)

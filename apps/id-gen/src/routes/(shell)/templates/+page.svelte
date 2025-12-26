@@ -124,6 +124,18 @@
 		dpi?: number;
 		created_at: string;
 		updated_at?: string | null;
+		// Asset variant URLs (thumbnails, previews, samples)
+		thumb_front_url?: string | null;
+		thumb_back_url?: string | null;
+		preview_front_url?: string | null;
+		preview_back_url?: string | null;
+		blank_front_url?: string | null;
+		blank_back_url?: string | null;
+		sample_front_url?: string | null;
+		sample_back_url?: string | null;
+		// Template metadata
+		tags?: string[];
+		usage_count?: number;
 	};
 
 	// Type for server response
@@ -228,6 +240,10 @@
 	let isClosingReview = $state(false);
 	let flyTarget = $state<{ top: number; left: number; width: number; height: number } | null>(null);
 	let savingTemplateId = $state<string | null>(null);
+
+	// Variant generation progress (for save overlay display)
+	let isGeneratingVariants = $state(false);
+	let variantGenerationProgress = $state('');
 
 	async function startReview() {
 		console.log('👀 Starting Template Review');
@@ -468,6 +484,49 @@
 		}
 	}
 
+	/**
+	 * Fetch an existing background image URL as a Blob for variant regeneration
+	 * Used when editing templates without re-uploading images
+	 */
+	async function fetchBackgroundAsBlob(url: string, side: 'front' | 'back'): Promise<Blob | null> {
+		if (!url) {
+			console.log(`⚠️ [fetchBackgroundAsBlob] No URL provided for ${side}`);
+			return null;
+		}
+		if (url.startsWith('blob:') || url.startsWith('data:')) {
+			console.log(`⚠️ [fetchBackgroundAsBlob] ${side}: Cannot fetch blob/data URL, skipping`);
+			return null;
+		}
+
+		console.log(`🔄 [fetchBackgroundAsBlob] Fetching ${side} background from:`, url);
+
+		try {
+			// Use proxied URL to handle CORS
+			const proxiedUrl = getProxiedUrl(url, 'templates');
+			console.log(`🔄 [fetchBackgroundAsBlob] ${side}: Proxied URL:`, proxiedUrl);
+
+			if (!proxiedUrl) {
+				console.error(`❌ [fetchBackgroundAsBlob] ${side}: Could not generate proxied URL`);
+				return null;
+			}
+
+			const response = await fetch(proxiedUrl);
+			if (!response.ok) {
+				console.error(`❌ [fetchBackgroundAsBlob] ${side}: HTTP ${response.status}`);
+				throw new Error(`Failed to fetch: ${response.status}`);
+			}
+
+			const blob = await response.blob();
+			console.log(
+				`✅ [fetchBackgroundAsBlob] ${side}: Fetched successfully, size: ${blob.size} bytes, type: ${blob.type}`
+			);
+			return blob;
+		} catch (e) {
+			console.error(`❌ [fetchBackgroundAsBlob] ${side}: Failed to fetch`, e);
+			return null;
+		}
+	}
+
 	async function saveTemplate() {
 		if (!(await validateBackgrounds())) {
 			return;
@@ -587,6 +646,20 @@
 						uploadError instanceof Error ? uploadError.message : 'Unknown upload error';
 					throw new Error(`Failed to upload front background: ${errorMsg}`);
 				}
+			} else if (frontPreview && requiredPixelDimensions && !croppedFrontBlob) {
+				// Editing existing template - fetch background for variant regeneration
+				console.log(
+					'🔄 [saveTemplate] No new front image uploaded, fetching existing for variant regeneration...'
+				);
+				toast.loading('Fetching existing front image for variant update...', { id: toastId });
+				croppedFrontBlob = await fetchBackgroundAsBlob(frontPreview, 'front');
+				if (croppedFrontBlob) {
+					console.log('✅ [saveTemplate] Front background fetched successfully for variants');
+				} else {
+					console.warn(
+						'⚠️ [saveTemplate] Could not fetch front background, variants may not regenerate'
+					);
+				}
 			}
 
 			// Process back background with cropping if needed
@@ -659,6 +732,20 @@
 						uploadError instanceof Error ? uploadError.message : 'Unknown upload error';
 					throw new Error(`Failed to upload back background: ${errorMsg}`);
 				}
+			} else if (backPreview && requiredPixelDimensions && !croppedBackBlob) {
+				// Editing existing template - fetch background for variant regeneration
+				console.log(
+					'🔄 [saveTemplate] No new back image uploaded, fetching existing for variant regeneration...'
+				);
+				toast.loading('Fetching existing back image for variant update...', { id: toastId });
+				croppedBackBlob = await fetchBackgroundAsBlob(backPreview, 'back');
+				if (croppedBackBlob) {
+					console.log('✅ [saveTemplate] Back background fetched successfully for variants');
+				} else {
+					console.warn(
+						'⚠️ [saveTemplate] Could not fetch back background, variants may not regenerate'
+					);
+				}
 			}
 
 			// Combine front and back elements
@@ -695,6 +782,9 @@
 
 			if (croppedFrontBlob && croppedBackBlob && requiredPixelDimensions) {
 				try {
+					// Show loading in overlay and toast
+					isGeneratingVariants = true;
+					variantGenerationProgress = 'Generating template variants...';
 					toast.loading('Generating template variants...', { id: toastId });
 					console.log('🎨 Generating template variants...');
 
@@ -711,10 +801,14 @@
 					);
 
 					console.log('✅ Variants generated and uploaded:', variantUrls);
+					variantGenerationProgress = 'Variants uploaded ✓';
 					toast.loading('Variants uploaded ✓ Saving to database...', { id: toastId });
 				} catch (variantError) {
 					console.warn('⚠️ Failed to generate variants (non-fatal):', variantError);
 					// Continue saving without variants - they're non-critical
+				} finally {
+					isGeneratingVariants = false;
+					variantGenerationProgress = '';
 				}
 			}
 
@@ -1037,9 +1131,12 @@
 			// Update local templates array and caches safely
 			try {
 				// Update local templates array directly (instant, no server round-trip)
-				// Navigation to /templates always runs a fresh load, so no invalidation needed
 				await refreshTemplatesList(normalizedForList as any);
 				console.log('✅ Local templates list updated');
+
+				// Invalidate the shared dependency so other pages (e.g., /use-template) get fresh data
+				await invalidate('app:templates');
+				console.log('✅ Cache invalidated for app:templates');
 			} catch (e) {
 				console.warn('⚠️ Non-fatal error updating list/cache:', e);
 			}
@@ -1146,16 +1243,23 @@
 			const baseFront = toUrl((savedTemplate as any).front_background);
 			const baseBack = toUrl((savedTemplate as any).back_background);
 			console.log('🧭 refreshTemplatesList URL resolution:', { baseFront, baseBack });
-			const addBuster = (url: string) => {
-				if (!url) return '';
+			const addBuster = (url: string | null | undefined) => {
+				if (!url) return null;
 				if (url.startsWith('blob:') || url.startsWith('data:')) return url; // don't append to blob/data URLs
 				const sep = url.includes('?') ? '&' : '?';
 				return `${url}${sep}t=${timestamp}`;
 			};
 			const normalized: DatabaseTemplate = {
 				...savedTemplate,
-				front_background: addBuster(baseFront),
-				back_background: addBuster(baseBack)
+				front_background: addBuster(baseFront) ?? '',
+				back_background: addBuster(baseBack) ?? '',
+				// Apply cache-busting to all variant URLs to force browser refresh
+				thumb_front_url: addBuster(savedTemplate.thumb_front_url),
+				thumb_back_url: addBuster(savedTemplate.thumb_back_url),
+				preview_front_url: addBuster(savedTemplate.preview_front_url),
+				preview_back_url: addBuster(savedTemplate.preview_back_url),
+				sample_front_url: addBuster(savedTemplate.sample_front_url),
+				sample_back_url: addBuster(savedTemplate.sample_back_url)
 			};
 
 			// Check if this is an update or create
@@ -2088,6 +2192,15 @@
 					class="mt-8 text-center text-white/40 text-sm transition-opacity duration-300"
 					class:opacity-0={isClosingReview}
 				>
+					{#if isGeneratingVariants}
+						<!-- Variant Generation Progress Indicator -->
+						<div class="mb-4 flex items-center justify-center gap-2 text-white">
+							<div
+								class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
+							></div>
+							<span class="text-sm font-medium">{variantGenerationProgress}</span>
+						</div>
+					{/if}
 					<p class="font-medium">{currentTemplate?.name || 'Untitled Template'}</p>
 					<p>
 						{requiredPixelDimensions.width}px × {requiredPixelDimensions.height}px • {frontElements.length +

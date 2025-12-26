@@ -6,7 +6,6 @@ import {
 	uploadProcessedImage,
 	saveHistoryItem
 } from '$lib/remote/index.remote';
-import { saveEnhancedImage } from '$lib/remote/enhance.remote';
 import { fileToImageData, processImageLSB, imageDataToBlob } from '$lib/utils/bye-synth-id';
 import { fileToDataUrl } from '$lib/utils/imageProcessing';
 import type { LayerManager } from './LayerManager.svelte';
@@ -232,18 +231,63 @@ export class ImageProcessor {
 		if (!confirm(`Set this layer as the ${this.layerManager.activeSide} background?`)) return;
 
 		this.isProcessing = true;
+		const toastId = toast.loading('Preparing background variants...');
+
 		try {
-			const result = await saveEnhancedImage({
+			// 1. Fetch the layer image
+			const response = await fetch(layer.imageUrl);
+			if (!response.ok) throw new Error('Failed to fetch layer image');
+			const blob = await response.blob();
+
+			// 2. Generate variants (thumb, preview) client-side
+			toast.loading('Generating thumbnails...', { id: toastId });
+			const { generateBackgroundVariants } = await import('$lib/utils/templateVariants');
+			const variants = await generateBackgroundVariants(blob);
+
+			// 3. Convert blobs to base64 for upload
+			const toBase64 = async (b: Blob): Promise<string> => {
+				const reader = new FileReader();
+				return new Promise((resolve, reject) => {
+					reader.onloadend = () => {
+						const result = reader.result as string;
+						// Remove data URL prefix to get raw base64
+						resolve(result.split(',')[1] || result);
+					};
+					reader.onerror = reject;
+					reader.readAsDataURL(b);
+				});
+			};
+
+			const [fullBase64, thumbBase64, previewBase64] = await Promise.all([
+				toBase64(variants.full),
+				toBase64(variants.thumb),
+				toBase64(variants.preview)
+			]);
+
+			// 4. Upload all variants and update database
+			toast.loading('Uploading variants...', { id: toastId });
+			const { updateTemplateBackgroundWithVariants } = await import(
+				'$lib/remote/templates.update.remote'
+			);
+
+			const result = await updateTemplateBackgroundWithVariants({
 				assetId: this.assetData.id,
-				imageUrl: layer.imageUrl,
-				side: this.layerManager.activeSide
+				side: this.layerManager.activeSide,
+				fullBase64,
+				thumbBase64,
+				previewBase64,
+				contentType: blob.type || 'image/png'
 			});
-			if (result.success) {
-				toast.success('Background updated');
-				return result.url;
+
+			if (result.success && result.urls) {
+				toast.success('Background updated with thumbnails', { id: toastId });
+				return result.urls.fullUrl;
+			} else {
+				throw new Error(result.error || 'Failed to update background');
 			}
 		} catch (e) {
-			toast.error('Failed to set background');
+			console.error('setAsMain error:', e);
+			toast.error(e instanceof Error ? e.message : 'Failed to set background', { id: toastId });
 		} finally {
 			this.isProcessing = false;
 		}
