@@ -60,6 +60,8 @@
 
 	// --- Local UI State ---
 	let selectedLayerId = $state<string | null>(null);
+	let activeTool = $state<'brush' | 'eraser' | 'lasso' | 'eyedropper' | null>(null);
+	let currentColor = $state('#3b82f6');
 	// Track overridden background URLs after setAsMain completes
 	let overriddenFrontUrl = $state<string | null>(null);
 	let overriddenBackUrl = $state<string | null>(null);
@@ -249,7 +251,13 @@
 		hasUpscaledPreview={layerMgr.currentLayers.some((l) => l.imageUrl.includes('upscaled'))}
 		isSaving={processor.isProcessing}
 		onSave={() => layerMgr.saveToStorage(data.asset.id)}
-		onReset={() => layerMgr.clearCurrentSide()}
+		onReset={() => {
+			layerMgr.clearCurrentSide();
+			// Reset overrides to show original file
+			if (layerMgr.activeSide === 'front') overriddenFrontUrl = null;
+			else overriddenBackUrl = null;
+			toast.info('Layers reset to original');
+		}}
 	/>
 
 	<div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -265,6 +273,26 @@
 				widthPixels={data.asset.widthPixels || 1050}
 				heightPixels={data.asset.heightPixels || 600}
 				orientation={data.asset.orientation || 'horizontal'}
+				bind:activeTool
+				bind:currentColor
+				onLassoCut={(points) => {
+					console.log('Lasso Cut Triggered:', { selectedLayerId, points: points.length });
+					let sourceUrl = '';
+
+					if (selectedLayerId === 'original-file') {
+						sourceUrl = currentImageUrl || '';
+					} else if (selectedLayerId) {
+						const l = layerMgr.currentLayers.find((layer) => layer.id === selectedLayerId);
+						if (l) sourceUrl = l.imageUrl;
+					}
+
+					if (sourceUrl) {
+						processor.cutPolygon(selectedLayerId, points, sourceUrl);
+					} else {
+						console.error('Lasso Cut: No source URL found', { selectedLayerId });
+					}
+				}}
+				isProcessing={processor.isProcessing}
 			/>
 
 			<!-- Global Options / Quick Actions -->
@@ -351,29 +379,27 @@
 					role="region"
 					aria-label="Layer list"
 				>
-					{#if layerMgr.showOriginalLayer}
-						<LayerCard
-							layer={{
-								id: 'original-file',
-								name: 'Original Background',
-								imageUrl: currentImageUrl || '',
-								zIndex: -1,
-								side: layerMgr.activeSide
-							} as any}
-							isOriginal={true}
-							onSelect={() => (selectedLayerId = 'original-file')}
-							isSelected={selectedLayerId === 'original-file'}
-							selection={{ included: true } as any}
-							onToggleOriginalLayer={() =>
-								(layerMgr.showOriginalLayer = !layerMgr.showOriginalLayer)}
-							visible={layerMgr.showOriginalLayer}
-							onAction={(action) => handleMenuAction(action as any, 'original-file')}
-							onPreviewImage={(url, title) => {
-								previewData = { url, title };
-								modals.preview = true;
-							}}
-						/>
-					{/if}
+					<LayerCard
+						layer={{
+							id: 'original-file',
+							name: 'Original Background',
+							imageUrl: currentImageUrl || '',
+							zIndex: -1,
+							side: layerMgr.activeSide
+						} as any}
+						isOriginal={true}
+						onSelect={() => (selectedLayerId = 'original-file')}
+						isSelected={selectedLayerId === 'original-file'}
+						selection={{ included: true } as any}
+						onToggleOriginalLayer={() => (layerMgr.showOriginalLayer = !layerMgr.showOriginalLayer)}
+						showOriginalLayer={layerMgr.showOriginalLayer}
+						visible={layerMgr.showOriginalLayer}
+						onAction={(action) => handleMenuAction(action as any, 'original-file')}
+						onPreviewImage={(url, title) => {
+							previewData = { url, title };
+							modals.preview = true;
+						}}
+					/>
 
 					{#each layerMgr.currentLayers as layer (layer.id)}
 						<LayerCard

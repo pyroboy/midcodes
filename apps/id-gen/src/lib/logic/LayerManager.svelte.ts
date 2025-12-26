@@ -70,6 +70,21 @@ export class LayerManager {
 		this.markUnsaved();
 	}
 
+	updateLayerImageUrl(layerId: string, newUrl: string) {
+		const list = this.activeSide === 'front' ? this.frontLayers : this.backLayers;
+		const layer = list.find((l) => l.id === layerId);
+		if (layer) {
+			layer.imageUrl = newUrl;
+			// Update selection too if needed
+			const sel = this.selections.get(layerId);
+			if (sel) {
+				sel.layerImageUrl = newUrl;
+				this.selections = new Map(this.selections);
+			}
+			this.markUnsaved();
+		}
+	}
+
 	// --- Selection & Metadata ---
 
 	updateSelection(layerId: string, updates: Partial<LayerSelection>) {

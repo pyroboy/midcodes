@@ -921,6 +921,7 @@ export const saveHistoryItem = command(
 		action: string;
 		side?: 'front' | 'back';
 		templateId?: string;
+		layers?: any[];
 	}): Promise<{ success: boolean; error?: string }> => {
 		const { user, org_id } = await requireAdmin();
 
@@ -933,7 +934,7 @@ export const saveHistoryItem = command(
 				orgId: org_id,
 				userId: user.id,
 				provider: 'manual-edit',
-				model: input.action, // e.g., 'crop'
+				model: input.action, // e.g., 'crop', 'lasso-cut'
 				creditsUsed: 0,
 				status: 'completed',
 				resultUrl: input.resultUrl,
@@ -941,7 +942,8 @@ export const saveHistoryItem = command(
 					input_image: input.originalUrl,
 					side: input.side,
 					template_id: input.templateId,
-					type: 'manual'
+					type: 'manual',
+					layers: input.layers
 				}
 			});
 

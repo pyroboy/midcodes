@@ -11,6 +11,7 @@ import { fileToDataUrl } from '$lib/utils/imageProcessing';
 import type { LayerManager } from './LayerManager.svelte';
 import type { HistoryManager } from './HistoryManager.svelte';
 import type { DecomposedLayer } from '$lib/schemas/decompose.schema';
+import { getProxiedUrl } from '$lib/utils/storage';
 
 export class ImageProcessor {
 	isProcessing = $state(false);
@@ -218,6 +219,160 @@ export class ImageProcessor {
 		} catch (e: any) {
 			console.error(e);
 			toast.error('Merge failed', { id: toastId });
+		} finally {
+			this.isProcessing = false;
+		}
+	}
+
+	// --- 4.5. Lasso Cut ---
+	async cutPolygon(layerId: string | null, points: { x: number; y: number }[], sourceImageUrl: string) {
+		if (!layerId || points.length < 3 || !sourceImageUrl) {
+			console.warn('cutPolygon: Missing arguments', { layerId, pointsLen: points.length, sourceImageUrl });
+			return;
+		}
+
+		this.isProcessing = true;
+		const toastId = toast.loading('Cutting selection...');
+
+		try {
+			// 1. Load source image via PROXY to avoid CORS
+			const proxiedUrl = getProxiedUrl(sourceImageUrl) || sourceImageUrl;
+			
+			const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+				const i = new Image();
+				i.crossOrigin = 'anonymous';
+				i.onload = () => resolve(i);
+				i.onerror = reject;
+				i.src = proxiedUrl;
+			});
+
+			// Canvas Dimensions (Target Space)
+			const canvasW = this.assetData.width;
+			const canvasH = this.assetData.height;
+
+			// Source Layer Position
+			// If cutting from original-file, it's at (0,0) and fills canvas (assumed)
+			// If cutting from another layer, it has specific bounds
+			let layerX = 0;
+			let layerY = 0;
+			let layerW = canvasW;
+			let layerH = canvasH;
+
+			if (layerId && layerId !== 'original-file') {
+				const layer = this.layerManager.currentLayers.find(l => l.id === layerId);
+				if (layer && layer.bounds) {
+					layerX = layer.bounds.x;
+					layerY = layer.bounds.y;
+					layerW = layer.bounds.width;
+					layerH = layer.bounds.height;
+				}
+			}
+
+			// Calculate "Cut" Bounding Box in CANVAS COORDINATES
+			// Lasso points are 0-1 relative to CANVAS
+			const canvasPoints = points.map(p => ({ x: p.x * canvasW, y: p.y * canvasH }));
+			const minX = Math.floor(Math.min(...canvasPoints.map(p => p.x)));
+			const minY = Math.floor(Math.min(...canvasPoints.map(p => p.y)));
+			const maxX = Math.ceil(Math.max(...canvasPoints.map(p => p.x)));
+			const maxY = Math.ceil(Math.max(...canvasPoints.map(p => p.y)));
+			
+			const bboxW = maxX - minX;
+			const bboxH = maxY - minY;
+
+			if (bboxW <= 0 || bboxH <= 0) throw new Error('Invalid selection dimensions');
+
+			console.log('Cutting polygon:', { minX, minY, bboxW, bboxH, layerX, layerY });
+
+			// --- Create Cut Canvas ---
+			const cutCanvas = document.createElement('canvas');
+			cutCanvas.width = bboxW;
+			cutCanvas.height = bboxH;
+			const cutCtx = cutCanvas.getContext('2d');
+			if (!cutCtx) throw new Error('No cut context');
+
+			// Clear to be safe
+			cutCtx.clearRect(0, 0, bboxW, bboxH);
+
+			cutCtx.save(); // Save state before clipping
+
+			// Draw CLIPPING PATH (Mapped to Cut Canvas space)
+			// Target Point = Canvas Point - minX (Top-left of bounding box)
+			cutCtx.beginPath();
+			canvasPoints.forEach((p, i) => {
+				const tx = p.x - minX;
+				const ty = p.y - minY;
+				if (i === 0) cutCtx.moveTo(tx, ty);
+				else cutCtx.lineTo(tx, ty);
+			});
+			cutCtx.closePath();
+			cutCtx.clip();
+
+			// Draw SOURCE IMAGE
+			// We need to map the source image (at layerX, layerY on Main Canvas)
+			// to the Cut Canvas (which represents the rect at minX, minY on Main Canvas).
+			// Offset = LayerPos - CutPos
+			const drawX = layerX - minX;
+			const drawY = layerY - minY;
+
+			// We use layerW/layerH for destination size to ensure it scales correctly if image vs bounds differ
+			cutCtx.drawImage(img, drawX, drawY, layerW, layerH);
+			
+			cutCtx.restore(); // Restore state (remove clip)
+			
+			const cutBlob = await new Promise<Blob | null>(r => cutCanvas.toBlob(r, 'image/png'));
+			if (!cutBlob) throw new Error('Cut blob failed');
+			const cutBase64 = await fileToDataUrl(cutBlob);
+			console.log('Uploading cut result...');
+			const cutUpload = await uploadProcessedImage({ imageBase64: cutBase64, mimeType: 'image/png' });
+
+			// --- Apply Changes ---
+			if (cutUpload.success && cutUpload.url) {
+				// 2. Add new layer
+				const originLayer = this.layerManager.currentLayers.find(l => l.id === layerId);
+				const originLayerName = originLayer ? originLayer.name : 'Background';
+				
+				const { layer: newLayer, selection } = this.layerManager.createLayerObj(
+					cutUpload.url,
+					`${originLayerName} (Copy)`,
+					{ x: minX, y: minY, width: bboxW, height: bboxH }, // Positioned where the cut happened
+					this.layerManager.activeSide,
+					this.layerManager.currentLayers.length + 1
+				);
+				// Ensure independent layer
+				newLayer.parentId = undefined;
+				this.layerManager.addLayer(newLayer, selection);
+				
+				// 3. Save to History
+				const currentLayersSnapshot = this.layerManager.currentLayers.map(l => ({
+					imageUrl: l.imageUrl,
+					name: l.name,
+					bounds: l.bounds,
+					width: l.bounds?.width || 0,
+					height: l.bounds?.height || 0,
+					zIndex: l.zIndex,
+					side: l.side
+				}));
+
+				await saveHistoryItem({
+					originalUrl: sourceImageUrl,
+					resultUrl: cutUpload.url,
+					action: 'lasso-copy',
+					side: this.layerManager.activeSide as 'front' | 'back',
+					templateId: this.assetData.templateId,
+					layers: currentLayersSnapshot
+				});
+				
+				// Refresh history list
+				this.historyManager.load();
+
+				toast.success('Copied selection to new layer', { id: toastId });
+			} else {
+				throw new Error('Failed to upload cut result');
+			}
+
+		} catch (e: any) {
+			console.error('Cut error details:', e);
+			toast.error('Cut failed: ' + e.message, { id: toastId });
 		} finally {
 			this.isProcessing = false;
 		}
