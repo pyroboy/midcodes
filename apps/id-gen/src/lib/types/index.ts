@@ -1,3 +1,12 @@
+// Template types
+export type {
+	DatabaseTemplate,
+	EditorTemplateData,
+	TemplateServerResponse,
+	TemplateListItem,
+	TemplateElement
+} from './template';
+
 export interface HeaderRow {
 	id: string;
 	name: string;

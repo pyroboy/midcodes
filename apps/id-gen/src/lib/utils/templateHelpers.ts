@@ -6,40 +6,10 @@ import {
 	COMMON_CARD_SIZES,
 	LEGACY_CARD_SIZE
 } from '$lib/utils/sizeConversion';
+import type { DatabaseTemplate } from '$lib/types/template';
 
-/**
- * Type for database template records
- */
-export interface DatabaseTemplate {
-	id: string;
-	user_id: string;
-	name: string;
-	description?: string | null;
-	org_id: string;
-	front_background: string;
-	back_background: string;
-	front_background_low_res?: string | null;
-	back_background_low_res?: string | null;
-	orientation: 'landscape' | 'portrait';
-	template_elements: any[];
-	width_pixels?: number;
-	height_pixels?: number;
-	dpi?: number;
-	created_at: string;
-	updated_at?: string | null;
-	// Asset variant URLs (thumbnails, previews, samples)
-	thumb_front_url?: string | null;
-	thumb_back_url?: string | null;
-	preview_front_url?: string | null;
-	preview_back_url?: string | null;
-	blank_front_url?: string | null;
-	blank_back_url?: string | null;
-	sample_front_url?: string | null;
-	sample_back_url?: string | null;
-	// Template metadata
-	tags?: string[];
-	usage_count?: number;
-}
+// Re-export for backwards compatibility
+export type { DatabaseTemplate } from '$lib/types/template';
 
 /**
  * Robustly detect orientation from pixel dimensions
@@ -203,13 +173,14 @@ export async function validateImage(
 	file: File,
 	side: string
 ): Promise<true | string> {
+	let url: string | null = null;
 	try {
-		const url = URL.createObjectURL(file);
+		url = URL.createObjectURL(file);
 		const img = new Image();
 		await new Promise((resolve, reject) => {
 			img.onload = resolve;
 			img.onerror = reject;
-			img.src = url;
+			img.src = url!;
 		});
 
 		// With cropping enabled, we only need to validate that the image loads
@@ -217,6 +188,10 @@ export async function validateImage(
 		URL.revokeObjectURL(url);
 		return true;
 	} catch {
+		// Clean up object URL even on error to prevent memory leak
+		if (url) {
+			URL.revokeObjectURL(url);
+		}
 		return `Error loading ${side} background image. Please try again.`;
 	}
 }
