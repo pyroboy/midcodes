@@ -37,12 +37,16 @@
 		isGeneratingVariants: boolean;
 		/** Current progress message for variant generation */
 		variantGenerationProgress: string;
+		/** Whether the save process is loading (uploading/saving) */
+		isLoading: boolean;
 		/** Callback when card is flipped */
 		onFlip: () => void;
 		/** Callback when modal is cancelled/closed */
 		onCancel: () => void;
 		/** Callback when template is confirmed/saved */
 		onConfirm: () => void;
+		/** Callback when save is aborted */
+		onAbort: () => void;
 	}
 
 	let {
@@ -61,9 +65,11 @@
 		flyTarget,
 		isGeneratingVariants,
 		variantGenerationProgress,
+		isLoading,
 		onFlip,
 		onCancel,
-		onConfirm
+		onConfirm,
+		onAbort
 	}: Props = $props();
 
 	// Handle backdrop click to close
@@ -133,13 +139,31 @@
 				{onFlip}
 			/>
 
+			<!-- Loading Bar / Progress -->
+			{#if isLoading}
+				<div
+					class="w-full max-w-sm mt-6 mb-2 flex flex-col items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300"
+				>
+					<div class="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+						<div
+							class="h-full w-1/3 bg-green-500 rounded-full animate-progress-indeterminate"
+						></div>
+					</div>
+					<p class="text-white/70 text-sm font-medium">
+						{variantGenerationProgress || 'Saving...'}
+					</p>
+				</div>
+			{/if}
+
 			<!-- Action Buttons -->
 			<TemplateActions
 				{isClosingReview}
 				{isGeneratingVariants}
 				{variantGenerationProgress}
+				{isLoading}
 				{onCancel}
 				{onConfirm}
+				{onAbort}
 			/>
 
 			<!-- Metadata Display -->
@@ -155,3 +179,17 @@
 		</div>
 	</div>
 {/if}
+
+<style>
+	@keyframes progress-indeterminate {
+		0% {
+			transform: translateX(-100%);
+		}
+		100% {
+			transform: translateX(400%);
+		}
+	}
+	.animate-progress-indeterminate {
+		animation: progress-indeterminate 1.5s ease-in-out infinite;
+	}
+</style>

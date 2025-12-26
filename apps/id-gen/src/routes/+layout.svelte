@@ -12,11 +12,4 @@
 
 <Toaster richColors closeButton />
 
-<style>
-	:global(body) {
-		margin: 0;
-		font-family:
-			-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-	}
-	/* Minimal global style - rest is in (shell) layout or component specific */
-</style>
+

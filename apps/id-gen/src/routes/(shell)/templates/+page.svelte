@@ -2,6 +2,8 @@
 	import { onMount, untrack } from 'svelte';
 	import { deserialize } from '$app/forms';
 	import { page } from '$app/stores';
+	import { fade } from 'svelte/transition';
+	import { cubicOut, cubicIn } from 'svelte/easing';
 
 	// Components
 	import TemplatesPageSkeleton from '$lib/components/skeletons/TemplatesPageSkeleton.svelte';
@@ -11,11 +13,11 @@
 	import CroppingConfirmationDialog from '$lib/components/CroppingConfirmationDialog.svelte';
 
 	// Hooks
-	import { useTemplateEditor } from '$lib/composables/useTemplateEditor';
-	import { useImageUpload } from '$lib/composables/useImageUpload';
-	import { useReviewModal } from '$lib/composables/useReviewModal';
-	import { useCroppingDialog } from '$lib/composables/useCroppingDialog';
-	import { useTemplateSave } from '$lib/composables/useTemplateSave';
+	import { useTemplateEditor } from '$lib/composables/useTemplateEditor.svelte';
+	import { useImageUpload } from '$lib/composables/useImageUpload.svelte';
+	import { useReviewModal } from '$lib/composables/useReviewModal.svelte';
+	import { useCroppingDialog } from '$lib/composables/useCroppingDialog.svelte';
+	import { useTemplateSave } from '$lib/composables/useTemplateSave.svelte';
 
 	// Utils
 	import { getPreloadState } from '$lib/services/preloadService';
@@ -38,7 +40,12 @@
 	let isSuperAdmin = $derived($page.data.isSuperAdmin === true);
 
 	// Upload image via server action to R2
-	async function uploadImage(file: File, path: string, userId?: string): Promise<string> {
+	async function uploadImage(
+		file: File,
+		path: string,
+		userId?: string,
+		signal?: AbortSignal
+	): Promise<string> {
 		const formData = new FormData();
 		formData.append('file', file);
 		formData.append('path', path);
@@ -47,7 +54,8 @@
 		try {
 			const response = await fetch('?/uploadImage', {
 				method: 'POST',
-				body: formData
+				body: formData,
+				signal
 			});
 
 			const result = deserialize(await response.text());
@@ -76,13 +84,15 @@
 		}
 	}
 
-	// Initialize hooks
-	const editor = useTemplateEditor({
-		data: data,
-		initialTemplates: data.templates,
-		user: data.user,
-		org_id: data.org_id
-	});
+	// Initialize hooks (untrack since we intentionally want initial values)
+	const editor = untrack(() =>
+		useTemplateEditor({
+			data: data,
+			initialTemplates: data.templates,
+			user: data.user,
+			org_id: data.org_id
+		})
+	);
 
 	// Re-sync templates when data changes (e.g. navigation)
 	$effect(() => {
@@ -100,46 +110,77 @@
 	});
 
 	// Sync editor state changes to image upload hook
+	// Track if user intentionally removed backgrounds (to avoid re-syncing from template)
+	let userRemovedFront = $state(false);
+	let userRemovedBack = $state(false);
+
+	// Wrap handleRemoveImage to track intentional removals
+	function handleRemoveImageWithTracking(side: 'front' | 'back') {
+		if (side === 'front') userRemovedFront = true;
+		else userRemovedBack = true;
+		imageUpload.handleRemoveImage(side);
+	}
+
+	// Wrap handleImageUpload to reset removal tracking when uploading new image
+	async function handleImageUploadWithTracking(files: FileList | null, side: 'front' | 'back') {
+		if (side === 'front') userRemovedFront = false;
+		else userRemovedBack = false;
+		await imageUpload.handleImageUpload(files, side);
+	}
+
 	$effect(() => {
 		// When template changes, update the image upload hook's previews
 		if (editor.currentTemplate) {
-			// Only update if differ to avoid loops
+			// Only sync if:
+			// - Values differ AND
+			// - Not a data URL (local upload) AND
+			// - User didn't intentionally remove the background
 			if (
 				editor.currentTemplate.front_background !== imageUpload.frontPreview &&
-				!imageUpload.frontPreview?.startsWith('data:')
+				!imageUpload.frontPreview?.startsWith('data:') &&
+				!userRemovedFront
 			) {
-				// Don't overwrite local previews
 				imageUpload.setPreview('front', editor.currentTemplate.front_background);
 			}
 			if (
 				editor.currentTemplate.back_background !== imageUpload.backPreview &&
-				!imageUpload.backPreview?.startsWith('data:')
+				!imageUpload.backPreview?.startsWith('data:') &&
+				!userRemovedBack
 			) {
 				imageUpload.setPreview('back', editor.currentTemplate.back_background);
 			}
 		} else if (!editor.isEditMode) {
 			// Reset when exiting edit mode
 			imageUpload.reset();
+			userRemovedFront = false;
+			userRemovedBack = false;
 		}
+	});
+
+	// Sync current backgrounds to editor for change detection
+	$effect(() => {
+		editor.setCurrentBackgrounds(imageUpload.frontPreview, imageUpload.backPreview);
 	});
 
 	const reviewModal = useReviewModal();
 
 	const croppingDialog = useCroppingDialog();
 
-	const templateSave = useTemplateSave({
-		user: data.user,
-		org_id: data.org_id,
-		uploadImage: uploadImage,
-		onSaveSuccess: (savedTemplate) => {
-			editor.updateTemplatesList(savedTemplate);
-			// Update current template with saved data (e.g. new ID)
-			editor.setCurrentTemplate(savedTemplate);
-		},
-		onRefreshList: async () => {
-			await invalidate('app:templates');
-		}
-	});
+	const templateSave = untrack(() =>
+		useTemplateSave({
+			user: data.user,
+			org_id: data.org_id,
+			uploadImage: uploadImage,
+			onSaveSuccess: (savedTemplate) => {
+				editor.updateTemplatesList(savedTemplate);
+				// Update current template with saved data (e.g. new ID)
+				editor.setCurrentTemplate(savedTemplate);
+			},
+			onRefreshList: async () => {
+				await invalidate('app:templates');
+			}
+		})
+	);
 
 	// Handle Save Action
 	function handleSave() {
@@ -178,7 +219,7 @@
 	async function handleConfirmSave() {
 		if (!editor.currentTemplate || !editor.requiredPixelDimensions) return;
 
-		await templateSave.saveTemplate({
+		const savedTemplate = await templateSave.saveTemplate({
 			currentTemplate: editor.currentTemplate,
 			frontBackground: imageUpload.frontBackground,
 			backBackground: imageUpload.backBackground,
@@ -192,11 +233,50 @@
 			validateBackgrounds: async () => true // Already validated
 		});
 
-		// Close review modal after save (controlled by verify success inside hook usually,
-		// but here we just wait for the promise)
-		if (!templateSave.isLoading) {
-			// If save finished
-			reviewModal.confirmAndSave(async () => {}); // Just close logic
+		if (savedTemplate) {
+			// Find target element in the list for fly animation
+			// The list might be lazily rendering the new item, so we poll for it briefly
+			const pollForElement = async (id: string, maxAttempts = 10, interval = 50) => {
+				for (let i = 0; i < maxAttempts; i++) {
+					const el = document.getElementById(id);
+					if (el) return el;
+					await new Promise((r) => setTimeout(r, interval));
+				}
+				return null;
+			};
+
+			const targetEl = await pollForElement(`template-card-${savedTemplate.id}`);
+
+			if (targetEl) {
+				const rect = targetEl.getBoundingClientRect();
+				// Target the inner image container for better visual alignment
+				const imageContainer = targetEl.querySelector('.relative.shadow-md');
+				const targetRect = imageContainer ? imageContainer.getBoundingClientRect() : rect;
+
+				// Set fly target to the list item position
+				reviewModal.setFlyTarget({
+					top: targetRect.top,
+					left: targetRect.left,
+					width: targetRect.width,
+					height: targetRect.height
+				});
+
+				// Start the fly animation
+				reviewModal.startClosingAnimation();
+
+				// Wait for animation to finish (approx 600ms + buffer)
+				setTimeout(() => {
+					// Switch back to list view
+					editor.handleBack();
+					// Reset animation state
+					reviewModal.endClosingAnimation();
+				}, 700);
+			} else {
+				console.warn('⚠️ Animation target not found, skipping fly animation');
+				// Fallback if target not found
+				editor.handleBack();
+				reviewModal.confirmAndSave(async () => {});
+			}
 		}
 	}
 
@@ -253,44 +333,53 @@
 	{:else}
 		<div class="grid grid-cols-1 grid-rows-1 w-full h-full overflow-hidden bg-background">
 			<!-- Template List -->
-			<div
-				class="col-start-1 row-start-1 w-full h-full overflow-hidden {editor.isEditMode
-					? 'invisible pointer-events-none'
-					: 'visible'}"
-			>
-				<TemplateList
-					templates={editor.templates}
-					onSelect={editor.handleTemplateSelect}
-					onCreateNew={editor.handleCreateNewTemplate}
-					savingTemplateId={templateSave.isSaving ? templateSave.savingTemplateId : null}
-					{sizePresets}
-				/>
-			</div>
+			{#if !editor.isEditMode || reviewModal.isReviewing || templateSave.isLoading}
+				<div
+					class="col-start-1 row-start-1 w-full h-full overflow-hidden"
+					in:fade={{ duration: 200, delay: 150, easing: cubicOut }}
+					out:fade={{ duration: 150, easing: cubicIn }}
+				>
+					<TemplateList
+						templates={editor.templates}
+						onSelect={editor.handleTemplateSelect}
+						onCreateNew={editor.handleCreateNewTemplate}
+						savingTemplateId={templateSave.isSaving ? templateSave.savingTemplateId : null}
+						{sizePresets}
+					/>
+				</div>
+			{/if}
 
 			<!-- Edit View -->
-			{#if editor.isEditMode}
-				<TemplateEditorLayout
-					version={editor.editorVersion}
-					isLoading={templateSave.isLoading}
-					frontElements={editor.frontElements}
-					backElements={editor.backElements}
-					frontPreview={imageUpload.frontPreview}
-					backPreview={imageUpload.backPreview}
-					errorMessage={editor.errorMessage}
-					cardSize={editor.currentCardSize}
-					pixelDimensions={editor.requiredPixelDimensions}
-					onBack={editor.handleBack}
-					onSave={handleSave}
-					onClear={editor.clearForm}
-					onUpdateElements={editor.updateElements}
-					onImageUpload={imageUpload.handleImageUpload}
-					onRemoveImage={imageUpload.handleRemoveImage}
-					onUpdateBackgroundPosition={imageUpload.handleBackgroundPositionUpdate}
-					{isSuperAdmin}
-					templateId={editor.currentTemplate?.id ?? null}
-					onDecompose={editor.handleDecompose}
-					isDecomposing={editor.isDecomposing}
-				/>
+			{#if editor.isEditMode && !reviewModal.isReviewing && !templateSave.isLoading}
+				<div
+					class="col-start-1 row-start-1 w-full h-full z-10"
+					in:fade={{ duration: 200, delay: 100, easing: cubicOut }}
+					out:fade={{ duration: 150, easing: cubicIn }}
+				>
+					<TemplateEditorLayout
+						version={editor.editorVersion}
+						isLoading={templateSave.isLoading}
+						frontElements={editor.frontElements}
+						backElements={editor.backElements}
+						frontPreview={imageUpload.frontPreview}
+						backPreview={imageUpload.backPreview}
+						errorMessage={editor.errorMessage}
+						cardSize={editor.currentCardSize}
+						pixelDimensions={editor.requiredPixelDimensions}
+						hasChanges={editor.hasChanges}
+						onBack={editor.handleBack}
+						onSave={handleSave}
+						onClear={editor.clearForm}
+						onUpdateElements={editor.updateElements}
+						onImageUpload={handleImageUploadWithTracking}
+						onRemoveImage={handleRemoveImageWithTracking}
+						onUpdateBackgroundPosition={imageUpload.handleBackgroundPositionUpdate}
+						{isSuperAdmin}
+						templateId={editor.currentTemplate?.id ?? null}
+						onDecompose={editor.handleDecompose}
+						isDecomposing={editor.isDecomposing}
+					/>
+				</div>
 			{/if}
 		</div>
 
@@ -324,9 +413,11 @@
 			flyTarget={reviewModal.flyTarget}
 			isGeneratingVariants={templateSave.isGeneratingVariants}
 			variantGenerationProgress={templateSave.variantGenerationProgress}
+			isLoading={templateSave.isLoading}
 			onFlip={reviewModal.flipReview}
 			onCancel={reviewModal.cancelReview}
 			onConfirm={handleConfirmSave}
+			onAbort={templateSave.cancelSave}
 		/>
 	{/if}
 </main>

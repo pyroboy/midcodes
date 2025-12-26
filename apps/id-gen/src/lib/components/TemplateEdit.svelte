@@ -9,6 +9,7 @@
 		frontPreview = null,
 		backPreview = null,
 		errorMessage = '',
+		hasChanges = true,
 		onBack,
 		onSave,
 		onClear,
@@ -30,6 +31,7 @@
 		frontPreview?: string | null;
 		backPreview?: string | null;
 		errorMessage?: string;
+		hasChanges?: boolean;
 		onBack: () => void;
 		onSave: () => void;
 		onClear: () => void;
@@ -158,12 +160,27 @@
 			{/if}
 
 			<div class="mt-6 flex gap-4">
-				<button
-					onclick={onSave}
-					class="inline-flex justify-center rounded-md border-0 bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-md hover:bg-primary/90 focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors duration-200"
-				>
-					Save Template
-				</button>
+				{#if hasChanges}
+					<button
+						type="button"
+						onclick={() => onSave()}
+						class="inline-flex justify-center rounded-md border-0 bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-md hover:bg-primary/90 focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors duration-200"
+					>
+						Save Template
+					</button>
+				{:else}
+					<button
+						type="button"
+						onclick={(e) => {
+							e.preventDefault();
+							e.stopPropagation();
+							onBack();
+						}}
+						class="inline-flex justify-center rounded-md border border-muted bg-muted/50 px-4 py-2 text-sm font-medium text-muted-foreground shadow-xs hover:bg-muted hover:text-foreground focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-colors duration-200"
+					>
+						No Changes - Back to list
+					</button>
+				{/if}
 				<button
 					onclick={onClear}
 					class="inline-flex justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground shadow-xs hover:bg-accent hover:text-accent-foreground focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2"

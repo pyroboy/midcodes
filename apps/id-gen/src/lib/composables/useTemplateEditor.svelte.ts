@@ -49,6 +49,47 @@ export function useTemplateEditor(options: UseTemplateEditorOptions) {
 	// Decompose state
 	let isDecomposing = $state(false);
 
+	// Change tracking - store initial state snapshots
+	let initialFrontElements = $state<string>('[]');
+	let initialBackElements = $state<string>('[]');
+	let initialFrontBackground = $state<string | null>(null);
+	let initialBackBackground = $state<string | null>(null);
+
+	// Current background state (updated by main page)
+	let currentFrontPreview = $state<string | null>(null);
+	let currentBackPreview = $state<string | null>(null);
+
+	// Function to update current backgrounds for change tracking
+	function setCurrentBackgrounds(frontPreview: string | null, backPreview: string | null) {
+		currentFrontPreview = frontPreview;
+		currentBackPreview = backPreview;
+	}
+
+	// Track if template has unsaved changes
+	let hasChanges = $derived.by(() => {
+		// For new templates (no initial background), any content is a change
+		if (!initialFrontBackground && !initialBackBackground) {
+			// Check if any backgrounds were added or elements exist
+			return !!currentFrontPreview || !!currentBackPreview || 
+				frontElements.length > 0 || backElements.length > 0;
+		}
+		
+		// Compare current state to initial state
+		const elementsChanged = 
+			JSON.stringify(frontElements) !== initialFrontElements ||
+			JSON.stringify(backElements) !== initialBackElements;
+
+		// Check if backgrounds changed (comparing preview URLs)
+		// A change is detected if:
+		// - A background existed but is now null (removed)
+		// - A background didn't exist but now has a value (added)
+		// - The background URL changed (replaced with different image)
+		const frontBackgroundChanged = initialFrontBackground !== currentFrontPreview;
+		const backBackgroundChanged = initialBackBackground !== currentBackPreview;
+
+		return elementsChanged || frontBackgroundChanged || backBackgroundChanged;
+	});
+
 	async function initializeEditor(templateData: EditorTemplateData) {
 		console.log('📝 Initializing editor with template:', templateData?.id);
 
@@ -95,6 +136,12 @@ export function useTemplateEditor(options: UseTemplateEditorOptions) {
 		const split = splitElementsBySide(elements);
 		frontElements = split.front.map(sanitizeElement);
 		backElements = split.back.map(sanitizeElement);
+
+		// Capture initial state for change tracking
+		initialFrontElements = JSON.stringify(frontElements);
+		initialBackElements = JSON.stringify(backElements);
+		initialFrontBackground = currentTemplate?.front_background || null;
+		initialBackBackground = currentTemplate?.back_background || null;
 
 		// Warn if backgrounds are missing
 		if (!currentTemplate?.front_background) {
@@ -266,6 +313,7 @@ export function useTemplateEditor(options: UseTemplateEditorOptions) {
 		get requiredPixelDimensions() { return requiredPixelDimensions; },
 		get isDecomposing() { return isDecomposing; },
 		set isDecomposing(value) { isDecomposing = value; },
+		get hasChanges() { return hasChanges; },
 
 		initializeEditor,
 		handleTemplateSelect,
@@ -276,6 +324,7 @@ export function useTemplateEditor(options: UseTemplateEditorOptions) {
 		handleDecompose,
 		updateTemplatesList,
 		setCurrentTemplate,
-		updateTemplateName
+		updateTemplateName,
+		setCurrentBackgrounds
 	};
 }

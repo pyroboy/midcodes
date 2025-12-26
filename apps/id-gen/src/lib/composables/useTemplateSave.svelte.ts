@@ -14,7 +14,7 @@ import { detectOrientationFromDimensions } from '$lib/utils/templateHelpers';
  * Type for the upload function that must be provided by the page
  * This allows the hook to work with SvelteKit server actions
  */
-export type UploadImageFn = (file: File, path: string, userId?: string) => Promise<string>;
+export type UploadImageFn = (file: File, path: string, userId?: string, signal?: AbortSignal) => Promise<string>;
 
 export interface UseTemplateSaveOptions {
 	user: { id: string } | null;
@@ -87,6 +87,8 @@ export function useTemplateSave(options: UseTemplateSaveOptions) {
 	let isGeneratingVariants = $state(false);
 	let variantGenerationProgress = $state('');
 	let savingTemplateId = $state<string | null>(null);
+	let abortController = $state<AbortController | null>(null);
+	let saveResult = $state<'success' | 'error' | 'cancelled' | null>(null);
 
 	// Fly animation state
 	let isClosingReview = $state(false);
@@ -114,11 +116,9 @@ export function useTemplateSave(options: UseTemplateSaveOptions) {
 		// Set loading state
 		isLoading = true;
 		isSaving = true;
+		abortController = new AbortController();
+		const signal = abortController.signal;
 
-		// Show initial progress toast
-		const toastId = toast.loading('Preparing template for save...', {
-			duration: Infinity
-		});
 
 		try {
 			let frontUrl = frontPreview;
@@ -131,16 +131,17 @@ export function useTemplateSave(options: UseTemplateSaveOptions) {
 			let croppedBackBlob: Blob | null = null;
 
 			// Generate template ID early for consistent styling
+			// Generate template ID early for consistent styling
 			const templateId = currentTemplate?.id || crypto.randomUUID();
 			savingTemplateId = templateId;
 
 			// Update progress: Processing images
-			toast.loading('Processing background images...', { id: toastId });
+			variantGenerationProgress = 'Processing background images...';
 
 			// Process front background with cropping if needed
 			if (frontBackground && requiredPixelDimensions) {
 				console.log('🖼️ Processing front background...');
-				toast.loading('Cropping front background image...', { id: toastId });
+				variantGenerationProgress = 'Cropping front background image...';
 
 				const frontResult = await cropBackgroundImage(
 					frontBackground,
@@ -156,21 +157,25 @@ export function useTemplateSave(options: UseTemplateSaveOptions) {
 
 				croppedFrontBlob = frontResult.croppedFile;
 
-				toast.loading('Uploading front background to storage...', { id: toastId });
+				variantGenerationProgress = 'Uploading front background to storage...';
 
 				const frontPath = getTemplateAssetPath(templateId, 'full', 'front', 'png');
-				frontUrl = await uploadImage(frontResult.croppedFile, frontPath, user?.id);
+				frontUrl = await uploadImage(frontResult.croppedFile, frontPath, user?.id, signal);
 
 				if (!frontUrl || typeof frontUrl !== 'string') {
 					throw new Error('Upload succeeded but returned invalid URL');
 				}
+				// Append timestamp to force cache bust
+				frontUrl = `${frontUrl}?t=${Date.now()}`;
 
 				// Generate and upload low-res version
 				try {
 					console.log('🖼️ Generating front low-res version...');
 					const frontLowRes = await createLowResVersion(frontResult.croppedFile);
 					const frontLowResPath = getTemplateAssetPath(templateId, 'preview', 'front', 'jpg');
-					frontLowResUrl = await uploadImage(frontLowRes, frontLowResPath, user?.id);
+					frontLowResUrl = await uploadImage(frontLowRes, frontLowResPath, user?.id, signal);
+					// Append timestamp to force cache bust
+					if (frontLowResUrl) frontLowResUrl = `${frontLowResUrl}?t=${Date.now()}`;
 					console.log('✅ Front low-res uploaded:', frontLowResUrl);
 				} catch (lowResError) {
 					console.warn('⚠️ Failed to generate/upload front low-res (non-fatal):', lowResError);
@@ -178,18 +183,18 @@ export function useTemplateSave(options: UseTemplateSaveOptions) {
 				}
 
 				console.log('✅ Front background uploaded successfully:', frontUrl);
-				toast.loading('Front image uploaded ✓ Processing back image...', { id: toastId });
+				variantGenerationProgress = 'Front image uploaded ✓ Processing back image...';
 			} else if (frontPreview && requiredPixelDimensions && !croppedFrontBlob) {
 				// Editing existing template - fetch background for variant regeneration
 				console.log('🔄 [saveTemplate] No new front image uploaded, fetching existing for variant regeneration...');
-				toast.loading('Fetching existing front image for variant update...', { id: toastId });
+				variantGenerationProgress = 'Fetching existing front image for variant update...';
 				croppedFrontBlob = await fetchBackgroundAsBlob(frontPreview, 'front');
 			}
 
 			// Process back background with cropping if needed
 			if (backBackground && requiredPixelDimensions) {
 				console.log('🖼️ Processing back background...');
-				toast.loading('Cropping back background image...', { id: toastId });
+				variantGenerationProgress = 'Cropping back background image...';
 
 				const backResult = await cropBackgroundImage(
 					backBackground,
@@ -205,21 +210,25 @@ export function useTemplateSave(options: UseTemplateSaveOptions) {
 
 				croppedBackBlob = backResult.croppedFile;
 
-				toast.loading('Uploading back background to storage...', { id: toastId });
+				variantGenerationProgress = 'Uploading back background to storage...';
 
 				const backPath = getTemplateAssetPath(templateId, 'full', 'back', 'png');
-				backUrl = await uploadImage(backResult.croppedFile, backPath, user?.id);
+				backUrl = await uploadImage(backResult.croppedFile, backPath, user?.id, signal);
 
 				if (!backUrl || typeof backUrl !== 'string') {
 					throw new Error('Upload succeeded but returned invalid URL');
 				}
+				// Append timestamp to force cache bust
+				backUrl = `${backUrl}?t=${Date.now()}`;
 
 				// Generate and upload low-res version
 				try {
 					console.log('🖼️ Generating back low-res version...');
 					const backLowRes = await createLowResVersion(backResult.croppedFile);
 					const backLowResPath = getTemplateAssetPath(templateId, 'preview', 'back', 'jpg');
-					backLowResUrl = await uploadImage(backLowRes, backLowResPath, user?.id);
+					backLowResUrl = await uploadImage(backLowRes, backLowResPath, user?.id, signal);
+					// Append timestamp to force cache bust
+					if (backLowResUrl) backLowResUrl = `${backLowResUrl}?t=${Date.now()}`;
 					console.log('✅ Back low-res uploaded:', backLowResUrl);
 				} catch (lowResError) {
 					console.warn('⚠️ Failed to generate/upload back low-res (non-fatal):', lowResError);
@@ -227,11 +236,11 @@ export function useTemplateSave(options: UseTemplateSaveOptions) {
 				}
 
 				console.log('✅ Back background uploaded successfully:', backUrl);
-				toast.loading('Both images uploaded ✓ Preparing to save...', { id: toastId });
+				variantGenerationProgress = 'Both images uploaded ✓ Preparing to save...';
 			} else if (backPreview && requiredPixelDimensions && !croppedBackBlob) {
 				// Editing existing template - fetch background for variant regeneration
 				console.log('🔄 [saveTemplate] No new back image uploaded, fetching existing for variant regeneration...');
-				toast.loading('Fetching existing back image for variant update...', { id: toastId });
+				variantGenerationProgress = 'Fetching existing back image for variant update...';
 				croppedBackBlob = await fetchBackgroundAsBlob(backPreview, 'back');
 			}
 
@@ -265,7 +274,6 @@ export function useTemplateSave(options: UseTemplateSaveOptions) {
 				try {
 					isGeneratingVariants = true;
 					variantGenerationProgress = 'Generating template variants...';
-					toast.loading('Generating template variants...', { id: toastId });
 					console.log('🎨 Generating template variants...');
 
 					variantUrls = await generateAndUploadVariants(
@@ -276,17 +284,15 @@ export function useTemplateSave(options: UseTemplateSaveOptions) {
 							elements: allElements,
 							dimensions: requiredPixelDimensions
 						},
-						async (file, path) => await uploadImage(file, path, user?.id)
+						async (file, path) => await uploadImage(file, path, user?.id, signal)
 					);
 
 					console.log('✅ Variants generated and uploaded:', variantUrls);
-					variantGenerationProgress = 'Variants uploaded ✓';
-					toast.loading('Variants uploaded ✓ Saving to database...', { id: toastId });
+					variantGenerationProgress = 'Variants uploaded ✓ Saving to database...';
 				} catch (variantError) {
 					console.warn('⚠️ Failed to generate variants (non-fatal):', variantError);
 				} finally {
 					isGeneratingVariants = false;
-					variantGenerationProgress = '';
 				}
 			}
 
@@ -335,7 +341,7 @@ export function useTemplateSave(options: UseTemplateSaveOptions) {
 			}
 
 			// Update progress: Saving to database
-			toast.loading('Saving template to database...', { id: toastId });
+			variantGenerationProgress = 'Saving template to database...';
 			console.log('💾 Saving to database...');
 
 			// Create form data - SvelteKit actions require FormData, not JSON body
@@ -345,7 +351,8 @@ export function useTemplateSave(options: UseTemplateSaveOptions) {
 			// Use fetch to call the server action - CORRECT endpoint is ?/create
 			const response = await fetch('?/create', {
 				method: 'POST',
-				body: formData
+				body: formData,
+				signal
 			});
 
 			const result = deserialize(await response.text());
@@ -384,12 +391,7 @@ export function useTemplateSave(options: UseTemplateSaveOptions) {
 				name: savedTemplate.name
 			});
 
-			// Show success toast notification
-			const action = currentTemplate?.id ? 'updated' : 'created';
-			toast.success(`Template ${action} successfully!`, {
-				description: `"${savedTemplate.name}" has been saved.`,
-				duration: 4000
-			});
+			saveResult = 'success';
 
 			// Refresh templates list
 			try {
@@ -409,20 +411,33 @@ export function useTemplateSave(options: UseTemplateSaveOptions) {
 			return savedTemplate;
 
 		} catch (error) {
+			if (error instanceof Error && error.name === 'AbortError') {
+				console.log('🛑 Save cancelled by user');
+				saveResult = 'cancelled';
+				return null;
+			}
 			console.error('❌ Error saving template:', error);
-			const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
-
-			toast.error('Failed to save template', {
-				description: errorMsg,
-				duration: 6000
-			});
+			saveResult = 'error';
 
 			return null;
 		} finally {
+			// Only reset if we're not waiting for an animation or something
+			// For now, always reset loading state here
 			isLoading = false;
 			isSaving = false;
 			savingTemplateId = null;
-			toast.dismiss(toastId);
+			abortController = null;
+			variantGenerationProgress = '';
+			// Note: saveResult is intentionally NOT reset here so UI can read it
+		}
+	}
+
+	function cancelSave() {
+		if (abortController) {
+			abortController.abort();
+			abortController = null;
+			isLoading = false;
+			isSaving = false;
 		}
 	}
 
@@ -456,9 +471,12 @@ export function useTemplateSave(options: UseTemplateSaveOptions) {
 		get savingTemplateId() { return savingTemplateId; },
 		get isClosingReview() { return isClosingReview; },
 		get flyTarget() { return flyTarget; },
+		get saveResult() { return saveResult; },
+		resetSaveResult() { saveResult = null; },
 		saveTemplate,
 		setFlyTarget,
 		startClosingAnimation,
-		endClosingAnimation
+		endClosingAnimation,
+		cancelSave
 	};
 }

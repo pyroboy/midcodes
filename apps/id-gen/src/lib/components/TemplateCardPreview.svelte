@@ -56,16 +56,16 @@
 	style="
 		width: {isClosingReview && flyTarget
 		? flyTarget.width
-		: requiredPixelDimensions.width * displayScale}px; 
+		: requiredPixelDimensions.width * displayScale}px;
 		height: {isClosingReview && flyTarget
 		? flyTarget.height
 		: requiredPixelDimensions.height * displayScale}px;
-		position: {isClosingReview ? 'fixed' : 'relative'};
-		top: {isClosingReview && flyTarget ? flyTarget.top : ''}px;
-		left: {isClosingReview && flyTarget ? flyTarget.left : ''}px;
-		transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+		{isClosingReview && flyTarget
+		? `position: fixed; top: ${flyTarget.top}px; left: ${flyTarget.left}px;`
+		: ''}
 		z-index: 100;
 		pointer-events: {isClosingReview ? 'none' : 'auto'};
+		transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1), height 0.6s cubic-bezier(0.16, 1, 0.3, 1), top 0.6s cubic-bezier(0.16, 1, 0.3, 1), left 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 	"
 >
 	<!-- Flip Container -->

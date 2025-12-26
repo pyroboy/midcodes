@@ -2,7 +2,6 @@
 	import TemplateEdit from './TemplateEdit.svelte';
 	import type { TemplateElement } from '$lib/stores/templateStore';
 	import type { CardSize } from '$lib/utils/sizeConversion';
-	import type { ImageInfo } from '$lib/utils/imageCropper';
 
 	interface Props {
 		version: number;
@@ -17,6 +16,7 @@
 		isSuperAdmin: boolean;
 		templateId: string | null;
 		isDecomposing: boolean;
+		hasChanges: boolean;
 
 		onBack: () => void;
 		onSave: () => void;
@@ -41,6 +41,7 @@
 		isSuperAdmin,
 		templateId,
 		isDecomposing,
+		hasChanges,
 		onBack,
 		onSave,
 		onClear,
@@ -52,9 +53,7 @@
 	}: Props = $props();
 </script>
 
-<div
-	class="col-start-1 row-start-1 z-10 w-full h-full bg-background animate-in fade-in slide-in-from-bottom-4 duration-300"
->
+<div class="col-start-1 row-start-1 w-full h-full bg-background">
 	{#key version}
 		<TemplateEdit
 			{version}
@@ -66,6 +65,7 @@
 			{errorMessage}
 			{cardSize}
 			{pixelDimensions}
+			{hasChanges}
 			{onBack}
 			{onSave}
 			{onClear}

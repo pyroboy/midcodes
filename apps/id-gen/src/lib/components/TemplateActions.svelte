@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Edit, Save } from 'lucide-svelte';
+	import { Edit, Save, X } from 'lucide-svelte';
 
 	interface Props {
 		/** Whether the review modal is closing (for fade-out animation) */
@@ -8,18 +8,24 @@
 		isGeneratingVariants: boolean;
 		/** Current progress message for variant generation */
 		variantGenerationProgress: string;
+		/** Whether the save process is loading */
+		isLoading: boolean;
 		/** Callback when cancel/back button is clicked */
 		onCancel: () => void;
 		/** Callback when confirm/save button is clicked */
 		onConfirm: () => void;
+		/** Callback when save is aborted */
+		onAbort: () => void;
 	}
 
 	let {
 		isClosingReview,
 		isGeneratingVariants,
 		variantGenerationProgress,
+		isLoading,
 		onCancel,
-		onConfirm
+		onConfirm,
+		onAbort
 	}: Props = $props();
 </script>
 
@@ -29,24 +35,26 @@
 	class:opacity-0={isClosingReview}
 >
 	<button
-		onclick={onCancel}
-		disabled={isGeneratingVariants}
-		class="px-6 py-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-all font-medium flex items-center gap-2 border border-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+		onclick={isLoading ? onAbort : onCancel}
+		disabled={isGeneratingVariants && !isLoading}
+		class="px-6 py-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-all font-medium flex items-center gap-2 border border-white/10 disabled:opacity-50 disabled:cursor-not-allowed z-50 hover:border-white/30"
 	>
-		<Edit size={18} />
-		Back to Edit
+		{#if isLoading}
+			<X size={18} />
+			Cancel Save
+		{:else}
+			<Edit size={18} />
+			Back to Edit
+		{/if}
 	</button>
 
 	<button
 		onclick={onConfirm}
-		disabled={isGeneratingVariants}
+		disabled={isGeneratingVariants || isLoading}
 		class="px-8 py-3 rounded-full bg-green-500 hover:bg-green-600 text-white shadow-lg shadow-green-500/20 hover:shadow-green-500/40 transition-all font-bold flex items-center gap-2 transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:scale-100"
 	>
-		{#if isGeneratingVariants}
-			<div
-				class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
-			></div>
-			{variantGenerationProgress || 'Saving...'}
+		{#if isLoading}
+			Saving...
 		{:else}
 			<Save size={18} />
 			Save Template
