@@ -1072,21 +1072,19 @@
 				duration: 4000
 			});
 
-			// Normalize data we pass to list — prefer the preview URLs we just set
-			// Prefer the known uploaded URLs for the list as well
-			// Prefer the already-loaded preview (Blob/Data URL) for instant display
-			// This avoids "skeleton" loading states by using the image we already have in memory
+			// Normalize data we pass to list — ALWAYS use actual uploaded URLs for the list
+			// FIX: Prioritize http:// URLs (actual uploads) over blob/data URLs (local previews)
+			// This ensures the template list shows the real saved images from R2 storage
+			// Local blob URLs are only used as fallback if no uploaded URL is available
 			const listFront =
-				frontPreview ||
 				(typeof frontUrl === 'string' && frontUrl.startsWith('http')
 					? `${frontUrl}?t=${Date.now()}`
-					: makePublicUrl(savedTemplate.front_background));
+					: makePublicUrl(savedTemplate.front_background)) || frontPreview;
 
 			const listBack =
-				backPreview ||
 				(typeof backUrl === 'string' && backUrl.startsWith('http')
 					? `${backUrl}?t=${Date.now()}`
-					: makePublicUrl(savedTemplate.back_background));
+					: makePublicUrl(savedTemplate.back_background)) || backPreview;
 
 			// --- FIX START: Force dimensions into list object ---
 			const currentWidth =
