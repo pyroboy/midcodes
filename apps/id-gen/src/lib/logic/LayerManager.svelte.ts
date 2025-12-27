@@ -67,6 +67,9 @@ export class LayerManager {
 	// Stores the 2D context of each layer's image to allow O(1) pixel read
 	private hitTestCache = new Map<string, { ctx: CanvasRenderingContext2D; width: number; height: number }>();
 
+	// Phase 8c: Merge Queue
+	private mergeQueue = new Map<string, Promise<void>>();
+
 	// Derived: count of pending/failed uploads
 	pendingUploads = $derived(
 		Array.from(this.cache.values()).filter(
@@ -666,11 +669,37 @@ export class LayerManager {
 	/**
 	 * Merge a new drawing stroke onto an existing layer.
 	 * Used by BrushTool to accumulate strokes on the same layer.
-	 * @param layerId - ID of the existing layer to merge onto
-	 * @param blob - New stroke as a Blob
-	 * @param bounds - Bounds of the new stroke in canvas intrinsic coordinates
+	 *
+	 * SERIALIZED: Chains operations on the same layer to prevent race conditions
+	 * where a second stroke tries to load a blob that the first stroke just revoked.
 	 */
 	async mergeDrawingToLayer(
+		layerId: string, 
+		blob: Blob, 
+		bounds: { x: number; y: number; width: number; height: number }
+	): Promise<void> {
+		console.log('[LayerManager] Queueing merge for layer:', layerId);
+		const previous = this.mergeQueue.get(layerId) || Promise.resolve();
+		
+		const task = previous.then(async () => {
+			console.log('[LayerManager] Starting merge task for:', layerId);
+			try {
+				await this._performMerge(layerId, blob, bounds);
+				console.log('[LayerManager] Merge task completed for:', layerId);
+			} catch (err) {
+				console.error('[LayerManager] Merge failed:', err);
+				toast.error('Failed to save stroke');
+			}
+		});
+
+		this.mergeQueue.set(layerId, task);
+		return task;
+	}
+
+	/**
+	 * Internal implementation of merge logic.
+	 */
+	private async _performMerge(
 		layerId: string, 
 		blob: Blob, 
 		bounds: { x: number; y: number; width: number; height: number }
@@ -689,9 +718,12 @@ export class LayerManager {
 		
 		// If no cached canvas, create one and load existing image
 		if (!canvas) {
+			console.log('[LayerManager] No cached canvas, loading image:', layer.imageUrl);
 			const existingImage = await this.loadImage(layer.imageUrl);
 			if (!existingImage) {
-				console.error('[LayerManager] mergeDrawingToLayer: Failed to load existing image');
+				console.error('[LayerManager] mergeDrawingToLayer: Failed to load existing image', layer.imageUrl);
+				// If we can't load the base, we can't merge. 
+				// This catches cases where revocation raced ahead of load.
 				return;
 			}
 			
@@ -719,6 +751,8 @@ export class LayerManager {
 			(canvas as any)._bounds = { ...existingBounds };
 			
 			this.layerCanvasCache.set(layerId, canvas);
+		} else {
+			console.log('[LayerManager] Using cached canvas');
 		}
 
 		const canvasBounds = (canvas as any)._bounds;
@@ -737,6 +771,7 @@ export class LayerManager {
 		if (newBounds.width > canvas.width || newBounds.height > canvas.height || 
 			newBounds.x < canvasBounds.x || newBounds.y < canvasBounds.y) {
 			
+			// console.log('[LayerManager] Resizing canvas', { old: canvasBounds, new: newBounds });
 			const newCanvas = document.createElement('canvas');
 			newCanvas.width = newBounds.width;
 			newCanvas.height = newBounds.height;
@@ -780,6 +815,7 @@ export class LayerManager {
 		return new Promise<void>((resolve) => {
 			canvas!.toBlob((mergedBlob) => {
 				if (mergedBlob) {
+					// console.log('[LayerManager] Blob generated, updating layer');
 					// Clean up old blob URL if it exists
 					if (layer.imageUrl.startsWith('blob:')) {
 						URL.revokeObjectURL(layer.imageUrl);
@@ -813,7 +849,14 @@ export class LayerManager {
 					// Update cache for upload queue
 					this.addToCache(layerId, mergedBlob, layer.side);
 					this.registerBlobLayer(layerId);
+					
+					// Update Hit Test Cache (Phase 8b - Fix: invalidate old cache)
+					this.hitTestCache.delete(layerId);
+					this.initializeHitCache(layer);
+					
 					this.markUnsaved();
+				} else {
+					console.error('[LayerManager] Failed to generate blob from canvas');
 				}
 				resolve();
 			}, 'image/png');
@@ -888,6 +931,34 @@ export class LayerManager {
 	}
 
 	/**
+	 * Confirm a layer upload by updating its URL without clearing the canvas cache.
+	 * This ensures that active drawing sessions are not interrupted by background uploads.
+	 */
+	confirmLayerUpload(layerId: string, newUrl: string) {
+		const list = this.activeSide === 'front' ? this.frontLayers : this.backLayers;
+		const layer = list.find((l) => l.id === layerId);
+		
+		if (layer) {
+			// Revoke old blob URL
+			if (layer.imageUrl.startsWith('blob:') && layer.imageUrl !== newUrl) {
+				URL.revokeObjectURL(layer.imageUrl);
+				this.blobLayers.delete(layerId);
+			}
+
+			layer.imageUrl = newUrl;
+			
+			// Update selection
+			const sel = this.selections.get(layerId);
+			if (sel) {
+				sel.layerImageUrl = newUrl;
+				this.selections = new Map(this.selections);
+			}
+			
+			this.markUnsaved();
+		}
+	}
+
+	/**
 	 * Process the upload queue - uploads all pending blobs to R2 sequentially.
 	 * Updates layer imageUrl on success, marks as failed on error.
 	 */
@@ -929,8 +1000,8 @@ export class LayerManager {
 				});
 
 				if (result.success && result.url) {
-					// Update layer URL
-					this.updateLayerImageUrl(layerId, result.url);
+					// Update layer URL safely (preserving canvas cache)
+					this.confirmLayerUpload(layerId, result.url);
 
 					// Mark as uploaded and remove from cache
 					entry.uploadStatus = 'uploaded';

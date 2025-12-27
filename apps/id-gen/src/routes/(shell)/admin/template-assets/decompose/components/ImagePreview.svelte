@@ -171,16 +171,19 @@
 	}
 
 	function handlePointerDown(e: PointerEvent) {
-		console.log('[Lasso Debug] pointerdown', { activeTool, hasCanvasElement: !!canvasElement });
+		console.log('[Pointer Debug] pointerdown', { activeTool, hasCanvasElement: !!canvasElement });
 		// If no tool is active, or move tool is active, allow layer selection
 		if (!canvasElement) return;
+
+		// Set pointer capture to ensure we receive pointerup even if mouse leaves canvas
+		(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
 
 		// Don't handle if clicking on popover or toolbar
 		const target = e.target as HTMLElement;
 		if (target.closest('[data-toolbar]') || target.closest('[data-selection-popover]')) return;
 
 		updateCanvasRect();
-		console.log('[Lasso Debug] canvasRect updated', { hasRect: !!canvasRect });
+		// console.log('[Pointer Debug] canvasRect updated', { hasRect: !!canvasRect });
 		if (!canvasRect) return;
 
 		let nextLayerId: string | null = null;
@@ -344,7 +347,7 @@
 	}
 
 	function handlePointerUp(e: PointerEvent) {
-		console.log('[Lasso Debug] pointerup', { activeTool, hasCanvasRect: !!canvasRect });
+		console.log('[Pointer Debug] pointerup', { activeTool, hasCanvasRect: !!canvasRect });
 		if (!activeTool || !canvasRect) return;
 
 		const ctx = {
@@ -369,11 +372,11 @@
 			moveTool.onPointerUp(e, ctx);
 		} else if (activeTool === 'lasso') {
 			console.log(
-				'[Lasso Debug] calling lassoTool.onPointerUp, points before:',
+				'[Pointer Debug] calling lassoTool.onPointerUp, points before:',
 				lassoTool.points.length
 			);
 			lassoTool.onPointerUp(e, ctx);
-			console.log('[Lasso Debug] points after:', lassoTool.points.length);
+			console.log('[Pointer Debug] points after:', lassoTool.points.length);
 		} else if (activeTool === 'rectangle') {
 			rectangleTool.onPointerUp(e, ctx);
 		} else if (activeTool === 'ellipse') {

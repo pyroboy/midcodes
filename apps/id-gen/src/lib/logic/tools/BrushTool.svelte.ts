@@ -26,13 +26,15 @@ export class BrushTool extends DrawingTool implements CanvasTool {
 	// Runtime state
 	protected isDrawing = false;
 	private context: CanvasRenderingContext2D | null = null;
-	private lastPoint: { x: number; y: number } | null = null;
+	private points: { x: number; y: number }[] = [];
 	private boundingBox: {
 		minX: number;
 		minY: number;
 		maxX: number;
 		maxY: number;
 	} | null = null;
+	// Track the blur radius to adjust bounding box padding
+	private currentBlurRadius = 0;
 
 	// Track the layer ID we're drawing on for this stroke
 	private targetLayerId: string | null = null;
@@ -47,42 +49,33 @@ export class BrushTool extends DrawingTool implements CanvasTool {
 	onDeactivate(): void {
 		this.isDrawing = false;
 		this.context = null;
-		this.lastPoint = null;
+		this.points = [];
 		this.boundingBox = null;
 		this.targetLayerId = null;
+		this.currentBlurRadius = 0;
 	}
 
 	onPointerDown(e: PointerEvent, ctx: ToolContext): void {
+		console.log('[BrushTool] onPointerDown', { hasCtx: !!ctx.canvasContext });
 		if (!ctx.canvasContext) return; // Must have drawing context
 
 		this.isDrawing = true;
 		this.context = ctx.canvasContext;
-		this.context.lineCap = 'round';
-		this.context.lineJoin = 'round';
-		this.context.strokeStyle = ctx.color;
-		
+		this.points = [];
+
+		// Calculate blur radius once per stroke
 		// Scale brush size from CSS pixels to canvas intrinsic pixels
 		const scaleX = ctx.canvasDimensions.widthPixels / ctx.canvasRect.width;
-		this.context.lineWidth = ctx.size * scaleX;
-		this.context.globalAlpha = ctx.opacity / 100;
+		
+		if (ctx.hardness < 100) {
+			// Reduced max blur to /4 to avoid excessive size blowup
+			this.currentBlurRadius = ((ctx.size * scaleX) * (1 - ctx.hardness / 100)) / 4;
+		} else {
+			this.currentBlurRadius = 0;
+		}
 
 		const point = this.getPoint(e, ctx.canvasRect, ctx.canvasDimensions);
-		this.lastPoint = point;
-
-		// Initialize bounding box
-		this.boundingBox = {
-			minX: point.x,
-			minY: point.y,
-			maxX: point.x,
-			maxY: point.y
-		};
-
-		// Start the path
-		this.context.beginPath();
-		this.context.moveTo(point.x, point.y);
-		// Draw a dot in case it's just a click
-		this.context.lineTo(point.x + 0.1, point.y + 0.1);
-		this.context.stroke();
+		this.addPoint(point);
 
 		// Use currently selected layer (any type) - capture at pointer down
 		if (ctx.selectedLayerId && ctx.selectedLayerId !== 'original-file') {
@@ -90,35 +83,93 @@ export class BrushTool extends DrawingTool implements CanvasTool {
 		} else {
 			this.targetLayerId = null; // Will create new layer
 		}
+
+		this.renderStroke(ctx);
 	}
 
 	onPointerMove(e: PointerEvent, ctx: ToolContext): void {
-		if (!this.isDrawing || !this.context || !this.lastPoint) return;
+		if (!this.isDrawing || !this.context) return;
 
 		const point = this.getPoint(e, ctx.canvasRect, ctx.canvasDimensions);
-
-		// Update bounding box
-		this.updateBoundingBox(point.x, point.y);
-
-		// Draw line
-		this.context.lineTo(point.x, point.y);
-		this.context.stroke();
-
-		this.lastPoint = point;
+		this.addPoint(point);
+		this.renderStroke(ctx);
 	}
 
 	onPointerUp(e: PointerEvent, ctx: ToolContext): void {
+		console.log('[BrushTool] onPointerUp', { isDrawing: this.isDrawing, hasContext: !!this.context });
 		if (!this.isDrawing) return;
 		this.isDrawing = false;
 
-		if (this.context && this.boundingBox && ctx.layerManager) {
-			this.context.closePath();
-			this.finalizeStroke(ctx);
+		if (this.context) {
+			if (this.boundingBox && ctx.layerManager) {
+				this.context.closePath();
+				this.finalizeStroke(ctx);
+			} else {
+				console.log('[BrushTool] Skipping finalizeStroke', { bbox: !!this.boundingBox, lm: !!ctx.layerManager });
+			}
+			// Reset filter
+			this.context.filter = 'none';
 		}
 
 		this.context = null;
-		this.lastPoint = null;
+		this.points = [];
 		this.boundingBox = null;
+		this.currentBlurRadius = 0;
+	}
+
+	private addPoint(point: { x: number; y: number }) {
+		this.points.push(point);
+		this.updateBoundingBox(point.x, point.y);
+	}
+
+	private renderStroke(ctx: ToolContext) {
+		if (!this.context || !ctx.canvasElement || this.points.length === 0) return;
+
+		const canvas = ctx.canvasElement as HTMLCanvasElement;
+		
+		// Clear entire canvas to avoid opacity stacking
+		this.context.clearRect(0, 0, canvas.width, canvas.height);
+
+		// Setup styles
+		const scaleX = ctx.canvasDimensions.widthPixels / ctx.canvasRect.width;
+		this.context.lineCap = 'round';
+		this.context.lineJoin = 'round';
+		this.context.strokeStyle = ctx.color;
+		this.context.lineWidth = ctx.size * scaleX;
+		this.context.globalAlpha = ctx.opacity / 100;
+
+		if (this.currentBlurRadius > 0) {
+			this.context.filter = `blur(${this.currentBlurRadius}px)`;
+		} else {
+			this.context.filter = 'none';
+		}
+
+		this.context.beginPath();
+
+		if (this.points.length < 2) {
+			// Draw a single dot
+			const p = this.points[0];
+			this.context.moveTo(p.x, p.y);
+			this.context.lineTo(p.x + 0.1, p.y + 0.1);
+		} else {
+			// Draw smooth curve through points
+			this.context.moveTo(this.points[0].x, this.points[0].y);
+			
+			// Use quadratic curves for smoothing
+			for (let i = 1; i < this.points.length - 1; i++) {
+				const p1 = this.points[i];
+				const p2 = this.points[i + 1];
+				const midX = (p1.x + p2.x) / 2;
+				const midY = (p1.y + p2.y) / 2;
+				this.context.quadraticCurveTo(p1.x, p1.y, midX, midY);
+			}
+			
+			// Connect to last point
+			const last = this.points[this.points.length - 1];
+			this.context.lineTo(last.x, last.y);
+		}
+
+		this.context.stroke();
 	}
 
 	/**
@@ -143,7 +194,10 @@ export class BrushTool extends DrawingTool implements CanvasTool {
 	}
 
 	private updateBoundingBox(x: number, y: number) {
-		if (!this.boundingBox) return;
+		if (!this.boundingBox) {
+			this.boundingBox = { minX: x, minY: y, maxX: x, maxY: y };
+			return;
+		}
 		this.boundingBox.minX = Math.min(this.boundingBox.minX, x);
 		this.boundingBox.minY = Math.min(this.boundingBox.minY, y);
 		this.boundingBox.maxX = Math.max(this.boundingBox.maxX, x);
@@ -151,14 +205,22 @@ export class BrushTool extends DrawingTool implements CanvasTool {
 	}
 
 	private async finalizeStroke(ctx: ToolContext) {
-		if (!ctx.canvasElement || !this.boundingBox || !ctx.layerManager) return;
+		console.log('[BrushTool] finalizeStroke called'); // Uncommented
+		if (!ctx.canvasElement || !this.boundingBox || !ctx.layerManager) {
+			console.log('[BrushTool] Missing dependencies', { canvas: !!ctx.canvasElement, bbox: !!this.boundingBox, lm: !!ctx.layerManager });
+			return;
+		}
 
 		const canvas = ctx.canvasElement as HTMLCanvasElement;
 		
 		// Calculate padding in canvas intrinsic pixels
 		const scaleX = canvas.width / ctx.canvasRect.width;
 		const scaledBrushSize = ctx.size * scaleX;
-		const padding = Math.ceil(scaledBrushSize / 2) + 2;
+		
+		// Include blur radius in padding calculation to avoid clipping
+		// We add a safety margin (e.g. 2x radius) because blur bell curve extends far
+		const extraBlurPadding = this.currentBlurRadius * 2;
+		const padding = Math.ceil(scaledBrushSize / 2 + extraBlurPadding) + 2;
 
 		// Bounds are already in canvas intrinsic coordinates
 		const bounds = {
@@ -173,7 +235,10 @@ export class BrushTool extends DrawingTool implements CanvasTool {
 		bounds.height = Math.min(bounds.height, canvas.height - bounds.y);
 
 		// Validate bounds
-		if (bounds.width <= 0 || bounds.height <= 0) return;
+		if (bounds.width <= 0 || bounds.height <= 0) {
+			console.log('[BrushTool] Invalid bounds', bounds);
+			return;
+		}
 
 		// Extract ImageData from the canvas
 		const tempCanvas = document.createElement('canvas');
@@ -203,10 +268,15 @@ export class BrushTool extends DrawingTool implements CanvasTool {
 		const mainCtx = canvas.getContext('2d');
 		
 		tempCanvas.toBlob(async (blob) => {
-			if (!blob || !ctx.layerManager) return;
+			// console.log('[BrushTool] generated blob:', blob ? blob.size : 'null');
+			if (!blob || !ctx.layerManager) {
+				console.error('[BrushTool] Failed to generate blob or missing layerManager');
+				return;
+			}
 
 			// If we have a target layer, merge onto it
 			if (targetLayerId) {
+				// console.log('[BrushTool] Merging to target layer:', targetLayerId);
 				// Capture undo snapshot BEFORE modifying
 				if (ctx.undoManager) {
 					const beforeSnapshot = ctx.undoManager.captureSnapshot(targetLayerId);
@@ -247,7 +317,6 @@ export class BrushTool extends DrawingTool implements CanvasTool {
 
 			// Clear the drawing canvas ONLY after the layer has been updated
 			mainCtx?.clearRect(0, 0, canvas.width, canvas.height);
-
 		}, 'image/png');
 	}
 }

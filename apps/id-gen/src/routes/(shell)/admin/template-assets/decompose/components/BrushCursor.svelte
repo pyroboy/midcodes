@@ -32,6 +32,13 @@
 		isEraser?: boolean;
 	} = $props();
 
+	// Calculate visual bleed from blur
+	// Must match BrushTool.svelte.ts logic
+	// Tool logic: blur = (size * (1 - H)) / 4
+	// Visual bleed approx 2 * blur
+	const blurRadius = $derived((size * (1 - hardness / 100)) / 4);
+	const visualSize = $derived(size + blurRadius * 4);
+
 	// Calculate gradient stops based on hardness
 	// Hardness 100 = solid circle with sharp edge
 	// Hardness 0 = fully feathered, gradient from center outward
@@ -75,12 +82,23 @@
 		style="
 			left: {x}px;
 			top: {y}px;
-			width: {size}px;
-			height: {size}px;
+			width: {visualSize}px;
+			height: {visualSize}px;
 			transform: translate(-50%, -50%);
 			background: radial-gradient(circle, {gradientStops});
 			border: 1px solid {isEraser ? 'rgba(255, 100, 100, 0.6)' : 'rgba(255, 255, 255, 0.8)'};
 			box-shadow: 0 0 0 1px {isEraser ? 'rgba(0, 0, 0, 0.3)' : 'rgba(0, 0, 0, 0.3)'};
 		"
-	></div>
+	>
+		<!-- Inner core indicator (original size) if soft -->
+		{#if hardness < 100}
+			<div
+				class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/30 border-dashed"
+				style="
+			width: {size}px;
+			height: {size}px;
+		  "
+			></div>
+		{/if}
+	</div>
 {/if}

@@ -6,6 +6,7 @@
 	// Logic
 	import { LayerManager } from '$lib/logic/LayerManager.svelte';
 	import { ToolManager } from '$lib/logic/ToolManager.svelte';
+	import type { ToolName, NormalizedPoint } from '$lib/logic/tools';
 	import { ImageProcessor } from '$lib/logic/ImageProcessor.svelte';
 	import { HistoryManager } from '$lib/logic/HistoryManager.svelte';
 	import { UndoManager } from '$lib/logic/UndoManager.svelte';
@@ -397,8 +398,8 @@
 						heightPixels={data.asset.heightPixels || 600}
 						orientation={data.asset.orientation || 'horizontal'}
 						activeTool={toolMgr.activeTool}
-						onToolChange={(tool) => toolMgr.setTool(tool)}
-						onSelectLayer={(id) => {
+						onToolChange={(tool: ToolName) => toolMgr.setTool(tool)}
+						onSelectLayer={(id: string | null) => {
 							if (id) {
 								selectedLayerId = id;
 								if (id !== 'original-file') {
@@ -410,7 +411,7 @@
 							if (selectedLayerId) layerMgr.duplicateLayer(selectedLayerId);
 						}}
 						currentColor={toolMgr.toolOptions.color}
-						onSelectionAction={(action, points) => {
+						onSelectionAction={(action: 'copy' | 'fill' | 'delete', points: NormalizedPoint[]) => {
 							console.log('Selection Action Triggered:', {
 								action,
 								selectedLayerId,
