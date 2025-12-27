@@ -53,6 +53,25 @@ export class HistoryManager {
 		return tempId;
 	}
 
+	addLocalEntry(action: 'draw' | 'erase' | 'fill', layerId: string) {
+		const id = crypto.randomUUID();
+		const entry = {
+			id,
+			createdAt: new Date().toISOString(),
+			status: 'completed',
+			provider: 'local',
+			model: action.toUpperCase(),
+			inputImageUrl: '',
+			side: this.layerManager.activeSide,
+			layers: [], 
+			isOptimistic: false,
+			isLocal: true,
+			layerId // Reference to modified layer
+		};
+		this.history = [entry, ...this.history];
+		toast.success(`Action recorded: ${action}`);
+	}
+
 	/**
 	 * Update the temp ID to the real job ID once the server responds.
 	 * Starts polling for this job automatically.

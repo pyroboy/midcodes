@@ -4,6 +4,7 @@
  */
 
 import type { DecomposedLayer, LayerSelection } from '$lib/schemas/decompose.schema';
+import type { ToolName, ToolOptions } from '$lib/logic/tools';
 
 export interface DecomposeSession {
 	assetId: string;
@@ -11,8 +12,14 @@ export interface DecomposeSession {
 	backLayers: DecomposedLayer[];
 	layerSelections: Record<string, LayerSelection>;
 	layerOpacity: Record<string, number>;
+	/** Mask data for non-destructive editing (Phase 6 eraser support) */
+	layerMasks?: Record<string, { layerId: string; maskData: string; bounds: { x: number; y: number; width: number; height: number } }>;
 	currentSide: 'front' | 'back';
 	showOriginalLayer: boolean;
+	/** Active tool state (Phase 2) */
+	activeTool?: ToolName;
+	/** Tool options like size, opacity, color (Phase 2) */
+	toolOptions?: ToolOptions;
 	savedAt: string;
 }
 

@@ -1,0 +1,238 @@
+
+> id-gen@2 check /Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen
+> svelte-kit sync && svelte-check --tsconfig ./tsconfig.json
+
+Loading svelte-check in workspace: /Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen
+Getting Svelte diagnostics...
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/lib/logic/tools/BucketTool.svelte.ts:70:25
+Error: Property 'tolerance' does not exist on type 'ToolContext'. 
+
+		const tolerance = ctx.tolerance ?? 32;
+		const fillColor = ctx.color;
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/lib/logic/tools/GradientTool.svelte.ts:19:14
+Error: Class 'GradientTool' incorrectly extends base class 'DrawingTool'.
+  Property 'isDrawing' is private in type 'GradientTool' but not in type 'DrawingTool'. 
+ */
+export class GradientTool extends DrawingTool implements CanvasTool {
+	readonly name = 'gradient';
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/lib/logic/tools/GradientTool.svelte.ts:19:14
+Error: Class 'GradientTool' incorrectly implements interface 'CanvasTool'.
+  Property 'reset' is private in type 'GradientTool' but not in type 'CanvasTool'. 
+ */
+export class GradientTool extends DrawingTool implements CanvasTool {
+	readonly name = 'gradient';
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/lib/logic/tools/index.ts:175:4
+Error: Type 'GradientTool' is not assignable to type 'CanvasTool'.
+  Property 'reset' is private in type 'GradientTool' but not in type 'CanvasTool'. 
+		case 'gradient':
+			return createGradientTool();
+		default:
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/lib/components/TemplateEditorLayout.svelte:73:50
+Error: Argument of type 'File[]' is not assignable to parameter of type 'FileList'.
+  Property 'item' is missing in type 'File[]' but required in type 'FileList'. (ts)
+			onUpdateElements={(elements, side) => onUpdateElements(elements, side)}
+			onImageUpload={(files, side) => onImageUpload(files, side)}
+			onRemoveImage={(side) => onRemoveImage(side)}
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/routes/(shell)/admin/template-assets/decompose/components/ImagePreview.svelte:293:2
+Warn: `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+	<div
+		class="relative aspect-[1.6/1] bg-muted/50 flex items-center justify-center pb-20 border border-border rounded-md overflow-hidden"
+		onclick={handleOuterClick}
+	>
+		<!-- Inner Image Wrapper - Constrained by Aspect Ratio -->
+		<div
+			bind:this={canvasElement}
+			class="relative w-full h-full shadow-sm flex items-center justify-center transition-all bg-[length:20px_20px] bg-repeat"
+			style="max-width: 100%; max-height: 100%; aspect-ratio: {widthPixels}/{heightPixels}; background-image: conic-gradient(#eee 90deg, transparent 90deg), conic-gradient(transparent 90deg, #eee 90deg);"
+			onclick={handleInnerClick}
+			onpointerdown={handlePointerDown}
+			onpointermove={handlePointerMove}
+			onpointerup={handlePointerUp}
+		>
+			{#if currentLayers.length > 0}
+				<!-- Render Decomposed Layers -->
+				<div class="relative w-full h-full">
+					<!-- Original File Layer (shown behind all others when enabled) -->
+					{#if showOriginalLayer && currentImageUrl}
+						<img
+							src={currentImageUrl}
+							alt="Original file"
+							class="absolute inset-0 w-full h-full object-contain transition-opacity duration-200"
+							style="z-index: -1; opacity: 0.5;"
+						/>
+					{/if}
+
+					{#each currentLayers as layer (layer.id)}
+						{@const selection = layerSelections.get(layer.id)}
+						{@const mask = masks.get(layer.id)}
+						{@const hasBounds = layer.bounds && layer.bounds.width > 0 && layer.bounds.height > 0}
+						<!-- Added mask-image style -->
+						<img
+							src={layer.imageUrl}
+							alt={layer.name}
+							class="absolute object-fill transition-opacity duration-200 pointer-events-none"
+							style="
+								z-index: {layer.zIndex}; 
+								opacity: {selection?.included ? 1 : 0};
+								left: {hasBounds ? ((layer.bounds?.x || 0) / widthPixels) * 100 : 0}%;
+								top: {hasBounds ? ((layer.bounds?.y || 0) / heightPixels) * 100 : 0}%;
+								width: {hasBounds ? ((layer.bounds?.width || 0) / widthPixels) * 100 : 100}%;
+								height: {hasBounds ? ((layer.bounds?.height || 0) / heightPixels) * 100 : 100}%;
+								mask-image: {mask ? `url(${mask.maskData})` : 'none'};
+								mask-size: 100% 100%;
+								-webkit-mask-image: {mask ? `url(${mask.maskData})` : 'none'};
+								-webkit-mask-size: 100% 100%;
+							"
+						/>
+					{/each}
+
+					<!-- Selection Overlay (High Z-Index) -->
+					<div class="absolute inset-0 pointer-events-none" style="z-index: 9999;">
+						{#if activeTool === 'brush' || activeTool === 'eraser'}
+							<DrawingCanvas
+								width={widthPixels}
+								height={heightPixels}
+								bind:canvasElement={drawingCanvasElement}
+								bind:context={drawingContext}
+							/>
+						{/if}
+						{#each currentLayers as layer (layer.id)}
+							<div
+								class="absolute inset-0 border-2 transition-opacity {selectedLayerId === layer.id
+									? 'border-primary opacity-100'
+									: 'border-transparent opacity-0'}"
+							></div>
+						{/each}
+					</div>
+				</div>
+			{:else if currentImageUrl && showOriginalLayer}
+				<img
+					src={currentImageUrl}
+					alt="{assetName} - {activeSide}"
+					class="w-full h-full object-contain"
+				/>
+			{:else}
+				<div class="text-center text-muted-foreground">
+					<ImageIcon class="h-12 w-12 mx-auto mb-2 opacity-30" />
+					<p class="text-sm">No image available</p>
+				</div>
+			{/if}
+
+			<!-- Unified Selection Overlay -->
+			<SelectionOverlay
+				{activeTool}
+				{lassoTool}
+				{rectangleTool}
+				{ellipseTool}
+				{isProcessing}
+				onAction={handleSelectionAction}
+			/>
+		</div>
+	</div>
+</div>
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/routes/(shell)/admin/template-assets/decompose/components/ImagePreview.svelte:298:3
+Warn: `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+		<!-- Inner Image Wrapper - Constrained by Aspect Ratio -->
+		<div
+			bind:this={canvasElement}
+			class="relative w-full h-full shadow-sm flex items-center justify-center transition-all bg-[length:20px_20px] bg-repeat"
+			style="max-width: 100%; max-height: 100%; aspect-ratio: {widthPixels}/{heightPixels}; background-image: conic-gradient(#eee 90deg, transparent 90deg), conic-gradient(transparent 90deg, #eee 90deg);"
+			onclick={handleInnerClick}
+			onpointerdown={handlePointerDown}
+			onpointermove={handlePointerMove}
+			onpointerup={handlePointerUp}
+		>
+			{#if currentLayers.length > 0}
+				<!-- Render Decomposed Layers -->
+				<div class="relative w-full h-full">
+					<!-- Original File Layer (shown behind all others when enabled) -->
+					{#if showOriginalLayer && currentImageUrl}
+						<img
+							src={currentImageUrl}
+							alt="Original file"
+							class="absolute inset-0 w-full h-full object-contain transition-opacity duration-200"
+							style="z-index: -1; opacity: 0.5;"
+						/>
+					{/if}
+
+					{#each currentLayers as layer (layer.id)}
+						{@const selection = layerSelections.get(layer.id)}
+						{@const mask = masks.get(layer.id)}
+						{@const hasBounds = layer.bounds && layer.bounds.width > 0 && layer.bounds.height > 0}
+						<!-- Added mask-image style -->
+						<img
+							src={layer.imageUrl}
+							alt={layer.name}
+							class="absolute object-fill transition-opacity duration-200 pointer-events-none"
+							style="
+								z-index: {layer.zIndex}; 
+								opacity: {selection?.included ? 1 : 0};
+								left: {hasBounds ? ((layer.bounds?.x || 0) / widthPixels) * 100 : 0}%;
+								top: {hasBounds ? ((layer.bounds?.y || 0) / heightPixels) * 100 : 0}%;
+								width: {hasBounds ? ((layer.bounds?.width || 0) / widthPixels) * 100 : 100}%;
+								height: {hasBounds ? ((layer.bounds?.height || 0) / heightPixels) * 100 : 100}%;
+								mask-image: {mask ? `url(${mask.maskData})` : 'none'};
+								mask-size: 100% 100%;
+								-webkit-mask-image: {mask ? `url(${mask.maskData})` : 'none'};
+								-webkit-mask-size: 100% 100%;
+							"
+						/>
+					{/each}
+
+					<!-- Selection Overlay (High Z-Index) -->
+					<div class="absolute inset-0 pointer-events-none" style="z-index: 9999;">
+						{#if activeTool === 'brush' || activeTool === 'eraser'}
+							<DrawingCanvas
+								width={widthPixels}
+								height={heightPixels}
+								bind:canvasElement={drawingCanvasElement}
+								bind:context={drawingContext}
+							/>
+						{/if}
+						{#each currentLayers as layer (layer.id)}
+							<div
+								class="absolute inset-0 border-2 transition-opacity {selectedLayerId === layer.id
+									? 'border-primary opacity-100'
+									: 'border-transparent opacity-0'}"
+							></div>
+						{/each}
+					</div>
+				</div>
+			{:else if currentImageUrl && showOriginalLayer}
+				<img
+					src={currentImageUrl}
+					alt="{assetName} - {activeSide}"
+					class="w-full h-full object-contain"
+				/>
+			{:else}
+				<div class="text-center text-muted-foreground">
+					<ImageIcon class="h-12 w-12 mx-auto mb-2 opacity-30" />
+					<p class="text-sm">No image available</p>
+				</div>
+			{/if}
+
+			<!-- Unified Selection Overlay -->
+			<SelectionOverlay
+				{activeTool}
+				{lassoTool}
+				{rectangleTool}
+				{ellipseTool}
+				{isProcessing}
+				onAction={handleSelectionAction}
+			/>
+		</div>
+	</div>
+
+====================================
+svelte-check found 5 errors and 2 warnings in 5 files
+ ELIFECYCLE  Command failed with exit code 1.

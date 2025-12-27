@@ -33,7 +33,7 @@ export interface UseImageUploadReturn {
 	dragUpdateTimeout: ReturnType<typeof setTimeout> | null;
 	lastPositionUpdateTime: number;
 	positionUpdateCount: number;
-	handleImageUpload: (files: FileList | null, side: 'front' | 'back') => Promise<void>;
+	handleImageUpload: (files: File[], side: 'front' | 'back') => Promise<void>;
 	handleRemoveImage: (side: 'front' | 'back') => void;
 	handleBackgroundPositionUpdate: (position: BackgroundPosition, side: 'front' | 'back') => Promise<void>;
 	updateCropPreviews: () => Promise<void>;
@@ -112,7 +112,7 @@ export function useImageUpload(options: UseImageUploadOptions): UseImageUploadRe
 	/**
 	 * Handle image file upload for specified side
 	 */
-	async function handleImageUpload(files: FileList | null, side: 'front' | 'back') {
+	async function handleImageUpload(files: File[], side: 'front' | 'back') {
 		lastError = null;
 
 		// Validate input

@@ -1,18 +1,28 @@
 <script lang="ts">
 	import { ImageIcon } from 'lucide-svelte';
 	import type { DecomposedLayer, LayerSelection } from '$lib/schemas/decompose.schema';
-	import CanvasToolbar from './CanvasToolbar.svelte';
+	import type { LayerMask, LayerManager } from '$lib/logic/LayerManager.svelte';
+	import type { ToolManager } from '$lib/logic/ToolManager.svelte';
+	import type { ImageProcessor } from '$lib/logic/ImageProcessor.svelte';
+	import type { HistoryManager } from '$lib/logic/HistoryManager.svelte';
+	import SelectionOverlay from './SelectionOverlay.svelte';
+	import { LassoTool } from '$lib/logic/tools/LassoTool.svelte';
+	import { RectangleTool } from '$lib/logic/tools/RectangleTool.svelte';
+	import { EllipseTool } from '$lib/logic/tools/EllipseTool.svelte';
+	import { BrushTool } from '$lib/logic/tools/BrushTool.svelte';
+	import { EraserTool } from '$lib/logic/tools/EraserTool.svelte';
+	import { BucketTool } from '$lib/logic/tools/BucketTool.svelte';
+	import { GradientTool } from '$lib/logic/tools/GradientTool.svelte';
+	import DrawingCanvas from './DrawingCanvas.svelte';
+	import type { ToolName, NormalizedPoint } from '$lib/logic/tools';
 
-	import { Button } from '$lib/components/ui/button';
-	import * as Popover from '$lib/components/ui/popover';
-	import { Scissors } from 'lucide-svelte';
-
-	type CanvasTool = 'brush' | 'eraser' | 'lasso' | 'eyedropper' | null;
+	type SelectionAction = 'copy' | 'fill' | 'delete';
 
 	let {
 		currentImageUrl,
 		currentLayers,
 		layerSelections,
+		masks = new Map(),
 		showOriginalLayer,
 		selectedLayerId,
 		assetName,
@@ -20,14 +30,21 @@
 		widthPixels,
 		heightPixels,
 		orientation,
-		activeTool = $bindable<CanvasTool>(null),
-		currentColor = $bindable<string>('#3b82f6'),
-		onLassoCut,
-		isProcessing = false
+		activeTool = null,
+		currentColor = '#3b82f6',
+		onSelectionAction,
+		isProcessing = false,
+		layerManager,
+		toolManager,
+		imageProcessor,
+		historyManager,
+		onToolChange,
+		onDuplicate
 	}: {
 		currentImageUrl: string | null;
 		currentLayers: DecomposedLayer[];
 		layerSelections: Map<string, LayerSelection>;
+		masks?: Map<string, LayerMask>;
 		showOriginalLayer: boolean;
 		selectedLayerId: string | null;
 		assetName: string;
@@ -35,121 +52,268 @@
 		widthPixels: number;
 		heightPixels: number;
 		orientation: string;
-		activeTool?: CanvasTool;
+		activeTool?: ToolName;
 		currentColor?: string;
-		onLassoCut?: (points: { x: number; y: number }[]) => void;
+		onSelectionAction?: (action: SelectionAction, points: NormalizedPoint[]) => void;
 		isProcessing?: boolean;
+		layerManager: LayerManager;
+		toolManager: ToolManager;
+		imageProcessor: ImageProcessor;
+		historyManager: HistoryManager;
+		onToolChange?: (tool: ToolName) => void;
+		onDuplicate?: () => void;
 	} = $props();
 
-	let previousTool = $state<CanvasTool>(null);
-	let lassoPoints = $state<{ x: number; y: number }[]>([]);
-	let isLassoClosed = $state(false);
-	let lassoPopoverOpen = $state(false);
+	// Tool instances
+	const lassoTool = new LassoTool();
+	const rectangleTool = new RectangleTool();
+	const ellipseTool = new EllipseTool();
+	const brushTool = new BrushTool();
+	const eraserTool = new EraserTool();
+	const bucketTool = new BucketTool();
+	const gradientTool = new GradientTool();
 
-	async function startEyedropper() {
-		if (typeof window !== 'undefined' && 'EyeDropper' in window) {
-			try {
-				// @ts-ignore - EyeDropper is a relatively new API
-				const eyeDropper = new window.EyeDropper();
-				const result = await eyeDropper.open();
-				currentColor = result.sRGBHex;
-				// After picking, switch back to previous tool if it was brush/lasso
-				if (previousTool && previousTool !== 'eyedropper') {
-					activeTool = previousTool;
-				} else {
-					activeTool = 'brush'; // Default to brush
-				}
-			} catch (e) {
-				console.log('Eyedropper cancelled or failed:', e);
-				// If cancelled, switch back anyway so we don't get stuck
-				activeTool = previousTool || null;
-			}
-		} else {
-			alert('Your browser does not support the EyeDropper API');
-			activeTool = previousTool || null;
+	// Get the active tool instance
+	const activeToolInstance = $derived(
+		activeTool === 'lasso'
+			? lassoTool
+			: activeTool === 'rectangle'
+				? rectangleTool
+				: activeTool === 'ellipse'
+					? ellipseTool
+					: activeTool === 'brush'
+						? brushTool
+						: activeTool === 'eraser'
+							? eraserTool
+							: activeTool === 'bucket'
+								? bucketTool
+								: activeTool === 'gradient'
+									? gradientTool
+									: null
+	);
+
+	// Unified selection closed state
+	const isSelectionClosed = $derived(
+		(activeTool === 'lasso' && lassoTool.isClosed) ||
+			(activeTool === 'rectangle' && rectangleTool.isClosed) ||
+			(activeTool === 'ellipse' && ellipseTool.isClosed)
+	);
+
+	let canvasRect: DOMRect | null = null;
+	let canvasElement: HTMLDivElement | null = null;
+	let drawingCanvasElement: HTMLCanvasElement | undefined = $state();
+	let drawingContext: CanvasRenderingContext2D | null | undefined = $state();
+
+	function updateCanvasRect() {
+		if (canvasElement) {
+			canvasRect = canvasElement.getBoundingClientRect();
 		}
 	}
 
-	$effect(() => {
-		if (activeTool === 'eyedropper') {
-			startEyedropper();
-		} else {
-			previousTool = activeTool;
+	function handlePointerDown(e: PointerEvent) {
+		if (!activeTool || !canvasElement) return;
+
+		// Don't handle if clicking on popover or toolbar
+		const target = e.target as HTMLElement;
+		if (target.closest('[data-toolbar]') || target.closest('[data-selection-popover]')) return;
+
+		updateCanvasRect();
+		if (!canvasRect) return;
+
+		const ctx = {
+			canvasRect,
+			selectedLayerId,
+			layerManager,
+			toolManager,
+			imageProcessor,
+			historyManager,
+			color: toolManager?.toolOptions?.color || currentColor,
+			size: toolManager?.toolOptions?.size || 20,
+			opacity: toolManager?.toolOptions?.opacity || 100,
+			tolerance: toolManager?.toolOptions?.tolerance,
+			canvasDimensions: { widthPixels, heightPixels },
+			canvasElement: drawingCanvasElement,
+			canvasContext: drawingContext ?? undefined
+		};
+
+		// For brush, we need real options. Ideally ImagePreview should receive toolOptions props.
+		// For now, using defaults or what's passed in ctx.
+		// Update: ImagePreview has activeTool but not full options prop.
+		// We should probably rely on `activeToolInstance` pattern more.
+
+		if (activeTool === 'lasso') {
+			lassoTool.onPointerDown(e, ctx);
+		} else if (activeTool === 'rectangle') {
+			rectangleTool.onPointerDown(e, ctx);
+		} else if (activeTool === 'ellipse') {
+			ellipseTool.onPointerDown(e, ctx);
+		} else if (activeTool === 'brush') {
+			brushTool.onPointerDown(e, ctx);
+		} else if (activeTool === 'eraser') {
+			eraserTool.onPointerDown(e, ctx);
+		} else if (activeTool === 'bucket') {
+			bucketTool.onPointerDown(e, ctx);
+		} else if (activeTool === 'gradient') {
+			gradientTool.onPointerDown(e, ctx);
 		}
-	});
+	}
+
+	function handlePointerMove(e: PointerEvent) {
+		if (!activeTool || !canvasRect) return;
+
+		const ctx = {
+			canvasRect,
+			selectedLayerId,
+			layerManager, // Pass layerManager
+			toolManager,
+			imageProcessor,
+			historyManager,
+			color: toolManager?.toolOptions?.color || currentColor,
+			size: toolManager?.toolOptions?.size || 20,
+			opacity: toolManager?.toolOptions?.opacity || 100,
+			tolerance: toolManager?.toolOptions?.tolerance,
+			canvasDimensions: { widthPixels, heightPixels },
+			canvasElement: drawingCanvasElement,
+			canvasContext: drawingContext ?? undefined
+		};
+
+		if (activeTool === 'rectangle') {
+			rectangleTool.onPointerMove(e, ctx);
+		} else if (activeTool === 'ellipse') {
+			ellipseTool.onPointerMove(e, ctx);
+		} else if (activeTool === 'brush') {
+			brushTool.onPointerMove(e, ctx);
+		} else if (activeTool === 'eraser') {
+			eraserTool.onPointerMove(e, ctx);
+		} else if (activeTool === 'gradient') {
+			gradientTool.onPointerMove(e, ctx);
+		}
+	}
+
+	function handlePointerUp(e: PointerEvent) {
+		if (!activeTool || !canvasRect) return;
+
+		const ctx = {
+			canvasRect,
+			selectedLayerId,
+			layerManager,
+			toolManager,
+			imageProcessor,
+			historyManager,
+			color: toolManager?.toolOptions?.color || currentColor,
+			size: toolManager?.toolOptions?.size || 20,
+			opacity: toolManager?.toolOptions?.opacity || 100,
+			tolerance: toolManager?.toolOptions?.tolerance,
+			canvasDimensions: { widthPixels, heightPixels },
+			canvasElement: drawingCanvasElement,
+			canvasContext: drawingContext ?? undefined
+		};
+
+		if (activeTool === 'lasso') {
+			lassoTool.onPointerUp(e, ctx);
+		} else if (activeTool === 'rectangle') {
+			rectangleTool.onPointerUp(e, ctx);
+		} else if (activeTool === 'ellipse') {
+			ellipseTool.onPointerUp(e, ctx);
+		} else if (activeTool === 'brush') {
+			brushTool.onPointerUp(e, ctx);
+		} else if (activeTool === 'eraser') {
+			eraserTool.onPointerUp(e, ctx);
+		} else if (activeTool === 'bucket') {
+			bucketTool.onPointerUp(e, ctx);
+		} else if (activeTool === 'gradient') {
+			gradientTool.onPointerUp(e, ctx);
+		}
+	}
 
 	function handleInnerClick(e: MouseEvent) {
 		const target = e.target as HTMLElement;
 
-		// If tool is lasso, handle poly-line creation
-		if (activeTool === 'lasso') {
+		// If a selection tool is active, delegate to pointer events
+		if (activeTool === 'lasso' || activeTool === 'rectangle' || activeTool === 'ellipse') {
 			// Don't interact if clicking on the popover or toolbar
-			if (target.closest('[data-toolbar]') || target.closest('[data-lasso-popover]')) return;
+			if (target.closest('[data-toolbar]') || target.closest('[data-selection-popover]')) return;
 
-			// Stop propagation so outer click doesn't deselect?
-			// Actually we want to stop propagation so we don't trigger "deselect" logic if that's on outer
-			e.stopPropagation();
-
-			const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-			const x = (e.clientX - rect.left) / rect.width;
-			const y = (e.clientY - rect.top) / rect.height;
-
-			// Check if closing the loop (click near start)
-			if (lassoPoints.length > 2) {
-				const start = lassoPoints[0];
-				const dist = Math.sqrt(Math.pow(x - start.x, 2) + Math.pow(y - start.y, 2));
-				// Threshold of 3% distance to close
-				if (dist < 0.03) {
-					isLassoClosed = true;
-					lassoPopoverOpen = true;
-					return;
+			// For lasso, use legacy click handler for backward compatibility
+			if (activeTool === 'lasso') {
+				e.stopPropagation();
+				updateCanvasRect();
+				if (canvasRect) {
+					lassoTool.handleClick(e, canvasRect);
 				}
-			}
-
-			if (isLassoClosed && !lassoPopoverOpen) {
-				// Reset if clicking after functionality is done
-				lassoPoints = [{ x, y }];
-				isLassoClosed = false;
-				lassoPopoverOpen = false;
-			} else if (!isLassoClosed) {
-				lassoPoints = [...lassoPoints, { x, y }];
 			}
 			return;
 		}
 
-		// If NOT lasso, we allow bubble or handle here?
-		// If clicking on image (inner) without tool, maybe deselect tool?
+		// If NOT a selection tool, deselect tool when clicking on canvas
 		if (!target.closest('[data-toolbar]')) {
-			activeTool = null;
+			// Tool deselection is handled by parent
 		}
 	}
 
 	function handleOuterClick(e: MouseEvent) {
 		const target = e.target as HTMLElement;
-		// Deselect tool when clicking on outer canvas area if not toolbar
-		// This handles clicking on "empty grey space"
+		// Don't handle if clicking on toolbar area
 		if (!target.closest('[data-toolbar]')) {
-			activeTool = null;
-			lassoPoints = [];
-			isLassoClosed = false;
+			lassoTool.reset();
+			rectangleTool.reset();
+			ellipseTool.reset();
+			eraserTool.reset();
 		}
 	}
 
-	// Reset lasso when tool changes
+	// Reset all tools when active tool changes
 	$effect(() => {
-		if (activeTool !== 'lasso') {
-			lassoPoints = [];
-			isLassoClosed = false;
-			lassoPopoverOpen = false;
+		if (activeTool !== 'lasso') lassoTool.reset();
+		if (activeTool !== 'rectangle') rectangleTool.reset();
+		if (activeTool !== 'ellipse') ellipseTool.reset();
+	});
+
+	// Sync tool selection completion to LayerManager
+	$effect(() => {
+		const handleComplete = (result: any) => {
+			layerManager.setSelection(result);
+		};
+
+		lassoTool.onComplete = handleComplete;
+		rectangleTool.onComplete = handleComplete;
+		ellipseTool.onComplete = handleComplete;
+		// Initialize with null/clear if no tool is active or selection is open?
+		// Actually, we probably want to clear checking if 'activeTool' changed.
+		// But let's rely on manual resets for now.
+	});
+
+	// Escape key resets selection
+	$effect(() => {
+		function handleKeyDown(e: KeyboardEvent) {
+			if (e.key === 'Escape') {
+				lassoTool.reset();
+				rectangleTool.reset();
+				ellipseTool.reset();
+			}
+		}
+
+		if (typeof window !== 'undefined') {
+			window.addEventListener('keydown', handleKeyDown);
+			return () => window.removeEventListener('keydown', handleKeyDown);
 		}
 	});
 
-	function handleCut() {
-		if (onLassoCut && isLassoClosed) {
-			onLassoCut(lassoPoints);
-			lassoPoints = [];
-			isLassoClosed = false;
-			lassoPopoverOpen = false;
+	function handleSelectionAction(action: SelectionAction) {
+		if (onSelectionAction) {
+			let points: NormalizedPoint[] = [];
+
+			if (activeTool === 'lasso' && lassoTool.isClosed) {
+				points = lassoTool.confirmCopy();
+			} else if (activeTool === 'rectangle' && rectangleTool.isClosed) {
+				points = rectangleTool.confirmCopy();
+			} else if (activeTool === 'ellipse' && ellipseTool.isClosed) {
+				points = ellipseTool.confirmCopy();
+			}
+
+			if (points.length > 0) {
+				onSelectionAction(action, points);
+			}
 		}
 	}
 </script>
@@ -166,12 +330,20 @@
 	<div
 		class="relative aspect-[1.6/1] bg-muted/50 flex items-center justify-center pb-20 border border-border rounded-md overflow-hidden"
 		onclick={handleOuterClick}
+		role="button"
+		tabindex="0"
 	>
 		<!-- Inner Image Wrapper - Constrained by Aspect Ratio -->
 		<div
+			bind:this={canvasElement}
 			class="relative w-full h-full shadow-sm flex items-center justify-center transition-all bg-[length:20px_20px] bg-repeat"
 			style="max-width: 100%; max-height: 100%; aspect-ratio: {widthPixels}/{heightPixels}; background-image: conic-gradient(#eee 90deg, transparent 90deg), conic-gradient(transparent 90deg, #eee 90deg);"
 			onclick={handleInnerClick}
+			onpointerdown={handlePointerDown}
+			onpointermove={handlePointerMove}
+			onpointerup={handlePointerUp}
+			role="button"
+			tabindex="0"
 		>
 			{#if currentLayers.length > 0}
 				<!-- Render Decomposed Layers -->
@@ -188,7 +360,9 @@
 
 					{#each currentLayers as layer (layer.id)}
 						{@const selection = layerSelections.get(layer.id)}
+						{@const mask = masks.get(layer.id)}
 						{@const hasBounds = layer.bounds && layer.bounds.width > 0 && layer.bounds.height > 0}
+						<!-- Added mask-image style -->
 						<img
 							src={layer.imageUrl}
 							alt={layer.name}
@@ -200,19 +374,24 @@
 								top: {hasBounds ? ((layer.bounds?.y || 0) / heightPixels) * 100 : 0}%;
 								width: {hasBounds ? ((layer.bounds?.width || 0) / widthPixels) * 100 : 100}%;
 								height: {hasBounds ? ((layer.bounds?.height || 0) / heightPixels) * 100 : 100}%;
+								mask-image: {mask ? `url(${mask.maskData})` : 'none'};
+								mask-size: 100% 100%;
+								-webkit-mask-image: {mask ? `url(${mask.maskData})` : 'none'};
+								-webkit-mask-size: 100% 100%;
 							"
-							onload={() =>
-								console.log('Layer rendered:', {
-									id: layer.id,
-									name: layer.name,
-									bounds: layer.bounds,
-									hasBounds
-								})}
 						/>
 					{/each}
 
 					<!-- Selection Overlay (High Z-Index) -->
 					<div class="absolute inset-0 pointer-events-none" style="z-index: 9999;">
+						{#if activeTool === 'brush' || activeTool === 'eraser'}
+							<DrawingCanvas
+								width={widthPixels}
+								height={heightPixels}
+								bind:canvasElement={drawingCanvasElement}
+								bind:context={drawingContext}
+							/>
+						{/if}
 						{#each currentLayers as layer (layer.id)}
 							<div
 								class="absolute inset-0 border-2 transition-opacity {selectedLayerId === layer.id
@@ -235,156 +414,15 @@
 				</div>
 			{/if}
 
-			<!-- Lasso Overlay attached to Inner Wrapper -->
-			{#if activeTool === 'lasso' && lassoPoints.length > 0}
-				<!-- Layer 1: Paths & Fills (Scalable geometry, consistent stroke) -->
-				<svg
-					class="absolute inset-0 w-full h-full pointer-events-none z-[10001]"
-					viewBox="0 0 100 100"
-					preserveAspectRatio="none"
-				>
-					<!-- Closed State: Dimmer & Highlight -->
-					{#if isLassoClosed}
-						<path
-							d={`M0,0 H100 V100 H0 Z ` +
-								`M${lassoPoints.map((p) => `${p.x * 100},${p.y * 100}`).join(' ')} Z`}
-							fill-rule="evenodd"
-							fill="rgba(0,0,0,0.6)"
-						/>
-						<polygon
-							points={lassoPoints.map((p) => `${p.x * 100},${p.y * 100}`).join(' ')}
-							fill="rgba(255,255,255,0.1)"
-						/>
-					{/if}
-
-					<!-- Marquee Stroke -->
-					{#if isLassoClosed}
-						<!-- White stroke base -->
-						<polygon
-							points={lassoPoints.map((p) => `${p.x * 100},${p.y * 100}`).join(' ')}
-							fill="none"
-							stroke="white"
-							stroke-width="1.5"
-							vector-effect="non-scaling-stroke"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-						/>
-						<!-- Black dashed march -->
-						<polygon
-							points={lassoPoints.map((p) => `${p.x * 100},${p.y * 100}`).join(' ')}
-							fill="none"
-							stroke="black"
-							stroke-width="1.5"
-							stroke-dasharray="4 4"
-							vector-effect="non-scaling-stroke"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							class="animate-march"
-						/>
-					{:else}
-						<polyline
-							points={lassoPoints.map((p) => `${p.x * 100},${p.y * 100}`).join(' ')}
-							fill="none"
-							stroke="white"
-							stroke-width="1.5"
-							vector-effect="non-scaling-stroke"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-						/>
-						<polyline
-							points={lassoPoints.map((p) => `${p.x * 100},${p.y * 100}`).join(' ')}
-							fill="none"
-							stroke="black"
-							stroke-width="1.5"
-							stroke-dasharray="4 4"
-							vector-effect="non-scaling-stroke"
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							class="animate-march"
-						/>
-					{/if}
-				</svg>
-
-				<!-- Layer 2: Handles/Dots (Screen-space 1:1, no distortion) -->
-				<svg class="absolute inset-0 w-full h-full pointer-events-none z-[10002]">
-					{#each lassoPoints as p, i}
-						<circle
-							cx="{p.x * 100}%"
-							cy="{p.y * 100}%"
-							r="3"
-							fill="white"
-							stroke="black"
-							stroke-width="1"
-						/>
-						{#if i === 0 && lassoPoints.length > 2 && !isLassoClosed}
-							<!-- Start Point Indicator -->
-							<circle
-								cx="{p.x * 100}%"
-								cy="{p.y * 100}%"
-								r="5"
-								fill="rgba(239, 68, 68, 0.4)"
-								stroke="rgba(239, 68, 68, 0.9)"
-								stroke-width="1"
-								class="animate-pulse"
-							/>
-						{/if}
-					{/each}
-				</svg>
-
-				<!-- Popover Anchor -->
-				{#if isLassoClosed && lassoPopoverOpen}
-					<div
-						class="absolute w-0 h-0 z-[10003]"
-						style="left: {lassoPoints[0].x * 100}%; top: {lassoPoints[0].y * 100}%;"
-						data-lasso-popover
-					>
-						<Popover.Root open={true} onOpenChange={(v) => !v && (lassoPopoverOpen = false)}>
-							<Popover.Trigger class="w-0 h-0 opacity-0" />
-							<Popover.Content
-								side="top"
-								sideOffset={10}
-								class="w-auto p-0 bg-transparent border-none shadow-none z-[10010] pointer-events-auto"
-							>
-								<Button
-									size="sm"
-									variant="default"
-									class="h-7 px-3 text-xs gap-1.5 rounded-full bg-zinc-900 text-zinc-50 hover:bg-zinc-800 shadow-xl border border-zinc-700/50 backdrop-blur-sm pointer-events-auto cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
-									onclick={handleCut}
-									disabled={isProcessing}
-								>
-									{#if isProcessing}
-										<div
-											class="w-3.5 h-3.5 border-2 border-zinc-400 border-t-white rounded-full animate-spin"
-										></div>
-										<span class="font-medium">Cutting...</span>
-									{:else}
-										<Scissors class="w-3.5 h-3.5" />
-										<span class="font-medium">Copy to New Layer</span>
-									{/if}
-								</Button>
-							</Popover.Content>
-						</Popover.Root>
-					</div>
-				{/if}
-			{/if}
-		</div>
-
-		<!-- Canvas Toolbar Overlay -->
-		<!-- Canvas Toolbar Overlay (Outside Inner Wrapper so it is fixed relative to card) -->
-		<!-- We use absolute positioning relative to the outer container now -->
-		<div class="absolute bottom-3 left-1/2 -translate-x-1/2 z-[10000]" data-toolbar>
-			<CanvasToolbar bind:activeTool bind:currentColor disabled={!selectedLayerId} />
+			<!-- Unified Selection Overlay -->
+			<SelectionOverlay
+				{activeTool}
+				{lassoTool}
+				{rectangleTool}
+				{ellipseTool}
+				{isProcessing}
+				onAction={handleSelectionAction}
+			/>
 		</div>
 	</div>
 </div>
-
-<style>
-	@keyframes march {
-		to {
-			stroke-dashoffset: -200; /* Should be large enough to look smooth, or match pattern */
-		}
-	}
-	.animate-march {
-		animation: march 5s linear infinite;
-	}
-</style>

@@ -12,6 +12,7 @@ import type { LayerManager } from './LayerManager.svelte';
 import type { HistoryManager } from './HistoryManager.svelte';
 import type { DecomposedLayer } from '$lib/schemas/decompose.schema';
 import { getProxiedUrl } from '$lib/utils/storage';
+import { type NormalizedPoint } from './tools';
 
 export class ImageProcessor {
 	isProcessing = $state(false);
@@ -38,7 +39,13 @@ export class ImageProcessor {
 		negativePrompt?: string;
 		settings: any;
 	}) {
+		if (this.isProcessing) {
+			toast.warning('Another operation is in progress');
+			return false;
+		}
+
 		const toastId = toast.loading('Queuing decomposition task...');
+		this.isProcessing = true;
 
 		// 1. Optimistic Update (Immediate)
 		const tempId = this.historyManager.addOptimisticItem(
@@ -77,6 +84,8 @@ export class ImageProcessor {
 			console.error(e);
 			toast.error(e.message || 'Failed to queue', { id: toastId });
 			return false;
+		} finally {
+			this.isProcessing = false;
 		}
 	}
 
@@ -86,7 +95,10 @@ export class ImageProcessor {
 		model: string,
 		removeWatermark = false
 	) {
+		if (this.isProcessing) return false;
+
 		const toastId = toast.loading('Queuing upscale task...');
+		this.isProcessing = true;
 
 		try {
 			let targetUrl = layer.imageUrl;
@@ -123,11 +135,17 @@ export class ImageProcessor {
 		} catch (e: any) {
 			toast.error(e.message, { id: toastId });
 			return false;
+		} finally {
+			this.isProcessing = false;
 		}
+
 	}
 
 	// --- 3. Remove Element ---
 	async removeElement(layer: DecomposedLayer, prompt: string) {
+		if (this.isProcessing) return false;
+		this.isProcessing = true;
+
 		const toastId = toast.loading(`Queuing removal of "${prompt}"...`);
 
 		// 1. Optimistic Update
@@ -160,11 +178,16 @@ export class ImageProcessor {
 		} catch (e: any) {
 			toast.error(e.message, { id: toastId });
 			return false;
+		} finally {
+			this.isProcessing = false;
 		}
+
 	}
 
 	// --- 4. Client-Side Merge ---
 	async mergeSelectedLayers() {
+		if (this.isProcessing) return;
+
 		const ids = Array.from(this.layerManager.selectedForMerge);
 		const layers = this.layerManager.currentLayers
 			.filter((l) => ids.includes(l.id))
@@ -226,6 +249,8 @@ export class ImageProcessor {
 
 	// --- 4.5. Lasso Cut ---
 	async cutPolygon(layerId: string | null, points: { x: number; y: number }[], sourceImageUrl: string) {
+		if (this.isProcessing) return;
+
 		if (!layerId || points.length < 3 || !sourceImageUrl) {
 			console.warn('cutPolygon: Missing arguments', { layerId, pointsLen: points.length, sourceImageUrl });
 			return;
@@ -380,6 +405,8 @@ export class ImageProcessor {
 
 	// --- 5. Set As Main Background ---
 	async setAsMain(layerId: string) {
+		if (this.isProcessing) return;
+
 		const layer = this.layerManager.currentLayers.find((l) => l.id === layerId);
 		if (!layer) return;
 
@@ -523,6 +550,174 @@ export class ImageProcessor {
 			console.error('Crop error:', e);
 			toast.error(e.message || 'Failed to apply crop', { id: toastId });
 			return false;
+		}
+	}
+	// --- 7. Selection Actions (Phase 3) ---
+
+	async fillSelection(points: NormalizedPoint[], color: string) {
+		if (this.isProcessing) return;
+		if (points.length < 3) return;
+
+		this.isProcessing = true;
+		const toastId = toast.loading('Filling selection...');
+
+		try {
+			const canvasW = this.assetData.width;
+			const canvasH = this.assetData.height;
+
+			const canvas = document.createElement('canvas');
+			canvas.width = canvasW;
+			canvas.height = canvasH;
+			const ctx = canvas.getContext('2d');
+			if (!ctx) throw new Error('No context');
+
+			// Draw shape
+			ctx.beginPath();
+			points.forEach((p, i) => {
+				const x = p.x * canvasW;
+				const y = p.y * canvasH;
+				if (i === 0) ctx.moveTo(x, y);
+				else ctx.lineTo(x, y);
+			});
+			ctx.closePath();
+			ctx.fillStyle = color;
+			ctx.fill();
+
+			// Calculate bounds
+			const xs = points.map((p) => p.x * canvasW);
+			const ys = points.map((p) => p.y * canvasH);
+			const minX = Math.floor(Math.min(...xs));
+			const minY = Math.floor(Math.min(...ys));
+			const maxX = Math.ceil(Math.max(...xs));
+			const maxY = Math.ceil(Math.max(...ys));
+			const width = maxX - minX;
+			const height = maxY - minY;
+
+			// Convert to blob and upload
+			const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/png'));
+			if (!blob) throw new Error('Blob creation failed');
+			const base64 = await fileToDataUrl(blob);
+
+			const upload = await uploadProcessedImage({ imageBase64: base64, mimeType: 'image/png' });
+
+			if (upload.success && upload.url) {
+				const { layer, selection } = this.layerManager.createLayerObj(
+					upload.url,
+					'Fill Layer',
+					{ x: 0, y: 0, width: canvasW, height: canvasH }, // Full size transparent with fill
+					this.layerManager.activeSide,
+					this.layerManager.currentLayers.length
+				);
+				// Override bounds to efficient size if we wanted, but keeping simple for now
+				// Actually, let's use the bounds we calculated for cleaner metadata
+				layer.bounds = { x: minX, y: minY, width, height };
+				
+				// BUT: The image created is full canvas size. 
+				// To support optimized bounds, we should have cropped the canvas.
+				// For now, let's stick to full canvas to avoid alignment issues 
+				// unless we implement the crop logic here. 
+				// Let's stick to full canvas for reliability first, then optimize.
+				layer.bounds = { x: 0, y: 0, width: canvasW, height: canvasH };
+
+				this.layerManager.addLayer(layer, selection);
+				this.historyManager.addLocalEntry('fill', layer.id);
+				toast.success('Filled selection created', { id: toastId });
+			} else {
+				throw new Error('Upload failed');
+			}
+		} catch (e: any) {
+			console.error('Fill error:', e);
+			toast.error('Fill failed: ' + e.message, { id: toastId });
+		} finally {
+			this.isProcessing = false;
+		}
+	}
+
+	async deleteSelection(layerId: string, points: NormalizedPoint[]) {
+		if (this.isProcessing) return;
+		if (!layerId || points.length < 3) return;
+
+		this.isProcessing = true;
+		const toastId = toast.loading('Creating mask...');
+
+		try {
+			// Phase 6 Precursor: Non-destructive masking
+			// We must generate the mask RELATIVE TO THE LAYER'S BOUNDS
+			// because the mask is applied to the <img> element which matches the layer's bounds.
+
+			const layer = this.layerManager.currentLayers.find((l) => l.id === layerId);
+			if (!layer) throw new Error('Layer not found');
+
+			// Determine layer bounds (in canvas pixels)
+			// If layer has no bounds (e.g. original background might not?), assume full canvas
+			const canvasW = this.assetData.width;
+			const canvasH = this.assetData.height;
+			
+			const layerX = layer.bounds?.x ?? 0;
+			const layerY = layer.bounds?.y ?? 0;
+			const layerW = layer.bounds?.width ?? canvasW;
+			const layerH = layer.bounds?.height ?? canvasH;
+
+			// Check for existing mask
+			const existingMask = this.layerManager.getMask(layerId);
+			
+			const canvas = document.createElement('canvas');
+			canvas.width = layerW;
+			canvas.height = layerH;
+			const ctx = canvas.getContext('2d');
+			if (!ctx) throw new Error('No context');
+
+			if (existingMask) {
+				// If existing mask exists, draw it first
+				// We assume existing mask matches layer bounds (robustness assumption)
+				const img = new Image();
+				await new Promise((resolve) => {
+					img.onload = resolve;
+					img.src = existingMask.maskData;
+				});
+				ctx.drawImage(img, 0, 0, layerW, layerH);
+			} else {
+				// Initialize as full opaque (white)
+				ctx.fillStyle = 'white';
+				ctx.fillRect(0, 0, layerW, layerH);
+			}
+
+			// Draw the ERASE polygon
+			// We must translate separate canvas points to layer-local coordinates
+			// Point (px) = Point (normalized) * CanvasSize
+			// LocalPoint (px) = Point (px) - LayerOffset
+			
+			ctx.globalCompositeOperation = 'destination-out';
+			
+			ctx.beginPath();
+			points.forEach((p, i) => {
+				const globalX = p.x * canvasW;
+				const globalY = p.y * canvasH;
+				const localX = globalX - layerX;
+				const localY = globalY - layerY;
+				
+				if (i === 0) ctx.moveTo(localX, localY);
+				else ctx.lineTo(localX, localY);
+			});
+			ctx.closePath();
+			ctx.fillStyle = 'black'; 
+			ctx.fill();
+
+			// Export
+			const base64 = canvas.toDataURL('image/png');
+			
+			this.layerManager.setMask(layerId, base64, {
+				x: layerX, y: layerY, width: layerW, height: layerH
+			});
+
+			toast.success('Area erased', { id: toastId });
+			this.historyManager.addLocalEntry('erase', layerId);
+
+		} catch (e: any) {
+			console.error('Delete error:', e);
+			toast.error('Delete failed: ' + e.message, { id: toastId });
+		} finally {
+			this.isProcessing = false;
 		}
 	}
 }

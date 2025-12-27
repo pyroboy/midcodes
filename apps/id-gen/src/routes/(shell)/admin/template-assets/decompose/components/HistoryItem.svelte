@@ -58,11 +58,41 @@
 				label: `DECOMPOSE (${item.layers.length})`,
 				color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'
 			};
+				color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'
+			};
+		}
+		if (item.model === 'DRAW') {
+			return {
+				label: 'DRAW',
+				color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400'
+			};
+		}
+		if (item.model === 'ERASE') {
+			return {
+				label: 'ERASE',
+				color: 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400'
+			};
+		}
+		if (item.model === 'FILL') {
+			return {
+				label: 'FILL',
+				color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400'
+			};
 		}
 		if ((item as any).action === 'crop') {
 			return {
 				label: 'CROP',
 				color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+			};
+		}
+		if (
+			(item as any).action === 'lasso-cut' ||
+			(item as any).action === 'lasso-copy' ||
+			(item as any).action === 'copy'
+		) {
+			return {
+				label: 'COPY',
+				color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400'
 			};
 		}
 		if (

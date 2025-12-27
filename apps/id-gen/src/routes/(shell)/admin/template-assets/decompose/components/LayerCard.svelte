@@ -19,6 +19,7 @@
 	import * as Select from '$lib/components/ui/select';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { Button } from '$lib/components/ui/button';
+	import LayerActions from './LayerActions.svelte';
 	import type { DecomposedLayer, LayerSelection } from '$lib/schemas/decompose.schema';
 
 	let {
@@ -86,7 +87,7 @@
 		onDragOver?: (e: DragEvent) => void;
 		onDragLeave?: () => void;
 		onDrop?: (e: DragEvent) => void;
-		onAction?: (action: 'decompose' | 'upscale' | 'remove' | 'crop') => void;
+		onAction?: (action: 'decompose' | 'upscale' | 'remove' | 'crop' | 'duplicate') => void;
 		onMoveUp?: () => void;
 		onMoveDown?: () => void;
 	} = $props();
@@ -199,9 +200,9 @@
 			</button>
 		{/if}
 
-		<!-- Layer Thumbnail -->
+		<!-- Layer Thumbnail with checkerboard for transparency -->
 		<button
-			class="w-14 h-14 rounded-lg border border-border bg-muted overflow-hidden flex-shrink-0 flex items-center justify-center cursor-zoom-in group relative"
+			class="layer-thumbnail w-14 h-14 rounded-lg border border-border overflow-hidden flex-shrink-0 flex items-center justify-center cursor-zoom-in group relative"
 			onclick={(e) => {
 				e.stopPropagation();
 				onPreviewImage?.(layer.imageUrl, layer.name);
@@ -209,17 +210,20 @@
 			title="Click to view full image"
 		>
 			{#if selection?.elementType === 'qr'}
-				<span class="text-[10px] text-muted-foreground font-medium">QR<br />Code</span>
+				<span
+					class="text-[10px] text-muted-foreground font-medium bg-muted w-full h-full flex items-center justify-center"
+					>QR<br />Code</span
+				>
 			{:else}
 				<img
 					src={layer.imageUrl}
 					alt="Thumbnail"
-					class="w-full h-full object-contain"
+					class="w-full h-full object-contain relative z-10"
 					style="opacity: {isOriginal ? 1 : (opacity ?? 100) / 100}"
 				/>
 			{/if}
 			<div
-				class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center"
+				class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center z-20"
 			>
 				<ZoomIn class="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
 			</div>
@@ -279,32 +283,28 @@
 				</div>
 			{/if}
 
-			<!-- Actions Menu -->
+			<!-- Actions Menu (New Phase 4) -->
 			{#if !mergeMode}
-				<DropdownMenu.Root>
-					<DropdownMenu.Trigger>
-						{#snippet child({ props })}
-							<Button {...props} variant="ghost" size="icon" class="h-8 w-8">
-								<MoreVertical class="h-4 w-4" />
-							</Button>
-						{/snippet}
-					</DropdownMenu.Trigger>
-					<DropdownMenu.Content align="end">
-						<DropdownMenu.Item onclick={() => onAction?.('upscale')}>
-							<Sparkles class="mr-2 h-4 w-4" /> Upscale
-						</DropdownMenu.Item>
-						<DropdownMenu.Item onclick={() => onAction?.('decompose')}>
-							<ImageIcon class="mr-2 h-4 w-4" /> Decompose
-						</DropdownMenu.Item>
-						<DropdownMenu.Item onclick={() => onAction?.('crop')}>
-							<Scissors class="mr-2 h-4 w-4" /> Crop
-						</DropdownMenu.Item>
-						<DropdownMenu.Separator />
-						<DropdownMenu.Item onclick={() => onAction?.('remove')}>
-							<Trash2 class="mr-2 h-4 w-4" /> Remove Element
-						</DropdownMenu.Item>
-					</DropdownMenu.Content>
-				</DropdownMenu.Root>
+				<LayerActions
+					layerId={layer.id}
+					onAction={(action) => {
+						if (action === 'rename') {
+							// Trigger rename (focus input) - implementation detail: could auto-focus variable name input
+							onToggleExpanded?.();
+							setTimeout(() => {
+								document.getElementById(`varName-${layer.id}`)?.focus();
+							}, 100);
+						} else if (action === 'duplicate') {
+							onAction?.('duplicate');
+						} else if (action === 'delete') {
+							onDelete?.();
+						} else if (action === 'moveUp') {
+							onMoveUp?.();
+						} else if (action === 'moveDown') {
+							onMoveDown?.();
+						}
+					}}
+				/>
 			{/if}
 
 			<!-- Delete Button (Quick access) -->
@@ -420,3 +420,31 @@
 		</div>
 	{/if}
 </div>
+
+<style>
+	/* Checkerboard pattern for transparent layer previews */
+	.layer-thumbnail {
+		background-image:
+			linear-gradient(45deg, #e5e5e5 25%, transparent 25%),
+			linear-gradient(-45deg, #e5e5e5 25%, transparent 25%),
+			linear-gradient(45deg, transparent 75%, #e5e5e5 75%),
+			linear-gradient(-45deg, transparent 75%, #e5e5e5 75%);
+		background-size: 8px 8px;
+		background-position:
+			0 0,
+			0 4px,
+			4px -4px,
+			-4px 0px;
+		background-color: #fff;
+	}
+
+	/* Dark mode adjustment */
+	:global(.dark) .layer-thumbnail {
+		background-image:
+			linear-gradient(45deg, #374151 25%, transparent 25%),
+			linear-gradient(-45deg, #374151 25%, transparent 25%),
+			linear-gradient(45deg, transparent 75%, #374151 75%),
+			linear-gradient(-45deg, transparent 75%, #374151 75%);
+		background-color: #1f2937;
+	}
+</style>

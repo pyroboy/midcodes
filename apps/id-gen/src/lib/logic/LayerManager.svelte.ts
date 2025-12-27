@@ -1,15 +1,34 @@
 import { saveSession, loadSession, clearSession } from '$lib/utils/decomposeSession';
-import type { DecomposedLayer, LayerSelection } from '$lib/schemas/decompose.schema';
+import type { DecomposedLayer, LayerSelection, CachedLayer } from '$lib/schemas/decompose.schema';
+import type { SelectionResult } from './tools';
+import { uploadProcessedImage } from '$lib/remote/index.remote';
+import { fileToDataUrl } from '$lib/utils/imageProcessing';
+import { toast } from 'svelte-sonner';
+
+/**
+ * Mask data for non-destructive erasing.
+ * Stores mask information per layer for Phase 6 eraser tool.
+ */
+export interface LayerMask {
+	layerId: string;
+	/** Base64 encoded canvas data representing the mask */
+	maskData: string;
+	bounds: { x: number; y: number; width: number; height: number };
+}
 
 export class LayerManager {
 	// Global State
 	activeSide = $state<'front' | 'back'>('front');
 	saveState = $state<'saved' | 'saving' | 'unsaved'>('saved');
+	syncState = $state<'synced' | 'pending' | 'syncing'>('synced');
 
 	// Layer Data
 	frontLayers = $state<DecomposedLayer[]>([]);
 	backLayers = $state<DecomposedLayer[]>([]);
 	selections = $state<Map<string, LayerSelection>>(new Map());
+
+	// Mask Data (Phase 1 requirement - non-destructive editing support)
+	masks = $state<Map<string, LayerMask>>(new Map());
 
 	// UI State
 	opacity = $state<Map<string, number>>(new Map());
@@ -17,6 +36,25 @@ export class LayerManager {
 	mergeMode = $state(false);
 	selectedForMerge = $state<Set<string>>(new Set());
 	showOriginalLayer = $state(true);
+
+	showOriginalLayer = $state(true);
+
+	// Cache State (Phase 8 - full upload queue system)
+	cache = $state<Map<string, CachedLayer>>(new Map());
+
+	// Concurrency & Resource State
+	private isUploading = false;
+	private blobLayers = new Set<string>(); // IDs of layers with blob URLs
+
+	// Derived: count of pending/failed uploads
+	pendingUploads = $derived(
+		Array.from(this.cache.values()).filter(
+			(c) => c.uploadStatus === 'pending' || c.uploadStatus === 'failed'
+		).length
+	);
+
+	// Selection State (Phase 3)
+	currentSelection = $state<SelectionResult | null>(null);
 
 	// Derived
 	currentLayers = $derived(this.activeSide === 'front' ? this.frontLayers : this.backLayers);
@@ -29,9 +67,31 @@ export class LayerManager {
 		this.activeSide = side;
 	}
 
+	// --- Resource Management ---
+
+	private registerBlobLayer(layerId: string) {
+		this.blobLayers.add(layerId);
+	}
+
+	private cleanupBlobLayer(layerId: string, imageUrl: string) {
+		if (this.blobLayers.has(layerId) || imageUrl.startsWith('blob:')) {
+			URL.revokeObjectURL(imageUrl);
+			this.blobLayers.delete(layerId);
+		}
+	}
+
 	// --- Core Layer Operations ---
 
 	addLayer(layer: DecomposedLayer, selection: LayerSelection) {
+		const currentCount = this.activeSide === 'front' ? this.frontLayers.length : this.backLayers.length;
+		if (currentCount >= 10) {
+			toast.warning('High layer count may affect performance');
+		}
+
+		if (layer.imageUrl.startsWith('blob:')) {
+			this.registerBlobLayer(layer.id);
+		}
+
 		if (layer.side === 'front') this.frontLayers.push(layer);
 		else this.backLayers.push(layer);
 
@@ -45,6 +105,9 @@ export class LayerManager {
 		const index = list.findIndex((l) => l.id === layerId);
 		if (index === -1) return;
 
+		const layer = list[index];
+		this.cleanupBlobLayer(layer.id, layer.imageUrl);
+
 		list.splice(index, 1);
 		// Re-index zIndex
 		list.forEach((l, i) => (l.zIndex = i));
@@ -54,18 +117,30 @@ export class LayerManager {
 		this.markUnsaved();
 	}
 
+	/**
+	 * Move a layer up or down in the visual stack.
+	 * "up" = higher zIndex (visually on top), "down" = lower zIndex (visually below).
+	 *
+	 * In the layer panel (displayed bottom-to-top), this means:
+	 * - "up" moves the layer to a LATER position in the array (swap with next)
+	 * - "down" moves the layer to an EARLIER position in the array (swap with previous)
+	 */
 	moveLayer(layerId: string, direction: 'up' | 'down') {
 		const list = this.activeSide === 'front' ? this.frontLayers : this.backLayers;
 		const index = list.findIndex((l) => l.id === layerId);
+		if (index === -1) return;
 
-		if (direction === 'up' && index > 0) {
-			[list[index - 1], list[index]] = [list[index], list[index - 1]];
-		} else if (direction === 'down' && index < list.length - 1) {
+		// "up" = higher zIndex = swap with next element (later in array)
+		// "down" = lower zIndex = swap with previous element (earlier in array)
+		if (direction === 'up' && index < list.length - 1) {
 			[list[index], list[index + 1]] = [list[index + 1], list[index]];
+		} else if (direction === 'down' && index > 0) {
+			[list[index - 1], list[index]] = [list[index], list[index - 1]];
 		} else {
 			return;
 		}
 
+		// Re-index all layers after swap
 		list.forEach((l, i) => (l.zIndex = i));
 		this.markUnsaved();
 	}
@@ -74,6 +149,11 @@ export class LayerManager {
 		const list = this.activeSide === 'front' ? this.frontLayers : this.backLayers;
 		const layer = list.find((l) => l.id === layerId);
 		if (layer) {
+			// If replacing a blob URL, revoke the old one
+			if (layer.imageUrl.startsWith('blob:') && layer.imageUrl !== newUrl) {
+				this.cleanupBlobLayer(layer.id, layer.imageUrl);
+			}
+
 			layer.imageUrl = newUrl;
 			// Update selection too if needed
 			const sel = this.selections.get(layerId);
@@ -106,6 +186,59 @@ export class LayerManager {
 		this.selectedForMerge = new Set(this.selectedForMerge);
 	}
 
+	// --- Mask Management (Phase 1 requirement for Phase 6) ---
+
+
+	/**
+	 * Get mask for a layer if it exists.
+	 */
+	getMask(layerId: string): LayerMask | undefined {
+		return this.masks.get(layerId);
+	}
+
+	/**
+	 * Set or update mask for a layer.
+	 */
+	setMask(layerId: string, maskData: string, bounds: LayerMask['bounds']): void {
+		this.masks.set(layerId, { layerId, maskData, bounds });
+		this.masks = new Map(this.masks); // Trigger reactivity
+		this.markUnsaved();
+	}
+
+	/**
+	 * Clear mask for a layer (restore original).
+	 */
+	clearMask(layerId: string): void {
+		if (this.masks.has(layerId)) {
+			this.masks.delete(layerId);
+			this.masks = new Map(this.masks);
+			this.markUnsaved();
+		}
+	}
+
+	/**
+	 * Check if a layer has a mask.
+	 */
+	hasMask(layerId: string): boolean {
+		return this.masks.has(layerId);
+	}
+
+	// --- Selection Management (Phase 3) ---
+
+	/**
+	 * Set the current selection result.
+	 */
+	setSelection(result: SelectionResult | null): void {
+		this.currentSelection = result;
+	}
+
+	/**
+	 * Clear the current selection.
+	 */
+	clearSelection(): void {
+		this.currentSelection = null;
+	}
+
 	// --- Session Management ---
 
 	markUnsaved() {
@@ -114,17 +247,28 @@ export class LayerManager {
 
 	saveToStorage(assetId: string) {
 		this.saveState = 'saving';
-		saveSession({
-			assetId,
-			frontLayers: this.frontLayers,
-			backLayers: this.backLayers,
-			layerSelections: Object.fromEntries(this.selections),
-			layerOpacity: Object.fromEntries(this.opacity),
-			currentSide: this.activeSide,
-			showOriginalLayer: this.showOriginalLayer,
-			savedAt: new Date().toISOString()
-		});
-		this.saveState = 'saved';
+		try {
+			saveSession({
+				assetId,
+				frontLayers: this.frontLayers,
+				backLayers: this.backLayers,
+				layerSelections: Object.fromEntries(this.selections),
+				layerOpacity: Object.fromEntries(this.opacity),
+				layerMasks: Object.fromEntries(this.masks),
+				currentSide: this.activeSide,
+				showOriginalLayer: this.showOriginalLayer,
+				savedAt: new Date().toISOString()
+			});
+			this.saveState = 'saved';
+		} catch (e) {
+			console.error('Save failed:', e);
+			this.saveState = 'unsaved';
+			if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+				toast.error('Local storage full. Cannot save progress.');
+			} else {
+				toast.error('Failed to save session.');
+			}
+		}
 	}
 
 	loadFromStorage(assetId: string) {
@@ -134,20 +278,25 @@ export class LayerManager {
 			this.backLayers = session.backLayers || [];
 			this.selections = new Map(Object.entries(session.layerSelections || {}));
 			this.opacity = new Map(Object.entries(session.layerOpacity || {}));
+			this.masks = new Map(Object.entries(session.layerMasks || {}));
 			this.activeSide = session.currentSide || 'front';
 			this.showOriginalLayer = session.showOriginalLayer ?? true;
 			this.saveState = 'saved';
-			return true;
+			return session;
 		}
-		return false;
+		return null;
 	}
 
 	clearCurrentSide() {
+		const list = this.activeSide === 'front' ? this.frontLayers : this.backLayers;
+		list.forEach((l) => {
+			this.selections.delete(l.id);
+			this.cleanupBlobLayer(l.id, l.imageUrl);
+		});
+		
 		if (this.activeSide === 'front') {
-			this.frontLayers.forEach((l) => this.selections.delete(l.id));
 			this.frontLayers = [];
 		} else {
-			this.backLayers.forEach((l) => this.selections.delete(l.id));
 			this.backLayers = [];
 		}
 		this.selections = new Map(this.selections);
@@ -185,29 +334,281 @@ export class LayerManager {
 		}
 	}
 
+	// --- Layer Actions (Phase 4) ---
+
+	duplicateLayer(layerId: string) {
+		const list = this.activeSide === 'front' ? this.frontLayers : this.backLayers;
+		const layerIndex = list.findIndex((l) => l.id === layerId);
+		if (layerIndex === -1) return;
+
+		const originalLayer = list[layerIndex];
+		const originalSelection = this.selections.get(layerId);
+		const originalMask = this.masks.get(layerId);
+
+		// Check limit
+		if (list.length >= 10) {
+			toast.warning('High layer count may affect performance');
+		}
+
+		// Generate new name
+		let newName = `${originalLayer.name} (Copy)`;
+		let counter = 2;
+		while (list.some((l) => l.name === newName)) {
+			newName = `${originalLayer.name} (Copy ${counter})`;
+			counter++;
+		}
+
+		// Create new layer object
+		const newId = crypto.randomUUID();
+		const newLayer: DecomposedLayer = {
+			...originalLayer,
+			id: newId,
+			name: newName,
+			// Place it right above the original
+			zIndex: originalLayer.zIndex + 1
+		};
+
+		// Note: If original has a blob URL, we should probably clone the blob 
+		// if we want them to be independent, but strings are immutable so 
+		// sharing the URL is fine until one changes.
+		// However, we need to track it as a blob layer if it is one.
+		if (newLayer.imageUrl.startsWith('blob:')) {
+			this.registerBlobLayer(newId);
+		}
+
+		// Insert into list
+		list.splice(layerIndex + 1, 0, newLayer);
+
+		// Re-index all z-indices
+		list.forEach((l, i) => (l.zIndex = i));
+
+		// Duplicate Selection
+		if (originalSelection) {
+			this.selections.set(newId, {
+				...originalSelection,
+				layerId: newId,
+				variableName: `${originalSelection.variableName}_copy`
+			});
+			this.selections = new Map(this.selections);
+		}
+
+		// Duplicate Mask
+		if (originalMask) {
+			this.masks.set(newId, {
+				...originalMask,
+				layerId: newId
+			});
+			this.masks = new Map(this.masks);
+		}
+
+		// Duplicate cached blob if present (Phase 8 upload queue preparation)
+		const originalCachedBlob = this.cache.get(layerId);
+		if (originalCachedBlob) {
+			this.cache.set(newId, originalCachedBlob);
+			this.cache = new Map(this.cache); // Trigger reactivity
+		}
+
+		this.markUnsaved();
+	}
+
+	reorderLayer(fromIndex: number, toIndex: number) {
+		const list = this.activeSide === 'front' ? this.frontLayers : this.backLayers;
+		
+		if (fromIndex < 0 || fromIndex >= list.length || toIndex < 0 || toIndex >= list.length) return;
+		if (fromIndex === toIndex) return;
+
+		const [movedLayer] = list.splice(fromIndex, 1);
+		list.splice(toIndex, 0, movedLayer);
+
+		// Re-index all z-indices
+		list.forEach((l, i) => (l.zIndex = i));
+		
+		this.markUnsaved();
+	}
+
 	// Helper to create objects
-	createLayerObj(url: string, name: string, bounds: any, side: 'front' | 'back', zIndex: number) {
+	createLayerObj(
+		url: string,
+		name: string,
+		bounds: any,
+		side: 'front' | 'back',
+		zIndex: number,
+		cachedBlob?: Blob,
+		layerType: 'decomposed' | 'drawing' | 'copied' | 'filled' = 'decomposed'
+	) {
 		const id = crypto.randomUUID();
 		const safeName = name.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
+
+		// If we have a blob, add to cache for upload queue
+		if (cachedBlob) {
+			this.addToCache(id, cachedBlob, side);
+		}
+
 		return {
 			layer: {
 				id,
 				name,
 				imageUrl: url,
 				zIndex,
-				suggestedType: 'unknown',
+				suggestedType: layerType === 'drawing' ? 'drawing' : 'unknown',
 				side,
-				bounds
+				bounds,
+				cachedBlob,
+				layerType
 			} as DecomposedLayer,
 			selection: {
 				layerId: id,
 				included: true,
-				elementType: 'image',
+				elementType: layerType === 'drawing' ? 'graphic' : 'image', // Drawings are graphics
 				variableName: `layer_${safeName}`,
 				bounds,
 				layerImageUrl: url,
 				side
 			} as LayerSelection
 		};
+	}
+
+	createDrawingLayer(blob: Blob, bounds: { x: number; y: number; width: number; height: number }) {
+		const url = URL.createObjectURL(blob);
+		const { layer, selection } = this.createLayerObj(
+			url,
+			'Drawing',
+			bounds,
+			this.activeSide,
+			this.currentLayers.length,
+			blob,
+			'drawing'
+		);
+		this.addLayer(layer, selection);
+	}
+
+	// --- Cache & Upload Queue (Phase 8) ---
+
+	/**
+	 * Add a blob to the upload cache with pending status.
+	 */
+	addToCache(layerId: string, blob: Blob, side: 'front' | 'back'): void {
+		const entry: CachedLayer = {
+			layerId,
+			blob,
+			side,
+			createdAt: new Date(),
+			uploadStatus: 'pending',
+			retryCount: 0
+		};
+		this.cache.set(layerId, entry);
+		this.cache = new Map(this.cache); // Trigger reactivity
+		this.syncState = 'pending';
+	}
+
+	/**
+	 * Get a cached blob URL for display (returns blob URL if cached, otherwise layer imageUrl).
+	 */
+	getCachedBlobUrl(layerId: string): string | null {
+		const entry = this.cache.get(layerId);
+		if (entry && entry.blob) {
+			return URL.createObjectURL(entry.blob);
+		}
+		return null;
+	}
+
+	/**
+	 * Process the upload queue - uploads all pending blobs to R2 sequentially.
+	 * Updates layer imageUrl on success, marks as failed on error.
+	 */
+	async processUploadQueue(): Promise<{ uploaded: number; failed: number }> {
+		if (this.isUploading) { 
+			console.log('Upload already in progress');
+			return { uploaded: 0, failed: 0 };
+		}
+		
+		const pending = Array.from(this.cache.entries()).filter(
+			([, entry]) => entry.uploadStatus === 'pending' || entry.uploadStatus === 'failed'
+		);
+
+		if (pending.length === 0) {
+			this.syncState = 'synced';
+			return { uploaded: 0, failed: 0 };
+		}
+
+		this.isUploading = true;
+		this.syncState = 'syncing';
+		let uploaded = 0;
+		let failed = 0;
+
+		try {
+			for (const [layerId, entry] of pending) {
+			// Update status to uploading
+			entry.uploadStatus = 'uploading';
+			this.cache.set(layerId, entry);
+			this.cache = new Map(this.cache);
+
+			try {
+				// Convert blob to base64
+				const base64 = await fileToDataUrl(entry.blob);
+
+				// Upload to R2
+				const result = await uploadProcessedImage({
+					imageBase64: base64,
+					mimeType: entry.blob.type || 'image/png'
+				});
+
+				if (result.success && result.url) {
+					// Update layer URL
+					this.updateLayerImageUrl(layerId, result.url);
+
+					// Mark as uploaded and remove from cache
+					entry.uploadStatus = 'uploaded';
+					this.cache.delete(layerId);
+					this.cache = new Map(this.cache);
+					uploaded++;
+				} else {
+					throw new Error(result.error || 'Upload failed');
+				}
+			} catch (err) {
+				// Mark as failed with error
+				entry.uploadStatus = 'failed';
+				entry.retryCount++;
+				entry.error = err instanceof Error ? err.message : 'Upload failed';
+				this.cache.set(layerId, entry);
+				this.cache = new Map(this.cache);
+				failed++;
+				console.error(`[LayerManager] Upload failed for ${layerId}:`, err);
+			}
+		}
+
+		} finally {
+			this.isUploading = false;
+			
+			// Update sync state
+			const stillPending = Array.from(this.cache.values()).some(
+				(c) => c.uploadStatus === 'pending' || c.uploadStatus === 'failed'
+			);
+			this.syncState = stillPending ? 'pending' : 'synced';
+		}
+
+		return { uploaded, failed };
+	}
+
+	/**
+	 * Retry failed uploads only.
+	 */
+	async retryFailedUploads(): Promise<{ uploaded: number; failed: number }> {
+		// Reset failed entries to pending (up to 3 retries)
+		for (const [layerId, entry] of this.cache.entries()) {
+			if (entry.uploadStatus === 'failed' && entry.retryCount < 3) {
+				entry.uploadStatus = 'pending';
+				this.cache.set(layerId, entry);
+			}
+		}
+		this.cache = new Map(this.cache);
+		return this.processUploadQueue();
+	}
+
+	/**
+	 * Check if there are any pending uploads that would be lost.
+	 */
+	hasPendingUploads(): boolean {
+		return this.pendingUploads > 0;
 	}
 }

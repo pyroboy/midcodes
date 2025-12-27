@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
 	import { deserialize } from '$app/forms';
+	import { invalidate } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { fade } from 'svelte/transition';
 	import { cubicOut, cubicIn } from 'svelte/easing';
@@ -22,7 +23,7 @@
 	// Utils
 	import { getPreloadState } from '$lib/services/preloadService';
 	import { LEGACY_CARD_SIZE } from '$lib/utils/sizeConversion';
-	import type { DatabaseTemplate } from '$lib/types/template';
+	import type { DatabaseTemplate, EditorTemplateData } from '$lib/types/template';
 	import type { CardSize } from '$lib/utils/sizeConversion';
 
 	let { data } = $props();
@@ -88,9 +89,9 @@
 	const editor = untrack(() =>
 		useTemplateEditor({
 			data: data,
-			initialTemplates: data.templates,
+			initialTemplates: data.templates as unknown as EditorTemplateData[],
 			user: data.user,
-			org_id: data.org_id
+			org_id: data.org_id ?? ''
 		})
 	);
 
@@ -122,7 +123,7 @@
 	}
 
 	// Wrap handleImageUpload to reset removal tracking when uploading new image
-	async function handleImageUploadWithTracking(files: FileList | null, side: 'front' | 'back') {
+	async function handleImageUploadWithTracking(files: File[], side: 'front' | 'back') {
 		if (side === 'front') userRemovedFront = false;
 		else userRemovedBack = false;
 		await imageUpload.handleImageUpload(files, side);
@@ -169,7 +170,7 @@
 	const templateSave = untrack(() =>
 		useTemplateSave({
 			user: data.user,
-			org_id: data.org_id,
+			org_id: data.org_id ?? '',
 			uploadImage: uploadImage,
 			onSaveSuccess: (savedTemplate) => {
 				editor.updateTemplatesList(savedTemplate);
@@ -295,7 +296,7 @@
 	// Auto-load template from URL
 	$effect(() => {
 		if (data.selectedTemplate && editor.currentTemplate?.id !== data.selectedTemplate.id) {
-			editor.initializeEditor(data.selectedTemplate);
+			editor.initializeEditor(data.selectedTemplate as unknown as EditorTemplateData);
 		}
 	});
 

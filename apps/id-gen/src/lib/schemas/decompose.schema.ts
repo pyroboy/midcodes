@@ -12,6 +12,7 @@ export const layerElementTypeSchema = z.enum([
 	'photo', // Photo placeholder (user-uploaded)
 	'qr', // QR code area
 	'signature', // Signature field
+	'drawing', // Freehand drawing layer
 	'unknown' // Not yet classified
 ]);
 export type LayerElementType = z.infer<typeof layerElementTypeSchema>;
@@ -42,9 +43,26 @@ export const decomposedLayerSchema = z.object({
 	zIndex: z.number().int().min(0),
 	suggestedType: layerElementTypeSchema.default('unknown'),
 	side: z.enum(['front', 'back']).default('front'),
-	parentId: z.string().optional() // Make sure parentId is supported
+	parentId: z.string().optional(), // Make sure parentId is supported
+	// NEW fields for client-side created layers
+	cachedBlob: z.custom<Blob>((val) => val instanceof Blob).optional(), // Temporary storage before upload
+	layerType: z.enum(['decomposed', 'drawing', 'copied', 'filled']).optional()
 });
 export type DecomposedLayer = z.infer<typeof decomposedLayerSchema>;
+
+/**
+ * Cached layer entry for Phase 8 upload queue system.
+ * Stores blobs locally before uploading to R2.
+ */
+export interface CachedLayer {
+	layerId: string;
+	blob: Blob;
+	side: 'front' | 'back';
+	createdAt: Date;
+	uploadStatus: 'pending' | 'uploading' | 'failed' | 'uploaded';
+	retryCount: number;
+	error?: string;
+}
 
 // User selection for converting layer to element
 export const layerSelectionSchema = z.object({

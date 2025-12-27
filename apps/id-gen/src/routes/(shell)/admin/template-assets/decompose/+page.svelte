@@ -1,10 +1,11 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	// Logic
 	import { LayerManager } from '$lib/logic/LayerManager.svelte';
+	import { ToolManager } from '$lib/logic/ToolManager.svelte';
 	import { ImageProcessor } from '$lib/logic/ImageProcessor.svelte';
 	import { HistoryManager } from '$lib/logic/HistoryManager.svelte';
 	import { getProxiedUrl } from '$lib/utils/storage';
@@ -13,7 +14,9 @@
 	import DecomposeHeader from './components/DecomposeHeader.svelte';
 	import ImagePreview from './components/ImagePreview.svelte';
 	import LayerCard from './components/LayerCard.svelte';
-	import HistoryItemCard from './components/HistoryItem.svelte'; // Using refactored HistoryItem
+	import HistoryItemCard from './components/HistoryItem.svelte';
+	import CanvasStack from './components/CanvasStack.svelte';
+	import SyncIndicator from './components/SyncIndicator.svelte';
 
 	// Modals
 	import DecomposeModal from './components/modals/DecomposeModal.svelte';
@@ -49,6 +52,7 @@
 
 	// --- Initialize Logic ---
 	const layerMgr = new LayerManager();
+	const toolMgr = new ToolManager();
 	const historyMgr = new HistoryManager(layerMgr, () => data.template?.id);
 	const assetConfig = $derived({
 		id: data.asset.id,
@@ -60,8 +64,6 @@
 
 	// --- Local UI State ---
 	let selectedLayerId = $state<string | null>(null);
-	let activeTool = $state<'brush' | 'eraser' | 'lasso' | 'eyedropper' | null>(null);
-	let currentColor = $state('#3b82f6');
 	// Track overridden background URLs after setAsMain completes
 	let overriddenFrontUrl = $state<string | null>(null);
 	let overriddenBackUrl = $state<string | null>(null);
@@ -101,7 +103,12 @@
 	onMount(() => {
 		historyMgr.load();
 		// Attempt session load
-		layerMgr.loadFromStorage(data.asset.id);
+		const session = layerMgr.loadFromStorage(data.asset.id);
+		if (session) {
+			// Hydrate tools
+			if (session.activeTool) toolMgr.setTool(session.activeTool);
+			if (session.toolOptions) toolMgr.setToolOptions(session.toolOptions);
+		}
 
 		// Set up callback to auto-add completed job results to layers
 		historyMgr.onJobComplete = (jobId: string, result: any, provider: string) => {
@@ -136,6 +143,18 @@
 				toast.success('Result added to layers');
 			}
 		};
+
+		// Phase 8: beforeunload warning for pending uploads
+		function handleBeforeUnload(e: BeforeUnloadEvent) {
+			if (layerMgr.hasPendingUploads()) {
+				e.preventDefault();
+			}
+		}
+		window.addEventListener('beforeunload', handleBeforeUnload);
+
+		return () => {
+			window.removeEventListener('beforeunload', handleBeforeUnload);
+		};
 	});
 
 	$effect(() => {
@@ -150,7 +169,10 @@
 	});
 
 	// --- Handlers ---
-	function handleMenuAction(action: 'decompose' | 'upscale' | 'remove' | 'crop', layerId: string) {
+	function handleMenuAction(
+		action: 'decompose' | 'upscale' | 'remove' | 'crop' | 'duplicate',
+		layerId: string
+	) {
 		actionModalLayerId = layerId;
 		selectedLayerId = layerId;
 		if (action === 'decompose') modals.decompose = true;
@@ -168,6 +190,9 @@
 			if (layerFound && layerFound.imageUrl) {
 				modals.crop = true;
 			}
+		}
+		if (action === 'duplicate') {
+			layerMgr.duplicateLayer(layerId);
 		}
 	}
 
@@ -216,12 +241,17 @@
 		}
 	}
 
-	// Drag & Drop for Sidebar
+	// Drag & Drop for Sidebar & Layer Reordering
 	function handleSidebarDragStart(e: DragEvent, layer: any) {
 		e.dataTransfer?.setData('application/json', JSON.stringify({ type: 'history-layer', layer }));
 	}
 
-	function handleDrop(e: DragEvent) {
+	function handleLayerDragStart(e: DragEvent, index: number) {
+		e.dataTransfer?.setData('application/json', JSON.stringify({ type: 'layer-reorder', index }));
+		e.dataTransfer!.effectAllowed = 'move';
+	}
+
+	function handleDrop(e: DragEvent, targetIndex?: number) {
 		e.preventDefault();
 		if (!e.dataTransfer) return;
 		const raw = e.dataTransfer.getData('application/json');
@@ -231,6 +261,11 @@
 				if (data.type === 'history-layer') {
 					layerMgr.addFromHistory(data.layer);
 					toast.success('Added from history');
+				} else if (data.type === 'layer-reorder' && typeof targetIndex === 'number') {
+					const fromIndex = data.index;
+					if (fromIndex !== targetIndex) {
+						layerMgr.reorderLayer(fromIndex, targetIndex);
+					}
 				}
 			} catch (e) {
 				console.error(e);
@@ -250,7 +285,26 @@
 		backHistoryCount={historyMgr.stats?.back?.count || 0}
 		hasUpscaledPreview={layerMgr.currentLayers.some((l) => l.imageUrl.includes('upscaled'))}
 		isSaving={processor.isProcessing}
-		onSave={() => layerMgr.saveToStorage(data.asset.id)}
+		onSave={async () => {
+			// Manually inject tool state into session save (since LayerManager no longer holds it)
+			// Ideally LayerManager logic should be updated to accept this, but for now we rely on
+			// the fact that standard save happens in LayerManager.
+			// To persist tools properly we need to update LayerManager.saveToStorage signature or internal logic?
+			// For Phase 2, we just ensure LayerManager saves.
+			// TODO: Update saveSession to include tool state from ToolManager
+			layerMgr.saveToStorage(data.asset.id);
+
+			// Phase 8: Also process upload queue
+			if (layerMgr.hasPendingUploads()) {
+				const result = await layerMgr.processUploadQueue();
+				if (result.uploaded > 0) {
+					toast.success(`Uploaded ${result.uploaded} layer(s) to cloud`);
+				}
+				if (result.failed > 0) {
+					toast.error(`${result.failed} upload(s) failed`);
+				}
+			}
+		}}
 		onReset={() => {
 			layerMgr.clearCurrentSide();
 			// Reset overrides to show original file
@@ -262,38 +316,83 @@
 
 	<div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
 		<div class="lg:col-span-2 space-y-4">
-			<ImagePreview
-				{currentImageUrl}
-				currentLayers={layerMgr.currentLayers}
-				layerSelections={layerMgr.selections}
-				showOriginalLayer={layerMgr.showOriginalLayer}
+			<CanvasStack
+				layerManager={layerMgr}
+				toolManager={toolMgr}
+				historyManager={historyMgr}
+				disabled={processor.isProcessing}
 				{selectedLayerId}
-				activeSide={layerMgr.activeSide}
-				assetName={data.asset.name}
-				widthPixels={data.asset.widthPixels || 1050}
-				heightPixels={data.asset.heightPixels || 600}
-				orientation={data.asset.orientation || 'horizontal'}
-				bind:activeTool
-				bind:currentColor
-				onLassoCut={(points) => {
-					console.log('Lasso Cut Triggered:', { selectedLayerId, points: points.length });
-					let sourceUrl = '';
-
-					if (selectedLayerId === 'original-file') {
-						sourceUrl = currentImageUrl || '';
-					} else if (selectedLayerId) {
-						const l = layerMgr.currentLayers.find((layer) => layer.id === selectedLayerId);
-						if (l) sourceUrl = l.imageUrl;
-					}
-
-					if (sourceUrl) {
-						processor.cutPolygon(selectedLayerId, points, sourceUrl);
-					} else {
-						console.error('Lasso Cut: No source URL found', { selectedLayerId });
+				onDuplicate={() => {
+					if (selectedLayerId) layerMgr.duplicateLayer(selectedLayerId);
+				}}
+				onDelete={() => {
+					// Shortcut delete - direct for now
+					if (selectedLayerId) {
+						layerMgr.removeLayer(selectedLayerId);
+						selectedLayerId = null;
+						toast.success('Layer deleted');
 					}
 				}}
-				isProcessing={processor.isProcessing}
-			/>
+				onMoveLayer={(dir) => {
+					if (selectedLayerId) layerMgr.moveLayer(selectedLayerId, dir);
+				}}
+			>
+				<ImagePreview
+					layerManager={layerMgr}
+					toolManager={toolMgr}
+					imageProcessor={processor}
+					historyManager={historyMgr}
+					{currentImageUrl}
+					currentLayers={layerMgr.currentLayers}
+					layerSelections={layerMgr.selections}
+					masks={layerMgr.masks}
+					showOriginalLayer={layerMgr.showOriginalLayer}
+					{selectedLayerId}
+					activeSide={layerMgr.activeSide}
+					assetName={data.asset.name}
+					widthPixels={data.asset.widthPixels || 1050}
+					heightPixels={data.asset.heightPixels || 600}
+					orientation={data.asset.orientation || 'horizontal'}
+					activeTool={toolMgr.activeTool}
+					onToolChange={(tool) => toolMgr.setTool(tool)}
+					onDuplicate={() => {
+						if (selectedLayerId) layerMgr.duplicateLayer(selectedLayerId);
+					}}
+					currentColor={toolMgr.toolOptions.color}
+					onSelectionAction={(action, points) => {
+						console.log('Selection Action Triggered:', {
+							action,
+							selectedLayerId,
+							points: points.length
+						});
+
+						if (action === 'copy') {
+							let sourceUrl = '';
+							if (selectedLayerId === 'original-file') {
+								sourceUrl = currentImageUrl || '';
+							} else if (selectedLayerId) {
+								const l = layerMgr.currentLayers.find((layer) => layer.id === selectedLayerId);
+								if (l) sourceUrl = l.imageUrl;
+							}
+
+							if (sourceUrl) {
+								processor.cutPolygon(selectedLayerId, points, sourceUrl);
+							} else {
+								toast.error('No layer selected to copy from');
+							}
+						} else if (action === 'fill') {
+							processor.fillSelection(points, toolMgr.toolOptions.color);
+						} else if (action === 'delete') {
+							if (selectedLayerId && selectedLayerId !== 'original-file') {
+								processor.deleteSelection(selectedLayerId, points);
+							} else {
+								toast.error('Cannot delete from background/original file directly (yet)');
+							}
+						}
+					}}
+					isProcessing={processor.isProcessing}
+				/>
+			</CanvasStack>
 
 			<!-- Global Options / Quick Actions -->
 			<div
@@ -374,7 +473,7 @@
 
 				<div
 					class="flex-1 overflow-y-auto p-2 space-y-2"
-					ondrop={handleDrop}
+					ondrop={(e) => handleDrop(e)}
 					ondragover={(e) => e.preventDefault()}
 					role="region"
 					aria-label="Layer list"
@@ -401,7 +500,7 @@
 						}}
 					/>
 
-					{#each layerMgr.currentLayers as layer (layer.id)}
+					{#each [...layerMgr.currentLayers].reverse() as layer, i (layer.id)}
 						<LayerCard
 							{layer}
 							selection={layerMgr.selections.get(layer.id)}
@@ -409,6 +508,9 @@
 							mergeMode={layerMgr.mergeMode}
 							isSelectedForMerge={layerMgr.selectedForMerge.has(layer.id)}
 							isProcessing={processor.processingLayerId === layer.id}
+							onDragStart={(e) => handleLayerDragStart(e, i)}
+							onDrop={(e) => handleDrop(e, i)}
+							onDragOver={(e) => e.preventDefault()}
 							onSelect={() => (selectedLayerId = layer.id)}
 							onMergeSelect={() => layerMgr.toggleMergeSelection(layer.id)}
 							onDelete={() => layerMgr.removeLayer(layer.id)}
@@ -505,7 +607,7 @@
 						<HistoryItemCard
 							{item}
 							onLoadRequest={() => historyMgr.restoreSession(item)}
-							onDragStart={(e) => handleSidebarDragStart(e, item)}
+							onDragStart={(e: DragEvent) => handleSidebarDragStart(e, item)}
 							isExpanded={historyMgr.expandedItems.has(item.id)}
 							onToggleExpanded={() => historyMgr.toggleExpand(item.id)}
 						/>

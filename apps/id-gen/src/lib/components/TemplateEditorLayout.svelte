@@ -22,7 +22,7 @@
 		onSave: () => void;
 		onClear: () => void;
 		onUpdateElements: (elements: TemplateElement[], side: 'front' | 'back') => void;
-		onImageUpload: (files: FileList | null, side: 'front' | 'back') => Promise<void>;
+		onImageUpload: (files: File[], side: 'front' | 'back') => Promise<void>;
 		onRemoveImage: (side: 'front' | 'back') => void;
 		onUpdateBackgroundPosition: (position: any, side: 'front' | 'back') => Promise<void>;
 		onDecompose: () => Promise<void>;
