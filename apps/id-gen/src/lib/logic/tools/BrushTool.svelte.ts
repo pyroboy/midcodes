@@ -52,10 +52,13 @@ export class BrushTool extends DrawingTool implements CanvasTool {
 		this.context.lineCap = 'round';
 		this.context.lineJoin = 'round';
 		this.context.strokeStyle = ctx.color;
-		this.context.lineWidth = ctx.size;
+		
+		// Scale brush size from CSS pixels to canvas intrinsic pixels
+		const scaleX = ctx.canvasDimensions.widthPixels / ctx.canvasRect.width;
+		this.context.lineWidth = ctx.size * scaleX;
 		this.context.globalAlpha = ctx.opacity / 100;
 
-		const point = this.getPoint(e, ctx.canvasRect);
+		const point = this.getPoint(e, ctx.canvasRect, ctx.canvasDimensions);
 		this.lastPoint = point;
 
 		// Initialize bounding box
@@ -77,7 +80,7 @@ export class BrushTool extends DrawingTool implements CanvasTool {
 	onPointerMove(e: PointerEvent, ctx: ToolContext): void {
 		if (!this.isDrawing || !this.context || !this.lastPoint) return;
 
-		const point = this.getPoint(e, ctx.canvasRect);
+		const point = this.getPoint(e, ctx.canvasRect, ctx.canvasDimensions);
 
 		// Update bounding box
 		this.updateBoundingBox(point.x, point.y);
@@ -103,11 +106,25 @@ export class BrushTool extends DrawingTool implements CanvasTool {
 		this.boundingBox = null;
 	}
 
-	private getPoint(e: PointerEvent, rect: DOMRect) {
-		return {
-			x: e.clientX - rect.left,
-			y: e.clientY - rect.top
-		};
+	/**
+	 * Transform CSS pixel coordinates to canvas intrinsic coordinates.
+	 * The canvas is displayed at CSS size but draws at intrinsic resolution.
+	 */
+	private getPoint(e: PointerEvent, rect: DOMRect, canvasDimensions?: { widthPixels: number; heightPixels: number }) {
+		const cssX = e.clientX - rect.left;
+		const cssY = e.clientY - rect.top;
+		
+		if (canvasDimensions) {
+			// Scale from CSS space to canvas intrinsic space
+			const scaleX = canvasDimensions.widthPixels / rect.width;
+			const scaleY = canvasDimensions.heightPixels / rect.height;
+			return {
+				x: cssX * scaleX,
+				y: cssY * scaleY
+			};
+		}
+		
+		return { x: cssX, y: cssY };
 	}
 
 	private updateBoundingBox(x: number, y: number) {

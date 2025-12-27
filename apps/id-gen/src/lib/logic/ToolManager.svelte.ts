@@ -10,6 +10,7 @@ export class ToolManager {
 		size: 20,
 		opacity: 100,
 		color: '#3b82f6',
+		hardness: 100,
 		tolerance: 32
 	});
 

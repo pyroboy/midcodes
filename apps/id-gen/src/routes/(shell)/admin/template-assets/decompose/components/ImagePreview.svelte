@@ -14,6 +14,7 @@
 	import { BucketTool } from '$lib/logic/tools/BucketTool.svelte';
 	import { GradientTool } from '$lib/logic/tools/GradientTool.svelte';
 	import DrawingCanvas from './DrawingCanvas.svelte';
+	import BrushCursor from './BrushCursor.svelte';
 	import type { ToolName, NormalizedPoint } from '$lib/logic/tools';
 	import { toast } from 'svelte-sonner';
 
@@ -135,6 +136,14 @@
 	let drawingCanvasElement: HTMLCanvasElement | undefined = $state();
 	let drawingContext: CanvasRenderingContext2D | null | undefined = $state();
 
+	// Mouse position for brush cursor (relative to canvas element)
+	let mousePosition = $state<{ x: number; y: number } | null>(null);
+
+	// Check if we should show the brush cursor
+	const showBrushCursor = $derived(
+		(activeTool === 'brush' || activeTool === 'eraser') && mousePosition !== null
+	);
+
 	function updateCanvasRect() {
 		if (canvasElement) {
 			canvasRect = canvasElement.getBoundingClientRect();
@@ -163,6 +172,7 @@
 			color: toolManager?.toolOptions?.color || currentColor,
 			size: toolManager?.toolOptions?.size || 20,
 			opacity: toolManager?.toolOptions?.opacity || 100,
+			hardness: toolManager?.toolOptions?.hardness ?? 100,
 			tolerance: toolManager?.toolOptions?.tolerance,
 			canvasDimensions: { widthPixels, heightPixels },
 			canvasElement: drawingCanvasElement,
@@ -188,6 +198,16 @@
 	}
 
 	function handlePointerMove(e: PointerEvent) {
+		// Update mouse position for brush cursor (in pixels relative to canvas element)
+		// This matches the coordinate system used by BrushTool for drawing
+		if ((activeTool === 'brush' || activeTool === 'eraser') && canvasElement) {
+			const rect = canvasElement.getBoundingClientRect();
+			mousePosition = {
+				x: e.clientX - rect.left,
+				y: e.clientY - rect.top
+			};
+		}
+
 		if (!activeTool || !canvasRect) return;
 
 		const ctx = {
@@ -200,6 +220,7 @@
 			color: toolManager?.toolOptions?.color || currentColor,
 			size: toolManager?.toolOptions?.size || 20,
 			opacity: toolManager?.toolOptions?.opacity || 100,
+			hardness: toolManager?.toolOptions?.hardness ?? 100,
 			tolerance: toolManager?.toolOptions?.tolerance,
 			canvasDimensions: { widthPixels, heightPixels },
 			canvasElement: drawingCanvasElement,
@@ -233,6 +254,7 @@
 			color: toolManager?.toolOptions?.color || currentColor,
 			size: toolManager?.toolOptions?.size || 20,
 			opacity: toolManager?.toolOptions?.opacity || 100,
+			hardness: toolManager?.toolOptions?.hardness ?? 100,
 			tolerance: toolManager?.toolOptions?.tolerance,
 			canvasDimensions: { widthPixels, heightPixels },
 			canvasElement: drawingCanvasElement,
@@ -372,20 +394,27 @@
 
 	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 	<div
-		class="relative aspect-[1.6/1] bg-muted/50 flex items-center justify-center pb-20 border border-border rounded-md overflow-hidden"
+		class="relative h-[500px] bg-muted/50 flex items-center justify-center p-4 border border-border rounded-md overflow-hidden"
 		onclick={handleOuterClick}
 		role="button"
 		tabindex="0"
 	>
-		<!-- Inner Image Wrapper - Constrained by Aspect Ratio -->
+		<!-- Inner Image Wrapper - Constrained by aspect ratio within fixed-height parent -->
 		<div
 			bind:this={canvasElement}
-			class="relative w-full h-full shadow-sm flex items-center justify-center transition-all bg-[length:20px_20px] bg-repeat"
-			style="max-width: 100%; max-height: 100%; aspect-ratio: {widthPixels}/{heightPixels}; background-image: conic-gradient(#eee 90deg, transparent 90deg), conic-gradient(transparent 90deg, #eee 90deg);"
+			class="relative shadow-sm transition-all bg-[length:20px_20px] bg-repeat"
+			style="
+				aspect-ratio: {widthPixels}/{heightPixels};
+				height: 100%;
+				max-width: 100%;
+				background-image: conic-gradient(#eee 90deg, transparent 90deg), conic-gradient(transparent 90deg, #eee 90deg);
+				cursor: {showBrushCursor ? 'none' : 'default'};
+			"
 			onclick={handleInnerClick}
 			onpointerdown={handlePointerDown}
 			onpointermove={handlePointerMove}
 			onpointerup={handlePointerUp}
+			onpointerleave={() => (mousePosition = null)}
 			role="button"
 			tabindex="0"
 		>
@@ -397,20 +426,15 @@
 						{@const mask = masks.get(layer.id)}
 						{@const isVisible = layer.isBackground ? true : (selection?.included ?? false)}
 						{@const hasBounds = layer.bounds && layer.bounds.width > 0 && layer.bounds.height > 0}
-						{@const debugLeft = hasBounds ? ((layer.bounds?.x || 0) / widthPixels) * 100 : 0}
-						{@const debugTop = hasBounds ? ((layer.bounds?.y || 0) / heightPixels) * 100 : 0}
-						{@const debugWidth = hasBounds ? ((layer.bounds?.width || 0) / widthPixels) * 100 : 100}
-						{@const debugHeight = hasBounds
-							? ((layer.bounds?.height || 0) / heightPixels) * 100
-							: 100}
-						{console.log(`[Layer ${idx}] ${layer.name}:`, {
-							id: layer.id,
-							zIndex: layer.zIndex,
-							hasBounds,
-							bounds: layer.bounds,
-							included: isVisible,
-							position: { left: debugLeft, top: debugTop, width: debugWidth, height: debugHeight }
-						})}
+						{@const boundsX = layer.bounds?.x || 0}
+						{@const boundsY = layer.bounds?.y || 0}
+						{@const boundsW = layer.bounds?.width || 0}
+						{@const boundsH = layer.bounds?.height || 0}
+						{@const cssLeft = hasBounds ? (boundsX / widthPixels) * 100 : 0}
+						{@const cssTop = hasBounds ? (boundsY / heightPixels) * 100 : 0}
+						{@const cssWidth = hasBounds ? (boundsW / widthPixels) * 100 : 100}
+						{@const cssHeight = hasBounds ? (boundsH / heightPixels) * 100 : 100}
+						{@const objectFit = layer.isBackground ? 'contain' : 'fill'}
 						<!-- Layer with explicit transparent background for PNG transparency -->
 						<!-- Using object-contain to preserve PNG aspect ratio and transparency -->
 						<img
@@ -419,14 +443,14 @@
 							class="absolute transition-opacity duration-200 pointer-events-none"
 							style="
 								background: transparent;
-								object-fit: {layer.isBackground ? 'contain' : 'fill'};
+								object-fit: {objectFit};
 								object-position: center;
 								z-index: {layer.zIndex};
 								opacity: {isVisible ? 1 : 0};
-								left: {hasBounds ? ((layer.bounds?.x || 0) / widthPixels) * 100 : 0}%;
-								top: {hasBounds ? ((layer.bounds?.y || 0) / heightPixels) * 100 : 0}%;
-								width: {hasBounds ? ((layer.bounds?.width || 0) / widthPixels) * 100 : 100}%;
-								height: {hasBounds ? ((layer.bounds?.height || 0) / heightPixels) * 100 : 100}%;
+								left: {cssLeft}%;
+								top: {cssTop}%;
+								width: {cssWidth}%;
+								height: {cssHeight}%;
 								mask-image: {mask ? `url(${mask.maskData})` : 'none'};
 								mask-size: 100% 100%;
 								-webkit-mask-image: {mask ? `url(${mask.maskData})` : 'none'};
@@ -443,6 +467,17 @@
 								height={heightPixels}
 								bind:canvasElement={drawingCanvasElement}
 								bind:context={drawingContext}
+							/>
+						{/if}
+						<!-- Brush Cursor -->
+						{#if showBrushCursor && mousePosition}
+							<BrushCursor
+								x={mousePosition.x}
+								y={mousePosition.y}
+								size={toolManager?.toolOptions?.size || 20}
+								hardness={toolManager?.toolOptions?.hardness ?? 100}
+								color={toolManager?.toolOptions?.color || currentColor}
+								isEraser={activeTool === 'eraser'}
 							/>
 						{/if}
 						{#each renderedLayers as layer (layer.id)}

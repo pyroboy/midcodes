@@ -46,6 +46,28 @@
 			};
 		}
 
+		// Check action-based types FIRST (before layers check to avoid misclassification)
+		// Note: 'action' is saved as 'model' field in the database
+		const action = item.model;
+		if (action === 'lasso-cut' || action === 'lasso-copy' || action === 'copy') {
+			return {
+				label: 'COPY',
+				color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400'
+			};
+		}
+		if (action === 'crop') {
+			return {
+				label: 'CROP',
+				color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+			};
+		}
+		if (action === 'remove-bg') {
+			return {
+				label: 'REMOVE BG',
+				color: 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400'
+			};
+		}
+
 		// Determine label and color based on history type
 		if (item.provider?.includes('upscale') || item.model?.includes('upscale')) {
 			return {
@@ -53,7 +75,8 @@
 				color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
 			};
 		}
-		if (item.layers?.length > 0) {
+		// Only show DECOMPOSE if it's actually from AI decomposition (has layers AND is from fal-ai)
+		if (item.layers?.length > 0 && item.provider?.includes('fal-ai-decompose')) {
 			return {
 				label: `DECOMPOSE (${item.layers.length})`,
 				color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'
@@ -77,24 +100,8 @@
 				color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400'
 			};
 		}
-		if ((item as any).action === 'crop') {
-			return {
-				label: 'CROP',
-				color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-			};
-		}
 		if (
-			(item as any).action === 'lasso-cut' ||
-			(item as any).action === 'lasso-copy' ||
-			(item as any).action === 'copy'
-		) {
-			return {
-				label: 'COPY',
-				color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400'
-			};
-		}
-		if (
-			(item as any).action === 'remove' ||
+			action === 'remove' ||
 			item.provider?.includes('remove') ||
 			item.model?.includes('remove')
 		) {

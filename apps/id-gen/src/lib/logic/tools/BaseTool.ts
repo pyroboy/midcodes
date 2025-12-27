@@ -26,6 +26,8 @@ export interface ToolContext {
 	size: number;
 	/** Current opacity (0-100) */
 	opacity: number;
+	/** Current hardness (0-100, 0 = soft/feathered, 100 = hard edge) */
+	hardness: number;
 	/** Canvas dimensions */
 	canvasDimensions: {
 		widthPixels: number;
@@ -57,6 +59,8 @@ export interface ToolOptions {
 	opacity: number;
 	/** Current color (hex) */
 	color: string;
+	/** Brush hardness (0-100, 0 = soft/feathered, 100 = hard edge) */
+	hardness: number;
 	/** Flood fill tolerance (for bucket tool) */
 	tolerance?: number;
 }

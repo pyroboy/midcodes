@@ -271,36 +271,59 @@ export class ImageProcessor {
 				i.src = proxiedUrl;
 			});
 
-			// Canvas Dimensions (Target Space)
+			// Canvas Dimensions (Target Space) - this is the full template size
 			const canvasW = this.assetData.width;
 			const canvasH = this.assetData.height;
 
-			// Source Layer Position & Dimensions
+			// Determine if this is a background layer (uses object-fit: contain)
+			// or a regular layer (uses object-fit: fill / stretches to bounds)
+			const isBackground = layerId === 'original-file';
+
+			// Source Layer Position & Dimensions (where it displays on the canvas)
 			let layerX = 0;
 			let layerY = 0;
 			let layerW = canvasW;
 			let layerH = canvasH;
 
-			if (layerId && layerId !== 'original-file') {
+			if (!isBackground) {
 				const layer = this.layerManager.currentLayers.find(l => l.id === layerId);
 				if (layer && layer.bounds) {
 					layerX = layer.bounds.x;
 					layerY = layer.bounds.y;
 					layerW = layer.bounds.width;
 					layerH = layer.bounds.height;
+
+					// DEBUG: Check if layer image dimensions match bounds
+					console.log('╔═══════════════════════════════════════════════════════════════╗');
+					console.log('║ ⚠️  SOURCE LAYER ANALYSIS (Non-Background):');
+					console.log('║    Layer Name:', layer.name);
+					console.log('║    Layer Bounds: x=', layerX, 'y=', layerY, 'w=', layerW, 'h=', layerH);
+					console.log('║    Layer Bounds Aspect:', (layerW / layerH).toFixed(4));
+					console.log('║    Source Image Natural Size:', img.naturalWidth, 'x', img.naturalHeight);
+					console.log('║    Source Image Aspect:', (img.naturalWidth / img.naturalHeight).toFixed(4));
+					const boundsAspect = layerW / layerH;
+					const imageAspect = img.naturalWidth / img.naturalHeight;
+					if (Math.abs(boundsAspect - imageAspect) > 0.01) {
+						console.log('║    ⚠️⚠️⚠️ ASPECT RATIO MISMATCH! ⚠️⚠️⚠️');
+						console.log('║    The layer image is being STRETCHED to fit bounds!');
+						console.log('║    This causes the "fat" copy issue.');
+						console.log('║    Bounds aspect:', boundsAspect.toFixed(4), '| Image aspect:', imageAspect.toFixed(4));
+					} else {
+						console.log('║    ✓ Aspect ratios match - no stretching');
+					}
+					console.log('╚═══════════════════════════════════════════════════════════════╝');
 				}
 			} else {
-				// For 'original-file' (Background), we must replicate 'object-fit: contain' logic
-				// to match what the user sees on screen.
+				// For 'original-file' (Background), replicate 'object-fit: contain' logic
 				const natW = img.naturalWidth;
 				const natH = img.naturalHeight;
-				
+
 				// Calculate scaling to 'contain' within canvasW/canvasH
 				const scale = Math.min(canvasW / natW, canvasH / natH);
-				
+
 				layerW = natW * scale;
 				layerH = natH * scale;
-				
+
 				// Center it
 				layerX = (canvasW - layerW) / 2;
 				layerY = (canvasH - layerH) / 2;
@@ -319,19 +342,87 @@ export class ImageProcessor {
 
 			if (bboxW <= 0 || bboxH <= 0) throw new Error('Invalid selection dimensions');
 
-			console.log('Cutting polygon:', { minX, minY, bboxW, bboxH, layerX, layerY });
+			// ═══════════════════════════════════════════════════════════════════════════
+			// DEBUG: Log all dimensions to trace stretching issue
+			// ═══════════════════════════════════════════════════════════════════════════
+			console.log('╔═══════════════════════════════════════════════════════════════╗');
+			console.log('║              LASSO CUT DEBUG - DIMENSION TRACE                ║');
+			console.log('╠═══════════════════════════════════════════════════════════════╣');
+			console.log('║ 1. CANVAS (Template Size):');
+			console.log('║    Width:', canvasW, 'Height:', canvasH);
+			console.log('║    Aspect Ratio:', (canvasW / canvasH).toFixed(4));
+			console.log('╠───────────────────────────────────────────────────────────────╣');
+			console.log('║ 2. SOURCE IMAGE (Natural/Original):');
+			console.log('║    Width:', img.naturalWidth, 'Height:', img.naturalHeight);
+			console.log('║    Aspect Ratio:', (img.naturalWidth / img.naturalHeight).toFixed(4));
+			console.log('╠───────────────────────────────────────────────────────────────╣');
+			console.log('║ 3. LAYER DISPLAY (Where it appears on canvas):');
+			console.log('║    Position: x=', layerX, 'y=', layerY);
+			console.log('║    Size: w=', layerW, 'h=', layerH);
+			console.log('║    Aspect Ratio:', (layerW / layerH).toFixed(4));
+			console.log('║    Is Background:', isBackground);
+			console.log('╠───────────────────────────────────────────────────────────────╣');
+			console.log('║ 4. LASSO SELECTION BBOX:');
+			console.log('║    Position: minX=', minX, 'minY=', minY);
+			console.log('║    Size: w=', bboxW, 'h=', bboxH);
+			console.log('║    Aspect Ratio:', (bboxW / bboxH).toFixed(4));
+			console.log('╠───────────────────────────────────────────────────────────────╣');
+			console.log('║ 5. ASPECT RATIO COMPARISON:');
+			console.log('║    Source vs Layer Display:',
+				(img.naturalWidth / img.naturalHeight).toFixed(4), 'vs', (layerW / layerH).toFixed(4),
+				(Math.abs((img.naturalWidth / img.naturalHeight) - (layerW / layerH)) < 0.01) ? '✓ MATCH' : '⚠️ MISMATCH (stretching!)');
+			console.log('╚═══════════════════════════════════════════════════════════════╝');
 
-			// --- Create Cut Canvas ---
+			// ═══════════════════════════════════════════════════════════════════════════
+			// ROBUST APPROACH: Create a "display canvas" that renders EXACTLY what the
+			// user sees on screen, then cut from that canvas. This handles all object-fit
+			// modes correctly without complex coordinate transformations.
+			// ═══════════════════════════════════════════════════════════════════════════
+
+			// Step 1: Create a full-size "display canvas" at canvas dimensions
+			const displayCanvas = document.createElement('canvas');
+			displayCanvas.width = canvasW;
+			displayCanvas.height = canvasH;
+			const displayCtx = displayCanvas.getContext('2d', { alpha: true });
+			if (!displayCtx) throw new Error('No display context');
+
+			// Step 2: Draw the source image EXACTLY as it appears on screen
+			// - Background: object-fit: contain (centered, aspect-preserved)
+			// - Layers: object-fit: fill (stretched to fill bounds)
+			if (isBackground) {
+				// object-fit: contain - draw at calculated position maintaining aspect ratio
+				displayCtx.drawImage(img, layerX, layerY, layerW, layerH);
+			} else {
+				// object-fit: fill - stretch to fill the layer bounds
+				// The image is stretched to exactly fill (layerX, layerY, layerW, layerH)
+				displayCtx.drawImage(img, layerX, layerY, layerW, layerH);
+			}
+
+			// Step 3: Create the cut canvas at bbox size
 			const cutCanvas = document.createElement('canvas');
 			cutCanvas.width = bboxW;
 			cutCanvas.height = bboxH;
 			const cutCtx = cutCanvas.getContext('2d', { alpha: true, willReadFrequently: true });
 			if (!cutCtx) throw new Error('No cut context');
 
-			// --- STEP 1: Draw the source image portion ---
-			const drawX = layerX - minX;
-			const drawY = layerY - minY;
-			cutCtx.drawImage(img, drawX, drawY, layerW, layerH);
+			// Step 4: Copy the bbox region from display canvas to cut canvas
+			// This is a direct 1:1 pixel copy - no stretching, no transformation
+			cutCtx.drawImage(
+				displayCanvas,
+				minX, minY, bboxW, bboxH,  // Source rectangle from display canvas
+				0, 0, bboxW, bboxH          // Destination (entire cut canvas)
+			);
+
+			console.log('╔═══════════════════════════════════════════════════════════════╗');
+			console.log('║ 6. DISPLAY CANVAS (What user sees):');
+			console.log('║    Size:', displayCanvas.width, 'x', displayCanvas.height);
+			console.log('║    Image drawn at: (', layerX, ',', layerY, ') size:', layerW, 'x', layerH);
+			console.log('╠───────────────────────────────────────────────────────────────╣');
+			console.log('║ 7. CUT CANVAS (Output before mask):');
+			console.log('║    Size:', cutCanvas.width, 'x', cutCanvas.height);
+			console.log('║    Aspect Ratio:', (cutCanvas.width / cutCanvas.height).toFixed(4));
+			console.log('║    Extracted from display at: (', minX, ',', minY, ')');
+			console.log('╚═══════════════════════════════════════════════════════════════╝');
 
 			// --- STEP 2: Convert polygon points to local canvas coordinates ---
 			const localPoints = canvasPoints.map(p => ({
@@ -381,54 +472,91 @@ export class ImageProcessor {
 			if (!cutBlob) throw new Error('Cut blob failed');
 			console.log('[cutPolygon] PNG blob size:', cutBlob.size, 'bytes');
 
-			const cutBase64 = await fileToDataUrl(cutBlob);
-			console.log('[cutPolygon] Uploading cut result...');
-			const cutUpload = await uploadProcessedImage({ imageBase64: cutBase64, mimeType: 'image/png' });
+			// ═══════════════════════════════════════════════════════════════════════════
+			// INSTANT FEEDBACK: Create layer with blob URL immediately, upload in background
+			// ═══════════════════════════════════════════════════════════════════════════
+			const blobUrl = URL.createObjectURL(cutBlob);
+			const originLayer = this.layerManager.currentLayers.find(l => l.id === layerId);
+			const originLayerName = originLayer ? originLayer.name : 'Background';
+			const newLayerBounds = { x: minX, y: minY, width: bboxW, height: bboxH };
 
-			// --- Apply Changes ---
-			if (cutUpload.success && cutUpload.url) {
-				// 2. Add new layer
-				const originLayer = this.layerManager.currentLayers.find(l => l.id === layerId);
-				const originLayerName = originLayer ? originLayer.name : 'Background';
-				
-				const { layer: newLayer, selection } = this.layerManager.createLayerObj(
-					cutUpload.url,
-					`${originLayerName} (Copy)`,
-					{ x: minX, y: minY, width: bboxW, height: bboxH }, // Positioned where the cut happened
-					this.layerManager.activeSide,
-					this.layerManager.currentLayers.length + 1
-				);
-				// Ensure independent layer
-				newLayer.parentId = undefined;
-				this.layerManager.addLayer(newLayer, selection);
-				
-				// 3. Save to History
-				const currentLayersSnapshot = this.layerManager.currentLayers.map(l => ({
-					imageUrl: l.imageUrl,
-					name: l.name,
-					bounds: l.bounds,
-					width: l.bounds?.width || 0,
-					height: l.bounds?.height || 0,
-					zIndex: l.zIndex,
-					side: l.side
-				}));
-
-				await saveHistoryItem({
-					originalUrl: sourceImageUrl,
-					resultUrl: cutUpload.url,
-					action: 'lasso-copy',
-					side: this.layerManager.activeSide as 'front' | 'back',
-					templateId: this.assetData.templateId,
-					layers: currentLayersSnapshot
-				});
-				
-				// Refresh history list
-				this.historyManager.load();
-
-				toast.success('Copied selection to new layer', { id: toastId });
+			console.log('╔═══════════════════════════════════════════════════════════════╗');
+			console.log('║ 8. OUTPUT LAYER (Instant with blob URL):');
+			console.log('║    Bounds: x=', newLayerBounds.x, 'y=', newLayerBounds.y);
+			console.log('║    Size: w=', newLayerBounds.width, 'h=', newLayerBounds.height);
+			console.log('║    Aspect Ratio:', (newLayerBounds.width / newLayerBounds.height).toFixed(4));
+			console.log('║    Blob URL:', blobUrl.substring(0, 40) + '...');
+			console.log('╠───────────────────────────────────────────────────────────────╣');
+			console.log('║ 9. ORIGIN LAYER (Source being cut from):');
+			if (originLayer) {
+				console.log('║    Name:', originLayer.name);
+				console.log('║    Bounds:', originLayer.bounds);
+				console.log('║    ImageUrl:', originLayer.imageUrl?.substring(0, 60) + '...');
 			} else {
-				throw new Error('Failed to upload cut result');
+				console.log('║    (Background - no layer object)');
 			}
+			console.log('╚═══════════════════════════════════════════════════════════════╝');
+
+			// 1. Add layer IMMEDIATELY with blob URL for instant feedback
+			const { layer: newLayer, selection } = this.layerManager.createLayerObj(
+				blobUrl,
+				`${originLayerName} (Copy)`,
+				newLayerBounds,
+				this.layerManager.activeSide,
+				this.layerManager.currentLayers.length + 1
+			);
+			newLayer.parentId = undefined;
+			this.layerManager.addLayer(newLayer, selection);
+
+			// 2. Show success toast IMMEDIATELY
+			toast.success('Copied selection to new layer', { id: toastId });
+
+			// 3. Upload in BACKGROUND and update layer URL when done
+			const cutBase64 = await fileToDataUrl(cutBlob);
+			console.log('[cutPolygon] Uploading cut result in background...');
+
+			uploadProcessedImage({ imageBase64: cutBase64, mimeType: 'image/png' })
+				.then((cutUpload) => {
+					if (cutUpload.success && cutUpload.url) {
+						// Update layer with permanent URL
+						console.log('[cutPolygon] Upload complete, updating layer URL:', cutUpload.url.substring(0, 60) + '...');
+						this.layerManager.updateLayerImageUrl(newLayer.id, cutUpload.url);
+
+						// Revoke blob URL to free memory
+						URL.revokeObjectURL(blobUrl);
+
+						// Save to history with permanent URL
+						const currentLayersSnapshot = this.layerManager.currentLayers.map(l => ({
+							imageUrl: l.imageUrl,
+							name: l.name,
+							bounds: l.bounds,
+							width: l.bounds?.width || 0,
+							height: l.bounds?.height || 0,
+							zIndex: l.zIndex,
+							side: l.side
+						}));
+
+						saveHistoryItem({
+							originalUrl: sourceImageUrl,
+							resultUrl: cutUpload.url,
+							action: 'lasso-copy',
+							side: this.layerManager.activeSide as 'front' | 'back',
+							templateId: this.assetData.templateId,
+							layers: currentLayersSnapshot
+						}).then(() => {
+							this.historyManager.load();
+						}).catch(err => {
+							console.error('[cutPolygon] Failed to save history (non-critical):', err);
+						});
+					} else {
+						console.error('[cutPolygon] Background upload failed:', cutUpload.error);
+						toast.warning('Layer created locally. Upload failed - changes may not persist.');
+					}
+				})
+				.catch(err => {
+					console.error('[cutPolygon] Background upload error:', err);
+					toast.warning('Layer created locally. Upload failed - changes may not persist.');
+				});
 
 		} catch (e: any) {
 			console.error('Cut error details:', e);
