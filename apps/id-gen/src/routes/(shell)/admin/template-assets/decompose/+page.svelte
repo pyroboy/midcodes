@@ -45,6 +45,7 @@
 		ArrowUp,
 		ArrowDown
 	} from 'lucide-svelte';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { Button } from '$lib/components/ui/button';
 	import { Label } from '$lib/components/ui/label';
 
@@ -274,436 +275,455 @@
 	}
 </script>
 
-<div class="container mx-auto max-w-7xl px-4 py-6">
-	<DecomposeHeader
-		assetName={data.asset.name}
-		bind:activeSide={layerMgr.activeSide}
-		hasBackImage={!!data.asset.backImageUrl}
-		frontLayersCount={layerMgr.frontLayers.length}
-		backLayersCount={layerMgr.backLayers.length}
-		frontHistoryCount={historyMgr.stats?.front?.count || 0}
-		backHistoryCount={historyMgr.stats?.back?.count || 0}
-		hasUpscaledPreview={layerMgr.currentLayers.some((l) => l.imageUrl.includes('upscaled'))}
-		isSaving={processor.isProcessing}
-		onSave={async () => {
-			// Manually inject tool state into session save (since LayerManager no longer holds it)
-			// Ideally LayerManager logic should be updated to accept this, but for now we rely on
-			// the fact that standard save happens in LayerManager.
-			// To persist tools properly we need to update LayerManager.saveToStorage signature or internal logic?
-			// For Phase 2, we just ensure LayerManager saves.
-			// TODO: Update saveSession to include tool state from ToolManager
-			layerMgr.saveToStorage(data.asset.id);
+<Tooltip.Provider>
+	<div class="container mx-auto max-w-7xl px-4 py-6">
+		<DecomposeHeader
+			assetName={data.asset.name}
+			bind:activeSide={layerMgr.activeSide}
+			hasBackImage={!!data.asset.backImageUrl}
+			frontLayersCount={layerMgr.frontLayers.length}
+			backLayersCount={layerMgr.backLayers.length}
+			frontHistoryCount={historyMgr.stats?.front?.count || 0}
+			backHistoryCount={historyMgr.stats?.back?.count || 0}
+			hasUpscaledPreview={layerMgr.currentLayers.some((l) => l.imageUrl.includes('upscaled'))}
+			isSaving={processor.isProcessing}
+			onSave={async () => {
+				// Manually inject tool state into session save (since LayerManager no longer holds it)
+				// Ideally LayerManager logic should be updated to accept this, but for now we rely on
+				// the fact that standard save happens in LayerManager.
+				// To persist tools properly we need to update LayerManager.saveToStorage signature or internal logic?
+				// For Phase 2, we just ensure LayerManager saves.
+				// TODO: Update saveSession to include tool state from ToolManager
+				layerMgr.saveToStorage(data.asset.id);
 
-			// Phase 8: Also process upload queue
-			if (layerMgr.hasPendingUploads()) {
-				const result = await layerMgr.processUploadQueue();
-				if (result.uploaded > 0) {
-					toast.success(`Uploaded ${result.uploaded} layer(s) to cloud`);
-				}
-				if (result.failed > 0) {
-					toast.error(`${result.failed} upload(s) failed`);
-				}
-			}
-		}}
-		onReset={() => {
-			layerMgr.clearCurrentSide();
-			// Reset overrides to show original file
-			if (layerMgr.activeSide === 'front') overriddenFrontUrl = null;
-			else overriddenBackUrl = null;
-			toast.info('Layers reset to original');
-		}}
-	/>
-
-	<div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-		<div class="lg:col-span-2 space-y-4">
-			<CanvasStack
-				layerManager={layerMgr}
-				toolManager={toolMgr}
-				historyManager={historyMgr}
-				disabled={processor.isProcessing}
-				{selectedLayerId}
-				onDuplicate={() => {
-					if (selectedLayerId) layerMgr.duplicateLayer(selectedLayerId);
-				}}
-				onDelete={() => {
-					// Shortcut delete - direct for now
-					if (selectedLayerId) {
-						layerMgr.removeLayer(selectedLayerId);
-						selectedLayerId = null;
-						toast.success('Layer deleted');
+				// Phase 8: Also process upload queue
+				if (layerMgr.hasPendingUploads()) {
+					const result = await layerMgr.processUploadQueue();
+					if (result.uploaded > 0) {
+						toast.success(`Uploaded ${result.uploaded} layer(s) to cloud`);
 					}
-				}}
-				onMoveLayer={(dir) => {
-					if (selectedLayerId) layerMgr.moveLayer(selectedLayerId, dir);
-				}}
-			>
-				<ImagePreview
+					if (result.failed > 0) {
+						toast.error(`${result.failed} upload(s) failed`);
+					}
+				}
+			}}
+			onReset={() => {
+				layerMgr.clearCurrentSide();
+				// Reset overrides to show original file
+				if (layerMgr.activeSide === 'front') overriddenFrontUrl = null;
+				else overriddenBackUrl = null;
+				toast.info('Layers reset to original');
+			}}
+		/>
+
+		<div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+			<div class="lg:col-span-2 space-y-4">
+				<CanvasStack
 					layerManager={layerMgr}
 					toolManager={toolMgr}
-					imageProcessor={processor}
 					historyManager={historyMgr}
-					{currentImageUrl}
-					currentLayers={layerMgr.currentLayers}
-					layerSelections={layerMgr.selections}
-					masks={layerMgr.masks}
-					showOriginalLayer={layerMgr.showOriginalLayer}
+					disabled={processor.isProcessing}
 					{selectedLayerId}
-					activeSide={layerMgr.activeSide}
-					assetName={data.asset.name}
-					widthPixels={data.asset.widthPixels || 1050}
-					heightPixels={data.asset.heightPixels || 600}
-					orientation={data.asset.orientation || 'horizontal'}
-					activeTool={toolMgr.activeTool}
-					onToolChange={(tool) => toolMgr.setTool(tool)}
 					onDuplicate={() => {
 						if (selectedLayerId) layerMgr.duplicateLayer(selectedLayerId);
 					}}
-					currentColor={toolMgr.toolOptions.color}
-					onSelectionAction={(action, points) => {
-						console.log('Selection Action Triggered:', {
-							action,
-							selectedLayerId,
-							points: points.length
-						});
-
-						if (action === 'copy') {
-							let sourceUrl = '';
-							if (selectedLayerId === 'original-file') {
-								sourceUrl = currentImageUrl || '';
-							} else if (selectedLayerId) {
-								const l = layerMgr.currentLayers.find((layer) => layer.id === selectedLayerId);
-								if (l) sourceUrl = l.imageUrl;
-							}
-
-							if (sourceUrl) {
-								processor.cutPolygon(selectedLayerId, points, sourceUrl);
-							} else {
-								toast.error('No layer selected to copy from');
-							}
-						} else if (action === 'fill') {
-							processor.fillSelection(points, toolMgr.toolOptions.color);
-						} else if (action === 'delete') {
-							if (selectedLayerId && selectedLayerId !== 'original-file') {
-								processor.deleteSelection(selectedLayerId, points);
-							} else {
-								toast.error('Cannot delete from background/original file directly (yet)');
-							}
+					onDelete={() => {
+						// Shortcut delete - direct for now
+						if (selectedLayerId) {
+							layerMgr.removeLayer(selectedLayerId);
+							selectedLayerId = null;
+							toast.success('Layer deleted');
 						}
 					}}
-					isProcessing={processor.isProcessing}
-				/>
-			</CanvasStack>
+					onMoveLayer={(dir) => {
+						if (selectedLayerId) layerMgr.moveLayer(selectedLayerId, dir);
+					}}
+				>
+					<ImagePreview
+						layerManager={layerMgr}
+						toolManager={toolMgr}
+						imageProcessor={processor}
+						historyManager={historyMgr}
+						{currentImageUrl}
+						currentLayers={layerMgr.currentLayers}
+						layerSelections={layerMgr.selections}
+						masks={layerMgr.masks}
+						showOriginalLayer={layerMgr.showOriginalLayer}
+						{selectedLayerId}
+						activeSide={layerMgr.activeSide}
+						assetName={data.asset.name}
+						widthPixels={data.asset.widthPixels || 1050}
+						heightPixels={data.asset.heightPixels || 600}
+						orientation={data.asset.orientation || 'horizontal'}
+						activeTool={toolMgr.activeTool}
+						onToolChange={(tool) => toolMgr.setTool(tool)}
+						onDuplicate={() => {
+							if (selectedLayerId) layerMgr.duplicateLayer(selectedLayerId);
+						}}
+						currentColor={toolMgr.toolOptions.color}
+						onSelectionAction={(action, points) => {
+							console.log('Selection Action Triggered:', {
+								action,
+								selectedLayerId,
+								points: points.length
+							});
 
-			<!-- Global Options / Quick Actions -->
-			<div
-				class="p-4 rounded-lg border border-border bg-card space-y-4 flex justify-between items-center"
-			>
-				<div class="flex items-center gap-4">
-					<Label class="text-sm text-muted-foreground">Default Layers:</Label>
-					<select
-						bind:value={settings.numLayers}
-						class="rounded border border-border bg-background px-2 py-1 text-sm h-8"
-					>
-						{#each [2, 3, 4, 6, 8] as n}<option value={n}>{n}</option>{/each}
-					</select>
-				</div>
-				<div class="flex items-center gap-2">
-					<Button
-						variant="outline"
-						size="sm"
-						onclick={() => handleMenuAction('crop', 'original-file')}
-					>
-						<Crop class="h-4 w-4 mr-2" /> Crop Original
-					</Button>
+							if (action === 'copy') {
+								let sourceUrl = '';
+								if (selectedLayerId === 'original-file') {
+									sourceUrl = currentImageUrl || '';
+								} else if (selectedLayerId) {
+									const l = layerMgr.currentLayers.find((layer) => layer.id === selectedLayerId);
+									if (l) sourceUrl = l.imageUrl;
+								}
+
+								if (sourceUrl) {
+									processor.cutPolygon(selectedLayerId, points, sourceUrl);
+									// Reset tool to allow canvas interaction immediately
+									toolMgr.setTool(null);
+								} else {
+									toast.error('No layer selected to copy from');
+								}
+							} else if (action === 'fill') {
+								processor.fillSelection(points, toolMgr.toolOptions.color);
+							} else if (action === 'delete') {
+								if (selectedLayerId && selectedLayerId !== 'original-file') {
+									processor.deleteSelection(selectedLayerId, points);
+								} else {
+									toast.error('Cannot delete from background/original file directly (yet)');
+								}
+							}
+						}}
+						isProcessing={processor.isProcessing}
+					/>
+				</CanvasStack>
+
+				<!-- Global Options / Quick Actions -->
+				<div
+					class="p-4 rounded-lg border border-border bg-card space-y-4 flex justify-between items-center"
+				>
+					<div class="flex items-center gap-4">
+						<Label class="text-sm text-muted-foreground">Default Layers:</Label>
+						<select
+							bind:value={settings.numLayers}
+							class="rounded border border-border bg-background px-2 py-1 text-sm h-8"
+						>
+							{#each [2, 3, 4, 6, 8] as n}<option value={n}>{n}</option>{/each}
+						</select>
+					</div>
+					<div class="flex items-center gap-2">
+						<Button
+							variant="outline"
+							size="sm"
+							onclick={() => handleMenuAction('crop', 'original-file')}
+						>
+							<Crop class="h-4 w-4 mr-2" /> Crop Original
+						</Button>
+					</div>
 				</div>
 			</div>
-		</div>
 
-		<!-- Right Column -->
-		<div class="space-y-4">
-			<!-- Layers Panel -->
-			<div class="rounded-xl border border-border bg-card shadow-sm flex flex-col h-[500px]">
-				<div class="p-4 border-b border-border flex justify-between items-center shrink-0">
-					<div class="flex items-center gap-3">
-						<div class="w-10 h-10 rounded-lg bg-muted/50 flex items-center justify-center">
-							<Layers class="h-5 w-5 text-muted-foreground" />
-						</div>
-						<div>
-							<h2 class="font-semibold text-foreground">
-								Layers ({layerMgr.currentLayers.length})
-							</h2>
-							<div class="flex items-center gap-2 text-sm">
-								{#if layerMgr.saveState === 'saved'}
-									<span class="flex items-center gap-1 text-green-600"
-										><Check class="h-3 w-3" /> Saved</span
-									>
-								{:else}
-									<span class="flex items-center gap-1 text-yellow-600"
-										><Circle class="h-3 w-3" /> Unsaved</span
-									>
-								{/if}
+			<!-- Right Column -->
+			<div class="space-y-4">
+				<!-- Layers Panel -->
+				<div class="rounded-xl border border-border bg-card shadow-sm flex flex-col h-[500px]">
+					<div class="p-4 border-b border-border flex justify-between items-center shrink-0">
+						<div class="flex items-center gap-3">
+							<div class="w-10 h-10 rounded-lg bg-muted/50 flex items-center justify-center">
+								<Layers class="h-5 w-5 text-muted-foreground" />
+							</div>
+							<div>
+								<h2 class="font-semibold text-foreground">
+									Layers ({layerMgr.currentLayers.length})
+								</h2>
+								<div class="flex items-center gap-2 text-sm">
+									{#if layerMgr.saveState === 'saved'}
+										<span class="flex items-center gap-1 text-green-600"
+											><Check class="h-3 w-3" /> Saved</span
+										>
+									{:else}
+										<span class="flex items-center gap-1 text-yellow-600"
+											><Circle class="h-3 w-3" /> Unsaved</span
+										>
+									{/if}
+								</div>
 							</div>
 						</div>
+						<div class="flex gap-1">
+							<Button
+								variant="ghost"
+								size="icon"
+								onclick={() => (layerMgr.mergeMode = !layerMgr.mergeMode)}
+							>
+								<Merge class="h-4 w-4 {layerMgr.mergeMode ? 'text-violet-600' : ''}" />
+							</Button>
+						</div>
 					</div>
-					<div class="flex gap-1">
-						<Button
-							variant="ghost"
-							size="icon"
-							onclick={() => (layerMgr.mergeMode = !layerMgr.mergeMode)}
-						>
-							<Merge class="h-4 w-4 {layerMgr.mergeMode ? 'text-violet-600' : ''}" />
-						</Button>
-					</div>
-				</div>
 
-				{#if layerMgr.mergeMode}
+					{#if layerMgr.mergeMode}
+						<div
+							class="p-2 bg-violet-500/10 border-b border-violet-500/20 flex justify-between items-center px-4 shrink-0"
+						>
+							<span class="text-xs text-violet-700">{layerMgr.selectedForMerge.size} selected</span>
+							<Button
+								size="sm"
+								class="h-7 text-xs bg-violet-600"
+								onclick={() => processor.mergeSelectedLayers()}
+							>
+								Merge
+							</Button>
+						</div>
+					{/if}
+
 					<div
-						class="p-2 bg-violet-500/10 border-b border-violet-500/20 flex justify-between items-center px-4 shrink-0"
+						class="flex-1 overflow-y-auto p-2 space-y-2"
+						ondrop={(e) => handleDrop(e)}
+						ondragover={(e) => e.preventDefault()}
+						role="region"
+						aria-label="Layer list"
 					>
-						<span class="text-xs text-violet-700">{layerMgr.selectedForMerge.size} selected</span>
-						<Button
-							size="sm"
-							class="h-7 text-xs bg-violet-600"
-							onclick={() => processor.mergeSelectedLayers()}
-						>
-							Merge
-						</Button>
-					</div>
-				{/if}
+						{#each [...layerMgr.currentLayers].reverse() as layer, i (layer.id)}
+							<LayerCard
+								{layer}
+								selection={layerMgr.selections.get(layer.id)}
+								isSelected={selectedLayerId === layer.id}
+								mergeMode={layerMgr.mergeMode}
+								isSelectedForMerge={layerMgr.selectedForMerge.has(layer.id)}
+								isProcessing={processor.processingLayerId === layer.id}
+								onDragStart={(e) => handleLayerDragStart(e, i)}
+								onDrop={(e) => handleDrop(e, i)}
+								onDragOver={(e) => e.preventDefault()}
+								onSelect={() => (selectedLayerId = layer.id)}
+								onMergeSelect={() => layerMgr.toggleMergeSelection(layer.id)}
+								onDelete={() => layerMgr.removeLayer(layer.id)}
+								onMoveUp={() => layerMgr.moveLayer(layer.id, 'up')}
+								onMoveDown={() => layerMgr.moveLayer(layer.id, 'down')}
+								onUpdateVariableName={(name) =>
+									layerMgr.updateSelection(layer.id, { variableName: name })}
+								onUpdateType={(type) => layerMgr.updateSelection(layer.id, { elementType: type })}
+								onSetOpacity={(val) => layerMgr.setOpacity(layer.id, val)}
+								onToggleIncluded={() =>
+									layerMgr.updateSelection(layer.id, {
+										included: !layerMgr.selections.get(layer.id)?.included
+									})}
+								onAction={(action) => handleMenuAction(action, layer.id)}
+								onPreviewImage={(url, title) => {
+									previewData = { url, title };
+									modals.preview = true;
+								}}
+							/>
+						{/each}
 
-				<div
-					class="flex-1 overflow-y-auto p-2 space-y-2"
-					ondrop={(e) => handleDrop(e)}
-					ondragover={(e) => e.preventDefault()}
-					role="region"
-					aria-label="Layer list"
-				>
-					<LayerCard
-						layer={{
-							id: 'original-file',
-							name: 'Original Background',
-							imageUrl: currentImageUrl || '',
-							zIndex: -1,
-							side: layerMgr.activeSide
-						} as any}
-						isOriginal={true}
-						onSelect={() => (selectedLayerId = 'original-file')}
-						isSelected={selectedLayerId === 'original-file'}
-						selection={{ included: true } as any}
-						onToggleOriginalLayer={() => (layerMgr.showOriginalLayer = !layerMgr.showOriginalLayer)}
-						showOriginalLayer={layerMgr.showOriginalLayer}
-						visible={layerMgr.showOriginalLayer}
-						onAction={(action) => handleMenuAction(action as any, 'original-file')}
-						onPreviewImage={(url, title) => {
-							previewData = { url, title };
-							modals.preview = true;
-						}}
-					/>
-
-					{#each [...layerMgr.currentLayers].reverse() as layer, i (layer.id)}
+						<!-- Original Background at bottom of list (lowest z-index) -->
 						<LayerCard
-							{layer}
-							selection={layerMgr.selections.get(layer.id)}
-							isSelected={selectedLayerId === layer.id}
-							mergeMode={layerMgr.mergeMode}
-							isSelectedForMerge={layerMgr.selectedForMerge.has(layer.id)}
-							isProcessing={processor.processingLayerId === layer.id}
-							onDragStart={(e) => handleLayerDragStart(e, i)}
-							onDrop={(e) => handleDrop(e, i)}
-							onDragOver={(e) => e.preventDefault()}
-							onSelect={() => (selectedLayerId = layer.id)}
-							onMergeSelect={() => layerMgr.toggleMergeSelection(layer.id)}
-							onDelete={() => layerMgr.removeLayer(layer.id)}
-							onMoveUp={() => layerMgr.moveLayer(layer.id, 'up')}
-							onMoveDown={() => layerMgr.moveLayer(layer.id, 'down')}
-							onUpdateVariableName={(name) =>
-								layerMgr.updateSelection(layer.id, { variableName: name })}
-							onUpdateType={(type) => layerMgr.updateSelection(layer.id, { elementType: type })}
-							onSetOpacity={(val) => layerMgr.setOpacity(layer.id, val)}
-							onToggleIncluded={() =>
-								layerMgr.updateSelection(layer.id, {
-									included: !layerMgr.selections.get(layer.id)?.included
-								})}
-							onAction={(action) => handleMenuAction(action, layer.id)}
+							layer={{
+								id: 'original-file',
+								name: 'Original Background',
+								imageUrl: currentImageUrl || '',
+								zIndex: -1,
+								side: layerMgr.activeSide
+							} as any}
+							isOriginal={true}
+							onSelect={() => (selectedLayerId = 'original-file')}
+							isSelected={selectedLayerId === 'original-file'}
+							selection={{ included: true } as any}
+							onToggleOriginalLayer={() =>
+								(layerMgr.showOriginalLayer = !layerMgr.showOriginalLayer)}
+							showOriginalLayer={layerMgr.showOriginalLayer}
+							visible={layerMgr.showOriginalLayer}
+							onAction={(action) => handleMenuAction(action as any, 'original-file')}
 							onPreviewImage={(url, title) => {
 								previewData = { url, title };
 								modals.preview = true;
 							}}
 						/>
-					{/each}
-				</div>
+					</div>
 
-				<!-- Action Bar (External) -->
-				<div class="p-3 border-t border-border grid grid-cols-5 gap-2 shrink-0">
-					<button
-						class="flex flex-col items-center gap-1 p-2 rounded hover:bg-violet-500/10 disabled:opacity-50 transition-colors"
-						disabled={!selectedLayerId}
-						onclick={() => selectedLayerId && handleMenuAction('decompose', selectedLayerId)}
-					>
-						<Sparkles class="h-4 w-4 text-violet-600" />
-						<span class="text-[10px]">Decompose</span>
-					</button>
-					<button
-						class="flex flex-col items-center gap-1 p-2 rounded hover:bg-green-500/10 disabled:opacity-50 transition-colors"
-						disabled={!selectedLayerId}
-						onclick={() => selectedLayerId && handleMenuAction('upscale', selectedLayerId)}
-					>
-						<ZoomIn class="h-4 w-4 text-green-600" />
-						<span class="text-[10px]">Upscale</span>
-					</button>
-					<button
-						class="flex flex-col items-center gap-1 p-2 rounded hover:bg-orange-500/10 disabled:opacity-50 transition-colors"
-						disabled={!selectedLayerId}
-						onclick={() => selectedLayerId && handleMenuAction('crop', selectedLayerId)}
-					>
-						<Crop class="h-4 w-4 text-orange-600" />
-						<span class="text-[10px]">Crop</span>
-					</button>
-					<button
-						class="flex flex-col items-center gap-1 p-2 rounded hover:bg-red-500/10 disabled:opacity-50 transition-colors"
-						disabled={!selectedLayerId}
-						onclick={() => selectedLayerId && handleMenuAction('remove', selectedLayerId)}
-					>
-						<Eraser class="h-4 w-4 text-red-600" />
-						<span class="text-[10px]">Remove</span>
-					</button>
-					<button
-						class="flex flex-col items-center gap-1 p-2 rounded hover:bg-cyan-500/10 disabled:opacity-50 transition-colors"
-						disabled={!selectedLayerId}
-						onclick={async () => {
-							if (!selectedLayerId) return;
-							const newUrl = await processor.setAsMain(selectedLayerId);
-							if (newUrl) {
-								// Update the override to reflect the new background immediately
-								if (layerMgr.activeSide === 'front') {
-									overriddenFrontUrl = newUrl;
-								} else {
-									overriddenBackUrl = newUrl;
+					<!-- Action Bar (External) -->
+					<div class="p-3 border-t border-border grid grid-cols-6 gap-2 shrink-0">
+						<button
+							class="flex flex-col items-center gap-1 p-2 rounded hover:bg-violet-500/10 disabled:opacity-50 transition-colors"
+							disabled={!selectedLayerId}
+							onclick={() => selectedLayerId && handleMenuAction('decompose', selectedLayerId)}
+						>
+							<Sparkles class="h-4 w-4 text-violet-600" />
+							<span class="text-[10px]">Decompose</span>
+						</button>
+						<button
+							class="flex flex-col items-center gap-1 p-2 rounded hover:bg-green-500/10 disabled:opacity-50 transition-colors"
+							disabled={!selectedLayerId}
+							onclick={() => selectedLayerId && handleMenuAction('upscale', selectedLayerId)}
+						>
+							<ZoomIn class="h-4 w-4 text-green-600" />
+							<span class="text-[10px]">Upscale</span>
+						</button>
+						<button
+							class="flex flex-col items-center gap-1 p-2 rounded hover:bg-pink-500/10 disabled:opacity-50 transition-colors"
+							disabled={!selectedLayerId}
+							onclick={() => selectedLayerId && processor.removeLayerBackground(selectedLayerId)}
+						>
+							<Wand2 class="h-4 w-4 text-pink-600" />
+							<span class="text-[10px]">Remove BG</span>
+						</button>
+						<button
+							class="flex flex-col items-center gap-1 p-2 rounded hover:bg-orange-500/10 disabled:opacity-50 transition-colors"
+							disabled={!selectedLayerId}
+							onclick={() => selectedLayerId && handleMenuAction('crop', selectedLayerId)}
+						>
+							<Crop class="h-4 w-4 text-orange-600" />
+							<span class="text-[10px]">Crop</span>
+						</button>
+						<button
+							class="flex flex-col items-center gap-1 p-2 rounded hover:bg-red-500/10 disabled:opacity-50 transition-colors"
+							disabled={!selectedLayerId}
+							onclick={() => selectedLayerId && handleMenuAction('remove', selectedLayerId)}
+						>
+							<Eraser class="h-4 w-4 text-red-600" />
+							<span class="text-[10px]">Remove</span>
+						</button>
+						<button
+							class="flex flex-col items-center gap-1 p-2 rounded hover:bg-cyan-500/10 disabled:opacity-50 transition-colors"
+							disabled={!selectedLayerId}
+							onclick={async () => {
+								if (!selectedLayerId) return;
+								const newUrl = await processor.setAsMain(selectedLayerId);
+								if (newUrl) {
+									// Update the override to reflect the new background immediately
+									if (layerMgr.activeSide === 'front') {
+										overriddenFrontUrl = newUrl;
+									} else {
+										overriddenBackUrl = newUrl;
+									}
 								}
-							}
-						}}
-					>
-						<ImageDown class="h-4 w-4 text-cyan-600" />
-						<span class="text-[10px]">Set BG</span>
-					</button>
+							}}
+						>
+							<ImageDown class="h-4 w-4 text-cyan-600" />
+							<span class="text-[10px]">Set BG</span>
+						</button>
+					</div>
 				</div>
-			</div>
 
-			<!-- History Panel -->
-			<div class="rounded-lg border border-border bg-card">
-				<div class="p-4 border-b border-border">
-					<h2 class="font-medium text-foreground flex items-center gap-2">
-						<Sparkles class="h-4 w-4 text-violet-500" /> History
-					</h2>
-				</div>
-				<div class="p-3 max-h-[400px] overflow-y-auto space-y-2">
-					{#if historyMgr.history.length === 0 && historyMgr.isLoading}
-						<div class="flex justify-center p-4">
-							<Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
-						</div>
-					{/if}
+				<!-- History Panel -->
+				<div class="rounded-lg border border-border bg-card">
+					<div class="p-4 border-b border-border">
+						<h2 class="font-medium text-foreground flex items-center gap-2">
+							<Sparkles class="h-4 w-4 text-violet-500" /> History
+						</h2>
+					</div>
+					<div class="p-3 max-h-[400px] overflow-y-auto space-y-2">
+						{#if historyMgr.history.length === 0 && historyMgr.isLoading}
+							<div class="flex justify-center p-4">
+								<Loader2 class="h-6 w-6 animate-spin text-muted-foreground" />
+							</div>
+						{/if}
 
-					{#each historyMgr.history as item (item.id)}
-						<HistoryItemCard
-							{item}
-							onLoadRequest={() => historyMgr.restoreSession(item)}
-							onDragStart={(e: DragEvent) => handleSidebarDragStart(e, item)}
-							isExpanded={historyMgr.expandedItems.has(item.id)}
-							onToggleExpanded={() => historyMgr.toggleExpand(item.id)}
-						/>
-					{/each}
+						{#each historyMgr.history as item (item.id)}
+							<HistoryItemCard
+								{item}
+								onLoadRequest={() => historyMgr.restoreSession(item)}
+								onDragStart={(e: DragEvent) => handleSidebarDragStart(e, item)}
+								isExpanded={historyMgr.expandedItems.has(item.id)}
+								onToggleExpanded={() => historyMgr.toggleExpand(item.id)}
+							/>
+						{/each}
+					</div>
 				</div>
 			</div>
 		</div>
-	</div>
 
-	<!-- Modals -->
-	<DecomposeModal
-		bind:open={modals.decompose}
-		bind:prompt={settings.prompt}
-		bind:negativePrompt={settings.negativePrompt}
-		bind:numLayers={settings.numLayers}
-		bind:numInferenceSteps={settings.steps}
-		bind:guidanceScale={settings.guidance}
-		bind:acceleration={settings.acceleration}
-		onProceed={onDecomposeSubmit}
-		isProcessing={processor.isProcessing}
-		actionLayer={actionModalLayerId === 'original-file'
-			? { id: 'original-file', name: 'Original', imageUrl: currentImageUrl || '' }
-			: layerMgr.currentLayers.find((l) => l.id === actionModalLayerId)}
-	/>
+		<!-- Modals -->
+		<DecomposeModal
+			bind:open={modals.decompose}
+			bind:prompt={settings.prompt}
+			bind:negativePrompt={settings.negativePrompt}
+			bind:numLayers={settings.numLayers}
+			bind:numInferenceSteps={settings.steps}
+			bind:guidanceScale={settings.guidance}
+			bind:acceleration={settings.acceleration}
+			onProceed={onDecomposeSubmit}
+			isProcessing={processor.isProcessing}
+			actionLayer={actionModalLayerId === 'original-file'
+				? { id: 'original-file', name: 'Original', imageUrl: currentImageUrl || '' }
+				: layerMgr.currentLayers.find((l) => l.id === actionModalLayerId)}
+		/>
 
-	<UpscaleActionModal
-		bind:open={modals.upscale}
-		bind:upscaleModel={settings.upscaleModel}
-		bind:removeWatermark={settings.removeWatermark}
-		onProceed={onUpscaleSubmit}
-		isProcessing={processor.isProcessing}
-		actionLayer={actionModalLayerId === 'original-file'
-			? { id: 'original-file', name: 'Original', imageUrl: currentImageUrl || '' }
-			: layerMgr.currentLayers.find((l) => l.id === actionModalLayerId)}
-	/>
+		<UpscaleActionModal
+			bind:open={modals.upscale}
+			bind:upscaleModel={settings.upscaleModel}
+			bind:removeWatermark={settings.removeWatermark}
+			onProceed={onUpscaleSubmit}
+			isProcessing={processor.isProcessing}
+			actionLayer={actionModalLayerId === 'original-file'
+				? { id: 'original-file', name: 'Original', imageUrl: currentImageUrl || '' }
+				: layerMgr.currentLayers.find((l) => l.id === actionModalLayerId)}
+		/>
 
-	<RemoveModal
-		bind:open={modals.remove}
-		bind:removePrompt
-		isProcessing={processor.isProcessing}
-		onProceed={async () => {
-			modals.remove = false;
-			const layer =
-				actionModalLayerId === 'original-file'
-					? {
-							id: 'original-file',
-							name: 'Original',
-							imageUrl: currentImageUrl || '',
-							side: layerMgr.activeSide
-						}
-					: layerMgr.currentLayers.find((l) => l.id === actionModalLayerId);
+		<RemoveModal
+			bind:open={modals.remove}
+			bind:removePrompt
+			isProcessing={processor.isProcessing}
+			onProceed={async () => {
+				modals.remove = false;
+				const layer =
+					actionModalLayerId === 'original-file'
+						? {
+								id: 'original-file',
+								name: 'Original',
+								imageUrl: currentImageUrl || '',
+								side: layerMgr.activeSide
+							}
+						: layerMgr.currentLayers.find((l) => l.id === actionModalLayerId);
 
-			if (layer) {
-				await processor.removeElement(layer as any, removePrompt);
-			}
-		}}
-		actionLayer={actionModalLayerId === 'original-file'
-			? { id: 'original-file', name: 'Original', imageUrl: currentImageUrl || '' }
-			: layerMgr.currentLayers.find((l) => l.id === actionModalLayerId)}
-	/>
-
-	<ImagePreviewModal
-		bind:open={modals.preview}
-		imageUrl={previewData.url}
-		title={previewData.title}
-		assetDimensions={{
-			width: data.asset.widthPixels || 1050,
-			height: data.asset.heightPixels || 600
-		}}
-	/>
-
-	{#if modals.crop}
-		<CropModal
-			bind:isOpen={modals.crop}
-			imageUrl={getProxiedUrl(
-				actionModalLayerId === 'original-file'
-					? currentImageUrl!
-					: layerMgr.currentLayers.find((l) => l.id === actionModalLayerId)?.imageUrl!
-			) || ''}
-			targetWidth={data.asset.widthPixels || 1050}
-			targetHeight={data.asset.heightPixels || 600}
-			aspectRatio={(data.asset.widthPixels || 1050) / (data.asset.heightPixels || 600)}
-			onCropComplete={async (croppedUrl) => {
-				modals.crop = false;
-				if (actionModalLayerId) {
-					const originalUrl =
-						actionModalLayerId === 'original-file'
-							? currentImageUrl
-							: layerMgr.currentLayers.find((l) => l.id === actionModalLayerId)?.imageUrl;
-					const layerName =
-						actionModalLayerId === 'original-file'
-							? 'Original'
-							: layerMgr.currentLayers.find((l) => l.id === actionModalLayerId)?.name || 'Layer';
-					await processor.handleCrop(actionModalLayerId, croppedUrl, layerName, originalUrl || '');
+				if (layer) {
+					await processor.removeElement(layer as any, removePrompt);
 				}
 			}}
+			actionLayer={actionModalLayerId === 'original-file'
+				? { id: 'original-file', name: 'Original', imageUrl: currentImageUrl || '' }
+				: layerMgr.currentLayers.find((l) => l.id === actionModalLayerId)}
 		/>
-	{/if}
-</div>
+
+		<ImagePreviewModal
+			bind:open={modals.preview}
+			imageUrl={previewData.url}
+			title={previewData.title}
+			assetDimensions={{
+				width: data.asset.widthPixels || 1050,
+				height: data.asset.heightPixels || 600
+			}}
+		/>
+
+		{#if modals.crop}
+			<CropModal
+				bind:isOpen={modals.crop}
+				imageUrl={getProxiedUrl(
+					actionModalLayerId === 'original-file'
+						? currentImageUrl!
+						: layerMgr.currentLayers.find((l) => l.id === actionModalLayerId)?.imageUrl!
+				) || ''}
+				targetWidth={data.asset.widthPixels || 1050}
+				targetHeight={data.asset.heightPixels || 600}
+				aspectRatio={(data.asset.widthPixels || 1050) / (data.asset.heightPixels || 600)}
+				onCropComplete={async (croppedUrl) => {
+					modals.crop = false;
+					if (actionModalLayerId) {
+						const originalUrl =
+							actionModalLayerId === 'original-file'
+								? currentImageUrl
+								: layerMgr.currentLayers.find((l) => l.id === actionModalLayerId)?.imageUrl;
+						const layerName =
+							actionModalLayerId === 'original-file'
+								? 'Original'
+								: layerMgr.currentLayers.find((l) => l.id === actionModalLayerId)?.name || 'Layer';
+						await processor.handleCrop(
+							actionModalLayerId,
+							croppedUrl,
+							layerName,
+							originalUrl || ''
+						);
+					}
+				}}
+			/>
+		{/if}
+	</div>
+</Tooltip.Provider>

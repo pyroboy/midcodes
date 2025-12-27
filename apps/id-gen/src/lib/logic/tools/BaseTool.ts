@@ -146,15 +146,18 @@ export interface CanvasTool {
 /**
  * Abstract base class for selection tools (lasso, rectangle, ellipse).
  * Provides common selection state and completion callback handling.
+ *
+ * NOTE: Child classes should define their own reactive state using $state()
+ * for properties like points, isActive, isClosed. We don't declare them here
+ * to avoid conflicts with Svelte 5's $state reactivity system.
  */
 export abstract class SelectionTool implements CanvasTool {
 	abstract readonly name: string;
 	abstract readonly cursor: string;
 	readonly requiresLayer = false;
 
-	protected points: NormalizedPoint[] = [];
-	protected isActive = false;
-	protected isClosed = false;
+	// NOTE: points, isActive, isClosed are managed by child classes with $state()
+	// Do NOT declare them here as it interferes with Svelte 5 reactivity
 
 	/** Callback when selection is completed */
 	onComplete?: (result: SelectionResult) => void;
@@ -166,32 +169,26 @@ export abstract class SelectionTool implements CanvasTool {
 	abstract onPointerUp(e: PointerEvent, ctx: ToolContext): void;
 	abstract renderOverlay?(ctx: CanvasRenderingContext2D): void;
 
-	reset(): void {
-		this.points = [];
-		this.isActive = false;
-		this.isClosed = false;
-	}
-
-	/** Get current selection points */
-	getPoints(): NormalizedPoint[] {
-		return [...this.points];
-	}
-
-	/** Check if selection is closed/complete */
-	isSelectionClosed(): boolean {
-		return this.isClosed;
-	}
+	// These methods must be implemented by child classes since they manage their own $state
+	abstract reset(): void;
+	abstract getPoints(): NormalizedPoint[];
+	abstract isSelectionClosed(): boolean;
 
 	/**
 	 * Calculate bounding box from selection points.
+	 * Child classes should call this with their points array.
 	 */
-	protected calculateBounds(widthPixels: number, heightPixels: number) {
-		if (this.points.length === 0) {
+	protected calculateBoundsFromPoints(
+		points: NormalizedPoint[],
+		widthPixels: number,
+		heightPixels: number
+	) {
+		if (points.length === 0) {
 			return { x: 0, y: 0, width: 0, height: 0 };
 		}
 
-		const xs = this.points.map((p) => p.x * widthPixels);
-		const ys = this.points.map((p) => p.y * heightPixels);
+		const xs = points.map((p) => p.x * widthPixels);
+		const ys = points.map((p) => p.y * heightPixels);
 
 		const minX = Math.min(...xs);
 		const maxX = Math.max(...xs);

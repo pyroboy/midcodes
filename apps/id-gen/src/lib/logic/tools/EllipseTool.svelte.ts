@@ -217,6 +217,11 @@ export class EllipseTool extends SelectionTool {
 		this.isPopoverOpen = false;
 	}
 
+	/** Check if selection is closed/complete */
+	isSelectionClosed(): boolean {
+		return this.isClosed;
+	}
+
 	/**
 	 * Get popover position (top center of ellipse).
 	 */

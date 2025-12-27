@@ -15,6 +15,7 @@
 	import { GradientTool } from '$lib/logic/tools/GradientTool.svelte';
 	import DrawingCanvas from './DrawingCanvas.svelte';
 	import type { ToolName, NormalizedPoint } from '$lib/logic/tools';
+	import { toast } from 'svelte-sonner';
 
 	type SelectionAction = 'copy' | 'fill' | 'delete';
 
@@ -92,6 +93,36 @@
 									: null
 	);
 
+	// Unified rendered layers (combines original + decomposed)
+	const renderedLayers = $derived.by(() => {
+		const layers = [];
+
+		// 1. Add Original/Background if enabled (at z-index 0)
+		if (showOriginalLayer && currentImageUrl) {
+			layers.push({
+				id: 'original-bg',
+				name: 'Original Image',
+				imageUrl: currentImageUrl,
+				zIndex: 0,
+				isBackground: true,
+				bounds: { x: 0, y: 0, width: widthPixels, height: heightPixels }
+			});
+		}
+
+		// 2. Add existing decomposed layers (shifted to start at z-index 1)
+		if (currentLayers) {
+			layers.push(
+				...currentLayers.map((l) => ({
+					...l,
+					zIndex: (l.zIndex || 0) + 1,
+					isBackground: false
+				}))
+			);
+		}
+
+		return layers.sort((a, b) => a.zIndex - b.zIndex);
+	});
+
 	// Unified selection closed state
 	const isSelectionClosed = $derived(
 		(activeTool === 'lasso' && lassoTool.isClosed) ||
@@ -111,6 +142,7 @@
 	}
 
 	function handlePointerDown(e: PointerEvent) {
+		console.log('[Lasso Debug] pointerdown', { activeTool, hasCanvasElement: !!canvasElement });
 		if (!activeTool || !canvasElement) return;
 
 		// Don't handle if clicking on popover or toolbar
@@ -118,6 +150,7 @@
 		if (target.closest('[data-toolbar]') || target.closest('[data-selection-popover]')) return;
 
 		updateCanvasRect();
+		console.log('[Lasso Debug] canvasRect updated', { hasRect: !!canvasRect });
 		if (!canvasRect) return;
 
 		const ctx = {
@@ -136,12 +169,8 @@
 			canvasContext: drawingContext ?? undefined
 		};
 
-		// For brush, we need real options. Ideally ImagePreview should receive toolOptions props.
-		// For now, using defaults or what's passed in ctx.
-		// Update: ImagePreview has activeTool but not full options prop.
-		// We should probably rely on `activeToolInstance` pattern more.
-
 		if (activeTool === 'lasso') {
+			console.log('[Lasso Debug] calling lassoTool.onPointerDown');
 			lassoTool.onPointerDown(e, ctx);
 		} else if (activeTool === 'rectangle') {
 			rectangleTool.onPointerDown(e, ctx);
@@ -191,6 +220,7 @@
 	}
 
 	function handlePointerUp(e: PointerEvent) {
+		console.log('[Lasso Debug] pointerup', { activeTool, hasCanvasRect: !!canvasRect });
 		if (!activeTool || !canvasRect) return;
 
 		const ctx = {
@@ -210,7 +240,12 @@
 		};
 
 		if (activeTool === 'lasso') {
+			console.log(
+				'[Lasso Debug] calling lassoTool.onPointerUp, points before:',
+				lassoTool.points.length
+			);
 			lassoTool.onPointerUp(e, ctx);
+			console.log('[Lasso Debug] points after:', lassoTool.points.length);
 		} else if (activeTool === 'rectangle') {
 			rectangleTool.onPointerUp(e, ctx);
 		} else if (activeTool === 'ellipse') {
@@ -229,19 +264,13 @@
 	function handleInnerClick(e: MouseEvent) {
 		const target = e.target as HTMLElement;
 
-		// If a selection tool is active, delegate to pointer events
+		// If a selection tool is active, pointer events handle everything
+		// Don't use legacy click handler - it causes double-registration of points
 		if (activeTool === 'lasso' || activeTool === 'rectangle' || activeTool === 'ellipse') {
 			// Don't interact if clicking on the popover or toolbar
 			if (target.closest('[data-toolbar]') || target.closest('[data-selection-popover]')) return;
-
-			// For lasso, use legacy click handler for backward compatibility
-			if (activeTool === 'lasso') {
-				e.stopPropagation();
-				updateCanvasRect();
-				if (canvasRect) {
-					lassoTool.handleClick(e, canvasRect);
-				}
-			}
+			// Pointer events (pointerdown/pointerup) handle point addition
+			e.stopPropagation();
 			return;
 		}
 
@@ -253,13 +282,22 @@
 
 	function handleOuterClick(e: MouseEvent) {
 		const target = e.target as HTMLElement;
-		// Don't handle if clicking on toolbar area
-		if (!target.closest('[data-toolbar]')) {
-			lassoTool.reset();
-			rectangleTool.reset();
-			ellipseTool.reset();
-			eraserTool.reset();
+		// Don't reset if clicking on toolbar, popover, or inside canvas area
+		if (target.closest('[data-toolbar]') || target.closest('[data-selection-popover]')) return;
+
+		// Don't reset selection tools if they're currently active (user is drawing)
+		if (activeTool === 'lasso' || activeTool === 'rectangle' || activeTool === 'ellipse') {
+			// Only reset if clicking OUTSIDE the canvas wrapper entirely
+			if (target.closest('.canvas-stack-content') || canvasElement?.contains(target)) {
+				return; // Don't reset - user is interacting with canvas
+			}
 		}
+
+		// Reset all tools when clicking outside canvas area
+		lassoTool.reset();
+		rectangleTool.reset();
+		ellipseTool.reset();
+		eraserTool.reset();
 	}
 
 	// Reset all tools when active tool changes
@@ -324,6 +362,12 @@
 		<p class="text-xs text-muted-foreground">
 			{widthPixels} x {heightPixels}px • {orientation}
 		</p>
+		<!-- DEBUG: Remove after testing -->
+		{#if activeTool === 'lasso'}
+			<p class="text-xs text-blue-500 mt-1">
+				Lasso: {lassoTool.points.length} pts | closed: {lassoTool.isClosed}
+			</p>
+		{/if}
 	</div>
 
 	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
@@ -345,31 +389,40 @@
 			role="button"
 			tabindex="0"
 		>
-			{#if currentLayers.length > 0}
-				<!-- Render Decomposed Layers -->
-				<div class="relative w-full h-full">
-					<!-- Original File Layer (shown behind all others when enabled) -->
-					{#if showOriginalLayer && currentImageUrl}
-						<img
-							src={currentImageUrl}
-							alt="Original file"
-							class="absolute inset-0 w-full h-full object-contain transition-opacity duration-200"
-							style="z-index: -1; opacity: 0.5;"
-						/>
-					{/if}
-
-					{#each currentLayers as layer (layer.id)}
+			{#if renderedLayers.length > 0}
+				<!-- Render Decomposed Layers - explicit transparent background for proper layer compositing -->
+				<div class="relative w-full h-full" style="background: transparent;">
+					{#each renderedLayers as layer, idx (layer.id)}
 						{@const selection = layerSelections.get(layer.id)}
 						{@const mask = masks.get(layer.id)}
+						{@const isVisible = layer.isBackground ? true : (selection?.included ?? false)}
 						{@const hasBounds = layer.bounds && layer.bounds.width > 0 && layer.bounds.height > 0}
-						<!-- Added mask-image style -->
+						{@const debugLeft = hasBounds ? ((layer.bounds?.x || 0) / widthPixels) * 100 : 0}
+						{@const debugTop = hasBounds ? ((layer.bounds?.y || 0) / heightPixels) * 100 : 0}
+						{@const debugWidth = hasBounds ? ((layer.bounds?.width || 0) / widthPixels) * 100 : 100}
+						{@const debugHeight = hasBounds
+							? ((layer.bounds?.height || 0) / heightPixels) * 100
+							: 100}
+						{console.log(`[Layer ${idx}] ${layer.name}:`, {
+							id: layer.id,
+							zIndex: layer.zIndex,
+							hasBounds,
+							bounds: layer.bounds,
+							included: isVisible,
+							position: { left: debugLeft, top: debugTop, width: debugWidth, height: debugHeight }
+						})}
+						<!-- Layer with explicit transparent background for PNG transparency -->
+						<!-- Using object-contain to preserve PNG aspect ratio and transparency -->
 						<img
 							src={layer.imageUrl}
 							alt={layer.name}
-							class="absolute object-fill transition-opacity duration-200 pointer-events-none"
+							class="absolute transition-opacity duration-200 pointer-events-none"
 							style="
-								z-index: {layer.zIndex}; 
-								opacity: {selection?.included ? 1 : 0};
+								background: transparent;
+								object-fit: {layer.isBackground ? 'contain' : 'fill'};
+								object-position: center;
+								z-index: {layer.zIndex};
+								opacity: {isVisible ? 1 : 0};
 								left: {hasBounds ? ((layer.bounds?.x || 0) / widthPixels) * 100 : 0}%;
 								top: {hasBounds ? ((layer.bounds?.y || 0) / heightPixels) * 100 : 0}%;
 								width: {hasBounds ? ((layer.bounds?.width || 0) / widthPixels) * 100 : 100}%;
@@ -392,7 +445,7 @@
 								bind:context={drawingContext}
 							/>
 						{/if}
-						{#each currentLayers as layer (layer.id)}
+						{#each renderedLayers as layer (layer.id)}
 							<div
 								class="absolute inset-0 border-2 transition-opacity {selectedLayerId === layer.id
 									? 'border-primary opacity-100'
@@ -401,12 +454,6 @@
 						{/each}
 					</div>
 				</div>
-			{:else if currentImageUrl && showOriginalLayer}
-				<img
-					src={currentImageUrl}
-					alt="{assetName} - {activeSide}"
-					class="w-full h-full object-contain"
-				/>
 			{:else}
 				<div class="text-center text-muted-foreground">
 					<ImageIcon class="h-12 w-12 mx-auto mb-2 opacity-30" />

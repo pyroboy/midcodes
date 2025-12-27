@@ -140,13 +140,13 @@
 	<!-- Toolbar Area -->
 	<div class="flex items-center justify-center gap-3 flex-wrap">
 		<ToolSelector
-			bind:activeTool={toolManager.activeTool}
+			activeTool={toolManager.activeTool}
 			{disabled}
 			onToolChange={(tool) => toolManager.setTool(tool)}
 		/>
 		<ToolOptions
 			activeTool={toolManager.activeTool}
-			bind:toolOptions={toolManager.toolOptions}
+			toolOptions={toolManager.toolOptions}
 			onOptionsChange={(opts) => toolManager.setToolOptions(opts)}
 		/>
 	</div>

@@ -45,11 +45,13 @@ export class LassoTool extends SelectionTool {
 	 * Handle pointer down - record start point for click detection.
 	 */
 	onPointerDown(e: PointerEvent, ctx: ToolContext): void {
+		console.log('[LassoTool] onPointerDown', { isClosed: this.isClosed });
 		if (this.isClosed) {
 			this.reset();
 		}
 		this.ctx = ctx;
 		this.pointerDownPoint = normalizePointerEvent(e, ctx.canvasRect);
+		console.log('[LassoTool] stored pointerDownPoint', this.pointerDownPoint);
 	}
 
 
@@ -66,6 +68,7 @@ export class LassoTool extends SelectionTool {
 	 * Handle pointer up - detect click and add point or close selection.
 	 */
 	onPointerUp(e: PointerEvent, ctx: ToolContext): void {
+		console.log('[LassoTool] onPointerUp', { hasPointerDownPoint: !!this.pointerDownPoint });
 		if (!this.pointerDownPoint) return;
 
 		const upPoint = normalizePointerEvent(e, ctx.canvasRect);
@@ -73,8 +76,10 @@ export class LassoTool extends SelectionTool {
 
 		// Consider it a click if pointer didn't move much (< 1% of canvas)
 		const CLICK_THRESHOLD = 0.01;
+		console.log('[LassoTool] click detection', { moveDistance, threshold: CLICK_THRESHOLD, isClick: moveDistance < CLICK_THRESHOLD });
 		if (moveDistance < CLICK_THRESHOLD) {
 			this.handlePointAdd(upPoint);
+			console.log('[LassoTool] point added, total points:', this.points.length);
 		}
 
 		this.pointerDownPoint = null;
@@ -163,7 +168,7 @@ export class LassoTool extends SelectionTool {
 		if (!this.onComplete || !this.ctx) return;
 
 		const { widthPixels, heightPixels } = this.ctx.canvasDimensions;
-		const bounds = this.calculateBounds(widthPixels, heightPixels);
+		const bounds = this.calculateBoundsFromPoints(this.points, widthPixels, heightPixels);
 
 		const result: SelectionResult = {
 			points: this.getPoints(),
@@ -192,6 +197,8 @@ export class LassoTool extends SelectionTool {
 	}
 
 	reset(): void {
+		console.log('[LassoTool] reset() called');
+		// console.trace('[LassoTool] reset stack trace');
 		this.points = [];
 		this.isClosed = false;
 		this.isPopoverOpen = false;

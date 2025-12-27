@@ -23,48 +23,42 @@
 		onAction?: (action: SelectionAction) => void;
 	} = $props();
 
-	// Derived states from each tool
-	const lassoPoints = $derived(lassoTool?.points ?? []);
-	const isLassoClosed = $derived(lassoTool?.isClosed ?? false);
-	const lassoPopoverOpen = $derived(lassoTool?.isPopoverOpen ?? false);
+	// NOTE: We access tool state ($state properties) directly in the template
+	// because $derived doesn't track changes to $state inside class instances
+	// passed as props. Direct template access maintains reactivity.
 
+	// Rectangle derived (uses getter method, so $derived works)
 	const rectBounds = $derived(rectangleTool?.getBounds());
-	const isRectClosed = $derived(rectangleTool?.isClosed ?? false);
-	const rectPopoverOpen = $derived(rectangleTool?.isPopoverOpen ?? false);
-
-	const ellipseParams = $derived(ellipseTool?.getEllipseParams());
-	const isEllipseClosed = $derived(ellipseTool?.isClosed ?? false);
-	const ellipsePopoverOpen = $derived(ellipseTool?.isPopoverOpen ?? false);
-
-	// Popover positions
-	const lassoPopoverPos = $derived(lassoTool?.getPopoverPosition());
 	const rectPopoverPos = $derived(rectangleTool?.getPopoverPosition());
+
+	// Ellipse derived (uses getter method, so $derived works)
+	const ellipseParams = $derived(ellipseTool?.getEllipseParams());
 	const ellipsePopoverPos = $derived(ellipseTool?.getPopoverPosition());
 </script>
 
-<!-- Lasso Overlay -->
-{#if activeTool === 'lasso' && lassoPoints.length > 0}
+<!-- Lasso Overlay - Access $state properties directly for reactivity -->
+{#if activeTool === 'lasso' && lassoTool && lassoTool.points.length > 0}
 	<svg
 		class="absolute inset-0 w-full h-full pointer-events-none z-[10001]"
 		viewBox="0 0 100 100"
 		preserveAspectRatio="none"
 	>
-		{#if isLassoClosed}
+		{#if lassoTool.isClosed}
 			<path
 				d={`M0,0 H100 V100 H0 Z ` +
-					`M${lassoPoints.map((p) => `${p.x * 100},${p.y * 100}`).join(' ')} Z`}
+					`M${lassoTool.points.map((p) => `${p.x * 100},${p.y * 100}`).join(' ')} Z`}
 				fill-rule="evenodd"
 				fill="rgba(0,0,0,0.6)"
 			/>
 			<polygon
-				points={lassoPoints.map((p) => `${p.x * 100},${p.y * 100}`).join(' ')}
+				points={lassoTool.points.map((p) => `${p.x * 100},${p.y * 100}`).join(' ')}
 				fill="rgba(255,255,255,0.1)"
 			/>
 		{/if}
 
-		{#if isLassoClosed}
+		{#if lassoTool.isClosed}
 			<polygon
-				points={lassoPoints.map((p) => `${p.x * 100},${p.y * 100}`).join(' ')}
+				points={lassoTool.points.map((p) => `${p.x * 100},${p.y * 100}`).join(' ')}
 				fill="none"
 				stroke="white"
 				stroke-width="1.5"
@@ -73,7 +67,7 @@
 				stroke-linejoin="round"
 			/>
 			<polygon
-				points={lassoPoints.map((p) => `${p.x * 100},${p.y * 100}`).join(' ')}
+				points={lassoTool.points.map((p) => `${p.x * 100},${p.y * 100}`).join(' ')}
 				fill="none"
 				stroke="black"
 				stroke-width="1.5"
@@ -85,7 +79,7 @@
 			/>
 		{:else}
 			<polyline
-				points={lassoPoints.map((p) => `${p.x * 100},${p.y * 100}`).join(' ')}
+				points={lassoTool.points.map((p) => `${p.x * 100},${p.y * 100}`).join(' ')}
 				fill="none"
 				stroke="white"
 				stroke-width="1.5"
@@ -94,7 +88,7 @@
 				stroke-linejoin="round"
 			/>
 			<polyline
-				points={lassoPoints.map((p) => `${p.x * 100},${p.y * 100}`).join(' ')}
+				points={lassoTool.points.map((p) => `${p.x * 100},${p.y * 100}`).join(' ')}
 				fill="none"
 				stroke="black"
 				stroke-width="1.5"
@@ -109,7 +103,7 @@
 
 	<!-- Lasso Handles -->
 	<svg class="absolute inset-0 w-full h-full pointer-events-none z-[10002]">
-		{#each lassoPoints as p, i}
+		{#each lassoTool.points as p, i}
 			<circle
 				cx="{p.x * 100}%"
 				cy="{p.y * 100}%"
@@ -118,7 +112,7 @@
 				stroke="black"
 				stroke-width="1"
 			/>
-			{#if i === 0 && lassoPoints.length > 2 && !isLassoClosed}
+			{#if i === 0 && lassoTool.points.length > 2 && !lassoTool.isClosed}
 				<circle
 					cx="{p.x * 100}%"
 					cy="{p.y * 100}%"
@@ -132,26 +126,29 @@
 		{/each}
 	</svg>
 
-	{#if isLassoClosed && lassoPopoverOpen && lassoPopoverPos}
-		<SelectionActions
-			open={lassoPopoverOpen}
-			position={lassoPopoverPos}
-			{isProcessing}
-			{onAction}
-			showFill={true}
-			showDelete={true}
-		/>
+	{#if lassoTool.isClosed && lassoTool.isPopoverOpen}
+		{@const popoverPos = lassoTool.getPopoverPosition()}
+		{#if popoverPos}
+			<SelectionActions
+				open={lassoTool.isPopoverOpen}
+				position={popoverPos}
+				{isProcessing}
+				{onAction}
+				showFill={true}
+				showDelete={true}
+			/>
+		{/if}
 	{/if}
 {/if}
 
 <!-- Rectangle Overlay -->
-{#if activeTool === 'rectangle' && rectBounds}
+{#if activeTool === 'rectangle' && rectangleTool && rectBounds}
 	<svg
 		class="absolute inset-0 w-full h-full pointer-events-none z-[10001]"
 		viewBox="0 0 100 100"
 		preserveAspectRatio="none"
 	>
-		{#if isRectClosed}
+		{#if rectangleTool.isClosed}
 			<!-- Dim area outside selection -->
 			<path
 				d={`M0,0 H100 V100 H0 Z M${rectBounds.x * 100},${rectBounds.y * 100} h${rectBounds.width * 100} v${rectBounds.height * 100} h-${rectBounds.width * 100} Z`}
@@ -192,9 +189,9 @@
 		/>
 	</svg>
 
-	{#if isRectClosed && rectPopoverOpen && rectPopoverPos}
+	{#if rectangleTool.isClosed && rectangleTool.isPopoverOpen && rectPopoverPos}
 		<SelectionActions
-			open={rectPopoverOpen}
+			open={rectangleTool.isPopoverOpen}
 			position={rectPopoverPos}
 			{isProcessing}
 			{onAction}
@@ -205,13 +202,13 @@
 {/if}
 
 <!-- Ellipse Overlay -->
-{#if activeTool === 'ellipse' && ellipseParams}
+{#if activeTool === 'ellipse' && ellipseTool && ellipseParams}
 	<svg
 		class="absolute inset-0 w-full h-full pointer-events-none z-[10001]"
 		viewBox="0 0 100 100"
 		preserveAspectRatio="none"
 	>
-		{#if isEllipseClosed}
+		{#if ellipseTool.isClosed}
 			<!-- Dim area outside selection -->
 			<defs>
 				<mask id="ellipse-mask">
@@ -260,9 +257,9 @@
 		/>
 	</svg>
 
-	{#if isEllipseClosed && ellipsePopoverOpen && ellipsePopoverPos}
+	{#if ellipseTool.isClosed && ellipseTool.isPopoverOpen && ellipsePopoverPos}
 		<SelectionActions
-			open={ellipsePopoverOpen}
+			open={ellipseTool.isPopoverOpen}
 			position={ellipsePopoverPos}
 			{isProcessing}
 			{onAction}

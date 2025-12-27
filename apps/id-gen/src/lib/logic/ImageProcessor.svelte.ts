@@ -7,7 +7,7 @@ import {
 	saveHistoryItem
 } from '$lib/remote/index.remote';
 import { fileToImageData, processImageLSB, imageDataToBlob } from '$lib/utils/bye-synth-id';
-import { fileToDataUrl } from '$lib/utils/imageProcessing';
+import { fileToDataUrl, removeBackgroundCloud } from '$lib/utils/imageProcessing';
 import type { LayerManager } from './LayerManager.svelte';
 import type { HistoryManager } from './HistoryManager.svelte';
 import type { DecomposedLayer } from '$lib/schemas/decompose.schema';
@@ -262,7 +262,7 @@ export class ImageProcessor {
 		try {
 			// 1. Load source image via PROXY to avoid CORS
 			const proxiedUrl = getProxiedUrl(sourceImageUrl) || sourceImageUrl;
-			
+
 			const img = await new Promise<HTMLImageElement>((resolve, reject) => {
 				const i = new Image();
 				i.crossOrigin = 'anonymous';
@@ -275,9 +275,7 @@ export class ImageProcessor {
 			const canvasW = this.assetData.width;
 			const canvasH = this.assetData.height;
 
-			// Source Layer Position
-			// If cutting from original-file, it's at (0,0) and fills canvas (assumed)
-			// If cutting from another layer, it has specific bounds
+			// Source Layer Position & Dimensions
 			let layerX = 0;
 			let layerY = 0;
 			let layerW = canvasW;
@@ -291,6 +289,21 @@ export class ImageProcessor {
 					layerW = layer.bounds.width;
 					layerH = layer.bounds.height;
 				}
+			} else {
+				// For 'original-file' (Background), we must replicate 'object-fit: contain' logic
+				// to match what the user sees on screen.
+				const natW = img.naturalWidth;
+				const natH = img.naturalHeight;
+				
+				// Calculate scaling to 'contain' within canvasW/canvasH
+				const scale = Math.min(canvasW / natW, canvasH / natH);
+				
+				layerW = natW * scale;
+				layerH = natH * scale;
+				
+				// Center it
+				layerX = (canvasW - layerW) / 2;
+				layerY = (canvasH - layerH) / 2;
 			}
 
 			// Calculate "Cut" Bounding Box in CANVAS COORDINATES
@@ -300,7 +313,7 @@ export class ImageProcessor {
 			const minY = Math.floor(Math.min(...canvasPoints.map(p => p.y)));
 			const maxX = Math.ceil(Math.max(...canvasPoints.map(p => p.x)));
 			const maxY = Math.ceil(Math.max(...canvasPoints.map(p => p.y)));
-			
+
 			const bboxW = maxX - minX;
 			const bboxH = maxY - minY;
 
@@ -312,42 +325,64 @@ export class ImageProcessor {
 			const cutCanvas = document.createElement('canvas');
 			cutCanvas.width = bboxW;
 			cutCanvas.height = bboxH;
-			const cutCtx = cutCanvas.getContext('2d');
+			const cutCtx = cutCanvas.getContext('2d', { alpha: true, willReadFrequently: true });
 			if (!cutCtx) throw new Error('No cut context');
 
-			// Clear to be safe
-			cutCtx.clearRect(0, 0, bboxW, bboxH);
-
-			cutCtx.save(); // Save state before clipping
-
-			// Draw CLIPPING PATH (Mapped to Cut Canvas space)
-			// Target Point = Canvas Point - minX (Top-left of bounding box)
-			cutCtx.beginPath();
-			canvasPoints.forEach((p, i) => {
-				const tx = p.x - minX;
-				const ty = p.y - minY;
-				if (i === 0) cutCtx.moveTo(tx, ty);
-				else cutCtx.lineTo(tx, ty);
-			});
-			cutCtx.closePath();
-			cutCtx.clip();
-
-			// Draw SOURCE IMAGE
-			// We need to map the source image (at layerX, layerY on Main Canvas)
-			// to the Cut Canvas (which represents the rect at minX, minY on Main Canvas).
-			// Offset = LayerPos - CutPos
+			// --- STEP 1: Draw the source image portion ---
 			const drawX = layerX - minX;
 			const drawY = layerY - minY;
-
-			// We use layerW/layerH for destination size to ensure it scales correctly if image vs bounds differ
 			cutCtx.drawImage(img, drawX, drawY, layerW, layerH);
-			
-			cutCtx.restore(); // Restore state (remove clip)
-			
+
+			// --- STEP 2: Convert polygon points to local canvas coordinates ---
+			const localPoints = canvasPoints.map(p => ({
+				x: p.x - minX,
+				y: p.y - minY
+			}));
+
+			// --- STEP 3: Use pixel manipulation for guaranteed transparency ---
+			// This approach manually sets alpha=0 for pixels outside the polygon
+			const imageData = cutCtx.getImageData(0, 0, bboxW, bboxH);
+			const data = imageData.data;
+
+			// Point-in-polygon test using ray casting algorithm
+			function isPointInPolygon(x: number, y: number, polygon: { x: number; y: number }[]): boolean {
+				let inside = false;
+				for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+					const xi = polygon[i].x, yi = polygon[i].y;
+					const xj = polygon[j].x, yj = polygon[j].y;
+
+					if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
+						inside = !inside;
+					}
+				}
+				return inside;
+			}
+
+			// Set alpha to 0 for all pixels outside the polygon
+			for (let y = 0; y < bboxH; y++) {
+				for (let x = 0; x < bboxW; x++) {
+					const idx = (y * bboxW + x) * 4;
+					if (!isPointInPolygon(x, y, localPoints)) {
+						data[idx + 3] = 0; // Set alpha to 0 (fully transparent)
+					}
+				}
+			}
+
+			// Put the modified image data back
+			cutCtx.putImageData(imageData, 0, 0);
+
+			// DEBUG: Verify transparency
+			const cornerAlpha = data[3];
+			console.log('[cutPolygon] Corner pixel alpha (should be 0):', cornerAlpha);
+			const centerIdx = (Math.floor(bboxH / 2) * bboxW + Math.floor(bboxW / 2)) * 4;
+			console.log('[cutPolygon] Center pixel alpha:', data[centerIdx + 3]);
+
 			const cutBlob = await new Promise<Blob | null>(r => cutCanvas.toBlob(r, 'image/png'));
 			if (!cutBlob) throw new Error('Cut blob failed');
+			console.log('[cutPolygon] PNG blob size:', cutBlob.size, 'bytes');
+
 			const cutBase64 = await fileToDataUrl(cutBlob);
-			console.log('Uploading cut result...');
+			console.log('[cutPolygon] Uploading cut result...');
 			const cutUpload = await uploadProcessedImage({ imageBase64: cutBase64, mimeType: 'image/png' });
 
 			// --- Apply Changes ---
@@ -716,6 +751,54 @@ export class ImageProcessor {
 		} catch (e: any) {
 			console.error('Delete error:', e);
 			toast.error('Delete failed: ' + e.message, { id: toastId });
+		} finally {
+			this.isProcessing = false;
+		}
+	}
+	
+	// --- 8. Background Removal (Manual) ---
+	async removeLayerBackground(layerId: string) {
+		if (this.isProcessing) return;
+		
+		const layer = this.layerManager.currentLayers.find(l => l.id === layerId);
+		if (!layer) return;
+
+		this.isProcessing = true;
+		const toastId = toast.loading('Removing background...');
+
+		try {
+			// 1. Fetch current image
+			const response = await fetch(layer.imageUrl);
+			const blob = await response.blob();
+			
+			// 2. Call cloud API
+			const processedBlob = await removeBackgroundCloud(blob);
+			
+			// 3. Convert to base64 and Upload
+			const base64 = await fileToDataUrl(processedBlob);
+			const upload = await uploadProcessedImage({ imageBase64: base64, mimeType: 'image/png' });
+			
+			if (upload.success && upload.url) {
+				// 4. Update layer
+				this.layerManager.updateLayerImageUrl(layerId, upload.url);
+				
+				// 5. History
+				await saveHistoryItem({
+					originalUrl: layer.imageUrl,
+					resultUrl: upload.url,
+					action: 'remove-bg', 
+					side: this.layerManager.activeSide,
+					templateId: this.assetData.templateId
+				});
+				this.historyManager.load();
+				
+				toast.success('Background removed', { id: toastId });
+			} else {
+				throw new Error(upload.error || 'Upload failed');
+			}
+		} catch (e: any) {
+			console.error('BG Remove error:', e);
+			toast.error('BG removal failed: ' + e.message, { id: toastId });
 		} finally {
 			this.isProcessing = false;
 		}

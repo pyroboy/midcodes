@@ -58,8 +58,6 @@
 				label: `DECOMPOSE (${item.layers.length})`,
 				color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'
 			};
-				color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'
-			};
 		}
 		if (item.model === 'DRAW') {
 			return {

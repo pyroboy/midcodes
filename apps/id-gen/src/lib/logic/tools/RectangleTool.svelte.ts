@@ -200,6 +200,11 @@ export class RectangleTool extends SelectionTool {
 		this.isPopoverOpen = false;
 	}
 
+	/** Check if selection is closed/complete */
+	isSelectionClosed(): boolean {
+		return this.isClosed;
+	}
+
 	/**
 	 * Get popover position (center of selection).
 	 */

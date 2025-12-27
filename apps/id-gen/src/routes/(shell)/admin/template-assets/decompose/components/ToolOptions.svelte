@@ -8,12 +8,12 @@
 
 	let {
 		activeTool,
-		toolOptions = $bindable<ToolOptions>({
+		toolOptions = {
 			size: 20,
 			opacity: 100,
 			color: '#3b82f6',
 			tolerance: 32
-		}),
+		},
 		onOptionsChange
 	}: {
 		activeTool: ToolName;
@@ -42,7 +42,6 @@
 	const showToleranceOption = $derived(activeTool === 'bucket');
 
 	function updateOption<K extends keyof ToolOptions>(key: K, value: ToolOptions[K]) {
-		toolOptions = { ...toolOptions, [key]: value };
 		onOptionsChange?.({ [key]: value });
 	}
 </script>

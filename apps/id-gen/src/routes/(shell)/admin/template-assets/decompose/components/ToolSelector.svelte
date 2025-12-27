@@ -14,7 +14,7 @@
 	import { TOOL_METADATA, type ToolName } from '$lib/logic/tools';
 
 	let {
-		activeTool = $bindable<ToolName>(null),
+		activeTool = null,
 		disabled = false,
 		onToolChange
 	}: {
@@ -38,10 +38,8 @@
 	function selectTool(toolId: ToolName) {
 		if (activeTool === toolId) {
 			// Toggle off if already selected
-			activeTool = null;
 			onToolChange?.(null);
 		} else {
-			activeTool = toolId;
 			onToolChange?.(toolId);
 		}
 	}

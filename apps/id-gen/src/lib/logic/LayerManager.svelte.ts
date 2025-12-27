@@ -16,6 +16,21 @@ export interface LayerMask {
 	bounds: { x: number; y: number; width: number; height: number };
 }
 
+/**
+ * Validation helper for bounds
+ */
+function isValidBounds(bounds: any): boolean {
+	return (
+		bounds &&
+		typeof bounds.x === 'number' &&
+		typeof bounds.y === 'number' &&
+		typeof bounds.width === 'number' &&
+		typeof bounds.height === 'number' &&
+		bounds.width > 0 &&
+		bounds.height > 0
+	);
+}
+
 export class LayerManager {
 	// Global State
 	activeSide = $state<'front' | 'back'>('front');
@@ -35,8 +50,6 @@ export class LayerManager {
 	expandedIds = $state<Set<string>>(new Set());
 	mergeMode = $state(false);
 	selectedForMerge = $state<Set<string>>(new Set());
-	showOriginalLayer = $state(true);
-
 	showOriginalLayer = $state(true);
 
 	// Cache State (Phase 8 - full upload queue system)
@@ -83,6 +96,17 @@ export class LayerManager {
 	// --- Core Layer Operations ---
 
 	addLayer(layer: DecomposedLayer, selection: LayerSelection) {
+		// Validation (Phase 3b)
+		if (!layer.id || !layer.name || !layer.imageUrl) {
+			console.error('Invalid layer data:', layer);
+			toast.error('Failed to add layer: Invalid data');
+			return;
+		}
+		if (layer.bounds && !isValidBounds(layer.bounds)) {
+			console.warn('Invalid layer bounds:', layer.bounds);
+			// Correct bounds if possible or fallback? For now, warn.
+		}
+
 		const currentCount = this.activeSide === 'front' ? this.frontLayers.length : this.backLayers.length;
 		if (currentCount >= 10) {
 			toast.warning('High layer count may affect performance');
@@ -149,6 +173,11 @@ export class LayerManager {
 		const list = this.activeSide === 'front' ? this.frontLayers : this.backLayers;
 		const layer = list.find((l) => l.id === layerId);
 		if (layer) {
+			if (!newUrl || typeof newUrl !== 'string') {
+				toast.error('Invalid image URL');
+				return;
+			}
+
 			// If replacing a blob URL, revoke the old one
 			if (layer.imageUrl.startsWith('blob:') && layer.imageUrl !== newUrl) {
 				this.cleanupBlobLayer(layer.id, layer.imageUrl);
@@ -200,6 +229,16 @@ export class LayerManager {
 	 * Set or update mask for a layer.
 	 */
 	setMask(layerId: string, maskData: string, bounds: LayerMask['bounds']): void {
+		if (!maskData || !maskData.startsWith('data:image/')) {
+			console.error('Invalid mask data');
+			toast.error('Failed to save mask: Invalid data format');
+			return;
+		}
+		if (!isValidBounds(bounds)) {
+			console.error('Invalid mask bounds');
+			return;
+		}
+
 		this.masks.set(layerId, { layerId, maskData, bounds });
 		this.masks = new Map(this.masks); // Trigger reactivity
 		this.markUnsaved();
@@ -426,7 +465,6 @@ export class LayerManager {
 		this.markUnsaved();
 	}
 
-	// Helper to create objects
 	createLayerObj(
 		url: string,
 		name: string,
@@ -436,6 +474,12 @@ export class LayerManager {
 		cachedBlob?: Blob,
 		layerType: 'decomposed' | 'drawing' | 'copied' | 'filled' = 'decomposed'
 	) {
+		if (!isValidBounds(bounds)) {
+			// Fallback for invalid bounds
+			bounds = { x: 0, y: 0, width: 100, height: 100 };
+			console.warn('createLayerObj: Resetting invalid bounds to default');
+		}
+
 		const id = crypto.randomUUID();
 		const safeName = name.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
 

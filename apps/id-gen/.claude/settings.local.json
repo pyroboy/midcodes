@@ -24,7 +24,11 @@
       "Bash(node -e:*)",
       "Bash(npx tsc:*)",
       "Bash(mv:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "WebFetch(domain:www.web-plus-plus.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:blog.cjgammon.com)"
     ],
     "deny": [],
     "ask": []
