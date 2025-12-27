@@ -755,6 +755,14 @@ export class LayerManager {
 			console.log('[LayerManager] Using cached canvas');
 		}
 
+		// Sync cached bounds with current layer bounds (which might have been moved)
+		if (layer.bounds) {
+			const cb = (canvas as any)._bounds;
+			cb.x = layer.bounds.x;
+			cb.y = layer.bounds.y;
+			// Width/Height should match canvas dimensions, usually consistent
+		}
+
 		const canvasBounds = (canvas as any)._bounds;
 
 		// Check if we need to expand the canvas
@@ -766,6 +774,15 @@ export class LayerManager {
 		};
 		newBounds.width = Math.max(canvasBounds.x + canvasBounds.width, bounds.x + bounds.width) - newBounds.x;
 		newBounds.height = Math.max(canvasBounds.y + canvasBounds.height, bounds.y + bounds.height) - newBounds.y;
+		
+		/*console.log('[LayerManager] Merge logic:', {
+			layerId,
+			strokeBounds: bounds,
+			currentCanvasBounds: canvasBounds,
+			calculatedNewBounds: newBounds,
+			drawStrokeAt: { x: bounds.x - newBounds.x, y: bounds.y - newBounds.y },
+			drawExistingAt: { x: canvasBounds.x - newBounds.x, y: canvasBounds.y - newBounds.y }
+		});*/
 
 		// If bounds expanded, we need to resize the canvas
 		if (newBounds.width > canvas.width || newBounds.height > canvas.height || 

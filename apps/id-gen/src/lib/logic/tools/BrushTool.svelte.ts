@@ -229,6 +229,13 @@ export class BrushTool extends DrawingTool implements CanvasTool {
 			width: Math.ceil(this.boundingBox.maxX - this.boundingBox.minX + padding * 2),
 			height: Math.ceil(this.boundingBox.maxY - this.boundingBox.minY + padding * 2)
 		};
+		
+		/*console.log('[BrushTool] Finalize Bounds:', {
+			rawBBox: this.boundingBox,
+			padding,
+			calculatedBounds: bounds,
+			canvasWidth: canvas.width
+		});*/
 
 		// Clip bounds to canvas size
 		bounds.width = Math.min(bounds.width, canvas.width - bounds.x);
