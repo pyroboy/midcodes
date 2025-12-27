@@ -5,6 +5,7 @@
 	import type { ToolManager } from '$lib/logic/ToolManager.svelte';
 	import type { ImageProcessor } from '$lib/logic/ImageProcessor.svelte';
 	import type { HistoryManager } from '$lib/logic/HistoryManager.svelte';
+	import type { UndoManager } from '$lib/logic/UndoManager.svelte';
 	import SelectionOverlay from './SelectionOverlay.svelte';
 	import { LassoTool } from '$lib/logic/tools/LassoTool.svelte';
 	import { RectangleTool } from '$lib/logic/tools/RectangleTool.svelte';
@@ -13,6 +14,7 @@
 	import { EraserTool } from '$lib/logic/tools/EraserTool.svelte';
 	import { BucketTool } from '$lib/logic/tools/BucketTool.svelte';
 	import { GradientTool } from '$lib/logic/tools/GradientTool.svelte';
+	import { MoveTool } from '$lib/logic/tools/MoveTool.svelte';
 	import DrawingCanvas from './DrawingCanvas.svelte';
 	import BrushCursor from './BrushCursor.svelte';
 	import type { ToolName, NormalizedPoint } from '$lib/logic/tools';
@@ -40,8 +42,10 @@
 		toolManager,
 		imageProcessor,
 		historyManager,
+		undoManager,
 		onToolChange,
-		onDuplicate
+		onDuplicate,
+		onSelectLayer
 	}: {
 		currentImageUrl: string | null;
 		currentLayers: DecomposedLayer[];
@@ -62,8 +66,10 @@
 		toolManager: ToolManager;
 		imageProcessor: ImageProcessor;
 		historyManager: HistoryManager;
+		undoManager?: UndoManager;
 		onToolChange?: (tool: ToolName) => void;
 		onDuplicate?: () => void;
+		onSelectLayer?: (layerId: string | null) => void;
 	} = $props();
 
 	// Tool instances
@@ -74,24 +80,27 @@
 	const eraserTool = new EraserTool();
 	const bucketTool = new BucketTool();
 	const gradientTool = new GradientTool();
+	const moveTool = new MoveTool();
 
 	// Get the active tool instance
 	const activeToolInstance = $derived(
-		activeTool === 'lasso'
-			? lassoTool
-			: activeTool === 'rectangle'
-				? rectangleTool
-				: activeTool === 'ellipse'
-					? ellipseTool
-					: activeTool === 'brush'
-						? brushTool
-						: activeTool === 'eraser'
-							? eraserTool
-							: activeTool === 'bucket'
-								? bucketTool
-								: activeTool === 'gradient'
-									? gradientTool
-									: null
+		activeTool === 'move'
+			? moveTool
+			: activeTool === 'lasso'
+				? lassoTool
+				: activeTool === 'rectangle'
+					? rectangleTool
+					: activeTool === 'ellipse'
+						? ellipseTool
+						: activeTool === 'brush'
+							? brushTool
+							: activeTool === 'eraser'
+								? eraserTool
+								: activeTool === 'bucket'
+									? bucketTool
+									: activeTool === 'gradient'
+										? gradientTool
+										: null
 	);
 
 	// Unified rendered layers (combines original + decomposed)
@@ -138,6 +147,17 @@
 
 	// Mouse position for brush cursor (relative to canvas element)
 	let mousePosition = $state<{ x: number; y: number } | null>(null);
+	// Track layer under cursor for hover effect
+	let hoveredLayerId = $state<string | null>(null);
+
+	// Ensure hit test cache is initialized for all layers
+	$effect(() => {
+		if (currentLayers && currentLayers.length > 0) {
+			currentLayers.forEach((l) => {
+				layerManager.initializeHitCache(l);
+			});
+		}
+	});
 
 	// Check if we should show the brush cursor
 	const showBrushCursor = $derived(
@@ -152,7 +172,8 @@
 
 	function handlePointerDown(e: PointerEvent) {
 		console.log('[Lasso Debug] pointerdown', { activeTool, hasCanvasElement: !!canvasElement });
-		if (!activeTool || !canvasElement) return;
+		// If no tool is active, or move tool is active, allow layer selection
+		if (!canvasElement) return;
 
 		// Don't handle if clicking on popover or toolbar
 		const target = e.target as HTMLElement;
@@ -161,6 +182,41 @@
 		updateCanvasRect();
 		console.log('[Lasso Debug] canvasRect updated', { hasRect: !!canvasRect });
 		if (!canvasRect) return;
+
+		let nextLayerId: string | null = null;
+
+		// Hit Testing for Selection
+		// Only if using Move tool or NO tool
+		if (!activeTool || activeTool === 'move') {
+			const point = {
+				x: (e.clientX - canvasRect.left) / canvasRect.width,
+				y: (e.clientY - canvasRect.top) / canvasRect.height
+			};
+
+			// Synchronous bounding box hit test
+			const hitLayerIds = layerManager.getLayersAtPosition(point, {
+				width: widthPixels,
+				height: heightPixels
+			});
+
+			if (hitLayerIds.length > 0) {
+				const currentIndex = hitLayerIds.indexOf(selectedLayerId || '');
+				if (currentIndex !== -1) {
+					// Cycle to next layer
+					nextLayerId = hitLayerIds[(currentIndex + 1) % hitLayerIds.length];
+				} else {
+					// Select top layer
+					nextLayerId = hitLayerIds[0];
+				}
+			}
+
+			if (nextLayerId && nextLayerId !== selectedLayerId) {
+				// Select the layer
+				if (onSelectLayer) {
+					onSelectLayer(nextLayerId);
+				}
+			}
+		}
 
 		const ctx = {
 			canvasRect,
@@ -176,10 +232,18 @@
 			tolerance: toolManager?.toolOptions?.tolerance,
 			canvasDimensions: { widthPixels, heightPixels },
 			canvasElement: drawingCanvasElement,
-			canvasContext: drawingContext ?? undefined
+			canvasContext: drawingContext ?? undefined,
+			undoManager
 		};
 
-		if (activeTool === 'lasso') {
+		if (activeTool === 'move') {
+			// If we just selected a new layer, ensure the move tool context uses it.
+			// Reactivity (selectedLayerId prop) won't have updated yet in this tick.
+			if (nextLayerId) {
+				ctx.selectedLayerId = nextLayerId;
+			}
+			moveTool.onPointerDown(e, ctx);
+		} else if (activeTool === 'lasso') {
 			console.log('[Lasso Debug] calling lassoTool.onPointerDown');
 			lassoTool.onPointerDown(e, ctx);
 		} else if (activeTool === 'rectangle') {
@@ -200,12 +264,48 @@
 	function handlePointerMove(e: PointerEvent) {
 		// Update mouse position for brush cursor (in pixels relative to canvas element)
 		// This matches the coordinate system used by BrushTool for drawing
-		if ((activeTool === 'brush' || activeTool === 'eraser') && canvasElement) {
+		if (canvasElement) {
 			const rect = canvasElement.getBoundingClientRect();
 			mousePosition = {
 				x: e.clientX - rect.left,
 				y: e.clientY - rect.top
 			};
+		} else {
+			mousePosition = null;
+		}
+
+		if (!activeTool || !canvasRect) {
+			// Even if tool is not active, we want hover effect
+			// But we need canvasRect for accurate hit test coordinates?
+			// Usually canvasRect is updated on pointer interaction.
+			// Let's rely on cached `canvasRect` or update it if invalid?
+			// Updating on every move might be expensive but maybe okay here.
+			if (canvasElement && !canvasRect) {
+				updateCanvasRect();
+			}
+		}
+
+		// Hover Effect Logic (When Move tool or No tool is active)
+		if ((!activeTool || activeTool === 'move') && canvasRect && layerManager) {
+			const point = {
+				x: (e.clientX - canvasRect.left) / canvasRect.width,
+				y: (e.clientY - canvasRect.top) / canvasRect.height
+			};
+
+			// Quick hit test
+			const hits = layerManager.getLayersAtPosition(point, {
+				width: widthPixels,
+				height: heightPixels
+			});
+			if (hits.length > 0) {
+				// For hover, just show the top-most one or the one that would be selected next?
+				// Simplest UX: Hover the top-most one.
+				hoveredLayerId = hits[0];
+			} else {
+				hoveredLayerId = null;
+			}
+		} else {
+			hoveredLayerId = null;
 		}
 
 		if (!activeTool || !canvasRect) return;
@@ -224,10 +324,13 @@
 			tolerance: toolManager?.toolOptions?.tolerance,
 			canvasDimensions: { widthPixels, heightPixels },
 			canvasElement: drawingCanvasElement,
-			canvasContext: drawingContext ?? undefined
+			canvasContext: drawingContext ?? undefined,
+			undoManager
 		};
 
-		if (activeTool === 'rectangle') {
+		if (activeTool === 'move') {
+			moveTool.onPointerMove(e, ctx);
+		} else if (activeTool === 'rectangle') {
 			rectangleTool.onPointerMove(e, ctx);
 		} else if (activeTool === 'ellipse') {
 			ellipseTool.onPointerMove(e, ctx);
@@ -258,10 +361,13 @@
 			tolerance: toolManager?.toolOptions?.tolerance,
 			canvasDimensions: { widthPixels, heightPixels },
 			canvasElement: drawingCanvasElement,
-			canvasContext: drawingContext ?? undefined
+			canvasContext: drawingContext ?? undefined,
+			undoManager
 		};
 
-		if (activeTool === 'lasso') {
+		if (activeTool === 'move') {
+			moveTool.onPointerUp(e, ctx);
+		} else if (activeTool === 'lasso') {
 			console.log(
 				'[Lasso Debug] calling lassoTool.onPointerUp, points before:',
 				lassoTool.points.length
@@ -394,7 +500,7 @@
 
 	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 	<div
-		class="relative h-[500px] bg-muted/50 flex items-center justify-center p-4 border border-border rounded-md overflow-hidden"
+		class="relative h-[500px] bg-muted/50 flex items-center justify-center p-4 border border-border rounded-md overflow-hidden select-none"
 		onclick={handleOuterClick}
 		role="button"
 		tabindex="0"
@@ -402,19 +508,30 @@
 		<!-- Inner Image Wrapper - Constrained by aspect ratio within fixed-height parent -->
 		<div
 			bind:this={canvasElement}
-			class="relative shadow-sm transition-all bg-[length:20px_20px] bg-repeat"
+			class="relative shadow-sm transition-all bg-[length:20px_20px] bg-repeat select-none"
 			style="
 				aspect-ratio: {widthPixels}/{heightPixels};
 				height: 100%;
 				max-width: 100%;
 				background-image: conic-gradient(#eee 90deg, transparent 90deg), conic-gradient(transparent 90deg, #eee 90deg);
-				cursor: {showBrushCursor ? 'none' : 'default'};
+				cursor: {showBrushCursor
+				? 'none'
+				: activeTool === 'move'
+					? 'move'
+					: activeTool
+						? 'crosshair'
+						: 'default'};
+				user-select: none;
+				-webkit-user-select: none;
 			"
 			onclick={handleInnerClick}
 			onpointerdown={handlePointerDown}
 			onpointermove={handlePointerMove}
 			onpointerup={handlePointerUp}
-			onpointerleave={() => (mousePosition = null)}
+			onpointerleave={() => {
+				mousePosition = null;
+				hoveredLayerId = null;
+			}}
 			role="button"
 			tabindex="0"
 		>
@@ -440,7 +557,8 @@
 						<img
 							src={layer.imageUrl}
 							alt={layer.name}
-							class="absolute transition-opacity duration-200 pointer-events-none"
+							draggable="false"
+							class="absolute transition-opacity duration-200 pointer-events-none select-none"
 							style="
 								background: transparent;
 								object-fit: {objectFit};
@@ -455,7 +573,13 @@
 								mask-size: 100% 100%;
 								-webkit-mask-image: {mask ? `url(${mask.maskData})` : 'none'};
 								-webkit-mask-size: 100% 100%;
+								filter: {selectedLayerId === layer.id
+								? 'var(--selection-drop-shadow)'
+								: hoveredLayerId === layer.id
+									? 'drop-shadow(0 0 6px rgba(255, 255, 255, 0.8))'
+									: 'none'};
 							"
+							class:layer-selection-glow={selectedLayerId === layer.id}
 						/>
 					{/each}
 
@@ -481,11 +605,15 @@
 							/>
 						{/if}
 						{#each renderedLayers as layer (layer.id)}
-							<div
-								class="absolute inset-0 border-2 transition-opacity {selectedLayerId === layer.id
-									? 'border-primary opacity-100'
-									: 'border-transparent opacity-0'}"
-							></div>
+							{@const hasBounds = layer.bounds && layer.bounds.width > 0 && layer.bounds.height > 0}
+							{@const boundsX = layer.bounds?.x || 0}
+							{@const boundsY = layer.bounds?.y || 0}
+							{@const boundsW = layer.bounds?.width || 0}
+							{@const boundsH = layer.bounds?.height || 0}
+							{@const cssLeft = hasBounds ? (boundsX / widthPixels) * 100 : 0}
+							{@const cssTop = hasBounds ? (boundsY / heightPixels) * 100 : 0}
+							{@const cssWidth = hasBounds ? (boundsW / widthPixels) * 100 : 100}
+							{@const cssHeight = hasBounds ? (boundsH / heightPixels) * 100 : 100}
 						{/each}
 					</div>
 				</div>
@@ -508,3 +636,22 @@
 		</div>
 	</div>
 </div>
+
+<style>
+	/* Glowing pulse animation for selected layer */
+	.layer-selection-glow {
+		animation: selection-pulse 2s ease-in-out infinite;
+	}
+
+	@keyframes selection-pulse {
+		0%,
+		100% {
+			filter: drop-shadow(0 0 2px rgba(34, 211, 238, 0.8))
+				drop-shadow(0 0 6px rgba(34, 211, 238, 0.4));
+		}
+		50% {
+			filter: drop-shadow(0 0 4px rgba(34, 211, 238, 1))
+				drop-shadow(0 0 12px rgba(34, 211, 238, 0.6));
+		}
+	}
+</style>

@@ -100,6 +100,12 @@
 				color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400'
 			};
 		}
+		if (item.model === 'MOVE') {
+			return {
+				label: 'MOVE',
+				color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400'
+			};
+		}
 		if (
 			action === 'remove' ||
 			item.provider?.includes('remove') ||

@@ -4,6 +4,10 @@
 	import type { LayerManager } from '$lib/logic/LayerManager.svelte';
 	import type { ToolManager } from '$lib/logic/ToolManager.svelte';
 	import type { HistoryManager } from '$lib/logic/HistoryManager.svelte';
+	import type { UndoManager } from '$lib/logic/UndoManager.svelte';
+	import { Undo2, Redo2 } from 'lucide-svelte';
+	import { Button } from '$lib/components/ui/button';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import ToolSelector from './ToolSelector.svelte';
 	import ToolOptions from './ToolOptions.svelte';
 
@@ -11,6 +15,7 @@
 		layerManager,
 		toolManager,
 		historyManager,
+		undoManager,
 		children,
 		disabled = false,
 		onDuplicate,
@@ -21,6 +26,7 @@
 		layerManager: LayerManager;
 		toolManager: ToolManager;
 		historyManager: HistoryManager;
+		undoManager?: UndoManager;
 		children?: import('svelte').Snippet;
 		disabled?: boolean;
 		onDuplicate?: () => void;
@@ -149,6 +155,67 @@
 			toolOptions={toolManager.toolOptions}
 			onOptionsChange={(opts) => toolManager.setToolOptions(opts)}
 		/>
+
+		<!-- Undo/Redo Buttons -->
+		{#if undoManager}
+			<div
+				class="flex items-center gap-1 rounded-lg border border-border bg-background/90 px-1 py-1 shadow-lg backdrop-blur-sm"
+			>
+				<Tooltip.Root delayDuration={300}>
+					<Tooltip.Trigger>
+						{#snippet child({ props })}
+							<Button
+								{...props}
+								variant="ghost"
+								size="icon"
+								class="h-9 w-9 hover:bg-muted"
+								onclick={() => undoManager.undo()}
+								disabled={!undoManager.canUndo}
+							>
+								<Undo2
+									class="h-4 w-4 {undoManager.canUndo
+										? 'text-foreground'
+										: 'text-muted-foreground'}"
+								/>
+							</Button>
+						{/snippet}
+					</Tooltip.Trigger>
+					<Tooltip.Content side="bottom" class="flex items-center gap-2">
+						<span>Undo</span>
+						<kbd class="rounded bg-muted px-1.5 py-0.5 text-xs font-mono text-muted-foreground"
+							>⌘Z</kbd
+						>
+					</Tooltip.Content>
+				</Tooltip.Root>
+
+				<Tooltip.Root delayDuration={300}>
+					<Tooltip.Trigger>
+						{#snippet child({ props })}
+							<Button
+								{...props}
+								variant="ghost"
+								size="icon"
+								class="h-9 w-9 hover:bg-muted"
+								onclick={() => undoManager.redo()}
+								disabled={!undoManager.canRedo}
+							>
+								<Redo2
+									class="h-4 w-4 {undoManager.canRedo
+										? 'text-foreground'
+										: 'text-muted-foreground'}"
+								/>
+							</Button>
+						{/snippet}
+					</Tooltip.Trigger>
+					<Tooltip.Content side="bottom" class="flex items-center gap-2">
+						<span>Redo</span>
+						<kbd class="rounded bg-muted px-1.5 py-0.5 text-xs font-mono text-muted-foreground"
+							>⌘⇧Z</kbd
+						>
+					</Tooltip.Content>
+				</Tooltip.Root>
+			</div>
+		{/if}
 	</div>
 
 	<!-- Canvas Content Area -->

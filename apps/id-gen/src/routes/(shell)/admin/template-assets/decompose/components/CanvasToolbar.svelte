@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { Paintbrush, Eraser, Lasso, Pipette } from 'lucide-svelte';
+	import { Paintbrush, Eraser, Lasso, Pipette, Move } from 'lucide-svelte';
 	import { Button } from '$lib/components/ui/button';
 
-	type CanvasTool = 'brush' | 'eraser' | 'lasso' | 'eyedropper' | null;
+	type CanvasTool = 'move' | 'brush' | 'eraser' | 'lasso' | 'eyedropper' | null;
 	import * as Popover from '$lib/components/ui/popover';
 	import { Input } from '$lib/components/ui/input';
 
@@ -22,10 +22,11 @@
 		label: string;
 		color: string;
 	}[] = [
-		{ id: 'brush', icon: Paintbrush, label: 'Brush', color: 'text-blue-500' },
-		{ id: 'eraser', icon: Eraser, label: 'Eraser', color: 'text-rose-500' },
-		{ id: 'lasso', icon: Lasso, label: 'Lasso', color: 'text-amber-500' },
-		{ id: 'eyedropper', icon: Pipette, label: 'Eyedropper', color: 'text-cyan-400' }
+		{ id: 'move', icon: Move, label: 'Move (V)', color: 'text-cyan-500' },
+		{ id: 'brush', icon: Paintbrush, label: 'Brush (B)', color: 'text-blue-500' },
+		{ id: 'eraser', icon: Eraser, label: 'Eraser (E)', color: 'text-rose-500' },
+		{ id: 'lasso', icon: Lasso, label: 'Lasso (L)', color: 'text-amber-500' },
+		{ id: 'eyedropper', icon: Pipette, label: 'Eyedropper (I)', color: 'text-cyan-400' }
 	];
 
 	const presets = [

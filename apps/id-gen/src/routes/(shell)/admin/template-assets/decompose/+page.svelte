@@ -8,6 +8,7 @@
 	import { ToolManager } from '$lib/logic/ToolManager.svelte';
 	import { ImageProcessor } from '$lib/logic/ImageProcessor.svelte';
 	import { HistoryManager } from '$lib/logic/HistoryManager.svelte';
+	import { UndoManager } from '$lib/logic/UndoManager.svelte';
 	import { getProxiedUrl } from '$lib/utils/storage';
 
 	// Components
@@ -54,6 +55,7 @@
 	// --- Initialize Logic ---
 	const layerMgr = new LayerManager();
 	const toolMgr = new ToolManager();
+	const undoMgr = new UndoManager(layerMgr);
 	const historyMgr = new HistoryManager(layerMgr, () => data.template?.id);
 	const assetConfig = $derived({
 		id: data.asset.id,
@@ -153,8 +155,41 @@
 		}
 		window.addEventListener('beforeunload', handleBeforeUnload);
 
+		// Keyboard shortcuts for undo/redo
+		function handleKeydown(e: KeyboardEvent) {
+			// Ignore if focus is in an input
+			if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+				return;
+			}
+
+			if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+				e.preventDefault();
+				if (e.shiftKey) {
+					// Ctrl+Shift+Z = Redo
+					if (undoMgr.redo()) {
+						toast.info('Redo');
+					}
+				} else {
+					// Ctrl+Z = Undo
+					if (undoMgr.undo()) {
+						toast.info('Undo');
+					}
+				}
+			}
+
+			// Also support Ctrl+Y for redo
+			if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+				e.preventDefault();
+				if (undoMgr.redo()) {
+					toast.info('Redo');
+				}
+			}
+		}
+		window.addEventListener('keydown', handleKeydown);
+
 		return () => {
 			window.removeEventListener('beforeunload', handleBeforeUnload);
+			window.removeEventListener('keydown', handleKeydown);
 		};
 	});
 
@@ -166,6 +201,10 @@
 
 		if (layerMgr.saveState === 'unsaved') {
 			layerMgr.saveToStorage(data.asset.id);
+			// Process uploads immediately on auto-save
+			if (layerMgr.hasPendingUploads()) {
+				layerMgr.processUploadQueue();
+			}
 		}
 	});
 
@@ -322,6 +361,7 @@
 					layerManager={layerMgr}
 					toolManager={toolMgr}
 					historyManager={historyMgr}
+					undoManager={undoMgr}
 					disabled={processor.isProcessing}
 					{selectedLayerId}
 					onDuplicate={() => {
@@ -344,6 +384,7 @@
 						toolManager={toolMgr}
 						imageProcessor={processor}
 						historyManager={historyMgr}
+						undoManager={undoMgr}
 						{currentImageUrl}
 						currentLayers={layerMgr.currentLayers}
 						layerSelections={layerMgr.selections}
@@ -357,6 +398,14 @@
 						orientation={data.asset.orientation || 'horizontal'}
 						activeTool={toolMgr.activeTool}
 						onToolChange={(tool) => toolMgr.setTool(tool)}
+						onSelectLayer={(id) => {
+							if (id) {
+								selectedLayerId = id;
+								if (id !== 'original-file') {
+									toolMgr.setTool('move');
+								}
+							}
+						}}
 						onDuplicate={() => {
 							if (selectedLayerId) layerMgr.duplicateLayer(selectedLayerId);
 						}}
@@ -493,7 +542,13 @@
 								onDragStart={(e) => handleLayerDragStart(e, i)}
 								onDrop={(e) => handleDrop(e, i)}
 								onDragOver={(e) => e.preventDefault()}
-								onSelect={() => (selectedLayerId = layer.id)}
+								onSelect={() => {
+									selectedLayerId = layer.id;
+									// Auto-select move tool when layer is selected
+									if (layer.id !== 'original-file') {
+										toolMgr.activeTool = 'move';
+									}
+								}}
 								onMergeSelect={() => layerMgr.toggleMergeSelection(layer.id)}
 								onDelete={() => layerMgr.removeLayer(layer.id)}
 								onMoveUp={() => layerMgr.moveLayer(layer.id, 'up')}

@@ -112,7 +112,8 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-	class="relative bg-muted/30 transition-colors rounded-lg border border-border/50
+	class="relative bg-muted/30 transition-all duration-200 rounded-lg border
+		{isSelected ? 'border-cyan-400/50 ring-2 ring-cyan-400/30 bg-cyan-500/5' : 'border-border/50'}
 		{isDragged ? 'opacity-50' : ''}
 		{isDragOver ? 'border-primary ring-1 ring-primary' : ''}
         {isProcessing ? 'animate-pulse' : ''}
@@ -123,10 +124,10 @@
 	ondragleave={onDragLeave}
 	ondrop={onDrop}
 >
-	<!-- Active/Selected Indicator Bar -->
+	<!-- Active/Selected Indicator Bar with gradient glow -->
 	<div
-		class="absolute left-0 top-0 bottom-0 w-1 rounded-l transition-colors {isSelected
-			? 'bg-cyan-500'
+		class="absolute left-0 top-0 bottom-0 w-1.5 rounded-l transition-all duration-200 {isSelected
+			? 'bg-gradient-to-b from-cyan-400 via-cyan-500 to-cyan-600 shadow-[0_0_8px_rgba(34,211,238,0.6)]'
 			: isExpanded
 				? 'bg-cyan-500/50'
 				: 'bg-transparent'}"

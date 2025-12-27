@@ -28,6 +28,7 @@ import { BrushTool, createBrushTool } from './BrushTool.svelte.js';
 import { EraserTool, createEraserTool } from './EraserTool.svelte.js';
 import { BucketTool, createBucketTool } from './BucketTool.svelte.js';
 import { GradientTool, createGradientTool } from './GradientTool.svelte.js';
+import { MoveTool, createMoveTool } from './MoveTool.svelte.js';
 export { LassoTool, createLassoTool };
 export { RectangleTool, createRectangleTool };
 export { EllipseTool, createEllipseTool };
@@ -35,17 +36,19 @@ export { BrushTool, createBrushTool };
 export { EraserTool, createEraserTool };
 export { BucketTool, createBucketTool };
 export { GradientTool, createGradientTool };
+export { MoveTool, createMoveTool };
 
 /**
  * Tool name type union.
  * Add new tool names here as they are implemented.
  */
-export type ToolName = 'lasso' | 'rectangle' | 'ellipse' | 'brush' | 'eraser' | 'bucket' | 'gradient' | 'eyedropper' | null;
+export type ToolName = 'move' | 'lasso' | 'rectangle' | 'ellipse' | 'brush' | 'eraser' | 'bucket' | 'gradient' | 'eyedropper' | null;
 
 /**
  * Tool keyboard shortcuts mapping.
  */
 export const TOOL_SHORTCUTS: Record<string, ToolName> = {
+	v: 'move',
 	l: 'lasso',
 	m: 'rectangle',
 	o: 'ellipse',
@@ -60,6 +63,7 @@ export const TOOL_SHORTCUTS: Record<string, ToolName> = {
  * Reverse mapping: tool name to keyboard shortcut.
  */
 export const SHORTCUT_BY_TOOL: Partial<Record<NonNullable<ToolName>, string>> = {
+	move: 'V',
 	lasso: 'L',
 	rectangle: 'M',
 	ellipse: 'O',
@@ -86,6 +90,7 @@ export interface ToolMetadata {
  * Complete tool metadata registry.
  */
 export const TOOL_METADATA: ToolMetadata[] = [
+	{ id: 'move', label: 'Move', shortcut: 'V', icon: 'Move', color: 'text-cyan-500', category: 'utility' },
 	{ id: 'lasso', label: 'Lasso Select', shortcut: 'L', icon: 'Lasso', color: 'text-amber-500', category: 'selection' },
 	{ id: 'rectangle', label: 'Rectangle Select', shortcut: 'M', icon: 'Square', color: 'text-blue-500', category: 'selection' },
 	{ id: 'ellipse', label: 'Ellipse Select', shortcut: 'O', icon: 'Circle', color: 'text-purple-500', category: 'selection' },
@@ -136,6 +141,8 @@ export function isFillTool(tool: ToolName): boolean {
  */
 export function getToolCursor(tool: ToolName): string {
 	switch (tool) {
+		case 'move':
+			return 'move';
 		case 'lasso':
 		case 'rectangle':
 		case 'ellipse':
@@ -159,6 +166,8 @@ export function getToolCursor(tool: ToolName): string {
  */
 export function createTool(name: ToolName): import('./BaseTool').CanvasTool | null {
 	switch (name) {
+		case 'move':
+			return createMoveTool();
 		case 'lasso':
 			return createLassoTool();
 		case 'rectangle':

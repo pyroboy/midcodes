@@ -2,6 +2,7 @@ import type { LayerManager } from '../LayerManager.svelte';
 import type { ToolManager } from '../ToolManager.svelte';
 import type { ImageProcessor } from '../ImageProcessor.svelte';
 import type { HistoryManager } from '../HistoryManager.svelte';
+import type { UndoManager } from '../UndoManager.svelte';
 
 /**
  * Context passed to tools during pointer events and rendering.
@@ -39,6 +40,8 @@ export interface ToolContext {
 	canvasContext?: CanvasRenderingContext2D;
 	/** Flood fill tolerance */
 	tolerance?: number;
+	/** Reference to UndoManager for undo/redo operations */
+	undoManager?: UndoManager;
 }
 
 /**

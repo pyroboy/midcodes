@@ -1,9 +1,10 @@
 import { saveSession, loadSession, clearSession } from '$lib/utils/decomposeSession';
 import type { DecomposedLayer, LayerSelection, CachedLayer } from '$lib/schemas/decompose.schema';
-import type { SelectionResult } from './tools';
+import type { SelectionResult } from './tools/BaseTool';
 import { uploadProcessedImage } from '$lib/remote/index.remote';
 import { fileToDataUrl } from '$lib/utils/imageProcessing';
 import { toast } from 'svelte-sonner';
+import { getProxiedUrl } from '$lib/utils/storage';
 
 /**
  * Mask data for non-destructive erasing.
@@ -58,6 +59,13 @@ export class LayerManager {
 	// Concurrency & Resource State
 	private isUploading = false;
 	private blobLayers = new Set<string>(); // IDs of layers with blob URLs
+	
+	// Optimization: Cache layer canvases for optimistic drawing (Phase 6b)
+	private layerCanvasCache = new Map<string, HTMLCanvasElement>();
+
+	// Phase 8b: Logic for Hit Testing Cache (Pixel Perfect Selection)
+	// Stores the 2D context of each layer's image to allow O(1) pixel read
+	private hitTestCache = new Map<string, { ctx: CanvasRenderingContext2D; width: number; height: number }>();
 
 	// Derived: count of pending/failed uploads
 	pendingUploads = $derived(
@@ -91,6 +99,14 @@ export class LayerManager {
 			URL.revokeObjectURL(imageUrl);
 			this.blobLayers.delete(layerId);
 		}
+		// Also clean up canvas cache
+		if (this.layerCanvasCache.has(layerId)) {
+			this.layerCanvasCache.delete(layerId);
+		}
+		// Clean up hit test cache
+		if (this.hitTestCache.has(layerId)) {
+			this.hitTestCache.delete(layerId);
+		}
 	}
 
 	// --- Core Layer Operations ---
@@ -122,7 +138,106 @@ export class LayerManager {
 		this.selections.set(layer.id, selection);
 		this.selections = new Map(this.selections); // Trigger reactivity
 		this.markUnsaved();
+		
+		// Preload hit cache
+		this.initializeHitCache(layer);
 	}
+
+
+
+	// --- Hit Testing ---
+	
+	/**
+	 * Preload layer image data into memory for fast pixel checking.
+	 * Must be called when layer is added or image changes.
+	 */
+	async initializeHitCache(layer: DecomposedLayer) {
+		if (this.hitTestCache.has(layer.id)) return; // Already cached
+
+		const img = await this.loadImage(layer.imageUrl);
+		if (!img) return;
+
+		const canvas = document.createElement('canvas');
+		canvas.width = img.naturalWidth;
+		canvas.height = img.naturalHeight;
+		const ctx = canvas.getContext('2d', { willReadFrequently: true });
+		if (!ctx) return;
+
+		ctx.drawImage(img, 0, 0);
+		this.hitTestCache.set(layer.id, { ctx, width: canvas.width, height: canvas.height });
+	}
+
+	/**
+	 * Find the topmost layers at the given normalized position (0-1).
+	 * Iterates in reverse z-index order (visual top to bottom).
+	 * Uses cached pixel data for accurate "select through" capability.
+	 */
+	getLayersAtPosition(
+		point: { x: number; y: number },
+		canvasDimensions: { width: number; height: number }
+	): string[] {
+		const list = this.activeSide === 'front' ? this.frontLayers : this.backLayers;
+		// Create a copy to reverse without mutating original
+		const uniqueLayers = [...list].sort((a, b) => b.zIndex - a.zIndex);
+
+		const pxX = point.x * canvasDimensions.width;
+		const pxY = point.y * canvasDimensions.height;
+
+		const hits: string[] = [];
+
+		for (const layer of uniqueLayers) {
+			const bounds = layer.bounds;
+			if (!bounds) continue;
+
+			// 1. Simple bounding box check
+			if (
+				pxX >= bounds.x &&
+				pxX <= bounds.x + bounds.width &&
+				pxY >= bounds.y &&
+				pxY <= bounds.y + bounds.height
+			) {
+				// 2. Optimized Pixel Check
+				// Check if we have cached data for this layer
+				const cached = this.hitTestCache.get(layer.id);
+				
+				if (cached) {
+					// Map global pixel to layer relative pixel
+					// Assumes layers are drawn at bounds size? 
+					// Ideally layers are drawn 1:1 with bounds.
+					// If bounds width != image width (scaled), we need to scale logic.
+					
+					const relativeX = pxX - bounds.x;
+					const relativeY = pxY - bounds.y;
+					
+					const scaleX = cached.width / bounds.width;
+					const scaleY = cached.height / bounds.height;
+					
+					const imgX = Math.floor(relativeX * scaleX);
+					const imgY = Math.floor(relativeY * scaleY);
+
+					if (imgX >= 0 && imgX < cached.width && imgY >= 0 && imgY < cached.height) {
+						const alpha = cached.ctx.getImageData(imgX, imgY, 1, 1).data[3];
+						if (alpha > 10) { // Threshold
+							hits.push(layer.id);
+						}
+					}
+				} else {
+					// Fallback: If no cache yet (loading?), treat bound hit as valid
+					// OR trigger load?
+					// For usability, better to allow selection than deny it during load.
+					hits.push(layer.id);
+					// Lazily trigger cache init if missing?
+					// this.initializeHitCache(layer); // Async, won't help this frame but helps next
+				}
+			}
+		}
+
+		return hits;
+	}
+
+	// --- Core Layer Operations ---
+
+
 
 	removeLayer(layerId: string) {
 		const list = this.activeSide === 'front' ? this.frontLayers : this.backLayers;
@@ -321,6 +436,26 @@ export class LayerManager {
 			this.activeSide = session.currentSide || 'front';
 			this.showOriginalLayer = session.showOriginalLayer ?? true;
 			this.saveState = 'saved';
+
+			// Validate and clean up any dead blob URLs (from previous crashed sessions)
+			let hasDeadBlobs = false;
+			const checkLayers = (layers: DecomposedLayer[]) => {
+				layers.forEach((l) => {
+					if (l.imageUrl && l.imageUrl.startsWith('blob:')) {
+						console.error(`[LayerManager] Found dead blob URL for layer ${l.id}: ${l.imageUrl}`);
+						// Replace with transparent pixel to prevent network errors
+						l.imageUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+						hasDeadBlobs = true;
+					}
+				});
+			};
+			checkLayers(this.frontLayers);
+			checkLayers(this.backLayers);
+
+			if (hasDeadBlobs) {
+				toast.warning('Some unsaved layer data could not be restored.');
+			}
+
 			return session;
 		}
 		return null;
@@ -331,6 +466,7 @@ export class LayerManager {
 		list.forEach((l) => {
 			this.selections.delete(l.id);
 			this.cleanupBlobLayer(l.id, l.imageUrl);
+			this.layerCanvasCache.delete(l.id);
 		});
 		
 		if (this.activeSide === 'front') {
@@ -512,7 +648,7 @@ export class LayerManager {
 		};
 	}
 
-	createDrawingLayer(blob: Blob, bounds: { x: number; y: number; width: number; height: number }) {
+	createDrawingLayer(blob: Blob, bounds: { x: number; y: number; width: number; height: number }): string {
 		const url = URL.createObjectURL(blob);
 		const { layer, selection } = this.createLayerObj(
 			url,
@@ -524,7 +660,202 @@ export class LayerManager {
 			'drawing'
 		);
 		this.addLayer(layer, selection);
+		return layer.id; // Return new layer ID for brush tool to track
 	}
+
+	/**
+	 * Merge a new drawing stroke onto an existing layer.
+	 * Used by BrushTool to accumulate strokes on the same layer.
+	 * @param layerId - ID of the existing layer to merge onto
+	 * @param blob - New stroke as a Blob
+	 * @param bounds - Bounds of the new stroke in canvas intrinsic coordinates
+	 */
+	async mergeDrawingToLayer(
+		layerId: string, 
+		blob: Blob, 
+		bounds: { x: number; y: number; width: number; height: number }
+	): Promise<void> {
+		const list = this.activeSide === 'front' ? this.frontLayers : this.backLayers;
+		const layerIndex = list.findIndex(l => l.id === layerId);
+		if (layerIndex === -1) {
+			console.error('[LayerManager] mergeDrawingToLayer: Layer not found:', layerId);
+			return;
+		}
+
+		const layer = list[layerIndex];
+
+		// OPTIMIZATION: Use cached canvas if available to avoid image decode
+		let canvas = this.layerCanvasCache.get(layerId);
+		
+		// If no cached canvas, create one and load existing image
+		if (!canvas) {
+			const existingImage = await this.loadImage(layer.imageUrl);
+			if (!existingImage) {
+				console.error('[LayerManager] mergeDrawingToLayer: Failed to load existing image');
+				return;
+			}
+			
+			const existingBounds = layer.bounds || { 
+				x: 0, 
+				y: 0, 
+				width: existingImage.width, 
+				height: existingImage.height 
+			};
+			
+			// Initialize canvas with sufficient size (might need resizing later)
+			// For now, we'll size it exactly to current bounds, and resize if needed
+			canvas = document.createElement('canvas');
+			canvas.width = existingBounds.width;
+			canvas.height = existingBounds.height;
+			
+			const ctx = canvas.getContext('2d');
+			if (!ctx) return;
+			
+			ctx.drawImage(existingImage, 0, 0);
+			
+			// Store bounds in cache entry or rely on layer bounds? 
+			// We need to know canvas position relative to global space.
+			// Let's attach metadata to the canvas element itself for simplicity
+			(canvas as any)._bounds = { ...existingBounds };
+			
+			this.layerCanvasCache.set(layerId, canvas);
+		}
+
+		const canvasBounds = (canvas as any)._bounds;
+
+		// Check if we need to expand the canvas
+		const newBounds = {
+			x: Math.min(canvasBounds.x, bounds.x),
+			y: Math.min(canvasBounds.y, bounds.y),
+			width: 0,
+			height: 0
+		};
+		newBounds.width = Math.max(canvasBounds.x + canvasBounds.width, bounds.x + bounds.width) - newBounds.x;
+		newBounds.height = Math.max(canvasBounds.y + canvasBounds.height, bounds.y + bounds.height) - newBounds.y;
+
+		// If bounds expanded, we need to resize the canvas
+		if (newBounds.width > canvas.width || newBounds.height > canvas.height || 
+			newBounds.x < canvasBounds.x || newBounds.y < canvasBounds.y) {
+			
+			const newCanvas = document.createElement('canvas');
+			newCanvas.width = newBounds.width;
+			newCanvas.height = newBounds.height;
+			const newCtx = newCanvas.getContext('2d');
+			if (!newCtx) return;
+			
+			// Draw existing canvas content at new relative position
+			newCtx.drawImage(
+				canvas,
+				canvasBounds.x - newBounds.x,
+				canvasBounds.y - newBounds.y
+			);
+			
+			// Replace old canvas with new, resized one
+			this.layerCanvasCache.set(layerId, newCanvas);
+			canvas = newCanvas;
+			(canvas as any)._bounds = newBounds;
+		}
+
+		// Now allow drawing the new stroke
+		const strokeUrl = URL.createObjectURL(blob);
+		const strokeImage = await this.loadImage(strokeUrl);
+		URL.revokeObjectURL(strokeUrl);
+		
+		if (!strokeImage) {
+			console.error('[LayerManager] mergeDrawingToLayer: Failed to load stroke image');
+			return;
+		}
+		
+		const ctx = canvas.getContext('2d');
+		if (!ctx) return;
+
+		// Draw new stroke relative to the (possibly updated) canvas bounds
+		ctx.drawImage(
+			strokeImage,
+			bounds.x - (canvas as any)._bounds.x,
+			bounds.y - (canvas as any)._bounds.y
+		);
+
+		// Convert result to blob
+		return new Promise<void>((resolve) => {
+			canvas!.toBlob((mergedBlob) => {
+				if (mergedBlob) {
+					// Clean up old blob URL if it exists
+					if (layer.imageUrl.startsWith('blob:')) {
+						URL.revokeObjectURL(layer.imageUrl);
+					}
+
+					const newUrl = URL.createObjectURL(mergedBlob);
+					
+					// Update layer properties - OPTIMISTIC UPDATE
+					// Since we already have the canvas, maybe we can skip blob creation for display?
+					// No, ImagePreview needs a URL. But this is fast enough.
+					
+					layer.imageUrl = newUrl;
+					layer.bounds = (canvas as any)._bounds; // Use the tracked bounds
+					layer.cachedBlob = mergedBlob;
+
+					// Trigger reactivity
+					if (this.activeSide === 'front') {
+						this.frontLayers = [...this.frontLayers];
+					} else {
+						this.backLayers = [...this.backLayers];
+					}
+
+					// Update selection bounds
+					const sel = this.selections.get(layerId);
+					if (sel && layer.bounds) {
+						sel.bounds = layer.bounds;
+						sel.layerImageUrl = newUrl;
+						this.selections = new Map(this.selections);
+					}
+
+					// Update cache for upload queue
+					this.addToCache(layerId, mergedBlob, layer.side);
+					this.registerBlobLayer(layerId);
+					this.markUnsaved();
+				}
+				resolve();
+			}, 'image/png');
+		});
+	}
+
+	/**
+	 * Helper to load an image from URL.
+	 * Uses getProxiedUrl for external URLs to avoid CORS issues with canvas operations.
+	 */
+	private loadImage(url: string): Promise<HTMLImageElement | null> {
+		return new Promise((resolve) => {
+			const img = new Image();
+			img.crossOrigin = 'anonymous';
+			img.onload = () => resolve(img);
+			img.onerror = () => resolve(null);
+			// Use proxied URL for external assets to avoid CORS issues
+			const proxiedUrl = getProxiedUrl(url) || url;
+			img.src = proxiedUrl;
+		});
+	}
+
+	/**
+	 * Check if a layer is a drawing layer (can be merged with brush strokes).
+	 */
+	isDrawingLayer(layerId: string): boolean {
+		const list = this.activeSide === 'front' ? this.frontLayers : this.backLayers;
+		const layer = list.find(l => l.id === layerId);
+		return layer?.layerType === 'drawing';
+	}
+
+	// --- Hit Testing ---
+	
+	/**
+	 * Find the topmost layer at the given normalized position (0-1).
+	 * Iterates in reverse z-index order (visual top to bottom).
+	 */
+	/**
+	 * Find the topmost layers at the given normalized position (0-1).
+	 * Iterates in reverse z-index order (visual top to bottom).
+	 */
+
 
 	// --- Cache & Upload Queue (Phase 8) ---
 

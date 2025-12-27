@@ -53,7 +53,7 @@ export class HistoryManager {
 		return tempId;
 	}
 
-	addLocalEntry(action: 'draw' | 'erase' | 'fill', layerId: string) {
+	addLocalEntry(action: 'draw' | 'erase' | 'fill' | 'move', layerId: string) {
 		const id = crypto.randomUUID();
 		const entry = {
 			id,
@@ -69,7 +69,7 @@ export class HistoryManager {
 			layerId // Reference to modified layer
 		};
 		this.history = [entry, ...this.history];
-		toast.success(`Action recorded: ${action}`);
+		// Toast removed - brush strokes should be silent
 	}
 
 	/**
