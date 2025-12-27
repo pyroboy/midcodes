@@ -196,27 +196,46 @@
 				y: (e.clientY - canvasRect.top) / canvasRect.height
 			};
 
+			/*console.log('[Hit Test]', {
+				client: { x: e.clientX, y: e.clientY },
+				canvasRect: {
+					left: canvasRect.left,
+					top: canvasRect.top,
+					w: canvasRect.width,
+					h: canvasRect.height
+				},
+				normalized: point,
+				dimensions: { w: widthPixels, h: heightPixels }
+			});*/
+
 			// Synchronous bounding box hit test
 			const hitLayerIds = layerManager.getLayersAtPosition(point, {
 				width: widthPixels,
 				height: heightPixels
 			});
 
-			if (hitLayerIds.length > 0) {
-				const currentIndex = hitLayerIds.indexOf(selectedLayerId || '');
-				if (currentIndex !== -1) {
-					// Cycle to next layer
-					nextLayerId = hitLayerIds[(currentIndex + 1) % hitLayerIds.length];
-				} else {
-					// Select top layer
-					nextLayerId = hitLayerIds[0];
-				}
+			console.log('[Hit Test] Hits:', hitLayerIds);
+
+			// Filter out original-file from selection consideration
+			const validHits = hitLayerIds.filter((id) => id !== 'original-file');
+			console.log('[Hit Test] Valid Hits:', validHits);
+
+			if (validHits.length > 0) {
+				// Always select the top-most layer (first hit).
+				// Removed cycling logic as it caused accidental selection of underlying layers during drag.
+				nextLayerId = validHits[0];
 			}
 
 			if (nextLayerId && nextLayerId !== selectedLayerId) {
 				// Select the layer
 				if (onSelectLayer) {
 					onSelectLayer(nextLayerId);
+				}
+			} else if (!nextLayerId && selectedLayerId) {
+				// Deselect if clicking on empty space
+				console.log('[Pointer Debug] Deselecting layer (miss)');
+				if (onSelectLayer) {
+					onSelectLayer(null);
 				}
 			}
 		}
@@ -300,10 +319,13 @@
 				width: widthPixels,
 				height: heightPixels
 			});
-			if (hits.length > 0) {
+
+			const validHits = hits.filter((id) => id !== 'original-file');
+
+			if (validHits.length > 0) {
 				// For hover, just show the top-most one or the one that would be selected next?
 				// Simplest UX: Hover the top-most one.
-				hoveredLayerId = hits[0];
+				hoveredLayerId = validHits[0];
 			} else {
 				hoveredLayerId = null;
 			}
@@ -393,6 +415,7 @@
 	}
 
 	function handleInnerClick(e: MouseEvent) {
+		e.stopPropagation();
 		const target = e.target as HTMLElement;
 
 		// If a selection tool is active, pointer events handle everything
@@ -408,6 +431,7 @@
 		// If NOT a selection tool, deselect tool when clicking on canvas
 		if (!target.closest('[data-toolbar]')) {
 			// Tool deselection is handled by parent
+			console.log('[Pointer Debug] Inner click handled (propagation stopped)');
 		}
 	}
 
@@ -429,6 +453,11 @@
 		rectangleTool.reset();
 		ellipseTool.reset();
 		eraserTool.reset();
+
+		if (onSelectLayer) {
+			console.log('[Pointer Debug] Deselecting layer (outer click)');
+			onSelectLayer(null);
+		}
 	}
 
 	// Reset all tools when active tool changes
@@ -520,7 +549,9 @@
 				cursor: {showBrushCursor
 				? 'none'
 				: activeTool === 'move'
-					? 'move'
+					? hoveredLayerId
+						? 'move'
+						: 'default'
 					: activeTool
 						? 'crosshair'
 						: 'default'};

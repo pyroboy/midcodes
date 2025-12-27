@@ -400,11 +400,9 @@
 						activeTool={toolMgr.activeTool}
 						onToolChange={(tool: ToolName) => toolMgr.setTool(tool)}
 						onSelectLayer={(id: string | null) => {
-							if (id) {
-								selectedLayerId = id;
-								if (id !== 'original-file') {
-									toolMgr.setTool('move');
-								}
+							selectedLayerId = id;
+							if (id && id !== 'original-file') {
+								toolMgr.setTool('move');
 							}
 						}}
 						onDuplicate={() => {
