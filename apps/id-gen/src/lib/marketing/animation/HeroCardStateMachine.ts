@@ -166,11 +166,12 @@ export function getStateTransform(state: CardState, sectionProgress: number): Ca
 			};
 		
 		case 'systemScale':
-			// Main card hides to let the grid take focus
+			// Main card fades out during first 20% of systemScale to let sphere take focus
+			const fadeProgress = Math.min(1, sectionProgress / 0.2);
 			return {
 				position: { x: 0, y: 0, z: 0 },
 				rotation: { x: 0, y: 0, z: 0 },
-				scale: 0
+				scale: 1 - fadeProgress
 			};
 
 		case 'shrinking':
@@ -300,7 +301,8 @@ export function getStateVisuals(
 			break;
 
 		case 'systemScale':
-			visuals.opacity = 0; // Ensure it's hidden visually as well
+			// Fade out during first 20% to match scale transition
+			visuals.opacity = 1 - Math.min(1, sectionProgress / 0.2);
 			break;
 
 		case 'shrinking':

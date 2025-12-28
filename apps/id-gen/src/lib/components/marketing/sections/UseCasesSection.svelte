@@ -60,30 +60,43 @@
 </section>
 
 <!-- Impact / Scale -->
-<section
-	class="min-h-screen flex items-center justify-center px-6 md:px-8"
-	data-section-id="systemScale"
->
-	<div class="text-center max-w-3xl mx-auto">
-		<span
-			class="inline-block px-4 py-1.5 bg-green-500/10 border border-green-500/20 rounded-full text-green-400 text-sm font-medium mb-6"
-		>
-			Impact
-		</span>
-		<h2 class="text-3xl sm:text-4xl md:text-6xl font-bold mb-6 leading-tight">System Scale.</h2>
-		<div class="grid grid-cols-2 gap-8 mb-8">
-			<div>
-				<div class="text-4xl md:text-5xl font-black text-foreground mb-2">1.2M+</div>
-				<p class="text-muted-foreground">Verifications Logged</p>
-			</div>
-			<div>
-				<div class="text-4xl md:text-5xl font-black text-foreground mb-2">24</div>
-				<p class="text-muted-foreground">Active Partners</p>
-			</div>
+<section class="min-h-[300vh] relative px-6 md:px-8 flex flex-col" data-section-id="systemScale">
+	<!-- Sticky Title at Top -->
+	<div
+		class="sticky top-0 pt-8 pb-4 z-10 bg-gradient-to-b from-background via-background to-transparent"
+	>
+		<div class="text-center">
+			<span
+				class="inline-block px-4 py-1.5 bg-green-500/10 border border-green-500/20 rounded-full text-green-400 text-sm font-medium mb-4"
+			>
+				Impact
+			</span>
+			<h2 class="text-3xl sm:text-4xl md:text-6xl font-bold leading-tight">System Scale.</h2>
 		</div>
-		<p class="text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed">
-			Trusted by schools, government offices, and event organizers across the Philippines.
-		</p>
+	</div>
+
+	<!-- Spacer to push content to bottom -->
+	<div class="flex-1"></div>
+
+	<!-- Sticky Content at Bottom -->
+	<div
+		class="sticky bottom-0 pb-12 pt-4 z-10 bg-gradient-to-t from-background via-background to-transparent"
+	>
+		<div class="text-center max-w-3xl mx-auto">
+			<div class="grid grid-cols-2 gap-8 mb-8">
+				<div>
+					<div class="text-4xl md:text-5xl font-black text-foreground mb-2">1.2M+</div>
+					<p class="text-muted-foreground">Verifications Logged</p>
+				</div>
+				<div>
+					<div class="text-4xl md:text-5xl font-black text-foreground mb-2">24</div>
+					<p class="text-muted-foreground">Active Partners</p>
+				</div>
+			</div>
+			<p class="text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed">
+				Trusted by schools, government offices, and event organizers across the Philippines.
+			</p>
+		</div>
 	</div>
 </section>
 
