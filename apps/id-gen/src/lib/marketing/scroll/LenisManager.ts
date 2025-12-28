@@ -34,7 +34,7 @@ export function initLenis(): Lenis | null {
 	if (lenisInstance) return lenisInstance;
 
 	lenisInstance = new Lenis({
-		duration: 1.2, // Scroll duration (seconds)
+		duration: 1.0, // Reduced from 1.2 for snappier feel
 		easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), // Smooth easing
 		orientation: 'vertical',
 		gestureOrientation: 'vertical',
@@ -44,14 +44,25 @@ export function initLenis(): Lenis | null {
 		infinite: false
 	});
 
+	let lastScroll = -1;
+
 	// Subscribe to scroll events
 	lenisInstance.on('scroll', (e: Lenis) => {
+		// Optimization: Round values to 2 decimal places to avoid "super big floats"
+		// and excessive reactivity updates
+		const currentScroll = Math.round(e.scroll * 100) / 100;
+		
+		// Skip if change is insignificant (less than 0.01px)
+		if (Math.abs(currentScroll - lastScroll) < 0.01) return;
+		
+		lastScroll = currentScroll;
+
 		const data: LenisScrollData = {
-			scroll: e.scroll,
-			limit: e.limit,
-			velocity: e.velocity,
+			scroll: currentScroll,
+			limit: Math.round(e.limit * 100) / 100,
+			velocity: Math.round(e.velocity * 100) / 100,
 			direction: e.direction as 1 | -1,
-			progress: e.progress
+			progress: Math.round(e.progress * 1000) / 1000 // Keep 3 decimal places for progress (0-1)
 		};
 
 		// Notify all subscribers

@@ -144,7 +144,7 @@
 {/if}
 
 <!-- Content layer (scrollable, above 3D scene) -->
-<div class="relative z-10 min-h-screen bg-transparent text-white">
+<div class="relative z-10 min-h-screen bg-transparent text-foreground">
 	<HeroSection />
 
 	<!-- Section 2: Verification Flow (Encode, Scan, Tap) -->

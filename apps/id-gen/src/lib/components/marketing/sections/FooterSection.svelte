@@ -2,8 +2,7 @@
 	// Footer
 </script>
 
-<footer
-	class="relative py-20 px-4 border-t border-gray-800 bg-gradient-to-b from-transparent to-black/50"
+	class="relative py-20 px-4 border-t border-border bg-gradient-to-b from-transparent to-black/5 dark:to-black/50"
 >
 	<div class="max-w-6xl mx-auto">
 		<!-- Main Footer Content -->
@@ -11,10 +10,10 @@
 			<!-- Brand Column -->
 			<div class="md:col-span-2">
 				<div class="flex items-center gap-3 mb-4">
-					<span class="text-4xl font-light text-white/80">ᜃ</span>
+					<span class="text-4xl font-light text-foreground/80">ᜃ</span>
 					<span class="text-3xl font-black">Kanaya</span>
 				</div>
-				<p class="text-gray-400 max-w-sm mb-6">
+				<p class="text-muted-foreground max-w-sm mb-6">
 					The comprehensive ID ecosystem for organizations of all sizes. Secure, scalable, and
 					beautifully designed.
 				</p>
@@ -23,7 +22,7 @@
 						href="https://github.com/midcodes"
 						target="_blank"
 						rel="noopener"
-						class="text-gray-500 hover:text-white transition-colors"
+						class="text-muted-foreground hover:text-foreground transition-colors"
 						aria-label="GitHub"
 					>
 						<svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"
@@ -51,35 +50,35 @@
 
 			<!-- Product Links -->
 			<div>
-				<h4 class="text-sm font-semibold text-white uppercase tracking-wider mb-4">Product</h4>
-				<nav class="flex flex-col gap-3 text-gray-400">
-					<a href="/pricing" class="hover:text-white transition-colors">Pricing</a>
-					<a href="/shop" class="hover:text-white transition-colors">Shop Cards</a>
-					<a href="/docs" class="hover:text-white transition-colors">API Documentation</a>
-					<a href="/auth" class="hover:text-white transition-colors">Login / Sign Up</a>
+				<h4 class="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Product</h4>
+				<nav class="flex flex-col gap-3 text-muted-foreground">
+					<a href="/pricing" class="hover:text-foreground transition-colors">Pricing</a>
+					<a href="/shop" class="hover:text-foreground transition-colors">Shop Cards</a>
+					<a href="/docs" class="hover:text-foreground transition-colors">API Documentation</a>
+					<a href="/auth" class="hover:text-foreground transition-colors">Login / Sign Up</a>
 				</nav>
 			</div>
 
 			<!-- Company Links -->
 			<div>
-				<h4 class="text-sm font-semibold text-white uppercase tracking-wider mb-4">Company</h4>
-				<nav class="flex flex-col gap-3 text-gray-400">
-					<a href="/about" class="hover:text-white transition-colors">About Us</a>
-					<a href="/privacy" class="hover:text-white transition-colors">Privacy Policy</a>
-					<a href="/terms" class="hover:text-white transition-colors">Terms of Service</a>
-					<a href="/contact" class="hover:text-white transition-colors">Contact</a>
+				<h4 class="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">Company</h4>
+				<nav class="flex flex-col gap-3 text-muted-foreground">
+					<a href="/about" class="hover:text-foreground transition-colors">About Us</a>
+					<a href="/privacy" class="hover:text-foreground transition-colors">Privacy Policy</a>
+					<a href="/terms" class="hover:text-foreground transition-colors">Terms of Service</a>
+					<a href="/contact" class="hover:text-foreground transition-colors">Contact</a>
 				</nav>
 			</div>
 		</div>
 
 		<!-- Bottom Bar -->
 		<div
-			class="pt-8 border-t border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4"
+			class="pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4"
 		>
-			<p class="text-gray-600 text-sm">
+			<p class="text-muted-foreground text-sm">
 				© 2025 Kanaya / Midcodes Inc. Tagbilaran City, Bohol, Philippines.
 			</p>
-			<p class="text-gray-700 text-xs">Built with Svelte, Three.js, and Neon.</p>
+			<p class="text-muted-foreground text-xs">Built with Svelte, Three.js, and Neon.</p>
 		</div>
 	</div>
 </footer>
