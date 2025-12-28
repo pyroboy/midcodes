@@ -202,7 +202,7 @@ const authGuard: Handle = async ({ event, resolve }) => {
 			if (returnTo && !returnTo.startsWith('/auth')) {
 				throw redirect(303, returnTo);
 			}
-			throw redirect(303, '/');
+			throw redirect(303, '/dashboard');
 		}
 	} else if (!isAuthRoute && !isPublicRoute) {
 		const returnTo = path === '/' ? '' : `?returnTo=${encodeURIComponent(path)}`;

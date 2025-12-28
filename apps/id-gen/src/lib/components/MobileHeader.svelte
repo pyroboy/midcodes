@@ -84,7 +84,7 @@
 					</svg>
 				</Button>
 
-				<a href="/" class="flex items-center gap-2">
+				<a href="/dashboard" class="flex items-center gap-2">
 					<span class="text-2xl font-normal text-foreground/80">ᜃ</span>
 					<span class="text-xl font-black tracking-tight text-foreground">Kanaya</span>
 				</a>
