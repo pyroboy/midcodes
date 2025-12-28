@@ -35,6 +35,16 @@ export default defineConfig(({ mode }) => {
 		},
 		resolve: {
 			dedupe: ['@sveltejs/kit', 'svelte']
+		},
+		build: {
+			rollupOptions: {
+				output: {
+					manualChunks: {
+						'vendor-three': ['three', '@threlte/core', '@threlte/extras'],
+						'vendor-ui': ['bits-ui', 'clsx', 'tailwind-merge']
+					}
+				}
+			}
 		}
 	} as UserConfig;
 });

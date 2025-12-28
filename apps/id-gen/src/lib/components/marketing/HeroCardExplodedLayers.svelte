@@ -30,17 +30,22 @@
 	});
 
 	// Derived scales to prevent inline array creation
-	const layer1Scale = $derived([cardWidth * 0.95, cardHeight * 0.95, 1]);
-	const layer1GridScale = $derived([cardWidth * 0.9, cardHeight * 0.9, 1]);
-	const chipScale = [0.4, 0.5, 0.01];
-	const chipAccentScale = [0.2, 0.02, 1];
-	const qrBgScale = [0.35, 0.35, 1];
-	const qrFgScale = [0.3, 0.3, 1];
-	const iconScale = [0.08, 0.08, 1];
-	const statusScale = $derived([cardWidth * 0.8, 0.05, 1]);
+	// Type as tuples for Threlte compatibility
+	const layer1Scale: [number, number, number] = $derived([cardWidth * 0.95, cardHeight * 0.95, 1]);
+	const layer1GridScale: [number, number, number] = $derived([
+		cardWidth * 0.9,
+		cardHeight * 0.9,
+		1
+	]);
+	const chipScale: [number, number, number] = [0.4, 0.5, 0.01];
+	const chipAccentScale: [number, number, number] = [0.2, 0.02, 1];
+	const qrBgScale: [number, number, number] = [0.35, 0.35, 1];
+	const qrFgScale: [number, number, number] = [0.3, 0.3, 1];
+	const iconScale: [number, number, number] = [0.08, 0.08, 1];
+	const statusScale: [number, number, number] = $derived([cardWidth * 0.8, 0.05, 1]);
 
 	// Text lines scales
-	const textScales = $derived([
+	const textScales: [number, number, number][] = $derived([
 		[cardWidth * 0.4, 0.03, 1],
 		[cardWidth * 0.4, 0.03, 1],
 		[cardWidth * 0.6, 0.03, 1],
@@ -76,7 +81,7 @@
 
 	<!-- Layer 3: Text Lines (Identity Data) -->
 	<T.Group position.z={layerSeparation * 1.1}>
-		{#each [0.4, 0.3, -0.1, -0.2, -0.3] as yPos, i}
+		{#each [0.4, 0.3, -0.1, -0.2, -0.3] as yPos, i (i)}
 			<T.Mesh position.y={yPos} position.x={0.1} geometry={planeGeo} scale={textScales[i]}>
 				<T.MeshBasicMaterial
 					color={0xaaddff}
@@ -109,10 +114,7 @@
 
 	<!-- Layer 5: Holographic/Status Icons -->
 	<T.Group position.z={layerSeparation * 1.9}>
-		<!-- Top right icon -->
-		<T.Mesh position.x={0.5} position.y={0.8} geometry={circleGeo} scale={iconScale}>
-			<T.MeshBasicMaterial color={0x00ff00} transparent opacity={0.8} />
-		</T.Mesh>
+		<!-- Top right icon (Green placeholder removed, now handled by parent) -->
 		<!-- Bottom center status bar -->
 		<T.Mesh position.y={-0.8} geometry={planeGeo} scale={statusScale}>
 			<T.MeshBasicMaterial color={0x00ffff} transparent opacity={0.6} />

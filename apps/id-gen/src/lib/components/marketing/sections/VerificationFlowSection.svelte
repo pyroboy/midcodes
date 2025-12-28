@@ -4,7 +4,10 @@
 </script>
 
 <!-- Encode (Manual Entry vs Automation) -->
-<section class="min-h-screen flex items-center justify-center px-6 md:px-8">
+<section
+	class="min-h-screen flex items-center justify-center px-6 md:px-8"
+	data-section-id="encode"
+>
 	<div
 		class="text-center max-w-3xl mx-auto backdrop-blur-sm bg-black/5 dark:bg-black/30 p-8 rounded-3xl border border-black/5 dark:border-white/5"
 	>
@@ -24,7 +27,7 @@
 </section>
 
 <!-- Scan (Visual Verification) -->
-<section class="min-h-screen flex items-center justify-center px-6 md:px-8">
+<section class="min-h-screen flex items-center justify-center px-6 md:px-8" data-section-id="scan">
 	<div class="text-center max-w-3xl mx-auto pointer-events-none">
 		<span
 			class="inline-block px-4 py-1.5 bg-green-500/10 border border-green-500/20 rounded-full text-green-400 text-sm font-medium mb-6 backdrop-blur-md"
@@ -45,7 +48,7 @@
 </section>
 
 <!-- Tap (NFC Verification) -->
-<section class="min-h-screen flex items-center justify-center px-6 md:px-8">
+<section class="min-h-screen flex items-center justify-center px-6 md:px-8" data-section-id="tap">
 	<div class="text-center max-w-3xl mx-auto pointer-events-none">
 		<span
 			class="inline-block px-4 py-1.5 bg-blue-500/10 border border-blue-500/20 rounded-full text-blue-400 text-sm font-medium mb-6 backdrop-blur-md"

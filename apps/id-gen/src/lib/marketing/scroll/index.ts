@@ -19,7 +19,6 @@ export {
 	getScrollState,
 	getSectionLocalProgress,
 	getDistanceToSection,
-	SECTION_BREAKPOINTS,
 	type SectionName
 } from './ScrollState.svelte.js';
 

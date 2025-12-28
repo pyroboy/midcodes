@@ -25,7 +25,6 @@ export {
 	getSectionCardState,
 	getStateTransform,
 	getStateVisuals,
-	blendTransforms,
 	blendVisuals,
 	type CardState,
 	type CardTransform,

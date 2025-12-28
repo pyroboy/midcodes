@@ -42,6 +42,34 @@ export function createBaybaninNormalMap(size: number = 128): THREE.CanvasTexture
 	return texture;
 }
 
+/**
+ * Generate the Baybayin "Ka" (ᜃ) logo for the exploded layers
+ */
+export function createKaLogoTexture(size: number = 64): THREE.CanvasTexture {
+	const canvas = document.createElement('canvas');
+	canvas.width = size;
+	canvas.height = size;
+	const ctx = canvas.getContext('2d')!;
+
+	// Draw circle background
+	ctx.fillStyle = '#10b981'; // Emerald 500
+	ctx.beginPath();
+	ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+	ctx.fill();
+
+	// Draw "Ka" symbol
+	ctx.fillStyle = '#ffffff';
+	ctx.font = `${size * 0.6}px serif`;
+	ctx.textAlign = 'center';
+	ctx.textBaseline = 'middle';
+	ctx.fillText('ᜃ', size / 2, size / 2);
+
+	const texture = new THREE.CanvasTexture(canvas);
+	texture.colorSpace = THREE.SRGBColorSpace;
+	texture.needsUpdate = true;
+	return texture;
+}
+
 // ============================================================================
 // CARD TEXTURE GENERATION
 // ============================================================================

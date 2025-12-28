@@ -2,7 +2,10 @@
 	// Physical Ecosystem Section
 </script>
 
-<section class="min-h-screen flex items-center justify-center px-6 md:px-8">
+<section
+	class="min-h-screen flex items-center justify-center px-6 md:px-8"
+	data-section-id="physical"
+>
 	<div
 		class="flex flex-col md:flex-row items-center justify-between w-full max-w-6xl mx-auto gap-12"
 	>

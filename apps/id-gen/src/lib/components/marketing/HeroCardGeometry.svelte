@@ -18,6 +18,7 @@
 		createBaybaninNormalMap,
 		createHeroCardTexture,
 		createCardBackTexture,
+		createKaLogoTexture,
 		getCachedTexture,
 		disposeCachedTextures
 	} from '$lib/marketing/textures/MarketingTextureManager';
@@ -53,6 +54,7 @@
 	let frontTexture: THREE.Texture | null = $state(null);
 	let backTexture: THREE.Texture | null = $state(null);
 	let normalMap: THREE.Texture | null = $state(null);
+	let kaLogoTexture: THREE.Texture | null = $state(null);
 
 	// Variant textures for use cases section
 	let variantTextures: THREE.Texture[] = $state([]);
@@ -74,15 +76,69 @@
 			backTexture = getCachedTexture('card-back', () => createCardBackTexture(640, 1024));
 			normalMap = getCachedTexture('baybayin-normal', () => createBaybaninNormalMap(512));
 
-			// Create variant textures for use cases section
+			// Logo for exploded layers
+			kaLogoTexture = getCachedTexture('ka-logo', () => createKaLogoTexture(128));
+
+			// Initial variant textures (fill with hero first to avoid blocking)
+			// This prevents ~500ms of synchronous canvas operations on mount
+			const sharedHeroTexture = getCachedTexture('variant-hero', () =>
+				createHeroCardTexture(640, 1024, 'hero')
+			);
+
 			variantTextures = [
-				getCachedTexture('variant-hero', () => createHeroCardTexture(640, 1024, 'hero')),
-				getCachedTexture('variant-student', () => createHeroCardTexture(640, 1024, 'student')),
-				getCachedTexture('variant-dorm', () => createHeroCardTexture(640, 1024, 'dorm')),
-				getCachedTexture('variant-event', () => createHeroCardTexture(640, 1024, 'event')),
-				// Special texture for segmentation (CEO)
-				getCachedTexture('variant-ceo', () => createHeroCardTexture(640, 1024, 'ceo'))
+				sharedHeroTexture, // hero (index 0)
+				sharedHeroTexture, // student placeholder (index 1)
+				sharedHeroTexture, // dorm placeholder (index 2)
+				sharedHeroTexture, // event placeholder (index 3)
+				sharedHeroTexture // ceo placeholder (index 4)
 			];
+
+			// Lazy load the rest when idle
+			if (typeof requestIdleCallback !== 'undefined') {
+				requestIdleCallback(() => loadVariants(), { timeout: 2000 });
+			} else {
+				setTimeout(loadVariants, 1000);
+			}
+
+			function loadVariants() {
+				// Generate textures one by one to yield to main thread
+				const variants: ['student', 'dorm', 'event', 'ceo'] = ['student', 'dorm', 'event', 'ceo'];
+				let idx = 0;
+
+				function next() {
+					if (idx >= variants.length) return;
+					const type = variants[idx];
+					// Map type to index in variantTextures array: student=1, dorm=2, event=3, ceo=4
+					const arrayIdx = idx + 1;
+
+					// Generate texture
+					const tex = getCachedTexture(`variant-${type}`, () =>
+						createHeroCardTexture(640, 1024, type)
+					);
+
+					// Update array assignment (Svelte 5 state proxy handles reactivity)
+					variantTextures[arrayIdx] = tex;
+
+					// Force update material if this texture is currently active
+					if (textureIndex === arrayIdx && frontMaterial) {
+						frontMaterial.map = tex;
+						frontMaterial.needsUpdate = true;
+					} else if (textureIndex === -1 && type === 'ceo' && backMaterial) {
+						// Special case for CEO back texture in segmentation view
+						backMaterial.map = tex;
+						backMaterial.needsUpdate = true;
+					}
+
+					idx++;
+					// Schedule next generation
+					if (typeof requestIdleCallback !== 'undefined') {
+						requestIdleCallback(next, { timeout: 1000 });
+					} else {
+						setTimeout(next, 50);
+					}
+				}
+				next();
+			}
 
 			// Create front material with normal map for emboss effect
 			frontMaterial = new THREE.MeshStandardMaterial({
@@ -183,10 +239,24 @@
 	<!-- Front face (Card Body - Behind layers) -->
 	<T.Group position.z={-layerSeparation * 0.2}>
 		<T.Mesh geometry={cardGeometry.frontGeometry} material={frontMaterial} />
+	</T.Group>
 
-		<!-- Dynamic Text Overlay (Simultaneous letter-by-letter typing) -->
+	<!-- Dynamic Text Overlay (Explodes with Layer 3) -->
+	<!-- Layer 3 is at 1.1, so we position this slightly in front -->
+	<T.Group position.z={layerSeparation * 1.1 + 0.02}>
 		<CardTextOverlay {typingProgress} {sectionProgress} {currentSection} />
 	</T.Group>
+
+	<!-- Ka Logo (Always visible, explodes to Layer 5) -->
+	<!-- Layer 5 is at 1.9. Base Z is 0.02 to sit on card. -->
+	{#if kaLogoTexture}
+		<T.Group position.x={0.5} position.y={0.8} position.z={layerSeparation * 1.9 + 0.02}>
+			<T.Mesh scale={[0.08, 0.08, 1]}>
+				<T.CircleGeometry args={[1, 16]} />
+				<T.MeshBasicMaterial map={kaLogoTexture} transparent opacity={1} />
+			</T.Mesh>
+		</T.Group>
+	{/if}
 
 	<!-- 5-Layer Stack (In front of card) -->
 	<HeroCardExplodedLayers

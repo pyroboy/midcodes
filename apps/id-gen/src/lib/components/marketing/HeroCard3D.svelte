@@ -100,7 +100,7 @@
 		// Only recalculate when state changes (optimization)
 		if (currentState !== prevState || !cachedTransform || !cachedVisuals) {
 			cachedTransform = getStateTransform(currentState, sectionProgress);
-			cachedVisuals = getStateVisuals(currentState, sectionProgress);
+			cachedVisuals = getStateVisuals(currentState, sectionProgress, currentSection);
 			prevState = currentState;
 		}
 		const targetTransform = cachedTransform;

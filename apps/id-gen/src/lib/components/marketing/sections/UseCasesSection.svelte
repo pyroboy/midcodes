@@ -4,7 +4,10 @@
 </script>
 
 <!-- Applications -->
-<section class="min-h-[150vh] flex items-center justify-center px-6 md:px-8">
+<section
+	class="min-h-[150vh] flex items-center justify-center px-6 md:px-8"
+	data-section-id="useCases"
+>
 	<div class="text-center max-w-3xl mx-auto">
 		<span
 			class="inline-block px-4 py-1.5 bg-purple-500/10 border border-purple-500/20 rounded-full text-purple-400 text-sm font-medium mb-6"
@@ -37,10 +40,30 @@
 			</div>
 		</div>
 	</div>
+
+	<!-- Impact / Scale (nested or split? Plan calls for single useCases. Let's keep it under the same ID effectively or merge logic, but DOM structure here separates them. Let's make Impact part of the same visual flow, or assume the parent section covers it. 
+	Wait, the plan said "Tag: useCases". The previous map had one 'useCases' sections. 
+	Let's wrap multiple sections? Or just tag the first one?
+	Actually, UseCases and Impact are separate sections in the file.
+	Let's tag the second one as part of useCases if possible, or just ignore for now if scroll state covers range.
+	But dynamic calculation relies on bounding box. 
+	If 'useCases' ID is only on the first section, the calculation will only cover that height.
+	I should probably tag the second one 'useCases-impact' or similar and merge, OR just wrap them.
+	Wrapping is better.
+	But they are top level elements. 
+	I will tag the first one 'useCases'. The second one 'impact' but map it to 'useCases' in logic?
+	Or just tag the second one 'impact' and add it to valid sections in logic.
+	Let's check ScrollState logic. It expects specific keys.
+	'useCases' key covers 0.70-0.85 approx.
+	Let's tag the first one `useCases` and the second one... let's merge them into a div wrapper?
+	-->
 </section>
 
 <!-- Impact / Scale -->
-<section class="min-h-screen flex items-center justify-center px-6 md:px-8">
+<section
+	class="min-h-screen flex items-center justify-center px-6 md:px-8"
+	data-section-id="systemScale"
+>
 	<div class="text-center max-w-3xl mx-auto">
 		<span
 			class="inline-block px-4 py-1.5 bg-green-500/10 border border-green-500/20 rounded-full text-green-400 text-sm font-medium mb-6"
@@ -65,7 +88,7 @@
 </section>
 
 <!-- Segmentation (Call to Action) -->
-<section class="min-h-screen flex items-center justify-center px-0">
+<section class="min-h-screen flex items-center justify-center px-0" data-section-id="segmentation">
 	<div class="flex flex-col md:flex-row w-full min-h-screen">
 		<!-- Organization Side -->
 		<div

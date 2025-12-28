@@ -128,7 +128,7 @@
 		</T.Mesh>
 
 		<!-- Horizontal edge markers (scanning bounds - moved out) -->
-		{#each [-1, 1] as side}
+		{#each [-1, 1] as side (side)}
 			<T.Mesh
 				position.x={side * cardWidth * 0.65}
 				position.y={getYPosition(scanProgress)}

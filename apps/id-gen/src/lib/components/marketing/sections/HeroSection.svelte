@@ -2,7 +2,7 @@
 	// Hero Section
 </script>
 
-<section class="min-h-screen flex flex-col items-center justify-center px-4">
+<section class="min-h-screen flex flex-col items-center justify-center px-4" data-section-id="hero">
 	<div class="text-center max-w-4xl mx-auto">
 		<!-- Baybayin Ka Symbol -->
 		<div class="text-8xl md:text-9xl font-light text-foreground/80 mb-8">ᜃ</div>

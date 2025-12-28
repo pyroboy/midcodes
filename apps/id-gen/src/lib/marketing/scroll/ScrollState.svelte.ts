@@ -7,22 +7,40 @@
 import { onScroll, type LenisScrollData } from './LenisManager';
 
 // Section breakpoints (normalized 0-1 progress values)
-// Section breakpoints (normalized 0-1 progress values)
-// Section breakpoints (normalized 0-1 progress values)
-export const SECTION_BREAKPOINTS = {
-	hero: { start: 0, end: 0.12 },
-	encode: { start: 0.12, end: 0.22 }, // Kill spreadsheet / Manual Entry
-	scan: { start: 0.22, end: 0.34 },   // Camera Scan
-	tap: { start: 0.34, end: 0.44 },    // NFC Tap
-	layers: { start: 0.44, end: 0.54 },      // ~10% for 100vh
-	useCases: { start: 0.54, end: 0.69 },    // ~15% for 150vh
-	testimonials: { start: 0.69, end: 0.79 }, // ~10% for 100vh
-	segmentation: { start: 0.79, end: 0.89 }, // ~10% for 100vh
-	physical: { start: 0.89, end: 0.98 },     // ~9% for 100vh
-	footer: { start: 0.98, end: 1.0 }
+// Initial default breakpoints (fallback)
+export const DEFAULT_BREAKPOINTS = {
+	hero: { start: 0, end: 0.1 },
+	encode: { start: 0.1, end: 0.2 },
+	scan: { start: 0.2, end: 0.3 },
+	tap: { start: 0.3, end: 0.4 },
+	'layers-main': { start: 0.4, end: 0.45 },
+	'layer-1': { start: 0.45, end: 0.5 },
+	'layer-2': { start: 0.5, end: 0.55 },
+	'layer-3': { start: 0.55, end: 0.6 },
+	'layer-4': { start: 0.6, end: 0.65 },
+	'layer-5': { start: 0.65, end: 0.7 },
+	useCases: { start: 0.7, end: 0.8 },
+	systemScale: { start: 0.8, end: 0.9 },
+	physical: { start: 0.9, end: 0.95 },
+	footer: { start: 0.95, end: 1.0 }
 } as const;
 
-export type SectionName = keyof typeof SECTION_BREAKPOINTS;
+export type SectionName =
+	| 'hero'
+	| 'encode'
+	| 'scan'
+	| 'tap'
+	| 'layers-main'
+	| 'layer-1'
+	| 'layer-2'
+	| 'layer-3'
+	| 'layer-4'
+	| 'layer-5'
+	| 'useCases'
+	| 'systemScale'
+	| 'physical'
+	| 'footer'
+	| 'segmentation'; // Added for compatibility
 
 // Scroll state using Svelte 5 runes
 let _progress = $state(0);
@@ -31,51 +49,166 @@ let _direction = $state<1 | -1>(1);
 let _currentSection = $state<SectionName>('hero');
 let _sectionProgress = $state(0); // 0-1 within current section
 
+
+// Cache of DOM elements for pixel-based detection
+let _elements: Array<{
+	id: string;
+	el: HTMLElement;
+	top: number;
+	height: number;
+}> = [];
+
 /**
- * Determine which section we're in based on progress
+ * Update element cache. Called on mount and resize.
  */
-function getSectionFromProgress(progress: number): SectionName {
-	for (const [name, bounds] of Object.entries(SECTION_BREAKPOINTS)) {
-		if (progress >= bounds.start && progress < bounds.end) {
-			return name as SectionName;
+export function refreshLayout() {
+	if (typeof document === 'undefined') return;
+	
+	const nodes = document.querySelectorAll('[data-section-id]');
+	const els: typeof _elements = [];
+
+	nodes.forEach((node) => {
+		if (node instanceof HTMLElement) {
+			const id = node.getAttribute('data-section-id');
+			if (id) {
+				els.push({
+					id: id,
+					el: node,
+					top: node.offsetTop,
+					height: node.offsetHeight
+				});
+			}
 		}
-	}
-	return 'footer';
+	});
+
+	// Sort by position
+	els.sort((a, b) => a.top - b.top);
+	_elements = els;
 }
 
 /**
- * Calculate progress within the current section (0-1)
+ * Determine valid section name
  */
-function getSectionProgress(progress: number, section: SectionName): number {
-	const bounds = SECTION_BREAKPOINTS[section];
-	const range = bounds.end - bounds.start;
-	if (range === 0) return 0;
-	return Math.max(0, Math.min(1, (progress - bounds.start) / range));
+function isSectionName(id: string): id is SectionName {
+	return id in DEFAULT_BREAKPOINTS || id === 'segmentation';
 }
 
 /**
  * Update scroll state from Lenis
+ * Uses robust BoundingClientRect logic relative to viewport top
  */
 function updateFromLenis(data: LenisScrollData) {
 	_progress = data.progress;
 	_velocity = data.velocity;
 	_direction = data.direction;
-	_currentSection = getSectionFromProgress(data.progress);
-	_sectionProgress = getSectionProgress(data.progress, _currentSection);
+
+	if (_elements.length === 0) return;
+
+	// Critical Fix: Use getBoundingClientRect for absolute truth about viewport position.
+	// We don't rely on cached 'offsetTop' or 'window.scrollY' which can drift or be affected by transforms.
+	
+	let activeIndex = -1;
+	let maxOverlap = -Infinity;
+
+	// Loop through elements to find which one is currently "active"
+	// Definition of Active: The element that is currently crossing the top of the screen,
+	// OR validly occupying the primary viewport space.
+	// Strict Rule: 0% progress = Element Top is at Viewport Top.
+	
+	for (let i = 0; i < _elements.length; i++) {
+		const item = _elements[i];
+		const rect = item.el.getBoundingClientRect();
+		
+		// An element is "active" if its top is at or above the viewport top,
+		// AND its bottom is still below the viewport top (it hasn't fully scrolled past).
+		// We add a small epsilon (1px) for exact boundary cases.
+		
+		if (rect.top <= 1 && rect.bottom > 0) {
+			// Found it. 
+			// If multiple match (e.g. nested or zero-height), prefer the last one or largest overlap?
+			// Standard separate sections should imply only one covers the 'top line'.
+			activeIndex = i;
+			// We break immediately if we assume sequential non-overlapping sections.
+			// However, if there are gaps, we might need fallback.
+			// Let's assume standard flow.
+			
+			// Calculate progress:
+			// 0% = rect.top is 0.
+			// 100% = rect.bottom is 0 (scrolled fully past).
+			// Progress = Scrolled Amount / Total Height
+			// Scrolled Amount = (Total Height - rect.bottom)? No.
+			// Distance traveled = Height - rect.bottom? 
+			// Wait.
+			// At Start: rect.top = 0, rect.bottom = Height.
+			// At End: rect.top = -Height, rect.bottom = 0.
+			// Scrolled = -rect.top.
+			// Progress = -rect.top / Height.
+			
+			const scrolledPixels = -rect.top;
+			_sectionProgress = Math.max(0, Math.min(1, scrolledPixels / rect.height));
+			break;
+		}
+	}
+
+	if (activeIndex !== -1) {
+		const s = _elements[activeIndex];
+		let id = s.id;
+		// Removed mapping for useCases_impact as it is now systemScale
+		_currentSection = id as SectionName;
+	} else {
+		// Fallback: If no element touches the top line.
+		// If we are above the first element:
+		const first = _elements[0];
+		if (first.el.getBoundingClientRect().top > 0) {
+			_currentSection = 'hero';
+			_sectionProgress = 0;
+		} 
+		// If we are below the last element:
+		else {
+			const last = _elements[_elements.length - 1];
+			// Use mapped name
+			let id = last.id;
+			// Removed mapping
+			
+			if (last.el.getBoundingClientRect().bottom <= 0) {
+				_currentSection = id as SectionName;
+				_sectionProgress = 1;
+			} else {
+				// We are in a gap between sections?
+				// Find the closest previous section
+				// This shouldn't happen with our contiguous layout assumption but good for safety.
+				// Just keep previous value or search closest.
+				// Let's assume footer or last known state.
+			}
+		}
+	}
 }
 
 // Subscribe on module load (will be called after Lenis init)
 let unsubscribe: (() => void) | null = null;
+let observer: ResizeObserver | null = null;
 
 /**
  * Connect scroll state to Lenis
  * Call this after initLenis()
  */
 export function connectScrollState(): () => void {
+	// Initial detection
+	refreshLayout();
+	
+	// Recalculate on resize
+	observer = new ResizeObserver(() => {
+		refreshLayout();
+	});
+	observer.observe(document.body);
+
 	unsubscribe = onScroll(updateFromLenis);
+	
 	return () => {
 		unsubscribe?.();
 		unsubscribe = null;
+		observer?.disconnect();
+		observer = null;
 	};
 }
 
@@ -123,8 +256,18 @@ export function isSectionActive(section: SectionName): boolean {
  * Returns 0 when inside the section
  */
 export function getDistanceToSection(section: SectionName): number {
-	const bounds = SECTION_BREAKPOINTS[section];
-	if (_progress < bounds.start) return bounds.start - _progress;
-	if (_progress > bounds.end) return bounds.end - _progress;
-	return 0;
+	// Not easily calculable in unitless 0-1 without updated cache logic.
+	// For now, simpler approximation:
+	if (_currentSection === section) return 0;
+	// We need to look up target section's index vs current
+    // This function is less critical for the core loop, can iterate
+    const target = _elements.find(e => e.id === section);
+    if (!target) return 0;
+    
+    const scrollY = typeof window !== 'undefined' ? window.scrollY : 0;
+    
+    if (scrollY < target.top) return (target.top - scrollY) / window.innerHeight; // Distance in screens
+    if (scrollY > target.top + target.height) return (target.top + target.height - scrollY) / window.innerHeight;
+    
+    return 0;
 }

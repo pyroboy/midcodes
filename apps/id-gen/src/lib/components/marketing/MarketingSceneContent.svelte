@@ -64,7 +64,7 @@
 <!-- Background card grid (visible during testimonials section) -->
 {#if sceneReady}
 	<InstancedCardGrid
-		visible={scrollState.currentSection === 'testimonials'}
+		visible={scrollState.currentSection === 'systemScale'}
 		scrollProgress={scrollState.sectionProgress}
 		gridCols={10}
 		gridRows={5}

@@ -17,10 +17,9 @@
 
 	let { typingProgress = 0, sectionProgress = 0, currentSection = 'hero' }: Props = $props();
 
-	// Caret visibility: end of hero, during encode, gone after
+	// Caret visibility: hero > 50%, during encode, gone after
 	let showCaret = $derived(
-		(currentSection === 'hero' && sectionProgress > 0.8) ||
-			currentSection === 'encode'
+		(currentSection === 'hero' && sectionProgress > 0.5) || currentSection === 'encode'
 	);
 
 	// Texture state
@@ -30,6 +29,9 @@
 
 	// Track last rendered progress to avoid unnecessary redraws
 	let lastRenderedProgress = -1;
+
+	// Blink state
+	let blinkVisible = $state(true);
 
 	// Config
 	const WIDTH = 640;
@@ -53,6 +55,15 @@
 
 		// Initial render with full text, no caret
 		renderText(1, false);
+
+		// Blink timer (530ms standard caret blink rate)
+		const interval = setInterval(() => {
+			blinkVisible = !blinkVisible;
+		}, 530);
+
+		return () => {
+			clearInterval(interval);
+		};
 	});
 
 	/**
@@ -72,21 +83,25 @@
 			const charCount = Math.round(line.text.length * effectiveProgress);
 			const visibleText = line.text.substring(0, charCount);
 
+			// Draw text if visible
 			if (visibleText.length > 0) {
 				ctx!.fillStyle = line.color;
 				ctx!.font = line.font;
 				ctx!.textAlign = 'left';
 				ctx!.textBaseline = 'middle';
 				ctx!.fillText(visibleText, WIDTH * 0.1, HEIGHT * line.y);
+			}
 
-				// Draw caret after first line (name) if visible
-				if (index === 0 && drawCaret) {
-					const metrics = ctx!.measureText(visibleText);
-					const caretX = WIDTH * 0.1 + metrics.width + 4;
-					const caretY = HEIGHT * line.y;
-					ctx!.fillStyle = '#1f2937';
-					ctx!.fillRect(caretX, caretY - 24, 3, 48);
-				}
+			// Draw caret for first line if requested and visible (blink)
+			if (index === 0 && drawCaret) {
+				// Must set font to get correct measurement even for empty string (width 0)
+				ctx!.font = line.font;
+				const metrics = ctx!.measureText(visibleText);
+				const caretX = WIDTH * 0.1 + metrics.width + 4;
+				const caretY = HEIGHT * line.y;
+
+				ctx!.fillStyle = '#1f2937';
+				ctx!.fillRect(caretX, caretY - 24, 3, 48);
 			}
 		});
 
@@ -95,7 +110,7 @@
 	}
 
 	// Track last caret state to detect changes
-	let lastCaretState = false;
+	let lastCaretDrawn = false;
 
 	/**
 	 * Update texture when typingProgress or caret state changes
@@ -107,19 +122,24 @@
 		const maxChars = Math.max(...LINES.map((l) => l.text.length));
 		const threshold = 1 / maxChars;
 
+		// Determine if caret should be drawn this frame
+		// Only draw caret if it's supposed to be shown AND it's in the visible phase of blink
+		const shouldDrawCaret = showCaret && blinkVisible;
+
 		// Check if we need to redraw
 		const progressDiff = Math.abs(typingProgress - lastRenderedProgress);
-		const caretChanged = showCaret !== lastCaretState;
+		const caretVisChanged = shouldDrawCaret !== lastCaretDrawn;
+
 		const needsRedraw =
 			progressDiff >= threshold || // New character would appear
 			lastRenderedProgress < 0 || // Initial render
 			(typingProgress > 0.95 && lastRenderedProgress <= 0.95) || // Snap to complete
 			(typingProgress < 0.05 && lastRenderedProgress >= 0.05) || // Snap to empty
-			caretChanged; // Caret visibility changed
+			caretVisChanged; // Caret visibility changed (including blink)
 
 		if (needsRedraw) {
-			renderText(typingProgress, showCaret);
-			lastCaretState = showCaret;
+			renderText(typingProgress, shouldDrawCaret);
+			lastCaretDrawn = shouldDrawCaret;
 		}
 	});
 </script>

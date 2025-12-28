@@ -44,6 +44,7 @@ export interface CardVisualState {
 	glowIntensity: number;
 	typingProgress: number; // 0 to 1 scaling for name bar
 	opacity: number;
+	highlightLayer: number; // 0 = none, 1-5 = specific layer
 }
 
 export function getSectionCardState(section: SectionName, sectionProgress: number): CardState {
@@ -60,22 +61,22 @@ export function getSectionCardState(section: SectionName, sectionProgress: numbe
 		case 'tap':
 			return 'tap';
 
-		case 'layers':
-			// Explode animation in first half, hold in second half
-			if (sectionProgress < 0.3) return 'exploding';
-			if (sectionProgress < 0.7) return 'exploded';
-			return 'collapsing';
+		case 'layers-main':
+			// Explode out
+			if (sectionProgress < 0.5) return 'exploding';
+			return 'exploded';
+
+		case 'layer-1':
+		case 'layer-2':
+		case 'layer-3':
+		case 'layer-4':
+		case 'layer-5':
+			return 'exploded';
 
 		case 'useCases':
 			return 'useCases';
 
-		case 'testimonials':
-			if (sectionProgress < 0.2) return 'shrinking';
-			return 'testimonials';
 
-		case 'segmentation':
-			if (sectionProgress < 0.2) return 'growing'; // Grow back from testimonials
-			return 'segmentation';
 
 		case 'physical':
 			// Stack of cards
@@ -215,212 +216,99 @@ export function getStateTransform(state: CardState, sectionProgress: number): Ca
 /**
  * Get visual state for a card state
  */
-export function getStateVisuals(state: CardState, sectionProgress: number): CardVisualState {
+export function getStateVisuals(
+	state: CardState,
+	sectionProgress: number,
+	sectionName?: SectionName
+): CardVisualState {
+	// Default visual state
+	const defaultVisuals: CardVisualState = {
+		autoRotate: false,
+		autoRotateSpeed: 0,
+		layerSeparation: 0,
+		textureIndex: 0,
+		lanyardVisible: false,
+		laserScanActive: false,
+		glowIntensity: 0,
+		typingProgress: 1,
+		opacity: 1,
+		highlightLayer: 0
+	};
+
+	let visuals = { ...defaultVisuals };
+
 	switch (state) {
 		case 'hero':
-			return {
-				autoRotate: true,
-				autoRotateSpeed: 0.3,
-				layerSeparation: 0,
-				textureIndex: 0,
-				lanyardVisible: false,
-				laserScanActive: false,
-				glowIntensity: 0,
-				typingProgress: 0, // Text hidden, types in encode section
-				opacity: 1
-			};
+			visuals.autoRotate = true;
+			visuals.autoRotateSpeed = 0.3;
+			visuals.typingProgress = 0;
+			break;
 
 		case 'encode':
-			return {
-				autoRotate: false,
-				autoRotateSpeed: 0,
-				layerSeparation: 0,
-				textureIndex: 0,
-				lanyardVisible: false,
-				laserScanActive: false,
-				glowIntensity: 0,
-				// Auto-play: target 1, lerp handles smooth animation
-				typingProgress: 1,
-				opacity: 1
-			};
+			visuals.typingProgress = 1;
+			break;
 
 		case 'scan':
-			return {
-				autoRotate: false,
-				autoRotateSpeed: 0,
-				layerSeparation: 0,
-				textureIndex: 0,
-				lanyardVisible: false,
-				laserScanActive: true,
-				glowIntensity: 1,
-				typingProgress: 1,
-				opacity: 1
-			};
+			visuals.laserScanActive = true;
+			visuals.glowIntensity = 1;
+			break;
 
 		case 'tap':
-			return {
-				autoRotate: false,
-				autoRotateSpeed: 0,
-				layerSeparation: 0,
-				textureIndex: 0,
-				lanyardVisible: false,
-				laserScanActive: false, // Laser off for tap
-				glowIntensity: 0,
-				typingProgress: 1,
-				opacity: 1
-			};
+			break;
 
 		case 'exploding':
-			return {
-				autoRotate: false,
-				autoRotateSpeed: 0,
-				layerSeparation: sectionProgress * 2.5, // 0 → 0.75
-				textureIndex: 0,
-				lanyardVisible: false,
-				laserScanActive: false,
-				glowIntensity: 0,
-				typingProgress: 1,
-				opacity: 1
-			};
+			visuals.layerSeparation = sectionProgress * 2.5;
+			break;
 
 		case 'exploded':
-			return {
-				autoRotate: false,
-				autoRotateSpeed: 0,
-				layerSeparation: 0.75,
-				textureIndex: 0,
-				lanyardVisible: false,
-				laserScanActive: false,
-				glowIntensity: 0,
-				typingProgress: 1,
-				opacity: 1
-			};
+			visuals.layerSeparation = 0.75;
+			// Map section to highlight layer
+			if (sectionName === 'layer-1') visuals.highlightLayer = 1;
+			else if (sectionName === 'layer-2') visuals.highlightLayer = 2;
+			else if (sectionName === 'layer-3') visuals.highlightLayer = 3;
+			else if (sectionName === 'layer-4') visuals.highlightLayer = 4;
+			else if (sectionName === 'layer-5') visuals.highlightLayer = 5;
+			break;
 
 		case 'collapsing':
-			// Map 0.7-1.0 → 0.75-0 separation
 			const collapseT = (sectionProgress - 0.7) / 0.3;
-			return {
-				autoRotate: false,
-				autoRotateSpeed: 0,
-				layerSeparation: 0.75 * (1 - collapseT),
-				textureIndex: 0,
-				lanyardVisible: false,
-				laserScanActive: false,
-				glowIntensity: 0,
-				typingProgress: 1,
-				opacity: 1
-			};
+			visuals.layerSeparation = 0.75 * (1 - collapseT);
+			break;
 
 		case 'physical':
-			return {
-				autoRotate: false,
-				autoRotateSpeed: 0,
-				layerSeparation: 0,
-				textureIndex: 0, // Should be hero texture
-				lanyardVisible: true, // Show physics lanyard
-				laserScanActive: false,
-				glowIntensity: 0,
-				typingProgress: 1,
-				opacity: 1
-			};
+			visuals.lanyardVisible = true;
+			break;
 
 		case 'segmentation':
-			return {
-				autoRotate: false,
-				autoRotateSpeed: 0,
-				layerSeparation: 0,
-				textureIndex: -1, // Special index to indicate segmentation (Student front, CEO back)
-				lanyardVisible: false,
-				laserScanActive: false,
-				glowIntensity: 0,
-				typingProgress: 1,
-				opacity: 1
-			};
+			visuals.textureIndex = -1;
+			break;
 
 		case 'useCases':
-			return {
-				autoRotate: true,
-				autoRotateSpeed: 0.2,
-				layerSeparation: 0,
-				textureIndex: Math.min(2, Math.floor(sectionProgress * 3)),
-				lanyardVisible: false,
-				laserScanActive: false,
-				glowIntensity: 0,
-				typingProgress: 1,
-				opacity: 1
-			};
+			visuals.autoRotate = true;
+			visuals.autoRotateSpeed = 0.2;
+			visuals.textureIndex = Math.min(2, Math.floor(sectionProgress * 3));
+			break;
 
 		case 'shrinking':
-		case 'testimonials':
-			return {
-				autoRotate: true,
-				autoRotateSpeed: 0.5,
-				layerSeparation: 0,
-				textureIndex: 0,
-				lanyardVisible: false,
-				laserScanActive: false,
-				glowIntensity: 0,
-				typingProgress: 1,
-				opacity: 1
-			};
+			visuals.autoRotate = true;
+			visuals.autoRotateSpeed = 0.5;
+			break;
 
 		case 'growing':
 		case 'shop':
-			return {
-				autoRotate: false,
-				autoRotateSpeed: 0,
-				layerSeparation: 0,
-				textureIndex: 0,
-				lanyardVisible: true,
-				laserScanActive: false,
-				glowIntensity: 0,
-				typingProgress: 1,
-				opacity: 1
-			};
+			visuals.lanyardVisible = true;
+			break;
 
 		case 'hidden':
 		default:
-			return {
-				autoRotate: false,
-				autoRotateSpeed: 0,
-				layerSeparation: 0,
-				textureIndex: 0,
-				lanyardVisible: false,
-				laserScanActive: false,
-				glowIntensity: 0,
-				typingProgress: 1,
-				opacity: 0
-			};
+			visuals.opacity = 0;
+			break;
 	}
+
+	return visuals;
 }
 
-// ============================================================================
-// TRANSITION HELPERS
-// ============================================================================
-
-/**
- * Blend two transforms with a factor (for smooth transitions)
- */
-export function blendTransforms(from: CardTransform, to: CardTransform, t: number): CardTransform {
-	const eased = Easing.smoothStep(t);
-	return {
-		position: {
-			x: from.position.x + (to.position.x - from.position.x) * eased,
-			y: from.position.y + (to.position.y - from.position.y) * eased,
-			z: from.position.z + (to.position.z - from.position.z) * eased
-		},
-		rotation: {
-			x: from.rotation.x + (to.rotation.x - from.rotation.x) * eased,
-			y: from.rotation.y + (to.rotation.y - from.rotation.y) * eased,
-			z: from.rotation.z + (to.rotation.z - from.rotation.z) * eased
-		},
-		scale: from.scale + (to.scale - from.scale) * eased
-	};
-}
-
-/**
- * Blend two visual states
- */
+// Update blendVisuals to handle highlightLayer
 export function blendVisuals(
 	from: CardVisualState,
 	to: CardVisualState,
@@ -436,6 +324,7 @@ export function blendVisuals(
 		laserScanActive: t > 0.5 ? to.laserScanActive : from.laserScanActive,
 		glowIntensity: from.glowIntensity + (to.glowIntensity - from.glowIntensity) * eased,
 		typingProgress: from.typingProgress + (to.typingProgress - from.typingProgress) * eased,
-		opacity: from.opacity + (to.opacity - from.opacity) * eased
+		opacity: from.opacity + (to.opacity - from.opacity) * eased,
+		highlightLayer: t > 0.5 ? to.highlightLayer : from.highlightLayer
 	};
 }

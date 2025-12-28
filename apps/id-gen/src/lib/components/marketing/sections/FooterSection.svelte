@@ -2,7 +2,9 @@
 	// Footer
 </script>
 
+<footer
 	class="relative py-20 px-4 border-t border-border bg-gradient-to-b from-transparent to-black/5 dark:to-black/50"
+	data-section-id="footer"
 >
 	<div class="max-w-6xl mx-auto">
 		<!-- Main Footer Content -->
