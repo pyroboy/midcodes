@@ -14,6 +14,8 @@
 	import * as THREE from 'three';
 	import HeroCardGeometry from './HeroCardGeometry.svelte';
 	import LaserScanEffect from './LaserScanEffect.svelte';
+	import PhoneMesh from './PhoneMesh.svelte';
+	import LanyardMesh from './LanyardMesh.svelte';
 	import type { SectionName } from '$lib/marketing/scroll';
 	import {
 		getSectionCardState,
@@ -62,8 +64,14 @@
 	let laserScanActive = $state(false);
 	let glowIntensity = $state(0);
 
+	let typingProgress = $state(1);
+
 	// Auto-rotation accumulator
 	let autoRotationY = $state(0);
+
+	// Scroll velocity for lanyard physics
+	let scrollVelocity = $state(0);
+	let prevScrollProgress = $state(0);
 
 	// Group reference for transforms
 	let groupRef: THREE.Group | undefined = $state();
@@ -103,6 +111,7 @@
 		layerSeparation = lerp(layerSeparation, targetVisuals.layerSeparation, lerpFactor);
 		opacity = lerp(opacity, targetVisuals.opacity, lerpFactor);
 		glowIntensity = lerp(glowIntensity, targetVisuals.glowIntensity, lerpFactor);
+		typingProgress = lerp(typingProgress, targetVisuals.typingProgress, lerpFactor);
 
 		// Discrete state changes (no lerp needed)
 		autoRotate = targetVisuals.autoRotate;
@@ -111,24 +120,40 @@
 		lanyardVisible = targetVisuals.lanyardVisible;
 		laserScanActive = targetVisuals.laserScanActive;
 
-		// Handle rotation
+		// Calculate target rotation based on mode
+		let targetRotX = targetTransform.rotation.x;
+		let targetRotY = targetTransform.rotation.y;
+		let targetRotZ = targetTransform.rotation.z;
+
 		if (autoRotate) {
-			// Accumulate auto-rotation
-			autoRotationY += delta * autoRotateSpeed;
-			rotation.y = autoRotationY;
+			// Increase speed multiplier (User requested faster)
+			const OSCILLATION_SPEED = 3.0;
+			autoRotationY += delta * autoRotateSpeed * OSCILLATION_SPEED;
+
+			// Fan oscillation targets
+			targetRotY = Math.sin(autoRotationY) * 0.4;
+			targetRotX = Math.sin(autoRotationY * 0.7 + 1) * 0.15;
+			targetRotZ = Math.sin(autoRotationY * 0.5 + 2) * 0.05;
 		} else {
-			// Lerp to target rotation
-			rotation.x = lerp(rotation.x, targetTransform.rotation.x, lerpFactor);
-			rotation.y = lerp(rotation.y, targetTransform.rotation.y, lerpFactor);
-			rotation.z = lerp(rotation.z, targetTransform.rotation.z, lerpFactor);
-			// Sync auto-rotation to current y to prevent jump when re-enabling
-			autoRotationY = rotation.y;
+			// Reset accumulator when not auto-rotating to prevent large values
+			// We can sync it to current Y to avoid phase jump if we re-enter,
+			// but sine inverse is singular. Resetting is stable.
+			autoRotationY = 0;
 		}
+
+		// Always lerp to target for smooth transitions
+		rotation.x = lerp(rotation.x, targetRotX, lerpFactor);
+		rotation.y = lerp(rotation.y, targetRotY, lerpFactor);
+		rotation.z = lerp(rotation.z, targetRotZ, lerpFactor);
 
 		// Apply transforms to Three.js group
 		groupRef.position.set(position.x, position.y, position.z);
 		groupRef.rotation.set(rotation.x, rotation.y, rotation.z);
 		groupRef.scale.setScalar(scale);
+
+		// Track scroll velocity for lanyard physics
+		scrollVelocity = (scrollProgress - prevScrollProgress) / delta;
+		prevScrollProgress = scrollProgress;
 	});
 </script>
 
@@ -139,14 +164,26 @@
 		{textureIndex}
 		{currentSection}
 		{sectionProgress}
+		{typingProgress}
 	/>
 
 	<!-- Laser scan effect for verification section -->
+	<!-- Laser scan effect for verification section -->
 	<LaserScanEffect
 		active={laserScanActive}
-		cardWidth={2}
-		cardHeight={2 / 1.586}
+		cardWidth={2 / 1.586}
+		cardHeight={2}
 		scanSpeed={0.8}
 		{glowIntensity}
 	/>
+
+	<!-- Lanyard for shop section -->
+	<LanyardMesh visible={lanyardVisible} {scrollVelocity} cardWidth={2 / 1.586} cardHeight={2} />
 </T.Group>
+
+<!-- Phone Model for Scan/Tap Sections -->
+<PhoneMesh
+	visible={currentSection === 'scan' || currentSection === 'tap'}
+	section={currentSection}
+	progress={sectionProgress}
+/>

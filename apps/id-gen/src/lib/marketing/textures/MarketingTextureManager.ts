@@ -117,7 +117,7 @@ export interface CardTextureSet {
 export function createHeroCardTexture(
 	width: number = 1024,
 	height: number = 640,
-	variant: 'hero' | 'student' | 'dorm' | 'event' = 'hero'
+	variant: 'hero' | 'student' | 'dorm' | 'event' | 'ceo' = 'hero'
 ): THREE.CanvasTexture {
 	const canvas = document.createElement('canvas');
 	canvas.width = width;
@@ -127,10 +127,10 @@ export function createHeroCardTexture(
 	// Variant-specific colors
 	const colorSchemes = {
 		hero: {
-			primary: '#1a1a2e',
-			secondary: '#16213e',
-			accent: '#0f0f23',
-			symbol: 'rgba(255, 255, 255, 0.08)'
+			primary: '#ffffff',
+			secondary: '#f3f4f6', // gray-100
+			accent: '#e5e7eb', // gray-200
+			symbol: 'rgba(0, 0, 0, 0.05)' // Dark symbol for contrast
 		},
 		student: {
 			primary: '#0d1b2a',
@@ -149,10 +149,19 @@ export function createHeroCardTexture(
 			secondary: '#2d1b4e',
 			accent: '#4a235a',
 			symbol: 'rgba(255, 255, 255, 0.1)'
+		},
+		ceo: {
+			primary: '#000000',
+			secondary: '#111111',
+			accent: '#222222',
+			symbol: 'rgba(212, 175, 55, 0.05)' // Gold hint
 		}
 	};
 
-	const colors = colorSchemes[variant];
+	const colors = colorSchemes[variant] || colorSchemes['hero'];
+	if (!colors) {
+		console.error(`MarketingTextureManager: No color scheme found for variant "${variant}". Defaulting to hero.`);
+	}
 
 	// Background gradient
 	const gradient = ctx.createLinearGradient(0, 0, width, height);
@@ -170,7 +179,7 @@ export function createHeroCardTexture(
 	ctx.fillText('ᜃ', width / 2, height / 2);
 
 	// Add subtle grid pattern
-	ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
+	ctx.strokeStyle = variant === 'hero' ? 'rgba(0, 0, 0, 0.03)' : 'rgba(255, 255, 255, 0.02)';
 	ctx.lineWidth = 1;
 	for (let x = 0; x < width; x += 40) {
 		ctx.beginPath();
@@ -207,6 +216,20 @@ export function createHeroCardTexture(
 		ctx.font = 'bold 40px sans-serif';
 		ctx.textAlign = 'center';
 		ctx.fillText('VIP', width / 2, height * 0.25);
+	} else if (variant === 'ceo') {
+		// CEO style (minimalist border)
+		ctx.strokeStyle = 'rgba(212, 175, 55, 0.5)'; // Gold
+		ctx.lineWidth = 2;
+		ctx.strokeRect(40, 40, width - 80, height - 80);
+		
+		ctx.fillStyle = 'rgba(212, 175, 55, 0.8)';
+		ctx.font = 'bold 36px serif';
+		ctx.textAlign = 'center';
+		ctx.fillText('CHIEF EXECUTIVE', width / 2, height * 0.4);
+		
+		ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+		ctx.font = '24px sans-serif';
+		ctx.fillText('KANAYA INC.', width / 2, height * 0.6);
 	}
 
 	const texture = new THREE.CanvasTexture(canvas);

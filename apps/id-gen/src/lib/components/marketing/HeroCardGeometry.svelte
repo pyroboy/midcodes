@@ -12,6 +12,7 @@
 	import * as THREE from 'three';
 	import { onMount } from 'svelte';
 	import { createRoundedRectCard, type CardGeometry } from '$lib/utils/cardGeometry';
+	import CardTextOverlay from './CardTextOverlay.svelte';
 	import {
 		createBaybaninNormalMap,
 		createHeroCardTexture,
@@ -26,18 +27,20 @@
 		textureIndex?: number;
 		currentSection?: SectionName;
 		sectionProgress?: number;
+		typingProgress?: number;
 	}
 
 	let {
 		layerSeparation = 0,
 		textureIndex = 0,
 		currentSection = 'hero',
-		sectionProgress = 0
+		sectionProgress = 0,
+		typingProgress = 1
 	}: Props = $props();
 
-	// Card dimensions (standard ID card ratio ~1.586)
-	const CARD_WIDTH = 2;
-	const CARD_HEIGHT = CARD_WIDTH / 1.586;
+	// Card dimensions (standard ID card ratio ~1.586) - PORTRAIT
+	const CARD_HEIGHT = 2;
+	const CARD_WIDTH = CARD_HEIGHT / 1.586;
 	const CARD_DEPTH = 0.007;
 	const CARD_RADIUS = 0.08;
 
@@ -66,16 +69,18 @@
 			cardGeometry = await createRoundedRectCard(CARD_WIDTH, CARD_HEIGHT, CARD_DEPTH, CARD_RADIUS);
 
 			// Create textures with caching
-			frontTexture = getCachedTexture('hero-front', () => createHeroCardTexture(1024, 640, 'hero'));
-			backTexture = getCachedTexture('card-back', () => createCardBackTexture(1024, 640));
+			frontTexture = getCachedTexture('hero-front', () => createHeroCardTexture(640, 1024, 'hero'));
+			backTexture = getCachedTexture('card-back', () => createCardBackTexture(640, 1024));
 			normalMap = getCachedTexture('baybayin-normal', () => createBaybaninNormalMap(512));
 
 			// Create variant textures for use cases section
 			variantTextures = [
-				getCachedTexture('variant-hero', () => createHeroCardTexture(1024, 640, 'hero')),
-				getCachedTexture('variant-student', () => createHeroCardTexture(1024, 640, 'student')),
-				getCachedTexture('variant-dorm', () => createHeroCardTexture(1024, 640, 'dorm')),
-				getCachedTexture('variant-event', () => createHeroCardTexture(1024, 640, 'event'))
+				getCachedTexture('variant-hero', () => createHeroCardTexture(640, 1024, 'hero')),
+				getCachedTexture('variant-student', () => createHeroCardTexture(640, 1024, 'student')),
+				getCachedTexture('variant-dorm', () => createHeroCardTexture(640, 1024, 'dorm')),
+				getCachedTexture('variant-event', () => createHeroCardTexture(640, 1024, 'event')),
+				// Special texture for segmentation (CEO)
+				getCachedTexture('variant-ceo', () => createHeroCardTexture(640, 1024, 'ceo'))
 			];
 
 			// Create front material with normal map for emboss effect
@@ -128,12 +133,25 @@
 		};
 	});
 
-	// Update texture based on textureIndex for use cases section
+	// Update texture based on textureIndex for use cases section and segmentation
 	$effect(() => {
-		if (frontMaterial && variantTextures.length > 0) {
-			const idx = Math.min(textureIndex, variantTextures.length - 1);
-			frontMaterial.map = variantTextures[idx];
+		if (frontMaterial && backMaterial && variantTextures.length > 0) {
+			// Segmentation state check (textureIndex = -1)
+			if (textureIndex === -1) {
+				// Front: Student (index 1)
+				frontMaterial.map = variantTextures[1];
+				// Back: CEO (index 4 - added above)
+				backMaterial.map = variantTextures[4];
+			} else {
+				// Normal behavior
+				const idx = Math.min(textureIndex, variantTextures.length - 1);
+				frontMaterial.map = variantTextures[idx];
+				// Reset back to standard back
+				backMaterial.map = backTexture;
+			}
+
 			frontMaterial.needsUpdate = true;
+			backMaterial.needsUpdate = true;
 		}
 	});
 
@@ -161,44 +179,93 @@
 
 {#if isLoaded && cardGeometry && frontMaterial && backMaterial && edgeMaterial && middleLayerMaterial}
 	<!-- Front face (separated forward in exploded view) -->
-	<T.Group position.z={layerSeparation * 0.5}>
+	<!-- Front face (Card Body - Behind layers) -->
+	<T.Group position.z={-layerSeparation * 0.2}>
 		<T.Mesh geometry={cardGeometry.frontGeometry} material={frontMaterial} />
+
+		<!-- Dynamic Text Overlay (Simultaneous letter-by-letter typing) -->
+		<CardTextOverlay {typingProgress} {sectionProgress} />
 	</T.Group>
 
-	<!-- Middle "data" layer (only visible when exploded) -->
+	<!-- 5-Layer Stack (In front of card) -->
 	{#if layerSeparation > 0.05}
-		<T.Group position.z={0}>
+		<!-- Layer 1: Base Grid/Background Data -->
+		<T.Group position.z={layerSeparation * 0.3}>
 			<T.Mesh material={middleLayerMaterial}>
-				<T.PlaneGeometry args={[CARD_WIDTH * 0.92, CARD_HEIGHT * 0.92]} />
+				<T.PlaneGeometry args={[CARD_WIDTH * 0.95, CARD_HEIGHT * 0.95]} />
 			</T.Mesh>
-			<!-- Data visualization elements -->
-			<T.Group position.z={0.001}>
-				<!-- Horizontal lines (data rows) -->
-				{#each [0.25, 0.1, -0.05, -0.2, -0.35] as yPos}
-					<T.Mesh position.y={yPos} position.x={-0.1}>
-						<T.PlaneGeometry args={[CARD_WIDTH * 0.6, 0.04]} />
-						<T.MeshBasicMaterial
-							color={0x4a4a8a}
-							transparent
-							opacity={Math.min(1, layerSeparation * 2)}
-						/>
-					</T.Mesh>
-				{/each}
-				<!-- Photo placeholder -->
-				<T.Mesh position.x={-0.65} position.y={0}>
-					<T.PlaneGeometry args={[0.4, 0.5]} />
+			<!-- Grid pattern -->
+			<T.Mesh position.z={0.001}>
+				<T.PlaneGeometry args={[CARD_WIDTH * 0.9, CARD_HEIGHT * 0.9]} />
+				<T.MeshBasicMaterial color={0x3a3a6a} wireframe transparent opacity={0.3} />
+			</T.Mesh>
+		</T.Group>
+
+		<!-- Layer 2: Photo Chip -->
+		<T.Group position.z={layerSeparation * 0.7}>
+			<T.Mesh position.x={-0.65} position.y={0}>
+				<T.BoxGeometry args={[0.4, 0.5, 0.01]} />
+				<T.MeshBasicMaterial
+					color={0x6a6aaa}
+					transparent
+					opacity={Math.min(1, layerSeparation * 2)}
+				/>
+			</T.Mesh>
+			<!-- Chip accents -->
+			<T.Mesh position.x={-0.65} position.y={0.3}>
+				<T.PlaneGeometry args={[0.2, 0.02]} />
+				<T.MeshBasicMaterial color={0xffaa00} />
+			</T.Mesh>
+		</T.Group>
+
+		<!-- Layer 3: Text Lines (Identity Data) -->
+		<T.Group position.z={layerSeparation * 1.1}>
+			{#each [0.4, 0.3, -0.1, -0.2, -0.3] as yPos, i}
+				<T.Mesh position.y={yPos} position.x={0.1}>
+					<T.PlaneGeometry args={[CARD_WIDTH * (i < 2 ? 0.4 : 0.6), 0.03]} />
 					<T.MeshBasicMaterial
-						color={0x6a6aaa}
+						color={0xaaddff}
 						transparent
 						opacity={Math.min(1, layerSeparation * 2)}
 					/>
 				</T.Mesh>
-			</T.Group>
+			{/each}
+		</T.Group>
+
+		<!-- Layer 4: QR Code -->
+		<T.Group position.z={layerSeparation * 1.5}>
+			<T.Mesh position.x={0.4} position.y={-0.5}>
+				<T.PlaneGeometry args={[0.35, 0.35]} />
+				<T.MeshBasicMaterial
+					color={0xffffff}
+					transparent
+					opacity={Math.min(1, layerSeparation * 2)}
+				/>
+			</T.Mesh>
+			<T.Mesh position.x={0.4} position.y={-0.5} position.z={0.001}>
+				<T.PlaneGeometry args={[0.3, 0.3]} />
+				<T.MeshBasicMaterial color={0x000000} wireframe transparent opacity={0.5} />
+			</T.Mesh>
+		</T.Group>
+
+		<!-- Layer 5: Holographic/Status Icons -->
+		<T.Group position.z={layerSeparation * 1.9}>
+			<!-- Top right icon -->
+			<T.Mesh position.x={0.5} position.y={0.8}>
+				<T.CircleGeometry args={[0.08, 16]} />
+				<T.MeshBasicMaterial color={0x00ff00} transparent opacity={0.8} />
+			</T.Mesh>
+			<!-- Bottom center status bar -->
+			<T.Mesh position.y={-0.8}>
+				<T.PlaneGeometry args={[CARD_WIDTH * 0.8, 0.05]} />
+				<T.MeshBasicMaterial color={0x00ffff} transparent opacity={0.6} />
+			</T.Mesh>
 		</T.Group>
 	{/if}
 
 	<!-- Back face (separated backward in exploded view) -->
-	<T.Group position.z={-layerSeparation * 0.5}>
+	<!-- Back face (Furthest back) -->
+	<T.Group position.z={-layerSeparation * 0.8}>
 		<T.Mesh geometry={cardGeometry.backGeometry} material={backMaterial} />
 	</T.Group>
 

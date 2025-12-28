@@ -7,6 +7,8 @@
 	import { interactivity } from '@threlte/extras';
 	import { onMount } from 'svelte';
 	import HeroCard3D from './HeroCard3D.svelte';
+	import InstancedCardGrid from './InstancedCardGrid.svelte';
+	import CardStack from './sections/CardStack.svelte';
 	import { getScrollState } from '$lib/marketing/scroll';
 
 	interface Props {
@@ -50,6 +52,17 @@
 <!-- Rim light from behind -->
 <T.DirectionalLight position={[0, 0, -5]} intensity={0.2} />
 
+<!-- Background card grid (visible during testimonials section) -->
+{#if sceneReady}
+	<InstancedCardGrid
+		visible={scrollState.currentSection === 'testimonials'}
+		scrollProgress={scrollState.sectionProgress}
+		gridCols={10}
+		gridRows={5}
+		cardSpacing={0.5}
+	/>
+{/if}
+
 <!-- The hero card driven by scroll state -->
 {#if sceneReady}
 	<HeroCard3D
@@ -57,5 +70,11 @@
 		currentSection={scrollState.currentSection}
 		sectionProgress={scrollState.sectionProgress}
 		{templateAssets}
+	/>
+
+	<!-- Card Stack for Physical Ecosystem section -->
+	<CardStack
+		visible={scrollState.currentSection === 'physical'}
+		scrollProgress={scrollState.sectionProgress}
 	/>
 {/if}

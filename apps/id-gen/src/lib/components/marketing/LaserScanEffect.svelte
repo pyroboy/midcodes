@@ -37,28 +37,31 @@
 	let time = $state(0);
 
 	onMount(() => {
-		// Bright red laser line
+		// Bright red laser line (Core)
 		lineMaterial = new THREE.MeshBasicMaterial({
-			color: 0xff3333,
+			color: 0xff0000,
 			transparent: true,
-			opacity: 0.9,
-			side: THREE.DoubleSide
+			opacity: 1.0,
+			side: THREE.DoubleSide,
+			blending: THREE.AdditiveBlending // Glow effect
 		});
 
-		// Outer glow
+		// Outer glow (Intense)
 		glowMaterial = new THREE.MeshBasicMaterial({
 			color: 0xff0000,
 			transparent: true,
-			opacity: 0.4,
-			side: THREE.DoubleSide
+			opacity: 0.6,
+			side: THREE.DoubleSide,
+			blending: THREE.AdditiveBlending
 		});
 
-		// Trailing glow
+		// Trailing glow (Wider)
 		trailMaterial = new THREE.MeshBasicMaterial({
-			color: 0xff2222,
+			color: 0xff0000,
 			transparent: true,
-			opacity: 0.15,
-			side: THREE.DoubleSide
+			opacity: 0.3,
+			side: THREE.DoubleSide,
+			blending: THREE.AdditiveBlending
 		});
 
 		return () => {
@@ -101,37 +104,38 @@
 
 {#if active && lineMaterial && glowMaterial && trailMaterial}
 	<!-- Main scan group - positioned in front of card -->
+	<!-- Main scan group - positioned in front of card -->
 	<T.Group position.z={0.02}>
 		<!-- Trailing glow (wider, behind) -->
 		<T.Mesh position.y={getYPosition(scanProgress)} position.z={-0.01} material={trailMaterial}>
-			<T.PlaneGeometry args={[cardWidth * 0.95, 0.15]} />
+			<T.PlaneGeometry args={[cardWidth * 1.4, 0.2]} />
 		</T.Mesh>
 
 		<!-- Outer glow (medium width) -->
 		<T.Mesh position.y={getYPosition(scanProgress)} material={glowMaterial}>
-			<T.PlaneGeometry args={[cardWidth * 0.95, 0.06]} />
+			<T.PlaneGeometry args={[cardWidth * 1.3, 0.08]} />
 		</T.Mesh>
 
 		<!-- Main laser line (thin and bright) -->
 		<T.Mesh position.y={getYPosition(scanProgress)} position.z={0.001} material={lineMaterial}>
-			<T.PlaneGeometry args={[cardWidth * 0.95, 0.015]} />
+			<T.PlaneGeometry args={[cardWidth * 1.3, 0.02]} />
 		</T.Mesh>
 
-		<!-- Leading edge highlight -->
+		<!-- Leading edge highlight (Tinted RED) -->
 		<T.Mesh position.y={getYPosition(scanProgress)} position.z={0.002}>
-			<T.PlaneGeometry args={[cardWidth * 0.95, 0.004]} />
-			<T.MeshBasicMaterial color={0xffffff} transparent opacity={0.7 * glowIntensity} />
+			<T.PlaneGeometry args={[cardWidth * 1.3, 0.005]} />
+			<T.MeshBasicMaterial color={0xffaaaa} transparent opacity={0.9 * glowIntensity} />
 		</T.Mesh>
 
-		<!-- Horizontal edge markers (scanning bounds) -->
+		<!-- Horizontal edge markers (scanning bounds - moved out) -->
 		{#each [-1, 1] as side}
 			<T.Mesh
-				position.x={side * cardWidth * 0.47}
+				position.x={side * cardWidth * 0.65}
 				position.y={getYPosition(scanProgress)}
 				position.z={0.001}
 			>
 				<T.PlaneGeometry args={[0.02, 0.08]} />
-				<T.MeshBasicMaterial color={0x00ff00} transparent opacity={0.6 * glowIntensity} />
+				<T.MeshBasicMaterial color={0xff0000} transparent opacity={0.8 * glowIntensity} />
 			</T.Mesh>
 		{/each}
 	</T.Group>
