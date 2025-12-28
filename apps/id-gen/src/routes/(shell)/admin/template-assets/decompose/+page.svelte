@@ -30,6 +30,7 @@
 	import UpscaleActionModal from './components/modals/UpscaleActionModal.svelte';
 	import RemoveModal from './components/modals/RemoveModal.svelte';
 	import ImagePreviewModal from './components/modals/ImagePreviewModal.svelte';
+	import OrgAssetPickerModal from '$lib/components/OrgAssetPickerModal.svelte';
 	import CropModal from './CropModal.svelte'; // Note: check absolute path, usually alongside +page
 
 	// UI Icons
@@ -50,7 +51,8 @@
 		Crop,
 		ImageDown,
 		ArrowUp,
-		ArrowDown
+		ArrowDown,
+		ImagePlus
 	} from 'lucide-svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { Button } from '$lib/components/ui/button';
@@ -106,7 +108,8 @@
 		upscale: false,
 		remove: false,
 		preview: false,
-		crop: false
+		crop: false,
+		addLayer: false
 	});
 
 	let actionModalLayerId = $state<string | null>(null);
@@ -353,6 +356,28 @@
 		}
 	}
 
+	async function handleAddLayerSelect(url: string) {
+		modals.addLayer = false;
+
+		const img = new Image();
+		img.crossOrigin = 'anonymous';
+		img.onload = () => {
+			const { layer, selection } = layerMgr.createLayerObj(
+				url,
+				'New Layer',
+				{ x: 0, y: 0, width: img.naturalWidth, height: img.naturalHeight },
+				layerMgr.activeSide,
+				layerMgr.currentLayers.length
+			);
+			layerMgr.addLayer(layer, selection);
+			toast.success('Layer added successfully');
+		};
+		img.onerror = () => {
+			toast.error('Failed to load image for new layer');
+		};
+		img.src = getProxiedUrl(url) || url;
+	}
+
 	// Drag & Drop for Sidebar & Layer Reordering
 	function handleSidebarDragStart(e: DragEvent, layer: any) {
 		e.dataTransfer?.setData('application/json', JSON.stringify({ type: 'history-layer', layer }));
@@ -543,6 +568,21 @@
 								}
 							}
 						}}
+						onConvertStaticElement={async (layerId: string) => {
+							const templateId = data.template?.id;
+							if (!templateId) return;
+
+							const pairedElementId = layerMgr.getPairedElementId(layerId);
+							if (!pairedElementId) return;
+
+							const result = await removeStaticElement({ templateId, elementId: pairedElementId });
+							if (result.success) {
+								layerMgr.setPairedElementId(layerId, undefined);
+								toast.success('Static Element removed. Layer is now editable.');
+							} else {
+								toast.error(result.error || 'Failed to convert layer');
+							}
+						}}
 						isProcessing={processor.isProcessing}
 					/>
 				</CanvasStack>
@@ -730,12 +770,11 @@
 							<span class="text-[10px]">Upscale</span>
 						</button>
 						<button
-							class="flex flex-col items-center gap-1 p-2 rounded hover:bg-pink-500/10 disabled:opacity-50 transition-colors"
-							disabled={!selectedLayerId}
-							onclick={() => selectedLayerId && processor.removeLayerBackground(selectedLayerId)}
+							class="flex flex-col items-center gap-1 p-2 rounded hover:bg-blue-500/10 disabled:opacity-50 transition-colors"
+							onclick={() => (modals.addLayer = true)}
 						>
-							<Wand2 class="h-4 w-4 text-pink-600" />
-							<span class="text-[10px]">Remove BG</span>
+							<ImagePlus class="h-4 w-4 text-blue-600" />
+							<span class="text-[10px]">Add Layer</span>
 						</button>
 						<button
 							class="flex flex-col items-center gap-1 p-2 rounded hover:bg-orange-500/10 disabled:opacity-50 transition-colors"
@@ -863,6 +902,12 @@
 				width: data.asset.widthPixels || 1050,
 				height: data.asset.heightPixels || 600
 			}}
+		/>
+
+		<OrgAssetPickerModal
+			bind:open={modals.addLayer}
+			onSelect={handleAddLayerSelect}
+			onClose={() => (modals.addLayer = false)}
 		/>
 
 		{#if modals.crop}

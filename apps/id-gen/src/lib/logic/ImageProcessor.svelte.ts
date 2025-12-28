@@ -1,10 +1,10 @@
 import { toast } from 'svelte-sonner';
 import {
-	decomposeImage,
-	upscaleImagePreview,
-	removeElementFromLayer,
-	uploadProcessedImage,
-	saveHistoryItem
+    decomposeImage,
+    upscaleImagePreview,
+    removeElementFromLayer,
+    uploadProcessedImage,
+    saveHistoryItem
 } from '$lib/remote/index.remote';
 import { fileToImageData, processImageLSB, imageDataToBlob } from '$lib/utils/bye-synth-id';
 import { fileToDataUrl, removeBackgroundCloud } from '$lib/utils/imageProcessing';
@@ -15,920 +15,587 @@ import { getProxiedUrl } from '$lib/utils/storage';
 import { type NormalizedPoint } from './tools';
 
 export class ImageProcessor {
-	isProcessing = $state(false);
-	processingLayerId = $state<string | null>(null);
-
-	constructor(
-		private layerManager: LayerManager,
-		private historyManager: HistoryManager,
-		private getAssetData: () => { id: string; width: number; height: number; templateId?: string }
-	) {}
-
-	private get assetData() {
-		return this.getAssetData();
-	}
-
-	// Note: Polling is now handled entirely by HistoryManager for better
-	// synchronization and to avoid duplicate polling.
-
-	// --- 1. Decompose ---
-	async decompose(params: {
-		imageUrl: string;
-		numLayers: number;
-		prompt?: string;
-		negativePrompt?: string;
-		settings: any;
-	}) {
-		if (this.isProcessing) {
-			toast.warning('Another operation is in progress');
-			return false;
-		}
-
-		const toastId = toast.loading('Queuing decomposition task...');
-		this.isProcessing = true;
-
-		// 1. Optimistic Update (Immediate)
-		const tempId = this.historyManager.addOptimisticItem(
-			'fal-ai-decompose',
-			'Qwen-Image-Layered',
-			params.imageUrl,
-			this.layerManager.activeSide
-		);
-
-		try {
-			const result = await decomposeImage({
-				imageUrl: params.imageUrl,
-				numLayers: params.numLayers,
-				prompt: params.prompt,
-				negative_prompt: params.negativePrompt,
-				side: this.layerManager.activeSide,
-				templateId: this.assetData.templateId,
-				...params.settings
-			});
-
-			if (!result.success || !result.jobId) {
-				throw new Error(result.error || 'Failed to queue decomposition');
-			}
-
-			// 2. Reconcile temp ID with real job ID - HistoryManager handles polling
-			this.historyManager.updateOptimisticId(tempId, result.jobId);
-
-			// Hide original if decomposing background
-			if (params.imageUrl.includes('original')) {
-				this.layerManager.showOriginalLayer = false;
-			}
-
-			toast.success('Decomposition queued! Processing in background...', { id: toastId });
-			return true;
-		} catch (e: any) {
-			console.error(e);
-			toast.error(e.message || 'Failed to queue', { id: toastId });
-			return false;
-		} finally {
-			this.isProcessing = false;
-		}
-	}
-
-	// --- 2. Upscale (with SynthID Removal) ---
-	async upscaleLayer(
-		layer: DecomposedLayer | { imageUrl: string; id: string },
-		model: string,
-		removeWatermark = false
-	) {
-		if (this.isProcessing) return false;
-
-		const toastId = toast.loading('Queuing upscale task...');
-		this.isProcessing = true;
-
-		try {
-			let targetUrl = layer.imageUrl;
-
-			if (removeWatermark) {
-				toast.loading('Removing SynthID...', { id: toastId });
-				targetUrl = await this.removeWatermarkLogic(targetUrl);
-			}
-
-			// 1. Optimistic Update
-			const tempId = this.historyManager.addOptimisticItem(
-				`fal-ai-upscale-${model}`,
-				model,
-				layer.imageUrl,
-				this.layerManager.activeSide
-			);
-
-			const result = await upscaleImagePreview({
-				imageUrl: targetUrl,
-				model: model as any,
-				side: this.layerManager.activeSide,
-				templateId: this.assetData.templateId || null
-			});
-
-			if (!result.success || !result.jobId) {
-				throw new Error(result.error || 'Failed to queue upscale');
-			}
-
-			// 2. Reconcile ID - HistoryManager handles polling
-			this.historyManager.updateOptimisticId(tempId, result.jobId);
-
-			toast.success('Upscale queued! Processing in background...', { id: toastId });
-			return true;
-		} catch (e: any) {
-			toast.error(e.message, { id: toastId });
-			return false;
-		} finally {
-			this.isProcessing = false;
-		}
-
-	}
-
-	// --- 3. Remove Element ---
-	async removeElement(layer: DecomposedLayer, prompt: string) {
-		if (this.isProcessing) return false;
-		this.isProcessing = true;
-
-		const toastId = toast.loading(`Queuing removal of "${prompt}"...`);
-
-		// 1. Optimistic Update
-		const tempId = this.historyManager.addOptimisticItem(
-			'fal-ai-remove',
-			'qwen-image-edit',
-			layer.imageUrl,
-			this.layerManager.activeSide
-		);
-
-		try {
-			const result = await removeElementFromLayer({
-				imageUrl: layer.imageUrl,
-				prompt,
-				imageWidth: this.assetData.width,
-				imageHeight: this.assetData.height,
-				side: (layer as any).side || this.layerManager.activeSide,
-				templateId: this.assetData.templateId || null
-			});
-
-			if (!result.success || !result.jobId) {
-				throw new Error(result.error || 'Failed to queue removal');
-			}
-
-			// 2. Reconcile ID - HistoryManager handles polling
-			this.historyManager.updateOptimisticId(tempId, result.jobId);
-
-			toast.success('Removal queued! Processing in background...', { id: toastId });
-			return true;
-		} catch (e: any) {
-			toast.error(e.message, { id: toastId });
-			return false;
-		} finally {
-			this.isProcessing = false;
-		}
-
-	}
-
-	// --- 4. Client-Side Merge ---
-	async mergeSelectedLayers() {
-		if (this.isProcessing) return;
-
-		const ids = Array.from(this.layerManager.selectedForMerge);
-		const layers = this.layerManager.currentLayers
-			.filter((l) => ids.includes(l.id))
-			.sort((a, b) => a.zIndex - b.zIndex);
-
-		if (layers.length < 2) return;
-		this.isProcessing = true;
-		const toastId = toast.loading('Merging layers...');
-
-		try {
-			const canvas = document.createElement('canvas');
-			canvas.width = this.assetData.width;
-			canvas.height = this.assetData.height;
-			const ctx = canvas.getContext('2d');
-			if (!ctx) throw new Error('No context');
-
-			for (const l of layers) {
-				await new Promise((resolve, reject) => {
-					const img = new Image();
-					img.crossOrigin = 'anonymous';
-					img.onload = () => {
-						ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-						resolve(null);
-					};
-					img.onerror = reject;
-					img.src = l.imageUrl; // Ensure proxy if needed
-				});
-			}
-
-			const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/png'));
-			if (!blob) throw new Error('Canvas blob failed');
-			const base64 = await fileToDataUrl(blob);
-
-			const upload = await uploadProcessedImage({ imageBase64: base64, mimeType: 'image/png' });
-			if (upload.success && upload.url) {
-				// Remove old
-				ids.forEach((id) => this.layerManager.removeLayer(id));
-
-				// Add merged
-				const { layer, selection } = this.layerManager.createLayerObj(
-					upload.url,
-					`Merged (${ids.length})`,
-					{ x: 0, y: 0, width: canvas.width, height: canvas.height },
-					this.layerManager.activeSide,
-					0 // zIndex will be fixed by addLayer or manually
-				);
-				this.layerManager.addLayer(layer, selection);
-				this.layerManager.mergeMode = false;
-				this.layerManager.selectedForMerge.clear();
-				toast.success('Layers merged', { id: toastId });
-			}
-		} catch (e: any) {
-			console.error(e);
-			toast.error('Merge failed', { id: toastId });
-		} finally {
-			this.isProcessing = false;
-		}
-	}
-
-	// --- 4.5. Lasso Cut ---
-	async cutPolygon(layerId: string | null, points: { x: number; y: number }[], sourceImageUrl: string) {
-		if (this.isProcessing) return;
-
-		if (!layerId || points.length < 3 || !sourceImageUrl) {
-			console.warn('cutPolygon: Missing arguments', { layerId, pointsLen: points.length, sourceImageUrl });
-			return;
-		}
-
-		this.isProcessing = true;
-		const toastId = toast.loading('Cutting selection...');
-
-		try {
-			// 1. Load source image via PROXY to avoid CORS
-			const proxiedUrl = getProxiedUrl(sourceImageUrl) || sourceImageUrl;
-
-			const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-				const i = new Image();
-				i.crossOrigin = 'anonymous';
-				i.onload = () => resolve(i);
-				i.onerror = reject;
-				i.src = proxiedUrl;
-			});
-
-			// Canvas Dimensions (Target Space) - this is the full template size
-			const canvasW = this.assetData.width;
-			const canvasH = this.assetData.height;
-
-			// Determine if this is a background layer (uses object-fit: contain)
-			// or a regular layer (uses object-fit: fill / stretches to bounds)
-			const isBackground = layerId === 'original-file';
-
-			// Source Layer Position & Dimensions (where it displays on the canvas)
-			let layerX = 0;
-			let layerY = 0;
-			let layerW = canvasW;
-			let layerH = canvasH;
-
-			if (!isBackground) {
-				const layer = this.layerManager.currentLayers.find(l => l.id === layerId);
-				if (layer && layer.bounds) {
-					layerX = layer.bounds.x;
-					layerY = layer.bounds.y;
-					layerW = layer.bounds.width;
-					layerH = layer.bounds.height;
-
-					// DEBUG: Check if layer image dimensions match bounds
-					console.log('╔═══════════════════════════════════════════════════════════════╗');
-					console.log('║ ⚠️  SOURCE LAYER ANALYSIS (Non-Background):');
-					console.log('║    Layer Name:', layer.name);
-					console.log('║    Layer Bounds: x=', layerX, 'y=', layerY, 'w=', layerW, 'h=', layerH);
-					console.log('║    Layer Bounds Aspect:', (layerW / layerH).toFixed(4));
-					console.log('║    Source Image Natural Size:', img.naturalWidth, 'x', img.naturalHeight);
-					console.log('║    Source Image Aspect:', (img.naturalWidth / img.naturalHeight).toFixed(4));
-					const boundsAspect = layerW / layerH;
-					const imageAspect = img.naturalWidth / img.naturalHeight;
-					if (Math.abs(boundsAspect - imageAspect) > 0.01) {
-						console.log('║    ⚠️⚠️⚠️ ASPECT RATIO MISMATCH! ⚠️⚠️⚠️');
-						console.log('║    The layer image is being STRETCHED to fit bounds!');
-						console.log('║    This causes the "fat" copy issue.');
-						console.log('║    Bounds aspect:', boundsAspect.toFixed(4), '| Image aspect:', imageAspect.toFixed(4));
-					} else {
-						console.log('║    ✓ Aspect ratios match - no stretching');
-					}
-					console.log('╚═══════════════════════════════════════════════════════════════╝');
-				}
-			} else {
-				// For 'original-file' (Background), replicate 'object-fit: contain' logic
-				const natW = img.naturalWidth;
-				const natH = img.naturalHeight;
-
-				// Calculate scaling to 'contain' within canvasW/canvasH
-				const scale = Math.min(canvasW / natW, canvasH / natH);
-
-				layerW = natW * scale;
-				layerH = natH * scale;
-
-				// Center it
-				layerX = (canvasW - layerW) / 2;
-				layerY = (canvasH - layerH) / 2;
-			}
-
-			// Calculate "Cut" Bounding Box in CANVAS COORDINATES
-			// Lasso points are 0-1 relative to CANVAS
-			const canvasPoints = points.map(p => ({ x: p.x * canvasW, y: p.y * canvasH }));
-			const minX = Math.floor(Math.min(...canvasPoints.map(p => p.x)));
-			const minY = Math.floor(Math.min(...canvasPoints.map(p => p.y)));
-			const maxX = Math.ceil(Math.max(...canvasPoints.map(p => p.x)));
-			const maxY = Math.ceil(Math.max(...canvasPoints.map(p => p.y)));
-
-			const bboxW = maxX - minX;
-			const bboxH = maxY - minY;
-
-			if (bboxW <= 0 || bboxH <= 0) throw new Error('Invalid selection dimensions');
-
-			// ═══════════════════════════════════════════════════════════════════════════
-			// DEBUG: Log all dimensions to trace stretching issue
-			// ═══════════════════════════════════════════════════════════════════════════
-			console.log('╔═══════════════════════════════════════════════════════════════╗');
-			console.log('║              LASSO CUT DEBUG - DIMENSION TRACE                ║');
-			console.log('╠═══════════════════════════════════════════════════════════════╣');
-			console.log('║ 1. CANVAS (Template Size):');
-			console.log('║    Width:', canvasW, 'Height:', canvasH);
-			console.log('║    Aspect Ratio:', (canvasW / canvasH).toFixed(4));
-			console.log('╠───────────────────────────────────────────────────────────────╣');
-			console.log('║ 2. SOURCE IMAGE (Natural/Original):');
-			console.log('║    Width:', img.naturalWidth, 'Height:', img.naturalHeight);
-			console.log('║    Aspect Ratio:', (img.naturalWidth / img.naturalHeight).toFixed(4));
-			console.log('╠───────────────────────────────────────────────────────────────╣');
-			console.log('║ 3. LAYER DISPLAY (Where it appears on canvas):');
-			console.log('║    Position: x=', layerX, 'y=', layerY);
-			console.log('║    Size: w=', layerW, 'h=', layerH);
-			console.log('║    Aspect Ratio:', (layerW / layerH).toFixed(4));
-			console.log('║    Is Background:', isBackground);
-			console.log('╠───────────────────────────────────────────────────────────────╣');
-			console.log('║ 4. LASSO SELECTION BBOX:');
-			console.log('║    Position: minX=', minX, 'minY=', minY);
-			console.log('║    Size: w=', bboxW, 'h=', bboxH);
-			console.log('║    Aspect Ratio:', (bboxW / bboxH).toFixed(4));
-			console.log('╠───────────────────────────────────────────────────────────────╣');
-			console.log('║ 5. ASPECT RATIO COMPARISON:');
-			console.log('║    Source vs Layer Display:',
-				(img.naturalWidth / img.naturalHeight).toFixed(4), 'vs', (layerW / layerH).toFixed(4),
-				(Math.abs((img.naturalWidth / img.naturalHeight) - (layerW / layerH)) < 0.01) ? '✓ MATCH' : '⚠️ MISMATCH (stretching!)');
-			console.log('╚═══════════════════════════════════════════════════════════════╝');
-
-			// ═══════════════════════════════════════════════════════════════════════════
-			// ROBUST APPROACH: Create a "display canvas" that renders EXACTLY what the
-			// user sees on screen, then cut from that canvas. This handles all object-fit
-			// modes correctly without complex coordinate transformations.
-			// ═══════════════════════════════════════════════════════════════════════════
-
-			// Step 1: Create a full-size "display canvas" at canvas dimensions
-			const displayCanvas = document.createElement('canvas');
-			displayCanvas.width = canvasW;
-			displayCanvas.height = canvasH;
-			const displayCtx = displayCanvas.getContext('2d', { alpha: true });
-			if (!displayCtx) throw new Error('No display context');
-
-			// Step 2: Draw the source image EXACTLY as it appears on screen
-			// - Background: object-fit: contain (centered, aspect-preserved)
-			// - Layers: object-fit: fill (stretched to fill bounds)
-			if (isBackground) {
-				// object-fit: contain - draw at calculated position maintaining aspect ratio
-				displayCtx.drawImage(img, layerX, layerY, layerW, layerH);
-			} else {
-				// object-fit: fill - stretch to fill the layer bounds
-				// The image is stretched to exactly fill (layerX, layerY, layerW, layerH)
-				displayCtx.drawImage(img, layerX, layerY, layerW, layerH);
-			}
-
-			// Step 3: Create the cut canvas at bbox size
-			const cutCanvas = document.createElement('canvas');
-			cutCanvas.width = bboxW;
-			cutCanvas.height = bboxH;
-			const cutCtx = cutCanvas.getContext('2d', { alpha: true, willReadFrequently: true });
-			if (!cutCtx) throw new Error('No cut context');
-
-			// Step 4: Copy the bbox region from display canvas to cut canvas
-			// This is a direct 1:1 pixel copy - no stretching, no transformation
-			cutCtx.drawImage(
-				displayCanvas,
-				minX, minY, bboxW, bboxH,  // Source rectangle from display canvas
-				0, 0, bboxW, bboxH          // Destination (entire cut canvas)
-			);
-
-			console.log('╔═══════════════════════════════════════════════════════════════╗');
-			console.log('║ 6. DISPLAY CANVAS (What user sees):');
-			console.log('║    Size:', displayCanvas.width, 'x', displayCanvas.height);
-			console.log('║    Image drawn at: (', layerX, ',', layerY, ') size:', layerW, 'x', layerH);
-			console.log('╠───────────────────────────────────────────────────────────────╣');
-			console.log('║ 7. CUT CANVAS (Output before mask):');
-			console.log('║    Size:', cutCanvas.width, 'x', cutCanvas.height);
-			console.log('║    Aspect Ratio:', (cutCanvas.width / cutCanvas.height).toFixed(4));
-			console.log('║    Extracted from display at: (', minX, ',', minY, ')');
-			console.log('╚═══════════════════════════════════════════════════════════════╝');
-
-			// --- STEP 2: Convert polygon points to local canvas coordinates ---
-			const localPoints = canvasPoints.map(p => ({
-				x: p.x - minX,
-				y: p.y - minY
-			}));
-
-			// --- STEP 3: Use pixel manipulation for guaranteed transparency ---
-			// This approach manually sets alpha=0 for pixels outside the polygon
-			const imageData = cutCtx.getImageData(0, 0, bboxW, bboxH);
-			const data = imageData.data;
-
-			// Point-in-polygon test using ray casting algorithm
-			function isPointInPolygon(x: number, y: number, polygon: { x: number; y: number }[]): boolean {
-				let inside = false;
-				for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-					const xi = polygon[i].x, yi = polygon[i].y;
-					const xj = polygon[j].x, yj = polygon[j].y;
-
-					if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
-						inside = !inside;
-					}
-				}
-				return inside;
-			}
-
-			// Set alpha to 0 for all pixels outside the polygon
-			for (let y = 0; y < bboxH; y++) {
-				for (let x = 0; x < bboxW; x++) {
-					const idx = (y * bboxW + x) * 4;
-					if (!isPointInPolygon(x, y, localPoints)) {
-						data[idx + 3] = 0; // Set alpha to 0 (fully transparent)
-					}
-				}
-			}
-
-			// Put the modified image data back
-			cutCtx.putImageData(imageData, 0, 0);
-
-			// DEBUG: Verify transparency
-			const cornerAlpha = data[3];
-			console.log('[cutPolygon] Corner pixel alpha (should be 0):', cornerAlpha);
-			const centerIdx = (Math.floor(bboxH / 2) * bboxW + Math.floor(bboxW / 2)) * 4;
-			console.log('[cutPolygon] Center pixel alpha:', data[centerIdx + 3]);
-
-			const cutBlob = await new Promise<Blob | null>(r => cutCanvas.toBlob(r, 'image/png'));
-			if (!cutBlob) throw new Error('Cut blob failed');
-			console.log('[cutPolygon] PNG blob size:', cutBlob.size, 'bytes');
-
-			// ═══════════════════════════════════════════════════════════════════════════
-			// INSTANT FEEDBACK: Create layer with blob URL immediately, upload in background
-			// ═══════════════════════════════════════════════════════════════════════════
-			const blobUrl = URL.createObjectURL(cutBlob);
-			const originLayer = this.layerManager.currentLayers.find(l => l.id === layerId);
-			const originLayerName = originLayer ? originLayer.name : 'Background';
-			const newLayerBounds = { x: minX, y: minY, width: bboxW, height: bboxH };
-
-			console.log('╔═══════════════════════════════════════════════════════════════╗');
-			console.log('║ 8. OUTPUT LAYER (Instant with blob URL):');
-			console.log('║    Bounds: x=', newLayerBounds.x, 'y=', newLayerBounds.y);
-			console.log('║    Size: w=', newLayerBounds.width, 'h=', newLayerBounds.height);
-			console.log('║    Aspect Ratio:', (newLayerBounds.width / newLayerBounds.height).toFixed(4));
-			console.log('║    Blob URL:', blobUrl.substring(0, 40) + '...');
-			console.log('╠───────────────────────────────────────────────────────────────╣');
-			console.log('║ 9. ORIGIN LAYER (Source being cut from):');
-			if (originLayer) {
-				console.log('║    Name:', originLayer.name);
-				console.log('║    Bounds:', originLayer.bounds);
-				console.log('║    ImageUrl:', originLayer.imageUrl?.substring(0, 60) + '...');
-			} else {
-				console.log('║    (Background - no layer object)');
-			}
-			console.log('╚═══════════════════════════════════════════════════════════════╝');
-
-			// 1. Add layer IMMEDIATELY with blob URL for instant feedback
-			const { layer: newLayer, selection } = this.layerManager.createLayerObj(
-				blobUrl,
-				`${originLayerName} (Copy)`,
-				newLayerBounds,
-				this.layerManager.activeSide,
-				this.layerManager.currentLayers.length + 1
-			);
-			newLayer.parentId = undefined;
-			this.layerManager.addLayer(newLayer, selection);
-
-			// 2. Show success toast IMMEDIATELY
-			toast.success('Copied selection to new layer', { id: toastId });
-
-			// 3. Upload in BACKGROUND and update layer URL when done
-			const cutBase64 = await fileToDataUrl(cutBlob);
-			console.log('[cutPolygon] Uploading cut result in background...');
-
-			uploadProcessedImage({ imageBase64: cutBase64, mimeType: 'image/png' })
-				.then((cutUpload) => {
-					if (cutUpload.success && cutUpload.url) {
-						// Update layer with permanent URL
-						console.log('[cutPolygon] Upload complete, updating layer URL:', cutUpload.url.substring(0, 60) + '...');
-						this.layerManager.updateLayerImageUrl(newLayer.id, cutUpload.url);
-
-						// Revoke blob URL to free memory
-						URL.revokeObjectURL(blobUrl);
-
-						// Save to history with permanent URL
-						const currentLayersSnapshot = this.layerManager.currentLayers.map(l => ({
-							imageUrl: l.imageUrl,
-							name: l.name,
-							bounds: l.bounds,
-							width: l.bounds?.width || 0,
-							height: l.bounds?.height || 0,
-							zIndex: l.zIndex,
-							side: l.side
-						}));
-
-						saveHistoryItem({
-							originalUrl: sourceImageUrl,
-							resultUrl: cutUpload.url,
-							action: 'lasso-copy',
-							side: this.layerManager.activeSide as 'front' | 'back',
-							templateId: this.assetData.templateId,
-							layers: currentLayersSnapshot
-						}).then(() => {
-							this.historyManager.load();
-						}).catch(err => {
-							console.error('[cutPolygon] Failed to save history (non-critical):', err);
-						});
-					} else {
-						console.error('[cutPolygon] Background upload failed:', cutUpload.error);
-						toast.warning('Layer created locally. Upload failed - changes may not persist.');
-					}
-				})
-				.catch(err => {
-					console.error('[cutPolygon] Background upload error:', err);
-					toast.warning('Layer created locally. Upload failed - changes may not persist.');
-				});
-
-		} catch (e: any) {
-			console.error('Cut error details:', e);
-			toast.error('Cut failed: ' + e.message, { id: toastId });
-		} finally {
-			this.isProcessing = false;
-		}
-	}
-
-	// --- 5. Set As Main Background ---
-	async setAsMain(layerId: string) {
-		if (this.isProcessing) return;
-
-		const layer = this.layerManager.currentLayers.find((l) => l.id === layerId);
-		if (!layer) return;
-
-		if (!confirm(`Set this layer as the ${this.layerManager.activeSide} background?`)) return;
-
-		this.isProcessing = true;
-		const toastId = toast.loading('Preparing background variants...');
-
-		try {
-			// 1. Fetch the layer image
-			const response = await fetch(layer.imageUrl);
-			if (!response.ok) throw new Error('Failed to fetch layer image');
-			const blob = await response.blob();
-
-			// 2. Generate variants (thumb, preview) client-side
-			toast.loading('Generating thumbnails...', { id: toastId });
-			const { generateBackgroundVariants } = await import('$lib/utils/templateVariants');
-			const variants = await generateBackgroundVariants(blob);
-
-			// 3. Convert blobs to base64 for upload
-			const toBase64 = async (b: Blob): Promise<string> => {
-				const reader = new FileReader();
-				return new Promise((resolve, reject) => {
-					reader.onloadend = () => {
-						const result = reader.result as string;
-						// Remove data URL prefix to get raw base64
-						resolve(result.split(',')[1] || result);
-					};
-					reader.onerror = reject;
-					reader.readAsDataURL(b);
-				});
-			};
-
-			const [fullBase64, thumbBase64, previewBase64] = await Promise.all([
-				toBase64(variants.full),
-				toBase64(variants.thumb),
-				toBase64(variants.preview)
-			]);
-
-			// 4. Upload all variants and update database
-			toast.loading('Uploading variants...', { id: toastId });
-			const { updateTemplateBackgroundWithVariants } = await import(
-				'$lib/remote/templates.update.remote'
-			);
-
-			const result = await updateTemplateBackgroundWithVariants({
-				assetId: this.assetData.id,
-				side: this.layerManager.activeSide,
-				fullBase64,
-				thumbBase64,
-				previewBase64,
-				contentType: blob.type || 'image/png'
-			});
-
-			if (result.success && result.urls) {
-				toast.success('Background updated with thumbnails', { id: toastId });
-				return result.urls.fullUrl;
-			} else {
-				throw new Error(result.error || 'Failed to update background');
-			}
-		} catch (e) {
-			console.error('setAsMain error:', e);
-			toast.error(e instanceof Error ? e.message : 'Failed to set background', { id: toastId });
-		} finally {
-			this.isProcessing = false;
-		}
-	}
-
-	// --- Helper: SynthID Removal ---
-	private async removeWatermarkLogic(url: string) {
-		const res = await fetch(url);
-		const blob = await res.blob();
-		const file = new File([blob], 'temp.png', { type: 'image/png' });
-		const imageData = await fileToImageData(file);
-		const processed = processImageLSB(imageData, undefined, 'high');
-		const processedBlob = await imageDataToBlob(processed.imageData, 'png');
-		const base64 = await fileToDataUrl(processedBlob);
-		const upload = await uploadProcessedImage({ imageBase64: base64, mimeType: 'image/png' });
-		return upload.url || url;
-	}
-
-	// --- 6. Handle Crop ---
-	// Crop is a fast, synchronous operation - no need for optimistic updates
-	async handleCrop(
-		layerId: string,
-		croppedImageUrl: string,
-		originalLayerName: string,
-		originalImageUrl: string
-	) {
-		const toastId = toast.loading('Processing crop...');
-		try {
-			// 1. Upload the cropped image
-			const response = await fetch(croppedImageUrl);
-			const blob = await response.blob();
-			const base64 = await fileToDataUrl(blob);
-
-			const uploadRes = await uploadProcessedImage({
-				imageBase64: base64,
-				mimeType: blob.type
-			});
-
-			if (!uploadRes.success || !uploadRes.url) {
-				throw new Error(uploadRes.error || 'Failed to upload cropped image');
-			}
-
-			const newImageUrl = uploadRes.url;
-
-			// 3. Save to history directly (crop is synchronous, no need for optimistic update)
-			await saveHistoryItem({
-				originalUrl: originalImageUrl || croppedImageUrl,
-				resultUrl: newImageUrl,
-				action: 'crop',
-				side: this.layerManager.activeSide,
-				templateId: this.assetData.templateId
-			});
-
-			// 4. Refresh history to show the new crop item
-			await this.historyManager.load();
-
-			// 5. Add the cropped image as a layer
-			const layerName =
-				layerId === 'original-file' ? `Cropped Original` : `Cropped ${originalLayerName}`;
-
-			const { layer, selection } = this.layerManager.createLayerObj(
-				newImageUrl,
-				layerName,
-				{
-					x: 0,
-					y: 0,
-					width: this.assetData.width,
-					height: this.assetData.height
-				},
-				this.layerManager.activeSide,
-				this.layerManager.currentLayers.length
-			);
-
-			this.layerManager.addLayer(layer, selection);
-			toast.success('Crop applied', { id: toastId });
-			return true;
-		} catch (e: any) {
-			console.error('Crop error:', e);
-			toast.error(e.message || 'Failed to apply crop', { id: toastId });
-			return false;
-		}
-	}
-	// --- 7. Selection Actions (Phase 3) ---
-
-	async fillSelection(points: NormalizedPoint[], color: string) {
-		if (this.isProcessing) return;
-		if (points.length < 3) return;
-
-		this.isProcessing = true;
-		const toastId = toast.loading('Filling selection...');
-
-		try {
-			const canvasW = this.assetData.width;
-			const canvasH = this.assetData.height;
-
-			const canvas = document.createElement('canvas');
-			canvas.width = canvasW;
-			canvas.height = canvasH;
-			const ctx = canvas.getContext('2d');
-			if (!ctx) throw new Error('No context');
-
-			// Draw shape
-			ctx.beginPath();
-			points.forEach((p, i) => {
-				const x = p.x * canvasW;
-				const y = p.y * canvasH;
-				if (i === 0) ctx.moveTo(x, y);
-				else ctx.lineTo(x, y);
-			});
-			ctx.closePath();
-			ctx.fillStyle = color;
-			ctx.fill();
-
-			// Calculate bounds
-			const xs = points.map((p) => p.x * canvasW);
-			const ys = points.map((p) => p.y * canvasH);
-			const minX = Math.floor(Math.min(...xs));
-			const minY = Math.floor(Math.min(...ys));
-			const maxX = Math.ceil(Math.max(...xs));
-			const maxY = Math.ceil(Math.max(...ys));
-			const width = maxX - minX;
-			const height = maxY - minY;
-
-			// Convert to blob and upload
-			const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/png'));
-			if (!blob) throw new Error('Blob creation failed');
-			const base64 = await fileToDataUrl(blob);
-
-			const upload = await uploadProcessedImage({ imageBase64: base64, mimeType: 'image/png' });
-
-			if (upload.success && upload.url) {
-				const { layer, selection } = this.layerManager.createLayerObj(
-					upload.url,
-					'Fill Layer',
-					{ x: 0, y: 0, width: canvasW, height: canvasH }, // Full size transparent with fill
-					this.layerManager.activeSide,
-					this.layerManager.currentLayers.length
-				);
-				// Override bounds to efficient size if we wanted, but keeping simple for now
-				// Actually, let's use the bounds we calculated for cleaner metadata
-				layer.bounds = { x: minX, y: minY, width, height };
-				
-				// BUT: The image created is full canvas size. 
-				// To support optimized bounds, we should have cropped the canvas.
-				// For now, let's stick to full canvas to avoid alignment issues 
-				// unless we implement the crop logic here. 
-				// Let's stick to full canvas for reliability first, then optimize.
-				layer.bounds = { x: 0, y: 0, width: canvasW, height: canvasH };
-
-				this.layerManager.addLayer(layer, selection);
-				this.historyManager.addLocalEntry('fill', layer.id);
-				toast.success('Filled selection created', { id: toastId });
-			} else {
-				throw new Error('Upload failed');
-			}
-		} catch (e: any) {
-			console.error('Fill error:', e);
-			toast.error('Fill failed: ' + e.message, { id: toastId });
-		} finally {
-			this.isProcessing = false;
-		}
-	}
-
-	async deleteSelection(layerId: string, points: NormalizedPoint[]) {
-		if (this.isProcessing) return;
-		if (!layerId || points.length < 3) return;
-
-		this.isProcessing = true;
-		const toastId = toast.loading('Creating mask...');
-
-		try {
-			// Phase 6 Precursor: Non-destructive masking
-			// We must generate the mask RELATIVE TO THE LAYER'S BOUNDS
-			// because the mask is applied to the <img> element which matches the layer's bounds.
-
-			const layer = this.layerManager.currentLayers.find((l) => l.id === layerId);
-			if (!layer) throw new Error('Layer not found');
-
-			// Determine layer bounds (in canvas pixels)
-			// If layer has no bounds (e.g. original background might not?), assume full canvas
-			const canvasW = this.assetData.width;
-			const canvasH = this.assetData.height;
-			
-			const layerX = layer.bounds?.x ?? 0;
-			const layerY = layer.bounds?.y ?? 0;
-			const layerW = layer.bounds?.width ?? canvasW;
-			const layerH = layer.bounds?.height ?? canvasH;
-
-			// Check for existing mask
-			const existingMask = this.layerManager.getMask(layerId);
-			
-			const canvas = document.createElement('canvas');
-			canvas.width = layerW;
-			canvas.height = layerH;
-			const ctx = canvas.getContext('2d');
-			if (!ctx) throw new Error('No context');
-
-			if (existingMask) {
-				// If existing mask exists, draw it first
-				// We assume existing mask matches layer bounds (robustness assumption)
-				const img = new Image();
-				await new Promise((resolve) => {
-					img.onload = resolve;
-					img.src = existingMask.maskData;
-				});
-				ctx.drawImage(img, 0, 0, layerW, layerH);
-			} else {
-				// Initialize as full opaque (white)
-				ctx.fillStyle = 'white';
-				ctx.fillRect(0, 0, layerW, layerH);
-			}
-
-			// Draw the ERASE polygon
-			// We must translate separate canvas points to layer-local coordinates
-			// Point (px) = Point (normalized) * CanvasSize
-			// LocalPoint (px) = Point (px) - LayerOffset
-			
-			ctx.globalCompositeOperation = 'destination-out';
-			
-			ctx.beginPath();
-			points.forEach((p, i) => {
-				const globalX = p.x * canvasW;
-				const globalY = p.y * canvasH;
-				const localX = globalX - layerX;
-				const localY = globalY - layerY;
-				
-				if (i === 0) ctx.moveTo(localX, localY);
-				else ctx.lineTo(localX, localY);
-			});
-			ctx.closePath();
-			ctx.fillStyle = 'black'; 
-			ctx.fill();
-
-			// Export
-			const base64 = canvas.toDataURL('image/png');
-			
-			this.layerManager.setMask(layerId, base64, {
-				x: layerX, y: layerY, width: layerW, height: layerH
-			});
-
-			toast.success('Area erased', { id: toastId });
-			this.historyManager.addLocalEntry('erase', layerId);
-
-		} catch (e: any) {
-			console.error('Delete error:', e);
-			toast.error('Delete failed: ' + e.message, { id: toastId });
-		} finally {
-			this.isProcessing = false;
-		}
-	}
-	
-	// --- 8. Background Removal (Manual) ---
-	async removeLayerBackground(layerId: string) {
-		if (this.isProcessing) return;
-		
-		const layer = this.layerManager.currentLayers.find(l => l.id === layerId);
-		if (!layer) return;
-
-		this.isProcessing = true;
-		const toastId = toast.loading('Removing background...');
-
-		try {
-			// 1. Fetch current image
-			const response = await fetch(layer.imageUrl);
-			const blob = await response.blob();
-			
-			// 2. Call cloud API
-			const processedBlob = await removeBackgroundCloud(blob);
-			
-			// 3. Convert to base64 and Upload
-			const base64 = await fileToDataUrl(processedBlob);
-			const upload = await uploadProcessedImage({ imageBase64: base64, mimeType: 'image/png' });
-			
-			if (upload.success && upload.url) {
-				// 4. Update layer
-				this.layerManager.updateLayerImageUrl(layerId, upload.url);
-				
-				// 5. History
-				await saveHistoryItem({
-					originalUrl: layer.imageUrl,
-					resultUrl: upload.url,
-					action: 'remove-bg', 
-					side: this.layerManager.activeSide,
-					templateId: this.assetData.templateId
-				});
-				this.historyManager.load();
-				
-				toast.success('Background removed', { id: toastId });
-			} else {
-				throw new Error(upload.error || 'Upload failed');
-			}
-		} catch (e: any) {
-			console.error('BG Remove error:', e);
-			toast.error('BG removal failed: ' + e.message, { id: toastId });
-		} finally {
-			this.isProcessing = false;
-		}
-	}
+    isProcessing = $state(false);
+    processingLayerId = $state<string | null>(null);
+
+    constructor(
+        private layerManager: LayerManager,
+        private historyManager: HistoryManager,
+        private getAssetData: () => { id: string; width: number; height: number; templateId?: string }
+    ) {}
+
+    private get assetData() {
+        return this.getAssetData();
+    }
+
+    /**
+     * Optimization: Centralized execution wrapper to reduce boilerplate.
+     * Handles isProcessing state, toasts, and standard error catching.
+     */
+    private async executeTask<T>(
+        label: string, 
+        task: (toastId: string | number) => Promise<T>
+    ): Promise<T | undefined> {
+        if (this.isProcessing) {
+            toast.warning('Another operation is in progress');
+            return undefined;
+        }
+
+        this.isProcessing = true;
+        const toastId = toast.loading(label);
+
+        try {
+            return await task(toastId);
+        } catch (e: any) {
+            console.error(`[ImageProcessor] Error in ${label}:`, e);
+            toast.error(e.message || 'Operation failed', { id: toastId });
+            return undefined;
+        } finally {
+            this.isProcessing = false;
+        }
+    }
+
+    // --- 1. Decompose ---
+    async decompose(params: {
+        imageUrl: string;
+        numLayers: number;
+        prompt?: string;
+        negativePrompt?: string;
+        settings: any;
+    }) {
+        return this.executeTask('Queuing decomposition...', async (toastId) => {
+            // 1. Optimistic Update
+            const tempId = this.historyManager.addOptimisticItem(
+                'fal-ai-decompose',
+                'Qwen-Image-Layered',
+                params.imageUrl,
+                this.layerManager.activeSide
+            );
+
+            const result = await decomposeImage({
+                imageUrl: params.imageUrl,
+                numLayers: params.numLayers,
+                prompt: params.prompt,
+                negative_prompt: params.negativePrompt,
+                side: this.layerManager.activeSide,
+                templateId: this.assetData.templateId,
+                ...params.settings
+            });
+
+            if (!result.success || !result.jobId) {
+                throw new Error(result.error || 'Failed to queue decomposition');
+            }
+
+            this.historyManager.updateOptimisticId(tempId, result.jobId);
+
+            if (params.imageUrl.includes('original')) {
+                this.layerManager.showOriginalLayer = false;
+            }
+
+            toast.success('Decomposition queued! Processing in background...', { id: toastId });
+            return true;
+        });
+    }
+
+    // --- 2. Upscale ---
+    async upscaleLayer(
+        layer: DecomposedLayer | { imageUrl: string; id: string },
+        model: string,
+        removeWatermark = false
+    ) {
+        return this.executeTask('Queuing upscale task...', async (toastId) => {
+            let targetUrl = layer.imageUrl;
+
+            if (removeWatermark) {
+                toast.loading('Removing SynthID...', { id: toastId });
+                targetUrl = await this.removeWatermarkLogic(targetUrl);
+            }
+
+            const tempId = this.historyManager.addOptimisticItem(
+                `fal-ai-upscale-${model}`,
+                model,
+                layer.imageUrl,
+                this.layerManager.activeSide
+            );
+
+            const result = await upscaleImagePreview({
+                imageUrl: targetUrl,
+                model: model as any,
+                side: this.layerManager.activeSide,
+                templateId: this.assetData.templateId || null
+            });
+
+            if (!result.success || !result.jobId) {
+                throw new Error(result.error || 'Failed to queue upscale');
+            }
+
+            this.historyManager.updateOptimisticId(tempId, result.jobId);
+            toast.success('Upscale queued! Processing in background...', { id: toastId });
+            return true;
+        });
+    }
+
+    // --- 3. Remove Element ---
+    async removeElement(layer: DecomposedLayer, prompt: string) {
+        return this.executeTask(`Queuing removal of "${prompt}"...`, async (toastId) => {
+            const tempId = this.historyManager.addOptimisticItem(
+                'fal-ai-remove',
+                'qwen-image-edit',
+                layer.imageUrl,
+                this.layerManager.activeSide
+            );
+
+            const result = await removeElementFromLayer({
+                imageUrl: layer.imageUrl,
+                prompt,
+                imageWidth: this.assetData.width,
+                imageHeight: this.assetData.height,
+                side: (layer as any).side || this.layerManager.activeSide,
+                templateId: this.assetData.templateId || null
+            });
+
+            if (!result.success || !result.jobId) {
+                throw new Error(result.error || 'Failed to queue removal');
+            }
+
+            this.historyManager.updateOptimisticId(tempId, result.jobId);
+            toast.success('Removal queued! Processing in background...', { id: toastId });
+            return true;
+        });
+    }
+
+    // --- 4. Client-Side Merge ---
+    async mergeSelectedLayers() {
+        const ids = Array.from(this.layerManager.selectedForMerge);
+        const layers = this.layerManager.currentLayers
+            .filter((l) => ids.includes(l.id))
+            .sort((a, b) => a.zIndex - b.zIndex);
+
+        if (layers.length < 2) return;
+
+        return this.executeTask('Merging layers...', async (toastId) => {
+            const canvas = document.createElement('canvas');
+            canvas.width = this.assetData.width;
+            canvas.height = this.assetData.height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) throw new Error('No context');
+
+            // Optimization: Load images in parallel using Promise.all
+            const imagePromises = layers.map(l => new Promise<HTMLImageElement>((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = getProxiedUrl(l.imageUrl) || l.imageUrl;
+            }));
+
+            const images = await Promise.all(imagePromises);
+
+            // Draw in sequence to maintain z-index order
+            images.forEach(img => ctx.drawImage(img, 0, 0, canvas.width, canvas.height));
+
+            const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/png'));
+            if (!blob) throw new Error('Canvas blob failed');
+            
+            const base64 = await fileToDataUrl(blob);
+            const upload = await uploadProcessedImage({ imageBase64: base64, mimeType: 'image/png' });
+
+            if (upload.success && upload.url) {
+                ids.forEach((id) => this.layerManager.removeLayer(id));
+
+                const { layer, selection } = this.layerManager.createLayerObj(
+                    upload.url,
+                    `Merged (${ids.length})`,
+                    { x: 0, y: 0, width: canvas.width, height: canvas.height },
+                    this.layerManager.activeSide,
+                    0
+                );
+                this.layerManager.addLayer(layer, selection);
+                this.layerManager.mergeMode = false;
+                this.layerManager.selectedForMerge.clear();
+                toast.success('Layers merged', { id: toastId });
+            }
+        });
+    }
+
+    // --- 4.5. Lasso Cut (Heavily Optimized) ---
+    async cutPolygon(layerId: string | null, points: { x: number; y: number }[], sourceImageUrl: string) {
+        if (!layerId || points.length < 3 || !sourceImageUrl) return;
+
+        return this.executeTask('Cutting selection...', async (toastId) => {
+            // 1. Load source image
+            const proxiedUrl = getProxiedUrl(sourceImageUrl) || sourceImageUrl;
+            const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+                const i = new Image();
+                i.crossOrigin = 'anonymous';
+                i.onload = () => resolve(i);
+                i.onerror = reject;
+                i.src = proxiedUrl;
+            });
+
+            const canvasW = this.assetData.width;
+            const canvasH = this.assetData.height;
+            const isBackground = layerId === 'original-file';
+
+            // 2. Determine Display Geometry (Exact "WYSIWYG" calculation)
+            let layerX = 0, layerY = 0, layerW = canvasW, layerH = canvasH;
+
+            if (!isBackground) {
+                const layer = this.layerManager.currentLayers.find(l => l.id === layerId);
+                if (layer && layer.bounds) {
+                    layerX = layer.bounds.x;
+                    layerY = layer.bounds.y;
+                    layerW = layer.bounds.width;
+                    layerH = layer.bounds.height;
+                }
+            } else {
+                // Background uses object-fit: contain logic
+                const scale = Math.min(canvasW / img.naturalWidth, canvasH / img.naturalHeight);
+                layerW = img.naturalWidth * scale;
+                layerH = img.naturalHeight * scale;
+                layerX = (canvasW - layerW) / 2;
+                layerY = (canvasH - layerH) / 2;
+            }
+
+            // 3. Render "Display Canvas" 
+            // This represents exactly what the user sees on screen.
+            const displayCanvas = document.createElement('canvas');
+            displayCanvas.width = canvasW;
+            displayCanvas.height = canvasH;
+            const displayCtx = displayCanvas.getContext('2d', { alpha: true });
+            if (!displayCtx) throw new Error('No context');
+
+            // Draw with object-fit logic applied
+            displayCtx.drawImage(img, layerX, layerY, layerW, layerH);
+
+            // 4. Calculate Bounding Box of Lasso
+            const canvasPoints = points.map(p => ({ x: p.x * canvasW, y: p.y * canvasH }));
+            const minX = Math.floor(Math.min(...canvasPoints.map(p => p.x)));
+            const minY = Math.floor(Math.min(...canvasPoints.map(p => p.y)));
+            const maxX = Math.ceil(Math.max(...canvasPoints.map(p => p.x)));
+            const maxY = Math.ceil(Math.max(...canvasPoints.map(p => p.y)));
+            const bboxW = maxX - minX;
+            const bboxH = maxY - minY;
+
+            if (bboxW <= 0 || bboxH <= 0) throw new Error('Invalid selection area');
+
+            // 5. Create Cut Canvas (Optimized: Using Clip instead of Pixel Iteration)
+            const cutCanvas = document.createElement('canvas');
+            cutCanvas.width = bboxW;
+            cutCanvas.height = bboxH;
+            const cutCtx = cutCanvas.getContext('2d');
+            if (!cutCtx) throw new Error('No cut context');
+
+            // Optimization: Translate context so (0,0) is the top-left of the bounding box
+            cutCtx.translate(-minX, -minY);
+
+            // Draw Polygon Path
+            cutCtx.beginPath();
+            canvasPoints.forEach((p, i) => {
+                if (i === 0) cutCtx.moveTo(p.x, p.y);
+                else cutCtx.lineTo(p.x, p.y);
+            });
+            cutCtx.closePath();
+
+            // Hardware Accelerated Masking
+            // This replaces the expensive JS pixel loop
+            cutCtx.clip();
+
+            // Draw the display canvas into the clipped area
+            // We draw the full display canvas, but only the clipped polygon part appears
+            cutCtx.drawImage(displayCanvas, 0, 0);
+
+            // 6. Generate Blob and Handle Result
+            const cutBlob = await new Promise<Blob | null>(r => cutCanvas.toBlob(r, 'image/png'));
+            if (!cutBlob) throw new Error('Cut blob creation failed');
+
+            const blobUrl = URL.createObjectURL(cutBlob);
+            const originLayer = this.layerManager.currentLayers.find(l => l.id === layerId);
+            const originName = originLayer ? originLayer.name : 'Background';
+            
+            // Add layer immediately for UI responsiveness
+            const { layer: newLayer, selection } = this.layerManager.createLayerObj(
+                blobUrl,
+                `${originName} (Copy)`,
+                { x: minX, y: minY, width: bboxW, height: bboxH },
+                this.layerManager.activeSide,
+                this.layerManager.currentLayers.length + 1
+            );
+            this.layerManager.addLayer(newLayer, selection);
+            toast.success('Copied selection', { id: toastId });
+
+            // Background Upload
+            const cutBase64 = await fileToDataUrl(cutBlob);
+            uploadProcessedImage({ imageBase64: cutBase64, mimeType: 'image/png' })
+                .then((res) => {
+                    if (res.success && res.url) {
+                        this.layerManager.updateLayerImageUrl(newLayer.id, res.url);
+                        URL.revokeObjectURL(blobUrl); // Cleanup memory
+                        
+                        // History
+                        saveHistoryItem({
+                            originalUrl: sourceImageUrl,
+                            resultUrl: res.url,
+                            action: 'lasso-copy',
+                            side: this.layerManager.activeSide,
+                            templateId: this.assetData.templateId
+                        }).then(() => this.historyManager.load());
+                    }
+                })
+                .catch(err => console.error('Background upload failed', err));
+        });
+    }
+
+    // --- 5. Set As Main Background ---
+    async setAsMain(layerId: string) {
+        const layer = this.layerManager.currentLayers.find((l) => l.id === layerId);
+        if (!layer) return;
+
+        if (!confirm(`Set this layer as the ${this.layerManager.activeSide} background?`)) return;
+
+        return this.executeTask('Updating background...', async (toastId) => {
+            const proxiedUrl = getProxiedUrl(layer.imageUrl) || layer.imageUrl;
+            const response = await fetch(proxiedUrl);
+            const blob = await response.blob();
+
+            const { generateBackgroundVariants } = await import('$lib/utils/templateVariants');
+            const variants = await generateBackgroundVariants(blob);
+
+            const toBase64 = (b: Blob) => fileToDataUrl(b).then(s => s.split(',')[1] || s);
+
+            const [fullBase64, thumbBase64, previewBase64] = await Promise.all([
+                toBase64(variants.full),
+                toBase64(variants.thumb),
+                toBase64(variants.preview)
+            ]);
+
+            const { updateTemplateBackgroundWithVariants } = await import('$lib/remote/templates.update.remote');
+
+            const result = await updateTemplateBackgroundWithVariants({
+                assetId: this.assetData.id,
+                side: this.layerManager.activeSide,
+                fullBase64,
+                thumbBase64,
+                previewBase64,
+                contentType: blob.type || 'image/png'
+            });
+
+            if (result.success && result.urls) {
+                toast.success('Background updated', { id: toastId });
+                return result.urls.fullUrl;
+            }
+            throw new Error(result.error || 'Failed to update background');
+        });
+    }
+
+    // --- Helper: SynthID Removal ---
+    private async removeWatermarkLogic(url: string) {
+        const res = await fetch(url);
+        const blob = await res.blob();
+        const file = new File([blob], 'temp.png', { type: 'image/png' });
+        const imageData = await fileToImageData(file);
+        const processed = processImageLSB(imageData, undefined, 'high');
+        const processedBlob = await imageDataToBlob(processed.imageData, 'png');
+        const base64 = await fileToDataUrl(processedBlob);
+        const upload = await uploadProcessedImage({ imageBase64: base64, mimeType: 'image/png' });
+        return upload.url || url;
+    }
+
+    // --- 6. Handle Crop ---
+    async handleCrop(layerId: string, croppedImageUrl: string, originalLayerName: string, originalImageUrl: string) {
+        const toastId = toast.loading('Processing crop...');
+        try {
+            const proxiedUrl = getProxiedUrl(croppedImageUrl) || croppedImageUrl;
+            const response = await fetch(proxiedUrl);
+            const blob = await response.blob();
+            const base64 = await fileToDataUrl(blob);
+
+            const uploadRes = await uploadProcessedImage({ imageBase64: base64, mimeType: blob.type });
+
+            if (!uploadRes.success || !uploadRes.url) {
+                throw new Error(uploadRes.error || 'Failed to upload cropped image');
+            }
+
+            // Cleanup local object URL if it was one
+            if (croppedImageUrl.startsWith('blob:')) URL.revokeObjectURL(croppedImageUrl);
+
+            const newImageUrl = uploadRes.url;
+
+            await saveHistoryItem({
+                originalUrl: originalImageUrl || croppedImageUrl,
+                resultUrl: newImageUrl,
+                action: 'crop',
+                side: this.layerManager.activeSide,
+                templateId: this.assetData.templateId
+            });
+
+            await this.historyManager.load();
+
+            const layerName = layerId === 'original-file' ? `Cropped Original` : `Cropped ${originalLayerName}`;
+            const { layer, selection } = this.layerManager.createLayerObj(
+                newImageUrl,
+                layerName,
+                { x: 0, y: 0, width: this.assetData.width, height: this.assetData.height },
+                this.layerManager.activeSide,
+                this.layerManager.currentLayers.length
+            );
+
+            this.layerManager.addLayer(layer, selection);
+            toast.success('Crop applied', { id: toastId });
+            return true;
+        } catch (e: any) {
+            console.error('Crop error:', e);
+            toast.error(e.message || 'Failed to apply crop', { id: toastId });
+            return false;
+        }
+    }
+
+    // --- 7. Selection Actions ---
+
+    async fillSelection(points: NormalizedPoint[], color: string) {
+        if (points.length < 3) return;
+
+        return this.executeTask('Filling selection...', async (toastId) => {
+            const canvasW = this.assetData.width;
+            const canvasH = this.assetData.height;
+
+            const canvas = document.createElement('canvas');
+            canvas.width = canvasW;
+            canvas.height = canvasH;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) throw new Error('No context');
+
+            ctx.beginPath();
+            points.forEach((p, i) => {
+                const x = p.x * canvasW;
+                const y = p.y * canvasH;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.closePath();
+            ctx.fillStyle = color;
+            ctx.fill();
+
+            // Calculate efficient bounds for metadata
+            const xs = points.map((p) => p.x * canvasW);
+            const ys = points.map((p) => p.y * canvasH);
+            const minX = Math.floor(Math.min(...xs));
+            const minY = Math.floor(Math.min(...ys));
+            const width = Math.ceil(Math.max(...xs)) - minX;
+            const height = Math.ceil(Math.max(...ys)) - minY;
+
+            const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/png'));
+            if (!blob) throw new Error('Blob failed');
+            const base64 = await fileToDataUrl(blob);
+
+            const upload = await uploadProcessedImage({ imageBase64: base64, mimeType: 'image/png' });
+
+            if (upload.success && upload.url) {
+                const { layer, selection } = this.layerManager.createLayerObj(
+                    upload.url,
+                    'Fill Layer',
+                    { x: 0, y: 0, width: canvasW, height: canvasH },
+                    this.layerManager.activeSide,
+                    this.layerManager.currentLayers.length
+                );
+                
+                // Keep bounds roughly accurate even if image is full canvas
+                layer.bounds = { x: 0, y: 0, width: canvasW, height: canvasH }; 
+
+                this.layerManager.addLayer(layer, selection);
+                this.historyManager.addLocalEntry('fill', layer.id);
+                toast.success('Filled selection created', { id: toastId });
+            }
+        });
+    }
+
+    async deleteSelection(layerId: string, points: NormalizedPoint[]) {
+        if (!layerId || points.length < 3) return;
+
+        return this.executeTask('Creating mask...', async (toastId) => {
+            const layer = this.layerManager.currentLayers.find((l) => l.id === layerId);
+            if (!layer) throw new Error('Layer not found');
+
+            const canvasW = this.assetData.width;
+            const canvasH = this.assetData.height;
+            const layerX = layer.bounds?.x ?? 0;
+            const layerY = layer.bounds?.y ?? 0;
+            const layerW = layer.bounds?.width ?? canvasW;
+            const layerH = layer.bounds?.height ?? canvasH;
+
+            const existingMask = this.layerManager.getMask(layerId);
+            const canvas = document.createElement('canvas');
+            canvas.width = layerW;
+            canvas.height = layerH;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) throw new Error('No context');
+
+            if (existingMask) {
+                const img = new Image();
+                await new Promise((resolve) => {
+                    img.onload = resolve;
+                    img.src = existingMask.maskData;
+                });
+                ctx.drawImage(img, 0, 0, layerW, layerH);
+            } else {
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, 0, layerW, layerH);
+            }
+
+            // Draw erase polygon
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.beginPath();
+            points.forEach((p, i) => {
+                const globalX = p.x * canvasW;
+                const globalY = p.y * canvasH;
+                const localX = globalX - layerX;
+                const localY = globalY - layerY;
+                if (i === 0) ctx.moveTo(localX, localY);
+                else ctx.lineTo(localX, localY);
+            });
+            ctx.closePath();
+            ctx.fillStyle = 'black'; 
+            ctx.fill();
+
+            const base64 = canvas.toDataURL('image/png');
+            this.layerManager.setMask(layerId, base64, {
+                x: layerX, y: layerY, width: layerW, height: layerH
+            });
+
+            toast.success('Area erased', { id: toastId });
+            this.historyManager.addLocalEntry('erase', layerId);
+        });
+    }
+    
+    // --- 8. Background Removal ---
+    async removeLayerBackground(layerId: string) {
+        const layer = this.layerManager.currentLayers.find(l => l.id === layerId);
+        if (!layer) return;
+
+        return this.executeTask('Removing background...', async (toastId) => {
+            const proxiedUrl = getProxiedUrl(layer.imageUrl) || layer.imageUrl;
+            const response = await fetch(proxiedUrl);
+            const blob = await response.blob();
+            
+            const processedBlob = await removeBackgroundCloud(blob);
+            const base64 = await fileToDataUrl(processedBlob);
+            const upload = await uploadProcessedImage({ imageBase64: base64, mimeType: 'image/png' });
+            
+            if (upload.success && upload.url) {
+                this.layerManager.updateLayerImageUrl(layerId, upload.url);
+                
+                await saveHistoryItem({
+                    originalUrl: layer.imageUrl,
+                    resultUrl: upload.url,
+                    action: 'remove-bg', 
+                    side: this.layerManager.activeSide,
+                    templateId: this.assetData.templateId
+                });
+                this.historyManager.load();
+                toast.success('Background removed', { id: toastId });
+            } else {
+                throw new Error(upload.error || 'Upload failed');
+            }
+        });
+    }
 }

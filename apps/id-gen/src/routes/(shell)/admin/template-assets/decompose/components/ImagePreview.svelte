@@ -19,6 +19,7 @@
 	import DrawingCanvas from './DrawingCanvas.svelte';
 	import BrushCursor from './BrushCursor.svelte';
 	import EyedropperCursor from './EyedropperCursor.svelte';
+	import StaticElementAlert from './StaticElementAlert.svelte';
 	import type { ToolName, NormalizedPoint } from '$lib/logic/tools';
 	import { getProxiedUrl } from '$lib/utils/storage';
 
@@ -49,7 +50,8 @@
 		templateId,
 		onToolChange,
 		onDuplicate,
-		onSelectLayer
+		onSelectLayer,
+		onConvertStaticElement
 	}: {
 		currentImageUrl: string | null;
 		currentLayers: DecomposedLayer[];
@@ -76,7 +78,12 @@
 		onToolChange?: (tool: ToolName) => void;
 		onDuplicate?: () => void;
 		onSelectLayer?: (layerId: string | null, addToSelection?: boolean) => void;
+		onConvertStaticElement?: (layerId: string) => Promise<void>;
 	} = $props();
+
+	// Static Element Alert state
+	let showStaticElementAlert = $state(false);
+	let pendingStaticElementLayerId = $state<string | null>(null);
 
 	// Tool instances
 	const lassoTool = new LassoTool();
@@ -129,13 +136,17 @@
 		}
 
 		// 2. Add existing decomposed layers (shifted to start at z-index 1)
+		// Exception: background-layer should stay at z-index 0 with isBackground true
 		if (currentLayers) {
 			layers.push(
-				...currentLayers.map((l) => ({
-					...l,
-					zIndex: (l.zIndex || 0) + 1,
-					isBackground: false
-				}))
+				...currentLayers.map((l) => {
+					const isBgLayer = l.id === 'background-layer';
+					return {
+						...l,
+						zIndex: isBgLayer ? 0 : (l.zIndex || 0) + 1,
+						isBackground: isBgLayer ? true : false
+					};
+				})
 			);
 		}
 
@@ -376,8 +387,25 @@
 			canvasElement: drawingCanvasElement,
 			canvasContext: drawingContext ?? undefined,
 			undoManager,
-			templateId
+			templateId,
+			originalImageUrl: currentImageUrl || undefined
 		};
+
+		// Static Element Lock: Block non-move tools on static element layers
+		const effectiveLayerId = nextLayerId || selectedLayerId;
+		if (
+			activeTool &&
+			activeTool !== 'move' &&
+			activeTool !== 'eyedropper' &&
+			effectiveLayerId &&
+			effectiveLayerId !== 'original-file' &&
+			layerManager.isStaticElement(effectiveLayerId)
+		) {
+			// Show alert dialog and block tool action
+			pendingStaticElementLayerId = effectiveLayerId;
+			showStaticElementAlert = true;
+			return;
+		}
 
 		if (activeTool === 'move') {
 			// If we just selected a new layer, ensure the move tool context uses it.
@@ -489,7 +517,8 @@
 			canvasElement: drawingCanvasElement,
 			canvasContext: drawingContext ?? undefined,
 			undoManager,
-			templateId
+			templateId,
+			originalImageUrl: currentImageUrl || undefined
 		};
 
 		if (activeTool === 'move') {
@@ -529,7 +558,8 @@
 			canvasElement: drawingCanvasElement,
 			canvasContext: drawingContext ?? undefined,
 			undoManager,
-			templateId
+			templateId,
+			originalImageUrl: currentImageUrl || undefined
 		};
 
 		if (activeTool === 'move') {
@@ -721,7 +751,7 @@
 					{#each renderedLayers as layer, idx (layer.id)}
 						{@const selection = layerSelections.get(layer.id)}
 						{@const mask = masks.get(layer.id)}
-						{@const isVisible = layer.isBackground ? true : (selection?.included ?? false)}
+						{@const isVisible = layer.id === 'original-bg' ? true : (selection?.included ?? false)}
 						{@const hasBounds = layer.bounds && layer.bounds.width > 0 && layer.bounds.height > 0}
 						{@const boundsX = layer.bounds?.x || 0}
 						{@const boundsY = layer.bounds?.y || 0}
@@ -731,7 +761,7 @@
 						{@const cssTop = hasBounds ? (boundsY / heightPixels) * 100 : 0}
 						{@const cssWidth = hasBounds ? (boundsW / widthPixels) * 100 : 100}
 						{@const cssHeight = hasBounds ? (boundsH / heightPixels) * 100 : 100}
-						{@const objectFit = layer.isBackground ? 'contain' : 'fill'}
+						{@const objectFit = 'fill'}
 						<!-- Layer with explicit transparent background for PNG transparency -->
 						<!-- Using object-contain to preserve PNG aspect ratio and transparency -->
 						<img
@@ -829,6 +859,20 @@
 		gridSize={11}
 	/>
 {/if}
+
+<!-- Static Element Alert Dialog -->
+<StaticElementAlert
+	bind:open={showStaticElementAlert}
+	onConvert={async () => {
+		if (pendingStaticElementLayerId && onConvertStaticElement) {
+			await onConvertStaticElement(pendingStaticElementLayerId);
+		}
+		pendingStaticElementLayerId = null;
+	}}
+	onCancel={() => {
+		pendingStaticElementLayerId = null;
+	}}
+/>
 
 <style>
 	/* Glowing pulse animation for selected layer */

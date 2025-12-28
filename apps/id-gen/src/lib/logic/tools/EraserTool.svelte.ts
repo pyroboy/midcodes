@@ -61,19 +61,42 @@ export class EraserTool extends DrawingTool implements CanvasTool {
 	}
 
 	async onPointerDown(e: PointerEvent, ctx: ToolContext): Promise<void> {
-		// Eraser requires a selected layer (not the original background)
-		if (!ctx.selectedLayerId || ctx.selectedLayerId === 'original-file') {
+		// Eraser requires a selected layer 
+		// If 'original-file' is selected, auto-create the background layer
+		let effectiveLayerId = ctx.selectedLayerId;
+		
+		if (ctx.selectedLayerId === 'original-file') {
+			// Auto-create BG layer from original image
+			if (ctx.originalImageUrl) {
+				effectiveLayerId = await ctx.layerManager.createBackgroundLayer(
+					ctx.originalImageUrl,
+					ctx.canvasDimensions.widthPixels,
+					ctx.canvasDimensions.heightPixels
+				);
+				console.log('[EraserTool] Created/found BG layer:', effectiveLayerId);
+			} else {
+				// Fallback: check if BG layer already exists
+				const bgLayer = ctx.layerManager.getBackgroundLayer();
+				if (!bgLayer) {
+					toast.warning('No background layer found. Draw on the original first to create one.');
+					return;
+				}
+				effectiveLayerId = bgLayer.id;
+			}
+		}
+		
+		if (!effectiveLayerId) {
 			toast.warning('Please select a layer to erase');
 			return;
 		}
 
-		this.targetLayerId = ctx.selectedLayerId;
+		this.targetLayerId = effectiveLayerId;
 
 		// Get the layer data
 		const layers = ctx.layerManager.activeSide === 'front'
 			? ctx.layerManager.frontLayers
 			: ctx.layerManager.backLayers;
-		const layer = layers.find(l => l.id === ctx.selectedLayerId);
+		const layer = layers.find(l => l.id === effectiveLayerId);
 		if (!layer) {
 			console.warn('[EraserTool] Layer not found');
 			return;

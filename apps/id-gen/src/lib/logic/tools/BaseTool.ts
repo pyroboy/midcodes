@@ -44,6 +44,8 @@ export interface ToolContext {
 	undoManager?: UndoManager;
 	/** Template ID for syncing static elements */
 	templateId?: string;
+	/** Original image URL for creating background layers */
+	originalImageUrl?: string;
 }
 
 /**

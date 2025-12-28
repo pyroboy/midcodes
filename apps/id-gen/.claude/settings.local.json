@@ -28,7 +28,8 @@
       "WebFetch(domain:www.web-plus-plus.com)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "WebFetch(domain:blog.cjgammon.com)"
+      "WebFetch(domain:blog.cjgammon.com)",
+      "Bash(wc:*)"
     ],
     "deny": [],
     "ask": []

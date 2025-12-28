@@ -41,7 +41,10 @@ export class BrushTool extends DrawingTool implements CanvasTool {
 
 	onActivate(ctx: ToolContext): void {
 		// Pick up selected layer if one exists
-		if (ctx.selectedLayerId && ctx.selectedLayerId !== 'original-file') {
+		if (ctx.selectedLayerId === 'original-file') {
+			const bgLayer = ctx.layerManager.getBackgroundLayer();
+			this.targetLayerId = bgLayer?.id || null;
+		} else if (ctx.selectedLayerId) {
 			this.targetLayerId = ctx.selectedLayerId;
 		}
 	}
@@ -55,8 +58,21 @@ export class BrushTool extends DrawingTool implements CanvasTool {
 		this.currentBlurRadius = 0;
 	}
 
-	onPointerDown(e: PointerEvent, ctx: ToolContext): void {
-		console.log('[BrushTool] onPointerDown', { hasCtx: !!ctx.canvasContext });
+	async onPointerDown(e: PointerEvent, ctx: ToolContext): Promise<void> {
+		console.log('[BrushTool] onPointerDown - Coordinate Debug:', {
+			hasCtx: !!ctx.canvasContext,
+			canvasRect: ctx.canvasRect ? {
+				left: ctx.canvasRect.left,
+				top: ctx.canvasRect.top,
+				width: ctx.canvasRect.width,
+				height: ctx.canvasRect.height
+			} : null,
+			canvasDimensions: ctx.canvasDimensions,
+			pointerEvent: {
+				clientX: e.clientX,
+				clientY: e.clientY
+			}
+		});
 		if (!ctx.canvasContext) return; // Must have drawing context
 
 		this.isDrawing = true;
@@ -66,6 +82,9 @@ export class BrushTool extends DrawingTool implements CanvasTool {
 		// Calculate blur radius once per stroke
 		// Scale brush size from CSS pixels to canvas intrinsic pixels
 		const scaleX = ctx.canvasDimensions.widthPixels / ctx.canvasRect.width;
+		const scaleY = ctx.canvasDimensions.heightPixels / ctx.canvasRect.height;
+		
+		console.log('[BrushTool] Scale factors:', { scaleX, scaleY });
 		
 		if (ctx.hardness < 100) {
 			// Reduced max blur to /4 to avoid excessive size blowup
@@ -75,10 +94,28 @@ export class BrushTool extends DrawingTool implements CanvasTool {
 		}
 
 		const point = this.getPoint(e, ctx.canvasRect, ctx.canvasDimensions);
+		console.log('[BrushTool] First stroke point (canvas intrinsic coords):', point);
+		
 		this.addPoint(point);
 
 		// Use currently selected layer (any type) - capture at pointer down
-		if (ctx.selectedLayerId && ctx.selectedLayerId !== 'original-file') {
+		// If 'original-file' is selected, auto-create the background layer
+		if (ctx.selectedLayerId === 'original-file') {
+			// Auto-create BG layer from original image
+			if (ctx.originalImageUrl) {
+				const bgLayerId = await ctx.layerManager.createBackgroundLayer(
+					ctx.originalImageUrl,
+					ctx.canvasDimensions.widthPixels,
+					ctx.canvasDimensions.heightPixels
+				);
+				this.targetLayerId = bgLayerId;
+				console.log('[BrushTool] Created/found BG layer:', bgLayerId);
+			} else {
+				// Fallback: check if BG layer already exists
+				const bgLayer = ctx.layerManager.getBackgroundLayer();
+				this.targetLayerId = bgLayer?.id || null;
+			}
+		} else if (ctx.selectedLayerId) {
 			this.targetLayerId = ctx.selectedLayerId;
 		} else {
 			this.targetLayerId = null; // Will create new layer
