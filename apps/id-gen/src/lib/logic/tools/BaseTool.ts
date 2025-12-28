@@ -42,6 +42,8 @@ export interface ToolContext {
 	tolerance?: number;
 	/** Reference to UndoManager for undo/redo operations */
 	undoManager?: UndoManager;
+	/** Template ID for syncing static elements */
+	templateId?: string;
 }
 
 /**

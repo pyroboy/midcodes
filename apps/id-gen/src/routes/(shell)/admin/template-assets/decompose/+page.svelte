@@ -470,6 +470,7 @@
 						imageProcessor={processor}
 						historyManager={historyMgr}
 						undoManager={undoMgr}
+						templateId={data.template?.id}
 						{currentImageUrl}
 						currentLayers={layerMgr.currentLayers}
 						layerSelections={layerMgr.selections}

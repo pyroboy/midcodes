@@ -46,6 +46,7 @@
 		imageProcessor,
 		historyManager,
 		undoManager,
+		templateId,
 		onToolChange,
 		onDuplicate,
 		onSelectLayer
@@ -71,6 +72,7 @@
 		imageProcessor: ImageProcessor;
 		historyManager: HistoryManager;
 		undoManager?: UndoManager;
+		templateId?: string;
 		onToolChange?: (tool: ToolName) => void;
 		onDuplicate?: () => void;
 		onSelectLayer?: (layerId: string | null, addToSelection?: boolean) => void;
@@ -373,7 +375,8 @@
 			canvasDimensions: { widthPixels, heightPixels },
 			canvasElement: drawingCanvasElement,
 			canvasContext: drawingContext ?? undefined,
-			undoManager
+			undoManager,
+			templateId
 		};
 
 		if (activeTool === 'move') {
@@ -485,7 +488,8 @@
 			canvasDimensions: { widthPixels, heightPixels },
 			canvasElement: drawingCanvasElement,
 			canvasContext: drawingContext ?? undefined,
-			undoManager
+			undoManager,
+			templateId
 		};
 
 		if (activeTool === 'move') {
@@ -524,7 +528,8 @@
 			canvasDimensions: { widthPixels, heightPixels },
 			canvasElement: drawingCanvasElement,
 			canvasContext: drawingContext ?? undefined,
-			undoManager
+			undoManager,
+			templateId
 		};
 
 		if (activeTool === 'move') {

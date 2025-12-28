@@ -308,6 +308,101 @@ export const syncStaticElementName = command(
 	}
 );
 
+// Schema for position sync
+const syncPositionSchema = z.object({
+	templateId: z.string().uuid(),
+	elementId: z.string().uuid(),
+	bounds: z.object({
+		x: z.number().int().min(0),
+		y: z.number().int().min(0),
+		width: z.number().int().positive(),
+		height: z.number().int().positive()
+	})
+});
+
+/**
+ * Sync element position (x, y, width, height) when layer is moved
+ */
+export const syncStaticElementPosition = command(
+	'unchecked',
+	async (
+		input: z.input<typeof syncPositionSchema>
+	): Promise<{ success: boolean; error?: string }> => {
+		const parseResult = syncPositionSchema.safeParse(input);
+		if (!parseResult.success) {
+			return {
+				success: false,
+				error: `Validation error: ${parseResult.error.issues.map((e: { message: string }) => e.message).join(', ')}`
+			};
+		}
+
+		await requireAdmin();
+		const { templateId, elementId, bounds } = parseResult.data;
+
+		console.log('[static-element.remote] syncStaticElementPosition called:', {
+			templateId,
+			elementId,
+			bounds
+		});
+
+		try {
+			const db = getDb();
+
+			// 1. Fetch current template
+			const [template] = await db
+				.select({ templateElements: templates.templateElements })
+				.from(templates)
+				.where(eq(templates.id, templateId))
+				.limit(1);
+
+			if (!template) {
+				return { success: false, error: 'Template not found' };
+			}
+
+			// 2. Find and update the element
+			const existingElements = (template.templateElements || []) as TemplateElement[];
+			let found = false;
+
+			const updatedElements = existingElements.map((el) => {
+				if (el.id === elementId) {
+					found = true;
+					return {
+						...el,
+						x: bounds.x,
+						y: bounds.y,
+						width: bounds.width,
+						height: bounds.height
+					};
+				}
+				return el;
+			});
+
+			if (!found) {
+				return { success: false, error: 'Element not found in template' };
+			}
+
+			// 3. Update template
+			await db
+				.update(templates)
+				.set({
+					templateElements: updatedElements,
+					updatedAt: new Date()
+				})
+				.where(eq(templates.id, templateId));
+
+			console.log('[static-element.remote] Successfully synced element position:', elementId);
+
+			return { success: true };
+		} catch (err) {
+			console.error('[static-element.remote] syncStaticElementPosition error:', err);
+			return {
+				success: false,
+				error: err instanceof Error ? err.message : 'Failed to sync element position'
+			};
+		}
+	}
+);
+
 /**
  * Check if a GraphicElement exists in template
  * Used to verify pairing status after template editor changes

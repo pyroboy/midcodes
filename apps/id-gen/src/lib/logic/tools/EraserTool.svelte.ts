@@ -49,7 +49,7 @@ export class EraserTool extends DrawingTool implements CanvasTool {
 		this.reset();
 	}
 
-	private reset() {
+	reset() {
 		this.isDrawing = false;
 		this.layerCanvas = null;
 		this.layerCtx = null;

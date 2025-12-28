@@ -153,11 +153,48 @@ export class MoveTool implements CanvasTool {
 
 					ctx.layerManager.markUnsaved();
 					ctx.historyManager?.addLocalEntry('move', 'layer-moved');
+
+					// Sync static element position if layer is paired
+					const pairedElementId = ctx.layerManager.getPairedElementId(this.targetLayerId);
+					if (pairedElementId && layer.bounds) {
+						// Fire and forget - sync position to template element
+						this.syncStaticElementPosition(ctx, pairedElementId, layer.bounds);
+					}
 				}
 			}
 		}
 
 		this.reset();
+	}
+
+	/**
+	 * Sync static element position to template (fire and forget)
+	 */
+	private async syncStaticElementPosition(
+		ctx: ToolContext,
+		elementId: string,
+		bounds: { x: number; y: number; width: number; height: number }
+	): Promise<void> {
+		try {
+			// Dynamic import to avoid circular dependency
+			const { syncStaticElementPosition } = await import('$lib/remote/static-element.remote');
+			
+			// Get template ID from the page context (passed through layerManager or toolManager)
+			// For now, we'll use a simple approach - the layer manager knows about templates
+			// The actual templateId should be passed through context
+			const templateId = (ctx as any).templateId;
+			if (!templateId) {
+				console.warn('[MoveTool] No templateId in context, cannot sync static element position');
+				return;
+			}
+
+			const result = await syncStaticElementPosition({ templateId, elementId, bounds });
+			if (!result.success) {
+				console.warn('[MoveTool] Failed to sync static element position:', result.error);
+			}
+		} catch (err) {
+			console.error('[MoveTool] Error syncing static element position:', err);
+		}
 	}
 
 	renderOverlay(ctx: CanvasRenderingContext2D): void {
