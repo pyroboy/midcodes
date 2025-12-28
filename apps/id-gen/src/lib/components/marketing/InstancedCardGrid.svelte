@@ -129,27 +129,35 @@
 			// Subtle floating animation
 			const floatOffset = Math.sin(time * 0.5 + i * 0.3) * 0.05;
 
-			// Wave effect based on scroll
-			const wavePhase = (pos.x + pos.y) * 0.5 + scrollProgress * 10;
+			// Subtle wavy motion
+			const wavePhase = (pos.x + pos.y) * 0.5 + time * 0.5; // Mostly time based now
 			const waveOffset = Math.sin(wavePhase) * 0.1;
 
-			// Active card gets highlight treatment
+			// Visible immediately at 0%, fade out at end (0.8-1.0)
+			let opacity = 1;
+			// Removed start fade-in to ensure visibility at 0%
+			if (scrollProgress > 0.8) opacity = (1 - scrollProgress) / 0.2;
+
+			// Apply fade to scale
+			const fadeScale = opacity;
+
 			const isActive = i === activeIndex;
-			const scale = isActive ? 1.3 : 1;
+			const scale = (isActive ? 1.3 : 1) * fadeScale;
 			const zOffset = isActive ? 0.5 : 0;
 
 			dummy.position.set(pos.x, pos.y + floatOffset, pos.z + waveOffset + zOffset);
 
 			// Slight rotation based on position
-			dummy.rotation.set(
-				Math.sin(time * 0.3 + i) * 0.05,
-				Math.cos(time * 0.2 + i) * 0.05,
-				0
-			);
+			dummy.rotation.set(Math.sin(time * 0.3 + i) * 0.05, Math.cos(time * 0.2 + i) * 0.05, 0);
 
 			dummy.scale.setScalar(scale);
 			dummy.updateMatrix();
 			instancedMesh.setMatrixAt(i, dummy.matrix);
+
+			// Also control global material opacity if single draw call
+			if (i === 0 && material) {
+				material.opacity = opacity * 0.6;
+			}
 		}
 
 		instancedMesh.instanceMatrix.needsUpdate = true;
@@ -166,21 +174,16 @@
 </script>
 
 {#if isReady && geometry && material}
-	<T.Group position.z={-2}>
-		<T.InstancedMesh
-			bind:ref={instancedMesh}
-			args={[geometry, material, totalCards]}
-			frustumCulled={false}
-		/>
-
-		<!-- Ambient glow behind grid -->
-		<T.Mesh position.z={-1}>
-			<T.PlaneGeometry args={[gridCols * cardSpacing * 1.5, gridRows * cardSpacing * 1.5]} />
-			<T.MeshBasicMaterial
-				color={0x1a1a2e}
-				transparent
-				opacity={visible ? 0.3 : 0}
+	<!-- Outer Group: Handles Scroll Position (World Y) and Scale -->
+	<!-- Moves straight up/down without drifting sideways -->
+	<T.Group position.z={-2} scale={2.5} position.y={1.5 + scrollProgress * 5}>
+		<!-- Inner Group: Handles Dutch Angle Rotation -->
+		<T.Group rotation.z={Math.PI * 0.1} rotation.x={-Math.PI * 0.1}>
+			<T.InstancedMesh
+				bind:ref={instancedMesh}
+				args={[geometry, material, totalCards]}
+				frustumCulled={false}
 			/>
-		</T.Mesh>
+		</T.Group>
 	</T.Group>
 {/if}

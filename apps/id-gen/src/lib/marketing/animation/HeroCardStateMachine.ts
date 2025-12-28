@@ -22,6 +22,7 @@ export type CardState =
 	| 'physical' // Stack of cards + lanyard (Hero card hides or moves to top)
 	| 'segmentation' // Flipping card (Student vs CEO)
 	| 'useCases' // Texture swapping on scroll
+	| 'systemScale' // Grid visible, main card hidden
 	| 'shrinking' // Transition: moving to corner
 	| 'testimonials' // Small, grid visible behind
 	| 'growing' // Transition: returning to center
@@ -76,7 +77,8 @@ export function getSectionCardState(section: SectionName, sectionProgress: numbe
 		case 'useCases':
 			return 'useCases';
 
-
+		case 'systemScale':
+			return 'systemScale';
 
 		case 'physical':
 			// Stack of cards
@@ -161,6 +163,14 @@ export function getStateTransform(state: CardState, sectionProgress: number): Ca
 				position: { x: 0, y: 0, z: 0 },
 				rotation: { x: 0, y: 0, z: 0 },
 				scale: 1
+			};
+		
+		case 'systemScale':
+			// Main card hides to let the grid take focus
+			return {
+				position: { x: 0, y: 0, z: 0 },
+				rotation: { x: 0, y: 0, z: 0 },
+				scale: 0
 			};
 
 		case 'shrinking':
@@ -287,6 +297,10 @@ export function getStateVisuals(
 			visuals.autoRotate = true;
 			visuals.autoRotateSpeed = 0.2;
 			visuals.textureIndex = Math.min(2, Math.floor(sectionProgress * 3));
+			break;
+
+		case 'systemScale':
+			visuals.opacity = 0; // Ensure it's hidden visually as well
 			break;
 
 		case 'shrinking':

@@ -62,10 +62,24 @@
 <T.DirectionalLight position={[0, 0, -5]} intensity={0.2} />
 
 <!-- Background card grid (visible during testimonials section) -->
+<!-- Calculate grid visibility and continuous progress -->
 {#if sceneReady}
+	{@const isUseCases = scrollState.currentSection === 'useCases'}
+	{@const isSystemScale = scrollState.currentSection === 'systemScale'}
+	{@const showGrid = isSystemScale || (isUseCases && scrollState.sectionProgress > 0.4)}
+
+	<!-- 
+			Continuous progress calculation:
+			- During UseCases 0.4-1.0: Maps from -0.6 to 0
+			- During SystemScale 0.0-1.0: Maps from 0 to 1
+		-->
+	{@const gridProgress = isSystemScale
+		? scrollState.sectionProgress
+		: scrollState.sectionProgress - 1}
+
 	<InstancedCardGrid
-		visible={scrollState.currentSection === 'systemScale'}
-		scrollProgress={scrollState.sectionProgress}
+		visible={showGrid}
+		scrollProgress={gridProgress}
 		gridCols={10}
 		gridRows={5}
 		cardSpacing={0.5}
