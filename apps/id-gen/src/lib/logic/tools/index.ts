@@ -29,6 +29,7 @@ import { EraserTool, createEraserTool } from './EraserTool.svelte.js';
 import { BucketTool, createBucketTool } from './BucketTool.svelte.js';
 import { GradientTool, createGradientTool } from './GradientTool.svelte.js';
 import { MoveTool, createMoveTool } from './MoveTool.svelte.js';
+import { EyedropperTool, createEyedropperTool } from './EyedropperTool.svelte.js';
 export { LassoTool, createLassoTool };
 export { RectangleTool, createRectangleTool };
 export { EllipseTool, createEllipseTool };
@@ -37,6 +38,7 @@ export { EraserTool, createEraserTool };
 export { BucketTool, createBucketTool };
 export { GradientTool, createGradientTool };
 export { MoveTool, createMoveTool };
+export { EyedropperTool, createEyedropperTool };
 
 /**
  * Tool name type union.
@@ -154,7 +156,8 @@ export function getToolCursor(tool: ToolName): string {
 		case 'bucket':
 			return 'crosshair';
 		case 'eyedropper':
-			return 'crosshair';
+			// Use default cursor - the native EyeDropper API shows its own zoom circle
+			return 'default';
 		default:
 			return 'default';
 	}
@@ -182,6 +185,8 @@ export function createTool(name: ToolName): import('./BaseTool').CanvasTool | nu
 			return createBucketTool();
 		case 'gradient':
 			return createGradientTool();
+		case 'eyedropper':
+			return createEyedropperTool();
 		default:
 			return null;
 	}

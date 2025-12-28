@@ -4,7 +4,8 @@
 	import { Label } from '$lib/components/ui/label';
 	import * as Popover from '$lib/components/ui/popover';
 	import { Button } from '$lib/components/ui/button';
-	import { ChevronDown } from 'lucide-svelte';
+	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { ChevronDown, Pipette } from 'lucide-svelte';
 	import { isDrawingTool, isFillTool, type ToolName, type ToolOptions } from '$lib/logic/tools';
 
 	let {
@@ -16,12 +17,53 @@
 			hardness: 100,
 			tolerance: 32
 		},
-		onOptionsChange
+		onOptionsChange,
+		onToolChange,
+		eyedropperPreviewColor
 	}: {
 		activeTool: ToolName;
 		toolOptions?: ToolOptions;
 		onOptionsChange?: (options: Partial<ToolOptions>) => void;
+		onToolChange?: (tool: ToolName) => void;
+		eyedropperPreviewColor?: string | null;
 	} = $props();
+
+	// Check if native EyeDropper API is available
+	const hasNativeEyeDropper = typeof window !== 'undefined' && 'EyeDropper' in window;
+
+	// Track if eyedropper is currently picking
+	let isPickingColor = $state(false);
+
+	/**
+	 * Open the native EyeDropper immediately.
+	 * Shows the big zoom circle for pixel-perfect color picking from anywhere on screen.
+	 */
+	async function openEyeDropper() {
+		if (!hasNativeEyeDropper || isPickingColor) return;
+
+		isPickingColor = true;
+
+		try {
+			// @ts-expect-error - EyeDropper is not in TypeScript's lib yet
+			const eyeDropper = new window.EyeDropper();
+			const result = await eyeDropper.open();
+
+			if (result?.sRGBHex) {
+				// Update the color
+				onOptionsChange?.({ color: result.sRGBHex });
+			}
+		} catch (err) {
+			// User cancelled (pressed Escape) - that's fine
+			if ((err as Error)?.name !== 'AbortError') {
+				console.warn('[ToolOptions] EyeDropper error:', err);
+			}
+		} finally {
+			isPickingColor = false;
+		}
+	}
+
+	// Determine if eyedropper is active
+	const isEyedropperActive = $derived(activeTool === 'eyedropper' || isPickingColor);
 
 	// Color presets - primary row (most used)
 	const primaryColors = ['#000000', '#ffffff', '#ef4444', '#22c55e', '#3b82f6', '#eab308'];
@@ -62,19 +104,56 @@
 
 <!-- Persistent Color Bar - Always visible -->
 <div
-	class="flex items-center gap-2 rounded-lg border border-border bg-background/90 px-3 py-2 shadow-lg backdrop-blur-sm transition-opacity {colorIsActive
+	class="flex items-center gap-2 rounded-lg border border-border bg-background/90 px-3 py-2 shadow-lg backdrop-blur-sm transition-opacity {colorIsActive || isEyedropperActive
 		? 'opacity-100'
 		: 'opacity-70'}"
 >
-	<!-- Current Color Indicator -->
-	<div class="flex items-center gap-2">
-		<div
-			class="w-7 h-7 rounded-md border-2 shadow-inner transition-all {colorIsActive
-				? 'border-primary'
-				: 'border-border'}"
-			style="background-color: {toolOptions.color}"
-			title="Current Color: {toolOptions.color}"
-		></div>
+	<!-- Current Color Indicator with Eyedropper Preview -->
+	<div class="flex items-center gap-1.5">
+		<!-- Main Color Swatch -->
+		<div class="relative">
+			<div
+				class="w-7 h-7 rounded-md border-2 shadow-inner transition-all {colorIsActive
+					? 'border-primary'
+					: 'border-border'}"
+				style="background-color: {toolOptions.color}"
+				title="Current Color: {toolOptions.color}"
+			></div>
+			<!-- Eyedropper Preview Overlay (when active and hovering) -->
+			{#if isEyedropperActive && eyedropperPreviewColor}
+				<div
+					class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white shadow-md ring-1 ring-black/20"
+					style="background-color: {eyedropperPreviewColor}"
+					title="Preview: {eyedropperPreviewColor}"
+				></div>
+			{/if}
+		</div>
+
+		<!-- Eyedropper Button - Opens native color picker immediately -->
+		<Tooltip.Root delayDuration={300}>
+			<Tooltip.Trigger>
+				{#snippet child({ props })}
+					<Button
+						{...props}
+						variant={isPickingColor ? 'secondary' : 'ghost'}
+						size="icon"
+						class="h-7 w-7 transition-all {isPickingColor
+							? 'ring-2 ring-cyan-400/50 bg-cyan-400/10'
+							: 'hover:bg-muted'}"
+						onclick={openEyeDropper}
+						disabled={!hasNativeEyeDropper || isPickingColor}
+					>
+						<Pipette
+							class="h-3.5 w-3.5 {isPickingColor ? 'text-cyan-400' : 'text-muted-foreground'}"
+						/>
+					</Button>
+				{/snippet}
+			</Tooltip.Trigger>
+			<Tooltip.Content side="bottom" class="flex items-center gap-2">
+				<span>{hasNativeEyeDropper ? 'Pick Color' : 'Not supported'}</span>
+				<kbd class="rounded bg-muted px-1.5 py-0.5 text-xs font-mono text-muted-foreground">I</kbd>
+			</Tooltip.Content>
+		</Tooltip.Root>
 	</div>
 
 	<!-- Quick Color Presets -->

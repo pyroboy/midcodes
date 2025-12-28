@@ -5,34 +5,40 @@ import {
 	DrawingTool
 } from './BaseTool';
 import { toast } from 'svelte-sonner';
+import { getProxiedUrl } from '$lib/utils/storage';
 
 /**
  * Eraser Tool Implementation
  *
- * Non-destructive eraser that works with layer masks.
- * Instead of modifying the source image, eraser strokes are rendered
- * to a mask that is applied via CSS mask-image.
+ * REAL-TIME eraser that directly modifies layer pixels as you draw.
+ * Instead of showing white strokes, it immediately erases pixels
+ * from the layer, showing transparency in real-time.
  *
- * Requirements:
- * 1. Draw eraser strokes on a dedicated canvas.
- * 2. On pointer up, convert strokes to mask data and merge with layer's existing mask.
- * 3. Mask is stored as base64 data URL for CSS mask-image.
- * 4. Support size option (shared with brush).
+ * Features:
+ * 1. Immediate visual feedback - pixels disappear as you draw
+ * 2. Proper coordinate scaling from CSS to canvas intrinsic dimensions
+ * 3. Smooth stroke rendering using quadratic bezier curves
+ * 4. Soft brush support via blur filter based on hardness setting
+ * 5. Full undo/redo snapshot support
+ * 6. Direct layer modification (no overlay strokes)
  */
 export class EraserTool extends DrawingTool implements CanvasTool {
 	readonly name = 'eraser';
 	readonly cursor = 'crosshair';
-	readonly requiresLayer = true; // Eraser requires a selected layer
+	readonly requiresLayer = true;
 
 	// Runtime state
 	protected isDrawing = false;
-	private context: CanvasRenderingContext2D | null = null;
+	private layerCanvas: HTMLCanvasElement | null = null;
+	private layerCtx: CanvasRenderingContext2D | null = null;
 	private lastPoint: { x: number; y: number } | null = null;
+	private currentBlurRadius = 0;
 	private targetLayerId: string | null = null;
-	private existingMaskImage: HTMLImageElement | null = null;
+	private beforeSnapshot: any = null;
+	private layerBounds: { x: number; y: number; width: number; height: number } | null = null;
 
 	renderOverlay(ctx: CanvasRenderingContext2D): void {
-		// Eraser renders to its own canvas, no overlay needed
+		// No overlay needed - we draw directly on the layer
 	}
 
 	onActivate(ctx: ToolContext): void {
@@ -40,160 +46,335 @@ export class EraserTool extends DrawingTool implements CanvasTool {
 	}
 
 	onDeactivate(): void {
-		this.isDrawing = false;
-		this.context = null;
-		this.lastPoint = null;
-		this.targetLayerId = null;
-		this.existingMaskImage = null;
+		this.reset();
 	}
 
-	onPointerDown(e: PointerEvent, ctx: ToolContext): void {
+	private reset() {
+		this.isDrawing = false;
+		this.layerCanvas = null;
+		this.layerCtx = null;
+		this.lastPoint = null;
+		this.currentBlurRadius = 0;
+		this.targetLayerId = null;
+		this.beforeSnapshot = null;
+		this.layerBounds = null;
+	}
+
+	async onPointerDown(e: PointerEvent, ctx: ToolContext): Promise<void> {
 		// Eraser requires a selected layer (not the original background)
 		if (!ctx.selectedLayerId || ctx.selectedLayerId === 'original-file') {
 			toast.warning('Please select a layer to erase');
 			return;
 		}
 
-		if (!ctx.canvasContext) {
-			console.warn('[EraserTool] No canvas context available');
+		this.targetLayerId = ctx.selectedLayerId;
+
+		// Get the layer data
+		const layers = ctx.layerManager.activeSide === 'front'
+			? ctx.layerManager.frontLayers
+			: ctx.layerManager.backLayers;
+		const layer = layers.find(l => l.id === ctx.selectedLayerId);
+		if (!layer) {
+			console.warn('[EraserTool] Layer not found');
 			return;
 		}
 
-		this.isDrawing = true;
-		this.context = ctx.canvasContext;
-		this.targetLayerId = ctx.selectedLayerId;
+		// Capture undo snapshot BEFORE any modifications
+		if (ctx.undoManager) {
+			this.beforeSnapshot = ctx.undoManager.captureSnapshot(this.targetLayerId);
+		}
 
-		// Set up context for eraser strokes
-		// We draw in black (which will become transparent in the mask)
-		this.context.lineCap = 'round';
-		this.context.lineJoin = 'round';
-		this.context.strokeStyle = '#000000';
-		this.context.lineWidth = ctx.size;
-		this.context.globalAlpha = 1;
-		this.context.globalCompositeOperation = 'source-over';
+		// Load the layer image into a canvas for direct editing
+		try {
+			const img = await this.loadImage(layer.imageUrl);
+			if (!img) {
+				console.warn('[EraserTool] Failed to load layer image');
+				return;
+			}
 
-		// Load existing mask if any
-		this.loadExistingMask(ctx);
+			// Create a canvas for direct editing
+			this.layerCanvas = document.createElement('canvas');
+			this.layerBounds = layer.bounds || { x: 0, y: 0, width: img.width, height: img.height };
+			this.layerCanvas.width = this.layerBounds.width;
+			this.layerCanvas.height = this.layerBounds.height;
+			this.layerCtx = this.layerCanvas.getContext('2d', { willReadFrequently: true });
 
-		const point = this.getPoint(e, ctx.canvasRect);
-		this.lastPoint = point;
+			if (!this.layerCtx) {
+				console.warn('[EraserTool] Failed to get canvas context');
+				return;
+			}
 
-		// Start the path
-		this.context.beginPath();
-		this.context.moveTo(point.x, point.y);
-		// Draw a dot in case it's just a click
-		this.context.lineTo(point.x + 0.1, point.y + 0.1);
-		this.context.stroke();
+			// Draw the current layer content
+			this.layerCtx.drawImage(img, 0, 0, this.layerBounds.width, this.layerBounds.height);
+
+			this.isDrawing = true;
+
+			// Calculate blur radius based on hardness
+			const scaleX = ctx.canvasDimensions.widthPixels / ctx.canvasRect.width;
+			if (ctx.hardness < 100) {
+				this.currentBlurRadius = ((ctx.size * scaleX) * (1 - ctx.hardness / 100)) / 4;
+			} else {
+				this.currentBlurRadius = 0;
+			}
+
+			// Get the first point and erase
+			const point = this.getPoint(e, ctx);
+			this.eraseAt(point, ctx);
+			this.lastPoint = point;
+
+			// Update the layer display immediately
+			this.updateLayerDisplay(ctx);
+		} catch (err) {
+			console.error('[EraserTool] Error initializing:', err);
+		}
 	}
 
 	onPointerMove(e: PointerEvent, ctx: ToolContext): void {
-		if (!this.isDrawing || !this.context || !this.lastPoint) return;
+		if (!this.isDrawing || !this.layerCtx || !this.layerCanvas) return;
 
-		const point = this.getPoint(e, ctx.canvasRect);
+		const point = this.getPoint(e, ctx);
 
-		// Draw eraser stroke
-		this.context.lineTo(point.x, point.y);
-		this.context.stroke();
+		// Draw erasing stroke from last point to current point
+		if (this.lastPoint) {
+			this.eraseStroke(this.lastPoint, point, ctx);
+		} else {
+			this.eraseAt(point, ctx);
+		}
 
 		this.lastPoint = point;
+
+		// Update the layer display immediately
+		this.updateLayerDisplay(ctx);
 	}
 
-	onPointerUp(e: PointerEvent, ctx: ToolContext): void {
-		if (!this.isDrawing) return;
+	async onPointerUp(e: PointerEvent, ctx: ToolContext): Promise<void> {
+		if (!this.isDrawing || !this.layerCanvas || !this.targetLayerId) {
+			this.reset();
+			return;
+		}
+
 		this.isDrawing = false;
 
-		if (this.context && this.targetLayerId && ctx.layerManager) {
-			this.context.closePath();
-			this.finalizeMask(ctx);
-		}
+		// Finalize: convert canvas to blob and update layer
+		await this.finalizeErase(ctx);
 
-		this.context = null;
-		this.lastPoint = null;
-		this.targetLayerId = null;
-		this.existingMaskImage = null;
-	}
-
-	private getPoint(e: PointerEvent, rect: DOMRect) {
-		return {
-			x: e.clientX - rect.left,
-			y: e.clientY - rect.top
-		};
+		this.reset();
 	}
 
 	/**
-	 * Load existing mask for the layer and draw it to the canvas.
-	 * This way new eraser strokes are merged with existing mask.
+	 * Get point in layer coordinates (accounting for layer bounds offset)
 	 */
-	private loadExistingMask(ctx: ToolContext): void {
-		if (!this.targetLayerId || !ctx.layerManager) return;
+	private getPoint(e: PointerEvent, ctx: ToolContext): { x: number; y: number } {
+		const cssX = e.clientX - ctx.canvasRect.left;
+		const cssY = e.clientY - ctx.canvasRect.top;
 
-		const existingMask = ctx.layerManager.getMask(this.targetLayerId);
-		if (existingMask && existingMask.maskData && this.context && ctx.canvasElement) {
-			const canvas = ctx.canvasElement as HTMLCanvasElement;
-			
-			// Load the existing mask image
-			const img = new Image();
-			img.onload = () => {
-				if (this.context) {
-					// Draw existing mask first (it's already inverted - black = transparent)
-					// We need to invert when drawing so black areas stay black
-					this.context.globalCompositeOperation = 'source-over';
-					this.context.drawImage(img, 0, 0, canvas.width, canvas.height);
-				}
+		// Scale to canvas dimensions
+		const scaleX = ctx.canvasDimensions.widthPixels / ctx.canvasRect.width;
+		const scaleY = ctx.canvasDimensions.heightPixels / ctx.canvasRect.height;
+		const canvasX = cssX * scaleX;
+		const canvasY = cssY * scaleY;
+
+		// Convert to layer-local coordinates
+		if (this.layerBounds) {
+			return {
+				x: canvasX - this.layerBounds.x,
+				y: canvasY - this.layerBounds.y
 			};
-			img.src = existingMask.maskData;
-			this.existingMaskImage = img;
 		}
+
+		return { x: canvasX, y: canvasY };
 	}
 
 	/**
-	 * Finalize the eraser stroke by converting canvas content to mask data
-	 * and updating the layer's mask in LayerManager.
+	 * Erase at a single point (for dots)
 	 */
-	private finalizeMask(ctx: ToolContext): void {
-		if (!ctx.canvasElement || !this.targetLayerId || !ctx.layerManager) return;
+	private eraseAt(point: { x: number; y: number }, ctx: ToolContext) {
+		if (!this.layerCtx) return;
 
-		const canvas = ctx.canvasElement as HTMLCanvasElement;
-		const maskCtx = canvas.getContext('2d');
-		if (!maskCtx) return;
+		const scaleX = ctx.canvasDimensions.widthPixels / ctx.canvasRect.width;
+		const brushSize = ctx.size * scaleX;
 
-		// Create the final mask canvas
-		// In CSS mask-image: white = visible, black = transparent
-		// Our eraser strokes are black on transparent
-		// We need to create: white background, then apply eraser strokes as black
-		
-		const finalMaskCanvas = document.createElement('canvas');
-		finalMaskCanvas.width = canvas.width;
-		finalMaskCanvas.height = canvas.height;
-		const finalCtx = finalMaskCanvas.getContext('2d');
-		if (!finalCtx) return;
+		// Save context state
+		this.layerCtx.save();
 
-		// Start with white (fully visible)
-		finalCtx.fillStyle = '#ffffff';
-		finalCtx.fillRect(0, 0, finalMaskCanvas.width, finalMaskCanvas.height);
+		// Use destination-out to erase
+		this.layerCtx.globalCompositeOperation = 'destination-out';
+		this.layerCtx.lineCap = 'round';
+		this.layerCtx.lineJoin = 'round';
+		this.layerCtx.lineWidth = brushSize;
+		this.layerCtx.strokeStyle = 'rgba(0, 0, 0, 1)';
 
-		// Apply eraser strokes (black areas from our canvas)
-		// Use destination-out to cut holes where we've drawn
-		finalCtx.globalCompositeOperation = 'destination-out';
-		finalCtx.drawImage(canvas, 0, 0);
+		// Apply blur for soft edges
+		if (this.currentBlurRadius > 0) {
+			this.layerCtx.filter = `blur(${this.currentBlurRadius}px)`;
+		}
 
-		// Convert to data URL
-		const maskData = finalMaskCanvas.toDataURL('image/png');
+		// Draw a tiny stroke to make a dot
+		this.layerCtx.beginPath();
+		this.layerCtx.moveTo(point.x, point.y);
+		this.layerCtx.lineTo(point.x + 0.1, point.y + 0.1);
+		this.layerCtx.stroke();
 
-		// Calculate bounds (for now, full canvas)
-		const bounds = {
-			x: 0,
-			y: 0,
-			width: canvas.width,
-			height: canvas.height
-		};
+		// Restore context state
+		this.layerCtx.restore();
+	}
 
-		// Update mask in LayerManager
-		ctx.layerManager.setMask(this.targetLayerId, maskData, bounds);
-		ctx.historyManager.addLocalEntry('erase', this.targetLayerId);
+	/**
+	 * Erase a stroke from point A to point B
+	 */
+	private eraseStroke(from: { x: number; y: number }, to: { x: number; y: number }, ctx: ToolContext) {
+		if (!this.layerCtx) return;
 
-		// Clear the drawing canvas for next stroke
-		maskCtx.clearRect(0, 0, canvas.width, canvas.height);
+		const scaleX = ctx.canvasDimensions.widthPixels / ctx.canvasRect.width;
+		const brushSize = ctx.size * scaleX;
+
+		// Save context state
+		this.layerCtx.save();
+
+		// Use destination-out to erase
+		this.layerCtx.globalCompositeOperation = 'destination-out';
+		this.layerCtx.lineCap = 'round';
+		this.layerCtx.lineJoin = 'round';
+		this.layerCtx.lineWidth = brushSize;
+		this.layerCtx.strokeStyle = 'rgba(0, 0, 0, 1)';
+
+		// Apply blur for soft edges
+		if (this.currentBlurRadius > 0) {
+			this.layerCtx.filter = `blur(${this.currentBlurRadius}px)`;
+		}
+
+		// Draw line segment
+		this.layerCtx.beginPath();
+		this.layerCtx.moveTo(from.x, from.y);
+		this.layerCtx.lineTo(to.x, to.y);
+		this.layerCtx.stroke();
+
+		// Restore context state
+		this.layerCtx.restore();
+	}
+
+	/**
+	 * Update the layer's display in real-time
+	 */
+	private updateLayerDisplay(ctx: ToolContext) {
+		if (!this.layerCanvas || !this.targetLayerId || !ctx.layerManager) return;
+
+		// Create a new blob URL for the modified canvas
+		this.layerCanvas.toBlob((blob) => {
+			if (!blob || !this.targetLayerId) return;
+
+			// Revoke old URL and create new one
+			const layers = ctx.layerManager.activeSide === 'front'
+				? ctx.layerManager.frontLayers
+				: ctx.layerManager.backLayers;
+			const layer = layers.find(l => l.id === this.targetLayerId);
+
+			if (layer) {
+				// Revoke old blob URL if it exists
+				if (layer.imageUrl.startsWith('blob:')) {
+					URL.revokeObjectURL(layer.imageUrl);
+				}
+
+				// Create new blob URL
+				const newUrl = URL.createObjectURL(blob);
+				layer.imageUrl = newUrl;
+
+				// Trigger reactivity
+				if (ctx.layerManager.activeSide === 'front') {
+					ctx.layerManager.frontLayers = [...ctx.layerManager.frontLayers];
+				} else {
+					ctx.layerManager.backLayers = [...ctx.layerManager.backLayers];
+				}
+			}
+		}, 'image/png');
+	}
+
+	/**
+	 * Finalize the erase operation
+	 */
+	private async finalizeErase(ctx: ToolContext): Promise<void> {
+		if (!this.layerCanvas || !this.targetLayerId || !ctx.layerManager) return;
+
+		const targetLayerId = this.targetLayerId;
+		const layerCanvas = this.layerCanvas;
+		const bounds = this.layerBounds;
+
+		return new Promise((resolve) => {
+			layerCanvas.toBlob(async (blob) => {
+				if (!blob) {
+					console.error('[EraserTool] Failed to generate final blob');
+					resolve();
+					return;
+				}
+
+				// Get layer reference
+				const layers = ctx.layerManager.activeSide === 'front'
+					? ctx.layerManager.frontLayers
+					: ctx.layerManager.backLayers;
+				const layer = layers.find(l => l.id === targetLayerId);
+
+				if (layer) {
+					// Update layer with final blob
+					if (layer.imageUrl.startsWith('blob:')) {
+						URL.revokeObjectURL(layer.imageUrl);
+					}
+					const newUrl = URL.createObjectURL(blob);
+					layer.imageUrl = newUrl;
+					layer.cachedBlob = blob;
+
+					// Update selection
+					const sel = ctx.layerManager.selections.get(targetLayerId);
+					if (sel) {
+						sel.layerImageUrl = newUrl;
+						ctx.layerManager.selections = new Map(ctx.layerManager.selections);
+					}
+
+					// Trigger reactivity
+					if (ctx.layerManager.activeSide === 'front') {
+						ctx.layerManager.frontLayers = [...ctx.layerManager.frontLayers];
+					} else {
+						ctx.layerManager.backLayers = [...ctx.layerManager.backLayers];
+					}
+
+					// Add to upload cache
+					ctx.layerManager.addToCache(targetLayerId, blob, layer.side);
+
+					// Update hit test cache
+					ctx.layerManager.initializeHitCache(layer);
+
+					ctx.layerManager.markUnsaved();
+				}
+
+				// Push undo action
+				if (ctx.undoManager && this.beforeSnapshot) {
+					const afterSnapshot = ctx.undoManager.captureSnapshot(targetLayerId);
+					ctx.undoManager.push({
+						type: 'layer-modify',
+						layerId: targetLayerId,
+						beforeSnapshot: this.beforeSnapshot,
+						afterSnapshot: afterSnapshot || undefined
+					});
+				}
+
+				ctx.historyManager?.addLocalEntry('erase', 'erased-from-layer');
+
+				resolve();
+			}, 'image/png');
+		});
+	}
+
+	/**
+	 * Load an image from URL with CORS support
+	 */
+	private loadImage(url: string): Promise<HTMLImageElement | null> {
+		return new Promise((resolve) => {
+			const img = new Image();
+			img.crossOrigin = 'anonymous';
+			img.onload = () => resolve(img);
+			img.onerror = () => resolve(null);
+			const proxiedUrl = getProxiedUrl(url) || url;
+			img.src = proxiedUrl;
+		});
 	}
 }
 

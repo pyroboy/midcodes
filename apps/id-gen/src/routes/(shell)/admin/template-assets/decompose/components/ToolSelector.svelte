@@ -17,11 +17,13 @@
 	let {
 		activeTool = null,
 		disabled = false,
-		onToolChange
+		onToolChange,
+		onColorPicked
 	}: {
 		activeTool?: ToolName;
 		disabled?: boolean;
 		onToolChange?: (tool: ToolName) => void;
+		onColorPicked?: (color: string) => void;
 	} = $props();
 
 	// Map icon names to components
@@ -50,7 +52,8 @@
 	const selectionTools = TOOL_METADATA.filter((t) => t.category === 'selection' && t.id !== 'move');
 	const drawingTools = TOOL_METADATA.filter((t) => t.category === 'drawing');
 	const fillTools = TOOL_METADATA.filter((t) => t.category === 'fill');
-	const utilityTools = TOOL_METADATA.filter((t) => t.category === 'utility');
+	// Filter out eyedropper from utility tools - we handle it specially
+	const utilityTools = TOOL_METADATA.filter((t) => t.category === 'utility' && t.id !== 'eyedropper');
 </script>
 
 {#snippet ToolButton(tool: (typeof TOOL_METADATA)[0])}
@@ -152,4 +155,30 @@
 	{#each [...fillTools, ...utilityTools] as tool (tool.id)}
 		{@render ToolButton(tool)}
 	{/each}
+
+	<!-- Eyedropper - Custom pixel-perfect color picker -->
+	<Tooltip.Root delayDuration={300}>
+		<Tooltip.Trigger>
+			{#snippet child({ props })}
+				<Button
+					{...props}
+					variant={activeTool === 'eyedropper' ? 'secondary' : 'ghost'}
+					size="icon"
+					class="h-9 w-9 transition-all {activeTool === 'eyedropper'
+						? 'ring-2 ring-cyan-400/50 bg-cyan-400/10'
+						: 'hover:bg-muted'}"
+					onclick={() => selectTool('eyedropper')}
+					{disabled}
+				>
+					<Pipette
+						class="h-4 w-4 {activeTool === 'eyedropper' ? 'text-cyan-400' : 'text-muted-foreground'}"
+					/>
+				</Button>
+			{/snippet}
+		</Tooltip.Trigger>
+		<Tooltip.Content side="bottom" class="flex items-center gap-2">
+			<span>Pick Color</span>
+			<kbd class="rounded bg-muted px-1.5 py-0.5 text-xs font-mono text-muted-foreground">I</kbd>
+		</Tooltip.Content>
+	</Tooltip.Root>
 </div>

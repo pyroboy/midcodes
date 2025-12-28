@@ -674,17 +674,18 @@ export class LayerManager {
 	 * where a second stroke tries to load a blob that the first stroke just revoked.
 	 */
 	async mergeDrawingToLayer(
-		layerId: string, 
-		blob: Blob, 
-		bounds: { x: number; y: number; width: number; height: number }
+		layerId: string,
+		blob: Blob,
+		bounds: { x: number; y: number; width: number; height: number },
+		compositeOperation: GlobalCompositeOperation = 'source-over'
 	): Promise<void> {
-		console.log('[LayerManager] Queueing merge for layer:', layerId);
+		console.log('[LayerManager] Queueing merge for layer:', layerId, 'operation:', compositeOperation);
 		const previous = this.mergeQueue.get(layerId) || Promise.resolve();
-		
+
 		const task = previous.then(async () => {
 			console.log('[LayerManager] Starting merge task for:', layerId);
 			try {
-				await this._performMerge(layerId, blob, bounds);
+				await this._performMerge(layerId, blob, bounds, compositeOperation);
 				console.log('[LayerManager] Merge task completed for:', layerId);
 			} catch (err) {
 				console.error('[LayerManager] Merge failed:', err);
@@ -698,11 +699,13 @@ export class LayerManager {
 
 	/**
 	 * Internal implementation of merge logic.
+	 * @param compositeOperation - The composite operation to use when drawing (e.g., 'source-over' for brush, 'destination-out' for eraser)
 	 */
 	private async _performMerge(
-		layerId: string, 
-		blob: Blob, 
-		bounds: { x: number; y: number; width: number; height: number }
+		layerId: string,
+		blob: Blob,
+		bounds: { x: number; y: number; width: number; height: number },
+		compositeOperation: GlobalCompositeOperation = 'source-over'
 	): Promise<void> {
 		const list = this.activeSide === 'front' ? this.frontLayers : this.backLayers;
 		const layerIndex = list.findIndex(l => l.id === layerId);
@@ -821,12 +824,18 @@ export class LayerManager {
 		const ctx = canvas.getContext('2d');
 		if (!ctx) return;
 
+		// Apply composite operation (source-over for brush, destination-out for eraser)
+		ctx.globalCompositeOperation = compositeOperation;
+
 		// Draw new stroke relative to the (possibly updated) canvas bounds
 		ctx.drawImage(
 			strokeImage,
 			bounds.x - (canvas as any)._bounds.x,
 			bounds.y - (canvas as any)._bounds.y
 		);
+
+		// Reset composite operation
+		ctx.globalCompositeOperation = 'source-over';
 
 		// Convert result to blob
 		return new Promise<void>((resolve) => {
@@ -1073,5 +1082,273 @@ export class LayerManager {
 	 */
 	hasPendingUploads(): boolean {
 		return this.pendingUploads > 0;
+	}
+
+	/**
+	 * Merge multiple selected layers into a single layer.
+	 * Layers are merged in z-index order (bottom to top).
+	 * @param layerIds - Array of layer IDs to merge
+	 * @returns The ID of the newly created merged layer, or null if merge failed
+	 */
+	async mergeLayers(layerIds: string[]): Promise<string | null> {
+		if (layerIds.length < 2) {
+			toast.warning('Select at least 2 layers to merge');
+			return null;
+		}
+
+		const list = this.activeSide === 'front' ? this.frontLayers : this.backLayers;
+
+		// Get the layers to merge, sorted by z-index (bottom to top)
+		const layersToMerge = list
+			.filter(l => layerIds.includes(l.id))
+			.sort((a, b) => a.zIndex - b.zIndex);
+
+		if (layersToMerge.length < 2) {
+			toast.error('Could not find layers to merge');
+			return null;
+		}
+
+		// Calculate the combined bounding box
+		let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+		for (const layer of layersToMerge) {
+			const bounds = layer.bounds || { x: 0, y: 0, width: 100, height: 100 };
+			minX = Math.min(minX, bounds.x);
+			minY = Math.min(minY, bounds.y);
+			maxX = Math.max(maxX, bounds.x + bounds.width);
+			maxY = Math.max(maxY, bounds.y + bounds.height);
+		}
+
+		const mergedBounds = {
+			x: minX,
+			y: minY,
+			width: maxX - minX,
+			height: maxY - minY
+		};
+
+		// Create a canvas for the merged result
+		const canvas = document.createElement('canvas');
+		canvas.width = mergedBounds.width;
+		canvas.height = mergedBounds.height;
+		const ctx = canvas.getContext('2d');
+		if (!ctx) {
+			toast.error('Failed to create merge canvas');
+			return null;
+		}
+
+		// Draw each layer onto the canvas (in z-index order)
+		for (const layer of layersToMerge) {
+			try {
+				const img = await this.loadImage(layer.imageUrl);
+				if (!img) {
+					console.warn('[LayerManager] Failed to load layer for merge:', layer.id);
+					continue;
+				}
+
+				const bounds = layer.bounds || { x: 0, y: 0, width: img.width, height: img.height };
+
+				// Draw relative to merged bounds
+				ctx.drawImage(
+					img,
+					bounds.x - mergedBounds.x,
+					bounds.y - mergedBounds.y,
+					bounds.width,
+					bounds.height
+				);
+			} catch (e) {
+				console.error('[LayerManager] Error loading layer for merge:', e);
+			}
+		}
+
+		// Convert to blob
+		return new Promise((resolve) => {
+			canvas.toBlob((blob) => {
+				if (!blob) {
+					toast.error('Failed to create merged image');
+					resolve(null);
+					return;
+				}
+
+				// Get the topmost layer's z-index for the merged layer
+				const topLayer = layersToMerge[layersToMerge.length - 1];
+				const mergedZIndex = topLayer.zIndex;
+
+				// Create the merged layer
+				const mergedUrl = URL.createObjectURL(blob);
+				const { layer: mergedLayer, selection: mergedSelection } = this.createLayerObj(
+					mergedUrl,
+					'Merged Layer',
+					mergedBounds,
+					this.activeSide,
+					mergedZIndex,
+					blob,
+					'drawing'
+				);
+
+				// Remove the old layers (in reverse order to avoid index issues)
+				for (const layer of [...layersToMerge].reverse()) {
+					this.removeLayer(layer.id);
+				}
+
+				// Add the merged layer
+				this.addLayer(mergedLayer, mergedSelection);
+
+				// Re-index z-indices
+				const updatedList = this.activeSide === 'front' ? this.frontLayers : this.backLayers;
+				updatedList.forEach((l, i) => (l.zIndex = i));
+
+				toast.success(`Merged ${layersToMerge.length} layers`);
+				resolve(mergedLayer.id);
+			}, 'image/png');
+		});
+	}
+
+	// --- Static Element Management (Layer ↔ GraphicElement pairing) ---
+
+	/**
+	 * Check if a layer is marked as a Static Element
+	 */
+	isStaticElement(layerId: string): boolean {
+		const selection = this.selections.get(layerId);
+		return !!selection?.pairedElementId;
+	}
+
+	/**
+	 * Get the paired element ID for a layer
+	 */
+	getPairedElementId(layerId: string): string | undefined {
+		return this.selections.get(layerId)?.pairedElementId;
+	}
+
+	/**
+	 * Ensure layer image is uploaded before creating static element
+	 * Returns the permanent URL
+	 */
+	async ensureLayerUploaded(layerId: string): Promise<string | null> {
+		const list = this.activeSide === 'front' ? this.frontLayers : this.backLayers;
+		const layer = list.find((l) => l.id === layerId);
+		if (!layer) return null;
+
+		// If already a permanent URL, return it
+		if (!layer.imageUrl.startsWith('blob:') && !layer.imageUrl.startsWith('data:')) {
+			return layer.imageUrl;
+		}
+
+		// Check if blob is in cache, upload it
+		const cached = this.cache.get(layerId);
+		if (cached && cached.uploadStatus !== 'uploaded') {
+			// Force upload this specific layer
+			const base64 = await fileToDataUrl(cached.blob);
+			try {
+				const result = await uploadProcessedImage({
+					imageBase64: base64,
+					mimeType: cached.blob.type || 'image/png'
+				});
+
+				if (result.success && result.url) {
+					this.confirmLayerUpload(layerId, result.url);
+					cached.uploadStatus = 'uploaded';
+					this.cache.delete(layerId);
+					this.cache = new Map(this.cache);
+					return result.url;
+				}
+			} catch (err) {
+				console.error('[LayerManager] ensureLayerUploaded error:', err);
+				return null;
+			}
+		}
+
+		// If it's a blob URL but not in cache, try to fetch and upload
+		if (layer.imageUrl.startsWith('blob:')) {
+			try {
+				const response = await fetch(layer.imageUrl);
+				const blob = await response.blob();
+				const base64 = await fileToDataUrl(blob);
+				
+				const result = await uploadProcessedImage({
+					imageBase64: base64,
+					mimeType: blob.type || 'image/png'
+				});
+
+				if (result.success && result.url) {
+					this.confirmLayerUpload(layerId, result.url);
+					return result.url;
+				}
+			} catch (err) {
+				console.error('[LayerManager] ensureLayerUploaded fetch error:', err);
+				return null;
+			}
+		}
+
+		return layer.imageUrl;
+	}
+
+	/**
+	 * Set the paired element ID for a layer
+	 */
+	setPairedElementId(layerId: string, elementId: string | undefined) {
+		const selection = this.selections.get(layerId);
+		if (!selection) return;
+
+		this.selections.set(layerId, { ...selection, pairedElementId: elementId });
+		this.selections = new Map(this.selections);
+
+		// Also update the layer object
+		const list = this.activeSide === 'front' ? this.frontLayers : this.backLayers;
+		const layer = list.find((l) => l.id === layerId);
+		if (layer) {
+			layer.pairedElementId = elementId;
+		}
+
+		this.markUnsaved();
+	}
+
+	/**
+	 * Update layer name and optionally sync to paired element
+	 */
+	updateLayerName(layerId: string, newName: string) {
+		const list = this.activeSide === 'front' ? this.frontLayers : this.backLayers;
+		const layer = list.find((l) => l.id === layerId);
+		if (!layer) return;
+
+		layer.name = newName;
+		
+		// Also update selection variableName
+		const selection = this.selections.get(layerId);
+		if (selection) {
+			const safeName = newName.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
+			this.selections.set(layerId, {
+				...selection,
+				variableName: safeName || selection.variableName
+			});
+			this.selections = new Map(this.selections);
+		}
+
+		this.markUnsaved();
+
+		// Return the paired element ID for external sync
+		return selection?.pairedElementId;
+	}
+
+	/**
+	 * Get layer data for static element creation
+	 */
+	getLayerDataForStaticElement(layerId: string): {
+		name: string;
+		imageUrl: string;
+		bounds: { x: number; y: number; width: number; height: number };
+		side: 'front' | 'back';
+	} | null {
+		const list = this.activeSide === 'front' ? this.frontLayers : this.backLayers;
+		const layer = list.find((l) => l.id === layerId);
+		const selection = this.selections.get(layerId);
+
+		if (!layer || !selection) return null;
+
+		return {
+			name: layer.name,
+			imageUrl: layer.imageUrl,
+			bounds: selection.bounds || layer.bounds || { x: 0, y: 0, width: 100, height: 100 },
+			side: layer.side || this.activeSide
+		};
 	}
 }

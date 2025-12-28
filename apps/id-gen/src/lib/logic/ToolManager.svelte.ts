@@ -4,7 +4,7 @@ export class ToolManager {
 	// Tool State
 	activeTool = $state<ToolName>(null);
 	previousTool = $state<ToolName>(null);
-	
+
 	// Tool Options
 	toolOptions = $state<ToolOptions>({
 		size: 20,
@@ -13,6 +13,9 @@ export class ToolManager {
 		hardness: 100,
 		tolerance: 32
 	});
+
+	// Eyedropper preview color (shown while hovering before clicking)
+	eyedropperPreviewColor = $state<string | null>(null);
 
 	constructor() {}
 

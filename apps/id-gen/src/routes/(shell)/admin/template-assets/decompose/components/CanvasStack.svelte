@@ -21,7 +21,9 @@
 		onDuplicate,
 		onDelete,
 		onMoveLayer,
-		selectedLayerId
+		onMergeLayers,
+		selectedLayerId,
+		selectedLayerIds = new Set()
 	}: {
 		layerManager: LayerManager;
 		toolManager: ToolManager;
@@ -32,7 +34,9 @@
 		onDuplicate?: () => void;
 		onDelete?: () => void;
 		onMoveLayer?: (direction: 'up' | 'down') => void;
+		onMergeLayers?: () => void;
 		selectedLayerId?: string | null;
+		selectedLayerIds?: Set<string>;
 	} = $props();
 
 	// Derived cursor style from active tool
@@ -55,6 +59,13 @@
 		if (isCmdOrCtrl && key === 'd') {
 			e.preventDefault();
 			onDuplicate?.();
+			return;
+		}
+
+		// Merge Layers (Ctrl/Cmd+E)
+		if (isCmdOrCtrl && key === 'e') {
+			e.preventDefault();
+			onMergeLayers?.();
 			return;
 		}
 
@@ -149,11 +160,13 @@
 			activeTool={toolManager.activeTool}
 			{disabled}
 			onToolChange={(tool) => toolManager.setTool(tool)}
+			onColorPicked={(color) => toolManager.setToolOption('color', color)}
 		/>
 		<ToolOptions
 			activeTool={toolManager.activeTool}
 			toolOptions={toolManager.toolOptions}
 			onOptionsChange={(opts) => toolManager.setToolOptions(opts)}
+			onToolChange={(tool) => toolManager.setTool(tool)}
 		/>
 
 		<!-- Undo/Redo Buttons -->

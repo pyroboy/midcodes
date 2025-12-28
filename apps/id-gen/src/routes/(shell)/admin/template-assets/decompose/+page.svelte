@@ -11,6 +11,11 @@
 	import { HistoryManager } from '$lib/logic/HistoryManager.svelte';
 	import { UndoManager } from '$lib/logic/UndoManager.svelte';
 	import { getProxiedUrl } from '$lib/utils/storage';
+	import {
+		addStaticElement,
+		removeStaticElement,
+		syncStaticElementName
+	} from '$lib/remote/static-element.remote';
 
 	// Components
 	import DecomposeHeader from './components/DecomposeHeader.svelte';
@@ -67,7 +72,12 @@
 	const processor = new ImageProcessor(layerMgr, historyMgr, () => assetConfig);
 
 	// --- Local UI State ---
-	let selectedLayerId = $state<string | null>(null);
+	// Multi-selection support: Set of selected layer IDs
+	let selectedLayerIds = $state<Set<string>>(new Set());
+	// For backward compatibility, derive primary selection (first selected)
+	const selectedLayerId = $derived<string | null>(
+		selectedLayerIds.size > 0 ? Array.from(selectedLayerIds)[0] : null
+	);
 	// Track overridden background URLs after setAsMain completes
 	let overriddenFrontUrl = $state<string | null>(null);
 	let overriddenBackUrl = $state<string | null>(null);
@@ -185,6 +195,14 @@
 					toast.info('Redo');
 				}
 			}
+
+			// Static Element toggle: Cmd+Opt+Shift+E (Mac) / Ctrl+Alt+Shift+E (Win)
+			if ((e.ctrlKey || e.metaKey) && e.altKey && e.shiftKey && e.key.toLowerCase() === 'e') {
+				e.preventDefault();
+				if (selectedLayerId && selectedLayerId !== 'original-file') {
+					handleToggleStaticElement(selectedLayerId);
+				}
+			}
 		}
 		window.addEventListener('keydown', handleKeydown);
 
@@ -215,7 +233,7 @@
 		layerId: string
 	) {
 		actionModalLayerId = layerId;
-		selectedLayerId = layerId;
+		selectedLayerIds = new Set([layerId]);
 		if (action === 'decompose') modals.decompose = true;
 		if (action === 'upscale') modals.upscale = true;
 		if (action === 'remove') {
@@ -234,6 +252,59 @@
 		}
 		if (action === 'duplicate') {
 			layerMgr.duplicateLayer(layerId);
+		}
+	}
+
+	// Static Element toggle handler
+	async function handleToggleStaticElement(layerId: string) {
+		const templateId = data.template?.id;
+		if (!templateId) {
+			toast.error('No template linked to this asset');
+			return;
+		}
+
+		const isCurrentlyStatic = layerMgr.isStaticElement(layerId);
+
+		if (isCurrentlyStatic) {
+			// Remove static element
+			const pairedElementId = layerMgr.getPairedElementId(layerId);
+			if (!pairedElementId) {
+				toast.error('Paired element ID not found');
+				return;
+			}
+
+			const result = await removeStaticElement({ templateId, elementId: pairedElementId });
+			if (result.success) {
+				layerMgr.setPairedElementId(layerId, undefined);
+				toast.success('Static Element removed');
+			} else {
+				toast.error(result.error || 'Failed to remove static element');
+			}
+		} else {
+			// Ensure image is uploaded first
+			const uploadedUrl = await layerMgr.ensureLayerUploaded(layerId);
+			if (!uploadedUrl) {
+				toast.error('Failed to upload layer image');
+				return;
+			}
+
+			// Get layer data
+			const layerData = layerMgr.getLayerDataForStaticElement(layerId);
+			if (!layerData) {
+				toast.error('Layer data not found');
+				return;
+			}
+
+			// Use uploaded URL
+			layerData.imageUrl = uploadedUrl;
+
+			const result = await addStaticElement({ templateId, layerId, layerData });
+			if (result.success && result.elementId) {
+				layerMgr.setPairedElementId(layerId, result.elementId);
+				toast.success('Converted to Static Element');
+			} else {
+				toast.error(result.error || 'Failed to create static element');
+			}
 		}
 	}
 
@@ -365,19 +436,32 @@
 					undoManager={undoMgr}
 					disabled={processor.isProcessing}
 					{selectedLayerId}
+					{selectedLayerIds}
 					onDuplicate={() => {
 						if (selectedLayerId) layerMgr.duplicateLayer(selectedLayerId);
 					}}
 					onDelete={() => {
-						// Shortcut delete - direct for now
-						if (selectedLayerId) {
-							layerMgr.removeLayer(selectedLayerId);
-							selectedLayerId = null;
-							toast.success('Layer deleted');
+						// Delete all selected layers
+						if (selectedLayerIds.size > 0) {
+							for (const id of selectedLayerIds) {
+								layerMgr.removeLayer(id);
+							}
+							selectedLayerIds = new Set();
+							toast.success(selectedLayerIds.size > 1 ? 'Layers deleted' : 'Layer deleted');
 						}
 					}}
 					onMoveLayer={(dir) => {
 						if (selectedLayerId) layerMgr.moveLayer(selectedLayerId, dir);
+					}}
+					onMergeLayers={async () => {
+						if (selectedLayerIds.size >= 2) {
+							const mergedId = await layerMgr.mergeLayers(Array.from(selectedLayerIds));
+							if (mergedId) {
+								selectedLayerIds = new Set([mergedId]);
+							}
+						} else {
+							toast.warning('Select at least 2 layers to merge (Shift+Click)');
+						}
 					}}
 				>
 					<ImagePreview
@@ -392,6 +476,7 @@
 						masks={layerMgr.masks}
 						showOriginalLayer={layerMgr.showOriginalLayer}
 						{selectedLayerId}
+						{selectedLayerIds}
 						activeSide={layerMgr.activeSide}
 						assetName={data.asset.name}
 						widthPixels={data.asset.widthPixels || 1050}
@@ -399,8 +484,23 @@
 						orientation={data.asset.orientation || 'horizontal'}
 						activeTool={toolMgr.activeTool}
 						onToolChange={(tool: ToolName) => toolMgr.setTool(tool)}
-						onSelectLayer={(id: string | null) => {
-							selectedLayerId = id;
+						onSelectLayer={(id: string | null, addToSelection: boolean = false) => {
+							if (id === null) {
+								// Deselect all
+								selectedLayerIds = new Set();
+							} else if (addToSelection) {
+								// Shift+click: toggle in selection
+								const newSet = new Set(selectedLayerIds);
+								if (newSet.has(id)) {
+									newSet.delete(id);
+								} else {
+									newSet.add(id);
+								}
+								selectedLayerIds = newSet;
+							} else {
+								// Regular click: replace selection
+								selectedLayerIds = new Set([id]);
+							}
 							if (id && id !== 'original-file') {
 								toolMgr.setTool('move');
 							}
@@ -534,15 +634,27 @@
 							<LayerCard
 								{layer}
 								selection={layerMgr.selections.get(layer.id)}
-								isSelected={selectedLayerId === layer.id}
+								isSelected={selectedLayerIds.has(layer.id)}
 								mergeMode={layerMgr.mergeMode}
 								isSelectedForMerge={layerMgr.selectedForMerge.has(layer.id)}
 								isProcessing={processor.processingLayerId === layer.id}
 								onDragStart={(e) => handleLayerDragStart(e, i)}
 								onDrop={(e) => handleDrop(e, i)}
 								onDragOver={(e) => e.preventDefault()}
-								onSelect={() => {
-									selectedLayerId = layer.id;
+								onSelect={(e?: MouseEvent) => {
+									if (e?.shiftKey) {
+										// Shift+click: add/remove from selection
+										const newSet = new Set(selectedLayerIds);
+										if (newSet.has(layer.id)) {
+											newSet.delete(layer.id);
+										} else {
+											newSet.add(layer.id);
+										}
+										selectedLayerIds = newSet;
+									} else {
+										// Regular click: replace selection
+										selectedLayerIds = new Set([layer.id]);
+									}
 									// Auto-select move tool when layer is selected
 									if (layer.id !== 'original-file') {
 										toolMgr.activeTool = 'move';
@@ -560,11 +672,16 @@
 									layerMgr.updateSelection(layer.id, {
 										included: !layerMgr.selections.get(layer.id)?.included
 									})}
-								onAction={(action) => handleMenuAction(action, layer.id)}
+								onAction={(action) => {
+									if (action !== 'toggleStaticElement') {
+										handleMenuAction(action, layer.id);
+									}
+								}}
 								onPreviewImage={(url, title) => {
 									previewData = { url, title };
 									modals.preview = true;
 								}}
+								onToggleStaticElement={() => handleToggleStaticElement(layer.id)}
 							/>
 						{/each}
 
@@ -578,8 +695,8 @@
 								side: layerMgr.activeSide
 							} as any}
 							isOriginal={true}
-							onSelect={() => (selectedLayerId = 'original-file')}
-							isSelected={selectedLayerId === 'original-file'}
+							onSelect={() => (selectedLayerIds = new Set(['original-file']))}
+							isSelected={selectedLayerIds.has('original-file')}
 							selection={{ included: true } as any}
 							onToggleOriginalLayer={() =>
 								(layerMgr.showOriginalLayer = !layerMgr.showOriginalLayer)}

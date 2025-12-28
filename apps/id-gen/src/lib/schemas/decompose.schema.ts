@@ -44,6 +44,7 @@ export const decomposedLayerSchema = z.object({
 	suggestedType: layerElementTypeSchema.default('unknown'),
 	side: z.enum(['front', 'back']).default('front'),
 	parentId: z.string().optional(), // Make sure parentId is supported
+	pairedElementId: z.string().uuid().optional(), // ID of linked GraphicElement (Static Element)
 	// NEW fields for client-side created layers
 	cachedBlob: z.custom<Blob>((val) => val instanceof Blob).optional(), // Temporary storage before upload
 	layerType: z.enum(['decomposed', 'drawing', 'copied', 'filled']).optional()
@@ -79,7 +80,8 @@ export const layerSelectionSchema = z.object({
 		height: z.number().int().positive()
 	}),
 	layerImageUrl: z.string().optional(), // For 'image' type: store layer PNG URL
-	side: z.enum(['front', 'back']).default('front') // Which side this layer belongs to
+	side: z.enum(['front', 'back']).default('front'), // Which side this layer belongs to
+	pairedElementId: z.string().uuid().optional() // ID of linked GraphicElement (Static Element)
 });
 export type LayerSelection = z.infer<typeof layerSelectionSchema>;
 

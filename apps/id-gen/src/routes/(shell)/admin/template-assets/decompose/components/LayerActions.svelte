@@ -1,18 +1,20 @@
 <script lang="ts">
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { Button } from '$lib/components/ui/button';
-	import { Copy, Trash2, ArrowUp, ArrowDown, Pencil, MoreHorizontal } from 'lucide-svelte';
+	import { Copy, Trash2, ArrowUp, ArrowDown, Pencil, MoreHorizontal, Image } from 'lucide-svelte';
 
-	type Action = 'rename' | 'duplicate' | 'delete' | 'moveUp' | 'moveDown';
+	type Action = 'rename' | 'duplicate' | 'delete' | 'moveUp' | 'moveDown' | 'toggleStaticElement';
 
 	let {
 		layerId,
 		onAction,
-		disabled = false
+		disabled = false,
+		isStaticElement = false
 	}: {
 		layerId: string;
 		onAction: (action: Action) => void;
 		disabled?: boolean;
+		isStaticElement?: boolean;
 	} = $props();
 
 	let isDeleting = $state(false);
@@ -51,6 +53,12 @@
 		<DropdownMenu.Item onclick={() => onAction('moveDown')}>
 			<ArrowDown class="mr-2 h-4 w-4" />
 			<span>Move Down</span>
+		</DropdownMenu.Item>
+		<DropdownMenu.Separator />
+		<DropdownMenu.Item onclick={() => onAction('toggleStaticElement')}>
+			<Image class="mr-2 h-4 w-4" />
+			<span>{isStaticElement ? 'Remove Static Element' : 'Convert to Static Element'}</span>
+			<DropdownMenu.Shortcut>⌘⌥⇧E</DropdownMenu.Shortcut>
 		</DropdownMenu.Item>
 		<DropdownMenu.Separator />
 		{#if isDeleting}

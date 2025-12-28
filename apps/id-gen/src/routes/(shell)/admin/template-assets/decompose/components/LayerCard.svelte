@@ -55,7 +55,8 @@
 		onDrop,
 		onAction,
 		onMoveUp,
-		onMoveDown
+		onMoveDown,
+		onToggleStaticElement
 	}: {
 		layer: DecomposedLayer | { id: string; name: string; imageUrl: string; zIndex: number };
 		selection: LayerSelection | undefined;
@@ -87,10 +88,16 @@
 		onDragOver?: (e: DragEvent) => void;
 		onDragLeave?: () => void;
 		onDrop?: (e: DragEvent) => void;
-		onAction?: (action: 'decompose' | 'upscale' | 'remove' | 'crop' | 'duplicate') => void;
+		onAction?: (
+			action: 'decompose' | 'upscale' | 'remove' | 'crop' | 'duplicate' | 'toggleStaticElement'
+		) => void;
 		onMoveUp?: () => void;
 		onMoveDown?: () => void;
+		onToggleStaticElement?: () => void;
 	} = $props();
+
+	// Derived: check if layer is a static element
+	const isStaticElement = $derived(!!selection?.pairedElementId);
 
 	function getTypeIcon(type: string): string {
 		switch (type) {
@@ -208,7 +215,13 @@
 				e.stopPropagation();
 				onPreviewImage?.(layer.imageUrl, layer.name);
 			}}
-			title="Click to view full image"
+			ondblclick={(e) => {
+				e.stopPropagation();
+				if (!isOriginal) {
+					onToggleStaticElement?.();
+				}
+			}}
+			title="Click to view full image, double-click to toggle Static Element"
 		>
 			{#if selection?.elementType === 'qr'}
 				<span
@@ -228,6 +241,14 @@
 			>
 				<ZoomIn class="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
 			</div>
+			<!-- SE Badge (Static Element indicator) -->
+			{#if isStaticElement && !isOriginal}
+				<div
+					class="absolute bottom-0.5 right-0.5 bg-violet-600 text-white text-[8px] font-bold px-1 rounded z-30"
+				>
+					SE
+				</div>
+			{/if}
 		</button>
 
 		<!-- Layer Info -->
@@ -288,6 +309,7 @@
 			{#if !mergeMode}
 				<LayerActions
 					layerId={layer.id}
+					{isStaticElement}
 					onAction={(action) => {
 						if (action === 'rename') {
 							// Trigger rename (focus input) - implementation detail: could auto-focus variable name input
@@ -303,6 +325,8 @@
 							onMoveUp?.();
 						} else if (action === 'moveDown') {
 							onMoveDown?.();
+						} else if (action === 'toggleStaticElement') {
+							onToggleStaticElement?.();
 						}
 					}}
 				/>
