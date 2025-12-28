@@ -1,23 +1,35 @@
 <script lang="ts">
 	/**
 	 * CardTextOverlay.svelte
-	 * Renders a transparent plane with dynamic text (CanvasTexture) to simulate typing.
+	 * Renders a transparent plane with static text (CanvasTexture).
+	 * Optimized: Only redraws when typingProgress changes significantly.
 	 */
 	import { T } from '@threlte/core';
 	import * as THREE from 'three';
-	import { onMount, tick } from 'svelte';
+	import { onMount } from 'svelte';
+	import type { SectionName } from '$lib/marketing/scroll';
 
 	interface Props {
 		typingProgress?: number;
 		sectionProgress?: number;
+		currentSection?: SectionName;
 	}
 
-	let { typingProgress = 0, sectionProgress = 0 }: Props = $props();
+	let { typingProgress = 0, sectionProgress = 0, currentSection = 'hero' }: Props = $props();
+
+	// Caret visibility: end of hero, during encode, gone after
+	let showCaret = $derived(
+		(currentSection === 'hero' && sectionProgress > 0.8) ||
+			currentSection === 'encode'
+	);
 
 	// Texture state
 	let textTexture: THREE.CanvasTexture | null = $state(null);
 	let canvas: HTMLCanvasElement;
 	let ctx: CanvasRenderingContext2D | null = null;
+
+	// Track last rendered progress to avoid unnecessary redraws
+	let lastRenderedProgress = -1;
 
 	// Config
 	const WIDTH = 640;
@@ -31,7 +43,6 @@
 	];
 
 	onMount(() => {
-		console.log('[CardTextOverlay] Mounted');
 		canvas = document.createElement('canvas');
 		canvas.width = WIDTH;
 		canvas.height = HEIGHT;
@@ -39,83 +50,90 @@
 
 		textTexture = new THREE.CanvasTexture(canvas);
 		textTexture.colorSpace = THREE.SRGBColorSpace;
-		console.log('[CardTextOverlay] Texture created', textTexture);
+
+		// Initial render with full text, no caret
+		renderText(1, false);
 	});
 
 	/**
-	 * Update texture when typingProgress changes
+	 * Render text to canvas
 	 */
-	$effect(() => {
-		if (!ctx || !textTexture) {
-			// console.warn('[CardTextOverlay] Skipping update - no ctx or texture');
-			return;
-		}
+	function renderText(progress: number, drawCaret: boolean) {
+		if (!ctx || !textTexture) return;
 
 		// Clear
 		ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
-		let debugTexts: string[] = [];
+		// Snap to full text when close to 1 (lerp never quite reaches 1)
+		const effectiveProgress = progress > 0.95 ? 1 : progress < 0.05 ? 0 : progress;
 
 		// Draw Lines
-		LINES.forEach((line) => {
-			// Calculate how many chars are visible
-			// We want concurrent typing.
-			// Map progress 0-1 to 0-Length.
-			// Add randomness/jitter? No, plain stepping.
-			const charCount = Math.floor(line.text.length * typingProgress);
-			let visibleText = line.text.substring(0, charCount);
-
-			// Add "decoding" effect: Append random chars at the tip if not fully typed
-			if (typingProgress < 1 && visibleText.length < line.text.length) {
-				// Add 1-2 random characters
-				const randomChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-				const r1 = randomChars.charAt(Math.floor(Math.random() * randomChars.length));
-				// const r2 = randomChars.charAt(Math.floor(Math.random() * randomChars.length));
-				visibleText += r1;
-			}
+		LINES.forEach((line, index) => {
+			const charCount = Math.round(line.text.length * effectiveProgress);
+			const visibleText = line.text.substring(0, charCount);
 
 			if (visibleText.length > 0) {
-				debugTexts.push(visibleText);
-				// Draw Text
 				ctx!.fillStyle = line.color;
 				ctx!.font = line.font;
 				ctx!.textAlign = 'left';
 				ctx!.textBaseline = 'middle';
-				// 3D Y=0 is Center. Canvas Y is Top->Bottom.
-				// MarketingTextureManager logic matched roughly.
-				// x=0.1 * WIDTH
 				ctx!.fillText(visibleText, WIDTH * 0.1, HEIGHT * line.y);
 
-				// Draw Cursor for this line if active (and not fully typed)
-				if (
-					typingProgress > 0 &&
-					typingProgress < 1 &&
-					visibleText.length < line.text.length &&
-					visibleText.length > 0
-				) {
-					// Measure text width to place cursor
+				// Draw caret after first line (name) if visible
+				if (index === 0 && drawCaret) {
 					const metrics = ctx!.measureText(visibleText);
-					const cursorX = WIDTH * 0.1 + metrics.width + 5;
-
-					// Blink effect (global sync)
-					if (Math.sin(sectionProgress * 30) > 0) {
-						ctx!.fillRect(cursorX, HEIGHT * line.y - 20, 3, 40);
-					}
+					const caretX = WIDTH * 0.1 + metrics.width + 4;
+					const caretY = HEIGHT * line.y;
+					ctx!.fillStyle = '#1f2937';
+					ctx!.fillRect(caretX, caretY - 24, 3, 48);
 				}
 			}
 		});
 
-		if (debugTexts.length > 0) {
-			console.log(`[CardTextOverlay] Rendering: "${debugTexts.join('", "')}"`);
-		}
 		textTexture.needsUpdate = true;
+		lastRenderedProgress = progress;
+	}
+
+	// Track last caret state to detect changes
+	let lastCaretState = false;
+
+	/**
+	 * Update texture when typingProgress or caret state changes
+	 */
+	$effect(() => {
+		if (!ctx || !textTexture) return;
+
+		// Calculate character threshold - only redraw when a new character would appear
+		const maxChars = Math.max(...LINES.map((l) => l.text.length));
+		const threshold = 1 / maxChars;
+
+		// Check if we need to redraw
+		const progressDiff = Math.abs(typingProgress - lastRenderedProgress);
+		const caretChanged = showCaret !== lastCaretState;
+		const needsRedraw =
+			progressDiff >= threshold || // New character would appear
+			lastRenderedProgress < 0 || // Initial render
+			(typingProgress > 0.95 && lastRenderedProgress <= 0.95) || // Snap to complete
+			(typingProgress < 0.05 && lastRenderedProgress >= 0.05) || // Snap to empty
+			caretChanged; // Caret visibility changed
+
+		if (needsRedraw) {
+			renderText(typingProgress, showCaret);
+			lastCaretState = showCaret;
+		}
 	});
 </script>
 
 {#if textTexture}
-	<!-- Overlay slightly above card surface -->
-	<T.Mesh position.z={0.005}>
+	<!-- Overlay in front of card surface (z=0.02 to avoid z-fighting) -->
+	<T.Mesh position.z={0.02}>
 		<T.PlaneGeometry args={[2 / 1.586, 2]} />
-		<T.MeshBasicMaterial map={textTexture} transparent opacity={1} side={THREE.DoubleSide} />
+		<T.MeshBasicMaterial
+			map={textTexture}
+			transparent
+			opacity={1}
+			depthTest={true}
+			depthWrite={false}
+		/>
 	</T.Mesh>
 {/if}

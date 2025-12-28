@@ -5,7 +5,7 @@
 	 */
 	import { T } from '@threlte/core';
 	import { interactivity } from '@threlte/extras';
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import HeroCard3D from './HeroCard3D.svelte';
 	import InstancedCardGrid from './InstancedCardGrid.svelte';
 	import CardStack from './sections/CardStack.svelte';
@@ -19,9 +19,11 @@
 			widthPixels: number | null;
 			heightPixels: number | null;
 		}>;
+		/** Callback when scene is fully loaded */
+		onSceneReady?: () => void;
 	}
 
-	let { templateAssets = [] }: Props = $props();
+	let { templateAssets = [], onSceneReady }: Props = $props();
 
 	// Scroll state for driving animations
 	const scrollState = getScrollState();
@@ -32,8 +34,15 @@
 	// Enable pointer events on 3D scene (must be called inside Canvas)
 	interactivity();
 
-	onMount(() => {
-		sceneReady = true;
+	onMount(async () => {
+		// Wait for next tick to ensure meshes are created
+		await tick();
+
+		// Small delay to ensure textures are uploaded to GPU
+		setTimeout(() => {
+			sceneReady = true;
+			onSceneReady?.();
+		}, 100);
 	});
 </script>
 

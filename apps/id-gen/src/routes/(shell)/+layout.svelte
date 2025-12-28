@@ -180,11 +180,17 @@
 		lastScopeKey = scopeKey;
 	});
 
+	// Check if on marketing page (skip heavy fonts)
+	let isMarketingPage = $derived($page.url.pathname === '/');
+
 	// Initialize theme on mount - ALWAYS for shell
 	onMount(async () => {
 		try {
 			setupGlobalErrorHandlers();
-			await loadGoogleFonts();
+			// Skip heavy font loading on marketing page for performance
+			if (!isMarketingPage) {
+				await loadGoogleFonts();
+			}
 			const currentTheme = theme.getCurrentTheme();
 			console.log('App Shell Theme initialized:', currentTheme);
 		} catch (error) {
@@ -194,12 +200,15 @@
 </script>
 
 <svelte:head>
-	<link href="https://fonts.googleapis.com" rel="preconnect" />
-	<link href="https://fonts.gstatic.com" rel="preconnect" crossorigin="anonymous" />
-	<link
-		href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Open+Sans:wght@300;400;600;700&family=Lato:wght@300;400;700&family=Montserrat:wght@300;400;500;700&family=Source+Sans+Pro:wght@300;400;600;700&family=Playfair+Display:wght@400;500;700&display=swap"
-		rel="stylesheet"
-	/>
+	<!-- Only load heavy fonts on non-marketing pages -->
+	{#if !isMarketingPage}
+		<link href="https://fonts.googleapis.com" rel="preconnect" />
+		<link href="https://fonts.gstatic.com" rel="preconnect" crossorigin="anonymous" />
+		<link
+			href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Open+Sans:wght@300;400;600;700&family=Lato:wght@300;400;700&family=Montserrat:wght@300;400;500;700&family=Source+Sans+Pro:wght@300;400;600;700&family=Playfair+Display:wght@400;500;700&display=swap"
+			rel="stylesheet"
+		/>
+	{/if}
 </svelte:head>
 
 <div class="min-h-screen bg-background text-foreground theme-transition">

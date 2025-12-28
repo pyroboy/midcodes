@@ -86,15 +86,25 @@
 		currentState = getSectionCardState(currentSection, sectionProgress);
 	});
 
+	// Cache previous state to avoid unnecessary calculations
+	let prevState = $state<CardState | null>(null);
+	let cachedTransform: ReturnType<typeof getStateTransform> | null = null;
+	let cachedVisuals: ReturnType<typeof getStateVisuals> | null = null;
+
 	/**
 	 * Animation loop - runs every frame
 	 */
 	useTask((delta) => {
 		if (!groupRef) return;
 
-		// Get target values from state machine
-		const targetTransform = getStateTransform(currentState, sectionProgress);
-		const targetVisuals = getStateVisuals(currentState, sectionProgress);
+		// Only recalculate when state changes (optimization)
+		if (currentState !== prevState || !cachedTransform || !cachedVisuals) {
+			cachedTransform = getStateTransform(currentState, sectionProgress);
+			cachedVisuals = getStateVisuals(currentState, sectionProgress);
+			prevState = currentState;
+		}
+		const targetTransform = cachedTransform;
+		const targetVisuals = cachedVisuals;
 
 		// Smoothly interpolate toward targets
 		const lerpFactor = Math.min(1, delta * LERP_SPEED);
@@ -111,7 +121,20 @@
 		layerSeparation = lerp(layerSeparation, targetVisuals.layerSeparation, lerpFactor);
 		opacity = lerp(opacity, targetVisuals.opacity, lerpFactor);
 		glowIntensity = lerp(glowIntensity, targetVisuals.glowIntensity, lerpFactor);
-		typingProgress = lerp(typingProgress, targetVisuals.typingProgress, lerpFactor);
+
+		// Typing speed tied to sectionProgress (scroll position)
+		// Start of section = very slow, end of section = 1x
+		let typingLerpFactor = lerpFactor;
+		if (currentSection === 'encode') {
+			// Speed based on how far through the section (0.02x to 1x)
+			const speedMultiplier = 0.02 + sectionProgress * 0.98;
+			typingLerpFactor = Math.min(1, delta * LERP_SPEED * speedMultiplier);
+		} else if (currentSection === 'hero') {
+			// Untyping: use inverse - further from encode = slower
+			const speedMultiplier = 0.02 + (1 - sectionProgress) * 0.98;
+			typingLerpFactor = Math.min(1, delta * LERP_SPEED * speedMultiplier);
+		}
+		typingProgress = lerp(typingProgress, targetVisuals.typingProgress, typingLerpFactor);
 
 		// Discrete state changes (no lerp needed)
 		autoRotate = targetVisuals.autoRotate;

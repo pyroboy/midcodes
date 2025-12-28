@@ -76,7 +76,7 @@ export async function createRoundedRectCard(
 		bevelSize: 0.002,
 		bevelSegments: 1, // Reduced from 2
 		steps: 1,
-		curveSegments: 12 // Reduced from 32
+		curveSegments: 6 // Reduced from 12 for optimization
 	};
 
 	const extrudeGeometry = new THREE.ExtrudeGeometry(roundedRectShape, extrudeSettings);

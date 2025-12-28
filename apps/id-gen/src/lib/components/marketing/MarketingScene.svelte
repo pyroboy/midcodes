@@ -16,14 +16,16 @@
 			widthPixels: number | null;
 			heightPixels: number | null;
 		}>;
+		/** Callback when scene is fully loaded */
+		onSceneReady?: () => void;
 	}
 
-	let { templateAssets = [] }: Props = $props();
+	let { templateAssets = [], onSceneReady }: Props = $props();
 </script>
 
 <!-- Fixed fullscreen canvas behind content -->
 <div class="fixed inset-0 w-screen h-screen z-0 pointer-events-none" style="touch-action: none;">
 	<Canvas>
-		<MarketingSceneContent {templateAssets} />
+		<MarketingSceneContent {templateAssets} {onSceneReady} />
 	</Canvas>
 </div>

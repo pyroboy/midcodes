@@ -226,7 +226,7 @@ export function getStateVisuals(state: CardState, sectionProgress: number): Card
 				lanyardVisible: false,
 				laserScanActive: false,
 				glowIntensity: 0,
-				typingProgress: 0, // Name hidden at start
+				typingProgress: 0, // Text hidden, types in encode section
 				opacity: 1
 			};
 
@@ -239,8 +239,8 @@ export function getStateVisuals(state: CardState, sectionProgress: number): Card
 				lanyardVisible: false,
 				laserScanActive: false,
 				glowIntensity: 0,
-				// Animate typing from 0 to 1
-				typingProgress: sectionProgress * 1.2 > 1 ? 1 : sectionProgress * 1.2,
+				// Auto-play: target 1, lerp handles smooth animation
+				typingProgress: 1,
 				opacity: 1
 			};
 
@@ -251,33 +251,9 @@ export function getStateVisuals(state: CardState, sectionProgress: number): Card
 				layerSeparation: 0,
 				textureIndex: 0,
 				lanyardVisible: false,
-				laserScanActive: true, // Always active during scan section
+				laserScanActive: true,
 				glowIntensity: 1,
-				typingProgress: 1, // Fully visible
-				opacity: 1
-			};
-
-		case 'encode':
-			return {
-				autoRotate: false,
-				autoRotateSpeed: 0,
-				layerSeparation: 0,
-				textureIndex: 0,
-				lanyardVisible: false,
-				laserScanActive: false,
-				glowIntensity: 0,
-				opacity: 1
-			};
-
-		case 'scan':
-			return {
-				autoRotate: false,
-				autoRotateSpeed: 0,
-				layerSeparation: 0,
-				textureIndex: 0,
-				lanyardVisible: false,
-				laserScanActive: true, // Always active during scan section
-				glowIntensity: 1,
+				typingProgress: 1,
 				opacity: 1
 			};
 

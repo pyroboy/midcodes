@@ -13,6 +13,7 @@
 	import { onMount } from 'svelte';
 	import { createRoundedRectCard, type CardGeometry } from '$lib/utils/cardGeometry';
 	import CardTextOverlay from './CardTextOverlay.svelte';
+	import HeroCardExplodedLayers from './HeroCardExplodedLayers.svelte';
 	import {
 		createBaybaninNormalMap,
 		createHeroCardTexture,
@@ -184,84 +185,16 @@
 		<T.Mesh geometry={cardGeometry.frontGeometry} material={frontMaterial} />
 
 		<!-- Dynamic Text Overlay (Simultaneous letter-by-letter typing) -->
-		<CardTextOverlay {typingProgress} {sectionProgress} />
+		<CardTextOverlay {typingProgress} {sectionProgress} {currentSection} />
 	</T.Group>
 
 	<!-- 5-Layer Stack (In front of card) -->
-	{#if layerSeparation > 0.05}
-		<!-- Layer 1: Base Grid/Background Data -->
-		<T.Group position.z={layerSeparation * 0.3}>
-			<T.Mesh material={middleLayerMaterial}>
-				<T.PlaneGeometry args={[CARD_WIDTH * 0.95, CARD_HEIGHT * 0.95]} />
-			</T.Mesh>
-			<!-- Grid pattern -->
-			<T.Mesh position.z={0.001}>
-				<T.PlaneGeometry args={[CARD_WIDTH * 0.9, CARD_HEIGHT * 0.9]} />
-				<T.MeshBasicMaterial color={0x3a3a6a} wireframe transparent opacity={0.3} />
-			</T.Mesh>
-		</T.Group>
-
-		<!-- Layer 2: Photo Chip -->
-		<T.Group position.z={layerSeparation * 0.7}>
-			<T.Mesh position.x={-0.65} position.y={0}>
-				<T.BoxGeometry args={[0.4, 0.5, 0.01]} />
-				<T.MeshBasicMaterial
-					color={0x6a6aaa}
-					transparent
-					opacity={Math.min(1, layerSeparation * 2)}
-				/>
-			</T.Mesh>
-			<!-- Chip accents -->
-			<T.Mesh position.x={-0.65} position.y={0.3}>
-				<T.PlaneGeometry args={[0.2, 0.02]} />
-				<T.MeshBasicMaterial color={0xffaa00} />
-			</T.Mesh>
-		</T.Group>
-
-		<!-- Layer 3: Text Lines (Identity Data) -->
-		<T.Group position.z={layerSeparation * 1.1}>
-			{#each [0.4, 0.3, -0.1, -0.2, -0.3] as yPos, i}
-				<T.Mesh position.y={yPos} position.x={0.1}>
-					<T.PlaneGeometry args={[CARD_WIDTH * (i < 2 ? 0.4 : 0.6), 0.03]} />
-					<T.MeshBasicMaterial
-						color={0xaaddff}
-						transparent
-						opacity={Math.min(1, layerSeparation * 2)}
-					/>
-				</T.Mesh>
-			{/each}
-		</T.Group>
-
-		<!-- Layer 4: QR Code -->
-		<T.Group position.z={layerSeparation * 1.5}>
-			<T.Mesh position.x={0.4} position.y={-0.5}>
-				<T.PlaneGeometry args={[0.35, 0.35]} />
-				<T.MeshBasicMaterial
-					color={0xffffff}
-					transparent
-					opacity={Math.min(1, layerSeparation * 2)}
-				/>
-			</T.Mesh>
-			<T.Mesh position.x={0.4} position.y={-0.5} position.z={0.001}>
-				<T.PlaneGeometry args={[0.3, 0.3]} />
-				<T.MeshBasicMaterial color={0x000000} wireframe transparent opacity={0.5} />
-			</T.Mesh>
-		</T.Group>
-
-		<!-- Layer 5: Holographic/Status Icons -->
-		<T.Group position.z={layerSeparation * 1.9}>
-			<!-- Top right icon -->
-			<T.Mesh position.x={0.5} position.y={0.8}>
-				<T.CircleGeometry args={[0.08, 16]} />
-				<T.MeshBasicMaterial color={0x00ff00} transparent opacity={0.8} />
-			</T.Mesh>
-			<!-- Bottom center status bar -->
-			<T.Mesh position.y={-0.8}>
-				<T.PlaneGeometry args={[CARD_WIDTH * 0.8, 0.05]} />
-				<T.MeshBasicMaterial color={0x00ffff} transparent opacity={0.6} />
-			</T.Mesh>
-		</T.Group>
-	{/if}
+	<HeroCardExplodedLayers
+		{layerSeparation}
+		{middleLayerMaterial}
+		cardWidth={CARD_WIDTH}
+		cardHeight={CARD_HEIGHT}
+	/>
 
 	<!-- Back face (separated backward in exploded view) -->
 	<!-- Back face (Furthest back) -->
