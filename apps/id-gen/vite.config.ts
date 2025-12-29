@@ -41,7 +41,7 @@ export default defineConfig(({ mode }) => {
 				output: {
 					manualChunks: {
 						'vendor-three': ['three', '@threlte/core', '@threlte/extras'],
-						'vendor-ui': ['bits-ui', 'clsx', 'tailwind-merge']
+						'vendor-ui': ['bits-ui', 'tailwind-merge']
 					}
 				}
 			}
