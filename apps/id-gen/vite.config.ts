@@ -40,8 +40,7 @@ export default defineConfig(({ mode }) => {
 			rollupOptions: {
 				output: {
 					manualChunks: {
-						'vendor-three': ['three', '@threlte/core', '@threlte/extras'],
-						'vendor-ui': ['bits-ui', 'tailwind-merge']
+						'vendor-three': ['three', '@threlte/core', '@threlte/extras']
 					}
 				}
 			}
