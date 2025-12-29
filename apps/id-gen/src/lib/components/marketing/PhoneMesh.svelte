@@ -317,25 +317,38 @@
 
 		// Update Transform
 		if (section === 'tap-bump') {
-			// Smooth entry for first 25%, then instant for the rest
-			if (progress < 0.25) {
-				// Lerp for smooth transition from tap-approach
-				const lerpSpeed = delta * 8; // Faster lerp for quick catch-up
-				position.x = lerp(position.x, targetX, lerpSpeed);
-				position.y = Math.sin(Date.now() * 0.001) * 0.05;
-				position.z = lerp(position.z, targetZ, lerpSpeed);
-				rotation.x = lerp(rotation.x, targetRotX, lerpSpeed);
-				rotation.y = lerp(rotation.y, targetRotY, lerpSpeed);
-				rotation.z = lerp(rotation.z, targetRotZ, lerpSpeed);
+			// Blend from lerped to instant over 0-30% progress
+			// This eliminates any hard cutoffs that cause snapping
+			const BLEND_END = 0.3;
+			
+			// Always calculate the lerped position
+			const lerpSpeed = delta * 8;
+			const lerpedX = lerp(position.x, targetX, lerpSpeed);
+			const lerpedZ = lerp(position.z, targetZ, lerpSpeed);
+			const lerpedRotX = lerp(rotation.x, targetRotX, lerpSpeed);
+			const lerpedRotY = lerp(rotation.y, targetRotY, lerpSpeed);
+			const lerpedRotZ = lerp(rotation.z, targetRotZ, lerpSpeed);
+
+			if (progress < BLEND_END) {
+				// Blend factor: 0 at start -> 1 at BLEND_END (smoothstep)
+				const t = progress / BLEND_END;
+				const blend = t * t * (3 - 2 * t); // Smoothstep for no sudden changes
+
+				// Interpolate between lerped and instant
+				position.x = lerp(lerpedX, targetX, blend);
+				position.z = lerp(lerpedZ, targetZ, blend);
+				rotation.x = lerp(lerpedRotX, targetRotX, blend);
+				rotation.y = lerp(lerpedRotY, targetRotY, blend);
+				rotation.z = lerp(lerpedRotZ, targetRotZ, blend);
 			} else {
-				// Instant position during bump (no lerp)
+				// Fully instant after blend zone
 				position.x = targetX;
-				position.y = Math.sin(Date.now() * 0.001) * 0.05;
 				position.z = targetZ;
 				rotation.x = targetRotX;
 				rotation.y = targetRotY;
 				rotation.z = targetRotZ;
 			}
+			position.y = Math.sin(Date.now() * 0.001) * 0.05;
 		} else {
 			// Lerp for smooth transitions
 			position.x = lerp(position.x, targetX, delta * 3);

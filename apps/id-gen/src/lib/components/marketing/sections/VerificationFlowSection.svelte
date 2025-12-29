@@ -5,7 +5,7 @@
 
 <!-- Encode (Manual Entry vs Automation) -->
 <section
-	class="min-h-screen flex items-center justify-center px-6 md:px-8"
+	class="min-h-[300vh] flex items-center justify-center px-6 md:px-8"
 	data-section-id="encode"
 >
 	<div
@@ -27,7 +27,7 @@
 </section>
 
 <!-- Scan (Visual Verification) -->
-<section class="min-h-screen flex items-center justify-center px-6 md:px-8" data-section-id="scan">
+<section class="min-h-[600vh] flex items-center justify-center px-6 md:px-8" data-section-id="scan">
 	<div class="text-center max-w-3xl mx-auto pointer-events-none">
 		<span
 			class="inline-block px-4 py-1.5 bg-green-500/10 border border-green-500/20 rounded-full text-green-400 text-sm font-medium mb-6 backdrop-blur-md"
@@ -68,7 +68,7 @@
 
 <!-- Tap Bump (Contact) -->
 <section
-	class="min-h-[50vh] flex items-center justify-center px-6 md:px-8"
+	class="min-h-[150vh] flex items-center justify-center px-6 md:px-8"
 	data-section-id="tap-bump"
 >
     <!-- Spacer for animation focus -->
@@ -76,7 +76,7 @@
 
 <!-- Tap Linger (Reading) -->
 <section
-	class="min-h-[60vh] flex items-center justify-center px-6 md:px-8"
+	class="min-h-[180vh] flex items-center justify-center px-6 md:px-8"
 	data-section-id="tap-linger"
 >
     <!-- Spacer for animation focus -->
