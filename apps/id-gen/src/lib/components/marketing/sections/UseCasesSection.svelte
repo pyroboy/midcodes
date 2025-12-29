@@ -1,63 +1,109 @@
 <script>
 	// Use Cases Section
-	// Merges Applications, Impact, and Segmentation into a single managed component
+	// Three main categories: Networking & Marketing (NFC), Identification & Information, Attendance & Management
+	// Each section is 250vh tall with card texture changes
+
+	const useCaseCategories = [
+		{
+			id: 'networking',
+			tag: 'Networking & Marketing',
+			tagColor: 'cyan',
+			title: 'Make Every Tap Count.',
+			description: 'Transform physical interactions into digital connections. NFC-powered cards that share, collect, and track.',
+			applications: [
+				{ icon: '💼', name: 'Digital Business Cards', desc: 'Share contact info with a tap' },
+				{ icon: '⭐', name: 'Review Cards', desc: 'Collect customer feedback instantly' },
+				{ icon: '📶', name: 'WiFi Access Cards', desc: 'One tap wireless network access' }
+			]
+		},
+		{
+			id: 'identification',
+			tag: 'Identification & Information',
+			tagColor: 'amber',
+			title: 'Critical Info When It Matters.',
+			description: 'Life-saving details accessible instantly. From emergency contacts to product authenticity verification.',
+			applications: [
+				{ icon: '🏥', name: 'Medical Emergency Cards', desc: 'Allergies, conditions, emergency contacts' },
+				{ icon: '🐕', name: 'Pet ID Tags', desc: 'Owner info and medical history' },
+				{ icon: '✓', name: 'Product Authentication', desc: 'Verify authenticity, track provenance' }
+			]
+		},
+		{
+			id: 'attendance',
+			tag: 'Attendance & Management',
+			tagColor: 'emerald',
+			title: 'Track. Manage. Secure.',
+			description: 'Streamline operations with smart access control and real-time attendance tracking across any venue.',
+			applications: [
+				{ icon: '⏰', name: 'Employee Time & Attendance', desc: 'Accurate clock-in, real-time reports' },
+				{ icon: '🎓', name: 'School Monitoring', desc: 'Student attendance and campus access' },
+				{ icon: '🎫', name: 'Event Ticketing', desc: 'VIP zones, session tracking' },
+				{ icon: '💪', name: 'Gym Membership', desc: 'Access control and usage analytics' }
+			]
+		}
+	];
+
+	const tagColorClasses = {
+		cyan: {
+			bg: 'bg-cyan-500/10',
+			border: 'border-cyan-500/20',
+			text: 'text-cyan-400'
+		},
+		amber: {
+			bg: 'bg-amber-500/10',
+			border: 'border-amber-500/20',
+			text: 'text-amber-400'
+		},
+		emerald: {
+			bg: 'bg-emerald-500/10',
+			border: 'border-emerald-500/20',
+			text: 'text-emerald-400'
+		}
+	};
 </script>
 
-<!-- Applications -->
-<section
-	class="min-h-[150vh] flex items-center justify-center px-6 md:px-8"
-	data-section-id="useCases"
->
-	<div class="text-center max-w-3xl mx-auto">
-		<span
-			class="inline-block px-4 py-1.5 bg-purple-500/10 border border-purple-500/20 rounded-full text-purple-400 text-sm font-medium mb-6"
-		>
-			Applications
-		</span>
-		<h2 class="text-3xl sm:text-4xl md:text-6xl font-bold mb-6 leading-tight">
-			One Platform, Many Use Cases.
-		</h2>
-		<p class="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-12 leading-relaxed">
-			Schools, Dorms, Events - all unified under one flexible system.
-		</p>
-		<div class="grid grid-cols-1 sm:grid-cols-3 gap-6 text-left">
-			<div
-				class="p-6 bg-black/5 dark:bg-white/5 rounded-xl border border-black/5 dark:border-white/10"
-			>
-				<div class="text-2xl mb-3">🎓</div>
-				<h3 class="font-semibold mb-2">Student IDs</h3>
-				<p class="text-sm text-muted-foreground">Library access, cafeteria, attendance tracking</p>
-			</div>
-			<div class="p-6 bg-white/5 rounded-xl border border-white/10">
-				<div class="text-2xl mb-3">🏠</div>
-				<h3 class="font-semibold mb-2">Dormitory Keys</h3>
-				<p class="text-sm text-muted-foreground">Room access, curfew logging, visitor management</p>
-			</div>
-			<div class="p-6 bg-white/5 rounded-xl border border-white/10">
-				<div class="text-2xl mb-3">🎪</div>
-				<h3 class="font-semibold mb-2">Event Passes</h3>
-				<p class="text-sm text-muted-foreground">VIP zones, session tracking, networking</p>
+{#each useCaseCategories as category, idx}
+	{@const colors = tagColorClasses[category.tagColor]}
+	<section
+		class="h-[250vh] relative flex items-center justify-center px-6 md:px-8"
+		data-section-id="useCases-{category.id}"
+	>
+		<!-- Sticky Container that stays in viewport -->
+		<div class="sticky top-0 h-screen w-full flex items-center justify-center">
+			<div class="text-center max-w-4xl mx-auto">
+				<!-- Tag Badge -->
+				<span
+					class="inline-block px-4 py-1.5 {colors.bg} border {colors.border} rounded-full {colors.text} text-sm font-medium mb-6"
+				>
+					{category.tag}
+				</span>
+				
+				<!-- Title -->
+				<h2 class="text-3xl sm:text-4xl md:text-6xl font-bold mb-4 leading-tight">
+					{category.title}
+				</h2>
+				
+				<!-- Description -->
+				<p class="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-12 leading-relaxed">
+					{category.description}
+				</p>
+				
+				<!-- Application Cards -->
+				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-{category.applications.length === 4 ? 4 : 3} gap-4 text-left">
+					{#each category.applications as app}
+						<div
+							class="p-5 bg-black/5 dark:bg-white/5 rounded-xl border border-black/5 dark:border-white/10 backdrop-blur-sm hover:bg-black/10 dark:hover:bg-white/10 transition-all duration-300"
+						>
+							<div class="text-2xl mb-3">{app.icon}</div>
+							<h3 class="font-semibold mb-1 text-sm md:text-base">{app.name}</h3>
+							<p class="text-xs md:text-sm text-muted-foreground">{app.desc}</p>
+						</div>
+					{/each}
+				</div>
 			</div>
 		</div>
-	</div>
-
-	<!-- Impact / Scale (nested or split? Plan calls for single useCases. Let's keep it under the same ID effectively or merge logic, but DOM structure here separates them. Let's make Impact part of the same visual flow, or assume the parent section covers it. 
-	Wait, the plan said "Tag: useCases". The previous map had one 'useCases' sections. 
-	Let's wrap multiple sections? Or just tag the first one?
-	Actually, UseCases and Impact are separate sections in the file.
-	Let's tag the second one as part of useCases if possible, or just ignore for now if scroll state covers range.
-	But dynamic calculation relies on bounding box. 
-	If 'useCases' ID is only on the first section, the calculation will only cover that height.
-	I should probably tag the second one 'useCases-impact' or similar and merge, OR just wrap them.
-	Wrapping is better.
-	But they are top level elements. 
-	I will tag the first one 'useCases'. The second one 'impact' but map it to 'useCases' in logic?
-	Or just tag the second one 'impact' and add it to valid sections in logic.
-	Let's check ScrollState logic. It expects specific keys.
-	'useCases' key covers 0.70-0.85 approx.
-	Let's tag the first one `useCases` and the second one... let's merge them into a div wrapper?
-	-->
-</section>
+	</section>
+{/each}
 
 <!-- Impact / Scale -->
 <section class="min-h-[300vh] relative px-6 md:px-8 flex flex-col" data-section-id="systemScale">
@@ -140,7 +186,7 @@
 			>
 				<h3 class="text-3xl font-bold mb-4">For Individuals</h3>
 				<p class="text-muted-foreground mb-8 text-lg">
-					Upgrade your networking. One card to share your entire professionally portfolio.
+					Upgrade your networking. One card to share your entire professional portfolio.
 				</p>
 				<a
 					href="/personal"

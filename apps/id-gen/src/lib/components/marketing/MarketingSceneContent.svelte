@@ -62,25 +62,30 @@
 <T.DirectionalLight position={[0, 0, -5]} intensity={0.2} />
 
 <!-- Background card grid (swarm-to-sphere animation) -->
-<!-- Visible from useCases 50% onwards, encapsulates main card during systemScale -->
+<!-- Visible from last useCases section (attendance) 50% onwards, through systemScale -->
 {#if sceneReady}
-	{@const isUseCases = scrollState.currentSection === 'useCases'}
-	{@const isSystemScale = scrollState.currentSection === 'systemScale'}
-	{@const useCasesProgress = isUseCases ? scrollState.sectionProgress : 0}
-	{@const showGrid = isSystemScale || useCasesProgress > 0.5}
+	{@const currentSection = scrollState.currentSection}
+	{@const sectionProgress = scrollState.sectionProgress}
+	
+	{@const isAttendance = currentSection === 'useCases-attendance'}
+	{@const isSystemScale = currentSection === 'systemScale'}
+	
+	{@const showGrid = isSystemScale || (isAttendance && sectionProgress > 0.5)}
 
 	<!-- 
 		Animation progress calculation:
-		- useCases 50-100% → 0.0 to 0.5 (swarm flying in)
+		- useCases-attendance 50-100% → 0.0 to 0.5 (swarm flying in)
 		- systemScale 0-100% → 0.5 to 1.0 (sphere formation and rotation)
 	-->
 	{@const animationProgress = isSystemScale
-		? 0.5 + scrollState.sectionProgress * 0.5
-		: isUseCases
-			? Math.max(0, (useCasesProgress - 0.5) * 1.0)
+		? 0.5 + sectionProgress * 0.5
+		: isAttendance
+			? Math.max(0, (sectionProgress - 0.5) * 1.0)
 			: 0}
 
-	<InstancedCardGrid visible={showGrid} {animationProgress} />
+	{#if showGrid}
+		<InstancedCardGrid visible={true} {animationProgress} />
+	{/if}
 {/if}
 
 <!-- The hero card driven by scroll state -->
