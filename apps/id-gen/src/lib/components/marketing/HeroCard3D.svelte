@@ -88,8 +88,12 @@
 
 	// Cache previous state to avoid unnecessary calculations
 	let prevState = $state<CardState | null>(null);
+	let prevSectionProgress = $state<number>(0);
 	let cachedTransform: ReturnType<typeof getStateTransform> | null = null;
 	let cachedVisuals: ReturnType<typeof getStateVisuals> | null = null;
+
+	// States that animate based on sectionProgress (need recalc every frame)
+	const ANIMATED_STATES: CardState[] = ['tap', 'exploding', 'collapsing', 'segmentation', 'shrinking', 'growing', 'systemScale', 'encode'];
 
 	/**
 	 * Animation loop - runs every frame
@@ -97,11 +101,18 @@
 	useTask((delta) => {
 		if (!groupRef) return;
 
-		// Only recalculate when state changes (optimization)
-		if (currentState !== prevState || !cachedTransform || !cachedVisuals) {
+		// Recalculate when state changes OR when sectionProgress changes for animated states
+		const needsRecalc =
+			currentState !== prevState ||
+			!cachedTransform ||
+			!cachedVisuals ||
+			(ANIMATED_STATES.includes(currentState) && sectionProgress !== prevSectionProgress);
+
+		if (needsRecalc) {
 			cachedTransform = getStateTransform(currentState, sectionProgress);
 			cachedVisuals = getStateVisuals(currentState, sectionProgress, currentSection);
 			prevState = currentState;
+			prevSectionProgress = sectionProgress;
 		}
 		const targetTransform = cachedTransform;
 		const targetVisuals = cachedVisuals;

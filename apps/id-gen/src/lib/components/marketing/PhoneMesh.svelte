@@ -22,10 +22,13 @@
 	const START_X = 1.2;
 	const START_ROT_Y = 0;
 
-	// State
-	let position = $state(new THREE.Vector3(START_X, 0, 0));
-	let rotation = $state(new THREE.Euler(0, START_ROT_Y, 0));
+	// State - use plain objects for Svelte reactivity
+	let position = $state({ x: START_X, y: 0, z: 0 });
+	let rotation = $state({ x: 0, y: START_ROT_Y, z: 0 });
 	let opacity = $state(0);
+
+	// Group reference for direct Three.js manipulation (like HeroCard3D)
+	let groupRef: THREE.Group | undefined = $state();
 
 	// Track previous visibility to detect when phone becomes visible
 	let wasVisible = $state(false);
@@ -34,13 +37,21 @@
 	$effect(() => {
 		if (visible && !wasVisible) {
 			// Phone just became visible - reset to start position for clean entry
-			position.set(START_X, 0, 0);
-			rotation.set(0, START_ROT_Y, 0);
+			position.x = START_X;
+			position.y = 0;
+			position.z = 0;
+			rotation.x = 0;
+			rotation.y = START_ROT_Y;
+			rotation.z = 0;
 			opacity = 0;
 		} else if (!visible && wasVisible) {
 			// Phone just became invisible - reset for next entrance
-			position.set(START_X, 0, 0);
-			rotation.set(0, START_ROT_Y, 0);
+			position.x = START_X;
+			position.y = 0;
+			position.z = 0;
+			rotation.x = 0;
+			rotation.y = START_ROT_Y;
+			rotation.z = 0;
 			opacity = 0;
 		}
 		wasVisible = visible;
@@ -72,12 +83,13 @@
 		screenTexture = new THREE.CanvasTexture(canvas);
 		screenTexture.wrapS = THREE.ClampToEdgeWrapping;
 		screenTexture.wrapT = THREE.RepeatWrapping;
-		screenTexture.repeat.set(1, 0.5); // Show half the texture height (the viewport)
-		screenTexture.offset.set(0, 0.5); // Start at top (Verified screen)
-		// Note: UV origin is bottom-left.
-		// repeatY=0.5 means we see half.
-		// offsetY=0.5 means we see the top half?
-		// Let's verify mapping later. Usually offset=0.5 with repeat=0.5 shows top half.
+		// 3 sections: show 1/3 of texture at a time
+		// UV origin is bottom-left, so:
+		// offset=0.66 → NFC notification (top section)
+		// offset=0.33 → Verified (middle section)
+		// offset=0.0  → Profile (bottom section)
+		screenTexture.repeat.set(1, 1 / 3);
+		screenTexture.offset.set(0, 0.66); // Start at NFC notification
 
 		return () => {
 			screenTexture?.dispose();
@@ -85,7 +97,7 @@
 	});
 
 	useTask((delta) => {
-		if (!visible) return;
+		if (!visible || !groupRef) return;
 
 		// Coordinate system:
 		// X: left(-) to right(+), Y: down(-) to up(+), Z: into screen(-) to camera(+)
@@ -95,12 +107,13 @@
 		let targetX = START_X; // Default off-screen right
 		let targetZ = 0;
 		let targetRotY = 0;
+		let targetRotX = 0;
+		let targetRotZ = 0;
 		let scrollY = 0.5; // Start at top (Verified)
 
-		// Phone back faces left = rotation.y = -π/2
-		// Rotate slightly towards camera (+0.5 rad)
-		const PHONE_SCAN_ROT = -Math.PI / 2 + 0.5;
-		const SCAN_POS_X = 0.15; // Balanced with card at -0.5
+		// Phone rotated 90 degrees during scan
+		const PHONE_SCAN_ROT = -Math.PI / 2+2;
+		const SCAN_POS_X = 0.9; // Centered (card is at -0.5)
 
 		if (section === 'scan') {
 			// SCAN: Phone enters from right, settles at SCAN_POS_X
@@ -118,35 +131,85 @@
 			// Bring forward to avoid Z-fighting
 			targetZ = 0.6;
 			targetRotY = PHONE_SCAN_ROT;
-			scrollY = 0.5;
+			targetRotX = 0;
+			targetRotZ = 0;
+			scrollY = 0.66; // NFC notification screen
 		} else if (section === 'tap') {
-			// TAP: Phone moves to center for tap
-			// Start from SCAN_POS, move to 0.0
-			const TAP_TARGET_X = 0.0;
+			// TAP: Phone taps card, shows NFC notification, then verified, then profile
+			// Screen states:
+			// - 0.66 = NFC notification (dark lock screen)
+			// - 0.33 = Verified (green success)
+			// - 0.0  = Profile (user details)
 
-			if (progress < 0.4) {
-				// Move toward card/center
-				const p = progress / 0.4;
-				targetX = lerp(SCAN_POS_X, TAP_TARGET_X, p);
-				targetZ = lerp(0.6, 0.4, p); // Move slightly closer to card
-				targetRotY = PHONE_SCAN_ROT;
+			const SCAN_Z = 0.6;
+			const TAP_ROT_Y = PHONE_SCAN_ROT - 0.3;
+			const TAP_X = 0.3;
+			const TAP_Z = 0.5;
+			const BUMP_X = -0.05;
+
+			// Success pose - phone faces viewer to show result
+			const SUCCESS_X = 0.2;
+			const SUCCESS_Z = 0.8;
+			const SUCCESS_ROT_Y = 0.1;
+
+			if (progress < 0.1) {
+				// Phase 1: Approach - show NFC notification
+				const p = easeInOutQuad(progress / 0.1);
+				targetX = lerp(SCAN_POS_X, TAP_X, p);
+				targetZ = lerp(SCAN_Z, TAP_Z, p);
+				targetRotY = lerp(PHONE_SCAN_ROT, TAP_ROT_Y, p);
+				scrollY = 0.66; // NFC notification
 				opacity = 1;
-			} else if (progress < 0.7) {
-				// Tap bump
-				const tapP = (progress - 0.4) / 0.3;
-				targetX = TAP_TARGET_X;
-				// Bump closer to card (Card is at Z=0.05 approx in tap)
-				targetZ = lerp(0.4, 0.25, Math.sin(tapP * Math.PI));
-				targetRotY = PHONE_SCAN_ROT;
+			} else if (progress < 0.25) {
+				// Phase 2: Tap bump - NFC detected
+				const p = (progress - 0.1) / 0.15;
+				const bumpP = Math.sin(p * Math.PI);
+				targetX = lerp(TAP_X, BUMP_X, bumpP);
+				targetZ = TAP_Z;
+				targetRotY = TAP_ROT_Y;
+				scrollY = 0.66; // Still NFC notification
+				opacity = 1;
+			} else if (progress < 0.35) {
+				// Phase 3: Hold after tap - "Reading..." delay
+				targetX = TAP_X;
+				targetZ = TAP_Z;
+				targetRotY = TAP_ROT_Y;
+				// Transition from NFC to Verified
+				const p = (progress - 0.25) / 0.1;
+				scrollY = lerp(0.66, 0.33, easeInOutQuad(p));
+				opacity = 1;
+			} else if (progress < 0.5) {
+				// Phase 4: Show Verified screen
+				targetX = TAP_X;
+				targetZ = TAP_Z;
+				targetRotY = TAP_ROT_Y;
+				scrollY = 0.33; // Verified!
+				opacity = 1;
+			} else if (progress < 0.65) {
+				// Phase 5: Pull back and rotate to show success
+				const p = easeInOutQuad((progress - 0.5) / 0.15);
+				targetX = lerp(TAP_X, SUCCESS_X, p);
+				targetZ = lerp(TAP_Z, SUCCESS_Z, p);
+				targetRotY = lerp(TAP_ROT_Y, SUCCESS_ROT_Y, p);
+				// Transition to Profile
+				scrollY = lerp(0.33, 0.0, p);
+				opacity = 1;
+			} else if (progress < 0.85) {
+				// Phase 6: Hold success pose showing Profile
+				targetX = SUCCESS_X;
+				targetZ = SUCCESS_Z;
+				targetRotY = SUCCESS_ROT_Y;
+				scrollY = 0.0; // Profile
 				opacity = 1;
 			} else {
-				// Exit
-				const p = (progress - 0.7) / 0.3;
-				targetX = lerp(TAP_TARGET_X, 3.5, easeInQuad(p));
-				targetRotY = lerp(PHONE_SCAN_ROT, 0, p);
+				// Phase 7: Exit to right
+				const p = easeInQuad((progress - 0.85) / 0.15);
+				targetX = lerp(SUCCESS_X, 2.0, p);
+				targetZ = SUCCESS_Z;
+				targetRotY = lerp(SUCCESS_ROT_Y, 0.5, p);
+				scrollY = 0.0;
 				opacity = 1 - p;
 			}
-			scrollY = 0.0;
 		}
 
 		// Apply texture scroll
@@ -161,6 +224,10 @@
 		position.z = lerp(position.z, targetZ, delta * 3);
 		// Apply rotation - use target directly (already set per section)
 		rotation.y = lerp(rotation.y, targetRotY, delta * 3);
+		rotation.x = lerp(rotation.x, targetRotX, delta * 3);
+		// Apply transforms directly to Three.js group (bypasses Svelte reactivity)
+		groupRef.position.set(position.x, position.y, position.z);
+		groupRef.rotation.set(rotation.x, rotation.y, rotation.z);
 	});
 
 	// Easing functions
@@ -176,10 +243,7 @@
 </script>
 
 {#if visible}
-	<T.Group
-		position={[position.x, position.y, position.z]}
-		rotation={[rotation.x, rotation.y, rotation.z]}
-	>
+	<T.Group bind:ref={groupRef}>
 		<!-- Phone Body -->
 		<T.Mesh>
 			<T.BoxGeometry args={[PHONE_WIDTH, PHONE_HEIGHT, PHONE_DEPTH]} />

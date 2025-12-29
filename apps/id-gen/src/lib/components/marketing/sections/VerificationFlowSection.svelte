@@ -47,8 +47,11 @@
 	</div>
 </section>
 
-<!-- Tap (NFC Verification) -->
-<section class="min-h-screen flex items-center justify-center px-6 md:px-8" data-section-id="tap">
+<!-- Tap (NFC Verification) - Extended height for longer animation -->
+<section
+	class="min-h-[180vh] flex items-center justify-center px-6 md:px-8"
+	data-section-id="tap"
+>
 	<div class="text-center max-w-3xl mx-auto pointer-events-none">
 		<span
 			class="inline-block px-4 py-1.5 bg-blue-500/10 border border-blue-500/20 rounded-full text-blue-400 text-sm font-medium mb-6 backdrop-blur-md"

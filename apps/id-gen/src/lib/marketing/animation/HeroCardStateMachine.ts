@@ -123,15 +123,87 @@ export function getStateTransform(state: CardState, sectionProgress: number): Ca
 				scale: 1
 			};
 
-		case 'tap':
-			// Card moves closer to phone for NFC tap
-			// Continues from scan position, moves right toward phone
-			const tapX = -0.5 + sectionProgress * 0.2; // -0.5 -> -0.3 (closer to phone)
+		case 'tap': {
+			// Card taps phone with NFC, shows verification, then exits
+			// Synced with phone phases:
+			// 0-0.1: Approach
+			// 0.1-0.25: Tap bump (NFC detected)
+			// 0.25-0.35: Hold - Reading...
+			// 0.35-0.5: Show Verified
+			// 0.5-0.65: Move to success pose
+			// 0.65-0.85: Hold success
+			// 0.85-1: Exit
+
+			const SCAN_X = -0.5;
+			const SCAN_ROT_Y = Math.PI * 0.25;
+			const TAP_X = -0.2;
+			const TAP_ROT_Y = Math.PI * 0.15;
+			const BUMP_X = 0.1;
+
+			const SUCCESS_X = 0;
+			const SUCCESS_Z = 0.4;
+			const SUCCESS_ROT_Y = Math.PI * 0.05;
+
+			// Dutch angle target for layers-main: { x: -0.3, y: Math.PI * 0.25, z: 0.3 }
+			const LAYERS_ROT_X = -0.3;
+			const LAYERS_ROT_Y = Math.PI * 0.25;
+			const LAYERS_ROT_Z = 0.3;
+			const LAYERS_POS_X = -0.2;
+
+			let x = SCAN_X;
+			let y = 0;
+			let z = 0;
+			let rotX = 0;
+			let rotY = SCAN_ROT_Y;
+			let rotZ = 0;
+
+			if (sectionProgress < 0.1) {
+				// Phase 1: Approach
+				const p = sectionProgress / 0.1;
+				const eased = p * p * (3 - 2 * p);
+				x = SCAN_X + (TAP_X - SCAN_X) * eased;
+				rotY = SCAN_ROT_Y + (TAP_ROT_Y - SCAN_ROT_Y) * eased;
+			} else if (sectionProgress < 0.25) {
+				// Phase 2: Tap bump
+				const p = (sectionProgress - 0.1) / 0.15;
+				const bumpP = Math.sin(p * Math.PI);
+				x = TAP_X + (BUMP_X - TAP_X) * bumpP;
+				z = 0.15 * bumpP;
+				rotY = TAP_ROT_Y;
+			} else if (sectionProgress < 0.5) {
+				// Phase 3-4: Hold during NFC reading & verification display
+				x = TAP_X;
+				z = 0;
+				rotY = TAP_ROT_Y;
+			} else if (sectionProgress < 0.65) {
+				// Phase 5: Move to success pose
+				const p = (sectionProgress - 0.5) / 0.15;
+				const eased = p * p * (3 - 2 * p);
+				x = TAP_X + (SUCCESS_X - TAP_X) * eased;
+				z = SUCCESS_Z * eased;
+				rotY = TAP_ROT_Y + (SUCCESS_ROT_Y - TAP_ROT_Y) * eased;
+			} else if (sectionProgress < 0.85) {
+				// Phase 6: Hold success pose
+				x = SUCCESS_X;
+				z = SUCCESS_Z;
+				rotY = SUCCESS_ROT_Y;
+			} else {
+				// Phase 7: Transition to dutch angle for layers-main
+				const p = (sectionProgress - 0.85) / 0.15;
+				const eased = p * p * (3 - 2 * p);
+				x = SUCCESS_X + (LAYERS_POS_X - SUCCESS_X) * eased;
+				z = SUCCESS_Z + (0 - SUCCESS_Z) * eased;
+				rotX = LAYERS_ROT_X * eased;
+				rotY = SUCCESS_ROT_Y + (LAYERS_ROT_Y - SUCCESS_ROT_Y) * eased;
+				rotZ = LAYERS_ROT_Z * eased;
+			}
+
 			return {
-				position: { x: tapX, y: 0, z: Math.sin(sectionProgress * Math.PI * 2) * 0.05 },
-				rotation: { x: 0, y: Math.PI * 0.25, z: 0 }, // Maintain same rotation as scan
+				position: { x, y, z },
+				rotation: { x: rotX, y: rotY, z: rotZ },
 				scale: 1
 			};
+		}
 
 		case 'exploding':
 		case 'exploded':
