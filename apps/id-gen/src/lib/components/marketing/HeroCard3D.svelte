@@ -93,7 +93,19 @@
 	let cachedVisuals: ReturnType<typeof getStateVisuals> | null = null;
 
 	// States that animate based on sectionProgress (need recalc every frame)
-	const ANIMATED_STATES: CardState[] = ['tap', 'exploding', 'collapsing', 'segmentation', 'shrinking', 'growing', 'systemScale', 'encode'];
+	const ANIMATED_STATES: CardState[] = [
+		'tap-approach',
+		'tap-bump',
+		'tap-linger',
+		'tap-success',
+		'exploding',
+		'collapsing',
+		'segmentation',
+		'shrinking',
+		'growing',
+		'systemScale',
+		'encode'
+	];
 
 	/**
 	 * Animation loop - runs every frame
@@ -117,8 +129,22 @@
 		const targetTransform = cachedTransform;
 		const targetVisuals = cachedVisuals;
 
+		// Dynamic lerp speed based on state
+		// Tap interactions need to be snappy/responsive to show the procedural animation details
+		let currentLerpSpeed = LERP_SPEED;
+		
+		if (currentState.startsWith('tap-')) {
+			// Much faster for tap interactions so we don't smooth out the "bounce" or "vibration"
+			currentLerpSpeed = 20; 
+			
+			if (currentState === 'tap-linger') {
+				// Slightly smoother for the floating/breathing phase
+				currentLerpSpeed = 10;
+			}
+		}
+
 		// Smoothly interpolate toward targets
-		const lerpFactor = Math.min(1, delta * LERP_SPEED);
+		const lerpFactor = Math.min(1, delta * currentLerpSpeed);
 
 		// Position
 		position.x = lerp(position.x, targetTransform.position.x, lerpFactor);
@@ -217,7 +243,7 @@
 
 <!-- Phone Model for Scan/Tap Sections -->
 <PhoneMesh
-	visible={currentSection === 'scan' || currentSection === 'tap'}
+	visible={currentSection === 'scan' || currentSection.startsWith('tap-')}
 	section={currentSection}
 	progress={sectionProgress}
 />

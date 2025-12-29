@@ -15,7 +15,10 @@ export type CardState =
 	| 'hero' // Slow rotation, embossed Ka symbol
 	| 'encode' // Enters stage, data entry context
 	| 'scan' // Laser scan, phone interaction
-	| 'tap' // NFC tap interaction
+	| 'tap-approach' 
+	| 'tap-bump'
+	| 'tap-linger'
+	| 'tap-success'
 	| 'exploding' // Transition: layers separating
 	| 'exploded' // 3 planes hovering apart
 	| 'collapsing' // Transition: layers merging
@@ -28,6 +31,33 @@ export type CardState =
 	| 'growing' // Transition: returning to center
 	| 'shop' // Lanyard attached, pendulum swing
 	| 'hidden'; // Footer (faded out)
+
+// Shared constants for Tap sequence
+const SCAN_X = -0.6;
+const SCAN_ROT_Y = Math.PI * 0.25;
+
+const APPROACH_X = -0.5;
+const APPROACH_ROT_Y = Math.PI * 0.2;
+
+const CONTACT_X = -0.42; // Prevent clipping (Center-to-Center needs > 0.8)
+const CONTACT_Z = 0.1;
+
+const BUMP_ROT_X = 0.15;
+const BUMP_ROT_Z = -0.1;
+
+const LINGER_X = -0.45;
+const LINGER_Z = 0.05;
+const LINGER_ROT_Y = Math.PI * 0.12;
+
+const SUCCESS_X = -0.4;
+const SUCCESS_Z = 0.3;
+const SUCCESS_ROT_Y = Math.PI * 0.06;
+
+// Dutch angle target for layers-main start
+const LAYERS_ROT_X = -0.3;
+const LAYERS_ROT_Y = Math.PI * 0.25;
+const LAYERS_ROT_Z = 0.3;
+const LAYERS_POS_X = -0.2;
 
 export interface CardTransform {
 	position: { x: number; y: number; z: number };
@@ -59,8 +89,17 @@ export function getSectionCardState(section: SectionName, sectionProgress: numbe
 		case 'scan':
 			return 'scan';
 
-		case 'tap':
-			return 'tap';
+		case 'tap-approach':
+			return 'tap-approach';
+
+		case 'tap-bump':
+			return 'tap-bump';
+
+		case 'tap-linger':
+			return 'tap-linger';
+
+		case 'tap-success':
+			return 'tap-success';
 
 		case 'layers-main':
 			// Explode out
@@ -123,115 +162,109 @@ export function getStateTransform(state: CardState, sectionProgress: number): Ca
 				scale: 1
 			};
 
-		case 'tap': {
-			// ═══════════════════════════════════════════════════════════════════
-			// CARD TAP ANIMATION - Synchronized with phone
-			// ═══════════════════════════════════════════════════════════════════
-			// 0-10%:   Approach - card holds, prepares
-			// 10-25%:  Bump contact (card moves RIGHT to meet phone at X≈0)
-			// 25-45%:  NFC linger (hold close, gentle breathing)
-			// 45-60%:  Pull back to success pose
-			// 60-85%:  Hold success
-			// 85-100%: Transition to dutch angle for layers-main
-
-			const SCAN_X = -0.5;
-			const SCAN_ROT_Y = Math.PI * 0.25;
-
-			// Approach position
-			const APPROACH_X = -0.35;
-			const APPROACH_ROT_Y = Math.PI * 0.2;
-
-			// Contact point - card meets phone at center
-			const CONTACT_X = 0.0;
-			const CONTACT_Z = 0.1;
-
-			// Dutch angle during bump (subtle tilt toward phone)
-			const BUMP_ROT_X = 0.15;
-			const BUMP_ROT_Z = -0.1;
-
-			// Linger position
-			const LINGER_X = -0.15;
-			const LINGER_Z = 0.05;
-			const LINGER_ROT_Y = Math.PI * 0.12;
-
-			// Success pose
-			const SUCCESS_X = -0.05;
-			const SUCCESS_Z = 0.3;
-			const SUCCESS_ROT_Y = Math.PI * 0.06;
-
-			// Dutch angle target for layers-main
-			const LAYERS_ROT_X = -0.3;
-			const LAYERS_ROT_Y = Math.PI * 0.25;
-			const LAYERS_ROT_Z = 0.3;
-			const LAYERS_POS_X = -0.2;
-
-			let x = SCAN_X;
-			let y = 0;
-			let z = 0;
-			let rotX = 0;
-			let rotY = SCAN_ROT_Y;
-			let rotZ = 0;
-
-			if (sectionProgress < 0.1) {
-				// ─── PHASE 1: APPROACH ───
-				const p = sectionProgress / 0.1;
-				const eased = p * p * (3 - 2 * p);
-				x = SCAN_X + (APPROACH_X - SCAN_X) * eased;
-				rotY = SCAN_ROT_Y + (APPROACH_ROT_Y - SCAN_ROT_Y) * eased;
-			} else if (sectionProgress < 0.25) {
-				// ─── PHASE 2: BUMP CONTACT ───
-				const p = (sectionProgress - 0.1) / 0.15;
-				const bumpP = Math.sin(p * Math.PI); // 0→1→0
-
-				x = APPROACH_X + (CONTACT_X - APPROACH_X) * bumpP;
-				z = CONTACT_Z * bumpP;
-
-				// Subtle dutch angle peaks at contact
-				rotX = BUMP_ROT_X * bumpP;
-				rotY = APPROACH_ROT_Y;
-				rotZ = BUMP_ROT_Z * bumpP;
-			} else if (sectionProgress < 0.45) {
-				// ─── PHASE 3: NFC LINGER ───
-				const p = (sectionProgress - 0.25) / 0.2;
-				const easeP = p * p * (3 - 2 * p);
-
-				// Gentle breathing
-				const breathe = Math.sin(p * Math.PI * 3) * 0.01;
-
-				x = APPROACH_X + (LINGER_X - APPROACH_X) * easeP + breathe;
-				z = CONTACT_Z + (LINGER_Z - CONTACT_Z) * easeP;
-
-				// Ease out of dutch angle
-				const dutchFade = 1 - easeP;
-				rotX = BUMP_ROT_X * dutchFade * 0.3;
-				rotY = APPROACH_ROT_Y + (LINGER_ROT_Y - APPROACH_ROT_Y) * easeP;
-				rotZ = BUMP_ROT_Z * dutchFade * 0.3;
-			} else if (sectionProgress < 0.6) {
-				// ─── PHASE 4: PULL BACK TO SUCCESS ───
-				const p = (sectionProgress - 0.45) / 0.15;
-				const eased = p * p * (3 - 2 * p);
-				x = LINGER_X + (SUCCESS_X - LINGER_X) * eased;
-				z = LINGER_Z + (SUCCESS_Z - LINGER_Z) * eased;
-				rotY = LINGER_ROT_Y + (SUCCESS_ROT_Y - LINGER_ROT_Y) * eased;
-			} else if (sectionProgress < 0.85) {
-				// ─── PHASE 5: HOLD SUCCESS ───
-				x = SUCCESS_X;
-				z = SUCCESS_Z;
-				rotY = SUCCESS_ROT_Y;
-			} else {
-				// ─── PHASE 6: TRANSITION TO DUTCH ANGLE ───
-				const p = (sectionProgress - 0.85) / 0.15;
-				const eased = p * p * (3 - 2 * p);
-				x = SUCCESS_X + (LAYERS_POS_X - SUCCESS_X) * eased;
-				z = SUCCESS_Z + (0 - SUCCESS_Z) * eased;
-				rotX = LAYERS_ROT_X * eased;
-				rotY = SUCCESS_ROT_Y + (LAYERS_ROT_Y - SUCCESS_ROT_Y) * eased;
-				rotZ = LAYERS_ROT_Z * eased;
-			}
+		case 'tap-approach': {
+			// 0-100%: Approach - Organic "Hand" Movement
+			const p = sectionProgress;
+			const eased = p * p * (3 - 2 * p); // smoothstep
+			const arcP = Math.sin(p * Math.PI); // 0->1->0
 
 			return {
-				position: { x, y, z },
-				rotation: { x: rotX, y: rotY, z: rotZ },
+				position: {
+					x: SCAN_X + (APPROACH_X - SCAN_X) * eased,
+					y: arcP * 0.05, // Slight lift
+					z: arcP * 0.1   // Arc out towards camera to "clear" obstacles
+				},
+				rotation: {
+					x: arcP * 0.1,  // "Wrist cock" - tilt back slightly during move
+					y: SCAN_ROT_Y + (APPROACH_ROT_Y - SCAN_ROT_Y) * eased,
+					z: -arcP * 0.1  // Bank into the turn
+				},
+				scale: 1
+			};
+		}
+
+		case 'tap-bump': {
+			// 0-100%: Tactile Bump
+			const p = sectionProgress;
+			const bumpP = Math.sin(p * Math.PI); // 0->1->0 base
+
+			// Sharper impact curve? Standard sin is fine for "bounce" feel
+			
+			return {
+				position: {
+					x: APPROACH_X + (CONTACT_X - APPROACH_X) * bumpP,
+					y: 0,
+					z: CONTACT_Z * bumpP
+				},
+				rotation: {
+					x: -0.2 * bumpP, // "Tip forward" to tap the reader with top edge
+					y: APPROACH_ROT_Y, 
+					z: -0.25 * bumpP // Stronger roll right (banking into the tap)
+				},
+				scale: 1
+			};
+		}
+
+		case 'tap-linger': {
+			// 0-100%: Magnetic Tension + Start of Peel
+			const p = sectionProgress;
+			const easeP = p * p * (3 - 2 * p);
+			
+			// High frequency "magnetic" vibration
+			const vibration = Math.sin(p * Math.PI * 8) * 0.005;
+			const float = Math.sin(p * Math.PI * 2) * 0.02; // Slow wobble
+
+			// Start peeling/lifting towards the end of linger
+			// EaseIn to build momentum into the success phase
+			const peelP = p * p; // 0 -> 1
+
+			// Targets for end of linger (halfway to layers-main)
+			const MID_PEEL_ROT_X = -0.15;
+			const MID_PEEL_ROT_Z = 0.1;
+
+			return {
+				position: {
+					x: APPROACH_X + (LINGER_X - APPROACH_X) * easeP + vibration,
+					y: float * 0.5,
+					z: CONTACT_Z + (LINGER_Z - CONTACT_Z) * easeP 
+				},
+				rotation: {
+					x: float + (MID_PEEL_ROT_X * peelP), 
+					y: APPROACH_ROT_Y + (LINGER_ROT_Y - APPROACH_ROT_Y) * easeP,
+					z: float * 0.5 + (MID_PEEL_ROT_Z * peelP)
+				},
+				scale: 1
+			};
+		}
+
+		case 'tap-success': {
+			// 0-100%: Complete Peel & Separate
+			const p = sectionProgress;
+			
+			// Constants to match Linger end state
+			const MID_PEEL_ROT_X = -0.15;
+			const MID_PEEL_ROT_Z = 0.1;
+
+			// 1. Peel Continuation: (EaseOut to finish the momentum started in Linger)
+			const peelP = 1 - (1 - p) * (1 - p);
+			
+			// 2. Separate: (EaseInCubic)
+			const separateP = p * p * p;
+
+			// 3. Rotate Z Continuation: (SmoothStep)
+			const rotateP = p * p * (3 - 2 * p);
+
+			return {
+				position: {
+					x: LINGER_X + (LAYERS_POS_X - LINGER_X) * separateP,
+					y: 0,
+					z: LINGER_Z + (0 - LINGER_Z) * separateP
+				},
+				rotation: {
+					x: MID_PEEL_ROT_X + (LAYERS_ROT_X - MID_PEEL_ROT_X) * peelP,
+					y: LINGER_ROT_Y + (LAYERS_ROT_Y - LINGER_ROT_Y) * rotateP,
+					z: MID_PEEL_ROT_Z + (LAYERS_ROT_Z - MID_PEEL_ROT_Z) * rotateP
+				},
 				scale: 1
 			};
 		}
@@ -368,7 +401,10 @@ export function getStateVisuals(
 			visuals.glowIntensity = 1;
 			break;
 
-		case 'tap':
+		case 'tap-approach':
+		case 'tap-bump':
+		case 'tap-linger':
+		case 'tap-success':
 			break;
 
 		case 'exploding':

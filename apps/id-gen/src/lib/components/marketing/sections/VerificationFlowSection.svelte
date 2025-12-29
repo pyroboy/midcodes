@@ -47,10 +47,10 @@
 	</div>
 </section>
 
-<!-- Tap (NFC Verification) - Extended height for longer animation -->
+<!-- Tap Approach (Card Enters) -->
 <section
-	class="min-h-[180vh] flex items-center justify-center px-6 md:px-8"
-	data-section-id="tap"
+	class="min-h-[40vh] flex items-center justify-center px-6 md:px-8"
+	data-section-id="tap-approach"
 >
 	<div class="text-center max-w-3xl mx-auto pointer-events-none">
 		<span
@@ -63,6 +63,31 @@
 		>
 			Tap.
 		</h2>
+	</div>
+</section>
+
+<!-- Tap Bump (Contact) -->
+<section
+	class="min-h-[50vh] flex items-center justify-center px-6 md:px-8"
+	data-section-id="tap-bump"
+>
+    <!-- Spacer for animation focus -->
+</section>
+
+<!-- Tap Linger (Reading) -->
+<section
+	class="min-h-[60vh] flex items-center justify-center px-6 md:px-8"
+	data-section-id="tap-linger"
+>
+    <!-- Spacer for animation focus -->
+</section>
+
+<!-- Tap Success (Verified) -->
+<section
+	class="min-h-screen flex items-center justify-center px-6 md:px-8"
+	data-section-id="tap-success"
+>
+	<div class="text-center max-w-3xl mx-auto pointer-events-none">
 		<p
 			class="text-lg md:text-xl text-gray-300 max-w-xl mx-auto backdrop-blur-sm bg-black/20 p-4 rounded-xl"
 		>

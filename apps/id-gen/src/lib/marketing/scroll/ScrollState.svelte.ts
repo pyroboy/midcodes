@@ -12,7 +12,10 @@ export const DEFAULT_BREAKPOINTS = {
 	hero: { start: 0, end: 0.1 },
 	encode: { start: 0.1, end: 0.2 },
 	scan: { start: 0.2, end: 0.3 },
-	tap: { start: 0.3, end: 0.4 },
+	'tap-approach': { start: 0.3, end: 0.325 },
+	'tap-bump': { start: 0.325, end: 0.35 },
+	'tap-linger': { start: 0.35, end: 0.375 },
+	'tap-success': { start: 0.375, end: 0.4 },
 	'layers-main': { start: 0.4, end: 0.45 },
 	'layer-1': { start: 0.45, end: 0.5 },
 	'layer-2': { start: 0.5, end: 0.55 },
@@ -29,7 +32,10 @@ export type SectionName =
 	| 'hero'
 	| 'encode'
 	| 'scan'
-	| 'tap'
+	| 'tap-approach' // Split tap section
+	| 'tap-bump'
+	| 'tap-linger'
+	| 'tap-success'
 	| 'layers-main'
 	| 'layer-1'
 	| 'layer-2'

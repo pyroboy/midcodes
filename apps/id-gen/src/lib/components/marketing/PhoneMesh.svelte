@@ -115,6 +115,22 @@
 		const PHONE_SCAN_ROT = -Math.PI / 2+2;
 		const SCAN_POS_X = 0.9; // Centered (card is at -0.5)
 
+		const SCAN_Z = 0.6;
+		const APPROACH_X = 0.5;
+		const APPROACH_Z = 0.5;
+		const APPROACH_ROT_Y = PHONE_SCAN_ROT - 0.2;
+		const CONTACT_X = 0.42;
+		const CONTACT_Z = 0.3;
+		const BUMP_ROT_X = -0.3;
+		const BUMP_ROT_Y = PHONE_SCAN_ROT - 0.6;
+		const BUMP_ROT_Z = 0.2;
+		const LINGER_X = 0.45;
+		const LINGER_Z = 0.4;
+		const LINGER_ROT_Y = PHONE_SCAN_ROT - 0.35;
+		const SUCCESS_X = 0.45;
+		const SUCCESS_Z = 0.7;
+		const SUCCESS_ROT_Y = 0.2;
+
 		if (section === 'scan') {
 			// SCAN: Phone enters from right, settles at SCAN_POS_X
 			// Smooth entry: Finish by 0.2 progress
@@ -134,115 +150,81 @@
 			targetRotX = 0;
 			targetRotZ = 0;
 			scrollY = 0.66; // NFC notification screen
-		} else if (section === 'tap') {
-			// ═══════════════════════════════════════════════════════════════════
-			// TAP ANIMATION - Realistic NFC tap with synchronized card/phone
-			// ═══════════════════════════════════════════════════════════════════
-			// Screen: 0.66=NFC, 0.33=Verified, 0.0=Profile
-			//
-			// 0-10%:   Approach - move toward card
-			// 10-25%:  Bump contact (DUTCH ANGLE, meet card at X=0)
-			// 25-45%:  NFC linger (hold close, wait for read, show Verified)
-			// 45-60%:  Pull back to success pose
-			// 60-85%:  Hold success, show Profile
-			// 85-100%: Exit
+		} else if (section === 'tap-approach') {
+			// 0-100%: Approach
+			const p = easeInOutQuad(progress);
+			targetX = lerp(SCAN_POS_X, APPROACH_X, p);
+			targetZ = lerp(SCAN_Z, APPROACH_Z, p);
+			targetRotY = lerp(PHONE_SCAN_ROT, APPROACH_ROT_Y, p);
+			scrollY = 0.66;
+			opacity = 1;
 
-			const SCAN_Z = 0.6;
+		} else if (section === 'tap-bump') {
+			// 0-100%: Bump Contact
+			const bumpP = Math.sin(progress * Math.PI); // 0→1→0 curve
 
-			// Approach position
-			const APPROACH_X = 0.4;
-			const APPROACH_Z = 0.5;
-			const APPROACH_ROT_Y = PHONE_SCAN_ROT - 0.2;
+			// Position: quick move to contact, then back
+			targetX = lerp(APPROACH_X, CONTACT_X, bumpP);
+			targetZ = lerp(APPROACH_Z, CONTACT_Z, bumpP);
 
-			// Contact point - phone meets card (card bumps to ~0.1)
-			const CONTACT_X = 0.05;
-			const CONTACT_Z = 0.3;
+			// Dutch angle peaks at contact
+			targetRotX = BUMP_ROT_X * bumpP;
+			targetRotY = lerp(APPROACH_ROT_Y, BUMP_ROT_Y, bumpP);
+			targetRotZ = BUMP_ROT_Z * bumpP;
 
-			// Dutch angle during bump
-			const BUMP_ROT_X = -0.3; // Top tilts toward card
-			const BUMP_ROT_Y = PHONE_SCAN_ROT - 0.6;
-			const BUMP_ROT_Z = 0.2; // Slight roll
+			scrollY = 0.66;
+			opacity = 1;
 
-			// Linger position (slight pull back)
-			const LINGER_X = 0.2;
-			const LINGER_Z = 0.4;
-			const LINGER_ROT_Y = PHONE_SCAN_ROT - 0.35;
+		} else if (section === 'tap-linger') {
+			// 0-100%: Linger & Read
+			const easeP = easeOutCubic(Math.min(1, progress * 1.5));
+			
+			// Gentle breathing
+			const breathe = Math.sin(progress * Math.PI * 3) * 0.015;
 
-			// Success pose
-			const SUCCESS_X = 0.35;
-			const SUCCESS_Z = 0.7;
-			const SUCCESS_ROT_Y = 0.2;
+			targetX = lerp(APPROACH_X, LINGER_X, easeP) + breathe;
+			targetZ = lerp(CONTACT_Z, LINGER_Z, easeP);
 
-			if (progress < 0.1) {
-				// ─── PHASE 1: APPROACH ───
-				const p = easeInOutQuad(progress / 0.1);
-				targetX = lerp(SCAN_POS_X, APPROACH_X, p);
-				targetZ = lerp(SCAN_Z, APPROACH_Z, p);
-				targetRotY = lerp(PHONE_SCAN_ROT, APPROACH_ROT_Y, p);
+			// Ease out of dutch angle
+			const dutchFade = 1 - easeP;
+			targetRotX = BUMP_ROT_X * dutchFade * 0.2;
+			targetRotY = lerp(BUMP_ROT_Y, LINGER_ROT_Y, easeP);
+			targetRotZ = BUMP_ROT_Z * dutchFade * 0.2;
+
+			// Screen: NFC → Verified transition near middle (0.3-0.6 range)
+			if (progress < 0.3) {
 				scrollY = 0.66;
-				opacity = 1;
-			} else if (progress < 0.25) {
-				// ─── PHASE 2: BUMP CONTACT with Dutch Angle ───
-				const p = (progress - 0.1) / 0.15;
-				const bumpP = Math.sin(p * Math.PI); // 0→1→0 curve
-
-				// Position: quick move to contact, then back
-				targetX = lerp(APPROACH_X, CONTACT_X, bumpP);
-				targetZ = lerp(APPROACH_Z, CONTACT_Z, Math.min(1, p * 1.5));
-
-				// Dutch angle peaks at contact
-				targetRotX = BUMP_ROT_X * bumpP;
-				targetRotY = lerp(APPROACH_ROT_Y, BUMP_ROT_Y, bumpP);
-				targetRotZ = BUMP_ROT_Z * bumpP;
-
-				scrollY = 0.66;
-				opacity = 1;
-			} else if (progress < 0.45) {
-				// ─── PHASE 3: NFC LINGER (Wait for read) ───
-				const p = (progress - 0.25) / 0.2;
-				const easeP = easeOutCubic(Math.min(1, p * 1.5));
-
-				// Gentle breathing while waiting
-				const breathe = Math.sin(p * Math.PI * 3) * 0.015;
-
-				targetX = lerp(APPROACH_X, LINGER_X, easeP) + breathe;
-				targetZ = lerp(CONTACT_Z, LINGER_Z, easeP);
-
-				// Ease out of dutch angle
-				const dutchFade = 1 - easeP;
-				targetRotX = BUMP_ROT_X * dutchFade * 0.2;
-				targetRotY = lerp(BUMP_ROT_Y, LINGER_ROT_Y, easeP);
-				targetRotZ = BUMP_ROT_Z * dutchFade * 0.2;
-
-				// Screen: NFC → Verified transition at 35%
-				if (progress < 0.32) {
-					scrollY = 0.66;
-				} else if (progress < 0.38) {
-					const screenP = (progress - 0.32) / 0.06;
-					scrollY = lerp(0.66, 0.33, easeInOutQuad(screenP));
-				} else {
-					scrollY = 0.33; // Verified!
-				}
-				opacity = 1;
 			} else if (progress < 0.6) {
-				// ─── PHASE 4: PULL BACK TO SUCCESS ───
-				const p = easeInOutQuad((progress - 0.45) / 0.15);
+				const screenP = (progress - 0.3) / 0.3;
+				scrollY = lerp(0.66, 0.33, easeInOutQuad(screenP));
+			} else {
+				scrollY = 0.33; // Verified!
+			}
+			opacity = 1;
+
+		} else if (section === 'tap-success') {
+			// 0-100%: Pull back -> Success -> Exit
+			// Split: 0-40% Pull back, 40-80% Hold, 80-100% Exit
+
+			if (progress < 0.4) {
+				// Pull back
+				const p = easeInOutQuad(progress / 0.4);
 				targetX = lerp(LINGER_X, SUCCESS_X, p);
 				targetZ = lerp(LINGER_Z, SUCCESS_Z, p);
 				targetRotY = lerp(LINGER_ROT_Y, SUCCESS_ROT_Y, p);
 				// Screen: Verified → Profile
 				scrollY = lerp(0.33, 0.0, p);
 				opacity = 1;
-			} else if (progress < 0.85) {
-				// ─── PHASE 5: HOLD SUCCESS POSE ───
+			} else if (progress < 0.8) {
+				// Hold
 				targetX = SUCCESS_X;
 				targetZ = SUCCESS_Z;
 				targetRotY = SUCCESS_ROT_Y;
 				scrollY = 0.0;
 				opacity = 1;
 			} else {
-				// ─── PHASE 6: EXIT ───
-				const p = easeInQuad((progress - 0.85) / 0.15);
+				// Exit
+				const p = easeInQuad((progress - 0.8) / 0.2);
 				targetX = lerp(SUCCESS_X, 2.5, p);
 				targetZ = SUCCESS_Z;
 				targetRotY = lerp(SUCCESS_ROT_Y, 0.6, p);
