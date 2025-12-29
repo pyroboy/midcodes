@@ -135,78 +135,117 @@
 			targetRotZ = 0;
 			scrollY = 0.66; // NFC notification screen
 		} else if (section === 'tap') {
-			// TAP: Phone taps card, shows NFC notification, then verified, then profile
-			// Screen states:
-			// - 0.66 = NFC notification (dark lock screen)
-			// - 0.33 = Verified (green success)
-			// - 0.0  = Profile (user details)
+			// ═══════════════════════════════════════════════════════════════════
+			// TAP ANIMATION - Realistic NFC tap with synchronized card/phone
+			// ═══════════════════════════════════════════════════════════════════
+			// Screen: 0.66=NFC, 0.33=Verified, 0.0=Profile
+			//
+			// 0-10%:   Approach - move toward card
+			// 10-25%:  Bump contact (DUTCH ANGLE, meet card at X=0)
+			// 25-45%:  NFC linger (hold close, wait for read, show Verified)
+			// 45-60%:  Pull back to success pose
+			// 60-85%:  Hold success, show Profile
+			// 85-100%: Exit
 
 			const SCAN_Z = 0.6;
-			const TAP_ROT_Y = PHONE_SCAN_ROT - 0.3;
-			const TAP_X = 0.3;
-			const TAP_Z = 0.5;
-			const BUMP_X = -0.05;
 
-			// Success pose - phone faces viewer to show result
-			const SUCCESS_X = 0.2;
-			const SUCCESS_Z = 0.8;
-			const SUCCESS_ROT_Y = 0.1;
+			// Approach position
+			const APPROACH_X = 0.4;
+			const APPROACH_Z = 0.5;
+			const APPROACH_ROT_Y = PHONE_SCAN_ROT - 0.2;
+
+			// Contact point - phone meets card (card bumps to ~0.1)
+			const CONTACT_X = 0.05;
+			const CONTACT_Z = 0.3;
+
+			// Dutch angle during bump
+			const BUMP_ROT_X = -0.3; // Top tilts toward card
+			const BUMP_ROT_Y = PHONE_SCAN_ROT - 0.6;
+			const BUMP_ROT_Z = 0.2; // Slight roll
+
+			// Linger position (slight pull back)
+			const LINGER_X = 0.2;
+			const LINGER_Z = 0.4;
+			const LINGER_ROT_Y = PHONE_SCAN_ROT - 0.35;
+
+			// Success pose
+			const SUCCESS_X = 0.35;
+			const SUCCESS_Z = 0.7;
+			const SUCCESS_ROT_Y = 0.2;
 
 			if (progress < 0.1) {
-				// Phase 1: Approach - show NFC notification
+				// ─── PHASE 1: APPROACH ───
 				const p = easeInOutQuad(progress / 0.1);
-				targetX = lerp(SCAN_POS_X, TAP_X, p);
-				targetZ = lerp(SCAN_Z, TAP_Z, p);
-				targetRotY = lerp(PHONE_SCAN_ROT, TAP_ROT_Y, p);
-				scrollY = 0.66; // NFC notification
+				targetX = lerp(SCAN_POS_X, APPROACH_X, p);
+				targetZ = lerp(SCAN_Z, APPROACH_Z, p);
+				targetRotY = lerp(PHONE_SCAN_ROT, APPROACH_ROT_Y, p);
+				scrollY = 0.66;
 				opacity = 1;
 			} else if (progress < 0.25) {
-				// Phase 2: Tap bump - NFC detected
+				// ─── PHASE 2: BUMP CONTACT with Dutch Angle ───
 				const p = (progress - 0.1) / 0.15;
-				const bumpP = Math.sin(p * Math.PI);
-				targetX = lerp(TAP_X, BUMP_X, bumpP);
-				targetZ = TAP_Z;
-				targetRotY = TAP_ROT_Y;
-				scrollY = 0.66; // Still NFC notification
+				const bumpP = Math.sin(p * Math.PI); // 0→1→0 curve
+
+				// Position: quick move to contact, then back
+				targetX = lerp(APPROACH_X, CONTACT_X, bumpP);
+				targetZ = lerp(APPROACH_Z, CONTACT_Z, Math.min(1, p * 1.5));
+
+				// Dutch angle peaks at contact
+				targetRotX = BUMP_ROT_X * bumpP;
+				targetRotY = lerp(APPROACH_ROT_Y, BUMP_ROT_Y, bumpP);
+				targetRotZ = BUMP_ROT_Z * bumpP;
+
+				scrollY = 0.66;
 				opacity = 1;
-			} else if (progress < 0.35) {
-				// Phase 3: Hold after tap - "Reading..." delay
-				targetX = TAP_X;
-				targetZ = TAP_Z;
-				targetRotY = TAP_ROT_Y;
-				// Transition from NFC to Verified
-				const p = (progress - 0.25) / 0.1;
-				scrollY = lerp(0.66, 0.33, easeInOutQuad(p));
+			} else if (progress < 0.45) {
+				// ─── PHASE 3: NFC LINGER (Wait for read) ───
+				const p = (progress - 0.25) / 0.2;
+				const easeP = easeOutCubic(Math.min(1, p * 1.5));
+
+				// Gentle breathing while waiting
+				const breathe = Math.sin(p * Math.PI * 3) * 0.015;
+
+				targetX = lerp(APPROACH_X, LINGER_X, easeP) + breathe;
+				targetZ = lerp(CONTACT_Z, LINGER_Z, easeP);
+
+				// Ease out of dutch angle
+				const dutchFade = 1 - easeP;
+				targetRotX = BUMP_ROT_X * dutchFade * 0.2;
+				targetRotY = lerp(BUMP_ROT_Y, LINGER_ROT_Y, easeP);
+				targetRotZ = BUMP_ROT_Z * dutchFade * 0.2;
+
+				// Screen: NFC → Verified transition at 35%
+				if (progress < 0.32) {
+					scrollY = 0.66;
+				} else if (progress < 0.38) {
+					const screenP = (progress - 0.32) / 0.06;
+					scrollY = lerp(0.66, 0.33, easeInOutQuad(screenP));
+				} else {
+					scrollY = 0.33; // Verified!
+				}
 				opacity = 1;
-			} else if (progress < 0.5) {
-				// Phase 4: Show Verified screen
-				targetX = TAP_X;
-				targetZ = TAP_Z;
-				targetRotY = TAP_ROT_Y;
-				scrollY = 0.33; // Verified!
-				opacity = 1;
-			} else if (progress < 0.65) {
-				// Phase 5: Pull back and rotate to show success
-				const p = easeInOutQuad((progress - 0.5) / 0.15);
-				targetX = lerp(TAP_X, SUCCESS_X, p);
-				targetZ = lerp(TAP_Z, SUCCESS_Z, p);
-				targetRotY = lerp(TAP_ROT_Y, SUCCESS_ROT_Y, p);
-				// Transition to Profile
+			} else if (progress < 0.6) {
+				// ─── PHASE 4: PULL BACK TO SUCCESS ───
+				const p = easeInOutQuad((progress - 0.45) / 0.15);
+				targetX = lerp(LINGER_X, SUCCESS_X, p);
+				targetZ = lerp(LINGER_Z, SUCCESS_Z, p);
+				targetRotY = lerp(LINGER_ROT_Y, SUCCESS_ROT_Y, p);
+				// Screen: Verified → Profile
 				scrollY = lerp(0.33, 0.0, p);
 				opacity = 1;
 			} else if (progress < 0.85) {
-				// Phase 6: Hold success pose showing Profile
+				// ─── PHASE 5: HOLD SUCCESS POSE ───
 				targetX = SUCCESS_X;
 				targetZ = SUCCESS_Z;
 				targetRotY = SUCCESS_ROT_Y;
-				scrollY = 0.0; // Profile
+				scrollY = 0.0;
 				opacity = 1;
 			} else {
-				// Phase 7: Exit to right
+				// ─── PHASE 6: EXIT ───
 				const p = easeInQuad((progress - 0.85) / 0.15);
-				targetX = lerp(SUCCESS_X, 2.0, p);
+				targetX = lerp(SUCCESS_X, 2.5, p);
 				targetZ = SUCCESS_Z;
-				targetRotY = lerp(SUCCESS_ROT_Y, 0.5, p);
+				targetRotY = lerp(SUCCESS_ROT_Y, 0.6, p);
 				scrollY = 0.0;
 				opacity = 1 - p;
 			}
@@ -222,9 +261,10 @@
 		position.x = lerp(position.x, targetX, delta * 3);
 		position.y = Math.sin(Date.now() * 0.001) * 0.05; // Gentle float
 		position.z = lerp(position.z, targetZ, delta * 3);
-		// Apply rotation - use target directly (already set per section)
-		rotation.y = lerp(rotation.y, targetRotY, delta * 3);
+		// Apply rotation
 		rotation.x = lerp(rotation.x, targetRotX, delta * 3);
+		rotation.y = lerp(rotation.y, targetRotY, delta * 3);
+		rotation.z = lerp(rotation.z, targetRotZ, delta * 3);
 		// Apply transforms directly to Three.js group (bypasses Svelte reactivity)
 		groupRef.position.set(position.x, position.y, position.z);
 		groupRef.rotation.set(rotation.x, rotation.y, rotation.z);
