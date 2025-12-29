@@ -115,20 +115,21 @@ export function getStateTransform(state: CardState, sectionProgress: number): Ca
 			};
 
 		case 'scan':
-			// Move to scan position and hold
-			const scanPos = -1.0 + (sectionProgress * 0.4); // -1.0 -> -0.6
+			// Card on LEFT, phone on RIGHT
+			// Adjusted rotation (45 degrees)
 			return {
-				position: { x: scanPos, y: 0, z: 0 },
-				rotation: { x: 0, y: 0, z: 0 },
+				position: { x: -0.5, y: 0, z: 0 },
+				rotation: { x: 0, y: Math.PI * 0.25, z: 0 },
 				scale: 1
 			};
 
 		case 'tap':
-			// Tap animation
-			// Move closer to phone (-0.6 -> -0.4) then tap (z bump)
+			// Card moves closer to phone for NFC tap
+			// Continues from scan position, moves right toward phone
+			const tapX = -0.5 + sectionProgress * 0.2; // -0.5 -> -0.3 (closer to phone)
 			return {
-				position: { x: -0.6 + (sectionProgress * 0.2), y: 0, z: Math.sin(sectionProgress * Math.PI * 4) * 0.05 },
-				rotation: { x: 0, y: 0, z: -0.1 }, // Tilt for tap
+				position: { x: tapX, y: 0, z: Math.sin(sectionProgress * Math.PI * 2) * 0.05 },
+				rotation: { x: 0, y: Math.PI * 0.25, z: 0 }, // Maintain same rotation as scan
 				scale: 1
 			};
 

@@ -18,10 +18,33 @@
 
 	let { visible = false, progress = 0, section = 'scan' }: Props = $props();
 
+	// Starting position (closer to edge for quicker entry)
+	const START_X = 1.2;
+	const START_ROT_Y = 0;
+
 	// State
-	let position = $state(new THREE.Vector3(3, 0, 0)); // Start off-screen right
-	let rotation = $state(new THREE.Euler(0, 0, 0));
+	let position = $state(new THREE.Vector3(START_X, 0, 0));
+	let rotation = $state(new THREE.Euler(0, START_ROT_Y, 0));
 	let opacity = $state(0);
+
+	// Track previous visibility to detect when phone becomes visible
+	let wasVisible = $state(false);
+
+	// Reset position when visibility changes
+	$effect(() => {
+		if (visible && !wasVisible) {
+			// Phone just became visible - reset to start position for clean entry
+			position.set(START_X, 0, 0);
+			rotation.set(0, START_ROT_Y, 0);
+			opacity = 0;
+		} else if (!visible && wasVisible) {
+			// Phone just became invisible - reset for next entrance
+			position.set(START_X, 0, 0);
+			rotation.set(0, START_ROT_Y, 0);
+			opacity = 0;
+		}
+		wasVisible = visible;
+	});
 
 	// Screen Texture
 	let canvas: HTMLCanvasElement;
@@ -64,56 +87,66 @@
 	useTask((delta) => {
 		if (!visible) return;
 
-		let targetX = 3; // Default off-screen
+		// Coordinate system:
+		// X: left(-) to right(+), Y: down(-) to up(+), Z: into screen(-) to camera(+)
+		// Card is on LEFT at x = -0.5, rotated -45° (front faces right)
+		// Phone is on RIGHT at x = +0.5, rotated -90° (back faces left toward card)
+
+		let targetX = START_X; // Default off-screen right
 		let targetZ = 0;
 		let targetRotY = 0;
 		let scrollY = 0.5; // Start at top (Verified)
 
-		if (section === 'scan') {
-			// SCAN BEHAVIOR
-			// 0.0 - 0.2: Enter
-			// 0.2 - 1.0: Hold (Waiting for scan completion)
+		// Phone back faces left = rotation.y = -π/2
+		// Rotate slightly towards camera (+0.5 rad)
+		const PHONE_SCAN_ROT = -Math.PI / 2 + 0.5;
+		const SCAN_POS_X = 0.15; // Balanced with card at -0.5
 
+		if (section === 'scan') {
+			// SCAN: Phone enters from right, settles at SCAN_POS_X
+			// Smooth entry: Finish by 0.2 progress
 			if (progress < 0.2) {
-				const p = progress / 0.2;
-				targetX = lerp(3, 0.8, easeOutCubic(p));
+				// Enter animation
+				const p = easeOutCubic(progress / 0.2);
+				targetX = lerp(START_X, SCAN_POS_X, p);
 				opacity = p;
 			} else {
-				targetX = 0.8;
+				// Hold position
+				targetX = SCAN_POS_X;
 				opacity = 1;
 			}
-			scrollY = 0.5; // Stay on Verified/Scan screen
+			// Bring forward to avoid Z-fighting
+			targetZ = 0.6;
+			targetRotY = PHONE_SCAN_ROT;
+			scrollY = 0.5;
 		} else if (section === 'tap') {
-			// TAP BEHAVIOR
-			// 0.0: Already at 0.8 (from scan) ? Or re-enter?
-			// Let's assume re-enter or continuous.
-			// Ideally we want continuity.
-			// 0.0 - 0.3: Move slightly closer
-			// 0.3 - 0.6: Tap Motion (Tilt/Bump)
-			// 0.6 - 1.0: Exit
+			// TAP: Phone moves to center for tap
+			// Start from SCAN_POS, move to 0.0
+			const TAP_TARGET_X = 0.0;
 
-			// Assume starting at 0.8 if continuous, but if section changed, progress jumps 0->1?
-			// Sections are adjacent. progress goes 1.0 (scan) -> 0.0 (tap).
-
-			if (progress < 0.3) {
-				// Move closer
-				targetX = lerp(0.8, 0.6, progress / 0.3);
+			if (progress < 0.4) {
+				// Move toward card/center
+				const p = progress / 0.4;
+				targetX = lerp(SCAN_POS_X, TAP_TARGET_X, p);
+				targetZ = lerp(0.6, 0.4, p); // Move slightly closer to card
+				targetRotY = PHONE_SCAN_ROT;
 				opacity = 1;
-			} else if (progress < 0.6) {
-				// Tap
-				targetX = 0.6;
+			} else if (progress < 0.7) {
+				// Tap bump
+				const tapP = (progress - 0.4) / 0.3;
+				targetX = TAP_TARGET_X;
+				// Bump closer to card (Card is at Z=0.05 approx in tap)
+				targetZ = lerp(0.4, 0.25, Math.sin(tapP * Math.PI));
+				targetRotY = PHONE_SCAN_ROT;
 				opacity = 1;
-				// Tap rotation/bump
-				const tapP = (progress - 0.3) / 0.3;
-				targetZ = Math.sin(tapP * Math.PI) * 0.2; // Bump forward
-				targetRotY = -0.2 + Math.sin(tapP * Math.PI) * 0.2;
 			} else {
 				// Exit
-				const p = (progress - 0.6) / 0.4;
-				targetX = lerp(0.6, 3.5, easeInQuad(p));
+				const p = (progress - 0.7) / 0.3;
+				targetX = lerp(TAP_TARGET_X, 3.5, easeInQuad(p));
+				targetRotY = lerp(PHONE_SCAN_ROT, 0, p);
 				opacity = 1 - p;
 			}
-			scrollY = 0.0; // Show Profile?
+			scrollY = 0.0;
 		}
 
 		// Apply texture scroll
@@ -122,12 +155,12 @@
 		}
 
 		// Update Transform
-		// Add some subtle float
-		position.x = lerp(position.x, targetX, delta * 5);
+		// Lower lerp speed (delta * 3) for smoother inertia
+		position.x = lerp(position.x, targetX, delta * 3);
 		position.y = Math.sin(Date.now() * 0.001) * 0.05; // Gentle float
-		// Tilt slightly towards card (left)
-		rotation.y = lerp(rotation.y, targetRotY !== 0 ? targetRotY : -0.2, delta * 2);
-		position.z = lerp(position.z, targetZ, delta * 5);
+		position.z = lerp(position.z, targetZ, delta * 3);
+		// Apply rotation - use target directly (already set per section)
+		rotation.y = lerp(rotation.y, targetRotY, delta * 3);
 	});
 
 	// Easing functions
