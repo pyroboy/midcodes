@@ -1,6 +1,7 @@
 <script lang="ts">
 	/**
 	 * PhoneMesh.svelte - 3D Phone model with animated screen and NFC banner overlay
+	 * Screen content updates dynamically based on cardDataStore input.
 	 */
 	import { T, useTask, useThrelte } from '@threlte/core';
 	import * as THREE from 'three';
@@ -14,6 +15,7 @@
 		NFC_BANNER_W,
 		NFC_BANNER_H
 	} from './utils/drawPhoneScreen';
+	import { cardDataStore, type CardData } from '$lib/stores/encodeInput';
 
 	interface Props {
 		visible?: boolean;
@@ -121,16 +123,22 @@
 		bannerClipPlane.setFromNormalAndCoplanarPoint(tempNormal, tempPoint);
 	}
 
+	// Flag to track if canvas is ready
+	let isReady = false;
+
+	// Re-render screen when card data changes
+	function redrawScreen(data: CardData) {
+		if (!ctx || !screenTexture || !isReady) return;
+		drawScreenContent(ctx, data);
+		screenTexture.needsUpdate = true;
+	}
+
 	onMount(() => {
 		// === Main Screen Texture ===
 		canvas = document.createElement('canvas');
 		canvas.width = PHONE_TEX_W;
 		canvas.height = PHONE_TEX_H;
 		ctx = canvas.getContext('2d');
-
-		if (ctx) {
-			drawScreenContent(ctx);
-		}
 
 		screenTexture = new THREE.CanvasTexture(canvas);
 		screenTexture.wrapS = THREE.ClampToEdgeWrapping;
@@ -151,7 +159,16 @@
 
 		bannerTexture = new THREE.CanvasTexture(bannerCanvas);
 
+		// Mark as ready
+		isReady = true;
+
+		// Subscribe to card data store - redraw directly on every change
+		const unsubscribe = cardDataStore.subscribe((data) => {
+			redrawScreen(data);
+		});
+
 		return () => {
+			unsubscribe();
 			screenTexture?.dispose();
 			bannerTexture?.dispose();
 		};

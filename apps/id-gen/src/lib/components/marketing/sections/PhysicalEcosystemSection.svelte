@@ -7,16 +7,9 @@
 	data-section-id="physical"
 >
 	<!-- Sticky Section Header -->
-	<div
-		class="sticky top-0 pt-8 pb-4 z-10 bg-gradient-to-b from-background via-background to-transparent"
-	>
+	<div class="sticky top-16 pt-6 pb-4 z-10">
 		<div class="text-center">
-			<span
-				class="inline-block px-4 py-1.5 bg-yellow-500/10 border border-yellow-500/20 rounded-full text-yellow-600 dark:text-yellow-400 text-sm font-medium mb-4"
-			>
-				Physical Ecosystem
-			</span>
-			<h2 class="text-4xl md:text-6xl font-bold leading-tight">
+			<h2 class="text-4xl md:text-6xl font-bold leading-tight text-foreground">
 				Digital Brain. Physical Beauty.
 			</h2>
 		</div>
@@ -35,16 +28,16 @@
 				</p>
 
 				<div class="space-y-4 mb-8">
-					<div class="flex items-center gap-3 text-muted-foreground">
-						<div class="w-1.5 h-1.5 rounded-full bg-yellow-400"></div>
+					<div class="flex items-center gap-3 text-foreground">
+						<div class="w-2 h-2 rounded-full bg-foreground"></div>
 						<span>Premium PVC Card Stock</span>
 					</div>
-					<div class="flex items-center gap-3 text-gray-300">
-						<div class="w-1.5 h-1.5 rounded-full bg-yellow-400"></div>
+					<div class="flex items-center gap-3 text-foreground">
+						<div class="w-2 h-2 rounded-full bg-foreground"></div>
 						<span>Custom Branded Lanyards</span>
 					</div>
-					<div class="flex items-center gap-3 text-gray-300">
-						<div class="w-1.5 h-1.5 rounded-full bg-yellow-400"></div>
+					<div class="flex items-center gap-3 text-foreground">
+						<div class="w-2 h-2 rounded-full bg-foreground"></div>
 						<span>Batch Printing Services</span>
 					</div>
 				</div>

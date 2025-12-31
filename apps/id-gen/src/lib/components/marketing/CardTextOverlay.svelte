@@ -1,13 +1,14 @@
 <script lang="ts">
 	/**
 	 * CardTextOverlay.svelte
-	 * Renders a transparent plane with static text (CanvasTexture).
-	 * Optimized: Only redraws when typingProgress changes significantly.
+	 * Renders a transparent plane with dynamic text (CanvasTexture).
+	 * Subscribes to cardDataStore for live updates from encode section.
 	 */
 	import { T } from '@threlte/core';
 	import * as THREE from 'three';
 	import { onMount } from 'svelte';
 	import type { SectionName } from '$lib/marketing/scroll';
+	import { cardDataStore, COMPANY_NAME, isUserEditingStore, type CardData } from '$lib/stores/encodeInput';
 
 	interface Props {
 		typingProgress?: number;
@@ -16,6 +17,12 @@
 	}
 
 	let { typingProgress = 0, sectionProgress = 0, currentSection = 'hero' }: Props = $props();
+
+	// Card data from store (reactive)
+	let cardData = $state<CardData>({ name: 'Arjo Magno', title: 'CEO' });
+
+	// Flag to bypass animation when user is actively editing
+	let isUserEditing = $state(false);
 
 	// Caret visibility: hero > 50%, during encode, gone after
 	let showCaret = $derived(
@@ -27,8 +34,10 @@
 	let canvas: HTMLCanvasElement;
 	let ctx: CanvasRenderingContext2D | null = null;
 
-	// Track last rendered progress to avoid unnecessary redraws
+	// Track last rendered state to avoid unnecessary redraws
 	let lastRenderedProgress = -1;
+	let lastRenderedName = '';
+	let lastRenderedTitle = '';
 
 	// Blink state
 	let blinkVisible = $state(true);
@@ -37,14 +46,25 @@
 	const WIDTH = 640;
 	const HEIGHT = 1024;
 
-	// Text Data
-	const LINES = [
-		{ text: 'Alex Morgan', y: 0.4, font: 'bold 48px Inter, sans-serif', color: '#1f2937' },
-		{ text: 'Student', y: 0.5, font: 'normal 28px Inter, sans-serif', color: '#6b7280' },
-		{ text: 'ID: 2024-8821', y: 0.6, font: 'normal 24px Inter, sans-serif', color: '#6b7280' }
-	];
+	// Dynamic text lines (computed from cardData)
+	let LINES = $derived([
+		{ text: cardData.name || 'Your Name', y: 0.4, font: 'bold 48px Inter, sans-serif', color: '#1f2937' },
+		{ text: cardData.title || 'Title', y: 0.5, font: 'normal 28px Inter, sans-serif', color: '#6b7280' },
+		{ text: COMPANY_NAME, y: 0.6, font: 'normal 24px Inter, sans-serif', color: '#6b7280' }
+	]);
 
 	onMount(() => {
+		// Subscribe to card data store
+		const unsubscribeData = cardDataStore.subscribe((data) => {
+			cardData = data;
+		});
+
+		// Subscribe to editing flag store
+		const unsubscribeEditing = isUserEditingStore.subscribe((editing) => {
+			isUserEditing = editing;
+		});
+
+		// Create canvas
 		canvas = document.createElement('canvas');
 		canvas.width = WIDTH;
 		canvas.height = HEIGHT;
@@ -63,6 +83,8 @@
 
 		return () => {
 			clearInterval(interval);
+			unsubscribeData();
+			unsubscribeEditing();
 		};
 	});
 
@@ -107,16 +129,21 @@
 
 		textTexture.needsUpdate = true;
 		lastRenderedProgress = progress;
+		lastRenderedName = cardData.name;
+		lastRenderedTitle = cardData.title;
 	}
 
 	// Track last caret state to detect changes
 	let lastCaretDrawn = false;
 
 	/**
-	 * Update texture when typingProgress or caret state changes
+	 * Update texture when typingProgress, caret state, or cardData changes
 	 */
 	$effect(() => {
 		if (!ctx || !textTexture) return;
+
+		// When user is actively editing, bypass scroll animation and show full text
+		const effectiveTypingProgress = isUserEditing ? 1 : typingProgress;
 
 		// Calculate character threshold - only redraw when a new character would appear
 		const maxChars = Math.max(...LINES.map((l) => l.text.length));
@@ -126,19 +153,23 @@
 		// Only draw caret if it's supposed to be shown AND it's in the visible phase of blink
 		const shouldDrawCaret = showCaret && blinkVisible;
 
+		// Check if cardData changed
+		const cardDataChanged = cardData.name !== lastRenderedName || cardData.title !== lastRenderedTitle;
+
 		// Check if we need to redraw
-		const progressDiff = Math.abs(typingProgress - lastRenderedProgress);
+		const progressDiff = Math.abs(effectiveTypingProgress - lastRenderedProgress);
 		const caretVisChanged = shouldDrawCaret !== lastCaretDrawn;
 
 		const needsRedraw =
+			cardDataChanged || // Card data changed from input
 			progressDiff >= threshold || // New character would appear
 			lastRenderedProgress < 0 || // Initial render
-			(typingProgress > 0.95 && lastRenderedProgress <= 0.95) || // Snap to complete
-			(typingProgress < 0.05 && lastRenderedProgress >= 0.05) || // Snap to empty
+			(effectiveTypingProgress > 0.95 && lastRenderedProgress <= 0.95) || // Snap to complete
+			(effectiveTypingProgress < 0.05 && lastRenderedProgress >= 0.05) || // Snap to empty
 			caretVisChanged; // Caret visibility changed (including blink)
 
 		if (needsRedraw) {
-			renderText(typingProgress, shouldDrawCaret);
+			renderText(effectiveTypingProgress, shouldDrawCaret);
 			lastCaretDrawn = shouldDrawCaret;
 		}
 	});

@@ -19,10 +19,10 @@
 	let showCaret = $state(true);
 
 	onMount(() => {
-		// Caret blink
+		// Caret blink (3x faster: 530ms → ~175ms)
 		const caretInterval = setInterval(() => {
 			showCaret = !showCaret;
-		}, 530);
+		}, 175);
 
 		// Typing animation
 		let timeout: ReturnType<typeof setTimeout>;
@@ -35,11 +35,11 @@
 				displayText = currentWord.slice(0, displayText.length + 1);
 
 				if (displayText === currentWord) {
-					// Pause at end of word
+					// Pause at end of word (3x faster: 2000ms → ~667ms)
 					timeout = setTimeout(() => {
 						isDeleting = true;
 						type();
-					}, 2000);
+					}, 667);
 					return;
 				}
 			} else {
@@ -52,8 +52,8 @@
 				}
 			}
 
-			// Speed: faster delete, slower type
-			const speed = isDeleting ? 50 : 100;
+			// Speed: 3x faster (100ms → 33ms, 50ms → 17ms)
+			const speed = isDeleting ? 17 : 33;
 			timeout = setTimeout(type, speed);
 		}
 
@@ -67,42 +67,42 @@
 	});
 </script>
 
-<section class="min-h-screen flex flex-col px-4 py-12 relative" data-section-id="hero">
-	<!-- Top Content -->
-	<div class="text-center max-w-4xl mx-auto pt-8">
+<section class="min-h-screen flex flex-col px-4 pt-4 pb-12 relative" data-section-id="hero">
+	<!-- Top Content - Title + Typing Animation -->
+	<div class="text-center max-w-4xl mx-auto">
 		<h1 class="text-4xl md:text-6xl font-black tracking-tight text-foreground">
 			Digital Card for Everything
 		</h1>
+
+		<!-- Typing Animation -->
+		<div class="text-2xl md:text-4xl font-bold text-foreground mt-4 h-12 flex items-center justify-center">
+			<span class="text-muted-foreground mr-2">for</span>
+			<span class="text-blue-500">
+				{displayText}
+			</span>
+			<span
+				class="w-[3px] h-8 md:h-10 bg-blue-500 ml-1 {showCaret ? 'opacity-100' : 'opacity-0'}"
+			></span>
+		</div>
 	</div>
 
 	<!-- Spacer for 3D Card -->
 	<div class="flex-1 min-h-[40vh]"></div>
 
-	<!-- Bottom Content -->
+	<!-- Bottom Content - CTA buttons -->
 	<div class="text-center max-w-4xl mx-auto pb-24">
-		<!-- Typing Animation -->
-		<div class="text-2xl md:text-4xl font-bold text-foreground mb-8 h-12 flex items-center justify-center">
-			<span class="text-muted-foreground mr-2">for</span>
-			<span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">
-				{displayText}
-			</span>
-			<span
-				class="w-[3px] h-8 md:h-10 bg-foreground ml-1 {showCaret ? 'opacity-100' : 'opacity-0'}"
-			></span>
-		</div>
-
 		<div class="flex flex-col sm:flex-row gap-4 justify-center">
 			<a
 				href="/auth"
 				class="px-8 py-4 bg-foreground text-background font-semibold rounded-lg hover:bg-foreground/90 transition-colors"
 			>
-				Initialize Organization
+				Get Started
 			</a>
 			<a
 				href="/auth"
 				class="px-8 py-4 border border-input text-muted-foreground font-semibold rounded-lg hover:border-foreground hover:text-foreground transition-colors"
 			>
-				Get Personal Card
+				Personal Card
 			</a>
 		</div>
 	</div>

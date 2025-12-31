@@ -3,7 +3,7 @@
  *
  * Canvas drawing logic for the PhoneMesh screen texture.
  * Layout: 6 screens stacked vertically (512px each)
- * 
+ *
  * Offset mapping (UV origin is bottom-left):
  * - 5/6 ≈ 0.833: QR Scanner View
  * - 4/6 ≈ 0.667: QR Success Badge
@@ -11,20 +11,50 @@
  * - 2/6 ≈ 0.333: Verifying Overlay
  * - 1/6 ≈ 0.167: Verified Screen
  * - 0/6 = 0.000: Profile Screen
- * 
+ *
  * NFC Banner is a SEPARATE texture for overlay animation.
+ *
+ * Profile layout is determined by job title:
+ * - CEO/CTO/Director/Manager: Executive theme (dark, professional)
+ * - Developer/Engineer: Tech theme (blue gradient, modern)
+ * - Designer: Creative theme (purple gradient)
+ * - Analyst: Corporate theme (clean, white)
  */
+
+import type { CardData } from '$lib/stores/encodeInput';
 
 export const PHONE_TEX_W = 256;
 export const PHONE_TEX_H = 3072; // 6 screens x 512 height
 const SECTION_H = 512;
 
+// Layout themes based on job title
+type LayoutTheme = 'executive' | 'tech' | 'creative' | 'corporate';
+
+function getThemeForTitle(title: string): LayoutTheme {
+	const t = title.toLowerCase();
+	if (t.includes('ceo') || t.includes('cto') || t.includes('director') || t.includes('manager')) {
+		return 'executive';
+	}
+	if (t.includes('developer') || t.includes('engineer')) {
+		return 'tech';
+	}
+	if (t.includes('designer')) {
+		return 'creative';
+	}
+	return 'corporate'; // Analyst, etc.
+}
+
 // Separate NFC Banner texture dimensions
 export const NFC_BANNER_W = 220;
 export const NFC_BANNER_H = 80;
 
-export function drawScreenContent(ctx: CanvasRenderingContext2D) {
+export function drawScreenContent(
+	ctx: CanvasRenderingContext2D,
+	cardData?: CardData
+) {
 	const TEX_W = PHONE_TEX_W;
+	const data = cardData || { name: 'Unknown', title: 'Visitor' };
+	const theme = getThemeForTitle(data.title);
 
 	// Fill entire texture with fallback
 	ctx.fillStyle = '#0f172a';
@@ -43,10 +73,10 @@ export function drawScreenContent(ctx: CanvasRenderingContext2D) {
 	drawVerifyingOverlay(ctx, SECTION_H * 3);
 
 	// === SCREEN 5: VERIFIED SCREEN ===
-	drawVerifiedScreen(ctx, SECTION_H * 4);
+	drawVerifiedScreen(ctx, SECTION_H * 4, data.name);
 
 	// === SCREEN 6 (Bottom): PROFILE SCREEN ===
-	drawProfileScreen(ctx, SECTION_H * 5);
+	drawProfileScreen(ctx, SECTION_H * 5, data, theme);
 }
 
 /**
@@ -300,7 +330,7 @@ function drawVerifyingOverlay(ctx: CanvasRenderingContext2D, yOffset: number) {
 	ctx.fillText('Reading card data', cx, cy + 135);
 }
 
-function drawVerifiedScreen(ctx: CanvasRenderingContext2D, yOffset: number) {
+function drawVerifiedScreen(ctx: CanvasRenderingContext2D, yOffset: number, name: string) {
 	const W = PHONE_TEX_W;
 	const H = SECTION_H;
 
@@ -310,93 +340,199 @@ function drawVerifiedScreen(ctx: CanvasRenderingContext2D, yOffset: number) {
 
 	// Checkmark circle
 	const cx = W / 2;
-	const cy = yOffset + H * 0.4;
+	const cy = yOffset + H * 0.35;
 
 	ctx.beginPath();
-	ctx.arc(cx, cy, 70, 0, Math.PI * 2);
+	ctx.arc(cx, cy, 60, 0, Math.PI * 2);
 	ctx.fillStyle = 'rgba(255,255,255,0.2)';
 	ctx.fill();
 
 	ctx.beginPath();
-	ctx.arc(cx, cy, 50, 0, Math.PI * 2);
+	ctx.arc(cx, cy, 42, 0, Math.PI * 2);
 	ctx.fillStyle = '#ffffff';
 	ctx.fill();
 
 	// Checkmark
 	ctx.strokeStyle = '#10b981';
-	ctx.lineWidth = 8;
+	ctx.lineWidth = 7;
 	ctx.lineCap = 'round';
 	ctx.beginPath();
-	ctx.moveTo(cx - 18, cy);
-	ctx.lineTo(cx - 5, cy + 12);
-	ctx.lineTo(cx + 22, cy - 18);
+	ctx.moveTo(cx - 15, cy);
+	ctx.lineTo(cx - 4, cy + 10);
+	ctx.lineTo(cx + 18, cy - 15);
 	ctx.stroke();
 
 	// "Verified!" text
 	ctx.fillStyle = '#ffffff';
-	ctx.font = 'bold 48px Inter, sans-serif';
+	ctx.font = 'bold 40px Inter, sans-serif';
 	ctx.textAlign = 'center';
-	ctx.fillText('Verified!', cx, cy + 100);
+	ctx.fillText('Verified!', cx, cy + 85);
 
-	ctx.font = '22px Inter, sans-serif';
-	ctx.fillStyle = 'rgba(255,255,255,0.9)';
-	ctx.fillText('Identity Confirmed', cx, cy + 135);
+	// Show name
+	ctx.font = 'bold 24px Inter, sans-serif';
+	ctx.fillStyle = 'rgba(255,255,255,0.95)';
+	ctx.fillText(name, cx, cy + 125);
+
+	ctx.font = '18px Inter, sans-serif';
+	ctx.fillStyle = 'rgba(255,255,255,0.8)';
+	ctx.fillText('Identity Confirmed', cx, cy + 155);
 }
 
-function drawProfileScreen(ctx: CanvasRenderingContext2D, yOffset: number) {
+function drawProfileScreen(
+	ctx: CanvasRenderingContext2D,
+	yOffset: number,
+	data: CardData,
+	theme: LayoutTheme
+) {
 	const W = PHONE_TEX_W;
 	const H = SECTION_H;
+	const cx = W / 2;
 
-	// Light background
-	ctx.fillStyle = '#f9fafb';
+	// Theme-based colors
+	const themeConfig = {
+		executive: {
+			bg: '#0f172a',
+			headerBg: '#1e293b',
+			accent: '#fbbf24', // Gold
+			text: '#ffffff',
+			subtext: '#94a3b8',
+			avatarBg: '#334155',
+			rowBg: 'rgba(255,255,255,0.05)'
+		},
+		tech: {
+			bg: '#0c1929',
+			headerBg: '#1e3a5f',
+			accent: '#3b82f6', // Blue
+			text: '#ffffff',
+			subtext: '#64748b',
+			avatarBg: '#1e40af',
+			rowBg: 'rgba(59,130,246,0.1)'
+		},
+		creative: {
+			bg: '#1e1033',
+			headerBg: '#2d1b4e',
+			accent: '#a855f7', // Purple
+			text: '#ffffff',
+			subtext: '#a78bfa',
+			avatarBg: '#6b21a8',
+			rowBg: 'rgba(168,85,247,0.1)'
+		},
+		corporate: {
+			bg: '#f9fafb',
+			headerBg: '#ffffff',
+			accent: '#10b981', // Green
+			text: '#1e293b',
+			subtext: '#64748b',
+			avatarBg: '#cbd5e1',
+			rowBg: 'rgba(0,0,0,0.03)'
+		}
+	};
+
+	const colors = themeConfig[theme];
+
+	// Background
+	ctx.fillStyle = colors.bg;
 	ctx.fillRect(0, yOffset, W, H);
 
-	// Header
-	ctx.fillStyle = '#ffffff';
-	ctx.fillRect(0, yOffset, W, 120);
+	// Header gradient for executive/tech/creative
+	if (theme !== 'corporate') {
+		const headerGrad = ctx.createLinearGradient(0, yOffset, 0, yOffset + 140);
+		headerGrad.addColorStop(0, colors.headerBg);
+		headerGrad.addColorStop(1, colors.bg);
+		ctx.fillStyle = headerGrad;
+		ctx.fillRect(0, yOffset, W, 140);
+	} else {
+		ctx.fillStyle = colors.headerBg;
+		ctx.fillRect(0, yOffset, W, 120);
+	}
 
-	// Avatar
-	const cx = W / 2;
+	// Avatar circle
 	ctx.beginPath();
-	ctx.arc(cx, yOffset + 90, 55, 0, Math.PI * 2);
-	ctx.fillStyle = '#cbd5e1';
+	ctx.arc(cx, yOffset + 85, 48, 0, Math.PI * 2);
+	ctx.fillStyle = colors.avatarBg;
 	ctx.fill();
-	ctx.strokeStyle = '#ffffff';
-	ctx.lineWidth = 6;
+
+	// Avatar accent ring
+	ctx.strokeStyle = colors.accent;
+	ctx.lineWidth = 3;
 	ctx.stroke();
 
-	// Name
-	ctx.fillStyle = '#1e293b';
+	// Initials in avatar
+	const initials = data.name
+		.split(' ')
+		.map((n) => n[0])
+		.join('')
+		.toUpperCase()
+		.slice(0, 2);
+	ctx.fillStyle = colors.text;
 	ctx.font = 'bold 32px Inter, sans-serif';
 	ctx.textAlign = 'center';
-	ctx.fillText('Alex Morgan', cx, yOffset + 185);
+	ctx.textBaseline = 'middle';
+	ctx.fillText(initials, cx, yOffset + 88);
+	ctx.textBaseline = 'alphabetic';
 
-	ctx.fillStyle = '#64748b';
-	ctx.font = '18px Inter, sans-serif';
-	ctx.fillText('Student • ID #2024-8821', cx, yOffset + 215);
+	// Name
+	ctx.fillStyle = colors.text;
+	ctx.font = 'bold 28px Inter, sans-serif';
+	ctx.fillText(data.name, cx, yOffset + 165);
+
+	// Title with badge style
+	if (theme === 'executive') {
+		// Gold badge for executives
+		const titleWidth = ctx.measureText(data.title).width + 24;
+		ctx.fillStyle = colors.accent;
+		roundRect(ctx, cx - titleWidth / 2, yOffset + 178, titleWidth, 28, 6);
+		ctx.fill();
+		ctx.fillStyle = '#000000';
+		ctx.font = 'bold 16px Inter, sans-serif';
+		ctx.fillText(data.title, cx, yOffset + 197);
+	} else {
+		ctx.fillStyle = colors.subtext;
+		ctx.font = '18px Inter, sans-serif';
+		ctx.fillText(data.title, cx, yOffset + 195);
+	}
 
 	// Verified badge
 	ctx.fillStyle = '#10b981';
-	ctx.font = 'bold 16px Inter, sans-serif';
-	ctx.fillText('✓ VERIFIED', cx, yOffset + 245);
+	ctx.font = 'bold 14px Inter, sans-serif';
+	ctx.fillText('✓ VERIFIED', cx, yOffset + 230);
 
-	// Data rows
+	// Company name
+	ctx.fillStyle = colors.subtext;
+	ctx.font = '16px Inter, sans-serif';
+	ctx.fillText('Kanaya', cx, yOffset + 255);
+
+	// Data rows with theme styling
 	const rowStart = yOffset + 290;
 	const rowH = 50;
-	const fields = ['Department', 'Valid Until', 'Access Level'];
-	const values = ['Engineering', 'Dec 2025', 'Full'];
+	const fields = ['Organization', 'Access', 'Status'];
+	const values = ['Kanaya Corp', 'Full', 'Active'];
 
 	for (let i = 0; i < fields.length; i++) {
 		const y = rowStart + i * rowH;
-		ctx.fillStyle = '#94a3b8';
-		ctx.font = '16px Inter, sans-serif';
+
+		// Row background for dark themes
+		if (theme !== 'corporate') {
+			ctx.fillStyle = colors.rowBg;
+			roundRect(ctx, 15, y - 18, W - 30, 38, 8);
+			ctx.fill();
+		}
+
+		ctx.fillStyle = colors.subtext;
+		ctx.font = '14px Inter, sans-serif';
 		ctx.textAlign = 'left';
 		ctx.fillText(fields[i], 25, y);
-		ctx.fillStyle = '#334155';
+
+		ctx.fillStyle = colors.text;
+		ctx.font = 'bold 14px Inter, sans-serif';
 		ctx.textAlign = 'right';
 		ctx.fillText(values[i], W - 25, y);
-		ctx.fillStyle = '#e2e8f0';
-		ctx.fillRect(15, y + 12, W - 30, 1);
+
+		// Divider for corporate theme
+		if (theme === 'corporate') {
+			ctx.fillStyle = '#e2e8f0';
+			ctx.fillRect(15, y + 15, W - 30, 1);
+		}
 	}
 }
 

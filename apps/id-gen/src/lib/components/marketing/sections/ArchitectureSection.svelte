@@ -1,37 +1,31 @@
 <script>
-	// Architecture Section
-	// 5 distinct scroll sections to explain each layer
-	
+	// Architecture Section - Stacking Cards on Scroll
+
 	const layers = [
 		{
 			id: 'layer-1',
 			title: 'Base Grid',
-			description: 'The foundational structure. A responsive grid system ensuring perfect alignment for every element.',
-			align: 'right'
+			description: 'The foundational structure. A responsive grid system ensuring perfect alignment for every element.'
 		},
 		{
 			id: 'layer-2',
 			title: 'Smart Assets',
-			description: 'Intelligent containers for photos and graphics that auto-scale and crop faces automatically.',
-			align: 'left'
+			description: 'Intelligent containers for photos and graphics that auto-scale and crop faces automatically.'
 		},
 		{
 			id: 'layer-3',
 			title: 'Live Data',
-			description: "Dynamic text fields linked to your organization's database in real-time.",
-			align: 'right'
+			description: "Dynamic text fields linked to your organization's database in real-time."
 		},
 		{
 			id: 'layer-4',
 			title: 'Secure Encoding',
-			description: 'High-density QR codes generated instantly for verification and access control.',
-			align: 'left'
+			description: 'High-density QR codes generated instantly for verification and access control.'
 		},
 		{
 			id: 'layer-5',
 			title: 'Holographic Security',
-			description: 'Top-level security overlays and watermarks to prevent counterfeiting.',
-			align: 'right'
+			description: 'Top-level security overlays and watermarks to prevent counterfeiting.'
 		}
 	];
 </script>
@@ -43,15 +37,8 @@
 		data-section-id="layers-main"
 	>
 		<!-- Sticky Section Header -->
-		<div
-			class="sticky top-0 pt-8 pb-4 z-20 bg-gradient-to-b from-background via-background to-transparent"
-		>
+		<div class="sticky top-16 pt-6 pb-4 z-20">
 			<div class="text-center">
-				<span
-					class="inline-block px-4 py-1.5 bg-blue-500/10 border border-blue-500/20 rounded-full text-blue-600 dark:text-blue-400 text-sm font-medium mb-4"
-				>
-					Architecture
-				</span>
 				<h2 class="text-3xl sm:text-4xl md:text-6xl font-bold leading-tight text-foreground">
 					Engineered, Not Just Printed.
 				</h2>
@@ -68,32 +55,24 @@
 			</div>
 		</div>
 
-		<!-- Layers with sticky titles -->
-		{#each layers as layer}
-			<div
-				class="min-h-screen relative flex flex-col"
-				data-section-id={layer.id}
-			>
-				<!-- Sticky Layer Title -->
+		<!-- Stacking Cards that reveal as you scroll -->
+		<div class="relative max-w-2xl mx-auto w-full">
+			{#each layers as layer, index}
 				<div
-					class="sticky top-24 z-10 py-2 {layer.align === 'right' ? 'text-right pr-6 md:pr-16' : 'text-left pl-6 md:pl-16'}"
+					class="sticky bg-background border border-border rounded-2xl p-6 md:p-8 shadow-lg mb-4"
+					style="top: {100 + index * 24}px; z-index: {index + 1};"
+					data-section-id={layer.id}
 				>
-					<h3 class="text-2xl md:text-4xl font-bold text-foreground inline-block px-4 py-2 bg-background/80 backdrop-blur-sm rounded-lg">
+					<h3 class="text-xl md:text-2xl font-bold text-foreground mb-3">
 						{layer.title}
 					</h3>
+					<p class="text-base text-muted-foreground leading-relaxed">
+						{layer.description}
+					</p>
 				</div>
-				
-				<!-- Layer Content -->
-				<div
-					class="flex-1 flex items-center {layer.align === 'right' ? 'justify-end' : 'justify-start'} px-6 md:px-16 pointer-events-none"
-				>
-					<div class="{layer.align === 'right' ? 'text-right' : 'text-left'} max-w-md">
-						<p class="text-lg text-muted-foreground">
-							{layer.description}
-						</p>
-					</div>
-				</div>
-			</div>
-		{/each}
+			{/each}
+			<!-- Spacer for full stack reveal -->
+			<div class="h-[100vh]"></div>
+		</div>
 	</section>
 </div>

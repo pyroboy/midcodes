@@ -131,13 +131,13 @@
 {#if showDebugUI}
 	<!-- Scroll Progress Indicator -->
 	<div
-		class="fixed top-0 left-0 h-1 bg-gradient-to-r from-white to-gray-500 z-50 transition-all duration-100"
+		class="fixed top-0 left-0 h-1 bg-blue-500 z-50 transition-all duration-100"
 		style="width: {scrollState.progress * 100}%"
 	></div>
 
 	<!-- Section Indicator -->
 	<div
-		class="fixed top-4 right-4 z-50 px-3 py-1.5 bg-black/50 backdrop-blur-sm rounded-full text-xs font-mono text-gray-400"
+		class="fixed top-4 right-4 z-50 px-3 py-1.5 bg-black/80 rounded-full text-xs font-mono text-gray-400"
 	>
 		{scrollState.currentSection} ({(scrollState.sectionProgress * 100).toFixed(0)}%)
 	</div>
@@ -150,7 +150,7 @@
 	<!-- Section 2: Verification Flow (Encode, Scan, Tap) -->
 	<VerificationFlowSection />
 
-	<!-- Section 3: Architecture -->
+	<!-- Section 3: Architecture / Layers -->
 	<ArchitectureSection />
 
 	<!-- Section 4-6: Use Cases & Segments -->

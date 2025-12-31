@@ -32,7 +32,11 @@
       "Bash(wc:*)",
       "Bash(pnpm add:*)",
       "Bash(git -C /Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen log --name-only --oneline -20)",
-      "Bash(git -C /Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen log --all --format='%h %s')"
+      "Bash(git -C /Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen log --all --format='%h %s')",
+      "Bash(git -C /Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen log --oneline -30)",
+      "Bash(git -C /Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen show d6c47bc --stat)",
+      "Bash(git -C /Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen show:*)",
+      "Bash(git -C /Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen log --oneline --all)"
     ],
     "deny": [],
     "ask": []

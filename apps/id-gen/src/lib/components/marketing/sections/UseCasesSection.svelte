@@ -1,123 +1,122 @@
-<script>
-	// Use Cases Section
-	// Three main categories: Networking & Marketing (NFC), Identification & Information, Attendance & Management
-	// Each section is 250vh tall with card texture changes
+<script lang="ts">
+	// Use Cases Section - Scroll-driven horizontal animation
+	import { getScrollState } from '$lib/marketing/scroll';
 
-	const useCaseCategories = [
-		{
-			id: 'networking',
-			tag: 'Networking & Marketing',
-			tagColor: 'cyan',
-			title: 'Make Every Tap Count.',
-			description: 'Transform physical interactions into digital connections. NFC-powered cards that share, collect, and track.',
-			applications: [
-				{ icon: '💼', name: 'Digital Business Cards', desc: 'Share contact info with a tap' },
-				{ icon: '⭐', name: 'Review Cards', desc: 'Collect customer feedback instantly' },
-				{ icon: '📶', name: 'WiFi Access Cards', desc: 'One tap wireless network access' }
-			]
-		},
-		{
-			id: 'identification',
-			tag: 'Identification & Information',
-			tagColor: 'amber',
-			title: 'Critical Info When It Matters.',
-			description: 'Life-saving details accessible instantly. From emergency contacts to product authenticity verification.',
-			applications: [
-				{ icon: '🏥', name: 'Medical Emergency Cards', desc: 'Allergies, conditions, emergency contacts' },
-				{ icon: '🐕', name: 'Pet ID Tags', desc: 'Owner info and medical history' },
-				{ icon: '✓', name: 'Product Authentication', desc: 'Verify authenticity, track provenance' }
-			]
-		},
-		{
-			id: 'attendance',
-			tag: 'Attendance & Management',
-			tagColor: 'emerald',
-			title: 'Track. Manage. Secure.',
-			description: 'Streamline operations with smart access control and real-time attendance tracking across any venue.',
-			applications: [
-				{ icon: '⏰', name: 'Employee Time & Attendance', desc: 'Accurate clock-in, real-time reports' },
-				{ icon: '🎓', name: 'School Monitoring', desc: 'Student attendance and campus access' },
-				{ icon: '🎫', name: 'Event Ticketing', desc: 'VIP zones, session tracking' },
-				{ icon: '💪', name: 'Gym Membership', desc: 'Access control and usage analytics' }
-			]
-		}
+	const scrollState = getScrollState();
+
+	// Split into two rows
+	const useCasesRow1 = [
+		{ id: 'business', title: 'Digital Business Cards', description: 'Share contact info with a tap' },
+		{ id: 'review', title: 'Review Cards', description: 'Collect customer feedback instantly' },
+		{ id: 'wifi', title: 'WiFi Access Cards', description: 'One tap wireless network access' },
+		{ id: 'medical', title: 'Medical Cards', description: 'Allergies, conditions, emergency contacts' },
+		{ id: 'pet', title: 'Pet ID Tags', description: 'Owner info and medical history' }
 	];
 
-	const tagColorClasses = {
-		cyan: {
-			bg: 'bg-cyan-500/10',
-			border: 'border-cyan-500/20',
-			text: 'text-cyan-400'
-		},
-		amber: {
-			bg: 'bg-amber-500/10',
-			border: 'border-amber-500/20',
-			text: 'text-amber-400'
-		},
-		emerald: {
-			bg: 'bg-emerald-500/10',
-			border: 'border-emerald-500/20',
-			text: 'text-emerald-400'
+	const useCasesRow2 = [
+		{ id: 'product', title: 'Product Auth', description: 'Verify authenticity, track provenance' },
+		{ id: 'employee', title: 'Employee Badges', description: 'Accurate clock-in, real-time reports' },
+		{ id: 'school', title: 'School IDs', description: 'Student attendance and campus access' },
+		{ id: 'event', title: 'Event Tickets', description: 'VIP zones, session tracking' },
+		{ id: 'gym', title: 'Gym Membership', description: 'Access control and usage analytics' }
+	];
+
+	// Calculate horizontal scroll based on section progress
+	let translateX = $derived(() => {
+		const section = scrollState.currentSection;
+		const progress = scrollState.sectionProgress;
+
+		// Only animate when in useCases sections
+		if (section === 'useCases-networking') {
+			return progress * -33; // First third of scroll
+		} else if (section === 'useCases-identification') {
+			return -33 + (progress * -33); // Second third
+		} else if (section === 'useCases-attendance') {
+			return -66 + (progress * -34); // Final third
 		}
-	};
+
+		// Check if we're past useCases
+		if (section === 'systemScale' || section === 'physical' || section === 'footer' || section === 'segmentation') {
+			return -100;
+		}
+
+		return 0;
+	});
 </script>
 
-{#each useCaseCategories as category, idx}
-	{@const colors = tagColorClasses[category.tagColor]}
-	<section
-		class="h-[250vh] relative flex items-center justify-center px-6 md:px-8"
-		data-section-id="useCases-{category.id}"
-	>
-		<!-- Sticky Container that stays in viewport -->
-		<div class="sticky top-0 h-screen w-full flex items-center justify-center">
-			<div class="text-center max-w-4xl mx-auto">
-				<!-- Tag Badge -->
-				<span
-					class="inline-block px-4 py-1.5 {colors.bg} border {colors.border} rounded-full {colors.text} text-sm font-medium mb-6"
-				>
-					{category.tag}
-				</span>
-				
-				<!-- Title -->
-				<h2 class="text-3xl sm:text-4xl md:text-6xl font-bold mb-4 leading-tight">
-					{category.title}
-				</h2>
-				
-				<!-- Description -->
-				<p class="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-12 leading-relaxed">
-					{category.description}
-				</p>
-				
-				<!-- Application Cards -->
-				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-{category.applications.length === 4 ? 4 : 3} gap-4 text-left">
-					{#each category.applications as app}
-						<div
-							class="p-5 bg-black/5 dark:bg-white/5 rounded-xl border border-black/5 dark:border-white/10 backdrop-blur-sm hover:bg-black/10 dark:hover:bg-white/10 transition-all duration-300"
-						>
-							<div class="text-2xl mb-3">{app.icon}</div>
-							<h3 class="font-semibold mb-1 text-sm md:text-base">{app.name}</h3>
-							<p class="text-xs md:text-sm text-muted-foreground">{app.desc}</p>
+<!-- Use Cases Section with Scroll-driven Horizontal Animation -->
+<section class="h-[400vh] relative" data-section-id="useCases-networking">
+	<!-- Sticky container -->
+	<div class="sticky top-16 h-[calc(100vh-4rem)] flex flex-col justify-center overflow-hidden">
+		<!-- Section Header -->
+		<div class="text-center px-6 md:px-8 mb-12">
+			<h2 class="text-3xl sm:text-4xl md:text-6xl font-bold leading-tight text-foreground">
+				One Platform, Endless Uses.
+			</h2>
+			<p class="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mt-4 leading-relaxed">
+				From business cards to gym memberships, we've got you covered.
+			</p>
+		</div>
+
+		<!-- Two rows of cards that scroll horizontally -->
+		<div class="space-y-4">
+			<!-- Row 1 -->
+			<div
+				class="flex gap-4 px-6 transition-transform duration-100 ease-out"
+				style="transform: translateX({translateX()}%);"
+			>
+				{#each useCasesRow1 as useCase}
+					<div
+						class="flex-shrink-0 w-72 bg-background border border-border rounded-2xl overflow-hidden"
+					>
+						<div class="w-full h-32 bg-muted flex items-center justify-center">
+							<svg class="w-12 h-12 text-muted-foreground/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+							</svg>
 						</div>
-					{/each}
-				</div>
+						<div class="p-4">
+							<h3 class="font-semibold text-foreground mb-1">{useCase.title}</h3>
+							<p class="text-sm text-muted-foreground">{useCase.description}</p>
+						</div>
+					</div>
+				{/each}
+			</div>
+
+			<!-- Row 2 (scrolls opposite direction for visual interest) -->
+			<div
+				class="flex gap-4 px-6 transition-transform duration-100 ease-out"
+				style="transform: translateX({-translateX() - 20}%);"
+			>
+				{#each useCasesRow2 as useCase}
+					<div
+						class="flex-shrink-0 w-72 bg-background border border-border rounded-2xl overflow-hidden"
+					>
+						<div class="w-full h-32 bg-muted flex items-center justify-center">
+							<svg class="w-12 h-12 text-muted-foreground/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+							</svg>
+						</div>
+						<div class="p-4">
+							<h3 class="font-semibold text-foreground mb-1">{useCase.title}</h3>
+							<p class="text-sm text-muted-foreground">{useCase.description}</p>
+						</div>
+					</div>
+				{/each}
 			</div>
 		</div>
-	</section>
-{/each}
+	</div>
+</section>
+
+<!-- Additional scroll sections for animation timing -->
+<section class="h-[200vh]" data-section-id="useCases-identification"></section>
+<section class="h-[150vh]" data-section-id="useCases-attendance"></section>
 
 <!-- Impact / Scale -->
 <section class="min-h-[300vh] relative px-6 md:px-8 flex flex-col" data-section-id="systemScale">
 	<!-- Sticky Title at Top -->
-	<div
-		class="sticky top-0 pt-8 pb-4 z-10 bg-gradient-to-b from-background via-background to-transparent"
-	>
+	<div class="sticky top-16 pt-6 pb-4 z-10">
 		<div class="text-center">
-			<span
-				class="inline-block px-4 py-1.5 bg-green-500/10 border border-green-500/20 rounded-full text-green-400 text-sm font-medium mb-4"
-			>
-				Impact
-			</span>
-			<h2 class="text-3xl sm:text-4xl md:text-6xl font-bold leading-tight">System Scale.</h2>
+			<h2 class="text-3xl sm:text-4xl md:text-6xl font-bold leading-tight text-foreground">System Scale.</h2>
 		</div>
 	</div>
 
@@ -125,9 +124,7 @@
 	<div class="flex-1"></div>
 
 	<!-- Sticky Content at Bottom -->
-	<div
-		class="sticky bottom-0 pb-12 pt-4 z-10 bg-gradient-to-t from-background via-background to-transparent"
-	>
+	<div class="sticky bottom-0 pb-12 pt-4 z-10">
 		<div class="text-center max-w-3xl mx-auto">
 			<div class="grid grid-cols-2 gap-8 mb-8">
 				<div>
@@ -148,21 +145,19 @@
 
 <!-- Segmentation (Call to Action) -->
 <section class="min-h-screen flex items-center justify-center px-0" data-section-id="segmentation">
-	<div class="flex flex-col md:flex-row w-full min-h-screen">
+	<div class="flex flex-col md:flex-row w-full min-h-[60vh]">
 		<!-- Organization Side -->
 		<div
-			class="flex-1 flex flex-col items-center justify-center p-8 border-b md:border-b-0 md:border-r border-black/5 dark:border-white/5 bg-gradient-to-br from-blue-900/10 to-transparent hover:from-blue-900/20 transition-all duration-500 group"
+			class="flex-1 flex flex-col items-center justify-center p-8 border-b md:border-b-0 md:border-r border-border"
 		>
-			<div
-				class="max-w-md text-center md:text-right md:pr-12 md:mr-auto w-full transition-transform duration-500 group-hover:-translate-x-2"
-			>
-				<h3 class="text-3xl font-bold mb-4">For Organizations</h3>
+			<div class="max-w-md text-center md:text-right md:pr-12 md:mr-auto w-full">
+				<h3 class="text-3xl font-bold mb-4 text-foreground">For Organizations</h3>
 				<p class="text-muted-foreground mb-8 text-lg">
 					Secure your campus or company. Unified attendance and access control.
 				</p>
 				<a
 					href="/enterprise"
-					class="text-blue-600 dark:text-blue-400 font-semibold hover:text-blue-500 dark:hover:text-blue-300 flex items-center gap-2 justify-center md:justify-end"
+					class="text-blue-500 font-semibold hover:text-blue-400 flex items-center gap-2 justify-center md:justify-end"
 				>
 					Explore Enterprise Solutions
 					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -178,19 +173,15 @@
 		</div>
 
 		<!-- Individual Side -->
-		<div
-			class="flex-1 flex flex-col items-center justify-center p-8 bg-gradient-to-bl from-purple-900/10 to-transparent hover:from-purple-900/20 transition-all duration-500 group"
-		>
-			<div
-				class="max-w-md text-center md:text-left md:pl-12 md:ml-auto w-full transition-transform duration-500 group-hover:translate-x-2"
-			>
-				<h3 class="text-3xl font-bold mb-4">For Individuals</h3>
+		<div class="flex-1 flex flex-col items-center justify-center p-8">
+			<div class="max-w-md text-center md:text-left md:pl-12 md:ml-auto w-full">
+				<h3 class="text-3xl font-bold mb-4 text-foreground">For Individuals</h3>
 				<p class="text-muted-foreground mb-8 text-lg">
 					Upgrade your networking. One card to share your entire professional portfolio.
 				</p>
 				<a
 					href="/personal"
-					class="text-purple-600 dark:text-purple-400 font-semibold hover:text-purple-500 dark:hover:text-purple-300 flex items-center gap-2 justify-center md:justify-start"
+					class="text-purple-500 font-semibold hover:text-purple-400 flex items-center gap-2 justify-center md:justify-start"
 				>
 					Get Your Personal Card
 					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"

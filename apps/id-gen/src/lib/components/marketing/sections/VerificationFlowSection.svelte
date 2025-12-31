@@ -1,38 +1,96 @@
-<script>
-	// Verification Flow Section
-	// Merges Encode, Scan, and Tap sections into a single managed component
+<script lang="ts">
+	// Verification Flow Section - Encode with live input that drives 3D card
+	import { cardDataStore, defaultCardData, JOB_TITLES, COMPANY_NAME, isUserEditingStore, type CardData } from '$lib/stores/encodeInput';
+
+	// Local state initialized from defaults
+	let cardData = $state<CardData>({ ...defaultCardData });
+	let showTitlePopover = $state(false);
+
+	// Sync to store so 3D card can read it
+	$effect(() => {
+		cardDataStore.set(cardData);
+	});
+
+	function selectTitle(title: string) {
+		// Reassign entire object to ensure reactivity triggers
+		cardData = { ...cardData, title };
+		// Explicitly update store (don't rely solely on effect)
+		cardDataStore.set(cardData);
+		showTitlePopover = false;
+		// Signal that user just edited - show full text immediately
+		isUserEditingStore.set(true);
+	}
+
+	// When user types, bypass the scroll animation and update store
+	function onNameInput() {
+		cardDataStore.set(cardData);
+		isUserEditingStore.set(true);
+	}
 </script>
 
-<!-- Encode (Manual Entry vs Automation) -->
+<!-- Encode Section with Live Input -->
 <section
 	class="min-h-[300vh] relative flex flex-col px-6 md:px-8"
 	data-section-id="encode"
 >
-	<!-- Sticky Section Header -->
-	<div
-		class="sticky top-0 pt-8 pb-4 z-10 bg-gradient-to-b from-background via-background to-transparent"
-	>
-		<div class="text-center">
-			<span
-				class="inline-block px-4 py-1.5 bg-red-500/10 border border-red-500/20 rounded-full text-red-400 text-sm font-medium mb-4"
-			>
-				Encode
-			</span>
+	<!-- Sticky content that follows through the section -->
+	<div class="sticky top-16 pt-6 pb-4 z-10">
+		<div class="text-center mb-8">
 			<h2 class="text-4xl md:text-6xl font-bold leading-tight text-foreground">
 				Kill the Spreadsheet.
 			</h2>
+			<p class="text-lg md:text-xl text-muted-foreground mt-4 max-w-2xl mx-auto leading-relaxed">
+				Manual entry is error-prone and slow. Type once, see it everywhere.
+			</p>
 		</div>
 	</div>
 
-	<!-- Content -->
-	<div class="flex-1 flex items-center justify-center">
-		<div
-			class="text-center max-w-3xl mx-auto backdrop-blur-sm bg-black/5 dark:bg-black/30 p-8 rounded-3xl border border-black/5 dark:border-white/5"
-		>
-			<p class="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-				Manual entry is error-prone and slow. Eliminate typos and sync issues by encoding data
-				directly into the card.
-			</p>
+	<!-- Spacer for 3D card visibility -->
+	<div class="flex-1 min-h-[50vh]"></div>
+
+	<!-- Sticky Input at bottom -->
+	<div class="sticky bottom-8 z-20 max-w-md mx-auto w-full px-4 space-y-3">
+		<!-- Name Input -->
+		<input
+			type="text"
+			bind:value={cardData.name}
+			oninput={onNameInput}
+			placeholder="Enter your name..."
+			class="w-full px-6 py-4 text-xl border-2 border-input rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-blue-500 transition-colors shadow-lg"
+		/>
+
+		<!-- Job Title Selection with Popover -->
+		<div class="relative">
+			<button
+				type="button"
+				onclick={() => showTitlePopover = !showTitlePopover}
+				class="w-full px-5 py-3 text-base text-left border border-input rounded-xl bg-background text-foreground hover:border-foreground transition-colors shadow-lg flex items-center justify-between"
+			>
+				<span>{cardData.title || 'Select job title...'}</span>
+				<svg class="w-5 h-5 text-muted-foreground transition-transform {showTitlePopover ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+				</svg>
+			</button>
+
+			<!-- Popover -->
+			{#if showTitlePopover}
+				<div class="absolute bottom-full left-0 right-0 mb-2 bg-background border border-border rounded-xl shadow-xl overflow-hidden z-50">
+					{#each JOB_TITLES as title}
+						<button
+							type="button"
+							onclick={() => selectTitle(title)}
+							class="w-full px-5 py-3 text-left hover:bg-muted transition-colors {cardData.title === title ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground'}"
+						>
+							{title}
+						</button>
+					{/each}
+				</div>
+			{/if}
+		</div>
+
+		<!-- Company (fixed, not editable) -->
+		<div class="px-5 py-3 text-base border border-border rounded-xl bg-muted/50 text-muted-foreground">
+			{COMPANY_NAME}
 		</div>
 	</div>
 </section>
@@ -40,18 +98,9 @@
 <!-- Scan (Visual Verification) -->
 <section class="min-h-[260vh] relative flex flex-col px-6 md:px-8" data-section-id="scan">
 	<!-- Sticky Section Header -->
-	<div
-		class="sticky top-0 pt-8 pb-4 z-10 bg-gradient-to-b from-background via-background to-transparent"
-	>
+	<div class="sticky top-16 pt-6 pb-4 z-10">
 		<div class="text-center">
-			<span
-				class="inline-block px-4 py-1.5 bg-green-500/10 border border-green-500/20 rounded-full text-green-400 text-sm font-medium mb-4 backdrop-blur-md"
-			>
-				Verification
-			</span>
-			<h2
-				class="text-7xl md:text-9xl font-black tracking-tighter text-foreground"
-			>
+			<h2 class="text-7xl md:text-9xl font-black tracking-tighter text-foreground">
 				Scan.
 			</h2>
 		</div>
@@ -60,9 +109,7 @@
 	<!-- Content -->
 	<div class="flex-1 flex items-center justify-center pointer-events-none">
 		<div class="text-center max-w-3xl mx-auto">
-			<p
-				class="text-lg md:text-xl text-muted-foreground max-w-xl mx-auto backdrop-blur-sm bg-black/5 dark:bg-black/20 p-4 rounded-xl"
-			>
+			<p class="text-lg md:text-xl text-muted-foreground max-w-xl mx-auto">
 				Instant optical verification with any smartphone.
 			</p>
 		</div>
@@ -75,18 +122,9 @@
 	data-section-id="tap-approach"
 >
 	<!-- Sticky Section Header -->
-	<div
-		class="sticky top-0 pt-8 pb-4 z-10 bg-gradient-to-b from-background via-background to-transparent"
-	>
+	<div class="sticky top-16 pt-6 pb-4 z-10">
 		<div class="text-center pointer-events-none">
-			<span
-				class="inline-block px-4 py-1.5 bg-blue-500/10 border border-blue-500/20 rounded-full text-blue-400 text-sm font-medium mb-4 backdrop-blur-md"
-			>
-				NFC
-			</span>
-			<h2
-				class="text-7xl md:text-9xl font-black tracking-tighter text-foreground"
-			>
+			<h2 class="text-7xl md:text-9xl font-black tracking-tighter text-foreground">
 				Tap.
 			</h2>
 		</div>
@@ -98,7 +136,7 @@
 	class="min-h-[150vh] flex items-center justify-center px-6 md:px-8"
 	data-section-id="tap-bump"
 >
-    <!-- Spacer for animation focus -->
+	<!-- Spacer for animation focus -->
 </section>
 
 <!-- Tap Linger (Reading) -->
@@ -106,7 +144,7 @@
 	class="min-h-[180vh] flex items-center justify-center px-6 md:px-8"
 	data-section-id="tap-linger"
 >
-    <!-- Spacer for animation focus -->
+	<!-- Spacer for animation focus -->
 </section>
 
 <!-- Tap Success (Verified) -->
@@ -115,9 +153,7 @@
 	data-section-id="tap-success"
 >
 	<div class="text-center max-w-3xl mx-auto pointer-events-none">
-		<p
-			class="text-lg md:text-xl text-gray-300 max-w-xl mx-auto backdrop-blur-sm bg-black/20 p-4 rounded-xl"
-		>
+		<p class="text-lg md:text-xl text-muted-foreground max-w-xl mx-auto">
 			Secure cryptographic challenge-response via NFC.
 		</p>
 	</div>

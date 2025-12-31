@@ -189,6 +189,7 @@ const authGuard: Handle = async ({ event, resolve }) => {
 	const isAuthRoute = path.startsWith('/auth') || path.startsWith('/api/auth');
 	const isPublicRoute =
 		path === '/' ||
+		path.startsWith('/id/') || // QR code landing pages - must be public
 		path.startsWith('/setup') ||
 		path.startsWith('/features') ||
 		path.startsWith('/pricing') ||
