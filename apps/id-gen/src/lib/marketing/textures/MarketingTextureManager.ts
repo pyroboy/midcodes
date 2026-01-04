@@ -189,7 +189,7 @@ export function createHeroCardTexture(
 
 	// Simplified color schemes
 	const colorSchemes: Record<string, { bg: string; symbol: string }> = {
-		hero: { bg: '#f8f9fa', symbol: 'rgba(0, 0, 0, 0.03)' },
+		hero: { bg: '#ffffff', symbol: 'rgba(0, 0, 0, 0.03)' },
 		student: { bg: '#1b263b', symbol: 'rgba(255, 255, 255, 0.05)' },
 		dorm: { bg: '#3d2914', symbol: 'rgba(255, 255, 255, 0.05)' },
 		event: { bg: '#2d1b4e', symbol: 'rgba(255, 255, 255, 0.05)' },
