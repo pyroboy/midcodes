@@ -85,7 +85,7 @@
 
 	<!-- 3. Assembly Phase (Quantum Spin Collapse) -->
 	<section
-		class="min-h-[130vh] relative flex flex-col items-center justify-center px-6 md:px-8"
+		class="min-h-[200vh] relative flex flex-col items-center justify-center px-6 md:px-8"
 		data-section-id="layer-assemble"
 	>
 		<div class="text-center max-w-4xl mx-auto z-10">

@@ -80,7 +80,6 @@ export interface CardVisualState {
 	textureIndex: number;
 	lanyardVisible: boolean;
 	laserScanActive: boolean;
-	glowIntensity: number;
 	typingProgress: number; // 0 to 1 scaling for name bar
 	opacity: number;
 	highlightLayer: number; // 0 = none, 1-5 = specific layer
@@ -293,7 +292,7 @@ export function getStateTransform(state: CardState, sectionProgress: number): Ca
 		case 'layer-1': 
 			// Focus on Base Grid (Deepest layer)
 			return {
-				position: { x: -0.2, y: 0, z: 0 },
+				position: { x: 0.4, y: 0, z: 1 },
 				rotation: { x: -0.3, y: Math.PI * 0.25, z: 0.3 },
 				scale: 1.1
 			};
@@ -301,7 +300,7 @@ export function getStateTransform(state: CardState, sectionProgress: number): Ca
 		case 'layer-2':
 			// Smart Assets
 			return {
-				position: { x: -0.35, y: 0, z: -0.15 },
+				position: { x: 0, y: 0, z: 0.7},
 				rotation: { x: -0.3, y: Math.PI * 0.25, z: 0.3 },
 				scale: 1.15
 			};
@@ -309,7 +308,7 @@ export function getStateTransform(state: CardState, sectionProgress: number): Ca
 		case 'layer-3':
 			// Live Data (Middle)
 			return {
-				position: { x: -0.5, y: 0, z: -0.3 },
+				position: { x: 0, y: 0, z: 0.5 },
 				rotation: { x: -0.3, y: Math.PI * 0.25, z: 0.3 },
 				scale: 1.2
 			};
@@ -325,7 +324,7 @@ export function getStateTransform(state: CardState, sectionProgress: number): Ca
 		case 'layer-5':
 			// Holographic (Front)
 			return {
-				position: { x: -0.8, y: 0, z: -0.6 },
+				position: { x: -0.8, y: 0, z: 1 },
 				rotation: { x: -0.3, y: Math.PI * 0.25, z: 0.3 },
 				scale: 1.2
 			};
@@ -333,7 +332,7 @@ export function getStateTransform(state: CardState, sectionProgress: number): Ca
 		case 'layer-6':
 			// Card Back (furthest back in stack)
 			return {
-				position: { x: -0.95, y: 0, z: -0.75 },
+				position: { x: -0.95, y: 0, z: 1.2 },
 				rotation: { x: -0.3, y: Math.PI * 0.25, z: 0.3 },
 				scale: 1.2
 			};
@@ -341,7 +340,7 @@ export function getStateTransform(state: CardState, sectionProgress: number): Ca
 		case 'layer-7':
 			// Card Back (furthest back in stack)
 			return {
-				position: { x: -0.95, y: 0, z: -0.75 },
+					position: { x: 0.5, y: 0, z: 0.2 },
 				rotation: { x: -0.3, y: Math.PI * 0.25, z: 0.3 },
 				scale: 1.2
 			};
@@ -350,12 +349,12 @@ export function getStateTransform(state: CardState, sectionProgress: number): Ca
 			// Quantum spin collapse: layers merge FIRST, then ultra-fast rotation
 			const p = sectionProgress;
 			// Collapse layers in first 5% (instant snap)
-			const collapseP = Math.min(1, p / 0.05);
+			const collapseP = Math.min(1, p / 0.25);
 			// Spin starts AFTER assembly is complete (from 5% onwards)
-			const spinP = Math.max(0, (p - 0.05) / 0.95);
+			const spinP = Math.max(0, (p - 0.25) / 0.75);
 			
 			// Quantum spin: 6 full rotations (12π) with acceleration
-			const quantumSpin = spinP * spinP * Math.PI * 12;
+			const quantumSpin = spinP  * Math.PI * 12;
 			
 			return {
 				position: { 
@@ -470,7 +469,6 @@ export function getStateVisuals(
 		textureIndex: 0,
 		lanyardVisible: false,
 		laserScanActive: false,
-		glowIntensity: 0,
 		typingProgress: 1,
 		opacity: 1,
 		highlightLayer: 0
@@ -491,7 +489,6 @@ export function getStateVisuals(
 
 		case 'scan':
 			visuals.laserScanActive = true;
-			visuals.glowIntensity = 1;
 			break;
 
 		case 'tap-approach':
@@ -501,54 +498,54 @@ export function getStateVisuals(
 			break;
 
 		case 'exploding-main':
-			// Reach full 0.75 separation within the first 12.5% of the section (p=0.125)
-			visuals.layerSeparation = Math.min(0.75, sectionProgress * 8.0);
+			// Reach full 0.5 separation within the first 12.5% of the section (p=0.125)
+			visuals.layerSeparation = Math.min(0.5, sectionProgress * 6.0);
 			break;
 
 		case 'exploded':
-			visuals.layerSeparation = 0.75;
+			visuals.layerSeparation = 0.5;
 			break;
 
 		case 'layer-1':
-			visuals.layerSeparation = 0.75;
+			visuals.layerSeparation = 1;
 			visuals.highlightLayer = 1;
 			break;
 		case 'layer-2':
-			visuals.layerSeparation = 0.75;
+			visuals.layerSeparation = 0.5;
 			visuals.highlightLayer = 2;
 			break;
 		case 'layer-3':
-			visuals.layerSeparation = 0.75;
+			visuals.layerSeparation = 0.5;
 			visuals.highlightLayer = 3;
 			break;
 		case 'layer-4':
-			visuals.layerSeparation = 0.75;
+			visuals.layerSeparation = 0.5;
 			visuals.highlightLayer = 4;
 			break;
 		case 'layer-5':
-			visuals.layerSeparation = 0.75;
+			visuals.layerSeparation = 0.5;
 			visuals.highlightLayer = 5;
 			break;
 		case 'layer-6':
-			visuals.layerSeparation = 0.75;
+			visuals.layerSeparation = 0.5;
 			visuals.highlightLayer = 6;
 			break;
 		case 'layer-7':
-			visuals.layerSeparation = 0.75;
+			visuals.layerSeparation = 1.3;
 			visuals.highlightLayer = 7;
 			break;
 
 		case 'layer-assemble': {
-			// Snap collapse layers in first 5%
-			const collapseP = Math.min(1, sectionProgress / 0.05);
-			visuals.layerSeparation = 0.75 * (1 - collapseP);
+			visuals.layerSeparation = 0;
+			const collapseP = Math.min(1, sectionProgress / 0.25);
+			visuals.layerSeparation = 0.25 * (1 - collapseP);
 			visuals.highlightLayer = 0; // All layers visible
 			break;
 		}
 
 		case 'collapsing':
 			const collapseT = (sectionProgress - 0.7) / 0.3;
-			visuals.layerSeparation = 0.75 * (1 - collapseT);
+			visuals.layerSeparation = 0.5 * (1 - collapseT);
 			break;
 
 		case 'physical':
@@ -603,7 +600,6 @@ export function blendVisuals(
 		textureIndex: t > 0.5 ? to.textureIndex : from.textureIndex,
 		lanyardVisible: t > 0.5 ? to.lanyardVisible : from.lanyardVisible,
 		laserScanActive: t > 0.5 ? to.laserScanActive : from.laserScanActive,
-		glowIntensity: from.glowIntensity + (to.glowIntensity - from.glowIntensity) * eased,
 		typingProgress: from.typingProgress + (to.typingProgress - from.typingProgress) * eased,
 		opacity: from.opacity + (to.opacity - from.opacity) * eased,
 		highlightLayer: t > 0.5 ? to.highlightLayer : from.highlightLayer

@@ -453,7 +453,7 @@
 		/>
 
 		<div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-			<div class="lg:col-span-2 space-y-4">
+			<div class="lg:col-span-2 space-y-4 min-h-[200vh]">
 				<CanvasStack
 					layerManager={layerMgr}
 					toolManager={toolMgr}

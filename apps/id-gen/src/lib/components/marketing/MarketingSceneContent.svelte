@@ -67,6 +67,7 @@
 	// Check if we're in a layers section (for lighting swap)
 	let isLayersSection = $derived(
 		scrollState.currentSection === 'layers-main' ||
+		scrollState.currentSection === 'layers-hold' ||
 		scrollState.currentSection === 'layer-1' ||
 		scrollState.currentSection === 'layer-2' ||
 		scrollState.currentSection === 'layer-3' ||

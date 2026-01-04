@@ -706,7 +706,7 @@
 
 	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 	<div
-		class="relative h-[500px] bg-muted/50 flex items-center justify-center p-4 border border-border rounded-md overflow-hidden select-none"
+		class="relative h-full bg-muted/50 flex items-center justify-center p-4 border border-border rounded-md overflow-hidden select-none"
 		onclick={handleOuterClick}
 		role="button"
 		tabindex="0"
@@ -751,7 +751,7 @@
 					{#each renderedLayers as layer, idx (layer.id)}
 						{@const selection = layerSelections.get(layer.id)}
 						{@const mask = masks.get(layer.id)}
-						{@const isVisible = layer.id === 'original-bg' ? true : (selection?.included ?? false)}
+						{@const isVisible = true}
 						{@const hasBounds = layer.bounds && layer.bounds.width > 0 && layer.bounds.height > 0}
 						{@const boundsX = layer.bounds?.x || 0}
 						{@const boundsY = layer.bounds?.y || 0}

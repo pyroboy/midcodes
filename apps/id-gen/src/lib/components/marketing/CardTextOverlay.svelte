@@ -14,9 +14,10 @@
 		typingProgress?: number;
 		sectionProgress?: number;
 		currentSection?: SectionName;
+		opacity?: number;
 	}
 
-	let { typingProgress = 0, sectionProgress = 0, currentSection = 'hero' }: Props = $props();
+	let { typingProgress = 0, sectionProgress = 0, currentSection = 'hero', opacity = 1 }: Props = $props();
 
 	// Card data from store (reactive)
 	let cardData = $state<CardData>({ name: 'Arjo Magno', title: 'CEO' });
@@ -182,7 +183,7 @@
 		<T.MeshBasicMaterial
 			map={textTexture}
 			transparent
-			opacity={1}
+			{opacity}
 			depthTest={true}
 			depthWrite={false}
 		/>

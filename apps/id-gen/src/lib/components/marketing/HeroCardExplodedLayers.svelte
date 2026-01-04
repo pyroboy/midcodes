@@ -12,7 +12,7 @@
 		middleLayerMaterial: THREE.MeshStandardMaterial;
 		cardWidth: number;
 		cardHeight: number;
-		highlightLayer?: number;
+		highlightLayer?: number; // Now a float for smooth transitions
 	}
 
 	let {
@@ -22,6 +22,7 @@
 		cardHeight,
 		highlightLayer = 0
 	}: Props = $props();
+
 	// Shared Geometries for optimization (Reuse unitary geometries and scale them)
 	const planeGeo = new THREE.PlaneGeometry(1, 1);
 	const boxGeo = new THREE.BoxGeometry(1, 1, 1);
@@ -45,15 +46,50 @@
 
 	useTask((delta) => {
 		if (layerSeparation < 0.1) return; // Don't animate if closed
-		
+
 		time += delta;
-		
+
 		// Gentle floating: Amplitude 0.05, Speed 0.5-1.0
 		layer1Y = Math.sin(time * 0.8) * 0.03;
-		layer2Y = Math.sin(time * 0.7 + 1) * 0.04; 
+		layer2Y = Math.sin(time * 0.7 + 1) * 0.04;
 		layer3Y = Math.sin(time * 0.6 + 2) * 0.05;
 		layer5Y = Math.sin(time * 0.5 + 3) * 0.06;
 	});
+
+	// Helper to calculate layer opacity based on distance from highlighted layer
+	// Returns smooth opacity: 1.0 when highlighted, fades to minOpacity when not
+	function getLayerOpacity(layerNum: number, minOpacity: number = 0.15): number {
+		if (highlightLayer === 0) return 1; // No highlight = all visible
+
+		// Calculate distance from the highlighted layer
+		const distance = Math.abs(highlightLayer - layerNum);
+
+		// Smooth falloff: closer layers are more visible
+		// When distance is 0, opacity is 1; when distance >= 1, opacity approaches minOpacity
+		const targetOpacity = Math.max(minOpacity, 1 - distance * (1 - minOpacity));
+
+		// When highlightLayer is between 0-1, blend gradually from full opacity to target
+		// This creates smooth transition during layers-hold → layer-1
+		if (highlightLayer < 1) {
+			return 1 - (1 - targetOpacity) * highlightLayer;
+		}
+
+		return targetOpacity;
+	}
+
+	// Calculate extra Z offset for non-highlighted layers (push them apart)
+	function getLayerZOffset(layerNum: number, baseZ: number): number {
+		if (highlightLayer === 0) return baseZ; // No highlight = normal positions
+
+		// Distance from highlighted layer
+		const distance = highlightLayer - layerNum;
+
+		// Push layers further apart based on distance from highlight
+		// Layers behind (lower number) go back, layers in front go forward
+		const extraSpacing = distance * 0.15; // 0.15 units per layer distance
+
+		return baseZ - extraSpacing;
+	}
 
 	// Derived scales to prevent inline array creation
 	// Type as tuples for Threlte compatibility
@@ -78,15 +114,25 @@
 		[cardWidth * 0.6, 0.03, 1],
 		[cardWidth * 0.6, 0.03, 1]
 	]);
+
+	// Calculate layer opacities reactively
+	const layer2Opacity = $derived(getLayerOpacity(2));
+	const layer3Opacity = $derived(getLayerOpacity(3));
+	const layer4Opacity = $derived(getLayerOpacity(4));
+	const layer6Opacity = $derived(getLayerOpacity(6));
+
+	// Calculate layer Z positions with dynamic spacing
+	const layer2Z = $derived(getLayerZOffset(2, layerSeparation * 0.3));
+	const layer3Z = $derived(getLayerZOffset(3, layerSeparation * 0.7));
+	const layer4Z = $derived(getLayerZOffset(4, layerSeparation * 1.1));
+	const layer6Z = $derived(getLayerZOffset(6, layerSeparation * 1.9));
 </script>
 
 {#if layerSeparation > 0.05}
 	<!-- Layer 2: Base Grid/Background Data -->
-	{@const layer2Opacity = highlightLayer === 0 || highlightLayer === 2 ? 1 : 0.03}
-	
-	<T.Group position.z={layerSeparation * 0.3} position.y={layer1Y}>
+	<T.Group position.z={layer2Z} position.y={layer1Y}>
 		<T.Mesh material={middleLayerMaterial} geometry={planeGeo} scale={layer1Scale} />
-		
+
 		<!-- Main Grid pattern -->
 		<T.Mesh position.z={0.001} geometry={planeGeo} scale={layer1GridScale}>
 			<T.MeshStandardMaterial
@@ -101,9 +147,7 @@
 	</T.Group>
 
 	<!-- Layer 3: Photo Chip -->
-	{@const layer3Opacity = highlightLayer === 0 || highlightLayer === 3 ? 1 : 0.03}
-
-	<T.Group position.z={layerSeparation * 0.7} position.y={layer2Y}>
+	<T.Group position.z={layer3Z} position.y={layer2Y}>
 		<T.Mesh position.x={-0.65} position.y={0} geometry={boxGeo} scale={chipScale}>
 			<T.MeshBasicMaterial
 				color={0x6a6aaa}
@@ -122,9 +166,7 @@
 	</T.Group>
 
 	<!-- Layer 4: Text Lines (Identity Data) -->
-	{@const layer4Opacity = highlightLayer === 0 || highlightLayer === 4 ? 1 : 0.03}
-
-	<T.Group position.z={layerSeparation * 1.1} position.y={layer3Y}>
+	<T.Group position.z={layer4Z} position.y={layer3Y}>
 		{#each [0.4, 0.3, -0.1, -0.2, -0.3] as yPos, i (i)}
 			<!-- Main Text Line -->
 			<T.Mesh position.y={yPos} position.x={0.1} geometry={planeGeo} scale={textScales[i]}>
@@ -140,9 +182,7 @@
 	<!-- Layer 5: QR Code (Moved to HeroCardGeometry for all-section visibility) -->
 
 	<!-- Layer 6: Holographic/Status Icons -->
-	{@const layer6Opacity = highlightLayer === 0 || highlightLayer === 6 ? 1 : 0.03}
-
-	<T.Group position.z={layerSeparation * 1.9} position.y={layer5Y}>
+	<T.Group position.z={layer6Z} position.y={layer5Y}>
 		<!-- Top right icon (Green placeholder removed, now handled by parent) -->
 		<!-- Bottom center status bar -->
 		<T.Mesh position.y={-0.8} geometry={planeGeo} scale={statusScale}>

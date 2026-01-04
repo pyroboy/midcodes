@@ -30,7 +30,7 @@
 
 <!-- Encode Section with Live Input -->
 <section
-	class="min-h-[300vh] relative flex flex-col px-6 md:px-8"
+	class="min-h-[160vh] relative flex flex-col px-6 md:px-8"
 	data-section-id="encode"
 >
 	<!-- Sticky content that follows through the section -->
@@ -40,7 +40,7 @@
 				Direct Card Inputs
 			</h2>
 			<p class="text-lg md:text-xl text-muted-foreground mt-4 max-w-2xl mx-auto leading-relaxed">
-				Manual entry is error-prone and slow. Type once, see it everywhere.
+				The fastest way to get data from the source to the card.
 			</p>
 		</div>
 	</div>
@@ -88,10 +88,7 @@
 			{/if}
 		</div>
 
-		<!-- Company (fixed, not editable) -->
-		<div class="px-5 py-3 text-base border border-border rounded-xl bg-muted/50 text-muted-foreground">
-			{COMPANY_NAME}
-		</div>
+	
 	</div>
 </section>
 
@@ -101,7 +98,7 @@
 	<div class="sticky top-16 pt-6 pb-4 z-10">
 		<div class="text-center">
 			<h2 class="text-7xl md:text-9xl font-black tracking-tighter text-foreground">
-				Scan.
+				Scan <span class="font-extralight">/</span>
 			</h2>
 		</div>
 	</div>
@@ -122,7 +119,7 @@
 	<div class="sticky top-16 pt-6 pb-4 z-10 pointer-events-none">
 		<div class="text-center">
 			<h2 class="text-7xl md:text-9xl font-black tracking-tighter text-foreground">
-				Tap.
+				<span class="font-extralight">or</span> Tap.
 			</h2>
 		</div>
 	</div>

@@ -63,7 +63,6 @@
 	let autoRotateSpeed = $state(0.3);
 	let lanyardVisible = $state(false);
 	let laserScanActive = $state(false);
-	let glowIntensity = $state(0);
 
 	let typingProgress = $state(1);
 
@@ -166,8 +165,8 @@
 		// Visual properties
 		layerSeparation = lerp(layerSeparation, targetVisuals.layerSeparation, lerpFactor);
 		opacity = lerp(opacity, targetVisuals.opacity, lerpFactor);
-		glowIntensity = lerp(glowIntensity, targetVisuals.glowIntensity, lerpFactor);
-		highlightLayer = targetVisuals.highlightLayer;
+		// Lerp highlightLayer for gradual opacity transitions between layers
+		highlightLayer = lerp(highlightLayer, targetVisuals.highlightLayer, lerpFactor * 0.5);
 
 		// Typing speed tied to sectionProgress (scroll position)
 		// Start of section = very slow, end of section = 1x
@@ -245,7 +244,6 @@
 		cardWidth={2 / 1.586}
 		cardHeight={2}
 		scanSpeed={0.8}
-		{glowIntensity}
 	/>
 
 	<!-- Lanyard for shop section -->
