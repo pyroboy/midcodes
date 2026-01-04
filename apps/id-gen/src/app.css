@@ -4,7 +4,7 @@
 
 @theme {
 	/* Light theme (default) - Base colors */
-	--color-background: hsl(0 0% 100%);
+	--color-background: hsl(220 10% 95%);
 	--color-foreground: hsl(222.2 84% 4.9%);
 
 	/* Improved Muted/Card colors for better contrast */
@@ -33,7 +33,7 @@
 /* Dark theme overrides */
 :root.dark {
 	/* Dark theme - Base colors */
-	--color-background: hsl(222.2 84% 4.9%);
+	--color-background: hsl(220 10% 15%);
 	--color-foreground: hsl(210 40% 98%);
 
 	/* Improved Dark Mode Contrast */

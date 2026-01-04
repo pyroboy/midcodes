@@ -150,7 +150,7 @@ export function getStateTransform(state: CardState, sectionProgress: number): Ca
 	switch (state) {
 		case 'hero':
 			return {
-				position: { x: 0, y: 0.3, z: 0 },
+				position: { x: 0, y: 0, z: 0 },
 				rotation: { x: 0, y: 0, z: 0 },
 				scale: 1
 			};

@@ -843,7 +843,7 @@
 									/>
 								</T.PerspectiveCamera>
 								<!-- Scene fog for depth - starts near card, fades to background -->
-								<T.Fog attach="fog" args={['#1a1a2e', 3, 12]} />
+								<T.Fog attach="fog" args={['#2a2a2a', 3, 12]} />
 
 								<!-- Ambient light for full color luster -->
 								<T.AmbientLight intensity={1.0} color="#ffffff" />
@@ -885,7 +885,7 @@
 									<T.ShaderMaterial
 										transparent={true}
 										uniforms={{
-											uColor: { value: [0.02, 0.02, 0.05] },
+											uColor: { value: [0.05, 0.05, 0.05] },
 											uOpacity: { value: shadowOpacity }
 										}}
 										vertexShader={`

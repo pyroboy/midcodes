@@ -25,7 +25,7 @@
 
 <!-- Fixed fullscreen canvas behind content with gradient background -->
 <div 
-	class="fixed inset-0 w-screen h-screen z-0 pointer-events-none bg-gradient-to-b from-white to-slate-100" 
+	class="fixed inset-0 w-screen h-screen z-0 pointer-events-none bg-gradient-to-b from-gray-300 to-gray-400"
 	style="touch-action: none;"
 >
 	<Canvas>

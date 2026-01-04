@@ -70,7 +70,7 @@
 <section class="min-h-screen flex flex-col px-4 pt-4 pb-12 relative" data-section-id="hero">
 	<!-- Top Content - Title + Typing Animation -->
 	<div class="text-center max-w-4xl mx-auto">
-		<h1 class="text-4xl md:text-6xl font-black tracking-tight text-foreground">
+		<h1 class="text-5xl md:text-7xl font-black tracking-tight text-foreground">
 			Digital Card for Everything
 		</h1>
 
