@@ -56,6 +56,7 @@
 	let layerSeparation = $state(0);
 	let textureIndex = $state(0);
 	let opacity = $state(1);
+	let highlightLayer = $state(0);
 
 	// Visual state flags
 	let autoRotate = $state(true);
@@ -98,7 +99,7 @@
 		'tap-bump',
 		'tap-linger',
 		'tap-success',
-		'exploding',
+		'exploding-main',
 		'collapsing',
 		'segmentation',
 		'shrinking',
@@ -126,6 +127,9 @@
 			prevState = currentState;
 			prevSectionProgress = sectionProgress;
 		}
+
+		if (!cachedTransform || !cachedVisuals) return;
+
 		const targetTransform = cachedTransform;
 		const targetVisuals = cachedVisuals;
 
@@ -158,6 +162,7 @@
 		layerSeparation = lerp(layerSeparation, targetVisuals.layerSeparation, lerpFactor);
 		opacity = lerp(opacity, targetVisuals.opacity, lerpFactor);
 		glowIntensity = lerp(glowIntensity, targetVisuals.glowIntensity, lerpFactor);
+		highlightLayer = targetVisuals.highlightLayer;
 
 		// Typing speed tied to sectionProgress (scroll position)
 		// Start of section = very slow, end of section = 1x
@@ -225,6 +230,7 @@
 		{currentSection}
 		{sectionProgress}
 		{typingProgress}
+		{highlightLayer}
 	/>
 
 	<!-- Laser scan effect for verification section -->

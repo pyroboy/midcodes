@@ -16,8 +16,9 @@ export const DEFAULT_BREAKPOINTS = {
 	'tap-bump': { start: 0.325, end: 0.35 },
 	'tap-linger': { start: 0.35, end: 0.375 },
 	'tap-success': { start: 0.375, end: 0.4 },
-	'layers-main': { start: 0.4, end: 0.45 },
-	'layer-1': { start: 0.45, end: 0.5 },
+	'layers-main': { start: 0.4, end: 0.44 },
+	'layers-hold': { start: 0.44, end: 0.46 },
+	'layer-1': { start: 0.46, end: 0.5 },
 	'layer-2': { start: 0.5, end: 0.55 },
 	'layer-3': { start: 0.55, end: 0.6 },
 	'layer-4': { start: 0.6, end: 0.65 },
@@ -37,6 +38,7 @@ export type SectionName =
 	| 'tap-linger'
 	| 'tap-success'
 	| 'layers-main'
+	| 'layers-hold'
 	| 'layer-1'
 	| 'layer-2'
 	| 'layer-3'

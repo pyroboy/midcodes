@@ -116,45 +116,50 @@
 	</div>
 </section>
 
-<!-- Tap Approach (Card Enters) -->
-<section
-	class="min-h-[40vh] relative flex flex-col px-6 md:px-8"
-	data-section-id="tap-approach"
->
-	<!-- Sticky Section Header -->
-	<div class="sticky top-16 pt-6 pb-4 z-10">
-		<div class="text-center pointer-events-none">
+<!-- Tap Group: Approach -> Bump -> Linger -> Success -->
+<div class="relative">
+	<!-- Common Sticky Header for Tap Flow -->
+	<div class="sticky top-16 pt-6 pb-4 z-10 pointer-events-none">
+		<div class="text-center">
 			<h2 class="text-7xl md:text-9xl font-black tracking-tighter text-foreground">
 				Tap.
 			</h2>
 		</div>
 	</div>
-</section>
 
-<!-- Tap Bump (Contact) -->
-<section
-	class="min-h-[150vh] flex items-center justify-center px-6 md:px-8"
-	data-section-id="tap-bump"
->
-	<!-- Spacer for animation focus -->
-</section>
+	<!-- Tap Approach (Card Enters) -->
+	<section
+		class="min-h-[40vh] relative flex flex-col px-6 md:px-8 mt-[-10rem]"
+		data-section-id="tap-approach"
+	>
+		<!-- Placeholder to maintain spacing if needed, but sticky header is now above -->
+	</section>
 
-<!-- Tap Linger (Reading) -->
-<section
-	class="min-h-[180vh] flex items-center justify-center px-6 md:px-8"
-	data-section-id="tap-linger"
->
-	<!-- Spacer for animation focus -->
-</section>
+	<!-- Tap Bump (Contact) -->
+	<section
+		class="min-h-[150vh] flex items-center justify-center px-6 md:px-8"
+		data-section-id="tap-bump"
+	>
+		<!-- Spacer for animation focus -->
+	</section>
 
-<!-- Tap Success (Verified) -->
-<section
-	class="min-h-screen flex items-center justify-center px-6 md:px-8"
-	data-section-id="tap-success"
->
-	<div class="text-center max-w-3xl mx-auto pointer-events-none">
-		<p class="text-lg md:text-xl text-muted-foreground max-w-xl mx-auto">
-			Secure cryptographic challenge-response via NFC.
-		</p>
-	</div>
-</section>
+	<!-- Tap Linger (Reading) -->
+	<section
+		class="min-h-[180vh] flex items-center justify-center px-6 md:px-8"
+		data-section-id="tap-linger"
+	>
+		<!-- Spacer for animation focus -->
+	</section>
+
+	<!-- Tap Success (Verified) -->
+	<section
+		class="min-h-screen flex items-center justify-center px-6 md:px-8 pb-20"
+		data-section-id="tap-success"
+	>
+		<div class="text-center max-w-3xl mx-auto pointer-events-none">
+			<p class="text-lg md:text-xl text-muted-foreground max-w-xl mx-auto">
+				Secure cryptographic challenge-response via NFC.
+			</p>
+		</div>
+	</section>
+</div>

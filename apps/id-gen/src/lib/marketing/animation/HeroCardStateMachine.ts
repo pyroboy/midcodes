@@ -19,7 +19,7 @@ export type CardState =
 	| 'tap-bump'
 	| 'tap-linger'
 	| 'tap-success'
-	| 'exploding' // Transition: layers separating
+	| 'exploding-main' // Dedicated explosion phase
 	| 'exploded' // 3 planes hovering apart
 	| 'collapsing' // Transition: layers merging
 	| 'physical' // Stack of cards + lanyard (Hero card hides or moves to top)
@@ -102,8 +102,9 @@ export function getSectionCardState(section: SectionName, sectionProgress: numbe
 			return 'tap-success';
 
 		case 'layers-main':
-			// Explode out
-			if (sectionProgress < 0.5) return 'exploding';
+			return 'exploding-main';
+
+		case 'layers-hold':
 			return 'exploded';
 
 		case 'layer-1':
@@ -269,7 +270,7 @@ export function getStateTransform(state: CardState, sectionProgress: number): Ca
 			};
 		}
 
-		case 'exploding':
+		case 'exploding-main':
 		case 'exploded':
 		case 'collapsing':
 			return {
@@ -407,8 +408,9 @@ export function getStateVisuals(
 		case 'tap-success':
 			break;
 
-		case 'exploding':
-			visuals.layerSeparation = sectionProgress * 2.5;
+		case 'exploding-main':
+			// Reach full 0.75 separation within the first 12.5% of the section (p=0.125)
+			visuals.layerSeparation = Math.min(0.75, sectionProgress * 8.0);
 			break;
 
 		case 'exploded':

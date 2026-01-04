@@ -31,6 +31,7 @@
 		currentSection?: SectionName;
 		sectionProgress?: number;
 		typingProgress?: number;
+		highlightLayer?: number;
 	}
 
 	let {
@@ -38,7 +39,8 @@
 		textureIndex = 0,
 		currentSection = 'hero',
 		sectionProgress = 0,
-		typingProgress = 1
+		typingProgress = 1,
+		highlightLayer = 0
 	}: Props = $props();
 
 	// Card dimensions (standard ID card ratio ~1.586) - PORTRAIT
@@ -303,6 +305,7 @@
 		{middleLayerMaterial}
 		cardWidth={CARD_WIDTH}
 		cardHeight={CARD_HEIGHT}
+		{highlightLayer}
 	/>
 
 	<!-- Back face (separated backward in exploded view) -->
