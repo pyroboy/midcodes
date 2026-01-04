@@ -81,8 +81,8 @@
 </script>
 
 {#if layerSeparation > 0.05}
-	<!-- Layer 1: Base Grid/Background Data -->
-	{@const layer1Opacity = highlightLayer === 0 || highlightLayer === 1 ? 1 : 0.1}
+	<!-- Layer 2: Base Grid/Background Data -->
+	{@const layer2Opacity = highlightLayer === 0 || highlightLayer === 2 ? 1 : 0.03}
 	
 	<T.Group position.z={layerSeparation * 0.3} position.y={layer1Y}>
 		<T.Mesh material={middleLayerMaterial} geometry={planeGeo} scale={layer1Scale} />
@@ -93,22 +93,22 @@
 				color={0xffffff}
 				wireframe
 				transparent
-				opacity={0.8 * layer1Opacity}
+				opacity={0.8 * layer2Opacity}
 				emissive={0x8888ff}
-				emissiveIntensity={1.0 * layer1Opacity}
+				emissiveIntensity={1.0 * layer2Opacity}
 			/>
 		</T.Mesh>
 	</T.Group>
 
-	<!-- Layer 2: Photo Chip -->
-	{@const layer2Opacity = highlightLayer === 0 || highlightLayer === 2 ? 1 : 0.1}
+	<!-- Layer 3: Photo Chip -->
+	{@const layer3Opacity = highlightLayer === 0 || highlightLayer === 3 ? 1 : 0.03}
 
 	<T.Group position.z={layerSeparation * 0.7} position.y={layer2Y}>
 		<T.Mesh position.x={-0.65} position.y={0} geometry={boxGeo} scale={chipScale}>
 			<T.MeshBasicMaterial
 				color={0x6a6aaa}
 				transparent
-				opacity={Math.min(1, layerSeparation * 2) * layer2Opacity}
+				opacity={Math.min(1, layerSeparation * 2) * layer3Opacity}
 			/>
 		</T.Mesh>
 		<!-- Chip accents -->
@@ -116,13 +116,13 @@
 			<T.MeshBasicMaterial
 				color={0xffaa00}
 				transparent
-				opacity={1 * layer2Opacity}
+				opacity={1 * layer3Opacity}
 			/>
 		</T.Mesh>
 	</T.Group>
 
-	<!-- Layer 3: Text Lines (Identity Data) -->
-	{@const layer3Opacity = highlightLayer === 0 || highlightLayer === 3 ? 1 : 0.1}
+	<!-- Layer 4: Text Lines (Identity Data) -->
+	{@const layer4Opacity = highlightLayer === 0 || highlightLayer === 4 ? 1 : 0.03}
 
 	<T.Group position.z={layerSeparation * 1.1} position.y={layer3Y}>
 		{#each [0.4, 0.3, -0.1, -0.2, -0.3] as yPos, i (i)}
@@ -131,16 +131,16 @@
 				<T.MeshBasicMaterial
 					color={0xaaddff}
 					transparent
-					opacity={Math.min(1, layerSeparation * 2) * layer3Opacity}
+					opacity={Math.min(1, layerSeparation * 2) * layer4Opacity}
 				/>
 			</T.Mesh>
 		{/each}
 	</T.Group>
 
-	<!-- Layer 4: QR Code (Moved to HeroCardGeometry for all-section visibility) -->
+	<!-- Layer 5: QR Code (Moved to HeroCardGeometry for all-section visibility) -->
 
-	<!-- Layer 5: Holographic/Status Icons -->
-	{@const layer5Opacity = highlightLayer === 0 || highlightLayer === 5 ? 1 : 0.1}
+	<!-- Layer 6: Holographic/Status Icons -->
+	{@const layer6Opacity = highlightLayer === 0 || highlightLayer === 6 ? 1 : 0.03}
 
 	<T.Group position.z={layerSeparation * 1.9} position.y={layer5Y}>
 		<!-- Top right icon (Green placeholder removed, now handled by parent) -->
@@ -149,7 +149,7 @@
 			<T.MeshBasicMaterial
 				color={0x00ffff}
 				transparent
-				opacity={0.6 * layer5Opacity}
+				opacity={0.6 * layer6Opacity}
 			/>
 		</T.Mesh>
 	</T.Group>

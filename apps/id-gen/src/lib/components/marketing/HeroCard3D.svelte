@@ -102,6 +102,7 @@
 		'tap-linger',
 		'tap-success',
 		'exploding-main',
+		'layer-assemble', // Quantum spin collapse animation
 		'collapsing',
 		'segmentation',
 		'shrinking',

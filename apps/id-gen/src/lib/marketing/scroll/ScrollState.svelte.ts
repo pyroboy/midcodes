@@ -23,10 +23,13 @@ export const DEFAULT_BREAKPOINTS = {
 	'layer-3': { start: 0.55, end: 0.6 },
 	'layer-4': { start: 0.6, end: 0.65 },
 	'layer-5': { start: 0.65, end: 0.7 },
-	useCases: { start: 0.7, end: 0.8 },
-	systemScale: { start: 0.8, end: 0.9 },
-	physical: { start: 0.9, end: 0.95 },
-	footer: { start: 0.95, end: 1.0 }
+	'layer-6': { start: 0.7, end: 0.75 },
+	'layer-7': { start: 0.75, end: 0.8 },
+	'layer-assemble': { start: 0.8, end: 0.85 },
+	useCases: { start: 0.85, end: 0.91 },
+	systemScale: { start: 0.91, end: 0.96 },
+	physical: { start: 0.96, end: 0.99 },
+	footer: { start: 0.99, end: 1.0 }
 } as const;
 
 export type SectionName =
@@ -44,6 +47,9 @@ export type SectionName =
 	| 'layer-3'
 	| 'layer-4'
 	| 'layer-5'
+	| 'layer-6'
+	| 'layer-7'
+	| 'layer-assemble'
 	| 'useCases'
 	| 'useCases-networking'
 	| 'useCases-identification'

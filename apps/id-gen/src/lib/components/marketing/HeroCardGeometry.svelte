@@ -240,27 +240,48 @@
 		}
 	});
 
+	// Dim opacity for non-highlighted layers (very low to emphasize active layer)
+	const DIM_OPACITY = 0.03;
+
 	// Update layer separation effects
 	$effect(() => {
 		if (!frontMaterial || !backMaterial || !middleLayerMaterial) return;
 
-		// Middle layer opacity based on separation
-		middleLayerMaterial.opacity = layerSeparation > 0.05 ? Math.min(1, layerSeparation * 2) : 0;
+		// Layer assignment:
+		// Layer 1: Card body (front face/substrate) - the physical card surface
+		// Layer 2: Grid (base structure overlay)
+		// Layer 3: Photo chip
+		// Layer 4: Text lines
+		// Layer 5: QR code
+		// Layer 6: Ka Logo + status icons (holographic)
+		// Layer 7: Back of card
+		
+		// Calculate highlight multipliers for each layer
+		// highlightLayer 0 = all visible, otherwise only the highlighted layer is bright
+		const frontHighlightMult = highlightLayer === 0 || highlightLayer === 1 ? 1 : DIM_OPACITY;
+		const backHighlightMult = highlightLayer === 0 || highlightLayer === 7 ? 1 : DIM_OPACITY;
+		// Middle layer (grid) is highlighted when highlightLayer is 2
+		const middleHighlightMult = highlightLayer === 0 || highlightLayer === 2 ? 1 : DIM_OPACITY;
+
+		// Middle layer opacity based on separation and highlight
+		const baseMidOpacity = layerSeparation > 0.05 ? Math.min(1, layerSeparation * 2) : 0;
+		middleLayerMaterial.opacity = baseMidOpacity * middleHighlightMult;
+		middleLayerMaterial.transparent = true;
 
 		// Slight transparency on front/back when separated
 		if (layerSeparation > 0.1) {
 			frontMaterial.transparent = true;
-			frontMaterial.opacity = Math.max(0.85, 1 - layerSeparation * 0.2);
+			frontMaterial.opacity = Math.max(0.85, 1 - layerSeparation * 0.2) * frontHighlightMult;
 			frontMaterial.depthWrite = true; // Keep true for shadows
 
 			backMaterial.transparent = true;
-			backMaterial.opacity = Math.max(0.85, 1 - layerSeparation * 0.2);
+			backMaterial.opacity = Math.max(0.85, 1 - layerSeparation * 0.2) * backHighlightMult;
 			backMaterial.depthWrite = true; // Keep true for shadows
 		} else {
-			frontMaterial.transparent = false;
-			frontMaterial.opacity = 1;
-			backMaterial.transparent = false;
-			backMaterial.opacity = 1;
+			frontMaterial.transparent = highlightLayer !== 0;
+			frontMaterial.opacity = frontHighlightMult;
+			backMaterial.transparent = highlightLayer !== 0;
+			backMaterial.opacity = backHighlightMult;
 		}
 	});
 </script>
@@ -278,28 +299,29 @@
 		<CardTextOverlay {typingProgress} {sectionProgress} {currentSection} />
 	</T.Group>
 
-	<!-- Ka Logo (Always visible, explodes to Layer 5) -->
-	<!-- Layer 5 is at 1.9. Base Z is 0.02 to sit on card. -->
+	<!-- Ka Logo (Always visible, explodes to Layer 6) -->
+	<!-- Layer 6 is at 1.9. Base Z is 0.02 to sit on card. -->
 	{#if kaLogoTexture}
+		{@const layer6Opacity = highlightLayer === 0 || highlightLayer === 6 ? 1 : 0.03}
 		<T.Group position.x={0.5} position.y={0.8} position.z={layerSeparation * 1.9 + 0.02}>
 			<T.Mesh scale={[0.08, 0.08, 1]}>
 				<T.CircleGeometry args={[1, 16]} />
-				<T.MeshBasicMaterial map={kaLogoTexture} transparent opacity={1} />
+				<T.MeshBasicMaterial map={kaLogoTexture} transparent opacity={layer6Opacity} />
 			</T.Mesh>
 		</T.Group>
 	{/if}
 
-	<!-- QR Code (visible in all sections, explodes with Layer 4) -->
+	<!-- QR Code (visible in all sections, explodes with Layer 5) -->
 	{#if qrCodeTexture}
-		{@const layer4Opacity = highlightLayer === 0 || highlightLayer === 4 ? 1 : 0.1}
+		{@const layer5Opacity = highlightLayer === 0 || highlightLayer === 5 ? 1 : 0.03}
 		<T.Group position.x={0.35} position.y={-0.65} position.z={layerSeparation * 1.5 + 0.02}>
 			<T.Mesh scale={[0.35, 0.35, 1]}>
 				<T.PlaneGeometry args={[1, 1]} />
 				<T.MeshBasicMaterial 
 					map={qrCodeTexture} 
-					transparent={layer4Opacity < 1} 
-					opacity={layer4Opacity}
-					depthWrite={layer4Opacity === 1}
+					transparent
+					opacity={layer5Opacity}
+					depthWrite={layer5Opacity === 1}
 				/>
 			</T.Mesh>
 		</T.Group>

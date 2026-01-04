@@ -21,11 +21,14 @@ export type CardState =
 	| 'tap-success'
 	| 'exploding-main' // Dedicated explosion phase
 	| 'exploded' // 3 planes hovering apart
-	| 'layer-1' // Base Grid
-	| 'layer-2' // Smart Assets
-	| 'layer-3' // Live Data
-	| 'layer-4' // Secure Encoding
-	| 'layer-5' // Holographic Security
+	| 'layer-1' // Card Body
+	| 'layer-2' // Base Grid
+	| 'layer-3' // Smart Assets
+	| 'layer-4' // Live Data
+	| 'layer-5' // Secure Encoding (QR)
+	| 'layer-6' // Holographic Security
+	| 'layer-7' // Card Back
+	| 'layer-assemble' // Quantum spin collapse
 	| 'collapsing' // Transition: layers merging
 	| 'physical' // Stack of cards + lanyard (Hero card hides or moves to top)
 	| 'segmentation' // Flipping card (Student vs CEO)
@@ -117,6 +120,9 @@ export function getSectionCardState(section: SectionName, sectionProgress: numbe
 		case 'layer-3': return 'layer-3';
 		case 'layer-4': return 'layer-4';
 		case 'layer-5': return 'layer-5';
+		case 'layer-6': return 'layer-6';
+		case 'layer-7': return 'layer-7';
+		case 'layer-assemble': return 'layer-assemble';
 
 		case 'useCases':
 			return 'useCases';
@@ -324,6 +330,48 @@ export function getStateTransform(state: CardState, sectionProgress: number): Ca
 				scale: 1.2
 			};
 
+		case 'layer-6':
+			// Card Back (furthest back in stack)
+			return {
+				position: { x: -0.95, y: 0, z: -0.75 },
+				rotation: { x: -0.3, y: Math.PI * 0.25, z: 0.3 },
+				scale: 1.2
+			};
+
+		case 'layer-7':
+			// Card Back (furthest back in stack)
+			return {
+				position: { x: -0.95, y: 0, z: -0.75 },
+				rotation: { x: -0.3, y: Math.PI * 0.25, z: 0.3 },
+				scale: 1.2
+			};
+
+		case 'layer-assemble': {
+			// Quantum spin collapse: layers merge FIRST, then ultra-fast rotation
+			const p = sectionProgress;
+			// Collapse layers in first 5% (instant snap)
+			const collapseP = Math.min(1, p / 0.05);
+			// Spin starts AFTER assembly is complete (from 5% onwards)
+			const spinP = Math.max(0, (p - 0.05) / 0.95);
+			
+			// Quantum spin: 6 full rotations (12π) with acceleration
+			const quantumSpin = spinP * spinP * Math.PI * 12;
+			
+			return {
+				position: { 
+					x: -0.2 + (0.2 * collapseP), // Move to center
+					y: 0, 
+					z: 0 
+				},
+				rotation: { 
+					x: -0.3 * (1 - collapseP), // Straighten out
+					y: (Math.PI * 0.25) + quantumSpin, // Fast Y spin AFTER collapse
+					z: 0.3 * (1 - collapseP) // Straighten out
+				},
+				scale: 1
+			};
+		}
+
 		case 'physical':
 			// Dangling card with physics, floating above/near the stack
 			return {
@@ -481,6 +529,22 @@ export function getStateVisuals(
 			visuals.layerSeparation = 0.75;
 			visuals.highlightLayer = 5;
 			break;
+		case 'layer-6':
+			visuals.layerSeparation = 0.75;
+			visuals.highlightLayer = 6;
+			break;
+		case 'layer-7':
+			visuals.layerSeparation = 0.75;
+			visuals.highlightLayer = 7;
+			break;
+
+		case 'layer-assemble': {
+			// Snap collapse layers in first 5%
+			const collapseP = Math.min(1, sectionProgress / 0.05);
+			visuals.layerSeparation = 0.75 * (1 - collapseP);
+			visuals.highlightLayer = 0; // All layers visible
+			break;
+		}
 
 		case 'collapsing':
 			const collapseT = (sectionProgress - 0.7) / 0.3;
