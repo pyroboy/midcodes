@@ -33,51 +33,43 @@
 <div class="w-full">
 	<!-- 1. Pure Explosion Phase (Visual Dramatics) -->
 	<section
-		class="min-h-[400vh] relative flex flex-col px-6 md:px-8"
+		class="min-h-[120vh] relative flex flex-col items-center justify-center px-6 md:px-8"
 		data-section-id="layers-main"
 	>
-		<!-- Sticky Section Header - Positioned at very top -->
-		<div class="sticky top-0 pt-12 pb-4 z-20">
-			<div class="text-center">
-				<h2 class="text-4xl sm:text-5xl md:text-7xl font-black tracking-tighter text-foreground">
-					Engineered, Not Just Printed.
-				</h2>
-			</div>
-		</div>
-
-		<!-- Intro Content - Card Explodes Here -->
-		<div class="flex-1 flex items-center justify-center">
-			<div class="text-center max-w-3xl mx-auto px-6">
-				<p class="text-xl md:text-3xl text-muted-foreground font-medium leading-relaxed">
-					Our Dynamic Layer engine separates design from data.
-				</p>
-			</div>
+		<div class="text-center max-w-4xl mx-auto z-10">
+			<h2 class="text-4xl sm:text-5xl md:text-7xl font-black tracking-tighter text-foreground mb-8">
+				Engineered, Not Just Printed.
+			</h2>
+			<p class="text-xl md:text-3xl text-muted-foreground font-medium leading-relaxed">
+				Our Dynamic Layer engine separates design from data.
+			</p>
 		</div>
 	</section>
 
-	<!-- Spacer Section to HOLD the explosion before text reveals -->
-	<section class="h-[100vh]" data-section-id="layers-hold"></section>
+	<!-- Spacer to transition from explosion to details -->
+	<section class="min-h-[50vh]" data-section-id="layers-hold"></section>
 
 	<!-- 2. Detailed Explanation Phase (Layer Cards) -->
 	<section class="relative px-6 md:px-8 pb-32">
-		<!-- Stacking Cards area -->
-		<div class="relative max-w-4xl mx-auto w-full">
-			{#each layers as layer, index}
+		<div class="relative w-full max-w-4xl mx-auto flex flex-col gap-0">
+			{#each layers as layer}
+				<!-- Each layer gets its own 120vh section for clear breakdown -->
 				<div
-					class="sticky bg-background/80 border border-border rounded-3xl pt-0 p-8 md:p-12 md:pt-0 shadow-2xl mb-8 transition-all hover:border-blue-500/50"
-					style="top: {180 + index * 50}px; z-index: {index + 1};"
+					class="min-h-[120vh] flex flex-col justify-center items-start md:pl-20"
 					data-section-id={layer.id}
 				>
-					<h3 class="text-2xl md:text-3xl font-black text-foreground mb-4">
-						{layer.title}
-					</h3>
-					<p class="text-lg md:text-xl text-muted-foreground leading-relaxed">
-						{layer.description}
-					</p>
+					<div
+						class="bg-background/80 border border-border rounded-3xl p-8 md:p-12 shadow-2xl backdrop-blur-md max-w-xl"
+					>
+						<h3 class="text-2xl md:text-3xl font-black text-foreground mb-4">
+							{layer.title}
+						</h3>
+						<p class="text-lg md:text-xl text-muted-foreground leading-relaxed">
+							{layer.description}
+						</p>
+					</div>
 				</div>
 			{/each}
-			<!-- Spacer for full stack reveal -->
-			<div class="h-[120vh]"></div>
 		</div>
 	</section>
 </div>

@@ -21,6 +21,11 @@ export type CardState =
 	| 'tap-success'
 	| 'exploding-main' // Dedicated explosion phase
 	| 'exploded' // 3 planes hovering apart
+	| 'layer-1' // Base Grid
+	| 'layer-2' // Smart Assets
+	| 'layer-3' // Live Data
+	| 'layer-4' // Secure Encoding
+	| 'layer-5' // Holographic Security
 	| 'collapsing' // Transition: layers merging
 	| 'physical' // Stack of cards + lanyard (Hero card hides or moves to top)
 	| 'segmentation' // Flipping card (Student vs CEO)
@@ -107,12 +112,11 @@ export function getSectionCardState(section: SectionName, sectionProgress: numbe
 		case 'layers-hold':
 			return 'exploded';
 
-		case 'layer-1':
-		case 'layer-2':
-		case 'layer-3':
-		case 'layer-4':
-		case 'layer-5':
-			return 'exploded';
+		case 'layer-1': return 'layer-1';
+		case 'layer-2': return 'layer-2';
+		case 'layer-3': return 'layer-3';
+		case 'layer-4': return 'layer-4';
+		case 'layer-5': return 'layer-5';
 
 		case 'useCases':
 			return 'useCases';
@@ -280,6 +284,46 @@ export function getStateTransform(state: CardState, sectionProgress: number): Ca
 				scale: 0.9
 			};
 
+		case 'layer-1': 
+			// Focus on Base Grid (Deepest layer)
+			return {
+				position: { x: -0.2, y: 0, z: 0 },
+				rotation: { x: -0.3, y: Math.PI * 0.25, z: 0.3 },
+				scale: 1.1
+			};
+
+		case 'layer-2':
+			// Smart Assets
+			return {
+				position: { x: -0.35, y: 0, z: -0.15 },
+				rotation: { x: -0.3, y: Math.PI * 0.25, z: 0.3 },
+				scale: 1.15
+			};
+
+		case 'layer-3':
+			// Live Data (Middle)
+			return {
+				position: { x: -0.5, y: 0, z: -0.3 },
+				rotation: { x: -0.3, y: Math.PI * 0.25, z: 0.3 },
+				scale: 1.2
+			};
+		
+		case 'layer-4':
+			// Encoding
+			return {
+				position: { x: -0.65, y: 0, z: -0.45 },
+				rotation: { x: -0.3, y: Math.PI * 0.25, z: 0.3 },
+				scale: 1.2
+			};
+
+		case 'layer-5':
+			// Holographic (Front)
+			return {
+				position: { x: -0.8, y: 0, z: -0.6 },
+				rotation: { x: -0.3, y: Math.PI * 0.25, z: 0.3 },
+				scale: 1.2
+			};
+
 		case 'physical':
 			// Dangling card with physics, floating above/near the stack
 			return {
@@ -415,12 +459,27 @@ export function getStateVisuals(
 
 		case 'exploded':
 			visuals.layerSeparation = 0.75;
-			// Map section to highlight layer
-			if (sectionName === 'layer-1') visuals.highlightLayer = 1;
-			else if (sectionName === 'layer-2') visuals.highlightLayer = 2;
-			else if (sectionName === 'layer-3') visuals.highlightLayer = 3;
-			else if (sectionName === 'layer-4') visuals.highlightLayer = 4;
-			else if (sectionName === 'layer-5') visuals.highlightLayer = 5;
+			break;
+
+		case 'layer-1':
+			visuals.layerSeparation = 0.75;
+			visuals.highlightLayer = 1;
+			break;
+		case 'layer-2':
+			visuals.layerSeparation = 0.75;
+			visuals.highlightLayer = 2;
+			break;
+		case 'layer-3':
+			visuals.layerSeparation = 0.75;
+			visuals.highlightLayer = 3;
+			break;
+		case 'layer-4':
+			visuals.layerSeparation = 0.75;
+			visuals.highlightLayer = 4;
+			break;
+		case 'layer-5':
+			visuals.layerSeparation = 0.75;
+			visuals.highlightLayer = 5;
 			break;
 
 		case 'collapsing':

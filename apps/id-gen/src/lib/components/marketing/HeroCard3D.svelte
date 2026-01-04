@@ -93,6 +93,8 @@
 	let cachedTransform: ReturnType<typeof getStateTransform> | null = null;
 	let cachedVisuals: ReturnType<typeof getStateVisuals> | null = null;
 
+	let prevSection = $state<SectionName>('hero');
+
 	// States that animate based on sectionProgress (need recalc every frame)
 	const ANIMATED_STATES: CardState[] = [
 		'tap-approach',
@@ -114,9 +116,10 @@
 	useTask((delta) => {
 		if (!groupRef) return;
 
-		// Recalculate when state changes OR when sectionProgress changes for animated states
+		// Recalculate when state changes OR when sectionProgress changes for animated states OR when section changes
 		const needsRecalc =
 			currentState !== prevState ||
+			currentSection !== prevSection ||
 			!cachedTransform ||
 			!cachedVisuals ||
 			(ANIMATED_STATES.includes(currentState) && sectionProgress !== prevSectionProgress);
@@ -125,6 +128,7 @@
 			cachedTransform = getStateTransform(currentState, sectionProgress);
 			cachedVisuals = getStateVisuals(currentState, sectionProgress, currentSection);
 			prevState = currentState;
+			prevSection = currentSection;
 			prevSectionProgress = sectionProgress;
 		}
 

@@ -4,7 +4,7 @@
 	 *
 	 * Renders the 5 layers that appear when the card explodes in the Architecture section.
 	 */
-	import { T } from '@threlte/core';
+	import { T, useTask } from '@threlte/core';
 	import * as THREE from 'three';
 
 	interface Props {
@@ -36,6 +36,25 @@
 		};
 	});
 
+	// Floating animation state
+	let time = 0;
+	let layer1Y = $state(0);
+	let layer2Y = $state(0);
+	let layer3Y = $state(0);
+	let layer5Y = $state(0);
+
+	useTask((delta) => {
+		if (layerSeparation < 0.1) return; // Don't animate if closed
+		
+		time += delta;
+		
+		// Gentle floating: Amplitude 0.05, Speed 0.5-1.0
+		layer1Y = Math.sin(time * 0.8) * 0.03;
+		layer2Y = Math.sin(time * 0.7 + 1) * 0.04; 
+		layer3Y = Math.sin(time * 0.6 + 2) * 0.05;
+		layer5Y = Math.sin(time * 0.5 + 3) * 0.06;
+	});
+
 	// Derived scales to prevent inline array creation
 	// Type as tuples for Threlte compatibility
 	const layer1Scale: [number, number, number] = $derived([cardWidth * 0.95, cardHeight * 0.95, 1]);
@@ -63,22 +82,12 @@
 
 {#if layerSeparation > 0.05}
 	<!-- Layer 1: Base Grid/Background Data -->
-	{@const layer1Opacity = highlightLayer === 0 || highlightLayer === 1 ? 1 : 0.2}
-	<T.Group position.z={layerSeparation * 0.3}>
-		<T.Mesh material={middleLayerMaterial} geometry={planeGeo} scale={layer1Scale}>
-			<T.MeshStandardMaterial
-				color={0x6666aa}
-				roughness={0.1}
-				metalness={1.0}
-				transparent={true}
-				side={THREE.DoubleSide}
-				depthWrite={true}
-				emissive={0x4444aa}
-				emissiveIntensity={0.5}
-				opacity={layerSeparation > 0.05 ? Math.min(1, layerSeparation * 2) * layer1Opacity : 0}
-			/>
-		</T.Mesh>
-		<!-- Grid pattern -->
+	{@const layer1Opacity = highlightLayer === 0 || highlightLayer === 1 ? 1 : 0.1}
+	
+	<T.Group position.z={layerSeparation * 0.3} position.y={layer1Y}>
+		<T.Mesh material={middleLayerMaterial} geometry={planeGeo} scale={layer1Scale} />
+		
+		<!-- Main Grid pattern -->
 		<T.Mesh position.z={0.001} geometry={planeGeo} scale={layer1GridScale}>
 			<T.MeshStandardMaterial
 				color={0xffffff}
@@ -92,8 +101,9 @@
 	</T.Group>
 
 	<!-- Layer 2: Photo Chip -->
-	{@const layer2Opacity = highlightLayer === 0 || highlightLayer === 2 ? 1 : 0.2}
-	<T.Group position.z={layerSeparation * 0.7}>
+	{@const layer2Opacity = highlightLayer === 0 || highlightLayer === 2 ? 1 : 0.1}
+
+	<T.Group position.z={layerSeparation * 0.7} position.y={layer2Y}>
 		<T.Mesh position.x={-0.65} position.y={0} geometry={boxGeo} scale={chipScale}>
 			<T.MeshBasicMaterial
 				color={0x6a6aaa}
@@ -112,9 +122,11 @@
 	</T.Group>
 
 	<!-- Layer 3: Text Lines (Identity Data) -->
-	{@const layer3Opacity = highlightLayer === 0 || highlightLayer === 3 ? 1 : 0.2}
-	<T.Group position.z={layerSeparation * 1.1}>
+	{@const layer3Opacity = highlightLayer === 0 || highlightLayer === 3 ? 1 : 0.1}
+
+	<T.Group position.z={layerSeparation * 1.1} position.y={layer3Y}>
 		{#each [0.4, 0.3, -0.1, -0.2, -0.3] as yPos, i (i)}
+			<!-- Main Text Line -->
 			<T.Mesh position.y={yPos} position.x={0.1} geometry={planeGeo} scale={textScales[i]}>
 				<T.MeshBasicMaterial
 					color={0xaaddff}
@@ -128,8 +140,9 @@
 	<!-- Layer 4: QR Code (Moved to HeroCardGeometry for all-section visibility) -->
 
 	<!-- Layer 5: Holographic/Status Icons -->
-	{@const layer5Opacity = highlightLayer === 0 || highlightLayer === 5 ? 1 : 0.2}
-	<T.Group position.z={layerSeparation * 1.9}>
+	{@const layer5Opacity = highlightLayer === 0 || highlightLayer === 5 ? 1 : 0.1}
+
+	<T.Group position.z={layerSeparation * 1.9} position.y={layer5Y}>
 		<!-- Top right icon (Green placeholder removed, now handled by parent) -->
 		<!-- Bottom center status bar -->
 		<T.Mesh position.y={-0.8} geometry={planeGeo} scale={statusScale}>

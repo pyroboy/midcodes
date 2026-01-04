@@ -291,10 +291,16 @@
 
 	<!-- QR Code (visible in all sections, explodes with Layer 4) -->
 	{#if qrCodeTexture}
+		{@const layer4Opacity = highlightLayer === 0 || highlightLayer === 4 ? 1 : 0.1}
 		<T.Group position.x={0.35} position.y={-0.65} position.z={layerSeparation * 1.5 + 0.02}>
 			<T.Mesh scale={[0.35, 0.35, 1]}>
 				<T.PlaneGeometry args={[1, 1]} />
-				<T.MeshBasicMaterial map={qrCodeTexture} transparent={false} />
+				<T.MeshBasicMaterial 
+					map={qrCodeTexture} 
+					transparent={layer4Opacity < 1} 
+					opacity={layer4Opacity}
+					depthWrite={layer4Opacity === 1}
+				/>
 			</T.Mesh>
 		</T.Group>
 	{/if}
