@@ -72,7 +72,10 @@
 		scrollState.currentSection === 'layer-2' ||
 		scrollState.currentSection === 'layer-3' ||
 		scrollState.currentSection === 'layer-4' ||
-		scrollState.currentSection === 'layer-5'
+		scrollState.currentSection === 'layer-5' ||
+		scrollState.currentSection === 'layer-6' ||
+		scrollState.currentSection === 'layer-7' ||
+		scrollState.currentSection === 'layer-assemble'
 	);
 </script>
 

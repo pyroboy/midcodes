@@ -36,7 +36,7 @@
 	<!-- Sticky content that follows through the section -->
 	<div class="sticky top-16 pt-6 pb-4 z-10">
 		<div class="text-center mb-8">
-			<h2 class="text-4xl md:text-6xl font-bold leading-tight text-foreground">
+			<h2 class="text-4xl md:text-6xl font-black leading-tight text-foreground">
 				Direct Card Inputs
 			</h2>
 			<p class="text-lg md:text-xl text-muted-foreground mt-4 max-w-2xl mx-auto leading-relaxed">
@@ -56,7 +56,7 @@
 			bind:value={cardData.name}
 			oninput={onNameInput}
 			placeholder="Enter your name..."
-			class="w-full px-6 py-4 text-xl border-2 border-input rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-blue-500 transition-colors shadow-lg"
+			class="w-full px-6 py-4 text-xl border-2 border-input rounded-xl bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-blue-500 transition-colors "
 		/>
 
 		<!-- Job Title Selection with Popover -->
@@ -64,7 +64,7 @@
 			<button
 				type="button"
 				onclick={() => showTitlePopover = !showTitlePopover}
-				class="w-full px-5 py-3 text-base text-left border border-input rounded-xl bg-background text-foreground hover:border-foreground transition-colors shadow-lg flex items-center justify-between"
+				class="w-full px-5 py-3 text-base text-left border border-input rounded-xl bg-background text-foreground hover:border-foreground transition-colors flex items-center justify-between"
 			>
 				<span>{cardData.title || 'Select job title...'}</span>
 				<svg class="w-5 h-5 text-muted-foreground transition-transform {showTitlePopover ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -74,7 +74,7 @@
 
 			<!-- Popover -->
 			{#if showTitlePopover}
-				<div class="absolute bottom-full left-0 right-0 mb-2 bg-background border border-border rounded-xl shadow-xl overflow-hidden z-50">
+				<div class="absolute bottom-full left-0 right-0 mb-2 bg-background border border-border rounded-xl overflow-hidden z-50">
 					{#each JOB_TITLES as title}
 						<button
 							type="button"

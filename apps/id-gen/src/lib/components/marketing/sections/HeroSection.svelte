@@ -3,14 +3,13 @@
 
 	// Use cases to cycle through
 	const useCases = [
+		'Attendance Systems',
 		'Student IDs',
 		'Business Cards',
 		'Event Badges',
 		'Employee Access',
 		'Gym Memberships',
-		'Medical IDs',
-		'Pet Tags',
-		'Product Authentication'
+		'Verification'
 	];
 
 	let currentIndex = $state(0);
