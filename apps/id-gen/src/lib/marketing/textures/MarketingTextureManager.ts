@@ -70,6 +70,99 @@ export function createKaLogoTexture(size: number = 64): THREE.CanvasTexture {
 	return texture;
 }
 
+/**
+ * Generate a QR code texture for a given URL
+ * Uses a simple manual implementation for small payloads
+ */
+export function createQRCodeTexture(
+	url: string = 'https://kanaya.app',
+	size: number = 128
+): THREE.CanvasTexture {
+	const canvas = document.createElement('canvas');
+	canvas.width = size;
+	canvas.height = size;
+	const ctx = canvas.getContext('2d')!;
+
+	// White background
+	ctx.fillStyle = '#ffffff';
+	ctx.fillRect(0, 0, size, size);
+
+	// Simple QR-like pattern (21x21 modules for Version 1)
+	// This creates a recognizable QR pattern without a full library
+	const modules = 21;
+	const moduleSize = Math.floor(size / (modules + 2)); // +2 for quiet zone
+	const offset = Math.floor((size - modules * moduleSize) / 2);
+
+	ctx.fillStyle = '#000000';
+
+	// Helper to draw a module
+	const drawModule = (row: number, col: number) => {
+		ctx.fillRect(
+			offset + col * moduleSize,
+			offset + row * moduleSize,
+			moduleSize,
+			moduleSize
+		);
+	};
+
+	// Finder patterns (7x7 squares in corners)
+	const drawFinderPattern = (startRow: number, startCol: number) => {
+		// Outer black square
+		for (let r = 0; r < 7; r++) {
+			for (let c = 0; c < 7; c++) {
+				if (r === 0 || r === 6 || c === 0 || c === 6) {
+					drawModule(startRow + r, startCol + c);
+				}
+			}
+		}
+		// Inner black square (3x3)
+		for (let r = 2; r < 5; r++) {
+			for (let c = 2; c < 5; c++) {
+				drawModule(startRow + r, startCol + c);
+			}
+		}
+	};
+
+	// Draw finder patterns
+	drawFinderPattern(0, 0); // Top-left
+	drawFinderPattern(0, 14); // Top-right
+	drawFinderPattern(14, 0); // Bottom-left
+
+	// Timing patterns
+	for (let i = 8; i < 13; i += 2) {
+		drawModule(6, i);
+		drawModule(i, 6);
+	}
+
+	// Data area - create pattern from URL hash
+	let hash = 0;
+	for (let i = 0; i < url.length; i++) {
+		hash = ((hash << 5) - hash + url.charCodeAt(i)) | 0;
+	}
+
+	// Fill data modules with pseudo-random pattern based on URL
+	for (let row = 0; row < modules; row++) {
+		for (let col = 0; col < modules; col++) {
+			// Skip finder patterns and timing
+			if (row < 9 && col < 9) continue; // Top-left
+			if (row < 9 && col > 12) continue; // Top-right
+			if (row > 12 && col < 9) continue; // Bottom-left
+			if (row === 6 || col === 6) continue; // Timing
+
+			// Pseudo-random based on position and hash
+			const bit = ((hash >> ((row * col) % 31)) & 1) ^ ((row + col) & 1);
+			if (bit) drawModule(row, col);
+		}
+	}
+
+	const texture = new THREE.CanvasTexture(canvas);
+	texture.colorSpace = THREE.SRGBColorSpace;
+	texture.magFilter = THREE.NearestFilter; // Sharp edges
+	texture.minFilter = THREE.NearestFilter;
+	texture.needsUpdate = true;
+	return texture;
+}
+
 // ============================================================================
 // CARD TEXTURE GENERATION
 // ============================================================================

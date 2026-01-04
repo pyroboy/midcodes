@@ -60,7 +60,7 @@
 		<T.Mesh material={middleLayerMaterial} geometry={planeGeo} scale={layer1Scale} />
 		<!-- Grid pattern -->
 		<T.Mesh position.z={0.001} geometry={planeGeo} scale={layer1GridScale}>
-			<T.MeshBasicMaterial color={0x3a3a6a} wireframe transparent opacity={0.3} />
+			<T.MeshStandardMaterial color={0xffffff} wireframe transparent opacity={0.8} emissive={0x8888ff} emissiveIntensity={1.0} />
 		</T.Mesh>
 	</T.Group>
 
@@ -92,25 +92,7 @@
 		{/each}
 	</T.Group>
 
-	<!-- Layer 4: QR Code -->
-	<T.Group position.z={layerSeparation * 1.5}>
-		<T.Mesh position.x={0.4} position.y={-0.5} geometry={planeGeo} scale={qrBgScale}>
-			<T.MeshBasicMaterial
-				color={0xffffff}
-				transparent
-				opacity={Math.min(1, layerSeparation * 2)}
-			/>
-		</T.Mesh>
-		<T.Mesh
-			position.x={0.4}
-			position.y={-0.5}
-			position.z={0.001}
-			geometry={planeGeo}
-			scale={qrFgScale}
-		>
-			<T.MeshBasicMaterial color={0x000000} wireframe transparent opacity={0.5} />
-		</T.Mesh>
-	</T.Group>
+	<!-- Layer 4: QR Code (Moved to HeroCardGeometry for all-section visibility) -->
 
 	<!-- Layer 5: Holographic/Status Icons -->
 	<T.Group position.z={layerSeparation * 1.9}>

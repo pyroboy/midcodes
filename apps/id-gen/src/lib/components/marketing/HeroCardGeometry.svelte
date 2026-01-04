@@ -19,6 +19,7 @@
 		createHeroCardTexture,
 		createCardBackTexture,
 		createKaLogoTexture,
+		createQRCodeTexture,
 		getCachedTexture,
 		disposeCachedTextures
 	} from '$lib/marketing/textures/MarketingTextureManager';
@@ -55,14 +56,15 @@
 	let backTexture: THREE.Texture | null = $state(null);
 	let normalMap: THREE.Texture | null = $state(null);
 	let kaLogoTexture: THREE.Texture | null = $state(null);
+	let qrCodeTexture: THREE.Texture | null = $state(null);
 
 	// Variant textures for use cases section
 	let variantTextures: THREE.Texture[] = $state([]);
 
 	// Materials
-	let frontMaterial: THREE.MeshStandardMaterial | null = $state(null);
-	let backMaterial: THREE.MeshStandardMaterial | null = $state(null);
-	let edgeMaterial: THREE.MeshStandardMaterial | null = $state(null);
+	let frontMaterial: THREE.MeshPhysicalMaterial | null = $state(null);
+	let backMaterial: THREE.MeshPhysicalMaterial | null = $state(null);
+	let edgeMaterial: THREE.MeshPhysicalMaterial | null = $state(null);
 	let middleLayerMaterial: THREE.MeshStandardMaterial | null = $state(null);
 
 	// Initialize geometry and materials
@@ -78,6 +80,9 @@
 
 			// Logo for exploded layers
 			kaLogoTexture = getCachedTexture('ka-logo', () => createKaLogoTexture(128));
+
+			// QR code for card (visible in all sections)
+			qrCodeTexture = getCachedTexture('qr-code', () => createQRCodeTexture('https://kanaya.app', 256));
 
 			// Initial variant textures (fill with hero first to avoid blocking)
 			// This prevents ~500ms of synchronous canvas operations on mount
@@ -141,39 +146,60 @@
 			}
 
 			// Create front material with normal map for emboss effect
-			frontMaterial = new THREE.MeshStandardMaterial({
+			frontMaterial = new THREE.MeshPhysicalMaterial({
 				map: frontTexture,
 				normalMap: normalMap,
 				normalScale: new THREE.Vector2(0.5, 0.5), // Subtle emboss
-				roughness: 0.3,
-				metalness: 0.1,
+				roughness: 0.1, // Base ceramic texture
+				metalness: 0.4, // Non-metallic base
+				clearcoat: 1.0, // Restoration: Glass-like top layer
+				// clearcoatRoughness: 0.05, // Sharp reflections on top
+				reflectivity: 1.0,
 				side: THREE.FrontSide,
-				envMapIntensity: 0.5
+				// envMapIntensity: 2.0, // Balanced for clearcoat
+				// emissive: 0xffffff,
+				// emissiveIntensity: 0.2
 			});
 
 			// Create back material
-			backMaterial = new THREE.MeshStandardMaterial({
+			backMaterial = new THREE.MeshPhysicalMaterial({
 				map: backTexture,
-				roughness: 0.4,
-				metalness: 0.05,
-				side: THREE.BackSide
+				color: 0xffffff,
+				roughness: 0.2,
+				metalness: 0.0,
+				clearcoat: 1.0,
+				clearcoatRoughness: 0.05,
+				reflectivity: 1.0,
+				side: THREE.BackSide,
+				envMapIntensity: 2.0,
+				emissive: 0xffffff,
+				emissiveIntensity: 0.2
 			});
 
 			// Create edge material
-			edgeMaterial = new THREE.MeshStandardMaterial({
-				color: 0x222222,
-				roughness: 0.5,
-				metalness: 0.3
+			edgeMaterial = new THREE.MeshPhysicalMaterial({
+				color: 0xffffff,
+				roughness: 0.2,
+				metalness: 0.0,
+				clearcoat: 1.0,
+				clearcoatRoughness: 0.05,
+				reflectivity: 1.0,
+				envMapIntensity: 2.0,
+				emissive: 0xffffff,
+				emissiveIntensity: 0.2
 			});
 
 			// Middle layer for exploded view (data layer)
 			middleLayerMaterial = new THREE.MeshStandardMaterial({
-				color: 0x2a2a4a,
-				roughness: 0.6,
-				metalness: 0.1,
+				color: 0x6666aa,
+				roughness: 0.1,
+				metalness: 1.0,
 				transparent: true,
 				opacity: 0,
-				side: THREE.DoubleSide
+				side: THREE.DoubleSide,
+				depthWrite: true, // Enable for ContactShadows
+				emissive: 0x4444aa,
+				emissiveIntensity: 0.5
 			});
 
 			isLoaded = true;
@@ -223,8 +249,11 @@
 		if (layerSeparation > 0.1) {
 			frontMaterial.transparent = true;
 			frontMaterial.opacity = Math.max(0.85, 1 - layerSeparation * 0.2);
+			frontMaterial.depthWrite = true; // Keep true for shadows
+
 			backMaterial.transparent = true;
 			backMaterial.opacity = Math.max(0.85, 1 - layerSeparation * 0.2);
+			backMaterial.depthWrite = true; // Keep true for shadows
 		} else {
 			frontMaterial.transparent = false;
 			frontMaterial.opacity = 1;
@@ -254,6 +283,16 @@
 			<T.Mesh scale={[0.08, 0.08, 1]}>
 				<T.CircleGeometry args={[1, 16]} />
 				<T.MeshBasicMaterial map={kaLogoTexture} transparent opacity={1} />
+			</T.Mesh>
+		</T.Group>
+	{/if}
+
+	<!-- QR Code (visible in all sections, explodes with Layer 4) -->
+	{#if qrCodeTexture}
+		<T.Group position.x={0.35} position.y={-0.65} position.z={layerSeparation * 1.5 + 0.02}>
+			<T.Mesh scale={[0.35, 0.35, 1]}>
+				<T.PlaneGeometry args={[1, 1]} />
+				<T.MeshBasicMaterial map={qrCodeTexture} transparent={false} />
 			</T.Mesh>
 		</T.Group>
 	{/if}

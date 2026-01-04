@@ -23,8 +23,11 @@
 	let { templateAssets = [], onSceneReady }: Props = $props();
 </script>
 
-<!-- Fixed fullscreen canvas behind content -->
-<div class="fixed inset-0 w-screen h-screen z-0 pointer-events-none" style="touch-action: none;">
+<!-- Fixed fullscreen canvas behind content with gradient background -->
+<div 
+	class="fixed inset-0 w-screen h-screen z-0 pointer-events-none bg-gradient-to-b from-white to-slate-100" 
+	style="touch-action: none;"
+>
 	<Canvas>
 		<MarketingSceneContent {templateAssets} {onSceneReady} />
 	</Canvas>
