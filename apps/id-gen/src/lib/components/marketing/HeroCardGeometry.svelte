@@ -145,25 +145,26 @@
 				map: frontTexture,
 				normalMap: normalMap,
 				normalScale: new THREE.Vector2(0.5, 0.5), // Subtle emboss
-				roughness: 0.3,
-				metalness: 0.1,
+				roughness: 0.05,
+				metalness: 0.15,
 				side: THREE.FrontSide,
-				envMapIntensity: 0.5
+				envMapIntensity: 1.2
 			});
 
 			// Create back material
 			backMaterial = new THREE.MeshStandardMaterial({
 				map: backTexture,
-				roughness: 0.4,
-				metalness: 0.05,
-				side: THREE.BackSide
+				roughness: 0.05,
+				metalness: 0.15,
+				side: THREE.BackSide,
+				envMapIntensity: 1.0
 			});
 
 			// Create edge material
 			edgeMaterial = new THREE.MeshStandardMaterial({
-				color: 0x222222,
-				roughness: 0.5,
-				metalness: 0.3
+				color: 0xeeeeee,
+				roughness: 0.1,
+				metalness: 0.1
 			});
 
 			// Middle layer for exploded view (data layer)

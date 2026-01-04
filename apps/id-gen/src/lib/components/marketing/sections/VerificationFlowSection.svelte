@@ -37,7 +37,7 @@
 	<div class="sticky top-16 pt-6 pb-4 z-10">
 		<div class="text-center mb-8">
 			<h2 class="text-4xl md:text-6xl font-bold leading-tight text-foreground">
-				Kill the Spreadsheet.
+				Direct Card Inputs
 			</h2>
 			<p class="text-lg md:text-xl text-muted-foreground mt-4 max-w-2xl mx-auto leading-relaxed">
 				Manual entry is error-prone and slow. Type once, see it everywhere.
