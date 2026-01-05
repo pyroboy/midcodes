@@ -2,6 +2,7 @@ import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
 import { drizzle, type NeonHttpDatabase } from 'drizzle-orm/neon-http';
 import { env } from './env';
 import * as schema from './schema';
+import { withRetryAndTimeout, dbCircuitBreaker } from './db-retry';
 
 // Lazy-initialized database connection
 // This prevents the connection from being created at build time when env vars aren't available
@@ -32,7 +33,7 @@ function getConnectionString(): string {
 }
 
 /**
- * Get the database instance.
+ * Get the database instance with retry and timeout handling.
  * Lazily initialized on first call to avoid build-time errors.
  */
 export function getDb(): NeonHttpDatabase<typeof schema> {
@@ -41,6 +42,39 @@ export function getDb(): NeonHttpDatabase<typeof schema> {
 		_db = drizzle(_sql, { schema });
 	}
 	return _db;
+}
+
+/**
+ * Get the database instance with circuit breaker protection.
+ * Use this for critical database operations that should fail fast when database is unavailable.
+ */
+export async function getDbWithCircuitBreaker(): Promise<NeonHttpDatabase<typeof schema>> {
+	return dbCircuitBreaker.execute(() => getDb());
+}
+
+/**
+ * Execute a database operation with retry and timeout handling.
+ * This is the recommended way to run database queries in production.
+ */
+export async function dbQuery<T>(
+	operation: () => Promise<T>,
+	timeoutMs: number = 5000
+): Promise<T> {
+	return withRetryAndTimeout(
+		operation,
+		{
+			maxAttempts: 3,
+			initialDelayMs: 100,
+			maxDelayMs: 5000,
+			backoffMultiplier: 2
+		},
+		{
+			timeoutMs,
+			onTimeout: () => {
+				console.error('[DB Query] Database operation timed out', { timeoutMs });
+			}
+		}
+	);
 }
 
 // Export as a proxy for backwards compatibility with existing code

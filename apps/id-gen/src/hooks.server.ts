@@ -1,5 +1,5 @@
 import { auth } from '$lib/server/auth';
-import { db } from '$lib/server/db';
+import { db, dbQuery } from '$lib/server/db';
 import { profiles } from '$lib/server/schema';
 import { eq } from 'drizzle-orm';
 import { sequence } from '@sveltejs/kit/hooks';
@@ -11,6 +11,7 @@ import '$lib/utils/setup-logging';
 import { logger } from '$lib/utils/logger';
 import { initializeEnv } from '$lib/server/env';
 import { generateCSRFTokens } from '$lib/server/csrf';
+import { dbCircuitBreaker } from '$lib/server/db-retry';
 
 // Flag to track if environment has been validated (runs once on first request)
 let _envValidated = false;
@@ -33,13 +34,16 @@ const betterAuthHandle: Handle = async ({ event, resolve }) => {
 		_envValidated = true;
 	}
 
-	// Better Auth session management
+	// Better Auth session management with retry and timeout
 	console.log('[AUTH DEBUG] Getting session from headers...');
 	let result: any = null;
 	try {
-		result = await auth.api.getSession({
-			headers: event.request.headers
-		});
+		result = await dbQuery(
+			() => auth.api.getSession({
+				headers: event.request.headers
+			}),
+			3000 // 3 second timeout for session retrieval
+		);
 		console.log(
 			'[AUTH DEBUG] Session result:',
 			result ? 'Session found' : 'No session',
@@ -47,6 +51,7 @@ const betterAuthHandle: Handle = async ({ event, resolve }) => {
 		);
 	} catch (e) {
 		console.error('[AUTH DEBUG] getSession FAILED:', e);
+		// Don't throw - allow request to continue without session
 	}
 
 	event.locals.auth = auth;
@@ -56,18 +61,22 @@ const betterAuthHandle: Handle = async ({ event, resolve }) => {
 
 	if (result?.user) {
 		console.log('[AUTH DEBUG] Fetching profile for user:', result.user.id);
-		// Fetch profile data from Neon via Drizzle
+		// Fetch profile data from Neon via Drizzle with retry and timeout
 		let userProfile: any = null;
 		try {
-			const [profile] = await db
-				.select()
-				.from(profiles)
-				.where(eq(profiles.id, result.user.id))
-				.limit(1);
+			const [profile] = await dbQuery(
+				() => db
+					.select()
+					.from(profiles)
+					.where(eq(profiles.id, result.user.id))
+					.limit(1),
+				5000 // 5 second timeout for profile fetch
+			);
 			userProfile = profile;
 			console.log('[AUTH DEBUG] Profile found:', userProfile ? 'yes' : 'no');
 		} catch (e) {
 			console.error('[AUTH DEBUG] Profile fetch FAILED:', e);
+			// Continue without profile - user will have limited access
 		}
 
 		if (userProfile) {
@@ -107,8 +116,11 @@ const betterAuthHandle: Handle = async ({ event, resolve }) => {
 				}
 			}
 
-			// Get permissions
-			const permissions = await getUserPermissions(effectiveRoles, userProfile.id);
+			// Get permissions with retry and timeout
+			const permissions = await dbQuery(
+				() => getUserPermissions(effectiveRoles, userProfile.id),
+				3000 // 3 second timeout for permissions
+			);
 
 			event.locals.org_id = userProfile.orgId ?? undefined;
 			event.locals.permissions = permissions;

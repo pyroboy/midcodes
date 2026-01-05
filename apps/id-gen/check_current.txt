@@ -1,0 +1,7 @@
+
+> id-gen@2 check /Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen
+> svelte-kit sync && svelte-check --tsconfig ./tsconfig.json
+
+Loading svelte-check in workspace: /Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen
+Getting Svelte diagnostics...
+
