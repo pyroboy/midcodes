@@ -5,3 +5,36 @@
 Loading svelte-check in workspace: /Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen
 Getting Svelte diagnostics...
 
+/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/lib/server/db-retry.ts:61:16
+Error: Variable 'timeoutId' is used before being assigned. 
+		const result = await Promise.race([promise, timeoutPromise]);
+		clearTimeout(timeoutId);
+		return result;
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/lib/server/db-retry.ts:64:16
+Error: Variable 'timeoutId' is used before being assigned. 
+	} catch (error) {
+		clearTimeout(timeoutId);
+		throw error;
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/lib/server/db.ts:52:40
+Error: Type 'NeonHttpDatabase<typeof import("/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/lib/server/schema")>' is missing the following properties from type 'Promise<NeonHttpDatabase<typeof import("/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/lib/server/schema")>>': then, catch, finally, [Symbol.toStringTag] 
+export async function getDbWithCircuitBreaker(): Promise<NeonHttpDatabase<typeof schema>> {
+	return dbCircuitBreaker.execute(() => getDb());
+}
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/routes/api/health/+server.ts:24:55
+Error: Type 'number' is not assignable to type 'SQL<unknown> | Aliased<unknown> | Subquery<string, Record<string, unknown>> | PgColumn<ColumnBaseConfig<ColumnDataType, string>, {}, {}> | PgTable<...> | SelectedFieldsFlat<...>'. 
+					// Import db here to avoid circular dependency
+					import('$lib/server/db').then(m => m.db.select({ count: 1 }).limit(0))
+				);
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/routes/api/health/+server.ts:24:67
+Error: Property 'limit' does not exist on type 'PgSelectBuilder<SelectedFields, "db">'. 
+					// Import db here to avoid circular dependency
+					import('$lib/server/db').then(m => m.db.select({ count: 1 }).limit(0))
+				);
+
+====================================
+svelte-check found 5 errors and 0 warnings in 3 files
+ ELIFECYCLE  Command failed with exit code 1.

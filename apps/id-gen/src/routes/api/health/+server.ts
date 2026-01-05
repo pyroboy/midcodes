@@ -19,11 +19,10 @@ export const GET: RequestHandler = async () => {
 		await dbQuery(
 			async () => {
 				// Simple query to test connection
-				const result = await dbQuery(() => 
-					// Import db here to avoid circular dependency
-					import('$lib/server/db').then(m => m.db.select({ count: 1 }).limit(0))
-				);
-				return result;
+				const { db } = await import('$lib/server/db');
+				// Use a simple select from any table to test connection
+				await db.select().from(db.query.users).limit(1);
+				return true;
 			},
 			3000 // 3 second timeout
 		);
