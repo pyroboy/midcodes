@@ -385,6 +385,12 @@
 						<span class="text-xs text-muted-foreground font-normal">Manage credit allocation</span>
 					</div>
 				</Button>
+				<Button href="/admin/docs" variant="outline" class="justify-start h-auto py-3 px-4">
+					<div class="flex flex-col items-start text-left">
+						<span class="font-semibold">Documentation Hub</span>
+						<span class="text-xs text-muted-foreground font-normal">Internal knowledge base</span>
+					</div>
+				</Button>
 			</CardContent>
 		</Card>
 
