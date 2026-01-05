@@ -61,18 +61,18 @@
 					<td><span class="status warn">Low</span></td>
 				</tr>
 				<tr>
-					<td><strong>RFID Inlays (Mifare 1K)</strong></td>
-					<td>Individual</td>
-					<td>200 pcs</td>
-					<td>₱14/pc</td>
-					<td><span class="status critical">Order Now</span></td>
+					<td><strong>Inkjet Printable RFID Cards</strong></td>
+					<td>Box of 230</td>
+					<td>1 Box</td>
+					<td>₱18/pc</td>
+					<td><span class="status critical">Order Shopee</span></td>
 				</tr>
 				<tr>
-					<td><strong>Lanyards (Outsourced)</strong></td>
-					<td>Finished</td>
+					<td><strong>Lanyards (Cebu Source)</strong></td>
+					<td>1-inch Sublimation</td>
 					<td>Order per Project</td>
-					<td>₱36/pc</td>
-					<td><span class="status neutral">On Demand</span></td>
+					<td>₱45/pc</td>
+					<td><span class="status neutral">7-Day Lead Time</span></td>
 				</tr>
 			</tbody>
 		</table>

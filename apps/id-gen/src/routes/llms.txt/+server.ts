@@ -1,11 +1,18 @@
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async () => {
-	const modules = import.meta.glob('../(shell)/admin/docs/**/*.svelte', {
-		query: '?raw',
-		import: 'default',
-		eager: true
-	});
+	const modules = {
+		...import.meta.glob('../\\(shell\\)/admin/docs/**/*.svelte', {
+			query: '?raw',
+			import: 'default',
+			eager: true
+		}),
+		...import.meta.glob(['../+page.svelte', '../pricing/+page.svelte'], {
+			query: '?raw',
+			import: 'default',
+			eager: true
+		})
+	};
 
 	// DEBUGGING LOGS
 	console.log('--- LLMS.TXT GENERATION START ---');

@@ -88,8 +88,8 @@
 
 			<p><strong>3. Retention &amp; Disposal:</strong></p>
 			<ul>
-				<li><strong>Digital Copy:</strong> Data is stored in our secure local server for 30 days to allow for reprints/corrections.</li>
-				<li><strong>Deletion:</strong> After 30 days, or upon immediate request by the Client, all personal data is permanently wiped from our systems.</li>
+				<li><strong>Retention:</strong> Data is retained securely for the duration of the Service Agreement to operate the Scan & Verify and Lost Card recovery features.</li>
+				<li><strong>Deletion:</strong> Upon contract termination or explicit request by the Client, all personal data is permanently wiped.</li>
 				<li><strong>Physical Waste:</strong> Any misprinted cards (rejects) are shredded physically before disposal to prevent identity theft.</li>
 			</ul>
 		</div>

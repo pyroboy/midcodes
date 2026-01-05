@@ -159,7 +159,7 @@ if (VerifyHMAC(card.uuid, card.signature, SECRET_KEY)) &#123;
             <h3>Scenario: No Internet at School Gate</h3>
             <p><strong>Solution: Local First Sync (PWA)</strong></p>
             <ol>
-                <li><strong>Morning Sync:</strong> The Scanner Tablet downloads the <code>whitelist_hash</code> (Lightweight JSON of active UIDs) at 6:00 AM.</li>
+                <li><strong>Morning Sync:</strong> The Scanner Tablet downloads the <code>whitelist.json</code> (Text only: UID + Name + Status). Photos are not preloaded—fetch on demand or show a placeholder if offline.</li>
                 <li><strong>Offline Scan:</strong> Tablet checks scanned UID against local Storage. Logs are saved locally.</li>
                 <li><strong>Re-Sync:</strong> Logs are pushed to Cloudflare DB once internet is restored.</li>
             </ol>

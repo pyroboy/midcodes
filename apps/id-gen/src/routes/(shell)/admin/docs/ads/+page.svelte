@@ -115,7 +115,7 @@
                 <h4>⚙️ Ad Settings</h4>
                 <ul>
                     <li><strong>Objective:</strong> Website Conversion (Free Trial Signup).</li>
-                    <li><strong>Location:</strong> Philippines (Exclude Tagbilaran - don't help competitors).</li>
+                    <li><strong>Location:</strong> Philippines (Exclude Visayas Region - protect our logistics hub).</li>
                     <li><strong>Interests:</strong> "Epson L-Series", "Photoshop", "Heat Press", "Sublimation Printing".</li>
                     <li><strong>Behavior:</strong> "Facebook Page Admins (Business Page)".</li>
                 </ul>

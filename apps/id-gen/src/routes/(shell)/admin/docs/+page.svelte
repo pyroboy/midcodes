@@ -6,11 +6,12 @@
 	// Simple Profit Calculator Logic
 	let qty = $state(100);
 	let pricePerId = $state(35);
-	let costPerId = $state(12); // Estimated loaded cost
+	let materialCost = $state(12);
+	let laborCost = $state(5);
 	let totalRevenue = $derived(qty * pricePerId);
-	let totalCost = $derived(qty * costPerId);
+	let totalCost = $derived((materialCost + laborCost) * qty);
 	let totalProfit = $derived(totalRevenue - totalCost);
-	let margin = $derived(((totalProfit / totalRevenue) * 100).toFixed(1));
+	let margin = $derived((totalRevenue ? (totalProfit / totalRevenue) * 100 : 0).toFixed(1));
 </script>
 
 <svelte:head>
@@ -150,14 +151,22 @@
 					<input type="number" bind:value={pricePerId} min="1" />
 				</label>
 				<label>
-					Est. Cost (₱):
-					<input type="number" bind:value={costPerId} min="1" />
+					Est. Material Cost (₱):
+					<input type="number" bind:value={materialCost} min="0" step="0.01" />
+				</label>
+				<label>
+					Est. Labor Cost (₱):
+					<input type="number" bind:value={laborCost} min="0" step="0.01" />
 				</label>
 			</div>
 			<div class="calc-results">
 				<div class="res-row">
 					<span>Revenue:</span>
 					<strong>₱{totalRevenue.toLocaleString()}</strong>
+				</div>
+				<div class="res-row">
+					<span>Total Cost:</span>
+					<strong>₱{totalCost.toLocaleString()}</strong>
 				</div>
 				<div class="res-row">
 					<span>Profit:</span>
