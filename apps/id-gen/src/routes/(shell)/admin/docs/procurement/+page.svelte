@@ -147,8 +147,6 @@
 			<strong>Technical Note:</strong> These printers use a modified "CD/DVD Printing Mode" to print onto a specialized tray
 			holding two cards. Manual intervention is required every 2 cards.
 		</div>
-			adapted by third-party suppliers to print directly onto PVC substrates.
-		</p>
 
 		<h3>3.1 The Epson L8050 and L18050 Paradigm</h3>
 		<p>

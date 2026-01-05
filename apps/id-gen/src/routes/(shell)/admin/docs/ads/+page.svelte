@@ -156,30 +156,32 @@
             <div class="card">
                 <h3>ROAS Calculator (Return on Ad Spend)</h3>
                 <table class="data-table">
-                    <tr>
-                        <td>Ad Spend</td>
-                        <td>₱ 1,000</td>
-                    </tr>
-                    <tr>
-                        <td>Leads Generated</td>
-                        <td>20 Messages</td>
-                    </tr>
-                    <tr>
-                        <td>Cost Per Lead</td>
-                        <td>₱ 50 / lead</td>
-                    </tr>
-                    <tr>
-                        <td>Closed Deals</td>
-                        <td>1 Client (5% Conv)</td>
-                    </tr>
-                    <tr>
-                        <td>Revenue</td>
-                        <td>₱ 15,000 (100 IDs)</td>
-                    </tr>
-                    <tr class="highlight">
-                        <td><strong>ROAS</strong></td>
-                        <td><strong>15x (For every ₱1 spent, you made ₱15)</strong></td>
-                    </tr>
+                    <tbody>
+                        <tr>
+                            <td>Ad Spend</td>
+                            <td>₱ 1,000</td>
+                        </tr>
+                        <tr>
+                            <td>Leads Generated</td>
+                            <td>20 Messages</td>
+                        </tr>
+                        <tr>
+                            <td>Cost Per Lead</td>
+                            <td>₱ 50 / lead</td>
+                        </tr>
+                        <tr>
+                            <td>Closed Deals</td>
+                            <td>1 Client (5% Conv)</td>
+                        </tr>
+                        <tr>
+                            <td>Revenue</td>
+                            <td>₱ 15,000 (100 IDs)</td>
+                        </tr>
+                        <tr class="highlight">
+                            <td><strong>ROAS</strong></td>
+                            <td><strong>15x (For every ₱1 spent, you made ₱15)</strong></td>
+                        </tr>
+                    </tbody>
                 </table>
             </div>
         </div>

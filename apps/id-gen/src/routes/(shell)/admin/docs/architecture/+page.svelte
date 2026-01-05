@@ -95,11 +95,11 @@
         <div class="code-block">
             <h4>Validation Logic (Pseudocode)</h4>
             <pre>
-if (VerifyHMAC(card.uuid, card.signature, SECRET_KEY)) {
+if (VerifyHMAC(card.uuid, card.signature, SECRET_KEY)) &#123;
     return "Valid Card";
-} else {
+&#125; else &#123;
     return "CLONE DETECTED - ALERT ADMIN";
-}</pre>
+&#125;</pre>
         </div>
     </section>
 

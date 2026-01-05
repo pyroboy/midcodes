@@ -59,22 +59,24 @@
         <div class="paper-doc">
             <h3>2.1 The Physical Credential</h3>
             <table class="spec-table">
-                <tr>
-                    <td><strong>Material Construction</strong></td>
-                    <td>3-Layer Fused PVC (Sandwich Type) - Non-fading.</td>
-                </tr>
-                <tr>
-                    <td><strong>Dimensions</strong></td>
-                    <td>CR-80 (85.60 × 53.98 mm) - ISO Standard 7810.</td>
-                </tr>
-                <tr>
-                    <td><strong>Smart Chip</strong></td>
-                    <td>NXP Mifare 1K EV1 (13.56 MHz) - <em>[Optional Upsell]</em>.</td>
-                </tr>
-                <tr>
-                    <td><strong>Data Encoding</strong></td>
-                    <td>AES-128 Encrypted UID linked to Kanaya Cloud.</td>
-                </tr>
+                <tbody>
+                    <tr>
+                        <td><strong>Material Construction</strong></td>
+                        <td>3-Layer Fused PVC (Sandwich Type) - Non-fading.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Dimensions</strong></td>
+                        <td>CR-80 (85.60 × 53.98 mm) - ISO Standard 7810.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Smart Chip</strong></td>
+                        <td>NXP Mifare 1K EV1 (13.56 MHz) - <em>[Optional Upsell]</em>.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Data Encoding</strong></td>
+                        <td>AES-128 Encrypted UID linked to Kanaya Cloud.</td>
+                    </tr>
+                </tbody>
             </table>
 
             <h3>2.2 The Digital Platform (SaaS)</h3>
