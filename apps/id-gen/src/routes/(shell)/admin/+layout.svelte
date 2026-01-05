@@ -554,6 +554,27 @@
 						<span class="hidden sm:inline">Optimization</span>
 						<span class="sm:hidden">Opt</span>
 					</a>
+					<a
+						href="/admin/docs"
+						class="flex items-center px-2 sm:px-3 py-4 text-xs sm:text-sm font-medium hover:text-blue-300 border-b-2 border-transparent hover:border-blue-300 whitespace-nowrap"
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-4 w-4 mr-1 sm:mr-2"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M12 20h9M12 4h9M5 8h16M5 16h16M4 4h.01M4 20h.01"
+							/>
+						</svg>
+						<span class="hidden sm:inline">Docs</span>
+						<span class="sm:hidden">Docs</span>
+					</a>
 				</div>
 			</div>
 		</nav>
