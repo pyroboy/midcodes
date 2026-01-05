@@ -136,6 +136,15 @@
 				<span class="dot"></span> Live Generated
 			</div>
 		</a>
+
+		<a href="/llms.txt?format=pdf" target="_blank" class="card pdf">
+			<div class="icon">📄</div>
+			<h2>Download PDF Bundle</h2>
+			<p>All docs exported with styling for offline review.</p>
+			<div class="status-indicator">
+				<span class="dot"></span> Auto-generated
+			</div>
+		</a>
 	</div>
 
 	<div class="split-section">

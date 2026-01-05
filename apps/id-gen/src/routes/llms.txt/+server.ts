@@ -1,6 +1,7 @@
 import type { RequestHandler } from './$types';
+import { PDFDocument, StandardFonts, type PDFFont } from 'pdf-lib';
 
-export const GET: RequestHandler = async () => {
+export const GET: RequestHandler = async ({ url }) => {
 	const modules = {
 		...import.meta.glob('../\\(shell\\)/admin/docs/**/*.svelte', {
 			query: '?raw',
@@ -61,6 +62,16 @@ export const GET: RequestHandler = async () => {
 		content += cleanSvelteContent(rawSvelte);
 	}
 
+	if (url.searchParams.get('format') === 'pdf') {
+		const pdfBytes = await generatePdf(content);
+		return new Response(pdfBytes, {
+			headers: {
+				'content-type': 'application/pdf',
+				'content-disposition': 'attachment; filename="kanaya-admin-docs.pdf"'
+			}
+		});
+	}
+
 	return new Response(content, {
 		headers: {
 			'content-type': 'text/plain; charset=utf-8'
@@ -109,4 +120,74 @@ function cleanSvelteContent(html: string): string {
 	text = text.split('\n').map(line => line.trim()).join('\n');
 
 	return text.trim();
+}
+
+async function generatePdf(content: string): Promise<Uint8Array> {
+	const pdfDoc = await PDFDocument.create();
+	const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+	const fontSize = 11;
+	const lineHeight = fontSize * 1.4;
+	const margin = 50;
+	const wrapWidth = 595.28 - margin * 2; // A4 width approximation
+
+	let page = pdfDoc.addPage();
+	let y = page.getHeight() - margin;
+
+	const lines = wrapText(content, font, fontSize, wrapWidth);
+
+	for (const line of lines) {
+		if (line === '__NEWPAGE__') {
+			page = pdfDoc.addPage();
+			y = page.getHeight() - margin;
+			continue;
+		}
+
+		if (y <= margin) {
+			page = pdfDoc.addPage();
+			y = page.getHeight() - margin;
+		}
+
+		page.drawText(line, {
+			x: margin,
+			y,
+			font,
+			size: fontSize
+		});
+		y -= lineHeight;
+	}
+
+	return pdfDoc.save();
+}
+
+function wrapText(content: string, font: PDFFont, fontSize: number, maxWidth: number): string[] {
+	const lines: string[] = [];
+	const paragraphs = content.split('\n');
+
+	for (const paragraph of paragraphs) {
+		const words = paragraph.split(/\s+/).filter(Boolean);
+		if (words.length === 0) {
+			lines.push('');
+			continue;
+		}
+
+		let currentLine = '';
+		for (const word of words) {
+			const testLine = currentLine ? `${currentLine} ${word}` : word;
+			const testWidth = font.widthOfTextAtSize(testLine, fontSize);
+			if (testWidth <= maxWidth) {
+				currentLine = testLine;
+			} else {
+				if (currentLine) {
+					lines.push(currentLine);
+				}
+				currentLine = word;
+			}
+		}
+
+		if (currentLine) {
+			lines.push(currentLine);
+		}
+	}
+
+	return lines;
 }
