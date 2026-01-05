@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import { dbQuery } from '$lib/server/db';
 import { dbCircuitBreaker } from '$lib/server/db-retry';
 import { dev } from '$app/environment';
+import { user } from '$lib/server/schema';
 
 export const GET: RequestHandler = async () => {
 	const healthCheck = {
@@ -21,7 +22,7 @@ export const GET: RequestHandler = async () => {
 				// Simple query to test connection
 				const { db } = await import('$lib/server/db');
 				// Use a simple select from any table to test connection
-				await db.select().from(db.query.user).limit(1);
+				await db.select().from(user).limit(1);
 				return true;
 			},
 			3000 // 3 second timeout
