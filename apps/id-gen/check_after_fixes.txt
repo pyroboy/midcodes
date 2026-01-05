@@ -5,3 +5,12 @@
 Loading svelte-check in workspace: /Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen
 Getting Svelte diagnostics...
 
+/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/routes/api/health/+server.ts:24:37
+Error: Property 'users' does not exist on type '{ readonly organizations: RelationalQueryBuilder<ExtractTablesWithRelations<typeof import("/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/lib/server/schema")>, { tsName: "organizations"; dbName: "organizations"; columns: { ...; }; relations: never; primaryKey: AnyColumn[]; }>; ... 22 more ...; readonly v...'. Did you mean 'user'? 
+				// Use a simple select from any table to test connection
+				await db.select().from(db.query.users).limit(1);
+				return true;
+
+====================================
+svelte-check found 1 error and 0 warnings in 1 file
+ ELIFECYCLE  Command failed with exit code 1.

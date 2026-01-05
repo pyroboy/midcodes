@@ -1,0 +1,16 @@
+
+> id-gen@2 check /Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen
+> svelte-kit sync && svelte-check --tsconfig ./tsconfig.json
+
+Loading svelte-check in workspace: /Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen
+Getting Svelte diagnostics...
+
+/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/routes/api/health/+server.ts:24:28
+Error: Argument of type 'RelationalQueryBuilder<ExtractTablesWithRelations<typeof import("/Users/arjomagno/Documents/GitHub/midcodes/apps/id-gen/src/lib/server/schema")>, { tsName: "user"; dbName: "user"; columns: { ...; }; relations: never; primaryKey: AnyColumn[]; }>' is not assignable to parameter of type 'PgTable<TableConfig> | SQL<unknown> | Subquery<string, Record<string, unknown>> | PgViewBase<string, boolean, ColumnsSelection>'. 
+				// Use a simple select from any table to test connection
+				await db.select().from(db.query.user).limit(1);
+				return true;
+
+====================================
+svelte-check found 1 error and 0 warnings in 1 file
+ ELIFECYCLE  Command failed with exit code 1.

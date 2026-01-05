@@ -21,7 +21,7 @@ export const GET: RequestHandler = async () => {
 				// Simple query to test connection
 				const { db } = await import('$lib/server/db');
 				// Use a simple select from any table to test connection
-				await db.select().from(db.query.users).limit(1);
+				await db.select().from(db.query.user).limit(1);
 				return true;
 			},
 			3000 // 3 second timeout
