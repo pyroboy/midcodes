@@ -49,7 +49,7 @@ export function getDb(): NeonHttpDatabase<typeof schema> {
  * Use this for critical database operations that should fail fast when database is unavailable.
  */
 export async function getDbWithCircuitBreaker(): Promise<NeonHttpDatabase<typeof schema>> {
-	return dbCircuitBreaker.execute(() => getDb());
+	return dbCircuitBreaker.execute(async () => getDb());
 }
 
 /**

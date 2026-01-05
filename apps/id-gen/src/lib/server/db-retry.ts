@@ -45,7 +45,7 @@ export async function withTimeout<T>(
 ): Promise<T> {
 	const { timeoutMs, onTimeout } = options;
 
-	let timeoutId: NodeJS.Timeout;
+	let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
 	const timeoutPromise = new Promise<never>((_, reject) => {
 		timeoutId = setTimeout(() => {
@@ -58,10 +58,14 @@ export async function withTimeout<T>(
 
 	try {
 		const result = await Promise.race([promise, timeoutPromise]);
-		clearTimeout(timeoutId);
+		if (timeoutId !== null) {
+			clearTimeout(timeoutId);
+		}
 		return result;
 	} catch (error) {
-		clearTimeout(timeoutId);
+		if (timeoutId !== null) {
+			clearTimeout(timeoutId);
+		}
 		throw error;
 	}
 }
