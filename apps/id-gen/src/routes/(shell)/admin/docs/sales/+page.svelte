@@ -51,7 +51,7 @@
 	</section>
 
 	<section id="pricing">
-		<h2>II. Official Pricing Matrix</h2>
+		<h2>II. Official Pricing Matrix & Lead Times</h2>
 		<p class="subtext">
 			<strong>Material Spec:</strong> Premium Laminated PVC (Sandwich Type). Inner-core printing (Non-fading). ATM Card Size/Thickness.<br>
 			<strong>Inclusions:</strong> Free Front/Back Template Design. Free Premium Lanyard Design (for bulk).
@@ -62,52 +62,48 @@
 				<tr>
 					<th>Quantity Tier</th>
 					<th>Unit Price (PHP)</th>
-					<th>Notes</th>
+					<th>Lead Time (Standard)</th>
 				</tr>
 			</thead>
 			<tbody>
 				<tr>
-					<td>Basic / Sample</td>
+					<td>Basic / Sample (1-4)</td>
 					<td><strong>₱150.00</strong></td>
-					<td>Retail Price (1-4 pcs)</td>
+					<td>1-2 Hours (While you wait)</td>
 				</tr>
 				<tr>
-					<td>5 pcs</td>
-					<td><strong>₱50.00</strong></td>
-					<td>Starter Pack</td>
+					<td>5-20 pcs</td>
+					<td><strong>₱50.00 - ₱45.00</strong></td>
+					<td>Same Day Delivery</td>
 				</tr>
 				<tr>
-					<td>20 pcs</td>
-					<td><strong>₱45.00</strong></td>
-					<td>Small Team</td>
+					<td>50-100 pcs</td>
+					<td><strong>₱40.00 - ₱35.00</strong></td>
+					<td>1-2 Business Days</td>
 				</tr>
 				<tr>
-					<td>50 pcs</td>
-					<td><strong>₱40.00</strong></td>
-					<td>SME Standard</td>
-				</tr>
-				<tr>
-					<td>100 pcs</td>
-					<td><strong>₱35.00</strong></td>
-					<td>Corporate Entry</td>
-				</tr>
-				<tr>
-					<td>200 pcs</td>
-					<td><strong>₱30.00</strong></td>
-					<td>Mid-Scale</td>
-				</tr>
-				<tr>
-					<td>500+ pcs</td>
-					<td><strong>₱25.00</strong></td>
-					<td>Bulk Rate</td>
+					<td>200-500 pcs</td>
+					<td><strong>₱30.00 - ₱25.00</strong></td>
+					<td>3-5 Business Days</td>
 				</tr>
 				<tr class="highlight-row">
 					<td>1,000+ pcs</td>
 					<td><strong>₱15.00</strong></td>
-					<td>Wholesale / Government Rate</td>
+					<td>7-10 Business Days</td>
 				</tr>
 			</tbody>
 		</table>
+
+		<div class="alert-box" style="background: #fffaf0; border-left: 4px solid #ed8936; color: #9c4221;">
+			<h4>🚀 Lead Time Standard & Rush Orders</h4>
+			<p>
+				<strong>Standard Lead Time:</strong> Counts only AFTER final design approval and downpayment. 
+				<br /><br />
+				<strong>Rush Orders:</strong> Defined as <strong>24-48 hours</strong> (not same day) for orders over 100 pieces. A 30% surcharge applies.
+				<br /><br />
+				<strong>The Delay Logic:</strong> We do not offer "Instant Bulk" due to our <strong>Curing and Quality Control</strong> process. Every 100 cards require a 4-hour "settling" period after lamination to ensure no warping or peeling occurs in the Tagbilaran humidity.
+			</p>
+		</div>
 	</section>
 
 	<section id="addons">

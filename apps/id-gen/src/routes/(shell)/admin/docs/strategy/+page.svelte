@@ -39,11 +39,19 @@
 				<li><strong>Secure the Contract:</strong> Close a deal for 300 IDs @ ₱120 (Total ₱36k) or similar volume.</li>
 				<li><strong>The Trigger:</strong> Demand a <strong>50% Downpayment (₱18k)</strong>. No work begins without this.</li>
 				<li>
+					<strong>Step 2.5: The Bridge Protocol:</strong>
+					<div class="alert-box" style="margin-top: 1rem; border-left-color: #3182ce; background: #ebf8ff;">
+						<strong>Critical Delay Check:</strong> Since checks take 3 days to clear and shipping for a new printer takes 5 days, you cannot wait to start production. 
+						<br /><br />
+						<strong>Action:</strong> Outsource the <em>first 100 cards</em> to a local partner (Supplier 3) immediately. You will lose margin on these cards, but it fulfills the deadline while your in-house capacity is being set up.
+					</div>
+				</li>
+				<li>
 					<strong>The Flip:</strong>
 					<ul>
-						<li>Take the ₱18k cash immediately to the store.</li>
+						<li>Take the ₱18k cash immediately to the store once cleared.</li>
 						<li>Buy the Printer (₱16k) + Ink/PVC (₱2k).</li>
-						<li><strong>Stop Outsourcing.</strong> Print the order in-house.</li>
+						<li><strong>Stop Outsourcing.</strong> Print the remaining order in-house.</li>
 					</ul>
 				</li>
 				<li><strong>The Profit:</strong> The remaining 50% payment (₱18k) becomes pure profit.</li>

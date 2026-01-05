@@ -45,9 +45,9 @@
                     <h4>🚀 The "Smart Campus" Starter</h4>
                     <p>
                         Order 100+ PVC IDs at regular price (₱150), and we will include the
-                        <strong>QR Code Database Integration</strong> for FREE.
+                        <strong>QR Code System Access</strong> for FREE for 1 School Year.
                     </p>
-                    <p class="terms"><em>*Valid for first-time school clients only.</em></p>
+                    <p class="terms"><em>*Year 2 renewal required to keep the scanning active. Valid for first-time school clients only.</em></p>
                 </div>
             </div>
         </div>

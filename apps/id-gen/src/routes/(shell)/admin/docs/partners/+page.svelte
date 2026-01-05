@@ -112,6 +112,10 @@
                     <span class="val">Unique Coupon Code (e.g., <code>TAGBILARAN_PRINT</code> gets the user 10% off).</span>
                 </div>
             </div>
+
+            <div class="alert-box critical" style="background: #fff5f5; border-left: 4px solid #f56565; color: #c53030; margin-top: 1.5rem;">
+                <strong>Geographic Non-Compete Rule:</strong> To protect our local manufacturing advantage, the SaaS license is <strong>RESTRICTED</strong>. It cannot be sold to, or used by, other print shops physically located within <strong>Tagbilaran City or the Province of Bohol</strong>.
+            </div>
         </div>
     </section>
 

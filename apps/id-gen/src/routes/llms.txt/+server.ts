@@ -50,8 +50,16 @@ export const GET: RequestHandler = async ({ url }) => {
 		});
 	}
 
-	// For text preview, just join them
-	const textPreview = moduleContents.map(m => m.markdown + m.html).join('');
+	// For clean text preview (LLM-friendly), strip HTML tags but preserve content
+	const htmlProcessor = unified().use(rehypeParse, { fragment: true }).use(rehypeRaw);
+	let textPreview = '';
+	for (const mod of moduleContents) {
+		const mdText = mod.markdown;
+		const htmlHast = await htmlProcessor.run(htmlProcessor.parse(mod.html));
+		const cleanHtmlText = toText(htmlHast);
+		textPreview += mdText + cleanHtmlText + '\n\n';
+	}
+
 	return new Response(textPreview, {
 		headers: { 'content-type': 'text/plain; charset=utf-8' }
 	});

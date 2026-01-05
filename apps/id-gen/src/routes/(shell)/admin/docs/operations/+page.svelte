@@ -16,14 +16,60 @@
 	</header>
 
 	<nav class="toc">
-		<h2>Production Workflow</h2>
+		<h2>Production Workflow & Throughput</h2>
 		<ol>
+			<li><a href="#throughput">Throughput & Capacity</a></li>
 			<li><a href="#printing">Phase 1: Printing Standards</a></li>
 			<li><a href="#lamination">Phase 2: Lamination & Cutting</a></li>
 			<li><a href="#encoding">Phase 3: RFID/NFC Encoding</a></li>
 			<li><a href="#troubleshooting">Troubleshooting Guide</a></li>
 		</ol>
 	</nav>
+
+	<section id="throughput">
+		<h2>Production Capacity (Epson L8050)</h2>
+		<p>The Epson L8050 uses a <strong>manual tray process</strong>. While the software is fast, physical production is limited by manual intervention (swapping trays).</p>
+
+		<h3>Realistic Throughput Calculator</h3>
+		<table class="tech-table">
+			<thead>
+				<tr>
+					<th>Batch Size</th>
+					<th>Time Estimate</th>
+					<th>Process Detail</th>
+				</tr>
+			</thead>
+			<tbody>
+				<tr>
+					<td><strong>2 IDs (1 Tray)</strong></td>
+					<td>2.5 Minutes</td>
+					<td>Print + Tray Swap</td>
+				</tr>
+				<tr>
+					<td><strong>100 IDs</strong></td>
+					<td>~2.5 Hours</td>
+					<td>Continuous Manual Operation</td>
+				</tr>
+				<tr>
+					<td><strong>500 IDs</strong></td>
+					<td><strong>10-12 Hours</strong></td>
+					<td>Includes 15-min cooling breaks every 100 IDs</td>
+				</tr>
+			</tbody>
+		</table>
+
+		<div class="alert-box warning">
+			<strong>IMPORTANT:</strong> Printing 500 IDs is a full-day manual operation. Do not promise same-day delivery for bulk orders.
+		</div>
+
+		<h3>"The Batching Protocol" (Heat Management)</h3>
+		<p>Tagbilaran humidity and heat can cause the Epson L8050 print head to misalign or overheat during long runs.</p>
+		<ul>
+			<li><strong>Run Limit:</strong> Maximum 100 cards per continuous session.</li>
+			<li><strong>Cooling Break:</strong> 15 minutes "Power Off" time between sessions to preserve head life.</li>
+			<li><strong>Environment:</strong> Production must be done in an air-conditioned room (target 24°C) to maintain ink viscosity.</li>
+		</ul>
+	</section>
 
 	<section id="printing">
 		<h2>I. Printing Standards (PVC Sandwich Process)</h2>

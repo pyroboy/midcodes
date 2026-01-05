@@ -43,6 +43,9 @@
 
 			<h4>4. Lead Time</h4>
 			<p>Production lead time commences only after the <strong>final approval of the design</strong> and receipt of the downpayment. Rush orders are subject to a 30% surcharge.</p>
+
+			<h4>5. Subscription Validity</h4>
+			<p>Client acknowledges that the <strong>Smart System / QR Access</strong> included in this contract is free for the <strong>Current Academic Year only</strong>. Continued access to scanning and verification features for subsequent years requires a renewal fee as per the prevailing rates at the time of renewal.</p>
 		</div>
 	</section>
 
@@ -92,6 +95,8 @@
 				<li><strong>Deletion:</strong> Upon contract termination or explicit request by the Client, all personal data is permanently wiped.</li>
 				<li><strong>Physical Waste:</strong> Any misprinted cards (rejects) are shredded physically before disposal to prevent identity theft.</li>
 			</ul>
+
+			<p><strong>4. Child Data Protection (RA 10173):</strong> In compliance with the Data Privacy Act of 2012, all student data (minors) is automatically purged and permanently deleted from Kanaya servers <strong>30 days after the school year ends</strong>, unless a contract renewal is executed prior to the deletion date.</p>
 		</div>
 	</section>
 

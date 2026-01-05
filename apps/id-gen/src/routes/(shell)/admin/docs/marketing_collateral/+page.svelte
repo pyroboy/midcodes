@@ -97,9 +97,12 @@
 			<h3>Hero Section</h3>
 			<ul>
 				<li><strong>Headline:</strong> Stop Layouting IDs in Photoshop.</li>
-				<li><strong>Sub-headline:</strong> The ID Card Automation Tool for print shops—generate 500 print-ready IDs in 5 minutes.</li>
+				<li><strong>Sub-headline:</strong> The ID Card Automation Tool for print shops—<strong>generate 500 Print-Ready Files in 5 minutes</strong>.</li>
 				<li><strong>Button:</strong> Start Free Trial (No Credit Card Required).</li>
 			</ul>
+			<p class="note" style="margin-top: 1rem; font-size: 0.85rem;">
+				<strong>Note to Sales:</strong> Always clarify that "5 minutes" refers to the <em>software processing time</em> for layouting. Physical printing speed depends on the printer hardware (e.g., Epson L8050 leads to ~10-12 hours for 500 physical cards).
+			</p>
 		</div>
 		<div class="panel">
 			<h3>Feature Grid</h3>
